@@ -110,6 +110,15 @@ waitable timer. Do not attribute its pacing improvement to NPU arithmetic change
 
 ## Artifacts
 
+All jobs passed for source `97a24919052632578d4816be2e908db5798e015a` in
+[CI run 37536608600](https://github.com/t8/npu-render/actions/runs/37536608600).
+The exact CI-produced Windows bundle was then downloaded, all 29 manifest file
+hashes verified, and its GPU/NPU 1080p byte qualification passed on Delta with only
+the bundled runtime and Windows system directories on PATH. This confirms the
+bundle's hardware path without requiring Python; it does not add display evidence.
+`delta-native-ci-bundle.json` records hashes, validation and the private artifact link.
+The installed **NPU Render Prototype** Start menu shortcut launches that bundle.
+
 `summary.json` records hashes and aggregate results. The `.json.gz` files contain
 the original UTF-8 JSON reports compressed losslessly; SHA256 values refer to the
 uncompressed bytes. They include raw per-frame and per-request timing, device
