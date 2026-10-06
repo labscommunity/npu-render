@@ -67,6 +67,18 @@ def main(argv: list[str] | None = None) -> int:
     demo.add_argument("--precision", choices=["f16", "f32"], default="f16")
     demo.add_argument("--layout", choices=["NCHW", "NHWC"], default="NCHW")
     demo.add_argument("--output", type=Path, default=Path("results/frame.ppm"))
+    live = commands.add_parser("live", help="animate and switch a software window's composition")
+    live.add_argument("--backend")
+    live.add_argument("--config", type=Path)
+    live.add_argument("--width", type=int, default=1280)
+    live.add_argument("--height", type=int, default=720)
+    live.add_argument("--layers", type=int, default=2)
+    live.add_argument("--seconds", type=float, default=30)
+    live.add_argument("--fps", type=float, default=60)
+    live.add_argument("--sequence", default="", help="comma-separated switch destinations")
+    live.add_argument("--switch-every", type=float, default=10)
+    live.add_argument("--headless", action="store_true", help="explicitly skip window presentation")
+    live.add_argument("--report", type=Path, default=Path("results/live.json"))
     args = parser.parse_args(argv)
     try:
         if args.command == "devices":
@@ -86,6 +98,30 @@ def main(argv: list[str] | None = None) -> int:
                 "qualified_shape": [16, 16],
                 "scope": "new renderers or explicit reload_selection(); integrations required",
             }
+        elif args.command == "live":
+            from .live import run_session
+            from .presentation import NullPresenter, WindowPresenter
+
+            spec = Composition(args.width, args.height, args.layers)
+            renderer = Renderer(spec, args.backend, config=args.config)
+            presenter = (
+                NullPresenter() if args.headless else WindowPresenter(spec.width, spec.height)
+            )
+            try:
+                result = run_session(
+                    renderer,
+                    presenter,
+                    seconds=args.seconds,
+                    fps=args.fps,
+                    sequence=[part.strip() for part in args.sequence.split(",") if part.strip()],
+                    switch_every=args.switch_every,
+                )
+            finally:
+                presenter.close()
+            args.report.parent.mkdir(parents=True, exist_ok=True)
+            args.report.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+            result = {key: value for key, value in result.items() if key != "frames"}
+            result["report"] = str(args.report)
         else:
             spec = Composition(args.width, args.height, args.layers, args.precision, args.layout)
             renderer = Renderer(spec, args.backend, config=args.config)

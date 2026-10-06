@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "npu-render"
-version = "0.1.0"
+version = "0.2.0"
 description = "Switchable graphics operations across NPU, GPU, and CPU backends"
 readme = "README.md"
 requires-python = ">=3.11,<3.15"
@@ -12,6 +12,12 @@ dependencies = ["numpy>=2,<2.5", "openvino==2026.1.0"]
 
 [project.scripts]
 npu-render = "npu_render.cli:main"
+npu-render-benchmark = "npu_render.benchmark:main"
+
+[project.optional-dependencies]
+live = [
+    "pygame==2.6.1",
+]
 
 [dependency-groups]
 dev = ["pytest>=8,<10", "ruff>=0.12,<1"]

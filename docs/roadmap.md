@@ -8,10 +8,11 @@ delivery requirements while freeing useful GPU capacity.
 |---|---|---|---|
 | Device feasibility | Deterministic composition and restricted triangle graphs | Independent checks on Panther Lake NPU, including reported execution devices | Original probe complete |
 | Shared runtime | Provider contracts, device selection, prepared switch, owned outputs | 27 local tests and GPU → NPU → CPU → GPU → NPU on delta | Initial implementation validated |
+| Live application | Animated software window, async switch, frame-stage timing | Windows console session; GPU → NPU → CPU → GPU; optimized conversion | Implemented; evidence being collected |
 | Compositor adapter | Restricted Weston renderer with a backend control | Correct nested output, then standalone DRM presentation | Planned |
 | Real buffer path | Linear graphics-buffer import/export, synchronization and format conversion | Correct fences/lifetimes plus end-to-end latency, including copies | Planned |
 | Work reduction | Damage tiles, occlusion, bounded layer groups, prepared graph variants | Sustained frame delivery and bounded memory/queue use | Planned |
-| Tahoma benefit | Reproducible concurrent inference and desktop traces | Paired GPU/NPU/CPU compositor runs and sustained results | Planned |
+| Tahoma benefit | Reproducible concurrent inference and desktop traces | Paired GPU/NPU/CPU compositor runs and sustained results | Application benchmark implemented; real trials in progress |
 | Wider operation coverage | Filters, scaling, transforms, supported app adapters | Per-operation conformance and backend capability manifests | Planned |
 | Broader platforms | Additional NPU providers and Windows integrations | Per-device/OS/runtime evidence with recovery tests | Planned |
 
@@ -45,3 +46,7 @@ switch/provider architecture.
 Investigate custom NPU kernels when a measured graph bottleneck justifies them.
 The first runtime uses the installed vendor driver and supported graph interface.
 Do not couple every integration to an experimental compiler ABI.
+
+See [the coverage ledger](coverage.md) for the full set of GPU functions and the
+specific implementation/integration gaps. The live harness is the first application
+adapter and does not replace system composition.

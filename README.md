@@ -60,6 +60,42 @@ conversion, fences, deadlines, damage, presentation, and device-loss policy.
 
 ## Evidence and direction
 
+### Live switching and concurrent inference
+
+```sh
+uv sync --frozen --extra live
+uv run npu-render live --backend GPU --seconds 60 --sequence NPU,CPU,GPU --switch-every 15
+```
+
+The window animates deterministic translucent surfaces. Press **1** for GPU,
+**2** for NPU, **3** for CPU, **R** to reload the saved selection, or **Escape** to
+exit. Compilation runs on a control thread while the previous backend keeps
+rendering. Reports include actual execution devices, switch failures, each frame's
+scene/composition/conversion/submission times, and skipped replay slots. The
+software window still passes through the operating system compositor. Submission
+timing is not physical scanout timing.
+
+An optional C extension speeds up CPU color conversion; installation falls back to
+NumPy if a compiler is unavailable. The report identifies the implementation.
+This conversion is explicitly CPU work, not attributed to the NPU.
+
+Against an existing Tahoma server running its model on the iGPU:
+
+```sh
+uv run npu-render-benchmark --endpoint http://127.0.0.1:8000/v1 \
+  --model YOUR_MODEL --inference-device GPU --rounds 5 --requests 3 \
+  --report results/contention.json
+```
+
+This rotates GPU/NPU/CPU/idle graphics conditions, keeps the prompt and animation
+fixed, and saves raw per-frame and per-request results after every trial. Token
+throughput uses server-reported usage; missing usage remains unknown. Text chunk
+arrival times are recorded separately from engine token timings. The declared
+inference device must be verified against server logs/telemetry. See the
+[measurement protocol](docs/live-benchmark.md) before interpreting differences.
+
+### Original device experiments
+
 The original Panther Lake study measured median NPU graph calls of 4.34 ms for a
 1080p one-foreground-layer blend and 5.55 ms for a 720p four-layer blend. The
 four-layer 1080p case took 12.87 ms with tail samples exceeding a 60 Hz interval.
