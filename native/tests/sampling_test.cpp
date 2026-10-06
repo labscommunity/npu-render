@@ -69,11 +69,38 @@ int main(int argc, char **argv) {
             require(nr_sample_regions(context,&source,&destination,regions,2,points.data(),points.size(),
                         nr_operator(operation),opacity,&stats,error,sizeof(error)) == 0,error);
             require(stats.pixels == count && stats.dispatches == 2, "unexpected sampling batching");
+            require(std::strncmp(stats.execution_devices,device,3) == 0,"sampler used another device");
             for (size_t i = 0; i < output.size(); ++i) {
                 int difference = std::abs(int(output[i])-int(expected[i]));
                 require(difference <= (touched[i] ? 2 : 0),"sampling differs from independent double oracle");
                 maximum = std::max(maximum,difference);
             }
+        }
+        // Aliased source/destination with nonlocal addresses across two batches.
+        // A provider must snapshot input and stage every result before committing.
+        auto aliased = image, alias_reference = image;
+        nr_surface alias{aliased.data(),aliased.size(),STRIDE,W,H,0};
+        size_t index = 0;
+        for (const auto &r : regions) for (size_t y = 0; y < r.height; ++y)
+            for (size_t x = 0; x < r.width; ++x,++index) {
+                double sampled[4]{};
+                for (size_t k = 0; k < 4; ++k) {
+                    const auto address = points[index].index[k];
+                    for (size_t c = 0; c < 4; ++c)
+                        sampled[c] += image[(address/W)*STRIDE+(address%W)*4+c]*double(points[index].weight[k]);
+                }
+                for (size_t c = 0; c < 4; ++c) {
+                    const size_t into = (r.y+y)*STRIDE+(r.x+x)*4+c;
+                    alias_reference[into] = uint8_t(std::lround(std::clamp(sampled[c]+image[into]*(1-sampled[3]/255),0.,255.)));
+                }
+            }
+        require(nr_sample_regions(context,&alias,&alias,regions,2,points.data(),points.size(),
+                    NR_SOURCE_OVER,1,&stats,error,sizeof(error)) == 0,error);
+        for (size_t i = 0; i < aliased.size(); ++i) {
+            const int difference = std::abs(int(aliased[i])-int(alias_reference[i]));
+            require(difference <= (touched[i] ? 2 : 0),
+                    "aliased sampling differs or changed untouched bytes");
+            maximum = std::max(maximum,difference);
         }
         auto before = output;
         points.back().index[0] = W*H;
@@ -87,7 +114,7 @@ int main(int argc, char **argv) {
         require(std::strcmp(stats.execution_devices,"CPU") == 0,"prepared sampler did not follow backend switch");
         nr_destroy(context);
         std::cout << "{\"sampling_passed\":true,\"initial_device\":\"" << device
-                  << "\",\"switched_device\":\"CPU\",\"max_byte_error\":" << maximum << "}\n";
+                  << "\",\"switched_device\":\"CPU\",\"alias_checked\":true,\"max_byte_error\":" << maximum << "}\n";
         return 0;
     } catch (const std::exception &e) { nr_destroy(context); std::cerr << e.what() << '\n'; return 1; }
 }

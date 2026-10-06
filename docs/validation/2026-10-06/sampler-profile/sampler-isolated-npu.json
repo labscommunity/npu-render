@@ -1,0 +1,138 @@
+[
+  {
+    "variant": "planar_f16",
+    "device": "NPU",
+    "source": [
+      67,
+      49
+    ],
+    "side": 16,
+    "compile_ms": 161.11600000294857,
+    "actual": "NPU",
+    "infer_copy_ms": [
+      18.110600009094924,
+      0.7824000058462843,
+      0.9356999944429845
+    ],
+    "max_byte_error": 1,
+    "passed": true,
+    "profiling": [
+      {
+        "name": "Gather_6",
+        "type": "Gather",
+        "exec_type": "Shave",
+        "real_ms": 0.324,
+        "cpu_ms": 0.367,
+        "status": "Status.EXECUTED"
+      },
+      {
+        "name": "Multiply_7",
+        "type": "Multiply",
+        "exec_type": "Shave",
+        "real_ms": 0.347,
+        "cpu_ms": 0.11699999999999999,
+        "status": "Status.EXECUTED"
+      },
+      {
+        "name": "Multiply_17",
+        "type": "Multiply",
+        "exec_type": "DPU",
+        "real_ms": 0.352,
+        "cpu_ms": 0.007,
+        "status": "Status.EXECUTED"
+      },
+      {
+        "name": "ReduceSum_9",
+        "type": "ReduceSum",
+        "exec_type": "DPU",
+        "real_ms": 0.005,
+        "cpu_ms": 0.009000000000000001,
+        "status": "Status.EXECUTED"
+      },
+      {
+        "name": "Subtract_16",
+        "type": "Subtract",
+        "exec_type": "DPU",
+        "real_ms": 0.007,
+        "cpu_ms": 0.002,
+        "status": "Status.EXECUTED"
+      },
+      {
+        "name": "Add_18",
+        "type": "Add",
+        "exec_type": "DPU",
+        "real_ms": 0.007,
+        "cpu_ms": 0.006,
+        "status": "Status.EXECUTED"
+      }
+    ]
+  },
+  {
+    "variant": "gather_nd",
+    "device": "NPU",
+    "source": [
+      67,
+      49
+    ],
+    "side": 16,
+    "compile_ms": 141.7016000050353,
+    "actual": "NPU",
+    "infer_copy_ms": [
+      16.08850000775419,
+      0.48319999768864363,
+      0.45849999878555536
+    ],
+    "max_byte_error": 1,
+    "passed": true,
+    "profiling": [
+      {
+        "name": "GatherND_5",
+        "type": "GatherND",
+        "exec_type": "Shave",
+        "real_ms": 0.15,
+        "cpu_ms": 0.8130000000000001,
+        "status": "Status.EXECUTED"
+      },
+      {
+        "name": "Multiply_16",
+        "type": "Multiply",
+        "exec_type": "DPU",
+        "real_ms": 0.187,
+        "cpu_ms": 0.007,
+        "status": "Status.EXECUTED"
+      },
+      {
+        "name": "Multiply_6",
+        "type": "Multiply",
+        "exec_type": "Shave",
+        "real_ms": 0.17,
+        "cpu_ms": 0.13799999999999998,
+        "status": "Status.EXECUTED"
+      },
+      {
+        "name": "ReduceSum_8",
+        "type": "ReduceSum",
+        "exec_type": "DPU",
+        "real_ms": 0.005,
+        "cpu_ms": 0.009000000000000001,
+        "status": "Status.EXECUTED"
+      },
+      {
+        "name": "Subtract_15",
+        "type": "Subtract",
+        "exec_type": "DPU",
+        "real_ms": 0.007,
+        "cpu_ms": 0.002,
+        "status": "Status.EXECUTED"
+      },
+      {
+        "name": "Add_17",
+        "type": "Add",
+        "exec_type": "DPU",
+        "real_ms": 0.007,
+        "cpu_ms": 0.006,
+        "status": "Status.EXECUTED"
+      }
+    ]
+  }
+]

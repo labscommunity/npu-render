@@ -45,3 +45,10 @@ For every newly supported operation or adapter, capture: independent pixel
 correctness, actual execution device, complete resource/copy costs, lifetime and
 synchronization behavior, failure recovery, and sustained frame/inference results.
 Broaden coverage based on these measurements while preserving a working switch.
+
+The [indexed sampling profile](validation/2026-10-06/sampler-profile/README.md)
+narrows the general-transform bottleneck to SHAVE Gather. Owned host staging and
+lookup conversion reduced overhead, but the full 720p sampling API still takes
+612–690 ms on the tested NPU stack. The [custom-kernel track](research/shave-kernels.md)
+records source evidence and explicit Panther Lake bring-up gates; no custom kernel
+has yet expanded runtime coverage.

@@ -1,0 +1,48 @@
+[
+  {
+    "variant": "planar_f16",
+    "device": "NPU",
+    "source": [
+      640,
+      360
+    ],
+    "side": 128,
+    "compile_ms": 172.30710000148974,
+    "actual": "NPU",
+    "infer_copy_ms": [
+      22.833700000774115,
+      20.22370000486262,
+      20.43289999710396,
+      19.28960000805091,
+      18.035500004771166
+    ],
+    "max_byte_error": 1,
+    "passed": true
+  },
+  {
+    "variant": "aos_f16",
+    "device": "NPU",
+    "source": [
+      640,
+      360
+    ],
+    "side": 128,
+    "compile_ms": 170.0328000006266,
+    "actual": "NPU",
+    "passed": false,
+    "error": "Exception from src\\inference\\src\\cpp\\infer_request.cpp:224:\nException from src\\plugins\\intel_npu\\src\\utils\\src\\zero\\zero_wrappers.cpp:227:\nL0 zeCommandQueueExecuteCommandLists result: ZE_RESULT_ERROR_DEVICE_LOST, code 0x70000001 - device hung, reset, was removed, or driver update occurred\n\n"
+  },
+  {
+    "variant": "aos_u8",
+    "device": "NPU",
+    "source": [
+      640,
+      360
+    ],
+    "side": 128,
+    "compile_ms": 504.6137000026647,
+    "actual": "NPU",
+    "passed": false,
+    "error": "Exception from src\\inference\\src\\cpp\\compiled_model.cpp:128:\nException from src\\plugins\\intel_npu\\src\\plugin\\src\\compiled_model.cpp:69:\nThe driver is not applicable. The driver doesn't exist or is too old to run inference for this blob.\n\n"
+  }
+]

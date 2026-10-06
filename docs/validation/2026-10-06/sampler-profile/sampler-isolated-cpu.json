@@ -1,0 +1,42 @@
+[
+  {
+    "variant": "planar_f16",
+    "device": "CPU",
+    "source": [
+      67,
+      49
+    ],
+    "side": 16,
+    "compile_ms": 16.268084291368723,
+    "actual": [
+      "CPU"
+    ],
+    "infer_copy_ms": [
+      0.4464578814804554,
+      0.13025011867284775,
+      0.09345775470137596
+    ],
+    "max_byte_error": 1,
+    "passed": true
+  },
+  {
+    "variant": "gather_nd",
+    "device": "CPU",
+    "source": [
+      67,
+      49
+    ],
+    "side": 16,
+    "compile_ms": 15.128540806472301,
+    "actual": [
+      "CPU"
+    ],
+    "infer_copy_ms": [
+      0.39016688242554665,
+      0.1066247932612896,
+      0.09537488222122192
+    ],
+    "max_byte_error": 1,
+    "passed": true
+  }
+]

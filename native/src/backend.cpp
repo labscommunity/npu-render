@@ -44,7 +44,7 @@ struct SamplingProgram {
     size_t source_pixels, capacity;
     std::string actual;
     ov::InferRequest request;
-    ov::Tensor image, indices, weights, background;
+    ov::Tensor image, indices, weights, background, output;
     std::mutex execution;
 };
 
@@ -171,6 +171,7 @@ std::shared_ptr<Program> prepare(ov::Core &core, uint32_t side, const std::strin
 std::shared_ptr<SamplingProgram> prepare_sampling(ov::Core &core, uint32_t width, uint32_t height,
                                                  size_t capacity, const std::string &target) {
     namespace op = ov::opset13;
+    (void)byte_tables();
     // Driver 32.0.100.4724 fails segmented Gather tiling for larger output batches
     // with common texture extents. Retile on the same device, without changing
     // the image, operation, or hidden CPU/GPU routing.
@@ -208,10 +209,16 @@ std::shared_ptr<SamplingProgram> prepare_sampling(ov::Core &core, uint32_t width
         program->actual += device;
     }
     program->request = compiled.create_infer_request();
-    program->image = program->request.get_input_tensor(0);
-    program->indices = program->request.get_input_tensor(1);
-    program->weights = program->request.get_input_tensor(2);
-    program->background = program->request.get_input_tensor(3);
+    program->image = ov::Tensor(ov::element::f16, ov::Shape{4, source_pixels});
+    program->indices = ov::Tensor(ov::element::i32, ov::Shape{4, side, side});
+    program->weights = ov::Tensor(ov::element::f16, ov::Shape{1, 4, side, side});
+    program->background = ov::Tensor(ov::element::f16, ov::Shape{4, side, side});
+    program->output = ov::Tensor(ov::element::f16, ov::Shape{4, side, side});
+    program->request.set_input_tensor(0, program->image);
+    program->request.set_input_tensor(1, program->indices);
+    program->request.set_input_tensor(2, program->weights);
+    program->request.set_input_tensor(3, program->background);
+    program->request.set_output_tensor(program->output);
     auto *texels = program->image.data<ov::float16>();
     auto *address = program->indices.data<int32_t>();
     auto *weight = program->weights.data<ov::float16>();
@@ -781,11 +788,15 @@ extern "C" NR_API int nr_sample_regions(nr_context *context, const nr_surface *s
             if (sum > 1.000001) throw std::invalid_argument("sampling weights exceed one");
         }
         std::lock_guard<std::mutex> lock(sampler->execution);
+        const auto pack_start = Clock::now();
+        const auto &tables = byte_tables();
         auto *image = sampler->image.data<ov::float16>();
         for (size_t y = 0; y < source->height; ++y) for (size_t x = 0; x < source->width; ++x)
             for (size_t c = 0; c < 4; ++c)
-                image[c * sampler->source_pixels + y * source->width + x] = ov::float16(float(
-                    c == 3 && source->opaque ? 255 : source->data[y * source->stride + x * 4 + c]));
+                image[c * sampler->source_pixels + y * source->width + x] = tables.encode[
+                    c == 3 && source->opaque ? 255 : source->data[y * source->stride + x * 4 + c]];
+        const auto batches_start = Clock::now();
+        double infer_ms = 0, batch_pack_ms = 0, stage_ms = 0;
         const size_t capacity = sampler->capacity;
         auto *indices = sampler->indices.data<int32_t>();
         auto *weights = sampler->weights.data<ov::float16>();
@@ -794,6 +805,7 @@ extern "C" NR_API int nr_sample_regions(nr_context *context, const nr_surface *s
         size_t rectangle = 0;
         uint64_t dispatches = 0;
         for (size_t offset = 0; offset < point_count; offset += capacity) {
+            const auto batch_start = Clock::now();
             std::fill_n(indices, capacity*4, int32_t(0));
             std::fill_n(weights, capacity*4, ov::float16(0.f));
             std::fill_n(bg, capacity*4, ov::float16(0.f));
@@ -806,17 +818,22 @@ extern "C" NR_API int nr_sample_regions(nr_context *context, const nr_surface *s
                 for (size_t c = 0; c < 4; ++c) {
                     indices[c*capacity+i] = int32_t(points[offset+i].index[c]);
                     weights[c*capacity+i] = ov::float16(points[offset+i].weight[c]*opacity);
-                    bg[c*capacity+i] = ov::float16(float(operation == NR_SOURCE ? 0 : c == 3 && destination->opaque ? 255 : pixel[c]));
+                    bg[c*capacity+i] = tables.encode[operation == NR_SOURCE ? 0 : c == 3 && destination->opaque ? 255 : pixel[c]];
                 }
             }
+            const auto before_infer = Clock::now();
             sampler->request.infer(); ++dispatches;
+            const auto before_stage = Clock::now();
+            batch_pack_ms += std::chrono::duration<double,std::milli>(before_infer-batch_start).count();
+            infer_ms += std::chrono::duration<double,std::milli>(before_stage-before_infer).count();
             const auto *out = sampler->request.get_output_tensor().data<const ov::float16>();
             for (size_t i = 0; i < count; ++i) for (size_t c = 0; c < 4; ++c) {
-                const float value = float(out[c*capacity+i]);
-                if (!std::isfinite(value)) throw std::runtime_error("non-finite sampling output");
+                const uint16_t bits = half_bits(out[c*capacity+i]);
+                if ((bits & 0x7c00) == 0x7c00) throw std::runtime_error("non-finite sampling output");
                 staged[4*(offset+i)+c] = c == 3 && destination->opaque ? 255 :
-                    uint8_t(std::lround(std::clamp(value, 0.f, 255.f)));
+                    tables.decode[bits];
             }
+            stage_ms += std::chrono::duration<double,std::milli>(Clock::now()-before_stage).count();
         }
         for (size_t i = 0; i < region_count; ++i) {
             const auto &r = regions[i];
@@ -824,9 +841,19 @@ extern "C" NR_API int nr_sample_regions(nr_context *context, const nr_surface *s
                 std::memcpy(destination->data+(r.y+y)*destination->stride+size_t(r.x)*4,
                             staged.data()+4*(offsets[i]+y*r.width), size_t(r.width)*4);
         }
+        const auto finished = Clock::now();
+        const char *trace = std::getenv("NPU_RENDER_TRACE_SAMPLING");
+        if (trace && std::strcmp(trace, "1") == 0) {
+            const auto ms = [](auto a, auto b) { return std::chrono::duration<double,std::milli>(b-a).count(); };
+            std::fprintf(stderr, "npu-render-sampling-stages: {\"execution_devices\":\"%s\","
+                "\"validate_wait_ms\":%.4f,\"source_pack_ms\":%.4f,\"batch_pack_ms\":%.4f,"
+                "\"infer_ms\":%.4f,\"stage_ms\":%.4f,\"total_ms\":%.4f}\n",
+                sampler->actual.c_str(), ms(started,pack_start), ms(pack_start,batches_start),
+                batch_pack_ms,infer_ms,stage_ms,ms(started,finished));
+        }
         if (stats) {
             stats->pixels = point_count; stats->dispatches = dispatches;
-            stats->elapsed_ms = std::chrono::duration<double, std::milli>(Clock::now()-started).count();
+            stats->elapsed_ms = std::chrono::duration<double, std::milli>(finished-started).count();
             copy_text(sampler->actual, stats->execution_devices, sizeof(stats->execution_devices));
         }
         copy_text("", error, error_size); return 0;

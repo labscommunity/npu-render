@@ -46,6 +46,10 @@ switch/provider architecture.
 Investigate custom NPU kernels when a measured graph bottleneck justifies them.
 The first runtime uses the installed vendor driver and supported graph interface.
 Do not couple every integration to an experimental compiler ABI.
+Indexed-sampling profiling now supplies that justification: Gather consumed
+19.231 ms in a roughly 21 ms profiled call. Follow the
+[Panther Lake kernel investigation](research/shave-kernels.md) through toolchain,
+invocation-contract, small-kernel and addressing checks before runtime integration.
 
 See [the coverage ledger](coverage.md) for the full set of GPU functions and the
 specific implementation/integration gaps. The live harness is the first application

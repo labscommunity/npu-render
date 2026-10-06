@@ -1,0 +1,67 @@
+{
+  "variant": "planar_f16",
+  "device": "NPU",
+  "source": [
+    640,
+    360
+  ],
+  "side": 128,
+  "compile_ms": 219.99690000666305,
+  "actual": "NPU",
+  "infer_copy_ms": [
+    203.20990000618622,
+    21.000699998694472
+  ],
+  "max_byte_error": 1,
+  "passed": true,
+  "profiling": [
+    {
+      "name": "Gather_6",
+      "type": "Gather",
+      "exec_type": "Shave",
+      "real_ms": 19.231,
+      "cpu_ms": 20.919,
+      "status": "Status.EXECUTED"
+    },
+    {
+      "name": "Multiply_17",
+      "type": "Multiply",
+      "exec_type": "Shave",
+      "real_ms": 0.35300000000000004,
+      "cpu_ms": 0.15,
+      "status": "Status.EXECUTED"
+    },
+    {
+      "name": "Multiply_7",
+      "type": "Multiply",
+      "exec_type": "Shave",
+      "real_ms": 0.111,
+      "cpu_ms": 0.46599999999999997,
+      "status": "Status.EXECUTED"
+    },
+    {
+      "name": "ReduceSum_9",
+      "type": "ReduceSum",
+      "exec_type": "DPU",
+      "real_ms": 0.19799999999999998,
+      "cpu_ms": 0.46099999999999997,
+      "status": "Status.EXECUTED"
+    },
+    {
+      "name": "Subtract_16",
+      "type": "Subtract",
+      "exec_type": "DPU",
+      "real_ms": 0.032,
+      "cpu_ms": 0.009000000000000001,
+      "status": "Status.EXECUTED"
+    },
+    {
+      "name": "Add_18",
+      "type": "Add",
+      "exec_type": "DPU",
+      "real_ms": 0.041999999999999996,
+      "cpu_ms": 0.039,
+      "status": "Status.EXECUTED"
+    }
+  ]
+}

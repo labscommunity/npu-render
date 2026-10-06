@@ -1,0 +1,18 @@
+{
+  "device": "Intel Core Ultra X7 358H / Panther Lake, Arc B390, NPU 5010",
+  "os": "Windows 11 Pro 26200",
+  "runtime": "OpenVINO 2026.1.0",
+  "npu_driver": "32.0.100.4724",
+  "gpu_driver": "32.0.101.8724",
+  "power_mode": "Balanced",
+  "source_parent": "ec23dcdbb7384520e80dab0143aa8c00d8ef68e0",
+  "source_sha256": {
+    "native/src/backend.cpp": "3d330a46c18f586fd74433637acd46873f64d806d54ba2340fe4b7110f0bea07",
+    "native/tests/sampling_test.cpp": "580b289b3a880e404c995b11c69c25883a7610b7acb3c3844d05bef81876ef36",
+    "research/sampler_layout_probe.py": "f1aa0d8124872cc71c60641c1c6b57b96ff6e7807a72c221451cc676ff0cdb5c"
+  },
+  "scope": "Off-screen sampling and profiling only. No visible presentation or concurrent Tahoma comparison.",
+  "probe_revisions": "Early captures predate watchdog/stage messages, GatherND, argument/device/finite-output guards and the abort-after-device-loss guard. Graph equations for reported variants are unchanged.",
+  "compiler_source": "0b38f7d42113ff329ac2bdd33583d123de4ccf2f",
+  "npunlock_source": "c23eded3d1d9eec88924f5709b3487640bd796d4"
+}

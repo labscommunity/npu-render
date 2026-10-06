@@ -1,0 +1,24 @@
+[
+  {
+    "variant": "width_neighbors",
+    "device": "NPU",
+    "source": [
+      640,
+      360
+    ],
+    "side": 256,
+    "passed": false,
+    "error": "Exception from src\\inference\\src\\cpp\\core.cpp:121:\nException from src\\inference\\src\\dev\\plugin.cpp:54:\nException from src\\plugins\\intel_npu\\src\\plugin\\src\\plugin.cpp:642:\nException from src\\plugins\\intel_npu\\src\\compiler_adapter\\src\\compiler_impl.cpp:433:\nCompilation failed. vclAllocatedExecutableCreate2 result: 0x78000004 - [NPU_VCL] Compiler returned msg:\nCompilation failed\n\n\n\n"
+  },
+  {
+    "variant": "rank5",
+    "device": "NPU",
+    "source": [
+      640,
+      360
+    ],
+    "side": 256,
+    "passed": false,
+    "error": "Exception from src\\inference\\src\\cpp\\core.cpp:121:\nException from src\\inference\\src\\dev\\plugin.cpp:54:\nException from src\\plugins\\intel_npu\\src\\plugin\\src\\plugin.cpp:642:\nException from src\\plugins\\intel_npu\\src\\compiler_adapter\\src\\compiler_impl.cpp:433:\nCompilation failed. vclAllocatedExecutableCreate2 result: 0x78000004 - [NPU_VCL] Compiler returned msg:\nCompilation failed\n\n\n\n"
+  }
+]

@@ -1,0 +1,11 @@
+{
+  "variant": "planar_f16",
+  "device": "NPU",
+  "source": [
+    640,
+    360
+  ],
+  "side": 128,
+  "passed": false,
+  "error": "Exception from src\\inference\\src\\cpp\\core.cpp:121:\nException from src\\inference\\src\\dev\\plugin.cpp:54:\nException from src\\plugins\\intel_npu\\src\\plugin\\src\\properties.cpp:1134:\n[ NOT_FOUND ] Option 'ENABLE_PROFILING' is not supported for current configuration\n\n\n"
+}
