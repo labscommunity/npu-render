@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "source_commit": "afd6d49a7afa3c943ab193b09bd836d48ba53a7e",
+  "artifacts": [
+    {
+      "file": "delta-live-720-initial.json.gz",
+      "uncompressed_sha256": "85bbcb69f74e0fc26b26fedc2b3126f78612f088e51069f029eab37969ff36f1",
+      "source_note": "Pre-commit live prototype without the native converter; source revision not captured."
+    },
+    {
+      "file": "delta-live-720-native.json.gz",
+      "uncompressed_sha256": "ccd9b128fda5abac45ab56c1c8e0016d521e340efa637e836c52f62910eca7c3",
+      "source_commit": "afd6d49a7afa3c943ab193b09bd836d48ba53a7e"
+    },
+    {
+      "file": "delta-contention-720.json.gz",
+      "uncompressed_sha256": "43eaf396d11812d678ca61961166bbd4e21ccfce52fa1e2060a62cfe99b0108a",
+      "source_commit": "afd6d49a7afa3c943ab193b09bd836d48ba53a7e"
+    }
+  ],
+  "comparisons": {
+    "paired_end_to_end_throughput_ratios": [
+      {
+        "round": 0,
+        "npu_over_gpu": 1.0070521941226889
+      },
+      {
+        "round": 1,
+        "npu_over_gpu": 1.0602039850194227
+      },
+      {
+        "round": 2,
+        "npu_over_gpu": 0.9571910515233986
+      },
+      {
+        "round": 3,
+        "npu_over_gpu": 1.0157029693638748
+      },
+      {
+        "round": 4,
+        "npu_over_gpu": 1.0397190056549375
+      }
+    ],
+    "ratio_distribution": {
+      "count": 5,
+      "median": 1.0157029693638748,
+      "p95": 1.0561069891465256,
+      "p99": 1.0593845858448432,
+      "max": 1.0602039850194227
+    },
+    "scope": "measured application composition conditions; not whole-desktop offload"
+  },
+  "conditions": {
+    "GPU": {
+      "requests": 15,
+      "median_end_to_end_tokens_per_second": 22.371686058532504,
+      "frames_submitted": 5094,
+      "processing_deadline_misses": 1143,
+      "skipped_replay_slots": 0,
+      "median_frame_work_ms": 14.333500002976507
+    },
+    "NPU": {
+      "requests": 15,
+      "median_end_to_end_tokens_per_second": 23.248267136830698,
+      "frames_submitted": 5000,
+      "processing_deadline_misses": 1059,
+      "skipped_replay_slots": 3,
+      "median_frame_work_ms": 14.428349997615442
+    },
+    "CPU": {
+      "requests": 15,
+      "median_end_to_end_tokens_per_second": 21.74750403640567,
+      "frames_submitted": 5142,
+      "processing_deadline_misses": 381,
+      "skipped_replay_slots": 2,
+      "median_frame_work_ms": 13.364350001211278
+    },
+    "IDLE": {
+      "requests": 15,
+      "median_end_to_end_tokens_per_second": 25.65120287905276,
+      "frames_submitted": 0,
+      "processing_deadline_misses": 0,
+      "skipped_replay_slots": 0,
+      "median_frame_work_ms": null
+    }
+  },
+  "output_hashes": [
+    "05131a8ab4b3795234d4b5dae5f6b70c907f05b8cbb7607b0f78574756ce07b7"
+  ],
+  "inference": {
+    "binary": "cascadia-ov.exe",
+    "version": "0.2.4",
+    "binary_sha256": "ed1f954f1c0a61de3e1b31a63156f41f908158c0b43f7e8913c5daa5da934793",
+    "runtime": "OpenVINO GenAI 2026.3.1.0",
+    "model": "Qwen2.5-7B-Instruct-int4-ov",
+    "requested_device": "GPU",
+    "gpu_plugin_observed_loaded": true,
+    "npu_plugin_observed_loaded": false,
+    "max_tokens": 128,
+    "power_plan": "Balanced",
+    "true_ttft_available": false,
+    "note": "This server mode returned each completion in one content chunk. Exact build revision not reported by binary."
+  }
+}

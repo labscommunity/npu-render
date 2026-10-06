@@ -1,0 +1,87 @@
+# Native graphics integration
+
+The C ABI in `include/npu_render.h` accepts CPU-addressable, top-down BGRA8/BGRX8
+surfaces and batches disjoint damaged regions into fixed-capacity inference
+dispatches. It implements premultiplied source-over and source-copy using an explicit
+CPU/GPU/NPU OpenVINO backend. The byte-domain blend preserves the integration's
+existing blend color space; it does not silently convert encoded buffers to linear.
+
+Creation and switching compile and qualify the exact static graph. Switching
+prepares a candidate while existing calls can retain the previous program. Infer
+requests serialize per program. Every region in one call is staged before writing
+the destination, so failures cannot leave a partially composited surface. Input and
+output buffers can alias. There is no compilation in the compose path.
+
+The current bridge imports host memory, packs FP16 planes, executes, converts to
+BGRA8 and copies changed pixels back. It is **not zero-copy DMA-BUF/D3D interop**.
+FP16 source-over allows at most one byte of error against the integer oracle; that
+is an exploratory gate, not full graphics API conformance. Source-copy is checked
+byte-exactly. Bounds, stride, disjointness and output ownership are validated.
+
+```sh
+uv sync --frozen --group native
+uv run --group native python tools/build_native.py
+# On an Intel machine with those devices available:
+uv run --group native python tools/build_native.py --devices GPU NPU CPU
+```
+
+This builds under `build/native` using the headers and libraries from the pinned
+OpenVINO wheel. Windows requires MSVC Build Tools; Linux/macOS require a C++17
+compiler. The tests run the requested devices explicitly and fail on unavailable
+devices. The initial single-rectangle and later batched-region implementation were
+tested on Delta's GPU, NPU and CPU. Cross-platform CI exercises CPU only.
+
+## Restricted Weston adapter
+
+`weston/` supplies a small patch against Weston revision
+`00201e077f5fd8e754ad6888097da720e17dfa86` (the 13.0 branch), plus a C integration.
+Weston remains responsible for client buffers, scene visibility, damage and output.
+Eligible source/source-over operations go through the native provider; unsupported
+ones remain explicitly counted Pixman operations. Native failure retries are safe
+because the destination was not partially committed.
+
+Currently eligible: little-endian ARGB8888/XRGB8888 SHM surfaces, integer translation,
+nearest sampling, global opacity, and disjoint damage rectangles. Scaling, rotation,
+source clipping, other formats and solid fills use the existing Pixman path. Source
+copy outside the source bounds also remains on Pixman. This adapter does not enable
+GPU DMA-BUF clients or offload arbitrary client rendering.
+
+Install Linux dependencies (Ubuntu 24.04 example):
+
+```sh
+sudo apt-get install meson ninja-build pkg-config libwayland-dev wayland-protocols \
+  libpixman-1-dev libinput-dev libevdev-dev libxkbcommon-dev libudev-dev libdrm-dev \
+  libcairo2-dev libpango1.0-dev libpng-dev libseat-dev
+uv run --group native python tools/build_native.py --pixman
+uv run python tools/build_weston.py
+uv run python tools/validate_weston.py
+```
+
+The test uses a real Wayland client against a headless compositor and compares the
+adapter separately with Pixman's pixel oracle. Headless CI is integration evidence,
+not an NPU or physical-display result. Native Linux Panther Lake validation is still
+required. The build installs privately under `build/weston-install`, not system paths.
+
+For an opt-in nested session with an installed NPU driver:
+
+```sh
+uv run npu-render select NPU
+export NPU_RENDER_NATIVE_LIBRARY="$PWD/build/native/libnpu_render_native.so"
+build/weston-install/bin/weston --backend=wayland-backend.so --renderer=pixman
+```
+
+The adapter reads the same saved selection as Python and watches it on a control
+thread. `npu-render select CPU` / `GPU` / `NPU` prepares a new backend before
+activation. Invalid or failed selections preserve the old renderer. An explicit
+`NPU_RENDER_BACKEND` environment override pins the backend and disables file
+watching, matching the Python precedence rule. The native adapter currently accepts
+unindexed device names and canonical version-1 selection JSON only.
+
+Frame logs name actual execution devices; shutdown logs report native calls/pixels,
+Pixman fallbacks and native failures. Check these before interpreting an NPU
+selection as coverage. A native DRM build can be prepared with `build_weston.py
+--drm`, but standalone display and presentation validation remain separate gates.
+
+The upstream Weston files retain their MIT license notices. The checked-in patch
+references upstream source; the preparation tool fetches the pinned revision from
+the Wayland mirror and refuses to patch another revision.

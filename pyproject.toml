@@ -21,6 +21,10 @@ live = [
 
 [dependency-groups]
 dev = ["pytest>=8,<10", "ruff>=0.12,<1"]
+native = [
+    "cmake>=3.25,<5",
+    "ninja>=1.11,<2",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
