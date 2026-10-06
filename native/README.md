@@ -67,7 +67,7 @@ For an opt-in nested session with an installed NPU driver:
 ```sh
 uv run npu-render select NPU
 export NPU_RENDER_NATIVE_LIBRARY="$PWD/build/native/libnpu_render_native.so"
-build/weston-install/bin/weston --backend=wayland-backend.so --renderer=pixman
+uv run python tools/run_weston.py --backend=wayland-backend.so --renderer=pixman
 ```
 
 The adapter reads the same saved selection as Python and watches it on a control

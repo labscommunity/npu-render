@@ -2,11 +2,12 @@
 
 import argparse
 import json
-import os
 import subprocess
 import tempfile
 import time
 from pathlib import Path
+
+from weston_environment import environment as weston_environment
 
 from npu_render.config import save_backend
 
@@ -33,7 +34,7 @@ def main():
         runtime = Path(directory)
         config = runtime / "selection.json"
         save_backend(args.backend, config)
-        environment = os.environ.copy()
+        environment = weston_environment(root)
         environment.pop("NPU_RENDER_BACKEND", None)
         environment.update(
             XDG_RUNTIME_DIR=str(runtime),
