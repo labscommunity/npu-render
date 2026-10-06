@@ -16,6 +16,17 @@
       "file": "delta-contention-720.json.gz",
       "uncompressed_sha256": "43eaf396d11812d678ca61961166bbd4e21ccfce52fa1e2060a62cfe99b0108a",
       "source_commit": "afd6d49a7afa3c943ab193b09bd836d48ba53a7e"
+    },
+    {
+      "file": "delta-contention-720-telemetry.jsonl.gz",
+      "uncompressed_sha256": "70ac0caddc769688314e650b0dce0f632288eccb7d8ba62468266611e95ab697",
+      "scope": "Partial counter capture; spans only a subset of trials and post-run activity. Nonzero counter_status invalidates that sample. No energy or thermal telemetry."
+    },
+    {
+      "file": "delta-contention-720-cb.json.gz",
+      "uncompressed_sha256": "a8039e0beb4e968a2455f6b28587929879461a5b24c7720cb463978dd170eaf1",
+      "source_commit": "afd6d49a7afa3c943ab193b09bd836d48ba53a7e",
+      "inference_mode": "continuous batching; cache 1 GB; max sequences 1; prefix caching disabled"
     }
   ],
   "comparisons": {
@@ -100,5 +111,37 @@
     "power_plan": "Balanced",
     "true_ttft_available": false,
     "note": "This server mode returned each completion in one content chunk. Exact build revision not reported by binary."
+  },
+  "streaming_comparisons": {
+    "paired_end_to_end_throughput_ratios": [
+      {
+        "round": 0,
+        "npu_over_gpu": 1.003420804470045
+      },
+      {
+        "round": 1,
+        "npu_over_gpu": 1.0961672000652112
+      },
+      {
+        "round": 2,
+        "npu_over_gpu": 1.0059801778388977
+      },
+      {
+        "round": 3,
+        "npu_over_gpu": 1.0104934641138836
+      },
+      {
+        "round": 4,
+        "npu_over_gpu": 1.0403222095596787
+      }
+    ],
+    "ratio_distribution": {
+      "count": 5,
+      "median": 1.0104934641138836,
+      "p95": 1.0849982019641047,
+      "p99": 1.0939334004449899,
+      "max": 1.0961672000652112
+    },
+    "scope": "measured application composition conditions; not whole-desktop offload"
   }
 }

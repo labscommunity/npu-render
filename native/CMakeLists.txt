@@ -9,6 +9,12 @@ target_link_libraries(npu_render_native PRIVATE openvino::runtime)
 target_compile_definitions(npu_render_native PRIVATE NR_BUILD)
 set_target_properties(npu_render_native PROPERTIES CXX_VISIBILITY_PRESET hidden)
 
+if(WIN32)
+  add_executable(nr_d3d12_interop tools/d3d12_interop.cpp)
+  target_compile_features(nr_d3d12_interop PRIVATE cxx_std_17)
+  target_link_libraries(nr_d3d12_interop PRIVATE openvino::runtime d3d12 dxgi)
+endif()
+
 include(CTest)
 option(NR_WITH_PIXMAN "Build the restricted Weston adapter tests" OFF)
 if(BUILD_TESTING)

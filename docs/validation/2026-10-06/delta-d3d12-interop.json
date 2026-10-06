@@ -1,0 +1,37 @@
+{
+  "passed": true,
+  "adapter": "Intel(R) Arc(TM) B390 GPU",
+  "execution_device": "NPU",
+  "shape": [
+    1,
+    4,
+    64,
+    64
+  ],
+  "frames": 8,
+  "max_abs_error": 0.000488281,
+  "input_and_output_shared": true,
+  "host_waited_fences": true,
+  "inference_ms": [
+    2.1275,
+    0.4736,
+    0.4464,
+    0.3481,
+    0.2836,
+    0.515,
+    0.3425,
+    0.3659
+  ],
+  "fixture_upload_infer_readback_check_ms": [
+    6.7992,
+    1.877,
+    1.8233,
+    1.5377,
+    1.6735,
+    1.8871,
+    1.6924,
+    1.7285
+  ],
+  "raw_report_sha256": "169210633959618f3fe08cb8594e2b52ee7fa765bfa7f0cb870a0875dae66793",
+  "runtime": "OpenVINO 2026.1.0"
+}

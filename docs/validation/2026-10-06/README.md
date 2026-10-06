@@ -55,6 +55,28 @@ token and per-token latency were unavailable; the reports correctly retain conte
 arrival timing without relabeling it as token-generation timing. A streaming-server
 follow-up is needed. Thermal/power and whole-desktop conclusions remain unproven.
 
+## Streaming follow-up and shared buffers
+
+A second five-round, 60-request run used the same executable/model with continuous
+batching enabled, a 1 GB KV cache, one sequence, and prefix caching disabled. This
+mode emitted incremental content with declared token counts. Its median paired
+NPU/GPU end-to-end throughput change was **+1.0%**, with ratios 1.0034, 1.0962,
+1.0060, 1.0105 and 1.0403. This still does not meet the product target. Raw chunk
+arrival timestamps are available in `delta-contention-720-cb.json.gz`.
+
+The Windows D3D12 interoperability probe passed eight changing 64×64 FP16 source-over
+frames on Arc B390/NPU. D3D12 populated shared input heaps; the NPU imported their
+NT handles and wrote to a shared output heap; D3D12 copied that output back for
+checking. Maximum pixel error was 0.000488281. Warm NPU calls were approximately
+0.28–0.52 ms for this small fixture. This establishes correct shared allocation
+handoff with explicit host waits; it does not establish arbitrary texture import,
+asynchronous GPU/NPU fence sharing, or a zero-copy desktop.
+
+The pinned Weston integration also passed Linux CI with a real SHM client in
+headless and nested compositor modes. CPU execution there is separate from the
+Windows NPU validation. Invalid live selections preserved rendering. Native Linux
+Panther Lake presentation has not been tested.
+
 ## Artifacts
 
 `summary.json` records hashes and aggregate results. The `.json.gz` files contain
