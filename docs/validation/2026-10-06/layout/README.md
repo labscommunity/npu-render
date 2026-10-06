@@ -90,10 +90,34 @@ Compiler diagnostics preceding JSON remain in those originals. `context.json`
 records the implementation hashes. No experiment here establishes improved Tahoma
 inference, total energy savings, or whole-desktop migration.
 
+## Installed private CI build
+
+[CI run 37544762852](https://github.com/t8/npu-render/actions/runs/37544762852)
+passed all Windows/Linux, Conventional Commit and Weston jobs for source
+`6f35f95b278e9f6b5cc68994040a15f8fe2dda59`. The HiDPI client completed 214 native
+resize calls from 600×400 to 300×200 with zero native failures. The run was CPU
+headless integration, not Linux NPU scanout.
+
+The [private Windows artifact](https://github.com/t8/npu-render/actions/runs/37544762852/artifacts/11450221186)
+was downloaded and installed under `%LOCALAPPDATA%\npu-render\builds\ci-6f35f95`.
+All 29 manifest files matched, and the exact CI executable passed 720p and 1080p
+GPU/NPU qualification with only its bundled runtime and Windows directories on
+PATH. The **NPU Render Prototype** Start-menu shortcut now launches this build;
+the previous installation remains available. These installation/qualification
+reports are retained here. The bundle requires no Python environment.
+
+Bundle SHA-256:
+`820168125c57d52d4bf95801fff65bb6727900d01e7f3fe4983dbfba9e56c3ec`.
+
 ## Runtime follow-up
 
 Intel publishes [OpenVINO 2026.3.1](https://github.com/openvinotoolkit/openvino/releases/tag/2026.3.1)
 and an [NPU driver supporting that runtime](https://www.intel.com/content/www/us/en/download/794734/intel-npu-driver-windows.html).
-These experiments have not changed Delta's driver or the project's runtime pin.
-A separate compatibility comparison is needed before attributing observed compiler
-limitations to current hardware capabilities.
+An isolated 2026.3.1 environment was tested with the same installed 32.0.100.4724
+driver. GridSample still failed with the same maximum normalized errors (~0.014
+for FP16 inputs and ~0.146 for FP32 inputs). Convolution packing still reached
+255-byte error; four-pixel grouping passed within one byte. The comparison reports
+are retained here. This limited runtime update did not resolve those operations,
+so the project's validated 2026.1.0 pin stays in place. The newer driver has not
+been installed or tested; this evidence does not isolate compiler from driver or
+establish a fundamental hardware limit.
