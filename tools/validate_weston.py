@@ -25,11 +25,12 @@ def stop(process):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--backend", default="CPU", choices=["CPU", "GPU", "NPU"])
+    parser.add_argument("--nested", action="store_true", help="test inside a second compositor")
     parser.add_argument("--report", type=Path, default=Path("results/weston.json"))
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     prefix = root / "build/weston-install"
-    compositor = client = None
+    compositor = client = outer = None
     with tempfile.TemporaryDirectory(prefix="npu-render-weston-") as directory:
         runtime = Path(directory)
         config = runtime / "selection.json"
@@ -47,10 +48,37 @@ def main():
             (runtime / "client.log").open("w") as client_log,
         ):
             try:
+                if args.nested:
+                    outer_environment = environment.copy()
+                    outer_environment.pop("NPU_RENDER_NATIVE_LIBRARY", None)
+                    outer = subprocess.Popen(
+                        [
+                            str(prefix / "bin/weston"),
+                            "--backend=headless-backend.so",
+                            "--renderer=pixman",
+                            "--shell=kiosk-shell.so",
+                            "--socket=npu-render-outer",
+                            "--width=640",
+                            "--height=480",
+                            "--idle-time=0",
+                            "--no-config",
+                        ],
+                        env=outer_environment,
+                        stdout=log,
+                        stderr=log,
+                    )
+                    deadline = time.monotonic() + 30
+                    while not (runtime / "npu-render-outer").exists():
+                        if outer.poll() is not None or time.monotonic() > deadline:
+                            raise RuntimeError("outer compositor failed to start")
+                        time.sleep(0.05)
+                    environment["WAYLAND_DISPLAY"] = "npu-render-outer"
                 compositor = subprocess.Popen(
                     [
                         str(prefix / "bin/weston"),
-                        "--backend=headless-backend.so",
+                        "--backend=wayland-backend.so"
+                        if args.nested
+                        else "--backend=headless-backend.so",
                         "--renderer=pixman",
                         "--shell=kiosk-shell.so",
                         "--socket=npu-render-validation",
@@ -63,6 +91,7 @@ def main():
                     stdout=log,
                     stderr=log,
                 )
+                environment["WAYLAND_DISPLAY"] = "npu-render-validation"
                 deadline = time.monotonic() + 30
                 while not (runtime / environment["WAYLAND_DISPLAY"]).exists():
                     if compositor.poll() is not None or time.monotonic() > deadline:
@@ -87,6 +116,7 @@ def main():
             finally:
                 stop(client)
                 stop(compositor)
+                stop(outer)
                 log.flush()
                 client_log.flush()
                 print((runtime / "weston.log").read_text(), flush=True)
@@ -110,7 +140,8 @@ def main():
             raise RuntimeError("live configuration rejection was not exercised")
         report = {
             "backend_requested": args.backend,
-            "scope": "headless Wayland integration; no scanout or native-display timing",
+            "scope": "nested Wayland on headless parent" if args.nested else "headless Wayland",
+            "scanout_measured": False,
             "summary": summaries[-1],
             "sampled_native_frames": frames,
             "invalid_selection_preserved_rendering": True,
