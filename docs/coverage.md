@@ -6,11 +6,12 @@ coverage, not just whether an equivalent tensor equation exists.
 
 | Function | Current implementation | Missing integration or proof |
 |---|---|---|
-| Premultiplied RGBA source-over | Explicit CPU/GPU/NPU provider, preparation checks, live backend changes | GPU-native buffer import/export and fences |
-| Animated application surfaces | SDL software window, deterministic replay, CPU conversion | Actual presentation timestamps and broader real application adapters |
-| Window composition | Eligible blend mathematics demonstrated on Panther Lake | Native compositor adapter, damage/occlusion, standalone display validation |
+| Premultiplied RGBA source-over | Explicit CPU/GPU/NPU provider, damage batches, saved switch, native Windows shared-buffer window | Visible native display validation; async fence integration |
+| Source copy | Native provider, byte-exact tests on CPU/GPU/NPU | Wider buffer formats and resource layouts |
+| Animated application surfaces | SDL window and native D3D12 swapchain; NPU byte conversion and composition | Native window occluded on first test; presentation timestamps and wider adapters |
+| Window composition | Restricted Weston adapter with damage/visibility; CPU headless and nested tests | Native Linux NPU execution and standalone display validation |
 | Window transforms and scaling | CPU scene placement in the demo only | Typed operation graphs, sampling/edge conformance, compositor mappings |
-| Color conversion and filters | CPU linear-sRGB display conversion | NPU graph implementations and end-to-end comparison |
+| Color conversion and filters | CPU linear-sRGB conversion; NPU BGRA8/FP16 packing and rounding in native window | NPU color-space/filter graphs and end-to-end comparison |
 | Client 2D drawing/text | No interception | Graphics-library/application adapters; glyph and path rasterization |
 | Game rendering | Restricted triangle research probe only | Shader/API translation, textures, depth/stencil, blending and synchronization |
 | General GPU compute | No interception | Per-API dispatch, memory and program translation |
@@ -25,11 +26,13 @@ measurements must separate graphics, copy, compute, media and display behavior.
 
 ## Platform progression
 
-Windows currently supports the library and live application harness. It does not
-replace DWM's renderer. The first desktop integration target is a restricted
-Weston renderer on Linux, preserving its display backend and explicit handling of
-unsupported operations. A nested run establishes integration correctness; native
-DRM presentation is needed to characterize useful desktop offload.
+Windows supports the library, live application harness, and a D3D12/NPU shared-buffer
+window with validated pixel semantics and saved-switch recovery. Its first display
+test was occluded by the screen saver. It does not replace DWM's renderer. The restricted Weston
+adapter now runs in Linux CPU CI, preserving its display backend and explicit
+handling of unsupported operations. Headless and nested runs establish integration
+correctness; native Linux NPU/DRM presentation is needed to characterize useful
+desktop offload.
 
 Client applications may still render on the GPU even when composition moves. The
 control therefore needs an integration registry and observable per-operation

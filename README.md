@@ -10,10 +10,18 @@ RGBA composition and an explicit backend switch. The packaged runtime passed
 GPU → NPU → CPU → GPU → NPU switching on Panther Lake. It supports CPU/GPU/NPU through
 its first OpenVINO provider; other providers can implement the same contracts.
 
-The switch currently affects applications using this library. System-wide desktop
-composition, arbitrary Direct3D/Vulkan games, display output, and codec replacement
-are integration milestones, not implemented features. Tahoma acceleration remains
-a measurement goal.
+The switch affects participating integrations. A restricted Weston adapter passes
+Linux CPU headless/nested tests, and D3D12 shared buffers pass a real Panther Lake
+NPU round trip on Windows. Native Linux NPU presentation, Windows DWM replacement,
+arbitrary Direct3D/Vulkan games, and codecs remain unfinished. Two Tahoma application
+comparisons showed only ~1–1.6% median paired gains; practical acceleration is unproven.
+
+A native Windows window now shares byte buffers between a D3D12 compute shader and
+the NPU, follows the saved selection, and preserves its active backend on invalid
+choices. GPU/NPU pixel checks pass at 720p and 1080p. Its first display test was
+occluded by Delta's screen saver, so visible native presentation remains unvalidated.
+The private CI Windows bundle runs with `run.cmd`; press **1 / 2 / 3** to switch
+GPU / NPU / CPU. See [native usage and limits](native/interop.md#native-windows-application).
 
 ## Run it
 
@@ -106,6 +114,10 @@ four-layer graph. They establish a credible implementation path, not a Tahoma ga
 - [Original probe, preserved for reproducibility](research/probe.py)
 - [Original hardware evidence](docs/research/npu_graphics_delta_evidence.json)
 - [Packaged runtime hardware validation](docs/validation/README.md)
+- [Live rendering and Tahoma results](docs/validation/2026-10-06/README.md)
+- [Native compositor adapter](native/README.md)
+- [D3D12/NPU buffer interoperability](native/interop.md)
+- [Operation coverage ledger](docs/coverage.md)
 - [Architecture and operation boundary](docs/architecture.md)
 - [Milestones toward the system-wide switch](docs/roadmap.md)
 

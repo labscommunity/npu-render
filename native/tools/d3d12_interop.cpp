@@ -1,168 +1,29 @@
 // A bounded graphics-buffer interoperability probe. See interop.md for the
 // vendor API references and the distinction between shared allocations and
 // proof of a fully copy-free compositor pipeline.
-#define NOMINMAX
-#include <windows.h>
-#include <d3d12.h>
-#include <dxgi1_4.h>
-#include <wrl.h>
-#include <openvino/openvino.hpp>
-#include <openvino/opsets/opset13.hpp>
-#include <openvino/runtime/properties.hpp>
+#include "../windows/d3d12_buffers.hpp"
+#include "../windows/blend_model.hpp"
 
-#include <algorithm>
-#include <chrono>
-#include <cmath>
-#include <cstring>
-#include <iomanip>
-#include <iostream>
-#include <sstream>
-#include <stdexcept>
-#include <string>
-#include <vector>
-
-using Microsoft::WRL::ComPtr;
-using Clock = std::chrono::steady_clock;
-
-void check(HRESULT code, const char *operation) {
-    if (FAILED(code)) {
-        std::ostringstream error;
-        error << operation << " failed with HRESULT 0x" << std::hex << uint32_t(code);
-        throw std::runtime_error(error.str());
-    }
-}
-
-std::string quote(const std::string &value) {
-    std::ostringstream text;
-    text << '"';
-    for (unsigned char c : value) {
-        if (c == '"' || c == '\\') text << '\\' << c;
-        else if (c < 32) text << "\\u" << std::hex << std::setw(4) << std::setfill('0') << int(c);
-        else text << c;
-    }
-    return text.str() + '"';
-}
-
-struct Handle {
-    HANDLE value = nullptr;
-    ~Handle() { if (value) CloseHandle(value); }
-    Handle() = default;
-    Handle(const Handle &) = delete;
-    Handle &operator=(const Handle &) = delete;
-};
-
-D3D12_RESOURCE_DESC buffer_description(size_t bytes, D3D12_RESOURCE_FLAGS flags) {
-    D3D12_RESOURCE_DESC desc{};
-    desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    desc.Width = bytes;
-    desc.Height = 1;
-    desc.DepthOrArraySize = 1;
-    desc.MipLevels = 1;
-    desc.SampleDesc.Count = 1;
-    desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-    desc.Flags = flags;
-    return desc;
-}
-
-struct SharedBuffer {
-    ComPtr<ID3D12Heap> heap;
-    ComPtr<ID3D12Resource> resource;
-    Handle shared;
-
-    SharedBuffer(ID3D12Device *device, size_t bytes) {
-        const size_t alignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
-        D3D12_HEAP_DESC desc{};
-        desc.SizeInBytes = (bytes + alignment - 1) & ~(alignment - 1);
-        desc.Alignment = alignment;
-        desc.Properties.Type = D3D12_HEAP_TYPE_CUSTOM;
-        desc.Properties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_NOT_AVAILABLE;
-        desc.Properties.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;
-        desc.Properties.CreationNodeMask = desc.Properties.VisibleNodeMask = 1;
-        desc.Flags = D3D12_HEAP_FLAG_SHARED | D3D12_HEAP_FLAG_SHARED_CROSS_ADAPTER;
-        check(device->CreateHeap(&desc, IID_PPV_ARGS(&heap)), "CreateHeap(cross-adapter)");
-        auto resource_desc = buffer_description(bytes, D3D12_RESOURCE_FLAG_ALLOW_CROSS_ADAPTER |
-                                                         D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-        check(device->CreatePlacedResource(heap.Get(), 0, &resource_desc,
-                                          D3D12_RESOURCE_STATE_COMMON, nullptr,
-                                          IID_PPV_ARGS(&resource)), "CreatePlacedResource");
-        check(device->CreateSharedHandle(heap.Get(), nullptr, GENERIC_ALL, nullptr, &shared.value),
-              "CreateSharedHandle(heap)");
-    }
-};
-
-ComPtr<ID3D12Resource> staging(ID3D12Device *device, size_t bytes, D3D12_HEAP_TYPE type) {
-    D3D12_HEAP_PROPERTIES heap{};
-    heap.Type = type;
-    heap.CreationNodeMask = heap.VisibleNodeMask = 1;
-    auto desc = buffer_description(bytes, D3D12_RESOURCE_FLAG_NONE);
-    ComPtr<ID3D12Resource> result;
-    check(device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
-                                          type == D3D12_HEAP_TYPE_UPLOAD ?
-                                              D3D12_RESOURCE_STATE_GENERIC_READ : D3D12_RESOURCE_STATE_COPY_DEST,
-                                          nullptr, IID_PPV_ARGS(&result)), "CreateCommittedResource(staging)");
-    return result;
-}
-
-struct Transfers {
-    ComPtr<ID3D12CommandQueue> queue;
-    ComPtr<ID3D12CommandAllocator> allocator;
-    ComPtr<ID3D12GraphicsCommandList> list;
-    ComPtr<ID3D12Fence> fence;
-    Handle event;
-    uint64_t serial = 0;
-
-    explicit Transfers(ID3D12Device *device) {
-        D3D12_COMMAND_QUEUE_DESC desc{};
-        desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-        check(device->CreateCommandQueue(&desc, IID_PPV_ARGS(&queue)), "CreateCommandQueue");
-        check(device->CreateCommandAllocator(desc.Type, IID_PPV_ARGS(&allocator)), "CreateCommandAllocator");
-        check(device->CreateCommandList(0, desc.Type, allocator.Get(), nullptr,
-                                        IID_PPV_ARGS(&list)), "CreateCommandList");
-        check(list->Close(), "initial command-list close");
-        check(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)), "CreateFence");
-        event.value = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-        if (!event.value) throw std::runtime_error("CreateEvent failed");
-    }
-
-    void begin() {
-        check(allocator->Reset(), "allocator reset");
-        check(list->Reset(allocator.Get(), nullptr), "command-list reset");
-    }
-
-    void barrier(ID3D12Resource *resource, D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after) {
-        D3D12_RESOURCE_BARRIER transition{};
-        transition.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        transition.Transition.pResource = resource;
-        transition.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        transition.Transition.StateBefore = before;
-        transition.Transition.StateAfter = after;
-        list->ResourceBarrier(1, &transition);
-    }
-
-    void finish() {
-        check(list->Close(), "command-list close");
-        ID3D12CommandList *commands[] = {list.Get()};
-        queue->ExecuteCommandLists(1, commands);
-        check(queue->Signal(fence.Get(), ++serial), "queue signal");
-        check(fence->SetEventOnCompletion(serial, event.value), "fence event");
-        if (WaitForSingleObject(event.value, 10000) != WAIT_OBJECT_0)
-            throw std::runtime_error("GPU transfer fence did not complete within 10 seconds");
-    }
-};
-
-void upload(ID3D12Resource *resource, const std::vector<ov::float16> &values) {
-    void *mapped = nullptr;
-    D3D12_RANGE no_read{0, 0};
-    check(resource->Map(0, &no_read, &mapped), "upload Map");
-    const size_t bytes = values.size() * sizeof(ov::float16);
-    std::memcpy(mapped, values.data(), bytes);
-    D3D12_RANGE written{0, bytes};
-    resource->Unmap(0, &written);
-}
-
-int main() {
+int main(int argc, char **argv) {
     std::string stage = "device";
     try {
+        size_t width = 64, height = 64, frame_count = 8;
+        bool packed_u8 = false, host_tensors = false;
+        for (int i = 1; i < argc; ++i) {
+            const std::string argument = argv[i];
+            if (argument == "--packed-u8") packed_u8 = true;
+            else if (argument == "--host-tensors") host_tensors = true;
+            else if ((argument == "--width" || argument == "--height" || argument == "--frames") && i + 1 < argc) {
+                const size_t value = std::stoul(argv[++i]);
+                if (argument == "--width") width = value;
+                else if (argument == "--height") height = value;
+                else frame_count = value;
+            } else throw std::invalid_argument("use --width N --height N --frames N [--packed-u8] [--host-tensors]");
+        }
+        if (!width || width > 4096 || !height || height > 4096 || !frame_count || frame_count > 1000)
+            throw std::invalid_argument("invalid extent (1..4096) or frame count (1..1000)");
+        const size_t pixels = width * height, elements = pixels * 4;
+        const size_t bytes = elements * (packed_u8 ? 1 : sizeof(ov::float16));
         ComPtr<IDXGIFactory1> factory;
         check(CreateDXGIFactory1(IID_PPV_ARGS(&factory)), "CreateDXGIFactory1");
         ComPtr<ID3D12Device> device;
@@ -183,8 +44,6 @@ int main() {
             }
         }
         if (!device) throw std::runtime_error("no Intel D3D12 graphics adapter found");
-        constexpr size_t side = 64, pixels = side * side, elements = pixels * 4;
-        constexpr size_t bytes = elements * sizeof(ov::float16);
         stage = "shared_allocations";
         SharedBuffer background(device.Get(), bytes), foreground(device.Get(), bytes), output(device.Get(), bytes);
         auto upload_bg = staging(device.Get(), bytes, D3D12_HEAP_TYPE_UPLOAD);
@@ -196,15 +55,9 @@ int main() {
         // NPU requests/tensors are destroyed before their D3D12 heaps/handles.
         {
             ov::Core core;
-            namespace op = ov::opset13;
-            const ov::Shape shape{1, 4, side, side};
-            auto bg = std::make_shared<op::Parameter>(ov::element::f16, shape);
-            auto fg = std::make_shared<op::Parameter>(ov::element::f16, shape);
-            auto alpha = std::make_shared<op::Gather>(fg,
-                op::Constant::create(ov::element::i64, {1}, {3}), op::Constant::create(ov::element::i64, {}, {1}));
-            auto result = std::make_shared<op::Add>(fg, std::make_shared<op::Multiply>(bg,
-                std::make_shared<op::Subtract>(op::Constant::create(ov::element::f16, {}, {1.f}), alpha)));
-            auto model = std::make_shared<ov::Model>(ov::OutputVector{result}, ov::ParameterVector{bg, fg});
+            const ov::Shape shape = packed_u8 ? ov::Shape{1, height, width, 4} : ov::Shape{1, 4, height, width};
+            const auto element_type = packed_u8 ? ov::element::u8 : ov::element::f16;
+            auto model = blend_model(width, height, packed_u8);
             stage = "npu_compile";
             auto compiled = core.compile_model(model, "NPU");
             const auto devices = compiled.get_property(ov::execution_devices);
@@ -213,9 +66,10 @@ int main() {
             })) throw std::runtime_error("inference did not report NPU execution");
             auto context = compiled.get_context();
             auto import = [&](HANDLE handle) {
-                return context.create_tensor(ov::element::f16, shape,
+                if (host_tensors) return ov::Tensor(element_type, shape);
+                return ov::Tensor(context.create_tensor(element_type, shape,
                     {{"MEM_TYPE", std::string("SHARED_BUF")}, {"MEM_HANDLE", static_cast<void *>(handle)},
-                     {"TENSOR_TYPE", std::string("BINDED")}});
+                     {"TENSOR_TYPE", std::string("BINDED")}}));
             };
             stage = "nt_handle_import";
             auto remote_bg = import(background.shared.value);
@@ -226,18 +80,23 @@ int main() {
             request.set_input_tensor(1, remote_fg);
             request.set_output_tensor(remote_output);
             std::vector<ov::float16> b(elements), f(elements);
-            for (size_t frame = 0; frame < 8; ++frame) {
+            std::vector<uint8_t> b8(elements), f8(elements);
+            for (size_t frame = 0; frame < frame_count; ++frame) {
                 const auto started = Clock::now();
                 for (size_t i = 0; i < pixels; ++i) {
                     const float a = float((i + frame * 31) % 257) / 256;
                     for (size_t c = 0; c < 4; ++c) {
                         b[c * pixels + i] = ov::float16(c == 3 ? 1.f : float((i + c * 13 + frame) % 257) / 256);
                         f[c * pixels + i] = ov::float16(c == 3 ? a : a * float((i + c * 37 + frame * 7) % 257) / 256);
+                        if (packed_u8) {
+                            b8[i * 4 + c] = uint8_t(std::lround(float(b[c * pixels + i]) * 255));
+                            f8[i * 4 + c] = uint8_t(std::lround(float(f[c * pixels + i]) * 255));
+                        }
                     }
                 }
                 stage = "gpu_upload";
-                upload(upload_bg.Get(), b);
-                upload(upload_fg.Get(), f);
+                upload(upload_bg.Get(), packed_u8 ? static_cast<const void *>(b8.data()) : b.data(), bytes);
+                upload(upload_fg.Get(), packed_u8 ? static_cast<const void *>(f8.data()) : f.data(), bytes);
                 transfers.begin();
                 transfers.barrier(background.resource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
                 transfers.barrier(foreground.resource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
@@ -247,6 +106,10 @@ int main() {
                 transfers.barrier(foreground.resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
                 transfers.finish(); // Producer completion before NPU reads.
                 stage = "npu_infer";
+                if (host_tensors) {
+                    std::memcpy(remote_bg.data(), packed_u8 ? static_cast<const void *>(b8.data()) : b.data(), bytes);
+                    std::memcpy(remote_fg.data(), packed_u8 ? static_cast<const void *>(f8.data()) : f.data(), bytes);
+                }
                 const auto before_inference = Clock::now();
                 request.infer(); // Consumer completion before GPU reads.
                 inference_ms.push_back(std::chrono::duration<double, std::milli>(Clock::now() - before_inference).count());
@@ -260,26 +123,44 @@ int main() {
                 void *mapped = nullptr;
                 D3D12_RANGE read{0, bytes};
                 check(readback->Map(0, &read, &mapped), "readback Map");
-                const auto *actual = static_cast<const ov::float16 *>(mapped);
+                const void *values = host_tensors ? remote_output.data() : mapped;
+                const auto *actual = static_cast<const ov::float16 *>(values);
+                std::string first_mismatch;
+                size_t mismatches = 0;
                 for (size_t i = 0; i < pixels; ++i) {
                     for (size_t c = 0; c < 4; ++c) {
-                        const float expected = float(f[c * pixels + i]) +
-                            (1 - float(f[3 * pixels + i])) * float(b[c * pixels + i]);
-                        const float error = std::abs(float(actual[c * pixels + i]) - expected);
-                        if (!std::isfinite(error) || error > 2.f / 255)
-                            throw std::runtime_error("shared buffer pixels differ from source-over oracle");
+                        const float foreground_value = packed_u8 ? float(f8[i * 4 + c]) / 255 : float(f[c * pixels + i]);
+                        const float background_value = packed_u8 ? float(b8[i * 4 + c]) / 255 : float(b[c * pixels + i]);
+                        const float alpha_value = packed_u8 ? float(f8[i * 4 + 3]) / 255 : float(f[3 * pixels + i]);
+                        const float expected = foreground_value + (1 - alpha_value) * background_value;
+                        const float observed = packed_u8 ? float(static_cast<const uint8_t *>(values)[i * 4 + c]) / 255 : float(actual[c * pixels + i]);
+                        const float error = std::abs(observed - expected);
+                        if (!std::isfinite(error) || error > 2.f / 255) {
+                            ++mismatches;
+                            if (first_mismatch.empty()) {
+                                std::ostringstream detail;
+                                detail << "frame=" << frame << " x=" << i % width << " y=" << i / width
+                                       << " channel=" << c << " expected=" << expected << " actual=" << observed;
+                                first_mismatch = detail.str();
+                            }
+                        }
                         maximum_error = std::max(maximum_error, error);
                     }
                 }
                 D3D12_RANGE no_write{0, 0};
                 readback->Unmap(0, &no_write);
+                if (mismatches) throw std::runtime_error(first_mismatch + " mismatches=" +
+                    std::to_string(mismatches) + " max_error=" + std::to_string(maximum_error));
                 roundtrip_ms.push_back(std::chrono::duration<double, std::milli>(Clock::now() - started).count());
             }
         }
         std::cout << "{\"passed\":true,\"adapter\":" << quote(adapter_name)
-                  << ",\"execution_device\":\"NPU\",\"shape\":[1,4,64,64],\"frames\":8,"
+                  << ",\"execution_device\":\"NPU\",\"width\":" << width << ",\"height\":" << height
+                  << ",\"format\":" << quote(packed_u8 ? "BGRA8_NHWC" : "BGRA16F_NCHW")
+                  << ",\"frames\":" << frame_count << ","
                   << "\"max_abs_error\":" << maximum_error
-                  << ",\"input_and_output_shared\":true,\"host_waited_fences\":true,"
+                  << ",\"input_and_output_shared\":" << (host_tensors ? "false" : "true")
+                  << ",\"host_waited_fences\":true,"
                   << "\"inference_ms\":[";
         for (size_t i = 0; i < inference_ms.size(); ++i) std::cout << (i ? "," : "") << inference_ms[i];
         std::cout << "],\"fixture_upload_infer_readback_check_ms\":[";

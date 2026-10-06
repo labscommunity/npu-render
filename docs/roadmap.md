@@ -7,12 +7,12 @@ delivery requirements while freeing useful GPU capacity.
 | Milestone | Deliverable | Acceptance evidence | Status |
 |---|---|---|---|
 | Device feasibility | Deterministic composition and restricted triangle graphs | Independent checks on Panther Lake NPU, including reported execution devices | Original probe complete |
-| Shared runtime | Provider contracts, device selection, prepared switch, owned outputs | 27 local tests and GPU → NPU → CPU → GPU → NPU on delta | Initial implementation validated |
-| Live application | Animated software window, async switch, frame-stage timing | Windows console session; GPU → NPU → CPU → GPU; optimized conversion | Implemented; evidence being collected |
-| Compositor adapter | Restricted Weston renderer with a backend control | Correct nested output, then standalone DRM presentation | Planned |
-| Real buffer path | Linear graphics-buffer import/export, synchronization and format conversion | Correct fences/lifetimes plus end-to-end latency, including copies | Planned |
-| Work reduction | Damage tiles, occlusion, bounded layer groups, prepared graph variants | Sustained frame delivery and bounded memory/queue use | Planned |
-| Tahoma benefit | Reproducible concurrent inference and desktop traces | Paired GPU/NPU/CPU compositor runs and sustained results | Application benchmark implemented; real trials in progress |
+| Shared runtime | Provider contracts, device selection, prepared switch, owned outputs | 43 Python checks, native pixel tests, real device switching | Implemented |
+| Live application | Animated software window, async switch, frame-stage timing | Windows console session; 2,400/2,400 scheduled submissions at 720p; optimized conversion | Implemented and measured |
+| Compositor adapter | Restricted Weston renderer with a backend control | Linux CPU pixel oracle plus headless/nested Wayland clients | CPU integration validated; native Linux NPU/display validation outstanding |
+| Real buffer path | Linear graphics-buffer import/export, synchronization and format conversion | D3D12 shared input/output, byte conversion and native swapchain application with saved switch | Pixel/control checks pass; native display test occluded; DMA-BUF outstanding |
+| Work reduction | Damage tiles, occlusion, bounded layer groups, prepared graph variants | Disjoint damage batching in the C ABI; Weston supplies visibility/damage | Initial implementation; sustained native display results outstanding |
+| Tahoma benefit | Reproducible concurrent inference and desktop traces | Two five-round GPU/NPU/CPU/idle application comparisons, including streaming | Measured; ~1–1.6% median paired gains do not establish the product target |
 | Wider operation coverage | Filters, scaling, transforms, supported app adapters | Per-operation conformance and backend capability manifests | Planned |
 | Broader platforms | Additional NPU providers and Windows integrations | Per-device/OS/runtime evidence with recovery tests | Planned |
 

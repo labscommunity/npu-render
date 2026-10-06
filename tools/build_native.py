@@ -47,12 +47,18 @@ def main():
     )
     for device in args.devices:
         subprocess.run([str(executable), device], check=True, env=environment)
-    if args.pixman:
-        subprocess.run(
-            ["ctest", "--test-dir", str(args.build_dir), "--output-on-failure"],
-            check=True,
-            env=environment,
-        )
+    subprocess.run(
+        [
+            "ctest",
+            "--test-dir",
+            str(args.build_dir),
+            "--build-config",
+            "Release",
+            "--output-on-failure",
+        ],
+        check=True,
+        env=environment,
+    )
 
 
 if __name__ == "__main__":

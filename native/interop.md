@@ -3,7 +3,9 @@
 `nr_d3d12_interop` is a Windows-only, opt-in hardware probe. CI compiles it but does
 not run it on machines without the target hardware. It creates an Intel D3D12
 device, three shared cross-adapter L0 heaps, and placed linear buffers. Two heaps
-carry background/foreground FP16 planes; the third receives NPU-composited pixels.
+carry background/foreground pixels; the third receives NPU-composited pixels.
+The default format is FP16 planes; `--packed-u8` uses interleaved BGRA8 and performs
+conversion, source-over, clamping and byte rounding on the NPU.
 
 The sequence is: CPU fixture → D3D12 upload → GPU copy to shared input heaps →
 GPU fence completion → NPU source-over using imported NT handles → synchronous
@@ -15,7 +17,8 @@ This proves a shared allocation handoff only if it passes on hardware. It does n
 prove arbitrary texture import, implicit fence interoperability, zero internal
 driver copies, scanout, or application/compositor performance. The fixture still
 uses upload and readback copies, and serializes producer/consumer completion on
-the host. The shape is intentionally bounded at 64×64 RGBA FP16.
+the host. The default fixture is 64×64; `--width` / `--height` accept extents up to
+4096, and `--frames` controls the number of changing fixtures.
 
 The probe uses OpenVINO's documented low-level parameter map (`MEM_TYPE`,
 `MEM_HANDLE`, `TENSOR_TYPE`) to avoid depending on device-specific headers omitted
@@ -31,6 +34,77 @@ failure stage, graphics adapter, actual NPU execution, per-call time and complet
 fixture upload/inference/readback/check time. Never treat an unsupported import as
 a successful copied fallback.
 
+`--host-tensors` is a diagnostic comparison that explicitly disables shared tensor
+binding and reports `input_and_output_shared: false`. It helped isolate a large-shape
+accuracy issue from buffer synchronization. Normalizing all input bytes to 0–1 and
+rescaling the result produced errors near three byte values at 720p/1080p, with
+both shared and ordinary host tensors. Keeping colors in byte units and normalizing
+only alpha fixed the captured fixtures. Direct NHWC arithmetic was also measured,
+but was slower than conversion through planar arithmetic. The final model lives in
+`windows/blend_model.hpp` and is shared by this probe and the native window.
+
+The byte-unit planar graph passed eight changing frames at 720p and 1080p. Warm NPU
+calls were approximately 9.8–10.3 ms and 21.1–22.1 ms respectively. The FP16 planar
+1080p graph took approximately 3.9–5.0 ms. These are separate small experiments,
+not claims of equal clocks or an isolated conversion cost. The complete fixture
+time includes deliberately expensive CPU fixture generation and pixel checking;
+it is not an application frame-time benchmark. See the dated validation artifacts.
+
+## Native Windows application
+
+`nr_native_live.exe` binds the same shared allocations to an explicit NPU graph or
+a native D3D12 compute shader. CPU mode uses integer source-over. All three paths
+use a BGRA8 contract in the supplied encoded color space, and startup checks opaque,
+transparent and fractional-alpha fixtures at the exact selected resolution against
+the integer oracle. GPU/NPU error must be at most one byte value. Every provider is
+prepared before the window opens; switching activates an already qualified provider
+between frames. A failed qualification aborts startup explicitly.
+
+The application copies one CPU-generated animated foreground into a shared buffer;
+its background is uploaded once. NPU mode performs byte conversion and blending on
+the NPU, then D3D12 copies the shared output directly into a flip-model swapchain.
+There is no per-frame GPU readback or host output conversion. GPU transfers,
+host-waited fences, the OS compositor and display engine remain involved. CPU mode
+avoids uploading input surfaces and uploads its composed output. The GPU baseline
+uses a compute shader, unlike the earlier Python OpenVINO-GPU baseline.
+
+```powershell
+uv run --group native python tools/build_native.py --devices GPU NPU CPU
+# Put the pinned OpenVINO libs directory on PATH, or use the packaged run.cmd.
+build/native/Release/nr_native_live.exe --seconds 60 --sequence NPU,CPU,GPU --switch-every 15
+uv run npu-render select NPU
+uv run python tools/validate_native_live.py --executable build/native/Release/nr_native_live.exe
+```
+
+Keys 1/2/3 choose GPU/NPU/CPU; Escape exits. By default the native window watches the
+same canonical selection file as the CLI every 250 ms. `--config` overrides its
+path. `--backend` or `NPU_RENDER_BACKEND` pins file selection. Invalid saved choices
+keep the active renderer; indexed names and escaped JSON forms are unsupported in
+this small adapter. Width must be a multiple of 64 for the D3D12 copy row pitch.
+Reports include every frame's stage timings, backend, presentation HRESULT, missed
+deadlines, skipped replay slots, and selection/rejection events. Pacing uses a
+process-local high-resolution waitable timer.
+
+The first native window/control run on Delta found an active screen-saver desktop:
+all calls returned `DXGI_STATUS_OCCLUDED`. Its rendering/control results are valid,
+but it is **not a visible-presentation result**. The validator's explicit
+`--allow-occluded` option permits only that narrower check. The native inference
+benchmark refuses occluded trials, including an occluded initial idle frame.
+`S_OK` itself still does not establish physical scanout timing.
+
+```powershell
+uv run python tools/benchmark_native.py --executable build/native/Release/nr_native_live.exe `
+  --endpoint http://127.0.0.1:8000/v1 --model YOUR_MODEL --inference-device GPU
+```
+
+This rotates five GPU/NPU/CPU/idle rounds with three requests each, preserving
+per-request and per-frame measurements. It checks for premature renderer exit,
+occlusion and unexpected backend changes. The native trace has one foreground
+surface, so do not compare its numbers directly with the earlier two-layer trace.
+The Windows CI job also builds a private portable bundle containing the runtime,
+notices, launch script and file-hash manifest. It requires installed Intel drivers
+and the Microsoft Visual C++ x64 runtime, but no Python installation.
+
 Primary references:
 
 - [OpenVINO NPU remote tensor interface](https://docs.openvino.ai/2026/openvino-workflow/running-inference/inference-devices-and-modes/npu-device/remote-tensor-api-npu-plugin.html)
@@ -38,3 +112,4 @@ Primary references:
 - [Intel's pinned DX12 interoperability tests](https://github.com/openvinotoolkit/openvino/blob/2026.1.0/src/plugins/intel_npu/tests/functional/behavior/remote_tensor_tests/dx12_remote_run.hpp)
 - [Microsoft shared heaps and cross-adapter restrictions](https://learn.microsoft.com/en-us/windows/win32/direct3d12/shared-heaps)
 - [Microsoft GPU synchronization](https://learn.microsoft.com/en-us/windows/win32/direct3d12/user-mode-heap-synchronization)
+- [Microsoft presentation return values](https://learn.microsoft.com/en-us/windows/win32/api/dxgi/nf-dxgi-idxgiswapchain-present)

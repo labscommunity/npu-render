@@ -52,8 +52,8 @@ traffic before claiming practical offload value.
 
 This inference mode returned an entire completion in one chunk. True time to first
 token and per-token latency were unavailable; the reports correctly retain content
-arrival timing without relabeling it as token-generation timing. A streaming-server
-follow-up is needed. Thermal/power and whole-desktop conclusions remain unproven.
+arrival timing without relabeling it as token-generation timing. The streaming-server
+follow-up is described below. Thermal/power and whole-desktop conclusions remain unproven.
 
 ## Streaming follow-up and shared buffers
 
@@ -77,9 +77,46 @@ headless and nested compositor modes. CPU execution there is separate from the
 Windows NPU validation. Invalid live selections preserved rendering. Native Linux
 Panther Lake presentation has not been tested.
 
+## Native byte buffers and saved-switch validation
+
+The expanded interop probe passed FP16 planes at 1080p. An initial packed-byte
+graph normalized and rescaled every color component; that failed at 720p/1080p
+with both shared and ordinary host tensors. Maximum observed error was approximately
+three byte values. Keeping colors in byte units and normalizing only alpha fixed
+the captured fixtures. Both failed reports and successful variants are retained:
+`u8-byte-*` denotes the chosen planar graph, `u8-direct-*` the slower direct-NHWC
+comparison, and plain `u8-720`/`u8-1080` the rejected normalization graph.
+
+The chosen packed-byte graph's warm NPU calls took approximately 9.8–10.3 ms at
+720p and 21.1–22.1 ms at 1080p. The final native window independently qualified GPU
+compute-shader and NPU results at both resolutions against three integer-byte
+fixtures, with maximum error of one byte value.
+
+The native window reads/writes shared buffers and copies NPU output directly into
+a D3D12 swapchain; it performs no per-frame GPU readback or host output conversion.
+Its control test switched GPU → NPU → invalid AUTO → CPU → GPU. The invalid choice
+left NPU rendering active. There were 1,145 submitted frames, zero skipped slots
+and six processing deadline misses over approximately 19 seconds. Median complete
+work was 5.15 ms for GPU, 12.71 ms for NPU and 10.10 ms for CPU. The executable hash
+is included in `delta-native-control-720.json.gz`.
+
+**Every native presentation returned `DXGI_STATUS_OCCLUDED` (0x087A0001).** The input
+desktop was `Screen-saver`, while the application ran on `WinSta0/Default` in console
+session 1. These timings validate rendering, transfers and switching only. They do
+not prove visible display delivery. The native Tahoma benchmark rejected its first
+occluded trial, so no native-baseline inference gain is reported. The initial native
+window report also used coarse pacing; the later control test uses a high-resolution
+waitable timer. Do not attribute its pacing improvement to NPU arithmetic changes.
+
 ## Artifacts
 
 `summary.json` records hashes and aggregate results. The `.json.gz` files contain
 the original UTF-8 JSON reports compressed losslessly; SHA256 values refer to the
 uncompressed bytes. They include raw per-frame and per-request timing, device
 attribution, switch events and errors. No model weights are included.
+
+`native-summary.json` adds hashes for the later native reports and the original
+UTF-16LE interop captures. Small interop reports are stored as parsed UTF-8 JSON;
+native per-frame reports are losslessly compressed. The early graph variants were
+development experiments before the native-window commit; their names and descriptions
+identify the variant rather than implying they all match the final source.

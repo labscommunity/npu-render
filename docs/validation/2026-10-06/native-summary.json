@@ -1,0 +1,56 @@
+{
+  "native_reports": {
+    "delta-native-window-720": {
+      "sha256": "836f5af1756c35e33cda14e97f304f5b170d3593d048346575a9745ec1c3d26c"
+    },
+    "delta-native-control-720": {
+      "sha256": "5f080dad4a198e758da1f42e82f68954e2fe01ba8d4f40f036b1b7cde8f765a1"
+    },
+    "delta-native-qualification-1080": {
+      "sha256": "2997e5651c02e59e76761664ed93c81ec89f7a66d18ee53e0a9034346d11d42f"
+    }
+  },
+  "interop_reports": {
+    "delta-d3d12-interop-1080.json": {
+      "captured_sha256": "c49e2e8e2cfe451fc22b6a9500d12cdb07cc78e3fe6e39ebe049a16ce43c2410",
+      "captured_encoding": "UTF-16LE BOM",
+      "passed": true
+    },
+    "delta-d3d12-interop-u8-1080.json": {
+      "captured_sha256": "fd4222432869157524269bf6b0c0c74193443bf44b894cdda18d5fd61bbf7ee6",
+      "captured_encoding": "UTF-16LE BOM",
+      "passed": false
+    },
+    "delta-d3d12-interop-u8-720.json": {
+      "captured_sha256": "fd4222432869157524269bf6b0c0c74193443bf44b894cdda18d5fd61bbf7ee6",
+      "captured_encoding": "UTF-16LE BOM",
+      "passed": false
+    },
+    "delta-d3d12-interop-u8-byte-1080.json": {
+      "captured_sha256": "64597bcb5e74f79db815177166126613cef01f085f87790bb7343324130df2af",
+      "captured_encoding": "UTF-16LE BOM",
+      "passed": true
+    },
+    "delta-d3d12-interop-u8-byte-720.json": {
+      "captured_sha256": "4db2c257b5f246e79930443c591d4dac85c3673f03719b64c75695afbda3b458",
+      "captured_encoding": "UTF-16LE BOM",
+      "passed": true
+    },
+    "delta-d3d12-interop-u8-direct-1080.json": {
+      "captured_sha256": "f2fe137ab51101dc053170548bfc93dbf6ee3cab7f61f88ebba362c7a183995c",
+      "captured_encoding": "UTF-16LE BOM",
+      "passed": true
+    },
+    "delta-d3d12-interop-u8-direct-720.json": {
+      "captured_sha256": "02057c52b7ac82ef740ba932eb780996fd700df1f7f87ab3bdf33130ad8f39d4",
+      "captured_encoding": "UTF-16LE BOM",
+      "passed": true
+    },
+    "delta-d3d12-interop-u8.json": {
+      "captured_sha256": "ce6571a903f820a025da9588e22d0db3b7cc4131f088ada3e1dceb33341a1086",
+      "captured_encoding": "UTF-16LE BOM",
+      "passed": true
+    }
+  },
+  "scope": "NPU/GPU byte conformance and native selection/recovery; native windows were occluded by active screen saver, not visible-display evidence."
+}
