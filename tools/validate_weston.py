@@ -33,6 +33,9 @@ def main():
     client_mode.add_argument(
         "--resized", action="store_true", help="exercise the specialized viewport resize path"
     )
+    client_mode.add_argument(
+        "--downscaled", action="store_true", help="exercise exact 2x downscaling of a HiDPI buffer"
+    )
     parser.add_argument("--report", type=Path, default=Path("results/weston.json"))
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
@@ -104,7 +107,9 @@ def main():
                     if compositor.poll() is not None or time.monotonic() > deadline:
                         raise RuntimeError("Weston failed to create its socket")
                     time.sleep(0.05)
-                if args.transformed or args.resized:
+                if args.downscaled:
+                    client_command = [str(prefix / "bin/weston-simple-damage"), "--scale=2"]
+                elif args.transformed or args.resized:
                     client_command = [
                         str(prefix / "bin/weston-simple-damage"),
                         "--use-viewport",
@@ -166,8 +171,16 @@ def main():
             raise RuntimeError("no actual native compositor work was observed")
         if args.transformed and (not sampling or summaries[-1]["sampling_calls"] < 1):
             raise RuntimeError("transformed client did not exercise native texture sampling")
-        if args.resized and (not resizing or summaries[-1]["resize_calls"] < 1):
+        if (args.resized or args.downscaled) and (
+            not resizing or summaries[-1]["resize_calls"] < 1
+        ):
             raise RuntimeError("viewport client did not exercise specialized resize")
+        if args.downscaled and not any(
+            frame["source"][0] == frame["resized"][0] * 2
+            and frame["source"][1] == frame["resized"][1] * 2
+            for frame in resizing
+        ):
+            raise RuntimeError("HiDPI client did not exercise exact 2x downscaling")
         if summaries[-1]["native_failures"]:
             raise RuntimeError("native compositor operations failed")
         if "rejected invalid selection" not in captured:
@@ -182,6 +195,7 @@ def main():
             "sampled_resize_frames": resizing,
             "transformed_client": args.transformed,
             "resized_client": args.resized,
+            "downscaled_client": args.downscaled,
             "invalid_selection_preserved_rendering": True,
         }
         args.report.parent.mkdir(parents=True, exist_ok=True)

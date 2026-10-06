@@ -18,6 +18,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--executable", type=Path, required=True)
     parser.add_argument("--report", type=Path, default=Path("results/native-control.json"))
+    parser.add_argument("--width", type=int, default=1280)
+    parser.add_argument("--height", type=int, default=720)
     parser.add_argument(
         "--allow-occluded",
         action="store_true",
@@ -40,6 +42,10 @@ def main():
         save_backend("GPU", config)
         command = [
             str(args.executable.resolve()),
+            "--width",
+            str(args.width),
+            "--height",
+            str(args.height),
             "--config",
             str(config),
             "--ready-file",

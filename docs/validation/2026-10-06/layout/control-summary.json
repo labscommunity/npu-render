@@ -1,0 +1,76 @@
+{
+  "passed": true,
+  "control_and_recovery_passed": true,
+  "all_present_calls_s_ok": false,
+  "scanout_measured": false,
+  "renderer_sha256": "fff54184cb645879fabc9ef55bf5109eeff4e0899773c828afb81a4a2dcdf7c9",
+  "graphics": {
+    "passed": true,
+    "adapter": "Intel(R) Arc(TM) B390 GPU",
+    "npu_execution_device": "NPU",
+    "gpu_provider": "D3D12 compute shader",
+    "session_id": 1,
+    "npu_pixel_group": 4,
+    "validation_only": false,
+    "width": 1920,
+    "height": 1080,
+    "target_fps": 60,
+    "requested_seconds": 60,
+    "max_byte_error": 1,
+    "started_unix_s": 1791327817.49,
+    "initial_present_hresult": 142213121,
+    "shared_npu_inputs_and_output": true,
+    "host_waited_fences": true,
+    "scanout_measured": false,
+    "skipped_slots": 14,
+    "deadline_misses": 42,
+    "selections": [
+      {
+        "elapsed_s": 0.00024,
+        "accepted": true,
+        "backend": "GPU"
+      },
+      {
+        "elapsed_s": 3.133805,
+        "accepted": true,
+        "backend": "NPU"
+      },
+      {
+        "elapsed_s": 8.100603,
+        "accepted": false,
+        "error": "expected canonical version 1 selection with GPU, NPU or CPU"
+      },
+      {
+        "elapsed_s": 11.217191,
+        "accepted": true,
+        "backend": "CPU"
+      },
+      {
+        "elapsed_s": 16.183894,
+        "accepted": true,
+        "backend": "GPU"
+      }
+    ]
+  },
+  "frame_count": 1131,
+  "backend_timings": {
+    "GPU": {
+      "frames": 362,
+      "work_median_ms": 6.8633500000000005,
+      "work_p99_ms": 9.4772,
+      "work_over_60hz_interval": 0
+    },
+    "NPU": {
+      "frames": 485,
+      "work_median_ms": 13.9348,
+      "work_p99_ms": 16.5926,
+      "work_over_60hz_interval": 4
+    },
+    "CPU": {
+      "frames": 284,
+      "work_median_ms": 10.33525,
+      "work_p99_ms": 32.819,
+      "work_over_60hz_interval": 22
+    }
+  }
+}

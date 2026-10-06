@@ -8,17 +8,19 @@ int main(int argc, char **argv) {
     std::string stage = "device";
     try {
         size_t width = 64, height = 64, frame_count = 8;
+        size_t pixel_group = 4;
         bool packed_u8 = false, host_tensors = false;
         for (int i = 1; i < argc; ++i) {
             const std::string argument = argv[i];
             if (argument == "--packed-u8") packed_u8 = true;
             else if (argument == "--host-tensors") host_tensors = true;
-            else if ((argument == "--width" || argument == "--height" || argument == "--frames") && i + 1 < argc) {
+            else if ((argument == "--width" || argument == "--height" || argument == "--frames" || argument == "--pixel-group") && i + 1 < argc) {
                 const size_t value = std::stoul(argv[++i]);
                 if (argument == "--width") width = value;
                 else if (argument == "--height") height = value;
+                else if (argument == "--pixel-group") pixel_group = value;
                 else frame_count = value;
-            } else throw std::invalid_argument("use --width N --height N --frames N [--packed-u8] [--host-tensors]");
+            } else throw std::invalid_argument("use --width N --height N --frames N [--packed-u8] [--pixel-group 1|4|16|32] [--host-tensors]");
         }
         if (!width || width > 4096 || !height || height > 4096 || !frame_count || frame_count > 1000)
             throw std::invalid_argument("invalid extent (1..4096) or frame count (1..1000)");
@@ -57,7 +59,7 @@ int main(int argc, char **argv) {
             ov::Core core;
             const ov::Shape shape = packed_u8 ? ov::Shape{1, height, width, 4} : ov::Shape{1, 4, height, width};
             const auto element_type = packed_u8 ? ov::element::u8 : ov::element::f16;
-            auto model = blend_model(width, height, packed_u8);
+            auto model = blend_model(width, height, packed_u8, pixel_group);
             stage = "npu_compile";
             auto compiled = core.compile_model(model, "NPU");
             const auto devices = compiled.get_property(ov::execution_devices);
@@ -157,6 +159,7 @@ int main(int argc, char **argv) {
         std::cout << "{\"passed\":true,\"adapter\":" << quote(adapter_name)
                   << ",\"execution_device\":\"NPU\",\"width\":" << width << ",\"height\":" << height
                   << ",\"format\":" << quote(packed_u8 ? "BGRA8_NHWC" : "BGRA16F_NCHW")
+                  << ",\"pixel_group\":" << blend_pixel_group(width, packed_u8, pixel_group)
                   << ",\"frames\":" << frame_count << ","
                   << "\"max_abs_error\":" << maximum_error
                   << ",\"input_and_output_shared\":" << (host_tensors ? "false" : "true")

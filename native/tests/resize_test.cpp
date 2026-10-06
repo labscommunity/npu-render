@@ -116,6 +116,28 @@ int main(int argc, char **argv) {
         require(nr_resize_regions(ctx.get(),&destination,&destination,dw,dh,0,0,damage.data(),damage.size(),
                                  NR_SOURCE_OVER,.5f,&stats,error,sizeof(error))==0,error);
         maximum=std::max(maximum,compare(destination,alias_reference,damage)); ++cases;
+        // Exact 2x reduction exercises the pool specialization, including image
+        // corners, transparent texels, padded rows and untouched gaps.
+        const uint32_t pw=dw*2, ph=dh*2;
+        const size_t ps=pw*4+16;
+        std::vector<uint8_t> pool_source(ps*ph,0xab);
+        for (uint32_t y=0;y<ph;++y) for (uint32_t x=0;x<pw;++x) {
+            const unsigned a=(x*19+y*31)%256;
+            for (unsigned c=0;c<4;++c) pool_source[y*ps+x*4+c]=c==3?a:(x*29+y*17+c*51)%(a+1);
+        }
+        nr_surface pooled{pool_source.data(),pool_source.size(),ps,pw,ph,0};
+        const std::vector<nr_damage_rect> corners{{0,0,5,4},{28,23,3,2}};
+        require(nr_prepare_resize(ctx.get(),pw,ph,dw,dh,error,sizeof(error))==0,error);
+        for (int opaque=0;opaque<4;++opaque) for (int op=0;op<2;++op) for (float opacity:{0.f,.5f,1.f}) {
+            pooled.opaque=opaque&1; destination.opaque=opaque&2;
+            std::copy(original.begin(),original.end(),dst.begin());
+            const auto reference=expected(pooled,destination,dw,dh,0,0,corners,nr_operator(op),opacity);
+            require(nr_resize_regions(ctx.get(),&pooled,&destination,dw,dh,0,0,corners.data(),corners.size(),
+                                     nr_operator(op),opacity,&stats,error,sizeof(error))==0,error);
+            require(stats.pixels==26 && stats.dispatches==1,"incorrect downscale work accounting");
+            require(std::strncmp(stats.execution_devices,argv[1],3)==0,"downscale used another device");
+            maximum=std::max(maximum,compare(destination,reference,corners)); ++cases;
+        }
         require(nr_switch(ctx.get(),"CPU",error,sizeof(error))==0,error);
         require(call(66,38,0,0,NR_SOURCE_OVER,1)==0,error);
         require(std::strncmp(stats.execution_devices,"CPU",3)==0,"switch did not prepare retained resize graphs");

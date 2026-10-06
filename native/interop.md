@@ -43,12 +43,20 @@ only alpha fixed the captured fixtures. Direct NHWC arithmetic was also measured
 but was slower than conversion through planar arithmetic. The final model lives in
 `windows/blend_model.hpp` and is shared by this probe and the native window.
 
-The byte-unit planar graph passed eight changing frames at 720p and 1080p. Warm NPU
+The original byte-unit planar graph passed eight changing frames at 720p and 1080p. Warm NPU
 calls were approximately 9.8–10.3 ms and 21.1–22.1 ms respectively. The FP16 planar
 1080p graph took approximately 3.9–5.0 ms. These are separate small experiments,
 not claims of equal clocks or an isolated conversion cost. The complete fixture
 time includes deliberately expensive CPU fixture generation and pixel checking;
 it is not an application frame-time benchmark. See the dated validation artifacts.
+
+The current graph groups four neighboring BGRA pixels into 16 channels, performs
+the same per-pixel arithmetic, and restores their byte order. Shared-buffer tests
+reduced warm NPU calls to about 4.8–5.1 ms at 720p and 9.3–9.7 ms at 1080p, with
+the same pixel gate. `nr_d3d12_interop --pixel-group 1` reproduces the original
+layout; groups 4/16/32 are diagnostic alternatives. Non-divisible widths use group
+one. This selection never changes the execution device. See the
+[grouping and downscale evidence](../docs/validation/2026-10-06/layout/README.md).
 
 ## Native Windows application
 

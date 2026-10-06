@@ -1,0 +1,33 @@
+{
+  "passed": true,
+  "adapter": "Intel(R) Arc(TM) B390 GPU",
+  "execution_device": "NPU",
+  "width": 1920,
+  "height": 1080,
+  "format": "BGRA8_NHWC",
+  "pixel_group": 4,
+  "frames": 8,
+  "max_abs_error": 0.00239909,
+  "input_and_output_shared": true,
+  "host_waited_fences": true,
+  "inference_ms": [
+    15.6741,
+    9.7428,
+    9.5923,
+    9.395,
+    9.5605,
+    9.269,
+    9.5037,
+    9.6617
+  ],
+  "fixture_upload_infer_readback_check_ms": [
+    169.851,
+    160.683,
+    161.657,
+    160.713,
+    163.393,
+    164.845,
+    167.4,
+    165.935
+  ]
+}

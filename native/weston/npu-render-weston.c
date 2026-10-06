@@ -341,8 +341,9 @@ static int repaint_resized(struct nr_weston *state, pixman_op_t operation,
     state->native_pixels += stats.pixels;
     if (state->resize_calls == 1 || state->resize_calls%300 == 0)
         fprintf(stderr, "npu-render-resize: {\"execution_devices\":\"%s\",\"pixels\":%llu,"
-                        "\"dispatches\":%llu,\"elapsed_ms\":%.3f}\n", stats.execution_devices,
-                (unsigned long long)stats.pixels, (unsigned long long)stats.dispatches, stats.elapsed_ms);
+                        "\"dispatches\":%llu,\"elapsed_ms\":%.3f,\"source\":[%u,%u],\"resized\":[%u,%u]}\n", stats.execution_devices,
+                (unsigned long long)stats.pixels, (unsigned long long)stats.dispatches, stats.elapsed_ms,
+                src->width, src->height, (uint32_t)rw, (uint32_t)rh);
     handled = 1;
 done:
     free(regions);

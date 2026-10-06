@@ -266,9 +266,18 @@ std::shared_ptr<ResizeProgram> prepare_resize(ov::Core &core, const ResizeKey &e
     attributes.mode = op::Interpolate::InterpolateMode::LINEAR_ONNX;
     attributes.shape_calculation_mode = op::Interpolate::ShapeCalcMode::SIZES;
     attributes.coordinate_transformation_mode = op::Interpolate::CoordinateTransformMode::HALF_PIXEL;
-    auto resized = std::make_shared<op::Interpolate>(image,
-        op::Constant::create(ov::element::i64, {2}, {rh, rw}),
-        op::Constant::create(ov::element::i64, {2}, {2, 3}), attributes);
+    std::shared_ptr<ov::Node> resized;
+    if (sw == 2*rw && sh == 2*rh) {
+        // Half-pixel coordinates are (2*x+.5, 2*y+.5): exactly four
+        // neighboring texels with weight 1/4, with no border extrapolation.
+        // This is not a new box-filter contract for arbitrary reduction ratios.
+        resized = std::make_shared<op::AvgPool>(image, ov::Strides{2,2},
+            ov::Shape{0,0}, ov::Shape{0,0}, ov::Shape{2,2}, true);
+    } else {
+        resized = std::make_shared<op::Interpolate>(image,
+            op::Constant::create(ov::element::i64, {2}, {rh, rw}),
+            op::Constant::create(ov::element::i64, {2}, {2, 3}), attributes);
+    }
     auto foreground = std::make_shared<op::Multiply>(resized, opacity);
     auto alpha = std::make_shared<op::Gather>(foreground,
         op::Constant::create(ov::element::i64, {1}, {3}), op::Constant::create(ov::element::i64, {}, {1}));

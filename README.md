@@ -28,6 +28,12 @@ occluded by Delta's screen saver, so visible native presentation remains unvalid
 The private CI Windows bundle runs with `run.cmd`; press **1 / 2 / 3** to switch
 GPU / NPU / CPU. See [native usage and limits](native/interop.md#native-windows-application).
 
+The grouped-pixel NPU graph halves shared-buffer call time: about 5 ms at 720p and
+9.5 ms at 1080p. A 1080p control run measured 13.9 ms median complete NPU processing
+while occluded; visible delivery remains unverified. Exact 2× downscale/compose now
+takes about 5 ms through the host API. See the
+[layout and downscale measurements](docs/validation/2026-10-06/layout/README.md).
+
 ## Run it
 
 Python 3.11–3.14 and a compatible installed device driver are required. The runtime

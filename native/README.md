@@ -78,6 +78,12 @@ the general sampler. Graph preparation stays off the paint thread. The optimized
 720p resize/compose API took 11.7–12.4 ms on Delta's NPU; 1080p took 26.7–27.2 ms.
 See [complete API measurements](../docs/validation/2026-10-06/resize/README.md).
 
+Exact 2× reduction in both dimensions uses an equivalent 2×2 average-pool graph.
+The complete 720p → 360p NPU resize/blend call takes about 5 ms in the captured
+fixtures. Other ratios retain interpolation; this does not change the bilinear
+contract into an arbitrary box filter. See
+[downscale validation](../docs/validation/2026-10-06/layout/README.md).
+
 Install Linux dependencies (Ubuntu 24.04 example):
 
 ```sh
@@ -89,6 +95,7 @@ uv run python tools/build_weston.py
 uv run python tools/validate_weston.py
 uv run python tools/validate_weston.py --transformed
 uv run python tools/validate_weston.py --resized
+uv run python tools/validate_weston.py --downscaled
 ```
 
 The test uses a real Wayland client against a headless compositor and compares the

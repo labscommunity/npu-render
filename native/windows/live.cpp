@@ -457,6 +457,8 @@ int main(int argc, char **argv) {
         DWORD session = 0; ProcessIdToSessionId(GetCurrentProcessId(), &session);
         report << std::setprecision(12) << "{\"passed\":true,\"adapter\":" << quote(renderer.adapter)
                << ",\"npu_execution_device\":\"NPU\",\"gpu_provider\":\"D3D12 compute shader\",\"session_id\":" << session
+               << ",\"npu_pixel_group\":" << blend_pixel_group(o.width, true)
+               << ",\"validation_only\":" << (o.validate_only ? "true" : "false")
                << ",\"width\":" << o.width << ",\"height\":" << o.height << ",\"target_fps\":" << o.fps
                << ",\"requested_seconds\":" << o.seconds << ",\"max_byte_error\":" << renderer.max_error
                << ",\"started_unix_s\":" << started_unix_s
