@@ -21,7 +21,8 @@ Git does not install hooks in fresh clones. Run `npm ci` and
 
 ## Server enforcement limitation
 
-At setup, GitHub returned HTTP 403 when asked to activate a commit-message ruleset:
+At setup, GitHub returned HTTP 403 when asked to activate a commit-message ruleset
+and main-branch protection:
 the account must upgrade to GitHub Pro to enable that feature for this private
 repository. The repository remains private. Local hooks and CI are active, but
 they do not substitute for a server rejecting noncompliant direct pushes.
