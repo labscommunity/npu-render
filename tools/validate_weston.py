@@ -86,8 +86,11 @@ def main():
             finally:
                 stop(client)
                 stop(compositor)
+                log.flush()
+                client_log.flush()
+                print((runtime / "weston.log").read_text(), flush=True)
+                print((runtime / "client.log").read_text(), flush=True)
         captured = (runtime / "weston.log").read_text()
-        print(captured)
         summaries = [
             json.loads(line.split("npu-render-summary: ", 1)[1])
             for line in captured.splitlines()
