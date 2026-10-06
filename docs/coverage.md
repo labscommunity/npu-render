@@ -10,7 +10,7 @@ coverage, not just whether an equivalent tensor equation exists.
 | Source copy | Native provider, byte-exact tests on CPU/GPU/NPU | Wider buffer formats and resource layouts |
 | Animated application surfaces | SDL window and native D3D12 swapchain; NPU byte conversion and composition | Native window occluded on first test; presentation timestamps and wider adapters |
 | Window composition | Restricted Weston adapter with damage/visibility; CPU headless and nested tests | Native Linux NPU execution and standalone display validation |
-| Window transforms and scaling | CPU scene placement in the demo only | Typed operation graphs, sampling/edge conformance, compositor mappings |
+| Window transforms and scaling | Native indexed texel sampling; Weston affine/nearest/bilinear and one-rectangle source clipping; 48 CPU/Pixman cases | Generic NPU path is too slow for full-frame 60 Hz; optimized resizing and Linux NPU presentation pending |
 | Color conversion and filters | CPU linear-sRGB conversion; NPU BGRA8/FP16 packing and rounding in native window | NPU color-space/filter graphs and end-to-end comparison |
 | Client 2D drawing/text | No interception | Graphics-library/application adapters; glyph and path rasterization |
 | Game rendering | Restricted triangle research probe only | Shader/API translation, textures, depth/stencil, blending and synchronization |

@@ -47,7 +47,22 @@ typedef struct nr_frame_stats {
     char execution_devices[128];
 } nr_frame_stats;
 
-/* tile_side fixes capacity for all requests; no compilation occurs per blend.
+/* Four integer texel addresses and nonnegative interpolation weights per output
+ * pixel. Addresses index the tightly packed logical source image, not its stride.
+ * Weights sum to at most one; omitted edge contributions remain transparent.
+ * Geometry/weight generation stays with the caller. Texel fetch, interpolation
+ * and source-over execute on the selected device. FP16 sampling allows <=2 LSB.
+ */
+typedef struct nr_sample_point {
+    uint32_t index[4];
+    float weight[4];
+} nr_sample_point;
+typedef struct nr_damage_rect {
+    uint32_t x, y, width, height;
+} nr_damage_rect;
+
+/* tile_side sets the upper batch capacity; NPU sampling currently caps it at
+ * 128x128 to avoid a verified driver compiler failure. No per-frame compilation.
  * Creation and switching compile and qualify on the requested device only.
  * Errors are copied into the caller buffer; functions do not throw across C ABI.
  */
@@ -68,6 +83,18 @@ NR_API int nr_compose_regions(nr_context *context, const nr_surface *source,
                               nr_surface *destination, const nr_region *regions,
                               size_t region_count, nr_operator operation, float opacity,
                               nr_frame_stats *stats, char *error, size_t error_size);
+
+/* Prepare each source extent on a control thread before sampling it. At most 16
+ * extents / 64 million source pixels are retained per context. Switching prepares all retained sampling
+ * graphs before activation; any failure preserves the entire previous backend.
+ */
+NR_API int nr_prepare_sampling(nr_context *context, uint32_t source_width,
+                               uint32_t source_height, char *error, size_t error_size);
+NR_API int nr_sample_regions(nr_context *context, const nr_surface *source,
+                             nr_surface *destination, const nr_damage_rect *regions,
+                             size_t region_count, const nr_sample_point *points,
+                             size_t point_count, nr_operator operation, float opacity,
+                             nr_frame_stats *stats, char *error, size_t error_size);
 
 /* Source/destination storage must remain valid and stable during the call.
  * Infer requests serialize per prepared backend. The destination changes only

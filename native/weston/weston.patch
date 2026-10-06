@@ -23,7 +23,7 @@
 -	if (source_clip)
 +	if (nr_weston_repaint(pr->offload, pixman_op, ps->image, target_image,
 +			      &transform, filter, repaint_output,
-+			      source_clip != NULL, ev->alpha)) {
++			      source_clip, ev->alpha)) {
 +		/* The native provider completed this damage region. */
 +	} else if (source_clip)
  		composite_clipped(output, ps->image, mask_image, target_image,

@@ -47,6 +47,10 @@ def main():
     )
     for device in args.devices:
         subprocess.run([str(executable), device], check=True, env=environment)
+        sampler = executable.with_name(
+            "nr_sampling_test.exe" if os.name == "nt" else "nr_sampling_test"
+        )
+        subprocess.run([str(sampler), device], check=True, env=environment)
     subprocess.run(
         [
             "ctest",

@@ -40,11 +40,28 @@ Eligible source/source-over operations go through the native provider; unsupport
 ones remain explicitly counted Pixman operations. Native failure retries are safe
 because the destination was not partially committed.
 
-Currently eligible: little-endian ARGB8888/XRGB8888 SHM surfaces, integer translation,
-nearest sampling, global opacity, and disjoint damage rectangles. Scaling, rotation,
-source clipping, other formats and solid fills use the existing Pixman path. Source
-copy outside the source bounds also remains on Pixman. This adapter does not enable
-GPU DMA-BUF clients or offload arbitrary client rendering.
+Eligible inputs are little-endian ARGB8888/XRGB8888 SHM surfaces, global opacity and
+disjoint damage. Integer translation retains the direct blend path. Affine scaling,
+rotation, mirroring and fractional translation use indexed texture sampling, with
+nearest/bilinear filtering and an optional single rectangular source clip. Bilinear
+coordinates match Pixman's 7-bit fractions and edge policy. Multiple source clips,
+perspective, other formats and solid fills retain counted Pixman handling. The
+adapter does not enable GPU DMA-BUF clients or offload arbitrary client rendering.
+
+`nr_prepare_sampling()` compiles/qualifies each source extent on a control thread.
+The adapter counts Pixman fallback while preparation is pending; sampling never
+compiles in the paint path. Backend switching prepares all retained sample graphs
+before activating the new backend. `nr_sample_regions()` receives integer addresses
+and weights; texel fetch/interpolation/blending run on the selected device. Coordinate
+generation, buffer packing and output staging remain CPU work. All output commits
+after successful inference, and invalid addresses/weights preserve the destination.
+Sampling has a two-byte exploratory accuracy gate, separate from blend's one byte.
+
+**Generic sampling is currently a correctness path.** The 640×360 → 1280×720 NPU test
+took roughly 0.7–0.9 seconds per host API call. This is not suitable for full-frame
+60 Hz use. NPU sampling batches are capped at 128×128 to avoid a measured compiler
+failure without changing devices. Specialized resize work is being evaluated.
+See [operation evidence and limitations](../docs/validation/2026-10-06/sampling/README.md).
 
 Install Linux dependencies (Ubuntu 24.04 example):
 
@@ -55,6 +72,7 @@ sudo apt-get install meson ninja-build pkg-config libwayland-dev wayland-protoco
 uv run --group native python tools/build_native.py --pixman
 uv run python tools/build_weston.py
 uv run python tools/validate_weston.py
+uv run python tools/validate_weston.py --transformed
 ```
 
 The test uses a real Wayland client against a headless compositor and compares the
