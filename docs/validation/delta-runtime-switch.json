@@ -1,0 +1,88 @@
+{
+  "created_utc": "2026-10-06T00:07:38.224894+00:00",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "openvino": "2026.1.0-21367-63e31528c62-releases/2026/1",
+  "package_version": "0.1.0",
+  "devices": [
+    {
+      "id": "CPU",
+      "name": "Intel(R) Core(TM) Ultra X7 358H",
+      "provider": "openvino"
+    },
+    {
+      "id": "GPU",
+      "name": "Intel(R) Arc(TM) B390 GPU (iGPU)",
+      "provider": "openvino"
+    },
+    {
+      "id": "NPU",
+      "name": "Intel(R) AI Boost",
+      "provider": "openvino"
+    }
+  ],
+  "operation": {
+    "width": 96,
+    "height": 64,
+    "layers": 2,
+    "precision": "f16",
+    "layout": "NCHW"
+  },
+  "scope": "backend switching and correctness; no display or Tahoma performance claim",
+  "switches": [
+    {
+      "requested": "GPU",
+      "backend": "GPU",
+      "execution_devices": [
+        "GPU.0"
+      ],
+      "host_call_ms": 0.24069999994935642,
+      "max_abs_error": 0.0007153836486395448,
+      "passed": true
+    },
+    {
+      "requested": "NPU",
+      "backend": "NPU",
+      "execution_devices": [
+        "NPU"
+      ],
+      "host_call_ms": 0.4100000001017179,
+      "max_abs_error": 0.0010411898110760376,
+      "passed": true
+    },
+    {
+      "requested": "CPU",
+      "backend": "CPU",
+      "execution_devices": [
+        "CPU"
+      ],
+      "host_call_ms": 0.1194999999825086,
+      "max_abs_error": 0.00024414030485786498,
+      "passed": true
+    },
+    {
+      "requested": "GPU",
+      "backend": "GPU",
+      "execution_devices": [
+        "GPU.0"
+      ],
+      "host_call_ms": 0.16600000003563764,
+      "max_abs_error": 0.0007153836486395448,
+      "passed": true
+    },
+    {
+      "requested": "NPU",
+      "backend": "NPU",
+      "execution_devices": [
+        "NPU"
+      ],
+      "host_call_ms": 0.49250000006395567,
+      "max_abs_error": 0.0010411898110760376,
+      "passed": true
+    }
+  ],
+  "passed": true,
+  "package_artifact": {
+    "filename": "npu_render-0.1.0-py3-none-any.whl",
+    "sha256": "9ae34770a10fe882ad13a2626a3ab5a87f47599f558b5e98619d039d770edceb"
+  }
+}

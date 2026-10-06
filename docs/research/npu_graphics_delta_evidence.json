@@ -1,0 +1,3584 @@
+{
+  "research_date": "2026-10-05",
+  "scope": "Measured hardware graph execution; not a compositor, game, presentation, or Tahoma acceleration result.",
+  "probe_source_sha256_at_evidence_collection": "5eee5ab7eadb3087e4b826d6aaf3c2c89802deac8581403918702c60014dfd7b",
+  "report_evolution": "Early reports predate optional layout/share_host_tensors metadata. Missing layout means NCHW; report names ending shared or nhwc requested Python sharing; other early reports used copying. Source hash identifies the final probe at collection, not every earlier invocation.",
+  "metadata": {
+    "captured_utc": "2026-10-05T23:50:06.2800525Z",
+    "cpu": {
+      "Name": "Intel(R) Core(TM) Ultra X7 358H",
+      "NumberOfCores": 16,
+      "NumberOfLogicalProcessors": 16
+    },
+    "os": {
+      "Caption": "Microsoft Windows 11 Pro",
+      "Version": "10.0.26200",
+      "BuildNumber": "26200"
+    },
+    "memory_bytes": 33746386944,
+    "video": {
+      "Name": "Intel(R) Arc(TM) B390 GPU",
+      "DriverVersion": "32.0.101.8724"
+    },
+    "npu": {
+      "DeviceName": "Intel(R) NPU",
+      "DriverVersion": "32.0.100.4724"
+    },
+    "power_plan": "Power Scheme GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (Balanced)",
+    "study_scope": "Sequential synthetic graph probes. No display or concurrent Tahoma test. No power or engine telemetry."
+  },
+  "runs": [
+    {
+      "report_name": "cpu-1080-nhwc.json",
+      "report": {
+        "schema_version": 1,
+        "openvino": "2026.1.0-21367-63e31528c62-releases/2026/1",
+        "os": "Windows-11-10.0.26200-SP0",
+        "device_requested": "CPU",
+        "devices_available": [
+          "CPU",
+          "GPU",
+          "NPU"
+        ],
+        "precision": "f16",
+        "layout": "NHWC",
+        "width": 1920,
+        "height": 1080,
+        "layers": 4,
+        "iterations": 100,
+        "share_host_tensors": true,
+        "timing_scope": "synchronous host inference call; Python buffer sharing requested; device copies may remain; excludes frame preparation and display",
+        "hardware_telemetry": "not collected",
+        "scenes": [
+          {
+            "scene": "composite",
+            "status": "pass",
+            "query_unsupported_ops": [],
+            "compile_config": {
+              "PERF_COUNT": true,
+              "INFERENCE_PRECISION_HINT": "f16"
+            },
+            "compile_ms": 39.447999999993044,
+            "execution_devices": [
+              "CPU"
+            ],
+            "device_full_name": "Intel(R) Core(TM) Ultra X7 358H",
+            "correctness": [
+              {
+                "case": "fractional_alpha",
+                "pass": true,
+                "max_abs_error": 0.0002441955367659121,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              },
+              {
+                "case": "all_transparent",
+                "pass": true,
+                "max_abs_error": 0.0,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              },
+              {
+                "case": "opaque_front",
+                "pass": true,
+                "max_abs_error": 0.0,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              }
+            ],
+            "host_call_ms": {
+              "median": 4.516550000005282,
+              "p95": 4.717259999992507,
+              "min": 4.400400000008631,
+              "samples": [
+                4.717099999993479,
+                4.720299999974031,
+                4.6379000000342785,
+                4.689900000016678,
+                4.712499999982356,
+                4.743299999972805,
+                4.895899999951325,
+                4.756799999995565,
+                4.6727999999802705,
+                4.623799999990297,
+                4.617799999948602,
+                4.617999999993572,
+                4.646400000012818,
+                4.628099999990809,
+                4.663499999992382,
+                4.6227999999928215,
+                4.619700000034754,
+                4.638499999998658,
+                4.705100000023776,
+                4.507199999977729,
+                4.4651000000044405,
+                4.664800000000469,
+                4.400400000008631,
+                4.411000000004606,
+                4.48340000002645,
+                4.514700000015637,
+                4.493799999977455,
+                4.534699999965142,
+                4.477199999996628,
+                4.4757000000004155,
+                4.495500000018637,
+                4.432199999996556,
+                4.6017000000233566,
+                4.569500000002336,
+                4.479199999991579,
+                4.452800000024126,
+                4.51229999998759,
+                4.514099999994414,
+                4.539099999988139,
+                4.587799999967501,
+                4.510200000026998,
+                4.55669999996644,
+                4.497099999980492,
+                4.430700000000343,
+                4.437199999983932,
+                4.523399999982303,
+                4.498600000033548,
+                4.468999999971857,
+                4.516299999977491,
+                4.500899999982266,
+                4.484999999988304,
+                4.4861999999739055,
+                4.537999999968179,
+                4.461399999968307,
+                4.460900000026413,
+                4.482800000005227,
+                4.500500000006014,
+                4.51799999996183,
+                4.589500000008684,
+                4.4520000000147775,
+                4.516800000033072,
+                4.451900000049136,
+                4.51620000001185,
+                4.487699999970118,
+                4.535599999996975,
+                4.524399999979778,
+                4.501399999981004,
+                4.4757000000004155,
+                4.471800000032999,
+                4.450899999994817,
+                4.514099999994414,
+                4.444599999999355,
+                4.539799999975003,
+                4.699700000003304,
+                4.490900000007514,
+                4.4368999999733205,
+                4.475300000024163,
+                4.461399999968307,
+                4.48340000002645,
+                4.496599999981754,
+                4.531600000007074,
+                4.535799999985102,
+                4.523399999982303,
+                4.7792000000299595,
+                4.58179999998265,
+                4.632899999990059,
+                4.59360000002107,
+                4.560499999968215,
+                4.561599999988175,
+                4.5616000000450185,
+                4.645700000025954,
+                4.601799999988998,
+                4.607500000020082,
+                4.510199999970155,
+                4.5912000000498665,
+                4.475500000012289,
+                4.48039999997718,
+                4.50439999997343,
+                4.556499999978314,
+                4.452799999967283
+              ]
+            },
+            "profiling": [
+              {
+                "node": "layer_3",
+                "type": "Parameter",
+                "execution_type": "unknown_f16",
+                "status": "Status.NOT_RUN",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9785",
+                "type": "Subgraph",
+                "execution_type": "jit_avx2_f16",
+                "status": "Status.EXECUTED",
+                "real_us": 434.0
+              },
+              {
+                "node": "Gather_40",
+                "type": "Gather",
+                "execution_type": "jit_avx2_f16",
+                "status": "Status.EXECUTED",
+                "real_us": 399.0
+              },
+              {
+                "node": "layer_2",
+                "type": "Parameter",
+                "execution_type": "unknown_f16",
+                "status": "Status.NOT_RUN",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9787",
+                "type": "Subgraph",
+                "execution_type": "jit_avx2_f16",
+                "status": "Status.EXECUTED",
+                "real_us": 369.0
+              },
+              {
+                "node": "Gather_29",
+                "type": "Gather",
+                "execution_type": "jit_avx2_f16",
+                "status": "Status.EXECUTED",
+                "real_us": 401.0
+              },
+              {
+                "node": "layer_1",
+                "type": "Parameter",
+                "execution_type": "unknown_f16",
+                "status": "Status.NOT_RUN",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9789",
+                "type": "Subgraph",
+                "execution_type": "jit_avx2_f16",
+                "status": "Status.EXECUTED",
+                "real_us": 358.0
+              },
+              {
+                "node": "Gather_18",
+                "type": "Gather",
+                "execution_type": "jit_avx2_f16",
+                "status": "Status.EXECUTED",
+                "real_us": 398.0
+              },
+              {
+                "node": "layer_0",
+                "type": "Parameter",
+                "execution_type": "unknown_f16",
+                "status": "Status.NOT_RUN",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9791",
+                "type": "Subgraph",
+                "execution_type": "jit_avx2_f16",
+                "status": "Status.EXECUTED",
+                "real_us": 351.0
+              },
+              {
+                "node": "Gather_7",
+                "type": "Gather",
+                "execution_type": "jit_avx2_f16",
+                "status": "Status.EXECUTED",
+                "real_us": 398.0
+              },
+              {
+                "node": "background",
+                "type": "Parameter",
+                "execution_type": "unknown_f16",
+                "status": "Status.NOT_RUN",
+                "real_us": 0.0
+              },
+              {
+                "node": "Add_45",
+                "type": "Subgraph",
+                "execution_type": "jit_avx2_f16",
+                "status": "Status.EXECUTED",
+                "real_us": 1348.0
+              },
+              {
+                "node": "Result_46",
+                "type": "Result",
+                "execution_type": "unknown_f16",
+                "status": "Status.NOT_RUN",
+                "real_us": 0.0
+              }
+            ]
+          }
+        ],
+        "pass": true
+      }
+    },
+    {
+      "report_name": "cpu-1080-shared.json",
+      "report": {
+        "schema_version": 1,
+        "openvino": "2026.1.0-21367-63e31528c62-releases/2026/1",
+        "os": "Windows-11-10.0.26200-SP0",
+        "device_requested": "CPU",
+        "devices_available": [
+          "CPU",
+          "GPU",
+          "NPU"
+        ],
+        "precision": "f16",
+        "width": 1920,
+        "height": 1080,
+        "layers": 4,
+        "iterations": 100,
+        "share_host_tensors": true,
+        "timing_scope": "synchronous host inference call; Python buffer sharing requested; device copies may remain; excludes frame preparation and display",
+        "hardware_telemetry": "not collected",
+        "scenes": [
+          {
+            "scene": "composite",
+            "status": "pass",
+            "query_unsupported_ops": [],
+            "compile_config": {
+              "PERF_COUNT": true,
+              "INFERENCE_PRECISION_HINT": "f16"
+            },
+            "compile_ms": 37.92100000003984,
+            "execution_devices": [
+              "CPU"
+            ],
+            "device_full_name": "Intel(R) Core(TM) Ultra X7 358H",
+            "correctness": [
+              {
+                "case": "fractional_alpha",
+                "pass": true,
+                "max_abs_error": 0.0002441955367659121,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              },
+              {
+                "case": "all_transparent",
+                "pass": true,
+                "max_abs_error": 0.0,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              },
+              {
+                "case": "opaque_front",
+                "pass": true,
+                "max_abs_error": 0.0,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              }
+            ],
+            "host_call_ms": {
+              "median": 3.3229000000005726,
+              "p95": 3.527094999986957,
+              "min": 3.3022000000073604,
+              "samples": [
+                3.5121000000231106,
+                3.4777999999846543,
+                3.483800000026349,
+                3.50199999996903,
+                3.512999999998101,
+                3.433400000005804,
+                3.5366000000180975,
+                3.4713999999667067,
+                3.5207999999897766,
+                3.49149999999554,
+                3.4828999999945154,
+                3.6634000000503875,
+                3.497000000038497,
+                3.4526000000028034,
+                3.447899999969195,
+                3.489899999976842,
+                3.4502000000316,
+                3.4789000000046144,
+                3.5265999999865016,
+                3.5007999999834283,
+                3.5035999999877276,
+                3.478700000016488,
+                3.440800000021227,
+                3.4673000000111642,
+                3.4640000000081272,
+                3.4931000000142376,
+                3.4033000000022184,
+                3.309300000012172,
+                3.316499999982625,
+                3.314400000022033,
+                3.3141999999770633,
+                3.3143999999651896,
+                3.3071999999947366,
+                3.3492000000023836,
+                3.312399999970239,
+                3.3049999999548163,
+                3.3077999999591157,
+                3.3077999999591157,
+                3.312499999992724,
+                3.3093999999778134,
+                3.3202999999843996,
+                3.304399999990437,
+                3.305300000022271,
+                3.3518000000185566,
+                3.317600000002585,
+                3.309999999999036,
+                3.3090000000015607,
+                3.3308999999803746,
+                3.3075999999709893,
+                3.304399999990437,
+                3.313899999966452,
+                3.3106999999859,
+                3.31180000000586,
+                3.3657000000175685,
+                3.3144999999876745,
+                3.419899999983045,
+                3.3751999999935833,
+                3.351199999997334,
+                3.4033000000022184,
+                3.378600000019105,
+                3.3222000000137086,
+                3.3047000000010485,
+                3.3197000000200205,
+                3.3182000000238077,
+                3.3128000000033353,
+                3.305599999976039,
+                3.3490999999798987,
+                3.3225999999899614,
+                3.307500000005348,
+                3.3056999999985237,
+                3.3144999999876745,
+                3.3152999999970234,
+                3.3140000000457803,
+                3.309099999967202,
+                3.3095000000002983,
+                3.3434000000056585,
+                3.323200000011184,
+                3.310999999996511,
+                3.3022000000073604,
+                3.3065000000078726,
+                3.3048000000235334,
+                3.330900000037218,
+                3.309199999989687,
+                3.3093999999778134,
+                3.364800000042578,
+                3.315799999995761,
+                3.3181000000013228,
+                3.3084000000371816,
+                3.315100000008897,
+                3.302299999973002,
+                3.3022000000073604,
+                3.355400000032205,
+                3.571999999962827,
+                3.540400000019872,
+                3.4499999999866304,
+                3.4633999999869047,
+                3.463699999997516,
+                3.5364999999956126,
+                3.429699999969671,
+                3.4547999999858803
+              ]
+            },
+            "profiling": [
+              {
+                "node": "layer_3",
+                "type": "Parameter",
+                "execution_type": "unknown_f16",
+                "status": "Status.NOT_RUN",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9785",
+                "type": "Subgraph",
+                "execution_type": "jit_avx2_f16",
+                "status": "Status.EXECUTED",
+                "real_us": 463.0
+              },
+              {
+                "node": "Gather_40",
+                "type": "Gather",
+                "execution_type": "unknown_f16",
+                "status": "Status.NOT_RUN",
+                "real_us": 0.0
+              },
+              {
+                "node": "layer_2",
+                "type": "Parameter",
+                "execution_type": "unknown_f16",
+                "status": "Status.NOT_RUN",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9787",
+                "type": "Subgraph",
+                "execution_type": "jit_avx2_f16",
+                "status": "Status.EXECUTED",
+                "real_us": 456.0
+              },
+              {
+                "node": "Gather_29",
+                "type": "Gather",
+                "execution_type": "unknown_f16",
+                "status": "Status.NOT_RUN",
+                "real_us": 0.0
+              },
+              {
+                "node": "layer_1",
+                "type": "Parameter",
+                "execution_type": "unknown_f16",
+                "status": "Status.NOT_RUN",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9789",
+                "type": "Subgraph",
+                "execution_type": "jit_avx2_f16",
+                "status": "Status.EXECUTED",
+                "real_us": 466.0
+              },
+              {
+                "node": "Gather_18",
+                "type": "Gather",
+                "execution_type": "unknown_f16",
+                "status": "Status.NOT_RUN",
+                "real_us": 0.0
+              },
+              {
+                "node": "layer_0",
+                "type": "Parameter",
+                "execution_type": "unknown_f16",
+                "status": "Status.NOT_RUN",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9791",
+                "type": "Subgraph",
+                "execution_type": "jit_avx2_f16",
+                "status": "Status.EXECUTED",
+                "real_us": 485.0
+              },
+              {
+                "node": "Gather_7",
+                "type": "Gather",
+                "execution_type": "unknown_f16",
+                "status": "Status.NOT_RUN",
+                "real_us": 0.0
+              },
+              {
+                "node": "background",
+                "type": "Parameter",
+                "execution_type": "unknown_f16",
+                "status": "Status.NOT_RUN",
+                "real_us": 0.0
+              },
+              {
+                "node": "Add_45",
+                "type": "Subgraph",
+                "execution_type": "jit_avx2_f16",
+                "status": "Status.EXECUTED",
+                "real_us": 1450.0
+              },
+              {
+                "node": "Result_46",
+                "type": "Result",
+                "execution_type": "unknown_f16",
+                "status": "Status.NOT_RUN",
+                "real_us": 0.0
+              }
+            ]
+          }
+        ],
+        "pass": true
+      }
+    },
+    {
+      "report_name": "cpu-1080.json",
+      "report": {
+        "schema_version": 1,
+        "openvino": "2026.1.0-21367-63e31528c62-releases/2026/1",
+        "os": "Windows-11-10.0.26200-SP0",
+        "device_requested": "CPU",
+        "devices_available": [
+          "CPU",
+          "GPU",
+          "NPU"
+        ],
+        "precision": "f16",
+        "width": 1920,
+        "height": 1080,
+        "layers": 4,
+        "iterations": 100,
+        "timing_scope": "synchronous host inference call including default input/output copying; excludes frame preparation and display",
+        "hardware_telemetry": "not collected",
+        "scenes": [
+          {
+            "scene": "composite",
+            "status": "pass",
+            "query_unsupported_ops": [],
+            "compile_config": {
+              "PERF_COUNT": true,
+              "INFERENCE_PRECISION_HINT": "f16"
+            },
+            "compile_ms": 38.08349999999905,
+            "execution_devices": [
+              "CPU"
+            ],
+            "device_full_name": "Intel(R) Core(TM) Ultra X7 358H",
+            "correctness": [
+              {
+                "case": "fractional_alpha",
+                "pass": true,
+                "max_abs_error": 0.0002441955367659121,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              },
+              {
+                "case": "all_transparent",
+                "pass": true,
+                "max_abs_error": 0.0,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              },
+              {
+                "case": "opaque_front",
+                "pass": true,
+                "max_abs_error": 0.0,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              }
+            ],
+            "host_call_ms": {
+              "median": 11.332700000011187,
+              "p95": 11.551470000014774,
+              "min": 11.16160000000832,
+              "samples": [
+                11.47069999998962,
+                11.448199999989583,
+                11.37800000000766,
+                11.611700000003111,
+                11.494900000002417,
+                11.496099999988019,
+                11.249800000001642,
+                11.226200000010067,
+                11.36419999997429,
+                11.453399999993508,
+                11.434799999989309,
+                11.46249999999327,
+                11.337100000019973,
+                11.267400000008365,
+                11.452200000007906,
+                11.304499999994277,
+                11.25170000000253,
+                11.34439999998449,
+                11.404600000020082,
+                11.254199999996217,
+                11.317200000007688,
+                11.444199999999682,
+                11.381300000010697,
+                11.422600000003058,
+                11.389100000002372,
+                11.25960000001669,
+                11.232399999983045,
+                11.258400000002666,
+                11.351899999993975,
+                11.868800000002011,
+                11.51419999999348,
+                11.23730000000478,
+                11.36560000000486,
+                11.281799999977693,
+                11.405499999995072,
+                11.426299999982348,
+                11.450800000005756,
+                11.313999999998714,
+                11.469799999986208,
+                11.16160000000832,
+                11.350999999990563,
+                11.49810000001139,
+                11.26640000001089,
+                11.272899999994479,
+                11.398499999984324,
+                11.251100000009728,
+                11.38199999999756,
+                11.300000000005639,
+                11.215900000024703,
+                11.393400000002885,
+                11.25480000001744,
+                11.312899999978754,
+                11.44979999997986,
+                11.333300000018198,
+                11.466500000011592,
+                11.24889999999823,
+                11.261200000006966,
+                11.26189999999383,
+                11.548300000015388,
+                11.410299999994322,
+                11.246999999997342,
+                11.273099999982605,
+                11.439499999994496,
+                11.168900000001258,
+                11.346700000018473,
+                11.274100000008502,
+                11.209199999996144,
+                11.287399999986292,
+                11.381099999994149,
+                11.24809999998888,
+                11.28420000000574,
+                11.260999999990418,
+                13.41899999999896,
+                11.418899999995347,
+                11.324599999994689,
+                11.203300000005356,
+                11.332100000004175,
+                11.249800000001642,
+                11.318499999987353,
+                11.367599999999811,
+                11.254500000006828,
+                11.395899999996573,
+                11.257600000021739,
+                11.23789999999758,
+                11.252300000023752,
+                11.246999999997342,
+                11.23989999999253,
+                11.657000000013795,
+                11.264899999986255,
+                11.270700000011402,
+                11.293699999981754,
+                12.972200000007206,
+                11.363299999999299,
+                11.211799999983896,
+                11.390899999980775,
+                11.376900000016121,
+                11.42210000000432,
+                11.225099999990107,
+                11.423300000018344,
+                11.258099999992055
+              ]
+            },
+            "profiling": [
+              {
+                "node": "layer_3",
+                "type": "Parameter",
+                "execution_type": "unknown_f16",
+                "status": "Status.NOT_RUN",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9785",
+                "type": "Subgraph",
+                "execution_type": "jit_avx2_f16",
+                "status": "Status.EXECUTED",
+                "real_us": 595.0
+              },
+              {
+                "node": "Gather_40",
+                "type": "Gather",
+                "execution_type": "unknown_f16",
+                "status": "Status.NOT_RUN",
+                "real_us": 0.0
+              },
+              {
+                "node": "layer_2",
+                "type": "Parameter",
+                "execution_type": "unknown_f16",
+                "status": "Status.NOT_RUN",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9787",
+                "type": "Subgraph",
+                "execution_type": "jit_avx2_f16",
+                "status": "Status.EXECUTED",
+                "real_us": 484.0
+              },
+              {
+                "node": "Gather_29",
+                "type": "Gather",
+                "execution_type": "unknown_f16",
+                "status": "Status.NOT_RUN",
+                "real_us": 0.0
+              },
+              {
+                "node": "layer_1",
+                "type": "Parameter",
+                "execution_type": "unknown_f16",
+                "status": "Status.NOT_RUN",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9789",
+                "type": "Subgraph",
+                "execution_type": "jit_avx2_f16",
+                "status": "Status.EXECUTED",
+                "real_us": 482.0
+              },
+              {
+                "node": "Gather_18",
+                "type": "Gather",
+                "execution_type": "unknown_f16",
+                "status": "Status.NOT_RUN",
+                "real_us": 0.0
+              },
+              {
+                "node": "layer_0",
+                "type": "Parameter",
+                "execution_type": "unknown_f16",
+                "status": "Status.NOT_RUN",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9791",
+                "type": "Subgraph",
+                "execution_type": "jit_avx2_f16",
+                "status": "Status.EXECUTED",
+                "real_us": 486.0
+              },
+              {
+                "node": "Gather_7",
+                "type": "Gather",
+                "execution_type": "unknown_f16",
+                "status": "Status.NOT_RUN",
+                "real_us": 0.0
+              },
+              {
+                "node": "background",
+                "type": "Parameter",
+                "execution_type": "unknown_f16",
+                "status": "Status.NOT_RUN",
+                "real_us": 0.0
+              },
+              {
+                "node": "Add_45",
+                "type": "Subgraph",
+                "execution_type": "jit_avx2_f16",
+                "status": "Status.EXECUTED",
+                "real_us": 1495.0
+              },
+              {
+                "node": "Result_46",
+                "type": "Result",
+                "execution_type": "unknown_f16",
+                "status": "Status.NOT_RUN",
+                "real_us": 0.0
+              }
+            ]
+          }
+        ],
+        "pass": true
+      }
+    },
+    {
+      "report_name": "gpu-1080-nhwc.json",
+      "report": {
+        "schema_version": 1,
+        "openvino": "2026.1.0-21367-63e31528c62-releases/2026/1",
+        "os": "Windows-11-10.0.26200-SP0",
+        "device_requested": "GPU",
+        "devices_available": [
+          "CPU",
+          "GPU",
+          "NPU"
+        ],
+        "precision": "f16",
+        "layout": "NHWC",
+        "width": 1920,
+        "height": 1080,
+        "layers": 4,
+        "iterations": 100,
+        "share_host_tensors": true,
+        "timing_scope": "synchronous host inference call; Python buffer sharing requested; device copies may remain; excludes frame preparation and display",
+        "hardware_telemetry": "not collected",
+        "scenes": [
+          {
+            "scene": "composite",
+            "status": "pass",
+            "query_unsupported_ops": [],
+            "compile_config": {
+              "PERF_COUNT": true,
+              "INFERENCE_PRECISION_HINT": "f16"
+            },
+            "compile_ms": 518.7798000000043,
+            "execution_devices": [
+              "GPU.0"
+            ],
+            "device_full_name": "Intel(R) Arc(TM) B390 GPU (iGPU)",
+            "correctness": [
+              {
+                "case": "fractional_alpha",
+                "pass": true,
+                "max_abs_error": 0.0012134878396359294,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              },
+              {
+                "case": "all_transparent",
+                "pass": true,
+                "max_abs_error": 0.0,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              },
+              {
+                "case": "opaque_front",
+                "pass": true,
+                "max_abs_error": 0.0,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              }
+            ],
+            "host_call_ms": {
+              "median": 5.859850000007327,
+              "p95": 6.747849999999289,
+              "min": 5.5274000000054,
+              "samples": [
+                5.6268999999815605,
+                6.371199999989585,
+                5.5274000000054,
+                5.689200000006167,
+                5.945100000019465,
+                5.968499999994492,
+                5.740599999967344,
+                5.718200000046636,
+                6.088599999998223,
+                5.749900000012076,
+                5.884900000012294,
+                5.696999999997843,
+                5.80939999997554,
+                5.912999999964086,
+                6.17779999998902,
+                6.775400000037735,
+                7.067500000005111,
+                6.746399999997266,
+                6.965100000002167,
+                6.286399999964942,
+                6.523900000047433,
+                6.033400000035272,
+                5.639900000005582,
+                5.899399999975685,
+                5.763800000011088,
+                5.814999999984138,
+                5.576399999995374,
+                5.781500000011874,
+                5.627800000013394,
+                5.8300000000031105,
+                5.684400000006917,
+                5.647699999997258,
+                5.747700000028999,
+                5.903100000011818,
+                5.790599999954793,
+                6.060100000013335,
+                5.728699999963283,
+                5.844000000024607,
+                5.637700000022505,
+                5.7957000000214975,
+                5.680699999970784,
+                5.738500000006752,
+                5.781000000013137,
+                5.7030000000395376,
+                5.973500000038712,
+                5.8306999999899745,
+                6.095300000026782,
+                6.2249999999721695,
+                5.969800000002579,
+                5.992499999990741,
+                6.3738999999714,
+                5.97949999996672,
+                6.698800000037863,
+                6.039699999973891,
+                5.838299999993524,
+                6.050300000026709,
+                5.880700000034267,
+                5.899300000010044,
+                6.197499999984757,
+                5.713399999990543,
+                6.139000000018768,
+                6.053599999972903,
+                5.63760000000002,
+                5.991999999992004,
+                5.864500000029693,
+                6.066700000019409,
+                6.054100000028484,
+                5.752799999982017,
+                6.134400000007645,
+                6.6461000000117565,
+                6.146599999965474,
+                5.790799999999763,
+                5.809099999964928,
+                5.806700000050569,
+                6.035999999994601,
+                6.110700000022007,
+                6.897600000002058,
+                5.914600000039627,
+                5.7793000000287975,
+                5.612799999994422,
+                5.547100000001137,
+                5.770299999994677,
+                5.6387000000199805,
+                5.733599999985017,
+                6.061500000043907,
+                7.1250999999961095,
+                6.531300000006013,
+                6.3011000000301465,
+                5.779099999983828,
+                5.622499999958563,
+                5.8746000000269305,
+                5.799400000000787,
+                5.73199999996632,
+                5.855199999984961,
+                5.7063000000425745,
+                6.161800000029416,
+                5.815100000006623,
+                5.770500000039647,
+                5.687299999976858,
+                6.302299999958905
+              ]
+            },
+            "profiling": [
+              {
+                "node": "Add_12",
+                "type": "Add",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Add_23",
+                "type": "Add",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Add_34",
+                "type": "Add",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Add_45",
+                "type": "Add",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Gather_18",
+                "type": "Gather",
+                "execution_type": "gather_ref__f16",
+                "status": "Status.EXECUTED",
+                "real_us": 170.0
+              },
+              {
+                "node": "Gather_29",
+                "type": "Gather",
+                "execution_type": "gather_ref__f16",
+                "status": "Status.EXECUTED",
+                "real_us": 165.0
+              },
+              {
+                "node": "Gather_40",
+                "type": "Gather",
+                "execution_type": "gather_ref__f16",
+                "status": "Status.EXECUTED",
+                "real_us": 166.0
+              },
+              {
+                "node": "Gather_7",
+                "type": "Gather",
+                "execution_type": "gather_ref__f16",
+                "status": "Status.EXECUTED",
+                "real_us": 161.0
+              },
+              {
+                "node": "Multiply_11",
+                "type": "Multiply",
+                "execution_type": "generic_eltwise_ref__f16",
+                "status": "Status.EXECUTED",
+                "real_us": 891.0
+              },
+              {
+                "node": "Multiply_22",
+                "type": "Multiply",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_33",
+                "type": "Multiply",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_44",
+                "type": "Multiply",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9670",
+                "type": "Multiply",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9670_cldnn_in1_reshape",
+                "type": "Reshape",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9673",
+                "type": "Multiply",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9673_cldnn_in1_reshape",
+                "type": "Reshape",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9676",
+                "type": "Multiply",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9676_cldnn_in1_reshape",
+                "type": "Reshape",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9679",
+                "type": "Multiply",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9679_cldnn_in1_reshape",
+                "type": "Reshape",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Result_46",
+                "type": "Result",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Subtract_10",
+                "type": "Add",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Subtract_21",
+                "type": "Add",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Subtract_32",
+                "type": "Add",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Subtract_43",
+                "type": "Add",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "background",
+                "type": "Parameter",
+                "execution_type": "wait_for_events__f16",
+                "status": "Status.EXECUTED",
+                "real_us": 0.0
+              },
+              {
+                "node": "layer_0",
+                "type": "Parameter",
+                "execution_type": "wait_for_events__f16",
+                "status": "Status.EXECUTED",
+                "real_us": 0.0
+              },
+              {
+                "node": "layer_1",
+                "type": "Parameter",
+                "execution_type": "wait_for_events__f16",
+                "status": "Status.EXECUTED",
+                "real_us": 0.0
+              },
+              {
+                "node": "layer_2",
+                "type": "Parameter",
+                "execution_type": "wait_for_events__f16",
+                "status": "Status.EXECUTED",
+                "real_us": 0.0
+              },
+              {
+                "node": "layer_3",
+                "type": "Parameter",
+                "execution_type": "wait_for_events__f16",
+                "status": "Status.EXECUTED",
+                "real_us": 0.0
+              }
+            ]
+          }
+        ],
+        "pass": true
+      }
+    },
+    {
+      "report_name": "gpu-1080-shared.json",
+      "report": {
+        "schema_version": 1,
+        "openvino": "2026.1.0-21367-63e31528c62-releases/2026/1",
+        "os": "Windows-11-10.0.26200-SP0",
+        "device_requested": "GPU",
+        "devices_available": [
+          "CPU",
+          "GPU",
+          "NPU"
+        ],
+        "precision": "f16",
+        "width": 1920,
+        "height": 1080,
+        "layers": 4,
+        "iterations": 100,
+        "share_host_tensors": true,
+        "timing_scope": "synchronous host inference call; Python buffer sharing requested; device copies may remain; excludes frame preparation and display",
+        "hardware_telemetry": "not collected",
+        "scenes": [
+          {
+            "scene": "composite",
+            "status": "pass",
+            "query_unsupported_ops": [],
+            "compile_config": {
+              "PERF_COUNT": true,
+              "INFERENCE_PRECISION_HINT": "f16"
+            },
+            "compile_ms": 41.22250000000349,
+            "execution_devices": [
+              "GPU.0"
+            ],
+            "device_full_name": "Intel(R) Arc(TM) B390 GPU (iGPU)",
+            "correctness": [
+              {
+                "case": "fractional_alpha",
+                "pass": true,
+                "max_abs_error": 0.0012134878396359294,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              },
+              {
+                "case": "all_transparent",
+                "pass": true,
+                "max_abs_error": 0.0,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              },
+              {
+                "case": "opaque_front",
+                "pass": true,
+                "max_abs_error": 0.0,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              }
+            ],
+            "host_call_ms": {
+              "median": 5.433850000002849,
+              "p95": 5.80571999997801,
+              "min": 5.337400000030357,
+              "samples": [
+                5.545299999994313,
+                5.801299999973253,
+                5.966700000044511,
+                5.666500000018004,
+                5.506999999965956,
+                5.490199999997003,
+                5.499900000017988,
+                5.457499999977244,
+                5.409900000017842,
+                5.43619999996281,
+                5.423599999971884,
+                5.420000000015079,
+                5.450599999960559,
+                5.517199999985678,
+                5.4331000000047425,
+                5.426600000021153,
+                6.036699999981465,
+                5.543100000011236,
+                5.956999999966683,
+                5.6052000000477165,
+                5.8760000000006585,
+                5.460599999992155,
+                5.4534999999873435,
+                5.451199999981782,
+                5.484700000010889,
+                5.412499999977172,
+                5.4094000000191045,
+                5.455100000006041,
+                5.434600000000955,
+                5.486200000007102,
+                5.424899999979971,
+                5.424699999991844,
+                5.441199999950186,
+                5.441899999993893,
+                5.437599999993381,
+                5.480800000043473,
+                5.47489999996742,
+                5.406900000025416,
+                5.349599999988186,
+                5.804099999977552,
+                5.41040000001658,
+                5.370500000026368,
+                5.403999999998632,
+                5.40080000001808,
+                5.391099999997095,
+                5.363100000010945,
+                5.470899999977519,
+                5.418200000008255,
+                5.409199999974135,
+                5.359499999997297,
+                5.498600000009901,
+                5.47799999998233,
+                5.465399999991405,
+                5.501000000037948,
+                5.490000000008877,
+                5.390200000022105,
+                5.393299999980172,
+                5.437400000005255,
+                5.792900000017198,
+                5.444499999953223,
+                5.400399999984984,
+                5.3667000000245935,
+                5.384399999968537,
+                5.41129999999157,
+                5.366799999990235,
+                5.359600000019782,
+                5.382100000019818,
+                5.406399999969835,
+                5.420300000025691,
+                5.356300000016745,
+                5.404599999963011,
+                5.410600000004706,
+                5.355900000040492,
+                5.412999999975909,
+                5.388800000048377,
+                5.363199999976587,
+                5.337400000030357,
+                5.7833000000186985,
+                5.379199999993034,
+                5.474700000036137,
+                5.465399999991405,
+                5.422300000020641,
+                5.455600000004779,
+                5.502700000022287,
+                5.527899999947294,
+                5.511900000044534,
+                5.471300000010615,
+                5.438099999992119,
+                5.44209999998202,
+                5.399800000020605,
+                5.449800000008054,
+                5.402900000035515,
+                5.3765000000112195,
+                5.364500000041517,
+                5.3935999999907835,
+                5.416699999955199,
+                5.8364999999866995,
+                5.398300000024392,
+                5.357000000003609,
+                5.41809999998577
+              ]
+            },
+            "profiling": [
+              {
+                "node": "Add_12",
+                "type": "Add",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Add_23",
+                "type": "Add",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Add_34",
+                "type": "Add",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Add_45",
+                "type": "Add",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Gather_18",
+                "type": "Gather",
+                "execution_type": "gather_ref__f16",
+                "status": "Status.EXECUTED",
+                "real_us": 78.0
+              },
+              {
+                "node": "Gather_29",
+                "type": "Gather",
+                "execution_type": "gather_ref__f16",
+                "status": "Status.EXECUTED",
+                "real_us": 77.0
+              },
+              {
+                "node": "Gather_40",
+                "type": "Gather",
+                "execution_type": "gather_ref__f16",
+                "status": "Status.EXECUTED",
+                "real_us": 72.0
+              },
+              {
+                "node": "Gather_7",
+                "type": "Gather",
+                "execution_type": "gather_ref__f16",
+                "status": "Status.EXECUTED",
+                "real_us": 74.0
+              },
+              {
+                "node": "Multiply_11",
+                "type": "Multiply",
+                "execution_type": "generic_eltwise_ref__f16",
+                "status": "Status.EXECUTED",
+                "real_us": 1299.0
+              },
+              {
+                "node": "Multiply_22",
+                "type": "Multiply",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_33",
+                "type": "Multiply",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_44",
+                "type": "Multiply",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9670",
+                "type": "Multiply",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9670_cldnn_in1_reshape",
+                "type": "Reshape",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9673",
+                "type": "Multiply",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9673_cldnn_in1_reshape",
+                "type": "Reshape",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9676",
+                "type": "Multiply",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9676_cldnn_in1_reshape",
+                "type": "Reshape",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9679",
+                "type": "Multiply",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9679_cldnn_in1_reshape",
+                "type": "Reshape",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Result_46",
+                "type": "Result",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Subtract_10",
+                "type": "Add",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Subtract_21",
+                "type": "Add",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Subtract_32",
+                "type": "Add",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Subtract_43",
+                "type": "Add",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "background",
+                "type": "Parameter",
+                "execution_type": "wait_for_events__f16",
+                "status": "Status.EXECUTED",
+                "real_us": 0.0
+              },
+              {
+                "node": "layer_0",
+                "type": "Parameter",
+                "execution_type": "wait_for_events__f16",
+                "status": "Status.EXECUTED",
+                "real_us": 0.0
+              },
+              {
+                "node": "layer_1",
+                "type": "Parameter",
+                "execution_type": "wait_for_events__f16",
+                "status": "Status.EXECUTED",
+                "real_us": 0.0
+              },
+              {
+                "node": "layer_2",
+                "type": "Parameter",
+                "execution_type": "wait_for_events__f16",
+                "status": "Status.EXECUTED",
+                "real_us": 0.0
+              },
+              {
+                "node": "layer_3",
+                "type": "Parameter",
+                "execution_type": "wait_for_events__f16",
+                "status": "Status.EXECUTED",
+                "real_us": 0.0
+              }
+            ]
+          }
+        ],
+        "pass": true
+      }
+    },
+    {
+      "report_name": "gpu-1080.json",
+      "report": {
+        "schema_version": 1,
+        "openvino": "2026.1.0-21367-63e31528c62-releases/2026/1",
+        "os": "Windows-11-10.0.26200-SP0",
+        "device_requested": "GPU",
+        "devices_available": [
+          "CPU",
+          "GPU",
+          "NPU"
+        ],
+        "precision": "f16",
+        "width": 1920,
+        "height": 1080,
+        "layers": 4,
+        "iterations": 100,
+        "timing_scope": "synchronous host inference call including default input/output copying; excludes frame preparation and display",
+        "hardware_telemetry": "not collected",
+        "scenes": [
+          {
+            "scene": "composite",
+            "status": "pass",
+            "query_unsupported_ops": [],
+            "compile_config": {
+              "PERF_COUNT": true,
+              "INFERENCE_PRECISION_HINT": "f16"
+            },
+            "compile_ms": 1445.065900000003,
+            "execution_devices": [
+              "GPU.0"
+            ],
+            "device_full_name": "Intel(R) Arc(TM) B390 GPU (iGPU)",
+            "correctness": [
+              {
+                "case": "fractional_alpha",
+                "pass": true,
+                "max_abs_error": 0.0012134878396359294,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              },
+              {
+                "case": "all_transparent",
+                "pass": true,
+                "max_abs_error": 0.0,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              },
+              {
+                "case": "opaque_front",
+                "pass": true,
+                "max_abs_error": 0.0,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              }
+            ],
+            "host_call_ms": {
+              "median": 22.980700000005072,
+              "p95": 26.25031999998412,
+              "min": 15.190899999993235,
+              "samples": [
+                15.190899999993235,
+                33.14409999998702,
+                32.50159999998914,
+                28.96010000000615,
+                26.10769999998297,
+                18.70710000000031,
+                23.325699999986682,
+                22.57099999999923,
+                23.042700000019067,
+                23.679200000003675,
+                23.153100000001814,
+                21.77649999998721,
+                21.238500000009708,
+                23.050399999988258,
+                23.663199999987228,
+                21.437899999995125,
+                21.88139999998384,
+                24.465100000014672,
+                32.92810000002078,
+                31.184000000024525,
+                16.90909999999235,
+                17.113300000005438,
+                18.065599999999904,
+                21.13289999999779,
+                22.942999999997937,
+                21.869999999978518,
+                21.296299999988832,
+                23.036399999995183,
+                22.980700000005072,
+                23.01399999998921,
+                23.62530000002039,
+                21.31450000001678,
+                23.01289999999767,
+                22.935300000000325,
+                23.000300000006746,
+                23.651599999993778,
+                22.85269999998718,
+                20.777600000002394,
+                23.046900000025516,
+                22.853900000001204,
+                23.596400000002404,
+                21.2145999999791,
+                23.075900000009142,
+                23.12109999999734,
+                23.11339999999973,
+                23.78840000000082,
+                22.93180000000916,
+                23.147700000009763,
+                23.030000000005657,
+                22.980700000005072,
+                23.55019999998831,
+                21.31459999998242,
+                22.774900000001708,
+                21.25300000000152,
+                24.05629999998382,
+                22.40179999998304,
+                22.929599999997663,
+                22.777599999983522,
+                22.98540000001026,
+                23.066700000015317,
+                21.774899999996933,
+                23.014900000021044,
+                23.02530000000047,
+                23.072600000006105,
+                21.64229999999634,
+                20.843999999982543,
+                20.521000000002232,
+                22.795400000006794,
+                22.973699999994324,
+                22.885800000011614,
+                21.833200000003217,
+                21.28149999998641,
+                22.99510000000282,
+                23.14059999997653,
+                22.877699999980905,
+                23.66040000001135,
+                22.879299999999603,
+                22.789500000016005,
+                22.771799999986797,
+                21.24449999999456,
+                23.476400000021158,
+                21.256200000010494,
+                22.902799999997114,
+                23.132799999984854,
+                23.043299999983446,
+                23.52050000001782,
+                22.79780000000642,
+                22.971400000017184,
+                23.027200000001358,
+                22.86709999998493,
+                23.579799999993156,
+                22.934800000001587,
+                23.073699999997643,
+                22.996699999993098,
+                22.968599999984463,
+                23.61949999999524,
+                23.038700000000745,
+                23.088099999995393,
+                21.25410000002148,
+                23.1804000000011
+              ]
+            },
+            "profiling": [
+              {
+                "node": "Add_12",
+                "type": "Add",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Add_23",
+                "type": "Add",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Add_34",
+                "type": "Add",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Add_45",
+                "type": "Add",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Gather_18",
+                "type": "Gather",
+                "execution_type": "gather_ref__f16",
+                "status": "Status.EXECUTED",
+                "real_us": 142.0
+              },
+              {
+                "node": "Gather_29",
+                "type": "Gather",
+                "execution_type": "gather_ref__f16",
+                "status": "Status.EXECUTED",
+                "real_us": 139.0
+              },
+              {
+                "node": "Gather_40",
+                "type": "Gather",
+                "execution_type": "gather_ref__f16",
+                "status": "Status.EXECUTED",
+                "real_us": 124.0
+              },
+              {
+                "node": "Gather_7",
+                "type": "Gather",
+                "execution_type": "gather_ref__f16",
+                "status": "Status.EXECUTED",
+                "real_us": 132.0
+              },
+              {
+                "node": "Multiply_11",
+                "type": "Multiply",
+                "execution_type": "generic_eltwise_ref__f16",
+                "status": "Status.EXECUTED",
+                "real_us": 3365.0
+              },
+              {
+                "node": "Multiply_22",
+                "type": "Multiply",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_33",
+                "type": "Multiply",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_44",
+                "type": "Multiply",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9670",
+                "type": "Multiply",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9670_cldnn_in1_reshape",
+                "type": "Reshape",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9673",
+                "type": "Multiply",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9673_cldnn_in1_reshape",
+                "type": "Reshape",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9676",
+                "type": "Multiply",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9676_cldnn_in1_reshape",
+                "type": "Reshape",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9679",
+                "type": "Multiply",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Multiply_9679_cldnn_in1_reshape",
+                "type": "Reshape",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Result_46",
+                "type": "Result",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Subtract_10",
+                "type": "Add",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Subtract_21",
+                "type": "Add",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Subtract_32",
+                "type": "Add",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "Subtract_43",
+                "type": "Add",
+                "execution_type": "undef",
+                "status": "Status.OPTIMIZED_OUT",
+                "real_us": 0.0
+              },
+              {
+                "node": "background",
+                "type": "Parameter",
+                "execution_type": "wait_for_events__f16",
+                "status": "Status.EXECUTED",
+                "real_us": 0.0
+              },
+              {
+                "node": "layer_0",
+                "type": "Parameter",
+                "execution_type": "wait_for_events__f16",
+                "status": "Status.EXECUTED",
+                "real_us": 0.0
+              },
+              {
+                "node": "layer_1",
+                "type": "Parameter",
+                "execution_type": "wait_for_events__f16",
+                "status": "Status.EXECUTED",
+                "real_us": 0.0
+              },
+              {
+                "node": "layer_2",
+                "type": "Parameter",
+                "execution_type": "wait_for_events__f16",
+                "status": "Status.EXECUTED",
+                "real_us": 0.0
+              },
+              {
+                "node": "layer_3",
+                "type": "Parameter",
+                "execution_type": "wait_for_events__f16",
+                "status": "Status.EXECUTED",
+                "real_us": 0.0
+              }
+            ]
+          }
+        ],
+        "pass": true
+      }
+    },
+    {
+      "report_name": "npu-1080-nhwc.json",
+      "report": {
+        "schema_version": 1,
+        "openvino": "2026.1.0-21367-63e31528c62-releases/2026/1",
+        "os": "Windows-11-10.0.26200-SP0",
+        "device_requested": "NPU",
+        "devices_available": [
+          "CPU",
+          "GPU",
+          "NPU"
+        ],
+        "precision": "f16",
+        "layout": "NHWC",
+        "width": 1920,
+        "height": 1080,
+        "layers": 4,
+        "iterations": 100,
+        "share_host_tensors": true,
+        "timing_scope": "synchronous host inference call; Python buffer sharing requested; device copies may remain; excludes frame preparation and display",
+        "hardware_telemetry": "not collected",
+        "scenes": [
+          {
+            "scene": "composite",
+            "status": "pass",
+            "query_unsupported_ops": [],
+            "compile_config": {
+              "PERF_COUNT": true
+            },
+            "compile_ms": 1195.9717999999953,
+            "execution_devices": [
+              "NPU"
+            ],
+            "device_full_name": "Intel(R) AI Boost",
+            "correctness": [
+              {
+                "case": "fractional_alpha",
+                "pass": true,
+                "max_abs_error": 0.0014785447176743904,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              },
+              {
+                "case": "all_transparent",
+                "pass": true,
+                "max_abs_error": 6.097555160522461e-05,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              },
+              {
+                "case": "opaque_front",
+                "pass": true,
+                "max_abs_error": 0.0,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              }
+            ],
+            "host_call_ms": {
+              "median": 42.78220000000488,
+              "p95": 49.0428699999768,
+              "min": 38.89780000002929,
+              "samples": [
+                48.11779999999999,
+                44.42269999998416,
+                42.625299999997424,
+                42.012800000009065,
+                41.869000000019696,
+                41.87680000001137,
+                42.561799999987215,
+                41.89670000005208,
+                41.384800000003,
+                39.05000000003156,
+                39.16359999999486,
+                39.2320000000268,
+                39.04389999996738,
+                40.46440000001894,
+                39.50529999997343,
+                40.45509999997421,
+                39.06920000002856,
+                39.08710000001747,
+                38.984099999993305,
+                39.05299999996714,
+                39.066399999967416,
+                40.49120000001949,
+                40.23419999998623,
+                46.35139999999183,
+                45.829799999978604,
+                46.56059999996387,
+                45.53499999997257,
+                46.49929999999358,
+                42.995499999960884,
+                42.88609999997561,
+                42.6347000000078,
+                42.73379999995086,
+                42.8733999999622,
+                43.028299999946285,
+                41.33569999999054,
+                40.67720000000463,
+                39.62330000001657,
+                39.51540000002751,
+                40.92159999999012,
+                40.936100000010356,
+                40.693099999998594,
+                46.39940000004117,
+                48.180199999990236,
+                46.392599999990125,
+                49.04169999997521,
+                46.61249999998063,
+                46.320299999990766,
+                49.07659999997804,
+                48.981099999991784,
+                49.00309999999308,
+                49.13329999999405,
+                46.43709999999146,
+                42.8229999999985,
+                49.02440000000752,
+                49.06510000000708,
+                49.16520000000446,
+                49.013099999967835,
+                50.991000000010445,
+                42.655299999978524,
+                45.1816999999437,
+                45.61810000001287,
+                46.34350000003451,
+                48.09819999996989,
+                46.46300000001702,
+                46.059200000001965,
+                45.756900000014866,
+                42.752100000029714,
+                45.23479999994606,
+                44.73619999998846,
+                44.16309999999157,
+                46.894999999949505,
+                47.4219999999832,
+                45.49229999997806,
+                46.36699999997518,
+                48.83289999997942,
+                42.823399999974754,
+                42.9053999999951,
+                42.586900000003425,
+                42.111999999974614,
+                44.258899999988444,
+                41.68540000000576,
+                41.25979999997753,
+                42.31409999999869,
+                40.291400000000976,
+                40.27299999995648,
+                39.39470000000256,
+                40.59499999999616,
+                43.38689999997314,
+                40.36490000004278,
+                38.89780000002929,
+                40.507800000000316,
+                39.12860000002638,
+                40.44170000003078,
+                45.56860000002416,
+                41.965600000025916,
+                42.489999999986594,
+                42.81229999998004,
+                41.70840000000453,
+                40.49440000000004,
+                46.62860000001956
+              ]
+            },
+            "profiling": [
+              {
+                "node": "Gather_40",
+                "type": "Gather",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 368.0
+              },
+              {
+                "node": "Subtract_43",
+                "type": "Subtract",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 1187.0
+              },
+              {
+                "node": "Gather_29",
+                "type": "Gather",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 396.0
+              },
+              {
+                "node": "Subtract_32",
+                "type": "Subtract",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 245.0
+              },
+              {
+                "node": "Gather_18",
+                "type": "Gather",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 422.0
+              },
+              {
+                "node": "Subtract_21",
+                "type": "Subtract",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 172.0
+              },
+              {
+                "node": "Gather_7",
+                "type": "Gather",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 384.0
+              },
+              {
+                "node": "Subtract_10",
+                "type": "Subtract",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 173.0
+              },
+              {
+                "node": "Multiply_11",
+                "type": "Multiply",
+                "execution_type": "Shave",
+                "status": "Status.EXECUTED",
+                "real_us": 7507.0
+              },
+              {
+                "node": "Add_12",
+                "type": "Add",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 840.0
+              },
+              {
+                "node": "Multiply_22",
+                "type": "Multiply",
+                "execution_type": "Shave",
+                "status": "Status.EXECUTED",
+                "real_us": 7509.0
+              },
+              {
+                "node": "Add_23",
+                "type": "Add",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 827.0
+              },
+              {
+                "node": "Multiply_33",
+                "type": "Multiply",
+                "execution_type": "Shave",
+                "status": "Status.EXECUTED",
+                "real_us": 7628.0
+              },
+              {
+                "node": "Add_34",
+                "type": "Add",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 1465.0
+              },
+              {
+                "node": "Multiply_44",
+                "type": "Multiply",
+                "execution_type": "Shave",
+                "status": "Status.EXECUTED",
+                "real_us": 7461.0
+              },
+              {
+                "node": "Add_45",
+                "type": "Add",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 901.0
+              }
+            ]
+          }
+        ],
+        "pass": true
+      }
+    },
+    {
+      "report_name": "npu-1080-one-layer.json",
+      "report": {
+        "schema_version": 1,
+        "openvino": "2026.1.0-21367-63e31528c62-releases/2026/1",
+        "os": "Windows-11-10.0.26200-SP0",
+        "device_requested": "NPU",
+        "devices_available": [
+          "CPU",
+          "GPU",
+          "NPU"
+        ],
+        "precision": "f16",
+        "layout": "NCHW",
+        "width": 1920,
+        "height": 1080,
+        "layers": 1,
+        "iterations": 100,
+        "share_host_tensors": true,
+        "timing_scope": "synchronous host inference call; Python buffer sharing requested; device copies may remain; excludes frame preparation and display",
+        "hardware_telemetry": "not collected",
+        "scenes": [
+          {
+            "scene": "composite",
+            "status": "pass",
+            "query_unsupported_ops": [],
+            "compile_config": {
+              "PERF_COUNT": true
+            },
+            "compile_ms": 249.90070000001197,
+            "execution_devices": [
+              "NPU"
+            ],
+            "device_full_name": "Intel(R) AI Boost",
+            "correctness": [
+              {
+                "case": "fractional_alpha",
+                "pass": true,
+                "max_abs_error": 0.0007318258285522461,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              },
+              {
+                "case": "all_transparent",
+                "pass": true,
+                "max_abs_error": 6.097555160522461e-05,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              },
+              {
+                "case": "opaque_front",
+                "pass": true,
+                "max_abs_error": 0.0,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              }
+            ],
+            "host_call_ms": {
+              "median": 4.340050000024576,
+              "p95": 4.9804100000017115,
+              "min": 3.2525000000305226,
+              "samples": [
+                4.959100000007766,
+                4.982500000039636,
+                4.972600000030525,
+                4.9802999999997155,
+                4.884100000026592,
+                4.975399999977981,
+                4.931800000008479,
+                4.906000000005406,
+                4.903799999965486,
+                5.044800000007399,
+                5.017200000054345,
+                5.006899999955294,
+                4.942799999980707,
+                4.837399999985337,
+                4.8449000000232445,
+                4.767500000014024,
+                4.798199999981989,
+                4.777400000023135,
+                4.7076000000174645,
+                4.668100000003506,
+                4.696500000022752,
+                4.788200000007237,
+                4.599600000005921,
+                4.629100000045128,
+                4.6030999999970845,
+                4.59250000000111,
+                4.534000000035121,
+                4.482300000006489,
+                4.518599999983053,
+                4.503300000010313,
+                4.535799999985102,
+                4.50049999994917,
+                4.472999999961758,
+                4.438499999992018,
+                4.456499999946573,
+                4.456000000004678,
+                4.433299999959672,
+                4.4224000000099295,
+                4.414699999983895,
+                4.4297000000028675,
+                4.401600000051076,
+                4.425599999990482,
+                4.406099999982871,
+                4.348600000014358,
+                4.403300000035415,
+                4.387500000007094,
+                4.40099999997301,
+                4.345300000011321,
+                4.277799999954368,
+                4.265799999984665,
+                4.2488999999932275,
+                4.260999999985415,
+                4.264900000009675,
+                4.268699999954606,
+                4.266999999970267,
+                4.334800000037831,
+                4.279499999995551,
+                4.236999999989166,
+                4.140300000017305,
+                4.295700000000124,
+                4.269899999997051,
+                4.2857999999910135,
+                4.271000000017011,
+                4.239299999994728,
+                4.234300000007352,
+                4.266000000029635,
+                4.2831999999748405,
+                4.272800000023835,
+                4.1523999999526495,
+                4.371900000023743,
+                4.2844000000172855,
+                5.749200000025212,
+                4.188900000031026,
+                4.198599999995167,
+                4.152699999963261,
+                4.19440000001714,
+                4.144600000017817,
+                4.1734000000133165,
+                4.163599999969847,
+                4.104499999982636,
+                4.064400000004298,
+                4.109799999980623,
+                4.082799999991948,
+                4.124399999966499,
+                3.427199999975983,
+                3.4168000000249776,
+                3.4331999999608342,
+                3.4142000000088046,
+                3.409599999997681,
+                3.5966000000371423,
+                3.4656999999924665,
+                3.2525000000305226,
+                3.413000000023203,
+                3.4064999999827705,
+                3.4428000000161774,
+                3.429799999992156,
+                3.3918999999968946,
+                3.5043999999970765,
+                3.4478000000035536,
+                3.422800000009829
+              ]
+            },
+            "profiling": [
+              {
+                "node": "Subtract_10",
+                "type": "Subtract",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 69.0
+              },
+              {
+                "node": "Multiply_11",
+                "type": "Multiply",
+                "execution_type": "Shave",
+                "status": "Status.EXECUTED",
+                "real_us": 824.0
+              },
+              {
+                "node": "Add_12",
+                "type": "Add",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 798.0
+              }
+            ]
+          }
+        ],
+        "pass": true
+      }
+    },
+    {
+      "report_name": "npu-1080-shared.json",
+      "report": {
+        "schema_version": 1,
+        "openvino": "2026.1.0-21367-63e31528c62-releases/2026/1",
+        "os": "Windows-11-10.0.26200-SP0",
+        "device_requested": "NPU",
+        "devices_available": [
+          "CPU",
+          "GPU",
+          "NPU"
+        ],
+        "precision": "f16",
+        "width": 1920,
+        "height": 1080,
+        "layers": 4,
+        "iterations": 100,
+        "share_host_tensors": true,
+        "timing_scope": "synchronous host inference call; Python buffer sharing requested; device copies may remain; excludes frame preparation and display",
+        "hardware_telemetry": "not collected",
+        "scenes": [
+          {
+            "scene": "composite",
+            "status": "pass",
+            "query_unsupported_ops": [],
+            "compile_config": {
+              "PERF_COUNT": true
+            },
+            "compile_ms": 790.5238999999824,
+            "execution_devices": [
+              "NPU"
+            ],
+            "device_full_name": "Intel(R) AI Boost",
+            "correctness": [
+              {
+                "case": "fractional_alpha",
+                "pass": true,
+                "max_abs_error": 0.0014785447176743904,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              },
+              {
+                "case": "all_transparent",
+                "pass": true,
+                "max_abs_error": 6.097555160522461e-05,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              },
+              {
+                "case": "opaque_front",
+                "pass": true,
+                "max_abs_error": 0.0,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              }
+            ],
+            "host_call_ms": {
+              "median": 12.86690000003432,
+              "p95": 15.604420000036612,
+              "min": 9.801100000004226,
+              "samples": [
+                15.427499999987049,
+                14.919200000008459,
+                14.315099999976155,
+                13.779100000022027,
+                13.390899999990324,
+                12.963600000034603,
+                12.770200000034038,
+                12.163900000018657,
+                11.993000000018128,
+                11.844100000018898,
+                11.662099999966813,
+                11.28500000004351,
+                11.322000000006938,
+                11.021599999992304,
+                10.804399999983616,
+                10.692199999994045,
+                10.676700000033179,
+                10.354599999971015,
+                10.232400000006692,
+                10.076999999967029,
+                10.098999999968328,
+                10.135999999988599,
+                10.02899999997453,
+                9.967900000049212,
+                10.009300000035637,
+                9.927199999992808,
+                9.940499999970598,
+                9.934100000009494,
+                9.954499999992095,
+                9.998199999984081,
+                9.853500000019721,
+                9.859099999971477,
+                9.898100000043542,
+                9.90409999997155,
+                9.943799999973635,
+                9.918299999981173,
+                9.960400000011305,
+                9.925399999985984,
+                9.98650000002499,
+                9.997800000007828,
+                9.914499999979398,
+                9.801100000004226,
+                9.879899999987174,
+                10.092499999984739,
+                10.007699999960096,
+                10.00749999997197,
+                10.038500000007389,
+                10.13910000000351,
+                9.968000000014854,
+                10.022300000002815,
+                10.066499999993539,
+                9.849000000031083,
+                9.928699999989021,
+                10.13829999999416,
+                9.95549999998957,
+                9.916199999963737,
+                21.954199999981938,
+                19.43010000002232,
+                13.95380000002433,
+                13.983600000017304,
+                13.545100000044386,
+                16.312799999980143,
+                16.717999999968924,
+                13.71700000004239,
+                13.7597000000369,
+                13.537900000017089,
+                14.612399999975878,
+                14.802399999950921,
+                14.680199999986598,
+                15.591800000038347,
+                14.475500000003194,
+                14.756400000010217,
+                14.314100000035523,
+                14.56949999999324,
+                14.333200000010038,
+                14.073899999971218,
+                14.337699999998677,
+                13.398800000004485,
+                14.41949999997405,
+                14.567699999986417,
+                15.168200000005072,
+                14.950699999985773,
+                15.427999999985786,
+                14.83360000003131,
+                14.441199999964738,
+                14.324600000009013,
+                14.39519999996719,
+                14.32369999997718,
+                14.374999999972715,
+                14.306099999998878,
+                14.37420000002021,
+                14.40700000000561,
+                15.844200000003639,
+                14.485200000024179,
+                14.42170000001397,
+                14.491399999997157,
+                14.62519999995493,
+                14.337900000043646,
+                14.33729999996558,
+                14.39239999996289
+              ]
+            },
+            "profiling": [
+              {
+                "node": "Subtract_43",
+                "type": "Subtract",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 81.0
+              },
+              {
+                "node": "Subtract_32",
+                "type": "Subtract",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 101.0
+              },
+              {
+                "node": "Subtract_21",
+                "type": "Subtract",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 99.0
+              },
+              {
+                "node": "Subtract_10",
+                "type": "Subtract",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 100.0
+              },
+              {
+                "node": "Multiply_11",
+                "type": "Multiply",
+                "execution_type": "Shave",
+                "status": "Status.EXECUTED",
+                "real_us": 828.0
+              },
+              {
+                "node": "Add_12",
+                "type": "Add",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 772.0
+              },
+              {
+                "node": "Multiply_22",
+                "type": "Multiply",
+                "execution_type": "Shave",
+                "status": "Status.EXECUTED",
+                "real_us": 858.0
+              },
+              {
+                "node": "Add_23",
+                "type": "Add",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 793.0
+              },
+              {
+                "node": "Multiply_33",
+                "type": "Multiply",
+                "execution_type": "Shave",
+                "status": "Status.EXECUTED",
+                "real_us": 812.0
+              },
+              {
+                "node": "Add_34",
+                "type": "Add",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 793.0
+              },
+              {
+                "node": "Multiply_44",
+                "type": "Multiply",
+                "execution_type": "Shave",
+                "status": "Status.EXECUTED",
+                "real_us": 828.0
+              },
+              {
+                "node": "Add_45",
+                "type": "Add",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 784.0
+              }
+            ]
+          }
+        ],
+        "pass": true
+      }
+    },
+    {
+      "report_name": "npu-1080.json",
+      "report": {
+        "schema_version": 1,
+        "openvino": "2026.1.0-21367-63e31528c62-releases/2026/1",
+        "os": "Windows-11-10.0.26200-SP0",
+        "device_requested": "NPU",
+        "devices_available": [
+          "CPU",
+          "GPU",
+          "NPU"
+        ],
+        "precision": "f16",
+        "width": 1920,
+        "height": 1080,
+        "layers": 4,
+        "iterations": 100,
+        "timing_scope": "synchronous host inference call including default input/output copying; excludes frame preparation and display",
+        "hardware_telemetry": "not collected",
+        "scenes": [
+          {
+            "scene": "composite",
+            "status": "pass",
+            "query_unsupported_ops": [],
+            "compile_config": {
+              "PERF_COUNT": true
+            },
+            "compile_ms": 785.5958000000101,
+            "execution_devices": [
+              "NPU"
+            ],
+            "device_full_name": "Intel(R) AI Boost",
+            "correctness": [
+              {
+                "case": "fractional_alpha",
+                "pass": true,
+                "max_abs_error": 0.0014785447176743904,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              },
+              {
+                "case": "all_transparent",
+                "pass": true,
+                "max_abs_error": 6.097555160522461e-05,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              },
+              {
+                "case": "opaque_front",
+                "pass": true,
+                "max_abs_error": 0.0,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              }
+            ],
+            "host_call_ms": {
+              "median": 23.060250000000337,
+              "p95": 24.341715000011273,
+              "min": 15.124799999995275,
+              "samples": [
+                20.086200000008603,
+                19.561100000004217,
+                19.120600000007926,
+                18.687800000009247,
+                18.390499999981103,
+                18.07390000001874,
+                17.98130000000242,
+                17.690700000002835,
+                17.6304000000016,
+                17.481099999997696,
+                17.62729999998669,
+                17.27010000001883,
+                17.00660000000198,
+                16.880399999990914,
+                16.656600000004573,
+                16.546099999999342,
+                16.352899999986903,
+                16.29859999999894,
+                16.300999999998567,
+                16.149899999987838,
+                16.098100000021986,
+                16.206800000020394,
+                15.678199999996423,
+                15.6120000000044,
+                15.78489999999988,
+                15.596399999992627,
+                15.595700000005763,
+                15.482200000008106,
+                15.442100000001346,
+                15.359799999998813,
+                15.263799999985395,
+                15.184399999981224,
+                15.218000000004395,
+                15.124799999995275,
+                15.811100000007627,
+                22.66980000001695,
+                22.302499999995007,
+                22.51839999999561,
+                22.382400000026337,
+                22.4570999999969,
+                22.46529999999325,
+                22.675899999995863,
+                23.06260000000293,
+                25.689100000022336,
+                23.057899999997744,
+                23.09619999999768,
+                23.31430000000978,
+                22.93179999998074,
+                22.891299999997727,
+                22.85400000002369,
+                23.025099999983922,
+                23.049700000001394,
+                26.06509999998252,
+                23.14309999999864,
+                23.560599999996157,
+                23.280600000020968,
+                23.338400000000092,
+                23.415800000009312,
+                23.342399999989993,
+                23.523299999993696,
+                23.32530000001043,
+                33.251899999982015,
+                22.99170000000572,
+                24.027300000000196,
+                23.594199999990906,
+                23.996199999999135,
+                24.049399999995558,
+                24.270800000010695,
+                23.23609999999121,
+                22.853300000008403,
+                23.42479999998659,
+                23.743099999990136,
+                24.209299999995437,
+                23.728000000005522,
+                23.88339999998834,
+                23.841900000007854,
+                23.615100000000666,
+                23.719699999986688,
+                26.303399999989097,
+                28.130700000019715,
+                23.877200000015364,
+                24.055500000002894,
+                23.775199999988672,
+                24.006999999983236,
+                23.70470000002456,
+                23.82829999999103,
+                23.658900000015137,
+                23.76129999998966,
+                23.874100000000453,
+                23.690299999998388,
+                23.628999999999678,
+                23.86660000001939,
+                23.884100000003627,
+                24.137800000005427,
+                23.824600000011742,
+                23.857500000019627,
+                24.025800000003983,
+                23.692999999980202,
+                23.843700000014678,
+                23.672499999975116
+              ]
+            },
+            "profiling": [
+              {
+                "node": "Subtract_43",
+                "type": "Subtract",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 152.0
+              },
+              {
+                "node": "Subtract_32",
+                "type": "Subtract",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 177.0
+              },
+              {
+                "node": "Subtract_21",
+                "type": "Subtract",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 163.0
+              },
+              {
+                "node": "Subtract_10",
+                "type": "Subtract",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 176.0
+              },
+              {
+                "node": "Multiply_11",
+                "type": "Multiply",
+                "execution_type": "Shave",
+                "status": "Status.EXECUTED",
+                "real_us": 1269.0
+              },
+              {
+                "node": "Add_12",
+                "type": "Add",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 1397.0
+              },
+              {
+                "node": "Multiply_22",
+                "type": "Multiply",
+                "execution_type": "Shave",
+                "status": "Status.EXECUTED",
+                "real_us": 1341.0
+              },
+              {
+                "node": "Add_23",
+                "type": "Add",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 1355.0
+              },
+              {
+                "node": "Multiply_33",
+                "type": "Multiply",
+                "execution_type": "Shave",
+                "status": "Status.EXECUTED",
+                "real_us": 1191.0
+              },
+              {
+                "node": "Add_34",
+                "type": "Add",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 1015.0000000000001
+              },
+              {
+                "node": "Multiply_44",
+                "type": "Multiply",
+                "execution_type": "Shave",
+                "status": "Status.EXECUTED",
+                "real_us": 1196.0
+              },
+              {
+                "node": "Add_45",
+                "type": "Add",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 995.0
+              }
+            ]
+          }
+        ],
+        "pass": true
+      }
+    },
+    {
+      "report_name": "npu-720.json",
+      "report": {
+        "schema_version": 1,
+        "openvino": "2026.1.0-21367-63e31528c62-releases/2026/1",
+        "os": "Windows-11-10.0.26200-SP0",
+        "device_requested": "NPU",
+        "devices_available": [
+          "CPU",
+          "GPU",
+          "NPU"
+        ],
+        "precision": "f16",
+        "layout": "NCHW",
+        "width": 1280,
+        "height": 720,
+        "layers": 4,
+        "iterations": 100,
+        "share_host_tensors": true,
+        "timing_scope": "synchronous host inference call; Python buffer sharing requested; device copies may remain; excludes frame preparation and display",
+        "hardware_telemetry": "not collected",
+        "scenes": [
+          {
+            "scene": "composite",
+            "status": "pass",
+            "query_unsupported_ops": [],
+            "compile_config": {
+              "PERF_COUNT": true
+            },
+            "compile_ms": 390.09889999999814,
+            "execution_devices": [
+              "NPU"
+            ],
+            "device_full_name": "Intel(R) AI Boost",
+            "correctness": [
+              {
+                "case": "fractional_alpha",
+                "pass": true,
+                "max_abs_error": 0.0014457432104700851,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              },
+              {
+                "case": "all_transparent",
+                "pass": true,
+                "max_abs_error": 6.0439109802246094e-05,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              },
+              {
+                "case": "opaque_front",
+                "pass": true,
+                "max_abs_error": 0.0,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              }
+            ],
+            "host_call_ms": {
+              "median": 5.5545500000278025,
+              "p95": 5.7768649999815125,
+              "min": 3.888000000017655,
+              "samples": [
+                5.647800000019743,
+                5.730099999993854,
+                5.772600000000239,
+                5.7925000000409455,
+                5.754800000033811,
+                5.732900000054997,
+                5.749999999977717,
+                5.825200000003861,
+                5.772500000034597,
+                5.776799999978266,
+                5.687500000021828,
+                5.710999999962496,
+                5.690299999969284,
+                5.665599999986171,
+                5.629199999987122,
+                5.642799999975523,
+                5.599099999983537,
+                5.589499999985037,
+                5.696799999952873,
+                5.857600000013008,
+                5.778100000043196,
+                5.758700000001227,
+                5.718800000011015,
+                5.756600000040635,
+                5.740000000002965,
+                5.755200000010063,
+                5.69860000001654,
+                5.688999999961197,
+                5.764700000042922,
+                5.754199999955745,
+                5.728499999975156,
+                5.672399999980371,
+                5.654899999967711,
+                5.662599999993745,
+                5.683899999951336,
+                5.676000000050863,
+                5.610399999966376,
+                5.634100000008857,
+                5.602399999986574,
+                5.6033000000184074,
+                5.5629999999951,
+                5.608200000040142,
+                5.5624000000307205,
+                5.623899999989135,
+                5.369799999982661,
+                5.585499999995136,
+                5.509399999994002,
+                5.5801999999971486,
+                5.5178000000069005,
+                5.547100000001137,
+                5.561600000021372,
+                5.5954999999698884,
+                5.6400999999937085,
+                5.547500000034233,
+                7.203400000037163,
+                5.194800000026589,
+                5.165900000008605,
+                5.2576999999587315,
+                5.239599999981692,
+                5.240399999991041,
+                5.3700000000276304,
+                5.222000000003391,
+                5.254400000012538,
+                5.291899999974703,
+                5.204899999966983,
+                5.215700000007928,
+                5.277899999953206,
+                5.2649999999516695,
+                5.241699999999128,
+                5.197500000008404,
+                5.156300000010106,
+                5.311299999959829,
+                5.2083999999581465,
+                5.281299999978728,
+                5.168500000024778,
+                5.158900000026279,
+                4.195900000013353,
+                4.155900000000656,
+                4.367000000002008,
+                4.227100000036899,
+                4.1838999999868065,
+                4.277799999954368,
+                4.202600000041912,
+                4.185600000027989,
+                4.230500000005577,
+                4.176499999971384,
+                4.1943999999602966,
+                4.352599999947415,
+                4.233900000031099,
+                4.267299999980878,
+                4.1904999999928805,
+                4.3396000000370805,
+                4.221000000029562,
+                4.017099999998663,
+                3.937199999995755,
+                3.888000000017655,
+                3.9156000000275526,
+                3.9676999999755935,
+                3.9285999999947308,
+                4.007500000000164
+              ]
+            },
+            "profiling": [
+              {
+                "node": "Subtract_43",
+                "type": "Subtract",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 41.0
+              },
+              {
+                "node": "Subtract_32",
+                "type": "Subtract",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 45.0
+              },
+              {
+                "node": "Subtract_21",
+                "type": "Subtract",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 50.0
+              },
+              {
+                "node": "Subtract_10",
+                "type": "Subtract",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 52.0
+              },
+              {
+                "node": "Multiply_11",
+                "type": "Multiply",
+                "execution_type": "Shave",
+                "status": "Status.EXECUTED",
+                "real_us": 198.0
+              },
+              {
+                "node": "Add_12",
+                "type": "Add",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 312.0
+              },
+              {
+                "node": "Multiply_22",
+                "type": "Multiply",
+                "execution_type": "Shave",
+                "status": "Status.EXECUTED",
+                "real_us": 182.0
+              },
+              {
+                "node": "Add_23",
+                "type": "Add",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 319.0
+              },
+              {
+                "node": "Multiply_33",
+                "type": "Multiply",
+                "execution_type": "Shave",
+                "status": "Status.EXECUTED",
+                "real_us": 181.0
+              },
+              {
+                "node": "Add_34",
+                "type": "Add",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 320.0
+              },
+              {
+                "node": "Multiply_44",
+                "type": "Multiply",
+                "execution_type": "Shave",
+                "status": "Status.EXECUTED",
+                "real_us": 189.0
+              },
+              {
+                "node": "Add_45",
+                "type": "Add",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 327.0
+              }
+            ]
+          }
+        ],
+        "pass": true
+      }
+    },
+    {
+      "report_name": "npu-small.json",
+      "report": {
+        "schema_version": 1,
+        "openvino": "2026.1.0-21367-63e31528c62-releases/2026/1",
+        "os": "Windows-11-10.0.26200-SP0",
+        "device_requested": "NPU",
+        "devices_available": [
+          "CPU",
+          "GPU",
+          "NPU"
+        ],
+        "precision": "f16",
+        "width": 96,
+        "height": 64,
+        "layers": 4,
+        "iterations": 20,
+        "timing_scope": "synchronous host inference call including default input/output copying; excludes frame preparation and display",
+        "hardware_telemetry": "not collected",
+        "scenes": [
+          {
+            "scene": "composite",
+            "status": "pass",
+            "export_sha256": {
+              ".xml": "20653714257d37748f8853218dc5578df13ce567e831de5e461f938ce3904038",
+              ".bin": "904aef822ddc8d00bd5a5b936f516fc82973f744a5cbb540e6a0571b7c4d485b"
+            },
+            "query_unsupported_ops": [],
+            "compile_config": {
+              "PERF_COUNT": true
+            },
+            "compile_ms": 615.470700000003,
+            "execution_devices": [
+              "NPU"
+            ],
+            "device_full_name": "Intel(R) AI Boost",
+            "correctness": [
+              {
+                "case": "fractional_alpha",
+                "pass": true,
+                "max_abs_error": 0.0010691421535471424,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              },
+              {
+                "case": "all_transparent",
+                "pass": true,
+                "max_abs_error": 0.0,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              },
+              {
+                "case": "opaque_front",
+                "pass": true,
+                "max_abs_error": 0.0,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              }
+            ],
+            "host_call_ms": {
+              "median": 0.32209999999111005,
+              "p95": 0.3270699999987414,
+              "min": 0.3175999999882606,
+              "samples": [
+                0.3260000000011587,
+                0.3265999999939595,
+                0.32699999999863394,
+                0.321999999982836,
+                0.3221999999993841,
+                0.32630000001176995,
+                0.31979999999975917,
+                0.319000000018832,
+                0.32179999999470965,
+                0.31930000000102154,
+                0.3175999999882606,
+                0.3227999999921849,
+                0.3210000000137825,
+                0.3247999999871354,
+                0.32509999999774664,
+                0.32170000000064647,
+                0.3284000000007836,
+                0.3216000000065833,
+                0.32369999999559695,
+                0.31979999999975917
+              ]
+            },
+            "profiling": [
+              {
+                "node": "Subtract_43",
+                "type": "Subtract",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 7.0
+              },
+              {
+                "node": "Multiply_11",
+                "type": "Multiply",
+                "execution_type": "Shave",
+                "status": "Status.EXECUTED",
+                "real_us": 53.0
+              },
+              {
+                "node": "Subtract_32",
+                "type": "Subtract",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 7.0
+              },
+              {
+                "node": "Subtract_21",
+                "type": "Subtract",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 7.0
+              },
+              {
+                "node": "Subtract_10",
+                "type": "Subtract",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 8.0
+              },
+              {
+                "node": "Multiply_44",
+                "type": "Multiply",
+                "execution_type": "Shave",
+                "status": "Status.EXECUTED",
+                "real_us": 128.0
+              },
+              {
+                "node": "Multiply_33",
+                "type": "Multiply",
+                "execution_type": "Shave",
+                "status": "Status.EXECUTED",
+                "real_us": 99.0
+              },
+              {
+                "node": "Multiply_22",
+                "type": "Multiply",
+                "execution_type": "Shave",
+                "status": "Status.EXECUTED",
+                "real_us": 68.0
+              },
+              {
+                "node": "Add_12",
+                "type": "Add",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 40.0
+              },
+              {
+                "node": "Add_23",
+                "type": "Add",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 66.0
+              },
+              {
+                "node": "Add_34",
+                "type": "Add",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 48.0
+              },
+              {
+                "node": "Add_45",
+                "type": "Add",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 50.0
+              }
+            ]
+          },
+          {
+            "scene": "triangles",
+            "status": "pass",
+            "export_sha256": {
+              ".xml": "189c7bdff7e66185cffaf47897b356933a5a9b0f24d377db31254b8fad8b7855",
+              ".bin": "c7ddc3fc67eeaab4a755d5ce9d8453fad39b03345296b195e095fe9e135e0b59"
+            },
+            "query_unsupported_ops": [],
+            "compile_config": {
+              "PERF_COUNT": true
+            },
+            "compile_ms": 160.98740000001044,
+            "execution_devices": [
+              "NPU"
+            ],
+            "device_full_name": "Intel(R) AI Boost",
+            "correctness": [
+              {
+                "case": "overlapping",
+                "pass": true,
+                "max_abs_error": 0.0,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              },
+              {
+                "case": "reversed_depth",
+                "pass": true,
+                "max_abs_error": 0.0,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              },
+              {
+                "case": "offscreen",
+                "pass": true,
+                "max_abs_error": 0.0,
+                "channels_outside_tolerance": 0,
+                "tolerance": 0.00784313725490196
+              }
+            ],
+            "host_call_ms": {
+              "median": 2.7228000000008024,
+              "p95": 2.944469999997068,
+              "min": 2.594999999985248,
+              "samples": [
+                2.603600000014694,
+                2.594999999985248,
+                2.6064000000189935,
+                2.6421999999968193,
+                2.6144999999928586,
+                2.609699999993609,
+                2.6055000000155815,
+                2.6200999999730357,
+                2.749499999993077,
+                2.8355999999973847,
+                2.8427999999962594,
+                2.8569000000118194,
+                2.9571999999973286,
+                2.9437999999970543,
+                2.734699999990653,
+                2.7109000000109518,
+                2.746400000006588,
+                2.874600000012606,
+                2.9068999999992684,
+                2.648600000014767
+              ]
+            },
+            "profiling": [
+              {
+                "node": "MatMul_162",
+                "type": "MatMul",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 16.0
+              },
+              {
+                "node": "MatMul_181",
+                "type": "MatMul",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 1405.0
+              },
+              {
+                "node": "ReduceMin_168",
+                "type": "ReduceMin",
+                "execution_type": "Shave",
+                "status": "Status.EXECUTED",
+                "real_us": 34.0
+              },
+              {
+                "node": "GreaterEqual_171",
+                "type": "GreaterEqual",
+                "execution_type": "Shave",
+                "status": "Status.EXECUTED",
+                "real_us": 291.0
+              },
+              {
+                "node": "Select_174",
+                "type": "Select",
+                "execution_type": "Shave",
+                "status": "Status.EXECUTED",
+                "real_us": 635.0
+              },
+              {
+                "node": "ReduceMin_177",
+                "type": "ReduceMin",
+                "execution_type": "Shave",
+                "status": "Status.EXECUTED",
+                "real_us": 34.0
+              },
+              {
+                "node": "Equal_178",
+                "type": "Equal",
+                "execution_type": "Shave",
+                "status": "Status.EXECUTED",
+                "real_us": 390.0
+              },
+              {
+                "node": "Equal_184",
+                "type": "Equal",
+                "execution_type": "Shave",
+                "status": "Status.EXECUTED",
+                "real_us": 292.0
+              },
+              {
+                "node": "LogicalAnd_179",
+                "type": "LogicalAnd",
+                "execution_type": "Shave",
+                "status": "Status.EXECUTED",
+                "real_us": 278.0
+              },
+              {
+                "node": "Multiply_186",
+                "type": "Multiply",
+                "execution_type": "Shave",
+                "status": "Status.EXECUTED",
+                "real_us": 698.0
+              },
+              {
+                "node": "Convert_185",
+                "type": "Convert",
+                "execution_type": "Shave",
+                "status": "Status.EXECUTED",
+                "real_us": 4.0
+              },
+              {
+                "node": "Add_187",
+                "type": "Add",
+                "execution_type": "DPU",
+                "status": "Status.EXECUTED",
+                "real_us": 7.0
+              },
+              {
+                "node": "Transpose_193",
+                "type": "Transpose",
+                "execution_type": "DMA",
+                "status": "Status.EXECUTED",
+                "real_us": 18.0
+              },
+              {
+                "node": "Result_194",
+                "type": "Result",
+                "execution_type": "DMA",
+                "status": "Status.EXECUTED",
+                "real_us": 1.0
+              }
+            ]
+          }
+        ],
+        "pass": true
+      }
+    }
+  ]
+}

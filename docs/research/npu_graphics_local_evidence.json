@@ -1,0 +1,356 @@
+{
+  "research_date": "2026-10-05",
+  "scope": "Local semantic checks only; not Intel hardware performance. Latencies omitted intentionally.",
+  "probe_sha256": "4af7915e70064a0ec1a2e5618b944c07b29182393608e2031a0b5bfba27531e2",
+  "runs": [
+    {
+      "openvino": "2026.1.0-21367-63e31528c62-releases/2026/1",
+      "os": "macOS-26.6.2-arm64-arm-64bit",
+      "device_requested": "CPU",
+      "devices_available": [
+        "CPU"
+      ],
+      "precision": "f32",
+      "width": 96,
+      "height": 64,
+      "layers": 4,
+      "pass": true,
+      "source_report": "npu-graphics-cpu-f32.json",
+      "scenes": [
+        {
+          "scene": "composite",
+          "status": "pass",
+          "compile_config": {
+            "PERF_COUNT": true,
+            "INFERENCE_PRECISION_HINT": "f32"
+          },
+          "execution_devices": [
+            "CPU"
+          ],
+          "device_full_name": "Apple M4",
+          "correctness": [
+            {
+              "case": "fractional_alpha",
+              "pass": true,
+              "max_abs_error": 1.1026711344008788e-07,
+              "channels_outside_tolerance": 0,
+              "tolerance": 1e-05
+            },
+            {
+              "case": "all_transparent",
+              "pass": true,
+              "max_abs_error": 0.0,
+              "channels_outside_tolerance": 0,
+              "tolerance": 1e-05
+            },
+            {
+              "case": "opaque_front",
+              "pass": true,
+              "max_abs_error": 0.0,
+              "channels_outside_tolerance": 0,
+              "tolerance": 1e-05
+            }
+          ]
+        },
+        {
+          "scene": "triangles",
+          "status": "pass",
+          "compile_config": {
+            "PERF_COUNT": true,
+            "INFERENCE_PRECISION_HINT": "f32"
+          },
+          "execution_devices": [
+            "CPU"
+          ],
+          "device_full_name": "Apple M4",
+          "correctness": [
+            {
+              "case": "overlapping",
+              "pass": true,
+              "max_abs_error": 0.0,
+              "channels_outside_tolerance": 0,
+              "tolerance": 1e-05
+            },
+            {
+              "case": "reversed_depth",
+              "pass": true,
+              "max_abs_error": 0.0,
+              "channels_outside_tolerance": 0,
+              "tolerance": 1e-05
+            },
+            {
+              "case": "offscreen",
+              "pass": true,
+              "max_abs_error": 0.0,
+              "channels_outside_tolerance": 0,
+              "tolerance": 1e-05
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "openvino": "2026.1.0-21367-63e31528c62-releases/2026/1",
+      "os": "macOS-26.6.2-arm64-arm-64bit",
+      "device_requested": "CPU",
+      "devices_available": [
+        "CPU"
+      ],
+      "precision": "f16",
+      "width": 96,
+      "height": 64,
+      "layers": 4,
+      "pass": true,
+      "source_report": "npu-graphics-cpu-f16.json",
+      "scenes": [
+        {
+          "scene": "composite",
+          "status": "pass",
+          "compile_config": {
+            "PERF_COUNT": true,
+            "INFERENCE_PRECISION_HINT": "f16"
+          },
+          "execution_devices": [
+            "CPU"
+          ],
+          "device_full_name": "Apple M4",
+          "correctness": [
+            {
+              "case": "fractional_alpha",
+              "pass": true,
+              "max_abs_error": 0.0010691421535471424,
+              "channels_outside_tolerance": 0,
+              "tolerance": 0.00784313725490196
+            },
+            {
+              "case": "all_transparent",
+              "pass": true,
+              "max_abs_error": 0.0,
+              "channels_outside_tolerance": 0,
+              "tolerance": 0.00784313725490196
+            },
+            {
+              "case": "opaque_front",
+              "pass": true,
+              "max_abs_error": 0.0,
+              "channels_outside_tolerance": 0,
+              "tolerance": 0.00784313725490196
+            }
+          ]
+        },
+        {
+          "scene": "triangles",
+          "status": "pass",
+          "compile_config": {
+            "PERF_COUNT": true,
+            "INFERENCE_PRECISION_HINT": "f16"
+          },
+          "execution_devices": [
+            "CPU"
+          ],
+          "device_full_name": "Apple M4",
+          "correctness": [
+            {
+              "case": "overlapping",
+              "pass": true,
+              "max_abs_error": 0.0,
+              "channels_outside_tolerance": 0,
+              "tolerance": 0.00784313725490196
+            },
+            {
+              "case": "reversed_depth",
+              "pass": true,
+              "max_abs_error": 0.0,
+              "channels_outside_tolerance": 0,
+              "tolerance": 0.00784313725490196
+            },
+            {
+              "case": "offscreen",
+              "pass": true,
+              "max_abs_error": 0.0,
+              "channels_outside_tolerance": 0,
+              "tolerance": 0.00784313725490196
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "openvino": "2026.1.0-21367-63e31528c62-releases/2026/1",
+      "os": "macOS-26.6.2-arm64-arm-64bit",
+      "device_requested": "CPU",
+      "devices_available": [
+        "CPU"
+      ],
+      "precision": "f16",
+      "width": 1920,
+      "height": 1080,
+      "layers": 4,
+      "pass": true,
+      "source_report": "npu-graphics-cpu-1080-f16.json",
+      "scenes": [
+        {
+          "scene": "composite",
+          "status": "pass",
+          "compile_config": {
+            "PERF_COUNT": true,
+            "INFERENCE_PRECISION_HINT": "f16"
+          },
+          "execution_devices": [
+            "CPU"
+          ],
+          "device_full_name": "Apple M4",
+          "correctness": [
+            {
+              "case": "fractional_alpha",
+              "pass": true,
+              "max_abs_error": 0.0014785447176743904,
+              "channels_outside_tolerance": 0,
+              "tolerance": 0.00784313725490196
+            },
+            {
+              "case": "all_transparent",
+              "pass": true,
+              "max_abs_error": 0.0,
+              "channels_outside_tolerance": 0,
+              "tolerance": 0.00784313725490196
+            },
+            {
+              "case": "opaque_front",
+              "pass": true,
+              "max_abs_error": 0.0,
+              "channels_outside_tolerance": 0,
+              "tolerance": 0.00784313725490196
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "openvino": "2026.1.0-21367-63e31528c62-releases/2026/1",
+      "os": "macOS-26.6.2-arm64-arm-64bit",
+      "device_requested": "CPU",
+      "devices_available": [
+        "CPU"
+      ],
+      "precision": "f32",
+      "width": 1920,
+      "height": 1080,
+      "layers": 4,
+      "pass": true,
+      "source_report": "npu-graphics-cpu-triangles-1080-f32.json",
+      "scenes": [
+        {
+          "scene": "triangles",
+          "status": "pass",
+          "compile_config": {
+            "PERF_COUNT": true,
+            "INFERENCE_PRECISION_HINT": "f32"
+          },
+          "execution_devices": [
+            "CPU"
+          ],
+          "device_full_name": "Apple M4",
+          "correctness": [
+            {
+              "case": "overlapping",
+              "pass": true,
+              "max_abs_error": 0.0,
+              "channels_outside_tolerance": 0,
+              "tolerance": 1e-05
+            },
+            {
+              "case": "reversed_depth",
+              "pass": true,
+              "max_abs_error": 0.0,
+              "channels_outside_tolerance": 0,
+              "tolerance": 1e-05
+            },
+            {
+              "case": "offscreen",
+              "pass": true,
+              "max_abs_error": 0.0,
+              "channels_outside_tolerance": 0,
+              "tolerance": 1e-05
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "openvino": "2026.1.0-21367-63e31528c62-releases/2026/1",
+      "os": "macOS-26.6.2-arm64-arm-64bit",
+      "device_requested": "CPU",
+      "devices_available": [
+        "CPU"
+      ],
+      "precision": "f16",
+      "width": 1920,
+      "height": 1080,
+      "layers": 4,
+      "pass": false,
+      "source_report": "npu-graphics-cpu-triangles-1080-f16.json",
+      "scenes": [
+        {
+          "scene": "triangles",
+          "status": "correctness_failed",
+          "compile_config": {
+            "PERF_COUNT": true,
+            "INFERENCE_PRECISION_HINT": "f16"
+          },
+          "execution_devices": [
+            "CPU"
+          ],
+          "device_full_name": "Apple M4",
+          "correctness": [
+            {
+              "case": "overlapping",
+              "pass": false,
+              "max_abs_error": 0.84375,
+              "channels_outside_tolerance": 3037,
+              "tolerance": 0.00784313725490196
+            },
+            {
+              "case": "reversed_depth",
+              "pass": false,
+              "max_abs_error": 0.84375,
+              "channels_outside_tolerance": 3039,
+              "tolerance": 0.00784313725490196
+            },
+            {
+              "case": "offscreen",
+              "pass": true,
+              "max_abs_error": 0.0,
+              "channels_outside_tolerance": 0,
+              "tolerance": 0.00784313725490196
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "openvino": "2026.1.0-21367-63e31528c62-releases/2026/1",
+      "os": "macOS-26.6.2-arm64-arm-64bit",
+      "device_requested": "NPU",
+      "devices_available": [
+        "CPU"
+      ],
+      "precision": "f16",
+      "width": 96,
+      "height": 64,
+      "layers": 4,
+      "pass": false,
+      "source_report": "npu-graphics-local-no-npu.json",
+      "scenes": [
+        {
+          "scene": "composite",
+          "status": "error",
+          "compile_config": {
+            "PERF_COUNT": true
+          },
+          "error": "Exception from src/inference/src/cpp/core.cpp:121:\nException from src/inference/src/dev/core_impl.cpp:700:\nDevice with \"NPU\" name is not registered in the OpenVINO Runtime\n\n"
+        }
+      ]
+    }
+  ]
+}
