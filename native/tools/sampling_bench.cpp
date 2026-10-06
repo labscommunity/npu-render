@@ -37,7 +37,11 @@ int main(int argc, char **argv) {
         const auto preparation_start=Clock::now();
         std::unique_ptr<nr_context,decltype(&nr_destroy)> context(nr_create(device,uint32_t(side),error,sizeof(error)),nr_destroy);
         if (!context) throw std::runtime_error(error);
+#ifdef NR_BENCH_RESIZE
+        if (nr_prepare_resize(context.get(),sw,sh,dw,dh,error,sizeof(error))) throw std::runtime_error(error);
+#else
         if (nr_prepare_sampling(context.get(),sw,sh,error,sizeof(error))) throw std::runtime_error(error);
+#endif
         const double preparation_ms=std::chrono::duration<double,std::milli>(Clock::now()-preparation_start).count();
         nr_surface source{src.data(),src.size(),size_t(sw)*4,uint32_t(sw),uint32_t(sh),0};
         nr_surface destination{dst.data(),dst.size(),size_t(dw)*4,uint32_t(dw),uint32_t(dh),0};
@@ -49,8 +53,13 @@ int main(int argc, char **argv) {
             const auto fixture_start=Clock::now();
             for (size_t i=0;i<src.size();++i) src[i]=i%4==3?160:uint8_t((i*13+frame*19)%161);
             std::copy(original.begin(),original.end(),dst.begin());
+#ifdef NR_BENCH_RESIZE
+            if (nr_resize_regions(context.get(),&source,&destination,dw,dh,0,0,&region,1,
+                                  NR_SOURCE_OVER,1,&stats,error,sizeof(error))) throw std::runtime_error(error);
+#else
             if (nr_sample_regions(context.get(),&source,&destination,&region,1,coordinates.data(),coordinates.size(),
                                   NR_SOURCE_OVER,1,&stats,error,sizeof(error))) throw std::runtime_error(error);
+#endif
             times.push_back(stats.elapsed_ms);
             for (size_t i=0;i<coordinates.size();++i) {
                 double value[4]{};
@@ -73,7 +82,11 @@ int main(int argc, char **argv) {
         for (size_t i=0;i<times.size();++i) std::cout << (i?",":"") << times[i];
         std::cout << "],\"fixture_update_call_check_ms\":[";
         for (size_t i=0;i<fixture_times.size();++i) std::cout << (i?",":"") << fixture_times[i];
+#ifdef NR_BENCH_RESIZE
+        std::cout << "],\"scope\":\"host-source resize and blend; coordinates only used by independent oracle; no presentation\"}\n";
+#else
         std::cout << "],\"scope\":\"host-source texture sampling; static CPU-generated coordinates; no presentation\"}\n";
+#endif
         return 0;
     } catch (const std::exception &e) { std::cerr << e.what() << '\n'; return 1; }
 }

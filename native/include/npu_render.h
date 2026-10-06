@@ -84,9 +84,10 @@ NR_API int nr_compose_regions(nr_context *context, const nr_surface *source,
                               size_t region_count, nr_operator operation, float opacity,
                               nr_frame_stats *stats, char *error, size_t error_size);
 
-/* Prepare each source extent on a control thread before sampling it. At most 16
- * extents / 64 million source pixels are retained per context. Switching prepares all retained sampling
- * graphs before activation; any failure preserves the entire previous backend.
+/* Prepare extents on a control thread. Sampling and resize share a cache limited
+ * to 16 graphs / 64 Mi logical RGBA tensor pixels (driver workspace additional).
+ * Switching prepares all retained graphs before activation; any failure
+ * preserves the entire previous backend.
  */
 NR_API int nr_prepare_sampling(nr_context *context, uint32_t source_width,
                                uint32_t source_height, char *error, size_t error_size);
@@ -95,6 +96,22 @@ NR_API int nr_sample_regions(nr_context *context, const nr_surface *source,
                              size_t region_count, const nr_sample_point *points,
                              size_t point_count, nr_operator operation, float opacity,
                              nr_frame_stats *stats, char *error, size_t error_size);
+
+/* Bilinear half-pixel resize with edge clamping. The resized image has the
+ * prepared extent and integer origin in destination coordinates. Every damage
+ * rectangle must fit both that virtual image and destination. Only damage is
+ * committed, but one inference processes the whole resized extent. Input/output
+ * extents are 1..4096. No CPU coordinate array or per-frame compilation.
+ */
+NR_API int nr_prepare_resize(nr_context *context, uint32_t source_width,
+                             uint32_t source_height, uint32_t resized_width,
+                             uint32_t resized_height, char *error, size_t error_size);
+NR_API int nr_resize_regions(nr_context *context, const nr_surface *source,
+                             nr_surface *destination, uint32_t resized_width,
+                             uint32_t resized_height, int32_t origin_x, int32_t origin_y,
+                             const nr_damage_rect *regions, size_t region_count,
+                             nr_operator operation, float opacity, nr_frame_stats *stats,
+                             char *error, size_t error_size);
 
 /* Source/destination storage must remain valid and stable during the call.
  * Infer requests serialize per prepared backend. The destination changes only

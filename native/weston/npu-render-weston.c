@@ -28,6 +28,10 @@ struct nr_weston {
     int (*sample)(nr_context *, const nr_surface *, nr_surface *, const nr_damage_rect *,
                   size_t, const nr_sample_point *, size_t, nr_operator, float,
                   nr_frame_stats *, char *, size_t);
+    int (*prepare_resize)(nr_context *, uint32_t, uint32_t, uint32_t, uint32_t, char *, size_t);
+    int (*resize)(nr_context *, const nr_surface *, nr_surface *, uint32_t, uint32_t,
+                  int32_t, int32_t, const nr_damage_rect *, size_t, nr_operator, float,
+                  nr_frame_stats *, char *, size_t);
     char config[PATH_MAX];
     char last_config[256];
     pthread_t watcher;
@@ -35,7 +39,9 @@ struct nr_weston {
     bool watching, stopping, pinned;
     struct { uint32_t width, height; int status; } sampling[16];
     size_t sampling_count;
-    uint64_t native_calls, native_pixels, sampling_calls, fallback_calls, failed_calls;
+    struct { uint32_t sw, sh, rw, rh; int status; } resizing[16];
+    size_t resizing_count;
+    uint64_t native_calls, native_pixels, sampling_calls, resize_calls, fallback_calls, failed_calls;
 };
 
 /* Accept the two canonical key orders produced by version-1 selection files.
@@ -100,6 +106,8 @@ static void *watch_selection(void *argument)
                 pthread_mutex_lock(&state->stop_mutex);
                 for (size_t i = 0; i < state->sampling_count; ++i)
                     if (state->sampling[i].status < 0) state->sampling[i].status = 0;
+                for (size_t i = 0; i < state->resizing_count; ++i)
+                    if (state->resizing[i].status < 0) state->resizing[i].status = 0;
                 pthread_mutex_unlock(&state->stop_mutex);
                 fprintf(stderr, "npu-render: activated %s for eligible compositor operations\n", backend);
             }
@@ -119,6 +127,20 @@ static void *watch_selection(void *argument)
             pthread_mutex_unlock(&state->stop_mutex);
             if (prepared) fprintf(stderr, "npu-render: sampling extent %ux%u rejected: %s\n", width, height, error);
             else fprintf(stderr, "npu-render: sampling extent %ux%u prepared\n", width, height);
+        }
+        for (size_t i = 0; i < 16; ++i) {
+            pthread_mutex_lock(&state->stop_mutex);
+            bool pending = i < state->resizing_count && state->resizing[i].status == 0;
+            uint32_t sw = pending ? state->resizing[i].sw : 0, sh = pending ? state->resizing[i].sh : 0;
+            uint32_t rw = pending ? state->resizing[i].rw : 0, rh = pending ? state->resizing[i].rh : 0;
+            pthread_mutex_unlock(&state->stop_mutex);
+            if (!pending) continue;
+            int prepared = state->prepare_resize(state->context, sw, sh, rw, rh, error, sizeof(error));
+            pthread_mutex_lock(&state->stop_mutex);
+            state->resizing[i].status = prepared ? -1 : 1;
+            pthread_mutex_unlock(&state->stop_mutex);
+            if (prepared) fprintf(stderr, "npu-render: resize extent %ux%u to %ux%u rejected: %s\n", sw, sh, rw, rh, error);
+            else fprintf(stderr, "npu-render: resize extent %ux%u to %ux%u prepared\n", sw, sh, rw, rh);
         }
         nanosleep(&interval, NULL);
     }
@@ -143,8 +165,10 @@ struct nr_weston *nr_weston_create(void)
     *(void **)(&state->compose) = dlsym(state->library, "nr_compose_regions");
     *(void **)(&state->prepare_sampling) = dlsym(state->library, "nr_prepare_sampling");
     *(void **)(&state->sample) = dlsym(state->library, "nr_sample_regions");
+    *(void **)(&state->prepare_resize) = dlsym(state->library, "nr_prepare_resize");
+    *(void **)(&state->resize) = dlsym(state->library, "nr_resize_regions");
     if (!state->create || !state->destroy || !state->change || !state->compose ||
-        !state->prepare_sampling || !state->sample) goto fail;
+        !state->prepare_sampling || !state->sample || !state->prepare_resize || !state->resize) goto fail;
     char backend[4] = "GPU", error[2048];
     const char *override = getenv("NPU_RENDER_BACKEND");
     const char *config = getenv("NPU_RENDER_CONFIG");
@@ -190,9 +214,10 @@ void nr_weston_destroy(struct nr_weston *state)
     pthread_mutex_unlock(&state->stop_mutex);
     if (state->watching) pthread_join(state->watcher, NULL);
     fprintf(stderr, "npu-render-summary: {\"native_calls\":%llu,\"native_pixels\":%llu,"
-                    "\"sampling_calls\":%llu,\"pixman_fallback_calls\":%llu,\"native_failures\":%llu}\n",
+                    "\"sampling_calls\":%llu,\"resize_calls\":%llu,\"pixman_fallback_calls\":%llu,\"native_failures\":%llu}\n",
             (unsigned long long)state->native_calls, (unsigned long long)state->native_pixels,
             (unsigned long long)state->sampling_calls,
+            (unsigned long long)state->resize_calls,
             (unsigned long long)state->fallback_calls, (unsigned long long)state->failed_calls);
     if (state->context) state->destroy(state->context);
     if (state->library) dlclose(state->library);
@@ -239,6 +264,89 @@ static bool sampling_ready(struct nr_weston *state, uint32_t width, uint32_t hei
 static int64_t fixed_floor(int64_t value)
 {
     return value >= 0 ? value / 65536 : -((-value + 65535) / 65536);
+}
+
+static bool resize_ready(struct nr_weston *state, uint32_t sw, uint32_t sh, uint32_t rw, uint32_t rh)
+{
+    bool ready = false;
+    pthread_mutex_lock(&state->stop_mutex);
+    size_t i;
+    for (i = 0; i < state->resizing_count; ++i)
+        if (state->resizing[i].sw == sw && state->resizing[i].sh == sh &&
+            state->resizing[i].rw == rw && state->resizing[i].rh == rh) break;
+    if (i < state->resizing_count) ready = state->resizing[i].status == 1;
+    else if (i < 16) {
+        state->resizing[i].sw = sw; state->resizing[i].sh = sh;
+        state->resizing[i].rw = rw; state->resizing[i].rh = rh;
+        state->resizing[i].status = 0; ++state->resizing_count;
+    }
+    pthread_mutex_unlock(&state->stop_mutex);
+    return ready;
+}
+
+/* Return -1 for geometry outside this specialization, 0 for explicit Pixman
+ * fallback (including asynchronous preparation), and 1 after native execution.
+ * Integer origin and exact fixed-point ratios preserve Pixman coordinates.
+ */
+static int repaint_resized(struct nr_weston *state, pixman_op_t operation,
+                           const nr_surface *src, nr_surface *dst,
+                           const pixman_transform_t *transform, pixman_filter_t filter,
+                           pixman_region32_t *damage, const pixman_region32_t *source_clip,
+                           float opacity)
+{
+    const int64_t one = 65536;
+    const int64_t ax = transform->matrix[0][0], ay = transform->matrix[1][1];
+    const int64_t tx = transform->matrix[0][2], ty = transform->matrix[1][2];
+    if (source_clip || filter != PIXMAN_FILTER_BILINEAR || ax <= 0 || ay <= 0 ||
+        transform->matrix[0][1] || transform->matrix[1][0] || transform->matrix[2][0] ||
+        transform->matrix[2][1] || transform->matrix[2][2] != one ||
+        src->width > 4096 || src->height > 4096 ||
+        /* Pixman's fractions have 7 bits. Require pixel-center fractions to be
+         * exactly representable, avoiding a changed filter at extreme scales. */
+        ax%1024 || ay%1024 ||
+        (src->width*one)%ax || (src->height*one)%ay || tx%ax || ty%ay) return -1;
+    const int64_t rw = src->width*one/ax, rh = src->height*one/ay, ox = -tx/ax, oy = -ty/ay;
+    if (rw < 1 || rh < 1 || rw > 4096 || rh > 4096 ||
+        ox < INT32_MIN || ox > INT32_MAX || oy < INT32_MIN || oy > INT32_MAX) return -1;
+    int count;
+    pixman_box32_t *boxes = pixman_region32_rectangles(damage, &count);
+    if (count < 0 || count > 4096) return -1;
+    if (!count) return 1;
+    nr_damage_rect *regions = calloc((size_t)count, sizeof(*regions));
+    if (!regions) return 0;
+    size_t used = 0;
+    int handled = -1;
+    for (int i = 0; i < count; ++i) {
+        int64_t x1 = boxes[i].x1 < 0 ? 0 : boxes[i].x1;
+        int64_t y1 = boxes[i].y1 < 0 ? 0 : boxes[i].y1;
+        int64_t x2 = boxes[i].x2 > (int64_t)dst->width ? dst->width : boxes[i].x2;
+        int64_t y2 = boxes[i].y2 > (int64_t)dst->height ? dst->height : boxes[i].y2;
+        if (x2 <= x1 || y2 <= y1) continue;
+        if (x1 < ox || y1 < oy || x2 > ox+rw || y2 > oy+rh) goto done;
+        regions[used++] = (nr_damage_rect){x1,y1,x2-x1,y2-y1};
+    }
+    if (!used) { handled = 1; goto done; }
+    handled = 0;
+    if (!resize_ready(state, src->width, src->height, rw, rh)) goto done;
+    char error[2048];
+    nr_frame_stats stats;
+    if (state->resize(state->context, src, dst, rw, rh, ox, oy, regions, used,
+                      operation == PIXMAN_OP_SRC ? NR_SOURCE : NR_SOURCE_OVER,
+                      opacity, &stats, error, sizeof(error))) {
+        ++state->failed_calls;
+        fprintf(stderr, "npu-render: resized operation failed; explicit Pixman retry: %s\n", error);
+        goto done;
+    }
+    ++state->native_calls; ++state->resize_calls;
+    state->native_pixels += stats.pixels;
+    if (state->resize_calls == 1 || state->resize_calls%300 == 0)
+        fprintf(stderr, "npu-render-resize: {\"execution_devices\":\"%s\",\"pixels\":%llu,"
+                        "\"dispatches\":%llu,\"elapsed_ms\":%.3f}\n", stats.execution_devices,
+                (unsigned long long)stats.pixels, (unsigned long long)stats.dispatches, stats.elapsed_ms);
+    handled = 1;
+done:
+    free(regions);
+    return handled;
 }
 
 static bool repaint_sampled(struct nr_weston *state, pixman_op_t operation,
@@ -410,6 +518,11 @@ bool nr_weston_repaint(struct nr_weston *state, pixman_op_t operation,
     return true;
 sampling:
     free(regions); regions = NULL;
+    {
+        int resized = repaint_resized(state, operation, &src, &dst, transform, filter, damage, source_clip, opacity);
+        if (resized == 1) return true;
+        if (resized == 0) goto fallback;
+    }
     if (repaint_sampled(state, operation, &src, &dst, transform, filter, damage, source_clip, opacity)) return true;
 fallback:
     free(regions);

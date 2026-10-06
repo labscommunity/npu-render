@@ -64,6 +64,8 @@ int main(int argc, char **argv)
         {1,0,0.25,0,1,-0.1875}, {0.5,0,1.125,0,0.75,-0.375},
         {1.25,0,-10.375,0,1.5,0.625}, {0,1,0,-1,0,W-1},
         {0.91,0.27,-3.35,-0.27,0.91,2.55}, {-1,0,W,0,1,0},
+        /* Exact axis scales exercise the single-dispatch resize specialization. */
+        {0.5,0,1,0,0.5,2}, {0.25,0,0,0,0.5,0}, {1,0,-2,0,1,-3},
     };
     int sampled_cases = 0;
     for (size_t variant = 0; variant < sizeof(affine)/sizeof(affine[0]); ++variant)

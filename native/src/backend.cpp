@@ -8,6 +8,8 @@
 #include <array>
 #include <chrono>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <limits>
 #include <map>
@@ -46,6 +48,34 @@ struct SamplingProgram {
     std::mutex execution;
 };
 
+using ResizeKey = std::array<uint32_t, 4>;
+struct ByteTables {
+    std::array<ov::float16, 256> encode;
+    std::array<uint8_t, 65536> decode;
+    ByteTables() {
+        for (size_t i = 0; i < encode.size(); ++i) encode[i] = ov::float16(float(i));
+        for (size_t i = 0; i < decode.size(); ++i) {
+            const float value = float(ov::float16::from_bits(uint16_t(i)));
+            decode[i] = std::isfinite(value) ? uint8_t(std::lround(std::clamp(value,0.f,255.f))) : 0;
+        }
+    }
+};
+const ByteTables &byte_tables() { static const ByteTables tables; return tables; }
+
+uint16_t half_bits(const ov::float16 &value) {
+    static_assert(sizeof(value) == sizeof(uint16_t), "FP16 storage changed");
+    uint16_t bits;
+    std::memcpy(&bits, &value, sizeof(bits));
+    return bits;
+}
+struct ResizeProgram {
+    size_t source_pixels, output_pixels;
+    std::string actual;
+    ov::InferRequest request;
+    ov::Tensor image, background, opacity, output;
+    std::mutex execution;
+};
+
 struct Program {
     std::string target;
     std::string actual;
@@ -56,7 +86,20 @@ struct Program {
     std::mutex execution;
     std::mutex sampling_mutex;
     std::map<std::pair<uint32_t, uint32_t>, std::shared_ptr<SamplingProgram>> sampling;
+    std::map<ResizeKey, std::shared_ptr<ResizeProgram>> resizing;
 };
+
+// Logical tensor budget excludes compiler/driver workspace. Include all persistent
+// graph inputs and outputs, counted in equivalent RGBA FP16 pixels.
+void check_resource_budget(const Program &program, size_t additional) {
+    size_t total = additional;
+    for (const auto &entry : program.sampling)
+        total += entry.second->source_pixels + 5 * entry.second->capacity;
+    for (const auto &entry : program.resizing)
+        total += entry.second->source_pixels + 2 * entry.second->output_pixels + 1;
+    if (program.sampling.size() + program.resizing.size() >= 16 || total > 64u * 1024 * 1024)
+        throw std::runtime_error("prepared graphics resource limit reached");
+}
 
 uint8_t byte_value(float value) {
     return static_cast<uint8_t>(std::lround(std::clamp(value, 0.0f, 1.0f) * 255));
@@ -208,6 +251,95 @@ std::shared_ptr<SamplingProgram> prepare_sampling(ov::Core &core, uint32_t width
     return program;
 }
 
+std::shared_ptr<ResizeProgram> prepare_resize(ov::Core &core, const ResizeKey &extent,
+                                             const std::string &target) {
+    namespace op = ov::opset13;
+    (void)byte_tables(); // Initialize conversion tables on the control thread.
+    const auto sw = extent[0], sh = extent[1], rw = extent[2], rh = extent[3];
+    auto program = std::make_shared<ResizeProgram>();
+    program->source_pixels = size_t(sw) * sh;
+    program->output_pixels = size_t(rw) * rh;
+    auto image = std::make_shared<op::Parameter>(ov::element::f16, ov::Shape{1, 4, sh, sw});
+    auto background = std::make_shared<op::Parameter>(ov::element::f16, ov::Shape{1, 4, rh, rw});
+    auto opacity = std::make_shared<op::Parameter>(ov::element::f16, ov::Shape{1});
+    op::Interpolate::InterpolateAttrs attributes;
+    attributes.mode = op::Interpolate::InterpolateMode::LINEAR_ONNX;
+    attributes.shape_calculation_mode = op::Interpolate::ShapeCalcMode::SIZES;
+    attributes.coordinate_transformation_mode = op::Interpolate::CoordinateTransformMode::HALF_PIXEL;
+    auto resized = std::make_shared<op::Interpolate>(image,
+        op::Constant::create(ov::element::i64, {2}, {rh, rw}),
+        op::Constant::create(ov::element::i64, {2}, {2, 3}), attributes);
+    auto foreground = std::make_shared<op::Multiply>(resized, opacity);
+    auto alpha = std::make_shared<op::Gather>(foreground,
+        op::Constant::create(ov::element::i64, {1}, {3}), op::Constant::create(ov::element::i64, {}, {1}));
+    auto inverse = std::make_shared<op::Subtract>(op::Constant::create(ov::element::f16, {}, {1.f}),
+        std::make_shared<op::Multiply>(alpha, op::Constant::create(ov::element::f16, {}, {1.f / 255})));
+    auto result = std::make_shared<op::Add>(foreground, std::make_shared<op::Multiply>(background, inverse));
+    auto model = std::make_shared<ov::Model>(ov::OutputVector{result},
+        ov::ParameterVector{image, background, opacity});
+    ov::AnyMap properties;
+    if (target != "NPU") properties[ov::hint::inference_precision.name()] = ov::element::f16;
+    auto compiled = core.compile_model(model, target, properties);
+    const auto actual = compiled.get_property(ov::execution_devices);
+    if (actual.empty() || std::any_of(actual.begin(), actual.end(), [&](const auto &device) {
+        return device != target && device.rfind(target + ".", 0) != 0;
+    })) throw std::runtime_error("unexpected resize execution device");
+    for (const auto &device : actual) {
+        if (!program->actual.empty()) program->actual += ",";
+        program->actual += device;
+    }
+    program->request = compiled.create_infer_request();
+    // This API consumes ordinary CPU memory. Use owned host tensors so the CPU
+    // packing/oracle loops never scatter across a driver's mapped device allocation.
+    // The runtime performs any required upload/download; this is not a zero-copy path.
+    program->image = ov::Tensor(ov::element::f16, ov::Shape{1, 4, sh, sw});
+    program->background = ov::Tensor(ov::element::f16, ov::Shape{1, 4, rh, rw});
+    program->opacity = ov::Tensor(ov::element::f16, ov::Shape{1});
+    program->output = ov::Tensor(ov::element::f16, ov::Shape{1, 4, rh, rw});
+    program->request.set_input_tensor(0, program->image);
+    program->request.set_input_tensor(1, program->background);
+    program->request.set_input_tensor(2, program->opacity);
+    program->request.set_output_tensor(program->output);
+    auto *texels = program->image.data<ov::float16>();
+    auto *bg = program->background.data<ov::float16>();
+    const size_t sn = program->source_pixels, dn = program->output_pixels;
+    // Qualify this exact shape against double precision, including border clamp,
+    // changing colors/alpha, and opacity endpoints. No graph becomes active first.
+    const float opacity_cases[] = {1.f, .5f, 0.f};
+    for (size_t frame = 0; frame < 3; ++frame) {
+        for (size_t i = 0; i < sn; ++i) {
+            const unsigned a = unsigned((i * 7 + frame * 31) % 256);
+            for (size_t c = 0; c < 4; ++c)
+                texels[c*sn+i] = ov::float16(float(c == 3 ? a : (i*(c+3)+frame*19)%(a+1)));
+        }
+        for (size_t i = 0; i < dn; ++i) for (size_t c = 0; c < 4; ++c)
+            bg[c*dn+i] = ov::float16(float(c == 3 ? 255 : (i*13+c*31)%256));
+        program->opacity.data<ov::float16>()[0] = ov::float16(opacity_cases[frame]);
+        program->request.infer();
+        const auto *out = program->request.get_output_tensor().data<const ov::float16>();
+        for (uint32_t y = 0; y < rh; ++y) for (uint32_t x = 0; x < rw; ++x) {
+            const double sx = (x+.5)*sw/rw-.5, sy = (y+.5)*sh/rh-.5;
+            const int ix = int(std::floor(sx)), iy = int(std::floor(sy));
+            const double fx = sx-ix, fy = sy-iy;
+            double sample[4]{};
+            for (int k = 0; k < 4; ++k) {
+                const size_t tx = std::clamp(ix+(k&1), 0, int(sw)-1);
+                const size_t ty = std::clamp(iy+(k>>1), 0, int(sh)-1);
+                const double weight = ((k&1)?fx:1-fx)*((k>>1)?fy:1-fy)*opacity_cases[frame];
+                for (size_t c = 0; c < 4; ++c) sample[c] += float(texels[c*sn+ty*sw+tx])*weight;
+            }
+            for (size_t c = 0; c < 4; ++c) {
+                const size_t index = c*dn+size_t(y)*rw+x;
+                const double expected = sample[c]+float(bg[index])*(1-sample[3]/255);
+                const double observed = float(out[index]);
+                if (!std::isfinite(observed) || std::abs(std::lround(observed)-std::lround(expected)) > 2)
+                    throw std::runtime_error("bilinear resize qualification failed");
+            }
+        }
+    }
+    return program;
+}
+
 void validate(const nr_surface &surface) {
     if (!surface.data || !surface.width || !surface.height ||
         size_t(surface.width) > std::numeric_limits<size_t>::max() / 4 ||
@@ -262,13 +394,22 @@ extern "C" NR_API int nr_switch(nr_context *context, const char *backend,
         }
         auto candidate = prepare(context->core, context->side, target);
         std::vector<std::pair<uint32_t, uint32_t>> extents;
+        std::vector<ResizeKey> resize_extents;
         {
             std::lock_guard<std::mutex> lock(context->active->sampling_mutex);
             for (const auto &entry : context->active->sampling) extents.push_back(entry.first);
+            for (const auto &entry : context->active->resizing) resize_extents.push_back(entry.first);
         }
-        for (const auto &extent : extents)
+        for (const auto &extent : extents) {
+            const size_t capacity = target == "NPU" ? std::min(candidate->capacity, size_t(128)*128) : candidate->capacity;
+            check_resource_budget(*candidate, size_t(extent.first)*extent.second + 5*capacity);
             candidate->sampling[extent] = prepare_sampling(context->core, extent.first, extent.second,
                                                           candidate->capacity, target);
+        }
+        for (const auto &extent : resize_extents) {
+            check_resource_budget(*candidate, size_t(extent[0])*extent[1] + 2*size_t(extent[2])*extent[3] + 1);
+            candidate->resizing[extent] = prepare_resize(context->core, extent, target);
+        }
         {
             std::lock_guard<std::mutex> lock(context->active_mutex);
             context->active = std::move(candidate);
@@ -426,10 +567,8 @@ extern "C" NR_API int nr_prepare_sampling(nr_context *context, uint32_t source_w
         {
             std::lock_guard<std::mutex> lock(program->sampling_mutex);
             if (program->sampling.count(key)) { copy_text("", error, error_size); return 0; }
-            size_t total = size_t(source_width) * source_height;
-            for (const auto &entry : program->sampling) total += entry.second->source_pixels;
-            if (program->sampling.size() >= 16 || total > 64u * 1024 * 1024)
-                throw std::runtime_error("prepared sampling resource limit reached");
+            const size_t capacity = program->target == "NPU" ? std::min(program->capacity, size_t(128)*128) : program->capacity;
+            check_resource_budget(*program, size_t(source_width)*source_height + 5*capacity);
         }
         auto sampler = prepare_sampling(context->core, source_width, source_height, program->capacity, program->target);
         {
@@ -440,6 +579,143 @@ extern "C" NR_API int nr_prepare_sampling(nr_context *context, uint32_t source_w
         return 0;
     } catch (const std::exception &e) { copy_text(e.what(), error, error_size); return -1; }
       catch (...) { copy_text("unknown sampling preparation failure", error, error_size); return -1; }
+}
+
+extern "C" NR_API int nr_prepare_resize(nr_context *context, uint32_t source_width,
+                                        uint32_t source_height, uint32_t resized_width,
+                                        uint32_t resized_height, char *error, size_t error_size) {
+    try {
+        const ResizeKey extent{source_width, source_height, resized_width, resized_height};
+        if (!context || std::any_of(extent.begin(), extent.end(), [](uint32_t n) { return n < 1 || n > 4096; }))
+            throw std::invalid_argument("resize extents must be in 1..4096");
+        std::lock_guard<std::mutex> changing(context->switch_mutex);
+        std::shared_ptr<Program> program;
+        {
+            std::lock_guard<std::mutex> lock(context->active_mutex);
+            program = context->active;
+        }
+        {
+            std::lock_guard<std::mutex> lock(program->sampling_mutex);
+            if (program->resizing.count(extent)) { copy_text("", error, error_size); return 0; }
+            check_resource_budget(*program, size_t(source_width)*source_height + 2*size_t(resized_width)*resized_height + 1);
+        }
+        auto resizer = prepare_resize(context->core, extent, program->target);
+        {
+            std::lock_guard<std::mutex> lock(program->sampling_mutex);
+            program->resizing.emplace(extent, std::move(resizer));
+        }
+        copy_text("", error, error_size); return 0;
+    } catch (const std::exception &e) { copy_text(e.what(), error, error_size); return -1; }
+      catch (...) { copy_text("unknown resize preparation failure", error, error_size); return -1; }
+}
+
+extern "C" NR_API int nr_resize_regions(nr_context *context, const nr_surface *source,
+                                        nr_surface *destination, uint32_t resized_width,
+                                        uint32_t resized_height, int32_t origin_x, int32_t origin_y,
+                                        const nr_damage_rect *regions, size_t region_count,
+                                        nr_operator operation, float opacity, nr_frame_stats *stats,
+                                        char *error, size_t error_size) {
+    if (stats) std::memset(stats, 0, sizeof(*stats));
+    try {
+        const auto started = Clock::now();
+        if (!context || !source || !destination || !regions || !region_count || region_count > 4096 ||
+            !std::isfinite(opacity) || opacity < 0 || opacity > 1 ||
+            (operation != NR_SOURCE && operation != NR_SOURCE_OVER))
+            throw std::invalid_argument("invalid resize arguments");
+        validate(*source); validate(*destination);
+        std::shared_ptr<Program> program;
+        {
+            std::lock_guard<std::mutex> lock(context->active_mutex);
+            program = context->active;
+        }
+        std::shared_ptr<ResizeProgram> resizer;
+        {
+            std::lock_guard<std::mutex> lock(program->sampling_mutex);
+            auto found = program->resizing.find({source->width, source->height, resized_width, resized_height});
+            if (found == program->resizing.end()) throw std::runtime_error("extent has no prepared resize graph");
+            resizer = found->second;
+        }
+        std::vector<size_t> offsets{0};
+        for (size_t i = 0; i < region_count; ++i) {
+            const auto &r = regions[i];
+            const int64_t local_x = int64_t(r.x)-origin_x, local_y = int64_t(r.y)-origin_y;
+            if (!r.width || !r.height || r.x > destination->width || r.width > destination->width-r.x ||
+                r.y > destination->height || r.height > destination->height-r.y ||
+                local_x < 0 || local_y < 0 || local_x+r.width > resized_width || local_y+r.height > resized_height)
+                throw std::invalid_argument("resize damage must fit destination and virtual image");
+            const size_t count = size_t(r.width)*r.height;
+            if (count > std::numeric_limits<size_t>::max()/4-offsets.back())
+                throw std::invalid_argument("resize damage overflows storage");
+            offsets.push_back(offsets.back()+count);
+            for (size_t j = 0; j < i; ++j) {
+                const auto &q = regions[j];
+                if (r.x < q.x+q.width && q.x < r.x+r.width && r.y < q.y+q.height && q.y < r.y+r.height)
+                    throw std::invalid_argument("resize damage must be disjoint");
+            }
+        }
+        std::lock_guard<std::mutex> lock(resizer->execution);
+        const auto pack_start = Clock::now();
+        auto *image = resizer->image.data<ov::float16>();
+        auto *bg = resizer->background.data<ov::float16>();
+        const auto &tables = byte_tables();
+        const size_t sn = resizer->source_pixels, dn = resizer->output_pixels;
+        for (size_t y = 0; y < source->height; ++y) for (size_t x = 0; x < source->width; ++x)
+            for (size_t c = 0; c < 4; ++c)
+                image[c*sn+y*source->width+x] = tables.encode[c == 3 && source->opaque ? 255 :
+                    source->data[y*source->stride+x*4+c]];
+        std::fill_n(bg, dn*4, ov::float16(0.f));
+        if (operation == NR_SOURCE_OVER) for (size_t i = 0; i < region_count; ++i) {
+            const auto &r = regions[i];
+            for (size_t y = r.y; y < size_t(r.y)+r.height; ++y)
+                for (size_t x = r.x; x < size_t(r.x)+r.width; ++x) {
+                    const auto *pixel = destination->data+y*destination->stride+x*4;
+                    const size_t index = size_t(int64_t(y)-origin_y)*resized_width+size_t(int64_t(x)-origin_x);
+                    for (size_t c = 0; c < 4; ++c)
+                        bg[c*dn+index] = tables.encode[c == 3 && destination->opaque ? 255 : pixel[c]];
+                }
+        }
+        resizer->opacity.data<ov::float16>()[0] = ov::float16(opacity);
+        const auto infer_start = Clock::now();
+        resizer->request.infer();
+        const auto stage_start = Clock::now();
+        const auto *out = resizer->request.get_output_tensor().data<const ov::float16>();
+        std::vector<uint8_t> staged(offsets.back()*4);
+        for (size_t i = 0; i < region_count; ++i) {
+            const auto &r = regions[i];
+            for (size_t y = 0; y < r.height; ++y) for (size_t x = 0; x < r.width; ++x) {
+                const size_t index = size_t(int64_t(r.y)+y-origin_y)*resized_width+size_t(int64_t(r.x)+x-origin_x);
+                for (size_t c = 0; c < 4; ++c) {
+                    const uint16_t bits = half_bits(out[c*dn+index]);
+                    if ((bits & 0x7c00) == 0x7c00) throw std::runtime_error("non-finite resize output");
+                    staged[4*(offsets[i]+y*r.width+x)+c] = c == 3 && destination->opaque ? 255 :
+                        tables.decode[bits];
+                }
+            }
+        }
+        // Aliased inputs are already packed; any failure above leaves all destination bytes intact.
+        for (size_t i = 0; i < region_count; ++i) {
+            const auto &r = regions[i];
+            for (size_t y = 0; y < r.height; ++y)
+                std::memcpy(destination->data+(r.y+y)*destination->stride+size_t(r.x)*4,
+                            staged.data()+4*(offsets[i]+y*r.width), size_t(r.width)*4);
+        }
+        const auto finished = Clock::now();
+        const char *trace = std::getenv("NPU_RENDER_TRACE_RESIZE");
+        if (trace && std::strcmp(trace, "1") == 0) {
+            const auto ms = [](auto a, auto b) { return std::chrono::duration<double,std::milli>(b-a).count(); };
+            std::fprintf(stderr, "npu-render-resize-stages: {\"execution_devices\":\"%s\","
+                "\"validate_wait_ms\":%.4f,\"pack_ms\":%.4f,\"infer_ms\":%.4f,\"stage_commit_ms\":%.4f}\n",
+                resizer->actual.c_str(), ms(started,pack_start), ms(pack_start,infer_start),
+                ms(infer_start,stage_start), ms(stage_start,finished));
+        }
+        if (stats) {
+            stats->pixels = offsets.back(); stats->dispatches = 1;
+            stats->elapsed_ms = std::chrono::duration<double, std::milli>(finished-started).count();
+            copy_text(resizer->actual, stats->execution_devices, sizeof(stats->execution_devices));
+        }
+        copy_text("", error, error_size); return 0;
+    } catch (const std::exception &e) { copy_text(e.what(), error, error_size); return -1; }
+      catch (...) { copy_text("unknown resize failure", error, error_size); return -1; }
 }
 
 extern "C" NR_API int nr_sample_regions(nr_context *context, const nr_surface *source,

@@ -83,3 +83,4 @@ jobs:
       - run: uv run --frozen python tools/validate_weston.py
       - run: uv run --frozen python tools/validate_weston.py --nested --report results/weston-nested.json
       - run: uv run --frozen python tools/validate_weston.py --transformed --report results/weston-transformed.json
+      - run: uv run --frozen python tools/validate_weston.py --resized --report results/weston-resized.json

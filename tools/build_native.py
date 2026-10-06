@@ -51,6 +51,10 @@ def main():
             "nr_sampling_test.exe" if os.name == "nt" else "nr_sampling_test"
         )
         subprocess.run([str(sampler), device], check=True, env=environment)
+        resizer = executable.with_name(
+            "nr_resize_test.exe" if os.name == "nt" else "nr_resize_test"
+        )
+        subprocess.run([str(resizer), device], check=True, env=environment)
     subprocess.run(
         [
             "ctest",

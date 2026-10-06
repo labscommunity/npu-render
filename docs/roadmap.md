@@ -13,7 +13,7 @@ delivery requirements while freeing useful GPU capacity.
 | Real buffer path | Linear graphics-buffer import/export, synchronization and format conversion | D3D12 shared input/output, byte conversion and native swapchain application with saved switch | Pixel/control checks pass; native display test occluded; DMA-BUF outstanding |
 | Work reduction | Damage tiles, occlusion, bounded layer groups, prepared graph variants | Disjoint damage batching in the C ABI; Weston supplies visibility/damage | Initial implementation; sustained native display results outstanding |
 | Tahoma benefit | Reproducible concurrent inference and desktop traces | Two five-round GPU/NPU/CPU/idle application comparisons, including streaming | Measured; ~1–1.6% median paired gains do not establish the product target |
-| Wider operation coverage | Filters, scaling, transforms, supported app adapters | Per-operation conformance and backend capability manifests | Planned |
+| Wider operation coverage | Filters, scaling, transforms, supported app adapters | Native sampling and optimized resize tested on GPU/NPU; 72 Weston transform/oracle cases | Sampling/scaling implemented; wider operations and native display coverage outstanding |
 | Broader platforms | Additional NPU providers and Windows integrations | Per-device/OS/runtime evidence with recovery tests | Planned |
 
 ## First integration target

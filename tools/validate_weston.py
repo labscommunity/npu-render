@@ -26,8 +26,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--backend", default="CPU", choices=["CPU", "GPU", "NPU"])
     parser.add_argument("--nested", action="store_true", help="test inside a second compositor")
-    parser.add_argument(
+    client_mode = parser.add_mutually_exclusive_group()
+    client_mode.add_argument(
         "--transformed", action="store_true", help="exercise scaling and rotating SHM buffers"
+    )
+    client_mode.add_argument(
+        "--resized", action="store_true", help="exercise the specialized viewport resize path"
     )
     parser.add_argument("--report", type=Path, default=Path("results/weston.json"))
     args = parser.parse_args()
@@ -100,15 +104,15 @@ def main():
                     if compositor.poll() is not None or time.monotonic() > deadline:
                         raise RuntimeError("Weston failed to create its socket")
                     time.sleep(0.05)
-                client_command = (
-                    [
+                if args.transformed or args.resized:
+                    client_command = [
                         str(prefix / "bin/weston-simple-damage"),
                         "--use-viewport",
-                        "--rotating-transform",
                     ]
-                    if args.transformed
-                    else [str(prefix / "bin/weston-simple-shm")]
-                )
+                    if args.transformed:
+                        client_command.append("--rotating-transform")
+                else:
+                    client_command = [str(prefix / "bin/weston-simple-shm")]
                 client = subprocess.Popen(
                     client_command,
                     env=environment,
@@ -149,10 +153,21 @@ def main():
             for line in captured.splitlines()
             if "npu-render-sampling: " in line
         ]
-        if not summaries or summaries[-1]["native_calls"] < 1 or not (frames or sampling):
+        resizing = [
+            json.loads(line.split("npu-render-resize: ", 1)[1])
+            for line in captured.splitlines()
+            if "npu-render-resize: " in line
+        ]
+        if (
+            not summaries
+            or summaries[-1]["native_calls"] < 1
+            or not (frames or sampling or resizing)
+        ):
             raise RuntimeError("no actual native compositor work was observed")
         if args.transformed and (not sampling or summaries[-1]["sampling_calls"] < 1):
             raise RuntimeError("transformed client did not exercise native texture sampling")
+        if args.resized and (not resizing or summaries[-1]["resize_calls"] < 1):
+            raise RuntimeError("viewport client did not exercise specialized resize")
         if summaries[-1]["native_failures"]:
             raise RuntimeError("native compositor operations failed")
         if "rejected invalid selection" not in captured:
@@ -164,7 +179,9 @@ def main():
             "summary": summaries[-1],
             "sampled_native_frames": frames,
             "sampled_texture_frames": sampling,
+            "sampled_resize_frames": resizing,
             "transformed_client": args.transformed,
+            "resized_client": args.resized,
             "invalid_selection_preserved_rendering": True,
         }
         args.report.parent.mkdir(parents=True, exist_ok=True)

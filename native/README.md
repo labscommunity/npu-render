@@ -60,8 +60,23 @@ Sampling has a two-byte exploratory accuracy gate, separate from blend's one byt
 **Generic sampling is currently a correctness path.** The 640×360 → 1280×720 NPU test
 took roughly 0.7–0.9 seconds per host API call. This is not suitable for full-frame
 60 Hz use. NPU sampling batches are capped at 128×128 to avoid a measured compiler
-failure without changing devices. Specialized resize work is being evaluated.
+failure without changing devices. The specialized resize path below avoids those
+repeated indexed dispatches for eligible scales.
 See [operation evidence and limitations](../docs/validation/2026-10-06/sampling/README.md).
+
+`nr_prepare_resize()` / `nr_resize_regions()` provide a specialized half-pixel,
+edge-clamped bilinear resize plus opacity and composition. The virtual resized
+image has an integer origin; disjoint damage must fit it and the destination. One
+inference processes the resized extent, with atomic damage commit. Extents are
+1..4096. Resize and sampling share a limit of 16 prepared graphs and 64 Mi logical
+RGBA FP16 tensor pixels; compiler workspace is additional. All retained graphs
+must prepare successfully before switching the active device.
+
+Weston selects this path for eligible axis-aligned bilinear scales with exact
+Pixman coordinates. Rotation, mirroring, source clips and other affine cases retain
+the general sampler. Graph preparation stays off the paint thread. The optimized
+720p resize/compose API took 11.7–12.4 ms on Delta's NPU; 1080p took 26.7–27.2 ms.
+See [complete API measurements](../docs/validation/2026-10-06/resize/README.md).
 
 Install Linux dependencies (Ubuntu 24.04 example):
 
@@ -73,6 +88,7 @@ uv run --group native python tools/build_native.py --pixman
 uv run python tools/build_weston.py
 uv run python tools/validate_weston.py
 uv run python tools/validate_weston.py --transformed
+uv run python tools/validate_weston.py --resized
 ```
 
 The test uses a real Wayland client against a headless compositor and compares the

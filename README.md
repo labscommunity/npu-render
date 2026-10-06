@@ -16,6 +16,11 @@ NPU round trip on Windows. Native Linux NPU presentation, Windows DWM replacemen
 arbitrary Direct3D/Vulkan games, and codecs remain unfinished. Two Tahoma application
 comparisons showed only ~1–1.6% median paired gains; practical acceleration is unproven.
 
+Texture sampling, affine transforms and specialized bilinear scaling now share the
+native switch. The optimized NPU resize/compose API measured about 12 ms at 720p
+and 27 ms at 1080p, including host memory work. These are off-screen operation
+measurements; see [resize evidence](docs/validation/2026-10-06/resize/README.md).
+
 A native Windows window now shares byte buffers between a D3D12 compute shader and
 the NPU, follows the saved selection, and preserves its active backend on invalid
 choices. GPU/NPU pixel checks pass at 720p and 1080p. Its first display test was

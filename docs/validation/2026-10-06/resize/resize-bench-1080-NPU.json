@@ -1,0 +1,40 @@
+{
+  "passed": true,
+  "device": "NPU",
+  "execution_devices": "NPU",
+  "source": [
+    960,
+    540
+  ],
+  "destination": [
+    1920,
+    1080
+  ],
+  "tile_side": 256,
+  "frames": 8,
+  "coordinate_cpu_ms": 8.9448,
+  "preparation_ms": 1747.03,
+  "max_byte_error": 1,
+  "dispatches_per_frame": 1,
+  "api_ms": [
+    26.6957,
+    27.1908,
+    27.0938,
+    26.8746,
+    26.7215,
+    27.1743,
+    27.0352,
+    27.0358
+  ],
+  "fixture_update_call_check_ms": [
+    72.7165,
+    73.3965,
+    73.3453,
+    73.0602,
+    74.05,
+    74.3696,
+    74.2673,
+    76.5361
+  ],
+  "scope": "host-source resize and blend; coordinates only used by independent oracle; no presentation"
+}
