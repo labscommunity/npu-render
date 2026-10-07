@@ -17,6 +17,8 @@ struct Options {
     bool pinned = false;
     std::string config;
     std::string expected_npu_driver;
+    std::string npu_alpha = "gather";
+    bool profile_npu = false;
 };
 
 bool valid_backend(const std::string &name) {
@@ -28,6 +30,7 @@ Options options(int argc, char **argv) {
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
         if (arg == "--validate-only") { o.validate_only = true; continue; }
+        if (arg == "--profile-npu") { o.profile_npu = true; continue; }
         if (i + 1 == argc) throw std::invalid_argument("missing option value: " + arg);
         const std::string value = argv[++i];
         if (arg == "--width") o.width = std::stoul(value);
@@ -39,6 +42,7 @@ Options options(int argc, char **argv) {
         else if (arg == "--config") o.config = value;
         else if (arg == "--report") o.report = value;
         else if (arg == "--expected-npu-driver") o.expected_npu_driver = value;
+        else if (arg == "--npu-alpha") o.npu_alpha = value;
         else if (arg == "--ready-file") o.ready_file = value;
         else if (arg == "--stop-file") o.stop_file = value;
         else if (arg == "--sequence") {
@@ -63,6 +67,7 @@ Options options(int argc, char **argv) {
         uint64_t(o.width)*o.height > 65535u*256u ||
         !o.fps || o.fps > 240 || !std::isfinite(o.seconds) || o.seconds <= 0 || o.seconds > 3600 ||
         !std::isfinite(o.switch_every) || o.switch_every <= 0 || !valid_backend(o.backend) ||
+        (o.npu_alpha != "gather" && o.npu_alpha != "convolution") ||
         std::any_of(o.sequence.begin(), o.sequence.end(), [](const auto &s) { return !valid_backend(s); }))
         throw std::invalid_argument("invalid options; width must be a multiple of 64, backend GPU/NPU/CPU/IDLE");
     return o;
@@ -70,6 +75,15 @@ Options options(int argc, char **argv) {
 
 double milliseconds(Clock::time_point from, Clock::time_point to = Clock::now()) {
     return std::chrono::duration<double, std::milli>(to - from).count();
+}
+
+double process_cpu_seconds() {
+    FILETIME created{}, ended{}, kernel{}, user{};
+    if (!GetProcessTimes(GetCurrentProcess(), &created, &ended, &kernel, &user))
+        throw std::runtime_error("GetProcessTimes failed");
+    const uint64_t k = (uint64_t(kernel.dwHighDateTime) << 32) | kernel.dwLowDateTime;
+    const uint64_t u = (uint64_t(user.dwHighDateTime) << 32) | user.dwLowDateTime;
+    return double(k + u) / 1e7;
 }
 
 struct FramePacer {
@@ -94,7 +108,8 @@ struct NpuBlend {
     ov::Tensor background, foreground, output;
     ov::InferRequest request;
     std::string driver_version, driver_error;
-    NpuBlend(UINT width, UINT height, HANDLE bg, HANDLE fg, HANDLE out, const std::string &expected_driver) {
+    NpuBlend(UINT width, UINT height, HANDLE bg, HANDLE fg, HANDLE out, const std::string &expected_driver,
+             const std::string &alpha_mode, bool profile) {
         try {
             std::ostringstream version;
             core.get_property("NPU", "NPU_DRIVER_VERSION").print(version);
@@ -103,7 +118,8 @@ struct NpuBlend {
         if (!expected_driver.empty() && driver_version != expected_driver)
             throw std::runtime_error("expected loaded NPU driver " + expected_driver +
                 ", renderer runtime reported " + driver_version);
-        compiled = core.compile_model(blend_model(width, height, true), "NPU");
+        compiled = core.compile_model(blend_model(width, height, true, 4, alpha_mode), "NPU",
+            {{"PERF_COUNT", profile}});
         auto devices = compiled.get_property(ov::execution_devices);
         if (devices.empty() || std::any_of(devices.begin(), devices.end(), [](const auto &d) {
             return d != "NPU" && d.rfind("NPU.", 0) != 0;
@@ -205,7 +221,8 @@ struct Renderer {
     std::vector<uint8_t> b, f, cpu;
     unsigned max_error = 0;
 
-    Renderer(UINT w, UINT h, const std::string &expected_driver) : width(w), height(h), pixels(w*h), bytes(size_t(w)*h*4), b(bytes), f(bytes), cpu(bytes) {
+    Renderer(UINT w, UINT h, const std::string &expected_driver, const std::string &alpha_mode,
+             bool profile) : width(w), height(h), pixels(w*h), bytes(size_t(w)*h*4), b(bytes), f(bytes), cpu(bytes) {
         check(CreateDXGIFactory1(IID_PPV_ARGS(&factory)), "create DXGI factory");
         for (UINT index = 0; ; ++index) {
             ComPtr<IDXGIAdapter1> candidate;
@@ -229,7 +246,8 @@ struct Renderer {
         readback = staging(device.Get(), bytes, D3D12_HEAP_TYPE_READBACK);
         transfers = std::make_unique<Transfers>(device.Get());
         gpu = std::make_unique<GpuBlend>(device.Get());
-        npu = std::make_unique<NpuBlend>(w, h, bg->shared.value, fg->shared.value, out->shared.value, expected_driver);
+        npu = std::make_unique<NpuBlend>(w, h, bg->shared.value, fg->shared.value, out->shared.value,
+            expected_driver, alpha_mode, profile);
     }
     void copy_input(ID3D12Resource *staged, SharedBuffer &destination, const std::vector<uint8_t> &data) {
         upload(staged, data.data(), bytes);
@@ -397,10 +415,12 @@ int main(int argc, char **argv) {
     try {
         const auto o = options(argc, argv);
         stage = "device_and_providers";
-        Renderer renderer(o.width, o.height, o.expected_npu_driver);
+        Renderer renderer(o.width, o.height, o.expected_npu_driver, o.npu_alpha, o.profile_npu);
         stage = "qualification"; renderer.qualify();
         size_t skipped = 0, misses = 0;
         double started_unix_s = 0;
+        double live_cpu_seconds = 0;
+        double live_wall_seconds = 0;
         HRESULT initial_present_status = S_OK;
         if (!o.validate_only) {
             stage = "window"; Window window(renderer);
@@ -415,6 +435,7 @@ int main(int argc, char **argv) {
             size_t selection = 0, slot = 0;
             double next_config_check = 0;
             const auto started = Clock::now();
+            const double cpu_start = process_cpu_seconds();
             started_unix_s = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
             if (!o.ready_file.empty()) {
                 std::ofstream ready(o.ready_file); ready << "ready\n";
@@ -462,6 +483,8 @@ int main(int argc, char **argv) {
                     milliseconds(after_compose, done), work, status});
                 ++slot;
             }
+            live_cpu_seconds = process_cpu_seconds() - cpu_start;
+            live_wall_seconds = milliseconds(started)/1000;
         }
         stage = "report";
         std::ostringstream report;
@@ -472,6 +495,9 @@ int main(int argc, char **argv) {
                << ",\"npu_driver_query_error\":" << quote(renderer.npu->driver_error)
                << ",\"npu_execution_device\":\"NPU\",\"gpu_provider\":\"D3D12 compute shader\",\"session_id\":" << session
                << ",\"npu_pixel_group\":" << blend_pixel_group(o.width, true)
+               << ",\"npu_alpha\":" << quote(o.npu_alpha)
+               << ",\"live_process_cpu_seconds\":" << live_cpu_seconds
+               << ",\"live_wall_seconds\":" << live_wall_seconds
                << ",\"validation_only\":" << (o.validate_only ? "true" : "false")
                << ",\"width\":" << o.width << ",\"height\":" << o.height << ",\"target_fps\":" << o.fps
                << ",\"requested_seconds\":" << o.seconds << ",\"max_byte_error\":" << renderer.max_error
@@ -488,6 +514,17 @@ int main(int argc, char **argv) {
         }
         report << "],\"selections\":[";
         for (size_t i = 0; i < selections.size(); ++i) report << (i ? "," : "") << selections[i];
+        report << "],\"npu_profile\":[";
+        if (o.profile_npu) {
+            const auto profile = renderer.npu->request.get_profiling_info();
+            for (size_t i = 0; i < profile.size(); ++i) {
+                const auto &p = profile[i];
+                report << (i ? "," : "") << "{\"name\":" << quote(p.node_name)
+                    << ",\"type\":" << quote(p.node_type) << ",\"exec_type\":" << quote(p.exec_type)
+                    << ",\"real_ms\":" << double(p.real_time.count())/1000
+                    << ",\"cpu_ms\":" << double(p.cpu_time.count())/1000 << '}';
+            }
+        }
         report << "]}\n";
         std::ofstream destination(o.report, std::ios::binary); destination << report.str();
         if (!destination) throw std::runtime_error("cannot write report " + o.report);

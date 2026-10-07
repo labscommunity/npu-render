@@ -14,8 +14,12 @@ The switch affects participating integrations. A restricted Weston adapter passe
 Linux CPU headless/nested tests, and D3D12 shared buffers pass a real Panther Lake
 NPU round trip on Windows. Native Linux NPU presentation, Windows DWM replacement,
 arbitrary Direct3D/Vulkan games, and codecs remain unfinished. The latest native
-Tahoma comparison was **5.9% slower** with NPU graphics than with a D3D12 shader
-(median of five paired rounds). Practical acceleration is unproven.
+Tahoma investigation reduced NPU blend time by **33%**, but the optimized path
+still made inference **6.3% slower** than a D3D12 shader in a sustained five-round
+comparison. Delta reported GPU power limiting and declining battery charge despite
+AC connection, so these percentages need a repeat with verified adequate power.
+See the [cost investigation](docs/validation/2026-10-07/slowdown/README.md).
+Practical acceleration is unproven.
 
 An [existing Windows compositor baseline](docs/validation/2026-10-07/desktop/README.md)
 now measures DWM while the same three static-content windows stay still or move.

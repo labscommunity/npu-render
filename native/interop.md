@@ -142,6 +142,61 @@ records its Python runtime stack and requires the child report to match too;
 adjacent DLLs can otherwise make their runtimes differ. Use the exact version
 spelling emitted by the runtime, not the Windows INF version.
 
+### Diagnose NPU composition cost
+
+`--npu-alpha convolution` replaces the alpha extraction/broadcast/inversion
+sequence with a sparse 1×1 channel convolution. Input/output byte order and the
+original clamp/rounding contract remain unchanged. The default is still `gather`;
+the alternate path requires the same full-shape pixel qualification and explicit
+NPU execution. `--profile-npu` records the final NPU request's device profiling
+entries. Entries can overlap: do not sum them as wall time or interpret their
+`cpu_ms` as host CPU utilization. Profiling is off during throughput comparisons.
+
+Live reports separately record process kernel+user CPU seconds and elapsed live
+seconds, excluding preparation. Their ratio measures CPU core equivalents (1.0
+is one fully occupied logical CPU), including settling time. It is not the
+percentage of the whole machine's CPU capacity.
+
+```powershell
+uv run python tools/benchmark_native.py --executable build/native/Release/nr_native_live.exe `
+  --endpoint http://127.0.0.1:18080/v1 --model YOUR_MODEL --inference-device GPU `
+  --expected-npu-driver 1005540 --conditions GPU,NPU,NPU_CONV,IDLE `
+  --warmup-seconds 120 --report results/native-cost.json
+```
+
+`NPU` denotes the baseline gather graph; `NPU_CONV` explicitly requests the
+convolution graph. Their reported execution backend remains `NPU`. The harness
+rejects a graph mismatch, preserves paired comparisons, and records Windows AC/
+battery status around each trial. `--warmup-seconds` adds sustained inference
+requests after the initial warmup; it does not guarantee a fixed thermal state.
+Review concurrent clock/power telemetry before interpreting throughput differences.
+
+The optional read-only Intel graphics telemetry probe builds against an external,
+pinned [IGCL checkout](https://github.com/intel/drivers.gpu.control-library):
+
+```powershell
+git clone https://github.com/intel/drivers.gpu.control-library results/igcl
+git -C results/igcl checkout b6c462933502e13d1537dd5024949a51be30e63d
+# First configure the normal native build using tools/build_native.py.
+uv run --group native cmake -S native -B build/native -DNR_IGCL_ROOT="$PWD/results/igcl"
+uv run --group native cmake --build build/native --config Release --target nr_gpu_power_probe
+build/native/Release/nr_gpu_power_probe.exe 900 results/igcl.jsonl
+```
+
+Run the probe in a separate terminal during the benchmark. It samples at roughly
+2 Hz, loads Intel's installed system library, and calls no setters. Initialization,
+adapter identity, API status, units and per-metric support are retained. A completed
+capture does not imply that every metric is supported. GPU energy is not package
+or NPU energy. No IGCL source or driver binary is bundled in the prototype.
+
+```sh
+python research/analyze_native_cost.py results/native-cost.json results/igcl.jsonl --output results/native-cost-summary.json
+```
+
+The analyzer uses only adjacent valid counter intervals wholly inside inference,
+checks units and counter resets, and keeps unsupported readings null. See the
+[measured cost investigation](../docs/validation/2026-10-07/slowdown/README.md).
+
 `nr_dxcore_probe.exe` inspects Direct3D adapter attributes and device creation.
 It is a diagnostic built with the native tools, not a rendering backend. A listed
 adapter or successful device creation does not prove custom shader execution.

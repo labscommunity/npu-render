@@ -8,7 +8,7 @@ coverage, not just whether an equivalent tensor equation exists.
 |---|---|---|
 | Premultiplied RGBA source-over | Explicit CPU/GPU/NPU provider, damage batches, saved switch, native Windows shared-buffer window; active-desktop 720p presentation checks pass | Physical presentation timing; async fence integration |
 | Source copy | Native provider, byte-exact tests on CPU/GPU/NPU | Wider buffer formats and resource layouts |
-| Animated application surfaces | SDL window and native D3D12 swapchain; NPU byte conversion and composition; native switching and concurrent inference checks pass at 720p | Presentation timestamps and wider adapters; measured Tahoma throughput regressed 5.9% |
+| Animated application surfaces | SDL window and native D3D12 swapchain; NPU byte conversion and composition; native switching and concurrent inference checks pass at 720p | Presentation timestamps and wider adapters; [optimized graph still regresses Tahoma in power-constrained testing](validation/2026-10-07/slowdown/README.md) |
 | Window composition | Restricted Weston adapter with damage/visibility; CPU headless and nested tests | Native Linux NPU execution and standalone display validation |
 | Existing Windows DWM composition | Process/adapter telemetry and a controlled static/moving-window Tahoma benchmark | [Graphics-renderer integration](research/windows-compositor.md); DWM work has not moved to the NPU |
 | Window transforms and scaling | Indexed texel sampling plus one-dispatch bilinear resize; Weston affine/nearest/bilinear and one-rectangle source clipping; 72 CPU/Pixman cases | Specialized NPU 720p API ~12 ms, 1080p ~27 ms; generic sampling is too slow full-frame; Linux NPU presentation pending |

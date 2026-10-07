@@ -20,6 +20,7 @@ def main():
     parser.add_argument("--report", type=Path, default=Path("results/native-control.json"))
     parser.add_argument("--width", type=int, default=1280)
     parser.add_argument("--height", type=int, default=720)
+    parser.add_argument("--npu-alpha", choices=["gather", "convolution"])
     parser.add_argument(
         "--allow-occluded",
         action="store_true",
@@ -57,6 +58,8 @@ def main():
             "--seconds",
             "60",
         ]
+        if args.npu_alpha:
+            command += ["--npu-alpha", args.npu_alpha]
         with (root / "child.log").open("w+", encoding="utf-8") as log:
             process = subprocess.Popen(command, env=environment, stdout=log, stderr=log)
             try:
@@ -81,6 +84,8 @@ def main():
                     raise RuntimeError("renderer failed: " + log.read())
                 graphics = json.loads(output.read_text(encoding="utf-8"))
                 write_report(args.report, {"passed": False, "graphics": graphics})
+                if args.npu_alpha and graphics.get("npu_alpha") != args.npu_alpha:
+                    raise RuntimeError("renderer did not use the requested NPU graph")
                 accepted = [s["backend"] for s in graphics["selections"] if s["accepted"]]
                 rejected = [s for s in graphics["selections"] if not s["accepted"]]
                 assert accepted == ["GPU", "NPU", "CPU", "GPU"], accepted

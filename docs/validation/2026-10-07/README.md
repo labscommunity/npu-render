@@ -4,6 +4,11 @@ The later [Windows desktop experiment](desktop/README.md) measures DWM's existin
 rendering and desktop-motion contention. It is separate from the synthetic
 GPU/NPU application comparison recorded below.
 
+The subsequent [cost investigation](slowdown/README.md) isolates alpha expansion,
+tests an optimized graph, and records GPU power limiting plus declining battery
+charge despite reported AC connection. Its sustained repeat still shows an
+inference regression; the historical measurements below are preserved.
+
 An explicitly authorized Windows Restart completed on Delta at
 2026-10-07 17:34:30.500 UTC. Both the installed Intel NPU package and the loaded
 OpenVINO driver now identify version 5540 (`32.0.100.5540` / `1005540`). Earlier
