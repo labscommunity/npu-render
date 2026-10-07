@@ -42,6 +42,7 @@ is pinned to OpenVINO 2026.1.0 to reproduce the first Panther Lake experiments.
 ```sh
 uv sync --frozen
 uv run npu-render devices
+uv run npu-render stack
 uv run npu-render select npu
 uv run npu-render demo --output results/npu-frame.ppm
 uv run npu-render select gpu
@@ -52,6 +53,12 @@ On a machine without an Intel NPU/GPU, use `select cpu`. A missing or unsupporte
 device returns an error. Selecting a backend compiles and checks a 16×16 fixture
 before saving the selection; every new renderer separately qualifies its actual
 shape. This selection is not a guarantee that arbitrary shapes will work.
+
+For driver comparisons, `stack --expected-npu-driver 1005540` requires the exact
+version reported by the loaded runtime. An installed driver package can differ
+from the driver still executing before a required restart. Missing or mismatched
+versions return failure with the captured report. The compiler-type property in
+this inspection is a runtime preference; a compiled graph can resolve it further.
 
 Selection precedence: explicit argument → `NPU_RENDER_BACKEND` → saved config →
 GPU. `NPU_RENDER_CONFIG` or CLI `--config` selects a different config file.

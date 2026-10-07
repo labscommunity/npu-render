@@ -12,6 +12,7 @@ from pathlib import Path
 
 from npu_render.benchmark import comparisons, trial_order, write_report
 from npu_render.inference import InferenceClient
+from npu_render.openvino_diagnostics import inspect_stack, require_npu_driver
 
 
 def run(args):
@@ -44,9 +45,13 @@ def run(args):
             "Every child compiles and qualifies all providers before readiness.",
             "Graphics reports include two settling seconds before the measured requests.",
             "Frame submission is not scanout; differing frame counts can confound throughput.",
+            "Harness and renderer each report their own loaded runtime/driver versions.",
         ],
     }
     try:
+        report["harness_loaded_stack"] = inspect_stack()
+        if args.expected_npu_driver:
+            require_npu_driver(report["harness_loaded_stack"], args.expected_npu_driver)
         report["warmup"] = client.request()
         for round_index in range(args.rounds):
             for condition in trial_order(round_index, ["GPU", "NPU", "CPU", "IDLE"]):
@@ -74,6 +79,8 @@ def run(args):
                         "--report",
                         str(graphics),
                     ]
+                    if args.expected_npu_driver:
+                        command += ["--expected-npu-driver", args.expected_npu_driver]
                     with (root / "child.log").open("w+", encoding="utf-8") as log:
                         process = subprocess.Popen(command, env=environment, stdout=log, stderr=log)
                         try:
@@ -104,6 +111,12 @@ def run(args):
                                 "inference": inference,
                                 "graphics": captured,
                             }
+                            if args.expected_npu_driver and (
+                                captured.get("npu_driver_version") != args.expected_npu_driver
+                            ):
+                                raise RuntimeError(
+                                    "renderer reported a different loaded NPU driver"
+                                )
                             if not captured["passed"] or captured["session_id"] == 0:
                                 raise RuntimeError(
                                     "renderer did not run successfully in an interactive session"
@@ -158,6 +171,7 @@ def main():
     parser.add_argument("--endpoint", required=True)
     parser.add_argument("--model", required=True)
     parser.add_argument("--inference-device", required=True)
+    parser.add_argument("--expected-npu-driver", help="require the runtime-reported driver version")
     parser.add_argument("--prompt", default="Explain how a computer renders a translucent window.")
     parser.add_argument("--max-tokens", type=int, default=128)
     parser.add_argument("--timeout", type=float, default=120)

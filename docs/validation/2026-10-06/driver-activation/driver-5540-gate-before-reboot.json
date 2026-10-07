@@ -1,0 +1,53 @@
+{
+  "runtime": "2026.1.0-21367-63e31528c62-releases/2026/1",
+  "devices": [
+    {
+      "id": "CPU",
+      "properties": {
+        "DEVICE_ARCHITECTURE": "intel64",
+        "FULL_DEVICE_NAME": "Intel(R) Core(TM) Ultra X7 358H"
+      },
+      "errors": {},
+      "plugins": {
+        "CPU": {
+          "build": "2026.1.0-21367-63e31528c62-releases/2026/1",
+          "description": "openvino_intel_cpu_plugin"
+        }
+      }
+    },
+    {
+      "id": "GPU",
+      "properties": {
+        "DEVICE_ARCHITECTURE": "GPU: vendor=0x8086 arch=v30.0.4",
+        "FULL_DEVICE_NAME": "Intel(R) Arc(TM) B390 GPU (iGPU)"
+      },
+      "errors": {},
+      "plugins": {
+        "GPU": {
+          "build": "2026.1.0-21367-63e31528c62-releases/2026/1",
+          "description": "Intel GPU plugin"
+        }
+      }
+    },
+    {
+      "id": "NPU",
+      "properties": {
+        "DEVICE_ARCHITECTURE": "5010",
+        "FULL_DEVICE_NAME": "Intel(R) AI Boost",
+        "NPU_COMPILER_TYPE": "CompilerType.PREFER_PLUGIN",
+        "NPU_COMPILER_VERSION": "458781",
+        "NPU_DRIVER_VERSION": "1004724"
+      },
+      "errors": {},
+      "plugins": {
+        "NPU": {
+          "build": "2026.1.0-21367-63e31528c62-releases/2026/1",
+          "description": "openvino_intel_npu_plugin"
+        }
+      }
+    }
+  ],
+  "scope": "Loaded runtime properties; installed-package versions, pixel correctness and presentation are separate checks.",
+  "passed": false,
+  "error": "expected loaded NPU driver 1005540, runtime reported ['1004724']"
+}

@@ -113,6 +113,18 @@ The Windows CI job also builds a private portable bundle containing the runtime,
 notices, launch script and file-hash manifest. It requires installed Intel drivers
 and the Microsoft Visual C++ x64 runtime, but no Python installation.
 
+For driver qualification, pass `--expected-npu-driver 1005540` to the native
+window or benchmark harness. The window checks its own loaded runtime before NPU
+compilation and readiness. Its report includes `openvino_runtime`,
+`npu_driver_version` and any property-query error. The harness independently
+records its Python runtime stack and requires the child report to match too;
+adjacent DLLs can otherwise make their runtimes differ. Use the exact version
+spelling emitted by the runtime, not the Windows INF version.
+
+`nr_dxcore_probe.exe` inspects Direct3D adapter attributes and device creation.
+It is a diagnostic built with the native tools, not a rendering backend. A listed
+adapter or successful device creation does not prove custom shader execution.
+
 Primary references:
 
 - [OpenVINO NPU remote tensor interface](https://docs.openvino.ai/2026/openvino-workflow/running-inference/inference-devices-and-modes/npu-device/remote-tensor-api-npu-plugin.html)

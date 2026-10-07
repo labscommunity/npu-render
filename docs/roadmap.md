@@ -7,7 +7,7 @@ delivery requirements while freeing useful GPU capacity.
 | Milestone | Deliverable | Acceptance evidence | Status |
 |---|---|---|---|
 | Device feasibility | Deterministic composition and restricted triangle graphs | Independent checks on Panther Lake NPU, including reported execution devices | Original probe complete |
-| Shared runtime | Provider contracts, device selection, prepared switch, owned outputs | 43 Python checks, native pixel tests, real device switching | Implemented |
+| Shared runtime | Provider contracts, device selection, prepared switch, owned outputs | 47 Python checks, native pixel tests, real device switching and loaded-driver qualification | Implemented |
 | Live application | Animated software window, async switch, frame-stage timing | Windows console session; 2,400/2,400 scheduled submissions at 720p; optimized conversion | Implemented and measured |
 | Compositor adapter | Restricted Weston renderer with a backend control | Linux CPU pixel oracle plus headless/nested Wayland clients | CPU integration validated; native Linux NPU/display validation outstanding |
 | Real buffer path | Linear graphics-buffer import/export, synchronization and format conversion | D3D12 shared input/output, byte conversion and native swapchain application with saved switch | Pixel/control checks pass; native display test occluded; DMA-BUF outstanding |

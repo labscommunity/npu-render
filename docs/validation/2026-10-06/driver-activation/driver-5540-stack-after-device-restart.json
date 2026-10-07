@@ -1,0 +1,26 @@
+{
+  "runtime": "2026.1.0-21367-63e31528c62-releases/2026/1",
+  "available_devices": [
+    "CPU",
+    "GPU",
+    "NPU"
+  ],
+  "properties": {
+    "DEVICE_ARCHITECTURE": "5010",
+    "FULL_DEVICE_NAME": "Intel(R) AI Boost",
+    "NPU_COMPILER_DYNAMIC_QUANTIZATION": "False",
+    "NPU_COMPILER_TYPE": "CompilerType.PLUGIN",
+    "NPU_COMPILER_VERSION": {
+      "error": "Exception from src\\inference\\src\\cpp\\compiled_model.cpp:145:\nException from src\\plugins\\intel_npu\\src\\plugin\\src\\properties.cpp:927:\nUnsupported configuration key: NPU_COMPILER_VERSION\n\n"
+    },
+    "NPU_DRIVER_VERSION": "1004724",
+    "EXECUTION_DEVICES": "NPU"
+  },
+  "plugin_versions": {
+    "NPU": {
+      "build_number": "2026.1.0-21367-63e31528c62-releases/2026/1",
+      "description": "openvino_intel_npu_plugin"
+    }
+  },
+  "relu_passed": true
+}

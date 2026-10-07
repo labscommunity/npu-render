@@ -71,3 +71,13 @@ This track could expand general graphics computation. It does not automatically
 provide Direct3D/Vulkan shader translation, application interception, codec
 implementations, system composition or display scanout. Those remain separate
 items in the [coverage ledger](../coverage.md).
+
+## Direct3D route
+
+Before depending on a private kernel ABI, inspect the existing driver interface.
+The repository now builds `nr_dxcore_probe` to distinguish runtime-independent NPU
+enumeration, Direct3D generic-ML attributes and Core compute support. The
+[driver-activation evidence](../validation/2026-10-06/driver-activation/README.md)
+records the first queries and their pre-restart limits. This route has not yet
+executed a shader on the NPU; a shipped Direct3D DLL alone establishes no such
+capability.

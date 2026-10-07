@@ -1,0 +1,40 @@
+{
+  "passed": true,
+  "device": "NPU",
+  "execution_devices": "NPU",
+  "source": [
+    640,
+    360
+  ],
+  "destination": [
+    1280,
+    720
+  ],
+  "tile_side": 256,
+  "frames": 8,
+  "coordinate_cpu_ms": 3.9814,
+  "preparation_ms": 330.494,
+  "max_byte_error": 1,
+  "dispatches_per_frame": 57,
+  "api_ms": [
+    649.314,
+    581.679,
+    578.111,
+    580.361,
+    626.621,
+    654.605,
+    652.088,
+    655.35
+  ],
+  "fixture_update_call_check_ms": [
+    673.902,
+    604.412,
+    598.967,
+    601.612,
+    689.708,
+    720.22,
+    717.405,
+    720.303
+  ],
+  "scope": "host-source texture sampling; static CPU-generated coordinates; no presentation"
+}

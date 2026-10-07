@@ -11,6 +11,7 @@ import numpy as np
 from .config import config_path, resolve_backend, save_backend
 from .contracts import Composition
 from .openvino_backend import OpenVINOProvider
+from .openvino_diagnostics import inspect_stack, require_npu_driver
 from .reference import from_nchw, to_nchw
 from .renderer import Renderer
 
@@ -53,6 +54,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("devices", help="list actual runtime devices")
+    stack = commands.add_parser(
+        "stack", help="inspect loaded runtime, compiler and driver versions"
+    )
+    stack.add_argument("--expected-npu-driver", help="require the exact runtime-reported version")
     status = commands.add_parser("status", help="show the effective backend selection")
     status.add_argument("--config", type=Path)
     select = commands.add_parser("select", help="qualify a small graph and save the backend")
@@ -83,6 +88,15 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "devices":
             result = {"devices": [asdict(device) for device in OpenVINOProvider().devices()]}
+        elif args.command == "stack":
+            result = inspect_stack()
+            if args.expected_npu_driver:
+                try:
+                    require_npu_driver(result, args.expected_npu_driver)
+                except RuntimeError as error:
+                    print(json.dumps({**result, "passed": False, "error": str(error)}, indent=2))
+                    return 1
+                result["passed"] = True
         elif args.command == "status":
             result = {
                 "backend": resolve_backend(path=args.config),

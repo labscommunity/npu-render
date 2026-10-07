@@ -16,6 +16,7 @@ struct Options {
     bool validate_only = false;
     bool pinned = false;
     std::string config;
+    std::string expected_npu_driver;
 };
 
 bool valid_backend(const std::string &name) {
@@ -37,6 +38,7 @@ Options options(int argc, char **argv) {
         else if (arg == "--backend") { o.backend = value; o.pinned = true; }
         else if (arg == "--config") o.config = value;
         else if (arg == "--report") o.report = value;
+        else if (arg == "--expected-npu-driver") o.expected_npu_driver = value;
         else if (arg == "--ready-file") o.ready_file = value;
         else if (arg == "--stop-file") o.stop_file = value;
         else if (arg == "--sequence") {
@@ -91,7 +93,16 @@ struct NpuBlend {
     ov::CompiledModel compiled;
     ov::Tensor background, foreground, output;
     ov::InferRequest request;
-    NpuBlend(UINT width, UINT height, HANDLE bg, HANDLE fg, HANDLE out) {
+    std::string driver_version, driver_error;
+    NpuBlend(UINT width, UINT height, HANDLE bg, HANDLE fg, HANDLE out, const std::string &expected_driver) {
+        try {
+            std::ostringstream version;
+            core.get_property("NPU", "NPU_DRIVER_VERSION").print(version);
+            driver_version = version.str();
+        } catch (const std::exception &error) { driver_error = error.what(); }
+        if (!expected_driver.empty() && driver_version != expected_driver)
+            throw std::runtime_error("expected loaded NPU driver " + expected_driver +
+                ", renderer runtime reported " + driver_version);
         compiled = core.compile_model(blend_model(width, height, true), "NPU");
         auto devices = compiled.get_property(ov::execution_devices);
         if (devices.empty() || std::any_of(devices.begin(), devices.end(), [](const auto &d) {
@@ -194,7 +205,7 @@ struct Renderer {
     std::vector<uint8_t> b, f, cpu;
     unsigned max_error = 0;
 
-    Renderer(UINT w, UINT h) : width(w), height(h), pixels(w*h), bytes(size_t(w)*h*4), b(bytes), f(bytes), cpu(bytes) {
+    Renderer(UINT w, UINT h, const std::string &expected_driver) : width(w), height(h), pixels(w*h), bytes(size_t(w)*h*4), b(bytes), f(bytes), cpu(bytes) {
         check(CreateDXGIFactory1(IID_PPV_ARGS(&factory)), "create DXGI factory");
         for (UINT index = 0; ; ++index) {
             ComPtr<IDXGIAdapter1> candidate;
@@ -218,7 +229,7 @@ struct Renderer {
         readback = staging(device.Get(), bytes, D3D12_HEAP_TYPE_READBACK);
         transfers = std::make_unique<Transfers>(device.Get());
         gpu = std::make_unique<GpuBlend>(device.Get());
-        npu = std::make_unique<NpuBlend>(w, h, bg->shared.value, fg->shared.value, out->shared.value);
+        npu = std::make_unique<NpuBlend>(w, h, bg->shared.value, fg->shared.value, out->shared.value, expected_driver);
     }
     void copy_input(ID3D12Resource *staged, SharedBuffer &destination, const std::vector<uint8_t> &data) {
         upload(staged, data.data(), bytes);
@@ -386,7 +397,7 @@ int main(int argc, char **argv) {
     try {
         const auto o = options(argc, argv);
         stage = "device_and_providers";
-        Renderer renderer(o.width, o.height);
+        Renderer renderer(o.width, o.height, o.expected_npu_driver);
         stage = "qualification"; renderer.qualify();
         size_t skipped = 0, misses = 0;
         double started_unix_s = 0;
@@ -456,6 +467,9 @@ int main(int argc, char **argv) {
         std::ostringstream report;
         DWORD session = 0; ProcessIdToSessionId(GetCurrentProcessId(), &session);
         report << std::setprecision(12) << "{\"passed\":true,\"adapter\":" << quote(renderer.adapter)
+               << ",\"openvino_runtime\":" << quote(ov::get_openvino_version().buildNumber)
+               << ",\"npu_driver_version\":" << quote(renderer.npu->driver_version)
+               << ",\"npu_driver_query_error\":" << quote(renderer.npu->driver_error)
                << ",\"npu_execution_device\":\"NPU\",\"gpu_provider\":\"D3D12 compute shader\",\"session_id\":" << session
                << ",\"npu_pixel_group\":" << blend_pixel_group(o.width, true)
                << ",\"validation_only\":" << (o.validate_only ? "true" : "false")
