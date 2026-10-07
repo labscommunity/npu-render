@@ -1,0 +1,36 @@
+[
+  {
+    "case": "relu",
+    "requested_compiler": "PLUGIN",
+    "source": [
+      64,
+      64
+    ],
+    "grid_output": [
+      32,
+      32
+    ],
+    "passed": false,
+    "stack": {
+      "runtime": "2026.1.0-21367-63e31528c62-releases/2026/1",
+      "devices": [
+        {
+          "id": "CPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "arm64",
+            "FULL_DEVICE_NAME": "Apple M4"
+          },
+          "errors": {},
+          "plugins": {
+            "CPU": {
+              "build": "2026.1.0-21367-63e31528c62-releases/2026/1",
+              "description": "openvino_arm_cpu_plugin"
+            }
+          }
+        }
+      ],
+      "scope": "Loaded runtime properties; installed-package versions, pixel correctness and presentation are separate checks."
+    },
+    "error": "no NPU was reported by the loaded runtime"
+  }
+]

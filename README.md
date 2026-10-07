@@ -13,8 +13,9 @@ its first OpenVINO provider; other providers can implement the same contracts.
 The switch affects participating integrations. A restricted Weston adapter passes
 Linux CPU headless/nested tests, and D3D12 shared buffers pass a real Panther Lake
 NPU round trip on Windows. Native Linux NPU presentation, Windows DWM replacement,
-arbitrary Direct3D/Vulkan games, and codecs remain unfinished. Two Tahoma application
-comparisons showed only ~1–1.6% median paired gains; practical acceleration is unproven.
+arbitrary Direct3D/Vulkan games, and codecs remain unfinished. The latest native
+Tahoma comparison was **5.9% slower** with NPU graphics than with a D3D12 shader
+(median of five paired rounds). Practical acceleration is unproven.
 
 Texture sampling, affine transforms and specialized bilinear scaling now share the
 native switch. The optimized NPU resize/compose API measured about 12 ms at 720p
@@ -23,14 +24,15 @@ measurements; see [resize evidence](docs/validation/2026-10-06/resize/README.md)
 
 A native Windows window now shares byte buffers between a D3D12 compute shader and
 the NPU, follows the saved selection, and preserves its active backend on invalid
-choices. GPU/NPU pixel checks pass at 720p and 1080p. Its first display test was
-occluded by Delta's screen saver, so visible native presentation remains unvalidated.
+choices. With NPU driver 5540 active, GPU/NPU pixel checks pass at 720p and 1080p.
+A 720p switching run and all twenty native inference trials completed on an active
+desktop with every presentation returning `S_OK`; scanout timing remains unmeasured.
 The private CI Windows bundle runs with `run.cmd`; press **1 / 2 / 3** to switch
 GPU / NPU / CPU. See [native usage and limits](native/interop.md#native-windows-application).
 
 The grouped-pixel NPU graph halves shared-buffer call time: about 5 ms at 720p and
 9.5 ms at 1080p. A 1080p control run measured 13.9 ms median complete NPU processing
-while occluded; visible delivery remains unverified. Exact 2× downscale/compose now
+while occluded; the subsequent active-desktop evidence is at 720p. Exact 2× downscale/compose now
 takes about 5 ms through the host API. See the
 [layout and downscale measurements](docs/validation/2026-10-06/layout/README.md).
 
@@ -139,6 +141,7 @@ four-layer graph. They establish a credible implementation path, not a Tahoma ga
 - [Original hardware evidence](docs/research/npu_graphics_delta_evidence.json)
 - [Packaged runtime hardware validation](docs/validation/README.md)
 - [Live rendering and Tahoma results](docs/validation/2026-10-06/README.md)
+- [Driver activation and native Tahoma comparison](docs/validation/2026-10-07/README.md)
 - [Native compositor adapter](native/README.md)
 - [D3D12/NPU buffer interoperability](native/interop.md)
 - [Operation coverage ledger](docs/coverage.md)

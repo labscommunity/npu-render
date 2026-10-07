@@ -81,3 +81,11 @@ enumeration, Direct3D generic-ML attributes and Core compute support. The
 records the first queries and their pre-restart limits. This route has not yet
 executed a shader on the NPU; a shipped Direct3D DLL alone establishes no such
 capability.
+
+The [post-restart results](../validation/2026-10-07/README.md) now confirm loaded
+driver 5540 and still find no NPU in either DXCore query. Explicit driver-compiler
+selection also produced incorrect pixels for a grouped layout, so it is not a
+general remedy. An exact-coordinate GridSample fetch alternative passed the pixel
+oracle but was slower than Gather at the matched 128×128 output size. These results
+leave the fused-kernel/toolchain investigation relevant; neither alternative was
+promoted into the native provider.

@@ -1,0 +1,185 @@
+{
+  "status": "complete",
+  "comparisons": {
+    "paired_end_to_end_throughput_ratios": [
+      {
+        "round": 0,
+        "npu_over_gpu": 0.9414317155390369
+      },
+      {
+        "round": 1,
+        "npu_over_gpu": 0.9720702745282834
+      },
+      {
+        "round": 2,
+        "npu_over_gpu": 0.9496359823615326
+      },
+      {
+        "round": 3,
+        "npu_over_gpu": 0.8953352488119456
+      },
+      {
+        "round": 4,
+        "npu_over_gpu": 0.9104210855246782
+      }
+    ],
+    "ratio_distribution": {
+      "count": 5,
+      "median": 0.9414317155390369,
+      "p95": 0.9675834160949333,
+      "p99": 0.9711729028416134,
+      "max": 0.9720702745282834
+    },
+    "scope": "measured application composition conditions; not whole-desktop offload"
+  },
+  "conditions": {
+    "GPU": {
+      "requests": 15,
+      "end_to_end_tokens_s": {
+        "median": 23.99493242024106,
+        "p95": 25.16791981965844,
+        "p99": 25.20556110057161,
+        "max": 25.214971420799905
+      },
+      "first_content_ms": {
+        "median": 148.52589999998145,
+        "p95": 154.52067999997325,
+        "p99": 161.82453600000827,
+        "max": 163.65050000001702
+      },
+      "chunk_interval_ms": {
+        "median": 40.48760000000584,
+        "p95": 44.192120000070645,
+        "p99": 47.61708400005773,
+        "max": 60.22799999993822
+      },
+      "frames": 5387,
+      "work_ms": {
+        "median": 2.9569,
+        "p95": 4.24717,
+        "p99": 4.531124,
+        "max": 5.4701
+      },
+      "compose_ms": {
+        "median": 0.5782,
+        "p95": 0.9660799999999999,
+        "p99": 1.1012800000000023,
+        "max": 1.9933
+      },
+      "skipped_slots": 0,
+      "deadline_misses": 0,
+      "all_present_s_ok": true
+    },
+    "NPU": {
+      "requests": 15,
+      "end_to_end_tokens_s": {
+        "median": 22.778401989038215,
+        "p95": 23.694237292790564,
+        "p99": 23.730344794574172,
+        "max": 23.739371670020073
+      },
+      "first_content_ms": {
+        "median": 153.18739999997888,
+        "p95": 157.0622899999762,
+        "p99": 157.5625379999292,
+        "max": 157.68759999991744
+      },
+      "chunk_interval_ms": {
+        "median": 42.61399999995774,
+        "p95": 50.15313999992941,
+        "p99": 50.79370800004199,
+        "max": 66.82910000006359
+      },
+      "frames": 5763,
+      "work_ms": {
+        "median": 7.4877,
+        "p95": 8.819629999999998,
+        "p99": 9.641376000000001,
+        "max": 11.909
+      },
+      "compose_ms": {
+        "median": 5.0682,
+        "p95": 5.48419,
+        "p99": 6.28964,
+        "max": 7.3425
+      },
+      "skipped_slots": 0,
+      "deadline_misses": 0,
+      "all_present_s_ok": true
+    },
+    "CPU": {
+      "requests": 15,
+      "end_to_end_tokens_s": {
+        "median": 22.7506765971238,
+        "p95": 25.20884376179589,
+        "p99": 25.284329186384873,
+        "max": 25.303200542532117
+      },
+      "first_content_ms": {
+        "median": 149.60650000000442,
+        "p95": 155.90494999994462,
+        "p99": 158.27458999997816,
+        "max": 158.86699999998655
+      },
+      "chunk_interval_ms": {
+        "median": 43.17190000000437,
+        "p95": 49.19640000002801,
+        "p99": 51.161672000084764,
+        "max": 60.014900000055604
+      },
+      "frames": 5613,
+      "work_ms": {
+        "median": 7.967,
+        "p95": 10.147139999999998,
+        "p99": 10.549892000000003,
+        "max": 11.7922
+      },
+      "compose_ms": {
+        "median": 6.4253,
+        "p95": 8.2707,
+        "p99": 8.598264,
+        "max": 9.7716
+      },
+      "skipped_slots": 0,
+      "deadline_misses": 0,
+      "all_present_s_ok": true
+    },
+    "IDLE": {
+      "requests": 15,
+      "end_to_end_tokens_s": {
+        "median": 25.185228996989792,
+        "p95": 25.711682238555486,
+        "p99": 25.75376439355065,
+        "max": 25.764284932299443
+      },
+      "first_content_ms": {
+        "median": 141.7405000000258,
+        "p95": 150.75922000002606,
+        "p99": 150.77064400001632,
+        "max": 150.77350000001388
+      },
+      "chunk_interval_ms": {
+        "median": 38.97810000000845,
+        "p95": 44.91952000000765,
+        "p99": 48.58612399994399,
+        "max": 63.65960000005089
+      },
+      "frames": 0,
+      "work_ms": null,
+      "compose_ms": null,
+      "skipped_slots": 0,
+      "deadline_misses": 0,
+      "all_present_s_ok": true
+    }
+  },
+  "completion_tokens": [
+    128
+  ],
+  "unique_output_hashes": 1,
+  "notes": [
+    "Frame statistics include two settling seconds per trial.",
+    "Client content/chunk timing is not engine token-generation timing.",
+    "IDLE presents once per trial and performs no repeated rendering.",
+    "Presentation S_OK is not physical scanout evidence."
+  ]
+}

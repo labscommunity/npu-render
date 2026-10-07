@@ -1,0 +1,126 @@
+[
+  {
+    "variant": "grid_nearest",
+    "device": "NPU",
+    "source": [
+      67,
+      49
+    ],
+    "side": 16,
+    "stack": {
+      "runtime": "2026.1.0-21367-63e31528c62-releases/2026/1",
+      "devices": [
+        {
+          "id": "CPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "intel64",
+            "FULL_DEVICE_NAME": "Intel(R) Core(TM) Ultra X7 358H"
+          },
+          "errors": {},
+          "plugins": {
+            "CPU": {
+              "build": "2026.1.0-21367-63e31528c62-releases/2026/1",
+              "description": "openvino_intel_cpu_plugin"
+            }
+          }
+        },
+        {
+          "id": "GPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "GPU: vendor=0x8086 arch=v30.0.4",
+            "FULL_DEVICE_NAME": "Intel(R) Arc(TM) B390 GPU (iGPU)"
+          },
+          "errors": {},
+          "plugins": {
+            "GPU": {
+              "build": "2026.1.0-21367-63e31528c62-releases/2026/1",
+              "description": "Intel GPU plugin"
+            }
+          }
+        },
+        {
+          "id": "NPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "5010",
+            "FULL_DEVICE_NAME": "Intel(R) AI Boost",
+            "NPU_COMPILER_TYPE": "CompilerType.PREFER_PLUGIN",
+            "NPU_COMPILER_VERSION": "458781",
+            "NPU_DRIVER_VERSION": "1005540"
+          },
+          "errors": {},
+          "plugins": {
+            "NPU": {
+              "build": "2026.1.0-21367-63e31528c62-releases/2026/1",
+              "description": "openvino_intel_npu_plugin"
+            }
+          }
+        }
+      ],
+      "scope": "Loaded runtime properties; installed-package versions, pixel correctness and presentation are separate checks."
+    },
+    "compile_ms": 144.20380000001387,
+    "actual": "NPU",
+    "actual_compiler": "CompilerType.PLUGIN",
+    "padded_source": [
+      128,
+      64
+    ],
+    "infer_copy_ms": [
+      3.7393000000065513,
+      0.4266000000825443,
+      0.40360000002692686
+    ],
+    "max_byte_error": 1,
+    "passed": true,
+    "profiling": [
+      {
+        "name": "GridSample_5",
+        "type": "GridSample",
+        "exec_type": "Shave",
+        "real_ms": 0.152,
+        "cpu_ms": 0.7919999999999999,
+        "status": "Status.EXECUTED"
+      },
+      {
+        "name": "Multiply_18",
+        "type": "Multiply",
+        "exec_type": "DPU",
+        "real_ms": 0.17,
+        "cpu_ms": 0.007,
+        "status": "Status.EXECUTED"
+      },
+      {
+        "name": "Multiply_8",
+        "type": "Multiply",
+        "exec_type": "Shave",
+        "real_ms": 0.154,
+        "cpu_ms": 0.029,
+        "status": "Status.EXECUTED"
+      },
+      {
+        "name": "ReduceSum_10",
+        "type": "ReduceSum",
+        "exec_type": "DPU",
+        "real_ms": 0.005,
+        "cpu_ms": 0.009000000000000001,
+        "status": "Status.EXECUTED"
+      },
+      {
+        "name": "Subtract_17",
+        "type": "Subtract",
+        "exec_type": "DPU",
+        "real_ms": 0.007,
+        "cpu_ms": 0.002,
+        "status": "Status.EXECUTED"
+      },
+      {
+        "name": "Add_19",
+        "type": "Add",
+        "exec_type": "DPU",
+        "real_ms": 0.007,
+        "cpu_ms": 0.006,
+        "status": "Status.EXECUTED"
+      }
+    ]
+  }
+]

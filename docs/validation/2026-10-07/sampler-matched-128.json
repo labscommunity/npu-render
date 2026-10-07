@@ -1,0 +1,150 @@
+[
+  {
+    "variant": "planar_f16",
+    "device": "NPU",
+    "source": [
+      640,
+      360
+    ],
+    "side": 128,
+    "stack": {
+      "runtime": "2026.1.0-21367-63e31528c62-releases/2026/1",
+      "devices": [
+        {
+          "id": "CPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "intel64",
+            "FULL_DEVICE_NAME": "Intel(R) Core(TM) Ultra X7 358H"
+          },
+          "errors": {},
+          "plugins": {
+            "CPU": {
+              "build": "2026.1.0-21367-63e31528c62-releases/2026/1",
+              "description": "openvino_intel_cpu_plugin"
+            }
+          }
+        },
+        {
+          "id": "GPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "GPU: vendor=0x8086 arch=v30.0.4",
+            "FULL_DEVICE_NAME": "Intel(R) Arc(TM) B390 GPU (iGPU)"
+          },
+          "errors": {},
+          "plugins": {
+            "GPU": {
+              "build": "2026.1.0-21367-63e31528c62-releases/2026/1",
+              "description": "Intel GPU plugin"
+            }
+          }
+        },
+        {
+          "id": "NPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "5010",
+            "FULL_DEVICE_NAME": "Intel(R) AI Boost",
+            "NPU_COMPILER_TYPE": "CompilerType.PREFER_PLUGIN",
+            "NPU_COMPILER_VERSION": "458781",
+            "NPU_DRIVER_VERSION": "1005540"
+          },
+          "errors": {},
+          "plugins": {
+            "NPU": {
+              "build": "2026.1.0-21367-63e31528c62-releases/2026/1",
+              "description": "openvino_intel_npu_plugin"
+            }
+          }
+        }
+      ],
+      "scope": "Loaded runtime properties; installed-package versions, pixel correctness and presentation are separate checks."
+    },
+    "compile_ms": 143.9343000001827,
+    "actual": "NPU",
+    "actual_compiler": "CompilerType.PLUGIN",
+    "infer_copy_ms": [
+      24.28660000009586,
+      20.334699999921213,
+      19.583400000101392,
+      18.873900000016874,
+      17.888599999878352
+    ],
+    "max_byte_error": 1,
+    "passed": true
+  },
+  {
+    "variant": "grid_nearest",
+    "device": "NPU",
+    "source": [
+      640,
+      360
+    ],
+    "side": 128,
+    "stack": {
+      "runtime": "2026.1.0-21367-63e31528c62-releases/2026/1",
+      "devices": [
+        {
+          "id": "CPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "intel64",
+            "FULL_DEVICE_NAME": "Intel(R) Core(TM) Ultra X7 358H"
+          },
+          "errors": {},
+          "plugins": {
+            "CPU": {
+              "build": "2026.1.0-21367-63e31528c62-releases/2026/1",
+              "description": "openvino_intel_cpu_plugin"
+            }
+          }
+        },
+        {
+          "id": "GPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "GPU: vendor=0x8086 arch=v30.0.4",
+            "FULL_DEVICE_NAME": "Intel(R) Arc(TM) B390 GPU (iGPU)"
+          },
+          "errors": {},
+          "plugins": {
+            "GPU": {
+              "build": "2026.1.0-21367-63e31528c62-releases/2026/1",
+              "description": "Intel GPU plugin"
+            }
+          }
+        },
+        {
+          "id": "NPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "5010",
+            "FULL_DEVICE_NAME": "Intel(R) AI Boost",
+            "NPU_COMPILER_TYPE": "CompilerType.PREFER_PLUGIN",
+            "NPU_COMPILER_VERSION": "458781",
+            "NPU_DRIVER_VERSION": "1005540"
+          },
+          "errors": {},
+          "plugins": {
+            "NPU": {
+              "build": "2026.1.0-21367-63e31528c62-releases/2026/1",
+              "description": "openvino_intel_npu_plugin"
+            }
+          }
+        }
+      ],
+      "scope": "Loaded runtime properties; installed-package versions, pixel correctness and presentation are separate checks."
+    },
+    "compile_ms": 175.81419999987702,
+    "actual": "NPU",
+    "actual_compiler": "CompilerType.PLUGIN",
+    "padded_source": [
+      1024,
+      512
+    ],
+    "infer_copy_ms": [
+      41.38660000012351,
+      32.979500000010376,
+      29.385499999989406,
+      27.249100000062754,
+      25.951399999939895
+    ],
+    "max_byte_error": 1,
+    "passed": true
+  }
+]

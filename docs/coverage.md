@@ -6,9 +6,9 @@ coverage, not just whether an equivalent tensor equation exists.
 
 | Function | Current implementation | Missing integration or proof |
 |---|---|---|
-| Premultiplied RGBA source-over | Explicit CPU/GPU/NPU provider, damage batches, saved switch, native Windows shared-buffer window | Visible native display validation; async fence integration |
+| Premultiplied RGBA source-over | Explicit CPU/GPU/NPU provider, damage batches, saved switch, native Windows shared-buffer window; active-desktop 720p presentation checks pass | Physical presentation timing; async fence integration |
 | Source copy | Native provider, byte-exact tests on CPU/GPU/NPU | Wider buffer formats and resource layouts |
-| Animated application surfaces | SDL window and native D3D12 swapchain; NPU byte conversion and composition | Native window occluded on first test; presentation timestamps and wider adapters |
+| Animated application surfaces | SDL window and native D3D12 swapchain; NPU byte conversion and composition; native switching and concurrent inference checks pass at 720p | Presentation timestamps and wider adapters; measured Tahoma throughput regressed 5.9% |
 | Window composition | Restricted Weston adapter with damage/visibility; CPU headless and nested tests | Native Linux NPU execution and standalone display validation |
 | Window transforms and scaling | Indexed texel sampling plus one-dispatch bilinear resize; Weston affine/nearest/bilinear and one-rectangle source clipping; 72 CPU/Pixman cases | Specialized NPU 720p API ~12 ms, 1080p ~27 ms; generic sampling is too slow full-frame; Linux NPU presentation pending |
 | Color conversion and filters | CPU linear-sRGB conversion; NPU BGRA8/FP16 packing and rounding in native window | NPU color-space/filter graphs and end-to-end comparison |
@@ -27,8 +27,10 @@ measurements must separate graphics, copy, compute, media and display behavior.
 ## Platform progression
 
 Windows supports the library, live application harness, and a D3D12/NPU shared-buffer
-window with validated pixel semantics and saved-switch recovery. Its first display
-test was occluded by the screen saver. It does not replace DWM's renderer. The restricted Weston
+window with validated pixel semantics and saved-switch recovery. After verified
+driver activation, its 720p control run and twenty inference trials passed active
+desktop and presentation-status checks. The [native comparison](validation/2026-10-07/README.md)
+did not improve Tahoma throughput. It does not replace DWM's renderer. The restricted Weston
 adapter now runs in Linux CPU CI, preserving its display backend and explicit
 handling of unsupported operations. Headless and nested runs establish integration
 correctness; native Linux NPU/DRM presentation is needed to characterize useful

@@ -12,6 +12,8 @@ import numpy as np
 import openvino as ov
 from openvino import opset13 as op
 
+from npu_render.openvino_diagnostics import inspect_stack, require_npu_driver
+
 
 def isolated(args):
     """Bound experimental compiler/driver calls and stop after device failure."""
@@ -36,6 +38,10 @@ def isolated(args):
         ]
         if args.profile:
             command.append("--profile")
+        if args.compiler:
+            command += ["--compiler", args.compiler]
+        if args.expected_npu_driver:
+            command += ["--expected-npu-driver", args.expected_npu_driver]
         process = subprocess.Popen(
             command,
             stdout=subprocess.PIPE,
@@ -74,7 +80,31 @@ def isolated(args):
     return int(failed)
 
 
-def graph(source_pixels, side, variant):
+def graph(source_pixels, side, variant, source_extent=None):
+    if variant == "grid_nearest":
+        width, height = source_extent
+        if max(width, height) > 2048:
+            raise ValueError("exact FP16 texel centers require padded extents at most 2048")
+        padded_width, padded_height = (1 << (value - 1).bit_length() for value in source_extent)
+        image = op.parameter([1, 4, padded_height, padded_width], np.float16)
+        coordinates = op.parameter([1, 4 * side, side, 2], np.float16)
+        weights = op.parameter([1, 4, side, side], np.float16)
+        background = op.parameter([4, side, side], np.float16)
+        fetched = op.grid_sample(
+            image,
+            coordinates,
+            {"mode": "nearest", "padding_mode": "zeros", "align_corners": False},
+        )
+        fetched = op.reshape(fetched, np.array([4, 4, side, side]), False)
+        sampled = op.reduce_sum(op.multiply(fetched, weights), np.array([1]), False)
+        alpha = op.gather(sampled, np.array([3]), np.array(0))
+        result = op.add(
+            sampled,
+            op.multiply(
+                background, op.subtract(np.float16(1), op.multiply(alpha, np.float16(1 / 255)))
+            ),
+        )
+        return ov.Model([result], [image, coordinates, weights, background])
     if variant == "gather_nd":
         image = op.parameter([4, source_pixels], np.float16)
         indices = op.parameter([4, 4, side, side, 2], np.int32)
@@ -152,13 +182,23 @@ def main():
     parser.add_argument("--frames", type=int, default=5)
     parser.add_argument("--device", default="NPU", choices=["NPU", "GPU", "CPU"])
     parser.add_argument("--profile", action="store_true")
+    parser.add_argument("--compiler", choices=["PLUGIN", "DRIVER"])
+    parser.add_argument("--expected-npu-driver")
     parser.add_argument("--timeout-seconds", type=float, default=45)
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument(
         "--variants",
         nargs="+",
         default=["planar_f16"],
-        choices=["planar_f16", "aos_f16", "aos_u8", "width_neighbors", "rank5", "gather_nd"],
+        choices=[
+            "planar_f16",
+            "aos_f16",
+            "aos_u8",
+            "width_neighbors",
+            "rank5",
+            "gather_nd",
+            "grid_nearest",
+        ],
         help="AoS variants caused device loss on the tested NPU stack; default is planar only",
     )
     args = parser.parse_args()
@@ -168,6 +208,8 @@ def main():
         parser.error("frames must be positive")
     if not 0 < args.timeout_seconds <= 300:
         parser.error("timeout must be positive and at most 300 seconds")
+    if args.device != "NPU" and (args.compiler or args.expected_npu_driver):
+        parser.error("compiler and loaded-driver gates apply only to the NPU")
     if not args.worker:
         return isolated(args)
     core = ov.Core()
@@ -181,12 +223,19 @@ def main():
             "side": args.side,
         }
         try:
+            config = {ov.properties.enable_profiling(): True} if args.profile else {}
+            if args.device == "NPU":
+                report["stack"] = inspect_stack(core)
+                if args.expected_npu_driver:
+                    require_npu_driver(report["stack"], args.expected_npu_driver)
+                if args.compiler:
+                    config["NPU_COMPILER_TYPE"] = args.compiler
             print(json.dumps({**report, "stage": "compiling"}), file=sys.stderr, flush=True)
             start = time.perf_counter()
             compiled = core.compile_model(
-                graph(source_pixels, args.side, variant),
+                graph(source_pixels, args.side, variant, (args.width, args.height)),
                 args.device,
-                {ov.properties.enable_profiling(): True} if args.profile else {},
+                config,
             )
             report["compile_ms"] = 1000 * (time.perf_counter() - start)
             report["actual"] = compiled.get_property("EXECUTION_DEVICES")
@@ -197,6 +246,10 @@ def main():
                 actual.split(".")[0] != args.device.split(".")[0] for actual in actual_devices
             ):
                 raise RuntimeError("compiled graph selected another device")
+            if args.device == "NPU":
+                report["actual_compiler"] = str(compiled.get_property("NPU_COMPILER_TYPE"))
+                if args.compiler and report["actual_compiler"].split(".")[-1] != args.compiler:
+                    raise RuntimeError("compiled graph selected another compiler")
             print(json.dumps({**report, "stage": "compiled"}), file=sys.stderr, flush=True)
             request = compiled.create_infer_request()
             rng = np.random.default_rng(5010)
@@ -215,7 +268,32 @@ def main():
                 ref = (image[indices].astype(np.float64) * weights.astype(np.float64)).sum(axis=0)
                 ref += background.astype(np.float64) * (1 - ref[..., 3:4] / 255)
                 expected = np.rint(np.clip(ref, 0, 255)).astype(np.int16)
-                if variant == "width_neighbors":
+                if variant == "grid_nearest":
+                    padded_width = 1 << (args.width - 1).bit_length()
+                    padded_height = 1 << (args.height - 1).bit_length()
+                    padded = np.zeros((1, 4, padded_height, padded_width), np.float16)
+                    padded[0, :, : args.height, : args.width] = image.reshape(
+                        args.height, args.width, 4
+                    ).transpose(2, 0, 1)
+                    grid = (
+                        np.stack(
+                            [
+                                (2 * (indices % args.width) + 1) / padded_width - 1,
+                                (2 * (indices // args.width) + 1) / padded_height - 1,
+                            ],
+                            axis=-1,
+                        )
+                        .astype(np.float16)
+                        .reshape(1, 4 * args.side, args.side, 2)
+                    )
+                    values = [
+                        padded,
+                        grid,
+                        weights[..., 0][None].copy(),
+                        background.transpose(2, 0, 1).copy(),
+                    ]
+                    report["padded_source"] = [padded_width, padded_height]
+                elif variant == "width_neighbors":
                     values = [
                         image.T.astype(np.float16).copy(),
                         indices.transpose(1, 2, 0).reshape(args.side, args.side * 4).copy(),
@@ -261,7 +339,7 @@ def main():
                 )
                 if variant in {"width_neighbors", "rank5"}:
                     out = out[0].transpose(1, 2, 0)
-                elif variant in {"planar_f16", "gather_nd"}:
+                elif variant in {"planar_f16", "gather_nd", "grid_nearest"}:
                     out = out.transpose(1, 2, 0)
                 if not np.isfinite(out).all():
                     raise RuntimeError("non-finite output")

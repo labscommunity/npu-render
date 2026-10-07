@@ -100,6 +100,13 @@ but it is **not a visible-presentation result**. The validator's explicit
 benchmark refuses occluded trials, including an occluded initial idle frame.
 `S_OK` itself still does not establish physical scanout timing.
 
+After the full restart activated driver 5540, the same installed bundle passed the
+720p control validator without `--allow-occluded`. Twenty native Tahoma trials also
+passed every desktop and presentation check. NPU graphics reduced median paired
+inference throughput by 5.9% versus the native GPU shader. See the
+[new-driver evidence](../docs/validation/2026-10-07/README.md); the earlier occluded
+captures remain unchanged.
+
 `npu-render session --require-desktop` reads session connection state, window
 station, thread/input desktops and monitor count. The contention harness records
 and checks these before inference warmup and around every trial, including IDLE.

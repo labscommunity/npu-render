@@ -1,0 +1,1122 @@
+[
+  {
+    "case": "relu",
+    "requested_compiler": "PLUGIN",
+    "source": [
+      64,
+      64
+    ],
+    "grid_output": [
+      32,
+      32
+    ],
+    "passed": true,
+    "stack": {
+      "runtime": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+      "devices": [
+        {
+          "id": "CPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "intel64",
+            "FULL_DEVICE_NAME": "Intel(R) Core(TM) Ultra X7 358H"
+          },
+          "errors": {},
+          "plugins": {
+            "CPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "openvino_intel_cpu_plugin"
+            }
+          }
+        },
+        {
+          "id": "GPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "GPU: vendor=0x8086 arch=v30.0.4",
+            "FULL_DEVICE_NAME": "Intel(R) Arc(TM) B390 GPU (iGPU)"
+          },
+          "errors": {},
+          "plugins": {
+            "GPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "Intel GPU plugin"
+            }
+          }
+        },
+        {
+          "id": "NPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "5010",
+            "FULL_DEVICE_NAME": "Intel(R) AI Boost",
+            "NPU_COMPILER_TYPE": "CompilerType.PREFER_PLUGIN",
+            "NPU_COMPILER_VERSION": "524290",
+            "NPU_DRIVER_VERSION": "1005540"
+          },
+          "errors": {},
+          "plugins": {
+            "NPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "openvino_intel_npu_plugin"
+            }
+          }
+        }
+      ],
+      "scope": "Loaded runtime properties; installed-package versions, pixel correctness and presentation are separate checks."
+    },
+    "tolerance": 0,
+    "cpu_control_max_error": 0.0,
+    "compile_ms": 289.8270999999113,
+    "actual_compiler": "CompilerType.PLUGIN",
+    "actual_devices": [
+      "NPU"
+    ],
+    "compiled_compiler_version": "524290",
+    "infer_copy_ms": [
+      2.407400000038251,
+      0.20570000015140977,
+      0.15170000006037299,
+      0.1456000002235669,
+      0.13889999991079094
+    ],
+    "max_error": 0.0
+  },
+  {
+    "case": "relu",
+    "requested_compiler": "DRIVER",
+    "source": [
+      64,
+      64
+    ],
+    "grid_output": [
+      32,
+      32
+    ],
+    "passed": true,
+    "stack": {
+      "runtime": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+      "devices": [
+        {
+          "id": "CPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "intel64",
+            "FULL_DEVICE_NAME": "Intel(R) Core(TM) Ultra X7 358H"
+          },
+          "errors": {},
+          "plugins": {
+            "CPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "openvino_intel_cpu_plugin"
+            }
+          }
+        },
+        {
+          "id": "GPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "GPU: vendor=0x8086 arch=v30.0.4",
+            "FULL_DEVICE_NAME": "Intel(R) Arc(TM) B390 GPU (iGPU)"
+          },
+          "errors": {},
+          "plugins": {
+            "GPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "Intel GPU plugin"
+            }
+          }
+        },
+        {
+          "id": "NPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "5010",
+            "FULL_DEVICE_NAME": "Intel(R) AI Boost",
+            "NPU_COMPILER_TYPE": "CompilerType.PREFER_PLUGIN",
+            "NPU_COMPILER_VERSION": "524290",
+            "NPU_DRIVER_VERSION": "1005540"
+          },
+          "errors": {},
+          "plugins": {
+            "NPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "openvino_intel_npu_plugin"
+            }
+          }
+        }
+      ],
+      "scope": "Loaded runtime properties; installed-package versions, pixel correctness and presentation are separate checks."
+    },
+    "tolerance": 0,
+    "cpu_control_max_error": 0.0,
+    "compile_ms": 22.6430000000164,
+    "actual_compiler": "CompilerType.DRIVER",
+    "actual_devices": [
+      "NPU"
+    ],
+    "compiled_compiler_version": "524291",
+    "infer_copy_ms": [
+      1.8244000000322558,
+      0.2580999998826883,
+      0.1882000001387496,
+      0.1803000000109023,
+      0.17369999977745465
+    ],
+    "max_error": 0.0
+  },
+  {
+    "case": "grid_f16",
+    "requested_compiler": "PLUGIN",
+    "source": [
+      64,
+      64
+    ],
+    "grid_output": [
+      32,
+      32
+    ],
+    "passed": true,
+    "stack": {
+      "runtime": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+      "devices": [
+        {
+          "id": "CPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "intel64",
+            "FULL_DEVICE_NAME": "Intel(R) Core(TM) Ultra X7 358H"
+          },
+          "errors": {},
+          "plugins": {
+            "CPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "openvino_intel_cpu_plugin"
+            }
+          }
+        },
+        {
+          "id": "GPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "GPU: vendor=0x8086 arch=v30.0.4",
+            "FULL_DEVICE_NAME": "Intel(R) Arc(TM) B390 GPU (iGPU)"
+          },
+          "errors": {},
+          "plugins": {
+            "GPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "Intel GPU plugin"
+            }
+          }
+        },
+        {
+          "id": "NPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "5010",
+            "FULL_DEVICE_NAME": "Intel(R) AI Boost",
+            "NPU_COMPILER_TYPE": "CompilerType.PREFER_PLUGIN",
+            "NPU_COMPILER_VERSION": "524290",
+            "NPU_DRIVER_VERSION": "1005540"
+          },
+          "errors": {},
+          "plugins": {
+            "NPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "openvino_intel_npu_plugin"
+            }
+          }
+        }
+      ],
+      "scope": "Loaded runtime properties; installed-package versions, pixel correctness and presentation are separate checks."
+    },
+    "tolerance": 0.00784313725490196,
+    "cpu_control_max_error": 0.000244140625,
+    "compile_ms": 90.98530000005667,
+    "actual_compiler": "CompilerType.PLUGIN",
+    "actual_devices": [
+      "NPU"
+    ],
+    "compiled_compiler_version": "524290",
+    "infer_copy_ms": [
+      2.1523999998862564,
+      0.25959999993574456,
+      0.21909999986746698,
+      0.19029999998565472,
+      0.1887000000806438
+    ],
+    "max_error": 0.000244140625
+  },
+  {
+    "case": "grid_f16",
+    "requested_compiler": "DRIVER",
+    "source": [
+      64,
+      64
+    ],
+    "grid_output": [
+      32,
+      32
+    ],
+    "passed": true,
+    "stack": {
+      "runtime": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+      "devices": [
+        {
+          "id": "CPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "intel64",
+            "FULL_DEVICE_NAME": "Intel(R) Core(TM) Ultra X7 358H"
+          },
+          "errors": {},
+          "plugins": {
+            "CPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "openvino_intel_cpu_plugin"
+            }
+          }
+        },
+        {
+          "id": "GPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "GPU: vendor=0x8086 arch=v30.0.4",
+            "FULL_DEVICE_NAME": "Intel(R) Arc(TM) B390 GPU (iGPU)"
+          },
+          "errors": {},
+          "plugins": {
+            "GPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "Intel GPU plugin"
+            }
+          }
+        },
+        {
+          "id": "NPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "5010",
+            "FULL_DEVICE_NAME": "Intel(R) AI Boost",
+            "NPU_COMPILER_TYPE": "CompilerType.PREFER_PLUGIN",
+            "NPU_COMPILER_VERSION": "524290",
+            "NPU_DRIVER_VERSION": "1005540"
+          },
+          "errors": {},
+          "plugins": {
+            "NPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "openvino_intel_npu_plugin"
+            }
+          }
+        }
+      ],
+      "scope": "Loaded runtime properties; installed-package versions, pixel correctness and presentation are separate checks."
+    },
+    "tolerance": 0.00784313725490196,
+    "cpu_control_max_error": 0.000244140625,
+    "compile_ms": 4.978799999889816,
+    "actual_compiler": "CompilerType.DRIVER",
+    "actual_devices": [
+      "NPU"
+    ],
+    "compiled_compiler_version": "524291",
+    "infer_copy_ms": [
+      1.9023000002107437,
+      0.26309999998375133,
+      0.20509999990281358,
+      0.19520000000738946,
+      0.18989999989571515
+    ],
+    "max_error": 0.000244140625
+  },
+  {
+    "case": "grid_f32",
+    "requested_compiler": "PLUGIN",
+    "source": [
+      64,
+      64
+    ],
+    "grid_output": [
+      32,
+      32
+    ],
+    "passed": false,
+    "stack": {
+      "runtime": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+      "devices": [
+        {
+          "id": "CPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "intel64",
+            "FULL_DEVICE_NAME": "Intel(R) Core(TM) Ultra X7 358H"
+          },
+          "errors": {},
+          "plugins": {
+            "CPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "openvino_intel_cpu_plugin"
+            }
+          }
+        },
+        {
+          "id": "GPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "GPU: vendor=0x8086 arch=v30.0.4",
+            "FULL_DEVICE_NAME": "Intel(R) Arc(TM) B390 GPU (iGPU)"
+          },
+          "errors": {},
+          "plugins": {
+            "GPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "Intel GPU plugin"
+            }
+          }
+        },
+        {
+          "id": "NPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "5010",
+            "FULL_DEVICE_NAME": "Intel(R) AI Boost",
+            "NPU_COMPILER_TYPE": "CompilerType.PREFER_PLUGIN",
+            "NPU_COMPILER_VERSION": "524290",
+            "NPU_DRIVER_VERSION": "1005540"
+          },
+          "errors": {},
+          "plugins": {
+            "NPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "openvino_intel_npu_plugin"
+            }
+          }
+        }
+      ],
+      "scope": "Loaded runtime properties; installed-package versions, pixel correctness and presentation are separate checks."
+    },
+    "tolerance": 0.00784313725490196,
+    "cpu_control_max_error": 3.814697265625e-06,
+    "compile_ms": 98.39790000000903,
+    "actual_compiler": "CompilerType.PLUGIN",
+    "actual_devices": [
+      "NPU"
+    ],
+    "compiled_compiler_version": "524290",
+    "infer_copy_ms": [
+      2.1557000000029802,
+      0.31940000008034986,
+      0.22260000014284742,
+      0.19550000001800072,
+      0.19790000010289077
+    ],
+    "max_error": 0.014965057373046875
+  },
+  {
+    "case": "grid_f32",
+    "requested_compiler": "DRIVER",
+    "source": [
+      64,
+      64
+    ],
+    "grid_output": [
+      32,
+      32
+    ],
+    "passed": false,
+    "stack": {
+      "runtime": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+      "devices": [
+        {
+          "id": "CPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "intel64",
+            "FULL_DEVICE_NAME": "Intel(R) Core(TM) Ultra X7 358H"
+          },
+          "errors": {},
+          "plugins": {
+            "CPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "openvino_intel_cpu_plugin"
+            }
+          }
+        },
+        {
+          "id": "GPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "GPU: vendor=0x8086 arch=v30.0.4",
+            "FULL_DEVICE_NAME": "Intel(R) Arc(TM) B390 GPU (iGPU)"
+          },
+          "errors": {},
+          "plugins": {
+            "GPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "Intel GPU plugin"
+            }
+          }
+        },
+        {
+          "id": "NPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "5010",
+            "FULL_DEVICE_NAME": "Intel(R) AI Boost",
+            "NPU_COMPILER_TYPE": "CompilerType.PREFER_PLUGIN",
+            "NPU_COMPILER_VERSION": "524290",
+            "NPU_DRIVER_VERSION": "1005540"
+          },
+          "errors": {},
+          "plugins": {
+            "NPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "openvino_intel_npu_plugin"
+            }
+          }
+        }
+      ],
+      "scope": "Loaded runtime properties; installed-package versions, pixel correctness and presentation are separate checks."
+    },
+    "tolerance": 0.00784313725490196,
+    "cpu_control_max_error": 3.814697265625e-06,
+    "compile_ms": 3.081500000007509,
+    "actual_compiler": "CompilerType.DRIVER",
+    "actual_devices": [
+      "NPU"
+    ],
+    "compiled_compiler_version": "524291",
+    "infer_copy_ms": [
+      2.0557000000280823,
+      0.25170000003527093,
+      0.20689999996648112,
+      0.19720000000233995,
+      0.20150000000285218
+    ],
+    "max_error": 0.014965057373046875
+  },
+  {
+    "case": "pack",
+    "requested_compiler": "PLUGIN",
+    "source": [
+      64,
+      64
+    ],
+    "grid_output": [
+      32,
+      32
+    ],
+    "passed": true,
+    "stack": {
+      "runtime": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+      "devices": [
+        {
+          "id": "CPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "intel64",
+            "FULL_DEVICE_NAME": "Intel(R) Core(TM) Ultra X7 358H"
+          },
+          "errors": {},
+          "plugins": {
+            "CPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "openvino_intel_cpu_plugin"
+            }
+          }
+        },
+        {
+          "id": "GPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "GPU: vendor=0x8086 arch=v30.0.4",
+            "FULL_DEVICE_NAME": "Intel(R) Arc(TM) B390 GPU (iGPU)"
+          },
+          "errors": {},
+          "plugins": {
+            "GPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "Intel GPU plugin"
+            }
+          }
+        },
+        {
+          "id": "NPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "5010",
+            "FULL_DEVICE_NAME": "Intel(R) AI Boost",
+            "NPU_COMPILER_TYPE": "CompilerType.PREFER_PLUGIN",
+            "NPU_COMPILER_VERSION": "524290",
+            "NPU_DRIVER_VERSION": "1005540"
+          },
+          "errors": {},
+          "plugins": {
+            "NPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "openvino_intel_npu_plugin"
+            }
+          }
+        }
+      ],
+      "scope": "Loaded runtime properties; installed-package versions, pixel correctness and presentation are separate checks."
+    },
+    "tolerance": 1,
+    "cpu_control_max_error": 1.0,
+    "compile_ms": 152.3493000001963,
+    "actual_compiler": "CompilerType.PLUGIN",
+    "actual_devices": [
+      "NPU"
+    ],
+    "compiled_compiler_version": "524290",
+    "infer_copy_ms": [
+      2.084899999999834,
+      0.3128999999262305,
+      0.26629999979377317,
+      0.25810000011006196,
+      0.25279999999838765
+    ],
+    "max_error": 1.0
+  },
+  {
+    "case": "pack",
+    "requested_compiler": "DRIVER",
+    "source": [
+      64,
+      64
+    ],
+    "grid_output": [
+      32,
+      32
+    ],
+    "passed": true,
+    "stack": {
+      "runtime": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+      "devices": [
+        {
+          "id": "CPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "intel64",
+            "FULL_DEVICE_NAME": "Intel(R) Core(TM) Ultra X7 358H"
+          },
+          "errors": {},
+          "plugins": {
+            "CPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "openvino_intel_cpu_plugin"
+            }
+          }
+        },
+        {
+          "id": "GPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "GPU: vendor=0x8086 arch=v30.0.4",
+            "FULL_DEVICE_NAME": "Intel(R) Arc(TM) B390 GPU (iGPU)"
+          },
+          "errors": {},
+          "plugins": {
+            "GPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "Intel GPU plugin"
+            }
+          }
+        },
+        {
+          "id": "NPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "5010",
+            "FULL_DEVICE_NAME": "Intel(R) AI Boost",
+            "NPU_COMPILER_TYPE": "CompilerType.PREFER_PLUGIN",
+            "NPU_COMPILER_VERSION": "524290",
+            "NPU_DRIVER_VERSION": "1005540"
+          },
+          "errors": {},
+          "plugins": {
+            "NPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "openvino_intel_npu_plugin"
+            }
+          }
+        }
+      ],
+      "scope": "Loaded runtime properties; installed-package versions, pixel correctness and presentation are separate checks."
+    },
+    "tolerance": 1,
+    "cpu_control_max_error": 1.0,
+    "compile_ms": 4.708100000016202,
+    "actual_compiler": "CompilerType.DRIVER",
+    "actual_devices": [
+      "NPU"
+    ],
+    "compiled_compiler_version": "524291",
+    "infer_copy_ms": [
+      2.3936999998568353,
+      0.31890000013845565,
+      0.26330000014240795,
+      0.24929999995038088,
+      0.24909999979172426
+    ],
+    "max_error": 1.0
+  },
+  {
+    "case": "unpack",
+    "requested_compiler": "PLUGIN",
+    "source": [
+      64,
+      64
+    ],
+    "grid_output": [
+      32,
+      32
+    ],
+    "passed": true,
+    "stack": {
+      "runtime": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+      "devices": [
+        {
+          "id": "CPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "intel64",
+            "FULL_DEVICE_NAME": "Intel(R) Core(TM) Ultra X7 358H"
+          },
+          "errors": {},
+          "plugins": {
+            "CPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "openvino_intel_cpu_plugin"
+            }
+          }
+        },
+        {
+          "id": "GPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "GPU: vendor=0x8086 arch=v30.0.4",
+            "FULL_DEVICE_NAME": "Intel(R) Arc(TM) B390 GPU (iGPU)"
+          },
+          "errors": {},
+          "plugins": {
+            "GPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "Intel GPU plugin"
+            }
+          }
+        },
+        {
+          "id": "NPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "5010",
+            "FULL_DEVICE_NAME": "Intel(R) AI Boost",
+            "NPU_COMPILER_TYPE": "CompilerType.PREFER_PLUGIN",
+            "NPU_COMPILER_VERSION": "524290",
+            "NPU_DRIVER_VERSION": "1005540"
+          },
+          "errors": {},
+          "plugins": {
+            "NPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "openvino_intel_npu_plugin"
+            }
+          }
+        }
+      ],
+      "scope": "Loaded runtime properties; installed-package versions, pixel correctness and presentation are separate checks."
+    },
+    "tolerance": 1,
+    "cpu_control_max_error": 1.0,
+    "compile_ms": 165.65639999998893,
+    "actual_compiler": "CompilerType.PLUGIN",
+    "actual_devices": [
+      "NPU"
+    ],
+    "compiled_compiler_version": "524290",
+    "infer_copy_ms": [
+      2.1054999999705615,
+      0.31919999992169323,
+      0.2712000000428816,
+      0.2606999998988613,
+      0.25699999991957156
+    ],
+    "max_error": 1.0
+  },
+  {
+    "case": "unpack",
+    "requested_compiler": "DRIVER",
+    "source": [
+      64,
+      64
+    ],
+    "grid_output": [
+      32,
+      32
+    ],
+    "passed": true,
+    "stack": {
+      "runtime": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+      "devices": [
+        {
+          "id": "CPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "intel64",
+            "FULL_DEVICE_NAME": "Intel(R) Core(TM) Ultra X7 358H"
+          },
+          "errors": {},
+          "plugins": {
+            "CPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "openvino_intel_cpu_plugin"
+            }
+          }
+        },
+        {
+          "id": "GPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "GPU: vendor=0x8086 arch=v30.0.4",
+            "FULL_DEVICE_NAME": "Intel(R) Arc(TM) B390 GPU (iGPU)"
+          },
+          "errors": {},
+          "plugins": {
+            "GPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "Intel GPU plugin"
+            }
+          }
+        },
+        {
+          "id": "NPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "5010",
+            "FULL_DEVICE_NAME": "Intel(R) AI Boost",
+            "NPU_COMPILER_TYPE": "CompilerType.PREFER_PLUGIN",
+            "NPU_COMPILER_VERSION": "524290",
+            "NPU_DRIVER_VERSION": "1005540"
+          },
+          "errors": {},
+          "plugins": {
+            "NPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "openvino_intel_npu_plugin"
+            }
+          }
+        }
+      ],
+      "scope": "Loaded runtime properties; installed-package versions, pixel correctness and presentation are separate checks."
+    },
+    "tolerance": 1,
+    "cpu_control_max_error": 1.0,
+    "compile_ms": 3.9804000000458473,
+    "actual_compiler": "CompilerType.DRIVER",
+    "actual_devices": [
+      "NPU"
+    ],
+    "compiled_compiler_version": "524291",
+    "infer_copy_ms": [
+      2.4393000001055043,
+      0.31930000000102154,
+      0.2678000000742031,
+      0.2566000000570057,
+      0.25290000007771596
+    ],
+    "max_error": 1.0
+  },
+  {
+    "case": "both",
+    "requested_compiler": "PLUGIN",
+    "source": [
+      64,
+      64
+    ],
+    "grid_output": [
+      32,
+      32
+    ],
+    "passed": true,
+    "stack": {
+      "runtime": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+      "devices": [
+        {
+          "id": "CPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "intel64",
+            "FULL_DEVICE_NAME": "Intel(R) Core(TM) Ultra X7 358H"
+          },
+          "errors": {},
+          "plugins": {
+            "CPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "openvino_intel_cpu_plugin"
+            }
+          }
+        },
+        {
+          "id": "GPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "GPU: vendor=0x8086 arch=v30.0.4",
+            "FULL_DEVICE_NAME": "Intel(R) Arc(TM) B390 GPU (iGPU)"
+          },
+          "errors": {},
+          "plugins": {
+            "GPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "Intel GPU plugin"
+            }
+          }
+        },
+        {
+          "id": "NPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "5010",
+            "FULL_DEVICE_NAME": "Intel(R) AI Boost",
+            "NPU_COMPILER_TYPE": "CompilerType.PREFER_PLUGIN",
+            "NPU_COMPILER_VERSION": "524290",
+            "NPU_DRIVER_VERSION": "1005540"
+          },
+          "errors": {},
+          "plugins": {
+            "NPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "openvino_intel_npu_plugin"
+            }
+          }
+        }
+      ],
+      "scope": "Loaded runtime properties; installed-package versions, pixel correctness and presentation are separate checks."
+    },
+    "tolerance": 1,
+    "cpu_control_max_error": 1.0,
+    "compile_ms": 162.661000000071,
+    "actual_compiler": "CompilerType.PLUGIN",
+    "actual_devices": [
+      "NPU"
+    ],
+    "compiled_compiler_version": "524290",
+    "infer_copy_ms": [
+      2.386099999966973,
+      0.29810000000907166,
+      0.24470000016663107,
+      0.2420999999230844,
+      0.2412000001186243
+    ],
+    "max_error": 1.0
+  },
+  {
+    "case": "both",
+    "requested_compiler": "DRIVER",
+    "source": [
+      64,
+      64
+    ],
+    "grid_output": [
+      32,
+      32
+    ],
+    "passed": true,
+    "stack": {
+      "runtime": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+      "devices": [
+        {
+          "id": "CPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "intel64",
+            "FULL_DEVICE_NAME": "Intel(R) Core(TM) Ultra X7 358H"
+          },
+          "errors": {},
+          "plugins": {
+            "CPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "openvino_intel_cpu_plugin"
+            }
+          }
+        },
+        {
+          "id": "GPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "GPU: vendor=0x8086 arch=v30.0.4",
+            "FULL_DEVICE_NAME": "Intel(R) Arc(TM) B390 GPU (iGPU)"
+          },
+          "errors": {},
+          "plugins": {
+            "GPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "Intel GPU plugin"
+            }
+          }
+        },
+        {
+          "id": "NPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "5010",
+            "FULL_DEVICE_NAME": "Intel(R) AI Boost",
+            "NPU_COMPILER_TYPE": "CompilerType.PREFER_PLUGIN",
+            "NPU_COMPILER_VERSION": "524290",
+            "NPU_DRIVER_VERSION": "1005540"
+          },
+          "errors": {},
+          "plugins": {
+            "NPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "openvino_intel_npu_plugin"
+            }
+          }
+        }
+      ],
+      "scope": "Loaded runtime properties; installed-package versions, pixel correctness and presentation are separate checks."
+    },
+    "tolerance": 1,
+    "cpu_control_max_error": 1.0,
+    "compile_ms": 3.8352999999915482,
+    "actual_compiler": "CompilerType.DRIVER",
+    "actual_devices": [
+      "NPU"
+    ],
+    "compiled_compiler_version": "524291",
+    "infer_copy_ms": [
+      2.3837999999614112,
+      0.3195999997842591,
+      0.2609000000575179,
+      0.26269999989381176,
+      0.2498999999716034
+    ],
+    "max_error": 1.0
+  },
+  {
+    "case": "channels_4",
+    "requested_compiler": "PLUGIN",
+    "source": [
+      64,
+      64
+    ],
+    "grid_output": [
+      32,
+      32
+    ],
+    "passed": true,
+    "stack": {
+      "runtime": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+      "devices": [
+        {
+          "id": "CPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "intel64",
+            "FULL_DEVICE_NAME": "Intel(R) Core(TM) Ultra X7 358H"
+          },
+          "errors": {},
+          "plugins": {
+            "CPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "openvino_intel_cpu_plugin"
+            }
+          }
+        },
+        {
+          "id": "GPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "GPU: vendor=0x8086 arch=v30.0.4",
+            "FULL_DEVICE_NAME": "Intel(R) Arc(TM) B390 GPU (iGPU)"
+          },
+          "errors": {},
+          "plugins": {
+            "GPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "Intel GPU plugin"
+            }
+          }
+        },
+        {
+          "id": "NPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "5010",
+            "FULL_DEVICE_NAME": "Intel(R) AI Boost",
+            "NPU_COMPILER_TYPE": "CompilerType.PREFER_PLUGIN",
+            "NPU_COMPILER_VERSION": "524290",
+            "NPU_DRIVER_VERSION": "1005540"
+          },
+          "errors": {},
+          "plugins": {
+            "NPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "openvino_intel_npu_plugin"
+            }
+          }
+        }
+      ],
+      "scope": "Loaded runtime properties; installed-package versions, pixel correctness and presentation are separate checks."
+    },
+    "tolerance": 1,
+    "cpu_control_max_error": 1.0,
+    "compile_ms": 117.30499999998756,
+    "actual_compiler": "CompilerType.PLUGIN",
+    "actual_devices": [
+      "NPU"
+    ],
+    "compiled_compiler_version": "524290",
+    "infer_copy_ms": [
+      2.1572000000560365,
+      0.30740000011064694,
+      0.2059000000826927,
+      0.19520000000738946,
+      0.19840000004478497
+    ],
+    "max_error": 1.0
+  },
+  {
+    "case": "channels_4",
+    "requested_compiler": "DRIVER",
+    "source": [
+      64,
+      64
+    ],
+    "grid_output": [
+      32,
+      32
+    ],
+    "passed": false,
+    "stack": {
+      "runtime": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+      "devices": [
+        {
+          "id": "CPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "intel64",
+            "FULL_DEVICE_NAME": "Intel(R) Core(TM) Ultra X7 358H"
+          },
+          "errors": {},
+          "plugins": {
+            "CPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "openvino_intel_cpu_plugin"
+            }
+          }
+        },
+        {
+          "id": "GPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "GPU: vendor=0x8086 arch=v30.0.4",
+            "FULL_DEVICE_NAME": "Intel(R) Arc(TM) B390 GPU (iGPU)"
+          },
+          "errors": {},
+          "plugins": {
+            "GPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "Intel GPU plugin"
+            }
+          }
+        },
+        {
+          "id": "NPU",
+          "properties": {
+            "DEVICE_ARCHITECTURE": "5010",
+            "FULL_DEVICE_NAME": "Intel(R) AI Boost",
+            "NPU_COMPILER_TYPE": "CompilerType.PREFER_PLUGIN",
+            "NPU_COMPILER_VERSION": "524290",
+            "NPU_DRIVER_VERSION": "1005540"
+          },
+          "errors": {},
+          "plugins": {
+            "NPU": {
+              "build": "2026.3.1-22476-759c5a6ab8c-releases/2026/3",
+              "description": "openvino_intel_npu_plugin"
+            }
+          }
+        }
+      ],
+      "scope": "Loaded runtime properties; installed-package versions, pixel correctness and presentation are separate checks."
+    },
+    "tolerance": 1,
+    "cpu_control_max_error": 1.0,
+    "compile_ms": 3.4307999999327876,
+    "actual_compiler": "CompilerType.DRIVER",
+    "actual_devices": [
+      "NPU"
+    ],
+    "compiled_compiler_version": "524291",
+    "infer_copy_ms": [
+      1.9654000000173255,
+      0.28140000017629063,
+      0.20670000003519817,
+      0.20289999997658015,
+      0.21130000004632166
+    ],
+    "max_error": 254.0
+  }
+]

@@ -1,0 +1,32 @@
+{
+  "capture_date_utc": "2026-10-07",
+  "source_parent": "96e4953eef4d774e2f65695ef29436d57846bb6a",
+  "hardware": "Core Ultra X7 358H / Panther Lake NPU 5010 / Arc B390",
+  "os": "Windows 11 Pro 26200",
+  "gpu_driver": "32.0.101.8724",
+  "power": "Balanced",
+  "loaded_npu_driver": "1005540",
+  "installed_npu_package": "32.0.100.5540",
+  "full_restart_verified": true,
+  "native_bundle_revision": "ee4d711e00cf5b5c58ff4ad6802952f5f4953c01",
+  "native_executable_sha256": "2a1165c7fb08b989c4a97c0d00bd9fe8ca6df7d7709044b1227d2c643c17b5fd",
+  "source_sha256": {
+    "research/compiler_probe.py": "2dd6e371e21b129733e92404941e5e3c43445b1248843279beeae46971166c15",
+    "research/sampler_layout_probe.py": "2cfbd5bccce65532c2b3edd70d53ac98f99111d5286d9226d0a75fec9fa07e00",
+    "research/layout_probe.py": "b4506f3bf0f19091e515085eed0d4c4f01ab3fccd7d3a478baf16d7ab16e75bc",
+    "tools/benchmark_native.py": "e7e025520152fedd1881887a28323bb91c510b277e6066e4661f495540859899",
+    "tools/validate_native_live.py": "7e9829685834f059ae30ca81ef154bb24c1f614191b8588cca93f19994377bd8",
+    "src/npu_render/windows_session.py": "f17b7c389d3602143b1867f87a3643c053dc5f3773e01076bf9eb3d9ce87f2ed",
+    "src/npu_render/openvino_diagnostics.py": "c3f23ccba0d9cd670aa082c71c4bb22e2e584b54afd67ea0760c4ad7154a20a4",
+    "native/windows/live.cpp": "4427a19e57accf44ef96907c531e6dad1fc026143f0feaca2f79f7cd0d04110f",
+    "native/src/backend.cpp": "3d330a46c18f586fd74433637acd46873f64d806d54ba2340fe4b7110f0bea07",
+    "native/tools/dxcore_probe.cpp": "6777b6eb95da2cf64e749766bab6b7dec0d93bac5bdaf65e406275f03374dceb"
+  },
+  "notes": [
+    "Research source hashes identify the corrected probes; interrupted/device-format captures precede those fixes.",
+    "The application bundle and saved global selection were preserved.",
+    "Tahoma prefix caching disabled; inference server stopped after the benchmark.",
+    "Raw reports with false passed fields preserve pixel or harness failures; README distinguishes them.",
+    "No physical scanout, power, engine-usage or bandwidth telemetry was collected."
+  ]
+}
