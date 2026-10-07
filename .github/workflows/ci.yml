@@ -47,8 +47,10 @@ jobs:
       - run: uv run --frozen pytest
       - run: uv run --frozen ruff check .
       - run: uv run --frozen ruff format --check .
-      - if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libpixman-1-dev pkg-config
+      - name: Install Linux native dependencies
+        if: runner.os == 'Linux'
+        timeout-minutes: 5
+        run: bash .github/install_linux_packages.sh libpixman-1-dev pkg-config
       - if: runner.os == 'Linux'
         run: uv run --frozen --group native python tools/build_native.py --pixman
       - if: runner.os == 'Windows'
@@ -73,9 +75,9 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install Linux build dependencies
+        timeout-minutes: 10
         run: |
-          sudo apt-get update
-          sudo apt-get install -y meson ninja-build pkg-config libwayland-dev wayland-protocols libpixman-1-dev libinput-dev libevdev-dev libxkbcommon-dev libudev-dev libdrm-dev libcairo2-dev libpango1.0-dev libpng-dev libseat-dev
+          bash .github/install_linux_packages.sh meson ninja-build pkg-config libwayland-dev wayland-protocols libpixman-1-dev libinput-dev libevdev-dev libxkbcommon-dev libudev-dev libdrm-dev libcairo2-dev libpango1.0-dev libpng-dev libseat-dev
           python -m pip install uv==0.11.12
           uv sync --frozen --group native
       - run: uv run --frozen --group native python tools/build_native.py --pixman
