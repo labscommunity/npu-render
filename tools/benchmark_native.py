@@ -13,6 +13,7 @@ from pathlib import Path
 from npu_render.benchmark import comparisons, trial_order, write_report
 from npu_render.inference import InferenceClient
 from npu_render.openvino_diagnostics import inspect_stack, require_npu_driver
+from npu_render.windows_session import inspect_session, require_interactive_desktop
 
 
 def run(args):
@@ -52,9 +53,13 @@ def run(args):
         report["harness_loaded_stack"] = inspect_stack()
         if args.expected_npu_driver:
             require_npu_driver(report["harness_loaded_stack"], args.expected_npu_driver)
+        report["windows_session"] = inspect_session()
+        require_interactive_desktop(report["windows_session"])
         report["warmup"] = client.request()
         for round_index in range(args.rounds):
             for condition in trial_order(round_index, ["GPU", "NPU", "CPU", "IDLE"]):
+                report["windows_session"] = inspect_session()
+                require_interactive_desktop(report["windows_session"])
                 with tempfile.TemporaryDirectory(prefix="npu-render-native-") as directory:
                     root = Path(directory)
                     ready, stop, graphics = (
@@ -106,11 +111,14 @@ def run(args):
                             report["pending_trial"] = {
                                 "round": round_index,
                                 "condition": condition,
+                                "session_before": report["windows_session"],
+                                "session_after": inspect_session(),
                                 "inference_begin_unix_s": begin,
                                 "inference_end_unix_s": end,
                                 "inference": inference,
                                 "graphics": captured,
                             }
+                            require_interactive_desktop(report["pending_trial"]["session_after"])
                             if args.expected_npu_driver and (
                                 captured.get("npu_driver_version") != args.expected_npu_driver
                             ):
@@ -129,16 +137,7 @@ def run(args):
                                 )
                             if any(frame["backend"] != condition for frame in captured["frames"]):
                                 raise RuntimeError("backend changed during a fixed-condition trial")
-                            report["trials"].append(
-                                {
-                                    "round": round_index,
-                                    "condition": condition,
-                                    "inference_begin_unix_s": begin,
-                                    "inference_end_unix_s": end,
-                                    "inference": inference,
-                                    "graphics": captured,
-                                }
-                            )
+                            report["trials"].append(report["pending_trial"])
                             del report["pending_trial"]
                             report["comparisons"] = comparisons(report["trials"])
                             write_report(args.report, report)

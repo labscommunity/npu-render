@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "status": "failed",
+  "renderer": "native shared-buffer D3D12 compute / NPU graph / integer CPU",
+  "renderer_sha256": "2a1165c7fb08b989c4a97c0d00bd9fe8ca6df7d7709044b1227d2c643c17b5fd",
+  "model": "preflight-only",
+  "prompt_sha256": "c4ee3092140ec9a8075ec09ea882c548ba706dffd563ea8db0e67700936a97d7",
+  "inference_device_declared": "GPU",
+  "inference_device_verified_by_harness": false,
+  "max_tokens": 128,
+  "requests_per_trial": 3,
+  "settle_seconds": 2,
+  "trials": [],
+  "notes": [
+    "One BGRA8 foreground surface; differs from the Python two-layer trace.",
+    "NPU conversion and blending run on NPU; GPU copy/presentation remain.",
+    "Every child compiles and qualifies all providers before readiness.",
+    "Graphics reports include two settling seconds before the measured requests.",
+    "Frame submission is not scanout; differing frame counts can confound throughput.",
+    "Harness and renderer each report their own loaded runtime/driver versions."
+  ],
+  "harness_loaded_stack": {
+    "runtime": "2026.1.0-21367-63e31528c62-releases/2026/1",
+    "devices": [
+      {
+        "id": "CPU",
+        "properties": {
+          "DEVICE_ARCHITECTURE": "intel64",
+          "FULL_DEVICE_NAME": "Intel(R) Core(TM) Ultra X7 358H"
+        },
+        "errors": {},
+        "plugins": {
+          "CPU": {
+            "build": "2026.1.0-21367-63e31528c62-releases/2026/1",
+            "description": "openvino_intel_cpu_plugin"
+          }
+        }
+      },
+      {
+        "id": "GPU",
+        "properties": {
+          "DEVICE_ARCHITECTURE": "GPU: vendor=0x8086 arch=v30.0.4",
+          "FULL_DEVICE_NAME": "Intel(R) Arc(TM) B390 GPU (iGPU)"
+        },
+        "errors": {},
+        "plugins": {
+          "GPU": {
+            "build": "2026.1.0-21367-63e31528c62-releases/2026/1",
+            "description": "Intel GPU plugin"
+          }
+        }
+      },
+      {
+        "id": "NPU",
+        "properties": {
+          "DEVICE_ARCHITECTURE": "5010",
+          "FULL_DEVICE_NAME": "Intel(R) AI Boost",
+          "NPU_COMPILER_TYPE": "CompilerType.PREFER_PLUGIN",
+          "NPU_COMPILER_VERSION": "458781",
+          "NPU_DRIVER_VERSION": "1004724"
+        },
+        "errors": {},
+        "plugins": {
+          "NPU": {
+            "build": "2026.1.0-21367-63e31528c62-releases/2026/1",
+            "description": "openvino_intel_npu_plugin"
+          }
+        }
+      }
+    ],
+    "scope": "Loaded runtime properties; installed-package versions, pixel correctness and presentation are separate checks."
+  },
+  "windows_session": {
+    "session_id": 1,
+    "connection_state": 0,
+    "errors": {},
+    "scope": "Desktop preconditions only; presentation and scanout remain separate checks.",
+    "window_station": {
+      "name": "WinSta0",
+      "error": 0
+    },
+    "thread_desktop": {
+      "name": "Default",
+      "error": 0
+    },
+    "input_desktop": {
+      "name": "Screen-saver",
+      "error": 0
+    },
+    "monitors": 1
+  },
+  "error": "renderer benchmark requires input_desktop default; observed 'Screen-saver'"
+}

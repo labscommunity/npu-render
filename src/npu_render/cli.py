@@ -14,6 +14,7 @@ from .openvino_backend import OpenVINOProvider
 from .openvino_diagnostics import inspect_stack, require_npu_driver
 from .reference import from_nchw, to_nchw
 from .renderer import Renderer
+from .windows_session import inspect_session, require_interactive_desktop
 
 
 def demo_inputs(spec: Composition) -> tuple[np.ndarray, list[np.ndarray]]:
@@ -58,6 +59,10 @@ def main(argv: list[str] | None = None) -> int:
         "stack", help="inspect loaded runtime, compiler and driver versions"
     )
     stack.add_argument("--expected-npu-driver", help="require the exact runtime-reported version")
+    session = commands.add_parser("session", help="inspect the Windows desktop without changing it")
+    session.add_argument(
+        "--require-desktop", action="store_true", help="require benchmark preconditions"
+    )
     status = commands.add_parser("status", help="show the effective backend selection")
     status.add_argument("--config", type=Path)
     select = commands.add_parser("select", help="qualify a small graph and save the backend")
@@ -93,6 +98,15 @@ def main(argv: list[str] | None = None) -> int:
             if args.expected_npu_driver:
                 try:
                     require_npu_driver(result, args.expected_npu_driver)
+                except RuntimeError as error:
+                    print(json.dumps({**result, "passed": False, "error": str(error)}, indent=2))
+                    return 1
+                result["passed"] = True
+        elif args.command == "session":
+            result = inspect_session()
+            if args.require_desktop:
+                try:
+                    require_interactive_desktop(result)
                 except RuntimeError as error:
                     print(json.dumps({**result, "passed": False, "error": str(error)}, indent=2))
                     return 1

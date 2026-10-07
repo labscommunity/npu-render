@@ -100,6 +100,18 @@ but it is **not a visible-presentation result**. The validator's explicit
 benchmark refuses occluded trials, including an occluded initial idle frame.
 `S_OK` itself still does not establish physical scanout timing.
 
+`npu-render session --require-desktop` reads session connection state, window
+station, thread/input desktops and monitor count. The contention harness records
+and checks these before inference warmup and around every trial, including IDLE.
+It never changes desktops, sends input or unlocks Windows. Per-frame presentation
+checks remain required; matching desktop names alone do not prove delivery.
+
+When launching a limited interactive task from an elevated SSH session, use a
+report directory writable by that desktop user, for example
+`%LOCALAPPDATA%\npu-render\checks`. An administrator-writable scratch directory
+can make the task exit before writing any report. The installed application uses
+the normal per-user directory; no broad permission changes are necessary.
+
 ```powershell
 uv run python tools/benchmark_native.py --executable build/native/Release/nr_native_live.exe `
   --endpoint http://127.0.0.1:8000/v1 --model YOUR_MODEL --inference-device GPU

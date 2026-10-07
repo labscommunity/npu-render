@@ -60,6 +60,12 @@ from the driver still executing before a required restart. Missing or mismatched
 versions return failure with the captured report. The compiler-type property in
 this inspection is a runtime preference; a compiled graph can resolve it further.
 
+On Windows, `npu-render session --require-desktop` checks the current process's
+session and desktop without changing either. The native contention benchmark
+requires a connected `WinSta0\Default` desktop before inference warmup and around
+each trial. This rejects session zero, a screen saver, and inaccessible desktops;
+passing the check does not establish visible frames or physical scanout.
+
 Selection precedence: explicit argument → `NPU_RENDER_BACKEND` → saved config →
 GPU. `NPU_RENDER_CONFIG` or CLI `--config` selects a different config file.
 `npu-render status` shows the effective selection. Existing applications call
