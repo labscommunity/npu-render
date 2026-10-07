@@ -98,3 +98,82 @@ def test_graph_condition_is_explicit_and_ratios_are_paired():
     ]
     assert report["npu_conv_over_gpu"]["ratio_distribution"]["median"] == 0.85
     assert trials == before
+
+
+def control_report():
+    return {
+        "diagnostic": "compute-only",
+        "diagnostic_wait_ms": 0,
+        "full_graphics_trace": False,
+        "npu_alpha": "convolution",
+        "initial_present_hresult": 0,
+        "frames": [
+            {"backend": "NPU", "presented": False, "composed": True, "present_hresult": None}
+        ],
+    }
+
+
+def test_omitted_presentation_is_explicit_and_not_a_success_hresult():
+    report = control_report()
+    benchmark.validate_graphics_condition("NPU_ONLY", report)
+    report["frames"][0]["present_hresult"] = 0
+    with pytest.raises(RuntimeError, match="presentation result"):
+        benchmark.validate_graphics_condition("NPU_ONLY", report)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("full_graphics_trace", True),
+        ("diagnostic", "none"),
+        ("diagnostic_wait_ms", 3),
+        ("npu_alpha", "gather"),
+        ("frames", []),
+    ],
+)
+def test_diagnostic_coverage_or_graph_mismatch_rejected(field, value):
+    report = control_report()
+    report[field] = value
+    with pytest.raises(RuntimeError):
+        benchmark.validate_graphics_condition("NPU_ONLY", report)
+
+
+def test_diagnostic_iterations_are_not_counted_as_display_submissions():
+    graphics = {
+        **control_report(),
+        "started_unix_s": 0,
+        "live_wall_seconds": 1,
+        "live_process_cpu_seconds": 0.1,
+        "skipped_slots": 0,
+        "deadline_misses": 0,
+    }
+    graphics["frames"][0].update(
+        elapsed_s=0.2, scene_ms=0, upload_ms=0, compose_ms=3, wait_ms=0, present_ms=0, work_ms=3
+    )
+    report = cost.summarize(
+        {
+            "status": "complete",
+            "comparisons": {},
+            "trials": [
+                {
+                    "round": 0,
+                    "condition": "NPU_ONLY",
+                    "graphics": graphics,
+                    "inference_begin_unix_s": 0,
+                    "inference_end_unix_s": 1,
+                    "inference": [
+                        {
+                            "tokens_per_second_end_to_end": 10,
+                            "completion_tokens": 10,
+                            "output_sha256": "test",
+                        }
+                    ],
+                }
+            ],
+        },
+        [{"kind": "adapter", "index": 0, "status": 0}],
+    )
+    trial = report["trials"][0]
+    assert trial["whole_live_iterations"] == trial["whole_live_compositions"] == 1
+    assert trial["whole_live_presentations"] == trial["whole_live_submissions_per_second"] == 0
+    assert trial["full_graphics_trace"] is False

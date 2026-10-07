@@ -18,6 +18,12 @@ from npu_render.live import distribution
 from npu_render.openvino_diagnostics import inspect_stack, require_npu_driver
 from npu_render.windows_session import inspect_session, require_interactive_desktop
 
+CONTROL_SETTINGS = {
+    "NPU_ONLY": ("NPU", "compute-only", 0.0, "convolution"),
+    "GPU_WAIT": ("GPU", "none", 3.0, "gather"),
+    "TRANSFER_PRESENT": ("GPU", "transfer-present", 0.0, "gather"),
+}
+
 
 def power_status():
     class Status(ctypes.Structure):
@@ -42,18 +48,71 @@ def parse_conditions(value):
     conditions = [item.strip().upper() for item in value.split(",")]
     if not conditions or len(set(conditions)) != len(conditions):
         raise ValueError("conditions must be a nonempty unique list")
-    if set(conditions) - {"GPU", "NPU", "NPU_CONV", "CPU", "IDLE"}:
-        raise ValueError("conditions must be GPU,NPU,NPU_CONV,CPU,IDLE")
+    if set(conditions) - {"GPU", "NPU", "NPU_CONV", "CPU", "IDLE", *CONTROL_SETTINGS}:
+        raise ValueError("unknown graphics or diagnostic condition")
     return conditions
 
 
 def condition_backend(condition):
+    if condition in CONTROL_SETTINGS:
+        return CONTROL_SETTINGS[condition][0]
     return "NPU" if condition == "NPU_CONV" else condition
+
+
+def condition_arguments(condition):
+    if condition == "NPU_CONV":
+        return ["--npu-alpha", "convolution"]
+    if condition in CONTROL_SETTINGS:
+        _, mode, wait, alpha = CONTROL_SETTINGS[condition]
+        return [
+            "--diagnostic",
+            mode,
+            "--diagnostic-wait-ms",
+            str(wait),
+            "--npu-alpha",
+            alpha,
+        ]
+    return []
+
+
+def validate_graphics_condition(condition, captured):
+    backend = condition_backend(condition)
+    _, mode, wait, alpha = CONTROL_SETTINGS.get(
+        condition, (backend, "none", 0.0, "convolution" if condition == "NPU_CONV" else "gather")
+    )
+    if captured.get("diagnostic", "none") != mode or captured.get("diagnostic_wait_ms", 0) != wait:
+        raise RuntimeError("renderer reported a different diagnostic condition")
+    if captured.get("full_graphics_trace", True) != (mode == "none"):
+        raise RuntimeError("renderer reported inconsistent graphics coverage")
+    if captured.get("npu_alpha", "gather") != alpha:
+        raise RuntimeError("renderer did not use the requested NPU graph")
+    if captured["initial_present_hresult"] != 0:
+        raise RuntimeError("initial presentation was occluded or returned a nonzero status")
+    if condition != "IDLE" and not captured["frames"]:
+        raise RuntimeError("renderer completed no measured iterations")
+    for frame in captured["frames"]:
+        if frame["backend"] != backend:
+            raise RuntimeError("backend changed during a fixed-condition trial")
+        if frame.get("composed", True) != (mode != "transfer-present"):
+            raise RuntimeError("composition execution differs from the requested control")
+        presented = frame.get("presented", True)
+        if presented != (mode != "compute-only"):
+            raise RuntimeError("presentation execution differs from the requested control")
+        if frame["present_hresult"] != (0 if presented else None):
+            raise RuntimeError("invalid or occluded presentation result")
 
 
 def native_comparisons(trials):
     result = comparisons(trials)
-    for numerator, denominator in (("NPU_CONV", "NPU"), ("NPU_CONV", "GPU"), ("GPU", "IDLE")):
+    for numerator, denominator in (
+        ("NPU_CONV", "NPU"),
+        ("NPU_CONV", "GPU"),
+        ("GPU", "IDLE"),
+        ("NPU_ONLY", "IDLE"),
+        ("GPU_WAIT", "GPU"),
+        ("TRANSFER_PRESENT", "IDLE"),
+        ("NPU_CONV", "NPU_ONLY"),
+    ):
         ratios = []
         for index in sorted({trial["round"] for trial in trials}):
             group = {t["condition"]: t for t in trials if t["round"] == index}
@@ -115,6 +174,9 @@ def run(args):
             "Graphics reports include two settling seconds before the measured requests.",
             "Frame submission is not scanout; differing frame counts can confound throughput.",
             "Harness and renderer each report their own loaded runtime/driver versions.",
+            "NPU_ONLY and TRANSFER_PRESENT omit stages; neither is a complete graphics trace.",
+            "GPU_WAIT adds a paced 3 ms host wait; it preserves the full graphics trace.",
+            "Diagnostic differences are not additive partitions of the original slowdown.",
         ],
     }
     try:
@@ -158,8 +220,7 @@ def run(args):
                         "--report",
                         str(graphics),
                     ]
-                    if condition == "NPU_CONV":
-                        command += ["--npu-alpha", "convolution"]
+                    command += condition_arguments(condition)
                     if args.expected_npu_driver:
                         command += ["--expected-npu-driver", args.expected_npu_driver]
                     with (root / "child.log").open("w+", encoding="utf-8") as log:
@@ -209,26 +270,7 @@ def run(args):
                                 raise RuntimeError(
                                     "renderer did not run successfully in an interactive session"
                                 )
-                            if captured["initial_present_hresult"] != 0 or any(
-                                frame["present_hresult"] != 0 for frame in captured["frames"]
-                            ):
-                                raise RuntimeError(
-                                    "a presentation was occluded or returned a nonzero status"
-                                )
-                            if (
-                                condition == "NPU_CONV"
-                                and captured.get("npu_alpha") != "convolution"
-                            ):
-                                raise RuntimeError("renderer did not use the requested NPU graph")
-                            if (
-                                condition == "NPU"
-                                and captured.get("npu_alpha", "gather") != "gather"
-                            ):
-                                raise RuntimeError(
-                                    "baseline NPU condition requires the gather graph"
-                                )
-                            if any(frame["backend"] != backend for frame in captured["frames"]):
-                                raise RuntimeError("backend changed during a fixed-condition trial")
+                            validate_graphics_condition(condition, captured)
                             report["trials"].append(report["pending_trial"])
                             del report["pending_trial"]
                             report["comparisons"] = native_comparisons(report["trials"])

@@ -19,6 +19,8 @@ struct Options {
     std::string expected_npu_driver;
     std::string npu_alpha = "gather";
     bool profile_npu = false;
+    std::string diagnostic = "none";
+    double diagnostic_wait_ms = 0;
 };
 
 bool valid_backend(const std::string &name) {
@@ -43,6 +45,8 @@ Options options(int argc, char **argv) {
         else if (arg == "--report") o.report = value;
         else if (arg == "--expected-npu-driver") o.expected_npu_driver = value;
         else if (arg == "--npu-alpha") o.npu_alpha = value;
+        else if (arg == "--diagnostic") o.diagnostic = value;
+        else if (arg == "--diagnostic-wait-ms") o.diagnostic_wait_ms = std::stod(value);
         else if (arg == "--ready-file") o.ready_file = value;
         else if (arg == "--stop-file") o.stop_file = value;
         else if (arg == "--sequence") {
@@ -70,6 +74,17 @@ Options options(int argc, char **argv) {
         (o.npu_alpha != "gather" && o.npu_alpha != "convolution") ||
         std::any_of(o.sequence.begin(), o.sequence.end(), [](const auto &s) { return !valid_backend(s); }))
         throw std::invalid_argument("invalid options; width must be a multiple of 64, backend GPU/NPU/CPU/IDLE");
+    if ((o.diagnostic != "none" && o.diagnostic != "compute-only" && o.diagnostic != "transfer-present") ||
+        !std::isfinite(o.diagnostic_wait_ms) || o.diagnostic_wait_ms < 0 || o.diagnostic_wait_ms > 10)
+        throw std::invalid_argument("invalid diagnostic mode or wait (0..10 ms)");
+    if (o.diagnostic != "none" || o.diagnostic_wait_ms > 0) {
+        if (!o.pinned || !o.sequence.empty() || (o.backend != "GPU" && o.backend != "NPU"))
+            throw std::invalid_argument("diagnostics require a fixed GPU/NPU backend without a switch sequence");
+        if ((o.diagnostic == "transfer-present" || o.diagnostic_wait_ms > 0) && o.backend != "GPU")
+            throw std::invalid_argument("transfer/presentation and wait controls require GPU backend");
+        if (o.diagnostic != "none" && o.diagnostic_wait_ms > 0)
+            throw std::invalid_argument("wait control cannot be combined with stage omission");
+    }
     return o;
 }
 
@@ -327,6 +342,7 @@ struct Window {
     std::array<ComPtr<ID3D12Resource>, 2> buffers;
     std::string requested;
     bool stopped = false;
+    bool allow_switch = true;
     static LRESULT CALLBACK procedure(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) {
         Window *self = reinterpret_cast<Window *>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
         if (message == WM_NCCREATE) {
@@ -334,9 +350,9 @@ struct Window {
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
         }
         if (self && message == WM_KEYDOWN) {
-            if (wparam == '1') self->requested = "GPU";
-            if (wparam == '2') self->requested = "NPU";
-            if (wparam == '3') self->requested = "CPU";
+            if (self->allow_switch && wparam == '1') self->requested = "GPU";
+            if (self->allow_switch && wparam == '2') self->requested = "NPU";
+            if (self->allow_switch && wparam == '3') self->requested = "CPU";
             if (wparam == VK_ESCAPE) self->stopped = true;
             return 0;
         }
@@ -397,14 +413,16 @@ struct Window {
         return status;
     }
     void title(const std::string &backend) {
-        SetWindowTextA(handle, ("npu-render | " + backend + " | 1 GPU / 2 NPU / 3 CPU / Esc exit").c_str());
+        SetWindowTextA(handle, ("npu-render | " + backend +
+            (allow_switch ? " | 1 GPU / 2 NPU / 3 CPU / Esc exit" : " | diagnostic control | Esc exit")).c_str());
     }
 };
 
 struct Frame {
     size_t slot;
     std::string backend;
-    double elapsed, scene, upload, compose, present, work;
+    double elapsed, scene, upload, compose, wait, present, work;
+    bool presented, composed;
     HRESULT presentation_status;
 };
 
@@ -424,6 +442,7 @@ int main(int argc, char **argv) {
         HRESULT initial_present_status = S_OK;
         if (!o.validate_only) {
             stage = "window"; Window window(renderer);
+            window.allow_switch = o.diagnostic == "none" && o.diagnostic_wait_ms == 0;
             FramePacer pacer;
             renderer.background(); renderer.scene(0); renderer.inputs(true);
             renderer.compose(o.backend); window.messages();
@@ -470,17 +489,27 @@ int main(int argc, char **argv) {
                 const size_t current = size_t(elapsed*o.fps);
                 if (current > slot) { skipped += current-slot; slot = current; }
                 if (backend == "IDLE" && !switched) { ++slot; continue; }
-                renderer.scene(elapsed); const auto after_scene = Clock::now();
+                if (o.diagnostic != "compute-only") renderer.scene(elapsed);
+                const auto after_scene = Clock::now();
                 // CPU mode avoids unnecessary GPU input uploads.
-                if (backend == "GPU" || backend == "NPU") renderer.inputs(false);
+                if (o.diagnostic != "compute-only" && (backend == "GPU" || backend == "NPU"))
+                    renderer.inputs(false);
                 const auto after_upload = Clock::now();
-                renderer.compose(backend); const auto after_compose = Clock::now();
-                const HRESULT status = window.present(renderer); const auto done = Clock::now();
+                const bool composed = o.diagnostic != "transfer-present";
+                if (composed) renderer.compose(backend);
+                const auto after_compose = Clock::now();
+                if (o.diagnostic_wait_ms > 0) pacer.until(after_compose +
+                    std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double, std::milli>(o.diagnostic_wait_ms)));
+                const auto after_wait = Clock::now();
+                const bool presented = o.diagnostic != "compute-only";
+                const HRESULT status = presented ? window.present(renderer) : S_OK;
+                const auto done = Clock::now();
                 const double work = milliseconds(frame_start, done);
                 if (milliseconds(started, done) > (slot+1)*1000.0/o.fps) ++misses;
                 frames.push_back({slot, backend, elapsed, milliseconds(frame_start, after_scene),
                     milliseconds(after_scene, after_upload), milliseconds(after_upload, after_compose),
-                    milliseconds(after_compose, done), work, status});
+                    milliseconds(after_compose, after_wait), milliseconds(after_wait, done), work,
+                    presented, composed, status});
                 ++slot;
             }
             live_cpu_seconds = process_cpu_seconds() - cpu_start;
@@ -496,6 +525,9 @@ int main(int argc, char **argv) {
                << ",\"npu_execution_device\":\"NPU\",\"gpu_provider\":\"D3D12 compute shader\",\"session_id\":" << session
                << ",\"npu_pixel_group\":" << blend_pixel_group(o.width, true)
                << ",\"npu_alpha\":" << quote(o.npu_alpha)
+               << ",\"diagnostic\":" << quote(o.diagnostic)
+               << ",\"diagnostic_wait_ms\":" << o.diagnostic_wait_ms
+               << ",\"full_graphics_trace\":" << (o.diagnostic == "none" ? "true" : "false")
                << ",\"live_process_cpu_seconds\":" << live_cpu_seconds
                << ",\"live_wall_seconds\":" << live_wall_seconds
                << ",\"validation_only\":" << (o.validate_only ? "true" : "false")
@@ -509,8 +541,13 @@ int main(int argc, char **argv) {
             const auto &f = frames[i];
             report << (i ? "," : "") << "{\"slot\":" << f.slot << ",\"backend\":" << quote(f.backend)
                    << ",\"elapsed_s\":" << f.elapsed << ",\"scene_ms\":" << f.scene << ",\"upload_ms\":" << f.upload
-                   << ",\"compose_ms\":" << f.compose << ",\"present_ms\":" << f.present << ",\"work_ms\":" << f.work
-                   << ",\"present_hresult\":" << f.presentation_status << "}";
+                   << ",\"compose_ms\":" << f.compose << ",\"wait_ms\":" << f.wait
+                   << ",\"present_ms\":" << f.present << ",\"work_ms\":" << f.work
+                   << ",\"composed\":" << (f.composed ? "true" : "false")
+                   << ",\"presented\":" << (f.presented ? "true" : "false")
+                   << ",\"present_hresult\":";
+            if (f.presented) report << f.presentation_status; else report << "null";
+            report << "}";
         }
         report << "],\"selections\":[";
         for (size_t i = 0; i < selections.size(); ++i) report << (i ? "," : "") << selections[i];
@@ -528,7 +565,7 @@ int main(int argc, char **argv) {
         report << "]}\n";
         std::ofstream destination(o.report, std::ios::binary); destination << report.str();
         if (!destination) throw std::runtime_error("cannot write report " + o.report);
-        std::cout << "passed: " << frames.size() << " submissions; " << skipped << " skipped slots; report=" << o.report << '\n';
+        std::cout << "passed: " << frames.size() << " iterations; " << skipped << " skipped slots; report=" << o.report << '\n';
         return 0;
     } catch (const std::exception &error) {
         std::cerr << "{\"passed\":false,\"stage\":" << quote(stage) << ",\"error\":" << quote(error.what())

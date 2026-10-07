@@ -1,0 +1,22 @@
+{
+  "baseline_source_revision": "4a2f5a638f7a957718fdd4fd417b3062b89fa3d8",
+  "baseline_renderer_sha256": "012c3cef43f013e6c3741c7a83e4851e7be92f7b30960fe5093668d8bedd3a5f",
+  "controls_renderer_sha256": "3d86093647f48c85639045336b7e4f707abb882eabd71d7102300298f4c3f620",
+  "controls_source": "raw/controls-live.cpp.gz; unchanged native dependencies from baseline revision",
+  "sources": {
+    "native/windows/live.cpp": "844ce5d4c69d947e2822ed5dee71fa77b0c8b5361935dfdca96a836da0d064e8",
+    "native/windows/blend_model.hpp": "1c55a46eeed27310085612dcdcfd28b4665a2f7e89ab05e267d4d7209d7844c8",
+    "native/windows/d3d12_buffers.hpp": "37d2edda8ff5ab9018f063ea36de1286ca2d82ce41dfb155912ffe35d9288dc2",
+    "tools/benchmark_native.py": "372e6f282724f0de8540d370488a06261efaa4d2fccda3910e65696affe0bd63",
+    "tools/validate_native_live.py": "ec9ca69e315a972b08ab8c72e64117304660d59b7db7a589c62a1465043da09f",
+    "research/analyze_native_cost.py": "bc0debd4c7f725591142ac8c8857f5399c9d25d46f72594fa74c9982698f398d"
+  },
+  "igcl_source_revision": "b6c462933502e13d1537dd5024949a51be30e63d",
+  "igcl_provenance": "../slowdown/igcl-source.json",
+  "notes": [
+    "Raw source captures match the executed files byte-for-byte.",
+    "The baseline uses the prior executable; controls use the diagnostic build.",
+    "No driver, plan, clock or fan settings were changed; the user changed the external power connection.",
+    "Model/runtime/server arguments are preserved in captures; model weights and binaries are not retained here."
+  ]
+}

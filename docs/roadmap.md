@@ -7,12 +7,12 @@ delivery requirements while freeing useful GPU capacity.
 | Milestone | Deliverable | Acceptance evidence | Status |
 |---|---|---|---|
 | Device feasibility | Deterministic composition and restricted triangle graphs | Independent checks on Panther Lake NPU, including reported execution devices | Original probe complete |
-| Shared runtime | Provider contracts, device selection, prepared switch, owned outputs | 68 Python checks, native pixel tests, real device switching and loaded-driver qualification | Implemented |
+| Shared runtime | Provider contracts, device selection, prepared switch, owned outputs | 75 Python checks, native pixel tests, real device switching and loaded-driver qualification | Implemented |
 | Live application | Animated software window, async switch, frame-stage timing | Windows console session; 2,400/2,400 scheduled submissions at 720p; optimized conversion | Implemented and measured |
 | Compositor adapter | Restricted Weston renderer with a backend control | Linux CPU pixel oracle plus headless/nested Wayland clients | CPU integration validated; native Linux NPU/display validation outstanding |
 | Real buffer path | Linear graphics-buffer import/export, synchronization and format conversion | D3D12 shared input/output, byte conversion and native swapchain application with saved switch | Pixel/control and active-desktop 720p presentation checks pass; scanout timing and DMA-BUF outstanding |
 | Work reduction | Damage tiles, occlusion, bounded layer groups, prepared graph variants | Disjoint damage batching in the C ABI; Weston supplies visibility/damage | Initial implementation; sustained native display results outstanding |
-| Tahoma benefit | Reproducible concurrent inference and desktop traces | Native D3D12 baseline, repeated graph variants, sustained warmup and clock/energy telemetry | NPU graph time reduced 33%; optimized path still regressed 6.3% in a power-constrained sustained run; adequate supply and useful inference benefit remain to be verified |
+| Tahoma benefit | Reproducible concurrent inference and desktop traces | Native D3D12 baseline, graph variants, sustained warmup, stage-isolation controls and telemetry | Battery now charges under load; unchanged-executable repeat still regresses 4.7%. NPU-only activity costs 3.3% versus idle; useful inference benefit remains unproven |
 | Wider operation coverage | Filters, scaling, transforms, supported app adapters | Native sampling and optimized resize tested on GPU/NPU; 72 Weston transform/oracle cases | Sampling/scaling implemented; wider operations and native display coverage outstanding |
 | Broader platforms | Additional NPU providers and Windows integrations | Per-device/OS/runtime evidence with recovery tests | Planned |
 
@@ -34,6 +34,13 @@ CPU composition and idle desktop controls. Record TTFT, throughput, tail token/f
 latency, memory, and available power/engine telemetry. Follow promising results
 with a sustained run. A repeatable 10% improvement is a provisional product gate,
 not an achieved result or a fundamental viability boundary.
+
+The [power-corrected controls](validation/2026-10-07/power-retest/README.md) show
+that comparable host waiting does not reproduce the interference from NPU execution.
+Prioritize reducing per-frame work and intermediate/transfer costs, then retiring
+existing compositor work at a real integration boundary. Compare equal visual work
+and apply shared damage/caching optimizations to both GPU and NPU baselines; a faster
+NPU call alone is not the resource-relief acceptance criterion.
 
 ## Broader GPU functions
 

@@ -72,6 +72,13 @@ gain is an initial product target, not a claim made by a passing harness test.
 Follow a promising short comparison with a sustained thermal/power run and then
 native compositor measurements.
 
+The native harness additionally provides [stage-isolation controls](../native/interop.md#diagnose-npu-composition-cost).
+These identify whether inference interference persists without repeated uploads
+and presentation, and whether a comparable host wait reproduces it. Omitted-stage
+traces must not be reported as working graphics offload or compared as equivalent
+visual workloads. Track battery remaining capacity over the run as well as AC and
+charging flags; those flags alone did not reliably describe Delta's power balance.
+
 ## Measure Windows' existing compositor
 
 `nr_desktop_motion` creates three static GDI windows and either keeps them still

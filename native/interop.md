@@ -171,6 +171,37 @@ battery status around each trial. `--warmup-seconds` adds sustained inference
 requests after the initial warmup; it does not guarantee a fixed thermal state.
 Review concurrent clock/power telemetry before interpreting throughput differences.
 
+For a controlled investigation of interference, the harness also accepts:
+
+| Condition | Work repeated at the requested frame rate | Purpose |
+|---|---|---|
+| `NPU_ONLY` | Convolution NPU composition on inputs uploaded once | Test NPU/driver activity without animated scene generation, repeated uploads or presentation |
+| `GPU_WAIT` | Full animated GPU path plus a 3 ms paced host wait after composition | Test elapsed frame time without introducing NPU activity |
+| `TRANSFER_PRESENT` | Scene generation, input upload and presentation of an unchanged output | Test surrounding work without a repeated blend |
+
+`NPU_ONLY` and `TRANSFER_PRESENT` deliberately omit stages and are **not complete
+graphics implementations**. Each still qualifies its providers and presents an
+initial frame before measurement. Their differences cannot be added or subtracted
+to partition the normal renderer's slowdown: inputs, output changes and overlapping
+activity differ. In particular, `NPU_ONLY` retains inference-driver and memory costs;
+it does not isolate NPU arithmetic from those costs.
+
+```powershell
+uv run python tools/benchmark_native.py --executable build/native/Release/nr_native_live.exe `
+  --endpoint http://127.0.0.1:18080/v1 --model YOUR_MODEL --inference-device GPU `
+  --expected-npu-driver 1005540 --warmup-seconds 120 `
+  --conditions GPU,NPU_CONV,NPU_ONLY,GPU_WAIT,TRANSFER_PRESENT,IDLE `
+  --report results/native-controls.json
+```
+
+Native flags are `--diagnostic compute-only|transfer-present` and
+`--diagnostic-wait-ms 3`. They require a pinned backend; selection-file and key
+switching are disabled during diagnostics. Reports identify the mode, omitted
+stages, actual wait duration, and composition/presentation separately for each
+iteration. An omitted presentation has a null HRESULT, never a fabricated success.
+The analyzer counts only actual presentation calls as submissions. Ordinary
+rendering remains the default.
+
 The optional read-only Intel graphics telemetry probe builds against an external,
 pinned [IGCL checkout](https://github.com/intel/drivers.gpu.control-library):
 

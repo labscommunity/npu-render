@@ -15,11 +15,14 @@ Linux CPU headless/nested tests, and D3D12 shared buffers pass a real Panther La
 NPU round trip on Windows. Native Linux NPU presentation, Windows DWM replacement,
 arbitrary Direct3D/Vulkan games, and codecs remain unfinished. The latest native
 Tahoma investigation reduced NPU blend time by **33%**, but the optimized path
-still made inference **6.3% slower** than a D3D12 shader in a sustained five-round
-comparison. Delta reported GPU power limiting and declining battery charge despite
-AC connection, so these percentages need a repeat with verified adequate power.
-See the [cost investigation](docs/validation/2026-10-07/slowdown/README.md).
-Practical acceleration is unproven.
+still made inference **4.7% slower** than a D3D12 shader in a five-round repeat
+after Delta's power change restored increasing battery charge under load.
+Isolation controls find a **3.3%** inference penalty from NPU blending even without
+repeated uploads or presentation; adding comparable elapsed time with a host wait
+does not reproduce it. The full-pipeline difference varies between experiments.
+See the [power repeat and interference controls](docs/validation/2026-10-07/power-retest/README.md)
+and [graph cost investigation](docs/validation/2026-10-07/slowdown/README.md).
+Practical acceleration remains unproven.
 
 An [existing Windows compositor baseline](docs/validation/2026-10-07/desktop/README.md)
 now measures DWM while the same three static-content windows stay still or move.

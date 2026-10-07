@@ -97,6 +97,7 @@ def summarize(benchmark, telemetry, index=0):
             and graphics["started_unix_s"] + f["elapsed_s"] + f["work_ms"] / 1000 <= end
         ]
         wall = graphics["live_wall_seconds"]
+        presentations = sum(f.get("presented", True) for f in graphics["frames"])
         trials.append(
             {
                 "round": trial["round"],
@@ -113,16 +114,28 @@ def summarize(benchmark, telemetry, index=0):
                 },
                 "frames_wholly_in_inference": len(frames),
                 "whole_live_frames": len(graphics["frames"]),
-                "whole_live_submissions_per_second": len(graphics["frames"]) / wall,
+                "whole_live_submissions_per_second": presentations / wall,
                 "whole_live_cpu_core_equivalents": graphics["live_process_cpu_seconds"] / wall,
                 "skipped_slots": graphics["skipped_slots"],
                 "deadline_misses": graphics["deadline_misses"],
                 "nonzero_present_statuses": sum(
-                    f["present_hresult"] != 0 for f in graphics["frames"]
+                    f.get("presented", True) and f["present_hresult"] != 0
+                    for f in graphics["frames"]
                 ),
                 "telemetry": telemetry_interval(samples, begin, end, index),
             }
         )
+        if "diagnostic" in graphics:
+            trials[-1].update(
+                diagnostic=graphics["diagnostic"],
+                diagnostic_wait_ms=graphics["diagnostic_wait_ms"],
+                full_graphics_trace=graphics["full_graphics_trace"],
+                whole_live_iterations=len(graphics["frames"]),
+                whole_live_iterations_per_second=len(graphics["frames"]) / wall,
+                whole_live_presentations=presentations,
+                whole_live_compositions=sum(f["composed"] for f in graphics["frames"]),
+            )
+            trials[-1]["frame_phases_ms"]["wait_ms"] = stats([f["wait_ms"] for f in frames])
     conditions = {}
     for condition in sorted({t["condition"] for t in trials}):
         group = [t for t in trials if t["condition"] == condition]
