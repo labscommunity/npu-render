@@ -112,6 +112,8 @@ surface, so do not compare its numbers directly with the earlier two-layer trace
 The Windows CI job also builds a private portable bundle containing the runtime,
 notices, launch script and file-hash manifest. It requires installed Intel drivers
 and the Microsoft Visual C++ x64 runtime, but no Python installation.
+The [installed ee4d711 bundle](../docs/validation/2026-10-06/bundle-ee4d711/README.md)
+passed pixel qualification with its bundled runtime and records its loaded driver.
 
 For driver qualification, pass `--expected-npu-driver 1005540` to the native
 window or benchmark harness. The window checks its own loaded runtime before NPU
