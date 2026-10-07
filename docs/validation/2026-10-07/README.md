@@ -161,6 +161,14 @@ path passed with one dispatch and API times of 11.7–12.1 ms. Both require host
 preparation and are off-screen calls, not desktop delivery. The generic path remains
 unsuitable for full-frame 60 Hz rendering.
 
+A subsequent profile of the existing 720p grouped blend passed with maximum byte
+error one. Warm host-tensor inference/copy calls took 7.3–7.7 ms. Operator entries
+included DPU alpha subtraction at 1.733 ms, DMA alpha Gather at 1.217 ms, and SHAVE
+rounding at 1.106 ms. These entries can overlap and are not a breakdown of the
+native shared-buffer frame or an explanation of Tahoma's regression. They identify
+specific graph operations for fusion/representation experiments. The capture and
+its exact probe source are preserved; no runtime optimization was applied.
+
 ## Remaining scope
 
 The private prototype provides a working switch within participating renderers.
