@@ -17,6 +17,13 @@ arbitrary Direct3D/Vulkan games, and codecs remain unfinished. The latest native
 Tahoma comparison was **5.9% slower** with NPU graphics than with a D3D12 shader
 (median of five paired rounds). Practical acceleration is unproven.
 
+An [existing Windows compositor baseline](docs/validation/2026-10-07/desktop/README.md)
+now measures DWM while the same three static-content windows stay still or move.
+Moving them reduced Tahoma throughput by a median 7.3% across five paired rounds;
+four pairs were slower. This identifies desktop contention, not an NPU offload gain.
+The [Windows integration assessment](docs/research/windows-compositor.md) describes
+the renderer/driver boundary still needed to move that work.
+
 Texture sampling, affine transforms and specialized bilinear scaling now share the
 native switch. The optimized NPU resize/compose API measured about 12 ms at 720p
 and 27 ms at 1080p, including host memory work. These are off-screen operation

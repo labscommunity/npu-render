@@ -1,0 +1,345 @@
+{
+  "schema_version": 1,
+  "scope": "controlled Windows desktop-motion sensitivity, not NPU offload or predicted gain",
+  "benchmark_status": "passed",
+  "paired_ratios": [
+    {
+      "round": 0,
+      "move_over_static": 0.9722116175433897
+    },
+    {
+      "round": 1,
+      "move_over_static": 1.0320512307684893
+    },
+    {
+      "round": 2,
+      "move_over_static": 0.9267186257187128
+    },
+    {
+      "round": 3,
+      "move_over_static": 0.9246112685267043
+    },
+    {
+      "round": 4,
+      "move_over_static": 0.9156956325209752
+    }
+  ],
+  "median_move_over_static": 0.9267186257187128,
+  "conditions": {
+    "static": {
+      "pooled_throughput_tokens_per_second": {
+        "count": 15,
+        "mean": 24.193162616746754,
+        "median": 24.297731493555716,
+        "maximum": 25.384079466286117
+      },
+      "time_to_first_content_ms": {
+        "count": 15,
+        "mean": 152.0313666665364,
+        "median": 151.8166999994719,
+        "maximum": 163.8251999993372
+      },
+      "trial_mean_dwm_3d_percent": {
+        "count": 5,
+        "mean": 0.03246443842274241,
+        "median": 0.03207543295090816,
+        "maximum": 0.03932217602044553
+      }
+    },
+    "move": {
+      "pooled_throughput_tokens_per_second": {
+        "count": 15,
+        "mean": 23.165293897494557,
+        "median": 23.83564015155104,
+        "maximum": 24.73884572797729
+      },
+      "time_to_first_content_ms": {
+        "count": 15,
+        "mean": 149.4841666667829,
+        "median": 149.52660000017204,
+        "maximum": 163.07210000013583
+      },
+      "trial_mean_dwm_3d_percent": {
+        "count": 5,
+        "mean": 3.0907055870682467,
+        "median": 3.2488620723039627,
+        "maximum": 3.502742829264178
+      }
+    }
+  },
+  "trials": [
+    {
+      "round": 0,
+      "condition": "static",
+      "complete_query_intervals": 3,
+      "dwm_hardware_3d_sample_percent": {
+        "count": 3,
+        "mean": 0.024237747998821207,
+        "median": 0.02882946903117221,
+        "maximum": 0.029193262680202024
+      },
+      "tahoma_hardware_neural_sample_percent": {
+        "count": 3,
+        "mean": 95.2926971441874,
+        "median": 95.57313404490255,
+        "maximum": 96.1786181900665
+      },
+      "throughput_tokens_per_second": {
+        "count": 3,
+        "mean": 25.345099449164366,
+        "median": 25.355945474970394,
+        "maximum": 25.384079466286117
+      }
+    },
+    {
+      "round": 0,
+      "condition": "move",
+      "complete_query_intervals": 3,
+      "dwm_hardware_3d_sample_percent": {
+        "count": 3,
+        "mean": 2.4829605200093945,
+        "median": 2.644608367295662,
+        "maximum": 2.900756453713184
+      },
+      "tahoma_hardware_neural_sample_percent": {
+        "count": 3,
+        "mean": 91.7712265230598,
+        "median": 92.03726045818463,
+        "maximum": 92.06150038269996
+      },
+      "throughput_tokens_per_second": {
+        "count": 3,
+        "mean": 24.64992163066707,
+        "median": 24.65134476456296,
+        "maximum": 24.73884572797729
+      }
+    },
+    {
+      "round": 1,
+      "condition": "move",
+      "complete_query_intervals": 4,
+      "dwm_hardware_3d_sample_percent": {
+        "count": 4,
+        "mean": 2.9059566471239946,
+        "median": 2.866915059597956,
+        "maximum": 3.434128639583705
+      },
+      "tahoma_hardware_neural_sample_percent": {
+        "count": 4,
+        "mean": 92.19836093973163,
+        "median": 92.48745911646178,
+        "maximum": 93.08844063080004
+      },
+      "throughput_tokens_per_second": {
+        "count": 3,
+        "mean": 24.266367397611287,
+        "median": 24.439391388124857,
+        "maximum": 24.524070653157967
+      }
+    },
+    {
+      "round": 1,
+      "condition": "static",
+      "complete_query_intervals": 4,
+      "dwm_hardware_3d_sample_percent": {
+        "count": 4,
+        "mean": 0.035856974616200236,
+        "median": 0.03784469354223915,
+        "maximum": 0.03901293464908437
+      },
+      "tahoma_hardware_neural_sample_percent": {
+        "count": 4,
+        "mean": 94.78446141112843,
+        "median": 95.34374971167236,
+        "maximum": 96.75660159332617
+      },
+      "throughput_tokens_per_second": {
+        "count": 3,
+        "mean": 24.189041813692466,
+        "median": 23.68040525461776,
+        "maximum": 25.373846961847043
+      }
+    },
+    {
+      "round": 2,
+      "condition": "move",
+      "complete_query_intervals": 4,
+      "dwm_hardware_3d_sample_percent": {
+        "count": 4,
+        "mean": 3.502742829264178,
+        "median": 3.6437828719721184,
+        "maximum": 3.805033309252553
+      },
+      "tahoma_hardware_neural_sample_percent": {
+        "count": 4,
+        "mean": 93.61075004020529,
+        "median": 93.70852550066223,
+        "maximum": 94.54372943133595
+      },
+      "throughput_tokens_per_second": {
+        "count": 3,
+        "mean": 21.26382591100072,
+        "median": 20.709326131147282,
+        "maximum": 22.475425843472852
+      }
+    },
+    {
+      "round": 2,
+      "condition": "static",
+      "complete_query_intervals": 4,
+      "dwm_hardware_3d_sample_percent": {
+        "count": 4,
+        "mean": 0.03932217602044553,
+        "median": 0.04046816696599243,
+        "maximum": 0.04142757477725871
+      },
+      "tahoma_hardware_neural_sample_percent": {
+        "count": 4,
+        "mean": 95.90065143096318,
+        "median": 95.83554854525175,
+        "maximum": 98.1429413603164
+      },
+      "throughput_tokens_per_second": {
+        "count": 3,
+        "mean": 22.615468892644202,
+        "median": 22.34694065319584,
+        "maximum": 24.288458691795547
+      }
+    },
+    {
+      "round": 3,
+      "condition": "static",
+      "complete_query_intervals": 3,
+      "dwm_hardware_3d_sample_percent": {
+        "count": 3,
+        "mean": 0.03207543295090816,
+        "median": 0.03692202071191672,
+        "maximum": 0.039679965665319776
+      },
+      "tahoma_hardware_neural_sample_percent": {
+        "count": 3,
+        "mean": 95.49753506148285,
+        "median": 96.87254298072241,
+        "maximum": 97.2135473932375
+      },
+      "throughput_tokens_per_second": {
+        "count": 3,
+        "mean": 24.173454831606474,
+        "median": 24.204280039056727,
+        "maximum": 24.482981124289743
+      }
+    },
+    {
+      "round": 3,
+      "condition": "move",
+      "complete_query_intervals": 4,
+      "dwm_hardware_3d_sample_percent": {
+        "count": 4,
+        "mean": 3.2488620723039627,
+        "median": 3.4135480106370344,
+        "maximum": 3.741956551363663
+      },
+      "tahoma_hardware_neural_sample_percent": {
+        "count": 4,
+        "mean": 92.20619813831688,
+        "median": 92.59283365108274,
+        "maximum": 93.67438303814639
+      },
+      "throughput_tokens_per_second": {
+        "count": 3,
+        "mean": 22.919161995759,
+        "median": 22.379550070687827,
+        "maximum": 24.026915551472822
+      }
+    },
+    {
+      "round": 4,
+      "condition": "static",
+      "complete_query_intervals": 3,
+      "dwm_hardware_3d_sample_percent": {
+        "count": 3,
+        "mean": 0.030829860527336907,
+        "median": 0.035821139662730796,
+        "maximum": 0.03739292541230309
+      },
+      "tahoma_hardware_neural_sample_percent": {
+        "count": 3,
+        "mean": 94.61877701222932,
+        "median": 93.73400843682192,
+        "maximum": 97.14882985000968
+      },
+      "throughput_tokens_per_second": {
+        "count": 3,
+        "mean": 24.642748096626274,
+        "median": 24.32041215802449,
+        "maximum": 25.31010063829861
+      }
+    },
+    {
+      "round": 4,
+      "condition": "move",
+      "complete_query_intervals": 4,
+      "dwm_hardware_3d_sample_percent": {
+        "count": 4,
+        "mean": 3.313005866639703,
+        "median": 3.461421301029632,
+        "maximum": 3.595435643580932
+      },
+      "tahoma_hardware_neural_sample_percent": {
+        "count": 4,
+        "mean": 93.39014655042632,
+        "median": 93.11108151590753,
+        "maximum": 96.61466870683199
+      },
+      "throughput_tokens_per_second": {
+        "count": 3,
+        "mean": 22.72719255243469,
+        "median": 22.27009519421305,
+        "maximum": 24.08331698772341
+      }
+    }
+  ],
+  "completion_token_counts": {
+    "128": 30
+  },
+  "output_hashes": {
+    "5c3c62f37112ddff687970c74872972c959cdd5e49b8b4c5beb58be95b411507": 30
+  },
+  "presentmon": {
+    "version": "2.6.0",
+    "rows": 6390,
+    "process_counts": {
+      "dwm.exe": 6390
+    },
+    "mode_counts": {
+      "Hardware: Legacy Flip": 6390
+    },
+    "numeric_display_latency_rows": 6387,
+    "phase_alignment": "not performed: date_time output has a timezone conversion anomaly"
+  },
+  "counter_capture": {
+    "samples": 140,
+    "schema_version": 2,
+    "requested_samples": 140,
+    "ended_utc": "2026-10-07T19:55:06.9387050Z",
+    "discovery": "Wildcard instances are refreshed before every independently primed sample. Short-lived processes and gaps between queries can be missed.",
+    "process_filter": [],
+    "started_utc": "2026-10-07T19:47:57.9120170Z",
+    "scope": "GPU Engine counters and process names only; no window contents or command lines",
+    "counter_errors": [
+      "The data in one of the performance counter samples is not valid. View the Status property for each PerformanceCounterSample object to make sure it contains valid data.",
+      "The data in one of the performance counter samples is not valid. View the Status property for each PerformanceCounterSample object to make sure it contains valid data."
+    ],
+    "sample_interval_seconds": 1,
+    "fatal_error": null,
+    "note": "Seconds is the sample count for backward compatibility; elapsed time may be longer. Counter statuses 0 and 1 are valid; other values are retained for rejection."
+  },
+  "notes": [
+    "Only independently primed queries wholly inside each inference interval are included.",
+    "Engine samples describe observed intervals, not continuous utilization.",
+    "This capture has one hardware 3D engine for DWM; engines are not added together.",
+    "Neural here is an Arc GPU engine label, established from its adapter LUID, not NPU.",
+    "Paired median ratios and pooled throughput medians answer different questions.",
+    "Window movement also changes CPU and memory work; no causal decomposition is claimed."
+  ]
+}

@@ -1,5 +1,9 @@
 # Activated driver, native presentation and Tahoma
 
+The later [Windows desktop experiment](desktop/README.md) measures DWM's existing
+rendering and desktop-motion contention. It is separate from the synthetic
+GPU/NPU application comparison recorded below.
+
 An explicitly authorized Windows Restart completed on Delta at
 2026-10-07 17:34:30.500 UTC. Both the installed Intel NPU package and the loaded
 OpenVINO driver now identify version 5540 (`32.0.100.5540` / `1005540`). Earlier

@@ -33,6 +33,13 @@ int main(int argc, char **argv) {
             check(adapter->GetProperty(DXCoreAdapterProperty::DriverDescription, length, description.data()), "description");
             uint64_t version = 0;
             check(adapter->GetProperty(DXCoreAdapterProperty::DriverVersion, sizeof(version), &version), "driver version");
+            LUID luid{};
+            const HRESULT luid_status = adapter->GetProperty(DXCoreAdapterProperty::InstanceLuid, sizeof(luid), &luid);
+            std::ostringstream luid_name;
+            luid_name << "luid_0x" << std::hex << std::setfill('0') << std::setw(8) << uint32_t(luid.HighPart)
+                      << "_0x" << std::setw(8) << luid.LowPart;
+            bool hardware = false;
+            const HRESULT hardware_status = adapter->GetProperty(DXCoreAdapterProperty::IsHardware, sizeof(hardware), &hardware);
             const bool npu = adapter->IsAttributeSupported(DXCORE_HARDWARE_TYPE_ATTRIBUTE_NPU);
             const bool core = adapter->IsAttributeSupported(DXCORE_ADAPTER_ATTRIBUTE_D3D12_CORE_COMPUTE);
             const bool graphics = adapter->IsAttributeSupported(DXCORE_ADAPTER_ATTRIBUTE_D3D12_GRAPHICS);
@@ -42,6 +49,10 @@ int main(int argc, char **argv) {
                    << '.' << ((version >> 16) & 65535) << '.' << (version & 65535);
             std::cout << (i ? "," : "") << "{\"description\":" << quote(description.data())
                       << ",\"dxcore_driver_version\":" << quote(driver.str())
+                      << ",\"instance_luid\":" << (SUCCEEDED(luid_status) ? quote(luid_name.str()) : "null")
+                      << ",\"luid_query_hresult\":" << uint32_t(luid_status)
+                      << ",\"hardware\":" << (SUCCEEDED(hardware_status) ? (hardware ? "true" : "false") : "null")
+                      << ",\"hardware_query_hresult\":" << uint32_t(hardware_status)
                       << ",\"npu\":" << (npu ? "true" : "false")
                       << ",\"core_compute\":" << (core ? "true" : "false")
                       << ",\"generic_ml\":" << (ml ? "true" : "false")
