@@ -1,0 +1,57 @@
+{
+  "binaries": {
+    "nr_capture_inventory.exe": {
+      "build": "desktop-offload-v18",
+      "built_utc": "2026-10-08T19:25:54.6994150Z",
+      "sha256": "8028a67f89b7391789f0f226a06e119fa7c7b75c5dcf0a115d9938b1d9133fe2"
+    },
+    "nr_capture_probe.exe": {
+      "build": "desktop-offload-v18",
+      "built_utc": "2026-10-08T19:25:50.3215319Z",
+      "sha256": "be5a1e7c06ff24ac58dd30b3a078aa6ef46ca1972c333420a160265f0936c403"
+    },
+    "nr_desktop_offload.exe": {
+      "build": "desktop-offload-v18",
+      "built_utc": "2026-10-08T19:25:45.8085855Z",
+      "sha256": "e089837d59d3f6c8a8578edcb1ed90829f4d9e03333b6d626c0e40d68f474bcb"
+    },
+    "nr_present_probe.exe": {
+      "build": "desktop-offload-v18",
+      "built_utc": "2026-10-08T19:25:58.9565654Z",
+      "sha256": "8f586f0d078ea0e8585699a70001da403e61230d9131cc1867648f63ff210b82"
+    },
+    "nr_wddm_allocation_probe.exe": {
+      "build": "wddm-allocation-v7",
+      "built_utc": "2026-10-08T19:15:42.1306672Z",
+      "sha256": "fd9b2daf2ff5bb4d43817a64320197ac02830fa5b364dcb8a3b82050b09cfba8"
+    }
+  },
+  "captured_utc": "2026-10-08T19:27:21.0349557Z",
+  "drivers": [
+    {
+      "DeviceName": "Intel(R) Arc(TM) B390 GPU",
+      "DriverVersion": "32.0.101.8724"
+    }
+  ],
+  "last_boot_utc": "2026-10-07T17:34:30.5022500Z",
+  "sources": {
+    "native/CMakeLists.txt": "734648ab610fc83d17d950498986ae76b5392ffe603ccf928f682001fd39561f",
+    "native/include/visible_spans.hpp": "b2126d4b1377df52b483509100e24772245e82f34f97259db2dad917c6d88586",
+    "native/providers/packed_blend.hpp": "d61e20aa3e2d2404005c0206ac083e150dddd8a132e4b20801792a1c4b472b92",
+    "native/tests/span_blend_test.cpp": "aee23d6daf2ee10afcaec576918297d5ccde4c5928be9b449fdd18ad7a3352b4",
+    "native/tests/visible_spans_test.cpp": "a09f853674386b59a6684c79019dabd8cce192cb7cea284945456493dbd1344c",
+    "native/tools/wddm_allocation_probe.cpp": "25505ef40e2a89093e95688e138240b421836604590ae779050a49940a219288",
+    "native/windows/blend_model.hpp": "1c55a46eeed27310085612dcdcfd28b4665a2f7e89ab05e267d4d7209d7844c8",
+    "native/windows/capture/desktop.cpp": "f728a5b9ebe8b01b94aaaef8ebcfde4e1949b905d84a14d58f114a0eb2168501",
+    "native/windows/capture/desktop_sources.hpp": "9240e9b40e1fe938e20c6d188868eb046615a1603bf9cd9c1d4e460d0ca266aa",
+    "native/windows/capture/inventory.cpp": "3e258b725415fdaf30a843353c30e167e852adea46a712b6ae68208363198cf2",
+    "native/windows/capture/present_probe.cpp": "fff13ff3c697411cd2254fbef4518a88e8d803328d9c8936795dc7db765967ce",
+    "native/windows/capture/presenter.hpp": "0d64bba95c8a8c70516e20ddbc9cba952db2b3704992298ce856fe99892d29fb",
+    "native/windows/capture/probe.cpp": "ba966a634e4af31748061967a9d2b1ed371b1fd2dcb188304ad660a18ff62e57",
+    "native/windows/capture/window_capture.hpp": "84f8c0b957573bcfeb10b18fae16d4e4c2ac357116cec7c0c09a7f4252c4e6a0",
+    "native/windows/d3d12_buffers.hpp": "37d2edda8ff5ab9018f063ea36de1286ca2d82ce41dfb155912ffe35d9288dc2",
+    "tools/run_desktop_capture.py": "b87563bb45b552a5a5984782849dce10425aaa82bbd422c868eba978de1687ea",
+    "tools/validate_desktop_capture.py": "fdc199f353e74e7c66cf5c0824c9caeba5ad0433b8d4c665a6054e2df3e7352f",
+    "tools/validate_desktop_watchdog.py": "78ca9c0896b666b9044fb0269d1bab98c036da7e655ef213a0e154d97e25c173"
+  }
+}
