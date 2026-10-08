@@ -57,6 +57,15 @@ conformance. The private Windows bundle includes this independently testable ste
 [source and exact-package checks](docs/validation/2026-10-08/windows-ddi/README.md)
 pass on Delta's CPU, GPU and NPU.
 
+The [captured-window desktop experiment](native/windows/capture/README.md) now
+presents an NPU-composed 2880×1800 desktop with input passing through to the
+original applications, a disable/enable control, and an external hang watchdog.
+It retains GPU capture/client rendering and fails equivalence to Windows' original
+shadows/taskbar effects, so it is **not full desktop offload**. A separate
+[shared allocation experiment](native/windows/wddm-memory.md) establishes real
+cross-process NPU buffers and GPU consumption without a CPU upload of the result.
+Neither is a system graphics adapter or evidence of a Tahoma improvement.
+
 Texture sampling, affine transforms and specialized bilinear scaling now share the
 native switch. The optimized NPU resize/compose API measured about 12 ms at 720p
 and 27 ms at 1080p, including host memory work. These are off-screen operation

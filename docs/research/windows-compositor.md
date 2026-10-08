@@ -156,3 +156,27 @@ must therefore use real OS allocations opened by another graphics device, with
 coherent ownership transitions. Our earlier D3D12/NPU buffer experiment establishes
 interoperability for its application but does not provide this D3D11 driver/DWM
 resource path.
+
+## October 8 capture and memory follow-up
+
+The [captured-window experiment](../../native/windows/capture/README.md) reaches
+native-display output and preserves mouse/keyboard input to the original windows.
+It does not solve the required work-retirement boundary: client rendering and
+GPU capture remain, and isolated window pixels do not reproduce all original
+Windows backdrop/shadow effects. Passing the independent output-image oracle is
+separate from passing the original-desktop oracle; the latter currently fails.
+Capture is retained as an experimental diagnostic, not the full-desktop solution.
+
+The [real shared allocation probe](../../native/windows/wddm-memory.md) resolves
+a lower-level uncertainty. Delta's NPU KMD accepts standard section-backed VidMm
+allocations and shares them across adapters/processes. A child process imports
+those handles and runs NPU composition; a GPU resource over the section consumes
+the changing output without a CPU result upload. ExistingSysMem succeeded in one
+process but failed to open in the child; ExistingSection passed. Host events and
+GPU completion waits still coordinate ownership. This is not a registered graphics
+adapter, D3D11 shared texture, native NPU/GPU shared fence or DWM selection.
+
+The next useful driver work must connect these resources to graphics-DDI resource
+identities and metadata, then execute the real composition command stream. The
+stock NPU's ability to allocate/import memory does not supply those graphics DDIs.
+An IDD or capture layer alone still cannot retire all existing composition work.
