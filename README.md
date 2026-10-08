@@ -53,7 +53,9 @@ process-local driver DLL through the ordinary D3D11 runtime and executes admitte
 source-over draws on the NPU. It recognizes an exact shader pair and rejects
 unsupported commands. Shared textures, presentation, a system graphics adapter,
 and full desktop routing remain unimplemented; feature-level negotiation is not
-conformance. The private Windows bundle includes this independently testable step.
+conformance. The private Windows bundle includes this independently testable step;
+[source and exact-package checks](docs/validation/2026-10-08/windows-ddi/README.md)
+pass on Delta's CPU, GPU and NPU.
 
 Texture sampling, affine transforms and specialized bilinear scaling now share the
 native switch. The optimized NPU resize/compose API measured about 12 ms at 720p

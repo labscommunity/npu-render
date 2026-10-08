@@ -1,0 +1,48 @@
+{
+  "runtime_source_revision": "9333d37cba274ab1dee06f7b9204eb3e2af49175",
+  "private_ci_run": "https://github.com/t8/npu-render/actions/runs/37807412108",
+  "ci_conclusion": "success",
+  "local_binaries_sha256": {
+    "nr_ddi_probe.exe": "c70e2f7ffc56bc13ebe70d0289019d700afd9343013f348f1717633b856a94be",
+    "nr_ddi_lab.dll": "fdcc8007c9c62d3d4610bba8d053f3ca2416d329c50090f26bc520e896a7e1ae"
+  },
+  "packaged_binaries_sha256": {
+    "nr_ddi_probe.exe": "b06935d4844646a4ae53c46de5a13dccb2639a2d5b60749f54d4df43d569ce07",
+    "nr_ddi_lab.dll": "cd2c607bd70df6ea37a74f88b4c8cac369d611dbcfc48c1fbe25bbb930a360df"
+  },
+  "bundle_sha256": "0550dcd0e9b31a6433189c287bfd57c3b29999c70d3dd1d9c9ce617714fb5490",
+  "verified_bundle_files": 36,
+  "source_hashes": {
+    "native/windows/ddi/unsupported.inc": "8ed01a87d6516139ce19725aa139d6b2de93f22d49307c6166825fa889300cdb",
+    "native/windows/ddi/driver.cpp": "3d1b2dd470b25f0b18a89f5415912c344a8be1ebc76cb98b5cd7f039023beb8d",
+    "validate_windows_ddi.py": "bf228431e7b58a2d4fc2cdef94730de8a1601209f10bf6721b08c913187b0e64",
+    "native/windows/blend_model.hpp": "1c55a46eeed27310085612dcdcfd28b4665a2f7e89ab05e267d4d7209d7844c8",
+    "native/windows/ddi/software_thunks.cpp": "ed39f3f8a0f613ddf842668a948a54cb9f163ed7ca2fd01eaa373c49f0b573c9",
+    "native/CMakeLists.txt": "a56fbd6de9a9115bca60c73c386f61339c40ca30ca29fc69f553903dff34d526",
+    "native/windows/ddi/contract.hpp": "4c37d327e3515ea1c22b6b1738cb9913e89f2b4d8db37a928414d653feee38be",
+    "native/windows/ddi/exports.def": "a1da6f29c3708ca5ce19a0c17b04057a0bcd6f643d0412397214a2f68556de3e",
+    "native/windows/ddi/probe.cpp": "1ac471e5444b4e699d5d319910606bce2f51f9c2b71af91c5ba1bfeef4ae9e91"
+  },
+  "dependencies": {
+    "openvino": "2026.1.0",
+    "wdk_nuget": "Microsoft.Windows.WDK.x64 10.0.26100.6584",
+    "wdk_nuget_sha256": "c393d03dfb640b5c92f546b32f6770ef68cd3aaf691956e7d66d8e2c28a1b55e",
+    "mesa_revision": "f7aeb0d677e71b68bf2ea04b07c0b7274451deab",
+    "microsoft_graphics_driver_samples_research_revision": "de4a2161991eda254013da6c18226f5ea06e4a9c"
+  },
+  "notes": [
+    "The qualified and ci-qualified phases use the same committed runtime source, with different local/CI toolchains and binary hashes.",
+    "All listed executed source hashes matched the runtime checkout. validate_windows_ddi.py is tools/validate_windows_ddi.py, copied to the remote experiment root.",
+    "qualified and ci-qualified each contain twelve passing process checks and 24 checked draws (eight per device).",
+    "Source-built and exact CI bundle runs used ordinary D3D11 calls in an SSH session; no window or display presentation was requested.",
+    "The bringup captures retain initial compile and DLL-loading failures from development, not the final binaries.",
+    "Preliminary GPU/NPU reports contain four draws each and match preliminary-executables.json. The preliminary CPU report is a later eight-draw development iteration; it must not be attributed to those preliminary executable hashes.",
+    "Preliminary source snapshots were not frozen; final claims use only qualified and ci-qualified.",
+    "Before final qualification, two rebuilds encountered transient LNK1104 for the probe executable; subsequent relinks succeeded. The cause was not established. Fresh private CI build and both final qualification suites passed.",
+    "No registered system graphics adapter, kernel driver, shared-resource implementation, swapchain or DWM selection is supplied by this DLL.",
+    "Software-adapter metadata is not hardware NPU identity. NPU execution attribution is from the explicit OpenVINO backend and checked execution_devices.",
+    "No existing application launcher, driver, power plan, Windows security setting or Tahoma working tree was modified.",
+    "The isolated private bundle includes Mesa notices. WDK headers, binary artifacts, model caches and network addresses are excluded from this evidence.",
+    "No Tahoma benchmark was run: these command checks do not produce an equal-work desktop/presentation path."
+  ]
+}

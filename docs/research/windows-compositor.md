@@ -119,7 +119,8 @@ maps source-over draws to the existing NPU blend graph. It retains host-backed
 resources and accounts for uploads, updates, copies and inference transfers.
 Unsupported shaders and shared resources fail explicitly. It is not a general
 shader translator, conformant feature-level-10 renderer, DWM adapter or display
-path. See the [contract and reproducible checks](../../native/windows/ddi/README.md).
+path. See the [contract and reproducible checks](../../native/windows/ddi/README.md)
+and [source/package evidence](../validation/2026-10-08/windows-ddi/README.md).
 
 The process-local adapter thunks are adapted from
 [Mesa 25.3.0](https://gitlab.freedesktop.org/mesa/mesa/-/blob/mesa-25.3.0/src/gallium/frontends/d3d10umd/D3DKMT.cpp),
@@ -143,3 +144,15 @@ mapping handles are not interchangeable with WDDM allocation handles. The curren
 shared-texture rejection is an implementation gap demonstrated by the test, not a
 proof that an NPU graphics driver is impossible. Until that boundary and actual
 DWM selection work, whole-desktop offload remains unfinished.
+
+For that allocation milestone, Microsoft's
+[`D3DKMTCreateAllocation` contract](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmthk/nf-d3dkmthk-d3dkmtcreateallocation)
+connects UMD allocation descriptions to the KMD and video-memory manager. Its
+standard existing-system-memory allocation path requires shared/cross-adapter
+flags; it is a candidate to investigate, not a facility implemented by our
+software thunks. The [hybrid resource model](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/using-cross-adapter-resources-in-a-hybrid-system)
+also defines layout/alignment and driver capability requirements. The next proof
+must therefore use real OS allocations opened by another graphics device, with
+coherent ownership transitions. Our earlier D3D12/NPU buffer experiment establishes
+interoperability for its application but does not provide this D3D11 driver/DWM
+resource path.
