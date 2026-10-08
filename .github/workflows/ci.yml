@@ -54,10 +54,10 @@ jobs:
       - if: runner.os == 'Linux'
         run: uv run --frozen --group native python tools/build_native.py --pixman
       - if: runner.os == 'Windows'
-        run: uv run --frozen --group native python tools/build_native.py
+        run: uv run --frozen --group native python tools/build_native.py --ddi
       - name: Package private Windows prototype
         if: runner.os == 'Windows'
-        run: uv run --frozen python tools/package_windows.py --source-revision ${{ github.sha }}
+        run: uv run --frozen python tools/package_windows.py --ddi --source-revision ${{ github.sha }}
       - name: Retain private Windows bundle
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

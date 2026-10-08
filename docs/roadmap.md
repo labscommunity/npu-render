@@ -7,7 +7,7 @@ delivery requirements while freeing useful GPU capacity.
 | Milestone | Deliverable | Acceptance evidence | Status |
 |---|---|---|---|
 | Device feasibility | Deterministic composition and restricted triangle graphs | Independent checks on Panther Lake NPU, including reported execution devices | Original probe complete |
-| Shared runtime | Provider contracts, device selection, prepared switch, owned outputs | 105 Python checks, native pixel tests, real device switching and loaded-driver qualification | Implemented |
+| Shared runtime | Provider contracts, device selection, prepared switch, owned outputs | 108 Python checks, native pixel tests, real device switching and loaded-driver qualification | Implemented |
 | Live application | Animated software window, async switch, frame-stage timing | Windows console session; 2,400/2,400 scheduled submissions at 720p; optimized conversion | Implemented and measured |
 | Compositor adapter | Restricted Weston renderer with a backend control | Linux CPU pixel oracle plus headless/nested Wayland clients | CPU integration validated; native Linux NPU/display validation outstanding |
 | Real buffer path | Linear graphics-buffer import/export, synchronization and format conversion | D3D12 shared input/output, byte conversion and native swapchain application with saved switch | Pixel/control and active-desktop 720p presentation checks pass; scanout timing and DMA-BUF outstanding |
@@ -15,7 +15,8 @@ delivery requirements while freeing useful GPU capacity.
 | Tahoma benefit | Reproducible concurrent inference and desktop traces | Native D3D12 baseline, graph variants, sustained warmup, stage-isolation controls and telemetry | Battery now charges under load; unchanged-executable repeat still regresses 4.7%. NPU-only activity costs 3.3% versus idle; useful inference benefit remains unproven |
 | Wider operation coverage | Filters, scaling, transforms, supported app adapters | Native sampling and optimized resize tested on GPU/NPU; 72 Weston transform/oracle cases | Sampling/scaling implemented; wider operations and native display coverage outstanding |
 | Cooperating Windows handoff | Retire owned GDI windows and compose their surfaces on NPU/GPU | Exact offscreen/screen oracles, switch retention, original-window restoration and concurrent Tahoma measurements | Bounded handoff implemented; outer DWM and arbitrary applications remain |
-| Broader platforms | Additional NPU providers and Windows graphics driver | Per-device/OS/runtime evidence with recovery tests | Direct-LUID probe finds NPU but installed driver rejects Direct3D device creation; graphics driver remains unimplemented |
+| Windows command executor | Direct3D runtime invokes NPU-backed user-mode driver callbacks | Independent pixel oracle, explicit backend attribution, texture update and rejection checks | Restricted process-local DDI laboratory implemented; shared allocations, fences, DWM selection and system driver outstanding |
+| Broader platforms | Additional NPU providers and Windows graphics driver | Per-device/OS/runtime evidence with recovery tests | Direct-LUID probe finds NPU but installed driver rejects Direct3D device creation; system graphics adapter remains unimplemented |
 
 ## First integration target
 

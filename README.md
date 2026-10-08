@@ -48,6 +48,13 @@ remains 3.1% below ordinary Windows composition in all five comparisons. Row-by-
 copies regress despite moving fewer bytes. Both retained variants remain explicit
 experiments; the default is unchanged and a net Tahoma benefit remains unproven.
 
+The [Direct3D command laboratory](native/windows/ddi/README.md) now loads our
+process-local driver DLL through the ordinary D3D11 runtime and executes admitted
+source-over draws on the NPU. It recognizes an exact shader pair and rejects
+unsupported commands. Shared textures, presentation, a system graphics adapter,
+and full desktop routing remain unimplemented; feature-level negotiation is not
+conformance. The private Windows bundle includes this independently testable step.
+
 Texture sampling, affine transforms and specialized bilinear scaling now share the
 native switch. The optimized NPU resize/compose API measured about 12 ms at 720p
 and 27 ms at 1080p, including host memory work. These are off-screen operation

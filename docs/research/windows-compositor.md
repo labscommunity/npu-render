@@ -89,10 +89,10 @@ Extending that boundary requires cooperating applications to provide surfaces,
 damage, ordering and lifecycle events before ordinary composition. A screen-capture
 API supplies pixels after rendering and cannot by itself retire the source work.
 For transparent use by arbitrary existing Windows applications, the graphics-driver
-track remains separate: no such renderer is installed or implemented here.
+track remains separate: no system-wide renderer is installed here.
 
-The next driver artifact must implement and test a bounded graphics command stream,
-not just enumerate a synthetic adapter. The Microsoft sample checkout examined
+The new [Direct3D DDI laboratory](../../native/windows/ddi/README.md) implements
+a bounded command stream through the real Direct3D runtime, described below. The Microsoft sample checkout examined
 for this work is pinned to `de4a2161991eda254013da6c18226f5ea06e4a9c`.
 Its render-only implementation has VC4 resource layouts, shader translation and
 hardware MMIO assumptions. Copying or renaming it would not provide a Panther Lake
@@ -102,3 +102,44 @@ an NPU-backed command executor before isolated-display DWM tests.
 
 The broad GPU-to-NPU objective remains open. Neither the bounded handoff nor
 Direct3D device-creation probing establishes whole-desktop offload.
+
+## Direct3D command execution on the NPU
+
+On October 8, an explicit test client successfully created a Direct3D 11 device
+using our DLL and executed admitted draw calls on Delta's NPU. Microsoft's
+[`D3D11CreateDevice`](https://learn.microsoft.com/en-us/windows/win32/api/d3d11/nf-d3d11-d3d11createdevice)
+accepts an explicit software-rasterizer module. The runtime negotiates the
+[D3D10 user-mode driver interface](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3d10umddi/nc-d3d10umddi-pfnd3d10ddi_openadapter)
+and dispatches commands into that DLL. This supplies a testable graphics-command
+boundary without installing a system driver. `SOFTWARE` describes how Direct3D
+loads the DLL; admitted draws then run on the explicitly selected OpenVINO device.
+
+The implementation recognizes one exact fullscreen vertex/pixel shader pair and
+maps source-over draws to the existing NPU blend graph. It retains host-backed
+resources and accounts for uploads, updates, copies and inference transfers.
+Unsupported shaders and shared resources fail explicitly. It is not a general
+shader translator, conformant feature-level-10 renderer, DWM adapter or display
+path. See the [contract and reproducible checks](../../native/windows/ddi/README.md).
+
+The process-local adapter thunks are adapted from
+[Mesa 25.3.0](https://gitlab.freedesktop.org/mesa/mesa/-/blob/mesa-25.3.0/src/gallium/frontends/d3d10umd/D3DKMT.cpp),
+revision `f7aeb0d677e71b68bf2ea04b07c0b7274451deab`, with notices retained.
+Their software LUID and WDDM metadata are not a hardware NPU identity. WDK headers
+come from a checksum-pinned NuGet dependency, without installing/registering a
+driver. Microsoft documents this distribution mechanism in
+[Install the WDK using NuGet](https://learn.microsoft.com/en-us/windows-hardware/drivers/install-the-wdk-using-nuget).
+
+This resolves one uncertainty: ordinary Direct3D commands can reach an NPU executor
+through a driver interface. It does not resolve transparent Windows integration.
+DWM does not load an arbitrary laboratory DLL because another application selected
+it. The normal [user-mode display-driver loading path](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/loading-a-user-mode-display-driver)
+is associated with the installed graphics-driver configuration. Registering that
+name alone would still leave all required render DDIs, shared allocations, fences,
+shader semantics, presentation and recovery unimplemented.
+
+The next kernel/user-mode boundary must preserve real shared-resource identities
+and ownership across the application, composition and display devices. Host file
+mapping handles are not interchangeable with WDDM allocation handles. The current
+shared-texture rejection is an implementation gap demonstrated by the test, not a
+proof that an NPU graphics driver is impossible. Until that boundary and actual
+DWM selection work, whole-desktop offload remains unfinished.

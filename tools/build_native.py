@@ -14,7 +14,17 @@ def main():
     parser.add_argument(
         "--pixman", action="store_true", help="also test the Linux compositor adapter"
     )
+    parser.add_argument(
+        "--ddi", action="store_true", help="build and test the explicit Windows DDI laboratory"
+    )
     args = parser.parse_args()
+    ddi_options = []
+    if args.ddi:
+        if os.name != "nt":
+            raise ValueError("the DDI laboratory requires Windows")
+        from prepare_wdk import DEFAULT_ROOT, prepare
+
+        ddi_options = [f"-DNR_WDK_INCLUDE_ROOT={prepare(DEFAULT_ROOT)}"]
     package = importlib.util.find_spec("openvino")
     if package is None or package.origin is None:
         raise RuntimeError("install the locked Python environment first")
@@ -31,6 +41,7 @@ def main():
             f"-DOpenVINO_DIR={root / 'cmake'}",
             "-DCMAKE_BUILD_TYPE=Release",
             f"-DNR_WITH_PIXMAN={'ON' if args.pixman else 'OFF'}",
+            *ddi_options,
         ],
         check=True,
         env=environment,

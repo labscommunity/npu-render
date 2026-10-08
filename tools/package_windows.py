@@ -17,6 +17,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--build-dir", type=Path, default=Path("build/native/Release"))
     parser.add_argument("--source-revision", required=True)
+    parser.add_argument("--ddi", action="store_true", help="include the explicit DDI laboratory")
     parser.add_argument("--output", type=Path, default=Path("dist/npu-render-windows-x64.zip"))
     args = parser.parse_args()
     if os.name != "nt" or not re.fullmatch(r"[0-9a-f]{40}", args.source_revision):
@@ -37,6 +38,15 @@ def main():
             "npu_render_native.dll",
         ):
             shutil.copy2(args.build_dir / name, root / name)
+        if args.ddi:
+            for name in ("nr_ddi_lab.dll", "nr_ddi_probe.exe"):
+                shutil.copy2(args.build_dir / name, root / name)
+            notice = root / "licenses" / "mesa-ddi.txt"
+            notice.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(Path(__file__).parents[1] / "native/windows/ddi/NOTICE.txt", notice)
+            shutil.copy2(
+                Path(__file__).parents[1] / "native/windows/ddi/README.md", root / "DDI-LAB.md"
+            )
         libraries = list(runtime.glob("*.dll"))
         if not libraries:
             raise RuntimeError("runtime DLLs missing")
@@ -111,6 +121,7 @@ def main():
                 {
                     "source_revision": args.source_revision,
                     "openvino": metadata.version,
+                    "ddi_laboratory": args.ddi,
                     "sha256": files,
                 },
                 indent=2,
