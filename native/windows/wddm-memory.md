@@ -66,3 +66,14 @@ installed driver rejects the tested Direct3D graphics device-creation routes.
 References: [standard allocation contracts](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmthk/nf-d3dkmthk-d3dkmtcreateallocation),
 [cross-adapter resource requirements](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/using-cross-adapter-resources-in-a-hybrid-system),
 [diagnostic heap from a file mapping](https://learn.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device3-openexistingheapfromfilemapping).
+
+## Native typed texture follow-up
+
+`nr_d3d11_texture_interop` now validates a stronger, distinct route: a graphics-owned
+typed NT texture is mapped through the GPU KMT device, and a process-local raw
+alias of its pages becomes an NPU output. Native D3D11 copies and shader samples
+the changing result correctly through display resolution. It does not use
+`OpenExistingHeapFromFileMapping`. The [qualified evidence and commands](../../docs/validation/2026-10-08/typed-textures/README.md)
+retain both the successful route and failed direct-typed/legacy controls. This
+one-process result still needs cross-process ownership and graphics-driver/DWM
+integration; it does not change the earlier legacy DDI consumer failure.

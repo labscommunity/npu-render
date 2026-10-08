@@ -160,3 +160,10 @@ The successful same-driver sharing and failed native-GPU consumption are both
 retained in the [hardware evidence](../../../docs/validation/2026-10-08/ddi-shared/README.md).
 Full desktop offload still needs interoperable graphics allocations, compatible
 shaders/state, a selectable render adapter, presentation/fences and recovery.
+
+A separate [graphics-owned NT texture probe](../../../docs/validation/2026-10-08/typed-textures/README.md)
+now passes native D3D11 copy and shader-consumption checks through 2880×1800.
+The NPU writes a raw alias of the GPU's mapped pages. This is not the legacy
+resource route above and does not make this DLL a selectable graphics adapter.
+Explicit software-DLL `OpenSharedResource1` still crashes before the relevant
+thunk even after adding NT exports; those experimental exports were reverted.

@@ -201,3 +201,22 @@ and [retained hardware evidence](../validation/2026-10-08/ddi-shared/README.md).
 The installed desktop renderer is unchanged. A new selectable render adapter and
 DWM's actual shader/state coverage remain required; passing the same-driver
 resource round trip does not make that system-level integration complete.
+
+## Graphics-owned NT texture route
+
+The next [hardware qualification](../validation/2026-10-08/typed-textures/README.md)
+passes native graphics consumption. The GPU creates a typed, row-major cross-adapter
+texture with D3D11 metadata; a raw allocation alias over its GPU-mapped pages lets
+the NPU write results that native D3D11 can copy and shader sample correctly.
+Four sizes through 2880×1800, both tested channel formats, explicit execution
+identity, clean cleanup and debug-layer checks pass. Direct typed import and
+NPU-side mapping are not equivalent to that successful route.
+
+The explicit software-DLL NT import route still crashes before our callback.
+Additional exports and process-local WDDM-version metadata did not fix it. A
+normal registered graphics adapter remains an integration requirement; private
+runtime patching is not an implemented contract. Microsoft's render-only sample
+provides reference interfaces, but its unfinished reset/preemption methods and
+global timeout-disabling installer cannot be treated as a deployable NPU driver.
+The sample has not been installed. Cross-process typed-resource lifetime, real
+composition shaders/state and presentation/recovery still need implementation.

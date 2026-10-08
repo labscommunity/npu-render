@@ -1,0 +1,65 @@
+{"stage":"exact_gpu_device"}
+{"stage":"create_typed_cross_adapter_texture"}
+{"stage":"native_d3d11_open"}
+{"stage":"npu_texture_page_alias"}
+{"operation":"alias OpenAdapterFromLuid(GPU)","ntstatus":0}
+{"operation":"alias CreateDevice","ntstatus":0}
+{"operation":"alias QueryResourceInfoFromNtHandle","ntstatus":0}
+{"operation":"alias OpenResourceFromNtHandle","ntstatus":0}
+{"operation":"alias Lock2 texture","ntstatus":0}
+{"texture_allocation_bytes":20774912,"mapped_region_bytes":20774912,"mapped_offset":0}
+{"operation":"alias CreateAllocation2 existing texture pages","ntstatus":0}
+{"operation":"alias ShareObjects","ntstatus":0}
+{"stage":"npu_import_and_compile"}
+{"compile_ms":696.791}
+{"input_memory_protection":1028}
+{"stage":"npu_write_texture"}
+{"stage":"native_d3d11_readback"}
+{"frame":0,"max_byte_error":1,"npu_infer_ms":35.7663,"gpu_map_ms":5.1874,"oracle_ms":28.3573}
+{"stage":"npu_write_texture"}
+{"stage":"native_d3d11_readback"}
+{"frame":1,"max_byte_error":1,"npu_infer_ms":18.9329,"gpu_map_ms":1.8818,"oracle_ms":27.8}
+{"stage":"npu_write_texture"}
+{"stage":"native_d3d11_readback"}
+{"frame":2,"max_byte_error":1,"npu_infer_ms":17.6359,"gpu_map_ms":2.4103,"oracle_ms":30.2565}
+{"stage":"npu_write_texture"}
+{"stage":"native_d3d11_readback"}
+{"frame":3,"max_byte_error":1,"npu_infer_ms":16.788,"gpu_map_ms":1.522,"oracle_ms":28.6002}
+{"stage":"npu_write_texture"}
+{"stage":"native_d3d11_readback"}
+{"frame":4,"max_byte_error":1,"npu_infer_ms":17.6696,"gpu_map_ms":2.2155,"oracle_ms":29.9114}
+{"stage":"npu_write_texture"}
+{"stage":"native_d3d11_readback"}
+{"frame":5,"max_byte_error":1,"npu_infer_ms":17.6883,"gpu_map_ms":2.4505,"oracle_ms":29.8521}
+{"stage":"npu_write_texture"}
+{"stage":"native_d3d11_readback"}
+{"frame":6,"max_byte_error":1,"npu_infer_ms":17.5492,"gpu_map_ms":2.4354,"oracle_ms":30.1692}
+{"stage":"npu_write_texture"}
+{"stage":"native_d3d11_readback"}
+{"frame":7,"max_byte_error":1,"npu_infer_ms":18.0294,"gpu_map_ms":2.5034,"oracle_ms":29.3383}
+{"stage":"npu_write_texture"}
+{"stage":"native_d3d11_readback"}
+{"frame":8,"max_byte_error":1,"npu_infer_ms":17.5969,"gpu_map_ms":2.493,"oracle_ms":29.2778}
+{"stage":"npu_write_texture"}
+{"stage":"native_d3d11_readback"}
+{"frame":9,"max_byte_error":1,"npu_infer_ms":17.7392,"gpu_map_ms":2.1947,"oracle_ms":28.5476}
+{"stage":"npu_write_texture"}
+{"stage":"native_d3d11_readback"}
+{"frame":10,"max_byte_error":1,"npu_infer_ms":17.8493,"gpu_map_ms":2.1613,"oracle_ms":27.6552}
+{"stage":"npu_write_texture"}
+{"stage":"native_d3d11_readback"}
+{"frame":11,"max_byte_error":1,"npu_infer_ms":18.0339,"gpu_map_ms":2.2669,"oracle_ms":27.7006}
+{"stage":"npu_write_texture"}
+{"stage":"native_d3d11_readback"}
+{"frame":12,"max_byte_error":1,"npu_infer_ms":16.5643,"gpu_map_ms":1.9482,"oracle_ms":28.4104}
+{"stage":"npu_write_texture"}
+{"stage":"native_d3d11_readback"}
+{"frame":13,"max_byte_error":1,"npu_infer_ms":17.1831,"gpu_map_ms":2.2497,"oracle_ms":28.2579}
+{"stage":"npu_write_texture"}
+{"stage":"native_d3d11_readback"}
+{"frame":14,"max_byte_error":1,"npu_infer_ms":17.6867,"gpu_map_ms":2.5568,"oracle_ms":30.072}
+{"stage":"npu_write_texture"}
+{"stage":"native_d3d11_readback"}
+{"frame":15,"max_byte_error":1,"npu_infer_ms":17.5928,"gpu_map_ms":2.5527,"oracle_ms":30.1298}
+{"alias_cleanup_failures":0}
+{"passed":true,"full_desktop_offload":false,"npu_output_shared":true,"host_inputs":true,"host_synchronized":true,"frames":16,"execution_device":"NPU","npu_driver":"1005540","host_input_copy_bytes":663552000,"host_output_copy_bytes":0,"consumer_api":"D3D11_TEXTURE","mapped_alias":true,"mapping_owner":"GPU","graphics_debug_enabled":true,"graphics_debug_errors":0,"width":2880,"gpu_validation_draws":0,"height":1800,"format":"BGRA","max_byte_error":1}
