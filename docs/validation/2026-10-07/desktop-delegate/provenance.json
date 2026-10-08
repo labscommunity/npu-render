@@ -1,0 +1,37 @@
+{
+  "runtime_source_revision": "bda4b9835f2a85eb48d2428c9fc67e0161be3905",
+  "previous_revision": "4d746f674e1019fec1c69a9a535f6fdd19963734",
+  "delegate_executable_sha256": "1c23a0c47a5d6b27916285b7c1cce32ced2e8b645948ab12cac21620822280d4",
+  "settings_executable_sha256": "43034bbb3b9fe8c482701746d91c9a900d0e7921c7b2454d27320352154b897c",
+  "tahoma_executable_sha256": "ed1f954f1c0a61de3e1b31a63156f41f908158c0b43f7e8913c5daa5da934793",
+  "settings_source": "raw/settings-live.cpp.gz before shared-header extraction; unchanged blend/D3D12 dependencies from previous revision",
+  "settings_harness": "raw/benchmark-native-settings.py.gz (executed frozen copy)",
+  "sources_sha256": {
+    "native/windows/live.cpp": "bcd35ab1c35e1b570b45e69f3600bfaebf08fd8a339e8c2ccf7a10994bc0380f",
+    "native/windows/live_renderer.hpp": "025dc28b900d8b160d6c9e074ef022384b66df0e493e0a9b692b049101ad478d",
+    "native/windows/desktop_delegate.cpp": "aea61e7b7c63e81c4205fe5877621efcd086c50027c08da434126ec28bf19c3d",
+    "native/windows/opaque_model.hpp": "555fbe7c8cbd3061cb56904fe013afd41f89f2f63961aae7a6c9a8872e435324",
+    "native/windows/blend_model.hpp": "1c55a46eeed27310085612dcdcfd28b4665a2f7e89ab05e267d4d7209d7844c8",
+    "native/windows/d3d12_buffers.hpp": "37d2edda8ff5ab9018f063ea36de1286ca2d82ce41dfb155912ffe35d9288dc2",
+    "native/tools/windows_route_probe.cpp": "bc031385dd143a7e6e955b305bd75d2d40a53b9d9f0bcbb678247fd26ebc170a",
+    "native/tools/gpu_power_probe.cpp": "db2a6149612c8e46415d873250bb72238933eccd987ca362aac6015f91706a93",
+    "tools/benchmark_native.py": "c41dda752135378af3b273221d474432d1e102313cf24861b6d957976cc132a1",
+    "tools/benchmark_delegate.py": "309b4234d01efdecc01493f417ef2244790fab1acb533dde25886a29cdfe6063",
+    "tools/windows_gpu_telemetry.ps1": "6e400de2d0a55a00dd4222a87d4ec4d10a43034f61d393f16ff57eeb71685f27",
+    "research/analyze_native_cost.py": "bc0debd4c7f725591142ac8c8857f5399c9d25d46f72594fa74c9982698f398d",
+    "research/analyze_delegate.py": "4294eee9616a9488fe1f8f04bffe1c1de673d69c424dfd82a2f5d5e15f07f8a5"
+  },
+  "igcl_source_revision": "b6c462933502e13d1537dd5024949a51be30e63d",
+  "microsoft_graphics_sample_revision": "de4a2161991eda254013da6c18226f5ea06e4a9c",
+  "package_installation": "raw/bundle-installation.json.gz",
+  "artifact_overlap": "select-transfer-sensitivity.json excludes the affected Select trial; main NPU/DWM/GPU comparisons are unaffected",
+  "private_ci_run": "https://github.com/t8/npu-render/actions/runs/37706145103",
+  "notes": [
+    "Raw captures retain original encoding and bytes inside deterministic gzip files.",
+    "Settings run began October 7 UTC; desktop delegation ran after midnight October 8 UTC.",
+    "No driver, power plan, clock, fan or security settings changed.",
+    "A positively identified non-secure ASUS screen-saver process was closed before successful interactive checks; no input injection or session unlock.",
+    "No desktop images, executable binaries, model weights or private network addresses are retained.",
+    "Final benchmark uses fixed 30-fps conditions after the preserved 60-fps Select rejection."
+  ]
+}

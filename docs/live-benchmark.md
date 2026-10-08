@@ -136,3 +136,31 @@ the additional boundary required to replace DWM work.
 - [Surface array transfer](https://www.pygame.org/docs/ref/surfarray.html)
 - Tahoma's `cascadia-api` SSE implementation: usage frames can count model tokens
   separately from text chunks, including speculative batches and final-only output.
+
+## Cooperating-window handoff on Windows
+
+`tools/benchmark_delegate.py` compares the same three GDI surfaces while Windows
+moves the original windows (`DWM`), or while a delegated `GPU`/`NPU` compositor
+resolves their overlap and retires those original windows. `NPU_SELECT` uses the
+restricted opaque-only graph. The outer canvas still passes through DWM.
+
+```powershell
+python tools/benchmark_delegate.py --executable build/native/Release/nr_desktop_delegate.exe --endpoint http://127.0.0.1:18080/v1 --model Qwen2.5-7B-Instruct-int4-ov --inference-device GPU --expected-npu-driver 1005540 --conditions DWM,NPU,GPU,NPU_SELECT --fps 30 --rounds 5 --requests 3 --max-tokens 128 --warmup-seconds 120 --report results/delegate.json
+```
+
+Launch in the unlocked interactive desktop. The endpoint's declared inference
+device must be corroborated with worker arguments/logs and adapter telemetry.
+Each trial checks all three displayed modes against the same independent pixel
+oracle, settles for two seconds, then runs identical inference requests. It rejects
+remaining original windows in delegated modes, unexpected execution calls, failed
+restoration, pixel mismatches, and loop rates below 99% of the requested cadence.
+Skipped slots and deadlines remain in the report and need review. Failed cadence
+trials are retained; lowering the target requires repeating every condition at
+the same rate. This is not a whole-Windows offload benchmark.
+
+`research/analyze_delegate.py` joins the retained trials to independently primed
+Windows GPU-engine queries and read-only IGCL samples, using exact adapter LUIDs.
+It keeps each engine separate and includes only query intervals entirely within
+inference. `tools/windows_gpu_telemetry.ps1 -StopFile path` permits graceful bounded
+collection; its metadata records an explicitly requested stop and actual sample
+count instead of claiming the nominal sample count completed.

@@ -240,3 +240,48 @@ Primary references:
 - [Microsoft shared heaps and cross-adapter restrictions](https://learn.microsoft.com/en-us/windows/win32/direct3d12/shared-heaps)
 - [Microsoft GPU synchronization](https://learn.microsoft.com/en-us/windows/win32/direct3d12/user-mode-heap-synchronization)
 - [Microsoft presentation return values](https://learn.microsoft.com/en-us/windows/win32/api/dxgi/nf-dxgi-idxgiswapchain-present)
+
+## Cooperating Windows surfaces
+
+The private bundle includes `run-delegate.cmd` (Windows 11, unlocked desktop).
+It creates three opaque GDI windows and starts with Windows composing them.
+Press **1** for DWM, **2** for NPU, **3** for GPU, or **Escape** to exit.
+The default is 1280×720 at 30 updates/s for 30 minutes. Keep the canvas visible;
+the startup and final screen-pixel checks deliberately reject occlusion.
+
+```powershell
+$env:PATH="$PWD\runtime;$env:PATH"
+.\nr_desktop_delegate.exe --fps 30 --seconds 30 --sequence NPU,GPU,DWM --switch-every 7 --report delegate.json
+```
+
+In DWM mode the three original windows remain visible and move over a static
+canvas. In delegated modes the selected device resolves their overlap in shared
+buffers; the originals are hidden only after a replacement frame is ready. The
+same source pixels, motion and z-order are used in all modes. Returning to DWM
+restores the original windows. Invalid selections retain the current mode; a
+runtime failure attempts to restore these owned surfaces to DWM and reports failure.
+
+This is a bounded compositor handoff for cooperating surfaces. It does not hook
+`dwm.exe`, capture the finished desktop, intercept arbitrary applications or
+replace the taskbar. Source painting and placement still use the CPU; shared-buffer
+uploads, final presentation and the outer DWM retain GPU work. Only the owned test
+windows are hidden or moved. Their transitions and rounded corners are disabled
+locally to preserve the rectangular pixel contract; system settings are unchanged.
+
+Eight independent offscreen oracle cases and on-screen DWM/NPU/GPU comparisons
+run before timing. The report distinguishes original-window visibility, NPU/GPU
+composition calls, DWM move calls, copy/composition/presentation costs and restoration.
+DWM window movements are not counted as this process's swapchain presentations.
+Submission status and screen snapshots do not measure physical scanout cadence.
+
+`--npu-graph opaque-select` tests an alpha-0/255-only Select graph; it is not a
+translucent compositor. It passes byte-exact NPU checks, but the measured graph
+is slower than the default source-over graph. `--npu-workload EFFICIENT` requests
+lower execution priority and `--npu-tiles 1` limits compiler tile allocation.
+Neither established a reliable Tahoma improvement; defaults remain unchanged.
+See the [hardware evidence](../docs/validation/2026-10-07/desktop-delegate/README.md).
+
+`nr_windows_route_probe.exe` directly queries the OpenVINO GPU and NPU adapter
+identities and tries explicit Direct3D device creation. It performs no desktop
+redirection and never substitutes the default adapter. Delta's NPU is found through
+DXCore but rejects the tested Direct3D device-creation routes with its current driver.

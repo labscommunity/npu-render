@@ -49,8 +49,13 @@ out by the absence of a stock switch. It is substantially more than an IDD:
 require render-specific DDIs for a graphics render-only driver.
 [MCDM terminology](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/mcdm)
 also uses “render-only” for compute devices, which does not imply graphics support.
-Delta's DXCore probe has not exposed an NPU graphics adapter. NT-handle sharing
-and successful NPU blending do not supply the missing graphics interfaces.
+The new [direct-LUID probe](../validation/2026-10-07/desktop-delegate/README.md)
+finds Delta's NPU through DXCore, but Direct3D 12 device creation fails with
+`DXGI_ERROR_UNSUPPORTED` for graphics, core-compute and generic-ML feature levels.
+The exact GPU adapter succeeds. The NPU is absent from DXGI graphics enumeration.
+This corrects the narrower older filtered-enumeration result: the adapter exists,
+but the installed driver exposes no working tested Direct3D route. NT-handle
+sharing and successful NPU blending do not supply those graphics interfaces.
 
 Microsoft's [graphics driver samples](https://github.com/microsoft/graphics-driver-samples)
 are references, not a ready Panther Lake solution. Their render-only sample
@@ -70,5 +75,30 @@ was installed or substituted for Delta's driver.
 5. Ship the switch for validated boundaries and operations. Games, codecs and
    arbitrary GPU compute retain separate coverage gates.
 
-The immediate Windows result is an instrumented baseline, not an implemented
-DWM replacement. The broad GPU-to-NPU objective remains open.
+## Implemented intermediate boundary
+
+`nr_desktop_delegate` now hands composition of three cooperating GDI windows
+between DWM and an explicit NPU/GPU compositor. Their original HWNDs are hidden
+only after the replacement is ready, and restored on return to DWM. All modes
+pass the same full-image and on-screen pixel oracles. This establishes a bounded
+handoff that removes those original surfaces from DWM's visible scene. The outer
+canvas remains a DWM surface; unrelated windows and client rendering do not move.
+See the [handoff and concurrent-inference evidence](../validation/2026-10-07/desktop-delegate/README.md).
+
+Extending that boundary requires cooperating applications to provide surfaces,
+damage, ordering and lifecycle events before ordinary composition. A screen-capture
+API supplies pixels after rendering and cannot by itself retire the source work.
+For transparent use by arbitrary existing Windows applications, the graphics-driver
+track remains separate: no such renderer is installed or implemented here.
+
+The next driver artifact must implement and test a bounded graphics command stream,
+not just enumerate a synthetic adapter. The Microsoft sample checkout examined
+for this work is pinned to `de4a2161991eda254013da6c18226f5ea06e4a9c`.
+Its render-only implementation has VC4 resource layouts, shader translation and
+hardware MMIO assumptions. Copying or renaming it would not provide a Panther Lake
+backend. Driver design must first define surface ownership, fence translation,
+per-operation coverage and explicit unsupported-command behavior; then validate
+an NPU-backed command executor before isolated-display DWM tests.
+
+The broad GPU-to-NPU objective remains open. Neither the bounded handoff nor
+Direct3D device-creation probing establishes whole-desktop offload.

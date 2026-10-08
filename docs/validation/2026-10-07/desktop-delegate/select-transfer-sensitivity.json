@@ -1,0 +1,40 @@
+{
+  "excluded_trial": {
+    "round": 4,
+    "condition": "NPU_SELECT",
+    "reason": "Private bundle upload overlapped inference for approximately 0.572 seconds.",
+    "artifact_created_utc": "2026-10-08T00:13:25.0447964Z",
+    "artifact_last_write_utc": "2026-10-08T00:13:25.6168174Z"
+  },
+  "comparisons_excluding_affected_trial": {
+    "npu_select_over_dwm": {
+      "paired_ratios": [
+        0.8371503407712615,
+        0.8149942574642324,
+        0.7824542933742373,
+        0.8580634597387559
+      ],
+      "median_ratio": 0.8260722991177469
+    },
+    "npu_select_over_npu": {
+      "paired_ratios": [
+        0.9061641922556191,
+        0.8619639848953313,
+        0.9022121531899715,
+        0.9105856358407444
+      ],
+      "median_ratio": 0.9041881727227953
+    },
+    "npu_select_over_gpu": {
+      "paired_ratios": [
+        0.9011378990369417,
+        0.812239960382274,
+        0.8541938972027067,
+        0.8566265460246895
+      ],
+      "median_ratio": 0.8554102216136981
+    }
+  },
+  "clean_select_median_trial_throughput": 19.588109419422274,
+  "main_npu_dwm_gpu_trials_affected": false
+}

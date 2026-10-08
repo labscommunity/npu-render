@@ -13,7 +13,7 @@ its first OpenVINO provider; other providers can implement the same contracts.
 The switch affects participating integrations. A restricted Weston adapter passes
 Linux CPU headless/nested tests, and D3D12 shared buffers pass a real Panther Lake
 NPU round trip on Windows. Native Linux NPU presentation, Windows DWM replacement,
-arbitrary Direct3D/Vulkan games, and codecs remain unfinished. The latest native
+arbitrary Direct3D/Vulkan games, and codecs remain unfinished. The earlier native
 Tahoma investigation reduced NPU blend time by **33%**, but the optimized path
 still made inference **4.7% slower** than a D3D12 shader in a five-round repeat
 after Delta's power change restored increasing battery charge under load.
@@ -24,12 +24,21 @@ See the [power repeat and interference controls](docs/validation/2026-10-07/powe
 and [graph cost investigation](docs/validation/2026-10-07/slowdown/README.md).
 Practical acceleration remains unproven.
 
-An [existing Windows compositor baseline](docs/validation/2026-10-07/desktop/README.md)
-now measures DWM while the same three static-content windows stay still or move.
-Moving them reduced Tahoma throughput by a median 7.3% across five paired rounds;
-four pairs were slower. This identifies desktop contention, not an NPU offload gain.
+A Windows experiment now hands composition of **three cooperating GDI windows**
+from DWM to the NPU or GPU, hides the originals during delegation, and restores
+them when switched back. All modes pass exact on-screen pixel checks. The private
+bundle includes `run-delegate.cmd`: **1 DWM / 2 NPU / 3 GPU**, at a default 30
+updates/s. Other applications and the outer Windows desktop stay on DWM. This is
+a bounded handoff, not a system-wide switch. See the
+[handoff and follow-up measurements](docs/validation/2026-10-07/desktop-delegate/README.md).
+
+The actual handoff reduced sampled DWM activity, but NPU composition made Tahoma
+**7.6% slower** than letting Windows compose these windows in five paired rounds.
+The NPU tile-count and priority follow-ups also did not establish a reliable Tahoma
+improvement. A direct adapter probe finds Delta's NPU through DXCore but confirms
+that its installed driver rejects the tested Direct3D device-creation routes.
 The [Windows integration assessment](docs/research/windows-compositor.md) describes
-the renderer/driver boundary still needed to move that work.
+the additional renderer/driver work required for arbitrary existing applications.
 
 Texture sampling, affine transforms and specialized bilinear scaling now share the
 native switch. The optimized NPU resize/compose API measured about 12 ms at 720p
