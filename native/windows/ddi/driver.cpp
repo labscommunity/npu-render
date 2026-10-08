@@ -1,5 +1,6 @@
-// Experimental D3D10 DDI command executor loaded only by an explicit test client.
-// This is not a WDDM adapter registration or a replacement for the system driver.
+// Experimental D3D10 DDI command executor loaded only by an explicit test
+// client. This is not a WDDM adapter registration or a replacement for the
+// system driver.
 #define NOMINMAX
 #include "../blend_model.hpp"
 #include "contract.hpp"
@@ -20,6 +21,9 @@
 #include <windows.h>
 #include <wrl/client.h>
 
+#ifdef NR_DDI_SHARED_EXPERIMENT
+#include "shared_memory.hpp"
+#endif
 using Microsoft::WRL::ComPtr;
 namespace {
 std::mutex stats_mutex;
@@ -34,11 +38,32 @@ void require(bool value, const char *message) {
     if (!value)
         throw std::runtime_error(message);
 }
+struct PixelStorage {
+    std::vector<uint8_t> host;
+#ifdef NR_DDI_SHARED_EXPERIMENT
+    std::shared_ptr<nr::ddi_shared::Surface> shared;
+#endif
+    void resize(size_t n) { host.resize(n); }
+    size_t size() const {
+#ifdef NR_DDI_SHARED_EXPERIMENT
+        if (shared)
+            return size_t(shared->metadata.pixel_bytes);
+#endif
+        return host.size();
+    }
+    uint8_t *data() {
+#ifdef NR_DDI_SHARED_EXPERIMENT
+        if (shared)
+            return shared->memory;
+#endif
+        return host.data();
+    }
+};
 struct Pixels {
     UINT width = 0, height = 0, usage = 0, cpu_access = 0;
     DXGI_FORMAT format{};
     bool mapped = false;
-    std::vector<uint8_t> data;
+    PixelStorage data;
 };
 struct Resource {
     std::shared_ptr<Pixels> pixels;
@@ -64,6 +89,10 @@ struct Blend {
     }
 };
 struct Device {
+#ifdef NR_DDI_SHARED_EXPERIMENT
+    HANDLE runtime_device = nullptr;
+    D3DDDI_DEVICECALLBACKS kernel_callbacks{};
+#endif
     D3D10DDI_HRTCORELAYER core_layer{};
     D3D10DDI_CORELAYER_DEVICECALLBACKS callbacks{};
     D3D10DDI_DEVICEFUNCS functions{};
@@ -154,18 +183,27 @@ SIZE_T APIENTRY resource_size(D3D10DDI_HDEVICE, const D3D10DDIARG_CREATERESOURCE
     return sizeof(Resource);
 }
 void APIENTRY create_resource(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATERESOURCE *a,
-                              D3D10DDI_HRESOURCE r, D3D10DDI_HRTRESOURCE) {
+                              D3D10DDI_HRESOURCE r, D3D10DDI_HRTRESOURCE rt_resource) {
     new (r.pDrvPrivate) Resource();
     guard(h, [&] {
         require(a && a->pMipInfoList && a->ResourceDimension == D3D10DDIRESOURCE_TEXTURE2D &&
                     a->MipLevels == 1 && a->ArraySize == 1,
                 "only one-mip one-slice 2D textures are supported");
+        bool shared = false;
+#ifdef NR_DDI_SHARED_EXPERIMENT
+        shared = nr::ddi_shared::enabled && a->MiscFlags == D3D10_DDI_RESOURCE_MISC_SHARED;
+#endif
         require(format_ok(a->Format) && a->SampleDesc.Count == 1 && a->SampleDesc.Quality == 0 &&
-                    !a->MiscFlags && !a->pPrimaryDesc,
+                    (!a->MiscFlags || shared) && !a->pPrimaryDesc,
                 "format, multisampling, sharing or primary resource unsupported");
         const auto &m = a->pMipInfoList[0];
-        require(m.TexelWidth && m.TexelWidth <= 2048 && m.TexelHeight && m.TexelHeight <= 2048 &&
-                    m.TexelDepth == 1,
+        UINT max_extent = 2048;
+#ifdef NR_DDI_SHARED_EXPERIMENT
+        if (nr::ddi_shared::enabled)
+            max_extent = nr::ddi_shared::max_extent;
+#endif
+        require(m.TexelWidth && m.TexelWidth <= max_extent && m.TexelHeight &&
+                    m.TexelHeight <= max_extent && m.TexelDepth == 1,
                 "texture dimensions outside lab contract");
         auto p = std::make_shared<Pixels>();
         p->width = m.TexelWidth;
@@ -173,7 +211,18 @@ void APIENTRY create_resource(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATERESOUR
         p->format = a->Format;
         p->usage = a->Usage;
         p->cpu_access = a->MapFlags;
-        p->data.resize(size_t(p->width) * p->height * 4);
+#ifdef NR_DDI_SHARED_EXPERIMENT
+        if (shared) {
+            require(a->Usage == D3D10_DDI_USAGE_DEFAULT && a->MapFlags == 0,
+                    "shared resources require default usage and no CPU map access");
+            auto storage = std::make_shared<nr::ddi_shared::Surface>();
+            auto &d = device(h);
+            storage->create(d.runtime_device, rt_resource.handle, d.kernel_callbacks, p->width,
+                            p->height, UINT(p->format));
+            p->data.shared = std::move(storage);
+        } else
+#endif
+            p->data.resize(size_t(p->width) * p->height * 4);
         if (a->pInitialDataUP) {
             require(a->pInitialDataUP->pSysMem && a->pInitialDataUP->SysMemPitch >= p->width * 4,
                     "invalid initial row pitch");
@@ -187,6 +236,31 @@ void APIENTRY create_resource(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATERESOUR
         static_cast<Resource *>(r.pDrvPrivate)->pixels = std::move(p);
     });
 }
+#ifdef NR_DDI_SHARED_EXPERIMENT
+SIZE_T APIENTRY open_resource_size(D3D10DDI_HDEVICE, const D3D10DDIARG_OPENRESOURCE *) {
+    return sizeof(Resource);
+}
+void APIENTRY open_resource(D3D10DDI_HDEVICE h, const D3D10DDIARG_OPENRESOURCE *a,
+                            D3D10DDI_HRESOURCE r, D3D10DDI_HRTRESOURCE rt) {
+    new (r.pDrvPrivate) Resource();
+    guard(h, [&] {
+        require(nr::ddi_shared::enabled && a && a->NumAllocations == 1 && a->pOpenAllocationInfo,
+                "shared resource opening is outside the explicit NPU contract");
+        auto &d = device(h);
+        auto storage = std::make_shared<nr::ddi_shared::Surface>();
+        storage->open(d.runtime_device, rt.handle, d.kernel_callbacks, a->hKMResource.handle,
+                      a->pOpenAllocationInfo[0].hAllocation);
+        auto p = std::make_shared<Pixels>();
+        p->width = storage->metadata.width;
+        p->height = storage->metadata.height;
+        p->format = DXGI_FORMAT(storage->metadata.format);
+        p->usage = D3D10_DDI_USAGE_DEFAULT;
+        require(format_ok(p->format), "shared texture format unsupported");
+        p->data.shared = std::move(storage);
+        static_cast<Resource *>(r.pDrvPrivate)->pixels = std::move(p);
+    });
+}
+#endif
 void APIENTRY destroy_resource(D3D10DDI_HDEVICE, D3D10DDI_HRESOURCE r) {
     static_cast<Resource *>(r.pDrvPrivate)->~Resource();
 }
@@ -431,18 +505,51 @@ void APIENTRY draw(D3D10DDI_HDEVICE h, UINT count, UINT first) {
         }
         auto &b = *d.models.at(key);
         auto bg = b.request.get_input_tensor(0), fg = b.request.get_input_tensor(1);
-        if (d.blend.BlendEnable[0])
-            std::memcpy(bg.data(), p->data.data(), p->data.size());
-        else
-            std::memset(bg.data(), 0, p->data.size());
-        std::memcpy(fg.data(), s->data.data(), s->data.size());
-        b.request.infer();
-        // Commit the output only after every state/resource check and successful inference.
+        uint64_t copied_input_bytes = 0;
+#ifdef NR_DDI_SHARED_EXPERIMENT
+        const bool remote_bg = d.blend.BlendEnable[0] && bool(p->data.shared);
+        const bool remote_fg = bool(s->data.shared);
+        try {
+            if (remote_bg)
+                b.request.set_input_tensor(0,
+                                           p->data.shared->input_tensor(b.compiled.get_context()));
+            if (remote_fg)
+                b.request.set_input_tensor(1,
+                                           s->data.shared->input_tensor(b.compiled.get_context()));
+            if (!remote_bg) {
+#endif
+                if (d.blend.BlendEnable[0])
+                    std::memcpy(bg.data(), p->data.data(), p->data.size());
+                else
+                    std::memset(bg.data(), 0, p->data.size());
+                copied_input_bytes += p->data.size();
+#ifdef NR_DDI_SHARED_EXPERIMENT
+            }
+            if (!remote_fg) {
+#endif
+                std::memcpy(fg.data(), s->data.data(), s->data.size());
+                copied_input_bytes += s->data.size();
+#ifdef NR_DDI_SHARED_EXPERIMENT
+            }
+#endif
+            b.request.infer();
+#ifdef NR_DDI_SHARED_EXPERIMENT
+            // The cached request must never keep an imported mapping alive past
+            // the resource's runtime identity. Restore host bindings before commit.
+            b.request.set_input_tensor(0, bg);
+            b.request.set_input_tensor(1, fg);
+        } catch (...) {
+            d.models.erase(key);
+            throw;
+        }
+#endif
+        // Commit the output only after every state/resource check and successful
+        // inference.
         std::memcpy(p->data.data(), b.request.get_output_tensor().data(), p->data.size());
         record([&](auto &v) {
             ++v.draws;
             ++v.executions;
-            v.inference_input_bytes += p->data.size() * 2;
+            v.inference_input_bytes += copied_input_bytes;
             v.inference_output_bytes += p->data.size();
         });
     });
@@ -532,8 +639,9 @@ HRESULT APIENTRY create_device(D3D10DDI_HADAPTER, D3D10DDIARG_CREATEDEVICE *a) {
         a->Interface != D3D10_0_7_DDI_INTERFACE_VERSION)
         return E_NOINTERFACE;
     Device *d = nullptr;
-    // Reserve configuration before constructing OpenVINO state, which may take time.
-    // All devices in a process must retain the same explicitly selected backend.
+    // Reserve configuration before constructing OpenVINO state, which may take
+    // time. All devices in a process must retain the same explicitly selected
+    // backend.
     bool reserved = false;
     try {
         std::string backend;
@@ -547,6 +655,11 @@ HRESULT APIENTRY create_device(D3D10DDI_HADAPTER, D3D10DDIARG_CREATEDEVICE *a) {
         d->core_layer = a->hRTCoreLayer;
         d->callbacks = *a->pUMCallbacks;
         d->backend = backend;
+#ifdef NR_DDI_SHARED_EXPERIMENT
+        require(a->pKTCallbacks != nullptr, "kernel callbacks missing");
+        d->runtime_device = a->hRTDevice.handle;
+        d->kernel_callbacks = *a->pKTCallbacks;
+#endif
         const auto available = d->runtime.get_available_devices();
         require(std::find(available.begin(), available.end(), d->backend) != available.end(),
                 "requested device unavailable");
@@ -559,6 +672,10 @@ HRESULT APIENTRY create_device(D3D10DDI_HADAPTER, D3D10DDIARG_CREATEDEVICE *a) {
 #undef NR_REJECT
         f.pfnCalcPrivateResourceSize = resource_size;
         f.pfnCreateResource = create_resource;
+#ifdef NR_DDI_SHARED_EXPERIMENT
+        f.pfnCalcPrivateOpenedResourceSize = open_resource_size;
+        f.pfnOpenResource = open_resource;
+#endif
         f.pfnDestroyResource = destroy_resource;
         f.pfnResourceCopy = copy_resource;
         f.pfnResourceUpdateSubresourceUP = update_resource;
@@ -621,7 +738,8 @@ HRESULT APIENTRY create_device(D3D10DDI_HADAPTER, D3D10DDIARG_CREATEDEVICE *a) {
         f.pfnRelocateDeviceFuncs = relocate;
         f.pfnDestroyDevice = destroy_device;
         *a->pDeviceFuncs = f;
-        // Presentation and shared KMD allocations are deliberately unsupported.
+        // Presentation remains unsupported. Only the experimental DLL admits shared KMD
+        // allocations.
         auto &dxgi = *a->DXGIBaseDDI.pDXGIDDIBaseFunctions;
         dxgi = {};
 #define NR_DXGI(field) dxgi.field = &UnsupportedDxgi<decltype(dxgi.field)>::call
@@ -682,6 +800,11 @@ extern "C" __declspec(dllexport) int nr_ddi_configure(const char *name) {
     if (active_devices || !name ||
         (std::strcmp(name, "NPU") && std::strcmp(name, "GPU") && std::strcmp(name, "CPU")))
         return 0;
+#ifdef NR_DDI_SHARED_EXPERIMENT
+    if (nr::ddi_shared::device)
+        return 0;
+    nr::ddi_shared::enabled = std::strcmp(name, "NPU") == 0;
+#endif
     selected = name;
     stats = {};
     return 1;
@@ -693,6 +816,20 @@ extern "C" __declspec(dllexport) int nr_ddi_get_stats(NrDdiStats *out) {
     *out = stats;
     return 1;
 }
+#ifdef NR_DDI_SHARED_EXPERIMENT
+extern "C" __declspec(dllexport) int nr_ddi_get_shared_stats(NrDdiSharedStats *out) {
+    if (!out || out->size != sizeof(NrDdiSharedStats) || out->version != 1)
+        return 0;
+    using namespace nr::ddi_shared;
+    out->created = created;
+    out->opened = opened;
+    out->live_surfaces = live_surfaces;
+    out->aliases = aliases;
+    out->live_aliases = live_aliases;
+    out->cleanup_failures = cleanup_failures;
+    return 1;
+}
+#endif
 extern "C" __declspec(dllexport) HRESULT APIENTRY OpenAdapter10(D3D10DDIARG_OPENADAPTER *a) {
     if (!a || !a->pAdapterFuncs)
         return E_INVALIDARG;
@@ -713,6 +850,10 @@ extern "C" __declspec(dllexport) HRESULT APIENTRY OpenAdapter10_2(D3D10DDIARG_OP
 }
 
 void nr_ddi_thunk(const char *name, bool rejected) {
+#ifdef NR_DDI_SHARED_EXPERIMENT
+    if (nr::ddi_shared::tracing())
+        std::fprintf(stderr, "thunk: %s rejected=%d\n", name, int(rejected));
+#endif
     record([&](auto &s) {
         ++s.software_thunk_calls;
         if (rejected)

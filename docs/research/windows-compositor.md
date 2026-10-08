@@ -180,3 +180,24 @@ The next useful driver work must connect these resources to graphics-DDI resourc
 identities and metadata, then execute the real composition command stream. The
 stock NPU's ability to allocate/import memory does not supply those graphics DDIs.
 An IDD or capture layer alone still cannot retire all existing composition work.
+
+## Shared Direct3D resource boundary follow-up
+
+The separate `nr_ddi_shared_lab` now creates real legacy-shared allocations through
+the runtime callbacks. Another Direct3D process opens them, executes the admitted
+shader pair on NPU remote inputs and returns changing pixels. The creator can
+release/reopen its resources while the worker holds them. Full-resolution checks
+require independent pixel oracles and complete mapping/alias cleanup.
+
+The stronger native-Arc consumer check fails even though `OpenSharedResource`
+returns success: GPU reads remain zero, and writing through that imported texture
+also fails. An ordinary GPU-created texture passes the same write/read control.
+The allocation-owner differential (NPU versus GPU KMT owner) does not fix the
+result. This is evidence of an unresolved graphics-resource representation or
+usage boundary, not proof of successful cross-driver texture interoperability.
+
+See [implementation and reproducible commands](../../native/windows/ddi/README.md#shared-resource-experiment)
+and [retained hardware evidence](../validation/2026-10-08/ddi-shared/README.md).
+The installed desktop renderer is unchanged. A new selectable render adapter and
+DWM's actual shader/state coverage remain required; passing the same-driver
+resource round trip does not make that system-level integration complete.

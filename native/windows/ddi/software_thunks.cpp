@@ -33,10 +33,21 @@
 
 // Adapted from Mesa mesa-25.3.0, f7aeb0d. Process-local software thunks only.
 #define NOMINMAX
-#include <windows.h>
+#include <cstdio>
 #include <d3d10_1.h>
 #include <d3d10umddi.h>
-#include <cstdio>
+#include <windows.h>
+#ifdef NR_DDI_SHARED_EXPERIMENT
+#include "shared_memory.hpp"
+#define NR_SHARED_FORWARD(name, argument)                                                          \
+    if (nr::ddi_shared::enabled)                                                                   \
+    return nr::ddi_shared::guard([&] {                                                             \
+        nr_ddi_thunk(#name, false);                                                                \
+        return nr::ddi_shared::real<decltype(&name)>(#name)(argument);                             \
+    })
+#else
+#define NR_SHARED_FORWARD(name, argument)
+#endif
 extern void nr_ddi_thunk(const char *name, bool rejected);
 #define LOG_ENTRYPOINT() nr_ddi_thunk(__func__, false)
 #define LOG_UNSUPPORTED_ENTRYPOINT() nr_ddi_thunk(__func__, true)
@@ -52,48 +63,84 @@ extern void nr_ddi_thunk(const char *name, bool rejected);
 #define STATUS_NOT_IMPLEMENTED 0xC0000002
 #endif
 
-EXTERN_C NTSTATUS APIENTRY D3DKMTCreateAllocation(D3DKMT_CREATEALLOCATION *pData) {
+EXTERN_C
+NTSTATUS APIENTRY D3DKMTCreateAllocation(D3DKMT_CREATEALLOCATION *pData) {
+#ifdef NR_DDI_SHARED_EXPERIMENT
+    if (nr::ddi_shared::enabled) {
+        nr_ddi_thunk(__func__, false);
+        return nr::ddi_shared::allocate(pData, false);
+    }
+#endif
     LOG_UNSUPPORTED_ENTRYPOINT();
     return STATUS_NOT_IMPLEMENTED;
 }
 
 EXTERN_C NTSTATUS APIENTRY D3DKMTCreateAllocation2(D3DKMT_CREATEALLOCATION *pData) {
+#ifdef NR_DDI_SHARED_EXPERIMENT
+    if (nr::ddi_shared::enabled) {
+        nr_ddi_thunk(__func__, false);
+        return nr::ddi_shared::allocate(pData, true);
+    }
+#endif
     LOG_UNSUPPORTED_ENTRYPOINT();
     return STATUS_NOT_IMPLEMENTED;
 }
 
 EXTERN_C NTSTATUS APIENTRY D3DKMTQueryResourceInfo(D3DKMT_QUERYRESOURCEINFO *pData) {
+    NR_SHARED_FORWARD(D3DKMTQueryResourceInfo, pData);
     LOG_UNSUPPORTED_ENTRYPOINT();
     return STATUS_NOT_IMPLEMENTED;
 }
 
 EXTERN_C NTSTATUS APIENTRY D3DKMTOpenResource(D3DKMT_OPENRESOURCE *pData) {
+    NR_SHARED_FORWARD(D3DKMTOpenResource, pData);
     LOG_UNSUPPORTED_ENTRYPOINT();
     return STATUS_NOT_IMPLEMENTED;
 }
 
 EXTERN_C NTSTATUS APIENTRY D3DKMTOpenResource2(D3DKMT_OPENRESOURCE *pData) {
+    NR_SHARED_FORWARD(D3DKMTOpenResource2, pData);
     LOG_UNSUPPORTED_ENTRYPOINT();
     return STATUS_NOT_IMPLEMENTED;
 }
 
 EXTERN_C NTSTATUS APIENTRY D3DKMTDestroyAllocation(CONST D3DKMT_DESTROYALLOCATION *pData) {
+    NR_SHARED_FORWARD(D3DKMTDestroyAllocation, pData);
     LOG_UNSUPPORTED_ENTRYPOINT();
     return STATUS_NOT_IMPLEMENTED;
 }
 
 EXTERN_C NTSTATUS APIENTRY D3DKMTSetAllocationPriority(CONST D3DKMT_SETALLOCATIONPRIORITY *pData) {
+    NR_SHARED_FORWARD(D3DKMTSetAllocationPriority, pData);
     LOG_UNSUPPORTED_ENTRYPOINT();
     return STATUS_NOT_IMPLEMENTED;
 }
 
 EXTERN_C NTSTATUS APIENTRY
 D3DKMTQueryAllocationResidency(CONST D3DKMT_QUERYALLOCATIONRESIDENCY *pData) {
+    NR_SHARED_FORWARD(D3DKMTQueryAllocationResidency, pData);
     LOG_UNSUPPORTED_ENTRYPOINT();
     return STATUS_NOT_IMPLEMENTED;
 }
 
 EXTERN_C NTSTATUS APIENTRY D3DKMTCreateDevice(D3DKMT_CREATEDEVICE *pData) {
+#ifdef NR_DDI_SHARED_EXPERIMENT
+    if (nr::ddi_shared::enabled)
+        return nr::ddi_shared::guard([&]() -> NTSTATUS {
+            if (!pData || nr::ddi_shared::device)
+                return NTSTATUS(0xc000000d);
+            nr_ddi_thunk("D3DKMTCreateDevice", false);
+            D3DKMT_CREATEDEVICE a{};
+            a.hAdapter = pData->hAdapter;
+            const auto result =
+                nr::ddi_shared::real<decltype(&D3DKMTCreateDevice)>("D3DKMTCreateDevice")(&a);
+            if (result >= 0) {
+                *pData = a;
+                nr::ddi_shared::device = a.hDevice;
+            }
+            return result;
+        });
+#endif
     LOG_ENTRYPOINT();
     if (!pData)
         return STATUS_INVALID_PARAMETER;
@@ -102,6 +149,17 @@ EXTERN_C NTSTATUS APIENTRY D3DKMTCreateDevice(D3DKMT_CREATEDEVICE *pData) {
 }
 
 EXTERN_C NTSTATUS APIENTRY D3DKMTDestroyDevice(CONST D3DKMT_DESTROYDEVICE *pData) {
+#ifdef NR_DDI_SHARED_EXPERIMENT
+    if (nr::ddi_shared::enabled)
+        return nr::ddi_shared::guard([&]() -> NTSTATUS {
+            nr_ddi_thunk("D3DKMTDestroyDevice", false);
+            const auto result =
+                nr::ddi_shared::real<decltype(&D3DKMTDestroyDevice)>("D3DKMTDestroyDevice")(pData);
+            if (result >= 0)
+                nr::ddi_shared::device = 0;
+            return result;
+        });
+#endif
     LOG_ENTRYPOINT();
     return STATUS_SUCCESS;
 }
@@ -165,11 +223,13 @@ D3DKMTSignalSynchronizationObject2(CONST D3DKMT_SIGNALSYNCHRONIZATIONOBJECT2 *pD
 }
 
 EXTERN_C NTSTATUS APIENTRY D3DKMTLock(D3DKMT_LOCK *pData) {
+    NR_SHARED_FORWARD(D3DKMTLock, pData);
     LOG_UNSUPPORTED_ENTRYPOINT();
     return STATUS_NOT_IMPLEMENTED;
 }
 
 EXTERN_C NTSTATUS APIENTRY D3DKMTUnlock(CONST D3DKMT_UNLOCK *pData) {
+    NR_SHARED_FORWARD(D3DKMTUnlock, pData);
     LOG_UNSUPPORTED_ENTRYPOINT();
     return STATUS_NOT_IMPLEMENTED;
 }
@@ -292,6 +352,15 @@ EXTERN_C NTSTATUS APIENTRY D3DKMTQueryAdapterInfo(CONST D3DKMT_QUERYADAPTERINFO 
 }
 
 EXTERN_C NTSTATUS APIENTRY D3DKMTOpenAdapterFromHdc(D3DKMT_OPENADAPTERFROMHDC *pData) {
+#ifdef NR_DDI_SHARED_EXPERIMENT
+    if (nr::ddi_shared::enabled) {
+        if (!pData)
+            return NTSTATUS(0xc000000d);
+        nr_ddi_thunk(__func__, false);
+        pData->VidPnSourceId = 0;
+        return nr::ddi_shared::open_adapter(pData->hAdapter, &pData->AdapterLuid);
+    }
+#endif
     LOG_ENTRYPOINT();
     if (!pData)
         return STATUS_INVALID_PARAMETER;
@@ -304,6 +373,15 @@ EXTERN_C NTSTATUS APIENTRY D3DKMTOpenAdapterFromHdc(D3DKMT_OPENADAPTERFROMHDC *p
 
 EXTERN_C NTSTATUS APIENTRY
 D3DKMTOpenAdapterFromGdiDisplayName(D3DKMT_OPENADAPTERFROMGDIDISPLAYNAME *pData) {
+#ifdef NR_DDI_SHARED_EXPERIMENT
+    if (nr::ddi_shared::enabled) {
+        if (!pData)
+            return NTSTATUS(0xc000000d);
+        nr_ddi_thunk(__func__, false);
+        pData->VidPnSourceId = 0;
+        return nr::ddi_shared::open_adapter(pData->hAdapter, &pData->AdapterLuid);
+    }
+#endif
     LOG_ENTRYPOINT();
     if (!pData)
         return STATUS_INVALID_PARAMETER;
@@ -316,6 +394,14 @@ D3DKMTOpenAdapterFromGdiDisplayName(D3DKMT_OPENADAPTERFROMGDIDISPLAYNAME *pData)
 
 EXTERN_C NTSTATUS APIENTRY
 D3DKMTOpenAdapterFromDeviceName(D3DKMT_OPENADAPTERFROMDEVICENAME *pData) {
+#ifdef NR_DDI_SHARED_EXPERIMENT
+    if (nr::ddi_shared::enabled) {
+        if (!pData)
+            return NTSTATUS(0xc000000d);
+        nr_ddi_thunk(__func__, false);
+        return nr::ddi_shared::open_adapter(pData->hAdapter, &pData->AdapterLuid);
+    }
+#endif
     LOG_ENTRYPOINT();
     if (!pData)
         return STATUS_INVALID_PARAMETER;
@@ -326,6 +412,7 @@ D3DKMTOpenAdapterFromDeviceName(D3DKMT_OPENADAPTERFROMDEVICENAME *pData) {
 }
 
 EXTERN_C NTSTATUS APIENTRY D3DKMTCloseAdapter(CONST D3DKMT_CLOSEADAPTER *pData) {
+    NR_SHARED_FORWARD(D3DKMTCloseAdapter, pData);
     LOG_ENTRYPOINT();
     return STATUS_SUCCESS;
 }
@@ -392,6 +479,7 @@ EXTERN_C NTSTATUS APIENTRY D3DKMTSetGammaRamp(CONST D3DKMT_SETGAMMARAMP *pData) 
 }
 
 EXTERN_C NTSTATUS APIENTRY D3DKMTGetDeviceState(D3DKMT_GETDEVICESTATE *pData) {
+    NR_SHARED_FORWARD(D3DKMTGetDeviceState, pData);
     LOG_ENTRYPOINT();
     if (!pData)
         return STATUS_INVALID_PARAMETER;
@@ -546,6 +634,7 @@ EXTERN_C NTSTATUS APIENTRY D3DKMTReleaseKeyedMutex(D3DKMT_RELEASEKEYEDMUTEX *pDa
 
 EXTERN_C NTSTATUS APIENTRY
 D3DKMTConfigureSharedResource(CONST D3DKMT_CONFIGURESHAREDRESOURCE *pData) {
+    NR_SHARED_FORWARD(D3DKMTConfigureSharedResource, pData);
     LOG_UNSUPPORTED_ENTRYPOINT();
     return STATUS_NOT_IMPLEMENTED;
 }
@@ -557,6 +646,7 @@ EXTERN_C NTSTATUS APIENTRY D3DKMTGetOverlayState(D3DKMT_GETOVERLAYSTATE *pData) 
 
 EXTERN_C NTSTATUS APIENTRY
 D3DKMTCheckSharedResourceAccess(CONST D3DKMT_CHECKSHAREDRESOURCEACCESS *pData) {
+    NR_SHARED_FORWARD(D3DKMTCheckSharedResourceAccess, pData);
     LOG_UNSUPPORTED_ENTRYPOINT();
     return STATUS_NOT_IMPLEMENTED;
 }

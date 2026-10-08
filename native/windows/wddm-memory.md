@@ -53,10 +53,12 @@ Windows devices or allocation modes.
 
 ## Required next integration
 
-The current D3D11 laboratory still has host-backed private resources and rejects
-shared textures. It must acquire proper graphics resource identities, preserve
-format/pitch/ownership metadata, and implement shared resource callbacks before
-this memory primitive can serve that integration. DWM also needs a registered
+The original D3D11 laboratory retains private resources. A separate
+[shared-resource DLL](ddi/README.md#shared-resource-experiment) now connects real
+legacy handles to the runtime callbacks and NPU remote inputs across processes.
+Its native GPU texture-consumption check still fails: opening a handle succeeds,
+but the imported texture does not produce correct pixels. The diagnostic heap
+path in this document does not establish that stronger graphics texture contract. DWM also needs a registered
 compatible render adapter, its real shader/state stream, presentation and recovery.
 The Intel NPU's successful KMT allocation calls do not change the fact that its
 installed driver rejects the tested Direct3D graphics device-creation routes.

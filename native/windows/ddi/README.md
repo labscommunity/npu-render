@@ -95,3 +95,68 @@ small offscreen command checks.
 
 See the repository's Windows compositor research and coverage ledger for the
 system-wide target and retained GPU/display responsibilities.
+
+## Shared-resource experiment
+
+`nr_ddi_shared_lab.dll` is a separate, explicitly loaded experimental target. With
+NPU selected it uses the real NPU adapter/device and runtime allocation callbacks
+for legacy shared textures. Two clients can use ordinary `CreateTexture2D`,
+`GetSharedHandle` and `OpenSharedResource`; admitted draws in the importing process
+read shared pages through NPU remote tensors. The shader contract above remains
+restricted. This DLL is not installed as a graphics adapter or included in the
+normal Windows bundle.
+
+```powershell
+uv run --frozen --group native python tools/build_native.py --ddi
+uv run --frozen python tools/validate_windows_ddi_shared.py --binary-dir build/native/Release --source-dir native --output results/ddi-shared
+```
+
+The supervisor requires the Intel NPU, records exact sources/binaries/runtime
+hashes, and checks 16 changing frames at each of 64×48 BGRA, 320×240 RGBA,
+1280×720 BGRA and 2880×1800 BGRA. The creator releases its original textures after
+the worker opens them, then reopens the legacy handles. Both processes must finish
+with zero live surfaces/aliases and no cleanup failures. An unaligned width must
+be rejected before inference. The worker is contained in a job that ends it when
+the parent exits. Shared-resource tests are distinct from the original DLL's
+CPU/GPU/NPU draw and rejection tests.
+
+The current shared contract is single-mip/slice RGBA8 or BGRA8 UNORM, default usage,
+no CPU map flags, width divisible by 32, and dimensions at most 4096. A process
+may have one laboratory device. Only NPU configuration enables shared storage;
+CPU/GPU configurations retain private storage and reject sharing. Kernel mappings
+are section-backed standard allocations, with a bounded, versioned footer for
+this driver's format/dimensions. They are not vendor-independent texture layouts.
+
+A process-local NT alias over the mapped pages bridges legacy Direct3D handles
+to NPU remote inputs. The input-copy counter is zero for the qualified shared
+source-over draws. Output is still copied from staged inference output after
+success, preserving the destination on preparation/inference failure. The fixture
+producer uploads pixels and the parent copies for validation. Host events and
+synchronous inference coordinate ownership; there are no native shared GPU/NPU
+fences or total-system zero-copy claims. `NR_DDI_TRACE=1` prints thunk diagnostics.
+
+**Native GPU texture consumption currently fails.** `--gpu-open` on the native
+probe reports whether the Arc device opens the handle, without claiming pixels
+are correct. The stronger supervisor mode below requires GPU readback of each
+changing result and returns failure when pixels disagree:
+
+```powershell
+uv run --frozen python tools/validate_windows_ddi_shared.py --binary-dir build/native/Release --source-dir native --output results/ddi-shared-gpu --gpu-readback
+```
+
+On Delta the handle opens, but the GPU reads zeros. Writing through that imported
+GPU texture also fails the pixel control, while a normal GPU-created texture
+passes. Changing only the underlying KMT owner from NPU to GPU does not fix it.
+720p/display-size native-GPU controls terminated with a process access violation;
+the diagnostic now rejects those sizes before device creation and its supervisor
+only repeats the two small fixtures. Same-driver NPU sharing at those large sizes
+passes separately.
+This narrows the gap to the imported graphics-resource path; it does not identify
+an exact vendor-driver defect. It is not valid to use a successful handle open as
+proof of DWM-compatible textures. `NR_DDI_GPU_DEBUG=1` explicitly requests the
+optional system graphics debug layer; absence fails, without silently disabling it.
+
+The successful same-driver sharing and failed native-GPU consumption are both
+retained in the [hardware evidence](../../../docs/validation/2026-10-08/ddi-shared/README.md).
+Full desktop offload still needs interoperable graphics allocations, compatible
+shaders/state, a selectable render adapter, presentation/fences and recovery.

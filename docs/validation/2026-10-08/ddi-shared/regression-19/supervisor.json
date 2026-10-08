@@ -1,0 +1,225 @@
+{
+  "scope": "process-local offscreen D3D11 DDI checks; no desktop routing",
+  "started_utc": "2026-10-08T20:26:56.191908+00:00",
+  "binaries_sha256": {
+    "nr_ddi_probe.exe": "3704e34339bd4f26b74eed93afd148855e72d08445845318d762ae0d5763cc5a",
+    "nr_ddi_lab.dll": "fec208a8aa907c05c1e4f055c98d18238ea6594bebe9271e9534c15722a04521"
+  },
+  "runtime_dlls_sha256": {
+    "openvino.dll": "8f942ea62fea186f8d1c67714a8dbb959a19daf62be7e279681bd7af0f3db4bc",
+    "openvino_auto_batch_plugin.dll": "0f2d523bb3aea6e1156b6589fd439c979dbd0b02a908f7bbb9e66c6b57e72635",
+    "openvino_auto_plugin.dll": "d9feb1904dabffe1619cb41bb9bb970e573f2ac5620635720685e23433fb6e06",
+    "openvino_c.dll": "d4178bb08b78f995cf3b77ddd23848ffbb883e0826513daea29399f8ccaffa7f",
+    "openvino_hetero_plugin.dll": "a22cc35b215d38fcef24c2d49b03a906ab6dc883daac65a1578af28feb06fb25",
+    "openvino_intel_cpu_plugin.dll": "443b0b7bdbfb8b85abf4b8b15ab7ff108885fbd154b4796b547b3029324ef3bd",
+    "openvino_intel_gpu_plugin.dll": "b5560e419f0d310765c830504505fcaffc8528f7b637fdeb9b672bf7bac90a49",
+    "openvino_intel_npu_compiler.dll": "842c2ce657e995753133b12a5a225b4c335242afd853007493b4e28f37aeeb2d",
+    "openvino_intel_npu_plugin.dll": "d224638d4f3460c8c37943d6a67493a2c03db1ad5398dfff0fff8d1b69dd4629",
+    "openvino_ir_frontend.dll": "3e558751f4ffca0fc190bf68f1d3e96e0a8c7e8fd1cfe217d15a07a69ca2ca0a",
+    "openvino_jax_frontend.dll": "c2cc72d3fa5721545bb253902ffce00a496f5855a032d4c3fba4e5becc9882b5",
+    "openvino_onnx_frontend.dll": "3e1b3a2d073b8c3719e30a431b0ffa0e80881243260bbe1814064270a5d675da",
+    "openvino_paddle_frontend.dll": "fd734eaab3beff99ec6c79cada576a77fa49f2a7af7e9432e4bfebc0a81fc5bf",
+    "openvino_pytorch_frontend.dll": "f6c67afec54b4cd33ba3c894ffcdcfa06550259268ed32215ffd0823928ba0c9",
+    "openvino_tensorflow_frontend.dll": "1ea598fa11be3cf0dde14aa86bf1c199a2cd11035a5ae1f2c567f6c53848ef86",
+    "openvino_tensorflow_lite_frontend.dll": "3223c168955534a6493442a4c00b3d43dca7c491b8f53d056050abd65d9879ff",
+    "tbb12.dll": "7ff7925b17e1ae666500feebe2f206d47362c8462ad4fd20d38edc25b091a8f8",
+    "tbbbind_2_5.dll": "e34aadbc84c53d25a9bc206df1a25df4ec582923c285b886a55d3ebb3c249d35",
+    "tbbmalloc.dll": "b5b4d7152c2b453598332be9cbcdacbf86dcfe7f7f4bbd3ad5174fe238730930",
+    "tbbmalloc_proxy.dll": "b60b89c6ab57c7b390af271940a7440b680440f4db994d27c5ba5c558e38c927"
+  },
+  "runs": [
+    {
+      "name": "cpu-draw",
+      "command": [
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\ddi-shared-v19\\Release\\nr_ddi_probe.exe",
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\ddi-shared-v19\\Release\\nr_ddi_lab.dll",
+        "CPU",
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\checks\\ddi-shared-20261008\\regression-19\\cpu-draw.json"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "wall_seconds": 0.8060726999974577
+    },
+    {
+      "name": "cpu-reject-shader",
+      "command": [
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\ddi-shared-v19\\Release\\nr_ddi_probe.exe",
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\ddi-shared-v19\\Release\\nr_ddi_lab.dll",
+        "CPU",
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\checks\\ddi-shared-20261008\\regression-19\\cpu-reject-shader.json",
+        "reject-shader"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "wall_seconds": 0.1554044999938924
+    },
+    {
+      "name": "cpu-reject-shared",
+      "command": [
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\ddi-shared-v19\\Release\\nr_ddi_probe.exe",
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\ddi-shared-v19\\Release\\nr_ddi_lab.dll",
+        "CPU",
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\checks\\ddi-shared-20261008\\regression-19\\cpu-reject-shared.json",
+        "reject-shared"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "wall_seconds": 0.15611070000159089
+    },
+    {
+      "name": "cpu-reject-draw",
+      "command": [
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\ddi-shared-v19\\Release\\nr_ddi_probe.exe",
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\ddi-shared-v19\\Release\\nr_ddi_lab.dll",
+        "CPU",
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\checks\\ddi-shared-20261008\\regression-19\\cpu-reject-draw.json",
+        "reject-draw"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "wall_seconds": 0.15651849999267142
+    },
+    {
+      "name": "gpu-draw",
+      "command": [
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\ddi-shared-v19\\Release\\nr_ddi_probe.exe",
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\ddi-shared-v19\\Release\\nr_ddi_lab.dll",
+        "GPU",
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\checks\\ddi-shared-20261008\\regression-19\\gpu-draw.json"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "wall_seconds": 0.2696284999983618
+    },
+    {
+      "name": "gpu-reject-shader",
+      "command": [
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\ddi-shared-v19\\Release\\nr_ddi_probe.exe",
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\ddi-shared-v19\\Release\\nr_ddi_lab.dll",
+        "GPU",
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\checks\\ddi-shared-20261008\\regression-19\\gpu-reject-shader.json",
+        "reject-shader"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "wall_seconds": 0.1537104999879375
+    },
+    {
+      "name": "gpu-reject-shared",
+      "command": [
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\ddi-shared-v19\\Release\\nr_ddi_probe.exe",
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\ddi-shared-v19\\Release\\nr_ddi_lab.dll",
+        "GPU",
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\checks\\ddi-shared-20261008\\regression-19\\gpu-reject-shared.json",
+        "reject-shared"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "wall_seconds": 0.15881919999083038
+    },
+    {
+      "name": "gpu-reject-draw",
+      "command": [
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\ddi-shared-v19\\Release\\nr_ddi_probe.exe",
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\ddi-shared-v19\\Release\\nr_ddi_lab.dll",
+        "GPU",
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\checks\\ddi-shared-20261008\\regression-19\\gpu-reject-draw.json",
+        "reject-draw"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "wall_seconds": 0.16206009998859372
+    },
+    {
+      "name": "npu-draw",
+      "command": [
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\ddi-shared-v19\\Release\\nr_ddi_probe.exe",
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\ddi-shared-v19\\Release\\nr_ddi_lab.dll",
+        "NPU",
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\checks\\ddi-shared-20261008\\regression-19\\npu-draw.json"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "wall_seconds": 0.3966768999962369
+    },
+    {
+      "name": "npu-reject-shader",
+      "command": [
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\ddi-shared-v19\\Release\\nr_ddi_probe.exe",
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\ddi-shared-v19\\Release\\nr_ddi_lab.dll",
+        "NPU",
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\checks\\ddi-shared-20261008\\regression-19\\npu-reject-shader.json",
+        "reject-shader"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "wall_seconds": 0.1612505999946734
+    },
+    {
+      "name": "npu-reject-shared",
+      "command": [
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\ddi-shared-v19\\Release\\nr_ddi_probe.exe",
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\ddi-shared-v19\\Release\\nr_ddi_lab.dll",
+        "NPU",
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\checks\\ddi-shared-20261008\\regression-19\\npu-reject-shared.json",
+        "reject-shared"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "wall_seconds": 0.1539978000073461
+    },
+    {
+      "name": "npu-reject-draw",
+      "command": [
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\ddi-shared-v19\\Release\\nr_ddi_probe.exe",
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\ddi-shared-v19\\Release\\nr_ddi_lab.dll",
+        "NPU",
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\checks\\ddi-shared-20261008\\regression-19\\npu-reject-draw.json",
+        "reject-draw"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "wall_seconds": 0.16258389998984057
+    }
+  ],
+  "passed": true,
+  "finished_utc": "2026-10-08T20:26:59.179795+00:00",
+  "captured_sha256": {
+    "cpu-draw.json": "13cd7b8f2a188960e2fbbf7ce22414bf01335cf435660832964a3f2868ea194e",
+    "cpu-draw.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cpu-draw.stdout.log": "c4e2d4b2b8fb36ee700d4e3532ebad5b1076b0e400e468089379e8853d85430a",
+    "cpu-reject-draw.json": "2247dd08570a2b409ee97dcd781429ea1c44725773affad54920d048811f594c",
+    "cpu-reject-draw.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cpu-reject-draw.stdout.log": "3052c99c5105c63df94ecf9771ed17fbe5d98c3e7ca7597ba03ccdf0c9211b57",
+    "cpu-reject-shader.json": "8f4f9987b09dbb91ed0d4417d8d222303adc3f01faa06d77d90a0bfa503d0d05",
+    "cpu-reject-shader.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cpu-reject-shader.stdout.log": "944286b8f7866f0e9d92c44dd801e820dac5173c5bd5dde9d968608c97448104",
+    "cpu-reject-shared.json": "473a57de4f7e2729aff86d42cc3d9cd561bc25834b5885d97802b7e55a03d224",
+    "cpu-reject-shared.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cpu-reject-shared.stdout.log": "d7eb6311ce6e25944847f744ba69409bae4c4642187e6f22754f211c755a9a0a",
+    "gpu-draw.json": "709fa1e68b9ff71edfb6f867e513f3148b7c8bfe4b979e34e6cfda293a3b23f7",
+    "gpu-draw.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gpu-draw.stdout.log": "c4e2d4b2b8fb36ee700d4e3532ebad5b1076b0e400e468089379e8853d85430a",
+    "gpu-reject-draw.json": "fd6d6cf73ec7ca479f47be453c1ecd7424222e562b50183ecde8fea0d06e1ac4",
+    "gpu-reject-draw.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gpu-reject-draw.stdout.log": "3052c99c5105c63df94ecf9771ed17fbe5d98c3e7ca7597ba03ccdf0c9211b57",
+    "gpu-reject-shader.json": "15e20458c9e7886c0ddc67453b55e49ae4504512c74416114cb677345aaf3ea5",
+    "gpu-reject-shader.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gpu-reject-shader.stdout.log": "944286b8f7866f0e9d92c44dd801e820dac5173c5bd5dde9d968608c97448104",
+    "gpu-reject-shared.json": "5c5c0dc692d3c9050c23182ad9ac23a40335f84cb79e46d6b35f3a1a1aacc8fe",
+    "gpu-reject-shared.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gpu-reject-shared.stdout.log": "d7eb6311ce6e25944847f744ba69409bae4c4642187e6f22754f211c755a9a0a",
+    "npu-draw.json": "501917175eedc7d9ee71e9fefa807ed46207cf5336c5d5546f1d16f86b0be9b1",
+    "npu-draw.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "npu-draw.stdout.log": "54c54fe523139da2de664ba2b893a9761cabfe4c7a73f66784851b47b500d50d",
+    "npu-reject-draw.json": "91a7754708ddc82cedefd3fb8626a5967d841a208aef8258f4e1c04d6a51d1e0",
+    "npu-reject-draw.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "npu-reject-draw.stdout.log": "3052c99c5105c63df94ecf9771ed17fbe5d98c3e7ca7597ba03ccdf0c9211b57",
+    "npu-reject-shader.json": "2f11495cd3a4c78c0951ce06efe7b2f82189a067aa01523c3ef3c1094b453a46",
+    "npu-reject-shader.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "npu-reject-shader.stdout.log": "944286b8f7866f0e9d92c44dd801e820dac5173c5bd5dde9d968608c97448104",
+    "npu-reject-shared.json": "b3f63180cac996069938abab156862e030593e5a1d043e990fa9cf22e217b4a6",
+    "npu-reject-shared.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "npu-reject-shared.stdout.log": "d7eb6311ce6e25944847f744ba69409bae4c4642187e6f22754f211c755a9a0a"
+  }
+}

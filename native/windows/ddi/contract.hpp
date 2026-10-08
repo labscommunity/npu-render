@@ -14,6 +14,14 @@ struct NrDdiStats {
 using NrDdiConfigure = int (*)(const char *);
 using NrDdiGetStats = int (*)(NrDdiStats *);
 
+// Separate optional ABI for the experimental shared-resource DLL.
+struct NrDdiSharedStats {
+    uint32_t size = sizeof(NrDdiSharedStats), version = 1;
+    uint64_t created = 0, opened = 0, live_surfaces = 0;
+    uint64_t aliases = 0, live_aliases = 0, cleanup_failures = 0;
+};
+using NrDdiGetSharedStats = int (*)(NrDdiSharedStats *);
+
 inline constexpr char nr_ddi_vertex_shader[] = R"(
 float4 main(uint id : SV_VertexID) : SV_POSITION {
     float2 p = float2((id << 1) & 2, id & 2);
