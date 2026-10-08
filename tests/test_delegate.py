@@ -113,3 +113,28 @@ def test_comparisons_pair_round_medians_and_keep_unmatched_rounds_out():
     assert result["npu_over_dwm"]["median_ratio"] == pytest.approx(0.85)
     assert len(result["npu_over_dwm"]["paired_ratios"]) == 2
     assert result["gpu_over_dwm"]["median_ratio"] is None
+
+
+def test_retained_sources_require_no_live_host_upload_and_device_placement():
+    report = capture()
+    report.update(
+        placement_provider="retained",
+        preparation_upload_bytes=100,
+        source_width=426,
+        source_height=240,
+    )
+    report["frames"][0].update(
+        host_uploaded_bytes=0, device_placement_copy_bytes=3 * 1280 * 720 * 4
+    )
+    benchmark.validate_capture(report, "NPU", 60, "1005540", expected_placement="retained")
+    report["frames"][0]["host_uploaded_bytes"] = 1280 * 720 * 4
+    with pytest.raises(RuntimeError, match="host uploads"):
+        benchmark.validate_capture(report, "NPU", 60, "1005540", expected_placement="retained")
+    report["frames"][0].update(host_uploaded_bytes=0, device_placement_copy_bytes=0)
+    with pytest.raises(RuntimeError, match="omitted device copies"):
+        benchmark.validate_capture(report, "NPU", 60, "1005540", expected_placement="retained")
+
+
+def test_staged_path_cannot_masquerade_as_retained():
+    with pytest.raises(RuntimeError, match="requested interactive mode"):
+        benchmark.validate_capture(capture(), "NPU", 60, "1005540", expected_placement="retained")

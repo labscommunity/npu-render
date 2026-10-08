@@ -8,7 +8,7 @@ struct DelegateOptions {
     double seconds = 30, switch_every = 3;
     std::string mode = "DWM", report = "desktop-delegate.json", ready, stop;
     std::string expected_driver, workload = "DEFAULT";
-    std::string graph = "source-over";
+    std::string graph = "source-over", placement = "staged";
     int64_t tiles = 0;
     std::vector<std::string> sequence;
     bool validate_only = false, pinned = false;
@@ -33,6 +33,7 @@ static DelegateOptions options(int argc, char **argv) {
         else if (arg == "--expected-npu-driver") o.expected_driver = value;
         else if (arg == "--npu-workload") o.workload = value;
         else if (arg == "--npu-graph") o.graph = value;
+        else if (arg == "--placement") o.placement = value;
         else if (arg == "--npu-tiles") o.tiles = std::stoll(value);
         else if (arg == "--switch-every") o.switch_every = std::stod(value);
         else if (arg == "--sequence") {
@@ -44,7 +45,8 @@ static DelegateOptions options(int argc, char **argv) {
         !o.fps || o.fps > 120 || !std::isfinite(o.seconds) || o.seconds <= 0 || o.seconds > 1800 ||
         !std::isfinite(o.switch_every) || o.switch_every <= 0 || !mode_valid(o.mode) || o.tiles < 0 ||
         (o.workload != "DEFAULT" && o.workload != "EFFICIENT") ||
-        (o.graph != "source-over" && o.graph != "opaque-select"))
+        (o.graph != "source-over" && o.graph != "opaque-select") ||
+        (o.placement != "staged" && o.placement != "retained"))
         throw std::invalid_argument("invalid dimensions, timing, mode or NPU settings");
     return o;
 }
@@ -146,13 +148,44 @@ static void place(std::vector<uint8_t> &dst, UINT width, UINT height, const Sour
 struct LayerComposer {
     Renderer &r;
     std::array<std::unique_ptr<SharedBuffer>, 2> intermediate;
+    std::array<std::unique_ptr<SharedBuffer>, 3> foregrounds, source_buffers;
+    std::unique_ptr<SharedBuffer> transparent;
+    bool retained, have_previous = false;
+    Positions previous{};
+    size_t preparation_upload_bytes = 0, frame_host_upload_bytes = 0, frame_device_copy_bytes = 0;
     ov::CompiledModel compiled;
     // Destroy requests/tensors before their imported heaps.
     std::array<std::array<ov::Tensor, 3>, 3> tensors;
     std::array<ov::InferRequest, 3> requests;
     unsigned oracle_max_error = 0;
-    explicit LayerComposer(Renderer &renderer, const std::string &graph) : r(renderer) {
+    explicit LayerComposer(Renderer &renderer, const std::string &graph, bool retain, const Sources &sources)
+        : r(renderer), retained(retain) {
         for (auto &buffer : intermediate) buffer = std::make_unique<SharedBuffer>(r.device.Get(), r.bytes);
+        if (retained) {
+            for (auto &buffer : foregrounds) buffer = std::make_unique<SharedBuffer>(r.device.Get(),r.bytes);
+            transparent = std::make_unique<SharedBuffer>(r.device.Get(),r.bytes);
+            std::array<ComPtr<ID3D12Resource>,4> uploads;
+            auto &t = *r.transfers; t.begin();
+            const auto copy = [&](size_t index, SharedBuffer &dst, const void *data, size_t bytes) {
+                uploads[index] = staging(r.device.Get(),bytes,D3D12_HEAP_TYPE_UPLOAD);
+                upload(uploads[index].Get(),data,bytes);
+                t.barrier(dst.resource.Get(),D3D12_RESOURCE_STATE_COMMON,D3D12_RESOURCE_STATE_COPY_DEST);
+                t.list->CopyBufferRegion(dst.resource.Get(),0,uploads[index].Get(),0,bytes);
+                t.barrier(dst.resource.Get(),D3D12_RESOURCE_STATE_COPY_DEST,D3D12_RESOURCE_STATE_COPY_SOURCE);
+                preparation_upload_bytes += bytes;
+            };
+            std::vector<uint8_t> zeros(r.bytes,0);
+            copy(3,*transparent,zeros.data(),r.bytes);
+            for (size_t i = 0; i < sources.size(); ++i) {
+                const size_t bytes = size_t(sources[i]->width)*sources[i]->height*4;
+                source_buffers[i] = std::make_unique<SharedBuffer>(r.device.Get(),bytes);
+                copy(i,*source_buffers[i],sources[i]->pixels,bytes);
+                t.barrier(foregrounds[i]->resource.Get(),D3D12_RESOURCE_STATE_COMMON,D3D12_RESOURCE_STATE_COPY_DEST);
+                t.list->CopyBufferRegion(foregrounds[i]->resource.Get(),0,transparent->resource.Get(),0,r.bytes);
+                t.barrier(foregrounds[i]->resource.Get(),D3D12_RESOURCE_STATE_COPY_DEST,D3D12_RESOURCE_STATE_COMMON);
+            }
+            t.finish(); // Upload resources remain alive until completion.
+        }
         compiled = r.npu->compiled;
         if (graph == "opaque-select") {
             ov::AnyMap settings;
@@ -171,26 +204,81 @@ struct LayerComposer {
                  {"TENSOR_TYPE",std::string("BINDED")}});
         };
         for (size_t i = 0; i < 3; ++i) {
-            tensors[i] = {tensor(input(i)),tensor(*r.fg),tensor(output(i))};
+            tensors[i] = {tensor(input(i)),tensor(foreground(i)),tensor(output(i))};
             requests[i] = compiled.create_infer_request();
             requests[i].set_input_tensor(0,tensors[i][0]); requests[i].set_input_tensor(1,tensors[i][1]);
             requests[i].set_output_tensor(tensors[i][2]);
         }
     }
+    SharedBuffer &foreground(size_t i) { return retained ? *foregrounds[i] : *r.fg; }
     SharedBuffer &input(size_t i) { return i ? *intermediate[i-1] : *r.bg; }
     SharedBuffer &output(size_t i) { return i == 2 ? *r.out : *intermediate[i]; }
     std::array<double, 3> compose(const std::string &mode, const Sources &sources, const Positions &p) {
         std::array<double, 3> times{};
+        frame_host_upload_bytes = 0; frame_device_copy_bytes = 0;
+        if (retained) {
+            // Copy retained source rows into separate transparent planes. GPU
+            // copies position each source; only the selected blend resolves overlap.
+            const auto begin = Clock::now(); auto &t = *r.transfers; t.begin();
+            for (size_t i = 0; i < sources.size(); ++i) {
+                auto &fg = foreground(i); const auto &src = *sources[i];
+                t.barrier(fg.resource.Get(),D3D12_RESOURCE_STATE_COMMON,D3D12_RESOURCE_STATE_COPY_DEST);
+                const auto bounds = [&](POINT point) {
+                    return RECT{std::max(0L,point.x),std::max(0L,point.y),
+                        std::min(LONG(r.width),point.x+LONG(src.width)),
+                        std::min(LONG(r.height),point.y+LONG(src.height))};
+                };
+                const auto clear = [&](RECT rect) {
+                    if (rect.right <= rect.left || rect.bottom <= rect.top) return;
+                    for (LONG y = rect.top; y < rect.bottom; ++y) {
+                        const size_t offset = (size_t(y)*r.width+rect.left)*4;
+                        const size_t bytes = size_t(rect.right-rect.left)*4;
+                        t.list->CopyBufferRegion(fg.resource.Get(),offset,transparent->resource.Get(),offset,bytes);
+                        frame_device_copy_bytes += bytes;
+                    }
+                };
+                if (have_previous) {
+                    const RECT old = bounds(previous[i]), next = bounds(p[i]);
+                    const RECT overlap{std::max(old.left,next.left),std::max(old.top,next.top),
+                        std::min(old.right,next.right),std::min(old.bottom,next.bottom)};
+                    if (overlap.right <= overlap.left || overlap.bottom <= overlap.top) clear(old);
+                    else {
+                        // Only vacated pixels need zeroing; the next source copy
+                        // replaces the intersection without resolving other layers.
+                        clear({old.left,old.top,old.right,overlap.top});
+                        clear({old.left,overlap.bottom,old.right,old.bottom});
+                        clear({old.left,overlap.top,overlap.left,overlap.bottom});
+                        clear({overlap.right,overlap.top,old.right,overlap.bottom});
+                    }
+                }
+                const LONG left = std::max(0L,p[i].x), top = std::max(0L,p[i].y);
+                const LONG right = std::min(LONG(r.width),p[i].x+LONG(src.width));
+                const LONG bottom = std::min(LONG(r.height),p[i].y+LONG(src.height));
+                for (LONG y = top; y < bottom && left < right; ++y) {
+                    const size_t bytes = size_t(right-left)*4;
+                    t.list->CopyBufferRegion(fg.resource.Get(),(size_t(y)*r.width+left)*4,
+                        source_buffers[i]->resource.Get(),(size_t(y-p[i].y)*src.width+left-p[i].x)*4,bytes);
+                    frame_device_copy_bytes += bytes;
+                }
+                t.barrier(fg.resource.Get(),D3D12_RESOURCE_STATE_COPY_DEST,D3D12_RESOURCE_STATE_COMMON);
+            }
+            const auto recorded = Clock::now(); t.finish();
+            times[0] = milliseconds(begin,recorded); times[1] = milliseconds(recorded);
+            previous = p; have_previous = true;
+        }
         for (size_t i = 0; i < sources.size(); ++i) {
             const auto begin = Clock::now();
-            std::fill(r.f.begin(), r.f.end(), 0); place(r.f,r.width,r.height,*sources[i],p[i]);
-            const auto placed = Clock::now();
-            r.transfers->begin(); r.copy_input(r.staging_fg.Get(), *r.fg, r.f); r.transfers->finish();
+            if (!retained) {
+                std::fill(r.f.begin(), r.f.end(), 0); place(r.f,r.width,r.height,*sources[i],p[i]);
+                const auto placed = Clock::now();
+                r.transfers->begin(); r.copy_input(r.staging_fg.Get(), *r.fg, r.f); r.transfers->finish();
+                times[0] += milliseconds(begin,placed); times[1] += milliseconds(placed);
+                frame_host_upload_bytes += r.bytes; frame_device_copy_bytes += r.bytes;
+            }
             const auto uploaded = Clock::now();
             if (mode == "NPU") requests[i].infer();
-            else if (mode == "GPU") r.gpu->dispatch(*r.transfers,input(i),*r.fg,output(i),r.pixels);
+            else if (mode == "GPU") r.gpu->dispatch(*r.transfers,input(i),foreground(i),output(i),r.pixels);
             else throw std::invalid_argument("not a delegated compositor mode");
-            times[0] += milliseconds(begin,placed); times[1] += milliseconds(placed,uploaded);
             times[2] += milliseconds(uploaded);
         }
         return times;
@@ -313,7 +401,7 @@ int main(int argc, char **argv) {
         r.qualify(); r.background(); std::fill(r.f.begin(),r.f.end(),0); r.inputs(true);
         Sources sources;
         for (unsigned i = 0; i < 3; ++i) sources[i] = std::make_unique<SourceWindow>(o.width/3,o.height/3,i);
-        LayerComposer compositor(r,o.graph); compositor.qualify(sources);
+        LayerComposer compositor(r,o.graph,o.placement == "retained",sources); compositor.qualify(sources);
         std::vector<std::string> frames, selections, screen_checks;
         size_t skipped = 0, misses = 0, slot = 0, selection = 0, moves = 0;
         double started_unix_s = 0, live_seconds = 0, cpu_seconds = 0;
@@ -402,6 +490,8 @@ int main(int argc, char **argv) {
                     std::ostringstream f; f << std::setprecision(12) << "{\"slot\":" << slot << ",\"elapsed_s\":" << elapsed
                         << ",\"mode\":" << quote(mode) << ",\"placement_ms\":" << phases[0] << ",\"upload_ms\":" << phases[1]
                         << ",\"compose_ms\":" << phases[2] << ",\"present_ms\":" << present_ms << ",\"work_ms\":" << milliseconds(begin,done)
+                        << ",\"host_uploaded_bytes\":" << (mode == "DWM" ? 0 : compositor.frame_host_upload_bytes)
+                        << ",\"device_placement_copy_bytes\":" << (mode == "DWM" ? 0 : compositor.frame_device_copy_bytes)
                         << ",\"visible_source_windows\":" << visible_count(sources) << ",\"npu_blends\":" << (mode == "NPU" ? 3 : 0)
                         << ",\"gpu_blends\":" << (mode == "GPU" ? 3 : 0) << ",\"present_hresult\":";
                     if (mode == "DWM") f << "null"; else f << status;
@@ -428,7 +518,8 @@ int main(int argc, char **argv) {
             << ",\"pid\":" << GetCurrentProcessId() << ",\"session_id\":" << session << ",\"initial_mode\":" << quote(o.mode)
             << ",\"npu_execution_device\":\"NPU\",\"npu_driver_version\":" << quote(r.npu->driver_version)
             << ",\"npu_workload\":" << quote(r.npu->workload) << ",\"npu_requested_tiles\":" << r.npu->requested_tiles
-            << ",\"npu_graph\":" << quote(o.graph)
+            << ",\"npu_graph\":" << quote(o.graph) << ",\"placement_provider\":" << quote(o.placement)
+            << ",\"preparation_upload_bytes\":" << compositor.preparation_upload_bytes
             << ",\"openvino_runtime\":" << quote(ov::get_openvino_version().buildNumber)
             << ",\"width\":" << o.width << ",\"height\":" << o.height << ",\"source_count\":3,\"source_width\":" << sources[0]->width
             << ",\"source_height\":" << sources[0]->height << ",\"opaque_oracle_max_error\":" << compositor.oracle_max_error

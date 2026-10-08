@@ -17,7 +17,9 @@ from npu_render.inference import InferenceClient
 from npu_render.windows_session import inspect_session, require_interactive_desktop
 
 
-def validate_capture(captured, mode, fps, expected_driver, expected_graph="source-over"):
+def validate_capture(
+    captured, mode, fps, expected_driver, expected_graph="source-over", expected_placement="staged"
+):
     if (
         not captured["passed"]
         or captured["validation_only"]
@@ -27,6 +29,7 @@ def validate_capture(captured, mode, fps, expected_driver, expected_graph="sourc
         or captured["initial_mode"] != mode
         or captured["fps"] != fps
         or captured["npu_graph"] != expected_graph
+        or captured.get("placement_provider", "staged") != expected_placement
     ):
         raise RuntimeError("delegation did not complete in the requested interactive mode")
     if (
@@ -53,7 +56,21 @@ def validate_capture(captured, mode, fps, expected_driver, expected_graph="sourc
     wall = captured["live_wall_seconds"]
     if not frames or not math.isfinite(wall) or wall <= 0 or len(frames) / wall < fps * 0.99:
         raise RuntimeError("delegated trace did not sustain 99% of the requested cadence")
+    if expected_placement == "retained" and captured.get("preparation_upload_bytes", 0) <= 0:
+        raise RuntimeError("retained source initialization was not reported")
     for frame in frames:
+        if expected_placement == "retained" and (
+            frame.get("host_uploaded_bytes") != 0
+            or (
+                mode != "DWM"
+                and frame.get("device_placement_copy_bytes", 0)
+                < captured["source_count"]
+                * captured["source_width"]
+                * captured["source_height"]
+                * 4
+            )
+        ):
+            raise RuntimeError("retained placement performed host uploads or omitted device copies")
         if (
             frame["mode"] != mode
             or frame["visible_source_windows"] != (3 if mode == "DWM" else 0)
@@ -75,6 +92,11 @@ def comparisons(trials):
         ("NPU_SELECT", "DWM"),
         ("NPU_SELECT", "NPU"),
         ("NPU_SELECT", "GPU"),
+        ("NPU_RETAINED", "NPU"),
+        ("GPU_RETAINED", "GPU"),
+        ("NPU_RETAINED", "DWM"),
+        ("GPU_RETAINED", "DWM"),
+        ("NPU_RETAINED", "GPU_RETAINED"),
     ):
         pairs = []
         for index in sorted({t["round"] for t in trials}):
@@ -111,9 +133,9 @@ def run(args):
     if (
         not modes
         or len(set(modes)) != len(modes)
-        or set(modes) - {"DWM", "NPU", "GPU", "NPU_SELECT"}
+        or set(modes) - {"DWM", "NPU", "GPU", "NPU_SELECT", "NPU_RETAINED", "GPU_RETAINED"}
     ):
-        raise ValueError("conditions must be a unique list of DWM,NPU,GPU,NPU_SELECT")
+        raise ValueError("conditions must be a unique list of supported DWM/GPU/NPU variants")
     package = importlib.util.find_spec("openvino")
     environment = os.environ.copy()
     environment["PATH"] = (
@@ -139,7 +161,7 @@ def run(args):
             "DWM moves three real opaque GDI windows over a static canvas.",
             "Delegated modes hide the owned windows and compose their surfaces into the canvas.",
             "All modes pass the same offscreen and on-screen pixel checks before measurement.",
-            "CPU placement, GPU transfers and the outer DWM remain in the delegated path.",
+            "Placement uses host staging or retained GPU copies; transfers and outer DWM remain.",
             "99% loop cadence is a minimum gate; skips, deadlines and display data need review.",
             "An accepted trial does not establish a system-wide desktop switch or a Tahoma gain.",
         ],
@@ -154,7 +176,8 @@ def run(args):
             write_report(args.report, report)
         for index in range(args.rounds):
             for condition in trial_order(index, modes):
-                mode = "NPU" if condition == "NPU_SELECT" else condition
+                mode = "NPU" if condition == "NPU_SELECT" else condition.removesuffix("_RETAINED")
+                placement = "retained" if condition.endswith("_RETAINED") else "staged"
                 graph = "opaque-select" if condition == "NPU_SELECT" else "source-over"
                 before = inspect_session()
                 require_interactive_desktop(before)
@@ -184,7 +207,7 @@ def run(args):
                     ]
                     if args.expected_npu_driver:
                         command += ["--expected-npu-driver", args.expected_npu_driver]
-                    command += ["--npu-graph", graph]
+                    command += ["--npu-graph", graph, "--placement", placement]
                     with (root / "child.log").open("w+", encoding="utf-8") as log:
                         process = subprocess.Popen(command, env=environment, stdout=log, stderr=log)
                         try:
@@ -217,7 +240,7 @@ def run(args):
                             }
                             require_interactive_desktop(report["pending_trial"]["session_after"])
                             validate_capture(
-                                captured, mode, args.fps, args.expected_npu_driver, graph
+                                captured, mode, args.fps, args.expected_npu_driver, graph, placement
                             )
                             if exit_code:
                                 raise RuntimeError("delegation process failed")

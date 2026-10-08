@@ -86,6 +86,18 @@ def summarize(root, benchmark_name):
                 "time_to_first_content_ms": stats(
                     [r["time_to_first_content_ms"] for r in trial["inference"]]
                 ),
+                "placement_provider": graphics.get("placement_provider", "staged"),
+                "retained_source_setup_upload_bytes": graphics.get("preparation_upload_bytes"),
+                "live_host_uploaded_bytes_per_frame": stats(
+                    [f["host_uploaded_bytes"] for f in frames if "host_uploaded_bytes" in f]
+                ),
+                "live_device_placement_copy_bytes_per_frame": stats(
+                    [
+                        f["device_placement_copy_bytes"]
+                        for f in frames
+                        if "device_placement_copy_bytes" in f
+                    ]
+                ),
                 "frames_during_inference": len(frames),
                 "stages_ms": {
                     name: stats([f[name] for f in frames])

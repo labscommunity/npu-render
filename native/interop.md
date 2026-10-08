@@ -285,3 +285,19 @@ See the [hardware evidence](../docs/validation/2026-10-07/desktop-delegate/READM
 identities and tries explicit Direct3D device creation. It performs no desktop
 redirection and never substitutes the default adapter. Delta's NPU is found through
 DXCore but rejects the tested Direct3D device-creation routes with its current driver.
+
+For the cooperating-window experiment, `--placement retained` uploads the three
+immutable source images once, keeps separate foreground planes, and uses GPU
+row copies to position them. It clears only pixels vacated since the preceding
+composition, preserving zeroes elsewhere. Both GPU and NPU modes use this same
+placement path. NPU mode still performs the three full-canvas blend calls; this
+option does not claim NPU-only placement or damage-limited NPU computation.
+
+Reports include the placement provider, foreground host-upload bytes per live
+frame and GPU placement-copy payload. `preparation_upload_bytes` counts the
+retained-source setup (three source images and the transparent clear buffer), not
+all renderer initialization or qualification traffic. GPU copy payload excludes
+blend reads/writes and final presentation; it is not measured DRAM bandwidth.
+The default remains `--placement staged` for comparison. Retained mode currently
+assumes immutable source pixels; changing application content needs explicit
+source updates and lifecycle integration.

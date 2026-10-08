@@ -164,3 +164,10 @@ It keeps each engine separate and includes only query intervals entirely within
 inference. `tools/windows_gpu_telemetry.ps1 -StopFile path` permits graceful bounded
 collection; its metadata records an explicitly requested stop and actual sample
 count instead of claiming the nominal sample count completed.
+
+`NPU_RETAINED` and `GPU_RETAINED` use `--placement retained` with the same source-over
+graphs as their ordinary counterparts. Compare `DWM,NPU,GPU,NPU_RETAINED,GPU_RETAINED`
+at a common frame rate. The harness rejects retained reports with repeated host
+pixel uploads or missing device-placement work, in addition to the existing
+pixel/visibility/cadence gates. The capture retains logical byte counts; a decrease
+in copying is not by itself a Tahoma performance result.
