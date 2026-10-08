@@ -46,7 +46,7 @@ static DelegateOptions options(int argc, char **argv) {
         !std::isfinite(o.switch_every) || o.switch_every <= 0 || !mode_valid(o.mode) || o.tiles < 0 ||
         (o.workload != "DEFAULT" && o.workload != "EFFICIENT") ||
         (o.graph != "source-over" && o.graph != "opaque-select") ||
-        (o.placement != "staged" && o.placement != "retained"))
+        (o.placement != "staged" && o.placement != "retained" && o.placement != "retained-rect"))
         throw std::invalid_argument("invalid dimensions, timing, mode or NPU settings");
     return o;
 }
@@ -150,7 +150,8 @@ struct LayerComposer {
     std::array<std::unique_ptr<SharedBuffer>, 2> intermediate;
     std::array<std::unique_ptr<SharedBuffer>, 3> foregrounds, source_buffers;
     std::unique_ptr<SharedBuffer> transparent;
-    bool retained, have_previous = false;
+    bool retained, rectangles, have_previous = false;
+    std::array<UINT,3> source_pitches{};
     Positions previous{};
     size_t preparation_upload_bytes = 0, frame_host_upload_bytes = 0, frame_device_copy_bytes = 0;
     ov::CompiledModel compiled;
@@ -158,8 +159,8 @@ struct LayerComposer {
     std::array<std::array<ov::Tensor, 3>, 3> tensors;
     std::array<ov::InferRequest, 3> requests;
     unsigned oracle_max_error = 0;
-    explicit LayerComposer(Renderer &renderer, const std::string &graph, bool retain, const Sources &sources)
-        : r(renderer), retained(retain) {
+    explicit LayerComposer(Renderer &renderer, const std::string &graph, const std::string &placement, const Sources &sources)
+        : r(renderer), retained(placement != "staged"), rectangles(placement == "retained-rect") {
         for (auto &buffer : intermediate) buffer = std::make_unique<SharedBuffer>(r.device.Get(), r.bytes);
         if (retained) {
             for (auto &buffer : foregrounds) buffer = std::make_unique<SharedBuffer>(r.device.Get(),r.bytes);
@@ -177,9 +178,14 @@ struct LayerComposer {
             std::vector<uint8_t> zeros(r.bytes,0);
             copy(3,*transparent,zeros.data(),r.bytes);
             for (size_t i = 0; i < sources.size(); ++i) {
-                const size_t bytes = size_t(sources[i]->width)*sources[i]->height*4;
+                const auto &source = *sources[i];
+                source_pitches[i] = rectangles ? ((source.width*4+255)/256)*256 : source.width*4;
+                const size_t bytes = size_t(source_pitches[i])*source.height;
+                std::vector<uint8_t> padded(bytes,0);
+                for (UINT y = 0; y < source.height; ++y)
+                    std::memcpy(padded.data()+size_t(y)*source_pitches[i],source.pixels+size_t(y)*source.width*4,source.width*4);
                 source_buffers[i] = std::make_unique<SharedBuffer>(r.device.Get(),bytes);
-                copy(i,*source_buffers[i],sources[i]->pixels,bytes);
+                copy(i,*source_buffers[i],padded.data(),bytes);
                 t.barrier(foregrounds[i]->resource.Get(),D3D12_RESOURCE_STATE_COMMON,D3D12_RESOURCE_STATE_COPY_DEST);
                 t.list->CopyBufferRegion(foregrounds[i]->resource.Get(),0,transparent->resource.Get(),0,r.bytes);
                 t.barrier(foregrounds[i]->resource.Get(),D3D12_RESOURCE_STATE_COPY_DEST,D3D12_RESOURCE_STATE_COMMON);
@@ -228,8 +234,23 @@ struct LayerComposer {
                         std::min(LONG(r.width),point.x+LONG(src.width)),
                         std::min(LONG(r.height),point.y+LONG(src.height))};
                 };
+                const auto location = [](ID3D12Resource *resource, UINT width, UINT height, UINT pitch) {
+                    D3D12_TEXTURE_COPY_LOCATION result{};
+                    result.pResource = resource; result.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+                    result.PlacedFootprint.Footprint = {DXGI_FORMAT_B8G8R8A8_UNORM,width,height,1,pitch};
+                    return result;
+                };
+                const auto target = location(fg.resource.Get(),r.width,r.height,r.width*4);
+                const auto zero = location(transparent->resource.Get(),r.width,r.height,r.width*4);
+                const auto bitmap = location(source_buffers[i]->resource.Get(),src.width,src.height,source_pitches[i]);
                 const auto clear = [&](RECT rect) {
                     if (rect.right <= rect.left || rect.bottom <= rect.top) return;
+                    if (rectangles) {
+                        const D3D12_BOX box{UINT(rect.left),UINT(rect.top),0,UINT(rect.right),UINT(rect.bottom),1};
+                        t.list->CopyTextureRegion(&target,UINT(rect.left),UINT(rect.top),0,&zero,&box);
+                        frame_device_copy_bytes += size_t(rect.right-rect.left)*(rect.bottom-rect.top)*4;
+                        return;
+                    }
                     for (LONG y = rect.top; y < rect.bottom; ++y) {
                         const size_t offset = (size_t(y)*r.width+rect.left)*4;
                         const size_t bytes = size_t(rect.right-rect.left)*4;
@@ -254,7 +275,13 @@ struct LayerComposer {
                 const LONG left = std::max(0L,p[i].x), top = std::max(0L,p[i].y);
                 const LONG right = std::min(LONG(r.width),p[i].x+LONG(src.width));
                 const LONG bottom = std::min(LONG(r.height),p[i].y+LONG(src.height));
-                for (LONG y = top; y < bottom && left < right; ++y) {
+                if (rectangles && left < right && top < bottom) {
+                    const D3D12_BOX box{UINT(left-p[i].x),UINT(top-p[i].y),0,
+                        UINT(right-p[i].x),UINT(bottom-p[i].y),1};
+                    t.list->CopyTextureRegion(&target,UINT(left),UINT(top),0,&bitmap,&box);
+                    frame_device_copy_bytes += size_t(right-left)*(bottom-top)*4;
+                }
+                for (LONG y = top; !rectangles && y < bottom && left < right; ++y) {
                     const size_t bytes = size_t(right-left)*4;
                     t.list->CopyBufferRegion(fg.resource.Get(),(size_t(y)*r.width+left)*4,
                         source_buffers[i]->resource.Get(),(size_t(y-p[i].y)*src.width+left-p[i].x)*4,bytes);
@@ -401,7 +428,7 @@ int main(int argc, char **argv) {
         r.qualify(); r.background(); std::fill(r.f.begin(),r.f.end(),0); r.inputs(true);
         Sources sources;
         for (unsigned i = 0; i < 3; ++i) sources[i] = std::make_unique<SourceWindow>(o.width/3,o.height/3,i);
-        LayerComposer compositor(r,o.graph,o.placement == "retained",sources); compositor.qualify(sources);
+        LayerComposer compositor(r,o.graph,o.placement,sources); compositor.qualify(sources);
         std::vector<std::string> frames, selections, screen_checks;
         size_t skipped = 0, misses = 0, slot = 0, selection = 0, moves = 0;
         double started_unix_s = 0, live_seconds = 0, cpu_seconds = 0;

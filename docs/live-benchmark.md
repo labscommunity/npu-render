@@ -171,3 +171,9 @@ at a common frame rate. The harness rejects retained reports with repeated host
 pixel uploads or missing device-placement work, in addition to the existing
 pixel/visibility/cadence gates. The capture retains logical byte counts; a decrease
 in copying is not by itself a Tahoma performance result.
+
+`NPU_RECT` and `GPU_RECT` select the rectangular retained-copy implementation.
+Compare `DWM,NPU,GPU,NPU_RECT,GPU_RECT` separately from the row-copy experiment;
+keep the frame rate, model, prompt and warmup unchanged. The analysis retains all
+paired results and per-frame copy payload rather than predicting gains from byte
+counts alone.

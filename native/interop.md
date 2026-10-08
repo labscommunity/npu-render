@@ -301,3 +301,9 @@ blend reads/writes and final presentation; it is not measured DRAM bandwidth.
 The default remains `--placement staged` for comparison. Retained mode currently
 assumes immutable source pixels; changing application content needs explicit
 source updates and lifecycle integration.
+
+`--placement retained-rect` uses rectangular `CopyTextureRegion` commands instead
+of row-by-row `CopyBufferRegion` commands. Source rows are padded to the required
+256-byte copy pitch; shared foreground planes remain tightly packed at the
+existing supported canvas widths. Both retained variants use the same independent
+pixel gates and report the same operation scope.

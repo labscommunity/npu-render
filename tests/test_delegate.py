@@ -115,10 +115,11 @@ def test_comparisons_pair_round_medians_and_keep_unmatched_rounds_out():
     assert result["gpu_over_dwm"]["median_ratio"] is None
 
 
-def test_retained_sources_require_no_live_host_upload_and_device_placement():
+@pytest.mark.parametrize("placement", ["retained", "retained-rect"])
+def test_retained_sources_require_no_live_host_upload_and_device_placement(placement):
     report = capture()
     report.update(
-        placement_provider="retained",
+        placement_provider=placement,
         preparation_upload_bytes=100,
         source_width=426,
         source_height=240,
@@ -126,13 +127,13 @@ def test_retained_sources_require_no_live_host_upload_and_device_placement():
     report["frames"][0].update(
         host_uploaded_bytes=0, device_placement_copy_bytes=3 * 1280 * 720 * 4
     )
-    benchmark.validate_capture(report, "NPU", 60, "1005540", expected_placement="retained")
+    benchmark.validate_capture(report, "NPU", 60, "1005540", expected_placement=placement)
     report["frames"][0]["host_uploaded_bytes"] = 1280 * 720 * 4
     with pytest.raises(RuntimeError, match="host uploads"):
-        benchmark.validate_capture(report, "NPU", 60, "1005540", expected_placement="retained")
+        benchmark.validate_capture(report, "NPU", 60, "1005540", expected_placement=placement)
     report["frames"][0].update(host_uploaded_bytes=0, device_placement_copy_bytes=0)
     with pytest.raises(RuntimeError, match="omitted device copies"):
-        benchmark.validate_capture(report, "NPU", 60, "1005540", expected_placement="retained")
+        benchmark.validate_capture(report, "NPU", 60, "1005540", expected_placement=placement)
 
 
 def test_staged_path_cannot_masquerade_as_retained():

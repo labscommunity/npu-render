@@ -56,10 +56,13 @@ def validate_capture(
     wall = captured["live_wall_seconds"]
     if not frames or not math.isfinite(wall) or wall <= 0 or len(frames) / wall < fps * 0.99:
         raise RuntimeError("delegated trace did not sustain 99% of the requested cadence")
-    if expected_placement == "retained" and captured.get("preparation_upload_bytes", 0) <= 0:
+    if (
+        expected_placement in ("retained", "retained-rect")
+        and captured.get("preparation_upload_bytes", 0) <= 0
+    ):
         raise RuntimeError("retained source initialization was not reported")
     for frame in frames:
-        if expected_placement == "retained" and (
+        if expected_placement in ("retained", "retained-rect") and (
             frame.get("host_uploaded_bytes") != 0
             or (
                 mode != "DWM"
@@ -97,6 +100,11 @@ def comparisons(trials):
         ("NPU_RETAINED", "DWM"),
         ("GPU_RETAINED", "DWM"),
         ("NPU_RETAINED", "GPU_RETAINED"),
+        ("NPU_RECT", "NPU"),
+        ("GPU_RECT", "GPU"),
+        ("NPU_RECT", "DWM"),
+        ("GPU_RECT", "DWM"),
+        ("NPU_RECT", "GPU_RECT"),
     ):
         pairs = []
         for index in sorted({t["round"] for t in trials}):
@@ -133,7 +141,17 @@ def run(args):
     if (
         not modes
         or len(set(modes)) != len(modes)
-        or set(modes) - {"DWM", "NPU", "GPU", "NPU_SELECT", "NPU_RETAINED", "GPU_RETAINED"}
+        or set(modes)
+        - {
+            "DWM",
+            "NPU",
+            "GPU",
+            "NPU_SELECT",
+            "NPU_RETAINED",
+            "GPU_RETAINED",
+            "NPU_RECT",
+            "GPU_RECT",
+        }
     ):
         raise ValueError("conditions must be a unique list of supported DWM/GPU/NPU variants")
     package = importlib.util.find_spec("openvino")
@@ -176,8 +194,16 @@ def run(args):
             write_report(args.report, report)
         for index in range(args.rounds):
             for condition in trial_order(index, modes):
-                mode = "NPU" if condition == "NPU_SELECT" else condition.removesuffix("_RETAINED")
-                placement = "retained" if condition.endswith("_RETAINED") else "staged"
+                mode = (
+                    "NPU"
+                    if condition == "NPU_SELECT"
+                    else condition.removesuffix("_RETAINED").removesuffix("_RECT")
+                )
+                placement = "staged"
+                if condition.endswith("_RETAINED"):
+                    placement = "retained"
+                elif condition.endswith("_RECT"):
+                    placement = "retained-rect"
                 graph = "opaque-select" if condition == "NPU_SELECT" else "source-over"
                 before = inspect_session()
                 require_interactive_desktop(before)
