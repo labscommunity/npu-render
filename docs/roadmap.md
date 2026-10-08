@@ -7,7 +7,7 @@ delivery requirements while freeing useful GPU capacity.
 | Milestone | Deliverable | Acceptance evidence | Status |
 |---|---|---|---|
 | Device feasibility | Deterministic composition and restricted triangle graphs | Independent checks on Panther Lake NPU, including reported execution devices | Original probe complete |
-| Shared runtime | Provider contracts, device selection, prepared switch, owned outputs | 102 Python checks, native pixel tests, real device switching and loaded-driver qualification | Implemented |
+| Shared runtime | Provider contracts, device selection, prepared switch, owned outputs | 105 Python checks, native pixel tests, real device switching and loaded-driver qualification | Implemented |
 | Live application | Animated software window, async switch, frame-stage timing | Windows console session; 2,400/2,400 scheduled submissions at 720p; optimized conversion | Implemented and measured |
 | Compositor adapter | Restricted Weston renderer with a backend control | Linux CPU pixel oracle plus headless/nested Wayland clients | CPU integration validated; native Linux NPU/display validation outstanding |
 | Real buffer path | Linear graphics-buffer import/export, synchronization and format conversion | D3D12 shared input/output, byte conversion and native swapchain application with saved switch | Pixel/control and active-desktop 720p presentation checks pass; scanout timing and DMA-BUF outstanding |
@@ -42,6 +42,14 @@ Prioritize reducing per-frame work and intermediate/transfer costs, then retirin
 existing compositor work at a real integration boundary. Compare equal visual work
 and apply shared damage/caching optimizations to both GPU and NPU baselines; a faster
 NPU call alone is not the resource-relief acceptance criterion.
+
+The [retained Windows follow-up](validation/2026-10-08/retained-windows/README.md)
+removes recurring foreground host uploads and replaces costly row copies with
+rectangle copies. It improves Tahoma by 2.1% relative to staged NPU in the paired
+median, but remains 3.1% below DWM in all five pairs. Next reduce the three
+full-frame blend passes or their processed area, applying the same optimization
+to both devices. Arbitrary application integration and a net Tahoma gain remain
+separate acceptance requirements.
 
 ## Broader GPU functions
 

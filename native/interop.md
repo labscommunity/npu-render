@@ -307,3 +307,8 @@ of row-by-row `CopyBufferRegion` commands. Source rows are padded to the require
 256-byte copy pitch; shared foreground planes remain tightly packed at the
 existing supported canvas widths. Both retained variants use the same independent
 pixel gates and report the same operation scope.
+
+The [retained-buffer experiment](../docs/validation/2026-10-08/retained-windows/README.md)
+found that row copies add GPU overhead. Rectangle batching improves the NPU path
+but still reduces Tahoma throughput versus DWM. Both flags remain experimental;
+the default remains staged placement, and the normal launcher starts in DWM mode.

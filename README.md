@@ -40,6 +40,14 @@ that its installed driver rejects the tested Direct3D device-creation routes.
 The [Windows integration assessment](docs/research/windows-compositor.md) describes
 the additional renderer/driver work required for arbitrary existing applications.
 
+An [autonomous retained-buffer follow-up](docs/validation/2026-10-08/retained-windows/README.md)
+eliminates repeated foreground host uploads and batches placement into rectangle
+copies. This reduces NPU frame processing from 15.1 to 11.7 ms. Tahoma throughput
+improves 2.1% versus staged NPU in the paired median (four of five rounds), but
+remains 3.1% below ordinary Windows composition in all five comparisons. Row-by-row
+copies regress despite moving fewer bytes. Both retained variants remain explicit
+experiments; the default is unchanged and a net Tahoma benefit remains unproven.
+
 Texture sampling, affine transforms and specialized bilinear scaling now share the
 native switch. The optimized NPU resize/compose API measured about 12 ms at 720p
 and 27 ms at 1080p, including host memory work. These are off-screen operation

@@ -1,0 +1,49 @@
+{
+  "previous_revision": "c3748990ffa02a51948de25a9940ffeb536b557f",
+  "runs": {
+    "rows": {
+      "runtime_source_revision": "af8f9d566fe545a80053a05df6a49c4d5cfbfb94",
+      "private_ci_run": "https://github.com/t8/npu-render/actions/runs/37714277802",
+      "renderer_executable_sha256": "c481f505f3257cbfa5766d806f5f1f4556266f84b12a12cb1d43f860145ef0ec",
+      "tahoma_executable_sha256": "ed1f954f1c0a61de3e1b31a63156f41f908158c0b43f7e8913c5daa5da934793",
+      "executed_sources": {
+        "desktop_delegate.cpp": "85f120a9533b2236b2b8d34e101d6b0083206a00f078e6294393ad717f67352d",
+        "benchmark_delegate.py": "2cc52dd9c3a351a0473dfed1b249fcc08589a86ef24507165ae49881c7c4df61"
+      }
+    },
+    "rectangles": {
+      "runtime_source_revision": "e69e78a9ace618d415557e5713ecffc4557a07d8",
+      "private_ci_run": "https://github.com/t8/npu-render/actions/runs/37715631523",
+      "renderer_executable_sha256": "8c1ff89dfaf1a5b76e1acc30ecf7067e304ac1619142ef89118e6f02bc1e568f",
+      "tahoma_executable_sha256": "ed1f954f1c0a61de3e1b31a63156f41f908158c0b43f7e8913c5daa5da934793",
+      "executed_sources": {
+        "desktop_delegate.cpp": "20d5aab4ebb2db9e6f2ad2b8ee6466871c524866ba1dc52fd810611c1bd40fba",
+        "benchmark_delegate.py": "477ffc44d4bd969e4700eb17f09bea4b479bdeed71597ad7161eed2201cf227e"
+      }
+    }
+  },
+  "shared_sources_sha256": {
+    "native/windows/live_renderer.hpp": "025dc28b900d8b160d6c9e074ef022384b66df0e493e0a9b692b049101ad478d",
+    "native/windows/d3d12_buffers.hpp": "37d2edda8ff5ab9018f063ea36de1286ca2d82ce41dfb155912ffe35d9288dc2",
+    "native/windows/blend_model.hpp": "1c55a46eeed27310085612dcdcfd28b4665a2f7e89ab05e267d4d7209d7844c8",
+    "native/windows/opaque_model.hpp": "555fbe7c8cbd3061cb56904fe013afd41f89f2f63961aae7a6c9a8872e435324",
+    "native/tools/windows_route_probe.cpp": "bc031385dd143a7e6e955b305bd75d2d40a53b9d9f0bcbb678247fd26ebc170a",
+    "native/tools/gpu_power_probe.cpp": "db2a6149612c8e46415d873250bb72238933eccd987ca362aac6015f91706a93",
+    "tools/windows_gpu_telemetry.ps1": "6e400de2d0a55a00dd4222a87d4ec4d10a43034f61d393f16ff57eeb71685f27",
+    "research/analyze_native_cost.py": "bc0debd4c7f725591142ac8c8857f5399c9d25d46f72594fa74c9982698f398d",
+    "research/analyze_delegate.py": "ca8fe41015cc52ec2b66cfd8d58f8f59c2faee7f0e9ea93830a511b2926fa792"
+  },
+  "igcl_source_revision": "b6c462933502e13d1537dd5024949a51be30e63d",
+  "package_installation": "raw/rectangles/bundle-installation.json.gz",
+  "notes": [
+    "Raw files preserve their original bytes and encoding inside deterministic gzip files.",
+    "The rectangle experiment started only after row experiment cleanup completed.",
+    "No build, extra graphics test or bundle upload ran on Delta during either measured experiment.",
+    "The direct-LUID route probe was rerun between experiments and copied into both capture directories; adapter identities matched IGCL on the same boot.",
+    "No driver, power plan, clock, fan or security settings were changed.",
+    "The earlier full-clear prototype has qualification captures but no frozen source snapshot; it is excluded from both sustained comparisons.",
+    "No desktop screenshots, binary artifacts, model weights, caches or private network addresses are retained.",
+    "The installed experimental bundle is isolated; the existing launcher and previous application builds remain unchanged.",
+    "The first final-state capture expanded PowerShell string metadata; it is preserved unchanged. final-state-verified.json uses a plain file string and is the compact final state check."
+  ]
+}

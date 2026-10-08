@@ -177,3 +177,8 @@ Compare `DWM,NPU,GPU,NPU_RECT,GPU_RECT` separately from the row-copy experiment;
 keep the frame rate, model, prompt and warmup unchanged. The analysis retains all
 paired results and per-frame copy payload rather than predicting gains from byte
 counts alone.
+
+The [first completed comparison](validation/2026-10-08/retained-windows/README.md)
+preserves both implementations, five-round results, exact executed sources,
+telemetry and package checks. Rectangle batching improves on staged NPU but has
+not established a Tahoma gain over ordinary Windows composition.
