@@ -1,0 +1,12 @@
+{"stage":"exact_gpu_device"}
+{"stage":"create_typed_cross_adapter_texture"}
+{"stage":"native_d3d11_open"}
+{"stage":"npu_texture_page_alias"}
+{"operation":"alias OpenAdapterFromLuid(NPU)","ntstatus":0}
+{"operation":"alias CreateDevice","ntstatus":0}
+{"operation":"alias QueryResourceInfoFromNtHandle","ntstatus":0}
+{"operation":"alias OpenResourceFromNtHandle","ntstatus":0}
+{"operation":"alias Lock2 texture","ntstatus":0}
+{"texture_allocation_bytes":65536,"mapped_region_bytes":16384,"mapped_offset":0}
+{"alias_cleanup_failures":0}
+{"passed":false,"full_desktop_offload":false,"stage":"npu_texture_page_alias","error":"texture mapping is smaller than the allocation"}

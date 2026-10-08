@@ -220,3 +220,14 @@ provides reference interfaces, but its unfinished reset/preemption methods and
 global timeout-disabling installer cannot be treated as a deployable NPU driver.
 The sample has not been installed. Cross-process typed-resource lifetime, real
 composition shaders/state and presentation/recovery still need implementation.
+
+The [next cross-process test](../validation/2026-10-08/texture-worker/README.md)
+passes GPU-produced inputs → child NPU composition → native graphics consumption,
+including full display resolution and parent texture release/reopen. Worker job
+lifetime and fault propagation pass, with a successful fresh run after failures.
+This closes a resource handoff uncertainty without establishing Windows renderer
+selection. A read-only inventory of installed compositor modules also finds 446
+embedded shader/library containers in `dwmcore.dll`, with sampling, derivatives,
+conditionals and nonlinear arithmetic. This is static evidence of broader shader
+semantics, not the active desktop's execution trace. The current exact-shader DDI
+cannot yet execute that general stream.

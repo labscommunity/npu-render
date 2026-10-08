@@ -2,5 +2,6 @@
 *.sh text eol=lf
 .githooks/* text eol=lf
 # Preserve Windows capture bytes so the retained SHA-256 manifests remain verifiable.
-docs/validation/2026-10-08/ddi-shared/** -text
-docs/validation/2026-10-08/typed-textures/** -text
+docs/validation/2026-10-08/ddi-shared/** -text whitespace=cr-at-eol
+docs/validation/2026-10-08/typed-textures/** -text whitespace=cr-at-eol
+docs/validation/2026-10-08/texture-worker/** -text whitespace=cr-at-eol

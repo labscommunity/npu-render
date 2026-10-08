@@ -77,3 +77,10 @@ the changing result correctly through display resolution. It does not use
 retain both the successful route and failed direct-typed/legacy controls. This
 one-process result still needs cross-process ownership and graphics-driver/DWM
 integration; it does not change the earlier legacy DDI consumer failure.
+
+The subsequent [`nr_texture_worker` qualification](../../docs/validation/2026-10-08/texture-worker/README.md)
+passes that cross-process ownership boundary. GPU-drawn input textures and the
+output are opened and locally aliased in an NPU child; native GPU shader sampling
+validates the result. The creator releases/reopens textures mid-run, and forced
+parent/worker exits leave no worker orphan. GPU/NPU host coordination remains;
+graphics-driver registration and DWM command execution remain unimplemented.

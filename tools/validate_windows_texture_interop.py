@@ -78,6 +78,7 @@ def main():
     sources = [
         "CMakeLists.txt",
         "tools/d3d11_texture_interop.cpp",
+        "windows/typed_texture.hpp",
         "windows/blend_model.hpp",
         "windows/d3d12_buffers.hpp",
         "windows/ddi/contract.hpp",

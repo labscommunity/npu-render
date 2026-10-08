@@ -57,6 +57,14 @@ conformance. The private Windows bundle includes this independently testable ste
 [source and exact-package checks](docs/validation/2026-10-08/windows-ddi/README.md)
 pass on Delta's CPU, GPU and NPU.
 
+The [native texture follow-up](docs/validation/2026-10-08/texture-worker/README.md)
+passes GPU-drawn input textures → separate NPU worker → native GPU shader sampling
+at 2880×1800 in BGRA and RGBA. It uses no explicit CPU pixel uploads or output
+copies. Creator release/reopen and parent/worker termination checks pass, followed
+by successful recovery. The private bundle includes both finite texture probes.
+This resolves a shared-resource boundary; a registered graphics adapter, Windows'
+general shader/state stream and actual DWM selection remain unimplemented.
+
 The [captured-window desktop experiment](native/windows/capture/README.md) now
 presents an NPU-composed 2880×1800 desktop with input passing through to the
 original applications, a disable/enable control, and an external hang watchdog.

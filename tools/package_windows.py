@@ -35,6 +35,8 @@ def main():
             "nr_desktop_delegate.exe",
             "nr_windows_route_probe.exe",
             "nr_d3d12_interop.exe",
+            "nr_d3d11_texture_interop.exe",
+            "nr_texture_worker.exe",
             "npu_render_native.dll",
         ):
             shutil.copy2(args.build_dir / name, root / name)
@@ -96,6 +98,7 @@ def main():
             "Requires current Intel GPU/NPU drivers and Microsoft Visual C++ x64 runtime.\n"
             "OpenVINO 2026.1.0 runtime and its notices are included. Python is not needed.\n"
             "Tested device: Panther Lake Core Ultra X7 358H, Arc B390, NPU 5010.\n"
+            "Native texture-worker follow-up uses NPU driver 32.0.100.5540.\n"
             "Practical Tahoma acceleration remains unproven.\n\n"
             "COOPERATING WINDOWS EXPERIMENT\n"
             "Run run-delegate.cmd on an unlocked Windows 11 desktop.\n"
@@ -109,6 +112,20 @@ def main():
             "All three modes pass pixel checks before the experiment begins.\n"
             "The report is %LOCALAPPDATA%\\npu-render\\desktop-delegate.json.\n"
             "NPU mode remains an experiment, not a recommended performance setting.\n",
+            encoding="utf-8",
+        )
+        (root / "TEXTURE-EXPERIMENTS.txt").write_text(
+            "PRIVATE HARDWARE INTEROPERABILITY CHECKS\n\n"
+            "In a command prompt in this folder, first set PATH=%CD%\\runtime;%PATH%\n"
+            "Run nr_d3d11_texture_interop.exe --sample --width 2880 --height 1800\n"
+            "or nr_texture_worker.exe --reopen --width 2880 --height 1800\n"
+            "Use --rgba for RGBA; the default is BGRA.\n"
+            "Add --debug only with Windows Graphics Tools installed.\n"
+            "These finite checks print JSON diagnostics and verify changing pixels.\n"
+            "The worker check launches one child process and cleans it up on exit.\n"
+            "It draws inputs on GPU, blends on NPU and samples the result on GPU.\n"
+            "No system driver is installed and Windows DWM does not switch renderers.\n"
+            "A passing result is not desktop offload or Tahoma acceleration.\n",
             encoding="utf-8",
         )
         files = {

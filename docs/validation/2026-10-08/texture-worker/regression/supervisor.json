@@ -1,0 +1,280 @@
+{
+  "scope": "NPU writes a graphics-owned texture; native D3D11 reads pixels in one process",
+  "full_desktop_offload": false,
+  "started_utc": "2026-10-08T21:35:40.682876+00:00",
+  "binaries_sha256": {
+    "nr_d3d11_texture_interop.exe": "46c8d4e53f9500757e0aebb7e902c6bdd37f7efa0d3ae7b9999b5fce45738b9f"
+  },
+  "sources_sha256": {
+    "CMakeLists.txt": "9bde318612243fb28bdc0fd79ab5d36bccfa1bcc8f56644e8cd0c352d1671281",
+    "tools/d3d11_texture_interop.cpp": "05097cfe9b3bc7d755bc90d67a4cb1c2a73fce4c33953cef69c0b2a88f4e4dca",
+    "windows/typed_texture.hpp": "55f31c493ed4196421f46305ebd7d85e47d24d6327670ba41e35415ea91ef690",
+    "windows/blend_model.hpp": "1c55a46eeed27310085612dcdcfd28b4665a2f7e89ab05e267d4d7209d7844c8",
+    "windows/d3d12_buffers.hpp": "37d2edda8ff5ab9018f063ea36de1286ca2d82ce41dfb155912ffe35d9288dc2",
+    "windows/ddi/contract.hpp": "e82cc949a2847eea1de8e5346bcef1dcaa23ea092126c57b56301bc48c07d919"
+  },
+  "runtime_dlls_sha256": {
+    "openvino.dll": "8f942ea62fea186f8d1c67714a8dbb959a19daf62be7e279681bd7af0f3db4bc",
+    "openvino_auto_batch_plugin.dll": "0f2d523bb3aea6e1156b6589fd439c979dbd0b02a908f7bbb9e66c6b57e72635",
+    "openvino_auto_plugin.dll": "d9feb1904dabffe1619cb41bb9bb970e573f2ac5620635720685e23433fb6e06",
+    "openvino_c.dll": "d4178bb08b78f995cf3b77ddd23848ffbb883e0826513daea29399f8ccaffa7f",
+    "openvino_hetero_plugin.dll": "a22cc35b215d38fcef24c2d49b03a906ab6dc883daac65a1578af28feb06fb25",
+    "openvino_intel_cpu_plugin.dll": "443b0b7bdbfb8b85abf4b8b15ab7ff108885fbd154b4796b547b3029324ef3bd",
+    "openvino_intel_gpu_plugin.dll": "b5560e419f0d310765c830504505fcaffc8528f7b637fdeb9b672bf7bac90a49",
+    "openvino_intel_npu_compiler.dll": "842c2ce657e995753133b12a5a225b4c335242afd853007493b4e28f37aeeb2d",
+    "openvino_intel_npu_plugin.dll": "d224638d4f3460c8c37943d6a67493a2c03db1ad5398dfff0fff8d1b69dd4629",
+    "openvino_ir_frontend.dll": "3e558751f4ffca0fc190bf68f1d3e96e0a8c7e8fd1cfe217d15a07a69ca2ca0a",
+    "openvino_jax_frontend.dll": "c2cc72d3fa5721545bb253902ffce00a496f5855a032d4c3fba4e5becc9882b5",
+    "openvino_onnx_frontend.dll": "3e1b3a2d073b8c3719e30a431b0ffa0e80881243260bbe1814064270a5d675da",
+    "openvino_paddle_frontend.dll": "fd734eaab3beff99ec6c79cada576a77fa49f2a7af7e9432e4bfebc0a81fc5bf",
+    "openvino_pytorch_frontend.dll": "f6c67afec54b4cd33ba3c894ffcdcfa06550259268ed32215ffd0823928ba0c9",
+    "openvino_tensorflow_frontend.dll": "1ea598fa11be3cf0dde14aa86bf1c199a2cd11035a5ae1f2c567f6c53848ef86",
+    "openvino_tensorflow_lite_frontend.dll": "3223c168955534a6493442a4c00b3d43dca7c491b8f53d056050abd65d9879ff",
+    "tbb12.dll": "7ff7925b17e1ae666500feebe2f206d47362c8462ad4fd20d38edc25b091a8f8",
+    "tbbbind_2_5.dll": "e34aadbc84c53d25a9bc206df1a25df4ec582923c285b886a55d3ebb3c249d35",
+    "tbbmalloc.dll": "b5b4d7152c2b453598332be9cbcdacbf86dcfe7f7f4bbd3ad5174fe238730930",
+    "tbbmalloc_proxy.dll": "b60b89c6ab57c7b390af271940a7440b680440f4db994d27c5ba5c558e38c927"
+  },
+  "supervisor_sha256": "836928dd5e87a50757c4d188688a924192664ec8ab706b27ab8c06f0049e1dc9",
+  "runs": [
+    {
+      "name": "bgra-64",
+      "command": [
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\texture-worker-v1\\Release\\nr_d3d11_texture_interop.exe",
+        "--width",
+        "64",
+        "--height",
+        "48",
+        "--debug"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "wall_seconds": 0.7305006999959005
+    },
+    {
+      "name": "rgba-320",
+      "command": [
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\texture-worker-v1\\Release\\nr_d3d11_texture_interop.exe",
+        "--width",
+        "320",
+        "--height",
+        "240",
+        "--rgba",
+        "--debug"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "wall_seconds": 0.3838934999948833
+    },
+    {
+      "name": "bgra-720p",
+      "command": [
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\texture-worker-v1\\Release\\nr_d3d11_texture_interop.exe",
+        "--width",
+        "1280",
+        "--height",
+        "720",
+        "--debug"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "wall_seconds": 0.6998701999982586
+    },
+    {
+      "name": "bgra-display",
+      "command": [
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\texture-worker-v1\\Release\\nr_d3d11_texture_interop.exe",
+        "--width",
+        "2880",
+        "--height",
+        "1800",
+        "--debug"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "wall_seconds": 1.9526217999955406
+    },
+    {
+      "name": "sample-bgra-64",
+      "command": [
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\texture-worker-v1\\Release\\nr_d3d11_texture_interop.exe",
+        "--width",
+        "64",
+        "--height",
+        "48",
+        "--sample",
+        "--debug"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "wall_seconds": 0.39180060000217054
+    },
+    {
+      "name": "sample-rgba-320",
+      "command": [
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\texture-worker-v1\\Release\\nr_d3d11_texture_interop.exe",
+        "--width",
+        "320",
+        "--height",
+        "240",
+        "--sample",
+        "--rgba",
+        "--debug"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "wall_seconds": 0.4085188000026392
+    },
+    {
+      "name": "sample-bgra-720p",
+      "command": [
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\texture-worker-v1\\Release\\nr_d3d11_texture_interop.exe",
+        "--width",
+        "1280",
+        "--height",
+        "720",
+        "--sample",
+        "--debug"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "wall_seconds": 0.6788908000016818
+    },
+    {
+      "name": "sample-bgra-display",
+      "command": [
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\texture-worker-v1\\Release\\nr_d3d11_texture_interop.exe",
+        "--width",
+        "2880",
+        "--height",
+        "1800",
+        "--sample",
+        "--debug"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "wall_seconds": 2.0526909999898635
+    },
+    {
+      "name": "buffer-control",
+      "command": [
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\texture-worker-v1\\Release\\nr_d3d11_texture_interop.exe",
+        "--width",
+        "64",
+        "--height",
+        "48",
+        "--buffer-control",
+        "--debug"
+      ],
+      "passed": true,
+      "exit_code": 0,
+      "wall_seconds": 0.4095431999885477
+    },
+    {
+      "name": "reject-width",
+      "command": [
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\texture-worker-v1\\Release\\nr_d3d11_texture_interop.exe",
+        "--width",
+        "63",
+        "--height",
+        "48",
+        "--debug"
+      ],
+      "passed": true,
+      "exit_code": 1,
+      "wall_seconds": 0.02765920000092592
+    },
+    {
+      "name": "reject-direct",
+      "command": [
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\texture-worker-v1\\Release\\nr_d3d11_texture_interop.exe",
+        "--width",
+        "64",
+        "--height",
+        "48",
+        "--direct-import",
+        "--debug"
+      ],
+      "passed": true,
+      "exit_code": 1,
+      "wall_seconds": 0.02843360000406392
+    },
+    {
+      "name": "reject-ddi-nt",
+      "command": [
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\texture-worker-v1\\Release\\nr_d3d11_texture_interop.exe",
+        "--width",
+        "64",
+        "--height",
+        "48",
+        "--ddi-import",
+        "--debug"
+      ],
+      "passed": true,
+      "exit_code": 1,
+      "wall_seconds": 0.031112600001506507
+    },
+    {
+      "name": "reject-npu-mapping",
+      "command": [
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\texture-worker-v1\\Release\\nr_d3d11_texture_interop.exe",
+        "--width",
+        "64",
+        "--height",
+        "256",
+        "--diagnostic-npu-map",
+        "--debug"
+      ],
+      "passed": true,
+      "exit_code": 1,
+      "wall_seconds": 0.24097559999790974
+    },
+    {
+      "name": "reject-legacy",
+      "command": [
+        "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\texture-worker-v1\\Release\\nr_d3d11_texture_interop.exe",
+        "--width",
+        "64",
+        "--height",
+        "48",
+        "--diagnostic-legacy",
+        "--debug"
+      ],
+      "passed": true,
+      "exit_code": 1,
+      "wall_seconds": 0.23563590001140255
+    }
+  ],
+  "passed": true,
+  "finished_utc": "2026-10-08T21:35:49.049921+00:00",
+  "captured_sha256": {
+    "bgra-64.jsonl": "aa4e751f615bd666ef974f37213fd584da564d97566a6467d51509d022c6ff82",
+    "bgra-64.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bgra-720p.jsonl": "76ce3ea3f074442dbba506e31810faf0b5c1ba9f8efcbca62bbbf0b2db462623",
+    "bgra-720p.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bgra-display.jsonl": "bcb847705978c3b141cc3c6b4c55ee95b032c7128832c46ec6402db1ab8d2db5",
+    "bgra-display.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "buffer-control.jsonl": "9437af48565be100013a20cc3c3633337def629b92f560adba59ac8ccaadc0e1",
+    "buffer-control.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reject-ddi-nt.jsonl": "13bdbefaaefc81c17968a3c263a44048337db0eefd4508aeb35b9f639518dd5b",
+    "reject-ddi-nt.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reject-direct.jsonl": "13bdbefaaefc81c17968a3c263a44048337db0eefd4508aeb35b9f639518dd5b",
+    "reject-direct.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reject-legacy.jsonl": "f14c086e0ead758ca67df50fd975bbb25215efe68d286c9fd1c42028ada5ef71",
+    "reject-legacy.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reject-npu-mapping.jsonl": "9e178bb2a035009106e2034495d0b786eb8b21b693b8eaa906bafdb262fe4358",
+    "reject-npu-mapping.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reject-width.jsonl": "5d1930ca83d0b05274a6f8ce84d2b16eb63c6be6c1f35fee4e2c7ced4b8591cc",
+    "reject-width.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "rgba-320.jsonl": "fa1044625c9497463c96d9446967824750330c96443b54543e8f12f81dbb1996",
+    "rgba-320.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "sample-bgra-64.jsonl": "cd65199150ef81f50d6263be0cea09d23399af20de47245433296532ce20120d",
+    "sample-bgra-64.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "sample-bgra-720p.jsonl": "2b3617ed90100ede51f23970d2ba88fda0a2737bf0adbcd4046ada30015b73f9",
+    "sample-bgra-720p.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "sample-bgra-display.jsonl": "83e9a2b8eaab071871d7b6db7f544c247376805ca425f874986646fb6a10cf3c",
+    "sample-bgra-display.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "sample-rgba-320.jsonl": "a134097384c730aaacd2001bd4cc556d0cdc9a644de63d64750b4458ff136454",
+    "sample-rgba-320.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}
