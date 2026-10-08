@@ -1,4 +1,4 @@
-"""Fetch pinned WDK headers for the process-local Windows DDI laboratory.
+"""Fetch pinned WDK headers and optional kernel build libraries.
 
 This extracts a build dependency only. It does not install or register drivers.
 """
@@ -21,7 +21,7 @@ PREFIX = "c/Include/10.0.26100.0/"
 DEFAULT_ROOT = Path("build/dependencies") / f"wdk-{VERSION}"
 
 
-def prepare(root: Path) -> Path:
+def prepare(root: Path, *, kernel: bool = False) -> Path:
     root.mkdir(parents=True, exist_ok=True)
     archive = root / "wdk.nupkg"
     if not archive.exists():
@@ -33,8 +33,19 @@ def prepare(root: Path) -> Path:
         raise RuntimeError("WDK package checksum mismatch")
     include = root / "include"
     records = {}
+    libraries = {}
     with zipfile.ZipFile(archive) as package:
         for entry in package.infolist():
+            library_prefix = "c/Lib/10.0.26100.0/km/x64/"
+            if kernel and entry.filename.startswith(library_prefix) and not entry.is_dir():
+                relative = Path(entry.filename.removeprefix(library_prefix))
+                if relative.is_absolute() or ".." in relative.parts:
+                    raise RuntimeError("unsafe WDK library path")
+                target = root / "lib" / relative
+                data = package.read(entry)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(data)
+                libraries[relative.as_posix()] = hashlib.sha256(data).hexdigest()
             if not entry.filename.startswith(PREFIX) or entry.is_dir():
                 continue
             relative = Path(entry.filename.removeprefix(PREFIX))
@@ -47,8 +58,21 @@ def prepare(root: Path) -> Path:
             records[relative.as_posix()] = hashlib.sha256(data).hexdigest()
     if not (include / "um/d3d10umddi.h").is_file():
         raise RuntimeError("WDK driver interface header missing")
+    if kernel:
+        for name in ("ntoskrnl.lib", "hal.lib", "displib.lib", "BufferOverflowK.lib"):
+            if name not in libraries:
+                raise RuntimeError(f"WDK kernel library missing: {name}")
     (root / "manifest.json").write_text(
-        json.dumps({"url": URL, "sha256": SHA256, "headers_sha256": records}, indent=2) + "\n"
+        json.dumps(
+            {
+                "url": URL,
+                "sha256": SHA256,
+                "headers_sha256": records,
+                "libraries_sha256": libraries,
+            },
+            indent=2,
+        )
+        + "\n"
     )
     return include.resolve()
 
@@ -56,8 +80,9 @@ def prepare(root: Path) -> Path:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=DEFAULT_ROOT)
+    parser.add_argument("--kernel", action="store_true", help="also extract x64 kernel libraries")
     args = parser.parse_args()
-    print(prepare(args.output))
+    print(prepare(args.output, kernel=args.kernel))
 
 
 if __name__ == "__main__":

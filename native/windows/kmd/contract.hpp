@@ -1,0 +1,36 @@
+#pragma once
+namespace nr::kernel_contract {
+using u32 = unsigned int;
+using u64 = unsigned long long;
+static_assert(sizeof(u32) == 4 && sizeof(u64) == 8);
+constexpr u32 magic = 0x4e52574b; // NRWK
+constexpr u32 version = 1;
+constexpr u64 max_surface_bytes = 128ull * 1024 * 1024;
+struct AdapterInfo {
+    u32 signature = magic;
+    u32 abi = version;
+    u32 bytes = sizeof(AdapterInfo);
+    u32 ready = 0;
+};
+struct Surface {
+    u32 signature = magic;
+    u32 abi = version;
+    u32 bytes = sizeof(Surface);
+    u32 width = 0;
+    u32 height = 0;
+    u32 format = 0;
+    u32 row_pitch = 0;
+    u32 reserved = 0;
+    u64 allocation_bytes = 0;
+};
+static_assert(sizeof(AdapterInfo) == 16 && sizeof(Surface) == 40);
+constexpr bool valid(const Surface &s) {
+    return s.signature == magic && s.abi == version && s.bytes == sizeof(Surface) &&
+           !s.reserved && s.width && s.width <= 8192 && s.height && s.height <= 8192 &&
+           (s.format == 28 || s.format == 87) && // RGBA8_UNORM / BGRA8_UNORM
+           s.row_pitch >= u64(s.width) * 4 && !(s.row_pitch % 256) &&
+           s.allocation_bytes && s.allocation_bytes <= max_surface_bytes &&
+           !(s.allocation_bytes % 4096) &&
+           u64(s.row_pitch) * s.height <= s.allocation_bytes;
+}
+} // namespace nr::kernel_contract

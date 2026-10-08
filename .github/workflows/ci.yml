@@ -55,6 +55,9 @@ jobs:
         run: uv run --frozen --group native python tools/build_native.py --pixman
       - if: runner.os == 'Windows'
         run: uv run --frozen --group native python tools/build_native.py --ddi
+      - name: Build start-disabled kernel target and test DDI contracts
+        if: runner.os == 'Windows'
+        run: uv run --frozen python tools/build_windows_driver.py
       - name: Package private Windows prototype
         if: runner.os == 'Windows'
         run: uv run --frozen python tools/package_windows.py --ddi --source-revision ${{ github.sha }}

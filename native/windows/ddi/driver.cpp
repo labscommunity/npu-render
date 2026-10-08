@@ -4,6 +4,9 @@
 #define NOMINMAX
 #include "../blend_model.hpp"
 #include "contract.hpp"
+#ifdef NR_DDI_REGISTERED_ADAPTER
+#include "../kmd/contract.hpp"
+#endif
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -833,6 +836,23 @@ extern "C" __declspec(dllexport) int nr_ddi_get_shared_stats(NrDdiSharedStats *o
 extern "C" __declspec(dllexport) HRESULT APIENTRY OpenAdapter10(D3D10DDIARG_OPENADAPTER *a) {
     if (!a || !a->pAdapterFuncs)
         return E_INVALIDARG;
+#ifdef NR_DDI_REGISTERED_ADAPTER
+    if (!a->pAdapterCallbacks || !a->pAdapterCallbacks->pfnQueryAdapterInfoCb)
+        return E_INVALIDARG;
+    nr::kernel_contract::AdapterInfo info{};
+    // Do not prefill matching magic: a callback that returns success without
+    // writing output must not make an unrelated adapter appear compatible.
+    std::memset(&info, 0, sizeof(info));
+    D3DDDICB_QUERYADAPTERINFO query{};
+    query.pPrivateDriverData = &info;
+    query.PrivateDriverDataSize = sizeof(info);
+    const HRESULT queried = a->pAdapterCallbacks->pfnQueryAdapterInfoCb(a->hRTAdapter.handle, &query);
+    if (FAILED(queried))
+        return queried;
+    if (info.signature != nr::kernel_contract::magic || info.abi != nr::kernel_contract::version ||
+        info.bytes != sizeof(info) || info.ready != 1)
+        return DXGI_ERROR_UNSUPPORTED;
+#endif
     a->hAdapter.pDrvPrivate = reinterpret_cast<void *>(1);
     a->pAdapterFuncs->pfnCalcPrivateDeviceSize = device_size;
     a->pAdapterFuncs->pfnCreateDevice = create_device;
