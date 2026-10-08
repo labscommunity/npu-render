@@ -23,6 +23,11 @@ CONTROL_SETTINGS = {
     "GPU_WAIT": ("GPU", "none", 3.0, "gather"),
     "TRANSFER_PRESENT": ("GPU", "transfer-present", 0.0, "gather"),
 }
+NPU_SETTINGS = {
+    "NPU_EFFICIENT": ("EFFICIENT", 0),
+    "NPU_ONE_TILE": ("DEFAULT", 1),
+    "NPU_ONE_TILE_EFFICIENT": ("EFFICIENT", 1),
+}
 
 
 def power_status():
@@ -48,18 +53,31 @@ def parse_conditions(value):
     conditions = [item.strip().upper() for item in value.split(",")]
     if not conditions or len(set(conditions)) != len(conditions):
         raise ValueError("conditions must be a nonempty unique list")
-    if set(conditions) - {"GPU", "NPU", "NPU_CONV", "CPU", "IDLE", *CONTROL_SETTINGS}:
+    if set(conditions) - {
+        "GPU",
+        "NPU",
+        "NPU_CONV",
+        "CPU",
+        "IDLE",
+        *CONTROL_SETTINGS,
+        *NPU_SETTINGS,
+    }:
         raise ValueError("unknown graphics or diagnostic condition")
     return conditions
 
 
 def condition_backend(condition):
+    if condition in NPU_SETTINGS:
+        return "NPU"
     if condition in CONTROL_SETTINGS:
         return CONTROL_SETTINGS[condition][0]
     return "NPU" if condition == "NPU_CONV" else condition
 
 
 def condition_arguments(condition):
+    if condition in NPU_SETTINGS:
+        workload, tiles = NPU_SETTINGS[condition]
+        return ["--npu-alpha", "convolution", "--npu-workload", workload, "--npu-tiles", str(tiles)]
     if condition == "NPU_CONV":
         return ["--npu-alpha", "convolution"]
     if condition in CONTROL_SETTINGS:
@@ -78,8 +96,22 @@ def condition_arguments(condition):
 def validate_graphics_condition(condition, captured):
     backend = condition_backend(condition)
     _, mode, wait, alpha = CONTROL_SETTINGS.get(
-        condition, (backend, "none", 0.0, "convolution" if condition == "NPU_CONV" else "gather")
+        condition,
+        (
+            backend,
+            "none",
+            0.0,
+            "convolution" if condition == "NPU_CONV" or condition in NPU_SETTINGS else "gather",
+        ),
     )
+    workload, tiles = NPU_SETTINGS.get(condition, ("DEFAULT", 0))
+    if (
+        captured.get("npu_workload", "DEFAULT") != workload
+        or captured.get("npu_requested_tiles", 0) != tiles
+    ):
+        raise RuntimeError("renderer reported different NPU execution settings")
+    if tiles and captured.get("npu_max_tiles", 0) < tiles:
+        raise RuntimeError("NPU tile request was not validated against the device")
     if captured.get("diagnostic", "none") != mode or captured.get("diagnostic_wait_ms", 0) != wait:
         raise RuntimeError("renderer reported a different diagnostic condition")
     if captured.get("full_graphics_trace", True) != (mode == "none"):
@@ -112,6 +144,7 @@ def native_comparisons(trials):
         ("GPU_WAIT", "GPU"),
         ("TRANSFER_PRESENT", "IDLE"),
         ("NPU_CONV", "NPU_ONLY"),
+        *((condition, baseline) for condition in NPU_SETTINGS for baseline in ("NPU_CONV", "GPU")),
     ):
         ratios = []
         for index in sorted({trial["round"] for trial in trials}):

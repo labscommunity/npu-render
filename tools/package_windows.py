@@ -29,7 +29,13 @@ def main():
     with tempfile.TemporaryDirectory(prefix="npu-render-package-") as directory:
         root = Path(directory) / "npu-render"
         (root / "runtime").mkdir(parents=True)
-        for name in ("nr_native_live.exe", "nr_d3d12_interop.exe", "npu_render_native.dll"):
+        for name in (
+            "nr_native_live.exe",
+            "nr_desktop_delegate.exe",
+            "nr_windows_route_probe.exe",
+            "nr_d3d12_interop.exe",
+            "npu_render_native.dll",
+        ):
             shutil.copy2(args.build_dir / name, root / name)
         libraries = list(runtime.glob("*.dll"))
         if not libraries:
@@ -55,6 +61,15 @@ def main():
             "if errorlevel 1 pause\r\n"
         )
         (root / "run.cmd").write_bytes(launcher.encode("ascii"))
+        delegate_launcher = (
+            "@echo off\r\nsetlocal\r\n"
+            'set "PATH=%~dp0runtime;%PATH%"\r\n'
+            'if not exist "%LOCALAPPDATA%\\npu-render" mkdir "%LOCALAPPDATA%\\npu-render"\r\n'
+            '"%~dp0nr_desktop_delegate.exe" --fps 30 --seconds 1800 '
+            '--report "%LOCALAPPDATA%\\npu-render\\desktop-delegate.json" %*\r\n'
+            "if errorlevel 1 pause\r\n"
+        )
+        (root / "run-delegate.cmd").write_bytes(delegate_launcher.encode("ascii"))
         (root / "README.txt").write_text(
             "PRIVATE NPU-RENDER PROTOTYPE\n\n"
             "Run run.cmd on a Windows Intel Core Ultra NPU machine.\n"
@@ -71,7 +86,19 @@ def main():
             "Requires current Intel GPU/NPU drivers and Microsoft Visual C++ x64 runtime.\n"
             "OpenVINO 2026.1.0 runtime and its notices are included. Python is not needed.\n"
             "Tested device: Panther Lake Core Ultra X7 358H, Arc B390, NPU 5010.\n"
-            "Practical Tahoma acceleration remains unproven.\n",
+            "Practical Tahoma acceleration remains unproven.\n\n"
+            "COOPERATING WINDOWS EXPERIMENT\n"
+            "Run run-delegate.cmd on an unlocked Windows 11 desktop.\n"
+            "Keys: 1 Windows DWM, 2 NPU, 3 GPU, Escape exit. Starts in DWM mode.\n"
+            "This creates three test windows with GDI content. NPU/GPU modes hide\n"
+            "those originals and combine the same surfaces into one canvas.\n"
+            "It does not move other applications, the taskbar or all of Windows\n"
+            "to the NPU. The outer canvas still uses Windows DWM and GPU copies.\n"
+            "The default is 1280x720 at 30 updates/s for 30 minutes.\n"
+            "Keep the test canvas visible and unscaled; screen pixel checks reject occlusion.\n"
+            "All three modes pass pixel checks before the experiment begins.\n"
+            "The report is %LOCALAPPDATA%\\npu-render\\desktop-delegate.json.\n"
+            "NPU mode remains an experiment, not a recommended performance setting.\n",
             encoding="utf-8",
         )
         files = {

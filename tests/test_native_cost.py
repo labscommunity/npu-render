@@ -177,3 +177,21 @@ def test_diagnostic_iterations_are_not_counted_as_display_submissions():
     assert trial["whole_live_iterations"] == trial["whole_live_compositions"] == 1
     assert trial["whole_live_presentations"] == trial["whole_live_submissions_per_second"] == 0
     assert trial["full_graphics_trace"] is False
+
+
+@pytest.mark.parametrize("condition", list(benchmark.NPU_SETTINGS))
+def test_npu_execution_settings_must_be_reported_and_match(condition):
+    workload, tiles = benchmark.NPU_SETTINGS[condition]
+    report = control_report()
+    report.update(
+        diagnostic="none",
+        full_graphics_trace=True,
+        npu_workload=workload,
+        npu_requested_tiles=tiles,
+        npu_max_tiles=3,
+    )
+    report["frames"][0].update(presented=True, present_hresult=0)
+    benchmark.validate_graphics_condition(condition, report)
+    report["npu_workload"] = "DEFAULT" if workload == "EFFICIENT" else "EFFICIENT"
+    with pytest.raises(RuntimeError, match="execution settings"):
+        benchmark.validate_graphics_condition(condition, report)

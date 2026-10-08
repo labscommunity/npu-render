@@ -2,7 +2,8 @@ param(
     [Parameter(Mandatory=$true)][string]$OutputPath,
     [int[]]$ProcessIds = @(),
     [ValidateRange(1,86400)][int]$Seconds = 300,
-    [ValidateRange(1,60)][int]$SampleIntervalSeconds = 1
+    [ValidateRange(1,60)][int]$SampleIntervalSeconds = 1,
+    [string]$StopFile = ''
 )
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
@@ -10,12 +11,17 @@ $started = (Get-Date).ToUniversalTime().ToString('o')
 $sampleIndex = 0
 $counterErrors = @()
 $fatalError = $null
+$stoppedByRequest = $false
 $writer = [System.IO.StreamWriter]::new($OutputPath, $false)
 try {
     # Get-Counter expands wildcard instances once per invocation. Reopen for
     # each sample so applications launched during the capture are discovered.
     # Each invocation takes its own initial reading before the timed sample.
     for ($attempt = 0; $attempt -lt $Seconds; $attempt++) {
+        if ($StopFile -and (Test-Path -LiteralPath $StopFile)) {
+            $stoppedByRequest = $true
+            break
+        }
         $queryStarted = (Get-Date).ToUniversalTime().ToString('o')
         Get-Counter '\GPU Engine(*)\Utilization Percentage' -SampleInterval $SampleIntervalSeconds -MaxSamples 1 -ErrorAction SilentlyContinue -ErrorVariable +counterErrors |
         ForEach-Object {
@@ -51,7 +57,7 @@ try {
             $writer.Flush()
         }
     }
-    if ($sampleIndex -ne $Seconds) {throw "Expected $Seconds samples; captured $sampleIndex"}
+    if (-not $stoppedByRequest -and $sampleIndex -ne $Seconds) {throw "Expected $Seconds samples; captured $sampleIndex"}
 } catch {
     $fatalError = $_.Exception.Message
     throw
@@ -59,7 +65,7 @@ try {
     $writer.Dispose()
     @{schema_version=2; started_utc=$started; ended_utc=(Get-Date).ToUniversalTime().ToString('o');
       requested_samples=$Seconds; sample_interval_seconds=$SampleIntervalSeconds;
-      samples=$sampleIndex; process_filter=$ProcessIds; fatal_error=$fatalError;
+      samples=$sampleIndex; stopped_by_request=$stoppedByRequest; process_filter=$ProcessIds; fatal_error=$fatalError;
       counter_errors=@($counterErrors | ForEach-Object {$_.Exception.Message});
       discovery='Wildcard instances are refreshed before every independently primed sample. Short-lived processes and gaps between queries can be missed.';
       scope='GPU Engine counters and process names only; no window contents or command lines';
