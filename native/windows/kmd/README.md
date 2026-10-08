@@ -14,6 +14,9 @@ uv run python tools/build_windows_driver.py
 The script verifies and extracts the pinned WDK package, compiles a `.sys`
 with `/kernel /W4 /WX`, and runs a user-mode test of the actual DDI source.
 It does not sign, install, change boot settings, or register a device.
+The optimized image includes CodeView information and a matching PDB for
+isolated kernel debugging. The build report hashes both files; retain that
+pair when test-signing the image so a debugger can verify symbol identity.
 
 The implementation currently provides:
 

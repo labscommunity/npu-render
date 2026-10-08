@@ -15,7 +15,7 @@ set(CMAKE_EXE_LINKER_FLAGS "")
 add_executable(nr_render_kmd driver.cpp)
 set_target_properties(nr_render_kmd PROPERTIES SUFFIX ".sys")
 target_compile_features(nr_render_kmd PRIVATE cxx_std_17)
-target_compile_options(nr_render_kmd PRIVATE /kernel /GR- /EHs-c- /Zl)
+target_compile_options(nr_render_kmd PRIVATE /kernel /GR- /EHs-c- /Zl /Z7)
 target_include_directories(nr_render_kmd PRIVATE
   "${NR_WDK_ROOT}/include/km" "${NR_WDK_ROOT}/include/shared"
   "${NR_WDK_ROOT}/include/km/crt")
@@ -23,7 +23,8 @@ target_compile_definitions(nr_render_kmd PRIVATE
   _AMD64_ AMD64 _WIN64 NTDDI_VERSION=NTDDI_WIN10_VB
   DXGKDDI_INTERFACE_VERSION=DXGKDDI_INTERFACE_VERSION_WDDM1_3)
 target_link_options(nr_render_kmd PRIVATE /DRIVER /SUBSYSTEM:NATIVE
-  /ENTRY:GsDriverEntry /NODEFAULTLIB /MANIFEST:NO /INTEGRITYCHECK /NXCOMPAT /DYNAMICBASE)
+  /ENTRY:GsDriverEntry /NODEFAULTLIB /MANIFEST:NO /INTEGRITYCHECK /NXCOMPAT /DYNAMICBASE
+  /DEBUG:FULL /OPT:REF /OPT:ICF)
 target_link_libraries(nr_render_kmd PRIVATE
   "${NR_WDK_ROOT}/lib/ntoskrnl.lib" "${NR_WDK_ROOT}/lib/hal.lib"
   "${NR_WDK_ROOT}/lib/displib.lib" "${NR_WDK_ROOT}/lib/BufferOverflowK.lib")

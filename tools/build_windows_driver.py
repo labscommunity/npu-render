@@ -37,10 +37,14 @@ def main():
         check=True,
     )
     binary = args.build_dir / "Release/nr_render_kmd.sys"
+    symbols = binary.with_suffix(".pdb")
+    if not symbols.is_file():
+        raise RuntimeError("Kernel build did not produce matching debugger symbols")
     report = {
         "schema": 1,
         "kind": "kernel-build-only",
         "sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
+        "pdb_sha256": hashlib.sha256(symbols.read_bytes()).hexdigest(),
         "start_enabled": False,
         "installation_performed": False,
         "signing_performed": False,
