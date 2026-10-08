@@ -1,0 +1,37 @@
+import hashlib,json,os,pathlib,subprocess,sys,time,zipfile
+from validate_windows_texture_worker import validate
+root=pathlib.Path(os.environ['LOCALAPPDATA'])/'npu-render/checks/texture-package-98c9d59'
+archive=root/'npu-render-windows-x64.zip';destination=root/'expanded'
+if destination.exists():raise ValueError('refusing to overwrite evidence')
+with zipfile.ZipFile(archive) as z:
+ for name in z.namelist():
+  p=pathlib.PurePosixPath(name)
+  if p.is_absolute() or '..' in p.parts:raise ValueError('unsafe archive path')
+ z.extractall(destination)
+package=destination/'npu-render';manifest=json.loads((package/'manifest.json').read_text())
+expected='98c9d59004e915fdda625fa5bdc7ab00abea2d58'
+if manifest['source_revision']!=expected:raise ValueError('package source mismatch')
+h=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+for name,digest in manifest['sha256'].items():
+ if h(package/name)!=digest:raise ValueError('package file hash mismatch '+name)
+report={'source_revision':expected,'archive_sha256':h(archive),'verified_package_files':len(manifest['sha256']),'full_desktop_offload':False,'runs':[]}
+env=os.environ.copy();env['PATH']=str(package/'runtime')+';'+env['PATH']
+for name,w,height,rgba in [('small',64,48,False),('display-bgra',2880,1800,False),('display-rgba',2880,1800,True)]:
+ args=[str(package/'nr_texture_worker.exe'),'--reopen','--debug','--width',str(w),'--height',str(height)]
+ if rgba:args+=['--rgba']
+ entry={'name':name,'passed':False};start=time.monotonic()
+ with (root/(name+'.jsonl')).open('xb') as out,(root/(name+'.stderr.log')).open('xb') as err:
+  try:
+   p=subprocess.run(args,env=env,stdout=out,stderr=err,timeout=180,creationflags=subprocess.CREATE_NO_WINDOW)
+   entry['exit_code']=p.returncode
+   if p.returncode:raise ValueError('packaged worker failed')
+   items=[json.loads(line) for line in (root/(name+'.jsonl')).read_text().splitlines() if line.strip()]
+   validate(items,w,height,rgba,True,True)
+   entry['passed']=True
+  except Exception as e:entry['error']=str(e)
+ entry['wall_seconds']=time.monotonic()-start;report['runs'].append(entry);print(name,entry,flush=True)
+report['passed']=all(r['passed'] for r in report['runs'])
+report['captured_sha256']={p.name:h(p) for p in sorted(root.glob('*')) if p.suffix in ('.jsonl','.log')}
+(root/'package-check.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(report))
+sys.exit(0 if report['passed'] else 1)

@@ -45,6 +45,16 @@ The initial successful qualification is also retained under `qualified/` and
 EOF newline; the exact original helper is archived as `initial-typed_texture.hpp.gz`.
 The final reports above match the shipped sources.
 
+The [private CI build](https://github.com/t8/npu-render/actions/runs/37849110664)
+for `98c9d59004e915fdda625fa5bdc7ab00abea2d58` also passes Windows/Linux tests,
+native builds, Weston integration and Conventional Commit checks. Its downloaded
+Windows ZIP was copied to Delta, all 39 manifest entries verified, and its exact
+worker executable passed 32-frame small, full-resolution BGRA and full-resolution
+RGBA release/reopen cases. See [package verification](package-98c9d59/package-check.json)
+and its retained raw outputs. This validates the CI artifact, separately from the
+locally compiled hardware qualification. Archive SHA-256:
+`a78281de298a558ee4edef166eaf43a024fb677237675491961363db632044ad`.
+
 ## Ownership, synchronization and retained work
 
 Only six inherited resource/event/log handles enter the worker. A Windows job
