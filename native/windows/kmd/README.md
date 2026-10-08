@@ -36,6 +36,16 @@ contract test supplies controlled callbacks; it is **not** evidence of Windows
 loading the DLL through a registered DXGI adapter. This UMD still accepts only
 the existing laboratory shader and restricted state subset.
 
+`nr_registered_probe --list` lists the available DXGI adapter LUIDs. After a
+usable paired adapter exists, run `nr_registered_probe PATH_TO_UMD CPU|GPU|NPU
+report.json HIGH:LOW` to exercise the same pixel oracle through normal
+`D3D11CreateDevice` adapter selection. The probe queries the kernel identity and
+readiness before creating a device. It preloads the specified UMD for backend
+configuration and requires execution statistics from that exact module, with
+zero software KMT replacement calls. An absent, foreign, or unready adapter
+fails; there is no default-adapter or WARP retry. Current validation covers
+rejection only, since the kernel startup gate remains closed.
+
 Before enabling `StartDevice`, implement and test real segments and paging,
 command submission and completion notifications, preemption, TDR/reset, worker
 ownership/teardown, and all mandatory render DDIs/caps. A successful compiler,

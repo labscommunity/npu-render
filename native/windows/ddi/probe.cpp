@@ -44,13 +44,36 @@ static ComPtr<ID3DBlob> compile(const char *source, const char *profile) {
           "D3DCompile");
     return b;
 }
+#ifdef NR_DDI_REGISTERED_PROBE
+#include "registered_adapter.hpp"
+#endif
 int main(int argc, char **argv) {
-    if (argc != 4 && argc != 5) {
+#ifdef NR_DDI_REGISTERED_PROBE
+    if (argc == 2 && std::string(argv[1]) == "--list") {
+        try { list_registered_adapters(); return 0; }
+        catch (const std::exception &e) { std::cerr << e.what() << '\n'; return 1; }
+    }
+    constexpr int required_args = 5;
+    constexpr const char *scope =
+        "explicit registered DXGI adapter via normal D3D11 creation; configured UMD preload; "
+        "restricted shader probe; no desktop routing";
+#else
+    constexpr int required_args = 4;
+    constexpr const char *scope =
+        "explicit process-local D3D11 software-driver DDI to selected compute device; "
+        "no desktop routing";
+#endif
+    if (argc != required_args && argc != required_args + 1) {
+#ifdef NR_DDI_REGISTERED_PROBE
+        std::cerr << "usage: nr_registered_probe DLL CPU|GPU|NPU report.json HIGH:LOW "
+                     "[reject-shader|reject-shared|reject-draw]\n";
+#else
         std::cerr << "usage: nr_ddi_probe DLL CPU|GPU|NPU report.json "
                      "[reject-shader|reject-shared|reject-draw]\n";
+#endif
         return 2;
     }
-    const std::string rejection = argc == 5 ? argv[4] : "";
+    const std::string rejection = argc > required_args ? argv[required_args] : "";
     HMODULE module = nullptr;
     NrDdiGetStats get = nullptr;
     NrDdiStats stats;
@@ -58,6 +81,7 @@ int main(int argc, char **argv) {
     bool passed = false, rejection_confirmed = false;
     HRESULT rejected_hresult = S_OK;
     UINT tested = 0, max_error = 0;
+    bool adapter_identity_confirmed = false, device_creation_attempted = false;
     HRESULT created = E_FAIL;
     D3D_FEATURE_LEVEL level{};
     try {
@@ -72,10 +96,21 @@ int main(int argc, char **argv) {
         ComPtr<ID3D11Device> device;
         ComPtr<ID3D11DeviceContext> context;
         const D3D_FEATURE_LEVEL requested = D3D_FEATURE_LEVEL_10_0;
+#ifdef NR_DDI_REGISTERED_PROBE
+        auto adapter = registered_adapter(argv[4]);
+        adapter_identity_confirmed = true;
+        device_creation_attempted = true;
+        created =
+            D3D11CreateDevice(adapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr,
+                              D3D11_CREATE_DEVICE_SINGLETHREADED | D3D11_CREATE_DEVICE_BGRA_SUPPORT,
+                              &requested, 1, D3D11_SDK_VERSION, &device, &level, &context);
+#else
+        device_creation_attempted = true;
         created =
             D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_SOFTWARE, module,
                               D3D11_CREATE_DEVICE_SINGLETHREADED | D3D11_CREATE_DEVICE_BGRA_SUPPORT,
                               &requested, 1, D3D11_SDK_VERSION, &device, &level, &context);
+#endif
         check(created, "D3D11CreateDevice");
         if (!rejection.empty()) {
             if (rejection == "reject-shader") {
@@ -251,6 +286,11 @@ int main(int argc, char **argv) {
                 std::string(stats.device) != argv[2])
                 throw std::runtime_error("execution attribution or command coverage failed");
         }
+#ifdef NR_DDI_REGISTERED_PROBE
+        if (stats.software_thunk_calls || stats.rejected_thunk_calls || !stats.adapters ||
+            !stats.devices)
+            throw std::runtime_error("normal UMD attribution failed");
+#endif
         passed = true;
     } catch (const std::exception &e) {
         error = e.what();
@@ -258,9 +298,13 @@ int main(int argc, char **argv) {
     if (get)
         get(&stats);
     std::ofstream out(argv[3]);
-    out << "{\"scope\":\"explicit process-local D3D11 software-driver DDI to selected compute "
-           "device; no desktop routing\",\"passed\":"
+    out << "{\"scope\":" << quote(scope) << ",\"passed\":"
         << (passed ? "true" : "false") << ",\"requested_device\":" << quote(argv[2])
+        << ",\"adapter_identity_confirmed\":" << (adapter_identity_confirmed ? "true" : "false")
+        << ",\"device_creation_attempted\":" << (device_creation_attempted ? "true" : "false")
+#ifdef NR_DDI_REGISTERED_PROBE
+        << ",\"adapter_luid\":" << quote(argv[4])
+#endif
         << ",\"device_creation_hresult\":" << uint32_t(created)
         << ",\"feature_level\":" << uint32_t(level) << ",\"cases\":" << tested
         << ",\"rejection_case\":" << quote(rejection)
