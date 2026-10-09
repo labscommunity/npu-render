@@ -29,7 +29,7 @@ struct Device {
     D3D10DDI_HRTCORELAYER core{};
     D3D10DDI_CORELAYER_DEVICECALLBACKS callbacks{};
     D3D10DDI_DEVICEFUNCS functions{};
-    PFNDDXGIDDI_PRESENTCB present_callback = nullptr;
+    const DXGI_DDI_BASE_CALLBACKS *dxgi_callbacks = nullptr;
     std::shared_ptr<Context> context;
     std::shared_ptr<Allocation> bound_target;
     std::shared_ptr<Allocation> bound_source;
@@ -358,7 +358,8 @@ HRESULT APIENTRY present(DXGI_DDI_ARG_PRESENT *a) {
     auto &d = *reinterpret_cast<Device *>(a->hDevice);
     try {
         require(a->Flags.Value == 1 && !a->SrcSubResourceIndex && !a->DstSubResourceIndex &&
-                d.context && !d.context->poisoned && d.present_callback && a->hSurfaceToPresent);
+                d.context && !d.context->poisoned && d.dxgi_callbacks &&
+                d.dxgi_callbacks->pfnPresentCb && a->hSurfaceToPresent);
         D3D10DDI_HRESOURCE hs{}; hs.pDrvPrivate = reinterpret_cast<void *>(a->hSurfaceToPresent);
         const auto &source = resource(hs);
         require(source.usage == D3D10_DDI_USAGE_DEFAULT && source.allocation->context == d.context && !source.allocation->locked);
@@ -375,7 +376,7 @@ HRESULT APIENTRY present(DXGI_DDI_ARG_PRESENT *a) {
             callback.hDstAllocation = destination.allocation->handle;
         }
         ++counters.present_requests;
-        const auto status = d.present_callback(d.context->runtime, &callback);
+        const auto status = d.dxgi_callbacks->pfnPresentCb(d.context->runtime, &callback);
         if (FAILED(status)) { d.context->poisoned = true; ++counters.rejected; }
         else ++counters.accepted_present_callbacks;
         return status;
@@ -395,7 +396,9 @@ HRESULT APIENTRY create_device(D3D10DDI_HADAPTER, D3D10DDIARG_CREATEDEVICE *a) {
         d->core = a->hRTCoreLayer; d->callbacks = *a->pUMCallbacks;
         d->context = std::make_shared<Context>(counters);
         d->context->create(a->hRTDevice.handle, *a->pKTCallbacks);
-        if (a->DXGIBaseDDI.pDXGIBaseCallbacks) d->present_callback = a->DXGIBaseDDI.pDXGIBaseCallbacks->pfnPresentCb;
+        // The runtime may replace table entries between UMD calls. Retain the
+        // table address, and read only the entry supported by this DDI version.
+        d->dxgi_callbacks = a->DXGIBaseDDI.pDXGIBaseCallbacks;
         d->backend = selected_backend;
         d->vertex_code = shader_tokens(nr_ddi_vertex_shader, "vs_4_0");
         d->pixel_code = shader_tokens(nr_ddi_pixel_shader, "ps_4_0");

@@ -1,12 +1,17 @@
 namespace {
 DXGIDDICB_PRESENT observed_present{};
 UINT present_callback_calls = 0;
+UINT replaced_present_callback_calls = 0;
 HRESULT present_callback_status = S_OK;
 HRESULT APIENTRY present_cb(HANDLE runtime, DXGIDDICB_PRESENT *args) {
     verify(runtime == runtime_handle && args);
     if (!args) return E_INVALIDARG;
     observed_present = *args; ++present_callback_calls;
     return present_callback_status;
+}
+HRESULT APIENTRY replaced_present_cb(HANDLE runtime, DXGIDDICB_PRESENT *args) {
+    ++replaced_present_callback_calls;
+    return present_cb(runtime, args);
 }
 }
 int test_present(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER_DEVICECALLBACKS &um) {
@@ -38,19 +43,21 @@ int test_present(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER_DEVI
         case 4: args.hDstResource = args.hSurfaceToPresent; break;
         case 5: source.allocation->locked = true; break;
         case 6: destination.allocation->surface.format = 28; break;
-        case 7: device(h).present_callback = nullptr; break;
+        case 7: device(h).dxgi_callbacks = nullptr; break;
         case 8: device(h).context->poisoned = true; break;
         }
         TEST(dxgi.pfnPresent(&args) == E_INVALIDARG && !present_callback_calls && memory == pixels_before);
         args = original; source.allocation->locked = false; destination.allocation->surface.format = 87;
-        device(h).present_callback = present_cb; device(h).context->poisoned = false;
+        device(h).dxgi_callbacks = &cb; device(h).context->poisoned = false;
     }
     TEST(dxgi.pfnPresent(&args) == S_OK && present_callback_calls == 1 && memory == pixels_before);
     TEST(observed_present.hSrcAllocation == source.allocation->handle && observed_present.hDstAllocation == destination.allocation->handle &&
          observed_present.hContext == context_handle && observed_present.pDXGIContext == args.pDXGIContext &&
          !observed_present.BroadcastContextCount && !observed_present.PrivateDriverDataSize && !observed_present.SyncIntervalOverrideValid);
     args.hDstResource = 0; present_callback_status = DXGI_STATUS_OCCLUDED;
+    cb.pfnPresentCb = replaced_present_cb;
     TEST(dxgi.pfnPresent(&args) == DXGI_STATUS_OCCLUDED && present_callback_calls == 2 && !observed_present.hDstAllocation);
+    TEST(replaced_present_callback_calls == 1);
     present_callback_status = E_ACCESSDENIED;
     TEST(dxgi.pfnPresent(&args) == E_ACCESSDENIED && present_callback_calls == 3 && device(h).context->poisoned);
     TEST(dxgi.pfnPresent(&args) == E_INVALIDARG && present_callback_calls == 3 && memory == pixels_before);

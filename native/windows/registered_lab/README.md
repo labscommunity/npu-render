@@ -80,6 +80,11 @@ callbacks; neither counter means a frame reached a display. The component test
 uses explicit callback shims and verifies that forwarding does not secretly
 copy pixels. Live swap-chain presentation remains a separate test; flips,
 cross-adapter imports and the other DXGI display functions are still unsupported.
+The driver retains the callback table address so runtime updates between calls
+take effect, as required by the
+[DXGI DDI contract](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/supporting-the-dxgi-ddi).
+The component test replaces `PresentCb` after the first call and verifies that
+the next invocation reaches its replacement.
 
 `--present` creates a visible 320×192 HWND and a discard-model DXGI swap chain
 on the selected laboratory adapter. It requires an interactive guest session,
