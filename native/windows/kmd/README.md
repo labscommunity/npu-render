@@ -89,7 +89,7 @@ build. It attempts startup with a 16 MiB software paging segment and Windows'
 required queue depth, using actual scheduler callbacks for actual submissions.
 It cannot be combined with synthetic startup probes. It exposes zero display
 sources/children, keeps the paired UMD identity `ready = 0`, and provides no
-rendering/presentation implementation. This mode exists to test Windows memory
+Direct3D renderer or presentation implementation. This mode exists to test Windows memory
 manager and scheduler contracts before enabling normal rendering. The build
 report records `start_enabled = true`, `lab_paging_adapter_enabled = true`, and
 `rendering_ready = false`; building neither installs nor signs it.
@@ -122,8 +122,23 @@ rejected the cached allocation because this adapter has no cache-coherent
 aperture. The next revision uses write-combined backing and allocations, declares
 the memory segment as populated from system RAM, and leaves the aperture-only
 `CacheCoherent` bit clear. Memory barriers drain stores before exposing initialized
-pages or completing a paging command. The host checks do not validate CPU memory
-types or Windows' acceptance; the live allocation test must be rerun.
+pages or completing a paging command. The [live allocation retry](../../../docs/validation/2026-10-09/kernel-paging-v21/report.json)
+passed a 12 KiB write/read round trip through public KMT locks, then a separate
+context test completed three queued CPU events. No paging or DMA submission was
+observed in those tests. The module unloaded and the package was removed without
+changing the original display status. Host checks alone cannot validate CPU
+memory types or Windows' acceptance.
+
+The lab mode now accepts one private `FillSurface` command through `DxgkDdiRender`
+to exercise actual memory residency and submission. It snapshots the user command
+under `ProbeForRead` and exception handling, requires one writable allocation owned
+by the context's device, and generates its own DMA marker, private record and
+patch list. Resident addresses are prepatched; later patching checks the actual
+allocation size and segment range. Submission copies a validated fill into owned
+queue storage for the software worker. This does not enable the paired Direct3D
+UMD or move any operation onto the NPU. The build report separately records
+`lab_fill_command_enabled`. Host tests cover invalid user mappings, ownership,
+repatching, deferred execution and mutation of the original input after capture.
 
 The [first live engine run](../../../docs/validation/2026-10-09/kernel-engine-v12/report.json)
 passed: Windows requested 32 queue entries, the driver reserved 33 slots, and

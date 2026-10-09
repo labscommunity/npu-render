@@ -67,6 +67,8 @@ public:
         UINT dma_bytes = 0;
         UINT private_bytes = 0;
         UINT commands = 0;
+        bool fill = false;
+        PagingCommand fill_command{};
     };
     // Shared inspection for patch and capture. This never allocates, queues,
     // executes or changes the caller's output on failure.
@@ -90,6 +92,22 @@ public:
         const UINT private_bytes = private_end - private_start;
         UINT commands = 0;
         const UCHAR *data = nullptr;
+        if ((dma_bytes || private_bytes) && !args.Flags.Paging) {
+            if (args.Flags.ContextSwitch || dma_bytes != sizeof(FillMarker) ||
+                args.DmaBufferSize > Scheduler::max_bytes || !args.pDmaBufferPrivateData ||
+                private_end > MAXULONG_PTR - ULONG_PTR(args.pDmaBufferPrivateData))
+                return STATUS_INVALID_PARAMETER;
+            View candidate{};
+            const auto status = Fill::execution(static_cast<const UCHAR *>(args.pDmaBufferPrivateData) + private_start,
+                                                private_bytes, candidate.fill_command);
+            if (status != STATUS_SUCCESS) return status;
+            candidate.dma_bytes = dma_bytes;
+            candidate.private_bytes = private_bytes;
+            candidate.commands = 1;
+            candidate.fill = true;
+            view = candidate;
+            return STATUS_SUCCESS;
+        }
         if (dma_bytes || private_bytes) {
             if (!args.Flags.Paging || args.Flags.ContextSwitch) return STATUS_NOT_SUPPORTED;
             if (!args.pDmaBufferPrivateData || args.DmaBufferSize > PAGE_SIZE ||
@@ -185,7 +203,8 @@ public:
         auto &packet = packets_[accepted.serial % count_];
         packet.ticket = accepted;
         packet.commands = view.commands;
-        if (view.private_bytes) RtlCopyMemory(packet.paging, view.data, view.private_bytes);
+        if (view.fill) packet.paging[0] = view.fill_command;
+        else if (view.private_bytes) RtlCopyMemory(packet.paging, view.data, view.private_bytes);
         ticket = accepted;
         return STATUS_SUCCESS;
     }

@@ -148,6 +148,8 @@ public:
                 progress();
             }
         }
+        NR_LAB_TRACE("nr_paging_lab: execute fence=%lu commands=%u status=%08lx irql=%u\n",
+            ULONG(claim.work.fence), packet ? packet->commands : 0, ULONG(status), UINT(KeGetCurrentIrql()));
         // No access to the packet or its MDLs is allowed after this call.
         Action finish{this, Operation::finish};
         finish.work = claim.work;

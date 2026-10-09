@@ -96,6 +96,7 @@ def main():
         "start_enabled": args.lab_paging_adapter,
         "rendering_ready": False,
         "lab_paging_adapter_enabled": args.lab_paging_adapter,
+        "lab_fill_command_enabled": args.lab_paging_adapter,
         "lab_sync_probe_enabled": args.lab_sync_probe,
         "lab_worker_probe_enabled": args.lab_worker_probe,
         "lab_engine_probe_enabled": args.lab_engine_probe,

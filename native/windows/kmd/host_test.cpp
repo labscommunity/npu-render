@@ -5,6 +5,7 @@ extern "C" {
 #include <dispmprt.h>
 void *nr_host_allocate(size_t bytes);
 void nr_host_free(void *pointer);
+void nr_host_probe(void *data, size_t bytes, unsigned long alignment);
 }
 namespace {
 DRIVER_INITIALIZATION_DATA registration{};
@@ -215,6 +216,7 @@ NTSTATUS initialize(DRIVER_OBJECT *, UNICODE_STRING *, DRIVER_INITIALIZATION_DAT
 }
 }
 #define ExAllocatePool2 pool_allocate
+#define ProbeForRead nr_host_probe
 #define ExFreePoolWithTag pool_free
 #define DxgkInitialize initialize
 #define MmAllocateContiguousMemorySpecifyCache segment_allocate
@@ -253,6 +255,7 @@ NTSTATUS initialize(DRIVER_OBJECT *, UNICODE_STRING *, DRIVER_INITIALIZATION_DAT
 #include "engine_test.hpp"
 #include "recovery_test.hpp"
 #include "allocation_test.hpp"
+#include "fill_test.hpp"
 #if NR_KMD_LAB_PAGING_ADAPTER
 #include "lab_start_test.hpp"
 #endif
@@ -426,6 +429,8 @@ extern "C" int nr_kernel_host_test() {
     // Exercise the dormant allocation implementation without enabling StartDevice.
     // This is a local model state, never a live adapter registration.
     a->started = true;
+    const auto fill_result = fill_test(a);
+    if (fill_result) return fill_result;
     const auto paging_result = paging_test(a);
     if (paging_result) return paging_result;
     nr::kernel_contract::Surface surface{};

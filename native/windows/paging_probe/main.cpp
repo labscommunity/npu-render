@@ -64,17 +64,17 @@ struct Allocation {
     }
     bool close() {
         bool ok = unlock();
+        if (context) {
+            D3DKMT_DESTROYCONTEXT args{context};
+            if (record("destroy_context", D3DKMTDestroyContext(&args))) context = 0;
+            else ok = false;
+        }
         if (allocation) {
             D3DKMT_DESTROYALLOCATION args{};
             args.hDevice = device;
             args.AllocationCount = 1;
             args.phAllocationList = &allocation;
             if (record("destroy_allocation", D3DKMTDestroyAllocation(&args))) allocation = 0;
-            else ok = false;
-        }
-        if (context) {
-            D3DKMT_DESTROYCONTEXT args{context};
-            if (record("destroy_context", D3DKMTDestroyContext(&args))) context = 0;
             else ok = false;
         }
         if (device) {
@@ -99,9 +99,8 @@ struct Allocation {
         device = create_device.hDevice;
         return true;
     }
-    bool schedule(D3DKMT_HANDLE adapter) {
-        if (!open_device(adapter)) return false;
-        D3DKMT_CREATECONTEXT create{};
+    bool open_context(D3DKMT_CREATECONTEXT &create) {
+        create = {};
         create.hDevice = device;
         create.EngineAffinity = 1;
         if (!record("create_context", D3DKMTCreateContext(&create))) return false;
@@ -109,22 +108,68 @@ struct Allocation {
         std::printf("{\"command_buffer_bytes\":%u,\"allocation_list_entries\":%u,\"patch_list_entries\":%u}\n",
                     create.CommandBufferSize, create.AllocationListSize, create.PatchLocationListSize);
         event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
-        if (!event) return false;
+        return event != nullptr;
+    }
+    bool completion_event(unsigned iteration) {
+        if (!event || !ResetEvent(event)) return false;
+        D3DKMT_SIGNALSYNCHRONIZATIONOBJECT2 signal{};
+        signal.hContext = context;
+        signal.Flags.EnqueueCpuEvent = 1;
+        signal.CpuEventHandle = event;
+        if (!record("enqueue_cpu_event", D3DKMTSignalSynchronizationObject2(&signal))) return false;
+        const auto result = WaitForSingleObject(event, 10000);
+        std::printf("{\"operation\":\"wait_cpu_event\",\"iteration\":%u,\"wait_result\":%lu}\n", iteration, result);
+        std::fflush(stdout);
+        return result == WAIT_OBJECT_0;
+    }
+    bool schedule(D3DKMT_HANDLE adapter) {
+        if (!open_device(adapter)) return false;
+        D3DKMT_CREATECONTEXT create{};
+        if (!open_context(create)) return false;
         for (unsigned i = 0; i < 3; ++i) {
-            if (!ResetEvent(event)) return false;
-            D3DKMT_SIGNALSYNCHRONIZATIONOBJECT2 signal{};
-            signal.hContext = context;
-            signal.Flags.EnqueueCpuEvent = 1;
-            signal.CpuEventHandle = event;
-            if (!record("enqueue_cpu_event", D3DKMTSignalSynchronizationObject2(&signal))) return false;
-            const auto result = WaitForSingleObject(event, 10000);
-            std::printf("{\"operation\":\"wait_cpu_event\",\"iteration\":%u,\"wait_result\":%lu}\n", i, result);
-            std::fflush(stdout);
-            if (result != WAIT_OBJECT_0) return false;
+            if (!completion_event(i)) return false;
         }
         // An event behind an otherwise empty context can complete without
         // hardware DMA. Only the kernel trace can establish actual submissions.
         std::puts("{\"context_events_verified\":3,\"dma_submission_proven\":false}");
+        return true;
+    }
+    bool fill(D3DKMT_HANDLE adapter) {
+        // Seed and verify the allocation first. The fill must change these bytes.
+        if (!exercise(adapter)) return false;
+        D3DKMT_CREATECONTEXT create{};
+        if (!open_context(create)) return false;
+        nr::kernel_contract::FillSurface command{};
+        command.pattern = 0x7ab35c1f;
+        if (!create.pCommandBuffer || create.CommandBufferSize < sizeof(command) ||
+            !create.pAllocationList || !create.AllocationListSize) return false;
+        std::memcpy(create.pCommandBuffer, &command, sizeof(command));
+        create.pAllocationList[0] = {};
+        create.pAllocationList[0].hAllocation = allocation;
+        create.pAllocationList[0].WriteOperation = 1;
+        D3DKMT_RENDER render{};
+        render.hContext = context;
+        render.CommandLength = sizeof(command);
+        render.AllocationCount = 1;
+        if (!record("render_software_fill", D3DKMTRender(&render))) return false;
+        // No command/allocation-list pointer from before Render is used again.
+        if (!completion_event(0)) return false;
+        D3DKMT_LOCK lock{};
+        lock.hDevice = device; lock.hAllocation = allocation;
+        lock.Flags.LockEntire = lock.Flags.DonotEvict = lock.Flags.ReadOnly = 1;
+        if (!record("lock_filled_allocation", D3DKMTLock(&lock))) return false;
+        locked = true;
+        if (!lock.pData) return false;
+        const auto bytes = static_cast<const unsigned char *>(lock.pData);
+        for (size_t i = 0; i < 12288; ++i) {
+            const auto expected = static_cast<unsigned char>(command.pattern >> ((i % 4) * 8));
+            if (bytes[i] != expected) {
+                std::printf("{\"fill_mismatch_offset\":%zu,\"actual\":%u,\"expected\":%u}\n", i, unsigned(bytes[i]), unsigned(expected));
+                return false;
+            }
+        }
+        if (!unlock()) return false;
+        std::puts("{\"software_fill_bytes\":12288,\"verified\":true,\"npu_execution_tested\":false}");
         return true;
     }
     bool exercise(D3DKMT_HANDLE adapter) {
@@ -168,8 +213,9 @@ int main(int argc, char **argv) {
     const bool list = argc == 2 && std::strcmp(argv[1], "--list") == 0;
     const bool exercise = argc == 2 && std::strcmp(argv[1], "--exercise") == 0;
     const bool schedule = argc == 2 && std::strcmp(argv[1], "--schedule") == 0;
-    if (!list && !exercise && !schedule) { std::fputs("usage: nr_paging_probe --list|--exercise|--schedule\n", stderr); return 2; }
-    if ((exercise || schedule) && !guest()) {
+    const bool fill = argc == 2 && std::strcmp(argv[1], "--fill") == 0;
+    if (!list && !exercise && !schedule && !fill) { std::fputs("usage: nr_paging_probe --list|--exercise|--schedule|--fill\n", stderr); return 2; }
+    if ((exercise || schedule || fill) && !guest()) {
         std::puts("{\"passed\":false,\"error\":\"exercise requires the owned disposable guest\"}");
         return 2;
     }
@@ -194,13 +240,14 @@ int main(int argc, char **argv) {
         if (ours) { selected = query.hAdapter; ++matches; }
     }
     bool passed = list;
-    if ((exercise || schedule) && matches == 1) {
+    if ((exercise || schedule || fill) && matches == 1) {
         Allocation allocation;
-        passed = exercise ? allocation.exercise(selected) : allocation.schedule(selected);
+        passed = exercise ? allocation.exercise(selected) :
+                 schedule ? allocation.schedule(selected) : allocation.fill(selected);
         passed = allocation.close() && passed;
     }
     passed = enumeration.close() && passed;
-    std::printf("{\"passed\":%s,\"matching_adapters\":%u,\"exercise_requested\":%s,\"schedule_requested\":%s,\"npu_execution_tested\":false,\"desktop_offload_tested\":false}\n",
-                passed ? "true" : "false", matches, exercise ? "true" : "false", schedule ? "true" : "false");
+    std::printf("{\"passed\":%s,\"matching_adapters\":%u,\"exercise_requested\":%s,\"schedule_requested\":%s,\"fill_requested\":%s,\"npu_execution_tested\":false,\"desktop_offload_tested\":false}\n",
+                passed ? "true" : "false", matches, exercise ? "true" : "false", schedule ? "true" : "false", fill ? "true" : "false");
     return passed ? 0 : 1;
 }

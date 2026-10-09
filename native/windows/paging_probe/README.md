@@ -14,6 +14,12 @@ event, and checks context/device cleanup. This uses public KMT scheduling APIs.
 An event on an otherwise empty context may complete without any hardware DMA;
 only the correlated kernel trace can establish actual submissions or fences.
 
+`--fill` seeds and verifies an allocation, submits the private laboratory fill
+command through `D3DKMTRender`, waits for a completion event, and verifies all
+12 KiB against the new pattern. It uses the same guest and adapter identity
+restrictions. The kernel's software worker performs this fill; it is not NPU
+rendering. Capture the paging/patch/submission trace alongside the probe output.
+
 Build on Windows with MSVC and the Windows SDK:
 
 ```powershell

@@ -23,6 +23,17 @@ struct Surface {
     u32 reserved = 0;
     u64 allocation_bytes = 0;
 };
+// Private laboratory command: fill the entire single writable allocation in
+// the OS-validated allocation list. No addresses or kernel handles are accepted.
+struct FillSurface {
+    u32 signature = magic;
+    u32 abi = version;
+    u32 bytes = sizeof(FillSurface);
+    u32 operation = 1;
+    u32 pattern = 0;
+    u32 reserved = 0;
+};
+static_assert(sizeof(FillSurface) == 24);
 static_assert(sizeof(AdapterInfo) == 16 && sizeof(Surface) == 40);
 constexpr bool valid(const Surface &s) {
     return s.signature == magic && s.abi == version && s.bytes == sizeof(Surface) &&

@@ -16,6 +16,7 @@ inline void *operator new(size_t, void *p) noexcept { return p; }
 #include "contract.hpp"
 #include "segment.hpp"
 #include "paging.hpp"
+#include "fill.hpp"
 #include "submission.hpp"
 #include "engine.hpp"
 #if NR_KMD_LAB_ENGINE_PROBE
@@ -32,6 +33,7 @@ namespace {
 constexpr ULONG pool_tag = 'rRpN';
 constexpr bool runtime_ready = false;
 constexpr bool startup_enabled = runtime_ready || NR_KMD_LAB_PAGING_ADAPTER != 0;
+constexpr bool lab_fill_enabled = NR_KMD_LAB_PAGING_ADAPTER != 0;
 struct Adapter {
     const DEVICE_OBJECT *physical;
     DXGKRNL_INTERFACE kernel;
@@ -59,6 +61,18 @@ struct Allocation { Adapter *adapter; nr::kernel_contract::Surface surface; LONG
 struct Device { Adapter *adapter; HANDLE runtime; LONG contexts; LONG opens; };
 struct Context { Device *device; HANDLE runtime; };
 struct OpenAllocation { Device *device; Allocation *allocation; bool read_only; };
+
+Allocation *writable_allocation(Adapter *adapter, const DXGK_ALLOCATIONLIST *list, UINT count,
+                                Device *device = nullptr) {
+    if (!list || count != 1 || !list[0].hDeviceSpecificAllocation ||
+        !list[0].WriteOperation || list[0].Reserved) return nullptr;
+    // The OS has converted its handle to our per-device open handle. No user
+    // pointer is read here. The allocation remains referenced until completion.
+    const auto opened = static_cast<OpenAllocation *>(list[0].hDeviceSpecificAllocation);
+    if (opened->read_only || opened->device->adapter != adapter ||
+        (device && opened->device != device) || opened->allocation->adapter != adapter) return nullptr;
+    return opened->allocation;
+}
 
 template <class T> T *allocate() {
     auto p = static_cast<T *>(ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(T), pool_tag));
@@ -205,7 +219,12 @@ NTSTATUS APIENTRY patch(HANDLE adapter, const DXGKARG_PATCH *args) {
     if (!adapter || !args) return STATUS_INVALID_PARAMETER;
     auto a = static_cast<Adapter *>(adapter);
     if (!a->started || a->resetting) return STATUS_DEVICE_NOT_READY;
-    const auto status = nr::kmd::Submissions::patch(*args);
+    NTSTATUS status;
+    if (!args->Flags.Paging && args->DmaBufferSubmissionEndOffset != args->DmaBufferSubmissionStartOffset) {
+        const auto allocation = writable_allocation(a, args->pAllocationList, args->AllocationListSize);
+        status = allocation ? nr::kmd::Fill::patch(a->segment, SIZE_T(allocation->surface.allocation_bytes), *args) :
+                              STATUS_INVALID_HANDLE;
+    } else status = nr::kmd::Submissions::patch(*args);
     NR_LAB_TRACE("nr_paging_lab: patch=%08lx flags=%lx fence=%lu dma=%lu..%lu private=%lu..%lu\n",
         ULONG(status), args->Flags.Value, args->SubmissionFenceId,
         args->DmaBufferSubmissionStartOffset, args->DmaBufferSubmissionEndOffset,
@@ -579,7 +598,7 @@ NTSTATUS APIENTRY create_context(HANDLE device, DXGKARG_CREATECONTEXT *args) {
     if (!device || !args) return STATUS_INVALID_PARAMETER;
     auto d = static_cast<Device *>(device);
     if (!d->adapter->started) return STATUS_DEVICE_NOT_READY;
-    if (args->NodeOrdinal || args->EngineAffinity != 1 || args->PrivateDriverDataSize)
+    if (args->NodeOrdinal || args->EngineAffinity != 1 || args->PrivateDriverDataSize || args->Flags.Value)
         return STATUS_NOT_SUPPORTED;
     auto c = allocate<Context>();
     if (!c) return STATUS_INSUFFICIENT_RESOURCES;
@@ -588,10 +607,24 @@ NTSTATUS APIENTRY create_context(HANDLE device, DXGKARG_CREATECONTEXT *args) {
     InterlockedIncrement(&d->contexts);
     RtlZeroMemory(&args->ContextInfo, sizeof(args->ContextInfo));
     args->ContextInfo.DmaBufferSize = nr::kmd::Scheduler::max_bytes;
+    args->ContextInfo.DmaBufferPrivateDataSize = sizeof(nr::kmd::FillRecord);
     args->ContextInfo.AllocationListSize = 64;
     args->ContextInfo.PatchLocationListSize = 64;
     args->hContext = c;
     return STATUS_SUCCESS;
+}
+DXGKDDI_RENDER render;
+NTSTATUS APIENTRY render(HANDLE context, DXGKARG_RENDER *args) {
+    if (!lab_fill_enabled) return STATUS_NOT_SUPPORTED;
+    if (!context || !args) return STATUS_INVALID_PARAMETER;
+    const auto c = static_cast<Context *>(context);
+    const auto a = c->device->adapter;
+    if (!a->started || a->resetting) return STATUS_DEVICE_NOT_READY;
+    const auto allocation = writable_allocation(a, args->pAllocationList, args->AllocationListSize, c->device);
+    if (!allocation) return STATUS_INVALID_HANDLE;
+    const auto status = nr::kmd::Fill::build(a->segment, SIZE_T(allocation->surface.allocation_bytes), *args);
+    NR_LAB_TRACE("nr_paging_lab: render_fill=%08lx\n", ULONG(status));
+    return status;
 }
 DXGKDDI_DESTROYCONTEXT destroy_context;
 NTSTATUS APIENTRY destroy_context(HANDLE context) {
@@ -639,7 +672,7 @@ extern "C" NTSTATUS DriverEntry(DRIVER_OBJECT *driver, UNICODE_STRING *registry)
     data.DxgkDdiSubmitCommand = submit;
     data.DxgkDdiBuildPagingBuffer = build_paging;
     data.DxgkDdiPreemptCommand = preempt;
-    NR_REJECT(DxgkDdiRender);
+    data.DxgkDdiRender = render;
     NR_REJECT(DxgkDdiPresent);
     data.DxgkDdiResetFromTimeout = reset_from_timeout;
     data.DxgkDdiRestartFromTimeout = restart_from_timeout;
