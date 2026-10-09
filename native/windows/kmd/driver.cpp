@@ -342,13 +342,16 @@ NTSTATUS APIENTRY query_adapter(HANDLE adapter, const DXGKARG_QUERYADAPTERINFO *
         caps.SchedulingCaps.MultiEngineAware = 1;
         caps.SchedulingCaps.PreemptionAware = 1;
         caps.GpuEngineTopology.NbAsymetricProcessingNodes = 1;
+        caps.WDDMVersion = DXGKDDI_WDDMv1_3;
         caps.PreemptionCaps.GraphicsPreemptionGranularity = D3DKMDT_GRAPHICS_PREEMPTION_DMA_BUFFER_BOUNDARY;
         caps.PreemptionCaps.ComputePreemptionGranularity = D3DKMDT_COMPUTE_PREEMPTION_DMA_BUFFER_BOUNDARY;
         caps.SupportPerEngineTDR = TRUE;
         // No display flips, GDI aperture, cross-adapter resources, virtual GPU
         // addresses or runtime power components are implemented. Do not claim
-        // them to satisfy a capability checklist. WDDMVersion is reserved zero
-        // with a Win7-or-newer DDI interface; DriverEntry supplies version 1.3.
+        // them to satisfy a capability checklist. Match DriverEntry's WDDM 1.3
+        // version as Microsoft's render-only sample does. The member reference
+        // says zero for newer interfaces, but our zero-version live attempt
+        // was rejected after this query; version consistency is under test.
         RtlCopyMemory(args->pOutputData, &caps, sizeof(caps));
         return STATUS_SUCCESS;
     }

@@ -131,6 +131,11 @@ The implementation currently provides:
   cross-adapter resources or runtime power components. The broader WDDM feature
   table and individual capability docs differ in their applicability to this
   software paging prototype; no unsupported bits are set merely to pass startup.
+  The capability version matches `DriverEntry`'s WDDM 1.3 version, following the
+  [Microsoft render-only sample](https://github.com/microsoft/graphics-driver-samples/blob/master/render-only-sample/roskmd/RosKmdAdapter.cpp).
+  This differs from the member reference's instruction to return zero for newer
+  interfaces. A live zero-version attempt was rejected immediately after the
+  capability query; whether this version field caused that rejection is under test.
   Windows acceptance remains an experimental question. Power notifications retain
   the software engine's nonpaged RAM and worker state, which follow system power;
   there are no device registers or separate powered memory to restore. This is

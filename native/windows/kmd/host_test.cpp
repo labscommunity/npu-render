@@ -291,7 +291,7 @@ extern "C" int nr_kernel_host_test() {
     cap_query.OutputDataSize++;
     NR_CHECK(registration.DxgkDdiQueryAdapterInfo(a, &cap_query) == STATUS_SUCCESS);
     const auto &caps = cap_buffer.caps;
-    NR_CHECK(cap_buffer.guard == 0xa5a5a5a5 && !caps.WDDMVersion);
+    NR_CHECK(cap_buffer.guard == 0xa5a5a5a5 && caps.WDDMVersion == DXGKDDI_WDDMv1_3);
     NR_CHECK(caps.GpuEngineTopology.NbAsymetricProcessingNodes == 1 && caps.SupportPerEngineTDR);
     NR_CHECK(caps.SchedulingCaps.MultiEngineAware && caps.SchedulingCaps.PreemptionAware);
     NR_CHECK(!caps.SchedulingCaps.CancelCommandAware && !caps.SchedulingCaps.NoDmaPatching);
