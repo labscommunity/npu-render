@@ -83,6 +83,7 @@ struct Allocation {
     Allocation &operator=(const Allocation &) = delete;
     HRESULT unlock() noexcept {
         if (!locked) return S_OK;
+        MemoryBarrier(); // Drain writes to write-combined VidMm mappings before release.
         D3DDDICB_UNLOCK args{1, &handle};
         const auto status = context->callbacks.pfnUnlockCb(context->runtime, &args);
         if (SUCCEEDED(status)) { locked = false; mapping = nullptr; }

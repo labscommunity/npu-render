@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdio>
 #include <memory>
 #include <mutex>
 #include <new>
@@ -25,6 +26,12 @@ struct Device {
     D3D10DDI_CORELAYER_DEVICECALLBACKS callbacks{};
     D3D10DDI_DEVICEFUNCS functions{};
     std::shared_ptr<Context> context;
+    std::shared_ptr<Allocation> bound_target;
+    D3D10_DDI_BLEND_DESC blend{};
+    D3D10_DDI_DEPTH_STENCIL_DESC depth{};
+    D3D10_DDI_RASTERIZER_DESC raster{};
+    std::array<FLOAT, 4> blend_factor{};
+    UINT sample_mask = ~0u, stencil_ref = 0;
 };
 struct Resource {
     std::shared_ptr<Allocation> allocation;
@@ -47,7 +54,11 @@ template<class F> void guard(D3D10DDI_HDEVICE h, F f) noexcept {
 template<class T, size_t Offset> struct Unsupported;
 template<class R, class... A, size_t Offset> struct Unsupported<R(APIENTRY *)(D3D10DDI_HDEVICE, A...), Offset> {
     static R APIENTRY call(D3D10DDI_HDEVICE h, A...) {
-        guard(h, [] { counters.last_unsupported_offset = Offset; throw Error{DXGI_ERROR_UNSUPPORTED}; });
+        guard(h, [] {
+            counters.last_unsupported_offset = Offset;
+            std::fprintf(stderr, "nr_fill_umd: unsupported DDI offset=%zu\n", Offset);
+            throw Error{DXGI_ERROR_UNSUPPORTED};
+        });
         if constexpr (!std::is_void_v<R>) return R{};
     }
 };
@@ -147,6 +158,58 @@ void APIENTRY map(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE r, UINT sub, D3D10_DDI_
 void APIENTRY unmap(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE r, UINT sub) {
     guard(h, [&] { auto &a = *resource(r).allocation; require(!sub && a.locked); check(a.unlock()); });
 }
+// The runtime constructs default pipeline state while initializing a device.
+// Retain those descriptors even though ClearRenderTargetView ignores them.
+// Drawing remains unsupported; state acceptance does not execute a shader.
+#define NR_STATE(Name, Type, Handle, RtHandle) \
+    SIZE_T APIENTRY Name##_size(D3D10DDI_HDEVICE, const Type *) { return sizeof(Type); } \
+    void APIENTRY create_##Name(D3D10DDI_HDEVICE h, const Type *desc, Handle out, RtHandle) { \
+        guard(h, [&] { require(desc && out.pDrvPrivate); *static_cast<Type *>(out.pDrvPrivate) = *desc; }); \
+    } \
+    void APIENTRY destroy_##Name(D3D10DDI_HDEVICE, Handle) {}
+NR_STATE(blend, D3D10_DDI_BLEND_DESC, D3D10DDI_HBLENDSTATE, D3D10DDI_HRTBLENDSTATE)
+NR_STATE(depth, D3D10_DDI_DEPTH_STENCIL_DESC, D3D10DDI_HDEPTHSTENCILSTATE, D3D10DDI_HRTDEPTHSTENCILSTATE)
+NR_STATE(raster, D3D10_DDI_RASTERIZER_DESC, D3D10DDI_HRASTERIZERSTATE, D3D10DDI_HRTRASTERIZERSTATE)
+NR_STATE(sampler, D3D10_DDI_SAMPLER_DESC, D3D10DDI_HSAMPLER, D3D10DDI_HRTSAMPLER)
+#undef NR_STATE
+void APIENTRY set_blend(D3D10DDI_HDEVICE h, D3D10DDI_HBLENDSTATE state, const FLOAT factor[4], UINT mask) {
+    guard(h, [&] {
+        auto &d = device(h);
+        d.blend = state.pDrvPrivate ? *static_cast<D3D10_DDI_BLEND_DESC *>(state.pDrvPrivate) : D3D10_DDI_BLEND_DESC{};
+        if (!state.pDrvPrivate) d.blend.RenderTargetWriteMask[0] = 15;
+        for (UINT i = 0; i < 4; ++i) d.blend_factor[i] = factor ? factor[i] : 1.f;
+        d.sample_mask = mask;
+    });
+}
+void APIENTRY set_depth(D3D10DDI_HDEVICE h, D3D10DDI_HDEPTHSTENCILSTATE state, UINT ref) {
+    guard(h, [&] {
+        auto &d = device(h);
+        d.depth = state.pDrvPrivate ? *static_cast<D3D10_DDI_DEPTH_STENCIL_DESC *>(state.pDrvPrivate) : D3D10_DDI_DEPTH_STENCIL_DESC{};
+        if (!state.pDrvPrivate) { d.depth.DepthEnable = TRUE; d.depth.DepthWriteMask = D3D10_DDI_DEPTH_WRITE_MASK_ALL; d.depth.DepthFunc = D3D10_DDI_COMPARISON_LESS; }
+        d.stencil_ref = ref;
+    });
+}
+void APIENTRY set_raster(D3D10DDI_HDEVICE h, D3D10DDI_HRASTERIZERSTATE state) {
+    guard(h, [&] {
+        auto &d = device(h);
+        d.raster = state.pDrvPrivate ? *static_cast<D3D10_DDI_RASTERIZER_DESC *>(state.pDrvPrivate) : D3D10_DDI_RASTERIZER_DESC{};
+        if (!state.pDrvPrivate) { d.raster.FillMode = D3D10_DDI_FILL_SOLID; d.raster.CullMode = D3D10_DDI_CULL_BACK; d.raster.DepthClipEnable = TRUE; }
+    });
+}
+void APIENTRY targets(D3D10DDI_HDEVICE h, const D3D10DDI_HRENDERTARGETVIEW *views, UINT count, UINT,
+                      D3D10DDI_HDEPTHSTENCILVIEW depth) {
+    guard(h, [&] {
+        require(count <= 8 && (!count || views) && !depth.pDrvPrivate);
+        std::shared_ptr<Allocation> selected;
+        for (UINT i = 0; i < count; ++i) {
+            if (!views[i].pDrvPrivate) continue;
+            require(i == 0);
+            selected = static_cast<View *>(views[i].pDrvPrivate)->allocation;
+            require(selected && selected->context == device(h).context);
+        }
+        device(h).bound_target = std::move(selected);
+    });
+}
 void APIENTRY flush(D3D10DDI_HDEVICE) {} // Every clear is submitted immediately.
 void APIENTRY hazard(D3D10DDI_HDEVICE, D3D10DDI_HRESOURCE) {} // Blocking locks order our staging copies.
 void APIENTRY format_support(D3D10DDI_HDEVICE, DXGI_FORMAT f, UINT *out) {
@@ -179,6 +242,14 @@ HRESULT APIENTRY create_device(D3D10DDI_HADAPTER, D3D10DDIARG_CREATEDEVICE *a) {
         f.pfnResourceUnmap = f.pfnStagingResourceUnmap = unmap;
         f.pfnCalcPrivateRenderTargetViewSize = view_size; f.pfnCreateRenderTargetView = create_view;
         f.pfnDestroyRenderTargetView = destroy_view; f.pfnClearRenderTargetView = clear;
+        f.pfnSetRenderTargets = targets;
+#define NR_BIND(Name, name) \
+        f.pfnCalcPrivate##Name##Size = name##_size; \
+        f.pfnCreate##Name = create_##name; f.pfnDestroy##Name = destroy_##name
+        NR_BIND(BlendState, blend); NR_BIND(DepthStencilState, depth);
+        NR_BIND(RasterizerState, raster); NR_BIND(Sampler, sampler);
+#undef NR_BIND
+        f.pfnSetBlendState = set_blend; f.pfnSetDepthStencilState = set_depth; f.pfnSetRasterizerState = set_raster;
         f.pfnFlush = flush; f.pfnResourceReadAfterWriteHazard = hazard;
         f.pfnCheckFormatSupport = format_support; f.pfnCheckMultisampleQualityLevels = multisample;
         f.pfnCheckCounterInfo = counter_info; f.pfnRelocateDeviceFuncs = relocate; f.pfnDestroyDevice = destroy_device;

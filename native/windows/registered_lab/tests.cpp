@@ -109,6 +109,23 @@ int main() {
     TEST(create_device({}, &create) == S_OK);
     const auto h = create.hDrvDevice;
     TEST(counters.live_contexts == 1);
+    D3D10_DDI_BLEND_DESC blend_desc{};
+    blend_desc.RenderTargetWriteMask[0] = 5;
+    D3D10_DDI_BLEND_DESC blend_storage{};
+    D3D10DDI_HBLENDSTATE blend_handle{}; blend_handle.pDrvPrivate = &blend_storage;
+    TEST(functions.pfnCalcPrivateBlendStateSize(h, &blend_desc) == sizeof(blend_desc));
+    functions.pfnCreateBlendState(h, &blend_desc, blend_handle, {});
+    FLOAT factors[4] = {.1f, .2f, .3f, .4f};
+    functions.pfnSetBlendState(h, blend_handle, factors, 0x7f);
+    TEST(last_error == S_OK && device(h).blend.RenderTargetWriteMask[0] == 5 && device(h).sample_mask == 0x7f);
+    TEST(device(h).blend_factor[2] == factors[2]);
+    functions.pfnDestroyBlendState(h, blend_handle);
+    functions.pfnSetBlendState(h, {}, nullptr, ~0u);
+    functions.pfnSetDepthStencilState(h, {}, 3);
+    functions.pfnSetRasterizerState(h, {});
+    functions.pfnSetRenderTargets(h, nullptr, 0, 8, {});
+    TEST(last_error == S_OK && device(h).stencil_ref == 3 && device(h).depth.DepthEnable &&
+         device(h).raster.DepthClipEnable && !device(h).bound_target);
     alignas(Resource) unsigned char target_storage[sizeof(Resource)]{}, staging_storage[sizeof(Resource)]{}, failed_storage[sizeof(Resource)]{};
     D3D10DDI_HRESOURCE target{}, staging{}, failed{};
     target.pDrvPrivate = target_storage; staging.pDrvPrivate = staging_storage; failed.pDrvPrivate = failed_storage;
@@ -135,6 +152,12 @@ int main() {
     view_args.hDrvResource = target; view_args.ResourceDimension = D3D10DDIRESOURCE_TEXTURE2D;
     view_args.Format = DXGI_FORMAT_R8G8B8A8_UNORM; view_args.Tex2D.ArraySize = 1;
     functions.pfnCreateRenderTargetView(h, &view_args, view, {});
+    functions.pfnSetRenderTargets(h, &view, 1, 0, {});
+    TEST(last_error == S_OK && device(h).bound_target == resource(target).allocation);
+    D3D10DDI_HRENDERTARGETVIEW invalid_views[2] = {view, view};
+    functions.pfnSetRenderTargets(h, invalid_views, 2, 0, {});
+    TEST(last_error == E_INVALIDARG && device(h).bound_target == resource(target).allocation);
+    last_error = S_OK;
     FLOAT color[4] = {1, 0, 0, 1};
     functions.pfnClearRenderTargetView(h, view, color);
     functions.pfnClearRenderTargetView(h, view, color);
