@@ -45,8 +45,12 @@ existing target into that allocation. A blocking write lock waits for the final
 submitted reader before releasing temporary storage. Full uploads zero padding.
 Invalid bounds, subresources, source pitches, locked targets and wrong-device
 resources are rejected. `upload_bytes` counts uploaded image bytes separately
-from staging-copy traffic and submitted-copy counts. Live guest validation of
-this new upload path is pending.
+from staging-copy traffic and submitted-copy counts. The
+[v30 guest validation](../../../docs/validation/2026-10-09/registered-upload-v30/report.json)
+passes all 24 upload readbacks and repeats the five sharing tests, for 58 exact
+readbacks overall. All process cleanup counters are zero and the driver unloads
+cleanly. Initial/full/partial upload work remains CPU work; no shader or NPU draw
+is admitted by this registered driver yet.
 
 The target is built with the native DDI build or independently:
 

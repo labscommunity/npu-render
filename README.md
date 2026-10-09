@@ -62,8 +62,15 @@ passes GPU-drawn input textures → separate NPU worker → native GPU shader sa
 at 2880×1800 in BGRA and RGBA. It uses no explicit CPU pixel uploads or output
 copies. Creator release/reopen and parent/worker termination checks pass, followed
 by successful recovery. The private bundle includes both finite texture probes.
-This resolves a shared-resource boundary; a registered graphics adapter, Windows'
-general shader/state stream and actual DWM selection remain unimplemented.
+This resolves a shared-resource boundary. Windows' general shader/state stream
+and actual DWM selection remain unimplemented.
+
+The subsequent [registered-driver laboratory](native/windows/registered_lab/README.md)
+now loads through Windows' normal graphics stack in an isolated VM. Clears,
+patterned image uploads, texture sharing across processes and keyed synchronization
+pass 58 exact readbacks with clean removal. These operations still run on CPU
+paths. Connecting the registered adapter to NPU shader execution and desktop
+presentation remains unfinished; this milestone establishes no Tahoma speedup.
 
 The [captured-window desktop experiment](native/windows/capture/README.md) now
 presents an NPU-composed 2880×1800 desktop with input passing through to the
