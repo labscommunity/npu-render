@@ -64,6 +64,12 @@ match the kernel contract (8192 per dimension, at most 128 MiB including padded
 rows). Installed tests at these sizes require the separate system-page adapter;
 the old 16 MiB segment cannot hold even one native-panel image. Component tests
 continue to use allocation shims and do not establish desktop frame delivery.
+The [v34 live validation](../../../docs/validation/2026-10-09/registered-desktop-v34/report.json)
+passes 24 registered CPU draws at both sizes plus six clear regressions: 30
+readbacks verify 348,438,528 bytes. Delta's CPU and NPU each separately pass 16
+native-size component draws. The driver unloads, mapped pages return to zero,
+and the original display stays healthy. Registered NPU execution, presentation
+and DWM migration remain untested.
 
 `--upload` exercises initial texture data, full and partial `UpdateSubresource`,
 and empty updates for ordinary, legacy shared and NT keyed textures in both

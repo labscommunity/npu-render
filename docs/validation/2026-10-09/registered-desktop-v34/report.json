@@ -1,0 +1,168 @@
+{
+  "schema": 1,
+  "kind": "registered-native-size-and-separate-npu-component-validation",
+  "date_utc": "2026-10-09",
+  "umd_source_revision": "e360d29dde86a32f40f46226b9393888df7e536e",
+  "probe_source_revision": "e360d29dde86a32f40f46226b9393888df7e536e",
+  "kernel_source_revision": "8527166b9e2bda5f299b4f8cb5028355b26d43a0",
+  "package": "v34-desktop",
+  "driver_version": "0.0.23.0",
+  "guest_build": "26300.9457",
+  "result": "registered-native-size-cpu-rendering-and-separate-npu-components-passed",
+  "cases": {
+    "draw-cpu": {
+      "exit_code": 0,
+      "started": "2026-10-09T22:47:35.6162710Z",
+      "finished": "2026-10-09T22:48:55.2122410Z",
+      "verified_readbacks": 24,
+      "verified_bytes": 348364800,
+      "process_stats": [
+        {
+          "pid": 1888,
+          "allocations": 100,
+          "fills": 0,
+          "staging_copy_bytes": 1393557504,
+          "live_allocations": 0,
+          "live_contexts": 0,
+          "cleanup_errors": 0,
+          "rejected": 0,
+          "submitted_copies": 88,
+          "upload_bytes": 740275200
+        }
+      ],
+      "execution_stats": [
+        {
+          "draws": 24,
+          "executions": 24,
+          "cpu_executions": 24,
+          "gpu_executions": 0,
+          "npu_executions": 0,
+          "execution_device": "CPU",
+          "inference_input_bytes": 696729600,
+          "inference_output_bytes": 348364800
+        }
+      ],
+      "expected_rejection": false
+    },
+    "fill": {
+      "exit_code": 0,
+      "started": "2026-10-09T22:49:17.9295210Z",
+      "finished": "2026-10-09T22:49:19.0644850Z",
+      "verified_readbacks": 6,
+      "verified_bytes": 73728,
+      "process_stats": [
+        {
+          "pid": 4852,
+          "allocations": 4,
+          "fills": 6,
+          "staging_copy_bytes": 73728,
+          "live_allocations": 0,
+          "live_contexts": 0,
+          "cleanup_errors": 0,
+          "rejected": 0,
+          "submitted_copies": 0,
+          "upload_bytes": 0
+        }
+      ],
+      "execution_stats": [
+        {
+          "draws": 0,
+          "executions": 0,
+          "cpu_executions": 0,
+          "gpu_executions": 0,
+          "npu_executions": 0,
+          "execution_device": "",
+          "inference_input_bytes": 0,
+          "inference_output_bytes": 0
+        }
+      ],
+      "expected_rejection": false
+    },
+    "draw-npu-unavailable": {
+      "exit_code": 1,
+      "started": "2026-10-09T22:49:22.3123280Z",
+      "finished": "2026-10-09T22:49:23.4207870Z",
+      "verified_readbacks": 0,
+      "verified_bytes": 0,
+      "process_stats": [],
+      "execution_stats": [
+        {
+          "failed": true,
+          "rejected": 1,
+          "last_unsupported_offset": 18446744073709551615,
+          "cleanup_errors": 0,
+          "executions": 0,
+          "cpu_executions": 0,
+          "gpu_executions": 0,
+          "npu_executions": 0,
+          "live_allocations": 0,
+          "live_contexts": 0
+        }
+      ],
+      "expected_rejection": true
+    }
+  },
+  "components_on_physical_delta": {
+    "cpu": {
+      "process": {
+        "started": "2026-10-09T22:42:46.8604038Z",
+        "finished": "2026-10-09T22:42:48.8973132Z",
+        "binary_sha256": "18CEA6BCB24E5573059D5BD2B76962DE588F5663E7E5605F641A3CEAE2B34C71",
+        "exit_code": 0,
+        "registered_adapter_tested": false,
+        "desktop_offload_tested": false
+      },
+      "result": {
+        "kind": "registered-ddi-runtime-shim",
+        "requested_backend": "CPU",
+        "execution_device": "CPU",
+        "verified_draws": 16,
+        "registered_adapter_tested": false,
+        "desktop_offload_tested": false
+      },
+      "verified_bytes": 232243200
+    },
+    "npu": {
+      "process": {
+        "started": "2026-10-09T22:42:48.9778614Z",
+        "finished": "2026-10-09T22:42:52.0135725Z",
+        "binary_sha256": "18CEA6BCB24E5573059D5BD2B76962DE588F5663E7E5605F641A3CEAE2B34C71",
+        "exit_code": 0,
+        "registered_adapter_tested": false,
+        "desktop_offload_tested": false
+      },
+      "result": {
+        "kind": "registered-ddi-runtime-shim",
+        "requested_backend": "NPU",
+        "execution_device": "NPU",
+        "verified_draws": 16,
+        "registered_adapter_tested": false,
+        "desktop_offload_tested": false
+      },
+      "verified_bytes": 232243200
+    }
+  },
+  "verified_guest_readbacks": 30,
+  "verified_guest_bytes": 348438528,
+  "successful_kernel_execution_fences": 94,
+  "aperture_address_bytes": 268435456,
+  "map_callbacks": 90,
+  "unmap_callbacks": 90,
+  "peak_mapped_pages": 25315,
+  "mapped_pages_after_tests": 0,
+  "registered_npu_execution_tested": false,
+  "npu_component_execution_tested": true,
+  "desktop_offload_tested": false,
+  "tahoma_benefit_tested": false,
+  "kernel_module_unloaded": true,
+  "owned_device_removed": true,
+  "owned_inf_deleted": true,
+  "prior_display_status_preserved": true,
+  "notes": [
+    "Registered CPU draws verify every pixel at 1920x1080 and 2880x1800 through real Windows allocations, submission ordering, same-adapter legacy and NT sharing. The 24 draws transfer 1393557504 staging-copy bytes, upload 740275200 image bytes, and copy 696729600 input and 348364800 output bytes through the provider. This is correctness validation, not a performance benchmark.",
+    "The physical NPU separately passes 16 component draws with actual UMD callbacks but allocation/submission shims. The CPU and NPU component checks are independent from the registered CPU guest tests; their combination does not prove registered NPU execution.",
+    "The VM has no NPU and its runtime bundles only the CPU plugin. An NPU request fails without fallback or leaked objects. Expected fault injection messages in the successful component tests are preserved.",
+    "The shader pair is restricted and the kernel copy/fill worker remains on CPU. No presentation, DWM migration, arbitrary shader stream or Tahoma benefit was tested.",
+    "An initial uninstalled package had a mistyped source revision. It was rejected and retained separately before staging. The validated package has the exact committed UMD revision and manifest recorded here."
+  ]
+}
