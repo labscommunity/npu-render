@@ -1,0 +1,75 @@
+{
+  "schema": 1,
+  "kind": "registered-presentation-rejection",
+  "date_utc": "2026-10-09",
+  "package": "v35-present",
+  "driver_version": "0.0.24.0",
+  "source_revisions": {
+    "kernel": "86354cc97534cdfdd29541bcc3fda604d5476df3",
+    "probe_v1": "86354cc97534cdfdd29541bcc3fda604d5476df3",
+    "probe_v2": "8b9a7c396ad4110442d626a16857a20f6eea8ccd"
+  },
+  "result": "public-kmt-present-rejected-before-driver-entry",
+  "cases": {
+    "present": {
+      "process": {
+        "started": "2026-10-09T23:03:08.4963780Z",
+        "finished": "2026-10-09T23:03:22.5701300Z",
+        "probe_sha256": "0E12E401B12C42C571A8DFFB04BC755CA8B4E6A8CFE63CE863189B3087C6408B",
+        "exit_code": 1,
+        "npu_execution_tested": false
+      },
+      "failed_call": {
+        "operation": "present_blit",
+        "status": "c000000d"
+      },
+      "verified_presented_frames": 0
+    },
+    "present-trace": {
+      "process": {
+        "started": "2026-10-09T23:05:53.8964190Z",
+        "finished": "2026-10-09T23:05:54.9790390Z",
+        "probe_sha256": "0E12E401B12C42C571A8DFFB04BC755CA8B4E6A8CFE63CE863189B3087C6408B",
+        "exit_code": 1,
+        "npu_execution_tested": false
+      },
+      "failed_call": {
+        "operation": "present_blit",
+        "status": "c000000d"
+      },
+      "verified_presented_frames": 0
+    },
+    "present-rect-v2": {
+      "process": {
+        "started": "2026-10-09T23:10:51.3960180Z",
+        "finished": "2026-10-09T23:11:05.6632190Z",
+        "probe_sha256": "D505D354992A35D054DC58F573281DCDF6BFF0AD89C56B0AA7B29105801770E0",
+        "exit_code": 1,
+        "npu_execution_tested": false
+      },
+      "failed_call": {
+        "operation": "present_blit",
+        "status": "c000000d"
+      },
+      "verified_presented_frames": 0
+    }
+  },
+  "verified_presented_frames": 0,
+  "kernel_present_breakpoint_hit": false,
+  "kernel_module_unloaded": true,
+  "owned_device_removed": true,
+  "owned_inf_deleted": true,
+  "prior_display_status_preserved": true,
+  "registered_npu_execution_tested": false,
+  "desktop_offload_tested": false,
+  "tahoma_benefit_tested": false,
+  "notes": [
+    "The initial public KMT probe omitted the required source subrectangle list for its first blit. Revision 8b9a7c3 supplies it. The corrected probe is still rejected with STATUS_INVALID_PARAMETER, so the omitted list was not the only unmet prerequisite.",
+    "Both probes supply ordinary offscreen allocation handles, no HWND and no primary ownership. The public API documents presentation-specific requirements that this diagnostic does not satisfy. These results do not validate the kernel Present implementation or establish that valid window presentation is impossible. The exact rejecting Windows branch was not traced.",
+    "The retry with a breakpoint at the actual kernel Present entrypoint and the corrected probe did not hit it. All public cleanup calls succeeded. The kernel worker did not execute a presentation buffer.",
+    "The next test uses the ordinary registered DXGI runtime, an owned interactive window and a screen-pixel oracle. CPU-worker clear presentation, NPU execution, DWM migration and Tahoma benefit remain independent acceptance gates."
+  ],
+  "references": [
+    "https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmthk/nf-d3dkmthk-d3dkmtpresent"
+  ]
+}

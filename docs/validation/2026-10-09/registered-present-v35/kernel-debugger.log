@@ -1,0 +1,128 @@
+Opened log file 'C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-present-v35-oct9.log'
+nr_paging_lab: memory=00000000 required_queue=32
+nr_paging_lab: engine_start=00000000 capacity=33; rendering_ready=0 sources=0 children=0
+nr_paging_lab: query type=1 input=0 output=552
+nr_paging_lab: query type=47 input=0 output=4
+nr_paging_lab: create_context node=0 affinity=1 flags=1 private=0
+nr_paging_lab: query type=5 input=24 output=32
+nr_paging_lab: query type=5 input=24 output=32
+nr_paging_lab: query type=10 input=4 output=4
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: create_context node=0 affinity=1 flags=0 private=0
+Break instruction exception - code 80000003 (first chance)
+*******************************************************************************
+*                                                                             *
+*   You are seeing this message because you pressed either                    *
+*       CTRL+C (if you run console kernel debugger) or,                       *
+*       CTRL+BREAK (if you run GUI kernel debugger),                          *
+*   on your debugger machine's keyboard.                                      *
+*                                                                             *
+*                   THIS IS NOT A BUG OR A SYSTEM CRASH                       *
+*                                                                             *
+* If you did not intend to break into the debugger, press the "g" key, then   *
+* press the "Enter" key now.  This message might immediately reappear.  If it *
+* does, press "g" and "Enter" again.                                          *
+*                                                                             *
+*******************************************************************************
+nt!DbgBreakPointWithStatus:
+fffff804`a52fdfb0 cc              int     3
+0: kd> .reload /f nr_render_kmd.sys; x nr_render_kmd!*present*
+
+
+Press ctrl-c (cdb, kd, ntsd) or ctrl-break (windbg) to abort symbol loads that take too long.
+Run !sym noisy before .reload to track down problems loading symbols.
+
+fffff804`3be24490 nr_render_kmd!nr::kmd::Present::locate (class nr::kmd::Segment *, struct _DXGK_ALLOCATIONLIST *, struct nr::kmd::PresentRecord *, bool)
+fffff804`3be25820 nr_render_kmd!nr::kmd::Present::patch (class nr::kmd::Segment *, struct nr::kernel_contract::Surface *, struct nr::kernel_contract::Surface *, struct _DXGKARG_PATCH *)
+fffff804`3be24830 nr_render_kmd!nr::kmd::Present::matches (struct nr::kmd::PresentRecord *, struct nr::kernel_contract::Surface *, struct nr::kernel_contract::Surface *)
+fffff804`3be21a10 nr_render_kmd!nr::kmd::Present::build (class nr::kmd::Segment *, struct nr::kernel_contract::Surface *, struct nr::kernel_contract::Surface *, struct _DXGKARG_PRESENT *)
+fffff804`3be26210 nr_render_kmd!`anonymous namespace'::present (void *, struct _DXGKARG_PRESENT *)
+fffff804`3be284a0 nr_render_kmd!nr::kmd::Present::valid (struct nr::kmd::PresentRecord *)
+fffff804`3be25168 nr_render_kmd!?A0xe1342900::present_allocations =  (inline caller) nr_render_kmd!`anonymous namespace'::patch+348
+fffff804`3be2625c nr_render_kmd!?A0xe1342900::present_allocations =  (inline caller) nr_render_kmd!`anonymous namespace'::present+4c
+fffff804`3be280f9 nr_render_kmd!nr::kmd::Present::execute =  (inline caller) nr_render_kmd!nr::kmd::Engine::thread_main+1e9
+0: kd> bp fffff804`3be26210; g
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: create_context node=0 affinity=1 flags=0 private=0
+Break instruction exception - code 80000003 (first chance)
+*******************************************************************************
+*                                                                             *
+*   You are seeing this message because you pressed either                    *
+*       CTRL+C (if you run console kernel debugger) or,                       *
+*       CTRL+BREAK (if you run GUI kernel debugger),                          *
+*   on your debugger machine's keyboard.                                      *
+*                                                                             *
+*                   THIS IS NOT A BUG OR A SYSTEM CRASH                       *
+*                                                                             *
+* If you did not intend to break into the debugger, press the "g" key, then   *
+* press the "Enter" key now.  This message might immediately reappear.  If it *
+* does, press "g" and "Enter" again.                                          *
+*                                                                             *
+*******************************************************************************
+nt!DbgBreakPointWithStatus:
+fffff804`a52fdfb0 cc              int     3
+0: kd> x dxgkrnl!*Present*
+                ^ Couldn't resolve 'x dxgkrnl'
+0: kd> x dxgkrnl!*Present*
+                ^ Couldn't resolve 'x dxgkrnl'
+0: kd> x dxgkrnl!*Present*
+                ^ Couldn't resolve 'x dxgkrnl'
+0: kd> g
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: create_context node=0 affinity=1 flags=0 private=0
+Break instruction exception - code 80000003 (first chance)
+*******************************************************************************
+*                                                                             *
+*   You are seeing this message because you pressed either                    *
+*       CTRL+C (if you run console kernel debugger) or,                       *
+*       CTRL+BREAK (if you run GUI kernel debugger),                          *
+*   on your debugger machine's keyboard.                                      *
+*                                                                             *
+*                   THIS IS NOT A BUG OR A SYSTEM CRASH                       *
+*                                                                             *
+* If you did not intend to break into the debugger, press the "g" key, then   *
+* press the "Enter" key now.  This message might immediately reappear.  If it *
+* does, press "g" and "Enter" again.                                          *
+*                                                                             *
+*******************************************************************************
+nt!DbgBreakPointWithStatus:
+fffff804`a52fdfb0 cc              int     3
+0: kd> g
+Unload module \SystemRoot\System32\DriverStore\FileRepository\nr_render_lab.inf_amd64_e805f1efdeb9508f\nr_render_kmd.sys at fffff804`3be20000
+Break instruction exception - code 80000003 (first chance)
+*******************************************************************************
+*                                                                             *
+*   You are seeing this message because you pressed either                    *
+*       CTRL+C (if you run console kernel debugger) or,                       *
+*       CTRL+BREAK (if you run GUI kernel debugger),                          *
+*   on your debugger machine's keyboard.                                      *
+*                                                                             *
+*                   THIS IS NOT A BUG OR A SYSTEM CRASH                       *
+*                                                                             *
+* If you did not intend to break into the debugger, press the "g" key, then   *
+* press the "Enter" key now.  This message might immediately reappear.  If it *
+* does, press "g" and "Enter" again.                                          *
+*                                                                             *
+*******************************************************************************
+nt!DbgBreakPointWithStatus:
+fffff804`a52fdfb0 cc              int     3
+0: kd> lm m dxgkrnl
+Browse full module list
+start             end                 module name
+0: kd> 
+Browse full module list
+start             end                 module name
+0: kd> bc *; .logclose; g
+Closing open log file C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-present-v35-oct9.log
