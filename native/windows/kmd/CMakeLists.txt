@@ -5,6 +5,7 @@ if(NOT MSVC OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
 endif()
 set(NR_WDK_ROOT "" CACHE PATH "Pinned WDK dependency root from prepare_wdk.py --kernel")
 option(NR_KMD_LAB_SYNC_PROBE "Observe synchronization before rejecting lab adapter startup" OFF)
+option(NR_KMD_LAB_WORKER_PROBE "Exercise an owned paging worker and deferred callback in the lab" OFF)
 if(NOT EXISTS "${NR_WDK_ROOT}/lib/ntoskrnl.lib")
   message(FATAL_ERROR "Prepare WDK kernel headers and libraries first")
 endif()
@@ -22,6 +23,7 @@ target_include_directories(nr_render_kmd PRIVATE
   "${NR_WDK_ROOT}/include/km/crt")
 target_compile_definitions(nr_render_kmd PRIVATE
   NR_KMD_LAB_SYNC_PROBE=$<BOOL:${NR_KMD_LAB_SYNC_PROBE}>
+  NR_KMD_LAB_WORKER_PROBE=$<BOOL:${NR_KMD_LAB_WORKER_PROBE}>
   _AMD64_ AMD64 _WIN64 NTDDI_VERSION=NTDDI_WIN10_VB
   DXGKDDI_INTERFACE_VERSION=DXGKDDI_INTERFACE_VERSION_WDDM1_3)
 target_link_options(nr_render_kmd PRIVATE /DRIVER /SUBSYSTEM:NATIVE
@@ -37,6 +39,7 @@ target_include_directories(nr_kernel_host_test PRIVATE
   "${NR_WDK_ROOT}/include/km" "${NR_WDK_ROOT}/include/shared")
 target_compile_definitions(nr_kernel_host_test PRIVATE
   NR_KMD_LAB_SYNC_PROBE=$<BOOL:${NR_KMD_LAB_SYNC_PROBE}>
+  NR_KMD_LAB_WORKER_PROBE=$<BOOL:${NR_KMD_LAB_WORKER_PROBE}>
   _AMD64_ AMD64 _WIN64 NTDDI_VERSION=NTDDI_WIN10_VB
   DXGKDDI_INTERFACE_VERSION=DXGKDDI_INTERFACE_VERSION_WDDM1_3)
 include(CTest)

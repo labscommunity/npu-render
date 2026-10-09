@@ -1,0 +1,151 @@
+Opened log file 'C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-sync-probe-oct9.log'
+
+************* Preparing the environment for Debugger Extensions Gallery repositories **************
+   ExtensionRepository : Implicit
+   UseExperimentalFeatureForNugetShare : true
+   AllowNugetExeUpdate : true
+   NonInteractiveNuget : true
+   AllowNugetMSCredentialProviderInstall : true
+   AllowParallelInitializationOfLocalRepositories : true
+
+   EnableRedirectToV8JsProvider : false
+
+   -- Configuring repositories
+      ----> Repository : LocalInstalled, Enabled: true
+      ----> Repository : UserExtensions, Enabled: true
+
+>>>>>>>>>>>>> Preparing the environment for Debugger Extensions Gallery repositories completed, duration 0.000 seconds
+
+************* Waiting for Debugger Extensions Gallery to Initialize **************
+
+>>>>>>>>>>>>> Waiting for Debugger Extensions Gallery to Initialize completed, duration 0.016 seconds
+   ----> Repository : UserExtensions, Enabled: true, Packages count: 0
+   ----> Repository : LocalInstalled, Enabled: true, Packages count: 29
+
+Microsoft (R) Windows Debugger Version 10.0.26100.6584 AMD64
+Copyright (c) Microsoft Corporation. All rights reserved.
+
+Opened 127.0.0.1
+Waiting to reconnect...
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\atlmfc.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\ObjectiveC.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\concurrency.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\cpp_rest.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\Kernel.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\stl.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\Windows.Data.Json.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\Windows.Devices.Geolocation.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\Windows.Devices.Sensors.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\Windows.Media.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\windows.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\winrt.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\Usb4Kd.natvis'
+Connected to Windows 10 26100 x64 target at (Fri Oct  9 09:36:25.203 2026 (UTC - 7:00)), ptr64 TRUE
+Kernel Debugger connection established.
+
+************* Path validation summary **************
+Response                         Time (ms)     Location
+Deferred                                       srv*C:\Users\tatef\AppData\Local\npu-render\vm\symbols*https://msdl.microsoft.com/download/symbols
+Symbol search path is: srv*C:\Users\tatef\AppData\Local\npu-render\vm\symbols*https://msdl.microsoft.com/download/symbols
+Executable search path is: 
+Windows 10 Kernel Version 26100 MP (1 procs) Free x64
+Edition build lab: 26100.1.amd64fre.ge_release.240331-1435
+Kernel base = 0xfffff807`d4600000 PsLoadedModuleList = 0xfffff807`d54f5410
+System Uptime: 0 days 0:00:00.003
+nt!DebugService2+0x5:
+fffff807`d4afe005 cc              int     3
+kd> .sympath+ C:\Users\tatef\AppData\Local\npu-render\builds\render-kernel-v6-sync\Release
+Symbol search path is: srv*C:\Users\tatef\AppData\Local\npu-render\vm\symbols*https://msdl.microsoft.com/download/symbols;C:\Users\tatef\AppData\Local\npu-render\builds\render-kernel-v6-sync\Release
+Expanded Symbol search path is: srv*c:\users\tatef\appdata\local\npu-render\vm\symbols*https://msdl.microsoft.com/download/symbols;c:\users\tatef\appdata\local\npu-render\builds\render-kernel-v6-sync\release
+
+************* Path validation summary **************
+Response                         Time (ms)     Location
+Deferred                                       srv*C:\Users\tatef\AppData\Local\npu-render\vm\symbols*https://msdl.microsoft.com/download/symbols
+OK                                             C:\Users\tatef\AppData\Local\npu-render\builds\render-kernel-v6-sync\Release
+kd> bu nr_render_kmd!DriverEntry; sxe ud:nr_render_kmd.sys; g
+Couldn't resolve error at 'nr_render_kmd.sys; g'
+kd> sxe ud:nr_render_kmd.sys
+Couldn't resolve error at 'nr_render_kmd.sys'
+kd> g
+KiInitializeMTRR: MTRR_MSR_DEFAULT is not consistent between processors.
+KDTARGET: Refreshing KD connection
+DriverEntry failed 0xc00000bb for driver \REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\uiomap
+Unload module uiomap.sys at fffff807`693f0000
+nt!DebugService2+0x5:
+fffff807`d4afe005 cc              int     3
+1: kd> sxd ud
+1: kd> g
+Unload module KMPDC.sys at fffff807`69a60000
+Unload module dam.sys at fffff807`69a30000
+Unload module dump_dumpfve.sys at fffff807`692d0000
+Unload module dump_storahci.sys at fffff807`69260000
+Unload module dump_diskdump.sys at fffff807`69200000
+DriverEntry failed 0xc00000bb for driver \REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\NetworkPrivacyPolicy
+Unload module NetworkPrivacyPolicy.sys at fffff807`6b390000
+Break instruction exception - code 80000003 (first chance)
+*******************************************************************************
+*                                                                             *
+*   You are seeing this message because you pressed either                    *
+*       CTRL+C (if you run console kernel debugger) or,                       *
+*       CTRL+BREAK (if you run GUI kernel debugger),                          *
+*   on your debugger machine's keyboard.                                      *
+*                                                                             *
+*                   THIS IS NOT A BUG OR A SYSTEM CRASH                       *
+*                                                                             *
+* If you did not intend to break into the debugger, press the "g" key, then   *
+* press the "Enter" key now.  This message might immediately reappear.  If it *
+* does, press "g" and "Enter" again.                                          *
+*                                                                             *
+*******************************************************************************
+nt!DbgBreakPointWithStatus:
+fffff807`d4afdfb0 cc              int     3
+0: kd> bl
+     0 e Disable Clear u                      0001 (0001) (nr_render_kmd!DriverEntry)
+
+0: kd> g
+Breakpoint 0 hit
+nr_render_kmd!DriverEntry:
+fffff807`6b562010 4055            push    rbp
+1: kd> lm m nr_render_kmd; x nr_render_kmd!*start_device*; x nr_render_kmd!*remove_device*; !irql; gu
+Browse full module list
+start             end                 module name
+fffff807`6b560000 fffff807`6b569000   nr_render_kmd   (private pdb symbols)  c:\users\tatef\appdata\local\npu-render\builds\render-kernel-v6-sync\release\nr_render_kmd.pdb
+fffff807`6b561dd0 nr_render_kmd!`anonymous namespace'::start_device (void *, struct _DXGK_START_INFO *, struct _DXGKRNL_INTERFACE *, unsigned long *, unsigned long *)
+fffff807`6b561d30 nr_render_kmd!`anonymous namespace'::remove_device (void *)
+Debugger saved IRQL for processor 0x1 -- 0 (LOW_LEVEL)
+nr_render_kmd!GsDriverEntry+0x20:
+fffff807`6b567020 488b5c2430      mov     rbx,qword ptr [rsp+30h]
+0: kd> r eax; bp fffff807`6b561dd0; bp fffff807`6b561d30; g
+eax=0
+Breakpoint 1 hit
+nr_render_kmd!`anonymous namespace'::start_device:
+fffff807`6b561dd0 4053            push    rbx
+1: kd> r @$t1=@rcx; r @$t2=@r9; r @$t3=poi(@rsp+0x28); !irql; gu
+Debugger saved IRQL for processor 0x1 -- 0 (LOW_LEVEL)
+nr_render_lab: sync status=00000000 calls=1 irql=3 returned=1 valid=1; startup remains disabled
+nr_render_kmd!DlpStartDevice+0x8e:
+fffff807`6b5661a2 4883c438        add     rsp,38h
+1: kd> r eax; dd @$t2 L1; dd @$t3 L1; dt nr_render_kmd!nr::kmd::SynchronizationProbe; g
+eax=c00000bb
+ffffae05`e02ccc14  00000000
+ffffae05`e02ccc10  00000000
+   +0x000 status           : Int4B
+   +0x004 calls            : Uint4B
+   +0x008 callback_irql    : UChar
+   +0x009 returned         : UChar
+Breakpoint 2 hit
+nr_render_kmd!`anonymous namespace'::remove_device:
+fffff807`6b561d30 4883ec28        sub     rsp,28h
+1: kd> r rcx; !irql; gu
+rcx=ffffae05e05027c0
+Debugger saved IRQL for processor 0x1 -- 0 (LOW_LEVEL)
+dxgkrnl!DpiDxgkDdiRemoveDevice+0x51:
+fffff807`66919f09 803df0e7d3ff00  cmp     byte ptr [dxgkrnl!bTracingEnabled (fffff807`66658700)],0
+1: kd> r eax; sxe ud:nr_render_kmd.sys
+eax=0
+1: kd> g
+Unload module nr_render_kmd.sys at fffff807`6b560000
+nt!DebugService2+0x5:
+fffff807`d4afe005 cc              int     3
+1: kd> .logclose
+Closing open log file C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-sync-probe-oct9.log

@@ -31,6 +31,26 @@ a completed fence. Default builds omit it. Host tests reject missing or repeated
 callbacks, unsuitable IRQL, false callback results and non-success statuses.
 Only a live kernel observation can establish Windows behavior.
 
+The [October 9 isolated-guest run](../../../docs/validation/2026-10-09/kernel-sync/report.json)
+of this probe succeeded: the public callback
+returned `STATUS_SUCCESS`, invoked the routine exactly once at IRQL 3, and
+returned its `TRUE` result. The driver then rejected startup and unloaded; the
+original display remained healthy. This validates the synchronization route on
+that Windows build, without a hardware interrupt resource. It does not validate
+`DxgkCbNotifyInterrupt`, deferred callbacks, fence completion or portability to
+other builds. Those require actual submitted work and separate observations.
+
+`--lab-worker-probe` additionally runs a finite system thread that fills an owned
+segment and transfers 1,024 patterned bytes to and from an owned nonpaged MDL,
+checking deferred execution, offset units, guard bytes and the borrowed MDL
+header. After releasing the memory it requests a Dxgkrnl DPC through the public
+synchronization callback. The parent joins the thread and drains queued DPCs
+before rejecting startup. Neither `NotifyInterrupt` nor `NotifyDpc` is called:
+there is no Windows-submitted fence to complete. This diagnostic is omitted
+from default builds. Its host model checks failed allocations, failed thread
+creation, rejected callbacks, a late DPC and a retried join; it does not model
+concurrency or establish live Windows memory-manager acceptance.
+
 The [October 9 registration trace](../../../docs/validation/2026-10-09/kernel-registration/report.json)
 validated the earlier `288be1a` baseline in an isolated Windows guest. Windows
 called `DriverEntry`, `AddDevice`, `StartDevice` and `RemoveDevice`; the first,

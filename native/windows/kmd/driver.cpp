@@ -2,7 +2,11 @@
 // the desktop bundle. StartDevice remains closed until the memory manager,
 // scheduler notifications, and worker teardown have passed isolated tests.
 extern "C" {
+#if NR_KMD_LAB_WORKER_PROBE
+#include <ntifs.h>
+#else
 #include <ntddk.h>
+#endif
 #include <dispmprt.h>
 }
 #include "scheduler.hpp"
@@ -11,6 +15,9 @@ extern "C" {
 #include "paging.hpp"
 #if NR_KMD_LAB_SYNC_PROBE
 #include "synchronization_probe.hpp"
+#endif
+#if NR_KMD_LAB_WORKER_PROBE
+#include "worker_probe.hpp"
 #endif
 
 inline void *operator new(size_t, void *p) noexcept { return p; }
@@ -25,6 +32,9 @@ struct Adapter {
     nr::kmd::Segment segment;
 #if NR_KMD_LAB_SYNC_PROBE
     nr::kmd::SynchronizationProbe synchronization;
+#endif
+#if NR_KMD_LAB_WORKER_PROBE
+    nr::kmd::WorkerProbe worker_probe;
 #endif
     LONG devices;
     LONG allocations;
@@ -75,6 +85,16 @@ NTSTATUS start_device(void *context, DXGK_START_INFO *start,
         ULONG(probe.status), probe.calls, UINT(probe.callback_irql),
         UINT(probe.returned), UINT(probe.valid_observation()));
 #endif
+#if NR_KMD_LAB_WORKER_PROBE
+    a->worker_probe.run(*kernel);
+    const auto &worker = a->worker_probe;
+    DbgPrintEx(DPFLTR_IHVVIDEO_ID, DPFLTR_ERROR_LEVEL,
+        "nr_render_lab: worker status=%08lx create=%08lx memory=%08lx sync=%08lx wait=%08lx close=%08lx joined=%u irql=%u/%u/%u calls=%lu/%ld queued=%u returned=%u; startup remains disabled\n",
+        ULONG(worker.status), ULONG(worker.create_status), ULONG(worker.memory_status),
+        ULONG(worker.sync_status), ULONG(worker.dpc_wait_status), ULONG(worker.close_status),
+        UINT(worker.joined), UINT(worker.worker_irql), UINT(worker.sync_irql), UINT(worker.dpc_irql),
+        worker.sync_calls, worker.dpc_calls, UINT(worker.queued), UINT(worker.returned));
+#endif
     // Do not let Dxgkrnl select an adapter with incomplete mandatory DDIs.
     if (!runtime_ready) return STATUS_NOT_SUPPORTED;
     const auto memory_status = a->segment.prepare();
@@ -117,7 +137,14 @@ NTSTATUS child_relations(void *, DXGK_CHILD_DESCRIPTOR *children, ULONG bytes) {
 DXGKDDI_INTERRUPT_ROUTINE interrupt;
 BOOLEAN interrupt(void *, ULONG) { return FALSE; }
 DXGKDDI_DPC_ROUTINE dpc;
-void dpc(void *) {} // No work can be submitted while runtime_ready is false.
+void dpc(void *context) {
+#if NR_KMD_LAB_WORKER_PROBE
+    if (context) static_cast<Adapter *>(context)->worker_probe.observe_dpc();
+#else
+    UNREFERENCED_PARAMETER(context);
+#endif
+    // No Windows DMA fence exists while runtime_ready is false.
+}
 DXGKDDI_RESET_DEVICE reset_device;
 void reset_device(void *context) {
     if (context) {

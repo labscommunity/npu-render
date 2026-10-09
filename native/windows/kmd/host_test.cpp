@@ -1,14 +1,18 @@
 // Executes the actual DDI implementation with memory/registration shims. This
 // tests validation and unwinding only; it is not a kernel/IRQL or Dxgkrnl test.
 extern "C" {
+#if NR_KMD_LAB_WORKER_PROBE
+#include <ntifs.h>
+#else
 #include <ntddk.h>
+#endif
 #include <dispmprt.h>
 void *nr_host_allocate(size_t bytes);
 void nr_host_free(void *pointer);
 }
 namespace {
 DRIVER_INITIALIZATION_DATA registration{};
-#if NR_KMD_LAB_SYNC_PROBE
+#if NR_KMD_LAB_SYNC_PROBE || NR_KMD_LAB_WORKER_PROBE
 enum class SyncMode {
     failed, missing_callback, valid, repeated, dispatch, profile, false_return, pending_return
 };
@@ -100,6 +104,87 @@ void *pool_allocate(POOL_FLAGS, SIZE_T bytes, ULONG) {
     return p;
 }
 void pool_free(void *p, ULONG) { if (p) { --outstanding; nr_host_free(p); } }
+#if NR_KMD_LAB_WORKER_PROBE
+void *dpc_owner = nullptr;
+bool worker_contract_error = false, thread_fail = false, thread_joined = false;
+bool thread_closed = false, thread_terminated = false;
+bool queue_accept = true, defer_dpc = false, pending_dpc = false;
+unsigned thread_wait_failures = 0, retry_delays = 0, dpc_flushes = 0;
+KIRQL delivered_dpc_irql = DISPATCH_LEVEL;
+void mdl_nonpaged(PMDL mdl) {
+    mdl->MappedSystemVa = MmGetMdlVirtualAddress(mdl);
+    mdl->MdlFlags = MDL_SOURCE_IS_NONPAGED_POOL;
+}
+void event_initialize(PRKEVENT event, EVENT_TYPE type, BOOLEAN state) {
+    if (type != NotificationEvent || state) worker_contract_error = true;
+    RtlZeroMemory(event, sizeof(*event));
+}
+LONG event_set(PRKEVENT event, KPRIORITY increment, BOOLEAN wait) {
+    if (increment || wait) worker_contract_error = true;
+    return InterlockedExchange(&event->Header.SignalState, 1);
+}
+NTSTATUS event_wait(void *object, KWAIT_REASON reason, KPROCESSOR_MODE mode,
+                    BOOLEAN alertable, LARGE_INTEGER *timeout) {
+    if (!object || reason != Executive || mode != KernelMode || alertable ||
+        !timeout || timeout->QuadPart != -50000000 || simulated_irql != PASSIVE_LEVEL)
+        worker_contract_error = true;
+    return static_cast<PRKEVENT>(object)->Header.SignalState ? STATUS_SUCCESS : STATUS_TIMEOUT;
+}
+NTSTATUS thread_create(PHANDLE handle, ULONG access, POBJECT_ATTRIBUTES attributes,
+                       HANDLE process, PCLIENT_ID client, PKSTART_ROUTINE start, void *context) {
+    if (!handle || access != SYNCHRONIZE || !attributes ||
+        attributes->Attributes != OBJ_KERNEL_HANDLE || process || client || !start || !context ||
+        simulated_irql != PASSIVE_LEVEL) worker_contract_error = true;
+    thread_joined = thread_closed = thread_terminated = false;
+    if (thread_fail) return STATUS_INSUFFICIENT_RESOURCES;
+    *handle = &thread_joined;
+    start(context); // Host contract model only; the guest exercises real concurrency.
+    return STATUS_SUCCESS;
+}
+NTSTATUS thread_terminate(NTSTATUS status) {
+    if (status != STATUS_SUCCESS) worker_contract_error = true;
+    thread_terminated = true;
+    return STATUS_SUCCESS;
+}
+NTSTATUS thread_wait(HANDLE handle, BOOLEAN alertable, LARGE_INTEGER *timeout) {
+    if (handle != &thread_joined || alertable || timeout || !thread_terminated)
+        worker_contract_error = true;
+    if (thread_wait_failures) { --thread_wait_failures; return STATUS_UNSUCCESSFUL; }
+    thread_joined = true;
+    return STATUS_SUCCESS;
+}
+NTSTATUS thread_close(HANDLE handle) {
+    if (handle != &thread_joined || !thread_joined || thread_closed) worker_contract_error = true;
+    thread_closed = true;
+    return STATUS_SUCCESS;
+}
+NTSTATUS retry_delay(KPROCESSOR_MODE mode, BOOLEAN alertable, LARGE_INTEGER *interval) {
+    if (mode != KernelMode || alertable || !interval || interval->QuadPart != -10000000)
+        worker_contract_error = true;
+    ++retry_delays;
+    return STATUS_SUCCESS;
+}
+void deliver_dpc() {
+    const auto previous = simulated_irql;
+    simulated_irql = delivered_dpc_irql;
+    registration.DxgkDdiDpcRoutine(dpc_owner);
+    simulated_irql = previous;
+}
+BOOLEAN queue_dpc(HANDLE device) {
+    if (device != &registration || !dpc_owner || simulated_irql <= DISPATCH_LEVEL ||
+        simulated_irql >= PROFILE_LEVEL || pending_dpc) worker_contract_error = true;
+    if (!queue_accept) return FALSE;
+    if (defer_dpc) pending_dpc = true;
+    else deliver_dpc();
+    return TRUE;
+}
+void flush_dpcs() {
+    if (!thread_joined || !thread_closed || simulated_irql != PASSIVE_LEVEL)
+        worker_contract_error = true;
+    ++dpc_flushes;
+    if (pending_dpc) { pending_dpc = false; deliver_dpc(); }
+}
+#endif
 NTSTATUS initialize(DRIVER_OBJECT *, UNICODE_STRING *, DRIVER_INITIALIZATION_DATA *data) {
     registration = *data;
     return STATUS_SUCCESS;
@@ -117,14 +202,29 @@ NTSTATUS initialize(DRIVER_OBJECT *, UNICODE_STRING *, DRIVER_INITIALIZATION_DAT
 #undef MmGetSystemAddressForMdlSafe
 #define MmGetSystemAddressForMdlSafe mdl_map
 #define DriverEntry NrHostDriverEntry
-#if NR_KMD_LAB_SYNC_PROBE
+#if NR_KMD_LAB_SYNC_PROBE || NR_KMD_LAB_WORKER_PROBE
 #define KeGetCurrentIrql current_irql
 #define DbgPrintEx lab_print
+#endif
+#if NR_KMD_LAB_WORKER_PROBE
+#define MmBuildMdlForNonPagedPool mdl_nonpaged
+#define KeInitializeEvent event_initialize
+#define KeSetEvent event_set
+#define KeWaitForSingleObject event_wait
+#define PsCreateSystemThread thread_create
+#define PsTerminateSystemThread thread_terminate
+#define ZwWaitForSingleObject thread_wait
+#define ZwClose thread_close
+#define KeDelayExecutionThread retry_delay
+#define KeFlushQueuedDpcs flush_dpcs
 #endif
 #include "driver.cpp"
 #undef DriverEntry
 #define NR_CHECK(expression) do { if (!(expression)) return __LINE__; } while (false)
 #include "paging_test.hpp"
+#if NR_KMD_LAB_WORKER_PROBE
+#include "worker_probe_test.hpp"
+#endif
 extern "C" int nr_kernel_host_test() {
     NR_CHECK(NT_SUCCESS(NrHostDriverEntry(nullptr, nullptr)));
     NR_CHECK(registration.Version == DXGKDDI_INTERFACE_VERSION_WDDM1_3);
@@ -319,6 +419,9 @@ extern "C" int nr_kernel_host_test() {
     NR_CHECK(registration.DxgkDdiQueryAdapterInfo(a, &query) == STATUS_DEVICE_NOT_READY);
     NR_CHECK(NT_SUCCESS(registration.DxgkDdiStopDevice(a)) && segment_frees == 4);
     NR_CHECK(!segment_contract_error);
+#if NR_KMD_LAB_WORKER_PROBE
+    NR_CHECK(worker_probe_test(a) == 0);
+#endif
     NR_CHECK(NT_SUCCESS(registration.DxgkDdiRemoveDevice(a)) && !outstanding);
     return 0;
 }
