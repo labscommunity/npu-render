@@ -8,6 +8,7 @@
 #include <array>
 #include <cstdio>
 #include <cstring>
+#include <cwchar>
 #include <stdexcept>
 #include <vector>
 #include "contract.hpp"
@@ -19,7 +20,7 @@ void check(HRESULT status, const char *operation) {
     if (FAILED(status)) throw std::runtime_error(operation);
 }
 void require(bool value, const char *message) { if (!value) throw std::runtime_error(message); }
-LUID select_adapter() {
+LUID select_adapter(WCHAR (&umd)[MAX_PATH]) {
     struct Handles {
         std::vector<D3DKMT_ADAPTERINFO> values;
         ~Handles() { for (const auto &a : values) if (a.hAdapter) { D3DKMT_CLOSEADAPTER close{a.hAdapter}; D3DKMTCloseAdapter(&close); } }
@@ -40,7 +41,15 @@ LUID select_adapter() {
         const auto status = D3DKMTQueryAdapterInfo(&query);
         const nr::kernel_contract::AdapterInfo expected{};
         if (!status && info.signature == expected.signature && info.abi == expected.abi &&
-            info.bytes == expected.bytes && info.ready == 0) { ++matches; selected = a.AdapterLuid; }
+            info.bytes == expected.bytes && info.ready == 0) {
+            ++matches; selected = a.AdapterLuid;
+            D3DKMT_UMDFILENAMEINFO name{};
+            name.Version = KMTUMDVERSION_DX10;
+            query.Type = KMTQAITYPE_UMDRIVERNAME;
+            query.pPrivateDriverData = &name; query.PrivateDriverDataSize = sizeof(name);
+            require(D3DKMTQueryAdapterInfo(&query) == 0 && std::wmemchr(name.UmdFileName, 0, MAX_PATH), "registered UMD path query");
+            std::memcpy(umd, name.UmdFileName, sizeof(umd));
+        }
     }
     require(matches == 1, "expected exactly one paired laboratory adapter");
     return selected;
@@ -86,7 +95,19 @@ int main(int argc, char **argv) {
     if (!nr_fill_guest()) { std::puts("{\"passed\":false,\"error\":\"owned graphics guest required\"}"); return 2; }
     HMODULE retained = nullptr;
     try {
-        const auto luid = select_adapter();
+        WCHAR umd[MAX_PATH]{}, root[MAX_PATH]{};
+        const auto luid = select_adapter(umd);
+        require(GetWindowsDirectoryW(root, MAX_PATH) != 0, "Windows directory");
+        require(wcscat_s(root, L"\\System32\\DriverStore\\FileRepository\\") == 0, "driver-store prefix");
+        const auto name = std::wcsrchr(umd, L'\\');
+        require(_wcsnicmp(umd, root, std::wcslen(root)) == 0 && !std::wcsstr(umd, L"\\..") &&
+                name && _wcsicmp(name + 1, L"nr_fill_umd.dll") == 0, "unexpected registered UMD path");
+        // Retain the exact OS-registered DLL for diagnostics even if device
+        // initialization fails and the runtime releases its own module handle.
+        // D3D11 still uses the selected adapter and a null software-module input.
+        retained = LoadLibraryExW(umd, nullptr, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
+        require(retained != nullptr, "retain registered UMD diagnostics");
+        require(!GetProcAddress(retained, "D3DKMTCreateDevice"), "unexpected KMT replacement export");
         ComPtr<IDXGIFactory4> factory;
         check(CreateDXGIFactory1(IID_PPV_ARGS(&factory)), "create_factory");
         ComPtr<IDXGIAdapter> adapter;
@@ -98,7 +119,6 @@ int main(int argc, char **argv) {
         check(D3D11CreateDevice(adapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr, 0, &requested, 1,
                                D3D11_SDK_VERSION, &device, &received, &context), "create_registered_device");
         require(received == requested, "unexpected feature level");
-        require(GetModuleHandleExW(0, L"nr_fill_umd.dll", &retained) != FALSE, "expected registered UMD not loaded");
         auto stats = reinterpret_cast<BOOL (*)(NrFillStats *)>(GetProcAddress(retained, "nr_fill_stats"));
         require(stats != nullptr, "UMD diagnostics unavailable");
         exercise(device.Get(), context.Get(), DXGI_FORMAT_B8G8R8A8_UNORM);
