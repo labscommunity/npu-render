@@ -1,5 +1,5 @@
-// Guest-only normal-loader D3D10 DDI bridge. Admits texture clears and staging
-// readback/uploads through real kernel allocations. No shaders, NPU or presentation.
+// Guest-only normal-loader D3D10 DDI bridge over real kernel allocations.
+// Restricted composition shaders use an explicit provider. No presentation.
 #define NOMINMAX
 #pragma warning(push)
 #pragma warning(disable: 4201) // Anonymous structures in Microsoft DDI headers.
@@ -17,16 +17,26 @@
 #include <type_traits>
 #include "contract.hpp"
 #include "kernel_memory.hpp"
+#include "blend_executor.hpp"
+#include "shader_contract.hpp"
 namespace {
 using namespace nr::registered_lab;
 std::recursive_mutex mutex;
 Counters counters;
+std::string selected_backend = "NPU";
 struct Device {
     D3D10DDI_HRTCORELAYER core{};
     D3D10DDI_CORELAYER_DEVICECALLBACKS callbacks{};
     D3D10DDI_DEVICEFUNCS functions{};
     std::shared_ptr<Context> context;
     std::shared_ptr<Allocation> bound_target;
+    std::shared_ptr<Allocation> bound_source;
+    std::unique_ptr<BlendExecutor> executor;
+    std::string backend;
+    std::vector<UINT> vertex_code, pixel_code;
+    UINT vertex_shader = 0, pixel_shader = 0, viewport_count = 0;
+    D3D10_DDI_VIEWPORT viewport{};
+    D3D10_DDI_PRIMITIVE_TOPOLOGY topology{};
     D3D10_DDI_BLEND_DESC blend{};
     D3D10_DDI_DEPTH_STENCIL_DESC depth{};
     D3D10_DDI_RASTERIZER_DESC raster{};
@@ -43,6 +53,7 @@ struct Resource {
     UINT usage = 0, map_flags = 0;
 };
 struct View { std::shared_ptr<Allocation> allocation; };
+struct Shader { UINT kind = 0; };
 Device &device(D3D10DDI_HDEVICE h) { return *static_cast<Device *>(h.pDrvPrivate); }
 void reject(D3D10DDI_HDEVICE h, HRESULT status) {
     ++counters.rejected;
@@ -54,6 +65,7 @@ template<class F> void guard(D3D10DDI_HDEVICE h, F f) noexcept {
     try { f(); }
     catch (const Error &e) { reject(h, e.status); }
     catch (const std::bad_alloc &) { reject(h, E_OUTOFMEMORY); }
+    catch (const std::exception &e) { std::fprintf(stderr, "nr_fill_umd: %s\n", e.what()); reject(h, E_FAIL); }
     catch (...) { reject(h, E_FAIL); }
 }
 template<class T, size_t Offset> struct Unsupported;
@@ -142,7 +154,8 @@ void APIENTRY create_resource(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATERESOUR
         const bool shared = a->MiscFlags == D3D10_DDI_RESOURCE_MISC_SHARED;
         require(!shared || rt.handle);
         const bool staging = a->Usage == D3D10_DDI_USAGE_STAGING && !a->BindFlags && a->MapFlags == D3D10_DDI_CPU_ACCESS_READ && !shared;
-        const bool target = a->Usage == D3D10_DDI_USAGE_DEFAULT && a->BindFlags == D3D10_DDI_BIND_RENDER_TARGET && !a->MapFlags;
+        constexpr UINT bindings = D3D10_DDI_BIND_RENDER_TARGET | D3D10_DDI_BIND_SHADER_RESOURCE;
+        const bool target = a->Usage == D3D10_DDI_USAGE_DEFAULT && a->BindFlags && !(a->BindFlags & ~bindings) && !a->MapFlags;
         require((staging || target) && (!a->pInitialDataUP || target));
         const auto &m = a->pMipInfoList[0];
         require(m.TexelDepth == 1);
@@ -256,7 +269,7 @@ void APIENTRY unmap(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE r, UINT sub) {
 }
 // The runtime constructs default pipeline state while initializing a device.
 // Retain those descriptors even though ClearRenderTargetView ignores them.
-// Drawing remains unsupported; state acceptance does not execute a shader.
+// State is retained and validated against the admitted draw before execution.
 #define NR_STATE(Name, Type, Handle, RtHandle) \
     SIZE_T APIENTRY Name##_size(D3D10DDI_HDEVICE, const Type *) { return sizeof(Type); } \
     void APIENTRY create_##Name(D3D10DDI_HDEVICE h, const Type *desc, Handle out, RtHandle) { \
@@ -319,10 +332,12 @@ void APIENTRY targets(D3D10DDI_HDEVICE h, const D3D10DDI_HRENDERTARGETVIEW *view
         device(h).bound_target = std::move(selected);
     });
 }
-void APIENTRY flush(D3D10DDI_HDEVICE) {} // Every clear is submitted immediately.
+#include "draw.hpp"
+void APIENTRY flush(D3D10DDI_HDEVICE) {} // Clears submit immediately; draws complete synchronously.
 void APIENTRY hazard(D3D10DDI_HDEVICE, D3D10DDI_HRESOURCE) {} // Blocking locks order our staging copies.
 void APIENTRY format_support(D3D10DDI_HDEVICE, DXGI_FORMAT f, UINT *out) {
-    *out = format_ok(f) ? D3D10_DDI_FORMAT_SUPPORT_RENDERTARGET : 0;
+    *out = format_ok(f) ? D3D10_DDI_FORMAT_SUPPORT_RENDERTARGET | D3D10_DDI_FORMAT_SUPPORT_SHADER_SAMPLE |
+                         D3D10_DDI_FORMAT_SUPPORT_BLENDABLE : 0;
 }
 void APIENTRY multisample(D3D10DDI_HDEVICE, DXGI_FORMAT f, UINT samples, UINT *out) { *out = format_ok(f) && samples == 1 ? 1 : 0; }
 void APIENTRY counter_info(D3D10DDI_HDEVICE, D3D10DDI_COUNTER_INFO *out) { *out = {}; }
@@ -341,6 +356,9 @@ HRESULT APIENTRY create_device(D3D10DDI_HADAPTER, D3D10DDIARG_CREATEDEVICE *a) {
         d->core = a->hRTCoreLayer; d->callbacks = *a->pUMCallbacks;
         d->context = std::make_shared<Context>(counters);
         d->context->create(a->hRTDevice.handle, *a->pKTCallbacks);
+        d->backend = selected_backend;
+        d->vertex_code = shader_tokens(nr_ddi_vertex_shader, "vs_4_0");
+        d->pixel_code = shader_tokens(nr_ddi_pixel_shader, "ps_4_0");
         auto &f = d->functions;
 #define NR_REJECT(field) f.field = &Unsupported<decltype(f.field), offsetof(D3D10DDI_DEVICEFUNCS, field)>::call
 #include "../ddi/unsupported.inc"
@@ -362,6 +380,7 @@ HRESULT APIENTRY create_device(D3D10DDI_HADAPTER, D3D10DDIARG_CREATEDEVICE *a) {
 #undef NR_BIND
         f.pfnSetBlendState = set_blend; f.pfnSetDepthStencilState = set_depth; f.pfnSetRasterizerState = set_raster;
         f.pfnVsSetSamplers = set_samplers<0>; f.pfnGsSetSamplers = set_samplers<1>; f.pfnPsSetSamplers = set_samplers<2>;
+        bind_draw_functions(f);
         f.pfnFlush = flush; f.pfnResourceReadAfterWriteHazard = hazard;
         f.pfnCheckFormatSupport = format_support; f.pfnCheckMultisampleQualityLevels = multisample;
         f.pfnCheckCounterInfo = counter_info; f.pfnRelocateDeviceFuncs = relocate; f.pfnDestroyDevice = destroy_device;
@@ -421,7 +440,7 @@ extern "C" __declspec(dllexport) HRESULT APIENTRY OpenAdapter10_2(D3D10DDIARG_OP
     return status;
 }
 extern "C" __declspec(dllexport) BOOL nr_fill_stats(NrFillStats *out) {
-    if (!out || out->bytes != sizeof(*out) || out->version != 3) return FALSE;
+    if (!out || out->bytes != sizeof(*out) || out->version != 4) return FALSE;
     std::lock_guard<std::recursive_mutex> lock(mutex);
     out->allocations = counters.allocations; out->fills = counters.fills; out->staging_copy_bytes = counters.copies;
     out->live_allocations = counters.live_allocations; out->live_contexts = counters.live_contexts;
@@ -429,5 +448,16 @@ extern "C" __declspec(dllexport) BOOL nr_fill_stats(NrFillStats *out) {
     out->last_unsupported_offset = counters.last_unsupported_offset;
     out->submitted_copies = counters.submitted_copies;
     out->upload_bytes = counters.upload_bytes;
+    out->draws = counters.draws; out->executions = counters.executions;
+    out->inference_input_bytes = counters.inference_input_bytes; out->inference_output_bytes = counters.inference_output_bytes;
+    out->cpu_executions = counters.cpu_executions; out->gpu_executions = counters.gpu_executions;
+    out->npu_executions = counters.npu_executions;
+    std::memcpy(out->last_execution_device, counters.last_execution_device, sizeof(out->last_execution_device));
     return TRUE;
+}
+extern "C" __declspec(dllexport) BOOL nr_fill_configure(const char *backend) {
+    std::lock_guard<std::recursive_mutex> lock(mutex);
+    if (!backend || counters.live_contexts || counters.live_allocations ||
+        (std::strcmp(backend, "CPU") && std::strcmp(backend, "GPU") && std::strcmp(backend, "NPU"))) return FALSE;
+    try { selected_backend = backend; return TRUE; } catch (...) { return FALSE; }
 }

@@ -2,6 +2,7 @@
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import subprocess
@@ -14,7 +15,12 @@ def source_hashes():
         p for p in directory.iterdir() if p.suffix in {".cpp", ".hpp"} or p.name == "CMakeLists.txt"
     ]
     paths.extend(
-        [Path("native/windows/kmd/contract.hpp"), Path("native/windows/ddi/unsupported.inc")]
+        [
+            Path("native/windows/kmd/contract.hpp"),
+            Path("native/windows/ddi/unsupported.inc"),
+            Path("native/windows/ddi/contract.hpp"),
+            Path("native/windows/blend_model.hpp"),
+        ]
     )
     return {p.as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(paths)}
 
@@ -27,6 +33,12 @@ def main():
     if os.name != "nt":
         raise RuntimeError("The registered UMD laboratory requires Windows and MSVC")
     sources = source_hashes()
+    package = importlib.util.find_spec("openvino")
+    if package is None or package.origin is None:
+        raise RuntimeError("install the locked OpenVINO environment first")
+    runtime_root = Path(package.origin).parent
+    environment = os.environ.copy()
+    environment["PATH"] = str(runtime_root / "libs") + os.pathsep + environment["PATH"]
     subprocess.run(
         [
             "cmake",
@@ -37,18 +49,22 @@ def main():
             "-A",
             "x64",
             f"-DNR_WDK_INCLUDE_ROOT={args.wdk_include_root.resolve()}",
+            f"-DOpenVINO_DIR={runtime_root / 'cmake'}",
         ],
         check=True,
+        env=environment,
     )
     # MSBuild reused a UMD after kernel_memory.hpp changed in a live lab build.
     # Source-file hashes alone cannot establish which headers produced an image.
     subprocess.run(
         ["cmake", "--build", str(args.build_dir), "--config", "Release", "--clean-first"],
         check=True,
+        env=environment,
     )
     subprocess.run(
         ["ctest", "--test-dir", str(args.build_dir), "-C", "Release", "--output-on-failure"],
         check=True,
+        env=environment,
     )
     if source_hashes() != sources:
         raise RuntimeError("Sources changed during the build; discard this result")

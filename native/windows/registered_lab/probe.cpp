@@ -8,6 +8,7 @@
 #include <wrl/client.h>
 #include <array>
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <cwchar>
@@ -15,6 +16,7 @@
 #include <vector>
 #include "contract.hpp"
 #include "../kmd/contract.hpp"
+#include "shader_contract.hpp"
 using Microsoft::WRL::ComPtr;
 void check(HRESULT status, const char *operation) {
     std::printf("{\"operation\":\"%s\",\"status\":\"%08lx\"}\n", operation, ULONG(status));
@@ -187,6 +189,7 @@ void exercise_shared(IDXGIAdapter *adapter, ID3D11Device *creator, ID3D11DeviceC
 }
 #include "process_probe.hpp"
 #include "upload_probe.hpp"
+#include "draw_probe.hpp"
 int main(int argc, char **argv) {
     const bool child_nt = argc == 5 && std::strcmp(argv[1], "--shared-child-nt") == 0;
     const bool child = child_nt || (argc == 5 && std::strcmp(argv[1], "--shared-child") == 0);
@@ -194,11 +197,22 @@ int main(int argc, char **argv) {
     const bool processes = process_nt || (argc == 2 && std::strcmp(argv[1], "--shared-process") == 0);
     const bool nt_handles = argc == 2 && std::strcmp(argv[1], "--shared-nt") == 0;
     const bool uploads = argc == 2 && std::strcmp(argv[1], "--upload") == 0;
-    if (!child && !processes && !nt_handles && !uploads && (argc != 2 || (std::strcmp(argv[1], "--exercise") && std::strcmp(argv[1], "--shared")))) return 2;
+    const char *draw_backend = argc == 2 && !std::strcmp(argv[1], "--draw-cpu") ? "CPU" :
+                               (argc == 2 && !std::strcmp(argv[1], "--draw-npu") ? "NPU" : nullptr);
+    if (!child && !processes && !nt_handles && !uploads && !draw_backend && (argc != 2 || (std::strcmp(argv[1], "--exercise") && std::strcmp(argv[1], "--shared")))) return 2;
     const bool shared = nt_handles || std::strcmp(argv[1], "--shared") == 0;
     if (!nr_fill_guest()) { std::puts("{\"passed\":false,\"error\":\"owned graphics guest required\"}"); return 2; }
     HMODULE retained = nullptr;
+    struct RuntimeDirectory {
+        DLL_DIRECTORY_COOKIE cookie = nullptr;
+        ~RuntimeDirectory() { if (cookie) RemoveDllDirectory(cookie); }
+    } runtime_directory;
     try {
+        WCHAR runtime[MAX_PATH]{};
+        const auto count = GetEnvironmentVariableW(L"NR_REGISTERED_RUNTIME", runtime, MAX_PATH);
+        require(count && count < MAX_PATH && SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_DEFAULT_DIRS), "explicit OpenVINO runtime directory required");
+        runtime_directory.cookie = AddDllDirectory(runtime);
+        require(runtime_directory.cookie != nullptr, "OpenVINO runtime directory unavailable");
         WCHAR umd[MAX_PATH]{}, root[MAX_PATH]{};
         const auto luid = select_adapter(umd);
         require(GetWindowsDirectoryW(root, MAX_PATH) != 0, "Windows directory");
@@ -209,9 +223,13 @@ int main(int argc, char **argv) {
         // Retain the exact OS-registered DLL for diagnostics even if device
         // initialization fails and the runtime releases its own module handle.
         // D3D11 still uses the selected adapter and a null software-module input.
-        retained = LoadLibraryExW(umd, nullptr, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
+        retained = LoadLibraryExW(umd, nullptr, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32 | LOAD_LIBRARY_SEARCH_USER_DIRS);
         require(retained != nullptr, "retain registered UMD diagnostics");
         require(!GetProcAddress(retained, "D3DKMTCreateDevice"), "unexpected KMT replacement export");
+        if (draw_backend) {
+            const auto configure = reinterpret_cast<BOOL (*)(const char *)>(GetProcAddress(retained, "nr_fill_configure"));
+            require(configure && configure(draw_backend), "explicit draw backend configuration failed");
+        }
         ComPtr<IDXGIFactory4> factory;
         check(CreateDXGIFactory1(IID_PPV_ARGS(&factory)), "create_factory");
         ComPtr<IDXGIAdapter> adapter;
@@ -225,7 +243,11 @@ int main(int argc, char **argv) {
         require(received == requested, "unexpected feature level");
         auto stats = reinterpret_cast<BOOL (*)(NrFillStats *)>(GetProcAddress(retained, "nr_fill_stats"));
         require(stats != nullptr, "UMD diagnostics unavailable");
-        if (uploads) {
+        if (draw_backend) {
+            for (const auto format : {DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM})
+                for (UINT width : {64u, 132u}) for (UINT sharing = 0; sharing < 3; ++sharing)
+                    exercise_draw(device.Get(), context.Get(), format, width, sharing);
+        } else if (uploads) {
             for (const auto format : {DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM})
                 for (UINT sharing = 0; sharing < 3; ++sharing) exercise_upload(device.Get(), context.Get(), format, sharing);
         } else if (child) process_child(device.Get(), context.Get(), argv, child_nt);
@@ -246,14 +268,25 @@ int main(int argc, char **argv) {
                     result.allocations, result.fills, result.staging_copy_bytes, result.live_allocations,
                     result.live_contexts, result.cleanup_errors, result.rejected, result.submitted_copies, result.upload_bytes);
         const UINT copies = child ? 2 : (processes ? 4 : 6);
-        if (uploads) require(result.allocations == 24 && !result.fills && result.staging_copy_bytes == 819200 &&
+        std::printf("{\"draws\":%llu,\"executions\":%llu,\"cpu_executions\":%llu,\"gpu_executions\":%llu,\"npu_executions\":%llu,\"execution_device\":\"%s\",\"inference_input_bytes\":%llu,\"inference_output_bytes\":%llu}\n",
+                    result.draws, result.executions, result.cpu_executions, result.gpu_executions, result.npu_executions,
+                    result.last_execution_device, result.inference_input_bytes, result.inference_output_bytes);
+        if (draw_backend) {
+            require(result.draws == 24 && result.executions == 24 && !result.gpu_executions &&
+                    result.cpu_executions == (!std::strcmp(draw_backend, "CPU") ? 24u : 0u) &&
+                    result.npu_executions == (!std::strcmp(draw_backend, "NPU") ? 24u : 0u), "unexpected draw execution counters");
+            require(result.allocations == 100 && !result.fills && result.submitted_copies == 88 && result.staging_copy_bytes == 786432 &&
+                    result.upload_bytes == 319872 && result.inference_input_bytes == 301056 && result.inference_output_bytes == 150528,
+                    "unexpected draw traffic counters");
+        } else if (uploads) require(result.allocations == 24 && !result.fills && result.staging_copy_bytes == 819200 &&
                              result.submitted_copies == 32 && result.upload_bytes == 119496, "unexpected upload counters");
         else require(result.allocations == (child ? 1u : 4u) && result.fills == (child ? 1u : (processes ? 2u : 6u)) &&
                 result.staging_copy_bytes == copies * 12288 && result.submitted_copies == (shared || child || processes ? copies : 0u) &&
                 !result.upload_bytes, "unexpected UMD counters");
         require(!result.live_allocations && !result.live_contexts && !result.cleanup_errors && !result.rejected, "unexpected cleanup counters");
+        if (!draw_backend) require(!result.executions && !result.draws, "unexpected rendering execution");
         FreeLibrary(retained);
-        std::puts("{\"passed\":true,\"npu_execution_tested\":false,\"desktop_offload_tested\":false}");
+        std::printf("{\"passed\":true,\"npu_execution_tested\":%s,\"desktop_offload_tested\":false}\n", result.npu_executions ? "true" : "false");
         return 0;
     } catch (const std::exception &e) {
         std::fprintf(stderr, "registered clear failed: %s\n", e.what());
@@ -261,8 +294,9 @@ int main(int argc, char **argv) {
             auto stats = reinterpret_cast<BOOL (*)(NrFillStats *)>(GetProcAddress(retained, "nr_fill_stats"));
             NrFillStats result{};
             if (stats && stats(&result))
-                std::printf("{\"failed\":true,\"rejected\":%llu,\"last_unsupported_offset\":%llu,\"cleanup_errors\":%llu}\n",
-                            result.rejected, result.last_unsupported_offset, result.cleanup_errors);
+                std::printf("{\"failed\":true,\"rejected\":%llu,\"last_unsupported_offset\":%llu,\"cleanup_errors\":%llu,\"executions\":%llu,\"cpu_executions\":%llu,\"gpu_executions\":%llu,\"npu_executions\":%llu,\"live_allocations\":%llu,\"live_contexts\":%llu}\n",
+                            result.rejected, result.last_unsupported_offset, result.cleanup_errors, result.executions,
+                            result.cpu_executions, result.gpu_executions, result.npu_executions, result.live_allocations, result.live_contexts);
             FreeLibrary(retained);
         }
         return 1;

@@ -122,7 +122,10 @@ HRESULT APIENTRY render_cb(HANDLE rt, D3DDDICB_RENDER *a) {
 }
 }
 #include "upload_test.hpp"
-int main() {
+#include "draw_test.hpp"
+int main(int argc, char **argv) {
+    const char *backend = argc == 2 ? argv[1] : "CPU";
+    TEST(argc <= 2);
     TEST(OpenAdapter10_2(nullptr) == E_INVALIDARG);
     if (!nr_fill_guest()) {
         D3DDDI_ADAPTERCALLBACKS callbacks{};
@@ -281,6 +284,7 @@ int main() {
     TEST(!counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
     TEST(released == 4 && destroys == 1);
     TEST(test_uploads(kt, um) == 0);
+    TEST(test_draws(kt, um, backend) == 0);
     std::puts("registered lab allocation and submission contracts passed");
     return 0;
 }

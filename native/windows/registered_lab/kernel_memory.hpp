@@ -25,6 +25,9 @@ struct Counters {
     uint64_t last_unsupported_offset = ~uint64_t(0);
     uint64_t submitted_copies = 0;
     uint64_t upload_bytes = 0;
+    uint64_t draws = 0, executions = 0, inference_input_bytes = 0, inference_output_bytes = 0;
+    uint64_t cpu_executions = 0, gpu_executions = 0, npu_executions = 0;
+    char last_execution_device[32]{};
 };
 struct Context {
     HANDLE runtime = nullptr;

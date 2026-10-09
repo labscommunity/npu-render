@@ -4,7 +4,8 @@ This guest-only UMD connects ordinary D3D11 texture clears to the private fill
 command exercised by the [v23 kernel test](../../../docs/validation/2026-10-09/kernel-paging-v23/report.json).
 It uses the normal registered-adapter loader ABI, real runtime allocation/context
 callbacks, and no process-local KMT replacement exports. It does not execute NPU
-work, shaders, presentation or desktop composition. Negotiating feature level
+work in its clear/copy path, presentation or desktop composition. A new restricted
+draw path connects an explicit composition provider. Negotiating feature level
 10.0 for this restricted test does not establish conformance.
 
 `nr_registered_clear_probe --exercise` selects exactly one paired adapter by KMT
@@ -30,7 +31,27 @@ The NT test closes the creator's original handle and duplicates the child's
 retained handle back into the parent. Child processes inherit only their explicit
 standard I/O handles and, for NT sharing, the single resource handle. Every process
 checks its own cleanup counters. Cross-adapter sharing, arbitrary usage,
-shader execution and display operations remain unsupported.
+general shader execution and display operations remain unsupported.
+
+The restricted draw path admits the existing exact fullscreen vertex/pixel shader
+pair and premultiplied source-over or source-copy blending. It validates geometry,
+viewport, state and resource ownership before executing a separately implemented
+OpenVINO provider. Configuration is explicit (`NPU` by default; `CPU` and `GPU`
+are controls), is rejected while devices are alive, and never permits `AUTO` or
+fallback. Every compiled graph's execution-device property is checked. Host
+readbacks, input copies and result uploads remain explicit and counted; the NPU
+does not own Windows' allocation callbacks or execute the kernel copy worker.
+
+`nr_registered_lab_test NPU` calls the actual UMD entrypoints with test-only
+allocation callbacks and runs the real NPU provider. It checks 16 draws, retained
+bindings, unsupported shader/state rejection and cleanup. This is a component
+test, not evidence that Windows selected an installed NPU graphics adapter.
+`nr_registered_clear_probe --draw-cpu` and `--draw-npu` exercise the normal
+registered loader in the guest. They cover two formats, two widths, ordinary and
+legacy/NT shared textures, source updates and both admitted blend modes. Live
+validation of these registered draw probes is pending. All probe modes now need
+an explicit `NR_REGISTERED_RUNTIME` directory holding the pinned OpenVINO DLLs;
+the test package separately verifies those dependency hashes.
 
 `--upload` exercises initial texture data, full and partial `UpdateSubresource`,
 and empty updates for ordinary, legacy shared and NT keyed textures in both
@@ -49,8 +70,8 @@ from staging-copy traffic and submitted-copy counts. The
 [v30 guest validation](../../../docs/validation/2026-10-09/registered-upload-v30/report.json)
 passes all 24 upload readbacks and repeats the five sharing tests, for 58 exact
 readbacks overall. All process cleanup counters are zero and the driver unloads
-cleanly. Initial/full/partial upload work remains CPU work; no shader or NPU draw
-is admitted by this registered driver yet.
+cleanly. That v30 package admits no shader or NPU draw. The new draw implementation
+above has a separate acceptance gate; the v30 evidence is not reused as proof of it.
 
 The target is built with the native DDI build or independently:
 
