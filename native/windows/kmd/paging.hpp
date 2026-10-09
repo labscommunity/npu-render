@@ -108,6 +108,7 @@ public:
             if (!NT_SUCCESS(status)) return status;
             RtlMoveMemory(destination.address, source.address, command.bytes);
         }
+        KeMemoryBarrier(); // Drain write-combined stores before fence completion.
         return STATUS_SUCCESS;
     }
 

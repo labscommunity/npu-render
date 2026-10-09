@@ -437,7 +437,9 @@ NTSTATUS APIENTRY create_allocation(HANDLE adapter, DXGKARG_CREATEALLOCATION *ar
         out.MaximumRenamingListLength = 0;
         out.Flags.Value = 0;
         out.Flags.CpuVisible = 1;
-        out.Flags.Cached = 1;
+        // VidMm rejects cached allocations targeting a memory segment when
+        // the adapter has no cache-coherent aperture. Segment backing uses
+        // MmWriteCombined so CPU aliases use the same memory type.
         out.pAllocationUsageHint = nullptr;
         out.AllocationPriority = D3DDDI_ALLOCATIONPRIORITY_NORMAL;
         out.hAllocation = created[i];

@@ -17,7 +17,9 @@ public:
             return STATUS_INVALID_PARAMETER;
         PHYSICAL_ADDRESS low{}, high{}, boundary{};
         high.QuadPart = MAXLONGLONG;
-        auto memory = MmAllocateContiguousMemorySpecifyCache(requested, low, high, boundary, MmCached);
+        // This is a memory segment, not a cache-coherent aperture. Match the
+        // write-combined mappings VidMm uses for our uncached allocations.
+        auto memory = MmAllocateContiguousMemorySpecifyCache(requested, low, high, boundary, MmWriteCombined);
         if (!memory) return STATUS_INSUFFICIENT_RESOURCES;
         const auto physical = MmGetPhysicalAddress(memory);
         if (physical.QuadPart < 0 || (physical.QuadPart & (PAGE_SIZE - 1)) ||
@@ -27,6 +29,7 @@ public:
         }
         // VidMm may expose this memory to user mode. Never expose stale pages.
         RtlZeroMemory(memory, requested);
+        KeMemoryBarrier(); // Publish initialized bytes before exposing the segment.
         physical_ = physical;
         memory_ = memory;
         committed_ = requested;
@@ -54,7 +57,8 @@ public:
         if (out.NbSegment != 1) return STATUS_INVALID_PARAMETER;
         DXGK_SEGMENTDESCRIPTOR3 descriptor{};
         descriptor.Flags.CpuVisible = 1;
-        descriptor.Flags.CacheCoherent = 1;
+        descriptor.Flags.PopulatedFromSystemMemory = 1;
+        // CacheCoherent is defined only for aperture segments; keep it clear.
         // Our software engine uses offsets. CPU access uses the actual reserved
         // physical pages; there is no fabricated aperture/MMIO address.
         descriptor.BaseAddress.QuadPart = 0;

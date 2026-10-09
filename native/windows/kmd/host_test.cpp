@@ -79,7 +79,7 @@ void *segment_allocate(SIZE_T bytes, PHYSICAL_ADDRESS low, PHYSICAL_ADDRESS high
                        PHYSICAL_ADDRESS boundary, MEMORY_CACHING_TYPE cache) {
     ++segment_allocations;
     if (segment_memory || !bytes || bytes > 64 * 1024 * 1024 || bytes % PAGE_SIZE || low.QuadPart ||
-        high.QuadPart != MAXLONGLONG || boundary.QuadPart || cache != MmCached)
+        high.QuadPart != MAXLONGLONG || boundary.QuadPart || cache != MmWriteCombined)
         segment_contract_error = true;
     if (segment_fail || bytes > segment_fail_above) return nullptr;
     segment_memory = nr_host_allocate(bytes);
@@ -418,7 +418,8 @@ extern "C" int nr_kernel_host_test() {
     NR_CHECK(NT_SUCCESS(registration.DxgkDdiQueryAdapterInfo(a, &query)));
     NR_CHECK(descriptor.CpuTranslatedAddress.QuadPart == segment_physical);
     NR_CHECK(!descriptor.BaseAddress.QuadPart && !descriptor.Reserved && !descriptor.Flags.Aperture);
-    NR_CHECK(descriptor.Flags.CpuVisible && descriptor.Flags.CacheCoherent);
+    NR_CHECK(descriptor.Flags.CpuVisible && descriptor.Flags.PopulatedFromSystemMemory);
+    NR_CHECK(!descriptor.Flags.CacheCoherent);
     NR_CHECK(descriptor.Size == nr::kmd::Segment::bytes && descriptor.CommitLimit == descriptor.Size);
     NR_CHECK(!segment_out.PagingBufferSegmentId && segment_out.PagingBufferSize == PAGE_SIZE);
     NR_CHECK(segment_out.PagingBufferPrivateDataSize == nr::kmd::Paging::private_bytes);
@@ -478,6 +479,7 @@ extern "C" int nr_kernel_host_test() {
     for (unsigned i = 0; i < 3; ++i) {
         handles[i] = allocations[i].hAllocation;
         NR_CHECK(handles[i] && allocations[i].Size == 12288);
+        NR_CHECK(allocations[i].Flags.CpuVisible && !allocations[i].Flags.Cached);
     }
     NR_CHECK(registration.DxgkDdiStopDevice(a) == STATUS_DEVICE_BUSY);
     const auto allocation_result = allocation_test(a, handles);

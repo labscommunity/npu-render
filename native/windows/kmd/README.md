@@ -104,7 +104,7 @@ returned success from `StartDevice` with 16 MiB and 33 queue slots. Windows then
 queried capabilities, rejected the adapter with Code 43, and unloaded it. The
 public KMT probe found no matching adapter and created no resources. No segment
 query, actual submission or OS fence completion was observed. Removal preserved
-the original display. The specific rejected capability remains under investigation.
+the original display. The startup failure was narrowed down in the next run.
 
 The [version-consistent retry](../../../docs/validation/2026-10-09/kernel-paging-v19/report.json)
 also failed. Stepping the callback and its Windows caller showed successful
@@ -114,6 +114,16 @@ test INF lacked the required user-mode driver registration. The next packaging
 experiment supplies the explicitly rejecting `nr_paging_guard.dll` and its
 per-device registry entries while retaining the same kernel binary. This is
 still a paging experiment, not a registered Direct3D renderer.
+
+With that registration, the unchanged kernel binary started successfully in the
+guest, answered both segment queries, enumerated through public KMT APIs, and
+created a device. The allocation create/open DDIs also succeeded, but VidMm
+rejected the cached allocation because this adapter has no cache-coherent
+aperture. The next revision uses write-combined backing and allocations, declares
+the memory segment as populated from system RAM, and leaves the aperture-only
+`CacheCoherent` bit clear. Memory barriers drain stores before exposing initialized
+pages or completing a paging command. The host checks do not validate CPU memory
+types or Windows' acceptance; the live allocation test must be rerun.
 
 The [first live engine run](../../../docs/validation/2026-10-09/kernel-engine-v12/report.json)
 passed: Windows requested 32 queue entries, the driver reserved 33 slots, and
@@ -240,7 +250,7 @@ readiness before creating a device. It preloads the specified UMD for backend
 configuration and requires execution statistics from that exact module, with
 zero software KMT replacement calls. An absent, foreign, or unready adapter
 fails; there is no default-adapter or WARP retry. Current validation covers
-rejection only, since the kernel startup gate remains closed.
+rejection only, since the normal rendering gate remains closed.
 
 Before enabling normal rendering, validate the paging engine in the isolated kernel
 and finish all mandatory render DDIs/caps. The separate paging-mode guest experiment
