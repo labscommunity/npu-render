@@ -70,6 +70,14 @@ jobs:
       - name: Build disposable-VM paging adapter and test startup unwind
         if: runner.os == 'Windows'
         run: uv run --frozen python tools/build_windows_driver.py --lab-paging-adapter --build-dir build/windows-kernel-paging-lab
+      - name: Build public KMT paging probe and check adapter enumeration
+        if: runner.os == 'Windows'
+        run: |
+          cmake -S native/windows/paging_probe -B build/windows-paging-probe -A x64
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build build/windows-paging-probe --config Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ctest --test-dir build/windows-paging-probe -C Release --output-on-failure
       - name: Package private Windows prototype
         if: runner.os == 'Windows'
         run: uv run --frozen python tools/package_windows.py --ddi --source-revision ${{ github.sha }}
