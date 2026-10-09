@@ -36,3 +36,12 @@ fallback, lock failure unwind, staging mapping, and rejection of stale command
 buffers after a failed submission. It is not evidence of live adapter execution.
 Installation is limited to the disposable kernel-debug guest and requires a
 separately signed, exact-hash package; this build does not install a driver.
+
+The [first registered run](../../../docs/validation/2026-10-09/registered-clear-v24/report.json)
+selected the adapter through DXGI and created its kernel context, but D3D11 device
+initialization failed after eight rejected UMD callbacks. The last recorded
+callback was render-target binding. No clear reached the kernel. The next revision
+retains blend/depth/rasterizer/sampler descriptors and render-target bindings
+while continuing to reject draws. The diagnostic probe pins the exact
+OS-registered DLL to retain error counters if initialization fails; D3D11 still
+selects the adapter normally and receives no software-driver module argument.
