@@ -14,6 +14,9 @@ struct WorkerProbe {
     KIRQL worker_irql = 0xff, sync_irql = 0xff, dpc_irql = 0xff;
     ULONG sync_calls = 0;
     ULONG memory_phase = 0;
+    ULONG backing_attempts = 0;
+    NTSTATUS first_backing_status = STATUS_NOT_SUPPORTED;
+    SIZE_T backing_bytes = 0;
     volatile LONG dpc_calls = 0, active = 0;
     BOOLEAN queued = FALSE, returned = FALSE, joined = FALSE;
     DXGKRNL_INTERFACE kernel{};
@@ -84,7 +87,7 @@ private:
         auto &probe = *static_cast<WorkerProbe *>(context);
         probe.worker_irql = KeGetCurrentIrql();
         probe.memory_status = probe.worker_irql == PASSIVE_LEVEL ?
-            paging_round_trip(probe.memory_phase) : STATUS_INVALID_DEVICE_STATE;
+            paging_round_trip(probe) : STATUS_INVALID_DEVICE_STATE;
         if (probe.memory_status == STATUS_SUCCESS) {
             probe.sync_status = probe.kernel.DxgkCbSynchronizeExecution(
                 probe.kernel.DeviceHandle, synchronize, &probe, 0, &probe.returned);
@@ -117,11 +120,22 @@ private:
         args.DmaBufferPrivateDataSize = sizeof(command);
         return Paging::build(segment, args);
     }
-    static NTSTATUS paging_round_trip(ULONG &phase) {
+    static NTSTATUS paging_round_trip(WorkerProbe &probe) {
         Memory memory;
+        auto &phase = probe.memory_phase;
         phase = 1;
-        auto result = memory.segment.prepare();
+        NTSTATUS result = STATUS_INSUFFICIENT_RESOURCES;
+        // Explicit lab sizing experiment, not a silent runtime fallback.
+        // The normal adapter still requests the original 64 MiB budget.
+        const SIZE_T sizes[] = {Segment::bytes, 16 * 1024 * 1024, 1024 * 1024, 65536};
+        for (const auto requested : sizes) {
+            ++probe.backing_attempts;
+            result = memory.segment.prepare(requested);
+            if (probe.backing_attempts == 1) probe.first_backing_status = result;
+            if (result != STATUS_INSUFFICIENT_RESOURCES) break;
+        }
         if (result != STATUS_SUCCESS) return result;
+        probe.backing_bytes = memory.segment.capacity();
         phase = 2;
         memory.buffer = static_cast<UCHAR *>(ExAllocatePool2(
             POOL_FLAG_NON_PAGED, 4 * PAGE_SIZE + 37, Memory::tag));

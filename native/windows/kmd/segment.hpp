@@ -11,32 +11,37 @@ public:
     Segment(const Segment &) = delete;
     Segment &operator=(const Segment &) = delete;
 
-    NTSTATUS prepare() {
+    NTSTATUS prepare(SIZE_T requested = bytes) {
         if (memory_) return STATUS_INVALID_DEVICE_STATE;
+        if (!requested || requested > bytes || requested % PAGE_SIZE)
+            return STATUS_INVALID_PARAMETER;
         PHYSICAL_ADDRESS low{}, high{}, boundary{};
         high.QuadPart = MAXLONGLONG;
-        auto memory = MmAllocateContiguousMemorySpecifyCache(bytes, low, high, boundary, MmCached);
+        auto memory = MmAllocateContiguousMemorySpecifyCache(requested, low, high, boundary, MmCached);
         if (!memory) return STATUS_INSUFFICIENT_RESOURCES;
         const auto physical = MmGetPhysicalAddress(memory);
         if (physical.QuadPart < 0 || (physical.QuadPart & (PAGE_SIZE - 1)) ||
-            physical.QuadPart > MAXLONGLONG - LONGLONG(bytes)) {
+            physical.QuadPart > MAXLONGLONG - LONGLONG(requested)) {
             MmFreeContiguousMemory(memory);
             return STATUS_INVALID_ADDRESS;
         }
         // VidMm may expose this memory to user mode. Never expose stale pages.
-        RtlZeroMemory(memory, bytes);
+        RtlZeroMemory(memory, requested);
         physical_ = physical;
         memory_ = memory;
+        committed_ = requested;
         return STATUS_SUCCESS;
     }
     void release() {
         if (memory_) MmFreeContiguousMemory(memory_);
         memory_ = nullptr;
         physical_.QuadPart = 0;
+        committed_ = 0;
     }
     bool ready() const { return memory_ != nullptr; }
+    SIZE_T capacity() const { return committed_; }
     void *range(ULONGLONG offset, SIZE_T length) const {
-        if (!memory_ || !length || offset >= bytes || length > bytes - offset) return nullptr;
+        if (!memory_ || !length || offset >= committed_ || length > committed_ - offset) return nullptr;
         return static_cast<UCHAR *>(memory_) + SIZE_T(offset);
     }
     NTSTATUS describe(DXGK_QUERYSEGMENTOUT3 &out) const {
@@ -54,8 +59,8 @@ public:
         // physical pages; there is no fabricated aperture/MMIO address.
         descriptor.BaseAddress.QuadPart = 0;
         descriptor.CpuTranslatedAddress = physical_;
-        descriptor.Size = bytes;
-        descriptor.CommitLimit = bytes;
+        descriptor.Size = committed_;
+        descriptor.CommitLimit = committed_;
         *out.pSegmentDescriptor = descriptor;
         out.PagingBufferSegmentId = 0; // VidMm-owned contiguous system memory.
         out.PagingBufferSize = PAGE_SIZE;
@@ -65,5 +70,6 @@ public:
 private:
     void *memory_ = nullptr;
     PHYSICAL_ADDRESS physical_{};
+    SIZE_T committed_ = 0;
 };
 } // namespace nr::kmd

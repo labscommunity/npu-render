@@ -55,8 +55,12 @@ The [first worker run](../../../docs/validation/2026-10-09/kernel-worker-v7/repo
 created and joined a real kernel thread, but returned
 `STATUS_INSUFFICIENT_RESOURCES` during the memory exercise before requesting a
 DPC. The original display remained healthy and the test package was removed.
-The next diagnostic records each memory phase to distinguish backing, buffer,
-MDL and transfer failures; that first run alone does not identify the allocation.
+An [instrumented rerun](../../../docs/validation/2026-10-09/kernel-worker-v8/report.json)
+isolated the failure to the contiguous backing allocation.
+The worker diagnostic now explicitly tries 64 MiB, 16 MiB, 1 MiB and 64 KiB,
+stopping at the first successful allocation and reporting its actual size and
+the first attempt's status. A reduced diagnostic allocation does not establish
+desktop capacity. The normal startup path still requests 64 MiB.
 
 The [October 9 registration trace](../../../docs/validation/2026-10-09/kernel-registration/report.json)
 validated the earlier `288be1a` baseline in an isolated Windows guest. Windows
@@ -74,9 +78,10 @@ The implementation currently provides:
   creation. Allocation failure releases every partial object before returning.
   A dormant memory-segment implementation reserves and clears 64 MiB of actual
   contiguous system memory and reports its physical address through the two-pass
-  WDDM 1.3 segment query. It rejects larger individual allocations. The startup
-  gate still prevents this allocation on a live system: only its host model has
-  run. Windows acceptance, paging, residency and NPU mapping remain unvalidated.
+  WDDM 1.3 segment query. It rejects individual allocations above the actual
+  reserved capacity. Smaller page-aligned capacities are available to the
+  explicit worker diagnostic. Normal builds keep allocation behind the startup
+  gate. Windows acceptance, paging, residency and NPU mapping remain unvalidated.
 - A bounded FIFO state machine that distinguishes a completed Windows fence
   from the lifetime of a worker ticket. Stopping invalidates completions;
   restarting remains forbidden until an active worker separately acknowledges

@@ -94,6 +94,9 @@ NTSTATUS start_device(void *context, DXGK_START_INFO *start,
         ULONG(worker.sync_status), ULONG(worker.dpc_wait_status), ULONG(worker.close_status),
         UINT(worker.joined), UINT(worker.worker_irql), UINT(worker.sync_irql), UINT(worker.dpc_irql),
         worker.sync_calls, worker.dpc_calls, UINT(worker.queued), UINT(worker.returned));
+    DbgPrintEx(DPFLTR_IHVVIDEO_ID, DPFLTR_ERROR_LEVEL,
+        "nr_render_lab: backing attempts=%lu first_status=%08lx committed_bytes=%llu; probe capacity is not desktop capacity\n",
+        worker.backing_attempts, ULONG(worker.first_backing_status), ULONGLONG(worker.backing_bytes));
 #endif
     // Do not let Dxgkrnl select an adapter with incomplete mandatory DDIs.
     if (!runtime_ready) return STATUS_NOT_SUPPORTED;
@@ -200,7 +203,7 @@ NTSTATUS APIENTRY create_allocation(HANDLE adapter, DXGKARG_CREATEALLOCATION *ar
             return STATUS_INVALID_PARAMETER;
         RtlCopyMemory(&descriptions[i], in.pPrivateDriverData, sizeof(descriptions[i]));
         if (!nr::kernel_contract::valid(descriptions[i])) return STATUS_INVALID_PARAMETER;
-        if (descriptions[i].allocation_bytes > nr::kmd::Segment::bytes)
+        if (descriptions[i].allocation_bytes > a->segment.capacity())
             return STATUS_INSUFFICIENT_RESOURCES;
     }
     LONG previous;

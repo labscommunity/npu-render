@@ -43,6 +43,7 @@ NTSTATUS synchronize(HANDLE device, PKSYNCHRONIZE_ROUTINE routine, PVOID context
 long fail_after = -1, outstanding = 0;
 void *segment_memory = nullptr;
 bool segment_fail = false, segment_contract_error = false;
+SIZE_T segment_fail_above = ~SIZE_T(0);
 LONGLONG segment_physical = 0x20000000; // Host-only physical-address model.
 unsigned segment_allocations = 0, segment_frees = 0;
 long mdl_fail_after = -1, mdl_outstanding = 0;
@@ -76,10 +77,10 @@ void mdl_free(PMDL mdl) { --mdl_outstanding; nr_host_free(mdl); }
 void *segment_allocate(SIZE_T bytes, PHYSICAL_ADDRESS low, PHYSICAL_ADDRESS high,
                        PHYSICAL_ADDRESS boundary, MEMORY_CACHING_TYPE cache) {
     ++segment_allocations;
-    if (segment_memory || bytes != 64 * 1024 * 1024 || low.QuadPart ||
+    if (segment_memory || !bytes || bytes > 64 * 1024 * 1024 || bytes % PAGE_SIZE || low.QuadPart ||
         high.QuadPart != MAXLONGLONG || boundary.QuadPart || cache != MmCached)
         segment_contract_error = true;
-    if (segment_fail) return nullptr;
+    if (segment_fail || bytes > segment_fail_above) return nullptr;
     segment_memory = nr_host_allocate(bytes);
     if (segment_memory) RtlFillMemory(segment_memory, bytes, 0xA5);
     return segment_memory;
@@ -222,6 +223,7 @@ NTSTATUS initialize(DRIVER_OBJECT *, UNICODE_STRING *, DRIVER_INITIALIZATION_DAT
 #undef DriverEntry
 #define NR_CHECK(expression) do { if (!(expression)) return __LINE__; } while (false)
 #include "paging_test.hpp"
+#include "segment_capacity_test.hpp"
 #if NR_KMD_LAB_WORKER_PROBE
 #include "worker_probe_test.hpp"
 #endif
@@ -423,6 +425,8 @@ extern "C" int nr_kernel_host_test() {
     const auto worker_result = worker_probe_test(a);
     if (worker_result) return worker_result;
 #endif
+    const auto capacity_result = segment_capacity_test(a);
+    if (capacity_result) return capacity_result;
     NR_CHECK(NT_SUCCESS(registration.DxgkDdiRemoveDevice(a)) && !outstanding);
     return 0;
 }

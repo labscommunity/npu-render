@@ -1,0 +1,51 @@
+Opened log file 'C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-worker-v8-oct9.log'
+0: kd> .sympath srv*C:\Users\tatef\AppData\Local\npu-render\vm\symbols*https://msdl.microsoft.com/download/symbols;C:\Users\tatef\AppData\Local\npu-render\builds\render-kernel-v8-worker\Release
+Symbol search path is: srv*C:\Users\tatef\AppData\Local\npu-render\vm\symbols*https://msdl.microsoft.com/download/symbols;C:\Users\tatef\AppData\Local\npu-render\builds\render-kernel-v8-worker\Release
+Expanded Symbol search path is: srv*c:\users\tatef\appdata\local\npu-render\vm\symbols*https://msdl.microsoft.com/download/symbols;c:\users\tatef\appdata\local\npu-render\builds\render-kernel-v8-worker\release
+
+************* Path validation summary **************
+Response                         Time (ms)     Location
+Deferred                                       srv*C:\Users\tatef\AppData\Local\npu-render\vm\symbols*https://msdl.microsoft.com/download/symbols
+OK                                             C:\Users\tatef\AppData\Local\npu-render\builds\render-kernel-v8-worker\Release
+0: kd> bu nr_render_kmd!DriverEntry; g
+Breakpoint 0 hit
+nr_render_kmd!DriverEntry:
+fffff807`6b5831c0 4055            push    rbp
+0: kd> lm m nr_render_kmd; x nr_render_kmd!*start_device*; x nr_render_kmd!*remove_device*; gu
+Browse full module list
+start             end                 module name
+fffff807`6b580000 fffff807`6b58b000   nr_render_kmd   (private pdb symbols)  c:\users\tatef\appdata\local\npu-render\builds\render-kernel-v8-worker\release\nr_render_kmd.pdb
+fffff807`6b582db0 nr_render_kmd!`anonymous namespace'::start_device (void *, struct _DXGK_START_INFO *, struct _DXGKRNL_INTERFACE *, unsigned long *, unsigned long *)
+fffff807`6b582a00 nr_render_kmd!`anonymous namespace'::remove_device (void *)
+nr_render_kmd!GsDriverEntry+0x20:
+fffff807`6b589020 488b5c2430      mov     rbx,qword ptr [rsp+30h]
+0: kd> r eax; bp fffff807`6b582db0; bp fffff807`6b582a00; g
+eax=0
+Breakpoint 1 hit
+nr_render_kmd!`anonymous namespace'::start_device:
+fffff807`6b582db0 48895c2418      mov     qword ptr [rsp+18h],rbx
+1: kd> r @$t1=@rcx; r @$t2=@r9; r @$t3=poi(@rsp+0x28); !irql; gu
+Debugger saved IRQL for processor 0x1 -- 0 (LOW_LEVEL)
+nr_render_lab: sync status=00000000 calls=1 irql=3 returned=1 valid=1; startup remains disabled
+nr_render_lab: worker status=c000009a create=00000000 memory=c000009a phase=1 sync=c00000bb wait=c00000bb close=00000000 joined=1 irql=0/255/255 calls=0/0 queued=0 returned=0; startup remains disabled
+nr_render_kmd!DlpStartDevice+0x8e:
+fffff807`6b5881a2 4883c438        add     rsp,38h
+1: kd> r eax; dd @$t2 L1; dd @$t3 L1; g
+eax=c00000bb
+ffffae05`e04dfc14  00000000
+ffffae05`e04dfc10  00000000
+Breakpoint 2 hit
+nr_render_kmd!`anonymous namespace'::remove_device:
+fffff807`6b582a00 4883ec28        sub     rsp,28h
+1: kd> !irql; gu
+Debugger saved IRQL for processor 0x1 -- 0 (LOW_LEVEL)
+dxgkrnl!DpiDxgkDdiRemoveDevice+0x51:
+fffff807`66919f09 803df0e7d3ff00  cmp     byte ptr [dxgkrnl!bTracingEnabled (fffff807`66658700)],0
+1: kd> r eax; sxe ud:nr_render_kmd.sys
+eax=0
+1: kd> g
+Unload module nr_render_kmd.sys at fffff807`6b580000
+nt!DebugService2+0x5:
+fffff807`d4afe005 cc              int     3
+1: kd> .logclose
+Closing open log file C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-worker-v8-oct9.log

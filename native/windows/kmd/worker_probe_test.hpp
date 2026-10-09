@@ -8,7 +8,7 @@ int worker_probe_test(Adapter *adapter) {
     kernel.DxgkCbQueueDpc = queue_dpc;
     dpc_owner = adapter;
     ULONG sources = 999, children = 999;
-    for (unsigned mutation = 0; mutation < 12; ++mutation) {
+    for (unsigned mutation = 0; mutation < 13; ++mutation) {
         sync_mode = SyncMode::valid;
         const auto baseline_pool = outstanding;
         const auto baseline_mdls = mdl_outstanding;
@@ -25,13 +25,20 @@ int worker_probe_test(Adapter *adapter) {
         case 9: sync_mode = SyncMode::failed; break;
         case 10: delivered_dpc_irql = KIRQL(DISPATCH_LEVEL + 1); break;
         case 11: thread_wait_failures = 1; break;
+        case 12: segment_fail_above = 16 * 1024 * 1024; break;
         }
         NR_CHECK(registration.DxgkDdiStartDevice(adapter, &start, &kernel, &sources, &children) ==
                  STATUS_NOT_SUPPORTED);
         const auto &probe = adapter->worker_probe;
-        NR_CHECK((probe.status == STATUS_SUCCESS) == (mutation == 0 || mutation == 11));
-        const ULONG phases[] = {10, 0, 1, 2, 3, 7, 9, 10, 10, 10, 10, 10};
+        NR_CHECK((probe.status == STATUS_SUCCESS) ==
+                 (mutation == 0 || mutation == 11 || mutation == 12));
+        const ULONG phases[] = {10, 0, 1, 2, 3, 7, 9, 10, 10, 10, 10, 10, 10};
         NR_CHECK(probe.memory_phase == phases[mutation]);
+        if (mutation == 12) {
+            NR_CHECK(probe.backing_attempts == 2 && probe.backing_bytes == 16 * 1024 * 1024 &&
+                     probe.first_backing_status == STATUS_INSUFFICIENT_RESOURCES);
+        }
+        if (mutation == 2) NR_CHECK(probe.backing_attempts == 4 && !probe.backing_bytes);
         NR_CHECK(!worker_contract_error && !segment_contract_error && !mdl_contract_error);
         NR_CHECK(outstanding == baseline_pool && mdl_outstanding == baseline_mdls);
         NR_CHECK(!segment_memory && !pending_dpc && !probe.active && !probe.kernel.DeviceHandle);
@@ -53,6 +60,7 @@ int worker_probe_test(Adapter *adapter) {
         fail_after = mdl_fail_after = -1;
         queue_accept = true;
         delivered_dpc_irql = DISPATCH_LEVEL;
+        segment_fail_above = ~SIZE_T(0);
     }
     NR_CHECK(retry_delays == 1 && !thread_wait_failures);
     dpc_owner = nullptr;
