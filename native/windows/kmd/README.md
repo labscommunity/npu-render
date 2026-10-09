@@ -10,7 +10,7 @@ The laboratory allocation contract now admits one linear allocation attached to
 a resource identity for same-adapter sharing. Resource and allocation descriptions
 must agree; opening resolves OS allocation handles and verifies that metadata.
 Resource ownership, allocation lifetime and per-device opens are counted
-separately, including an empty resource awaiting destruction. This does not
+separately, including an empty resource awaiting destruction. The default path does not
 advertise cross-adapter resources or an aperture segment. Host tests cover failed
 allocation unwind, import metadata rejection and combined/separate destruction;
 live sharing requires the registered UMD probe.
@@ -19,8 +19,8 @@ live sharing requires the registered UMD probe.
 locked system pages. It snapshots page numbers from a kernel-owned MDL, creates
 temporary CPU mappings, and directs unmapped ranges to the actual supplied dummy
 page. Bounds, ownership, partial unmap/remap, allocation failures and cleanup are
-covered by an explicit host memory model. It is not yet exposed as a VidMm segment
-and gives the NPU no direct access to these pages.
+covered by an explicit host memory model. The separate aperture experiment below exposes it as a VidMm segment.
+It gives the NPU no direct access to these pages.
 
 `--lab-aperture-probe` builds an isolated, start-disabled diagnostic. It allocates
 enough owned noncontiguous system memory for a 2880×1800 image, releases the input
@@ -39,7 +39,11 @@ allocations. Copies and fills execute through transient CPU mappings with actual
 submission ordering. It does not enable cross-adapter resources, presentation,
 NPU page access or production readiness. Host DDI tests cover startup unwind,
 mapping, a queued copy between offsets beyond the old segment, and teardown;
-live VidMm validation remains pending.
+the [v33 live run](../../../docs/validation/2026-10-09/registered-aperture-v33/report.json)
+passes all 62 small-image readbacks with actual map/unmap callbacks and 138
+successful execution fences. Mapped-page counts return to zero and removal
+preserves the original display. This validates Windows' aperture acceptance;
+native-size capacity and presentation remain separate gates.
 
 The design follows the documented [linear aperture address-space contract](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/linear-aperture-space-segments)
 and [map/unmap requirements](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/nc-d3dkmddi-dxgkddi_buildpagingbuffer).

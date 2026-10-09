@@ -1,0 +1,237 @@
+{
+  "schema": 1,
+  "kind": "registered-system-page-adapter-validation",
+  "date_utc": "2026-10-09",
+  "umd_source_revision": "458e66f8f83e2d245597454a758e9ab5436ce353",
+  "probe_source_revision": "458e66f8f83e2d245597454a758e9ab5436ce353",
+  "kernel_source_revision": "8527166b9e2bda5f299b4f8cb5028355b26d43a0",
+  "package": "v33-aperture",
+  "driver_version": "0.0.22.0",
+  "guest_build": "26300.9457",
+  "result": "registered-system-page-allocation-and-cpu-rendering-passed",
+  "cases": {
+    "draw-cpu": {
+      "exit_code": 0,
+      "started": "2026-10-09T22:37:25.4269210Z",
+      "finished": "2026-10-09T22:37:30.5276000Z",
+      "verified_readbacks": 24,
+      "verified_bytes": 150528,
+      "process_stats": [
+        {
+          "pid": 5076,
+          "allocations": 100,
+          "fills": 0,
+          "staging_copy_bytes": 786432,
+          "live_allocations": 0,
+          "live_contexts": 0,
+          "cleanup_errors": 0,
+          "rejected": 0,
+          "submitted_copies": 88,
+          "upload_bytes": 319872
+        }
+      ],
+      "execution_stats": [
+        {
+          "draws": 24,
+          "executions": 24,
+          "cpu_executions": 24,
+          "gpu_executions": 0,
+          "npu_executions": 0,
+          "execution_device": "CPU",
+          "inference_input_bytes": 301056,
+          "inference_output_bytes": 150528
+        }
+      ],
+      "expected_rejection": false
+    },
+    "upload": {
+      "exit_code": 0,
+      "started": "2026-10-09T22:37:19.7365920Z",
+      "finished": "2026-10-09T22:37:22.1366050Z",
+      "verified_readbacks": 24,
+      "verified_bytes": 230880,
+      "process_stats": [
+        {
+          "pid": 3128,
+          "allocations": 24,
+          "fills": 0,
+          "staging_copy_bytes": 819200,
+          "live_allocations": 0,
+          "live_contexts": 0,
+          "cleanup_errors": 0,
+          "rejected": 0,
+          "submitted_copies": 32,
+          "upload_bytes": 119496
+        }
+      ],
+      "execution_stats": [
+        {
+          "draws": 0,
+          "executions": 0,
+          "cpu_executions": 0,
+          "gpu_executions": 0,
+          "npu_executions": 0,
+          "execution_device": "",
+          "inference_input_bytes": 0,
+          "inference_output_bytes": 0
+        }
+      ],
+      "expected_rejection": false
+    },
+    "process-nt": {
+      "exit_code": 0,
+      "started": "2026-10-09T22:37:33.8856410Z",
+      "finished": "2026-10-09T22:37:36.1541010Z",
+      "verified_readbacks": 8,
+      "verified_bytes": 98304,
+      "process_stats": [
+        {
+          "pid": 4360,
+          "allocations": 1,
+          "fills": 1,
+          "staging_copy_bytes": 24576,
+          "live_allocations": 0,
+          "live_contexts": 0,
+          "cleanup_errors": 0,
+          "rejected": 0,
+          "submitted_copies": 2,
+          "upload_bytes": 0
+        },
+        {
+          "pid": 2072,
+          "allocations": 1,
+          "fills": 1,
+          "staging_copy_bytes": 24576,
+          "live_allocations": 0,
+          "live_contexts": 0,
+          "cleanup_errors": 0,
+          "rejected": 0,
+          "submitted_copies": 2,
+          "upload_bytes": 0
+        },
+        {
+          "pid": 4248,
+          "allocations": 4,
+          "fills": 2,
+          "staging_copy_bytes": 49152,
+          "live_allocations": 0,
+          "live_contexts": 0,
+          "cleanup_errors": 0,
+          "rejected": 0,
+          "submitted_copies": 4,
+          "upload_bytes": 0
+        }
+      ],
+      "execution_stats": [
+        {
+          "draws": 0,
+          "executions": 0,
+          "cpu_executions": 0,
+          "gpu_executions": 0,
+          "npu_executions": 0,
+          "execution_device": "",
+          "inference_input_bytes": 0,
+          "inference_output_bytes": 0
+        },
+        {
+          "draws": 0,
+          "executions": 0,
+          "cpu_executions": 0,
+          "gpu_executions": 0,
+          "npu_executions": 0,
+          "execution_device": "",
+          "inference_input_bytes": 0,
+          "inference_output_bytes": 0
+        },
+        {
+          "draws": 0,
+          "executions": 0,
+          "cpu_executions": 0,
+          "gpu_executions": 0,
+          "npu_executions": 0,
+          "execution_device": "",
+          "inference_input_bytes": 0,
+          "inference_output_bytes": 0
+        }
+      ],
+      "expected_rejection": false
+    },
+    "fill": {
+      "exit_code": 0,
+      "started": "2026-10-09T22:36:31.1243850Z",
+      "finished": "2026-10-09T22:36:45.2478690Z",
+      "verified_readbacks": 6,
+      "verified_bytes": 73728,
+      "process_stats": [
+        {
+          "pid": 560,
+          "allocations": 4,
+          "fills": 6,
+          "staging_copy_bytes": 73728,
+          "live_allocations": 0,
+          "live_contexts": 0,
+          "cleanup_errors": 0,
+          "rejected": 0,
+          "submitted_copies": 0,
+          "upload_bytes": 0
+        }
+      ],
+      "execution_stats": [
+        {
+          "draws": 0,
+          "executions": 0,
+          "cpu_executions": 0,
+          "gpu_executions": 0,
+          "npu_executions": 0,
+          "execution_device": "",
+          "inference_input_bytes": 0,
+          "inference_output_bytes": 0
+        }
+      ],
+      "expected_rejection": false
+    },
+    "draw-npu-unavailable": {
+      "exit_code": 1,
+      "started": "2026-10-09T22:37:39.4995240Z",
+      "finished": "2026-10-09T22:37:40.6069810Z",
+      "verified_readbacks": 0,
+      "verified_bytes": 0,
+      "process_stats": [],
+      "execution_stats": [
+        {
+          "failed": true,
+          "rejected": 1,
+          "last_unsupported_offset": 18446744073709551615,
+          "cleanup_errors": 0,
+          "executions": 0,
+          "cpu_executions": 0,
+          "gpu_executions": 0,
+          "npu_executions": 0,
+          "live_allocations": 0,
+          "live_contexts": 0
+        }
+      ],
+      "expected_rejection": true
+    }
+  },
+  "verified_guest_readbacks": 62,
+  "verified_guest_bytes": 553440,
+  "successful_kernel_execution_fences": 138,
+  "aperture_address_bytes": 268435456,
+  "map_callbacks": 116,
+  "unmap_callbacks": 116,
+  "peak_mapped_pages": 15,
+  "mapped_pages_after_tests": 0,
+  "registered_npu_execution_tested": false,
+  "desktop_offload_tested": false,
+  "tahoma_benefit_tested": false,
+  "kernel_module_unloaded": true,
+  "owned_device_removed": true,
+  "owned_inf_deleted": true,
+  "prior_display_status_preserved": true,
+  "notes": [
+    "Windows accepted the real VidMm system-page aperture and supplied successful map/unmap callbacks. No fabricated CPU bus address is advertised. The kernel fill/copy engine uses transient CPU mappings of OS-owned pages.",
+    "All registered draws explicitly select the CPU provider. There is no NPU in this guest and its dependency directory contains only the CPU plugin. NPU selection fails without fallback or leaked objects.",
+    "Tests exercise small textures and are not native-size capacity proof. The unchanged UMD has a 1024-pixel extent limit. No presentation, arbitrary shader stream, cross-adapter display, DWM migration or Tahoma speedup was tested."
+  ]
+}
