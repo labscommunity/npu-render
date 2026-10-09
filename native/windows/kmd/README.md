@@ -63,8 +63,13 @@ before the worker copies pixels and reports the actual OS fence. Multi-pass
 output resumes when a DMA buffer cannot hold the remaining rectangles. Host
 tests verify padding preservation, rejected inputs, short buffers, later-record
 failure before mutation, source-record lifetime and cleanup. No flip or scanout
-is claimed. The public-KMT `nr_paging_probe --present` is the separate live gate;
-at this revision live acceptance remains untested.
+is claimed. The [v35 public-KMT attempt](../../../docs/validation/2026-10-09/registered-present-v35/report.json)
+is rejected before the kernel Present entrypoint. Its first version omitted a
+required source rectangle list; supplying that list still fails. The diagnostic
+also lacks the documented presentation resources; the rejecting OS branch was
+not traced.
+It provides no live validation of the kernel blitter. The next live gate uses an
+owned interactive HWND through ordinary DXGI and a screen-pixel oracle.
 
 The design follows the documented [linear aperture address-space contract](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/linear-aperture-space-segments)
 and [map/unmap requirements](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/nc-d3dkmddi-dxgkddi_buildpagingbuffer).
