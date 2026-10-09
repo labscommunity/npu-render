@@ -1,0 +1,187 @@
+{
+  "schema": 1,
+  "kind": "isolated-registered-texture-sharing",
+  "date_utc": "2026-10-09",
+  "driver_source_revision": "24b66084ee91c7fd9ef88b907e1a0e37622ceb91",
+  "final_probe_source_revision": "bd4fbbb31a0023a62ce321e23a70c001ef2f1934",
+  "package": "v29-paging",
+  "driver_version": "0.0.18.0",
+  "guest_build": "26300.9457",
+  "result": "all-five-final-sharing-cases-passed",
+  "final_cases": {
+    "process-nt": {
+      "exit_code": 0,
+      "started": "2026-10-09T21:16:39.3189140Z",
+      "finished": "2026-10-09T21:16:42.4403630Z",
+      "verified_readbacks": 8,
+      "verified_bytes": 98304,
+      "process_stats": [
+        {
+          "pid": 6920,
+          "allocations": 1,
+          "fills": 1,
+          "staging_copy_bytes": 24576,
+          "live_allocations": 0,
+          "live_contexts": 0,
+          "cleanup_errors": 0,
+          "rejected": 0,
+          "submitted_copies": 2
+        },
+        {
+          "pid": 1560,
+          "allocations": 1,
+          "fills": 1,
+          "staging_copy_bytes": 24576,
+          "live_allocations": 0,
+          "live_contexts": 0,
+          "cleanup_errors": 0,
+          "rejected": 0,
+          "submitted_copies": 2
+        },
+        {
+          "pid": 6932,
+          "allocations": 4,
+          "fills": 2,
+          "staging_copy_bytes": 49152,
+          "live_allocations": 0,
+          "live_contexts": 0,
+          "cleanup_errors": 0,
+          "rejected": 0,
+          "submitted_copies": 4
+        }
+      ]
+    },
+    "process": {
+      "exit_code": 0,
+      "started": "2026-10-09T21:16:57.4250090Z",
+      "finished": "2026-10-09T21:16:59.8243250Z",
+      "verified_readbacks": 8,
+      "verified_bytes": 98304,
+      "process_stats": [
+        {
+          "pid": 7000,
+          "allocations": 1,
+          "fills": 1,
+          "staging_copy_bytes": 24576,
+          "live_allocations": 0,
+          "live_contexts": 0,
+          "cleanup_errors": 0,
+          "rejected": 0,
+          "submitted_copies": 2
+        },
+        {
+          "pid": 5456,
+          "allocations": 1,
+          "fills": 1,
+          "staging_copy_bytes": 24576,
+          "live_allocations": 0,
+          "live_contexts": 0,
+          "cleanup_errors": 0,
+          "rejected": 0,
+          "submitted_copies": 2
+        },
+        {
+          "pid": 2144,
+          "allocations": 4,
+          "fills": 2,
+          "staging_copy_bytes": 49152,
+          "live_allocations": 0,
+          "live_contexts": 0,
+          "cleanup_errors": 0,
+          "rejected": 0,
+          "submitted_copies": 4
+        }
+      ]
+    },
+    "nt": {
+      "exit_code": 0,
+      "started": "2026-10-09T21:17:11.6976000Z",
+      "finished": "2026-10-09T21:17:12.9836400Z",
+      "verified_readbacks": 6,
+      "verified_bytes": 73728,
+      "process_stats": [
+        {
+          "pid": 4980,
+          "allocations": 4,
+          "fills": 6,
+          "staging_copy_bytes": 73728,
+          "live_allocations": 0,
+          "live_contexts": 0,
+          "cleanup_errors": 0,
+          "rejected": 0,
+          "submitted_copies": 6
+        }
+      ]
+    },
+    "shared": {
+      "exit_code": 0,
+      "started": "2026-10-09T21:17:26.7137500Z",
+      "finished": "2026-10-09T21:17:28.0117470Z",
+      "verified_readbacks": 6,
+      "verified_bytes": 73728,
+      "process_stats": [
+        {
+          "pid": 6424,
+          "allocations": 4,
+          "fills": 6,
+          "staging_copy_bytes": 73728,
+          "live_allocations": 0,
+          "live_contexts": 0,
+          "cleanup_errors": 0,
+          "rejected": 0,
+          "submitted_copies": 6
+        }
+      ]
+    },
+    "fill": {
+      "exit_code": 0,
+      "started": "2026-10-09T21:17:37.0850010Z",
+      "finished": "2026-10-09T21:17:38.2613730Z",
+      "verified_readbacks": 6,
+      "verified_bytes": 73728,
+      "process_stats": [
+        {
+          "pid": 5228,
+          "allocations": 4,
+          "fills": 6,
+          "staging_copy_bytes": 73728,
+          "live_allocations": 0,
+          "live_contexts": 0,
+          "cleanup_errors": 0,
+          "rejected": 0,
+          "submitted_copies": 0
+        }
+      ]
+    }
+  },
+  "verified_readbacks": 34,
+  "verified_bytes": 417792,
+  "formats": [
+    87,
+    28
+  ],
+  "dimensions": [
+    64,
+    48
+  ],
+  "same_adapter_only": true,
+  "legacy_cross_process_passed": true,
+  "nt_cross_process_passed": true,
+  "nt_keyed_mutex_passed": true,
+  "creator_release_reopen_passed": true,
+  "kernel_module_unloaded": true,
+  "owned_device_removed": true,
+  "owned_inf_deleted": true,
+  "prior_display_status_preserved": true,
+  "removal_child_exit": 0,
+  "npu_execution_tested": false,
+  "desktop_offload_tested": false,
+  "tahoma_benefit_tested": false,
+  "notes": [
+    "Shared targets are non-lockable memory-segment allocations. Readback submits a bounded source-read/destination-write copy into an independent staging allocation. Windows controls residency, dependency ordering and completion; the kernel CPU worker performs the clear and copy.",
+    "The NT cross-process test closes the parent original resource and NT handle after the child has imported it, duplicates the retained child handle back to the parent, and reopens the texture. Keyed mutexes order parent and child access. Both directions are checked byte by byte.",
+    "Final cases use one committed probe revision and check each process cleanup counters. Earlier v7-v9 runs are retained as diagnostic history. Intermediate probe build reports record hashes; their uncommitted intermediate source snapshots are superseded by the final committed probe and rerun suite.",
+    "Only the probe executable changed after v29 driver installation. The package still contains the signed driver pair built from 24b6608; later probe-build DLLs were not installed.",
+    "Functional tests in an emulated isolated guest do not establish frame delivery, real NPU execution, desktop selection, cross-adapter interoperability or useful Tahoma acceleration. Timings are not performance claims."
+  ]
+}

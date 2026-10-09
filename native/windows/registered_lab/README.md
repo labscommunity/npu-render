@@ -56,8 +56,12 @@ copy into a lockable staging texture. VidMm tracks the source read and destinati
 write, and staging Map waits for completion. The copy executes on the kernel CPU
 worker; it is not NPU execution. Ordinary unshared readback retains its explicit
 blocking CPU copy. `submitted_copies` distinguishes these paths in probe results.
-The v29 guest tests accept shared allocation creation and pass the ordinary and
-shared pixel oracles. The registered path still executes on the CPU worker.
+The [v29 guest tests](../../../docs/validation/2026-10-09/registered-shared-v29/report.json)
+pass all five final cases: ordinary rendering, same-process legacy/NT sharing,
+and separate-process legacy/NT sharing. Their 34 readbacks verify 417,792 bytes
+across BGRA8 and RGBA8, with zero rejected callbacks or cleanup errors in every
+process. The module unloads and the package is removed cleanly. The registered
+path still executes on the CPU worker; no desktop or NPU result is implied.
 
 The host test calls the actual UMD callbacks with owned runtime shims. It checks
 allocation failure cleanup, rotated submission buffers, absence of a CPU clear
