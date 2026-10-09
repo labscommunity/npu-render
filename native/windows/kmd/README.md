@@ -115,7 +115,7 @@ experiment supplies the explicitly rejecting `nr_paging_guard.dll` and its
 per-device registry entries while retaining the same kernel binary. This is
 still a paging experiment, not a registered Direct3D renderer.
 
-With that registration, the unchanged kernel binary started successfully in the
+With that registration, the [unchanged kernel binary started successfully](../../../docs/validation/2026-10-09/kernel-paging-v20/report.json) in the
 guest, answered both segment queries, enumerated through public KMT APIs, and
 created a device. The allocation create/open DDIs also succeeded, but VidMm
 rejected the cached allocation because this adapter has no cache-coherent

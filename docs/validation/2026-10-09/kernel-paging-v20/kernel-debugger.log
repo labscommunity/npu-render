@@ -1,0 +1,290 @@
+Opened log file 'C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-paging-v20-oct9.log'
+Breakpoint 0 hit
+nr_render_kmd!DriverEntry:
+fffff807`6b604c60 4055            push    rbp
+0: kd> lm m nr_render_kmd; x nr_render_kmd!*start_device*; x nr_render_kmd!*query_adapter*; x nr_render_kmd!*remove_device*; gu
+Browse full module list
+start             end                 module name
+fffff807`6b600000 fffff807`6b60c000   nr_render_kmd   (private pdb symbols)  c:\users\tatef\appdata\local\npu-render\builds\render-kernel-v19-paging\release\nr_render_kmd.pdb
+fffff807`6b6039f0 nr_render_kmd!`anonymous namespace'::start_device (void *, struct _DXGK_START_INFO *, struct _DXGKRNL_INTERFACE *, unsigned long *, unsigned long *)
+fffff807`6b6030f0 nr_render_kmd!`anonymous namespace'::query_adapter (void *, struct _DXGKARG_QUERYADAPTERINFO *)
+fffff807`6b603470 nr_render_kmd!`anonymous namespace'::remove_device (void *)
+nr_render_kmd!GsDriverEntry+0x20:
+fffff807`6b60a020 488b5c2430      mov     rbx,qword ptr [rsp+30h]
+1: kd> r eax; bp fffff807`6b6039f0; bp fffff807`6b6030f0; bp fffff807`6b603470; g
+eax=0
+Breakpoint 1 hit
+nr_render_kmd!`anonymous namespace'::start_device:
+fffff807`6b6039f0 4056            push    rsi
+1: kd> r @$t1=@rcx; r @$t2=@r9; r @$t3=poi(@rsp+0x28); dt nr_render_kmd!_DXGK_START_INFO @rdx; gu
+   +0x000 RequiredDmaQueueEntry : 0x20
+   +0x004 AdapterGuid      : _GUID {7eb11ddd-c40f-11f1-a25a-525400123456}
+   +0x014 AdapterLuid      : _LUID
+nr_paging_lab: memory=00000000 required_queue=32
+nr_paging_lab: engine_start=00000000 capacity=33; rendering_ready=0 sources=0 children=0
+nr_render_kmd!DlpStartDevice+0x8e:
+fffff807`6b6091a2 4883c438        add     rsp,38h
+1: kd> r eax; dd @$t2 L1; dd @$t3 L1; g
+eax=0
+ffffae05`dcfafc14  00000000
+ffffae05`dcfafc10  00000000
+Breakpoint 2 hit
+nr_render_kmd!`anonymous namespace'::query_adapter:
+fffff807`6b6030f0 48895c2408      mov     qword ptr [rsp+8],rbx
+1: kd> dt nr_render_kmd!_DXGKARG_QUERYADAPTERINFO @rdx; gu
+   +0x000 Type             : 1 ( DXGKQAITYPE_DRIVERCAPS )
+   +0x008 pInputData       : (null) 
+   +0x010 InputDataSize    : 0
+   +0x018 pOutputData      : 0xffffae05`dfcf7978 Void
+   +0x020 OutputDataSize   : 0x228
+   +0x024 Flags            : _DXGK_QUERYADAPTERINFOFLAGS
+   +0x028 hKmdProcessHandle : (null) 
+nr_paging_lab: query type=1 input=0 output=552
+dxgkrnl!DXGADAPTER::DdiQueryAdapterInfo+0x177:
+fffff807`667e5007 807de700        cmp     byte ptr [rbp-19h],0
+1: kd> r eax; gu
+eax=0
+dxgkrnl!DXGADAPTER::Initialize+0x6b0:
+fffff807`66692ec8 33db            xor     ebx,ebx
+1: kd> r eax; gu
+eax=0
+Breakpoint 2 hit
+nr_render_kmd!`anonymous namespace'::query_adapter:
+fffff807`6b6030f0 48895c2408      mov     qword ptr [rsp+8],rbx
+0: kd> dt nr_render_kmd!_DXGKARG_QUERYADAPTERINFO @rdx; gu
+   +0x000 Type             : 2f ( DXGKQAITYPE_64BITONLYCAPS )
+   +0x008 pInputData       : (null) 
+   +0x010 InputDataSize    : 0
+   +0x018 pOutputData      : 0xfffffd8f`31b8c4e8 Void
+   +0x020 OutputDataSize   : 4
+   +0x024 Flags            : _DXGK_QUERYADAPTERINFOFLAGS
+   +0x028 hKmdProcessHandle : (null) 
+nr_paging_lab: query type=47 input=0 output=4
+dxgkrnl!DXGADAPTER::DdiQueryAdapterInfo+0x177:
+fffff807`667e5007 807de700        cmp     byte ptr [rbp-19h],0
+0: kd> r eax; g
+eax=c00000bb
+Breakpoint 2 hit
+nr_render_kmd!`anonymous namespace'::query_adapter:
+fffff807`6b6030f0 48895c2408      mov     qword ptr [rsp+8],rbx
+0: kd> dt nr_render_kmd!_DXGKARG_QUERYADAPTERINFO @rdx; gu
+   +0x000 Type             : 5 ( DXGKQAITYPE_QUERYSEGMENT3 )
+   +0x008 pInputData       : 0xfffffd8f`31b8bf18 Void
+   +0x010 InputDataSize    : 0x18
+   +0x018 pOutputData      : 0xfffffd8f`31b8bea0 Void
+   +0x020 OutputDataSize   : 0x20
+   +0x024 Flags            : _DXGK_QUERYADAPTERINFOFLAGS
+   +0x028 hKmdProcessHandle : (null) 
+nr_paging_lab: query type=5 input=24 output=32
+dxgkrnl!DXGADAPTER::DdiQueryAdapterInfo+0x177:
+fffff807`667e5007 807de700        cmp     byte ptr [rbp-19h],0
+0: kd> r eax; g
+eax=0
+Breakpoint 2 hit
+nr_render_kmd!`anonymous namespace'::query_adapter:
+fffff807`6b6030f0 48895c2408      mov     qword ptr [rsp+8],rbx
+0: kd> dt nr_render_kmd!_DXGKARG_QUERYADAPTERINFO @rdx; gu
+   +0x000 Type             : 5 ( DXGKQAITYPE_QUERYSEGMENT3 )
+   +0x008 pInputData       : 0xfffffd8f`31b8bf18 Void
+   +0x010 InputDataSize    : 0x18
+   +0x018 pOutputData      : 0xfffffd8f`31b8bea0 Void
+   +0x020 OutputDataSize   : 0x20
+   +0x024 Flags            : _DXGK_QUERYADAPTERINFOFLAGS
+   +0x028 hKmdProcessHandle : (null) 
+nr_paging_lab: query type=5 input=24 output=32
+dxgkrnl!DXGADAPTER::DdiQueryAdapterInfo+0x177:
+fffff807`667e5007 807de700        cmp     byte ptr [rbp-19h],0
+0: kd> r eax; bc 2; g
+eax=0
+nr_paging_lab: query type=10 input=4 output=4
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: query type=0 input=0 output=16
+Break instruction exception - code 80000003 (first chance)
+*******************************************************************************
+*                                                                             *
+*   You are seeing this message because you pressed either                    *
+*       CTRL+C (if you run console kernel debugger) or,                       *
+*       CTRL+BREAK (if you run GUI kernel debugger),                          *
+*   on your debugger machine's keyboard.                                      *
+*                                                                             *
+*                   THIS IS NOT A BUG OR A SYSTEM CRASH                       *
+*                                                                             *
+* If you did not intend to break into the debugger, press the "g" key, then   *
+* press the "Enter" key now.  This message might immediately reappear.  If it *
+* does, press "g" and "Enter" again.                                          *
+*                                                                             *
+*******************************************************************************
+nt!DbgBreakPointWithStatus:
+fffff807`d4afdfb0 cc              int     3
+0: kd> bu nr_render_kmd!create_allocation; g
+Couldn't resolve error at 'nr_render_kmd!create_allocation; g'
+nr_paging_lab: query type=0 input=0 output=16
+Break instruction exception - code 80000003 (first chance)
+*******************************************************************************
+*                                                                             *
+*   You are seeing this message because you pressed either                    *
+*       CTRL+C (if you run console kernel debugger) or,                       *
+*       CTRL+BREAK (if you run GUI kernel debugger),                          *
+*   on your debugger machine's keyboard.                                      *
+*                                                                             *
+*                   THIS IS NOT A BUG OR A SYSTEM CRASH                       *
+*                                                                             *
+* If you did not intend to break into the debugger, press the "g" key, then   *
+* press the "Enter" key now.  This message might immediately reappear.  If it *
+* does, press "g" and "Enter" again.                                          *
+*                                                                             *
+*******************************************************************************
+nt!DbgBreakPointWithStatus:
+fffff807`d4afdfb0 cc              int     3
+0: kd> x nr_render_kmd!*create_allocation*
+fffff807`6b6017e0 nr_render_kmd!`anonymous namespace'::create_allocation (void *, struct _DXGKARG_CREATEALLOCATION *)
+0: kd> bp fffff807`6b6017e0; g
+nr_paging_lab: query type=0 input=0 output=16
+Breakpoint 2 hit
+nr_render_kmd!`anonymous namespace'::create_allocation:
+fffff807`6b6017e0 48895c2418      mov     qword ptr [rsp+18h],rbx
+0: kd> r @$t1=@rdx; dt nr_render_kmd!_DXGKARG_CREATEALLOCATION @rdx; dt nr_render_kmd!_DXGK_ALLOCATIONINFO poi(@rdx+0x10); gu
+   +0x000 pPrivateDriverData : (null) 
+   +0x008 PrivateDriverDataSize : 0
+   +0x00c NumAllocations   : 1
+   +0x010 pAllocationInfo  : 0xffff9b80`ae6152e0 _DXGK_ALLOCATIONINFO
+   +0x018 hResource        : (null) 
+   +0x020 Flags            : _DXGK_CREATEALLOCATIONFLAGS
+   +0x000 pPrivateDriverData : 0xffff9b80`ae6f1b80 Void
+   +0x008 PrivateDriverDataSize : 0x28
+   +0x00c Alignment        : 0
+   +0x00c MinimumPageSize  : 0
+   +0x00e RecommendedPageSize : 0
+   +0x010 Size             : 0
+   +0x018 PitchAlignedSize : 0
+   +0x020 HintedBank       : _DXGK_SEGMENTBANKPREFERENCE
+   +0x024 PreferredSegment : _D3DDDI_SEGMENTPREFERENCE
+   +0x028 SupportedReadSegmentSet : 0
+   +0x028 MmuSet           : 0
+   +0x02c SupportedWriteSegmentSet : 0
+   +0x030 EvictionSegmentSet : 0
+   +0x034 MaximumRenamingListLength : 0
+   +0x034 PhysicalAdapterIndex : 0
+   +0x038 hAllocation      : (null) 
+   +0x040 Flags            : _DXGK_ALLOCATIONINFOFLAGS
+   +0x040 FlagsWddm2       : _DXGK_ALLOCATIONINFOFLAGS_WDDM2_0
+   +0x048 pAllocationUsageHint : (null) 
+   +0x050 AllocationPriority : 0
+dxgkrnl!DXGDEVICE::CreateDriverAllocations+0x2db:
+fffff807`667e24fb 807dd000        cmp     byte ptr [rbp-30h],0
+0: kd> r eax; dt nr_render_kmd!_DXGK_CREATEALLOCATIONFLAGS @$t1+0x20; dd poi(poi(@$t1+0x10)) L10; dt nr_render_kmd!_DXGK_ALLOCATIONINFO poi(@$t1+0x10); bc 2; g
+eax=0
+   +0x000 Resource         : 0y0
+   +0x000 Reserved         : 0y0000000000000000000000000000000 (0)
+   +0x000 Value            : 0
+ffff9b80`ae6f1b80  4e52574b 00000001 00000028 00000040
+ffff9b80`ae6f1b90  00000030 00000057 00000100 00000000
+ffff9b80`ae6f1ba0  00003000 00000000 4e52574b 00000001
+ffff9b80`ae6f1bb0  00000028 00000040 00000030 00000057
+   +0x000 pPrivateDriverData : 0xffff9b80`ae6f1b80 Void
+   +0x008 PrivateDriverDataSize : 0x28
+   +0x00c Alignment        : 0x1000
+   +0x00c MinimumPageSize  : 0x1000
+   +0x00e RecommendedPageSize : 0
+   +0x010 Size             : 0x3000
+   +0x018 PitchAlignedSize : 0
+   +0x020 HintedBank       : _DXGK_SEGMENTBANKPREFERENCE
+   +0x024 PreferredSegment : _D3DDDI_SEGMENTPREFERENCE
+   +0x028 SupportedReadSegmentSet : 1
+   +0x028 MmuSet           : 1
+   +0x02c SupportedWriteSegmentSet : 1
+   +0x030 EvictionSegmentSet : 0
+   +0x034 MaximumRenamingListLength : 0
+   +0x034 PhysicalAdapterIndex : 0
+   +0x038 hAllocation      : 0xffffae05`e1af4720 Void
+   +0x040 Flags            : _DXGK_ALLOCATIONINFOFLAGS
+   +0x040 FlagsWddm2       : _DXGK_ALLOCATIONINFOFLAGS_WDDM2_0
+   +0x048 pAllocationUsageHint : (null) 
+   +0x050 AllocationPriority : 0x78000000
+Break instruction exception - code 80000003 (first chance)
+*******************************************************************************
+*                                                                             *
+*   You are seeing this message because you pressed either                    *
+*       CTRL+C (if you run console kernel debugger) or,                       *
+*       CTRL+BREAK (if you run GUI kernel debugger),                          *
+*   on your debugger machine's keyboard.                                      *
+*                                                                             *
+*                   THIS IS NOT A BUG OR A SYSTEM CRASH                       *
+*                                                                             *
+* If you did not intend to break into the debugger, press the "g" key, then   *
+* press the "Enter" key now.  This message might immediately reappear.  If it *
+* does, press "g" and "Enter" again.                                          *
+*                                                                             *
+*******************************************************************************
+nt!DbgBreakPointWithStatus:
+fffff807`d4afdfb0 cc              int     3
+0: kd> x nr_render_kmd!*open_allocation*; x nr_render_kmd!*destroy_allocation*; x dxgmms1!*CreateAllocation*
+fffff807`6b602710 nr_render_kmd!`anonymous namespace'::open_allocation (void *, struct _DXGKARG_OPENALLOCATION *)
+fffff807`6b601fa0 nr_render_kmd!`anonymous namespace'::destroy_allocation (void *, struct _DXGKARG_DESTROYALLOCATION *)
+fffff807`6b6676cc dxgmms1!VIDMM_GLOBAL::CreateAllocation (public: long __cdecl VIDMM_GLOBAL::CreateAllocation(class VIDMM_DEVICE *,unsigned long,unsigned __int64,unsigned __int64,unsigned long,unsigned long,unsigned long,unsigned long,struct _D3DDDI_SEGMENTPREFERENCE,struct _DXGK_SEGMENTBANKPREFERENCE,struct _DXGK_ALLOCATIONINFOFLAGS,struct _DXGK_ALLOCATIONINFOFLAGS2,unsigned long,class DXGADAPTERALLOCATION const *,void *,struct VIDMM_CROSSADAPTER_ALLOC * *,struct VIDMM_MULTI_GLOBAL_ALLOC * *))
+fffff807`6b639380 dxgmms1!VidMmCreateAllocation (VidMmCreateAllocation)
+0: kd> bp fffff807`6b602710; bp fffff807`6b6676cc; g
+nr_paging_lab: query type=0 input=0 output=16
+Breakpoint 2 hit
+nr_render_kmd!`anonymous namespace'::open_allocation:
+fffff807`6b602710 48895c2418      mov     qword ptr [rsp+18h],rbx
+0: kd> r @$t1=@rdx; dt nr_render_kmd!_DXGKARG_OPENALLOCATION @rdx; gu
+   +0x000 NumAllocations   : 1
+   +0x008 pOpenAllocation  : 0xffff9b80`ae6151f0 _DXGK_OPENALLOCATIONINFO
+   +0x010 pPrivateDriverData : (null) 
+   +0x018 PrivateDriverSize : 0
+   +0x01c Flags            : _DXGK_OPENALLOCATIONFLAGS
+   +0x020 SubresourceIndex : 0
+   +0x028 SubresourceOffset : 0
+   +0x030 Pitch            : 0
+dxgkrnl!ADAPTER_RENDER::DdiOpenAllocation+0x1a8:
+fffff807`66861d78 807de700        cmp     byte ptr [rbp-19h],0
+0: kd> r eax; dt nr_render_kmd!_DXGK_OPENALLOCATIONINFO poi(@$t1+8); dt nr_render_kmd!_DXGK_OPENALLOCATIONFLAGS @$t1+0x1c; g
+eax=0
+   +0x000 hAllocation      : 0x40000100
+   +0x008 pPrivateDriverData : 0xffff9b80`ae6f8c00 Void
+   +0x010 PrivateDriverDataSize : 0x28
+   +0x018 hDeviceSpecificAllocation : 0xffffae05`dfb28be0 Void
+   +0x000 Create           : 0y1
+   +0x000 ReadOnly         : 0y0
+   +0x000 Reserved         : 0y000000000000000000000000000000 (0)
+   +0x000 Value            : 1
+Breakpoint 4 hit
+dxgmms1!VIDMM_GLOBAL::CreateAllocation:
+fffff807`6b6676cc 488bc4          mov     rax,rsp
+0: kd> gu
+dxgmms1!VidMmCreateAllocation+0xd7:
+fffff807`6b639457 488d8c2490000000 lea     rcx,[rsp+90h]
+0: kd> r eax; bc 2; bc 4; g
+eax=c000000d
+Break instruction exception - code 80000003 (first chance)
+*******************************************************************************
+*                                                                             *
+*   You are seeing this message because you pressed either                    *
+*       CTRL+C (if you run console kernel debugger) or,                       *
+*       CTRL+BREAK (if you run GUI kernel debugger),                          *
+*   on your debugger machine's keyboard.                                      *
+*                                                                             *
+*                   THIS IS NOT A BUG OR A SYSTEM CRASH                       *
+*                                                                             *
+* If you did not intend to break into the debugger, press the "g" key, then   *
+* press the "Enter" key now.  This message might immediately reappear.  If it *
+* does, press "g" and "Enter" again.                                          *
+*                                                                             *
+*******************************************************************************
+nt!DbgBreakPointWithStatus:
+fffff807`d4afdfb0 cc              int     3
+0: kd> .logclose; .logopen C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-paging-v20-internal-oct9.log; uf dxgmms1!VIDMM_GLOBAL::CreateAllocation
+Closing open log file C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-paging-v20-oct9.log

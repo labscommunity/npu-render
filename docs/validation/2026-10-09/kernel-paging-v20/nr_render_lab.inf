@@ -1,0 +1,56 @@
+[Version]
+Signature="$WINDOWS NT$"
+Class=Display
+ClassGuid={4d36e968-e325-11ce-bfc1-08002be10318}
+Provider=%Provider%
+DriverVer=10/09/2026,0.0.9.0
+CatalogFile=nr_render_lab.cat
+PnpLockdown=1
+
+[Manufacturer]
+%Provider%=Models,NTamd64.10.0...19041
+
+[Models.NTamd64.10.0...19041]
+%Description%=Install,ROOT\NPURENDER_KMD_LAB
+
+[Install.NT]
+CopyFiles=KernelFiles,UserFiles
+AddReg=LabSoftware
+FeatureScore=F9
+
+[Install.NT.Services]
+AddService=nr_render_kmd,0x00000002,Service
+
+[Service]
+DisplayName=%Description%
+ServiceType=1
+StartType=3
+ErrorControl=1
+ServiceBinary=%13%\nr_render_kmd.sys
+
+[DestinationDirs]
+KernelFiles=13
+UserFiles=13
+
+[SourceDisksNames]
+1=%Media%
+
+[SourceDisksFiles]
+nr_render_kmd.sys=1
+nr_paging_guard.dll=1
+
+[KernelFiles]
+nr_render_kmd.sys
+
+[UserFiles]
+nr_paging_guard.dll
+
+[LabSoftware]
+HKR,,UserModeDriverName,0x00010000,%13%\nr_paging_guard.dll,%13%\nr_paging_guard.dll,%13%\nr_paging_guard.dll
+HKR,,InstalledDisplayDrivers,0x00010000,nr_paging_guard
+
+[Strings]
+Provider="NPU Render Laboratory"
+Description="NPU Render Paging Lab (VM only; no rendering)"
+Media="NPU Render Laboratory Files"
+

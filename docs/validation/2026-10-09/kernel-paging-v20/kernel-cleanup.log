@@ -1,0 +1,14 @@
+Opened log file 'C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-paging-v20-cleanup-oct9.log'
+Breakpoint 3 hit
+nr_render_kmd!`anonymous namespace'::remove_device:
+fffff807`6b603470 4883ec28        sub     rsp,28h
+0: kd> gu
+dxgkrnl!DpiDxgkDdiRemoveDevice+0x51:
+fffff807`66919f09 803df0e7d3ff00  cmp     byte ptr [dxgkrnl!bTracingEnabled (fffff807`66658700)],0
+0: kd> r eax; sxe ud:nr_render_kmd.sys; g
+eax=0
+Unload module nr_render_kmd.sys at fffff807`6b600000
+nt!DebugService2+0x5:
+fffff807`d4afe005 cc              int     3
+0: kd> .logclose; bc *; sxd ud; g
+Closing open log file C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-paging-v20-cleanup-oct9.log
