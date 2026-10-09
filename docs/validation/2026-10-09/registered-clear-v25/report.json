@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "kind": "isolated-registered-direct3d-initialization",
+  "date_utc": "2026-10-09",
+  "kernel_source_revision": "5db40e536ef2b6c82141cd037349313704808f30",
+  "umd_source_revision": "09191f4fb005594fcb7164346edf9d332a9aa0c8",
+  "probe_source_revision": "09191f4fb005594fcb7164346edf9d332a9aa0c8",
+  "package": "v25-paging",
+  "guest_build": "26300.9457",
+  "result": "registered-device-created-sampler-initialization-rejected",
+  "dxgi_paired_adapter_selected": true,
+  "direct3d_device_created": true,
+  "d3d11_create_device_status": "0x00000000",
+  "first_texture_status": "0x887a0005",
+  "umd_rejected_callbacks": 4,
+  "unsupported_ddi_offsets": [
+    216,
+    216,
+    232,
+    32
+  ],
+  "unsupported_ddi_names": [
+    "pfnVsSetSamplers",
+    "pfnVsSetSamplers",
+    "pfnGsSetSamplers",
+    "pfnPsSetSamplers"
+  ],
+  "umd_cleanup_errors": 0,
+  "kernel_module_unloaded": true,
+  "owned_device_removed": true,
+  "owned_inf_deleted": true,
+  "prior_display_status_preserved": true,
+  "removal_task_completed": true,
+  "removal_child_exit": 0,
+  "direct3d_clear_submitted": false,
+  "npu_execution_tested": false,
+  "desktop_offload_tested": false,
+  "tahoma_benefit_tested": false,
+  "note": "Ordinary D3D11CreateDevice succeeded on the registered adapter. Runtime sampler-binding callbacks were rejected; the first texture creation returned device removed before any clear. Stderr retains every rejected callback offset. Revision 61235ba adds per-stage owned sampler descriptors and bounded slot updates. This is software-worker infrastructure, not NPU execution or desktop offload.",
+  "pnp_problem_code": 0,
+  "driver_version": "0.0.14.0"
+}

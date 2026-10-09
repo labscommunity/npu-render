@@ -45,3 +45,10 @@ retains blend/depth/rasterizer/sampler descriptors and render-target bindings
 while continuing to reject draws. The diagnostic probe pins the exact
 OS-registered DLL to retain error counters if initialization fails; D3D11 still
 selects the adapter normally and receives no software-driver module argument.
+
+The [next run](../../../docs/validation/2026-10-09/registered-clear-v25/report.json)
+created the Direct3D device successfully. Sampler bindings made during
+initialization were still rejected, causing the first texture creation to fail.
+Per-call diagnostics identified the vertex, geometry and pixel sampler bindings.
+The following revision retains independent descriptors for all 16 sampler slots
+in each admitted shader stage; this still supplies no shader execution.
