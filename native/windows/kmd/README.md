@@ -99,7 +99,8 @@ The implementation currently provides:
   restarting remains forbidden until an active worker separately acknowledges
   that it has drained. DMA-boundary preemption waits for the active buffer,
   cancels the older queue prefix and preserves submissions after the request.
-  This state machine is not yet wired to kernel interrupts.
+  The dormant engine serializes queue changes through the public synchronization
+  callback. Live Windows submission and notification acceptance remain untested.
 - Preallocated submission storage sized from Windows' `RequiredDmaQueueEntry`,
   with an additional active-worker slot and an explicit 64 MiB storage budget.
   An excessive requirement rejects startup instead of silently reducing queue
@@ -107,7 +108,8 @@ The implementation currently provides:
   submitter returns; capture does not allocate or execute work. Host tests cover
   allocation failure, malformed records, partial-buffer offsets, input mutation,
   deferred execution, ring reuse, empty context switches and drain-before-free.
-  This storage is not yet connected to `DxgkDdiSubmitCommand`.
+  This storage feeds `DxgkDdiSubmitCommand` only after adapter startup; the live
+  startup gate remains closed.
 - A dormant paging builder for transfer, fill and discard operations in that
   owned segment. It writes pointer-free DMA markers and separate kernel-private
   records; allocation contents change only when the deferred executor runs.
@@ -119,8 +121,17 @@ The implementation currently provides:
   Windows submission, fence completion and VidMm acceptance remain untested.
   Other paging operations reject explicitly; these failures are not valid normal
   behavior for a started adapter, so the startup gate remains essential.
-- Explicit failing callbacks for unsupported rendering, presentation, paging operations,
-  preemption and reset. Display callbacks are null.
+- A dormant paging engine with an owned system thread, completion/fault
+  notifications, DPC notification, current-fence queries, DMA-boundary preemption,
+  and adapter timeout reset/restart. It joins the worker and drains DPCs before
+  releasing storage; failures do not produce successful completion notifications.
+  Host tests manually step the actual engine through callback shims, including
+  a failed completion synchronization, coalesced DPCs, reset cleanup and restart.
+  These tests do not establish concurrency, Windows scheduler acceptance or
+  valid per-engine TDR. The current queue admits one pending preemption request;
+  the OS behavior at that boundary still needs validation.
+- Explicit failing callbacks for unsupported rendering, presentation, paging
+  operations and per-engine recovery. Display callbacks are null.
 
 The separate `nr_render_umd` target uses the existing restricted renderer
 without the software laboratory's KMT replacement exports. Its `OpenAdapter`
@@ -139,9 +150,10 @@ zero software KMT replacement calls. An absent, foreign, or unready adapter
 fails; there is no default-adapter or WARP retry. Current validation covers
 rejection only, since the kernel startup gate remains closed.
 
-Before enabling `StartDevice`, implement and test real segments and paging,
-command submission and completion notifications, preemption, TDR/reset, worker
-ownership/teardown, and all mandatory render DDIs/caps. A successful compiler,
+Before enabling `StartDevice`, validate the paging engine in the isolated kernel
+and finish per-engine recovery and all mandatory render DDIs/caps. Submission,
+notifications, preemption and reset still need actual Windows-scheduler evidence.
+A successful compiler,
 host test, or even an eventual adapter enumeration is not graphics conformance.
 After those contracts, normal adapter creation, shared-resource opening, NPU
 execution, presentation, DWM selection, original GPU work retirement, and Tahoma
@@ -168,3 +180,6 @@ Paging contracts: [buffer construction](https://learn.microsoft.com/en-us/window
 [partial MDL ownership](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-iobuildpartialmdl).
 Submission contracts: [required preallocation](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/dispmprt/ns-dispmprt-_dxgk_start_info),
 [private-data ranges and empty submissions](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/ns-d3dkmddi-_dxgkarg_submitcommand).
+Engine contracts: [interrupt notification](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/nc-d3dkmddi-dxgkcb_notify_interrupt),
+[preemption](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/nc-d3dkmddi-dxgkddi_preemptcommand),
+[reset synchronization and zero-byte eviction](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/thread-synchronization-and-tdr).

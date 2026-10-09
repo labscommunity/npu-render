@@ -2,11 +2,7 @@
 // the desktop bundle. StartDevice remains closed until the memory manager,
 // scheduler notifications, and worker teardown have passed isolated tests.
 extern "C" {
-#if NR_KMD_LAB_WORKER_PROBE
 #include <ntifs.h>
-#else
-#include <ntddk.h>
-#endif
 #include <dispmprt.h>
 }
 inline void *operator new(size_t, void *p) noexcept { return p; }
@@ -16,6 +12,7 @@ inline void *operator new(size_t, void *p) noexcept { return p; }
 #include "segment.hpp"
 #include "paging.hpp"
 #include "submission.hpp"
+#include "engine.hpp"
 #if NR_KMD_LAB_SYNC_PROBE
 #include "synchronization_probe.hpp"
 #endif
@@ -32,6 +29,7 @@ struct Adapter {
     nr::kmd::Scheduler scheduler;
     nr::kmd::Segment segment;
     nr::kmd::Submissions submissions;
+    nr::kmd::Engine engine;
 #if NR_KMD_LAB_SYNC_PROBE
     nr::kmd::SynchronizationProbe synchronization;
 #endif
@@ -41,6 +39,7 @@ struct Adapter {
     LONG devices;
     LONG allocations;
     bool started;
+    bool resetting;
 };
 struct Allocation { Adapter *adapter; nr::kernel_contract::Surface surface; };
 struct Device { Adapter *adapter; HANDLE runtime; LONG contexts; };
@@ -52,7 +51,7 @@ template <class T> T *allocate() {
 }
 void release(void *p) { if (p) ExFreePoolWithTag(p, pool_tag); }
 // Unsupported functions always return a failing NTSTATUS. In particular,
-// present, render, paging, preemption and reset never report fake completion.
+// present and render never report fake completion.
 template <class T> struct Reject;
 template <class... A> struct Reject<NTSTATUS(APIENTRY *)(A...)> {
     static NTSTATUS APIENTRY call(A...) { return STATUS_NOT_SUPPORTED; }
@@ -110,11 +109,12 @@ NTSTATUS start_device(void *context, DXGK_START_INFO *start,
         return queue_status;
     }
     a->kernel = *kernel;
-    if (a->scheduler.start() != nr::kmd::QueueResult::ok) {
+    const auto engine_status = a->engine.start(a->kernel, a->scheduler, a->submissions, a->segment);
+    if (engine_status != STATUS_SUCCESS) {
         a->submissions.release();
         a->segment.release();
         RtlZeroMemory(&a->kernel, sizeof(a->kernel));
-        return STATUS_INVALID_DEVICE_STATE;
+        return engine_status;
     }
     a->started = true;
     return STATUS_SUCCESS;
@@ -123,11 +123,15 @@ DXGKDDI_STOP_DEVICE stop_device;
 NTSTATUS stop_device(void *context) {
     if (!context) return STATUS_INVALID_PARAMETER;
     auto a = static_cast<Adapter *>(context);
-    if (a->devices || a->allocations || a->scheduler.active()) return STATUS_DEVICE_BUSY;
+    if (a->devices || a->allocations || (a->scheduler.active() && !a->engine.alive()))
+        return STATUS_DEVICE_BUSY;
+    const auto engine_status = a->engine.stop();
+    if (engine_status != STATUS_SUCCESS) return engine_status;
     a->scheduler.stop();
     const auto queue_status = a->submissions.release();
     if (!NT_SUCCESS(queue_status)) return queue_status;
     a->started = false;
+    a->resetting = false;
     a->segment.release();
     RtlZeroMemory(&a->kernel, sizeof(a->kernel));
     return STATUS_SUCCESS;
@@ -137,7 +141,7 @@ NTSTATUS remove_device(void *context) {
     if (!context) return STATUS_INVALID_PARAMETER;
     auto a = static_cast<Adapter *>(context);
     if (a->started || a->devices || a->allocations || a->scheduler.active() ||
-        a->segment.ready() || a->submissions.ready()) return STATUS_DEVICE_BUSY;
+        a->segment.ready() || a->submissions.ready() || a->engine.alive()) return STATUS_DEVICE_BUSY;
     release(a);
     return STATUS_SUCCESS;
 }
@@ -151,19 +155,65 @@ DXGKDDI_INTERRUPT_ROUTINE interrupt;
 BOOLEAN interrupt(void *, ULONG) { return FALSE; }
 DXGKDDI_DPC_ROUTINE dpc;
 void dpc(void *context) {
+    if (context) static_cast<Adapter *>(context)->engine.observe_dpc();
 #if NR_KMD_LAB_WORKER_PROBE
     if (context) static_cast<Adapter *>(context)->worker_probe.observe_dpc();
 #else
     UNREFERENCED_PARAMETER(context);
 #endif
-    // No Windows DMA fence exists while runtime_ready is false.
+    // The engine stays inactive while runtime_ready is false.
 }
 DXGKDDI_RESET_DEVICE reset_device;
 void reset_device(void *context) {
     if (context) {
         auto a = static_cast<Adapter *>(context);
-        a->scheduler.stop();
+        a->engine.request_shutdown();
     }
+}
+DXGKDDI_SUBMITCOMMAND submit;
+NTSTATUS APIENTRY submit(HANDLE adapter, const DXGKARG_SUBMITCOMMAND *args) {
+    if (!adapter || !args) return STATUS_INVALID_PARAMETER;
+    auto a = static_cast<Adapter *>(adapter);
+    if (!a->started || a->resetting) return STATUS_DEVICE_NOT_READY;
+    return a->engine.submit(*args);
+}
+DXGKDDI_PREEMPTCOMMAND preempt;
+NTSTATUS APIENTRY preempt(HANDLE adapter, const DXGKARG_PREEMPTCOMMAND *args) {
+    if (!adapter || !args) return STATUS_INVALID_PARAMETER;
+    auto a = static_cast<Adapter *>(adapter);
+    if (!a->started || a->resetting) return STATUS_DEVICE_NOT_READY;
+    return a->engine.preempt(*args);
+}
+DXGKDDI_QUERYCURRENTFENCE current_fence;
+NTSTATUS APIENTRY current_fence(HANDLE adapter, DXGKARG_QUERYCURRENTFENCE *args) {
+    if (!adapter || !args) return STATUS_INVALID_PARAMETER;
+    if (args->NodeOrdinal || args->EngineOrdinal) return STATUS_NOT_SUPPORTED;
+    auto a = static_cast<Adapter *>(adapter);
+    if (!a->started) return STATUS_DEVICE_NOT_READY;
+    if (a->resetting) {
+        // Reset joined the sole producer and retains the last reported fence.
+        args->CurrentFence = a->scheduler.completed();
+        return STATUS_SUCCESS;
+    }
+    return a->engine.query(args->CurrentFence);
+}
+DXGKDDI_RESETFROMTIMEOUT reset_from_timeout;
+NTSTATUS APIENTRY reset_from_timeout(HANDLE adapter) {
+    if (!adapter) return STATUS_INVALID_PARAMETER;
+    auto a = static_cast<Adapter *>(adapter);
+    if (!a->started) return STATUS_DEVICE_NOT_READY;
+    const auto status = a->engine.stop();
+    if (status == STATUS_SUCCESS) a->resetting = true;
+    return status;
+}
+DXGKDDI_RESTARTFROMTIMEOUT restart_from_timeout;
+NTSTATUS APIENTRY restart_from_timeout(HANDLE adapter) {
+    if (!adapter) return STATUS_INVALID_PARAMETER;
+    auto a = static_cast<Adapter *>(adapter);
+    if (!a->started || !a->resetting) return STATUS_INVALID_DEVICE_STATE;
+    const auto status = a->engine.start(a->kernel, a->scheduler, a->submissions, a->segment);
+    if (status == STATUS_SUCCESS) a->resetting = false;
+    return status;
 }
 DXGKDDI_UNLOAD unload;
 void unload() {}
@@ -196,6 +246,10 @@ NTSTATUS APIENTRY build_paging(HANDLE adapter, DXGKARG_BUILDPAGINGBUFFER *args) 
     if (!adapter || !args) return STATUS_INVALID_PARAMETER;
     auto a = static_cast<Adapter *>(adapter);
     if (!a->started) return STATUS_DEVICE_NOT_READY;
+    // During TDR cleanup VidMm reports an eviction with a zero-byte transfer.
+    // No data is moved and no DMA command is emitted for this notification.
+    if (a->resetting && args->Operation == DXGK_OPERATION_TRANSFER && !args->Transfer.TransferSize)
+        return STATUS_SUCCESS;
     return nr::kmd::Paging::build(a->segment, *args);
 }
 DXGKDDI_CREATEALLOCATION create_allocation;
@@ -355,16 +409,16 @@ extern "C" NTSTATUS DriverEntry(DRIVER_OBJECT *driver, UNICODE_STRING *registry)
     NR_REJECT(DxgkDdiOpenAllocation);
     NR_REJECT(DxgkDdiCloseAllocation);
     NR_REJECT(DxgkDdiPatch);
-    NR_REJECT(DxgkDdiSubmitCommand);
+    data.DxgkDdiSubmitCommand = submit;
     data.DxgkDdiBuildPagingBuffer = build_paging;
-    NR_REJECT(DxgkDdiPreemptCommand);
+    data.DxgkDdiPreemptCommand = preempt;
     NR_REJECT(DxgkDdiRender);
     NR_REJECT(DxgkDdiPresent);
-    NR_REJECT(DxgkDdiResetFromTimeout);
-    NR_REJECT(DxgkDdiRestartFromTimeout);
+    data.DxgkDdiResetFromTimeout = reset_from_timeout;
+    data.DxgkDdiRestartFromTimeout = restart_from_timeout;
     NR_REJECT(DxgkDdiEscape);
     NR_REJECT(DxgkDdiCollectDbgInfo);
-    NR_REJECT(DxgkDdiQueryCurrentFence);
+    data.DxgkDdiQueryCurrentFence = current_fence;
     NR_REJECT(DxgkDdiControlInterrupt);
     NR_REJECT(DxgkDdiRenderKm);
     NR_REJECT(DxgkDdiQueryDependentEngineGroup);

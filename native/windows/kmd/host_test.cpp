@@ -1,45 +1,44 @@
 // Executes the actual DDI implementation with memory/registration shims. This
 // tests validation and unwinding only; it is not a kernel/IRQL or Dxgkrnl test.
 extern "C" {
-#if NR_KMD_LAB_WORKER_PROBE
 #include <ntifs.h>
-#else
-#include <ntddk.h>
-#endif
 #include <dispmprt.h>
 void *nr_host_allocate(size_t bytes);
 void nr_host_free(void *pointer);
 }
 namespace {
 DRIVER_INITIALIZATION_DATA registration{};
-#if NR_KMD_LAB_SYNC_PROBE || NR_KMD_LAB_WORKER_PROBE
 enum class SyncMode {
     failed, missing_callback, valid, repeated, dispatch, profile, false_return, pending_return
 };
 SyncMode sync_mode = SyncMode::failed;
 KIRQL simulated_irql = PASSIVE_LEVEL;
 ULONG sync_calls = 0;
+ULONG sync_fail_call = 0;
 bool sync_contract_error = false;
 KIRQL current_irql() { return simulated_irql; }
+#if NR_KMD_LAB_SYNC_PROBE || NR_KMD_LAB_WORKER_PROBE
 ULONG lab_print(ULONG, ULONG, PCSTR, ...) { return 0; }
+#endif
 NTSTATUS synchronize(HANDLE device, PKSYNCHRONIZE_ROUTINE routine, PVOID context,
                      ULONG message, PBOOLEAN result) {
     ++sync_calls;
+    if (sync_calls == sync_fail_call) return STATUS_UNSUCCESSFUL;
     if (device != &registration || !routine || !context || message || !result) {
         sync_contract_error = true;
         return STATUS_INVALID_PARAMETER;
     }
     if (sync_mode == SyncMode::failed) return STATUS_UNSUCCESSFUL;
     if (sync_mode == SyncMode::missing_callback) return STATUS_SUCCESS;
+    const auto previous = simulated_irql;
     simulated_irql = KIRQL(sync_mode == SyncMode::dispatch ? DISPATCH_LEVEL :
                           sync_mode == SyncMode::profile ? PROFILE_LEVEL : DISPATCH_LEVEL + 1);
     *result = routine(context);
     if (sync_mode == SyncMode::repeated) routine(context);
     if (sync_mode == SyncMode::false_return) *result = FALSE;
-    simulated_irql = PASSIVE_LEVEL;
+    simulated_irql = previous;
     return sync_mode == SyncMode::pending_return ? STATUS_PENDING : STATUS_SUCCESS;
 }
-#endif
 long fail_after = -1, outstanding = 0;
 void *segment_memory = nullptr;
 bool segment_fail = false, segment_contract_error = false;
@@ -105,23 +104,28 @@ void *pool_allocate(POOL_FLAGS, SIZE_T bytes, ULONG) {
     return p;
 }
 void pool_free(void *p, ULONG) { if (p) { --outstanding; nr_host_free(p); } }
-#if NR_KMD_LAB_WORKER_PROBE
 void *dpc_owner = nullptr;
+bool engine_mode = false;
+PKSTART_ROUTINE deferred_thread = nullptr;
+void *deferred_thread_context = nullptr;
 bool worker_contract_error = false, thread_fail = false, thread_joined = false;
 bool thread_closed = false, thread_terminated = false;
 bool queue_accept = true, defer_dpc = false, pending_dpc = false;
 unsigned thread_wait_failures = 0, retry_delays = 0, dpc_flushes = 0;
 KIRQL delivered_dpc_irql = DISPATCH_LEVEL;
+#if NR_KMD_LAB_WORKER_PROBE
 void mdl_nonpaged(PMDL mdl) {
     mdl->MappedSystemVa = MmGetMdlVirtualAddress(mdl);
     mdl->MdlFlags = MDL_SOURCE_IS_NONPAGED_POOL;
 }
+#endif
 void event_initialize(PRKEVENT event, EVENT_TYPE type, BOOLEAN state) {
-    if (type != NotificationEvent || state) worker_contract_error = true;
+    if (type != (engine_mode ? SynchronizationEvent : NotificationEvent) || state)
+        worker_contract_error = true;
     RtlZeroMemory(event, sizeof(*event));
 }
 LONG event_set(PRKEVENT event, KPRIORITY increment, BOOLEAN wait) {
-    if (increment || wait) worker_contract_error = true;
+    if (increment || wait || simulated_irql > DISPATCH_LEVEL) worker_contract_error = true;
     return InterlockedExchange(&event->Header.SignalState, 1);
 }
 NTSTATUS event_wait(void *object, KWAIT_REASON reason, KPROCESSOR_MODE mode,
@@ -139,7 +143,8 @@ NTSTATUS thread_create(PHANDLE handle, ULONG access, POBJECT_ATTRIBUTES attribut
     thread_joined = thread_closed = thread_terminated = false;
     if (thread_fail) return STATUS_INSUFFICIENT_RESOURCES;
     *handle = &thread_joined;
-    start(context); // Host contract model only; the guest exercises real concurrency.
+    if (engine_mode) { deferred_thread = start; deferred_thread_context = context; }
+    else start(context); // Host model only; the guest exercises real concurrency.
     return STATUS_SUCCESS;
 }
 NTSTATUS thread_terminate(NTSTATUS status) {
@@ -148,6 +153,7 @@ NTSTATUS thread_terminate(NTSTATUS status) {
     return STATUS_SUCCESS;
 }
 NTSTATUS thread_wait(HANDLE handle, BOOLEAN alertable, LARGE_INTEGER *timeout) {
+    if (engine_mode && !thread_terminated && deferred_thread) deferred_thread(deferred_thread_context);
     if (handle != &thread_joined || alertable || timeout || !thread_terminated)
         worker_contract_error = true;
     if (thread_wait_failures) { --thread_wait_failures; return STATUS_UNSUCCESSFUL; }
@@ -173,7 +179,8 @@ void deliver_dpc() {
 }
 BOOLEAN queue_dpc(HANDLE device) {
     if (device != &registration || !dpc_owner || simulated_irql <= DISPATCH_LEVEL ||
-        simulated_irql >= PROFILE_LEVEL || pending_dpc) worker_contract_error = true;
+        simulated_irql >= PROFILE_LEVEL) worker_contract_error = true;
+    if (pending_dpc) return FALSE;
     if (!queue_accept) return FALSE;
     if (defer_dpc) pending_dpc = true;
     else deliver_dpc();
@@ -185,7 +192,21 @@ void flush_dpcs() {
     ++dpc_flushes;
     if (pending_dpc) { pending_dpc = false; deliver_dpc(); }
 }
-#endif
+DXGKARGCB_NOTIFY_INTERRUPT_DATA notifications[64]{};
+UINT notification_count = 0, notified_dpcs = 0;
+void notify_interrupt(HANDLE device, DXGKARGCB_NOTIFY_INTERRUPT_DATA *data) {
+    if (device != &registration || !data || simulated_irql <= DISPATCH_LEVEL ||
+        simulated_irql >= PROFILE_LEVEL || notification_count == 64) {
+        worker_contract_error = true;
+        return;
+    }
+    notifications[notification_count++] = *data;
+}
+void notify_dpc(HANDLE device) {
+    if (device != &registration || simulated_irql != DISPATCH_LEVEL || !notification_count)
+        worker_contract_error = true;
+    ++notified_dpcs;
+}
 NTSTATUS initialize(DRIVER_OBJECT *, UNICODE_STRING *, DRIVER_INITIALIZATION_DATA *data) {
     registration = *data;
     return STATUS_SUCCESS;
@@ -203,12 +224,13 @@ NTSTATUS initialize(DRIVER_OBJECT *, UNICODE_STRING *, DRIVER_INITIALIZATION_DAT
 #undef MmGetSystemAddressForMdlSafe
 #define MmGetSystemAddressForMdlSafe mdl_map
 #define DriverEntry NrHostDriverEntry
-#if NR_KMD_LAB_SYNC_PROBE || NR_KMD_LAB_WORKER_PROBE
 #define KeGetCurrentIrql current_irql
+#if NR_KMD_LAB_SYNC_PROBE || NR_KMD_LAB_WORKER_PROBE
 #define DbgPrintEx lab_print
 #endif
 #if NR_KMD_LAB_WORKER_PROBE
 #define MmBuildMdlForNonPagedPool mdl_nonpaged
+#endif
 #define KeInitializeEvent event_initialize
 #define KeSetEvent event_set
 #define KeWaitForSingleObject event_wait
@@ -218,13 +240,13 @@ NTSTATUS initialize(DRIVER_OBJECT *, UNICODE_STRING *, DRIVER_INITIALIZATION_DAT
 #define ZwClose thread_close
 #define KeDelayExecutionThread retry_delay
 #define KeFlushQueuedDpcs flush_dpcs
-#endif
 #include "driver.cpp"
 #undef DriverEntry
 #define NR_CHECK(expression) do { if (!(expression)) return __LINE__; } while (false)
 #include "paging_test.hpp"
 #include "segment_capacity_test.hpp"
 #include "submission_test.hpp"
+#include "engine_test.hpp"
 #if NR_KMD_LAB_WORKER_PROBE
 #include "worker_probe_test.hpp"
 #endif
@@ -232,9 +254,9 @@ extern "C" int nr_kernel_host_test() {
     NR_CHECK(NT_SUCCESS(NrHostDriverEntry(nullptr, nullptr)));
     NR_CHECK(registration.Version == DXGKDDI_INTERFACE_VERSION_WDDM1_3);
     NR_CHECK(!registration.DxgkDdiSetVidPnSourceAddress && !registration.DxgkDdiCommitVidPn);
-    NR_CHECK(registration.DxgkDdiSubmitCommand(nullptr, nullptr) == STATUS_NOT_SUPPORTED);
+    NR_CHECK(registration.DxgkDdiSubmitCommand(nullptr, nullptr) == STATUS_INVALID_PARAMETER);
     NR_CHECK(registration.DxgkDdiPresent(nullptr, nullptr) == STATUS_NOT_SUPPORTED);
-    NR_CHECK(registration.DxgkDdiPreemptCommand(nullptr, nullptr) == STATUS_NOT_SUPPORTED);
+    NR_CHECK(registration.DxgkDdiPreemptCommand(nullptr, nullptr) == STATUS_INVALID_PARAMETER);
     DEVICE_OBJECT physical{};
     void *opaque = reinterpret_cast<void *>(1);
     fail_after = 0;
@@ -430,6 +452,8 @@ extern "C" int nr_kernel_host_test() {
     if (capacity_result) return capacity_result;
     const auto submission_result = submission_test(a);
     if (submission_result) return submission_result;
+    const auto engine_result = engine_test(a);
+    if (engine_result) return engine_result;
     NR_CHECK(NT_SUCCESS(registration.DxgkDdiRemoveDevice(a)) && !outstanding);
     return 0;
 }
