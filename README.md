@@ -66,11 +66,13 @@ This resolves a shared-resource boundary. Windows' general shader/state stream
 and actual DWM selection remain unimplemented.
 
 The subsequent [registered-driver laboratory](native/windows/registered_lab/README.md)
-now loads through Windows' normal graphics stack in an isolated VM. Clears,
-patterned image uploads, texture sharing across processes and keyed synchronization
-pass 58 exact readbacks with clean removal. These operations still run on CPU
-paths. Connecting the registered adapter to NPU shader execution and desktop
-presentation remains unfinished; this milestone establishes no Tahoma speedup.
+now loads through Windows' normal graphics stack in an isolated VM. Restricted
+shader draws, image uploads, clears and process sharing pass 62 image checks with
+clean removal in the [v31 test](docs/validation/2026-10-09/registered-draw-v31/report.json).
+These registered draws explicitly use the CPU provider. The same draw callbacks
+separately pass 16 checks on Delta's NPU using test allocation callbacks;
+installed-adapter NPU execution and desktop presentation remain unproven.
+This milestone establishes no Tahoma speedup.
 
 The [captured-window desktop experiment](native/windows/capture/README.md) now
 presents an NPU-composed 2880×1800 desktop with input passing through to the

@@ -48,8 +48,12 @@ bindings, unsupported shader/state rejection and cleanup. This is a component
 test, not evidence that Windows selected an installed NPU graphics adapter.
 `nr_registered_clear_probe --draw-cpu` and `--draw-npu` exercise the normal
 registered loader in the guest. They cover two formats, two widths, ordinary and
-legacy/NT shared textures, source updates and both admitted blend modes. Live
-validation of these registered draw probes is pending. All probe modes now need
+legacy/NT shared textures, source updates and both admitted blend modes. The
+[v31 guest run](../../../docs/validation/2026-10-09/registered-draw-v31/report.json)
+passes 24 registered CPU draws and 38 regression readbacks with clean removal.
+The physical NPU separately passes 16 component draws with allocation shims;
+these results do not establish registered NPU execution. Requesting NPU in the
+CPU-only guest fails without fallback or leaked resources. All probe modes need
 an explicit `NR_REGISTERED_RUNTIME` directory holding the pinned OpenVINO DLLs;
 the test package separately verifies those dependency hashes.
 

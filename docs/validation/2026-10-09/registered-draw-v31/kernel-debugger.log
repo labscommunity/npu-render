@@ -1,0 +1,2108 @@
+Opened log file 'C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-paging-v31-oct9.log'
+
+************* Preparing the environment for Debugger Extensions Gallery repositories **************
+   ExtensionRepository : Implicit
+   UseExperimentalFeatureForNugetShare : true
+   AllowNugetExeUpdate : true
+   NonInteractiveNuget : true
+   AllowNugetMSCredentialProviderInstall : true
+   AllowParallelInitializationOfLocalRepositories : true
+
+   EnableRedirectToV8JsProvider : false
+
+   -- Configuring repositories
+      ----> Repository : LocalInstalled, Enabled: true
+      ----> Repository : UserExtensions, Enabled: true
+
+>>>>>>>>>>>>> Preparing the environment for Debugger Extensions Gallery repositories completed, duration 0.000 seconds
+
+************* Waiting for Debugger Extensions Gallery to Initialize **************
+
+>>>>>>>>>>>>> Waiting for Debugger Extensions Gallery to Initialize completed, duration 0.015 seconds
+   ----> Repository : UserExtensions, Enabled: true, Packages count: 0
+   ----> Repository : LocalInstalled, Enabled: true, Packages count: 29
+
+Microsoft (R) Windows Debugger Version 10.0.26100.6584 AMD64
+Copyright (c) Microsoft Corporation. All rights reserved.
+
+Opened 127.0.0.1
+Waiting to reconnect...
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\atlmfc.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\ObjectiveC.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\concurrency.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\cpp_rest.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\Kernel.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\stl.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\Windows.Data.Json.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\Windows.Devices.Geolocation.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\Windows.Devices.Sensors.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\Windows.Media.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\windows.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\winrt.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\Usb4Kd.natvis'
+Connected to Windows 10 26100 x64 target at (Fri Oct  9 15:07:38.505 2026 (UTC - 7:00)), ptr64 TRUE
+Kernel Debugger connection established.
+
+************* Path validation summary **************
+Response                         Time (ms)     Location
+Deferred                                       srv*C:\Users\tatef\AppData\Local\npu-render\vm\symbols*https://msdl.microsoft.com/download/symbols
+OK                                             C:\Users\tatef\AppData\Local\npu-render\builds\render-kernel-v29-paging\Release
+Symbol search path is: srv*C:\Users\tatef\AppData\Local\npu-render\vm\symbols*https://msdl.microsoft.com/download/symbols;C:\Users\tatef\AppData\Local\npu-render\builds\render-kernel-v29-paging\Release
+Executable search path is: 
+Windows 10 Kernel Version 26100 MP (2 procs) Free x64
+Product: WinNt, suite: TerminalServer SingleUserTS
+Edition build lab: 26100.1.amd64fre.ge_release.240331-1435
+Kernel base = 0xfffff804`a4e00000 PsLoadedModuleList = 0xfffff804`a5cf5410
+Debug session time: Fri Oct  9 15:07:32.863 2026 (UTC - 7:00)
+System Uptime: 0 days 0:06:59.802
+Break instruction exception - code 80000003 (first chance)
+*******************************************************************************
+*                                                                             *
+*   You are seeing this message because you pressed either                    *
+*       CTRL+C (if you run console kernel debugger) or,                       *
+*       CTRL+BREAK (if you run GUI kernel debugger),                          *
+*   on your debugger machine's keyboard.                                      *
+*                                                                             *
+*                   THIS IS NOT A BUG OR A SYSTEM CRASH                       *
+*                                                                             *
+* If you did not intend to break into the debugger, press the "g" key, then   *
+* press the "Enter" key now.  This message might immediately reappear.  If it *
+* does, press "g" and "Enter" again.                                          *
+*                                                                             *
+*******************************************************************************
+nt!DbgBreakPointWithStatus:
+fffff804`a52fdfb0 cc              int     3
+0: kd> sxd ld; sxd ud; bc *; g
+nt!DebugService2+0x5:
+fffff804`a52fe005 cc              int     3
+1: kd> .lastevent; sx; lm m nr_render_kmd
+Last event: Load module nr_render_kmd.sys at fffff804`3c300000
+  debugger time: Fri Oct  9 15:14:14.496 2026 (UTC - 7:00)
+  ct - Create thread - ignore
+  et - Exit thread - ignore
+ cpr - Create process - ignore
+ epr - Exit process - ignore
+  ld - Load module - output
+  ud - Unload module - output
+ ser - System error - ignore
+ ibp - Initial breakpoint - ignore
+ iml - Initial module load - break
+ out - Debuggee output - output
+
+  av - Access violation - break - not handled
+asrt - Assertion failure - break - not handled
+ aph - Application hang - break - not handled
+ bpe - Break instruction exception - break
+bpec - Break instruction exception continue - handled
+  eh - C++ EH exception - second-chance break - not handled
+ clr - CLR exception - second-chance break - not handled
+clrn - CLR notification exception - second-chance break - handled
+ cce - Control-Break exception - break
+  cc - Control-Break exception continue - handled
+ cce - Control-C exception - break
+  cc - Control-C exception continue - handled
+  dm - Data misaligned - break - not handled
+dbce - Debugger command exception - ignore - handled
+  gp - Guard page violation - break - not handled
+  ii - Illegal instruction - second-chance break - not handled
+  ip - In-page I/O error - break - not handled
+  dz - Integer divide-by-zero - break - not handled
+ iov - Integer overflow - break - not handled
+  ch - Invalid handle - break
+  hc - Invalid handle continue - not handled
+ lsq - Invalid lock sequence - break - not handled
+ isc - Invalid system call - break - not handled
+  3c - Port disconnected - second-chance break - not handled
+ svh - Service hang - break - not handled
+ sse - Single step exception - break
+ssec - Single step exception continue - handled
+ sbo - Security check failure or stack buffer overrun - break - not handled
+ sov - Stack overflow - break - not handled
+  vs - Verifier stop - break - not handled
+vcpp - Visual C++ exception - ignore - handled
+ wkd - Wake debugger - break - not handled
+ rto - Windows Runtime Originate Error - second-chance break - not handled
+ rtt - Windows Runtime Transform Error - second-chance break - not handled
+ wob - WOW64 breakpoint - break - handled
+ wos - WOW64 single step exception - break - handled
+
+   * - Other exception - second-chance break - not handled
+Browse full module list
+start             end                 module name
+fffff804`3c300000 fffff804`3c30f000   nr_render_kmd   (deferred)             
+
+Unable to enumerate kernel-mode unloaded modules, HRESULT 0x80004005
+1: kd> sxd iml; sxd ld; sxd ud; bc *; g
+nr_paging_lab: memory=00000000 required_queue=32
+nr_paging_lab: engine_start=00000000 capacity=33; rendering_ready=0 sources=0 children=0
+nr_paging_lab: query type=1 input=0 output=552
+nr_paging_lab: query type=47 input=0 output=4
+nr_paging_lab: create_context node=0 affinity=1 flags=1 private=0
+nr_paging_lab: query type=5 input=24 output=32
+nr_paging_lab: query type=5 input=24 output=32
+nr_paging_lab: query type=10 input=4 output=4
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: create_context node=0 affinity=1 flags=0 private=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=1 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=1
+nr_paging_lab: execute fence=1 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=2 dma=8..16 private=56..112
+nr_paging_lab: submit=00000000 flags=1 fence=2
+nr_paging_lab: execute fence=2 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=3 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=3
+nr_paging_lab: execute fence=3 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=4 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=4
+nr_paging_lab: patch=00000000 flags=1 fence=5 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=5
+nr_paging_lab: execute fence=4 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=5 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=6 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=6
+nr_paging_lab: execute fence=6 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=7 dma=8..16 private=56..112
+nr_paging_lab: submit=00000000 flags=1 fence=7
+nr_paging_lab: execute fence=7 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=8 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=8
+nr_paging_lab: execute fence=8 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=9 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=9
+nr_paging_lab: patch=00000000 flags=1 fence=10 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=10
+nr_paging_lab: execute fence=9 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=10 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=11 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=11
+nr_paging_lab: execute fence=11 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=12 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=12
+nr_paging_lab: execute fence=12 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=13 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=13
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=14 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=14
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=15 dma=0..8 private=0..56
+nr_paging_lab: execute fence=13 commands=1 status=00000000 irql=0
+nr_paging_lab: submit=00000000 flags=1 fence=15
+nr_paging_lab: execute fence=14 commands=0 status=00000000 irql=0
+nr_paging_lab: execute fence=15 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=16 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=16
+nr_paging_lab: execute fence=16 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=17 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=17
+nr_paging_lab: patch=00000000 flags=1 fence=18 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=18
+nr_paging_lab: execute fence=17 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=18 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=19 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=19
+nr_paging_lab: execute fence=19 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=1 fence=20 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=20
+nr_paging_lab: execute fence=20 commands=0 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=21 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=21
+nr_paging_lab: execute fence=21 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=22 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=22
+nr_paging_lab: patch=00000000 flags=1 fence=23 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=23
+nr_paging_lab: execute fence=22 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=23 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=24 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=24
+nr_paging_lab: patch=00000000 flags=0 fence=25 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=25
+nr_paging_lab: execute fence=24 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=25 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=26 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=26
+nr_paging_lab: execute fence=26 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=27 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=27
+nr_paging_lab: execute fence=27 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=28
+nr_paging_lab: execute fence=28 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=29 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=29
+nr_paging_lab: patch=00000000 flags=1 fence=30 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=30
+nr_paging_lab: execute fence=29 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=30 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=31 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=31
+nr_paging_lab: execute fence=31 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=32 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=32
+nr_paging_lab: execute fence=32 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=33 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=33
+nr_paging_lab: patch=00000000 flags=1 fence=34 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=34
+nr_paging_lab: execute fence=33 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=34 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=35 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=35
+nr_paging_lab: execute fence=35 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=1 fence=36 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=36
+nr_paging_lab: execute fence=36 commands=0 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=37 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=37
+nr_paging_lab: execute fence=37 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=38 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=38
+nr_paging_lab: patch=00000000 flags=1 fence=39 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=39
+nr_paging_lab: execute fence=38 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=39 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=40
+nr_paging_lab: execute fence=40 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=41 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=41
+nr_paging_lab: patch=00000000 flags=1 fence=42 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=42
+nr_paging_lab: execute fence=41 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=42 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=43 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=43
+nr_paging_lab: execute fence=43 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=44 dma=8..16 private=56..112
+nr_paging_lab: submit=00000000 flags=1 fence=44
+nr_paging_lab: execute fence=44 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=45 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=45
+nr_paging_lab: execute fence=45 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=46 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=46
+nr_paging_lab: patch=00000000 flags=1 fence=47 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=47
+nr_paging_lab: execute fence=46 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=47 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=48 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=48
+nr_paging_lab: execute fence=48 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=49 dma=8..16 private=56..112
+nr_paging_lab: submit=00000000 flags=1 fence=49
+nr_paging_lab: patch=00000000 flags=0 fence=50 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=50
+nr_paging_lab: execute fence=49 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=50 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=51 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=51
+nr_paging_lab: patch=00000000 flags=1 fence=52 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=52
+nr_paging_lab: execute fence=51 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=52 commands=0 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=53 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=53
+nr_paging_lab: patch=00000000 flags=1 fence=54 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=54
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=55 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=55
+nr_paging_lab: patch=00000000 flags=1 fence=56 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=56
+nr_paging_lab: execute fence=53 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=54 commands=0 status=00000000 irql=0
+nr_paging_lab: execute fence=55 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=56 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=57 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=57
+nr_paging_lab: execute fence=57 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=58 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=58
+nr_paging_lab: execute fence=58 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=59 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=59
+nr_paging_lab: patch=00000000 flags=1 fence=60 dma=8..8 private=56..56
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=1 fence=60
+nr_paging_lab: execute fence=59 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=61 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=61
+nr_paging_lab: execute fence=60 commands=0 status=00000000 irql=0
+nr_paging_lab: execute fence=61 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=62 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=62
+nr_paging_lab: execute fence=62 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=63 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=63
+nr_paging_lab: patch=00000000 flags=1 fence=64 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=64
+nr_paging_lab: execute fence=63 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=64 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=65 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=65
+nr_paging_lab: execute fence=65 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=1 fence=66 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=66
+nr_paging_lab: patch=00000000 flags=0 fence=67 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=67
+nr_paging_lab: execute fence=66 commands=0 status=00000000 irql=0
+nr_paging_lab: execute fence=67 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=68 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=68
+nr_paging_lab: patch=00000000 flags=1 fence=69 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=69
+nr_paging_lab: execute fence=68 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=69 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=70 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=70
+nr_paging_lab: patch=00000000 flags=0 fence=71 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=71
+nr_paging_lab: execute fence=70 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=71 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=72 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=72
+nr_paging_lab: execute fence=72 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=73 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=73
+nr_paging_lab: execute fence=73 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=74
+nr_paging_lab: execute fence=74 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=75 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=75
+nr_paging_lab: patch=00000000 flags=1 fence=76 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=76
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: execute fence=75 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=77 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=77
+nr_paging_lab: execute fence=76 commands=0 status=00000000 irql=0
+nr_paging_lab: execute fence=77 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=78 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=78
+nr_paging_lab: execute fence=78 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=79 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=79
+nr_paging_lab: patch=00000000 flags=1 fence=80 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=80
+nr_paging_lab: execute fence=79 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=80 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=81 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=81
+nr_paging_lab: execute fence=81 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=1 fence=82 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=82
+nr_paging_lab: execute fence=82 commands=0 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=83 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=83
+nr_paging_lab: execute fence=83 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=84 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=84
+nr_paging_lab: patch=00000000 flags=1 fence=85 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=85
+nr_paging_lab: execute fence=84 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=85 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=86
+nr_paging_lab: execute fence=86 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=87 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=87
+nr_paging_lab: patch=00000000 flags=1 fence=88 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=88
+nr_paging_lab: execute fence=87 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=88 commands=0 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=89 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=89
+nr_paging_lab: patch=00000000 flags=1 fence=90 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=90
+nr_paging_lab: execute fence=89 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=90 commands=0 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=91 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=91
+nr_paging_lab: patch=00000000 flags=1 fence=92 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=92
+nr_paging_lab: execute fence=91 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=92 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=93 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=93
+nr_paging_lab: execute fence=93 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=94 dma=8..16 private=56..112
+nr_paging_lab: submit=00000000 flags=1 fence=94
+nr_paging_lab: execute fence=94 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=95 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=95
+nr_paging_lab: execute fence=95 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=96 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=96
+nr_paging_lab: patch=00000000 flags=1 fence=97 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=97
+nr_paging_lab: execute fence=96 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=97 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=98 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=98
+nr_paging_lab: execute fence=98 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=99 dma=8..16 private=56..112
+nr_paging_lab: submit=00000000 flags=1 fence=99
+nr_paging_lab: execute fence=99 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=100 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=100
+nr_paging_lab: execute fence=100 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=101 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=101
+nr_paging_lab: patch=00000000 flags=1 fence=102 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=102
+nr_paging_lab: execute fence=101 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=102 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=103 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=103
+nr_paging_lab: execute fence=103 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=104 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=104
+nr_paging_lab: execute fence=104 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=105 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=105
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=106 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=106
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: execute fence=105 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=1 fence=107 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=107
+nr_paging_lab: execute fence=106 commands=0 status=00000000 irql=0
+nr_paging_lab: execute fence=107 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=108 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=108
+nr_paging_lab: execute fence=108 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=109 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=109
+nr_paging_lab: patch=00000000 flags=1 fence=110 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=110
+nr_paging_lab: execute fence=109 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=110 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=111 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=111
+nr_paging_lab: execute fence=111 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=1 fence=112 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=112
+nr_paging_lab: execute fence=112 commands=0 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=113 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=113
+nr_paging_lab: execute fence=113 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=114 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=114
+nr_paging_lab: patch=00000000 flags=1 fence=115 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=115
+nr_paging_lab: execute fence=114 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=115 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=116 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=116
+nr_paging_lab: patch=00000000 flags=0 fence=117 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=117
+nr_paging_lab: execute fence=116 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=117 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=118 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=118
+nr_paging_lab: execute fence=118 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=119 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=119
+nr_paging_lab: execute fence=119 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=120
+nr_paging_lab: execute fence=120 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=121 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=121
+nr_paging_lab: patch=00000000 flags=1 fence=122 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=122
+nr_paging_lab: execute fence=121 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=122 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=123 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=123
+nr_paging_lab: execute fence=123 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=124 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=124
+nr_paging_lab: execute fence=124 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=125 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=125
+nr_paging_lab: patch=00000000 flags=1 fence=126 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=126
+nr_paging_lab: execute fence=125 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=126 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=127 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=127
+nr_paging_lab: execute fence=127 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=1 fence=128 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=128
+nr_paging_lab: execute fence=128 commands=0 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=129 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=129
+nr_paging_lab: execute fence=129 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=130 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=130
+nr_paging_lab: patch=00000000 flags=1 fence=131 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=131
+nr_paging_lab: execute fence=130 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=131 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=132
+nr_paging_lab: execute fence=132 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=133 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=133
+nr_paging_lab: patch=00000000 flags=1 fence=134 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=134
+nr_paging_lab: execute fence=133 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=134 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=135 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=135
+nr_paging_lab: execute fence=135 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=136 dma=8..16 private=56..112
+nr_paging_lab: submit=00000000 flags=1 fence=136
+nr_paging_lab: execute fence=136 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=137 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=137
+nr_paging_lab: execute fence=137 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=138 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=138
+nr_paging_lab: patch=00000000 flags=1 fence=139 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=139
+nr_paging_lab: execute fence=138 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=139 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=140 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=140
+nr_paging_lab: execute fence=140 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=141 dma=8..16 private=56..112
+nr_paging_lab: submit=00000000 flags=1 fence=141
+nr_paging_lab: execute fence=141 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=142 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=142
+nr_paging_lab: execute fence=142 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=143 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=143
+nr_paging_lab: patch=00000000 flags=1 fence=144 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=144
+nr_paging_lab: execute fence=143 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=144 commands=0 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=145 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=145
+nr_paging_lab: patch=00000000 flags=1 fence=146 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=146
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=147 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=147
+nr_paging_lab: patch=00000000 flags=1 fence=148 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=148
+nr_paging_lab: execute fence=145 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=146 commands=0 status=00000000 irql=0
+nr_paging_lab: execute fence=147 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=148 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=149 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=149
+nr_paging_lab: execute fence=149 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=150 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=150
+nr_paging_lab: execute fence=150 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=151 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=151
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=152 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=152
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=153 dma=0..8 private=0..56
+nr_paging_lab: execute fence=151 commands=1 status=00000000 irql=0
+nr_paging_lab: submit=00000000 flags=1 fence=153
+nr_paging_lab: execute fence=152 commands=0 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=154 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=154
+nr_paging_lab: execute fence=153 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=154 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=155 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=155
+nr_paging_lab: patch=00000000 flags=1 fence=156 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=156
+nr_paging_lab: execute fence=155 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=156 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=157 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=157
+nr_paging_lab: execute fence=157 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=1 fence=158 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=158
+nr_paging_lab: execute fence=158 commands=0 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=159 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=159
+nr_paging_lab: execute fence=159 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=160 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=160
+nr_paging_lab: patch=00000000 flags=1 fence=161 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=161
+nr_paging_lab: execute fence=160 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=161 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=162 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=162
+nr_paging_lab: patch=00000000 flags=0 fence=163 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=163
+nr_paging_lab: execute fence=162 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=163 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=164 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=164
+nr_paging_lab: execute fence=164 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=165 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=165
+nr_paging_lab: execute fence=165 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=166
+nr_paging_lab: execute fence=166 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=167 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=167
+nr_paging_lab: patch=00000000 flags=1 fence=168 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=168
+nr_paging_lab: execute fence=167 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=168 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=169 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=169
+nr_paging_lab: patch=00000000 flags=0 fence=170 dma=0..24 private=0..40
+nr_paging_lab: execute fence=169 commands=1 status=00000000 irql=0
+nr_paging_lab: submit=00000000 flags=0 fence=170
+nr_paging_lab: execute fence=170 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=171 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=171
+nr_paging_lab: patch=00000000 flags=1 fence=172 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=172
+nr_paging_lab: execute fence=171 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=172 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=173 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=173
+nr_paging_lab: execute fence=173 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=1 fence=174 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=174
+nr_paging_lab: execute fence=174 commands=0 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=175 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=175
+nr_paging_lab: execute fence=175 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=176 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=176
+nr_paging_lab: patch=00000000 flags=1 fence=177 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=177
+nr_paging_lab: execute fence=176 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=177 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=178
+nr_paging_lab: execute fence=178 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=179 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=179
+nr_paging_lab: patch=00000000 flags=1 fence=180 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=180
+nr_paging_lab: execute fence=179 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=180 commands=0 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=181 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=181
+nr_paging_lab: patch=00000000 flags=1 fence=182 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=182
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=183 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=183
+nr_paging_lab: patch=00000000 flags=1 fence=184 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=184
+nr_paging_lab: execute fence=181 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=182 commands=0 status=00000000 irql=0
+nr_paging_lab: execute fence=183 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=184 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=185 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=185
+nr_paging_lab: execute fence=185 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=186 dma=8..16 private=56..112
+nr_paging_lab: submit=00000000 flags=1 fence=186
+nr_paging_lab: execute fence=186 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=187 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=187
+nr_paging_lab: execute fence=187 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=188 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=188
+nr_paging_lab: patch=00000000 flags=1 fence=189 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=189
+nr_paging_lab: execute fence=188 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=189 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=190 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=190
+nr_paging_lab: execute fence=190 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=191 dma=8..16 private=56..112
+nr_paging_lab: submit=00000000 flags=1 fence=191
+nr_paging_lab: patch=00000000 flags=0 fence=192 dma=0..24 private=0..40
+nr_paging_lab: execute fence=191 commands=1 status=00000000 irql=0
+nr_paging_lab: submit=00000000 flags=0 fence=192
+nr_paging_lab: execute fence=192 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=193 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=193
+nr_paging_lab: patch=00000000 flags=1 fence=194 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=194
+nr_paging_lab: execute fence=193 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=194 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=195 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=195
+nr_paging_lab: execute fence=195 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=196 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=196
+nr_paging_lab: execute fence=196 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=197 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=197
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=198 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=198
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=199 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=199
+nr_paging_lab: execute fence=197 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=198 commands=0 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=200 dma=0..24 private=0..40
+nr_paging_lab: execute fence=199 commands=1 status=00000000 irql=0
+nr_paging_lab: submit=00000000 flags=0 fence=200
+nr_paging_lab: execute fence=200 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=201 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=201
+nr_paging_lab: patch=00000000 flags=1 fence=202 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=202
+nr_paging_lab: execute fence=201 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=202 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=203 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=203
+nr_paging_lab: execute fence=203 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=1 fence=204 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=204
+nr_paging_lab: execute fence=204 commands=0 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=205 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=205
+nr_paging_lab: execute fence=205 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=206 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=206
+nr_paging_lab: patch=00000000 flags=1 fence=207 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=207
+nr_paging_lab: execute fence=206 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=207 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=208 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=208
+nr_paging_lab: patch=00000000 flags=0 fence=209 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=209
+nr_paging_lab: execute fence=208 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=209 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=210 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=210
+nr_paging_lab: execute fence=210 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=211 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=211
+nr_paging_lab: execute fence=211 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=212
+nr_paging_lab: execute fence=212 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=213 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=213
+nr_paging_lab: patch=00000000 flags=1 fence=214 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=214
+nr_paging_lab: execute fence=213 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=215 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=215
+nr_paging_lab: execute fence=214 commands=0 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=216 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=216
+nr_paging_lab: execute fence=215 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=216 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=217 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=217
+nr_paging_lab: patch=00000000 flags=1 fence=218 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=218
+nr_paging_lab: execute fence=217 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=219 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=219
+nr_paging_lab: execute fence=218 commands=0 status=00000000 irql=0
+nr_paging_lab: execute fence=219 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=1 fence=220 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=220
+nr_paging_lab: patch=00000000 flags=0 fence=221 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=221
+nr_paging_lab: execute fence=220 commands=0 status=00000000 irql=0
+nr_paging_lab: execute fence=221 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=222 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=222
+nr_paging_lab: patch=00000000 flags=1 fence=223 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=223
+nr_paging_lab: execute fence=222 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=223 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=224
+nr_paging_lab: execute fence=224 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=225 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=225
+nr_paging_lab: patch=00000000 flags=1 fence=226 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=226
+nr_paging_lab: execute fence=225 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=226 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=227 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=227
+nr_paging_lab: execute fence=227 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=228 dma=8..16 private=56..112
+nr_paging_lab: submit=00000000 flags=1 fence=228
+nr_paging_lab: execute fence=228 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=229 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=229
+nr_paging_lab: execute fence=229 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=230 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=230
+nr_paging_lab: patch=00000000 flags=1 fence=231 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=231
+nr_paging_lab: execute fence=230 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=231 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=232 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=232
+nr_paging_lab: execute fence=232 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=233 dma=8..16 private=56..112
+nr_paging_lab: submit=00000000 flags=1 fence=233
+nr_paging_lab: execute fence=233 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=234 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=234
+nr_paging_lab: execute fence=234 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=235 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=235
+nr_paging_lab: patch=00000000 flags=1 fence=236 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=236
+nr_paging_lab: execute fence=235 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=236 commands=0 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=237 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=237
+nr_paging_lab: patch=00000000 flags=1 fence=238 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=238
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=239 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=239
+nr_paging_lab: patch=00000000 flags=1 fence=240 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=240
+nr_paging_lab: execute fence=237 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=238 commands=0 status=00000000 irql=0
+nr_paging_lab: execute fence=239 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=240 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=241 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=241
+nr_paging_lab: execute fence=241 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=242 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=242
+nr_paging_lab: execute fence=242 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=243 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=243
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=244 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=244
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=245 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=245
+nr_paging_lab: execute fence=243 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=244 commands=0 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=246 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=246
+nr_paging_lab: execute fence=245 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=246 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=247 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=247
+nr_paging_lab: patch=00000000 flags=1 fence=248 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=248
+nr_paging_lab: execute fence=247 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=248 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=249 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=249
+nr_paging_lab: execute fence=249 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=1 fence=250 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=250
+nr_paging_lab: execute fence=250 commands=0 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=251 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=251
+nr_paging_lab: execute fence=251 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=252 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=252
+nr_paging_lab: patch=00000000 flags=1 fence=253 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=253
+nr_paging_lab: execute fence=252 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=253 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=254 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=254
+nr_paging_lab: patch=00000000 flags=0 fence=255 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=255
+nr_paging_lab: execute fence=254 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=255 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=256 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=256
+nr_paging_lab: execute fence=256 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=257 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=257
+nr_paging_lab: execute fence=257 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=258
+nr_paging_lab: execute fence=258 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=259 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=259
+nr_paging_lab: patch=00000000 flags=1 fence=260 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=260
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: execute fence=259 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=261 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=261
+nr_paging_lab: execute fence=260 commands=0 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=262 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=262
+nr_paging_lab: execute fence=261 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=262 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=263 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=263
+nr_paging_lab: patch=00000000 flags=1 fence=264 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=264
+nr_paging_lab: execute fence=263 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=264 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=265 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=265
+nr_paging_lab: execute fence=265 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=1 fence=266 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=266
+nr_paging_lab: execute fence=266 commands=0 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=267 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=267
+nr_paging_lab: execute fence=267 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=268 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=268
+nr_paging_lab: patch=00000000 flags=1 fence=269 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=269
+nr_paging_lab: execute fence=268 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=269 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=270
+nr_paging_lab: execute fence=270 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=271 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=271
+nr_paging_lab: patch=00000000 flags=1 fence=272 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=272
+nr_paging_lab: execute fence=271 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=272 commands=0 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=273 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=273
+nr_paging_lab: patch=00000000 flags=1 fence=274 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=274
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=275 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=275
+nr_paging_lab: patch=00000000 flags=1 fence=276 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=276
+nr_paging_lab: execute fence=273 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=274 commands=0 status=00000000 irql=0
+nr_paging_lab: execute fence=275 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=276 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=277 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=277
+nr_paging_lab: execute fence=277 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=278 dma=8..16 private=56..112
+nr_paging_lab: submit=00000000 flags=1 fence=278
+nr_paging_lab: execute fence=278 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=279 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=279
+nr_paging_lab: execute fence=279 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=280 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=280
+nr_paging_lab: patch=00000000 flags=1 fence=281 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=281
+nr_paging_lab: execute fence=280 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=281 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=282 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=282
+nr_paging_lab: execute fence=282 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=283 dma=8..16 private=56..112
+nr_paging_lab: submit=00000000 flags=1 fence=283
+nr_paging_lab: execute fence=283 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=284 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=284
+nr_paging_lab: execute fence=284 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=285 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=285
+nr_paging_lab: patch=00000000 flags=1 fence=286 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=286
+nr_paging_lab: execute fence=285 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=286 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=287 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=287
+nr_paging_lab: execute fence=287 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=288 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=288
+nr_paging_lab: execute fence=288 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=289 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=289
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=290 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=290
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=291 dma=0..8 private=0..56
+nr_paging_lab: execute fence=289 commands=1 status=00000000 irql=0
+nr_paging_lab: submit=00000000 flags=1 fence=291
+nr_paging_lab: execute fence=290 commands=0 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=292 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=292
+nr_paging_lab: execute fence=291 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=292 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=293 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=293
+nr_paging_lab: patch=00000000 flags=1 fence=294 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=294
+nr_paging_lab: execute fence=293 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=294 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=295 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=295
+nr_paging_lab: execute fence=295 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=1 fence=296 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=296
+nr_paging_lab: execute fence=296 commands=0 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=297 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=297
+nr_paging_lab: execute fence=297 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=298 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=298
+nr_paging_lab: patch=00000000 flags=1 fence=299 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=299
+nr_paging_lab: execute fence=298 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=299 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=300 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=300
+nr_paging_lab: patch=00000000 flags=0 fence=301 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=301
+nr_paging_lab: execute fence=300 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=301 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=302 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=302
+nr_paging_lab: execute fence=302 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=303 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=303
+nr_paging_lab: execute fence=303 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=304
+nr_paging_lab: execute fence=304 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=305 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=305
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=306 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=306
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=307 dma=0..8 private=0..56
+nr_paging_lab: execute fence=305 commands=1 status=00000000 irql=0
+nr_paging_lab: submit=00000000 flags=1 fence=307
+nr_paging_lab: execute fence=306 commands=0 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=308 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=308
+nr_paging_lab: execute fence=307 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=308 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=309 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=309
+nr_paging_lab: patch=00000000 flags=1 fence=310 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=310
+nr_paging_lab: execute fence=309 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=310 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=311 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=311
+nr_paging_lab: execute fence=311 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=1 fence=312 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=312
+nr_paging_lab: execute fence=312 commands=0 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=313 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=313
+nr_paging_lab: execute fence=313 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=314 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=314
+nr_paging_lab: patch=00000000 flags=1 fence=315 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=315
+nr_paging_lab: execute fence=314 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=315 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=316
+nr_paging_lab: execute fence=316 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=317 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=317
+nr_paging_lab: patch=00000000 flags=1 fence=318 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=318
+nr_paging_lab: execute fence=317 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=318 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=319 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=319
+nr_paging_lab: execute fence=319 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=320 dma=8..16 private=56..112
+nr_paging_lab: submit=00000000 flags=1 fence=320
+nr_paging_lab: execute fence=320 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=321 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=321
+nr_paging_lab: execute fence=321 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=322 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=322
+nr_paging_lab: patch=00000000 flags=1 fence=323 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=323
+nr_paging_lab: execute fence=322 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=323 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=324 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=324
+nr_paging_lab: execute fence=324 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=325 dma=8..16 private=56..112
+nr_paging_lab: submit=00000000 flags=1 fence=325
+nr_paging_lab: execute fence=325 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=326 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=326
+nr_paging_lab: execute fence=326 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=327 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=327
+nr_paging_lab: patch=00000000 flags=1 fence=328 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=328
+nr_paging_lab: execute fence=327 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=328 commands=0 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=329 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=329
+nr_paging_lab: patch=00000000 flags=1 fence=330 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=330
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=331 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=331
+nr_paging_lab: patch=00000000 flags=1 fence=332 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=332
+nr_paging_lab: execute fence=329 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=330 commands=0 status=00000000 irql=0
+nr_paging_lab: execute fence=331 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=332 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=333 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=333
+nr_paging_lab: execute fence=333 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=334 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=334
+nr_paging_lab: execute fence=334 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=335 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=335
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=336 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=336
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: execute fence=335 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=1 fence=337 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=337
+nr_paging_lab: execute fence=336 commands=0 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=338 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=338
+nr_paging_lab: execute fence=337 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=338 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=339 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=339
+nr_paging_lab: patch=00000000 flags=1 fence=340 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=340
+nr_paging_lab: execute fence=339 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=340 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=341 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=341
+nr_paging_lab: execute fence=341 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=1 fence=342 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=342
+nr_paging_lab: execute fence=342 commands=0 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=343 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=343
+nr_paging_lab: execute fence=343 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=344 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=344
+nr_paging_lab: patch=00000000 flags=1 fence=345 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=345
+nr_paging_lab: execute fence=344 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=345 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=346 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=346
+nr_paging_lab: patch=00000000 flags=0 fence=347 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=347
+nr_paging_lab: execute fence=346 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=347 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=348 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=348
+nr_paging_lab: execute fence=348 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=349 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=349
+nr_paging_lab: execute fence=349 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=350
+nr_paging_lab: execute fence=350 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=351 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=351
+nr_paging_lab: patch=00000000 flags=1 fence=352 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=352
+nr_paging_lab: execute fence=351 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=352 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=353 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=353
+nr_paging_lab: execute fence=353 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=354 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=354
+nr_paging_lab: execute fence=354 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=355 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=355
+nr_paging_lab: patch=00000000 flags=1 fence=356 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=356
+nr_paging_lab: execute fence=355 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=356 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=357 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=357
+nr_paging_lab: execute fence=357 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=1 fence=358 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=358
+nr_paging_lab: execute fence=358 commands=0 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=359 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=359
+nr_paging_lab: execute fence=359 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=360 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=360
+nr_paging_lab: patch=00000000 flags=1 fence=361 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=361
+nr_paging_lab: execute fence=360 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=361 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=362
+nr_paging_lab: execute fence=362 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=363 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=363
+nr_paging_lab: patch=00000000 flags=1 fence=364 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=364
+nr_paging_lab: execute fence=363 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=364 commands=0 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=365 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=365
+nr_paging_lab: patch=00000000 flags=1 fence=366 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=366
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=367 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=367
+nr_paging_lab: patch=00000000 flags=1 fence=368 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=368
+nr_paging_lab: execute fence=365 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=366 commands=0 status=00000000 irql=0
+nr_paging_lab: execute fence=367 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=368 commands=0 status=00000000 irql=0
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: create_context node=0 affinity=1 flags=0 private=0
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: create_context node=0 affinity=1 flags=0 private=0
+nr_paging_lab: render_fill=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=369 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=369
+nr_paging_lab: execute fence=369 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=370 dma=0..16 private=0..32
+nr_paging_lab: submit=00000000 flags=0 fence=370
+nr_paging_lab: execute fence=370 commands=1 status=00000000 irql=0
+nr_paging_lab: render_fill=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=371
+nr_paging_lab: execute fence=371 commands=1 status=00000000 irql=0
+nr_paging_lab: render_fill=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=372
+nr_paging_lab: execute fence=372 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=373 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=373
+nr_paging_lab: patch=00000000 flags=1 fence=374 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=374
+nr_paging_lab: execute fence=373 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=374 commands=0 status=00000000 irql=0
+nr_paging_lab: render_fill=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=375 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=375
+nr_paging_lab: patch=00000000 flags=0 fence=376 dma=0..16 private=0..32
+nr_paging_lab: submit=00000000 flags=0 fence=376
+nr_paging_lab: execute fence=375 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=376 commands=1 status=00000000 irql=0
+nr_paging_lab: render_fill=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=377
+nr_paging_lab: execute fence=377 commands=1 status=00000000 irql=0
+nr_paging_lab: render_fill=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=378
+nr_paging_lab: execute fence=378 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=379 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=379
+nr_paging_lab: patch=00000000 flags=1 fence=380 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=380
+nr_paging_lab: execute fence=379 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=380 commands=0 status=00000000 irql=0
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: create_context node=0 affinity=1 flags=0 private=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=381 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=381
+nr_paging_lab: execute fence=381 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=382 dma=8..16 private=56..112
+nr_paging_lab: submit=00000000 flags=1 fence=382
+nr_paging_lab: execute fence=382 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=383 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=383
+nr_paging_lab: execute fence=383 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=384 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=384
+nr_paging_lab: patch=00000000 flags=1 fence=385 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=385
+nr_paging_lab: execute fence=384 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=385 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=386 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=386
+nr_paging_lab: patch=00000000 flags=0 fence=387 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=387
+nr_paging_lab: execute fence=386 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=387 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=388 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=388
+nr_paging_lab: execute fence=388 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=1 fence=389 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=389
+nr_paging_lab: execute fence=389 commands=0 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=390 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=390
+nr_paging_lab: execute fence=390 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=391 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=391
+nr_paging_lab: patch=00000000 flags=1 fence=392 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=392
+nr_paging_lab: execute fence=391 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=392 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=393
+nr_paging_lab: execute fence=393 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=394 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=394
+nr_paging_lab: execute fence=394 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=395 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=395
+nr_paging_lab: execute fence=395 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=396
+nr_paging_lab: execute fence=396 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=397 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=397
+nr_paging_lab: patch=00000000 flags=1 fence=398 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=398
+nr_paging_lab: execute fence=397 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=398 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=399
+nr_paging_lab: execute fence=399 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=400
+nr_paging_lab: execute fence=400 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=401 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=401
+nr_paging_lab: patch=00000000 flags=1 fence=402 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=402
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=403 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=403
+nr_paging_lab: patch=00000000 flags=1 fence=404 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=404
+nr_paging_lab: execute fence=401 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=402 commands=0 status=00000000 irql=0
+nr_paging_lab: execute fence=403 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=404 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=405 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=405
+nr_paging_lab: execute fence=405 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=406 dma=8..16 private=56..112
+nr_paging_lab: submit=00000000 flags=1 fence=406
+nr_paging_lab: patch=00000000 flags=0 fence=407 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=407
+nr_paging_lab: execute fence=406 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=407 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=408 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=408
+nr_paging_lab: patch=00000000 flags=1 fence=409 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=409
+nr_paging_lab: execute fence=408 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=409 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=410 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=410
+nr_paging_lab: patch=00000000 flags=0 fence=411 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=411
+nr_paging_lab: execute fence=410 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=411 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=412 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=412
+nr_paging_lab: execute fence=412 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=1 fence=413 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=413
+nr_paging_lab: execute fence=413 commands=0 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=414 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=414
+nr_paging_lab: execute fence=414 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=415 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=415
+nr_paging_lab: patch=00000000 flags=1 fence=416 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=416
+nr_paging_lab: execute fence=415 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=416 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=417
+nr_paging_lab: execute fence=417 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=418 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=418
+nr_paging_lab: execute fence=418 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=419 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=419
+nr_paging_lab: execute fence=419 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=420
+nr_paging_lab: execute fence=420 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=421 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=421
+nr_paging_lab: patch=00000000 flags=1 fence=422 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=422
+nr_paging_lab: execute fence=421 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=422 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=423
+nr_paging_lab: execute fence=423 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=424
+nr_paging_lab: execute fence=424 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=425 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=425
+nr_paging_lab: patch=00000000 flags=1 fence=426 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=426
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=427 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=427
+nr_paging_lab: patch=00000000 flags=1 fence=428 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=428
+nr_paging_lab: execute fence=425 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=426 commands=0 status=00000000 irql=0
+nr_paging_lab: execute fence=427 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=428 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=429 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=429
+nr_paging_lab: execute fence=429 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=430 dma=8..16 private=56..112
+nr_paging_lab: submit=00000000 flags=1 fence=430
+nr_paging_lab: execute fence=430 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=431 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=431
+nr_paging_lab: execute fence=431 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=432 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=432
+nr_paging_lab: patch=00000000 flags=1 fence=433 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=433
+nr_paging_lab: execute fence=432 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=433 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=434 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=434
+nr_paging_lab: patch=00000000 flags=0 fence=435 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=435
+nr_paging_lab: execute fence=434 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=435 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=436 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=436
+nr_paging_lab: execute fence=436 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=1 fence=437 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=437
+nr_paging_lab: execute fence=437 commands=0 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=438 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=438
+nr_paging_lab: execute fence=438 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=439 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=439
+nr_paging_lab: patch=00000000 flags=1 fence=440 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=440
+nr_paging_lab: execute fence=439 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=440 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=441
+nr_paging_lab: execute fence=441 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=442 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=442
+nr_paging_lab: patch=00000000 flags=0 fence=443 dma=0..24 private=0..40
+nr_paging_lab: execute fence=442 commands=1 status=00000000 irql=0
+nr_paging_lab: submit=00000000 flags=0 fence=443
+nr_paging_lab: execute fence=443 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=444
+nr_paging_lab: execute fence=444 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=445 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=445
+nr_paging_lab: patch=00000000 flags=1 fence=446 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=446
+nr_paging_lab: execute fence=445 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=446 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=447
+nr_paging_lab: execute fence=447 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=448
+nr_paging_lab: execute fence=448 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=449 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=449
+nr_paging_lab: patch=00000000 flags=1 fence=450 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=450
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=451 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=451
+nr_paging_lab: patch=00000000 flags=1 fence=452 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=452
+nr_paging_lab: execute fence=449 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=450 commands=0 status=00000000 irql=0
+nr_paging_lab: execute fence=451 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=452 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=453 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=453
+nr_paging_lab: execute fence=453 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=454 dma=8..16 private=56..112
+nr_paging_lab: submit=00000000 flags=1 fence=454
+nr_paging_lab: execute fence=454 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=455 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=455
+nr_paging_lab: execute fence=455 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=456 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=456
+nr_paging_lab: patch=00000000 flags=1 fence=457 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=457
+nr_paging_lab: execute fence=456 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=457 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=458 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=458
+nr_paging_lab: patch=00000000 flags=0 fence=459 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=459
+nr_paging_lab: execute fence=458 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=459 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=0 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=460 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=460
+nr_paging_lab: execute fence=460 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=1 fence=461 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=461
+nr_paging_lab: execute fence=461 commands=0 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=462 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=462
+nr_paging_lab: execute fence=462 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=463 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=463
+nr_paging_lab: patch=00000000 flags=1 fence=464 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=464
+nr_paging_lab: execute fence=463 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=464 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=465
+nr_paging_lab: execute fence=465 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=466 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=466
+nr_paging_lab: execute fence=466 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=467 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=467
+nr_paging_lab: execute fence=467 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=468
+nr_paging_lab: execute fence=468 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=469 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=469
+nr_paging_lab: patch=00000000 flags=1 fence=470 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=470
+nr_paging_lab: execute fence=469 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=470 commands=0 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=471
+nr_paging_lab: execute fence=471 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=472
+nr_paging_lab: execute fence=472 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=473 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=473
+nr_paging_lab: patch=00000000 flags=1 fence=474 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=474
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=475 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=475
+nr_paging_lab: patch=00000000 flags=1 fence=476 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=476
+nr_paging_lab: execute fence=473 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=474 commands=0 status=00000000 irql=0
+nr_paging_lab: execute fence=475 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=476 commands=0 status=00000000 irql=0
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: create_context node=0 affinity=1 flags=0 private=0
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: create_context node=0 affinity=1 flags=0 private=0
+nr_paging_lab: render_fill=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=477 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=477
+nr_paging_lab: patch=00000000 flags=0 fence=478 dma=0..16 private=0..32
+nr_paging_lab: submit=00000000 flags=0 fence=478
+nr_paging_lab: execute fence=477 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=478 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=479 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=479
+nr_paging_lab: patch=00000000 flags=0 fence=480 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=480
+nr_paging_lab: execute fence=479 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=480 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=481 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=481
+nr_paging_lab: patch=00000000 flags=0 fence=482 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=482
+nr_paging_lab: execute fence=481 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=482 commands=1 status=00000000 irql=0
+nr_paging_lab: render_fill=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=483
+nr_paging_lab: execute fence=483 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=484
+nr_paging_lab: execute fence=484 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=485
+nr_paging_lab: execute fence=485 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=486 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=486
+nr_paging_lab: patch=00000000 flags=1 fence=487 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=487
+nr_paging_lab: execute fence=486 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=487 commands=0 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=488 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=488
+nr_paging_lab: patch=00000000 flags=1 fence=489 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=489
+nr_paging_lab: execute fence=488 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=489 commands=0 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=490 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=490
+nr_paging_lab: patch=00000000 flags=1 fence=491 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=491
+nr_paging_lab: execute fence=490 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=491 commands=0 status=00000000 irql=0
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: create_context node=0 affinity=1 flags=0 private=0
+nr_paging_lab: render_fill=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=492 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=492
+nr_paging_lab: patch=00000000 flags=0 fence=493 dma=0..16 private=0..32
+nr_paging_lab: submit=00000000 flags=0 fence=493
+nr_paging_lab: execute fence=492 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=493 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=494 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=494
+nr_paging_lab: patch=00000000 flags=0 fence=495 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=495
+nr_paging_lab: execute fence=494 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=495 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=496 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=496
+nr_paging_lab: patch=00000000 flags=0 fence=497 dma=0..24 private=0..40
+nr_paging_lab: submit=00000000 flags=0 fence=497
+nr_paging_lab: execute fence=496 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=497 commands=1 status=00000000 irql=0
+nr_paging_lab: render_fill=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=498
+nr_paging_lab: execute fence=498 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=499
+nr_paging_lab: execute fence=499 commands=1 status=00000000 irql=0
+nr_paging_lab: render_copy=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=500
+nr_paging_lab: execute fence=500 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=501 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=501
+nr_paging_lab: patch=00000000 flags=1 fence=502 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=502
+nr_paging_lab: execute fence=501 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=502 commands=0 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=503 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=503
+nr_paging_lab: patch=00000000 flags=1 fence=504 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=504
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=505 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=505
+nr_paging_lab: patch=00000000 flags=1 fence=506 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=506
+nr_paging_lab: execute fence=503 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=504 commands=0 status=00000000 irql=0
+nr_paging_lab: execute fence=505 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=506 commands=0 status=00000000 irql=0
+Break instruction exception - code 80000003 (first chance)
+*******************************************************************************
+*                                                                             *
+*   You are seeing this message because you pressed either                    *
+*       CTRL+C (if you run console kernel debugger) or,                       *
+*       CTRL+BREAK (if you run GUI kernel debugger),                          *
+*   on your debugger machine's keyboard.                                      *
+*                                                                             *
+*                   THIS IS NOT A BUG OR A SYSTEM CRASH                       *
+*                                                                             *
+* If you did not intend to break into the debugger, press the "g" key, then   *
+* press the "Enter" key now.  This message might immediately reappear.  If it *
+* does, press "g" and "Enter" again.                                          *
+*                                                                             *
+*******************************************************************************
+nt!DbgBreakPointWithStatus:
+fffff804`a52fdfb0 cc              int     3
+0: kd> sxe ud:nr_render_kmd.sys; g
+Unload module nr_render_kmd.sys at fffff804`3c300000
+nt!DebugService2+0x5:
+fffff804`a52fe005 cc              int     3
+1: kd> .logclose; sxd ud; bc *; g
+Closing open log file C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-paging-v31-oct9.log
