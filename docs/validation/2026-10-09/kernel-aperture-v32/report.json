@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "kind": "isolated-owned-system-page-translation",
+  "date_utc": "2026-10-09",
+  "kernel_source_revision": "c300e90977f858c631f04a75444d2c79fc22f00e",
+  "package": "v32-aperture",
+  "driver_version": "0.0.21.0",
+  "guest_build": "26300.9457",
+  "result": "owned-memory-roundtrip-and-dummy-aliases-passed",
+  "kernel_status": "00000000",
+  "phase": 8,
+  "verified_bytes": 20742144,
+  "image_extent": [
+    2880,
+    1800
+  ],
+  "image_allocation_bytes": 20738048,
+  "released_to_dummy_pages": 5063,
+  "cleaned": true,
+  "intentional_startup_rejection": true,
+  "lab_device_problem_after_install": 43,
+  "kernel_module_unloaded": true,
+  "owned_device_removed": true,
+  "owned_inf_deleted": true,
+  "prior_display_status_preserved": true,
+  "windows_aperture_advertised": false,
+  "windows_allocation_mapping_tested": false,
+  "windows_submission_tested": false,
+  "npu_execution_tested": false,
+  "desktop_offload_tested": false,
+  "notes": [
+    "The diagnostic owns nonpaged system memory and copies its actual PFN identities from a temporary MDL. It frees that input descriptor before accessing the pages through independently created mappings. It does not borrow a parent system mapping.",
+    "An unaligned fill checks every source byte including guards, followed by a page-crossing read/write round trip. Unmap points all 5063 addresses to the same real owned dummy page; reads and writes across adjacent aliases are independently checked against the original dummy memory.",
+    "This is real kernel mapping evidence, not VidMm allocation or aperture-DDI acceptance. The driver deliberately rejects startup, resulting in Code 43 for the laboratory node. The original display remains healthy and removal succeeds.",
+    "The debugger log preserves a symbol-path setup typo: semicolon-separated commands were interpreted as path entries. The path was corrected and the guest resumed before installation; this did not modify guest code or the diagnostic.",
+    "No fabricated CPU bus address, OS pointer patch, synthetic Windows fence, NPU execution, desktop composition or Tahoma measurement was used."
+  ]
+}

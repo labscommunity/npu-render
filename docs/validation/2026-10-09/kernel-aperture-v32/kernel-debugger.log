@@ -1,0 +1,49 @@
+Opened log file 'C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-aperture-v32-oct9.log'
+WARNING: Whitespace at start of path element
+WARNING: Whitespace at start of path element
+WARNING: Whitespace at start of path element
+WARNING: Whitespace at start of path element
+WARNING: Whitespace at start of path element
+Symbol search path is: srv*C:\Users\tatef\AppData\Local\npu-render\vm\symbols*https://msdl.microsoft.com/download/symbols;C:\Users\tatef\AppData\Local\npu-render\builds\render-kernel-v29-paging\Release;C:\Users\tatef\AppData\Local\npu-render\builds\aperture-probe-v1\Release; sxd iml; sxd ld; sxd ud; bc *; g
+Expanded Symbol search path is: srv*c:\users\tatef\appdata\local\npu-render\vm\symbols*https://msdl.microsoft.com/download/symbols;c:\users\tatef\appdata\local\npu-render\builds\render-kernel-v29-paging\release;c:\users\tatef\appdata\local\npu-render\builds\aperture-probe-v1\release; sxd iml; sxd ld; sxd ud; bc *; g
+WARNING: Whitespace at start of path element
+WARNING: Whitespace at start of path element
+WARNING: Whitespace at start of path element
+WARNING: Whitespace at start of path element
+WARNING: Whitespace at start of path element
+
+************* Path validation summary **************
+Response                         Time (ms)     Location
+Deferred                                       srv*C:\Users\tatef\AppData\Local\npu-render\vm\symbols*https://msdl.microsoft.com/download/symbols
+OK                                             C:\Users\tatef\AppData\Local\npu-render\builds\render-kernel-v29-paging\Release
+OK                                             C:\Users\tatef\AppData\Local\npu-render\builds\aperture-probe-v1\Release
+0: kd> .sympath srv*C:\Users\tatef\AppData\Local\npu-render\vm\symbols*https://msdl.microsoft.com/download/symbols;C:\Users\tatef\AppData\Local\npu-render\builds\aperture-probe-v1\Release
+Symbol search path is: srv*C:\Users\tatef\AppData\Local\npu-render\vm\symbols*https://msdl.microsoft.com/download/symbols;C:\Users\tatef\AppData\Local\npu-render\builds\aperture-probe-v1\Release
+Expanded Symbol search path is: srv*c:\users\tatef\appdata\local\npu-render\vm\symbols*https://msdl.microsoft.com/download/symbols;c:\users\tatef\appdata\local\npu-render\builds\aperture-probe-v1\release
+
+************* Path validation summary **************
+Response                         Time (ms)     Location
+Deferred                                       srv*C:\Users\tatef\AppData\Local\npu-render\vm\symbols*https://msdl.microsoft.com/download/symbols
+OK                                             C:\Users\tatef\AppData\Local\npu-render\builds\aperture-probe-v1\Release
+0: kd> sxd iml; sxd ld; sxd ud; bc *; g
+nr_render_lab: aperture status=00000000 phase=8 verified_bytes=20742144 released_pages=5063 cleaned=1; owned-memory diagnostic only; startup remains disabled
+Unload module nr_render_kmd.sys at fffff804`3c3b0000
+Break instruction exception - code 80000003 (first chance)
+*******************************************************************************
+*                                                                             *
+*   You are seeing this message because you pressed either                    *
+*       CTRL+C (if you run console kernel debugger) or,                       *
+*       CTRL+BREAK (if you run GUI kernel debugger),                          *
+*   on your debugger machine's keyboard.                                      *
+*                                                                             *
+*                   THIS IS NOT A BUG OR A SYSTEM CRASH                       *
+*                                                                             *
+* If you did not intend to break into the debugger, press the "g" key, then   *
+* press the "Enter" key now.  This message might immediately reappear.  If it *
+* does, press "g" and "Enter" again.                                          *
+*                                                                             *
+*******************************************************************************
+nt!DbgBreakPointWithStatus:
+fffff804`a52fdfb0 cc              int     3
+0: kd> .logclose; g
+Closing open log file C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-aperture-v32-oct9.log
