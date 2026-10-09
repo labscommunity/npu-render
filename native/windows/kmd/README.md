@@ -62,6 +62,15 @@ stopping at the first successful allocation and reporting its actual size and
 the first attempt's status. A reduced diagnostic allocation does not establish
 desktop capacity. The normal startup path still requests 64 MiB.
 
+The [sized worker run](../../../docs/validation/2026-10-09/kernel-worker-v9/report.json)
+passed with 16 MiB after the 64 MiB request failed. It verified the fill and
+round trip through real partial MDL mappings, then observed the synchronization
+callback at IRQL 3 and the actual DPC at IRQL 2. The thread joined, queued
+callbacks drained, the module unloaded and the original display remained healthy.
+This validates the owned-memory worker and DPC route on that guest. Windows
+submission acceptance, completed OS fences, NPU execution and desktop offload
+remain untested by this diagnostic.
+
 The [October 9 registration trace](../../../docs/validation/2026-10-09/kernel-registration/report.json)
 validated the earlier `288be1a` baseline in an isolated Windows guest. Windows
 called `DriverEntry`, `AddDevice`, `StartDevice` and `RemoveDevice`; the first,
@@ -93,7 +102,8 @@ The implementation currently provides:
   uses owned partial MDLs to preserve borrowed MDLs and release temporary mappings.
   Host tests cover both transfer directions, overlapping moves, deferred fills,
   invalid ranges, buffer exhaustion and mapping/allocation failure cleanup.
-  Submission, completion, real MDL mappings and VidMm acceptance remain untested.
+  The isolated worker validates real partial MDL mappings on owned memory.
+  Windows submission, fence completion and VidMm acceptance remain untested.
   Other paging operations reject explicitly; these failures are not valid normal
   behavior for a started adapter, so the startup gate remains essential.
 - Explicit failing callbacks for unsupported rendering, presentation, paging operations,
