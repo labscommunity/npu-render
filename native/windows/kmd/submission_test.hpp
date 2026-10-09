@@ -47,7 +47,61 @@ int submission_test(Adapter *adapter) {
     args.DmaBufferPrivateDataSubmissionEndOffset = sizeof(records);
     const auto valid = args;
     const auto valid_record = records[1];
-    for (unsigned mutation = 0; mutation < 18; ++mutation) {
+    // Patch checks the same private slice without queueing or executing it.
+    // Corrupt bytes outside the submitted slice are not part of this packet.
+    PagingMarker markers[3]{};
+    markers[0].magic = 0;
+    DXGKARG_PATCH patch{};
+    patch.Flags.Paging = 1;
+    patch.pDmaBuffer = markers;
+    patch.DmaBufferSize = sizeof(markers);
+    patch.DmaBufferSubmissionStartOffset = sizeof(PagingMarker);
+    patch.DmaBufferSubmissionEndOffset = sizeof(markers);
+    patch.pDmaBufferPrivateData = records;
+    patch.DmaBufferPrivateDataSize = sizeof(records);
+    patch.DmaBufferPrivateDataSubmissionStartOffset = sizeof(PagingCommand);
+    patch.DmaBufferPrivateDataSubmissionEndOffset = sizeof(records);
+    NR_CHECK(registration.DxgkDdiPatch(adapter, &patch) == STATUS_DEVICE_NOT_READY);
+    adapter->started = true; // Model only; live startup is still disabled.
+    fail_after = 0;
+    const auto valid_patch = patch;
+    for (UINT fence = 7; fence < 9; ++fence) {
+        patch.SubmissionFenceId = fence; // Repatching cannot bake in an old fence.
+        NR_CHECK(registration.DxgkDdiPatch(adapter, &patch) == STATUS_SUCCESS);
+        NR_CHECK(!q.pending() && !q.active() && !q.completed());
+        NR_CHECK(*static_cast<ULONG *>(adapter->segment.range(12, 4)) == 0);
+    }
+    for (unsigned mutation = 0; mutation < 14; ++mutation) {
+        patch = valid_patch;
+        switch (mutation) {
+        case 0: patch.Flags.Paging = 0; break;
+        case 1: patch.Flags.Present = 1; break;
+        case 2: patch.DmaBufferSegmentId = 1; break;
+        case 3: patch.EngineOrdinal = 1; break;
+        case 4: patch.AllocationListSize = 1; break;
+        case 5: patch.PatchLocationListSubmissionLength = 1; break;
+        case 6: patch.pDmaBuffer = nullptr; break;
+        case 7: patch.DmaBufferSubmissionStartOffset++; break;
+        case 8: patch.DmaBufferPrivateDataSubmissionEndOffset--; break;
+        case 9: patch.DmaBufferPrivateDataSize--; break;
+        case 10: markers[2].magic = 0; break;
+        case 11: markers[2].reserved = 1; break;
+        case 12: records[2].magic = 0; break;
+        case 13: records[2].bytes = 1; break;
+        }
+        NR_CHECK(!NT_SUCCESS(registration.DxgkDdiPatch(adapter, &patch)));
+        NR_CHECK(!q.pending() && !q.active());
+        markers[2] = {};
+        records[2] = {};
+        records[2].operation = DXGK_OPERATION_DISCARD_CONTENT;
+    }
+    patch = {};
+    patch.pDmaBufferPrivateData = reinterpret_cast<void *>(MAXULONG_PTR);
+    patch.DmaBufferPrivateDataSubmissionEndOffset = MAXULONG;
+    NR_CHECK(registration.DxgkDdiPatch(adapter, &patch) == STATUS_SUCCESS);
+    adapter->started = false;
+    fail_after = -1;
+    for (unsigned mutation = 0; mutation < 19; ++mutation) {
         args = valid;
         records[1] = valid_record;
         switch (mutation) {
@@ -69,6 +123,7 @@ int submission_test(Adapter *adapter) {
         case 15: records[1].reserved = 1; break;
         case 16: records[1].bytes = Segment::bytes + 1; break;
         case 17: records[1].operation = DXGK_OPERATION_MAP_APERTURE_SEGMENT; break;
+        case 18: args.DmaBufferSegmentId = 1; break;
         }
         NR_CHECK(!NT_SUCCESS(pool.capture(args, ticket)));
         NR_CHECK(!q.pending() && !q.active() && ticket.serial == 99 && ticket.epoch == 99);

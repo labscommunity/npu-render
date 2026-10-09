@@ -134,6 +134,13 @@ The implementation currently provides:
   deferred execution, ring reuse, empty context switches and drain-before-free.
   This storage feeds `DxgkDdiSubmitCommand` only after adapter startup; the live
   startup gate remains closed.
+- A dormant paging-only patch callback using the same private-record validation
+  as submission. It checks the submitted marker slice without executing or
+  queueing it. Paging addresses were resolved during buffer construction and
+  have no relocation entries; completion uses the later submission fence.
+  Host tests cover partial slices, repeated patching, malformed markers and
+  metadata, empty packets, and preservation of queue/memory state. Normal
+  rendering relocation remains unsupported; live Windows patching is untested.
 - A dormant paging builder for transfer, fill and discard operations in that
   owned segment. It writes pointer-free DMA markers and separate kernel-private
   records; allocation contents change only when the deferred executor runs.

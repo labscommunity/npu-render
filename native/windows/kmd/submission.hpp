@@ -62,12 +62,20 @@ public:
     bool ready() const { return packets_ != nullptr; }
     SIZE_T capacity() const { return count_; }
 
-    NTSTATUS capture(const DXGKARG_SUBMITCOMMAND &args, Ticket &ticket) {
-        if (!ready() || !scheduler_->running()) return STATUS_DEVICE_NOT_READY;
+    struct View {
+        const UCHAR *data = nullptr;
+        UINT dma_bytes = 0;
+        UINT private_bytes = 0;
+        UINT commands = 0;
+    };
+    // Shared inspection for patch and capture. This never allocates, queues,
+    // executes or changes the caller's output on failure.
+    static NTSTATUS inspect(const DXGKARG_SUBMITCOMMAND &args, View &view) {
         DXGK_SUBMITCOMMANDFLAGS allowed{};
         allowed.Paging = 1;
         allowed.ContextSwitch = 1;
-        if ((args.Flags.Value & ~allowed.Value) || args.NodeOrdinal || args.EngineOrdinal)
+        if ((args.Flags.Value & ~allowed.Value) || args.NodeOrdinal || args.EngineOrdinal ||
+            args.DmaBufferSegmentId)
             return STATUS_NOT_SUPPORTED;
         // WDDM leaves private-data fields unspecified when its size is zero.
         const UINT private_start = args.DmaBufferPrivateDataSize ?
@@ -123,8 +131,52 @@ public:
                 }
             }
         }
+        view = {data, dma_bytes, private_bytes, commands};
+        return STATUS_SUCCESS;
+    }
+    static NTSTATUS patch(const DXGKARG_PATCH &args) {
+        DXGK_PATCHFLAGS allowed{};
+        allowed.Paging = 1;
+        if ((args.Flags.Value & ~allowed.Value) || args.EngineOrdinal || args.DmaBufferSegmentId ||
+            args.pAllocationList || args.AllocationListSize || args.pPatchLocationList ||
+            args.PatchLocationListSize || args.PatchLocationListSubmissionStart ||
+            args.PatchLocationListSubmissionLength) return STATUS_NOT_SUPPORTED;
+        DXGKARG_SUBMITCOMMAND input{};
+        input.Flags.Paging = args.Flags.Paging;
+        input.DmaBufferSize = args.DmaBufferSize;
+        input.DmaBufferSubmissionStartOffset = args.DmaBufferSubmissionStartOffset;
+        input.DmaBufferSubmissionEndOffset = args.DmaBufferSubmissionEndOffset;
+        input.pDmaBufferPrivateData = args.pDmaBufferPrivateData;
+        input.DmaBufferPrivateDataSize = args.DmaBufferPrivateDataSize;
+        input.DmaBufferPrivateDataSubmissionStartOffset = args.DmaBufferPrivateDataSubmissionStartOffset;
+        input.DmaBufferPrivateDataSubmissionEndOffset = args.DmaBufferPrivateDataSubmissionEndOffset;
+        View view{};
+        const auto status = inspect(input, view);
+        if (status != STATUS_SUCCESS) return status;
+        if (view.dma_bytes) {
+            const auto base = ULONG_PTR(args.pDmaBuffer);
+            if (!base || args.DmaBufferSubmissionEndOffset > MAXULONG_PTR - base)
+                return STATUS_INVALID_PARAMETER;
+            for (UINT i = 0; i < view.commands; ++i) {
+                PagingMarker marker{};
+                RtlCopyMemory(&marker, static_cast<const UCHAR *>(args.pDmaBuffer) +
+                    args.DmaBufferSubmissionStartOffset + SIZE_T(i) * sizeof(marker), sizeof(marker));
+                if (marker.magic != PagingMarker{}.magic || marker.reserved)
+                    return STATUS_INVALID_PARAMETER;
+            }
+        }
+        // BuildPagingBuffer already resolved segment offsets and borrowed MDLs.
+        // The pointer-free markers have no addresses or fence words to patch;
+        // execution/notification happen later, using SubmitCommand's fence.
+        return STATUS_SUCCESS;
+    }
+    NTSTATUS capture(const DXGKARG_SUBMITCOMMAND &args, Ticket &ticket) {
+        if (!ready() || !scheduler_->running()) return STATUS_DEVICE_NOT_READY;
+        View view{};
+        const auto status = inspect(args, view);
+        if (status != STATUS_SUCCESS) return status;
         Ticket accepted{};
-        switch (scheduler_->submit(args.SubmissionFenceId, dma_bytes, accepted)) {
+        switch (scheduler_->submit(args.SubmissionFenceId, view.dma_bytes, accepted)) {
         case QueueResult::ok: break;
         case QueueResult::full: return STATUS_INSUFFICIENT_RESOURCES;
         case QueueResult::stopped: return STATUS_DEVICE_NOT_READY;
@@ -132,8 +184,8 @@ public:
         }
         auto &packet = packets_[accepted.serial % count_];
         packet.ticket = accepted;
-        packet.commands = commands;
-        if (private_bytes) RtlCopyMemory(packet.paging, data, private_bytes);
+        packet.commands = view.commands;
+        if (view.private_bytes) RtlCopyMemory(packet.paging, view.data, view.private_bytes);
         ticket = accepted;
         return STATUS_SUCCESS;
     }

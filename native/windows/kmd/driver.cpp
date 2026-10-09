@@ -188,6 +188,13 @@ void reset_device(void *context) {
         a->engine.request_shutdown();
     }
 }
+DXGKDDI_PATCH patch;
+NTSTATUS APIENTRY patch(HANDLE adapter, const DXGKARG_PATCH *args) {
+    if (!adapter || !args) return STATUS_INVALID_PARAMETER;
+    auto a = static_cast<Adapter *>(adapter);
+    if (!a->started || a->resetting) return STATUS_DEVICE_NOT_READY;
+    return nr::kmd::Submissions::patch(*args);
+}
 DXGKDDI_SUBMITCOMMAND submit;
 NTSTATUS APIENTRY submit(HANDLE adapter, const DXGKARG_SUBMITCOMMAND *args) {
     if (!adapter || !args) return STATUS_INVALID_PARAMETER;
@@ -557,7 +564,7 @@ extern "C" NTSTATUS DriverEntry(DRIVER_OBJECT *driver, UNICODE_STRING *registry)
     NR_REJECT(DxgkDdiGetStandardAllocationDriverData);
     data.DxgkDdiOpenAllocation = open_allocation;
     data.DxgkDdiCloseAllocation = close_allocation;
-    NR_REJECT(DxgkDdiPatch);
+    data.DxgkDdiPatch = patch;
     data.DxgkDdiSubmitCommand = submit;
     data.DxgkDdiBuildPagingBuffer = build_paging;
     data.DxgkDdiPreemptCommand = preempt;
