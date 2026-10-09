@@ -59,6 +59,7 @@ bool present_blits(D3DKMT_HANDLE adapter) {
             // Public KMT accepts subrectangles in source coordinates; the KMD
             // receives destination coordinates after Windows translates them.
             const RECT rectangles[] = {{1, 1, 21, 6}, {28, 7, 61, 12}};
+            present.SubRectCnt = 1; present.pSrcSubRects = &present.SrcRect;
             if (pass) { present.SubRectCnt = 2; present.pSrcSubRects = rectangles; }
             if (!record("present_blit", D3DKMTPresent(&present)) || !owner.completion_event(pass)) return false;
             bytes = destination.map(true); if (!bytes) return false;
