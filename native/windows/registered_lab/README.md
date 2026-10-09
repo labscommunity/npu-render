@@ -23,9 +23,14 @@ operations report an error to the runtime. A new `--shared` probe exercises
 legacy shared render targets between two devices on this same adapter, including
 creator release/reopen and alternating writers. Their allocation and resource
 metadata must agree, and each import is released through its own runtime resource
-identity. This probe runs within one process; cross-process and cross-adapter
-sharing need separate validation. NT sharing, keyed mutexes, arbitrary usage,
-initial uploads, shader execution and display operations remain unsupported.
+identity. `--shared-nt` uses NT handles and keyed mutexes between two devices.
+`--shared-process` and `--shared-process-nt` run separate child processes, release
+the creator's original resource, reopen it, and verify writes in both directions.
+The NT test closes the creator's original handle and duplicates the child's
+retained handle back into the parent. Child processes inherit only their explicit
+standard I/O handles and, for NT sharing, the single resource handle. Every process
+checks its own cleanup counters. Cross-adapter sharing, arbitrary usage, initial
+uploads, shader execution and display operations remain unsupported.
 
 The target is built with the native DDI build or independently:
 
@@ -51,7 +56,8 @@ copy into a lockable staging texture. VidMm tracks the source read and destinati
 write, and staging Map waits for completion. The copy executes on the kernel CPU
 worker; it is not NPU execution. Ordinary unshared readback retains its explicit
 blocking CPU copy. `submitted_copies` distinguishes these paths in probe results.
-Live validation of the correction is still required.
+The v29 guest tests accept shared allocation creation and pass the ordinary and
+shared pixel oracles. The registered path still executes on the CPU worker.
 
 The host test calls the actual UMD callbacks with owned runtime shims. It checks
 allocation failure cleanup, rotated submission buffers, absence of a CPU clear

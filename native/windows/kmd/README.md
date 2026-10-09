@@ -149,6 +149,16 @@ UMD or move any operation onto the NPU. The build report separately records
 `lab_fill_command_enabled`. Host tests cover invalid user mappings, ownership,
 repatching, deferred execution and mutation of the original input after capture.
 
+The registered Direct3D laboratory also uses a bounded `CopySurface` command.
+Its source and destination come from two OS-resolved per-device allocation
+handles with matching surface descriptions. The kernel validates read/write
+roles, ownership, non-overlapping segment ranges, and both patch records before
+capturing the copy for deferred execution. Shared targets in this memory segment
+are not CPU visible: the UMD submits a copy into a separate lockable staging
+allocation, and Windows waits for the copy before granting staging access.
+The copy remains a CPU-worker operation. No NPU execution or display support is
+implied by accepting the command.
+
 The [first fill-package attempt](../../../docs/validation/2026-10-09/kernel-paging-v22/report.json)
 regressed adapter startup: rejecting every context flag also rejected Windows'
 paging context. The callback returned `STATUS_NOT_SUPPORTED`; the Windows

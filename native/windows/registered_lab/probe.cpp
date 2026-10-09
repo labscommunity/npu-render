@@ -2,6 +2,7 @@
 #define NOMINMAX
 #include <windows.h>
 #include <d3d11.h>
+#include <d3d11_1.h>
 #include <dxgi1_4.h>
 #include <d3dkmthk.h>
 #include <wrl/client.h>
@@ -90,33 +91,65 @@ void exercise(ID3D11Device *device, ID3D11DeviceContext *context, DXGI_FORMAT fo
     }
     context->Flush();
 }
+struct KeyedAccess {
+    IDXGIKeyedMutex *mutex = nullptr;
+    KeyedAccess(IDXGIKeyedMutex *m, UINT64 key) : mutex(m) {
+        if (mutex) {
+            const auto status = mutex->AcquireSync(key, 10000);
+            check(status, "acquire_keyed_mutex");
+            require(status == S_OK, "keyed mutex timed out or was abandoned");
+        }
+    }
+    ~KeyedAccess() { if (mutex) mutex->ReleaseSync(0); }
+    void release(UINT64 key) {
+        if (mutex) { check(mutex->ReleaseSync(key), "release_keyed_mutex"); mutex = nullptr; }
+    }
+};
 void exercise_shared(IDXGIAdapter *adapter, ID3D11Device *creator, ID3D11DeviceContext *creator_context,
-                     DXGI_FORMAT format) {
+                     DXGI_FORMAT format, bool nt_handles = false) {
     D3D11_TEXTURE2D_DESC desc{};
     desc.Width = 64; desc.Height = 48; desc.MipLevels = desc.ArraySize = 1;
     desc.Format = format; desc.SampleDesc.Count = 1; desc.BindFlags = D3D11_BIND_RENDER_TARGET;
-    desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED;
+    desc.MiscFlags = nt_handles ? D3D11_RESOURCE_MISC_SHARED_NTHANDLE | D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX : D3D11_RESOURCE_MISC_SHARED;
     ComPtr<ID3D11Texture2D> original;
     check(creator->CreateTexture2D(&desc, nullptr, &original), "create_shared_target");
     ComPtr<IDXGIResource> identity;
     check(original.As(&identity), "query_shared_identity");
     HANDLE shared = nullptr;
-    check(identity->GetSharedHandle(&shared), "get_shared_handle");
-    require(shared != nullptr, "missing shared handle"); // Legacy resource handle is not CloseHandle-owned.
+    struct OwnedShare { HANDLE value = nullptr; ~OwnedShare() { if (value) CloseHandle(value); } } owned;
+    if (nt_handles) {
+        ComPtr<IDXGIResource1> resource;
+        check(identity.As(&resource), "query_nt_shared_identity");
+        check(resource->CreateSharedHandle(nullptr, DXGI_SHARED_RESOURCE_READ | DXGI_SHARED_RESOURCE_WRITE, nullptr, &owned.value), "create_nt_shared_handle");
+        shared = owned.value;
+    } else check(identity->GetSharedHandle(&shared), "get_shared_handle");
+    require(shared != nullptr, "missing shared handle"); // Only NT handles are CloseHandle-owned.
     ComPtr<ID3D11Device> consumer;
     ComPtr<ID3D11DeviceContext> consumer_context;
     const D3D_FEATURE_LEVEL level = D3D_FEATURE_LEVEL_10_0;
     check(D3D11CreateDevice(adapter, D3D_DRIVER_TYPE_UNKNOWN, nullptr, 0, &level, 1, D3D11_SDK_VERSION,
                            &consumer, nullptr, &consumer_context), "create_consumer_device");
     ComPtr<ID3D11Texture2D> imported, reopened, staging;
-    check(consumer->OpenSharedResource(shared, IID_PPV_ARGS(&imported)), "open_shared_target");
+    const auto open = [&](ID3D11Device *device, ComPtr<ID3D11Texture2D> &texture, const char *operation) {
+        if (nt_handles) {
+            ComPtr<ID3D11Device1> extended;
+            check(device->QueryInterface(IID_PPV_ARGS(&extended)), "query_device1");
+            check(extended->OpenSharedResource1(shared, IID_PPV_ARGS(&texture)), operation);
+        } else check(device->OpenSharedResource(shared, IID_PPV_ARGS(&texture)), operation);
+    };
+    open(consumer.Get(), imported, "open_shared_target");
     D3D11_TEXTURE2D_DESC actual{};
     imported->GetDesc(&actual);
     require(actual.Width == desc.Width && actual.Height == desc.Height && actual.Format == format &&
             actual.BindFlags == desc.BindFlags && actual.MiscFlags == desc.MiscFlags, "imported texture description");
     identity.Reset(); original.Reset();
     std::puts("{\"creator_resource_released\":true,\"consumer_still_owns_resource\":true}");
-    check(creator->OpenSharedResource(shared, IID_PPV_ARGS(&reopened)), "reopen_after_creator_release");
+    open(creator, reopened, "reopen_after_creator_release");
+    ComPtr<IDXGIKeyedMutex> consumer_mutex, creator_mutex;
+    if (nt_handles) {
+        check(imported.As(&consumer_mutex), "consumer_keyed_mutex");
+        check(reopened.As(&creator_mutex), "creator_keyed_mutex");
+    }
     ComPtr<ID3D11RenderTargetView> consumer_view, creator_view;
     check(consumer->CreateRenderTargetView(imported.Get(), nullptr, &consumer_view), "create_imported_view");
     check(creator->CreateRenderTargetView(reopened.Get(), nullptr, &creator_view), "create_reopened_view");
@@ -126,8 +159,12 @@ void exercise_shared(IDXGIAdapter *adapter, ID3D11Device *creator, ID3D11DeviceC
     for (UINT pass = 0; pass < 3; ++pass) {
         auto writer = pass == 1 ? creator_context : consumer_context.Get();
         auto view = pass == 1 ? creator_view.Get() : consumer_view.Get();
+        KeyedAccess write_access(pass == 1 ? creator_mutex.Get() : consumer_mutex.Get(), 0);
         writer->ClearRenderTargetView(view, colors[pass]);
+        writer->Flush();
         check((pass == 1 ? creator : consumer.Get())->GetDeviceRemovedReason(), "shared_clear_device_status");
+        write_access.release(1);
+        KeyedAccess read_access(consumer_mutex.Get(), 1);
         consumer_context->CopyResource(staging.Get(), imported.Get());
         check(consumer->GetDeviceRemovedReason(), "shared_copy_device_status");
         D3D11_MAPPED_SUBRESOURCE mapped{};
@@ -142,13 +179,20 @@ void exercise_shared(IDXGIAdapter *adapter, ID3D11Device *creator, ID3D11DeviceC
         }
         consumer_context->Unmap(staging.Get(), 0);
         check(consumer->GetDeviceRemovedReason(), "shared_unmap_device_status");
+        read_access.release(0);
         require(valid, "shared pixel mismatch");
-        std::printf("{\"shared_format\":%u,\"pass\":%u,\"verified_bytes\":12288,\"same_process\":true}\n", UINT(format), pass);
+        std::printf("{\"shared_format\":%u,\"pass\":%u,\"verified_bytes\":12288,\"same_process\":true,\"nt_handles\":%s}\n", UINT(format), pass, nt_handles ? "true" : "false");
     }
 }
+#include "process_probe.hpp"
 int main(int argc, char **argv) {
-    if (argc != 2 || (std::strcmp(argv[1], "--exercise") && std::strcmp(argv[1], "--shared"))) return 2;
-    const bool shared = std::strcmp(argv[1], "--shared") == 0;
+    const bool child_nt = argc == 5 && std::strcmp(argv[1], "--shared-child-nt") == 0;
+    const bool child = child_nt || (argc == 5 && std::strcmp(argv[1], "--shared-child") == 0);
+    const bool process_nt = argc == 2 && std::strcmp(argv[1], "--shared-process-nt") == 0;
+    const bool processes = process_nt || (argc == 2 && std::strcmp(argv[1], "--shared-process") == 0);
+    const bool nt_handles = argc == 2 && std::strcmp(argv[1], "--shared-nt") == 0;
+    if (!child && !processes && !nt_handles && (argc != 2 || (std::strcmp(argv[1], "--exercise") && std::strcmp(argv[1], "--shared")))) return 2;
+    const bool shared = nt_handles || std::strcmp(argv[1], "--shared") == 0;
     if (!nr_fill_guest()) { std::puts("{\"passed\":false,\"error\":\"owned graphics guest required\"}"); return 2; }
     HMODULE retained = nullptr;
     try {
@@ -178,9 +222,13 @@ int main(int argc, char **argv) {
         require(received == requested, "unexpected feature level");
         auto stats = reinterpret_cast<BOOL (*)(NrFillStats *)>(GetProcAddress(retained, "nr_fill_stats"));
         require(stats != nullptr, "UMD diagnostics unavailable");
-        if (shared) {
-            exercise_shared(adapter.Get(), device.Get(), context.Get(), DXGI_FORMAT_B8G8R8A8_UNORM);
-            exercise_shared(adapter.Get(), device.Get(), context.Get(), DXGI_FORMAT_R8G8B8A8_UNORM);
+        if (child) process_child(device.Get(), context.Get(), argv, child_nt);
+        else if (processes) {
+            exercise_process(device.Get(), context.Get(), DXGI_FORMAT_B8G8R8A8_UNORM, process_nt);
+            exercise_process(device.Get(), context.Get(), DXGI_FORMAT_R8G8B8A8_UNORM, process_nt);
+        } else if (shared) {
+            exercise_shared(adapter.Get(), device.Get(), context.Get(), DXGI_FORMAT_B8G8R8A8_UNORM, nt_handles);
+            exercise_shared(adapter.Get(), device.Get(), context.Get(), DXGI_FORMAT_R8G8B8A8_UNORM, nt_handles);
         } else {
             exercise(device.Get(), context.Get(), DXGI_FORMAT_B8G8R8A8_UNORM);
             exercise(device.Get(), context.Get(), DXGI_FORMAT_R8G8B8A8_UNORM);
@@ -188,11 +236,12 @@ int main(int argc, char **argv) {
         context.Reset(); device.Reset(); adapter.Reset(); factory.Reset();
         NrFillStats result{};
         require(stats(&result) != FALSE, "UMD diagnostics failed");
-        std::printf("{\"allocations\":%llu,\"fills\":%llu,\"staging_copy_bytes\":%llu,\"live_allocations\":%llu,\"live_contexts\":%llu,\"cleanup_errors\":%llu,\"rejected\":%llu,\"submitted_copies\":%llu}\n",
+        std::printf("{\"pid\":%lu,\"allocations\":%llu,\"fills\":%llu,\"staging_copy_bytes\":%llu,\"live_allocations\":%llu,\"live_contexts\":%llu,\"cleanup_errors\":%llu,\"rejected\":%llu,\"submitted_copies\":%llu}\n", GetCurrentProcessId(),
                     result.allocations, result.fills, result.staging_copy_bytes, result.live_allocations,
                     result.live_contexts, result.cleanup_errors, result.rejected, result.submitted_copies);
-        require(result.allocations == 4 && result.fills == 6 && result.staging_copy_bytes == 6 * 12288 &&
-                result.submitted_copies == (shared ? 6u : 0u) &&
+        const UINT copies = child ? 2 : (processes ? 4 : 6);
+        require(result.allocations == (child ? 1u : 4u) && result.fills == (child ? 1u : (processes ? 2u : 6u)) &&
+                result.staging_copy_bytes == copies * 12288 && result.submitted_copies == (shared || child || processes ? copies : 0u) &&
                 !result.live_allocations && !result.live_contexts && !result.cleanup_errors && !result.rejected, "unexpected UMD counters");
         FreeLibrary(retained);
         std::puts("{\"passed\":true,\"npu_execution_tested\":false,\"desktop_offload_tested\":false}");
