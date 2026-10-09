@@ -58,6 +58,9 @@ jobs:
       - name: Build start-disabled kernel target and test DDI contracts
         if: runner.os == 'Windows'
         run: uv run --frozen python tools/build_windows_driver.py
+      - name: Build optional kernel synchronization probe and test observations
+        if: runner.os == 'Windows'
+        run: uv run --frozen python tools/build_windows_driver.py --lab-sync-probe --build-dir build/windows-kernel-sync-probe
       - name: Package private Windows prototype
         if: runner.os == 'Windows'
         run: uv run --frozen python tools/package_windows.py --ddi --source-revision ${{ github.sha }}

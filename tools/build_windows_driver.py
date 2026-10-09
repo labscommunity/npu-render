@@ -14,6 +14,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--build-dir", type=Path, default=Path("build/windows-kernel"))
     parser.add_argument("--wdk-root", type=Path, default=DEFAULT_ROOT)
+    parser.add_argument(
+        "--lab-sync-probe",
+        action="store_true",
+        help="Observe the public synchronization callback; adapter startup stays disabled",
+    )
     args = parser.parse_args()
     if os.name != "nt":
         raise RuntimeError("The x64 WDDM laboratory requires Windows and MSVC")
@@ -28,6 +33,7 @@ def main():
             "-A",
             "x64",
             f"-DNR_WDK_ROOT={args.wdk_root.resolve()}",
+            f"-DNR_KMD_LAB_SYNC_PROBE={'ON' if args.lab_sync_probe else 'OFF'}",
         ],
         check=True,
     )
@@ -46,6 +52,7 @@ def main():
         "sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
         "pdb_sha256": hashlib.sha256(symbols.read_bytes()).hexdigest(),
         "start_enabled": False,
+        "lab_sync_probe_enabled": args.lab_sync_probe,
         "installation_performed": False,
         "signing_performed": False,
         "npu_execution_tested": False,

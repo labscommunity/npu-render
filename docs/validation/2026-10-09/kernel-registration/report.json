@@ -1,0 +1,66 @@
+{
+  "schema": 1,
+  "kind": "isolated-kernel-registration",
+  "date_utc": "2026-10-09",
+  "source_revision": "288be1a",
+  "package": "v3-start-disabled",
+  "guest": {
+    "os": "Windows 11 Enterprise Evaluation",
+    "build": "26300.9457",
+    "machine": "QEMU q35",
+    "cpu": "Haswell-v4,pmu=off",
+    "accelerator": "TCG",
+    "physical_npu_present": false
+  },
+  "callbacks": {
+    "DriverEntry": {
+      "status": "0x00000000",
+      "irql": 0
+    },
+    "AddDevice": {
+      "status": "0x00000000",
+      "irql": 0
+    },
+    "StartDevice": {
+      "status": "0xc00000bb",
+      "irql": 0,
+      "sources": 0,
+      "children": 0
+    },
+    "RemoveDevice": {
+      "status": "0x00000000",
+      "irql": 0
+    },
+    "StopDevice": {
+      "observed": false
+    }
+  },
+  "same_adapter_context_observed": true,
+  "kernel_module_unloaded": true,
+  "device_problem_code": 43,
+  "owned_device_removed": true,
+  "owned_inf_deleted": true,
+  "prior_display_status_preserved": true,
+  "latest_segment_and_paging_code_tested": false,
+  "adapter_started": false,
+  "windows_command_completion_tested": false,
+  "npu_execution_tested": false,
+  "desktop_offload_tested": false,
+  "tahoma_benefit_tested": false,
+  "raw_debugger_logs": [
+    {
+      "path": "results/render-driver/guest-kd-managed-oct9.log",
+      "sha256": "23e0047648631c8aef12b47925a0c75357457f0d45c8491b9944c4ee91fda36e"
+    },
+    {
+      "path": "results/render-driver/guest-kd-registration-cleanup-oct9.log",
+      "sha256": "30d32f95d9b8de338c4396c09a45085ee9a7eca9a8f122b7089f6a526505aace"
+    }
+  ],
+  "excerpt_note": "Lifecycle only; source logs retained unchanged in ignored results. No Microsoft function disassembly included.",
+  "limitations": [
+    "Guest only; no custom kernel driver installed on the physical Delta host.",
+    "PnP installation success is not successful adapter startup.",
+    "This baseline predates the newer segment, paging and synchronization-probe source."
+  ]
+}

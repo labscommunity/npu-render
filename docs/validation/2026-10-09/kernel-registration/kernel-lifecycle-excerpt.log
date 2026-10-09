@@ -1,0 +1,117 @@
+0: kd> bu nr_render_kmd!DriverEntry
+0: kd> bl
+     0 e Disable Clear u                      0001 (0001) (nr_render_kmd!DriverEntry)
+
+0: kd> g
+nt!DebugService2+0x5:
+fffff801`efcfe005 cc              int     3
+1: kd> lm m nr_render_kmd
+Browse full module list
+start             end                 module name
+fffff801`87550000 fffff801`87559000   nr_render_kmd   (private pdb symbols)  c:\users\tatef\appdata\local\npu-render\builds\render-kernel-v3\release\nr_render_kmd.pdb
+1: kd> x nr_render_kmd!*device*
+fffff801`87554068 nr_render_kmd!gDlpDxgkCbWriteDeviceSpace = 0x00000000`00000000
+fffff801`87554090 nr_render_kmd!gDlpDxgkCbGetDeviceInformation = 0x00000000`00000000
+fffff801`875540a0 nr_render_kmd!gDlpDxgkCbReadDeviceSpace = 0x00000000`00000000
+fffff801`875540a8 nr_render_kmd!MiniportStartDevice = 0x00000000`00000000
+fffff801`87556000 nr_render_kmd!DlpCallSyncDeviceIoControl (struct _DEVICE_OBJECT *, unsigned long, unsigned char, void *, unsigned long, void *, unsigned long, unsigned int64 *)
+fffff801`87551000 nr_render_kmd!`anonymous namespace'::add_device (struct _DEVICE_OBJECT *, void **)
+fffff801`875518b0 nr_render_kmd!`anonymous namespace'::remove_device (void *)
+fffff801`87551910 nr_render_kmd!`anonymous namespace'::reset_device (void *)
+fffff801`87551950 nr_render_kmd!`anonymous namespace'::start_device (void *, struct _DXGK_START_INFO *, struct _DXGKRNL_INTERFACE *, unsigned long *, unsigned long *)
+fffff801`87551810 nr_render_kmd!`anonymous namespace'::destroy_device (void *)
+fffff801`875519d0 nr_render_kmd!`anonymous namespace'::stop_device (void *)
+fffff801`87551130 nr_render_kmd!`anonymous namespace'::Reject<long (__cdecl*)(void *,unsigned long,_DXGK_DEVICE_DESCRIPTOR *)>::call (void *, unsigned long, struct _DXGK_DEVICE_DESCRIPTOR *)
+fffff801`87551130 nr_render_kmd!`anonymous namespace'::Reject<long (__cdecl*)(void *,unsigned long,enum _DEVICE_POWER_STATE,enum POWER_ACTION)>::call (void *, unsigned long, _DEVICE_POWER_STATE, POWER_ACTION)
+fffff801`87556114 nr_render_kmd!DlpStartDevice (void *, struct _DXGK_START_INFO *, struct _DXGKRNL_INTERFACE *, unsigned long *, unsigned long *)
+fffff801`87551650 nr_render_kmd!`anonymous namespace'::create_device (void *, struct _DXGKARG_CREATEDEVICE *)
+fffff801`87553030 nr_render_kmd!_imp_IoGetDeviceObjectPointer = <no type information>
+fffff801`87553038 nr_render_kmd!_imp_IoBuildDeviceIoControlRequest = <no type information>
+1: kd> bp fffff801`87551000; bp fffff801`87551950; bp fffff801`875518b0; bp fffff801`875519d0; bl
+     0 e Disable Clear  fffff801`87551a40     0001 (0001) nr_render_kmd!DriverEntry
+     1 e Disable Clear  fffff801`87551000     0001 (0001) nr_render_kmd!`anonymous namespace'::add_device
+     2 e Disable Clear  fffff801`87551950     0001 (0001) nr_render_kmd!`anonymous namespace'::start_device
+     3 e Disable Clear  fffff801`875518b0     0001 (0001) nr_render_kmd!`anonymous namespace'::remove_device
+     4 e Disable Clear  fffff801`875519d0     0001 (0001) nr_render_kmd!`anonymous namespace'::stop_device
+
+1: kd> g
+Breakpoint 0 hit
+nr_render_kmd!DriverEntry:
+fffff801`87551a40 4055            push    rbp
+0: kd> !irql; gu
+Debugger saved IRQL for processor 0x0 -- 0 (LOW_LEVEL)
+nr_render_kmd!GsDriverEntry+0x20:
+fffff801`87557020 488b5c2430      mov     rbx,qword ptr [rsp+30h]
+1: kd> r eax
+eax=0
+1: kd> g
+Breakpoint 1 hit
+nr_render_kmd!`anonymous namespace'::add_device:
+fffff801`87551000 4055            push    rbp
+1: kd> r @$t0=@rdx; !irql; gu
+Debugger saved IRQL for processor 0x1 -- 0 (LOW_LEVEL)
+dxgkrnl!DpiDxgkDdiAddDevice+0x59:
+fffff801`81b87215 803de414e0ff00  cmp     byte ptr [dxgkrnl!bTracingEnabled (fffff801`81988700)],0
+1: kd> r eax; dq @$t0 L1; r @$t1=poi(@$t0)
+eax=0
+ffffd08d`81a1b090  ffffc082`cce2d6e0
+1: kd> g
+Breakpoint 2 hit
+nr_render_kmd!`anonymous namespace'::start_device:
+fffff801`87551950 4885c9          test    rcx,rcx
+0: kd> r rcx; !irql; r @$t2=@r9; r @$t3=poi(@rsp+0x28); gu
+rcx=ffffc082cce2d6e0
+Debugger saved IRQL for processor 0x0 -- 0 (LOW_LEVEL)
+nr_render_kmd!DlpStartDevice+0x8e:
+fffff801`875561a2 4883c438        add     rsp,38h
+0: kd> r eax; dd @$t2 L1; dd @$t3 L1
+eax=c00000bb
+ffffc082`cba1bc14  00000000
+ffffc082`cba1bc10  00000000
+0: kd> g
+Breakpoint 3 hit
+nr_render_kmd!`anonymous namespace'::remove_device:
+fffff801`875518b0 4883ec28        sub     rsp,28h
+1: kd> r rcx; !irql; gu
+rcx=ffffc082cce2d6e0
+Debugger saved IRQL for processor 0x1 -- 0 (LOW_LEVEL)
+dxgkrnl!DpiDxgkDdiRemoveDevice+0x51:
+fffff801`81c49f09 803df0e7d3ff00  cmp     byte ptr [dxgkrnl!bTracingEnabled (fffff801`81988700)],0
+1: kd> r eax
+eax=0
+1: kd> .logclose
+Closing open log file C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-managed-oct9.log
+
+Opened log file 'C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-registration-cleanup-oct9.log'
+1: kd> sxe ud:nr_render_kmd.sys
+1: kd> g
+Unload module nr_render_kmd.sys at fffff801`87550000
+nt!DebugService2+0x5:
+fffff801`efcfe005 cc              int     3
+1: kd> lm m nr_render_kmd
+Browse full module list
+start             end                 module name
+fffff801`87550000 fffff801`87559000   nr_render_kmd   (private pdb symbols)  c:\users\tatef\appdata\local\npu-render\builds\render-kernel-v3\release\nr_render_kmd.pdb
+1: kd> g
+Break instruction exception - code 80000003 (first chance)
+*******************************************************************************
+*                                                                             *
+*   You are seeing this message because you pressed either                    *
+*       CTRL+C (if you run console kernel debugger) or,                       *
+*       CTRL+BREAK (if you run GUI kernel debugger),                          *
+*   on your debugger machine's keyboard.                                      *
+*                                                                             *
+*                   THIS IS NOT A BUG OR A SYSTEM CRASH                       *
+*                                                                             *
+* If you did not intend to break into the debugger, press the "g" key, then   *
+* press the "Enter" key now.  This message might immediately reappear.  If it *
+* does, press "g" and "Enter" again.                                          *
+*                                                                             *
+*******************************************************************************
+nt!DbgBreakPointWithStatus:
+fffff801`efcfdfb0 cc              int     3
+0: kd> lm m nr_render_kmd; x dxgkrnl!*SynchronizeExecution*
+Browse full module list
+start             end                 module name
+fffff801`8184fd00 dxgkrnl!DpSynchronizeExecution (DpSynchronizeExecution)
+fffff801`819a6d98 dxgkrnl!_imp_KeSynchronizeExecution = <no type information>

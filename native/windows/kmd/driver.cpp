@@ -9,6 +9,9 @@ extern "C" {
 #include "contract.hpp"
 #include "segment.hpp"
 #include "paging.hpp"
+#if NR_KMD_LAB_SYNC_PROBE
+#include "synchronization_probe.hpp"
+#endif
 
 inline void *operator new(size_t, void *p) noexcept { return p; }
 
@@ -20,6 +23,9 @@ struct Adapter {
     DXGKRNL_INTERFACE kernel;
     nr::kmd::Scheduler scheduler;
     nr::kmd::Segment segment;
+#if NR_KMD_LAB_SYNC_PROBE
+    nr::kmd::SynchronizationProbe synchronization;
+#endif
     LONG devices;
     LONG allocations;
     bool started;
@@ -59,6 +65,16 @@ NTSTATUS start_device(void *context, DXGK_START_INFO *start,
     *children = 0;
     auto a = static_cast<Adapter *>(context);
     if (a->started) return STATUS_INVALID_DEVICE_STATE;
+#if NR_KMD_LAB_SYNC_PROBE
+    a->synchronization.run(*kernel);
+    // Error-level filtering makes this explicit lab diagnostic visible in a
+    // default debugger configuration. This code is absent from default builds.
+    const auto &probe = a->synchronization;
+    DbgPrintEx(DPFLTR_IHVVIDEO_ID, DPFLTR_ERROR_LEVEL,
+        "nr_render_lab: sync status=%08lx calls=%lu irql=%u returned=%u valid=%u; startup remains disabled\n",
+        ULONG(probe.status), probe.calls, UINT(probe.callback_irql),
+        UINT(probe.returned), UINT(probe.valid_observation()));
+#endif
     // Do not let Dxgkrnl select an adapter with incomplete mandatory DDIs.
     if (!runtime_ready) return STATUS_NOT_SUPPORTED;
     const auto memory_status = a->segment.prepare();

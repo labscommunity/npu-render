@@ -8,6 +8,34 @@ void nr_host_free(void *pointer);
 }
 namespace {
 DRIVER_INITIALIZATION_DATA registration{};
+#if NR_KMD_LAB_SYNC_PROBE
+enum class SyncMode {
+    failed, missing_callback, valid, repeated, dispatch, profile, false_return, pending_return
+};
+SyncMode sync_mode = SyncMode::failed;
+KIRQL simulated_irql = PASSIVE_LEVEL;
+ULONG sync_calls = 0;
+bool sync_contract_error = false;
+KIRQL current_irql() { return simulated_irql; }
+ULONG lab_print(ULONG, ULONG, PCSTR, ...) { return 0; }
+NTSTATUS synchronize(HANDLE device, PKSYNCHRONIZE_ROUTINE routine, PVOID context,
+                     ULONG message, PBOOLEAN result) {
+    ++sync_calls;
+    if (device != &registration || !routine || !context || message || !result) {
+        sync_contract_error = true;
+        return STATUS_INVALID_PARAMETER;
+    }
+    if (sync_mode == SyncMode::failed) return STATUS_UNSUCCESSFUL;
+    if (sync_mode == SyncMode::missing_callback) return STATUS_SUCCESS;
+    simulated_irql = KIRQL(sync_mode == SyncMode::dispatch ? DISPATCH_LEVEL :
+                          sync_mode == SyncMode::profile ? PROFILE_LEVEL : DISPATCH_LEVEL + 1);
+    *result = routine(context);
+    if (sync_mode == SyncMode::repeated) routine(context);
+    if (sync_mode == SyncMode::false_return) *result = FALSE;
+    simulated_irql = PASSIVE_LEVEL;
+    return sync_mode == SyncMode::pending_return ? STATUS_PENDING : STATUS_SUCCESS;
+}
+#endif
 long fail_after = -1, outstanding = 0;
 void *segment_memory = nullptr;
 bool segment_fail = false, segment_contract_error = false;
@@ -89,6 +117,10 @@ NTSTATUS initialize(DRIVER_OBJECT *, UNICODE_STRING *, DRIVER_INITIALIZATION_DAT
 #undef MmGetSystemAddressForMdlSafe
 #define MmGetSystemAddressForMdlSafe mdl_map
 #define DriverEntry NrHostDriverEntry
+#if NR_KMD_LAB_SYNC_PROBE
+#define KeGetCurrentIrql current_irql
+#define DbgPrintEx lab_print
+#endif
 #include "driver.cpp"
 #undef DriverEntry
 #define NR_CHECK(expression) do { if (!(expression)) return __LINE__; } while (false)
@@ -114,6 +146,35 @@ extern "C" int nr_kernel_host_test() {
     NR_CHECK(registration.DxgkDdiStartDevice(a, &start, &kernel, &sources, &children) ==
              STATUS_NOT_SUPPORTED);
     NR_CHECK(!sources && !children && !a->started && !a->scheduler.running());
+#if NR_KMD_LAB_SYNC_PROBE
+    NR_CHECK(a->synchronization.status == STATUS_INVALID_PARAMETER && sync_calls == 0);
+    kernel.DxgkCbSynchronizeExecution = synchronize;
+    NR_CHECK(registration.DxgkDdiStartDevice(a, &start, &kernel, &sources, &children) ==
+             STATUS_NOT_SUPPORTED);
+    NR_CHECK(!a->synchronization.valid_observation() && sync_calls == 0);
+    kernel.DeviceHandle = &registration;
+    const SyncMode modes[] = {SyncMode::failed, SyncMode::missing_callback, SyncMode::valid,
+        SyncMode::repeated, SyncMode::dispatch, SyncMode::profile, SyncMode::false_return,
+        SyncMode::pending_return};
+    for (const auto mode : modes) {
+        sync_mode = mode;
+        const auto before = sync_calls;
+        sources = children = 999;
+        NR_CHECK(registration.DxgkDdiStartDevice(a, &start, &kernel, &sources, &children) ==
+                 STATUS_NOT_SUPPORTED);
+        NR_CHECK(sync_calls == before + 1 && !sync_contract_error);
+        NR_CHECK(a->synchronization.valid_observation() == (mode == SyncMode::valid));
+        NR_CHECK(!sources && !children && !a->started && !a->scheduler.running());
+        NR_CHECK(!a->segment.ready() && segment_allocations == 0 && simulated_irql == PASSIVE_LEVEL);
+    }
+    // A later failed probe must not retain an earlier observation.
+    kernel = {};
+    NR_CHECK(registration.DxgkDdiStartDevice(a, &start, &kernel, &sources, &children) ==
+             STATUS_NOT_SUPPORTED);
+    NR_CHECK(a->synchronization.status == STATUS_INVALID_PARAMETER &&
+             !a->synchronization.calls && a->synchronization.callback_irql == 0xff &&
+             !a->synchronization.returned);
+#endif
     DXGKARG_CREATEDEVICE device{};
     NR_CHECK(registration.DxgkDdiCreateDevice(a, &device) == STATUS_DEVICE_NOT_READY);
     nr::kernel_contract::AdapterInfo info{};

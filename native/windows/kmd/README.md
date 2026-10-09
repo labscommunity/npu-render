@@ -18,6 +18,27 @@ The optimized image includes CodeView information and a matching PDB for
 isolated kernel debugging. The build report hashes both files; retain that
 pair when test-signing the image so a debugger can verify symbol identity.
 
+An opt-in diagnostic build observes the public `DxgkCbSynchronizeExecution`
+callback during `StartDevice`:
+
+```powershell
+uv run python tools/build_windows_driver.py --lab-sync-probe --build-dir build/windows-kernel-sync-probe
+```
+
+It records the status, callback count, callback IRQL and Boolean result. Startup
+still returns `STATUS_NOT_SUPPORTED`; the probe neither submits work nor signals
+a completed fence. Default builds omit it. Host tests reject missing or repeated
+callbacks, unsuitable IRQL, false callback results and non-success statuses.
+Only a live kernel observation can establish Windows behavior.
+
+The [October 9 registration trace](../../../docs/validation/2026-10-09/kernel-registration/report.json)
+validated the earlier `288be1a` baseline in an isolated Windows guest. Windows
+called `DriverEntry`, `AddDevice`, `StartDevice` and `RemoveDevice`; the first,
+second and fourth succeeded, while startup returned its intended rejection.
+The module unloaded, the test devnode and package were removed, and the existing
+display remained healthy. This does not validate the newer memory/paging code,
+an operational graphics adapter, NPU execution or desktop migration.
+
 The implementation currently provides:
 
 - Add/stop/remove and device/context lifetime bookkeeping.
