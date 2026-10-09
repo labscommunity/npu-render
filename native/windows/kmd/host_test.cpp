@@ -13,6 +13,34 @@ void *segment_memory = nullptr;
 bool segment_fail = false, segment_contract_error = false;
 LONGLONG segment_physical = 0x20000000; // Host-only physical-address model.
 unsigned segment_allocations = 0, segment_frees = 0;
+long mdl_fail_after = -1, mdl_outstanding = 0;
+bool mdl_map_fail = false, mdl_contract_error = false;
+PMDL mdl_allocate(void *start, ULONG bytes, BOOLEAN secondary, BOOLEAN quota, PIRP irp) {
+    if (secondary || quota || irp) mdl_contract_error = true;
+    if (mdl_fail_after == 0) return nullptr;
+    if (mdl_fail_after > 0) --mdl_fail_after;
+    auto mdl = static_cast<PMDL>(nr_host_allocate(sizeof(MDL)));
+    if (!mdl) return nullptr;
+    RtlZeroMemory(mdl, sizeof(MDL));
+    mdl->StartVa = reinterpret_cast<void *>(ULONG_PTR(start) & ~ULONG_PTR(PAGE_SIZE - 1));
+    mdl->ByteOffset = ULONG(ULONG_PTR(start) & (PAGE_SIZE - 1));
+    mdl->ByteCount = bytes;
+    ++mdl_outstanding;
+    return mdl;
+}
+void mdl_partial(PMDL source, PMDL target, void *start, ULONG bytes) {
+    const auto offset = ULONG_PTR(start) - ULONG_PTR(MmGetMdlVirtualAddress(source));
+    if (offset > source->ByteCount || bytes > source->ByteCount - offset ||
+        target->ByteCount != bytes || target->Next) mdl_contract_error = true;
+    target->MappedSystemVa = static_cast<UCHAR *>(source->MappedSystemVa) + offset;
+    target->MdlFlags = MDL_PARTIAL;
+}
+void *mdl_map(PMDL mdl, ULONG priority) {
+    if (priority != (HighPagePriority | MdlMappingNoExecute) || !(mdl->MdlFlags & MDL_PARTIAL))
+        mdl_contract_error = true;
+    return mdl_map_fail ? nullptr : mdl->MappedSystemVa;
+}
+void mdl_free(PMDL mdl) { --mdl_outstanding; nr_host_free(mdl); }
 void *segment_allocate(SIZE_T bytes, PHYSICAL_ADDRESS low, PHYSICAL_ADDRESS high,
                        PHYSICAL_ADDRESS boundary, MEMORY_CACHING_TYPE cache) {
     ++segment_allocations;
@@ -55,10 +83,16 @@ NTSTATUS initialize(DRIVER_OBJECT *, UNICODE_STRING *, DRIVER_INITIALIZATION_DAT
 #define MmAllocateContiguousMemorySpecifyCache segment_allocate
 #define MmGetPhysicalAddress segment_address
 #define MmFreeContiguousMemory segment_free
+#define IoAllocateMdl mdl_allocate
+#define IoBuildPartialMdl mdl_partial
+#define IoFreeMdl mdl_free
+#undef MmGetSystemAddressForMdlSafe
+#define MmGetSystemAddressForMdlSafe mdl_map
 #define DriverEntry NrHostDriverEntry
 #include "driver.cpp"
 #undef DriverEntry
 #define NR_CHECK(expression) do { if (!(expression)) return __LINE__; } while (false)
+#include "paging_test.hpp"
 extern "C" int nr_kernel_host_test() {
     NR_CHECK(NT_SUCCESS(NrHostDriverEntry(nullptr, nullptr)));
     NR_CHECK(registration.Version == DXGKDDI_INTERFACE_VERSION_WDDM1_3);
@@ -151,10 +185,12 @@ extern "C" int nr_kernel_host_test() {
     NR_CHECK(descriptor.Flags.CpuVisible && descriptor.Flags.CacheCoherent);
     NR_CHECK(descriptor.Size == nr::kmd::Segment::bytes && descriptor.CommitLimit == descriptor.Size);
     NR_CHECK(!segment_out.PagingBufferSegmentId && segment_out.PagingBufferSize == PAGE_SIZE);
-    NR_CHECK(!segment_out.PagingBufferPrivateDataSize);
+    NR_CHECK(segment_out.PagingBufferPrivateDataSize == nr::kmd::Paging::private_bytes);
     // Exercise the dormant allocation implementation without enabling StartDevice.
     // This is a local model state, never a live adapter registration.
     a->started = true;
+    const auto paging_result = paging_test(a);
+    if (paging_result) return paging_result;
     nr::kernel_contract::Surface surface{};
     surface.width = 64; surface.height = 48; surface.format = 87;
     surface.row_pitch = 256; surface.allocation_bytes = 12288;

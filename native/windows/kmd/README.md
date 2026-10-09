@@ -33,7 +33,17 @@ The implementation currently provides:
   from the lifetime of a worker ticket. Stopping invalidates completions;
   restarting remains forbidden until an active worker separately acknowledges
   that it has drained. This state machine is not yet wired to kernel interrupts.
-- Explicit failing callbacks for unsupported rendering, presentation, paging,
+- A dormant paging builder for transfer, fill and discard operations in that
+  owned segment. It writes pointer-free DMA markers and separate kernel-private
+  records; allocation contents change only when the deferred executor runs.
+  MDL page offsets and segment byte offsets are handled separately. The executor
+  uses owned partial MDLs to preserve borrowed MDLs and release temporary mappings.
+  Host tests cover both transfer directions, overlapping moves, deferred fills,
+  invalid ranges, buffer exhaustion and mapping/allocation failure cleanup.
+  Submission, completion, real MDL mappings and VidMm acceptance remain untested.
+  Other paging operations reject explicitly; these failures are not valid normal
+  behavior for a started adapter, so the startup gate remains essential.
+- Explicit failing callbacks for unsupported rendering, presentation, paging operations,
   preemption and reset. Display callbacks are null.
 
 The separate `nr_render_umd` target uses the existing restricted renderer
@@ -76,3 +86,6 @@ address, or successful returns from unimplemented recovery operations.
 References: [WDDM render-only requirements](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/wddm-driver-and-feature-caps),
 [preemption](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/gpu-preemption),
 [segment reporting](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/ns-d3dkmddi-_dxgk_querysegmentout3).
+Paging contracts: [buffer construction](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/nc-d3dkmddi-dxgkddi_buildpagingbuffer),
+[offset units](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/ns-d3dkmddi-_dxgkarg_buildpagingbuffer),
+[partial MDL ownership](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-iobuildpartialmdl).

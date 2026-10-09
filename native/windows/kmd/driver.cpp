@@ -8,6 +8,7 @@ extern "C" {
 #include "scheduler.hpp"
 #include "contract.hpp"
 #include "segment.hpp"
+#include "paging.hpp"
 
 inline void *operator new(size_t, void *p) noexcept { return p; }
 
@@ -120,8 +121,11 @@ NTSTATUS APIENTRY query_adapter(HANDLE adapter, const DXGKARG_QUERYADAPTERINFO *
             return STATUS_INVALID_PARAMETER;
         if (args->OutputDataSize < sizeof(DXGK_QUERYSEGMENTOUT3))
             return STATUS_BUFFER_TOO_SMALL;
-        return static_cast<Adapter *>(adapter)->segment.describe(
-            *static_cast<DXGK_QUERYSEGMENTOUT3 *>(args->pOutputData));
+        auto &out = *static_cast<DXGK_QUERYSEGMENTOUT3 *>(args->pOutputData);
+        const auto status = static_cast<Adapter *>(adapter)->segment.describe(out);
+        if (NT_SUCCESS(status) && out.pSegmentDescriptor)
+            out.PagingBufferPrivateDataSize = nr::kmd::Paging::private_bytes;
+        return status;
     }
     if (args->Type != DXGKQAITYPE_UMDRIVERPRIVATE) return STATUS_NOT_SUPPORTED;
     if (args->InputDataSize || args->OutputDataSize != sizeof(nr::kernel_contract::AdapterInfo))
@@ -130,6 +134,13 @@ NTSTATUS APIENTRY query_adapter(HANDLE adapter, const DXGKARG_QUERYADAPTERINFO *
     info.ready = runtime_ready ? 1 : 0;
     RtlCopyMemory(args->pOutputData, &info, sizeof(info));
     return STATUS_SUCCESS;
+}
+DXGKDDI_BUILDPAGINGBUFFER build_paging;
+NTSTATUS APIENTRY build_paging(HANDLE adapter, DXGKARG_BUILDPAGINGBUFFER *args) {
+    if (!adapter || !args) return STATUS_INVALID_PARAMETER;
+    auto a = static_cast<Adapter *>(adapter);
+    if (!a->started) return STATUS_DEVICE_NOT_READY;
+    return nr::kmd::Paging::build(a->segment, *args);
 }
 DXGKDDI_CREATEALLOCATION create_allocation;
 NTSTATUS APIENTRY create_allocation(HANDLE adapter, DXGKARG_CREATEALLOCATION *args) {
@@ -289,7 +300,7 @@ extern "C" NTSTATUS DriverEntry(DRIVER_OBJECT *driver, UNICODE_STRING *registry)
     NR_REJECT(DxgkDdiCloseAllocation);
     NR_REJECT(DxgkDdiPatch);
     NR_REJECT(DxgkDdiSubmitCommand);
-    NR_REJECT(DxgkDdiBuildPagingBuffer);
+    data.DxgkDdiBuildPagingBuffer = build_paging;
     NR_REJECT(DxgkDdiPreemptCommand);
     NR_REJECT(DxgkDdiRender);
     NR_REJECT(DxgkDdiPresent);
