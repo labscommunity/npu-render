@@ -107,7 +107,8 @@ Allocation *present_allocations(Adapter *adapter, const DXGK_ALLOCATIONLIST *lis
     if (!destination || opened->device->adapter != adapter ||
         opened->device != static_cast<OpenAllocation *>(list[2].hDeviceSpecificAllocation)->device ||
         (device && opened->device != device) || opened->allocation->adapter != adapter ||
-        opened->allocation == destination || opened->allocation->surface.format != destination->surface.format)
+        opened->allocation == destination ||
+        !nr::kernel_contract::copy_format_compatible(opened->allocation->surface.format, destination->surface.format))
         return nullptr;
     source = opened->allocation;
     return destination;
@@ -531,7 +532,9 @@ NTSTATUS APIENTRY create_allocation(HANDLE adapter, DXGKARG_CREATEALLOCATION *ar
             return STATUS_INVALID_PARAMETER;
         RtlCopyMemory(&descriptions[i], in.pPrivateDriverData, sizeof(descriptions[i]));
         if (!nr::kernel_contract::valid(descriptions[i])) return STATUS_INVALID_PARAMETER;
-        if (descriptions[i].flags && (!resource_owned || !a->segment.is_aperture()))
+        if (descriptions[i].flags && !a->segment.is_aperture())
+            return STATUS_NOT_SUPPORTED;
+        if (descriptions[i].flags == nr::kernel_contract::cross_adapter_surface && !resource_owned)
             return STATUS_NOT_SUPPORTED;
         if (resource_owned && !same_surface(resource_description, descriptions[i]))
             return STATUS_INVALID_PARAMETER;

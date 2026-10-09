@@ -56,6 +56,37 @@ int standard_allocation_test() {
     NR_CHECK(StandardAllocation::describe(query) == STATUS_NOT_SUPPORTED);
     query.StandardAllocationType = D3DKMDT_STANDARDALLOCATION_GDISURFACE; query.pCreateGdiSurfaceData = nullptr;
     NR_CHECK(StandardAllocation::describe(query) == STATUS_INVALID_PARAMETER);
+    D3DKMDT_STAGINGSURFACEDATA staging{};
+    staging.Width = 65; staging.Height = 37; staging.Pitch = 0x1234;
+    query = {}; query.StandardAllocationType = D3DKMDT_STANDARDALLOCATION_STAGINGSURFACE;
+    query.pCreateStagingSurfaceData = &staging;
+    NR_CHECK(StandardAllocation::describe(query) == STATUS_SUCCESS && staging.Pitch == 0x1234);
+    NR_CHECK(query.AllocationPrivateDriverDataSize == sizeof(Surface) && !query.ResourcePrivateDriverDataSize);
+    query.pAllocationPrivateDriverData = &allocation.surface;
+    query.AllocationPrivateDriverDataSize = sizeof(Surface) - 1; allocation.surface.width = 99;
+    NR_CHECK(StandardAllocation::describe(query) == STATUS_BUFFER_TOO_SMALL && staging.Pitch == 0x1234 && allocation.surface.width == 99);
+    NR_CHECK(StandardAllocation::describe(query) == STATUS_SUCCESS && staging.Pitch == 512);
+    NR_CHECK(allocation.surface.flags == nr::kernel_contract::presentation_staging_surface && allocation.surface.format == 88 &&
+             allocation.surface.allocation_bytes == 20480 && nr::kernel_contract::valid(allocation.surface));
+    bad = allocation.surface; bad.flags = 0; NR_CHECK(!nr::kernel_contract::valid(bad));
+    bad = allocation.surface; bad.flags = 3; NR_CHECK(!nr::kernel_contract::valid(bad));
+    bad = allocation.surface; bad.format = 87; NR_CHECK(!nr::kernel_contract::valid(bad));
+    query.pResourcePrivateDriverData = &resource.surface;
+    NR_CHECK(StandardAllocation::describe(query) == STATUS_INVALID_PARAMETER);
+    query.pResourcePrivateDriverData = nullptr;
+    for (UINT invalid = 0; invalid < 5; ++invalid) {
+        staging.Width = 65; staging.Height = 37; staging.Pitch = 0x1234; allocation.surface.width = 99;
+        switch (invalid) {
+        case 0: staging.Width = 0; break;
+        case 1: staging.Height = 0; break;
+        case 2: staging.Width = MAXULONG; break;
+        case 3: staging.Height = 8193; break;
+        case 4: staging.Width = 8192; staging.Height = 4097; break;
+        }
+        NR_CHECK(StandardAllocation::describe(query) == STATUS_INVALID_PARAMETER && staging.Pitch == 0x1234 && allocation.surface.width == 99);
+    }
+    query.pCreateStagingSurfaceData = nullptr;
+    NR_CHECK(StandardAllocation::describe(query) == STATUS_INVALID_PARAMETER);
     return 0;
 }
 
@@ -81,6 +112,17 @@ int standard_allocation_ddi_test(Adapter *a) {
     NR_CHECK(info.Flags.Cached && info.Flags.CpuVisible);
     DXGKARG_DESTROYALLOCATION destroy{}; destroy.NumAllocations = 1; destroy.pAllocationList = &info.hAllocation;
     destroy.hResource = create.hResource; destroy.Flags.DestroyResource = 1;
+    NR_CHECK(registration.DxgkDdiDestroyAllocation(a, &destroy) == STATUS_SUCCESS && !a->allocations && !a->resources);
+    D3DKMDT_STAGINGSURFACEDATA staging{}; staging.Width = 320; staging.Height = 192;
+    query = {}; query.StandardAllocationType = D3DKMDT_STANDARDALLOCATION_STAGINGSURFACE; query.pCreateStagingSurfaceData = &staging;
+    NR_CHECK(registration.DxgkDdiGetStandardAllocationDriverData(a, &query) == STATUS_SUCCESS && !query.ResourcePrivateDriverDataSize);
+    query.pAllocationPrivateDriverData = &allocation;
+    NR_CHECK(registration.DxgkDdiGetStandardAllocationDriverData(a, &query) == STATUS_SUCCESS && staging.Pitch == 1280);
+    info = {}; info.pPrivateDriverData = &allocation; info.PrivateDriverDataSize = sizeof(allocation);
+    create = {}; create.NumAllocations = 1; create.pAllocationInfo = &info;
+    NR_CHECK(registration.DxgkDdiCreateAllocation(a, &create) == STATUS_SUCCESS && info.hAllocation && !create.hResource);
+    NR_CHECK(info.Size == 245760 && info.Flags.CpuVisible && info.Flags.Cached);
+    destroy = {}; destroy.NumAllocations = 1; destroy.pAllocationList = &info.hAllocation;
     NR_CHECK(registration.DxgkDdiDestroyAllocation(a, &destroy) == STATUS_SUCCESS && !a->allocations && !a->resources);
     return 0;
 }

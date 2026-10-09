@@ -78,6 +78,30 @@ int present_test(Adapter *a, Allocation *source, Allocation *destination, UCHAR 
     args = original; args.MultipassOffset = 1;
     NR_CHECK(registration.DxgkDdiPresent(&context, &args) == STATUS_SUCCESS && args.MultipassOffset == 2);
     NR_CHECK(records[0].source_relative == 7 * 512 + 28 * 4 && records[0].shape.row_bytes == 33 * 4);
+    // The OS's presentation staging allocation is BGRX. A byte copy from BGRA
+    // preserves all defined RGB channels without inventing an alpha conversion.
+    destination->surface.format = 88; destination->surface.flags = nr::kernel_contract::presentation_staging_surface;
+    destination->surface.row_pitch = 512;
+    for (SIZE_T i = 0; i < 8192; ++i) backing[8192 + i] = 0xc3;
+    args = original;
+    NR_CHECK(registration.DxgkDdiPresent(&context, &args) == STATUS_SUCCESS && args.MultipassOffset == 2);
+    NR_CHECK(registration.DxgkDdiPatch(a, &patch) == STATUS_SUCCESS);
+    submit.SubmissionFenceId = 3;
+    NR_CHECK(registration.DxgkDdiSubmitCommand(a, &submit) == STATUS_SUCCESS);
+    RtlZeroMemory(records, sizeof(records));
+    NR_CHECK(a->engine.process_one() == STATUS_SUCCESS && a->scheduler.completed() == 3);
+    for (SIZE_T i = 0; i < 8192; ++i) {
+        const auto y = i / 512, x = i % 512 / 4, channel = i % 4;
+        const bool copied = (x >= 3 && x < 23 && y >= 2 && y < 7) || (x >= 30 && x < 63 && y >= 8 && y < 13);
+        UCHAR expected = 0xc3;
+        if (copied) expected = backing[(y - 1) * 512 + (x - 2) * 4 + channel];
+        NR_CHECK(backing[8192 + i] == expected);
+    }
+    source->surface.format = 88; source->surface.flags = nr::kernel_contract::presentation_staging_surface;
+    destination->surface.format = 87; destination->surface.flags = 0;
+    args = original;
+    NR_CHECK(!NT_SUCCESS(registration.DxgkDdiPresent(&context, &args)) && args.pDmaBuffer == markers);
+    NR_CHECK(!nr::kernel_contract::copy_format_compatible(28, 88) && !nr::kernel_contract::copy_format_compatible(88, 87));
     source->surface = source_before; destination->surface = destination_before;
     return 0;
 }

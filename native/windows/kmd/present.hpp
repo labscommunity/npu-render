@@ -28,7 +28,8 @@ public:
         return r.source + r.shape.source_span() <= r.destination || r.destination + r.shape.destination_span() <= r.source;
     }
     static bool matches(const PresentRecord &r, const kernel_contract::Surface &s, const kernel_contract::Surface &d) {
-        return valid(r) && kernel_contract::valid(s) && kernel_contract::valid(d) && s.format == d.format &&
+        return valid(r) && kernel_contract::valid(s) && kernel_contract::valid(d) &&
+            kernel_contract::copy_format_compatible(s.format, d.format) &&
                r.shape.source_pitch == s.row_pitch && r.shape.destination_pitch == d.row_pitch &&
                r.shape.source_span() <= s.allocation_bytes && r.shape.destination_span() <= d.allocation_bytes &&
                r.source_relative <= s.allocation_bytes - r.shape.source_span() &&
@@ -55,7 +56,8 @@ public:
                           const kernel_contract::Surface &d, DXGKARG_PRESENT &a) {
         if (!segment.is_aperture()) return STATUS_NOT_SUPPORTED;
         if (a.Flags.Value != 1 || a.DmaBufferSegmentId || !a.pAllocationList ||
-            !kernel_contract::valid(s) || !kernel_contract::valid(d) || s.format != d.format)
+            !kernel_contract::valid(s) || !kernel_contract::valid(d) ||
+            !kernel_contract::copy_format_compatible(s.format, d.format))
             return STATUS_NOT_SUPPORTED;
         const auto width = LONGLONG(a.SrcRect.right) - a.SrcRect.left;
         const auto height = LONGLONG(a.SrcRect.bottom) - a.SrcRect.top;

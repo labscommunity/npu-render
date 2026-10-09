@@ -71,6 +71,17 @@ not traced.
 It provides no live validation of the kernel blitter. The next live gate uses an
 owned interactive HWND through ordinary DXGI and a screen-pixel oracle.
 
+The interactive path now reaches the runtime presentation callback. Windows
+requests `D3DKMDT_STANDARDALLOCATION_STAGINGSURFACE` before the blit, which the
+previous kernel rejects. The new implementation describes this lockable BGRX8
+surface with allocation-only metadata and an explicit staging tag. A BGRA8-to-
+BGRX8 presentation preserves RGB bytes and leaves the unused fourth byte alone;
+reverse copies and RGBA channel conversion remain rejected. Host tests exercise
+the size/fill queries, allocation lifetime, clipped copy, padding preservation,
+queue ownership and completion. Live presentation still requires a new package.
+This follows the [Windows presentation staging contract](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmdt/ns-d3dkmdt-_d3dkmdt_stagingsurfacedata);
+the CPU readout and original display path remain separate from NPU rendering.
+
 The design follows the documented [linear aperture address-space contract](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/linear-aperture-space-segments)
 and [map/unmap requirements](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/nc-d3dkmddi-dxgkddi_buildpagingbuffer).
 This software translation table is an implementation experiment; it does not
