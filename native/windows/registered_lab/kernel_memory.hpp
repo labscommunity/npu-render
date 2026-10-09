@@ -145,7 +145,7 @@ struct Allocation {
     }
     void open(HANDLE resource, D3DKMT_HANDLE allocation, const kernel_contract::Surface &description) {
         require(!handle && context && context->command.hContext && resource && allocation &&
-                kernel_contract::valid(description));
+                kernel_contract::valid(description) && !description.flags);
         surface = description; runtime_resource = resource; handle = allocation;
         ++context->stats.live_allocations;
     }

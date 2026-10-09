@@ -45,6 +45,17 @@ successful execution fences. Mapped-page counts return to zero and removal
 preserves the original display. This validates Windows' aperture acceptance;
 native-size capacity and presentation remain separate gates.
 
+The next implementation generates standard allocation metadata for the admitted
+RGBA8/BGRA8 GDI textures. Cross-adapter descriptions use Windows' exact 128-byte
+pitch and four-row height alignment; ordinary textures retain 256-byte rows.
+Size queries leave the input untouched, and short buffers or unsupported formats
+fail before writing descriptors. Actual DDI host tests feed those descriptors
+through allocation creation and destruction. Cross-adapter capability remains
+clear, and the UMD rejects cross-adapter imports until strided copying and
+presentation are implemented. These host checks are not live interoperability.
+The layout follows Microsoft's [cross-adapter resource contract](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/using-cross-adapter-resources-in-a-hybrid-system)
+and [standard allocation query contract](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/nc-d3dkmddi-dxgkddi_getstandardallocationdriverdata).
+
 The design follows the documented [linear aperture address-space contract](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/linear-aperture-space-segments)
 and [map/unmap requirements](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/nc-d3dkmddi-dxgkddi_buildpagingbuffer).
 This software translation table is an implementation experiment; it does not

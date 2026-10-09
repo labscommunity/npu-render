@@ -6,6 +6,7 @@ static_assert(sizeof(u32) == 4 && sizeof(u64) == 8);
 constexpr u32 magic = 0x4e52574b; // NRWK
 constexpr u32 version = 1;
 constexpr u64 max_surface_bytes = 128ull * 1024 * 1024;
+constexpr u32 cross_adapter_surface = 1;
 struct AdapterInfo {
     u32 signature = magic;
     u32 abi = version;
@@ -20,7 +21,7 @@ struct Surface {
     u32 height = 0;
     u32 format = 0;
     u32 row_pitch = 0;
-    u32 reserved = 0;
+    u32 flags = 0;
     u64 allocation_bytes = 0;
 };
 // Private laboratory command: fill the entire single writable allocation in
@@ -46,12 +47,15 @@ struct CopySurface {
 static_assert(sizeof(CopySurface) == sizeof(FillSurface));
 static_assert(sizeof(AdapterInfo) == 16 && sizeof(Surface) == 40);
 constexpr bool valid(const Surface &s) {
+    const bool cross = s.flags == cross_adapter_surface;
+    const u64 rows = cross ? (u64(s.height) + 3) & ~u64(3) : s.height;
     return s.signature == magic && s.abi == version && s.bytes == sizeof(Surface) &&
-           !s.reserved && s.width && s.width <= 8192 && s.height && s.height <= 8192 &&
+           !(s.flags & ~cross_adapter_surface) && s.width && s.width <= 8192 && s.height && s.height <= 8192 &&
            (s.format == 28 || s.format == 87) && // RGBA8_UNORM / BGRA8_UNORM
-           s.row_pitch >= u64(s.width) * 4 && !(s.row_pitch % 256) &&
+           (cross ? s.row_pitch == ((u64(s.width) * 4 + 127) & ~u64(127)) :
+                    s.row_pitch >= u64(s.width) * 4 && !(s.row_pitch % 256)) &&
            s.allocation_bytes && s.allocation_bytes <= max_surface_bytes &&
            !(s.allocation_bytes % 4096) &&
-           u64(s.row_pitch) * s.height <= s.allocation_bytes;
+           u64(s.row_pitch) * rows <= s.allocation_bytes;
 }
 } // namespace nr::kernel_contract

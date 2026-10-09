@@ -251,6 +251,7 @@ NTSTATUS initialize(DRIVER_OBJECT *, UNICODE_STRING *, DRIVER_INITIALIZATION_DAT
 #include "driver.cpp"
 #undef DriverEntry
 #define NR_CHECK(expression) do { if (!(expression)) return __LINE__; } while (false)
+#include "standard_allocation_test.hpp"
 #include "aperture_test.hpp"
 #include "paging_test.hpp"
 #include "segment_capacity_test.hpp"
@@ -271,6 +272,8 @@ NTSTATUS initialize(DRIVER_OBJECT *, UNICODE_STRING *, DRIVER_INITIALIZATION_DAT
 #include "worker_probe_test.hpp"
 #endif
 extern "C" int nr_kernel_host_test() {
+    const auto standard_result = standard_allocation_test();
+    if (standard_result) return standard_result;
     const auto aperture_result = aperture_test();
     if (aperture_result) return aperture_result;
     NR_CHECK(NT_SUCCESS(NrHostDriverEntry(nullptr, nullptr)));
@@ -483,7 +486,7 @@ extern "C" int nr_kernel_host_test() {
         case 4: surface.row_pitch = 255; break;
         case 5: surface.allocation_bytes = ~nr::kernel_contract::u64(0); break;
         case 6: surface.format = 0; break;
-        case 7: surface.reserved = 1; break;
+        case 7: surface.flags = 2; break;
         case 8: surface.abi = 0; break;
         }
         NR_CHECK(registration.DxgkDdiCreateAllocation(a, &create) == STATUS_INVALID_PARAMETER);

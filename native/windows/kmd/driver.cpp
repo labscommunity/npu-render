@@ -14,6 +14,7 @@ inline void *operator new(size_t, void *p) noexcept { return p; }
 
 #include "scheduler.hpp"
 #include "contract.hpp"
+#include "standard_allocation.hpp"
 #include "segment.hpp"
 #include "paging.hpp"
 #include "fill.hpp"
@@ -69,7 +70,7 @@ struct Context { Device *device; HANDLE runtime; bool system; };
 struct OpenAllocation { Device *device; Allocation *allocation; bool read_only; };
 bool same_surface(const nr::kernel_contract::Surface &a, const nr::kernel_contract::Surface &b) {
     return a.width == b.width && a.height == b.height && a.format == b.format &&
-           a.row_pitch == b.row_pitch && a.allocation_bytes == b.allocation_bytes;
+           a.row_pitch == b.row_pitch && a.allocation_bytes == b.allocation_bytes && a.flags == b.flags;
 }
 
 Allocation *writable_allocation(Adapter *adapter, const DXGK_ALLOCATIONLIST *list, UINT count,
@@ -464,6 +465,15 @@ NTSTATUS APIENTRY build_paging(HANDLE adapter, DXGKARG_BUILDPAGINGBUFFER *args) 
     NR_LAB_TRACE("nr_paging_lab: build_paging operation=%u status=%08lx\n", UINT(args->Operation), ULONG(status));
     return status;
 }
+DXGKDDI_GETSTANDARDALLOCATIONDRIVERDATA standard_allocation;
+NTSTATUS APIENTRY standard_allocation(HANDLE adapter, DXGKARG_GETSTANDARDALLOCATIONDRIVERDATA *args) {
+    if (!adapter || !args) return STATUS_INVALID_PARAMETER;
+    const auto a = static_cast<Adapter *>(adapter);
+    if (!a->started || !a->segment.is_aperture()) return STATUS_DEVICE_NOT_READY;
+    const auto status = nr::kmd::StandardAllocation::describe(*args);
+    NR_LAB_TRACE("nr_paging_lab: standard_allocation type=%u status=%08lx\n", UINT(args->StandardAllocationType), ULONG(status));
+    return status;
+}
 DXGKDDI_CREATEALLOCATION create_allocation;
 NTSTATUS APIENTRY create_allocation(HANDLE adapter, DXGKARG_CREATEALLOCATION *args) {
     if (!adapter || !args || !args->pAllocationInfo || !args->NumAllocations ||
@@ -487,6 +497,8 @@ NTSTATUS APIENTRY create_allocation(HANDLE adapter, DXGKARG_CREATEALLOCATION *ar
             return STATUS_INVALID_PARAMETER;
         RtlCopyMemory(&descriptions[i], in.pPrivateDriverData, sizeof(descriptions[i]));
         if (!nr::kernel_contract::valid(descriptions[i])) return STATUS_INVALID_PARAMETER;
+        if (descriptions[i].flags && (!resource_owned || !a->segment.is_aperture()))
+            return STATUS_NOT_SUPPORTED;
         if (resource_owned && !same_surface(resource_description, descriptions[i]))
             return STATUS_INVALID_PARAMETER;
         if (descriptions[i].allocation_bytes > a->segment.capacity())
@@ -794,7 +806,7 @@ extern "C" NTSTATUS DriverEntry(DRIVER_OBJECT *driver, UNICODE_STRING *registry)
     data.DxgkDdiCreateAllocation = create_allocation;
     data.DxgkDdiDestroyAllocation = destroy_allocation;
     data.DxgkDdiDescribeAllocation = describe_allocation;
-    NR_REJECT(DxgkDdiGetStandardAllocationDriverData);
+    data.DxgkDdiGetStandardAllocationDriverData = standard_allocation;
     data.DxgkDdiOpenAllocation = open_allocation;
     data.DxgkDdiCloseAllocation = close_allocation;
     data.DxgkDdiPatch = patch;
