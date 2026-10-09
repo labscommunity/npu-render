@@ -103,6 +103,12 @@ an operational graphics adapter, NPU execution or desktop migration.
 The implementation currently provides:
 
 - Add/stop/remove and device/context lifetime bookkeeping.
+- Dormant allocation description and per-device open/close callbacks. Opens
+  resolve Windows' 32-bit allocation handles through `DxgkCbGetHandleData`,
+  preserve read-only intent, and publish handles only after every allocation
+  succeeds. Open references prevent allocation/device teardown. Host tests
+  cover cross-device opens, invalid ownership, partial allocation failure,
+  duplicate closes and metadata output. Actual Windows opens remain untested.
 - A versioned adapter identity query; it explicitly reports `ready = 0`.
 - Bounded surface metadata validation and transactional allocation metadata
   creation. Allocation failure releases every partial object before returning.

@@ -252,6 +252,7 @@ NTSTATUS initialize(DRIVER_OBJECT *, UNICODE_STRING *, DRIVER_INITIALIZATION_DAT
 #include "submission_test.hpp"
 #include "engine_test.hpp"
 #include "recovery_test.hpp"
+#include "allocation_test.hpp"
 #if NR_KMD_LAB_WORKER_PROBE
 #include "worker_probe_test.hpp"
 #endif
@@ -435,6 +436,8 @@ extern "C" int nr_kernel_host_test() {
         NR_CHECK(handles[i] && allocations[i].Size == 12288);
     }
     NR_CHECK(registration.DxgkDdiStopDevice(a) == STATUS_DEVICE_BUSY);
+    const auto allocation_result = allocation_test(a, handles);
+    if (allocation_result) return allocation_result;
     DXGKARG_DESTROYALLOCATION destroy{};
     destroy.NumAllocations = 3; destroy.pAllocationList = handles;
     handles[2] = handles[1];

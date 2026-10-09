@@ -44,12 +44,14 @@ struct Adapter {
 #endif
     LONG devices;
     LONG allocations;
+    LONG opens;
     bool started;
     bool resetting;
 };
-struct Allocation { Adapter *adapter; nr::kernel_contract::Surface surface; };
-struct Device { Adapter *adapter; HANDLE runtime; LONG contexts; };
+struct Allocation { Adapter *adapter; nr::kernel_contract::Surface surface; LONG opens; };
+struct Device { Adapter *adapter; HANDLE runtime; LONG contexts; LONG opens; };
 struct Context { Device *device; HANDLE runtime; };
+struct OpenAllocation { Device *device; Allocation *allocation; bool read_only; };
 
 template <class T> T *allocate() {
     auto p = static_cast<T *>(ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(T), pool_tag));
@@ -139,7 +141,7 @@ DXGKDDI_STOP_DEVICE stop_device;
 NTSTATUS stop_device(void *context) {
     if (!context) return STATUS_INVALID_PARAMETER;
     auto a = static_cast<Adapter *>(context);
-    if (a->devices || a->allocations || (a->scheduler.active() && !a->engine.alive()))
+    if (a->devices || a->allocations || a->opens || (a->scheduler.active() && !a->engine.alive()))
         return STATUS_DEVICE_BUSY;
     const auto engine_status = a->engine.stop();
     if (engine_status != STATUS_SUCCESS) return engine_status;
@@ -156,7 +158,7 @@ DXGKDDI_REMOVE_DEVICE remove_device;
 NTSTATUS remove_device(void *context) {
     if (!context) return STATUS_INVALID_PARAMETER;
     auto a = static_cast<Adapter *>(context);
-    if (a->started || a->devices || a->allocations || a->scheduler.active() ||
+    if (a->started || a->devices || a->allocations || a->opens || a->scheduler.active() ||
         a->segment.ready() || a->submissions.ready() || a->engine.alive()) return STATUS_DEVICE_BUSY;
     release(a);
     return STATUS_SUCCESS;
@@ -375,11 +377,101 @@ NTSTATUS APIENTRY destroy_allocation(HANDLE adapter, const DXGKARG_DESTROYALLOCA
     for (UINT i = 0; i < args->NumAllocations; ++i) {
         auto allocation = static_cast<Allocation *>(args->pAllocationList[i]);
         if (!allocation || allocation->adapter != adapter) return STATUS_INVALID_PARAMETER;
+        if (InterlockedCompareExchange(&allocation->opens, 0, 0)) return STATUS_DEVICE_BUSY;
         for (UINT j = 0; j < i; ++j)
             if (args->pAllocationList[j] == allocation) return STATUS_INVALID_PARAMETER;
     }
     for (UINT i = 0; i < args->NumAllocations; ++i) release(args->pAllocationList[i]);
     InterlockedExchangeAdd(&static_cast<Adapter *>(adapter)->allocations, -LONG(args->NumAllocations));
+    return STATUS_SUCCESS;
+}
+DXGKDDI_DESCRIBEALLOCATION describe_allocation;
+NTSTATUS APIENTRY describe_allocation(HANDLE adapter, DXGKARG_DESCRIBEALLOCATION *args) {
+    if (!adapter || !args || !args->hAllocation) return STATUS_INVALID_PARAMETER;
+    if (args->Flags.Value) return STATUS_NOT_SUPPORTED;
+    const auto allocation = static_cast<Allocation *>(args->hAllocation);
+    if (allocation->adapter != adapter) return STATUS_INVALID_HANDLE;
+    const auto &surface = allocation->surface;
+    args->Width = surface.width;
+    args->Height = surface.height;
+    args->Format = surface.format == 87 ? D3DDDIFMT_A8R8G8B8 : D3DDDIFMT_A8B8G8R8;
+    args->MultisampleMethod = {};
+    args->RefreshRate = {}; // No primary/scanout mode belongs to this allocation.
+    args->PrivateDriverFormatAttribute = 0;
+    args->Rotation = D3DDDI_ROTATION_IDENTITY;
+    return STATUS_SUCCESS;
+}
+DXGKDDI_OPENALLOCATIONINFO open_allocation;
+NTSTATUS APIENTRY open_allocation(HANDLE device, const DXGKARG_OPENALLOCATION *args) {
+    if (!device || !args || !args->NumAllocations || args->NumAllocations > 16 ||
+        !args->pOpenAllocation) return STATUS_INVALID_PARAMETER;
+    DXGK_OPENALLOCATIONFLAGS allowed{};
+    allowed.Create = allowed.ReadOnly = 1;
+    if ((args->Flags.Value & ~allowed.Value) || args->PrivateDriverSize || args->SubresourceIndex)
+        return STATUS_NOT_SUPPORTED;
+    auto d = static_cast<Device *>(device);
+    auto a = d->adapter;
+    if (!a->started || !a->kernel.DxgkCbGetHandleData) return STATUS_DEVICE_NOT_READY;
+    Allocation *allocations[16]{};
+    for (UINT i = 0; i < args->NumAllocations; ++i) {
+        const auto &in = args->pOpenAllocation[i];
+        if (in.PrivateDriverDataSize &&
+            (!in.pPrivateDriverData || in.PrivateDriverDataSize != sizeof(nr::kernel_contract::Surface)))
+            return STATUS_INVALID_PARAMETER;
+        DXGKARGCB_GETHANDLEDATA lookup{};
+        lookup.hObject = in.hAllocation;
+        lookup.Type = DXGK_HANDLE_ALLOCATION;
+        // This 32-bit OS handle is never interpreted as a kernel pointer.
+        allocations[i] = static_cast<Allocation *>(a->kernel.DxgkCbGetHandleData(&lookup));
+        if (!allocations[i] || allocations[i]->adapter != a) return STATUS_INVALID_HANDLE;
+    }
+    // One adapter-wide bound also bounds every per-device/per-allocation count.
+    LONG previous;
+    do {
+        previous = InterlockedCompareExchange(&a->opens, 0, 0);
+        if (previous < 0 || previous > 4096 - LONG(args->NumAllocations))
+            return STATUS_INSUFFICIENT_RESOURCES;
+    } while (InterlockedCompareExchange(&a->opens, previous + LONG(args->NumAllocations), previous) != previous);
+    OpenAllocation *created[16]{};
+    for (UINT i = 0; i < args->NumAllocations; ++i) {
+        created[i] = allocate<OpenAllocation>();
+        if (!created[i]) {
+            for (UINT j = 0; j < i; ++j) release(created[j]);
+            InterlockedExchangeAdd(&a->opens, -LONG(args->NumAllocations));
+            return STATUS_INSUFFICIENT_RESOURCES;
+        }
+        created[i]->device = d;
+        created[i]->allocation = allocations[i];
+        created[i]->read_only = args->Flags.ReadOnly != 0;
+    }
+    for (UINT i = 0; i < args->NumAllocations; ++i) {
+        InterlockedIncrement(&allocations[i]->opens);
+        auto &out = args->pOpenAllocation[i];
+        if (out.PrivateDriverDataSize)
+            RtlCopyMemory(out.pPrivateDriverData, &allocations[i]->surface, sizeof(allocations[i]->surface));
+        out.hDeviceSpecificAllocation = created[i];
+    }
+    InterlockedExchangeAdd(&d->opens, LONG(args->NumAllocations));
+    return STATUS_SUCCESS;
+}
+DXGKDDI_CLOSEALLOCATION close_allocation;
+NTSTATUS APIENTRY close_allocation(HANDLE device, const DXGKARG_CLOSEALLOCATION *args) {
+    if (!device || !args || !args->NumAllocations || args->NumAllocations > 16 ||
+        !args->pOpenHandleList) return STATUS_INVALID_PARAMETER;
+    auto d = static_cast<Device *>(device);
+    for (UINT i = 0; i < args->NumAllocations; ++i) {
+        const auto opened = static_cast<OpenAllocation *>(args->pOpenHandleList[i]);
+        if (!opened || opened->device != d) return STATUS_INVALID_HANDLE;
+        for (UINT j = 0; j < i; ++j)
+            if (args->pOpenHandleList[j] == opened) return STATUS_INVALID_PARAMETER;
+    }
+    for (UINT i = 0; i < args->NumAllocations; ++i) {
+        auto opened = static_cast<OpenAllocation *>(args->pOpenHandleList[i]);
+        InterlockedDecrement(&opened->allocation->opens);
+        release(opened);
+    }
+    InterlockedExchangeAdd(&d->opens, -LONG(args->NumAllocations));
+    InterlockedExchangeAdd(&d->adapter->opens, -LONG(args->NumAllocations));
     return STATUS_SUCCESS;
 }
 DXGKDDI_CREATEDEVICE create_device;
@@ -399,7 +491,7 @@ DXGKDDI_DESTROYDEVICE destroy_device;
 NTSTATUS APIENTRY destroy_device(HANDLE device) {
     if (!device) return STATUS_INVALID_PARAMETER;
     auto d = static_cast<Device *>(device);
-    if (d->contexts) return STATUS_DEVICE_BUSY;
+    if (d->contexts || d->opens) return STATUS_DEVICE_BUSY;
     InterlockedDecrement(&d->adapter->devices);
     release(d);
     return STATUS_SUCCESS;
@@ -461,10 +553,10 @@ extern "C" NTSTATUS DriverEntry(DRIVER_OBJECT *driver, UNICODE_STRING *registry)
     data.DxgkDdiQueryAdapterInfo = query_adapter;
     data.DxgkDdiCreateAllocation = create_allocation;
     data.DxgkDdiDestroyAllocation = destroy_allocation;
-    NR_REJECT(DxgkDdiDescribeAllocation);
+    data.DxgkDdiDescribeAllocation = describe_allocation;
     NR_REJECT(DxgkDdiGetStandardAllocationDriverData);
-    NR_REJECT(DxgkDdiOpenAllocation);
-    NR_REJECT(DxgkDdiCloseAllocation);
+    data.DxgkDdiOpenAllocation = open_allocation;
+    data.DxgkDdiCloseAllocation = close_allocation;
     NR_REJECT(DxgkDdiPatch);
     data.DxgkDdiSubmitCommand = submit;
     data.DxgkDdiBuildPagingBuffer = build_paging;
