@@ -106,6 +106,15 @@ public KMT probe found no matching adapter and created no resources. No segment
 query, actual submission or OS fence completion was observed. Removal preserved
 the original display. The specific rejected capability remains under investigation.
 
+The [version-consistent retry](../../../docs/validation/2026-10-09/kernel-paging-v19/report.json)
+also failed. Stepping the callback and its Windows caller showed successful
+capability output followed by `DXGADAPTER::Initialize` returning
+`STATUS_OBJECT_NAME_NOT_FOUND`. The exact missing object was not traced; the
+test INF lacked the required user-mode driver registration. The next packaging
+experiment supplies the explicitly rejecting `nr_paging_guard.dll` and its
+per-device registry entries while retaining the same kernel binary. This is
+still a paging experiment, not a registered Direct3D renderer.
+
 The [first live engine run](../../../docs/validation/2026-10-09/kernel-engine-v12/report.json)
 passed: Windows requested 32 queue entries, the driver reserved 33 slots, and
 the worker completed the fill, idle preemption and restart checks. The observer
@@ -141,8 +150,9 @@ The implementation currently provides:
   The capability version matches `DriverEntry`'s WDDM 1.3 version, following the
   [Microsoft render-only sample](https://github.com/microsoft/graphics-driver-samples/blob/master/render-only-sample/roskmd/RosKmdAdapter.cpp).
   This differs from the member reference's instruction to return zero for newer
-  interfaces. A live zero-version attempt was rejected immediately after the
-  capability query; whether this version field caused that rejection is under test.
+  interfaces. Both zero-version and version-consistent attempts failed after the
+  capability query; the latter reported a missing object during initialization.
+  The version change alone did not resolve that failure.
   Windows acceptance remains an experimental question. Power notifications retain
   the software engine's nonpaged RAM and worker state, which follow system power;
   there are no device registers or separate powered memory to restore. This is
