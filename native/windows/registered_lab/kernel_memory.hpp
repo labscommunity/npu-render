@@ -7,11 +7,17 @@
 #pragma warning(pop)
 #include <cstring>
 #include <cstdint>
+#include <cstdio>
 #include <memory>
 #include "../kmd/contract.hpp"
 namespace nr::registered_lab {
 struct Error { HRESULT status; };
-inline void check(HRESULT status) { if (FAILED(status)) throw Error{status}; }
+inline void check(HRESULT status, const char *operation = "runtime") {
+    if (FAILED(status)) {
+        std::fprintf(stderr, "nr_fill_umd: %s HRESULT=%08lx\n", operation, ULONG(status));
+        throw Error{status};
+    }
+}
 inline void require(bool value) { if (!value) throw Error{E_INVALIDARG}; }
 struct Counters {
     uint64_t allocations = 0, fills = 0, copies = 0, live_allocations = 0;
@@ -40,7 +46,7 @@ struct Context {
         runtime = rt; callbacks = cb;
         D3DDDICB_CREATECONTEXT args{};
         args.EngineAffinity = 1;
-        check(callbacks.pfnCreateContextCb(runtime, &args));
+        check(callbacks.pfnCreateContextCb(runtime, &args), "CreateContextCb");
         require(args.hContext != nullptr);
         command = args;
         ++stats.live_contexts;
@@ -61,7 +67,7 @@ struct Context {
         args.NumAllocations = 1;
         // A failed callback must never leave old writable command pointers reusable.
         poisoned = true;
-        check(callbacks.pfnRenderCb(runtime, &args));
+        check(callbacks.pfnRenderCb(runtime, &args), "RenderCb");
         command.pCommandBuffer = args.pNewCommandBuffer;
         command.CommandBufferSize = args.NewCommandBufferSize;
         command.pAllocationList = args.pNewAllocationList;
@@ -76,6 +82,7 @@ struct Allocation {
     std::shared_ptr<Context> context;
     kernel_contract::Surface surface{};
     D3DKMT_HANDLE handle = 0;
+    HANDLE runtime_resource = nullptr;
     void *mapping = nullptr;
     bool locked = false;
     explicit Allocation(std::shared_ptr<Context> c) : context(std::move(c)) {}
@@ -93,11 +100,12 @@ struct Allocation {
         if (!handle) return;
         if (FAILED(unlock())) ++context->stats.cleanup_errors;
         D3DDDICB_DEALLOCATE args{};
-        args.NumAllocations = 1; args.HandleList = &handle;
+        if (runtime_resource) args.hResource = runtime_resource;
+        else { args.NumAllocations = 1; args.HandleList = &handle; }
         if (FAILED(context->callbacks.pfnDeallocateCb(context->runtime, &args))) ++context->stats.cleanup_errors;
         --context->stats.live_allocations;
     }
-    void create(UINT width, UINT height, UINT format) {
+    void create(UINT width, UINT height, UINT format, HANDLE resource = nullptr) {
         require(!handle && context && context->command.hContext && width && width <= 1024 && height && height <= 1024);
         surface.width = width; surface.height = height; surface.format = format;
         surface.row_pitch = (width * 4 + 255) & ~255u;
@@ -106,13 +114,20 @@ struct Allocation {
         D3DDDI_ALLOCATIONINFO item{};
         item.pPrivateDriverData = &surface; item.PrivateDriverDataSize = sizeof(surface);
         D3DDDICB_ALLOCATE args{};
-        // Device-associated, unshared allocation. Shared resources need a
-        // separately implemented resource identity/opening contract.
+        args.hResource = resource;
+        if (resource) { args.pPrivateDriverData = &surface; args.PrivateDriverDataSize = sizeof(surface); }
         args.NumAllocations = 1; args.pAllocationInfo = &item;
-        check(context->callbacks.pfnAllocateCb(context->runtime, &args));
+        check(context->callbacks.pfnAllocateCb(context->runtime, &args), "AllocateCb");
         require(item.hAllocation != 0);
         handle = item.hAllocation;
+        runtime_resource = resource;
         ++context->stats.allocations; ++context->stats.live_allocations;
+    }
+    void open(HANDLE resource, D3DKMT_HANDLE allocation, const kernel_contract::Surface &description) {
+        require(!handle && context && context->command.hContext && resource && allocation &&
+                kernel_contract::valid(description) && description.width <= 1024 && description.height <= 1024);
+        surface = description; runtime_resource = resource; handle = allocation;
+        ++context->stats.live_allocations;
     }
     void *lock(bool read_only) {
         require(handle && !locked);
@@ -121,7 +136,7 @@ struct Allocation {
         args.Flags.LockEntire = args.Flags.DonotEvict = 1;
         args.Flags.ReadOnly = read_only;
         args.Flags.WriteOnly = !read_only;
-        check(context->callbacks.pfnLockCb(context->runtime, &args));
+        check(context->callbacks.pfnLockCb(context->runtime, &args), "LockCb");
         locked = true; mapping = args.pData;
         require(mapping && args.hAllocation == handle);
         return mapping;

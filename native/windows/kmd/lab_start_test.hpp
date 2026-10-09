@@ -44,6 +44,8 @@ int lab_start_test() {
     query.OutputDataSize = sizeof(info);
     NR_CHECK(registration.DxgkDdiQueryAdapterInfo(a, &query) == STATUS_SUCCESS && !info.ready);
     NR_CHECK(registration.DxgkDdiStartDevice(a, &start, &kernel, &sources, &children) == STATUS_INVALID_DEVICE_STATE);
+    const auto resource_result = resource_test(a);
+    if (resource_result) return resource_result;
     const auto fill_result = fill_test(a);
     if (fill_result) return fill_result;
     NR_CHECK(registration.DxgkDdiStopDevice(a) == STATUS_SUCCESS);

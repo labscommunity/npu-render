@@ -90,8 +90,65 @@ void exercise(ID3D11Device *device, ID3D11DeviceContext *context, DXGI_FORMAT fo
     }
     context->Flush();
 }
+void exercise_shared(IDXGIAdapter *adapter, ID3D11Device *creator, ID3D11DeviceContext *creator_context,
+                     DXGI_FORMAT format) {
+    D3D11_TEXTURE2D_DESC desc{};
+    desc.Width = 64; desc.Height = 48; desc.MipLevels = desc.ArraySize = 1;
+    desc.Format = format; desc.SampleDesc.Count = 1; desc.BindFlags = D3D11_BIND_RENDER_TARGET;
+    desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED;
+    ComPtr<ID3D11Texture2D> original;
+    check(creator->CreateTexture2D(&desc, nullptr, &original), "create_shared_target");
+    ComPtr<IDXGIResource> identity;
+    check(original.As(&identity), "query_shared_identity");
+    HANDLE shared = nullptr;
+    check(identity->GetSharedHandle(&shared), "get_shared_handle");
+    require(shared != nullptr, "missing shared handle"); // Legacy resource handle is not CloseHandle-owned.
+    ComPtr<ID3D11Device> consumer;
+    ComPtr<ID3D11DeviceContext> consumer_context;
+    const D3D_FEATURE_LEVEL level = D3D_FEATURE_LEVEL_10_0;
+    check(D3D11CreateDevice(adapter, D3D_DRIVER_TYPE_UNKNOWN, nullptr, 0, &level, 1, D3D11_SDK_VERSION,
+                           &consumer, nullptr, &consumer_context), "create_consumer_device");
+    ComPtr<ID3D11Texture2D> imported, reopened, staging;
+    check(consumer->OpenSharedResource(shared, IID_PPV_ARGS(&imported)), "open_shared_target");
+    D3D11_TEXTURE2D_DESC actual{};
+    imported->GetDesc(&actual);
+    require(actual.Width == desc.Width && actual.Height == desc.Height && actual.Format == format &&
+            actual.BindFlags == desc.BindFlags && actual.MiscFlags == desc.MiscFlags, "imported texture description");
+    identity.Reset(); original.Reset();
+    std::puts("{\"creator_resource_released\":true,\"consumer_still_owns_resource\":true}");
+    check(creator->OpenSharedResource(shared, IID_PPV_ARGS(&reopened)), "reopen_after_creator_release");
+    ComPtr<ID3D11RenderTargetView> consumer_view, creator_view;
+    check(consumer->CreateRenderTargetView(imported.Get(), nullptr, &consumer_view), "create_imported_view");
+    check(creator->CreateRenderTargetView(reopened.Get(), nullptr, &creator_view), "create_reopened_view");
+    desc.MiscFlags = desc.BindFlags = 0; desc.Usage = D3D11_USAGE_STAGING; desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+    check(consumer->CreateTexture2D(&desc, nullptr, &staging), "create_shared_staging");
+    const FLOAT colors[3][4] = {{1, 0, 0, 1}, {0, 1, 0, 1}, {0, 0, 1, 1}};
+    for (UINT pass = 0; pass < 3; ++pass) {
+        auto writer = pass == 1 ? creator_context : consumer_context.Get();
+        auto view = pass == 1 ? creator_view.Get() : consumer_view.Get();
+        writer->ClearRenderTargetView(view, colors[pass]);
+        check((pass == 1 ? creator : consumer.Get())->GetDeviceRemovedReason(), "shared_clear_device_status");
+        consumer_context->CopyResource(staging.Get(), imported.Get());
+        check(consumer->GetDeviceRemovedReason(), "shared_copy_device_status");
+        D3D11_MAPPED_SUBRESOURCE mapped{};
+        check(consumer_context->Map(staging.Get(), 0, D3D11_MAP_READ, 0, &mapped), "shared_map");
+        bool valid = mapped.pData && mapped.RowPitch >= desc.Width * 4;
+        for (UINT y = 0; valid && y < desc.Height; ++y) {
+            const auto row = static_cast<const unsigned char *>(mapped.pData) + size_t(y) * mapped.RowPitch;
+            for (UINT x = 0; valid && x < desc.Width; ++x) for (UINT c = 0; c < 4; ++c) {
+                const auto channel = format == DXGI_FORMAT_B8G8R8A8_UNORM && c != 1 && c != 3 ? 2 - c : c;
+                if (row[x * 4 + c] != (channel == pass || channel == 3 ? 255 : 0)) { valid = false; break; }
+            }
+        }
+        consumer_context->Unmap(staging.Get(), 0);
+        check(consumer->GetDeviceRemovedReason(), "shared_unmap_device_status");
+        require(valid, "shared pixel mismatch");
+        std::printf("{\"shared_format\":%u,\"pass\":%u,\"verified_bytes\":12288,\"same_process\":true}\n", UINT(format), pass);
+    }
+}
 int main(int argc, char **argv) {
-    if (argc != 2 || std::strcmp(argv[1], "--exercise")) return 2;
+    if (argc != 2 || (std::strcmp(argv[1], "--exercise") && std::strcmp(argv[1], "--shared"))) return 2;
+    const bool shared = std::strcmp(argv[1], "--shared") == 0;
     if (!nr_fill_guest()) { std::puts("{\"passed\":false,\"error\":\"owned graphics guest required\"}"); return 2; }
     HMODULE retained = nullptr;
     try {
@@ -121,8 +178,13 @@ int main(int argc, char **argv) {
         require(received == requested, "unexpected feature level");
         auto stats = reinterpret_cast<BOOL (*)(NrFillStats *)>(GetProcAddress(retained, "nr_fill_stats"));
         require(stats != nullptr, "UMD diagnostics unavailable");
-        exercise(device.Get(), context.Get(), DXGI_FORMAT_B8G8R8A8_UNORM);
-        exercise(device.Get(), context.Get(), DXGI_FORMAT_R8G8B8A8_UNORM);
+        if (shared) {
+            exercise_shared(adapter.Get(), device.Get(), context.Get(), DXGI_FORMAT_B8G8R8A8_UNORM);
+            exercise_shared(adapter.Get(), device.Get(), context.Get(), DXGI_FORMAT_R8G8B8A8_UNORM);
+        } else {
+            exercise(device.Get(), context.Get(), DXGI_FORMAT_B8G8R8A8_UNORM);
+            exercise(device.Get(), context.Get(), DXGI_FORMAT_R8G8B8A8_UNORM);
+        }
         context.Reset(); device.Reset(); adapter.Reset(); factory.Reset();
         NrFillStats result{};
         require(stats(&result) != FALSE, "UMD diagnostics failed");

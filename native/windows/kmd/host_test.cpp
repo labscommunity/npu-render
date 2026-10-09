@@ -255,6 +255,7 @@ NTSTATUS initialize(DRIVER_OBJECT *, UNICODE_STRING *, DRIVER_INITIALIZATION_DAT
 #include "engine_test.hpp"
 #include "recovery_test.hpp"
 #include "allocation_test.hpp"
+#include "resource_test.hpp"
 #include "fill_test.hpp"
 #if NR_KMD_LAB_PAGING_ADAPTER
 #include "lab_start_test.hpp"
@@ -429,6 +430,8 @@ extern "C" int nr_kernel_host_test() {
     // Exercise the dormant allocation implementation without enabling StartDevice.
     // This is a local model state, never a live adapter registration.
     a->started = true;
+    const auto resource_result = resource_test(a);
+    if (resource_result) return resource_result;
     const auto fill_result = fill_test(a);
     if (fill_result) return fill_result;
     const auto paging_result = paging_test(a);

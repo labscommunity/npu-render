@@ -2,10 +2,13 @@
 #include "driver.cpp"
 #include <cstdio>
 #include <vector>
+#include <map>
 #define TEST(x) do { if (!(x)) { std::fprintf(stderr, "line %d: %s\n", __LINE__, #x); return 1; } } while (false)
 namespace {
 std::array<std::vector<unsigned char>, 8> memory;
 std::array<bool, 8> locked{};
+std::array<UINT, 8> references{};
+std::map<HANDLE, UINT> resource_handles;
 nr::kernel_contract::FillSurface commands[2]{};
 D3DDDI_ALLOCATIONLIST lists[2]{};
 UINT current_buffer = 0, renders = 0, destroys = 0, released = 0;
@@ -38,20 +41,36 @@ HRESULT APIENTRY destroy_context_cb(HANDLE rt, const D3DDDICB_DESTROYCONTEXT *a)
     return S_OK;
 }
 HRESULT APIENTRY allocate_cb(HANDLE rt, D3DDDICB_ALLOCATE *a) {
-    verify(rt == runtime_handle && !a->hResource && !a->PrivateDriverDataSize && a->NumAllocations == 1);
+    verify(rt == runtime_handle && a->NumAllocations == 1);
+    verify(a->hResource ? a->PrivateDriverDataSize == sizeof(nr::kernel_contract::Surface) && a->pPrivateDriverData
+                       : !a->PrivateDriverDataSize);
     if (allocation_failure) return E_OUTOFMEMORY;
     const auto &s = *static_cast<const nr::kernel_contract::Surface *>(a->pAllocationInfo->pPrivateDriverData);
     verify(nr::kernel_contract::valid(s));
     for (UINT i = 1; i < memory.size(); ++i) {
-        if (memory[i].empty()) { memory[i].resize(size_t(s.allocation_bytes), 0x35); a->pAllocationInfo->hAllocation = i; return S_OK; }
+        if (memory[i].empty()) {
+            memory[i].resize(size_t(s.allocation_bytes), 0x35); references[i] = 1;
+            a->pAllocationInfo->hAllocation = i;
+            if (a->hResource) { resource_handles[a->hResource] = i; a->hKMResource = 77; }
+            return S_OK;
+        }
     }
     return E_OUTOFMEMORY;
 }
 HRESULT APIENTRY deallocate_cb(HANDLE rt, const D3DDDICB_DEALLOCATE *a) {
-    verify(rt == runtime_handle && !a->hResource && a->NumAllocations == 1 && a->HandleList);
-    const auto i = *a->HandleList;
+    verify(rt == runtime_handle);
+    UINT i = 0;
+    if (a->hResource) {
+        verify(!a->NumAllocations && !a->HandleList);
+        auto found = resource_handles.find(a->hResource);
+        if (found == resource_handles.end()) return E_INVALIDARG;
+        i = found->second; resource_handles.erase(found);
+    } else {
+        verify(a->NumAllocations == 1 && a->HandleList);
+        i = *a->HandleList;
+    }
     if (i >= memory.size() || memory[i].empty() || locked[i]) return E_INVALIDARG;
-    memory[i].clear(); ++released;
+    if (!--references[i]) { memory[i].clear(); ++released; }
     return S_OK;
 }
 HRESULT APIENTRY lock_cb(HANDLE rt, D3DDDICB_LOCK *a) {
@@ -199,9 +218,36 @@ int main() {
     TEST(last_error == E_INVALIDARG && renders == 3); // Failed submission poisoned old pointers.
     functions.pfnDestroyRenderTargetView(h, view);
     functions.pfnDestroyResource(h, target); functions.pfnDestroyResource(h, staging);
+    // Runtime-owned identities retain a shared allocation after its creator
+    // closes, and release the import through its own runtime resource handle.
+    functions.pfnSetRenderTargets(h, nullptr, 0, 8, {});
+    alignas(Resource) unsigned char shared_storage[sizeof(Resource)]{}, imported_storage[sizeof(Resource)]{};
+    D3D10DDI_HRESOURCE shared{}, imported{};
+    shared.pDrvPrivate = shared_storage; imported.pDrvPrivate = imported_storage;
+    D3D10DDI_HRTRESOURCE owner{}, borrower{};
+    owner.handle = reinterpret_cast<HANDLE>(uintptr_t(0x9001)); borrower.handle = reinterpret_cast<HANDLE>(uintptr_t(0x9002));
+    args.Usage = D3D10_DDI_USAGE_DEFAULT; args.BindFlags = D3D10_DDI_BIND_RENDER_TARGET;
+    args.MapFlags = 0; args.MiscFlags = D3D10_DDI_RESOURCE_MISC_SHARED;
+    last_error = S_OK;
+    functions.pfnCreateResource(h, &args, shared, owner);
+    TEST(last_error == S_OK && resource_handles.count(owner.handle) == 1);
+    const auto shared_index = resource_handles.at(owner.handle);
+    auto description = resource(shared).allocation->surface;
+    D3DDDI_OPENALLOCATIONINFO opened{};
+    opened.hAllocation = shared_index; opened.pPrivateDriverData = &description; opened.PrivateDriverDataSize = sizeof(description);
+    D3D10DDIARG_OPENRESOURCE open{};
+    open.NumAllocations = 1; open.pOpenAllocationInfo = &opened; open.hKMResource.handle = 77;
+    open.pPrivateDriverData = &description; open.PrivateDriverDataSize = sizeof(description);
+    resource_handles[borrower.handle] = shared_index; ++references[shared_index]; // OS opens before the UMD callback.
+    functions.pfnOpenResource(h, &open, imported, borrower);
+    TEST(last_error == S_OK && counters.live_allocations == 2);
+    functions.pfnDestroyResource(h, shared);
+    TEST(!resource_handles.count(owner.handle) && references[shared_index] == 1 && !memory[shared_index].empty());
+    functions.pfnDestroyResource(h, imported);
+    TEST(resource_handles.empty() && memory[shared_index].empty());
     functions.pfnDestroyDevice(h);
     TEST(!counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
-    TEST(released == 2 && destroys == 1);
+    TEST(released == 3 && destroys == 1);
     std::puts("registered lab allocation and submission contracts passed");
     return 0;
 }

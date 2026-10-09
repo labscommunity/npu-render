@@ -14,12 +14,17 @@ readback, verifies the expected UMD was loaded, and checks cleanup counters. Bot
 the probe and UMD refuse to operate outside the owned `NR-GFX-LAB` guest with the
 `NR_WINDOWS` volume. The production UMD's readiness gate remains closed.
 
-The admitted operations are unshared 2D render targets, staging textures, clears,
+The admitted operations are 2D render targets, staging textures, clears,
 blocking CPU staging copies, and staging read maps. Resource data uses VidMm
 allocations with no private pixel-buffer fallback. Clears submit immediately and
 replace all command-buffer pointers with the runtime's returned pointers. Failed
 submission invalidates the context's writable command pointers. Unsupported
-operations report an error to the runtime. Shared textures, arbitrary usage,
+operations report an error to the runtime. A new `--shared` probe exercises
+legacy shared render targets between two devices on this same adapter, including
+creator release/reopen and alternating writers. Their allocation and resource
+metadata must agree, and each import is released through its own runtime resource
+identity. This probe runs within one process; cross-process and cross-adapter
+sharing need separate validation. NT sharing, keyed mutexes, arbitrary usage,
 initial uploads, shader execution and display operations remain unsupported.
 
 The target is built with the native DDI build or independently:

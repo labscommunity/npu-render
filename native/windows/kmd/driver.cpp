@@ -52,15 +52,21 @@ struct Adapter {
 #endif
     LONG devices;
     LONG allocations;
+    LONG resources;
     LONG opens;
     volatile LONG power_state = PowerDeviceD0;
     bool started;
     bool resetting;
 };
-struct Allocation { Adapter *adapter; nr::kernel_contract::Surface surface; LONG opens; };
+struct Resource { Adapter *adapter; LONG allocations; };
+struct Allocation { Adapter *adapter; nr::kernel_contract::Surface surface; LONG opens; Resource *resource; };
 struct Device { Adapter *adapter; HANDLE runtime; LONG contexts; LONG opens; };
 struct Context { Device *device; HANDLE runtime; bool system; };
 struct OpenAllocation { Device *device; Allocation *allocation; bool read_only; };
+bool same_surface(const nr::kernel_contract::Surface &a, const nr::kernel_contract::Surface &b) {
+    return a.width == b.width && a.height == b.height && a.format == b.format &&
+           a.row_pitch == b.row_pitch && a.allocation_bytes == b.allocation_bytes;
+}
 
 Allocation *writable_allocation(Adapter *adapter, const DXGK_ALLOCATIONLIST *list, UINT count,
                                 Device *device = nullptr) {
@@ -167,7 +173,7 @@ DXGKDDI_STOP_DEVICE stop_device;
 NTSTATUS stop_device(void *context) {
     if (!context) return STATUS_INVALID_PARAMETER;
     auto a = static_cast<Adapter *>(context);
-    if (a->devices || a->allocations || a->opens || (a->scheduler.active() && !a->engine.alive()))
+    if (a->devices || a->allocations || a->resources || a->opens || (a->scheduler.active() && !a->engine.alive()))
         return STATUS_DEVICE_BUSY;
     const auto engine_status = a->engine.stop();
     if (engine_status != STATUS_SUCCESS) return engine_status;
@@ -184,7 +190,7 @@ DXGKDDI_REMOVE_DEVICE remove_device;
 NTSTATUS remove_device(void *context) {
     if (!context) return STATUS_INVALID_PARAMETER;
     auto a = static_cast<Adapter *>(context);
-    if (a->started || a->devices || a->allocations || a->opens || a->scheduler.active() ||
+    if (a->started || a->devices || a->allocations || a->resources || a->opens || a->scheduler.active() ||
         a->segment.ready() || a->submissions.ready() || a->engine.alive()) return STATUS_DEVICE_BUSY;
     release(a);
     return STATUS_SUCCESS;
@@ -409,8 +415,16 @@ NTSTATUS APIENTRY build_paging(HANDLE adapter, DXGKARG_BUILDPAGINGBUFFER *args) 
 DXGKDDI_CREATEALLOCATION create_allocation;
 NTSTATUS APIENTRY create_allocation(HANDLE adapter, DXGKARG_CREATEALLOCATION *args) {
     if (!adapter || !args || !args->pAllocationInfo || !args->NumAllocations ||
-        args->NumAllocations > 16 || args->Flags.Value || args->hResource ||
-        args->PrivateDriverDataSize) return STATUS_INVALID_PARAMETER;
+        args->NumAllocations > 16 || (args->Flags.Value & ~1u) || args->hResource)
+        return STATUS_INVALID_PARAMETER;
+    const bool resource_owned = args->Flags.Resource != 0;
+    nr::kernel_contract::Surface resource_description{};
+    if (resource_owned) {
+        if (args->NumAllocations != 1 || !args->pPrivateDriverData ||
+            args->PrivateDriverDataSize != sizeof(resource_description)) return STATUS_INVALID_PARAMETER;
+        RtlCopyMemory(&resource_description, args->pPrivateDriverData, sizeof(resource_description));
+        if (!nr::kernel_contract::valid(resource_description)) return STATUS_INVALID_PARAMETER;
+    } else if (args->PrivateDriverDataSize) return STATUS_INVALID_PARAMETER;
     auto a = static_cast<Adapter *>(adapter);
     if (!a->started || !a->segment.ready()) return STATUS_DEVICE_NOT_READY;
     nr::kernel_contract::Surface descriptions[16]{};
@@ -421,6 +435,8 @@ NTSTATUS APIENTRY create_allocation(HANDLE adapter, DXGKARG_CREATEALLOCATION *ar
             return STATUS_INVALID_PARAMETER;
         RtlCopyMemory(&descriptions[i], in.pPrivateDriverData, sizeof(descriptions[i]));
         if (!nr::kernel_contract::valid(descriptions[i])) return STATUS_INVALID_PARAMETER;
+        if (resource_owned && !same_surface(resource_description, descriptions[i]))
+            return STATUS_INVALID_PARAMETER;
         if (descriptions[i].allocation_bytes > a->segment.capacity())
             return STATUS_INSUFFICIENT_RESOURCES;
     }
@@ -431,16 +447,29 @@ NTSTATUS APIENTRY create_allocation(HANDLE adapter, DXGKARG_CREATEALLOCATION *ar
             return STATUS_INSUFFICIENT_RESOURCES;
     } while (InterlockedCompareExchange(&a->allocations, previous + args->NumAllocations,
                                        previous) != previous);
+    Resource *resource = nullptr;
+    if (resource_owned) {
+        if (InterlockedIncrement(&a->resources) <= 128) resource = allocate<Resource>();
+        if (!resource) {
+            InterlockedDecrement(&a->resources);
+            InterlockedExchangeAdd(&a->allocations, -LONG(args->NumAllocations));
+            return STATUS_INSUFFICIENT_RESOURCES;
+        }
+        resource->adapter = a;
+        resource->allocations = LONG(args->NumAllocations);
+    }
     Allocation *created[16]{};
     for (UINT i = 0; i < args->NumAllocations; ++i) {
         created[i] = allocate<Allocation>();
         if (!created[i]) {
             for (UINT j = 0; j < i; ++j) release(created[j]);
+            if (resource) { release(resource); InterlockedDecrement(&a->resources); }
             InterlockedExchangeAdd(&a->allocations, -LONG(args->NumAllocations));
             return STATUS_INSUFFICIENT_RESOURCES;
         }
         created[i]->adapter = a;
         created[i]->surface = descriptions[i];
+        created[i]->resource = resource;
     }
     for (UINT i = 0; i < args->NumAllocations; ++i) {
         auto &out = args->pAllocationInfo[i];
@@ -463,23 +492,41 @@ NTSTATUS APIENTRY create_allocation(HANDLE adapter, DXGKARG_CREATEALLOCATION *ar
         out.AllocationPriority = D3DDDI_ALLOCATIONPRIORITY_NORMAL;
         out.hAllocation = created[i];
     }
+    args->hResource = resource;
     return STATUS_SUCCESS;
 }
 DXGKDDI_DESTROYALLOCATION destroy_allocation;
 NTSTATUS APIENTRY destroy_allocation(HANDLE adapter, const DXGKARG_DESTROYALLOCATION *args) {
-    if (!adapter || !args || !args->pAllocationList || !args->NumAllocations ||
-        args->NumAllocations > 16 || args->Flags.Value || args->hResource)
+    if (!adapter || !args || (args->NumAllocations && !args->pAllocationList) ||
+        args->NumAllocations > 16 || (args->Flags.Value & ~1u) ||
+        (!args->NumAllocations && !args->Flags.DestroyResource))
         return STATUS_INVALID_PARAMETER;
+    auto resource = static_cast<Resource *>(args->hResource);
+    if (args->Flags.DestroyResource && !resource) return STATUS_INVALID_PARAMETER;
+    if (resource) {
+        if (resource->adapter != adapter) return STATUS_INVALID_HANDLE;
+        const auto count = InterlockedCompareExchange(&resource->allocations, 0, 0);
+        if (count < LONG(args->NumAllocations) ||
+            (args->Flags.DestroyResource && count != LONG(args->NumAllocations))) return STATUS_DEVICE_BUSY;
+    }
     // These are Dxgkrnl-validated opaque KMD handles, never UMD pointers.
     for (UINT i = 0; i < args->NumAllocations; ++i) {
         auto allocation = static_cast<Allocation *>(args->pAllocationList[i]);
         if (!allocation || allocation->adapter != adapter) return STATUS_INVALID_PARAMETER;
+        if (allocation->resource != resource) return STATUS_INVALID_PARAMETER;
         if (InterlockedCompareExchange(&allocation->opens, 0, 0)) return STATUS_DEVICE_BUSY;
         for (UINT j = 0; j < i; ++j)
             if (args->pAllocationList[j] == allocation) return STATUS_INVALID_PARAMETER;
     }
     for (UINT i = 0; i < args->NumAllocations; ++i) release(args->pAllocationList[i]);
     InterlockedExchangeAdd(&static_cast<Adapter *>(adapter)->allocations, -LONG(args->NumAllocations));
+    if (resource) {
+        InterlockedExchangeAdd(&resource->allocations, -LONG(args->NumAllocations));
+        if (args->Flags.DestroyResource) {
+            release(resource);
+            InterlockedDecrement(&static_cast<Adapter *>(adapter)->resources);
+        }
+    }
     return STATUS_SUCCESS;
 }
 DXGKDDI_DESCRIBEALLOCATION describe_allocation;
@@ -504,8 +551,15 @@ NTSTATUS APIENTRY open_allocation(HANDLE device, const DXGKARG_OPENALLOCATION *a
         !args->pOpenAllocation) return STATUS_INVALID_PARAMETER;
     DXGK_OPENALLOCATIONFLAGS allowed{};
     allowed.Create = allowed.ReadOnly = 1;
-    if ((args->Flags.Value & ~allowed.Value) || args->PrivateDriverSize || args->SubresourceIndex)
+    if ((args->Flags.Value & ~allowed.Value) || args->SubresourceIndex)
         return STATUS_NOT_SUPPORTED;
+    nr::kernel_contract::Surface resource_description{};
+    if (args->PrivateDriverSize) {
+        if (!args->pPrivateDriverData || args->PrivateDriverSize != sizeof(resource_description) || args->NumAllocations != 1)
+            return STATUS_NOT_SUPPORTED;
+        RtlCopyMemory(&resource_description, args->pPrivateDriverData, sizeof(resource_description));
+        if (!nr::kernel_contract::valid(resource_description)) return STATUS_INVALID_PARAMETER;
+    }
     auto d = static_cast<Device *>(device);
     auto a = d->adapter;
     if (!a->started || !a->kernel.DxgkCbGetHandleData) return STATUS_DEVICE_NOT_READY;
@@ -521,6 +575,9 @@ NTSTATUS APIENTRY open_allocation(HANDLE device, const DXGKARG_OPENALLOCATION *a
         // This 32-bit OS handle is never interpreted as a kernel pointer.
         allocations[i] = static_cast<Allocation *>(a->kernel.DxgkCbGetHandleData(&lookup));
         if (!allocations[i] || allocations[i]->adapter != a) return STATUS_INVALID_HANDLE;
+        if (bool(allocations[i]->resource) != bool(args->PrivateDriverSize) ||
+            (args->PrivateDriverSize && !same_surface(resource_description, allocations[i]->surface)))
+            return STATUS_INVALID_PARAMETER;
     }
     // One adapter-wide bound also bounds every per-device/per-allocation count.
     LONG previous;

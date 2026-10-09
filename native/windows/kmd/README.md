@@ -6,6 +6,15 @@ work. Default `StartDevice` returns `STATUS_NOT_SUPPORTED`. The separate
 disposable-VM paging mode below can attempt startup without enabling rendering
 or display ownership. No installer or INF is shipped in the desktop bundle.
 
+The laboratory allocation contract now admits one linear allocation attached to
+a resource identity for same-adapter sharing. Resource and allocation descriptions
+must agree; opening resolves OS allocation handles and verifies that metadata.
+Resource ownership, allocation lifetime and per-device opens are counted
+separately, including an empty resource awaiting destruction. This does not
+advertise cross-adapter resources or an aperture segment. Host tests cover failed
+allocation unwind, import metadata rejection and combined/separate destruction;
+live sharing requires the registered UMD probe.
+
 Build on x64 Windows with MSVC and the pinned SDK:
 
 ```powershell

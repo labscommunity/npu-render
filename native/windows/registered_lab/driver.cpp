@@ -80,21 +80,42 @@ Resource &resource(D3D10DDI_HRESOURCE h) {
 }
 SIZE_T APIENTRY resource_size(D3D10DDI_HDEVICE, const D3D10DDIARG_CREATERESOURCE *) { return sizeof(Resource); }
 void APIENTRY create_resource(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATERESOURCE *a,
-                             D3D10DDI_HRESOURCE out, D3D10DDI_HRTRESOURCE) {
+                             D3D10DDI_HRESOURCE out, D3D10DDI_HRTRESOURCE rt) {
     new (out.pDrvPrivate) Resource();
     guard(h, [&] {
         require(a && a->ResourceDimension == D3D10DDIRESOURCE_TEXTURE2D && a->MipLevels == 1 &&
                 a->ArraySize == 1 && a->pMipInfoList && format_ok(a->Format) && a->SampleDesc.Count == 1 &&
-                !a->SampleDesc.Quality && !a->MiscFlags && !a->pPrimaryDesc && !a->pInitialDataUP);
-        const bool staging = a->Usage == D3D10_DDI_USAGE_STAGING && !a->BindFlags && a->MapFlags == D3D10_DDI_CPU_ACCESS_READ;
+                !a->SampleDesc.Quality && !(a->MiscFlags & ~D3D10_DDI_RESOURCE_MISC_SHARED) && !a->pPrimaryDesc && !a->pInitialDataUP);
+        const bool shared = a->MiscFlags == D3D10_DDI_RESOURCE_MISC_SHARED;
+        require(!shared || rt.handle);
+        const bool staging = a->Usage == D3D10_DDI_USAGE_STAGING && !a->BindFlags && a->MapFlags == D3D10_DDI_CPU_ACCESS_READ && !shared;
         const bool target = a->Usage == D3D10_DDI_USAGE_DEFAULT && a->BindFlags == D3D10_DDI_BIND_RENDER_TARGET && !a->MapFlags;
         require(staging || target);
         const auto &m = a->pMipInfoList[0];
         require(m.TexelDepth == 1);
         auto allocation = std::make_shared<Allocation>(device(h).context);
-        allocation->create(m.TexelWidth, m.TexelHeight, UINT(a->Format));
+        allocation->create(m.TexelWidth, m.TexelHeight, UINT(a->Format), shared ? rt.handle : nullptr);
         auto &r = *static_cast<Resource *>(out.pDrvPrivate);
         r.allocation = std::move(allocation); r.usage = a->Usage; r.map_flags = a->MapFlags;
+    });
+}
+SIZE_T APIENTRY opened_resource_size(D3D10DDI_HDEVICE, const D3D10DDIARG_OPENRESOURCE *) { return sizeof(Resource); }
+void APIENTRY open_resource(D3D10DDI_HDEVICE h, const D3D10DDIARG_OPENRESOURCE *a,
+                           D3D10DDI_HRESOURCE out, D3D10DDI_HRTRESOURCE rt) {
+    new (out.pDrvPrivate) Resource();
+    guard(h, [&] {
+        require(a && rt.handle && a->hKMResource.handle && a->NumAllocations == 1 && a->pOpenAllocationInfo &&
+                a->pPrivateDriverData && a->PrivateDriverDataSize == sizeof(nr::kernel_contract::Surface));
+        const auto &item = a->pOpenAllocationInfo[0];
+        require(item.hAllocation && item.pPrivateDriverData && item.PrivateDriverDataSize == sizeof(nr::kernel_contract::Surface));
+        nr::kernel_contract::Surface description{}, per_allocation{};
+        std::memcpy(&description, a->pPrivateDriverData, sizeof(description));
+        std::memcpy(&per_allocation, item.pPrivateDriverData, sizeof(per_allocation));
+        require(std::memcmp(&description, &per_allocation, sizeof(description)) == 0);
+        auto allocation = std::make_shared<Allocation>(device(h).context);
+        allocation->open(rt.handle, item.hAllocation, description);
+        auto &r = *static_cast<Resource *>(out.pDrvPrivate);
+        r.allocation = std::move(allocation); r.usage = D3D10_DDI_USAGE_DEFAULT;
     });
 }
 void APIENTRY destroy_resource(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE r) {
@@ -255,6 +276,7 @@ HRESULT APIENTRY create_device(D3D10DDI_HADAPTER, D3D10DDIARG_CREATEDEVICE *a) {
 #include "../ddi/unsupported.inc"
 #undef NR_REJECT
         f.pfnCalcPrivateResourceSize = resource_size; f.pfnCreateResource = create_resource;
+        f.pfnCalcPrivateOpenedResourceSize = opened_resource_size; f.pfnOpenResource = open_resource;
         f.pfnDestroyResource = destroy_resource; f.pfnResourceCopy = copy_resource;
         f.pfnResourceMap = f.pfnStagingResourceMap = map;
         f.pfnResourceUnmap = f.pfnStagingResourceUnmap = unmap;
