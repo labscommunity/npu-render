@@ -83,6 +83,14 @@ void APIENTRY create_resource(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATERESOUR
                              D3D10DDI_HRESOURCE out, D3D10DDI_HRTRESOURCE rt) {
     new (out.pDrvPrivate) Resource();
     guard(h, [&] {
+        if (a && a->MiscFlags) {
+            std::fprintf(stderr, "nr_fill_umd: resource dimension=%u mips=%u array=%u format=%u samples=%u/%u misc=%x usage=%u bind=%x map=%x primary=%u initial=%u runtime_resource=%u\n",
+                UINT(a->ResourceDimension), a->MipLevels, a->ArraySize, UINT(a->Format), a->SampleDesc.Count,
+                a->SampleDesc.Quality, a->MiscFlags, UINT(a->Usage), a->BindFlags, a->MapFlags,
+                UINT(a->pPrimaryDesc != nullptr), UINT(a->pInitialDataUP != nullptr), UINT(rt.handle != nullptr));
+            if (a->pMipInfoList) std::fprintf(stderr, "nr_fill_umd: resource extent=%ux%ux%u\n",
+                a->pMipInfoList[0].TexelWidth, a->pMipInfoList[0].TexelHeight, a->pMipInfoList[0].TexelDepth);
+        }
         require(a && a->ResourceDimension == D3D10DDIRESOURCE_TEXTURE2D && a->MipLevels == 1 &&
                 a->ArraySize == 1 && a->pMipInfoList && format_ok(a->Format) && a->SampleDesc.Count == 1 &&
                 !a->SampleDesc.Quality && !(a->MiscFlags & ~D3D10_DDI_RESOURCE_MISC_SHARED) && !a->pPrimaryDesc && !a->pInitialDataUP);
