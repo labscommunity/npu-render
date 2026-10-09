@@ -52,3 +52,10 @@ initialization were still rejected, causing the first texture creation to fail.
 Per-call diagnostics identified the vertex, geometry and pixel sampler bindings.
 The following revision retains independent descriptors for all 16 sampler slots
 in each admitted shader stage; this still supplies no shader execution.
+
+The [v26 run](../../../docs/validation/2026-10-09/registered-clear-v26/report.json)
+passes all six ordinary Direct3D clears and staging readbacks. Every visible byte
+matches, all runtime-owned objects are released, and no callback is rejected.
+The kernel debugger records the six actual render submissions and completions.
+This validates the registered CPU-worker path on the isolated guest. NPU execution,
+sharing, shaders, presentation, and DWM selection are separate remaining gates.

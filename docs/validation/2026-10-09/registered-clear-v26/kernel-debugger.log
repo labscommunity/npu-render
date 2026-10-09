@@ -1,0 +1,108 @@
+Opened log file 'C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-paging-v26-oct9.log'
+Breakpoint 0 hit
+nr_render_kmd!DriverEntry:
+fffff807`6b565710 4055            push    rbp
+1: kd> gu
+nr_render_kmd!GsDriverEntry+0x20:
+fffff807`6b56c020 488b5c2430      mov     rbx,qword ptr [rsp+30h]
+1: kd> r eax;bc *;g
+eax=0
+nr_paging_lab: memory=00000000 required_queue=32
+nr_paging_lab: engine_start=00000000 capacity=33; rendering_ready=0 sources=0 children=0
+nr_paging_lab: query type=1 input=0 output=552
+nr_paging_lab: query type=47 input=0 output=4
+nr_paging_lab: create_context node=0 affinity=1 flags=1 private=0
+nr_paging_lab: query type=5 input=24 output=32
+nr_paging_lab: query type=5 input=24 output=32
+nr_paging_lab: query type=10 input=4 output=4
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: create_context node=0 affinity=1 flags=0 private=0
+nr_paging_lab: render_fill=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=1 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=1
+nr_paging_lab: execute fence=1 commands=1 status=00000000 irql=0
+nr_paging_lab: patch=00000000 flags=0 fence=2 dma=0..16 private=0..32
+nr_paging_lab: submit=00000000 flags=0 fence=2
+nr_paging_lab: execute fence=2 commands=1 status=00000000 irql=0
+nr_paging_lab: render_fill=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=3
+nr_paging_lab: execute fence=3 commands=1 status=00000000 irql=0
+nr_paging_lab: render_fill=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=4
+nr_paging_lab: execute fence=4 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=5 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=5
+nr_paging_lab: patch=00000000 flags=1 fence=6 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=6
+nr_paging_lab: execute fence=5 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=6 commands=0 status=00000000 irql=0
+nr_paging_lab: render_fill=00000000
+nr_paging_lab: build_paging operation=1 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=7 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=7
+nr_paging_lab: patch=00000000 flags=0 fence=8 dma=0..16 private=0..32
+nr_paging_lab: submit=00000000 flags=0 fence=8
+nr_paging_lab: execute fence=7 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=8 commands=1 status=00000000 irql=0
+nr_paging_lab: render_fill=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=9
+nr_paging_lab: execute fence=9 commands=1 status=00000000 irql=0
+nr_paging_lab: render_fill=00000000
+nr_paging_lab: submit=00000000 flags=0 fence=10
+nr_paging_lab: execute fence=10 commands=1 status=00000000 irql=0
+nr_paging_lab: build_paging operation=2 status=00000000
+nr_paging_lab: patch=00000000 flags=1 fence=11 dma=0..8 private=0..56
+nr_paging_lab: submit=00000000 flags=1 fence=11
+nr_paging_lab: patch=00000000 flags=1 fence=12 dma=8..8 private=56..56
+nr_paging_lab: submit=00000000 flags=1 fence=12
+nr_paging_lab: execute fence=11 commands=1 status=00000000 irql=0
+nr_paging_lab: execute fence=12 commands=0 status=00000000 irql=0
+Break instruction exception - code 80000003 (first chance)
+*******************************************************************************
+*                                                                             *
+*   You are seeing this message because you pressed either                    *
+*       CTRL+C (if you run console kernel debugger) or,                       *
+*       CTRL+BREAK (if you run GUI kernel debugger),                          *
+*   on your debugger machine's keyboard.                                      *
+*                                                                             *
+*                   THIS IS NOT A BUG OR A SYSTEM CRASH                       *
+*                                                                             *
+* If you did not intend to break into the debugger, press the "g" key, then   *
+* press the "Enter" key now.  This message might immediately reappear.  If it *
+* does, press "g" and "Enter" again.                                          *
+*                                                                             *
+*******************************************************************************
+nt!DbgBreakPointWithStatus:
+fffff807`d4afdfb0 cc              int     3
+0: kd> sxe ud:nr_render_kmd.sys;g
+Unload module nr_render_kmd.sys at fffff807`6b560000
+nt!DebugService2+0x5:
+fffff807`d4afe005 cc              int     3
+1: kd> .logclose;sxd ud;bc *;g
+Closing open log file C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-paging-v26-oct9.log
