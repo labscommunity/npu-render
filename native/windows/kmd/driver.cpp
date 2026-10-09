@@ -689,7 +689,9 @@ NTSTATUS APIENTRY open_allocation(HANDLE device, const DXGKARG_OPENALLOCATION *a
         // This 32-bit OS handle is never interpreted as a kernel pointer.
         allocations[i] = static_cast<Allocation *>(a->kernel.DxgkCbGetHandleData(&lookup));
         if (!allocations[i] || allocations[i]->adapter != a) return STATUS_INVALID_HANDLE;
-        if (bool(allocations[i]->resource) != bool(args->PrivateDriverSize) ||
+        const bool staging_without_resource_data = allocations[i]->resource && !args->PrivateDriverSize &&
+            args->NumAllocations == 1 && allocations[i]->surface.flags == nr::kernel_contract::presentation_staging_surface;
+        if ((!staging_without_resource_data && bool(allocations[i]->resource) != bool(args->PrivateDriverSize)) ||
             (args->PrivateDriverSize && !same_surface(resource_description, allocations[i]->surface)))
             return STATUS_INVALID_PARAMETER;
     }

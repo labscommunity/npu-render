@@ -146,6 +146,30 @@ int standard_allocation_ddi_test(Adapter *a) {
     NR_CHECK(registration.DxgkDdiDescribeAllocation(a, &description) == STATUS_SUCCESS &&
              description.Width == 320 && description.Height == 192 && description.Format == D3DDDIFMT_X8R8G8B8);
     destroy.hResource = create.hResource; destroy.Flags.DestroyResource = 1;
+    // Resolve a host-only OS handle, then exercise the same open/close lifetime
+    // used for the live standard surface. No kernel-pointer handle shortcut.
+    static Allocation *staging_lookup = nullptr;
+    staging_lookup = static_cast<Allocation *>(info.hAllocation);
+    const auto old_lookup = a->kernel.DxgkCbGetHandleData;
+    a->kernel.DxgkCbGetHandleData = [](const DXGKARGCB_GETHANDLEDATA *lookup) -> void * {
+        return lookup && lookup->hObject == 901 && lookup->Type == DXGK_HANDLE_ALLOCATION && !lookup->Flags.Value ? staging_lookup : nullptr;
+    };
+    DXGKARG_CREATEDEVICE device_args{};
+    NR_CHECK(registration.DxgkDdiCreateDevice(a, &device_args) == STATUS_SUCCESS);
+    DXGK_OPENALLOCATIONINFO opened{}; opened.hAllocation = 901;
+    DXGKARG_OPENALLOCATION open{}; open.NumAllocations = 1; open.pOpenAllocation = &opened; open.Flags.Create = 1;
+    const auto original_surface = staging_lookup->surface;
+    staging_lookup->surface.flags = 0; staging_lookup->surface.format = 87;
+    NR_CHECK(registration.DxgkDdiOpenAllocation(device_args.hDevice, &open) == STATUS_INVALID_PARAMETER && !opened.hDeviceSpecificAllocation);
+    staging_lookup->surface = original_surface;
+    NR_CHECK(registration.DxgkDdiOpenAllocation(device_args.hDevice, &open) == STATUS_SUCCESS && opened.hDeviceSpecificAllocation);
+    NR_CHECK(a->opens == 1 && staging_lookup->opens == 1);
+    NR_CHECK(registration.DxgkDdiDestroyAllocation(a, &destroy) == STATUS_DEVICE_BUSY);
+    NR_CHECK(registration.DxgkDdiDestroyDevice(device_args.hDevice) == STATUS_DEVICE_BUSY);
+    DXGKARG_CLOSEALLOCATION close{}; close.NumAllocations = 1; close.pOpenHandleList = &opened.hDeviceSpecificAllocation;
+    NR_CHECK(registration.DxgkDdiCloseAllocation(device_args.hDevice, &close) == STATUS_SUCCESS && !a->opens && !staging_lookup->opens);
+    NR_CHECK(registration.DxgkDdiDestroyDevice(device_args.hDevice) == STATUS_SUCCESS);
+    staging_lookup = nullptr; a->kernel.DxgkCbGetHandleData = old_lookup;
     NR_CHECK(registration.DxgkDdiDestroyAllocation(a, &destroy) == STATUS_SUCCESS && !a->allocations && !a->resources);
     return 0;
 }
