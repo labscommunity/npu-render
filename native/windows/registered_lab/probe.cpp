@@ -190,7 +190,9 @@ void exercise_shared(IDXGIAdapter *adapter, ID3D11Device *creator, ID3D11DeviceC
 #include "process_probe.hpp"
 #include "upload_probe.hpp"
 #include "draw_probe.hpp"
+#include "present_probe.hpp"
 int main(int argc, char **argv) {
+    const bool presentation = argc == 2 && !std::strcmp(argv[1], "--present");
     const bool child_nt = argc == 5 && std::strcmp(argv[1], "--shared-child-nt") == 0;
     const bool child = child_nt || (argc == 5 && std::strcmp(argv[1], "--shared-child") == 0);
     const bool process_nt = argc == 2 && std::strcmp(argv[1], "--shared-process-nt") == 0;
@@ -201,7 +203,7 @@ int main(int argc, char **argv) {
     const bool draw_args = argc == 2 || desktop_size;
     const char *draw_backend = draw_args && !std::strcmp(argv[1], "--draw-cpu") ? "CPU" :
                                (draw_args && !std::strcmp(argv[1], "--draw-npu") ? "NPU" : nullptr);
-    if (!child && !processes && !nt_handles && !uploads && !draw_backend && (argc != 2 || (std::strcmp(argv[1], "--exercise") && std::strcmp(argv[1], "--shared")))) return 2;
+    if (!presentation && !child && !processes && !nt_handles && !uploads && !draw_backend && (argc != 2 || (std::strcmp(argv[1], "--exercise") && std::strcmp(argv[1], "--shared")))) return 2;
     const bool shared = nt_handles || std::strcmp(argv[1], "--shared") == 0;
     if (!nr_fill_guest()) { std::puts("{\"passed\":false,\"error\":\"owned graphics guest required\"}"); return 2; }
     HMODULE retained = nullptr;
@@ -245,7 +247,8 @@ int main(int argc, char **argv) {
         require(received == requested, "unexpected feature level");
         auto stats = reinterpret_cast<BOOL (*)(NrFillStats *)>(GetProcAddress(retained, "nr_fill_stats"));
         require(stats != nullptr, "UMD diagnostics unavailable");
-        if (draw_backend) {
+        if (presentation) exercise_present(factory.Get(), device.Get(), context.Get());
+        else if (draw_backend) {
             const std::array<std::pair<UINT, UINT>, 2> extents = desktop_size ?
                 std::array<std::pair<UINT, UINT>, 2>{{{1920, 1080}, {2880, 1800}}} :
                 std::array<std::pair<UINT, UINT>, 2>{{{64, 16}, {132, 16}}};
@@ -269,7 +272,7 @@ int main(int argc, char **argv) {
         context.Reset(); device.Reset(); adapter.Reset(); factory.Reset();
         NrFillStats result{};
         require(stats(&result) != FALSE, "UMD diagnostics failed");
-        std::printf("{\"present_requests\":%llu,\"accepted_present_callbacks\":%llu,\"display_delivery_tested\":false}\n", result.present_requests, result.accepted_present_callbacks);
+        std::printf("{\"present_requests\":%llu,\"accepted_present_callbacks\":%llu,\"display_delivery_tested\":%s}\n", result.present_requests, result.accepted_present_callbacks, presentation ? "true" : "false");
         std::printf("{\"pid\":%lu,\"allocations\":%llu,\"fills\":%llu,\"staging_copy_bytes\":%llu,\"live_allocations\":%llu,\"live_contexts\":%llu,\"cleanup_errors\":%llu,\"rejected\":%llu,\"submitted_copies\":%llu,\"upload_bytes\":%llu}\n", GetCurrentProcessId(),
                     result.allocations, result.fills, result.staging_copy_bytes, result.live_allocations,
                     result.live_contexts, result.cleanup_errors, result.rejected, result.submitted_copies, result.upload_bytes);
@@ -277,7 +280,8 @@ int main(int argc, char **argv) {
         std::printf("{\"draws\":%llu,\"executions\":%llu,\"cpu_executions\":%llu,\"gpu_executions\":%llu,\"npu_executions\":%llu,\"execution_device\":\"%s\",\"inference_input_bytes\":%llu,\"inference_output_bytes\":%llu}\n",
                     result.draws, result.executions, result.cpu_executions, result.gpu_executions, result.npu_executions,
                     result.last_execution_device, result.inference_input_bytes, result.inference_output_bytes);
-        if (draw_backend) {
+        if (presentation) require(result.fills == 3 && result.present_requests == 3 && result.accepted_present_callbacks == 3, "unexpected presentation counters");
+        else if (draw_backend) {
             require(result.draws == 24 && result.executions == 24 && !result.gpu_executions &&
                     result.cpu_executions == (!std::strcmp(draw_backend, "CPU") ? 24u : 0u) &&
                     result.npu_executions == (!std::strcmp(draw_backend, "NPU") ? 24u : 0u), "unexpected draw execution counters");
@@ -303,9 +307,9 @@ int main(int argc, char **argv) {
             auto stats = reinterpret_cast<BOOL (*)(NrFillStats *)>(GetProcAddress(retained, "nr_fill_stats"));
             NrFillStats result{};
             if (stats && stats(&result))
-                std::printf("{\"failed\":true,\"rejected\":%llu,\"last_unsupported_offset\":%llu,\"cleanup_errors\":%llu,\"executions\":%llu,\"cpu_executions\":%llu,\"gpu_executions\":%llu,\"npu_executions\":%llu,\"live_allocations\":%llu,\"live_contexts\":%llu}\n",
+                std::printf("{\"failed\":true,\"rejected\":%llu,\"last_unsupported_offset\":%llu,\"cleanup_errors\":%llu,\"executions\":%llu,\"cpu_executions\":%llu,\"gpu_executions\":%llu,\"npu_executions\":%llu,\"live_allocations\":%llu,\"live_contexts\":%llu,\"present_requests\":%llu,\"accepted_present_callbacks\":%llu}\n",
                             result.rejected, result.last_unsupported_offset, result.cleanup_errors, result.executions,
-                            result.cpu_executions, result.gpu_executions, result.npu_executions, result.live_allocations, result.live_contexts);
+                            result.cpu_executions, result.gpu_executions, result.npu_executions, result.live_allocations, result.live_contexts, result.present_requests, result.accepted_present_callbacks);
             FreeLibrary(retained);
         }
         return 1;

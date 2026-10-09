@@ -24,7 +24,7 @@ set_property(TARGET nr_fill_umd PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<
 add_executable(nr_registered_clear_probe probe.cpp)
 target_compile_features(nr_registered_clear_probe PRIVATE cxx_std_17)
 target_compile_options(nr_registered_clear_probe PRIVATE /W4 /WX)
-target_link_libraries(nr_registered_clear_probe PRIVATE d3d11 dxgi gdi32 d3dcompiler)
+target_link_libraries(nr_registered_clear_probe PRIVATE d3d11 dxgi gdi32 d3dcompiler user32 dwmapi)
 set_property(TARGET nr_registered_clear_probe PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 add_executable(nr_registered_lab_test tests.cpp)
 target_link_libraries(nr_registered_lab_test PRIVATE nr_registered_blend d3dcompiler)

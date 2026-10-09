@@ -1,5 +1,6 @@
 // Guest-only normal-loader D3D10 DDI bridge over real kernel allocations.
-// Restricted composition shaders use an explicit provider. No presentation.
+// Restricted composition shaders use an explicit provider. Blit presents forward
+// to DXGI; callback acceptance alone does not establish display delivery.
 #define NOMINMAX
 #pragma warning(push)
 #pragma warning(disable: 4201) // Anonymous structures in Microsoft DDI headers.
@@ -80,9 +81,14 @@ template<class R, class... A, size_t Offset> struct Unsupported<R(APIENTRY *)(D3
         if constexpr (!std::is_void_v<R>) return R{};
     }
 };
-template<class T> struct UnsupportedDxgi;
-template<class R, class... A> struct UnsupportedDxgi<R(APIENTRY *)(A...)> {
-    static R APIENTRY call(A...) { return DXGI_ERROR_UNSUPPORTED; }
+template<class T, size_t Offset> struct UnsupportedDxgi;
+template<class R, class... A, size_t Offset> struct UnsupportedDxgi<R(APIENTRY *)(A...), Offset> {
+    static R APIENTRY call(A...) {
+        std::lock_guard<std::recursive_mutex> lock(mutex);
+        ++counters.rejected;
+        std::fprintf(stderr, "nr_fill_umd: unsupported DXGI DDI offset=%zu\n", Offset);
+        return DXGI_ERROR_UNSUPPORTED;
+    }
 };
 bool format_ok(DXGI_FORMAT f) { return f == DXGI_FORMAT_R8G8B8A8_UNORM || f == DXGI_FORMAT_B8G8R8A8_UNORM; }
 Resource &resource(D3D10DDI_HRESOURCE h) {
@@ -141,7 +147,7 @@ void APIENTRY create_resource(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATERESOUR
                              D3D10DDI_HRESOURCE out, D3D10DDI_HRTRESOURCE rt) {
     new (out.pDrvPrivate) Resource();
     guard(h, [&] {
-        if (a && a->MiscFlags) {
+        if (a && (a->MiscFlags || a->pPrimaryDesc)) {
             std::fprintf(stderr, "nr_fill_umd: resource dimension=%u mips=%u array=%u format=%u samples=%u/%u misc=%x usage=%u bind=%x map=%x primary=%u initial=%u runtime_resource=%u\n",
                 UINT(a->ResourceDimension), a->MipLevels, a->ArraySize, UINT(a->Format), a->SampleDesc.Count,
                 a->SampleDesc.Quality, a->MiscFlags, UINT(a->Usage), a->BindFlags, a->MapFlags,
@@ -420,7 +426,7 @@ HRESULT APIENTRY create_device(D3D10DDI_HADAPTER, D3D10DDIARG_CREATEDEVICE *a) {
         f.pfnCheckCounterInfo = counter_info; f.pfnRelocateDeviceFuncs = relocate; f.pfnDestroyDevice = destroy_device;
         auto &dxgi = *a->DXGIBaseDDI.pDXGIDDIBaseFunctions;
         dxgi = {};
-#define NR_DXGI(field) dxgi.field = &UnsupportedDxgi<decltype(dxgi.field)>::call
+#define NR_DXGI(field) dxgi.field = &UnsupportedDxgi<decltype(dxgi.field), offsetof(DXGI_DDI_BASE_FUNCTIONS, field)>::call
         dxgi.pfnPresent = present; NR_DXGI(pfnGetGammaCaps); NR_DXGI(pfnSetDisplayMode);
         NR_DXGI(pfnSetResourcePriority); NR_DXGI(pfnQueryResourceResidency);
         NR_DXGI(pfnRotateResourceIdentities); NR_DXGI(pfnBlt);

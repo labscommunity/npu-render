@@ -81,6 +81,15 @@ uses explicit callback shims and verifies that forwarding does not secretly
 copy pixels. Live swap-chain presentation remains a separate test; flips,
 cross-adapter imports and the other DXGI display functions are still unsupported.
 
+`--present` creates a visible 320×192 HWND and a discard-model DXGI swap chain
+on the selected laboratory adapter. It requires an interactive guest session,
+clears the back buffer red/green/blue, submits each present, and checks every RGB
+byte captured from that window's screen rectangle after DWM flushes. The GDI
+capture is only the independent output oracle. An occluded present, pixel
+mismatch or rejected callback fails the test. This tests CPU clear presentation;
+it does not move DWM or establish NPU execution. Unsupported DXGI callbacks now
+emit their table offset to aid diagnosis without claiming implementation.
+
 `--upload` exercises initial texture data, full and partial `UpdateSubresource`,
 and empty updates for ordinary, legacy shared and NT keyed textures in both
 formats. Patterned 65×37 images have padded source rows; every readback checks
