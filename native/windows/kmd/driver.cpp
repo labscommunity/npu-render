@@ -5,6 +5,11 @@ extern "C" {
 #include <ntifs.h>
 #include <dispmprt.h>
 }
+#if NR_KMD_LAB_PAGING_ADAPTER
+#define NR_LAB_TRACE(...) DbgPrintEx(DPFLTR_IHVVIDEO_ID, DPFLTR_ERROR_LEVEL, __VA_ARGS__)
+#else
+#define NR_LAB_TRACE(...) do {} while (false)
+#endif
 inline void *operator new(size_t, void *p) noexcept { return p; }
 
 #include "scheduler.hpp"
@@ -26,6 +31,7 @@ inline void *operator new(size_t, void *p) noexcept { return p; }
 namespace {
 constexpr ULONG pool_tag = 'rRpN';
 constexpr bool runtime_ready = false;
+constexpr bool startup_enabled = runtime_ready || NR_KMD_LAB_PAGING_ADAPTER != 0;
 struct Adapter {
     const DEVICE_OBJECT *physical;
     DXGKRNL_INTERFACE kernel;
@@ -45,6 +51,7 @@ struct Adapter {
     LONG devices;
     LONG allocations;
     LONG opens;
+    volatile LONG power_state = PowerDeviceD0;
     bool started;
     bool resetting;
 };
@@ -117,9 +124,12 @@ NTSTATUS start_device(void *context, DXGK_START_INFO *start,
         engine_probe.required_entries, ULONGLONG(engine_probe.queue_entries), engine_probe.notifications,
         engine_probe.dpcs, UINT(engine_probe.worker_irql), UINT(engine_probe.notify_irql), UINT(engine_probe.dpc_irql));
 #endif
-    // Do not let Dxgkrnl select an adapter with incomplete mandatory DDIs.
-    if (!runtime_ready) return STATUS_NOT_SUPPORTED;
-    const auto memory_status = a->segment.prepare();
+    // Only the explicit disposable-VM build may start the paging-only engine.
+    // Paired UMD readiness and display ownership remain disabled in that build.
+    if (!startup_enabled) return STATUS_NOT_SUPPORTED;
+    const auto memory_status = a->segment.prepare(NR_KMD_LAB_PAGING_ADAPTER ?
+        16 * 1024 * 1024 : nr::kmd::Segment::bytes);
+    NR_LAB_TRACE("nr_paging_lab: memory=%08lx required_queue=%lu\n", ULONG(memory_status), start->RequiredDmaQueueEntry);
     if (!NT_SUCCESS(memory_status)) return memory_status;
     const auto queue_status = a->submissions.prepare(a->scheduler, start->RequiredDmaQueueEntry);
     if (!NT_SUCCESS(queue_status)) {
@@ -128,6 +138,8 @@ NTSTATUS start_device(void *context, DXGK_START_INFO *start,
     }
     a->kernel = *kernel;
     const auto engine_status = a->engine.start(a->kernel, a->scheduler, a->submissions, a->segment);
+    NR_LAB_TRACE("nr_paging_lab: engine_start=%08lx capacity=%llu; rendering_ready=0 sources=0 children=0\n",
+        ULONG(engine_status), ULONGLONG(a->submissions.capacity()));
     if (engine_status != STATUS_SUCCESS) {
         a->submissions.release();
         a->segment.release();
@@ -193,14 +205,21 @@ NTSTATUS APIENTRY patch(HANDLE adapter, const DXGKARG_PATCH *args) {
     if (!adapter || !args) return STATUS_INVALID_PARAMETER;
     auto a = static_cast<Adapter *>(adapter);
     if (!a->started || a->resetting) return STATUS_DEVICE_NOT_READY;
-    return nr::kmd::Submissions::patch(*args);
+    const auto status = nr::kmd::Submissions::patch(*args);
+    NR_LAB_TRACE("nr_paging_lab: patch=%08lx flags=%lx fence=%lu dma=%lu..%lu private=%lu..%lu\n",
+        ULONG(status), args->Flags.Value, args->SubmissionFenceId,
+        args->DmaBufferSubmissionStartOffset, args->DmaBufferSubmissionEndOffset,
+        args->DmaBufferPrivateDataSubmissionStartOffset, args->DmaBufferPrivateDataSubmissionEndOffset);
+    return status;
 }
 DXGKDDI_SUBMITCOMMAND submit;
 NTSTATUS APIENTRY submit(HANDLE adapter, const DXGKARG_SUBMITCOMMAND *args) {
     if (!adapter || !args) return STATUS_INVALID_PARAMETER;
     auto a = static_cast<Adapter *>(adapter);
     if (!a->started || a->resetting) return STATUS_DEVICE_NOT_READY;
-    return a->engine.submit(*args);
+    const auto status = a->engine.submit(*args);
+    NR_LAB_TRACE("nr_paging_lab: submit=%08lx flags=%lx fence=%lu\n", ULONG(status), args->Flags.Value, args->SubmissionFenceId);
+    return status;
 }
 DXGKDDI_PREEMPTCOMMAND preempt;
 NTSTATUS APIENTRY preempt(HANDLE adapter, const DXGKARG_PREEMPTCOMMAND *args) {
@@ -281,6 +300,29 @@ NTSTATUS APIENTRY collect_debug(HANDLE adapter, const DXGKARG_COLLECTDBGINFO *ar
     RtlCopyMemory(args->pBuffer, &data, sizeof(data));
     return STATUS_SUCCESS;
 }
+DXGKDDI_SET_POWER_STATE set_power;
+NTSTATUS set_power(void *context, ULONG device, DEVICE_POWER_STATE state, POWER_ACTION) {
+    if (!context || state < PowerDeviceD0 || state > PowerDeviceD3)
+        return STATUS_INVALID_PARAMETER;
+    // This software paging engine has no bus resource, device registers or
+    // volatile device memory. Its system thread and nonpaged RAM follow system
+    // suspend/resume. Retain queue/fence/segment state; do not cancel packets or
+    // allocate a replacement worker during D0. An NPU provider will need its own
+    // device-power contract before this adapter can execute NPU work.
+    if (device == DISPLAY_ADAPTER_HW_ID)
+        InterlockedExchange(&static_cast<Adapter *>(context)->power_state, LONG(state));
+    // There are no child power resources, including a stale child notification.
+    return STATUS_SUCCESS;
+}
+DXGKDDI_GETNODEMETADATA node_metadata;
+NTSTATUS APIENTRY node_metadata(HANDLE adapter, UINT node, DXGKARG_GETNODEMETADATA *args) {
+    if (!adapter || !args) return STATUS_INVALID_PARAMETER;
+    if (node) return STATUS_NOT_SUPPORTED;
+    DXGKARG_GETNODEMETADATA info{};
+    info.EngineType = DXGK_ENGINE_TYPE_COPY; // Current engine only performs paging.
+    *args = info;
+    return STATUS_SUCCESS;
+}
 DXGKDDI_UNLOAD unload;
 void unload() {}
 DXGKDDI_CONTROL_ETW_LOGGING control_etw;
@@ -288,6 +330,28 @@ void control_etw(BOOLEAN, ULONG, UCHAR) {}
 DXGKDDI_QUERYADAPTERINFO query_adapter;
 NTSTATUS APIENTRY query_adapter(HANDLE adapter, const DXGKARG_QUERYADAPTERINFO *args) {
     if (!adapter || !args || !args->pOutputData) return STATUS_INVALID_PARAMETER;
+    NR_LAB_TRACE("nr_paging_lab: query type=%u input=%lu output=%lu\n", UINT(args->Type), args->InputDataSize, args->OutputDataSize);
+    if (args->Type == DXGKQAITYPE_DRIVERCAPS) {
+        if (args->InputDataSize) return STATUS_INVALID_PARAMETER;
+        if (args->OutputDataSize < sizeof(DXGK_DRIVERCAPS)) return STATUS_BUFFER_TOO_SMALL;
+        DXGK_DRIVERCAPS caps{};
+        caps.HighestAcceptableAddress.QuadPart = MAXLONGLONG;
+        caps.PresentationCaps.NoScreenToScreenBlt = 1;
+        caps.PresentationCaps.NoOverlapScreenBlt = 1;
+        caps.PresentationCaps.NoCacheCoherentApertureMemory = 1;
+        caps.SchedulingCaps.MultiEngineAware = 1;
+        caps.SchedulingCaps.PreemptionAware = 1;
+        caps.GpuEngineTopology.NbAsymetricProcessingNodes = 1;
+        caps.PreemptionCaps.GraphicsPreemptionGranularity = D3DKMDT_GRAPHICS_PREEMPTION_DMA_BUFFER_BOUNDARY;
+        caps.PreemptionCaps.ComputePreemptionGranularity = D3DKMDT_COMPUTE_PREEMPTION_DMA_BUFFER_BOUNDARY;
+        caps.SupportPerEngineTDR = TRUE;
+        // No display flips, GDI aperture, cross-adapter resources, virtual GPU
+        // addresses or runtime power components are implemented. Do not claim
+        // them to satisfy a capability checklist. WDDMVersion is reserved zero
+        // with a Win7-or-newer DDI interface; DriverEntry supplies version 1.3.
+        RtlCopyMemory(args->pOutputData, &caps, sizeof(caps));
+        return STATUS_SUCCESS;
+    }
     if (args->Type == DXGKQAITYPE_QUERYSEGMENT3) {
         if (!args->pInputData || args->InputDataSize != sizeof(DXGK_QUERYSEGMENTIN))
             return STATUS_INVALID_PARAMETER;
@@ -316,7 +380,9 @@ NTSTATUS APIENTRY build_paging(HANDLE adapter, DXGKARG_BUILDPAGINGBUFFER *args) 
     // No data is moved and no DMA command is emitted for this notification.
     if (a->resetting && args->Operation == DXGK_OPERATION_TRANSFER && !args->Transfer.TransferSize)
         return STATUS_SUCCESS;
-    return nr::kmd::Paging::build(a->segment, *args);
+    const auto status = nr::kmd::Paging::build(a->segment, *args);
+    NR_LAB_TRACE("nr_paging_lab: build_paging operation=%u status=%08lx\n", UINT(args->Operation), ULONG(status));
+    return status;
 }
 DXGKDDI_CREATEALLOCATION create_allocation;
 NTSTATUS APIENTRY create_allocation(HANDLE adapter, DXGKARG_CREATEALLOCATION *args) {
@@ -554,7 +620,7 @@ extern "C" NTSTATUS DriverEntry(DRIVER_OBJECT *driver, UNICODE_STRING *registry)
     NR_REJECT(DxgkDdiDispatchIoRequest);
     NR_REJECT(DxgkDdiQueryChildStatus);
     NR_REJECT(DxgkDdiQueryDeviceDescriptor);
-    NR_REJECT(DxgkDdiSetPowerState);
+    data.DxgkDdiSetPowerState = set_power;
     NR_REJECT(DxgkDdiNotifyAcpiEvent);
     NR_REJECT(DxgkDdiQueryInterface);
     data.DxgkDdiQueryAdapterInfo = query_adapter;
@@ -581,7 +647,7 @@ extern "C" NTSTATUS DriverEntry(DRIVER_OBJECT *driver, UNICODE_STRING *registry)
     data.DxgkDdiQueryEngineStatus = engine_status;
     data.DxgkDdiResetEngine = reset_engine;
     NR_REJECT(DxgkDdiCancelCommand);
-    NR_REJECT(DxgkDdiGetNodeMetadata);
+    data.DxgkDdiGetNodeMetadata = node_metadata;
 #undef NR_REJECT
     // Every display-specific DDI stays null: this device must never own scanout.
     return DxgkInitialize(driver, registry, &data);

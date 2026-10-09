@@ -1,9 +1,10 @@
 # Windows kernel adapter bring-up
 
-This is an original, **start-disabled** WDDM 1.3 kernel target. It is not a
-registered rendering adapter, and it cannot move desktop work. `StartDevice`
-returns `STATUS_NOT_SUPPORTED`; the existing display stays in control. No
-installer or INF is shipped in the desktop bundle.
+This is an original WDDM 1.3 kernel target whose **default build is
+start-disabled**. It is not a usable rendering adapter and cannot move desktop
+work. Default `StartDevice` returns `STATUS_NOT_SUPPORTED`. The separate
+disposable-VM paging mode below can attempt startup without enabling rendering
+or display ownership. No installer or INF is shipped in the desktop bundle.
 
 Build on x64 Windows with MSVC and the pinned SDK:
 
@@ -83,6 +84,21 @@ to Windows' `NotifyInterrupt` or `NotifyDpc` callbacks and still rejects startup
 This diagnostic can establish kernel concurrency behavior, not Windows scheduler
 acceptance. It is separately opt-in and omitted from default builds.
 
+`--lab-paging-adapter` is a separate, explicit **disposable kernel-debug VM only**
+build. It attempts startup with a 16 MiB software paging segment and Windows'
+required queue depth, using actual scheduler callbacks for actual submissions.
+It cannot be combined with synthetic startup probes. It exposes zero display
+sources/children, keeps the paired UMD identity `ready = 0`, and provides no
+rendering/presentation implementation. This mode exists to test Windows memory
+manager and scheduler contracts before enabling normal rendering. The build
+report records `start_enabled = true`, `lab_paging_adapter_enabled = true`, and
+`rendering_ready = false`; building neither installs nor signs it.
+
+Host tests cover its successful startup and allocation/thread failure unwind.
+These tests do not establish that Windows accepts the reported capabilities,
+submits paging work, or accepts completion notifications. That requires a live
+guest run. Do not install this mode on the physical development machine.
+
 The [first live engine run](../../../docs/validation/2026-10-09/kernel-engine-v12/report.json)
 passed: Windows requested 32 queue entries, the driver reserved 33 slots, and
 the worker completed the fill, idle preemption and restart checks. The observer
@@ -110,6 +126,15 @@ The implementation currently provides:
   cover cross-device opens, invalid ownership, partial allocation failure,
   duplicate closes and metadata output. Actual Windows opens remain untested.
 - A versioned adapter identity query; it explicitly reports `ready = 0`.
+- Capability reporting for one copy node, DMA-boundary preemption and per-engine
+  recovery. It reports no graphics aperture, GDI acceleration, display flips,
+  cross-adapter resources or runtime power components. The broader WDDM feature
+  table and individual capability docs differ in their applicability to this
+  software paging prototype; no unsupported bits are set merely to pass startup.
+  Windows acceptance remains an experimental question. Power notifications retain
+  the software engine's nonpaged RAM and worker state, which follow system power;
+  there are no device registers or separate powered memory to restore. This is
+  not NPU power management and must be extended before an NPU provider is used.
 - Bounded surface metadata validation and transactional allocation metadata
   creation. Allocation failure releases every partial object before returning.
   A dormant memory-segment implementation reserves and clears 64 MiB of actual
@@ -133,7 +158,7 @@ The implementation currently provides:
   allocation failure, malformed records, partial-buffer offsets, input mutation,
   deferred execution, ring reuse, empty context switches and drain-before-free.
   This storage feeds `DxgkDdiSubmitCommand` only after adapter startup; the live
-  startup gate remains closed.
+  default startup gate remains closed.
 - A dormant paging-only patch callback using the same private-record validation
   as submission. It checks the submitted marker slice without executing or
   queueing it. Paging addresses were resolved during buffer construction and
@@ -151,7 +176,8 @@ The implementation currently provides:
   The isolated worker validates real partial MDL mappings on owned memory.
   Windows submission, fence completion and VidMm acceptance remain untested.
   Other paging operations reject explicitly; these failures are not valid normal
-  behavior for a started adapter, so the startup gate remains essential.
+  behavior for a general rendering adapter. Only the explicitly restricted
+  paging-mode guest experiment may exercise the incomplete adapter.
 - A dormant paging engine with an owned system thread, completion/fault
   notifications, DPC notification, current-fence queries, DMA-boundary preemption,
   and adapter timeout reset/restart. It joins the worker and drains DPCs before
@@ -194,8 +220,9 @@ zero software KMT replacement calls. An absent, foreign, or unready adapter
 fails; there is no default-adapter or WARP retry. Current validation covers
 rejection only, since the kernel startup gate remains closed.
 
-Before enabling `StartDevice`, validate the paging engine in the isolated kernel
-and finish all mandatory render DDIs/caps. Submission,
+Before enabling normal rendering, validate the paging engine in the isolated kernel
+and finish all mandatory render DDIs/caps. The separate paging-mode guest experiment
+does not satisfy that requirement. Submission,
 notifications, preemption and reset still need actual Windows-scheduler evidence.
 A successful compiler,
 host test, or even an eventual adapter enumeration is not graphics conformance.

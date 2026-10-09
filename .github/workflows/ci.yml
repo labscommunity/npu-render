@@ -67,6 +67,9 @@ jobs:
       - name: Build isolated engine probe with local notification observers
         if: runner.os == 'Windows'
         run: uv run --frozen python tools/build_windows_driver.py --lab-engine-probe --build-dir build/windows-kernel-engine-probe
+      - name: Build disposable-VM paging adapter and test startup unwind
+        if: runner.os == 'Windows'
+        run: uv run --frozen python tools/build_windows_driver.py --lab-paging-adapter --build-dir build/windows-kernel-paging-lab
       - name: Package private Windows prototype
         if: runner.os == 'Windows'
         run: uv run --frozen python tools/package_windows.py --ddi --source-revision ${{ github.sha }}

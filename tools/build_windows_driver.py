@@ -1,4 +1,4 @@
-"""Build the isolated, start-disabled WDDM kernel laboratory; never install it."""
+"""Build the isolated WDDM kernel laboratory; never sign or install it."""
 
 import argparse
 import hashlib
@@ -38,7 +38,16 @@ def main():
         action="store_true",
         help="Exercise the paging engine with lab observers; never send test fences to Windows",
     )
+    parser.add_argument(
+        "--lab-paging-adapter",
+        action="store_true",
+        help="Enable paging-only startup for a disposable kernel-debug VM; UMD stays unready",
+    )
     args = parser.parse_args()
+    if args.lab_paging_adapter and (
+        args.lab_sync_probe or args.lab_worker_probe or args.lab_engine_probe
+    ):
+        parser.error("The paging adapter cannot be combined with synthetic startup probes")
     if os.name != "nt":
         raise RuntimeError("The x64 WDDM laboratory requires Windows and MSVC")
     prepare(args.wdk_root, kernel=True)
@@ -56,6 +65,7 @@ def main():
             f"-DNR_KMD_LAB_SYNC_PROBE={'ON' if args.lab_sync_probe else 'OFF'}",
             f"-DNR_KMD_LAB_WORKER_PROBE={'ON' if args.lab_worker_probe else 'OFF'}",
             f"-DNR_KMD_LAB_ENGINE_PROBE={'ON' if args.lab_engine_probe else 'OFF'}",
+            f"-DNR_KMD_LAB_PAGING_ADAPTER={'ON' if args.lab_paging_adapter else 'OFF'}",
         ],
         check=True,
     )
@@ -83,7 +93,9 @@ def main():
         "pdb_sha256": hashlib.sha256(symbols.read_bytes()).hexdigest(),
         "source_sha256": sources,
         "clean_build": True,
-        "start_enabled": False,
+        "start_enabled": args.lab_paging_adapter,
+        "rendering_ready": False,
+        "lab_paging_adapter_enabled": args.lab_paging_adapter,
         "lab_sync_probe_enabled": args.lab_sync_probe,
         "lab_worker_probe_enabled": args.lab_worker_probe,
         "lab_engine_probe_enabled": args.lab_engine_probe,

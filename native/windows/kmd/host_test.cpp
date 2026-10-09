@@ -19,7 +19,7 @@ ULONG sync_calls = 0;
 ULONG sync_fail_call = 0;
 bool sync_contract_error = false;
 KIRQL current_irql() { return simulated_irql; }
-#if NR_KMD_LAB_SYNC_PROBE || NR_KMD_LAB_WORKER_PROBE || NR_KMD_LAB_ENGINE_PROBE
+#if NR_KMD_LAB_SYNC_PROBE || NR_KMD_LAB_WORKER_PROBE || NR_KMD_LAB_ENGINE_PROBE || NR_KMD_LAB_PAGING_ADAPTER
 ULONG lab_print(ULONG, ULONG, PCSTR, ...) { return 0; }
 #endif
 NTSTATUS synchronize(HANDLE device, PKSYNCHRONIZE_ROUTINE routine, PVOID context,
@@ -229,7 +229,7 @@ NTSTATUS initialize(DRIVER_OBJECT *, UNICODE_STRING *, DRIVER_INITIALIZATION_DAT
 #define KeGetCurrentIrql current_irql
 #undef KeQueryInterruptTime
 #define KeQueryInterruptTime interrupt_time
-#if NR_KMD_LAB_SYNC_PROBE || NR_KMD_LAB_WORKER_PROBE || NR_KMD_LAB_ENGINE_PROBE
+#if NR_KMD_LAB_SYNC_PROBE || NR_KMD_LAB_WORKER_PROBE || NR_KMD_LAB_ENGINE_PROBE || NR_KMD_LAB_PAGING_ADAPTER
 #define DbgPrintEx lab_print
 #endif
 #if NR_KMD_LAB_WORKER_PROBE
@@ -253,11 +253,17 @@ NTSTATUS initialize(DRIVER_OBJECT *, UNICODE_STRING *, DRIVER_INITIALIZATION_DAT
 #include "engine_test.hpp"
 #include "recovery_test.hpp"
 #include "allocation_test.hpp"
+#if NR_KMD_LAB_PAGING_ADAPTER
+#include "lab_start_test.hpp"
+#endif
 #if NR_KMD_LAB_WORKER_PROBE
 #include "worker_probe_test.hpp"
 #endif
 extern "C" int nr_kernel_host_test() {
     NR_CHECK(NT_SUCCESS(NrHostDriverEntry(nullptr, nullptr)));
+#if NR_KMD_LAB_PAGING_ADAPTER
+    return lab_start_test();
+#else
     NR_CHECK(registration.Version == DXGKDDI_INTERFACE_VERSION_WDDM1_3);
     NR_CHECK(!registration.DxgkDdiSetVidPnSourceAddress && !registration.DxgkDdiCommitVidPn);
     NR_CHECK(registration.DxgkDdiSubmitCommand(nullptr, nullptr) == STATUS_INVALID_PARAMETER);
@@ -271,6 +277,44 @@ extern "C" int nr_kernel_host_test() {
     fail_after = -1;
     NR_CHECK(NT_SUCCESS(registration.DxgkDdiAddDevice(&physical, &opaque)));
     auto a = static_cast<Adapter *>(opaque);
+    // Capability output must not imply the unimplemented rendering/display
+    // contracts. Too-small output leaves both data and guard bytes untouched.
+    struct CapsBuffer { DXGK_DRIVERCAPS caps; ULONG guard; } cap_buffer{};
+    cap_buffer.caps.HighestAcceptableAddress.QuadPart = 123;
+    cap_buffer.guard = 0xa5a5a5a5;
+    DXGKARG_QUERYADAPTERINFO cap_query{};
+    cap_query.Type = DXGKQAITYPE_DRIVERCAPS;
+    cap_query.pOutputData = &cap_buffer.caps;
+    cap_query.OutputDataSize = sizeof(cap_buffer.caps) - 1;
+    NR_CHECK(registration.DxgkDdiQueryAdapterInfo(a, &cap_query) == STATUS_BUFFER_TOO_SMALL);
+    NR_CHECK(cap_buffer.caps.HighestAcceptableAddress.QuadPart == 123);
+    cap_query.OutputDataSize++;
+    NR_CHECK(registration.DxgkDdiQueryAdapterInfo(a, &cap_query) == STATUS_SUCCESS);
+    const auto &caps = cap_buffer.caps;
+    NR_CHECK(cap_buffer.guard == 0xa5a5a5a5 && !caps.WDDMVersion);
+    NR_CHECK(caps.GpuEngineTopology.NbAsymetricProcessingNodes == 1 && caps.SupportPerEngineTDR);
+    NR_CHECK(caps.SchedulingCaps.MultiEngineAware && caps.SchedulingCaps.PreemptionAware);
+    NR_CHECK(!caps.SchedulingCaps.CancelCommandAware && !caps.SchedulingCaps.NoDmaPatching);
+    NR_CHECK(!caps.MemoryManagementCaps.Value && !caps.FlipCaps.Value && !caps.HybridDiscrete &&
+             !caps.SupportDirectFlip && !caps.SupportRuntimePowerManagement);
+    NR_CHECK(caps.PresentationCaps.NoCacheCoherentApertureMemory &&
+             !caps.PresentationCaps.SupportKernelModeCommandBuffer &&
+             !caps.PresentationCaps.SupportSoftwareDeviceBitmaps);
+    DXGKARG_GETNODEMETADATA metadata{};
+    NR_CHECK(registration.DxgkDdiGetNodeMetadata(a, 1, &metadata) == STATUS_NOT_SUPPORTED);
+    NR_CHECK(registration.DxgkDdiGetNodeMetadata(a, 0, &metadata) == STATUS_SUCCESS);
+    NR_CHECK(metadata.EngineType == DXGK_ENGINE_TYPE_COPY && !metadata.FriendlyName[0]);
+    const auto power_outstanding = outstanding;
+    fail_after = 0;
+    NR_CHECK(registration.DxgkDdiSetPowerState(a, DISPLAY_ADAPTER_HW_ID, PowerDeviceD3,
+                                             PowerActionSleep) == STATUS_SUCCESS);
+    NR_CHECK(a->power_state == PowerDeviceD3);
+    NR_CHECK(registration.DxgkDdiSetPowerState(a, 99, PowerDeviceD0, PowerActionNone) == STATUS_SUCCESS);
+    NR_CHECK(a->power_state == PowerDeviceD3); // Stale child notification changes nothing.
+    NR_CHECK(registration.DxgkDdiSetPowerState(a, DISPLAY_ADAPTER_HW_ID, PowerDeviceD0,
+                                             PowerActionNone) == STATUS_SUCCESS);
+    NR_CHECK(a->power_state == PowerDeviceD0 && outstanding == power_outstanding);
+    fail_after = -1;
     ULONG sources = 999, children = 999;
     DXGK_START_INFO start{};
     DXGKRNL_INTERFACE kernel{};
@@ -466,4 +510,5 @@ extern "C" int nr_kernel_host_test() {
     if (recovery_result) return recovery_result;
     NR_CHECK(NT_SUCCESS(registration.DxgkDdiRemoveDevice(a)) && !outstanding);
     return 0;
+#endif
 }

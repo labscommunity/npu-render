@@ -7,6 +7,10 @@ set(NR_WDK_ROOT "" CACHE PATH "Pinned WDK dependency root from prepare_wdk.py --
 option(NR_KMD_LAB_SYNC_PROBE "Observe synchronization before rejecting lab adapter startup" OFF)
 option(NR_KMD_LAB_WORKER_PROBE "Exercise an owned paging worker and deferred callback in the lab" OFF)
 option(NR_KMD_LAB_ENGINE_PROBE "Exercise the engine with lab notification observers" OFF)
+option(NR_KMD_LAB_PAGING_ADAPTER "Enable a paging-only adapter in a disposable kernel-debug guest" OFF)
+if(NR_KMD_LAB_PAGING_ADAPTER AND (NR_KMD_LAB_SYNC_PROBE OR NR_KMD_LAB_WORKER_PROBE OR NR_KMD_LAB_ENGINE_PROBE))
+  message(FATAL_ERROR "The paging adapter must not run synthetic startup probes")
+endif()
 if(NOT EXISTS "${NR_WDK_ROOT}/lib/ntoskrnl.lib")
   message(FATAL_ERROR "Prepare WDK kernel headers and libraries first")
 endif()
@@ -26,6 +30,7 @@ target_compile_definitions(nr_render_kmd PRIVATE
   NR_KMD_LAB_SYNC_PROBE=$<BOOL:${NR_KMD_LAB_SYNC_PROBE}>
   NR_KMD_LAB_WORKER_PROBE=$<BOOL:${NR_KMD_LAB_WORKER_PROBE}>
   NR_KMD_LAB_ENGINE_PROBE=$<BOOL:${NR_KMD_LAB_ENGINE_PROBE}>
+  NR_KMD_LAB_PAGING_ADAPTER=$<BOOL:${NR_KMD_LAB_PAGING_ADAPTER}>
   _AMD64_ AMD64 _WIN64 NTDDI_VERSION=NTDDI_WIN10_VB
   DXGKDDI_INTERFACE_VERSION=DXGKDDI_INTERFACE_VERSION_WDDM1_3)
 target_link_options(nr_render_kmd PRIVATE /DRIVER /SUBSYSTEM:NATIVE
@@ -43,6 +48,7 @@ target_compile_definitions(nr_kernel_host_test PRIVATE
   NR_KMD_LAB_SYNC_PROBE=$<BOOL:${NR_KMD_LAB_SYNC_PROBE}>
   NR_KMD_LAB_WORKER_PROBE=$<BOOL:${NR_KMD_LAB_WORKER_PROBE}>
   NR_KMD_LAB_ENGINE_PROBE=$<BOOL:${NR_KMD_LAB_ENGINE_PROBE}>
+  NR_KMD_LAB_PAGING_ADAPTER=$<BOOL:${NR_KMD_LAB_PAGING_ADAPTER}>
   _AMD64_ AMD64 _WIN64 NTDDI_VERSION=NTDDI_WIN10_VB
   DXGKDDI_INTERFACE_VERSION=DXGKDDI_INTERFACE_VERSION_WDDM1_3)
 include(CTest)
