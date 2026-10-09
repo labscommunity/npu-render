@@ -99,6 +99,13 @@ These tests do not establish that Windows accepts the reported capabilities,
 submits paging work, or accepts completion notifications. That requires a live
 guest run. Do not install this mode on the physical development machine.
 
+The [first live paging-mode attempt](../../../docs/validation/2026-10-09/kernel-paging-v18/report.json)
+returned success from `StartDevice` with 16 MiB and 33 queue slots. Windows then
+queried capabilities, rejected the adapter with Code 43, and unloaded it. The
+public KMT probe found no matching adapter and created no resources. No segment
+query, actual submission or OS fence completion was observed. Removal preserved
+the original display. The specific rejected capability remains under investigation.
+
 The [first live engine run](../../../docs/validation/2026-10-09/kernel-engine-v12/report.json)
 passed: Windows requested 32 queue entries, the driver reserved 33 slots, and
 the worker completed the fill, idle preemption and restart checks. The observer

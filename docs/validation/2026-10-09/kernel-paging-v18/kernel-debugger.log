@@ -1,0 +1,77 @@
+Opened log file 'C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-paging-v18-oct9.log'
+0: kd> .sympath srv*C:\Users\tatef\AppData\Local\npu-render\symbols*https://msdl.microsoft.com/download/symbols;C:\Users\tatef\AppData\Local\npu-render\builds\render-kernel-v18-paging\Release
+Symbol search path is: srv*C:\Users\tatef\AppData\Local\npu-render\symbols*https://msdl.microsoft.com/download/symbols;C:\Users\tatef\AppData\Local\npu-render\builds\render-kernel-v18-paging\Release
+Expanded Symbol search path is: srv*c:\users\tatef\appdata\local\npu-render\symbols*https://msdl.microsoft.com/download/symbols;c:\users\tatef\appdata\local\npu-render\builds\render-kernel-v18-paging\release
+
+************* Path validation summary **************
+Response                         Time (ms)     Location
+Deferred                                       srv*C:\Users\tatef\AppData\Local\npu-render\symbols*https://msdl.microsoft.com/download/symbols
+OK                                             C:\Users\tatef\AppData\Local\npu-render\builds\render-kernel-v18-paging\Release
+0: kd> bu nr_render_kmd!DriverEntry
+0: kd> g
+Breakpoint 0 hit
+nr_render_kmd!DriverEntry:
+fffff807`6b5c4cb0 4055            push    rbp
+1: kd> lm m nr_render_kmd; x nr_render_kmd!*start_device*; x nr_render_kmd!*remove_device*; gu
+Browse full module list
+start             end                 module name
+fffff807`6b5c0000 fffff807`6b5cc000   nr_render_kmd   (private pdb symbols)  c:\users\tatef\appdata\local\npu-render\builds\render-kernel-v18-paging\release\nr_render_kmd.pdb
+fffff807`6b5c3a40 nr_render_kmd!`anonymous namespace'::start_device (void *, struct _DXGK_START_INFO *, struct _DXGKRNL_INTERFACE *, unsigned long *, unsigned long *)
+fffff807`6b5c34c0 nr_render_kmd!`anonymous namespace'::remove_device (void *)
+nr_render_kmd!GsDriverEntry+0x20:
+fffff807`6b5ca020 488b5c2430      mov     rbx,qword ptr [rsp+30h]
+0: kd> r eax; bp fffff807`6b5c3a40; bp fffff807`6b5c34c0; g
+eax=0
+Breakpoint 1 hit
+nr_render_kmd!`anonymous namespace'::start_device:
+fffff807`6b5c3a40 4056            push    rsi
+0: kd> r @$t1=@rcx; r @$t2=@r9; r @$t3=poi(@rsp+0x28); dt nr_render_kmd!_DXGK_START_INFO @rdx; !irql; gu
+   +0x000 RequiredDmaQueueEntry : 0x20
+   +0x004 AdapterGuid      : _GUID {aed27ad7-c3ff-11f1-a25a-525400123456}
+   +0x014 AdapterLuid      : _LUID
+Debugger saved IRQL for processor 0x0 -- 0 (LOW_LEVEL)
+nr_paging_lab: memory=00000000 required_queue=32
+nr_paging_lab: engine_start=00000000 capacity=33; rendering_ready=0 sources=0 children=0
+nr_render_kmd!DlpStartDevice+0x8e:
+fffff807`6b5c91a2 4883c438        add     rsp,38h
+0: kd> r eax; dd @$t2 L1; dd @$t3 L1; g
+eax=0
+ffffae05`ddb49c14  00000000
+ffffae05`ddb49c10  00000000
+nr_paging_lab: query type=1 input=0 output=552
+Breakpoint 2 hit
+nr_render_kmd!`anonymous namespace'::remove_device:
+fffff807`6b5c34c0 4883ec28        sub     rsp,28h
+1: kd> k; dt nr_render_kmd!Adapter @rcx; gu
+ # Child-SP          RetAddr               Call Site
+00 fffffd8f`2c8f22b8 fffff807`66919f09     nr_render_kmd!`anonymous namespace'::remove_device
+01 fffffd8f`2c8f22c0 fffff807`66746995     dxgkrnl!DpiDxgkDdiRemoveDevice+0x51
+02 fffffd8f`2c8f2300 fffff807`66744b14     dxgkrnl!DpiFdoHandleRemoveDevice+0x3d5
+03 fffffd8f`2c8f2350 fffff807`668b3b38     dxgkrnl!DpiFdoDispatchPnp+0xd4
+04 fffffd8f`2c8f23f0 fffff807`d48b2254     dxgkrnl!DpiDispatchPnp+0x1f8
+05 fffffd8f`2c8f2510 fffff807`d4efae20     nt!IofCallDriver+0x84
+06 fffffd8f`2c8f2550 fffff807`d4efc5ee     nt!IopSynchronousCall+0xf8
+07 fffffd8f`2c8f25c0 fffff807`d4a6fb30     nt!IopRemoveDevice+0xe2
+08 fffffd8f`2c8f2670 fffff807`d501dbb9     nt!PnpRemoveLockedDeviceNode+0x234
+09 fffffd8f`2c8f26d0 fffff807`d501d9c9     nt!PnpDeleteLockedDeviceNode+0x65
+0a fffffd8f`2c8f2710 fffff807`d501cb11     nt!PnpDeleteLockedDeviceNodes+0x109
+0b fffffd8f`2c8f27a0 fffff807`d501c9e8     nt!PipRemoveDevicesInRelationList+0x91
+0c fffffd8f`2c8f27f0 fffff807`d5018fcc     nt!PnpDelayedRemoveWorker+0x178
+0d fffffd8f`2c8f2830 fffff807`d4aae916     nt!PnpChainDereferenceComplete+0x10c
+0e fffffd8f`2c8f2860 fffff807`d5019a68     nt!PnpIsChainDereferenced+0x11e
+0f fffffd8f`2c8f28c0 fffff807`d5018e6f     nt!PnpProcessQueryRemoveAndEject+0x22c
+10 fffffd8f`2c8f29a0 fffff807`d4ff6fae     nt!PnpProcessTargetDeviceEvent+0xe7
+11 fffffd8f`2c8f29d0 fffff807`d490fcdb     nt!PnpDeviceEventWorker+0x28e
+12 fffffd8f`2c8f2a50 fffff807`d4a944ca     nt!ExpWorkerThread+0x3db
+13 fffffd8f`2c8f2bf0 fffff807`d4caf7f4     nt!PspSystemThreadStartup+0x5a
+14 fffffd8f`2c8f2c40 00000000`00000000     nt!KiStartSystemThread+0x34
+Symbol nr_render_kmd!Adapter not found.
+dxgkrnl!DpiDxgkDdiRemoveDevice+0x51:
+fffff807`66919f09 803df0e7d3ff00  cmp     byte ptr [dxgkrnl!bTracingEnabled (fffff807`66658700)],0
+1: kd> r eax; sxe ud:nr_render_kmd.sys; g
+eax=0
+Unload module nr_render_kmd.sys at fffff807`6b5c0000
+nt!DebugService2+0x5:
+fffff807`d4afe005 cc              int     3
+1: kd> .logclose; .logopen C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-paging-v18-cleanup-oct9.log; bc *; sxd ud; g
+Closing open log file C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-paging-v18-oct9.log
