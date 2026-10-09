@@ -68,6 +68,9 @@ jobs:
             avx512bw = [System.Runtime.Intrinsics.X86.Avx512BW]::IsSupported
           } | ConvertTo-Json
           uv run --frozen python -c "import openvino as ov; c=ov.Core(); print(ov.__version__); print(c.get_property('CPU','FULL_DEVICE_NAME')); print(c.get_property('CPU','OPTIMIZATION_CAPABILITIES'))"
+          $runtime = uv run --frozen python -c "import openvino,pathlib; print(pathlib.Path(openvino.__file__).parent/'libs')"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:PATH = "$runtime;$env:PATH"
           # Diagnostic comparison only: the original failing step still fails CI.
           # No ISA restriction is applied to the normal build or shipped runtime.
           $env:ONEDNN_VERBOSE = '1'
