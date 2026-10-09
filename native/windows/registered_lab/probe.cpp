@@ -7,6 +7,7 @@
 #include <d3dkmthk.h>
 #include <wrl/client.h>
 #include <array>
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <cwchar>
@@ -185,13 +186,15 @@ void exercise_shared(IDXGIAdapter *adapter, ID3D11Device *creator, ID3D11DeviceC
     }
 }
 #include "process_probe.hpp"
+#include "upload_probe.hpp"
 int main(int argc, char **argv) {
     const bool child_nt = argc == 5 && std::strcmp(argv[1], "--shared-child-nt") == 0;
     const bool child = child_nt || (argc == 5 && std::strcmp(argv[1], "--shared-child") == 0);
     const bool process_nt = argc == 2 && std::strcmp(argv[1], "--shared-process-nt") == 0;
     const bool processes = process_nt || (argc == 2 && std::strcmp(argv[1], "--shared-process") == 0);
     const bool nt_handles = argc == 2 && std::strcmp(argv[1], "--shared-nt") == 0;
-    if (!child && !processes && !nt_handles && (argc != 2 || (std::strcmp(argv[1], "--exercise") && std::strcmp(argv[1], "--shared")))) return 2;
+    const bool uploads = argc == 2 && std::strcmp(argv[1], "--upload") == 0;
+    if (!child && !processes && !nt_handles && !uploads && (argc != 2 || (std::strcmp(argv[1], "--exercise") && std::strcmp(argv[1], "--shared")))) return 2;
     const bool shared = nt_handles || std::strcmp(argv[1], "--shared") == 0;
     if (!nr_fill_guest()) { std::puts("{\"passed\":false,\"error\":\"owned graphics guest required\"}"); return 2; }
     HMODULE retained = nullptr;
@@ -222,7 +225,10 @@ int main(int argc, char **argv) {
         require(received == requested, "unexpected feature level");
         auto stats = reinterpret_cast<BOOL (*)(NrFillStats *)>(GetProcAddress(retained, "nr_fill_stats"));
         require(stats != nullptr, "UMD diagnostics unavailable");
-        if (child) process_child(device.Get(), context.Get(), argv, child_nt);
+        if (uploads) {
+            for (const auto format : {DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM})
+                for (UINT sharing = 0; sharing < 3; ++sharing) exercise_upload(device.Get(), context.Get(), format, sharing);
+        } else if (child) process_child(device.Get(), context.Get(), argv, child_nt);
         else if (processes) {
             exercise_process(device.Get(), context.Get(), DXGI_FORMAT_B8G8R8A8_UNORM, process_nt);
             exercise_process(device.Get(), context.Get(), DXGI_FORMAT_R8G8B8A8_UNORM, process_nt);
@@ -236,13 +242,16 @@ int main(int argc, char **argv) {
         context.Reset(); device.Reset(); adapter.Reset(); factory.Reset();
         NrFillStats result{};
         require(stats(&result) != FALSE, "UMD diagnostics failed");
-        std::printf("{\"pid\":%lu,\"allocations\":%llu,\"fills\":%llu,\"staging_copy_bytes\":%llu,\"live_allocations\":%llu,\"live_contexts\":%llu,\"cleanup_errors\":%llu,\"rejected\":%llu,\"submitted_copies\":%llu}\n", GetCurrentProcessId(),
+        std::printf("{\"pid\":%lu,\"allocations\":%llu,\"fills\":%llu,\"staging_copy_bytes\":%llu,\"live_allocations\":%llu,\"live_contexts\":%llu,\"cleanup_errors\":%llu,\"rejected\":%llu,\"submitted_copies\":%llu,\"upload_bytes\":%llu}\n", GetCurrentProcessId(),
                     result.allocations, result.fills, result.staging_copy_bytes, result.live_allocations,
-                    result.live_contexts, result.cleanup_errors, result.rejected, result.submitted_copies);
+                    result.live_contexts, result.cleanup_errors, result.rejected, result.submitted_copies, result.upload_bytes);
         const UINT copies = child ? 2 : (processes ? 4 : 6);
-        require(result.allocations == (child ? 1u : 4u) && result.fills == (child ? 1u : (processes ? 2u : 6u)) &&
+        if (uploads) require(result.allocations == 24 && !result.fills && result.staging_copy_bytes == 819200 &&
+                             result.submitted_copies == 32 && result.upload_bytes == 119496, "unexpected upload counters");
+        else require(result.allocations == (child ? 1u : 4u) && result.fills == (child ? 1u : (processes ? 2u : 6u)) &&
                 result.staging_copy_bytes == copies * 12288 && result.submitted_copies == (shared || child || processes ? copies : 0u) &&
-                !result.live_allocations && !result.live_contexts && !result.cleanup_errors && !result.rejected, "unexpected UMD counters");
+                !result.upload_bytes, "unexpected UMD counters");
+        require(!result.live_allocations && !result.live_contexts && !result.cleanup_errors && !result.rejected, "unexpected cleanup counters");
         FreeLibrary(retained);
         std::puts("{\"passed\":true,\"npu_execution_tested\":false,\"desktop_offload_tested\":false}");
         return 0;

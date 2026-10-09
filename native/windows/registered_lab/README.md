@@ -29,8 +29,24 @@ the creator's original resource, reopen it, and verify writes in both directions
 The NT test closes the creator's original handle and duplicates the child's
 retained handle back into the parent. Child processes inherit only their explicit
 standard I/O handles and, for NT sharing, the single resource handle. Every process
-checks its own cleanup counters. Cross-adapter sharing, arbitrary usage, initial
-uploads, shader execution and display operations remain unsupported.
+checks its own cleanup counters. Cross-adapter sharing, arbitrary usage,
+shader execution and display operations remain unsupported.
+
+`--upload` exercises initial texture data, full and partial `UpdateSubresource`,
+and empty updates for ordinary, legacy shared and NT keyed textures in both
+formats. Patterned 65×37 images have padded source rows; every readback checks
+the entire image, including the pixels outside a partial update. The caller's
+source storage is overwritten immediately after the API returns. These tests
+still execute CPU uploads and kernel-worker copies, not NPU rendering.
+
+Shared targets cannot be locked directly. Uploads use an owned, CPU-visible
+VidMm transfer allocation and a submitted copy; partial updates first copy the
+existing target into that allocation. A blocking write lock waits for the final
+submitted reader before releasing temporary storage. Full uploads zero padding.
+Invalid bounds, subresources, source pitches, locked targets and wrong-device
+resources are rejected. `upload_bytes` counts uploaded image bytes separately
+from staging-copy traffic and submitted-copy counts. Live guest validation of
+this new upload path is pending.
 
 The target is built with the native DDI build or independently:
 

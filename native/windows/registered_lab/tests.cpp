@@ -14,6 +14,8 @@ D3DDDI_ALLOCATIONLIST lists[2][2]{};
 UINT current_buffer = 0, renders = 0, destroys = 0, released = 0;
 bool contract_error = false, allocation_failure = false, render_failure = false;
 bool lock_failure = false;
+bool emulate_copies = false;
+std::vector<std::pair<UINT, UINT>> pending_copies;
 HRESULT last_error = S_OK;
 unsigned adapter_queries = 0;
 HRESULT APIENTRY query_adapter_cb(HANDLE, const D3DDDICB_QUERYADAPTERINFO *args) {
@@ -70,6 +72,7 @@ HRESULT APIENTRY deallocate_cb(HANDLE rt, const D3DDDICB_DEALLOCATE *a) {
         i = *a->HandleList;
     }
     if (i >= memory.size() || memory[i].empty() || locked[i]) return E_INVALIDARG;
+    for (const auto &copy : pending_copies) verify(copy.first != i && copy.second != i);
     if (!--references[i]) { memory[i].clear(); ++released; }
     return S_OK;
 }
@@ -79,6 +82,13 @@ HRESULT APIENTRY lock_cb(HANDLE rt, D3DDDICB_LOCK *a) {
     const auto i = a->hAllocation;
     for (const auto &resource : resource_handles) if (resource.second == i) return E_ACCESSDENIED;
     if (i >= memory.size() || memory[i].empty() || locked[i]) return E_INVALIDARG;
+    // Explicit test-only executor. Deferred until a blocking lock, so tests
+    // detect upload storage that is freed or modified before submission retires.
+    for (const auto &copy : pending_copies) {
+        verify(memory[copy.first].size() == memory[copy.second].size());
+        memory[copy.second] = memory[copy.first];
+    }
+    pending_copies.clear();
     locked[i] = true; a->pData = memory[i].data();
     return S_OK;
 }
@@ -103,12 +113,15 @@ HRESULT APIENTRY render_cb(HANDLE rt, D3DDDICB_RENDER *a) {
     }
     ++renders;
     if (render_failure) return E_ACCESSDENIED;
+    if (emulate_copies && commands[current_buffer].operation == 2)
+        pending_copies.emplace_back(lists[current_buffer][0].hAllocation, lists[current_buffer][1].hAllocation);
     current_buffer ^= 1;
     a->pNewCommandBuffer = &commands[current_buffer]; a->NewCommandBufferSize = sizeof(commands[0]);
     a->pNewAllocationList = lists[current_buffer]; a->NewAllocationListSize = 2;
     return S_OK;
 }
 }
+#include "upload_test.hpp"
 int main() {
     TEST(OpenAdapter10_2(nullptr) == E_INVALIDARG);
     if (!nr_fill_guest()) {
@@ -267,6 +280,7 @@ int main() {
     functions.pfnDestroyDevice(h);
     TEST(!counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
     TEST(released == 4 && destroys == 1);
+    TEST(test_uploads(kt, um) == 0);
     std::puts("registered lab allocation and submission contracts passed");
     return 0;
 }

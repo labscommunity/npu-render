@@ -1,5 +1,5 @@
 // Guest-only normal-loader D3D10 DDI bridge. Admits texture clears and staging
-// readback through real kernel allocations. No shaders, NPU or presentation.
+// readback/uploads through real kernel allocations. No shaders, NPU or presentation.
 #define NOMINMAX
 #pragma warning(push)
 #pragma warning(disable: 4201) // Anonymous structures in Microsoft DDI headers.
@@ -78,6 +78,51 @@ Resource &resource(D3D10DDI_HRESOURCE h) {
     require(bool(r.allocation));
     return r;
 }
+void upload(Allocation &target, const D3D10_DDI_BOX *box, const void *source, UINT pitch) {
+    require(!target.locked && !target.context->poisoned);
+    const auto &s = target.surface;
+    const D3D10_DDI_BOX region = box ? *box : D3D10_DDI_BOX{0, 0, 0, LONG(s.width), LONG(s.height), 1};
+    require(region.left >= 0 && region.left <= region.right && region.right <= LONG(s.width) &&
+            region.top >= 0 && region.top <= region.bottom && region.bottom <= LONG(s.height) &&
+            region.front >= 0 && region.front <= region.back && region.back <= 1);
+    if (region.left == region.right || region.top == region.bottom || region.front == region.back) return;
+    const UINT row_bytes = (region.right - region.left) * 4, rows = region.bottom - region.top;
+    const uint64_t source_bytes = uint64_t(rows - 1) * pitch + row_bytes;
+    require(source && pitch >= row_bytes && uintptr_t(source) <= UINTPTR_MAX - source_bytes);
+    const bool entire = !region.left && !region.top && region.right == LONG(s.width) && region.bottom == LONG(s.height);
+    // CPU-visible upload storage is separate from the shared memory-segment
+    // allocation. A partial shared update first preserves the previous pixels.
+    std::unique_ptr<Allocation> transfer;
+    Allocation *writable = &target;
+    if (target.runtime_resource) {
+        transfer = std::make_unique<Allocation>(target.context);
+        transfer->create(s.width, s.height, s.format);
+        writable = transfer.get();
+        if (!entire) {
+            target.context->copy(target.handle, transfer->handle);
+            counters.copies += s.allocation_bytes;
+        }
+    }
+    {
+        Mapping write(*writable, false);
+        if (entire) std::memset(write.data, 0, size_t(s.allocation_bytes));
+        for (UINT y = 0; y < rows; ++y) {
+            auto destination = static_cast<unsigned char *>(write.data) + size_t(y + region.top) * s.row_pitch + region.left * 4;
+            auto input = static_cast<const unsigned char *>(source) + size_t(y) * pitch;
+            std::memcpy(destination, input, row_bytes);
+        }
+        write.finish();
+    }
+    if (transfer) {
+        target.context->copy(transfer->handle, target.handle);
+        counters.copies += s.allocation_bytes;
+        // A blocking write lock waits for the submitted reader before the
+        // temporary allocation is released. No cached pointer survives a lock.
+        Mapping consumed(*transfer, false);
+        consumed.finish();
+    }
+    counters.upload_bytes += uint64_t(row_bytes) * rows;
+}
 SIZE_T APIENTRY resource_size(D3D10DDI_HDEVICE, const D3D10DDIARG_CREATERESOURCE *) { return sizeof(Resource); }
 void APIENTRY create_resource(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATERESOURCE *a,
                              D3D10DDI_HRESOURCE out, D3D10DDI_HRTRESOURCE rt) {
@@ -93,16 +138,17 @@ void APIENTRY create_resource(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATERESOUR
         }
         require(a && a->ResourceDimension == D3D10DDIRESOURCE_TEXTURE2D && a->MipLevels == 1 &&
                 a->ArraySize == 1 && a->pMipInfoList && format_ok(a->Format) && a->SampleDesc.Count == 1 &&
-                !a->SampleDesc.Quality && !(a->MiscFlags & ~D3D10_DDI_RESOURCE_MISC_SHARED) && !a->pPrimaryDesc && !a->pInitialDataUP);
+                !a->SampleDesc.Quality && !(a->MiscFlags & ~D3D10_DDI_RESOURCE_MISC_SHARED) && !a->pPrimaryDesc);
         const bool shared = a->MiscFlags == D3D10_DDI_RESOURCE_MISC_SHARED;
         require(!shared || rt.handle);
         const bool staging = a->Usage == D3D10_DDI_USAGE_STAGING && !a->BindFlags && a->MapFlags == D3D10_DDI_CPU_ACCESS_READ && !shared;
         const bool target = a->Usage == D3D10_DDI_USAGE_DEFAULT && a->BindFlags == D3D10_DDI_BIND_RENDER_TARGET && !a->MapFlags;
-        require(staging || target);
+        require((staging || target) && (!a->pInitialDataUP || target));
         const auto &m = a->pMipInfoList[0];
         require(m.TexelDepth == 1);
         auto allocation = std::make_shared<Allocation>(device(h).context);
         allocation->create(m.TexelWidth, m.TexelHeight, UINT(a->Format), shared ? rt.handle : nullptr);
+        if (a->pInitialDataUP) upload(*allocation, nullptr, a->pInitialDataUP->pSysMem, a->pInitialDataUP->SysMemPitch);
         auto &r = *static_cast<Resource *>(out.pDrvPrivate);
         r.allocation = std::move(allocation); r.usage = a->Usage; r.map_flags = a->MapFlags;
     });
@@ -183,6 +229,14 @@ void APIENTRY copy_resource(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE dst, D3D10DDI
         std::memcpy(write.data, read.data, size_t(a->surface.allocation_bytes));
         write.finish(); read.finish();
         counters.copies += a->surface.allocation_bytes;
+    });
+}
+void APIENTRY update_resource(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE dst, UINT sub,
+                             const D3D10_DDI_BOX *box, const void *source, UINT pitch, UINT) {
+    guard(h, [&] {
+        auto &r = resource(dst);
+        require(!sub && r.usage == D3D10_DDI_USAGE_DEFAULT && r.allocation->context == device(h).context);
+        upload(*r.allocation, box, source, pitch); // CPU upload bytes are counted separately from submitted work.
     });
 }
 void APIENTRY map(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE r, UINT sub, D3D10_DDI_MAP type,
@@ -294,6 +348,7 @@ HRESULT APIENTRY create_device(D3D10DDI_HADAPTER, D3D10DDIARG_CREATEDEVICE *a) {
         f.pfnCalcPrivateResourceSize = resource_size; f.pfnCreateResource = create_resource;
         f.pfnCalcPrivateOpenedResourceSize = opened_resource_size; f.pfnOpenResource = open_resource;
         f.pfnDestroyResource = destroy_resource; f.pfnResourceCopy = copy_resource;
+        f.pfnResourceUpdateSubresourceUP = update_resource;
         f.pfnResourceMap = f.pfnStagingResourceMap = map;
         f.pfnResourceUnmap = f.pfnStagingResourceUnmap = unmap;
         f.pfnCalcPrivateRenderTargetViewSize = view_size; f.pfnCreateRenderTargetView = create_view;
@@ -366,12 +421,13 @@ extern "C" __declspec(dllexport) HRESULT APIENTRY OpenAdapter10_2(D3D10DDIARG_OP
     return status;
 }
 extern "C" __declspec(dllexport) BOOL nr_fill_stats(NrFillStats *out) {
-    if (!out || out->bytes != sizeof(*out) || out->version != 2) return FALSE;
+    if (!out || out->bytes != sizeof(*out) || out->version != 3) return FALSE;
     std::lock_guard<std::recursive_mutex> lock(mutex);
     out->allocations = counters.allocations; out->fills = counters.fills; out->staging_copy_bytes = counters.copies;
     out->live_allocations = counters.live_allocations; out->live_contexts = counters.live_contexts;
     out->cleanup_errors = counters.cleanup_errors; out->rejected = counters.rejected;
     out->last_unsupported_offset = counters.last_unsupported_offset;
     out->submitted_copies = counters.submitted_copies;
+    out->upload_bytes = counters.upload_bytes;
     return TRUE;
 }

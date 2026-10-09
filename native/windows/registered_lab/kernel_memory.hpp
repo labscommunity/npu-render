@@ -24,6 +24,7 @@ struct Counters {
     uint64_t live_contexts = 0, cleanup_errors = 0, rejected = 0;
     uint64_t last_unsupported_offset = ~uint64_t(0);
     uint64_t submitted_copies = 0;
+    uint64_t upload_bytes = 0;
 };
 struct Context {
     HANDLE runtime = nullptr;

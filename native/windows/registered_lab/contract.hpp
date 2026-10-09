@@ -2,11 +2,12 @@
 #include <windows.h>
 #include <cstdint>
 struct NrFillStats {
-    UINT bytes = sizeof(NrFillStats), version = 2;
+    UINT bytes = sizeof(NrFillStats), version = 3;
     uint64_t allocations = 0, fills = 0, staging_copy_bytes = 0;
     uint64_t live_allocations = 0, live_contexts = 0, cleanup_errors = 0, rejected = 0;
     uint64_t last_unsupported_offset = ~uint64_t(0);
     uint64_t submitted_copies = 0;
+    uint64_t upload_bytes = 0;
 };
 inline bool nr_fill_guest() {
     WCHAR name[MAX_COMPUTERNAME_LENGTH + 1]{}, volume[64]{};
