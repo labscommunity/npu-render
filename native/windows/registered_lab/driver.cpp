@@ -28,6 +28,7 @@ struct Device {
     D3D10DDI_HRTCORELAYER core{};
     D3D10DDI_CORELAYER_DEVICECALLBACKS callbacks{};
     D3D10DDI_DEVICEFUNCS functions{};
+    PFNDDXGIDDI_PRESENTCB present_callback = nullptr;
     std::shared_ptr<Context> context;
     std::shared_ptr<Allocation> bound_target;
     std::shared_ptr<Allocation> bound_source;
@@ -343,6 +344,38 @@ void APIENTRY multisample(D3D10DDI_HDEVICE, DXGI_FORMAT f, UINT samples, UINT *o
 void APIENTRY counter_info(D3D10DDI_HDEVICE, D3D10DDI_COUNTER_INFO *out) { *out = {}; }
 void APIENTRY relocate(D3D10DDI_HDEVICE h, D3D10DDI_DEVICEFUNCS *out) { *out = device(h).functions; }
 void APIENTRY destroy_device(D3D10DDI_HDEVICE h) { std::lock_guard<std::recursive_mutex> lock(mutex); device(h).~Device(); }
+// DXGI returns an HRESULT directly. A callback acceptance is not evidence of
+// display delivery, and no local pixel copy substitutes for the callback.
+HRESULT APIENTRY present(DXGI_DDI_ARG_PRESENT *a) {
+    if (!a || !a->hDevice) return E_INVALIDARG;
+    std::lock_guard<std::recursive_mutex> lock(mutex);
+    auto &d = *reinterpret_cast<Device *>(a->hDevice);
+    try {
+        require(a->Flags.Value == 1 && !a->SrcSubResourceIndex && !a->DstSubResourceIndex &&
+                d.context && !d.context->poisoned && d.present_callback && a->hSurfaceToPresent);
+        D3D10DDI_HRESOURCE hs{}; hs.pDrvPrivate = reinterpret_cast<void *>(a->hSurfaceToPresent);
+        const auto &source = resource(hs);
+        require(source.usage == D3D10_DDI_USAGE_DEFAULT && source.allocation->context == d.context && !source.allocation->locked);
+        DXGIDDICB_PRESENT callback{};
+        callback.hSrcAllocation = source.allocation->handle;
+        callback.hContext = d.context->command.hContext;
+        callback.pDXGIContext = a->pDXGIContext;
+        if (a->hDstResource) {
+            D3D10DDI_HRESOURCE hd{}; hd.pDrvPrivate = reinterpret_cast<void *>(a->hDstResource);
+            const auto &destination = resource(hd);
+            require(destination.usage == D3D10_DDI_USAGE_DEFAULT && destination.allocation->context == d.context &&
+                    !destination.allocation->locked && destination.allocation != source.allocation &&
+                    destination.allocation->surface.format == source.allocation->surface.format);
+            callback.hDstAllocation = destination.allocation->handle;
+        }
+        ++counters.present_requests;
+        const auto status = d.present_callback(d.context->runtime, &callback);
+        if (FAILED(status)) { d.context->poisoned = true; ++counters.rejected; }
+        else ++counters.accepted_present_callbacks;
+        return status;
+    } catch (const Error &e) { ++counters.rejected; return e.status; }
+    catch (...) { ++counters.rejected; return E_FAIL; }
+}
 SIZE_T APIENTRY device_size(D3D10DDI_HADAPTER, const D3D10DDIARG_CALCPRIVATEDEVICESIZE *) { return sizeof(Device); }
 HRESULT APIENTRY create_device(D3D10DDI_HADAPTER, D3D10DDIARG_CREATEDEVICE *a) {
     std::lock_guard<std::recursive_mutex> lock(mutex);
@@ -356,6 +389,7 @@ HRESULT APIENTRY create_device(D3D10DDI_HADAPTER, D3D10DDIARG_CREATEDEVICE *a) {
         d->core = a->hRTCoreLayer; d->callbacks = *a->pUMCallbacks;
         d->context = std::make_shared<Context>(counters);
         d->context->create(a->hRTDevice.handle, *a->pKTCallbacks);
+        if (a->DXGIBaseDDI.pDXGIBaseCallbacks) d->present_callback = a->DXGIBaseDDI.pDXGIBaseCallbacks->pfnPresentCb;
         d->backend = selected_backend;
         d->vertex_code = shader_tokens(nr_ddi_vertex_shader, "vs_4_0");
         d->pixel_code = shader_tokens(nr_ddi_pixel_shader, "ps_4_0");
@@ -387,7 +421,7 @@ HRESULT APIENTRY create_device(D3D10DDI_HADAPTER, D3D10DDIARG_CREATEDEVICE *a) {
         auto &dxgi = *a->DXGIBaseDDI.pDXGIDDIBaseFunctions;
         dxgi = {};
 #define NR_DXGI(field) dxgi.field = &UnsupportedDxgi<decltype(dxgi.field)>::call
-        NR_DXGI(pfnPresent); NR_DXGI(pfnGetGammaCaps); NR_DXGI(pfnSetDisplayMode);
+        dxgi.pfnPresent = present; NR_DXGI(pfnGetGammaCaps); NR_DXGI(pfnSetDisplayMode);
         NR_DXGI(pfnSetResourcePriority); NR_DXGI(pfnQueryResourceResidency);
         NR_DXGI(pfnRotateResourceIdentities); NR_DXGI(pfnBlt);
 #undef NR_DXGI
@@ -440,7 +474,7 @@ extern "C" __declspec(dllexport) HRESULT APIENTRY OpenAdapter10_2(D3D10DDIARG_OP
     return status;
 }
 extern "C" __declspec(dllexport) BOOL nr_fill_stats(NrFillStats *out) {
-    if (!out || out->bytes != sizeof(*out) || out->version != 4) return FALSE;
+    if (!out || out->bytes != sizeof(*out) || out->version != 5) return FALSE;
     std::lock_guard<std::recursive_mutex> lock(mutex);
     out->allocations = counters.allocations; out->fills = counters.fills; out->staging_copy_bytes = counters.copies;
     out->live_allocations = counters.live_allocations; out->live_contexts = counters.live_contexts;
@@ -452,6 +486,7 @@ extern "C" __declspec(dllexport) BOOL nr_fill_stats(NrFillStats *out) {
     out->inference_input_bytes = counters.inference_input_bytes; out->inference_output_bytes = counters.inference_output_bytes;
     out->cpu_executions = counters.cpu_executions; out->gpu_executions = counters.gpu_executions;
     out->npu_executions = counters.npu_executions;
+    out->present_requests = counters.present_requests; out->accepted_present_callbacks = counters.accepted_present_callbacks;
     std::memcpy(out->last_execution_device, counters.last_execution_device, sizeof(out->last_execution_device));
     return TRUE;
 }

@@ -71,6 +71,16 @@ native-size component draws. The driver unloads, mapped pages return to zero,
 and the original display stays healthy. Registered NPU execution, presentation
 and DWM migration remain untested.
 
+The DXGI blit-present entrypoint now forwards the actual source/destination
+allocation handles, kernel context and opaque DXGI context to the runtime's
+`PresentCb`. It preserves callback status (including occlusion), rejects
+unsupported flags and mismatched resources, and invalidates the context after
+a failed callback. Statistics ABI 5 distinguishes requests from accepted
+callbacks; neither counter means a frame reached a display. The component test
+uses explicit callback shims and verifies that forwarding does not secretly
+copy pixels. Live swap-chain presentation remains a separate test; flips,
+cross-adapter imports and the other DXGI display functions are still unsupported.
+
 `--upload` exercises initial texture data, full and partial `UpdateSubresource`,
 and empty updates for ordinary, legacy shared and NT keyed textures in both
 formats. Patterned 65×37 images have padded source rows; every readback checks
