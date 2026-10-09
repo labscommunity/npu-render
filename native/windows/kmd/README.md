@@ -17,6 +17,9 @@ It does not sign, install, change boot settings, or register a device.
 The optimized image includes CodeView information and a matching PDB for
 isolated kernel debugging. The build report hashes both files; retain that
 pair when test-signing the image so a debugger can verify symbol identity.
+The driver target is rebuilt from clean objects because the remote MSBuild
+project reused objects after included headers changed. Reports now include
+source hashes and reject source changes during the build.
 
 An opt-in diagnostic build observes the public `DxgkCbSynchronizeExecution`
 callback during `StartDevice`:
@@ -94,7 +97,17 @@ The implementation currently provides:
 - A bounded FIFO state machine that distinguishes a completed Windows fence
   from the lifetime of a worker ticket. Stopping invalidates completions;
   restarting remains forbidden until an active worker separately acknowledges
-  that it has drained. This state machine is not yet wired to kernel interrupts.
+  that it has drained. DMA-boundary preemption waits for the active buffer,
+  cancels the older queue prefix and preserves submissions after the request.
+  This state machine is not yet wired to kernel interrupts.
+- Preallocated submission storage sized from Windows' `RequiredDmaQueueEntry`,
+  with an additional active-worker slot and an explicit 64 MiB storage budget.
+  An excessive requirement rejects startup instead of silently reducing queue
+  depth. Kernel-private paging records are copied into owned slots before the
+  submitter returns; capture does not allocate or execute work. Host tests cover
+  allocation failure, malformed records, partial-buffer offsets, input mutation,
+  deferred execution, ring reuse, empty context switches and drain-before-free.
+  This storage is not yet connected to `DxgkDdiSubmitCommand`.
 - A dormant paging builder for transfer, fill and discard operations in that
   owned segment. It writes pointer-free DMA markers and separate kernel-private
   records; allocation contents change only when the deferred executor runs.
@@ -139,8 +152,9 @@ and `DxgkInitialize` with test shims. It exercises descriptor validation,
 memory clearing, two-pass segment queries, allocator failure at each position,
 duplicate destruction, startup rejection, and cleanup. It cannot validate IRQL,
 Windows scheduling, kernel memory mappings, driver signing, or PnP behavior.
-The portable scheduler test compares 200,000 lifecycle operations against an
-independent FIFO model, with explicit full-queue and delayed-completion cases.
+The portable scheduler test compares 800,000 lifecycle operations across four
+queue capacities against an independent FIFO model, with explicit full-queue,
+delayed-completion and external-storage lifetime cases.
 
 The project deliberately does not use the Microsoft render-only sample's
 registry changes that disable preemption and TDR, fake CPU physical aperture
@@ -152,3 +166,5 @@ References: [WDDM render-only requirements](https://learn.microsoft.com/en-us/wi
 Paging contracts: [buffer construction](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/nc-d3dkmddi-dxgkddi_buildpagingbuffer),
 [offset units](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/ns-d3dkmddi-_dxgkarg_buildpagingbuffer),
 [partial MDL ownership](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-iobuildpartialmdl).
+Submission contracts: [required preallocation](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/dispmprt/ns-dispmprt-_dxgk_start_info),
+[private-data ranges and empty submissions](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/ns-d3dkmddi-_dxgkarg_submitcommand).

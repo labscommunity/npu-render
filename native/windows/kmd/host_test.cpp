@@ -224,6 +224,7 @@ NTSTATUS initialize(DRIVER_OBJECT *, UNICODE_STRING *, DRIVER_INITIALIZATION_DAT
 #define NR_CHECK(expression) do { if (!(expression)) return __LINE__; } while (false)
 #include "paging_test.hpp"
 #include "segment_capacity_test.hpp"
+#include "submission_test.hpp"
 #if NR_KMD_LAB_WORKER_PROBE
 #include "worker_probe_test.hpp"
 #endif
@@ -427,6 +428,8 @@ extern "C" int nr_kernel_host_test() {
 #endif
     const auto capacity_result = segment_capacity_test(a);
     if (capacity_result) return capacity_result;
+    const auto submission_result = submission_test(a);
+    if (submission_result) return submission_result;
     NR_CHECK(NT_SUCCESS(registration.DxgkDdiRemoveDevice(a)) && !outstanding);
     return 0;
 }

@@ -10,6 +10,15 @@ from pathlib import Path
 from prepare_wdk import DEFAULT_ROOT, prepare
 
 
+def source_hashes():
+    paths = sorted(
+        path
+        for path in Path("native/windows/kmd").iterdir()
+        if path.suffix in {".cpp", ".hpp", ".h"} or path.name == "CMakeLists.txt"
+    )
+    return {path.as_posix(): hashlib.sha256(path.read_bytes()).hexdigest() for path in paths}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--build-dir", type=Path, default=Path("build/windows-kernel"))
@@ -28,6 +37,7 @@ def main():
     if os.name != "nt":
         raise RuntimeError("The x64 WDDM laboratory requires Windows and MSVC")
     prepare(args.wdk_root, kernel=True)
+    sources = source_hashes()
     subprocess.run(
         [
             "cmake",
@@ -43,7 +53,13 @@ def main():
         ],
         check=True,
     )
-    subprocess.run(["cmake", "--build", str(args.build_dir), "--config", "Release"], check=True)
+    # MSBuild's kernel project did not reliably invalidate objects after changes
+    # to included implementation headers during remote builds. Rebuild this
+    # small target so the hashed image always comes from the current sources.
+    subprocess.run(
+        ["cmake", "--build", str(args.build_dir), "--config", "Release", "--clean-first"],
+        check=True,
+    )
     subprocess.run(
         ["ctest", "--test-dir", str(args.build_dir), "-C", "Release", "--output-on-failure"],
         check=True,
@@ -52,11 +68,15 @@ def main():
     symbols = binary.with_suffix(".pdb")
     if not symbols.is_file():
         raise RuntimeError("Kernel build did not produce matching debugger symbols")
+    if source_hashes() != sources:
+        raise RuntimeError("Kernel sources changed during the build; discard this result")
     report = {
         "schema": 1,
         "kind": "kernel-build-only",
         "sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
         "pdb_sha256": hashlib.sha256(symbols.read_bytes()).hexdigest(),
+        "source_sha256": sources,
+        "clean_build": True,
         "start_enabled": False,
         "lab_sync_probe_enabled": args.lab_sync_probe,
         "lab_worker_probe_enabled": args.lab_worker_probe,

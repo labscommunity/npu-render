@@ -9,18 +9,19 @@ extern "C" {
 #endif
 #include <dispmprt.h>
 }
+inline void *operator new(size_t, void *p) noexcept { return p; }
+
 #include "scheduler.hpp"
 #include "contract.hpp"
 #include "segment.hpp"
 #include "paging.hpp"
+#include "submission.hpp"
 #if NR_KMD_LAB_SYNC_PROBE
 #include "synchronization_probe.hpp"
 #endif
 #if NR_KMD_LAB_WORKER_PROBE
 #include "worker_probe.hpp"
 #endif
-
-inline void *operator new(size_t, void *p) noexcept { return p; }
 
 namespace {
 constexpr ULONG pool_tag = 'rRpN';
@@ -30,6 +31,7 @@ struct Adapter {
     DXGKRNL_INTERFACE kernel;
     nr::kmd::Scheduler scheduler;
     nr::kmd::Segment segment;
+    nr::kmd::Submissions submissions;
 #if NR_KMD_LAB_SYNC_PROBE
     nr::kmd::SynchronizationProbe synchronization;
 #endif
@@ -102,8 +104,14 @@ NTSTATUS start_device(void *context, DXGK_START_INFO *start,
     if (!runtime_ready) return STATUS_NOT_SUPPORTED;
     const auto memory_status = a->segment.prepare();
     if (!NT_SUCCESS(memory_status)) return memory_status;
+    const auto queue_status = a->submissions.prepare(a->scheduler, start->RequiredDmaQueueEntry);
+    if (!NT_SUCCESS(queue_status)) {
+        a->segment.release();
+        return queue_status;
+    }
     a->kernel = *kernel;
     if (a->scheduler.start() != nr::kmd::QueueResult::ok) {
+        a->submissions.release();
         a->segment.release();
         RtlZeroMemory(&a->kernel, sizeof(a->kernel));
         return STATUS_INVALID_DEVICE_STATE;
@@ -117,6 +125,8 @@ NTSTATUS stop_device(void *context) {
     auto a = static_cast<Adapter *>(context);
     if (a->devices || a->allocations || a->scheduler.active()) return STATUS_DEVICE_BUSY;
     a->scheduler.stop();
+    const auto queue_status = a->submissions.release();
+    if (!NT_SUCCESS(queue_status)) return queue_status;
     a->started = false;
     a->segment.release();
     RtlZeroMemory(&a->kernel, sizeof(a->kernel));
@@ -127,7 +137,7 @@ NTSTATUS remove_device(void *context) {
     if (!context) return STATUS_INVALID_PARAMETER;
     auto a = static_cast<Adapter *>(context);
     if (a->started || a->devices || a->allocations || a->scheduler.active() ||
-        a->segment.ready()) return STATUS_DEVICE_BUSY;
+        a->segment.ready() || a->submissions.ready()) return STATUS_DEVICE_BUSY;
     release(a);
     return STATUS_SUCCESS;
 }
