@@ -32,6 +32,11 @@ struct Device {
     D3D10_DDI_RASTERIZER_DESC raster{};
     std::array<FLOAT, 4> blend_factor{};
     UINT sample_mask = ~0u, stencil_ref = 0;
+    struct SamplerBinding {
+        bool bound = false;
+        D3D10_DDI_SAMPLER_DESC desc{};
+    };
+    std::array<std::array<SamplerBinding, 16>, 3> samplers{};
 };
 struct Resource {
     std::shared_ptr<Allocation> allocation;
@@ -172,6 +177,19 @@ NR_STATE(depth, D3D10_DDI_DEPTH_STENCIL_DESC, D3D10DDI_HDEPTHSTENCILSTATE, D3D10
 NR_STATE(raster, D3D10_DDI_RASTERIZER_DESC, D3D10DDI_HRASTERIZERSTATE, D3D10DDI_HRTRASTERIZERSTATE)
 NR_STATE(sampler, D3D10_DDI_SAMPLER_DESC, D3D10DDI_HSAMPLER, D3D10DDI_HRTSAMPLER)
 #undef NR_STATE
+template<size_t Stage>
+void APIENTRY set_samplers(D3D10DDI_HDEVICE h, UINT start, UINT count, const D3D10DDI_HSAMPLER *states) {
+    guard(h, [&] {
+        auto &slots = device(h).samplers[Stage];
+        require(start < slots.size() && count <= slots.size() - start && (!count || states));
+        for (UINT i = 0; i < count; ++i) {
+            auto &binding = slots[start + i];
+            binding.bound = states[i].pDrvPrivate != nullptr;
+            binding.desc = binding.bound ? *static_cast<const D3D10_DDI_SAMPLER_DESC *>(states[i].pDrvPrivate)
+                                         : D3D10_DDI_SAMPLER_DESC{};
+        }
+    });
+}
 void APIENTRY set_blend(D3D10DDI_HDEVICE h, D3D10DDI_HBLENDSTATE state, const FLOAT factor[4], UINT mask) {
     guard(h, [&] {
         auto &d = device(h);
@@ -250,6 +268,7 @@ HRESULT APIENTRY create_device(D3D10DDI_HADAPTER, D3D10DDIARG_CREATEDEVICE *a) {
         NR_BIND(RasterizerState, raster); NR_BIND(Sampler, sampler);
 #undef NR_BIND
         f.pfnSetBlendState = set_blend; f.pfnSetDepthStencilState = set_depth; f.pfnSetRasterizerState = set_raster;
+        f.pfnVsSetSamplers = set_samplers<0>; f.pfnGsSetSamplers = set_samplers<1>; f.pfnPsSetSamplers = set_samplers<2>;
         f.pfnFlush = flush; f.pfnResourceReadAfterWriteHazard = hazard;
         f.pfnCheckFormatSupport = format_support; f.pfnCheckMultisampleQualityLevels = multisample;
         f.pfnCheckCounterInfo = counter_info; f.pfnRelocateDeviceFuncs = relocate; f.pfnDestroyDevice = destroy_device;

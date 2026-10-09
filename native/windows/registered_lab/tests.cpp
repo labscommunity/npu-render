@@ -126,6 +126,23 @@ int main() {
     functions.pfnSetRenderTargets(h, nullptr, 0, 8, {});
     TEST(last_error == S_OK && device(h).stencil_ref == 3 && device(h).depth.DepthEnable &&
          device(h).raster.DepthClipEnable && !device(h).bound_target);
+    D3D10_DDI_SAMPLER_DESC sampler_desc{}, sampler_storage{};
+    sampler_desc.MaxAnisotropy = 4;
+    D3D10DDI_HSAMPLER sampler_handle{}; sampler_handle.pDrvPrivate = &sampler_storage;
+    functions.pfnCreateSampler(h, &sampler_desc, sampler_handle, {});
+    functions.pfnVsSetSamplers(h, 15, 1, &sampler_handle);
+    functions.pfnGsSetSamplers(h, 4, 1, &sampler_handle);
+    functions.pfnPsSetSamplers(h, 0, 1, &sampler_handle);
+    functions.pfnDestroySampler(h, sampler_handle);
+    sampler_storage.MaxAnisotropy = 0; // Bindings own descriptors, not private-storage pointers.
+    TEST(last_error == S_OK && device(h).samplers[0][15].desc.MaxAnisotropy == 4 &&
+         device(h).samplers[1][4].desc.MaxAnisotropy == 4 && device(h).samplers[2][0].bound);
+    functions.pfnVsSetSamplers(h, 15, 2, &sampler_handle);
+    TEST(last_error == E_INVALIDARG && device(h).samplers[0][15].desc.MaxAnisotropy == 4);
+    last_error = S_OK;
+    D3D10DDI_HSAMPLER empty_samplers[16]{};
+    functions.pfnVsSetSamplers(h, 0, 16, empty_samplers);
+    TEST(last_error == S_OK && !device(h).samplers[0][15].bound && device(h).samplers[1][4].bound);
     alignas(Resource) unsigned char target_storage[sizeof(Resource)]{}, staging_storage[sizeof(Resource)]{}, failed_storage[sizeof(Resource)]{};
     D3D10DDI_HRESOURCE target{}, staging{}, failed{};
     target.pDrvPrivate = target_storage; staging.pDrvPrivate = staging_storage; failed.pDrvPrivate = failed_storage;
