@@ -197,8 +197,10 @@ int main(int argc, char **argv) {
     const bool processes = process_nt || (argc == 2 && std::strcmp(argv[1], "--shared-process") == 0);
     const bool nt_handles = argc == 2 && std::strcmp(argv[1], "--shared-nt") == 0;
     const bool uploads = argc == 2 && std::strcmp(argv[1], "--upload") == 0;
-    const char *draw_backend = argc == 2 && !std::strcmp(argv[1], "--draw-cpu") ? "CPU" :
-                               (argc == 2 && !std::strcmp(argv[1], "--draw-npu") ? "NPU" : nullptr);
+    const bool desktop_size = argc == 3 && !std::strcmp(argv[2], "--desktop-size");
+    const bool draw_args = argc == 2 || desktop_size;
+    const char *draw_backend = draw_args && !std::strcmp(argv[1], "--draw-cpu") ? "CPU" :
+                               (draw_args && !std::strcmp(argv[1], "--draw-npu") ? "NPU" : nullptr);
     if (!child && !processes && !nt_handles && !uploads && !draw_backend && (argc != 2 || (std::strcmp(argv[1], "--exercise") && std::strcmp(argv[1], "--shared")))) return 2;
     const bool shared = nt_handles || std::strcmp(argv[1], "--shared") == 0;
     if (!nr_fill_guest()) { std::puts("{\"passed\":false,\"error\":\"owned graphics guest required\"}"); return 2; }
@@ -244,9 +246,12 @@ int main(int argc, char **argv) {
         auto stats = reinterpret_cast<BOOL (*)(NrFillStats *)>(GetProcAddress(retained, "nr_fill_stats"));
         require(stats != nullptr, "UMD diagnostics unavailable");
         if (draw_backend) {
+            const std::array<std::pair<UINT, UINT>, 2> extents = desktop_size ?
+                std::array<std::pair<UINT, UINT>, 2>{{{1920, 1080}, {2880, 1800}}} :
+                std::array<std::pair<UINT, UINT>, 2>{{{64, 16}, {132, 16}}};
             for (const auto format : {DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM})
-                for (UINT width : {64u, 132u}) for (UINT sharing = 0; sharing < 3; ++sharing)
-                    exercise_draw(device.Get(), context.Get(), format, width, sharing);
+                for (const auto &[width, height] : extents) for (UINT sharing = 0; sharing < 3; ++sharing)
+                    exercise_draw(device.Get(), context.Get(), format, width, height, sharing);
         } else if (uploads) {
             for (const auto format : {DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM})
                 for (UINT sharing = 0; sharing < 3; ++sharing) exercise_upload(device.Get(), context.Get(), format, sharing);
@@ -275,8 +280,11 @@ int main(int argc, char **argv) {
             require(result.draws == 24 && result.executions == 24 && !result.gpu_executions &&
                     result.cpu_executions == (!std::strcmp(draw_backend, "CPU") ? 24u : 0u) &&
                     result.npu_executions == (!std::strcmp(draw_backend, "NPU") ? 24u : 0u), "unexpected draw execution counters");
-            require(result.allocations == 100 && !result.fills && result.submitted_copies == 88 && result.staging_copy_bytes == 786432 &&
-                    result.upload_bytes == 319872 && result.inference_input_bytes == 301056 && result.inference_output_bytes == 150528,
+            require(result.allocations == 100 && !result.fills && result.submitted_copies == 88 &&
+                    result.staging_copy_bytes == (desktop_size ? 1393557504ull : 786432ull) &&
+                    result.upload_bytes == (desktop_size ? 740275200ull : 319872ull) &&
+                    result.inference_input_bytes == (desktop_size ? 696729600ull : 301056ull) &&
+                    result.inference_output_bytes == (desktop_size ? 348364800ull : 150528ull),
                     "unexpected draw traffic counters");
         } else if (uploads) require(result.allocations == 24 && !result.fills && result.staging_copy_bytes == 819200 &&
                              result.submitted_copies == 32 && result.upload_bytes == 119496, "unexpected upload counters");

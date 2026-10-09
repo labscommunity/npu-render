@@ -1,5 +1,4 @@
-void exercise_draw(ID3D11Device *device, ID3D11DeviceContext *context, DXGI_FORMAT format, UINT width, UINT sharing) {
-    constexpr UINT height = 16;
+void exercise_draw(ID3D11Device *device, ID3D11DeviceContext *context, DXGI_FORMAT format, UINT width, UINT height, UINT sharing) {
     std::vector<unsigned char> foreground(size_t(width) * height * 4), background(foreground.size());
     for (size_t i = 0; i < foreground.size(); i += 4) {
         const auto alpha = static_cast<unsigned char>((i / 4 * 37) % 256);
@@ -85,8 +84,8 @@ void exercise_draw(ID3D11Device *device, ID3D11DeviceContext *context, DXGI_FORM
         context->Unmap(staging.Get(), 0);
         check(device->GetDeviceRemovedReason(), "draw_unmap_status");
         require(max_error <= (pass ? 0u : 1u), "composition pixel mismatch");
-        std::printf("{\"draw_format\":%u,\"width\":%u,\"height\":16,\"sharing\":%u,\"pass\":%u,\"verified_bytes\":%zu,\"max_error\":%u}\n",
-                    UINT(format), width, sharing, pass, foreground.size(), max_error);
+        std::printf("{\"draw_format\":%u,\"width\":%u,\"height\":%u,\"sharing\":%u,\"pass\":%u,\"verified_bytes\":%zu,\"max_error\":%u}\n",
+                    UINT(format), width, height, sharing, pass, foreground.size(), max_error);
     }
     context->OMSetRenderTargets(0, nullptr, nullptr);
     ID3D11ShaderResourceView *none = nullptr; context->PSSetShaderResources(0, 1, &none);

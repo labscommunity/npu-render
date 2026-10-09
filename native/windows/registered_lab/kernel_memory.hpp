@@ -126,7 +126,7 @@ struct Allocation {
         --context->stats.live_allocations;
     }
     void create(UINT width, UINT height, UINT format, HANDLE resource = nullptr) {
-        require(!handle && context && context->command.hContext && width && width <= 1024 && height && height <= 1024);
+        require(!handle && context && context->command.hContext && width && width <= 8192 && height && height <= 8192);
         surface.width = width; surface.height = height; surface.format = format;
         surface.row_pitch = (width * 4 + 255) & ~255u;
         surface.allocation_bytes = (uint64_t(surface.row_pitch) * height + 4095) & ~uint64_t(4095);
@@ -145,7 +145,7 @@ struct Allocation {
     }
     void open(HANDLE resource, D3DKMT_HANDLE allocation, const kernel_contract::Surface &description) {
         require(!handle && context && context->command.hContext && resource && allocation &&
-                kernel_contract::valid(description) && description.width <= 1024 && description.height <= 1024);
+                kernel_contract::valid(description));
         surface = description; runtime_resource = resource; handle = allocation;
         ++context->stats.live_allocations;
     }

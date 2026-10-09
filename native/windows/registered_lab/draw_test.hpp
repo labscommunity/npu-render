@@ -1,5 +1,5 @@
 // Real composition provider with explicit, test-only runtime allocation shims.
-int test_draws(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER_DEVICECALLBACKS &um, const char *backend) {
+int test_draws(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER_DEVICECALLBACKS &um, const char *backend, bool desktop_size) {
     TEST(nr_fill_configure("AUTO") == FALSE && nr_fill_configure(backend));
     emulate_copies = true; last_error = S_OK;
     alignas(Device) unsigned char storage[sizeof(Device)]{};
@@ -33,9 +33,11 @@ int test_draws(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER_DEVICE
     blend.BlendOp = blend.BlendOpAlpha = D3D10_DDI_BLEND_OP_ADD;
     D3D10DDI_HBLENDSTATE hb{}; hb.pDrvPrivate = &blend;
     UINT checks = 0;
+    const std::array<std::pair<UINT, UINT>, 2> extents = desktop_size ?
+        std::array<std::pair<UINT, UINT>, 2>{{{1920, 1080}, {2880, 1800}}} :
+        std::array<std::pair<UINT, UINT>, 2>{{{64, 16}, {132, 16}}};
     for (auto format : {DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_B8G8R8A8_UNORM})
-        for (bool shared : {false, true}) for (UINT width : {64u, 132u}) {
-            const UINT height = 16;
+        for (bool shared : {false, true}) for (const auto &[width, height] : extents) {
             std::vector<unsigned char> foreground(size_t(width) * height * 4), background(foreground.size());
             for (size_t i = 0; i < foreground.size(); i += 4) {
                 const auto alpha = static_cast<unsigned char>((i / 4 * 37) % 256);
@@ -100,6 +102,8 @@ int test_draws(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER_DEVICE
                     max_error = std::max(max_error, UINT(std::abs(int(actual) - expected)));
                 }
                 TEST(max_error <= (pass ? 0u : 1u)); ++checks;
+                std::printf("{\"component_draw\":true,\"format\":%u,\"width\":%u,\"height\":%u,\"shared\":%s,\"pass\":%u,\"max_error\":%u,\"verified_bytes\":%zu}\n",
+                    UINT(format), width, height, shared ? "true" : "false", pass, max_error, foreground.size());
             }
             f.pfnSetRenderTargets(h, nullptr, 0, 8, {});
             const D3D10DDI_HSHADERRESOURCEVIEW none{}; f.pfnPsSetShaderResources(h, 0, 1, &none);

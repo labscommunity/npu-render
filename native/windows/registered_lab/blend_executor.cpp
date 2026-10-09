@@ -31,7 +31,8 @@ BlendExecutor::BlendExecutor(const std::string &backend) : state(std::make_uniqu
 BlendExecutor::~BlendExecutor() = default;
 BlendExecutor::Result BlendExecutor::compose(uint32_t width, uint32_t height,
         const std::vector<uint8_t> &background, const std::vector<uint8_t> &foreground) {
-    if (!width || width > 1024 || !height || height > 1024 ||
+    if (!width || width > 8192 || !height || height > 8192 ||
+        uint64_t(width) * height * 4 > 128ull * 1024 * 1024 ||
         background.size() != size_t(width) * height * 4 || foreground.size() != background.size())
         throw std::invalid_argument("invalid packed composition extents");
     const uint64_t key = (uint64_t(width) << 32) | height;

@@ -57,6 +57,14 @@ CPU-only guest fails without fallback or leaked resources. All probe modes need
 an explicit `NR_REGISTERED_RUNTIME` directory holding the pinned OpenVINO DLLs;
 the test package separately verifies those dependency hashes.
 
+
+Both draw executables accept `--desktop-size` after their backend argument. This
+runs the same independent pixel oracle at 1920×1080 and 2880×1800. Surface bounds
+match the kernel contract (8192 per dimension, at most 128 MiB including padded
+rows). Installed tests at these sizes require the separate system-page adapter;
+the old 16 MiB segment cannot hold even one native-panel image. Component tests
+continue to use allocation shims and do not establish desktop frame delivery.
+
 `--upload` exercises initial texture data, full and partial `UpdateSubresource`,
 and empty updates for ordinary, legacy shared and NT keyed textures in both
 formats. Patterned 65×37 images have padded source rows; every readback checks
