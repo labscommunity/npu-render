@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "kind": "registered-interactive-swapchain-rejection",
+  "date_utc": "2026-10-09",
+  "package": "v36-present-runtime",
+  "driver_version": "0.0.25.0",
+  "source_revisions": {
+    "kernel": "86354cc97534cdfdd29541bcc3fda604d5476df3",
+    "umd": "6f887ba6f6aa96cac562ff0a4532239dc56e6711"
+  },
+  "result": "back-buffer-descriptor-rejected",
+  "process": {
+    "started": "2026-10-09T23:25:36.1071930Z",
+    "finished": "2026-10-09T23:25:53.0422490Z",
+    "probe_sha256": "76E021879E0E7F0E269C7A3A54A83123F8967CF4ED48F2E1D5339CF4AB18EE3A",
+    "exit_code": 1,
+    "npu_execution_tested": false
+  },
+  "process_stats": {
+    "failed": true,
+    "rejected": 1,
+    "last_unsupported_offset": 18446744073709551615,
+    "cleanup_errors": 0,
+    "executions": 0,
+    "cpu_executions": 0,
+    "gpu_executions": 0,
+    "npu_executions": 0,
+    "live_allocations": 0,
+    "live_contexts": 0,
+    "present_requests": 0,
+    "accepted_present_callbacks": 0
+  },
+  "interactive_session": 1,
+  "requested_client_extent": [
+    320,
+    192
+  ],
+  "verified_presented_frames": 0,
+  "requested_backbuffer": {
+    "format": 87,
+    "misc_flags": 8,
+    "bind_flags": 160,
+    "primary_descriptor": false,
+    "initial_data": false
+  },
+  "kernel_module_unloaded": true,
+  "owned_device_removed": true,
+  "owned_inf_deleted": true,
+  "prior_display_status_preserved": true,
+  "registered_npu_execution_tested": false,
+  "desktop_offload_tested": false,
+  "tahoma_benefit_tested": false,
+  "notes": [
+    "The registered D3D11 device succeeds in interactive session 1. DXGI then requests a BGRA8 back buffer with PRESENT|RENDER_TARGET binding and DISCARD_ON_PRESENT. The UMD resource filter excludes both new flags and reports E_INVALIDARG; the public CreateSwapChain call reports DXGI_ERROR_DEVICE_REMOVED. No Present callback, draw, clear or screen oracle executes. Cleanup counters are zero.",
+    "Revision 4150245 admits this copy-style back buffer using real VidMm allocations, with separate component tests for supported and rejected descriptors. It does not admit primary scanout. A later package must validate the fix live.",
+    "This package retains the earlier individually cached DXGI callback. Revision 2504bb9 corrects that lifetime error by retaining the callback table and testing replacement between calls. The v36 run never reaches that callback.",
+    "The first scheduled install invocation exited with task result 1 before producing a fresh installation report. Its cause was not established. A wrapper that records bootstrap exceptions was added; the next invocation completed successfully without a bootstrap exception. The installation/removal reports here correspond to that completed invocation.",
+    "The interactive task wrapper originally returned status 0 even when its child probe exited 1. The child exit report and pixel/callback data determine this failed result. The next task wrapper propagates the child status."
+  ],
+  "references": [
+    "https://learn.microsoft.com/en-us/windows-hardware/drivers/display/passing-dxgi-information-at-resource-creation-time",
+    "https://learn.microsoft.com/en-us/windows-hardware/drivers/display/supporting-the-dxgi-ddi"
+  ]
+}
