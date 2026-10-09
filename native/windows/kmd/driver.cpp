@@ -13,6 +13,9 @@ inline void *operator new(size_t, void *p) noexcept { return p; }
 #include "paging.hpp"
 #include "submission.hpp"
 #include "engine.hpp"
+#if NR_KMD_LAB_ENGINE_PROBE
+#include "engine_probe.hpp"
+#endif
 #if NR_KMD_LAB_SYNC_PROBE
 #include "synchronization_probe.hpp"
 #endif
@@ -30,6 +33,9 @@ struct Adapter {
     nr::kmd::Segment segment;
     nr::kmd::Submissions submissions;
     nr::kmd::Engine engine;
+#if NR_KMD_LAB_ENGINE_PROBE
+    nr::kmd::EngineProbe engine_probe;
+#endif
 #if NR_KMD_LAB_SYNC_PROBE
     nr::kmd::SynchronizationProbe synchronization;
 #endif
@@ -98,6 +104,16 @@ NTSTATUS start_device(void *context, DXGK_START_INFO *start,
     DbgPrintEx(DPFLTR_IHVVIDEO_ID, DPFLTR_ERROR_LEVEL,
         "nr_render_lab: backing attempts=%lu first_status=%08lx committed_bytes=%llu; probe capacity is not desktop capacity\n",
         worker.backing_attempts, ULONG(worker.first_backing_status), ULONGLONG(worker.backing_bytes));
+#endif
+#if NR_KMD_LAB_ENGINE_PROBE
+    a->engine_probe.run(*kernel, start->RequiredDmaQueueEntry, a->engine,
+                        a->scheduler, a->submissions, a->segment);
+    const auto &engine_probe = a->engine_probe;
+    DbgPrintEx(DPFLTR_IHVVIDEO_ID, DPFLTR_ERROR_LEVEL,
+        "nr_render_lab: engine status=%08lx phase=%lu stop=%08lx required=%lu capacity=%llu notifications=%ld dpcs=%ld irql=%u/%u/%u; notifications terminate at lab observers, not Windows; startup remains disabled\n",
+        ULONG(engine_probe.status), engine_probe.phase, ULONG(engine_probe.stop_status),
+        engine_probe.required_entries, ULONGLONG(engine_probe.queue_entries), engine_probe.notifications,
+        engine_probe.dpcs, UINT(engine_probe.worker_irql), UINT(engine_probe.notify_irql), UINT(engine_probe.dpc_irql));
 #endif
     // Do not let Dxgkrnl select an adapter with incomplete mandatory DDIs.
     if (!runtime_ready) return STATUS_NOT_SUPPORTED;

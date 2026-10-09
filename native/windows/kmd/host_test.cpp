@@ -17,7 +17,7 @@ ULONG sync_calls = 0;
 ULONG sync_fail_call = 0;
 bool sync_contract_error = false;
 KIRQL current_irql() { return simulated_irql; }
-#if NR_KMD_LAB_SYNC_PROBE || NR_KMD_LAB_WORKER_PROBE
+#if NR_KMD_LAB_SYNC_PROBE || NR_KMD_LAB_WORKER_PROBE || NR_KMD_LAB_ENGINE_PROBE
 ULONG lab_print(ULONG, ULONG, PCSTR, ...) { return 0; }
 #endif
 NTSTATUS synchronize(HANDLE device, PKSYNCHRONIZE_ROUTINE routine, PVOID context,
@@ -225,7 +225,7 @@ NTSTATUS initialize(DRIVER_OBJECT *, UNICODE_STRING *, DRIVER_INITIALIZATION_DAT
 #define MmGetSystemAddressForMdlSafe mdl_map
 #define DriverEntry NrHostDriverEntry
 #define KeGetCurrentIrql current_irql
-#if NR_KMD_LAB_SYNC_PROBE || NR_KMD_LAB_WORKER_PROBE
+#if NR_KMD_LAB_SYNC_PROBE || NR_KMD_LAB_WORKER_PROBE || NR_KMD_LAB_ENGINE_PROBE
 #define DbgPrintEx lab_print
 #endif
 #if NR_KMD_LAB_WORKER_PROBE

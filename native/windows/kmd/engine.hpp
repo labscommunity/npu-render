@@ -23,6 +23,7 @@ public:
         submissions_ = &submissions;
         segment_ = &segment;
         inflight_ = {};
+        worker_irql_ = 0xff;
         InterlockedExchange(&quit_, 0);
         KeInitializeEvent(&wake_, SynchronizationEvent, FALSE);
         if (queue.start() != QueueResult::ok) return STATUS_INVALID_DEVICE_STATE;
@@ -62,6 +63,7 @@ public:
         return result;
     }
     bool alive() const { return InterlockedCompareExchange(&alive_, 0, 0) != 0; }
+    KIRQL worker_irql_after_join() const { return worker_irql_; }
     // Crash-time reset must not wait or enter Dxgkrnl synchronization. Normal
     // reset/stop calls stop() at PASSIVE_LEVEL and joins the worker separately.
     void request_shutdown() { InterlockedExchange(&quit_, 1); }
@@ -229,6 +231,7 @@ private:
     }
     static void thread_main(void *context) {
         auto &self = *static_cast<Engine *>(context);
+        self.worker_irql_ = KeGetCurrentIrql();
         while (!InterlockedCompareExchange(&self.quit_, 0, 0)) {
             const auto wait = KeWaitForSingleObject(&self.wake_, Executive, KernelMode, FALSE, nullptr);
             if (wait != STATUS_SUCCESS) break;
@@ -253,5 +256,6 @@ private:
     KEVENT wake_{};
     volatile LONG quit_ = 0;
     mutable volatile LONG alive_ = 0;
+    KIRQL worker_irql_ = 0xff;
 };
 } // namespace nr::kmd

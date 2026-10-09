@@ -74,6 +74,15 @@ This validates the owned-memory worker and DPC route on that guest. Windows
 submission acceptance, completed OS fences, NPU execution and desktop offload
 remain untested by this diagnostic.
 
+`--lab-engine-probe` exercises the new queue worker with real kernel threads,
+public synchronization and actual DPC routing. It requests a 16 MiB lab segment
+and the queue depth Windows specifies, then checks a deferred fill, idle
+preemption, thread shutdown and restart. Its test completion/preemption records
+terminate at driver-owned observers. It never forwards artificial fence values
+to Windows' `NotifyInterrupt` or `NotifyDpc` callbacks and still rejects startup.
+This diagnostic can establish kernel concurrency behavior, not Windows scheduler
+acceptance. It is separately opt-in and omitted from default builds.
+
 The [October 9 registration trace](../../../docs/validation/2026-10-09/kernel-registration/report.json)
 validated the earlier `288be1a` baseline in an isolated Windows guest. Windows
 called `DriverEntry`, `AddDevice`, `StartDevice` and `RemoveDevice`; the first,

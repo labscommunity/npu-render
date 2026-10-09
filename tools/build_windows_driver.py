@@ -33,6 +33,11 @@ def main():
         action="store_true",
         help="Exercise owned paging memory, a kernel thread and a DPC; startup stays disabled",
     )
+    parser.add_argument(
+        "--lab-engine-probe",
+        action="store_true",
+        help="Exercise the paging engine with lab observers; never send test fences to Windows",
+    )
     args = parser.parse_args()
     if os.name != "nt":
         raise RuntimeError("The x64 WDDM laboratory requires Windows and MSVC")
@@ -50,6 +55,7 @@ def main():
             f"-DNR_WDK_ROOT={args.wdk_root.resolve()}",
             f"-DNR_KMD_LAB_SYNC_PROBE={'ON' if args.lab_sync_probe else 'OFF'}",
             f"-DNR_KMD_LAB_WORKER_PROBE={'ON' if args.lab_worker_probe else 'OFF'}",
+            f"-DNR_KMD_LAB_ENGINE_PROBE={'ON' if args.lab_engine_probe else 'OFF'}",
         ],
         check=True,
     )
@@ -80,6 +86,7 @@ def main():
         "start_enabled": False,
         "lab_sync_probe_enabled": args.lab_sync_probe,
         "lab_worker_probe_enabled": args.lab_worker_probe,
+        "lab_engine_probe_enabled": args.lab_engine_probe,
         "installation_performed": False,
         "signing_performed": False,
         "npu_execution_tested": False,
