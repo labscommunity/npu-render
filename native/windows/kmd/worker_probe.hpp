@@ -13,6 +13,7 @@ struct WorkerProbe {
     NTSTATUS close_status = STATUS_NOT_SUPPORTED;
     KIRQL worker_irql = 0xff, sync_irql = 0xff, dpc_irql = 0xff;
     ULONG sync_calls = 0;
+    ULONG memory_phase = 0;
     volatile LONG dpc_calls = 0, active = 0;
     BOOLEAN queued = FALSE, returned = FALSE, joined = FALSE;
     DXGKRNL_INTERFACE kernel{};
@@ -83,7 +84,7 @@ private:
         auto &probe = *static_cast<WorkerProbe *>(context);
         probe.worker_irql = KeGetCurrentIrql();
         probe.memory_status = probe.worker_irql == PASSIVE_LEVEL ?
-            paging_round_trip() : STATUS_INVALID_DEVICE_STATE;
+            paging_round_trip(probe.memory_phase) : STATUS_INVALID_DEVICE_STATE;
         if (probe.memory_status == STATUS_SUCCESS) {
             probe.sync_status = probe.kernel.DxgkCbSynchronizeExecution(
                 probe.kernel.DeviceHandle, synchronize, &probe, 0, &probe.returned);
@@ -116,15 +117,18 @@ private:
         args.DmaBufferPrivateDataSize = sizeof(command);
         return Paging::build(segment, args);
     }
-    static NTSTATUS paging_round_trip() {
+    static NTSTATUS paging_round_trip(ULONG &phase) {
         Memory memory;
+        phase = 1;
         auto result = memory.segment.prepare();
         if (result != STATUS_SUCCESS) return result;
+        phase = 2;
         memory.buffer = static_cast<UCHAR *>(ExAllocatePool2(
             POOL_FLAG_NON_PAGED, 4 * PAGE_SIZE + 37, Memory::tag));
         if (!memory.buffer) return STATUS_INSUFFICIENT_RESOURCES;
         RtlFillMemory(memory.buffer, 4 * PAGE_SIZE + 37, 0xa5);
         auto data = memory.buffer + 37;
+        phase = 3;
         memory.mdl = IoAllocateMdl(data, 4 * PAGE_SIZE, FALSE, FALSE, nullptr);
         if (!memory.mdl) return STATUS_INSUFFICIENT_RESOURCES;
         MmBuildMdlForNonPagedPool(memory.mdl);
@@ -140,10 +144,12 @@ private:
         args.Fill.FillSize = length;
         args.Fill.FillPattern = 0x04030201;
         PagingCommand command{};
+        phase = 4;
         result = build(memory.segment, args, command);
         if (result != STATUS_SUCCESS) return result;
         for (SIZE_T i = 0; i < length; ++i)
             if (destination[i] != 0) return STATUS_DATA_ERROR;
+        phase = 5;
         result = Paging::execute(memory.segment, command);
         if (result != STATUS_SUCCESS) return result;
         for (SIZE_T i = 0; i < length; ++i)
@@ -157,10 +163,12 @@ private:
         args.Transfer.Source.pMdl = memory.mdl;
         args.Transfer.Destination.SegmentId = 1;
         args.Transfer.Destination.SegmentAddress.QuadPart = 9000;
+        phase = 6;
         result = build(memory.segment, args, command);
         if (result != STATUS_SUCCESS) return result;
         for (SIZE_T i = 0; i < length; ++i)
             if (destination[i] != (i % 4) + 1) return STATUS_DATA_ERROR;
+        phase = 7;
         result = Paging::execute(memory.segment, command);
         if (result != STATUS_SUCCESS) return result;
         for (SIZE_T i = 0; i < length; ++i)
@@ -174,10 +182,12 @@ private:
         args.Transfer.Source.SegmentId = 1;
         args.Transfer.Source.SegmentAddress.QuadPart = 9000;
         args.Transfer.Destination.pMdl = memory.mdl;
+        phase = 8;
         result = build(memory.segment, args, command);
         if (result != STATUS_SUCCESS) return result;
         for (SIZE_T i = 0; i < length; ++i)
             if (data[2 * PAGE_SIZE + i] != 0xa5) return STATUS_DATA_ERROR;
+        phase = 9;
         result = Paging::execute(memory.segment, command);
         if (result != STATUS_SUCCESS) return result;
         for (SIZE_T i = 0; i < length; ++i)
@@ -185,6 +195,7 @@ private:
         if (data[2 * PAGE_SIZE - 1] != 0xa5 || data[2 * PAGE_SIZE + length] != 0xa5 ||
             RtlCompareMemory(memory.mdl, &original, sizeof(original)) != sizeof(original))
             return STATUS_DATA_ERROR;
+        phase = 10;
         return STATUS_SUCCESS;
     }
 };

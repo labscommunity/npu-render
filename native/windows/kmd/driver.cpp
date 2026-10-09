@@ -89,8 +89,8 @@ NTSTATUS start_device(void *context, DXGK_START_INFO *start,
     a->worker_probe.run(*kernel);
     const auto &worker = a->worker_probe;
     DbgPrintEx(DPFLTR_IHVVIDEO_ID, DPFLTR_ERROR_LEVEL,
-        "nr_render_lab: worker status=%08lx create=%08lx memory=%08lx sync=%08lx wait=%08lx close=%08lx joined=%u irql=%u/%u/%u calls=%lu/%ld queued=%u returned=%u; startup remains disabled\n",
-        ULONG(worker.status), ULONG(worker.create_status), ULONG(worker.memory_status),
+        "nr_render_lab: worker status=%08lx create=%08lx memory=%08lx phase=%lu sync=%08lx wait=%08lx close=%08lx joined=%u irql=%u/%u/%u calls=%lu/%ld queued=%u returned=%u; startup remains disabled\n",
+        ULONG(worker.status), ULONG(worker.create_status), ULONG(worker.memory_status), worker.memory_phase,
         ULONG(worker.sync_status), ULONG(worker.dpc_wait_status), ULONG(worker.close_status),
         UINT(worker.joined), UINT(worker.worker_irql), UINT(worker.sync_irql), UINT(worker.dpc_irql),
         worker.sync_calls, worker.dpc_calls, UINT(worker.queued), UINT(worker.returned));

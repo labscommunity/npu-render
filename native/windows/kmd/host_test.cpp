@@ -420,7 +420,8 @@ extern "C" int nr_kernel_host_test() {
     NR_CHECK(NT_SUCCESS(registration.DxgkDdiStopDevice(a)) && segment_frees == 4);
     NR_CHECK(!segment_contract_error);
 #if NR_KMD_LAB_WORKER_PROBE
-    NR_CHECK(worker_probe_test(a) == 0);
+    const auto worker_result = worker_probe_test(a);
+    if (worker_result) return worker_result;
 #endif
     NR_CHECK(NT_SUCCESS(registration.DxgkDdiRemoveDevice(a)) && !outstanding);
     return 0;

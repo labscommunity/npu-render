@@ -51,6 +51,13 @@ from default builds. Its host model checks failed allocations, failed thread
 creation, rejected callbacks, a late DPC and a retried join; it does not model
 concurrency or establish live Windows memory-manager acceptance.
 
+The [first worker run](../../../docs/validation/2026-10-09/kernel-worker-v7/report.json)
+created and joined a real kernel thread, but returned
+`STATUS_INSUFFICIENT_RESOURCES` during the memory exercise before requesting a
+DPC. The original display remained healthy and the test package was removed.
+The next diagnostic records each memory phase to distinguish backing, buffer,
+MDL and transfer failures; that first run alone does not identify the allocation.
+
 The [October 9 registration trace](../../../docs/validation/2026-10-09/kernel-registration/report.json)
 validated the earlier `288be1a` baseline in an isolated Windows guest. Windows
 called `DriverEntry`, `AddDevice`, `StartDevice` and `RemoveDevice`; the first,

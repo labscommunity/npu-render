@@ -30,6 +30,8 @@ int worker_probe_test(Adapter *adapter) {
                  STATUS_NOT_SUPPORTED);
         const auto &probe = adapter->worker_probe;
         NR_CHECK((probe.status == STATUS_SUCCESS) == (mutation == 0 || mutation == 11));
+        const ULONG phases[] = {10, 0, 1, 2, 3, 7, 9, 10, 10, 10, 10, 10};
+        NR_CHECK(probe.memory_phase == phases[mutation]);
         NR_CHECK(!worker_contract_error && !segment_contract_error && !mdl_contract_error);
         NR_CHECK(outstanding == baseline_pool && mdl_outstanding == baseline_mdls);
         NR_CHECK(!segment_memory && !pending_dpc && !probe.active && !probe.kernel.DeviceHandle);
