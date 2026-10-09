@@ -168,7 +168,15 @@ void APIENTRY copy_resource(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE dst, D3D10DDI
         auto a = d.allocation, b = s.allocation;
         require(a != b && a->context == device(h).context && b->context == a->context &&
                 a->surface.width == b->surface.width && a->surface.height == b->surface.height &&
-                a->surface.format == b->surface.format);
+                a->surface.format == b->surface.format && a->surface.row_pitch == b->surface.row_pitch &&
+                a->surface.allocation_bytes == b->surface.allocation_bytes && !a->locked && !b->locked);
+        if (b->runtime_resource) {
+            // Shared memory-segment targets cannot be locked by the UMD. The
+            // OS orders this submitted copy; staging Map waits on its write.
+            a->context->copy(b->handle, a->handle);
+            counters.copies += a->surface.allocation_bytes;
+            return;
+        }
         // This explicit CPU staging copy waits for submitted writes through the
         // blocking source lock. It is not a GPU or NPU copy implementation.
         Mapping read(*b, true), write(*a, false);
@@ -358,11 +366,12 @@ extern "C" __declspec(dllexport) HRESULT APIENTRY OpenAdapter10_2(D3D10DDIARG_OP
     return status;
 }
 extern "C" __declspec(dllexport) BOOL nr_fill_stats(NrFillStats *out) {
-    if (!out || out->bytes != sizeof(*out) || out->version != 1) return FALSE;
+    if (!out || out->bytes != sizeof(*out) || out->version != 2) return FALSE;
     std::lock_guard<std::recursive_mutex> lock(mutex);
     out->allocations = counters.allocations; out->fills = counters.fills; out->staging_copy_bytes = counters.copies;
     out->live_allocations = counters.live_allocations; out->live_contexts = counters.live_contexts;
     out->cleanup_errors = counters.cleanup_errors; out->rejected = counters.rejected;
     out->last_unsupported_offset = counters.last_unsupported_offset;
+    out->submitted_copies = counters.submitted_copies;
     return TRUE;
 }

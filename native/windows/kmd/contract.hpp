@@ -34,6 +34,16 @@ struct FillSurface {
     u32 reserved = 0;
 };
 static_assert(sizeof(FillSurface) == 24);
+// Copy between two OS-validated allocations (source first, destination second).
+// Extent is derived from matching allocation descriptors, never user addresses.
+struct CopySurface {
+    u32 signature = magic;
+    u32 abi = version;
+    u32 bytes = sizeof(CopySurface);
+    u32 operation = 2;
+    u32 reserved[2]{};
+};
+static_assert(sizeof(CopySurface) == sizeof(FillSurface));
 static_assert(sizeof(AdapterInfo) == 16 && sizeof(Surface) == 40);
 constexpr bool valid(const Surface &s) {
     return s.signature == magic && s.abi == version && s.bytes == sizeof(Surface) &&

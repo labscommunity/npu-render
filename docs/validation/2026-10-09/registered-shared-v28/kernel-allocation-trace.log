@@ -1,0 +1,77 @@
+Opened log file 'C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-paging-v28-recovery2-oct9.log'
+Break instruction exception - code 80000003 (first chance)
+*******************************************************************************
+*                                                                             *
+*   You are seeing this message because you pressed either                    *
+*       CTRL+C (if you run console kernel debugger) or,                       *
+*       CTRL+BREAK (if you run GUI kernel debugger),                          *
+*   on your debugger machine's keyboard.                                      *
+*                                                                             *
+*                   THIS IS NOT A BUG OR A SYSTEM CRASH                       *
+*                                                                             *
+* If you did not intend to break into the debugger, press the "g" key, then   *
+* press the "Enter" key now.  This message might immediately reappear.  If it *
+* does, press "g" and "Enter" again.                                          *
+*                                                                             *
+*******************************************************************************
+nt!DbgBreakPointWithStatus:
+fffff807`d4afdfb0 cc              int     3
+0: kd> bp /1 fffff807`66842029 ".printf \"OpenAllocations returned %x\\n\", @eax;gc";bp /1 fffff807`668420d9 ".printf \"CreateVidMmAllocations returned %x\\n\", @eax;gc";g
+Break instruction exception - code 80000003 (first chance)
+*******************************************************************************
+*                                                                             *
+*   You are seeing this message because you pressed either                    *
+*       CTRL+C (if you run console kernel debugger) or,                       *
+*       CTRL+BREAK (if you run GUI kernel debugger),                          *
+*   on your debugger machine's keyboard.                                      *
+*                                                                             *
+*                   THIS IS NOT A BUG OR A SYSTEM CRASH                       *
+*                                                                             *
+* If you did not intend to break into the debugger, press the "g" key, then   *
+* press the "Enter" key now.  This message might immediately reappear.  If it *
+* does, press "g" and "Enter" again.                                          *
+*                                                                             *
+*******************************************************************************
+nt!DbgBreakPointWithStatus:
+fffff807`d4afdfb0 cc              int     3
+0: kd> bl;g
+     0 e Disable Clear  fffff807`66842029     /1 0001 (0001) dxgkrnl!DXGDEVICE::CreateAllocation+0x961 ".printf \"OpenAllocations returned %x\\n\", @eax;gc"
+     1 e Disable Clear  fffff807`668420d9     /1 0001 (0001) dxgkrnl!DXGDEVICE::CreateAllocation+0xa11 ".printf \"CreateVidMmAllocations returned %x\\n\", @eax;gc"
+
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: create_context node=0 affinity=1 flags=0 private=0
+OpenAllocations returned 0
+CreateVidMmAllocations returned c000000d
+Break instruction exception - code 80000003 (first chance)
+*******************************************************************************
+*                                                                             *
+*   You are seeing this message because you pressed either                    *
+*       CTRL+C (if you run console kernel debugger) or,                       *
+*       CTRL+BREAK (if you run GUI kernel debugger),                          *
+*   on your debugger machine's keyboard.                                      *
+*                                                                             *
+*                   THIS IS NOT A BUG OR A SYSTEM CRASH                       *
+*                                                                             *
+* If you did not intend to break into the debugger, press the "g" key, then   *
+* press the "Enter" key now.  This message might immediately reappear.  If it *
+* does, press "g" and "Enter" again.                                          *
+*                                                                             *
+*******************************************************************************
+nt!DbgBreakPointWithStatus:
+fffff807`d4afdfb0 cc              int     3
+0: kd> bc *;sxe ud:nr_render_kmd.sys;g
+Unload module \SystemRoot\System32\DriverStore\FileRepository\nr_render_lab.inf_amd64_4eb30b1e72535da7\nr_render_kmd.sys at fffff807`6b5a0000
+nt!DebugService2+0x5:
+fffff807`d4afe005 cc              int     3
+0: kd> .logclose;sxd ud;bc *;g
+Closing open log file C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-paging-v28-recovery2-oct9.log

@@ -15,7 +15,7 @@ the probe and UMD refuse to operate outside the owned `NR-GFX-LAB` guest with th
 `NR_WINDOWS` volume. The production UMD's readiness gate remains closed.
 
 The admitted operations are 2D render targets, staging textures, clears,
-blocking CPU staging copies, and staging read maps. Resource data uses VidMm
+staging copies, and staging read maps. Resource data uses VidMm
 allocations with no private pixel-buffer fallback. Clears submit immediately and
 replace all command-buffer pointers with the runtime's returned pointers. Failed
 submission invalidates the context's writable command pointers. Unsupported
@@ -41,6 +41,17 @@ build's evidence, but do not treat its source snapshot as an exact build proof.
 The clean v28 diagnostic image shows the shared allocation callback returning
 `E_INVALIDARG`; this corrects the earlier inference that UMD descriptor validation
 rejected the request before the callback.
+
+The [v28 trace](../../../docs/validation/2026-10-09/registered-shared-v28/report.json)
+locates the rejection in Windows' `CreateVidMmAllocations`, after its allocation
+opening succeeds. The [Microsoft render-only sample](https://github.com/microsoft/graphics-driver-samples/blob/master/render-only-sample/roskmd/RosKmdAdapter.cpp)
+documents that shared allocations cannot be CPU visible in a memory segment.
+The next revision clears that flag for shared targets and submits a two-allocation
+copy into a lockable staging texture. VidMm tracks the source read and destination
+write, and staging Map waits for completion. The copy executes on the kernel CPU
+worker; it is not NPU execution. Ordinary unshared readback retains its explicit
+blocking CPU copy. `submitted_copies` distinguishes these paths in probe results.
+Live validation of the correction is still required.
 
 The host test calls the actual UMD callbacks with owned runtime shims. It checks
 allocation failure cleanup, rotated submission buffers, absence of a CPU clear

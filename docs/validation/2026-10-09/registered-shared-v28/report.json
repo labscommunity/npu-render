@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "kind": "isolated-registered-shared-texture-diagnosis",
+  "date_utc": "2026-10-09",
+  "umd_source_revision": "67798a1a0250e9fa520417181154bf1d52d37444",
+  "kernel_source_revision": "7fad81f32d97924f3403415026352776b3be5552",
+  "package": "v28-paging",
+  "driver_version": "0.0.17.0",
+  "guest_build": "26300.9457",
+  "result": "shared-allocation-rejected-by-vidmm",
+  "shared_create_texture_status": "0x887a0005",
+  "allocate_callback_status": "0x80070057",
+  "windows_open_allocations_status": "0x00000000",
+  "windows_create_vidmm_allocations_status": "0xc000000d",
+  "shared_resource_created": false,
+  "npu_execution_tested": false,
+  "desktop_offload_tested": false,
+  "tahoma_benefit_tested": false,
+  "kernel_module_unloaded": true,
+  "owned_device_removed": true,
+  "owned_inf_deleted": true,
+  "prior_display_status_preserved": true,
+  "removal_child_exit": 0,
+  "notes": [
+    "The clean diagnostic UMD accepts the 64x48 BGRA8 shared target descriptor and calls AllocateCb, which fails with E_INVALIDARG. This corrects the v27 report inference that descriptor validation failed before AllocateCb.",
+    "Incremental MSBuild had reused an older UMD object after a header-only diagnostic edit in v27. The new standalone builder requires a clean build and records source/binary hashes.",
+    "The agent server restarted during this installation. The VM and storage tunnels continued running. The debugger and remote console were reattached.",
+    "The debugger recovery log was inadvertently reopened with an unsupported append option; earlier recovery entries were overwritten. The retained allocation trace starts after that reopen and records the debug4 attempt: Windows OpenAllocations succeeds and CreateVidMmAllocations returns STATUS_INVALID_PARAMETER. Earlier debug-attempt stdout/stderr and exit records are preserved, but their earlier kernel traces are unavailable.",
+    "Debugger pauses affected elapsed times. These are functional diagnostics, not performance measurements.",
+    "Microsoft render-only sample documents that shared allocations can be CPU visible only when exclusively in an aperture segment. Our current shared allocation uses a memory segment with CpuVisible=1. This is the next correction to validate; this report does not claim the fix works."
+  ],
+  "references": [
+    "https://github.com/microsoft/graphics-driver-samples/blob/master/render-only-sample/roskmd/RosKmdAdapter.cpp",
+    "https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/ns-d3dkmddi-_dxgk_allocationinfoflags"
+  ]
+}

@@ -48,6 +48,8 @@ int lab_start_test() {
     if (resource_result) return resource_result;
     const auto fill_result = fill_test(a);
     if (fill_result) return fill_result;
+    const auto copy_result = copy_test(a);
+    if (copy_result) return copy_result;
     NR_CHECK(registration.DxgkDdiStopDevice(a) == STATUS_SUCCESS);
     NR_CHECK(!a->started && !a->engine.alive() && !a->segment.ready() && !a->submissions.ready());
     NR_CHECK(registration.DxgkDdiRemoveDevice(a) == STATUS_SUCCESS && !outstanding);

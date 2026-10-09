@@ -17,6 +17,7 @@ inline void *operator new(size_t, void *p) noexcept { return p; }
 #include "segment.hpp"
 #include "paging.hpp"
 #include "fill.hpp"
+#include "copy.hpp"
 #include "submission.hpp"
 #include "engine.hpp"
 #if NR_KMD_LAB_ENGINE_PROBE
@@ -78,6 +79,19 @@ Allocation *writable_allocation(Adapter *adapter, const DXGK_ALLOCATIONLIST *lis
     if (opened->read_only || opened->device->adapter != adapter ||
         (device && opened->device != device) || opened->allocation->adapter != adapter) return nullptr;
     return opened->allocation;
+}
+Allocation *copy_allocations(Adapter *adapter, const DXGK_ALLOCATIONLIST *list, UINT count,
+                             Device *device = nullptr) {
+    if (!list || count != 2 || !list[0].hDeviceSpecificAllocation || list[0].WriteOperation ||
+        list[0].Reserved) return nullptr;
+    const auto destination = writable_allocation(adapter, list + 1, 1, device);
+    const auto source = static_cast<OpenAllocation *>(list[0].hDeviceSpecificAllocation);
+    if (!destination || source->device->adapter != adapter ||
+        source->device != static_cast<OpenAllocation *>(list[1].hDeviceSpecificAllocation)->device ||
+        (device && source->device != device) || source->allocation->adapter != adapter ||
+        source->allocation == destination || !same_surface(source->allocation->surface, destination->surface))
+        return nullptr;
+    return destination;
 }
 
 template <class T> T *allocate() {
@@ -227,9 +241,15 @@ NTSTATUS APIENTRY patch(HANDLE adapter, const DXGKARG_PATCH *args) {
     if (!a->started || a->resetting) return STATUS_DEVICE_NOT_READY;
     NTSTATUS status;
     if (!args->Flags.Paging && args->DmaBufferSubmissionEndOffset != args->DmaBufferSubmissionStartOffset) {
-        const auto allocation = writable_allocation(a, args->pAllocationList, args->AllocationListSize);
-        status = allocation ? nr::kmd::Fill::patch(a->segment, SIZE_T(allocation->surface.allocation_bytes), *args) :
-                              STATUS_INVALID_HANDLE;
+        if (args->AllocationListSize == 2) {
+            const auto allocation = copy_allocations(a, args->pAllocationList, args->AllocationListSize);
+            status = allocation ? nr::kmd::Copy::patch(a->segment, SIZE_T(allocation->surface.allocation_bytes), *args) :
+                                  STATUS_INVALID_HANDLE;
+        } else {
+            const auto allocation = writable_allocation(a, args->pAllocationList, args->AllocationListSize);
+            status = allocation ? nr::kmd::Fill::patch(a->segment, SIZE_T(allocation->surface.allocation_bytes), *args) :
+                                  STATUS_INVALID_HANDLE;
+        }
     } else status = nr::kmd::Submissions::patch(*args);
     NR_LAB_TRACE("nr_paging_lab: patch=%08lx flags=%lx fence=%lu dma=%lu..%lu private=%lu..%lu\n",
         ULONG(status), args->Flags.Value, args->SubmissionFenceId,
@@ -484,7 +504,10 @@ NTSTATUS APIENTRY create_allocation(HANDLE adapter, DXGKARG_CREATEALLOCATION *ar
         out.EvictionSegmentSet = 0;
         out.MaximumRenamingListLength = 0;
         out.Flags.Value = 0;
-        out.Flags.CpuVisible = 1;
+        // Shared allocations in a memory segment cannot be CPU visible. This
+        // laboratory admits resource-owned allocations only for shared targets.
+        // Readback uses a submitted copy into a separate lockable staging image.
+        out.Flags.CpuVisible = resource_owned ? 0 : 1;
         // VidMm rejects cached allocations targeting a memory segment when
         // the adapter has no cache-coherent aperture. Segment backing uses
         // MmWriteCombined so CPU aliases use the same memory type.
@@ -672,7 +695,7 @@ NTSTATUS APIENTRY create_context(HANDLE device, DXGKARG_CREATECONTEXT *args) {
     InterlockedIncrement(&d->contexts);
     RtlZeroMemory(&args->ContextInfo, sizeof(args->ContextInfo));
     args->ContextInfo.DmaBufferSize = nr::kmd::Scheduler::max_bytes;
-    args->ContextInfo.DmaBufferPrivateDataSize = sizeof(nr::kmd::FillRecord);
+    args->ContextInfo.DmaBufferPrivateDataSize = sizeof(nr::kmd::CopyRecord);
     args->ContextInfo.AllocationListSize = 64;
     args->ContextInfo.PatchLocationListSize = 64;
     args->hContext = c;
@@ -686,6 +709,13 @@ NTSTATUS APIENTRY render(HANDLE context, DXGKARG_RENDER *args) {
     if (c->system) return STATUS_NOT_SUPPORTED;
     const auto a = c->device->adapter;
     if (!a->started || a->resetting) return STATUS_DEVICE_NOT_READY;
+    if (args->AllocationListSize == 2) {
+        const auto allocation = copy_allocations(a, args->pAllocationList, args->AllocationListSize, c->device);
+        if (!allocation) return STATUS_INVALID_HANDLE;
+        const auto status = nr::kmd::Copy::build(a->segment, SIZE_T(allocation->surface.allocation_bytes), *args);
+        NR_LAB_TRACE("nr_paging_lab: render_copy=%08lx\n", ULONG(status));
+        return status;
+    }
     const auto allocation = writable_allocation(a, args->pAllocationList, args->AllocationListSize, c->device);
     if (!allocation) return STATUS_INVALID_HANDLE;
     const auto status = nr::kmd::Fill::build(a->segment, SIZE_T(allocation->surface.allocation_bytes), *args);

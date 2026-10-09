@@ -188,10 +188,11 @@ int main(int argc, char **argv) {
         context.Reset(); device.Reset(); adapter.Reset(); factory.Reset();
         NrFillStats result{};
         require(stats(&result) != FALSE, "UMD diagnostics failed");
-        std::printf("{\"allocations\":%llu,\"fills\":%llu,\"staging_copy_bytes\":%llu,\"live_allocations\":%llu,\"live_contexts\":%llu,\"cleanup_errors\":%llu,\"rejected\":%llu}\n",
+        std::printf("{\"allocations\":%llu,\"fills\":%llu,\"staging_copy_bytes\":%llu,\"live_allocations\":%llu,\"live_contexts\":%llu,\"cleanup_errors\":%llu,\"rejected\":%llu,\"submitted_copies\":%llu}\n",
                     result.allocations, result.fills, result.staging_copy_bytes, result.live_allocations,
-                    result.live_contexts, result.cleanup_errors, result.rejected);
+                    result.live_contexts, result.cleanup_errors, result.rejected, result.submitted_copies);
         require(result.allocations == 4 && result.fills == 6 && result.staging_copy_bytes == 6 * 12288 &&
+                result.submitted_copies == (shared ? 6u : 0u) &&
                 !result.live_allocations && !result.live_contexts && !result.cleanup_errors && !result.rejected, "unexpected UMD counters");
         FreeLibrary(retained);
         std::puts("{\"passed\":true,\"npu_execution_tested\":false,\"desktop_offload_tested\":false}");

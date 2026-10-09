@@ -1,0 +1,31 @@
+Opened log file 'C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-paging-v28-oct9.log'
+Breakpoint 0 hit
+nr_render_kmd!DriverEntry:
+fffff807`6b5a59a0 4055            push    rbp
+0: kd> gu
+nr_render_kmd!GsDriverEntry+0x20:
+fffff807`6b5ac020 488b5c2430      mov     rbx,qword ptr [rsp+30h]
+0: kd> r eax;bc *;g
+eax=0
+nr_paging_lab: memory=00000000 required_queue=32
+nr_paging_lab: engine_start=00000000 capacity=33; rendering_ready=0 sources=0 children=0
+nr_paging_lab: query type=1 input=0 output=552
+nr_paging_lab: query type=47 input=0 output=4
+nr_paging_lab: create_context node=0 affinity=1 flags=1 private=0
+nr_paging_lab: query type=5 input=24 output=32
+nr_paging_lab: query type=5 input=24 output=32
+nr_paging_lab: query type=10 input=4 output=4
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53

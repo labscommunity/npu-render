@@ -10,7 +10,7 @@ std::array<bool, 8> locked{};
 std::array<UINT, 8> references{};
 std::map<HANDLE, UINT> resource_handles;
 nr::kernel_contract::FillSurface commands[2]{};
-D3DDDI_ALLOCATIONLIST lists[2]{};
+D3DDDI_ALLOCATIONLIST lists[2][2]{};
 UINT current_buffer = 0, renders = 0, destroys = 0, released = 0;
 bool contract_error = false, allocation_failure = false, render_failure = false;
 bool lock_failure = false;
@@ -31,7 +31,7 @@ HRESULT APIENTRY create_context_cb(HANDLE rt, D3DDDICB_CREATECONTEXT *a) {
     verify(rt == runtime_handle && a->EngineAffinity == 1 && !a->NodeOrdinal && !a->Flags.Value);
     a->hContext = context_handle;
     a->pCommandBuffer = &commands[current_buffer]; a->CommandBufferSize = sizeof(commands[0]);
-    a->pAllocationList = &lists[current_buffer]; a->AllocationListSize = 1;
+    a->pAllocationList = lists[current_buffer]; a->AllocationListSize = 2;
     return S_OK;
 }
 HRESULT APIENTRY destroy_context_cb(HANDLE rt, const D3DDDICB_DESTROYCONTEXT *a) {
@@ -77,6 +77,7 @@ HRESULT APIENTRY lock_cb(HANDLE rt, D3DDDICB_LOCK *a) {
     verify(rt == runtime_handle && a->Flags.LockEntire && a->Flags.DonotEvict && !a->Flags.Discard);
     if (lock_failure && a->Flags.WriteOnly) return E_ACCESSDENIED;
     const auto i = a->hAllocation;
+    for (const auto &resource : resource_handles) if (resource.second == i) return E_ACCESSDENIED;
     if (i >= memory.size() || memory[i].empty() || locked[i]) return E_INVALIDARG;
     locked[i] = true; a->pData = memory[i].data();
     return S_OK;
@@ -90,14 +91,21 @@ HRESULT APIENTRY unlock_cb(HANDLE rt, const D3DDDICB_UNLOCK *a) {
 }
 HRESULT APIENTRY render_cb(HANDLE rt, D3DDDICB_RENDER *a) {
     verify(rt == runtime_handle && a->hContext == context_handle && a->CommandLength == sizeof(commands[0]) &&
-           a->NumAllocations == 1 && !a->NumPatchLocations && !a->CommandOffset);
-    verify(commands[current_buffer].signature == nr::kernel_contract::magic && commands[current_buffer].pattern == 0xff0000ff);
-    verify(lists[current_buffer].hAllocation == 1 && lists[current_buffer].WriteOperation);
+           !a->NumPatchLocations && !a->CommandOffset);
+    verify(commands[current_buffer].signature == nr::kernel_contract::magic);
+    if (commands[current_buffer].operation == 2) {
+        verify(a->NumAllocations == 2 && !lists[current_buffer][0].WriteOperation && lists[current_buffer][1].WriteOperation);
+        verify(lists[current_buffer][0].hAllocation != lists[current_buffer][1].hAllocation);
+        verify(!commands[current_buffer].pattern && !commands[current_buffer].reserved);
+    } else {
+        verify(a->NumAllocations == 1 && commands[current_buffer].operation == 1 && commands[current_buffer].pattern == 0xff0000ff);
+        verify(lists[current_buffer][0].hAllocation == 1 && lists[current_buffer][0].WriteOperation);
+    }
     ++renders;
     if (render_failure) return E_ACCESSDENIED;
     current_buffer ^= 1;
     a->pNewCommandBuffer = &commands[current_buffer]; a->NewCommandBufferSize = sizeof(commands[0]);
-    a->pNewAllocationList = &lists[current_buffer]; a->NewAllocationListSize = 1;
+    a->pNewAllocationList = lists[current_buffer]; a->NewAllocationListSize = 2;
     return S_OK;
 }
 }
@@ -211,11 +219,6 @@ int main() {
     TEST(last_error == S_OK && mapped.pData == memory[2].data() && locked[2]);
     functions.pfnStagingResourceUnmap(h, staging, 0);
     TEST(!locked[2]);
-    render_failure = true;
-    functions.pfnClearRenderTargetView(h, view, color);
-    TEST(last_error == E_ACCESSDENIED && renders == 3);
-    functions.pfnClearRenderTargetView(h, view, color);
-    TEST(last_error == E_INVALIDARG && renders == 3); // Failed submission poisoned old pointers.
     functions.pfnDestroyRenderTargetView(h, view);
     functions.pfnDestroyResource(h, target); functions.pfnDestroyResource(h, staging);
     // Runtime-owned identities retain a shared allocation after its creator
@@ -243,11 +246,27 @@ int main() {
     TEST(last_error == S_OK && counters.live_allocations == 2);
     functions.pfnDestroyResource(h, shared);
     TEST(!resource_handles.count(owner.handle) && references[shared_index] == 1 && !memory[shared_index].empty());
+    args.Usage = D3D10_DDI_USAGE_STAGING; args.BindFlags = 0;
+    args.MapFlags = D3D10_DDI_CPU_ACCESS_READ; args.MiscFlags = 0;
+    functions.pfnCreateResource(h, &args, staging, {});
+    const auto staging_index = resource(staging).allocation->handle;
+    memory[shared_index][0] = 0x94;
+    functions.pfnResourceCopy(h, staging, imported);
+    TEST(last_error == S_OK && renders == 3 && counters.submitted_copies == 1);
+    TEST(memory[staging_index][0] == 0x35 && !locked[shared_index] && !locked[staging_index]);
+    // Submission shims do not execute. A successful call must not secretly lock
+    // and copy the shared allocation on the UMD's CPU thread.
+    render_failure = true;
+    functions.pfnResourceCopy(h, staging, imported);
+    TEST(last_error == E_ACCESSDENIED && renders == 4 && counters.submitted_copies == 1);
+    functions.pfnResourceCopy(h, staging, imported);
+    TEST(last_error == E_INVALIDARG && renders == 4); // No reuse of failed callback buffers.
+    functions.pfnDestroyResource(h, staging);
     functions.pfnDestroyResource(h, imported);
     TEST(resource_handles.empty() && memory[shared_index].empty());
     functions.pfnDestroyDevice(h);
     TEST(!counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
-    TEST(released == 3 && destroys == 1);
+    TEST(released == 4 && destroys == 1);
     std::puts("registered lab allocation and submission contracts passed");
     return 0;
 }

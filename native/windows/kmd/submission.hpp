@@ -93,13 +93,15 @@ public:
         UINT commands = 0;
         const UCHAR *data = nullptr;
         if ((dma_bytes || private_bytes) && !args.Flags.Paging) {
-            if (args.Flags.ContextSwitch || dma_bytes != sizeof(FillMarker) ||
+            const bool copy = dma_bytes == sizeof(CopyMarker);
+            if (args.Flags.ContextSwitch || (!copy && dma_bytes != sizeof(FillMarker)) ||
                 args.DmaBufferSize > Scheduler::max_bytes || !args.pDmaBufferPrivateData ||
                 private_end > MAXULONG_PTR - ULONG_PTR(args.pDmaBufferPrivateData))
                 return STATUS_INVALID_PARAMETER;
             View candidate{};
-            const auto status = Fill::execution(static_cast<const UCHAR *>(args.pDmaBufferPrivateData) + private_start,
-                                                private_bytes, candidate.fill_command);
+            const auto record = static_cast<const UCHAR *>(args.pDmaBufferPrivateData) + private_start;
+            const auto status = copy ? Copy::execution(record, private_bytes, candidate.fill_command) :
+                                       Fill::execution(record, private_bytes, candidate.fill_command);
             if (status != STATUS_SUCCESS) return status;
             candidate.dma_bytes = dma_bytes;
             candidate.private_bytes = private_bytes;

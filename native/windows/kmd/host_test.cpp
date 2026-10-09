@@ -257,6 +257,7 @@ NTSTATUS initialize(DRIVER_OBJECT *, UNICODE_STRING *, DRIVER_INITIALIZATION_DAT
 #include "allocation_test.hpp"
 #include "resource_test.hpp"
 #include "fill_test.hpp"
+#include "copy_test.hpp"
 #if NR_KMD_LAB_PAGING_ADAPTER
 #include "lab_start_test.hpp"
 #endif
@@ -434,6 +435,8 @@ extern "C" int nr_kernel_host_test() {
     if (resource_result) return resource_result;
     const auto fill_result = fill_test(a);
     if (fill_result) return fill_result;
+    const auto copy_result = copy_test(a);
+    if (copy_result) return copy_result;
     const auto paging_result = paging_test(a);
     if (paging_result) return paging_result;
     nr::kernel_contract::Surface surface{};

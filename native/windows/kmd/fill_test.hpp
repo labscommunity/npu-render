@@ -29,7 +29,7 @@ int fill_test(Adapter *a) {
     NR_CHECK(registration.DxgkDdiCreateContext(d, &context) == STATUS_INSUFFICIENT_RESOURCES);
     fail_after = -1;
     NR_CHECK(!d->contexts && registration.DxgkDdiCreateContext(d, &context) == STATUS_SUCCESS);
-    NR_CHECK(context.ContextInfo.DmaBufferPrivateDataSize == sizeof(FillRecord));
+    NR_CHECK(context.ContextInfo.DmaBufferPrivateDataSize >= sizeof(FillRecord));
     nr::kernel_contract::Surface surface{};
     surface.width = 64; surface.height = 48; surface.format = 87;
     surface.row_pitch = 256; surface.allocation_bytes = 12288;

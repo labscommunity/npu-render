@@ -27,6 +27,7 @@ int resource_test(Adapter *a) {
     for (unsigned separate = 0; separate < 2; ++separate) {
         NR_CHECK(registration.DxgkDdiCreateAllocation(a, &create) == STATUS_SUCCESS);
         NR_CHECK(create.hResource && info.hAllocation && a->resources == 1 && a->allocations == 1);
+        NR_CHECK(!info.Flags.CpuVisible && info.SupportedReadSegmentSet == 1 && info.SupportedWriteSegmentSet == 1);
         auto allocation = static_cast<Allocation *>(info.hAllocation);
         NR_CHECK(allocation->resource == create.hResource);
         DXGKARG_CREATEDEVICE device_args{};

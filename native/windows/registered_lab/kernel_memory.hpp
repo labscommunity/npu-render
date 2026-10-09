@@ -23,6 +23,7 @@ struct Counters {
     uint64_t allocations = 0, fills = 0, copies = 0, live_allocations = 0;
     uint64_t live_contexts = 0, cleanup_errors = 0, rejected = 0;
     uint64_t last_unsupported_offset = ~uint64_t(0);
+    uint64_t submitted_copies = 0;
 };
 struct Context {
     HANDLE runtime = nullptr;
@@ -61,10 +62,26 @@ struct Context {
         command.pAllocationList[0] = {};
         command.pAllocationList[0].hAllocation = allocation;
         command.pAllocationList[0].WriteOperation = 1;
+        submit(sizeof(data), 1);
+        ++stats.fills;
+    }
+    void copy(D3DKMT_HANDLE source, D3DKMT_HANDLE destination) {
+        require(!poisoned && command.hContext && source && destination && source != destination &&
+                command.pCommandBuffer && command.CommandBufferSize >= sizeof(kernel_contract::CopySurface) &&
+                command.pAllocationList && command.AllocationListSize >= 2);
+        const kernel_contract::CopySurface data{};
+        std::memcpy(command.pCommandBuffer, &data, sizeof(data));
+        command.pAllocationList[0] = {}; command.pAllocationList[0].hAllocation = source;
+        command.pAllocationList[1] = {}; command.pAllocationList[1].hAllocation = destination;
+        command.pAllocationList[1].WriteOperation = 1;
+        submit(sizeof(data), 2);
+        ++stats.submitted_copies;
+    }
+    void submit(UINT bytes, UINT allocations) {
         D3DDDICB_RENDER args{};
         args.hContext = command.hContext;
-        args.CommandLength = sizeof(data);
-        args.NumAllocations = 1;
+        args.CommandLength = bytes;
+        args.NumAllocations = allocations;
         // A failed callback must never leave old writable command pointers reusable.
         poisoned = true;
         check(callbacks.pfnRenderCb(runtime, &args), "RenderCb");
@@ -75,7 +92,6 @@ struct Context {
         command.pPatchLocationList = args.pNewPatchLocationList;
         command.PatchLocationListSize = args.NewPatchLocationListSize;
         poisoned = false;
-        ++stats.fills;
     }
 };
 struct Allocation {
