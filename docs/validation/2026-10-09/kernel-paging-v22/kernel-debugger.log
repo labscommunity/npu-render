@@ -1,0 +1,204 @@
+Opened log file 'C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-paging-v22-oct9.log'
+Breakpoint 0 hit
+nr_render_kmd!DriverEntry:
+fffff807`6b6d56b0 4055            push    rbp
+0: kd> lmv m nr_render_kmd; gu
+Browse full module list
+start             end                 module name
+fffff807`6b6d0000 fffff807`6b6de000   nr_render_kmd   (private pdb symbols)  c:\users\tatef\appdata\local\npu-render\builds\render-kernel-v22-paging\release\nr_render_kmd.pdb
+    Loaded symbol image file: nr_render_kmd.sys
+    Image path: nr_render_kmd.sys
+    Image name: nr_render_kmd.sys
+    Browse all global symbols  functions  data
+    Timestamp:        Fri Oct  9 12:17:48 2026 (6AC93DDC)
+    CheckSum:         0000D953
+    ImageSize:        0000E000
+    Translations:     0000.04b0 0000.04e4 0409.04b0 0409.04e4
+    Information from resource tables:
+nr_render_kmd!GsDriverEntry+0x20:
+fffff807`6b6dc020 488b5c2430      mov     rbx,qword ptr [rsp+30h]
+0: kd> r eax; bc *; g
+eax=0
+nr_paging_lab: memory=00000000 required_queue=32
+nr_paging_lab: engine_start=00000000 capacity=33; rendering_ready=0 sources=0 children=0
+nr_paging_lab: query type=1 input=0 output=552
+nr_paging_lab: query type=47 input=0 output=4
+Unload module nr_render_kmd.sys at fffff807`6b6d0000
+Break instruction exception - code 80000003 (first chance)
+*******************************************************************************
+*                                                                             *
+*   You are seeing this message because you pressed either                    *
+*       CTRL+C (if you run console kernel debugger) or,                       *
+*       CTRL+BREAK (if you run GUI kernel debugger),                          *
+*   on your debugger machine's keyboard.                                      *
+*                                                                             *
+*                   THIS IS NOT A BUG OR A SYSTEM CRASH                       *
+*                                                                             *
+* If you did not intend to break into the debugger, press the "g" key, then   *
+* press the "Enter" key now.  This message might immediately reappear.  If it *
+* does, press "g" and "Enter" again.                                          *
+*                                                                             *
+*******************************************************************************
+nt!DbgBreakPointWithStatus:
+fffff807`d4afdfb0 cc              int     3
+0: kd> bu nr_render_kmd!DriverEntry; g
+Breakpoint 0 hit
+nr_render_kmd!DriverEntry:
+fffff807`6b6f56b0 4055            push    rbp
+0: kd> x nr_render_kmd!*query_adapter*; gu
+fffff807`6b6f3a00 nr_render_kmd!`anonymous namespace'::query_adapter (void *, struct _DXGKARG_QUERYADAPTERINFO *)
+nr_render_kmd!GsDriverEntry+0x20:
+fffff807`6b6fc020 488b5c2430      mov     rbx,qword ptr [rsp+30h]
+0: kd> r eax; bp fffff807`6b6f3a00; g
+eax=0
+nr_paging_lab: memory=00000000 required_queue=32
+nr_paging_lab: engine_start=00000000 capacity=33; rendering_ready=0 sources=0 children=0
+Breakpoint 1 hit
+nr_render_kmd!`anonymous namespace'::query_adapter:
+fffff807`6b6f3a00 48895c2408      mov     qword ptr [rsp+8],rbx
+1: kd> dt nr_render_kmd!_DXGKARG_QUERYADAPTERINFO @rdx; gu; r eax; gu; r eax; gu
+   +0x000 Type             : 1 ( DXGKQAITYPE_DRIVERCAPS )
+   +0x008 pInputData       : (null) 
+   +0x010 InputDataSize    : 0
+   +0x018 pOutputData      : 0xffffae05`e1f26978 Void
+   +0x020 OutputDataSize   : 0x228
+   +0x024 Flags            : _DXGK_QUERYADAPTERINFOFLAGS
+   +0x028 hKmdProcessHandle : (null) 
+nr_paging_lab: query type=1 input=0 output=552
+eax=0
+eax=0
+Breakpoint 1 hit
+nr_render_kmd!`anonymous namespace'::query_adapter:
+fffff807`6b6f3a00 48895c2408      mov     qword ptr [rsp+8],rbx
+1: kd> dt nr_render_kmd!_DXGKARG_QUERYADAPTERINFO @rdx; gu; r eax; gu
+   +0x000 Type             : 2f ( DXGKQAITYPE_64BITONLYCAPS )
+   +0x008 pInputData       : (null) 
+   +0x010 InputDataSize    : 0
+   +0x018 pOutputData      : 0xfffffd8f`2f2f24e8 Void
+   +0x020 OutputDataSize   : 4
+   +0x024 Flags            : _DXGK_QUERYADAPTERINFOFLAGS
+   +0x028 hKmdProcessHandle : (null) 
+nr_paging_lab: query type=47 input=0 output=4
+eax=c00000bb
+dxgkrnl!DXGADAPTER::Initialize+0x1de1:
+fffff807`666945f9 8a8e180c0000    mov     cl,byte ptr [rsi+0C18h]
+1: kd> gu; r eax; k 5
+eax=c0000017
+ # Child-SP          RetAddr               Call Site
+00 fffffd8f`2f2f2640 fffff807`66925917     dxgkrnl!DXGGLOBAL::CreateAdapter+0x78
+01 fffffd8f`2f2f27a0 fffff807`6674b4cb     dxgkrnl!DxgkAddAdapter+0xa7
+02 fffffd8f`2f2f2800 fffff807`6674d2c1     dxgkrnl!DpiFdoStartAdapter+0xd03
+03 fffffd8f`2f2f2a00 fffff807`6674cf48     dxgkrnl!DpiFdoStartNonLdaAdapter+0x85
+04 fffffd8f`2f2f2a50 fffff807`6674c863     dxgkrnl!DpiFdoStartAdapterThreadImpl+0x60c
+1: kd> !vm 1; bc *; g
+Page File: \??\C:\pagefile.sys
+  Current:   1441792 Kb  Free Space:   1423304 Kb
+  Minimum:   1441792 Kb  Maximum:      8351100 Kb
+Page File: \??\C:\swapfile.sys
+  Current:    262144 Kb  Free Space:    262136 Kb
+  Minimum:    262144 Kb  Maximum:      6281820 Kb
+No Name for Paging File
+  Current:   1048576 Kb  Free Space:    785152 Kb
+  Minimum:   1048576 Kb  Maximum:      1048576 Kb
+
+Physical Memory:          1046970 (    4187880 Kb)
+Available Pages:           515332 (    2061328 Kb)
+ResAvail Pages:            959704 (    3838816 Kb)
+Locked IO Pages:                0 (          0 Kb)
+Free System PTEs:      4296963255 (17187853020 Kb)
+Modified Pages:             15293 (      61172 Kb)
+Modified PF Pages:          15279 (      61116 Kb)
+Modified No Write Pages:        0 (          0 Kb)
+NonPagedPool Usage:             1 (          4 Kb)
+NonPagedPoolNx Usage:       22378 (      89512 Kb)
+NonPagedPool Max:      4294967296 (17179869184 Kb)
+PagedPool Usage:            43459 (     173836 Kb)
+PagedPool Maximum:     4294967296 (17179869184 Kb)
+Processor Commit:             150 (        600 Kb)
+Session Commit:                 0 (          0 Kb)
+Shared Commit:              25106 (     100424 Kb)
+Special Pool:                   0 (          0 Kb)
+Kernel Stacks:               8335 (      33340 Kb)
+Pages For MDLs:               428 (       1712 Kb)
+ContigMem Pages:             4934 (      19736 Kb)
+Partition Pages:                0 (          0 Kb)
+Pages For AWE:                  0 (          0 Kb)
+NonPagedPool Commit:        24479 (      97916 Kb)
+PagedPool Commit:           43461 (     173844 Kb)
+Driver Commit:              15080 (      60320 Kb)
+Boot Commit:                 3571 (      14284 Kb)
+PFN Array Commit:           13304 (      53216 Kb)
+SmallNonPagedPtesCommit:      148 (        592 Kb)
+SlabAllocatorPages:          5632 (      22528 Kb)
+SkPagesInUnchargedSlabs:        0 (          0 Kb)
+System PageTables:           7788 (      31152 Kb)
+ProcessLockedFilePages:        16 (         64 Kb)
+Pagefile Hash Pages:           64 (        256 Kb)
+Sum System Commit:         146864 (     587456 Kb)
+Total Private:             347524 (    1390096 Kb)
+Misc/Transient Commit:        525 (       2100 Kb)
+Committed pages:           494913 (    1979652 Kb)
+Commit limit:             1407418 (    5629672 Kb)
+Unload module nr_render_kmd.sys at fffff807`6b6f0000
+Break instruction exception - code 80000003 (first chance)
+*******************************************************************************
+*                                                                             *
+*   You are seeing this message because you pressed either                    *
+*       CTRL+C (if you run console kernel debugger) or,                       *
+*       CTRL+BREAK (if you run GUI kernel debugger),                          *
+*   on your debugger machine's keyboard.                                      *
+*                                                                             *
+*                   THIS IS NOT A BUG OR A SYSTEM CRASH                       *
+*                                                                             *
+* If you did not intend to break into the debugger, press the "g" key, then   *
+* press the "Enter" key now.  This message might immediately reappear.  If it *
+* does, press "g" and "Enter" again.                                          *
+*                                                                             *
+*******************************************************************************
+nt!DbgBreakPointWithStatus:
+fffff807`d4afdfb0 cc              int     3
+0: kd> bu nr_render_kmd!DriverEntry; g
+Breakpoint 0 hit
+nr_render_kmd!DriverEntry:
+fffff807`6b7156b0 4055            push    rbp
+1: kd> x nr_render_kmd!*create_context*; gu
+fffff807`6b711ff0 nr_render_kmd!`anonymous namespace'::create_context (void *, struct _DXGKARG_CREATECONTEXT *)
+nr_render_kmd!GsDriverEntry+0x20:
+fffff807`6b71c020 488b5c2430      mov     rbx,qword ptr [rsp+30h]
+1: kd> bp fffff807`6b711ff0; g
+nr_paging_lab: memory=00000000 required_queue=32
+nr_paging_lab: engine_start=00000000 capacity=33; rendering_ready=0 sources=0 children=0
+nr_paging_lab: query type=1 input=0 output=552
+nr_paging_lab: query type=47 input=0 output=4
+Breakpoint 1 hit
+nr_render_kmd!`anonymous namespace'::create_context:
+fffff807`6b711ff0 48895c2408      mov     qword ptr [rsp+8],rbx
+1: kd> dt nr_render_kmd!_DXGKARG_CREATECONTEXT @rdx; gu; r eax; bc *; g
+   +0x000 hContext         : (null) 
+   +0x008 NodeOrdinal      : 0
+   +0x00c EngineAffinity   : 1
+   +0x010 Flags            : _DXGK_CREATECONTEXTFLAGS
+   +0x018 pPrivateDriverData : (null) 
+   +0x020 PrivateDriverDataSize : 0
+   +0x024 ContextInfo      : _DXGK_CONTEXTINFO
+eax=c00000bb
+Unload module nr_render_kmd.sys at fffff807`6b710000
+Break instruction exception - code 80000003 (first chance)
+*******************************************************************************
+*                                                                             *
+*   You are seeing this message because you pressed either                    *
+*       CTRL+C (if you run console kernel debugger) or,                       *
+*       CTRL+BREAK (if you run GUI kernel debugger),                          *
+*   on your debugger machine's keyboard.                                      *
+*                                                                             *
+*                   THIS IS NOT A BUG OR A SYSTEM CRASH                       *
+*                                                                             *
+* If you did not intend to break into the debugger, press the "g" key, then   *
+* press the "Enter" key now.  This message might immediately reappear.  If it *
+* does, press "g" and "Enter" again.                                          *
+*                                                                             *
+*******************************************************************************
+nt!DbgBreakPointWithStatus:
+fffff807`d4afdfb0 cc              int     3
+0: kd> .logclose; g
+Closing open log file C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-paging-v22-oct9.log

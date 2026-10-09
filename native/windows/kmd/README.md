@@ -140,6 +140,16 @@ UMD or move any operation onto the NPU. The build report separately records
 `lab_fill_command_enabled`. Host tests cover invalid user mappings, ownership,
 repatching, deferred execution and mutation of the original input after capture.
 
+The [first fill-package attempt](../../../docs/validation/2026-10-09/kernel-paging-v22/report.json)
+regressed adapter startup: rejecting every context flag also rejected Windows'
+paging context. The callback returned `STATUS_NOT_SUPPORTED`; the Windows
+initializer subsequently returned `STATUS_NO_MEMORY` despite available RAM.
+The corrected validation admits the documented
+[`SystemContext`](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/ns-d3dkmddi-_dxgk_createcontextflags)
+flag, retains its identity, and rejects user rendering on that context. Other
+context flags remain unsupported. Host tests cover system-context lifetime and
+flag combinations; a separate live retry must validate the actual fill path.
+
 The [first live engine run](../../../docs/validation/2026-10-09/kernel-engine-v12/report.json)
 passed: Windows requested 32 queue entries, the driver reserved 33 slots, and
 the worker completed the fill, idle preemption and restart checks. The observer
