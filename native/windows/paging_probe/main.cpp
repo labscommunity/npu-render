@@ -49,7 +49,8 @@ struct Enumeration {
     }
 };
 struct Allocation {
-    D3DKMT_HANDLE device = 0, allocation = 0;
+    D3DKMT_HANDLE device = 0, allocation = 0, context = 0;
+    HANDLE event = nullptr;
     bool locked = false;
     bool unlock() {
         if (!locked) return true;
@@ -71,22 +72,63 @@ struct Allocation {
             if (record("destroy_allocation", D3DKMTDestroyAllocation(&args))) allocation = 0;
             else ok = false;
         }
+        if (context) {
+            D3DKMT_DESTROYCONTEXT args{context};
+            if (record("destroy_context", D3DKMTDestroyContext(&args))) context = 0;
+            else ok = false;
+        }
         if (device) {
             D3DKMT_DESTROYDEVICE args{device};
             if (record("destroy_device", D3DKMTDestroyDevice(&args))) {
-                device = allocation = 0;
+                device = allocation = context = 0;
                 locked = false;
             }
+            else ok = false;
+        }
+        if (event) {
+            if (CloseHandle(event)) event = nullptr;
             else ok = false;
         }
         return ok;
     }
     ~Allocation() { close(); }
-    bool exercise(D3DKMT_HANDLE adapter) {
+    bool open_device(D3DKMT_HANDLE adapter) {
         D3DKMT_CREATEDEVICE create_device{};
         create_device.hAdapter = adapter;
         if (!record("create_device", D3DKMTCreateDevice(&create_device))) return false;
         device = create_device.hDevice;
+        return true;
+    }
+    bool schedule(D3DKMT_HANDLE adapter) {
+        if (!open_device(adapter)) return false;
+        D3DKMT_CREATECONTEXT create{};
+        create.hDevice = device;
+        create.EngineAffinity = 1;
+        if (!record("create_context", D3DKMTCreateContext(&create))) return false;
+        context = create.hContext;
+        std::printf("{\"command_buffer_bytes\":%u,\"allocation_list_entries\":%u,\"patch_list_entries\":%u}\n",
+                    create.CommandBufferSize, create.AllocationListSize, create.PatchLocationListSize);
+        event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+        if (!event) return false;
+        for (unsigned i = 0; i < 3; ++i) {
+            if (!ResetEvent(event)) return false;
+            D3DKMT_SIGNALSYNCHRONIZATIONOBJECT2 signal{};
+            signal.hContext = context;
+            signal.Flags.EnqueueCpuEvent = 1;
+            signal.CpuEventHandle = event;
+            if (!record("enqueue_cpu_event", D3DKMTSignalSynchronizationObject2(&signal))) return false;
+            const auto result = WaitForSingleObject(event, 10000);
+            std::printf("{\"operation\":\"wait_cpu_event\",\"iteration\":%u,\"wait_result\":%lu}\n", i, result);
+            std::fflush(stdout);
+            if (result != WAIT_OBJECT_0) return false;
+        }
+        // An event behind an otherwise empty context can complete without
+        // hardware DMA. Only the kernel trace can establish actual submissions.
+        std::puts("{\"context_events_verified\":3,\"dma_submission_proven\":false}");
+        return true;
+    }
+    bool exercise(D3DKMT_HANDLE adapter) {
+        if (!open_device(adapter)) return false;
         nr::kernel_contract::Surface surface{};
         surface.width = 64; surface.height = 48; surface.format = 87;
         surface.row_pitch = 256; surface.allocation_bytes = 12288;
@@ -125,8 +167,9 @@ struct Allocation {
 int main(int argc, char **argv) {
     const bool list = argc == 2 && std::strcmp(argv[1], "--list") == 0;
     const bool exercise = argc == 2 && std::strcmp(argv[1], "--exercise") == 0;
-    if (!list && !exercise) { std::fputs("usage: nr_paging_probe --list|--exercise\n", stderr); return 2; }
-    if (exercise && !guest()) {
+    const bool schedule = argc == 2 && std::strcmp(argv[1], "--schedule") == 0;
+    if (!list && !exercise && !schedule) { std::fputs("usage: nr_paging_probe --list|--exercise|--schedule\n", stderr); return 2; }
+    if ((exercise || schedule) && !guest()) {
         std::puts("{\"passed\":false,\"error\":\"exercise requires the owned disposable guest\"}");
         return 2;
     }
@@ -151,13 +194,13 @@ int main(int argc, char **argv) {
         if (ours) { selected = query.hAdapter; ++matches; }
     }
     bool passed = list;
-    if (exercise && matches == 1) {
+    if ((exercise || schedule) && matches == 1) {
         Allocation allocation;
-        passed = allocation.exercise(selected);
+        passed = exercise ? allocation.exercise(selected) : allocation.schedule(selected);
         passed = allocation.close() && passed;
     }
     passed = enumeration.close() && passed;
-    std::printf("{\"passed\":%s,\"matching_adapters\":%u,\"exercise_requested\":%s,\"npu_execution_tested\":false,\"desktop_offload_tested\":false}\n",
-                passed ? "true" : "false", matches, exercise ? "true" : "false");
+    std::printf("{\"passed\":%s,\"matching_adapters\":%u,\"exercise_requested\":%s,\"schedule_requested\":%s,\"npu_execution_tested\":false,\"desktop_offload_tested\":false}\n",
+                passed ? "true" : "false", matches, exercise ? "true" : "false", schedule ? "true" : "false");
     return passed ? 0 : 1;
 }

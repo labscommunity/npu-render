@@ -8,6 +8,12 @@ and volume label, exactly one matching NPU Render kernel identity, and
 write/read locks, verifies a byte pattern, and checks cleanup results. It never
 selects a default, foreign, or WARP adapter after a failed identity check.
 
+`--schedule` has the same guest/identity gates. It creates a context on node zero,
+queues three CPU events with completion semantics, waits up to ten seconds per
+event, and checks context/device cleanup. This uses public KMT scheduling APIs.
+An event on an otherwise empty context may complete without any hardware DMA;
+only the correlated kernel trace can establish actual submissions or fences.
+
 Build on Windows with MSVC and the Windows SDK:
 
 ```powershell
