@@ -41,3 +41,12 @@ open exports always fail; it supplies no DDI table and cannot create a D3D
 device. This lets the package describe its user-mode entry points while keeping
 rendering explicitly unavailable during kernel paging bring-up. It is separate
 from the existing `nr_render_umd` renderer and is never a production backend.
+
+`--present` tests offscreen blit presentation through public `D3DKMTPresent`.
+It allocates source and destination textures with different row pitches, sends
+full and clipped source rectangles, waits behind the submitted work, and checks
+every destination byte, including padding and untouched pixels. Both color
+formats are exercised. This needs the aperture adapter with its restricted
+present implementation. It does not test a monitor, DWM migration, cross-adapter
+sharing, NPU execution or performance. Live acceptance must be established by
+probe output and the kernel submission trace together.

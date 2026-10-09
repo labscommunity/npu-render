@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <cstring>
 #include <cwchar>
+#include <cstdint>
 #include <vector>
 #include "../kmd/contract.hpp"
 
@@ -209,13 +210,15 @@ struct Allocation {
         return true;
     }
 };
+#include "present.hpp"
 int main(int argc, char **argv) {
     const bool list = argc == 2 && std::strcmp(argv[1], "--list") == 0;
     const bool exercise = argc == 2 && std::strcmp(argv[1], "--exercise") == 0;
     const bool schedule = argc == 2 && std::strcmp(argv[1], "--schedule") == 0;
     const bool fill = argc == 2 && std::strcmp(argv[1], "--fill") == 0;
-    if (!list && !exercise && !schedule && !fill) { std::fputs("usage: nr_paging_probe --list|--exercise|--schedule|--fill\n", stderr); return 2; }
-    if ((exercise || schedule || fill) && !guest()) {
+    const bool present = argc == 2 && std::strcmp(argv[1], "--present") == 0;
+    if (!list && !exercise && !schedule && !fill && !present) { std::fputs("usage: nr_paging_probe --list|--exercise|--schedule|--fill|--present\n", stderr); return 2; }
+    if ((exercise || schedule || fill || present) && !guest()) {
         std::puts("{\"passed\":false,\"error\":\"exercise requires the owned disposable guest\"}");
         return 2;
     }
@@ -240,14 +243,15 @@ int main(int argc, char **argv) {
         if (ours) { selected = query.hAdapter; ++matches; }
     }
     bool passed = list;
-    if ((exercise || schedule || fill) && matches == 1) {
+    if (present && matches == 1) passed = present_blits(selected);
+    else if ((exercise || schedule || fill) && matches == 1) {
         Allocation allocation;
         passed = exercise ? allocation.exercise(selected) :
                  schedule ? allocation.schedule(selected) : allocation.fill(selected);
         passed = allocation.close() && passed;
     }
     passed = enumeration.close() && passed;
-    std::printf("{\"passed\":%s,\"matching_adapters\":%u,\"exercise_requested\":%s,\"schedule_requested\":%s,\"fill_requested\":%s,\"npu_execution_tested\":false,\"desktop_offload_tested\":false}\n",
-                passed ? "true" : "false", matches, exercise ? "true" : "false", schedule ? "true" : "false", fill ? "true" : "false");
+    std::printf("{\"passed\":%s,\"matching_adapters\":%u,\"exercise_requested\":%s,\"schedule_requested\":%s,\"fill_requested\":%s,\"present_requested\":%s,\"npu_execution_tested\":false,\"desktop_offload_tested\":false}\n",
+                passed ? "true" : "false", matches, exercise ? "true" : "false", schedule ? "true" : "false", fill ? "true" : "false", present ? "true" : "false");
     return passed ? 0 : 1;
 }

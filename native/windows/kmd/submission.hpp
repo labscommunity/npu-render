@@ -12,6 +12,8 @@ public:
         Ticket ticket{};
         UINT commands = 0;
         PagingCommand paging[max_commands]{};
+        bool present = false;
+        PresentRecord rectangles[Present::max_records]{};
     };
     Submissions() = default;
     Submissions(const Submissions &) = delete;
@@ -68,6 +70,7 @@ public:
         UINT private_bytes = 0;
         UINT commands = 0;
         bool fill = false;
+        bool present = false;
         PagingCommand fill_command{};
     };
     // Shared inspection for patch and capture. This never allocates, queues,
@@ -76,6 +79,7 @@ public:
         DXGK_SUBMITCOMMANDFLAGS allowed{};
         allowed.Paging = 1;
         allowed.ContextSwitch = 1;
+        allowed.Present = allowed.RedirectedPresent = 1;
         if ((args.Flags.Value & ~allowed.Value) || args.NodeOrdinal || args.EngineOrdinal ||
             args.DmaBufferSegmentId)
             return STATUS_NOT_SUPPORTED;
@@ -92,6 +96,24 @@ public:
         const UINT private_bytes = private_end - private_start;
         UINT commands = 0;
         const UCHAR *data = nullptr;
+        if (args.Flags.Present || args.Flags.RedirectedPresent) {
+            if (!args.Flags.Present || args.Flags.Paging || args.Flags.ContextSwitch || !dma_bytes ||
+                args.DmaBufferSize > Scheduler::max_bytes || !args.pDmaBufferPrivateData ||
+                private_end > MAXULONG_PTR - ULONG_PTR(args.pDmaBufferPrivateData) ||
+                dma_bytes % sizeof(PresentMarker) || private_bytes % sizeof(PresentRecord) ||
+                dma_bytes / sizeof(PresentMarker) != private_bytes / sizeof(PresentRecord) ||
+                dma_bytes / sizeof(PresentMarker) > Present::max_records) return STATUS_INVALID_PARAMETER;
+            data = static_cast<const UCHAR *>(args.pDmaBufferPrivateData) + private_start;
+            const UINT count = dma_bytes / UINT(sizeof(PresentMarker));
+            for (UINT i = 0; i < count; ++i) {
+                PresentRecord r{}; RtlCopyMemory(&r, data + SIZE_T(i) * sizeof(r), sizeof(r));
+                if (!Present::valid(r) || !r.patched) return STATUS_INVALID_PARAMETER;
+            }
+            View candidate{}; candidate.data = data; candidate.dma_bytes = dma_bytes;
+            candidate.private_bytes = private_bytes; candidate.commands = count; candidate.present = true;
+            view = candidate;
+            return STATUS_SUCCESS;
+        }
         if ((dma_bytes || private_bytes) && !args.Flags.Paging) {
             const bool copy = dma_bytes == sizeof(CopyMarker);
             if (args.Flags.ContextSwitch || (!copy && dma_bytes != sizeof(FillMarker)) ||
@@ -205,7 +227,9 @@ public:
         auto &packet = packets_[accepted.serial % count_];
         packet.ticket = accepted;
         packet.commands = view.commands;
-        if (view.fill) packet.paging[0] = view.fill_command;
+        packet.present = view.present;
+        if (view.present) RtlCopyMemory(packet.rectangles, view.data, view.private_bytes);
+        else if (view.fill) packet.paging[0] = view.fill_command;
         else if (view.private_bytes) RtlCopyMemory(packet.paging, view.data, view.private_bytes);
         ticket = accepted;
         return STATUS_SUCCESS;

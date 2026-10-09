@@ -19,6 +19,7 @@ inline void *operator new(size_t, void *p) noexcept { return p; }
 #include "paging.hpp"
 #include "fill.hpp"
 #include "copy.hpp"
+#include "present.hpp"
 #include "submission.hpp"
 #include "engine.hpp"
 #if NR_KMD_LAB_APERTURE_PROBE
@@ -95,6 +96,20 @@ Allocation *copy_allocations(Adapter *adapter, const DXGK_ALLOCATIONLIST *list, 
         (device && source->device != device) || source->allocation->adapter != adapter ||
         source->allocation == destination || !same_surface(source->allocation->surface, destination->surface))
         return nullptr;
+    return destination;
+}
+Allocation *present_allocations(Adapter *adapter, const DXGK_ALLOCATIONLIST *list, UINT count,
+                                Allocation *&source, Device *device = nullptr) {
+    if (!list || count != 3 || list[0].hDeviceSpecificAllocation || !list[1].hDeviceSpecificAllocation ||
+        list[1].WriteOperation || list[1].Reserved) return nullptr;
+    const auto destination = writable_allocation(adapter, list + 2, 1, device);
+    const auto opened = static_cast<OpenAllocation *>(list[1].hDeviceSpecificAllocation);
+    if (!destination || opened->device->adapter != adapter ||
+        opened->device != static_cast<OpenAllocation *>(list[2].hDeviceSpecificAllocation)->device ||
+        (device && opened->device != device) || opened->allocation->adapter != adapter ||
+        opened->allocation == destination || opened->allocation->surface.format != destination->surface.format)
+        return nullptr;
+    source = opened->allocation;
     return destination;
 }
 
@@ -253,7 +268,11 @@ NTSTATUS APIENTRY patch(HANDLE adapter, const DXGKARG_PATCH *args) {
     auto a = static_cast<Adapter *>(adapter);
     if (!a->started || a->resetting) return STATUS_DEVICE_NOT_READY;
     NTSTATUS status;
-    if (!args->Flags.Paging && args->DmaBufferSubmissionEndOffset != args->DmaBufferSubmissionStartOffset) {
+    if (args->Flags.Present || args->Flags.RedirectedPresent) {
+        Allocation *source = nullptr;
+        const auto destination = present_allocations(a, args->pAllocationList, args->AllocationListSize, source);
+        status = destination ? nr::kmd::Present::patch(a->segment, source->surface, destination->surface, *args) : STATUS_INVALID_HANDLE;
+    } else if (!args->Flags.Paging && args->DmaBufferSubmissionEndOffset != args->DmaBufferSubmissionStartOffset) {
         if (args->AllocationListSize == 2) {
             const auto allocation = copy_allocations(a, args->pAllocationList, args->AllocationListSize);
             status = allocation ? nr::kmd::Copy::patch(a->segment, SIZE_T(allocation->surface.allocation_bytes), *args) :
@@ -268,6 +287,21 @@ NTSTATUS APIENTRY patch(HANDLE adapter, const DXGKARG_PATCH *args) {
         ULONG(status), args->Flags.Value, args->SubmissionFenceId,
         args->DmaBufferSubmissionStartOffset, args->DmaBufferSubmissionEndOffset,
         args->DmaBufferPrivateDataSubmissionStartOffset, args->DmaBufferPrivateDataSubmissionEndOffset);
+    return status;
+}
+DXGKDDI_PRESENT present;
+NTSTATUS APIENTRY present(HANDLE context, DXGKARG_PRESENT *args) {
+    if (!NR_KMD_LAB_APERTURE_ADAPTER) return STATUS_NOT_SUPPORTED;
+    if (!context || !args) return STATUS_INVALID_PARAMETER;
+    const auto c = static_cast<Context *>(context);
+    const auto a = c->device->adapter;
+    if (!a->started || a->resetting || c->system) return STATUS_DEVICE_NOT_READY;
+    Allocation *source = nullptr;
+    const auto destination = present_allocations(a, args->pAllocationList, 3, source, c->device);
+    if (!destination) return STATUS_INVALID_HANDLE;
+    const auto status = nr::kmd::Present::build(a->segment, source->surface, destination->surface, *args);
+    NR_LAB_TRACE("nr_paging_lab: present flags=%lx rectangles=%u progress=%u status=%08lx\n",
+        args->Flags.Value, args->SubRectCnt, args->MultipassOffset, ULONG(status));
     return status;
 }
 DXGKDDI_SUBMITCOMMAND submit;
@@ -814,7 +848,7 @@ extern "C" NTSTATUS DriverEntry(DRIVER_OBJECT *driver, UNICODE_STRING *registry)
     data.DxgkDdiBuildPagingBuffer = build_paging;
     data.DxgkDdiPreemptCommand = preempt;
     data.DxgkDdiRender = render;
-    NR_REJECT(DxgkDdiPresent);
+    data.DxgkDdiPresent = present;
     data.DxgkDdiResetFromTimeout = reset_from_timeout;
     data.DxgkDdiRestartFromTimeout = restart_from_timeout;
     NR_REJECT(DxgkDdiEscape);

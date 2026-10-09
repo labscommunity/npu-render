@@ -143,7 +143,8 @@ public:
         if (packet) {
             for (UINT i = 0; i < packet->commands; ++i) {
                 if (InterlockedCompareExchange(&quit_, 0, 0)) { status = STATUS_CANCELLED; break; }
-                status = Paging::execute(*segment_, packet->paging[i]);
+                status = packet->present ? Present::execute(*segment_, packet->rectangles[i]) :
+                                           Paging::execute(*segment_, packet->paging[i]);
                 if (status != STATUS_SUCCESS) break;
                 progress();
             }

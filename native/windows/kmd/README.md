@@ -56,6 +56,16 @@ presentation are implemented. These host checks are not live interoperability.
 The layout follows Microsoft's [cross-adapter resource contract](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/using-cross-adapter-resources-in-a-hybrid-system)
 and [standard allocation query contract](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/nc-d3dkmddi-dxgkddi_getstandardallocationdriverdata).
 
+The aperture build also has a restricted `DxgkDdiPresent` blit path. It records
+clipped, untranslated-color rectangles with independent source/destination row
+pitches, validates patch locations and relocation, and snapshots the commands
+before the worker copies pixels and reports the actual OS fence. Multi-pass
+output resumes when a DMA buffer cannot hold the remaining rectangles. Host
+tests verify padding preservation, rejected inputs, short buffers, later-record
+failure before mutation, source-record lifetime and cleanup. No flip or scanout
+is claimed. The public-KMT `nr_paging_probe --present` is the separate live gate;
+at this revision live acceptance remains untested.
+
 The design follows the documented [linear aperture address-space contract](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/linear-aperture-space-segments)
 and [map/unmap requirements](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/nc-d3dkmddi-dxgkddi_buildpagingbuffer).
 This software translation table is an implementation experiment; it does not

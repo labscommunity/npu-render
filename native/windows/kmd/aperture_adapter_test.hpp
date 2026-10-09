@@ -85,6 +85,37 @@ int aperture_adapter_test() {
     NR_CHECK(notifications[0].InterruptType == DXGK_INTERRUPT_DMA_COMPLETED &&
              notifications[0].DmaCompleted.SubmissionFenceId == 1);
     for (SIZE_T i = 0; i < 8192; ++i) NR_CHECK(backing[i] == 0xa4 && backing[8192 + i] == 0xa4);
+    for (SIZE_T i = 0; i < 8192; ++i) { backing[i] = UCHAR(i * 37 + i / 97); backing[8192 + i] = 0xc3; }
+    const RowCopy rectangle{92, 13, 128, 256};
+    const auto input_offset = offsets[0] + 7, output_offset = offsets[1] + 19;
+    for (UINT failure = 0; failure < 8; ++failure) {
+        RowCopy bad = rectangle; auto from = input_offset, to = output_offset;
+        switch (failure) {
+        case 0: bad.row_bytes = 0; break;
+        case 1: bad.rows = 0; break;
+        case 2: bad.source_pitch = 91; break;
+        case 3: bad.destination_pitch = 91; break;
+        case 4: bad.rows = MAXULONG; break;
+        case 5: bad.destination_pitch = MAXULONG; break;
+        case 6: from = Aperture::bytes - 1; break;
+        case 7: to = from + 1; break;
+        }
+        NR_CHECK(a->segment.aperture().copy_rows(from, to, bad) == STATUS_INVALID_PARAMETER);
+    }
+    mdl_fail_after = 1; // Mapping the destination fails after source mapping succeeds.
+    NR_CHECK(a->segment.aperture().copy_rows(input_offset, output_offset, rectangle) == STATUS_INSUFFICIENT_RESOURCES);
+    mdl_fail_after = -1;
+    NR_CHECK(!aperture_mappings && !mdl_outstanding);
+    for (SIZE_T i = 0; i < 8192; ++i) NR_CHECK(backing[8192 + i] == 0xc3);
+    NR_CHECK(a->segment.aperture().copy_rows(input_offset, output_offset, rectangle) == STATUS_SUCCESS);
+    for (SIZE_T i = 0; i < 8192; ++i) {
+        const bool copied = i >= 19 && (i - 19) / 256 < 13 && (i - 19) % 256 < 92;
+        const auto source_index = 7 + (i - 19) / 256 * 128 + (i - 19) % 256;
+        NR_CHECK(backing[8192 + i] == (copied ? backing[source_index] : 0xc3));
+    }
+    const auto present_result = present_test(a, static_cast<Allocation *>(info[0].hAllocation),
+                                            static_cast<Allocation *>(info[1].hAllocation), backing, offsets);
+    if (present_result) return present_result;
     for (UINT i = 0; i < 2; ++i) {
         DXGKARG_BUILDPAGINGBUFFER unmap{}; unmap.Operation = DXGK_OPERATION_UNMAP_APERTURE_SEGMENT;
         auto &u = unmap.UnmapApertureSegment;

@@ -266,6 +266,7 @@ NTSTATUS initialize(DRIVER_OBJECT *, UNICODE_STRING *, DRIVER_INITIALIZATION_DAT
 #include "lab_start_test.hpp"
 #endif
 #if NR_KMD_LAB_APERTURE_ADAPTER
+#include "present_test.hpp"
 #include "aperture_adapter_test.hpp"
 #endif
 #if NR_KMD_LAB_WORKER_PROBE

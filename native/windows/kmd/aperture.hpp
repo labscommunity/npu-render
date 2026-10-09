@@ -2,6 +2,7 @@
 // not a hardware/MMIO aperture and does not give the NPU access to these pages.
 // The caller must expose this only after live map/unmap/submission validation.
 #pragma once
+#include "row_copy.hpp"
 namespace nr::kmd {
 class Aperture {
 public:
@@ -107,6 +108,30 @@ public:
         status = output.prepare(entries_, destination, length);
         if (status != STATUS_SUCCESS) return status;
         RtlCopyMemory(output.data, input.data, length);
+        KeMemoryBarrier();
+        return STATUS_SUCCESS;
+    }
+    NTSTATUS copy_rows(ULONGLONG source, ULONGLONG destination, const RowCopy &shape) {
+        if (!ready()) return STATUS_DEVICE_NOT_READY;
+        if (KeGetCurrentIrql() != PASSIVE_LEVEL) return STATUS_INVALID_DEVICE_STATE;
+        if (!shape.valid()) return STATUS_INVALID_PARAMETER;
+        const auto source_bytes = SIZE_T(shape.source_span()), destination_bytes = SIZE_T(shape.destination_span());
+        if (!byte_range(source, source_bytes) || !byte_range(destination, destination_bytes) ||
+            !(source + source_bytes <= destination || destination + destination_bytes <= source))
+            return STATUS_INVALID_PARAMETER;
+        Lock lock(mutex_);
+        const auto from = owner(source, source_bytes), to = owner(destination, destination_bytes);
+        if (!from || !to || from == to) return STATUS_INVALID_PARAMETER;
+        Mapping input, output;
+        auto status = input.prepare(entries_, source, source_bytes);
+        if (status != STATUS_SUCCESS) return status;
+        status = output.prepare(entries_, destination, destination_bytes);
+        if (status != STATUS_SUCCESS) return status;
+        // Both complete ranges are mapped before any destination byte changes.
+        // Preserve all row padding and pixels outside the copied rectangle.
+        for (ULONG row = 0; row < shape.rows; ++row)
+            RtlCopyMemory(output.data + SIZE_T(row) * shape.destination_pitch,
+                          input.data + SIZE_T(row) * shape.source_pitch, shape.row_bytes);
         KeMemoryBarrier();
         return STATUS_SUCCESS;
     }
