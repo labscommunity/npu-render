@@ -16,9 +16,9 @@ class Fill {
 public:
     static bool valid(const FillRecord &record) {
         return record.magic == FillRecord{}.magic && record.version == 1 &&
-            record.bytes && record.bytes <= Segment::bytes && !(record.bytes % sizeof(ULONG)) &&
+            record.bytes && record.bytes <= Segment::transfer_bytes && !(record.bytes % sizeof(ULONG)) &&
             record.patched <= 1 && (record.patched || !record.offset) &&
-            record.offset <= Segment::bytes - record.bytes;
+            record.offset <= Segment::address_bytes - record.bytes;
     }
     static NTSTATUS snapshot(const void *data, UINT bytes, kernel_contract::FillSurface &out) {
         if (!data || bytes != sizeof(out)) return STATUS_INVALID_USER_BUFFER;
@@ -44,7 +44,7 @@ public:
             return STATUS_SUCCESS;
         }
         if (allocation.SegmentId != 1 || allocation.PhysicalAddress.QuadPart < 0 ||
-            !segment.range(ULONGLONG(allocation.PhysicalAddress.QuadPart), SIZE_T(record.bytes)))
+            !segment.contains(ULONGLONG(allocation.PhysicalAddress.QuadPart), SIZE_T(record.bytes)))
             return STATUS_INVALID_PARAMETER;
         record.offset = ULONGLONG(allocation.PhysicalAddress.QuadPart);
         record.patched = 1;

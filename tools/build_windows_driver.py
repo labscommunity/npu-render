@@ -48,7 +48,14 @@ def main():
         action="store_true",
         help="Check owned system-page translations in a disposable VM; startup stays disabled",
     )
+    parser.add_argument(
+        "--lab-aperture-adapter",
+        action="store_true",
+        help="Use system-page translation in the disposable-VM paging adapter",
+    )
     args = parser.parse_args()
+    if args.lab_aperture_adapter:
+        args.lab_paging_adapter = True
     if args.lab_aperture_probe and (
         args.lab_sync_probe
         or args.lab_worker_probe
@@ -79,6 +86,7 @@ def main():
             f"-DNR_KMD_LAB_ENGINE_PROBE={'ON' if args.lab_engine_probe else 'OFF'}",
             f"-DNR_KMD_LAB_PAGING_ADAPTER={'ON' if args.lab_paging_adapter else 'OFF'}",
             f"-DNR_KMD_LAB_APERTURE_PROBE={'ON' if args.lab_aperture_probe else 'OFF'}",
+            f"-DNR_KMD_LAB_APERTURE_ADAPTER={'ON' if args.lab_aperture_adapter else 'OFF'}",
         ],
         check=True,
     )
@@ -114,6 +122,7 @@ def main():
         "lab_worker_probe_enabled": args.lab_worker_probe,
         "lab_engine_probe_enabled": args.lab_engine_probe,
         "lab_aperture_probe_enabled": args.lab_aperture_probe,
+        "lab_aperture_adapter_enabled": args.lab_aperture_adapter,
         "installation_performed": False,
         "signing_performed": False,
         "npu_execution_tested": False,

@@ -90,12 +90,39 @@ public:
         KeMemoryBarrier();
         return STATUS_SUCCESS;
     }
+    // Submitted resource copies require distinct VidMm allocation identities.
+    // Diagnostic reads/fills above separately preserve dummy-page access.
+    NTSTATUS copy(ULONGLONG source, ULONGLONG destination, SIZE_T length) {
+        if (!ready()) return STATUS_DEVICE_NOT_READY;
+        if (KeGetCurrentIrql() != PASSIVE_LEVEL) return STATUS_INVALID_DEVICE_STATE;
+        if (!byte_range(source, length) || !byte_range(destination, length) ||
+            !(source + length <= destination || destination + length <= source))
+            return STATUS_INVALID_PARAMETER;
+        Lock lock(mutex_);
+        const auto from = owner(source, length), to = owner(destination, length);
+        if (!from || !to || from == to) return STATUS_INVALID_PARAMETER;
+        Mapping input, output;
+        auto status = input.prepare(entries_, source, length);
+        if (status != STATUS_SUCCESS) return status;
+        status = output.prepare(entries_, destination, length);
+        if (status != STATUS_SUCCESS) return status;
+        RtlCopyMemory(output.data, input.data, length);
+        KeMemoryBarrier();
+        return STATUS_SUCCESS;
+    }
 private:
     static constexpr ULONG tag = 'aRpN';
     struct Entry { PFN_NUMBER pfn; HANDLE owner; bool valid; };
     static bool valid_pfn(PFN_NUMBER pfn) { return pfn && pfn <= PFN_NUMBER(MAXLONGLONG / PAGE_SIZE); }
     static bool page_range(SIZE_T first, SIZE_T count) { return count && first < pages && count <= pages - first; }
     static bool byte_range(ULONGLONG offset, SIZE_T length) { return length && offset < bytes && length <= bytes - offset; }
+    HANDLE owner(ULONGLONG offset, SIZE_T length) const {
+        const auto first = SIZE_T(offset / PAGE_SIZE), last = SIZE_T((offset + length - 1) / PAGE_SIZE);
+        const auto identity = entries_[first].owner;
+        for (SIZE_T i = first; i <= last; ++i)
+            if (!entries_[i].valid || entries_[i].owner != identity) return nullptr;
+        return identity;
+    }
     struct Lock {
         FAST_MUTEX &mutex;
         explicit Lock(FAST_MUTEX &m) : mutex(m) { ExAcquireFastMutex(&mutex); }

@@ -42,7 +42,7 @@ public:
         case DXGK_OPERATION_TRANSFER: {
             const auto &transfer = args.Transfer;
             command.bytes = transfer.TransferSize;
-            if (!command.bytes || command.bytes > Segment::bytes) return STATUS_INVALID_PARAMETER;
+            if (!command.bytes || command.bytes > Segment::transfer_bytes) return STATUS_INVALID_PARAMETER;
             if (!endpoint(segment, transfer.Source.SegmentId, transfer.Source.SegmentAddress,
                           transfer.Source.pMdl, transfer.TransferOffset, transfer.MdlOffset,
                           command.bytes, command.source) ||
@@ -65,7 +65,7 @@ public:
             // Keep ordering with earlier work by emitting an explicit command.
             if (args.DiscardContent.SegmentId != 1 ||
                 args.DiscardContent.SegmentAddress.QuadPart < 0 ||
-                !segment.range(ULONGLONG(args.DiscardContent.SegmentAddress.QuadPart), 1))
+                !segment.contains(ULONGLONG(args.DiscardContent.SegmentAddress.QuadPart), 1))
                 return STATUS_INVALID_PARAMETER;
             break;
         default:
@@ -83,7 +83,7 @@ public:
 
     // Only accept commands copied from VidMm's kernel-private paging data.
     // Never dispatch this method using a user-provided byte stream/MDL pointer.
-    static NTSTATUS execute(const Segment &segment, const PagingCommand &command) {
+    static NTSTATUS execute(Segment &segment, const PagingCommand &command) {
         if (!segment.ready()) return STATUS_DEVICE_NOT_READY;
         if (command.magic != PagingCommand{}.magic || command.reserved)
             return STATUS_INVALID_PARAMETER;
@@ -91,9 +91,24 @@ public:
             return command.bytes ? STATUS_INVALID_PARAMETER : STATUS_SUCCESS;
         if (command.operation != DXGK_OPERATION_TRANSFER && command.operation != DXGK_OPERATION_FILL)
             return STATUS_NOT_SUPPORTED;
-        if (!command.bytes || command.bytes > Segment::bytes) return STATUS_INVALID_PARAMETER;
+        if (!command.bytes || command.bytes > Segment::transfer_bytes) return STATUS_INVALID_PARAMETER;
         if (command.operation == DXGK_OPERATION_FILL &&
             (command.bytes % sizeof(ULONG) || command.destination.mdl)) return STATUS_INVALID_PARAMETER;
+        if (segment.is_aperture()) {
+            if (command.operation == DXGK_OPERATION_FILL)
+                return segment.aperture().fill(command.destination.offset, command.bytes, command.pattern);
+            if (!command.source.mdl && !command.destination.mdl)
+                return segment.aperture().copy(command.source.offset, command.destination.offset, command.bytes);
+            if (bool(command.source.mdl) != bool(command.destination.mdl)) {
+                Mapping system;
+                const auto status = system.prepare(segment,
+                    command.source.mdl ? command.source : command.destination, command.bytes);
+                if (status != STATUS_SUCCESS) return status;
+                return command.source.mdl ?
+                    segment.aperture().write(command.destination.offset, system.address, command.bytes) :
+                    segment.aperture().read(command.source.offset, system.address, command.bytes);
+            }
+        }
         Mapping destination;
         auto status = destination.prepare(segment, command.destination, command.bytes);
         if (!NT_SUCCESS(status)) return status;
@@ -129,7 +144,7 @@ private:
         }
         if (id != 1 || address.QuadPart < 0) return false;
         const auto offset = ULONGLONG(address.QuadPart) + transfer_offset;
-        if (!segment.range(offset, bytes)) return false;
+        if (!segment.contains(offset, bytes)) return false;
         out = {nullptr, offset};
         return true;
     }

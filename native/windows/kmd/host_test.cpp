@@ -264,6 +264,9 @@ NTSTATUS initialize(DRIVER_OBJECT *, UNICODE_STRING *, DRIVER_INITIALIZATION_DAT
 #if NR_KMD_LAB_PAGING_ADAPTER
 #include "lab_start_test.hpp"
 #endif
+#if NR_KMD_LAB_APERTURE_ADAPTER
+#include "aperture_adapter_test.hpp"
+#endif
 #if NR_KMD_LAB_WORKER_PROBE
 #include "worker_probe_test.hpp"
 #endif
@@ -271,7 +274,9 @@ extern "C" int nr_kernel_host_test() {
     const auto aperture_result = aperture_test();
     if (aperture_result) return aperture_result;
     NR_CHECK(NT_SUCCESS(NrHostDriverEntry(nullptr, nullptr)));
-#if NR_KMD_LAB_PAGING_ADAPTER
+#if NR_KMD_LAB_APERTURE_ADAPTER
+    return aperture_adapter_test();
+#elif NR_KMD_LAB_PAGING_ADAPTER
     return lab_start_test();
 #else
     NR_CHECK(registration.Version == DXGKDDI_INTERFACE_VERSION_WDDM1_3);

@@ -73,6 +73,9 @@ jobs:
       - name: Build owned-page translation probe and test mapping contracts
         if: runner.os == 'Windows'
         run: uv run --frozen python tools/build_windows_driver.py --lab-aperture-probe --build-dir build/windows-kernel-aperture-probe
+      - name: Build system-page paging adapter and test submitted copies
+        if: runner.os == 'Windows'
+        run: uv run --frozen python tools/build_windows_driver.py --lab-aperture-adapter --build-dir build/windows-kernel-aperture-adapter
       - name: Build public KMT paging probe and check adapter enumeration
         if: runner.os == 'Windows'
         run: |

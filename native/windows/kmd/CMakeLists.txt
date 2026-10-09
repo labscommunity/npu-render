@@ -9,6 +9,10 @@ option(NR_KMD_LAB_WORKER_PROBE "Exercise an owned paging worker and deferred cal
 option(NR_KMD_LAB_ENGINE_PROBE "Exercise the engine with lab notification observers" OFF)
 option(NR_KMD_LAB_PAGING_ADAPTER "Enable a paging-only adapter in a disposable kernel-debug guest" OFF)
 option(NR_KMD_LAB_APERTURE_PROBE "Validate owned system-page translations before rejecting startup" OFF)
+option(NR_KMD_LAB_APERTURE_ADAPTER "Use real system-page translation in the isolated paging adapter" OFF)
+if(NR_KMD_LAB_APERTURE_ADAPTER AND NOT NR_KMD_LAB_PAGING_ADAPTER)
+  message(FATAL_ERROR "The aperture adapter requires the disposable-VM paging mode")
+endif()
 if(NR_KMD_LAB_APERTURE_PROBE AND (NR_KMD_LAB_SYNC_PROBE OR NR_KMD_LAB_WORKER_PROBE OR NR_KMD_LAB_ENGINE_PROBE OR NR_KMD_LAB_PAGING_ADAPTER))
   message(FATAL_ERROR "The aperture diagnostic must run in isolation")
 endif()
@@ -31,6 +35,7 @@ target_include_directories(nr_render_kmd PRIVATE
   "${NR_WDK_ROOT}/include/km" "${NR_WDK_ROOT}/include/shared"
   "${NR_WDK_ROOT}/include/km/crt")
 target_compile_definitions(nr_render_kmd PRIVATE
+  NR_KMD_LAB_APERTURE_ADAPTER=$<BOOL:${NR_KMD_LAB_APERTURE_ADAPTER}>
   NR_KMD_LAB_APERTURE_PROBE=$<BOOL:${NR_KMD_LAB_APERTURE_PROBE}>
   NR_KMD_LAB_SYNC_PROBE=$<BOOL:${NR_KMD_LAB_SYNC_PROBE}>
   NR_KMD_LAB_WORKER_PROBE=$<BOOL:${NR_KMD_LAB_WORKER_PROBE}>
@@ -50,6 +55,7 @@ target_compile_features(nr_kernel_host_test PRIVATE cxx_std_17)
 target_include_directories(nr_kernel_host_test PRIVATE
   "${NR_WDK_ROOT}/include/km" "${NR_WDK_ROOT}/include/shared")
 target_compile_definitions(nr_kernel_host_test PRIVATE
+  NR_KMD_LAB_APERTURE_ADAPTER=$<BOOL:${NR_KMD_LAB_APERTURE_ADAPTER}>
   # The owned-page probe needs real kernel PFNs. Host tests exercise its
   # translation implementation with an explicit memory model separately.
   NR_KMD_LAB_APERTURE_PROBE=0

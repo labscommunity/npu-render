@@ -16,8 +16,8 @@ class Copy {
 public:
     static bool valid(const CopyRecord &r) {
         if (r.magic != CopyRecord{}.magic || r.version != 1 || r.reserved ||
-            !r.bytes || r.bytes > Segment::bytes || r.patched > 1 ||
-            r.source > Segment::bytes - r.bytes || r.destination > Segment::bytes - r.bytes)
+            !r.bytes || r.bytes > Segment::transfer_bytes || r.patched > 1 ||
+            r.source > Segment::address_bytes - r.bytes || r.destination > Segment::address_bytes - r.bytes)
             return false;
         if (!r.patched) return !r.source && !r.destination;
         return r.source + r.bytes <= r.destination || r.destination + r.bytes <= r.source;
@@ -31,7 +31,7 @@ public:
         for (UINT i = 0; i < 2; ++i) {
             if (!list[i].SegmentId && allow_unresident) { resident = false; continue; }
             if (list[i].SegmentId != 1 || list[i].PhysicalAddress.QuadPart < 0 ||
-                !segment.range(ULONGLONG(list[i].PhysicalAddress.QuadPart), SIZE_T(r.bytes)))
+                !segment.contains(ULONGLONG(list[i].PhysicalAddress.QuadPart), SIZE_T(r.bytes)))
                 return STATUS_INVALID_PARAMETER;
             offsets[i] = ULONGLONG(list[i].PhysicalAddress.QuadPart);
         }

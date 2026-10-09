@@ -172,8 +172,8 @@ NTSTATUS start_device(void *context, DXGK_START_INFO *start,
     // Only the explicit disposable-VM build may start the paging-only engine.
     // Paired UMD readiness and display ownership remain disabled in that build.
     if (!startup_enabled) return STATUS_NOT_SUPPORTED;
-    const auto memory_status = a->segment.prepare(NR_KMD_LAB_PAGING_ADAPTER ?
-        16 * 1024 * 1024 : nr::kmd::Segment::bytes);
+    const auto memory_status = NR_KMD_LAB_APERTURE_ADAPTER ? a->segment.prepare_aperture() :
+        a->segment.prepare(NR_KMD_LAB_PAGING_ADAPTER ? 16 * 1024 * 1024 : nr::kmd::Segment::bytes);
     NR_LAB_TRACE("nr_paging_lab: memory=%08lx required_queue=%lu\n", ULONG(memory_status), start->RequiredDmaQueueEntry);
     if (!NT_SUCCESS(memory_status)) return memory_status;
     const auto queue_status = a->submissions.prepare(a->scheduler, start->RequiredDmaQueueEntry);
@@ -198,6 +198,7 @@ DXGKDDI_STOP_DEVICE stop_device;
 NTSTATUS stop_device(void *context) {
     if (!context) return STATUS_INVALID_PARAMETER;
     auto a = static_cast<Adapter *>(context);
+    if (a->segment.is_aperture() && a->segment.aperture().mapped_pages()) return STATUS_DEVICE_BUSY;
     if (a->devices || a->allocations || a->resources || a->opens || (a->scheduler.active() && !a->engine.alive()))
         return STATUS_DEVICE_BUSY;
     const auto engine_status = a->engine.stop();
@@ -394,7 +395,7 @@ NTSTATUS APIENTRY query_adapter(HANDLE adapter, const DXGKARG_QUERYADAPTERINFO *
         caps.HighestAcceptableAddress.QuadPart = MAXLONGLONG;
         caps.PresentationCaps.NoScreenToScreenBlt = 1;
         caps.PresentationCaps.NoOverlapScreenBlt = 1;
-        caps.PresentationCaps.NoCacheCoherentApertureMemory = 1;
+        caps.PresentationCaps.NoCacheCoherentApertureMemory = NR_KMD_LAB_APERTURE_ADAPTER ? 0 : 1;
         caps.SchedulingCaps.MultiEngineAware = 1;
         caps.SchedulingCaps.PreemptionAware = 1;
         caps.GpuEngineTopology.NbAsymetricProcessingNodes = 1;
@@ -435,6 +436,26 @@ NTSTATUS APIENTRY build_paging(HANDLE adapter, DXGKARG_BUILDPAGINGBUFFER *args) 
     if (!adapter || !args) return STATUS_INVALID_PARAMETER;
     auto a = static_cast<Adapter *>(adapter);
     if (!a->started) return STATUS_DEVICE_NOT_READY;
+    if (a->segment.is_aperture() && (args->Operation == DXGK_OPERATION_MAP_APERTURE_SEGMENT ||
+                                    args->Operation == DXGK_OPERATION_UNMAP_APERTURE_SEGMENT)) {
+        if (args->MultipassOffset) return STATUS_INVALID_PARAMETER;
+        const bool mapping = args->Operation == DXGK_OPERATION_MAP_APERTURE_SEGMENT;
+        const auto allocation = static_cast<Allocation *>(mapping ? args->MapApertureSegment.hAllocation : args->UnmapApertureSegment.hAllocation);
+        const auto segment = mapping ? args->MapApertureSegment.SegmentId : args->UnmapApertureSegment.SegmentId;
+        const auto first = mapping ? args->MapApertureSegment.OffsetInPages : args->UnmapApertureSegment.OffsetInPages;
+        const auto count = mapping ? args->MapApertureSegment.NumberOfPages : args->UnmapApertureSegment.NumberOfPages;
+        // DMA buffers stay in system segment zero; every admitted aperture map
+        // names an actual allocation handle supplied by this adapter to VidMm.
+        if (!allocation || allocation->adapter != a || segment != 1 ||
+            !count || count > allocation->surface.allocation_bytes / PAGE_SIZE)
+            return STATUS_INVALID_PARAMETER;
+        const auto status = mapping ? a->segment.aperture().map(allocation, first, count,
+            args->MapApertureSegment.pMdl, args->MapApertureSegment.MdlOffset, args->MapApertureSegment.Flags.Value) :
+            a->segment.aperture().unmap(allocation, first, count, args->UnmapApertureSegment.DummyPage);
+        NR_LAB_TRACE("nr_paging_lab: aperture operation=%u pages=%llu status=%08lx live=%llu\n",
+            UINT(args->Operation), ULONGLONG(count), ULONG(status), ULONGLONG(a->segment.aperture().mapped_pages()));
+        return status;
+    }
     // During TDR cleanup VidMm reports an eviction with a zero-byte transfer.
     // No data is moved and no DMA command is emitted for this notification.
     if (a->resetting && args->Operation == DXGK_OPERATION_TRANSFER && !args->Transfer.TransferSize)
@@ -518,7 +539,8 @@ NTSTATUS APIENTRY create_allocation(HANDLE adapter, DXGKARG_CREATEALLOCATION *ar
         // Shared allocations in a memory segment cannot be CPU visible. This
         // laboratory admits resource-owned allocations only for shared targets.
         // Readback uses a submitted copy into a separate lockable staging image.
-        out.Flags.CpuVisible = resource_owned ? 0 : 1;
+        out.Flags.CpuVisible = a->segment.is_aperture() || !resource_owned;
+        out.Flags.Cached = a->segment.is_aperture() ? 1 : 0;
         // VidMm rejects cached allocations targeting a memory segment when
         // the adapter has no cache-coherent aperture. Segment backing uses
         // MmWriteCombined so CPU aliases use the same memory type.

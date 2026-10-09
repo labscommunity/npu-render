@@ -136,10 +136,10 @@ public:
                     return STATUS_INVALID_PARAMETER;
                 switch (command.operation) {
                 case DXGK_OPERATION_TRANSFER:
-                    if (!command.bytes || command.bytes > Segment::bytes) return STATUS_INVALID_PARAMETER;
+                    if (!command.bytes || command.bytes > Segment::transfer_bytes) return STATUS_INVALID_PARAMETER;
                     break;
                 case DXGK_OPERATION_FILL:
-                    if (!command.bytes || command.bytes > Segment::bytes ||
+                    if (!command.bytes || command.bytes > Segment::transfer_bytes ||
                         command.bytes % sizeof(ULONG) || command.destination.mdl)
                         return STATUS_INVALID_PARAMETER;
                     break;

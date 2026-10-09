@@ -25,9 +25,21 @@ and gives the NPU no direct access to these pages.
 `--lab-aperture-probe` builds an isolated, start-disabled diagnostic. It allocates
 enough owned noncontiguous system memory for a 2880×1800 image, releases the input
 MDL descriptor, verifies writes through the copied page table against the original
-memory, then checks dummy-page aliases. This tests real kernel mappings separately
-from Windows allocation/paging acceptance. Live validation is pending. Do not
-advertise aperture or cross-adapter capabilities on the strength of its host model.
+memory, then checks dummy-page aliases. The
+[v32 guest diagnostic](../../../docs/validation/2026-10-09/kernel-aperture-v32/report.json)
+passes: 20,742,144 bytes verified, 5,063 pages remapped to the owned dummy page,
+all mappings cleaned and the module unloaded. It deliberately rejects startup;
+the laboratory node's Code 43 is expected. This establishes real kernel mapping
+behavior separately from Windows allocation/paging acceptance.
+
+`--lab-aperture-adapter` now builds a separate disposable-VM experiment using a
+256 MiB aperture address space backed by real VidMm page mappings. It declares
+no CPU bus aperture, retains system-memory DMA buffers, and uses coherent cached
+allocations. Copies and fills execute through transient CPU mappings with actual
+submission ordering. It does not enable cross-adapter resources, presentation,
+NPU page access or production readiness. Host DDI tests cover startup unwind,
+mapping, a queued copy between offsets beyond the old segment, and teardown;
+live VidMm validation remains pending.
 
 The design follows the documented [linear aperture address-space contract](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/linear-aperture-space-segments)
 and [map/unmap requirements](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/nc-d3dkmddi-dxgkddi_buildpagingbuffer).
