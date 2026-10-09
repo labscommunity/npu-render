@@ -59,7 +59,7 @@ struct Adapter {
 };
 struct Allocation { Adapter *adapter; nr::kernel_contract::Surface surface; LONG opens; };
 struct Device { Adapter *adapter; HANDLE runtime; LONG contexts; LONG opens; };
-struct Context { Device *device; HANDLE runtime; };
+struct Context { Device *device; HANDLE runtime; bool system; };
 struct OpenAllocation { Device *device; Allocation *allocation; bool read_only; };
 
 Allocation *writable_allocation(Adapter *adapter, const DXGK_ALLOCATIONLIST *list, UINT count,
@@ -598,11 +598,19 @@ NTSTATUS APIENTRY create_context(HANDLE device, DXGKARG_CREATECONTEXT *args) {
     if (!device || !args) return STATUS_INVALID_PARAMETER;
     auto d = static_cast<Device *>(device);
     if (!d->adapter->started) return STATUS_DEVICE_NOT_READY;
-    if (args->NodeOrdinal || args->EngineAffinity != 1 || args->PrivateDriverDataSize || args->Flags.Value)
+    NR_LAB_TRACE("nr_paging_lab: create_context node=%u affinity=%u flags=%x private=%u\n",
+        args->NodeOrdinal, args->EngineAffinity, args->Flags.Value, args->PrivateDriverDataSize);
+    // VidMm creates a system context for paging while starting the adapter.
+    // It uses the same engine, but must not admit user rendering commands.
+    DXGK_CREATECONTEXTFLAGS allowed{};
+    allowed.SystemContext = 1;
+    if (args->NodeOrdinal || args->EngineAffinity != 1 || args->PrivateDriverDataSize ||
+        (args->Flags.Value & ~allowed.Value))
         return STATUS_NOT_SUPPORTED;
     auto c = allocate<Context>();
     if (!c) return STATUS_INSUFFICIENT_RESOURCES;
     c->device = d;
+    c->system = args->Flags.SystemContext != 0;
     c->runtime = args->hContext;
     InterlockedIncrement(&d->contexts);
     RtlZeroMemory(&args->ContextInfo, sizeof(args->ContextInfo));
@@ -618,6 +626,7 @@ NTSTATUS APIENTRY render(HANDLE context, DXGKARG_RENDER *args) {
     if (!lab_fill_enabled) return STATUS_NOT_SUPPORTED;
     if (!context || !args) return STATUS_INVALID_PARAMETER;
     const auto c = static_cast<Context *>(context);
+    if (c->system) return STATUS_NOT_SUPPORTED;
     const auto a = c->device->adapter;
     if (!a->started || a->resetting) return STATUS_DEVICE_NOT_READY;
     const auto allocation = writable_allocation(a, args->pAllocationList, args->AllocationListSize, c->device);

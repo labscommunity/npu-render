@@ -8,8 +8,22 @@ int fill_test(Adapter *a) {
     auto d = static_cast<Device *>(device.hDevice);
     DXGKARG_CREATECONTEXT context{};
     context.EngineAffinity = 1;
-    context.Flags.GdiContext = 1;
-    NR_CHECK(registration.DxgkDdiCreateContext(d, &context) == STATUS_NOT_SUPPORTED);
+    for (unsigned bit = 1; bit < 32; ++bit) {
+        context.Flags.Value = 1u << bit;
+        NR_CHECK(registration.DxgkDdiCreateContext(d, &context) == STATUS_NOT_SUPPORTED);
+        context.Flags.SystemContext = 1;
+        NR_CHECK(registration.DxgkDdiCreateContext(d, &context) == STATUS_NOT_SUPPORTED);
+        NR_CHECK(!d->contexts && !context.hContext);
+    }
+    context.Flags.Value = 0;
+    context.Flags.SystemContext = 1;
+    NR_CHECK(registration.DxgkDdiCreateContext(d, &context) == STATUS_SUCCESS);
+    NR_CHECK(d->contexts == 1 && static_cast<Context *>(context.hContext)->system);
+    DXGKARG_RENDER system_render{};
+    NR_CHECK(registration.DxgkDdiRender(context.hContext, &system_render) == STATUS_NOT_SUPPORTED);
+    NR_CHECK(registration.DxgkDdiDestroyContext(context.hContext) == STATUS_SUCCESS);
+    context = {};
+    context.EngineAffinity = 1;
     context.Flags.Value = 0;
     fail_after = 0;
     NR_CHECK(registration.DxgkDdiCreateContext(d, &context) == STATUS_INSUFFICIENT_RESOURCES);
