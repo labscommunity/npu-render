@@ -1,0 +1,164 @@
+Opened log file 'C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-present-v37-oct9.log'
+nr_paging_lab: memory=00000000 required_queue=32
+nr_paging_lab: engine_start=00000000 capacity=33; rendering_ready=0 sources=0 children=0
+nr_paging_lab: query type=1 input=0 output=552
+nr_paging_lab: query type=47 input=0 output=4
+nr_paging_lab: create_context node=0 affinity=1 flags=1 private=0
+nr_paging_lab: query type=5 input=24 output=32
+nr_paging_lab: query type=5 input=24 output=32
+nr_paging_lab: query type=10 input=4 output=4
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: create_context node=0 affinity=1 flags=0 private=0
+nr_paging_lab: render_fill=00000000
+nr_paging_lab: aperture operation=5 pages=60 status=00000000 live=60
+nr_paging_lab: patch=00000000 flags=0 fence=1 dma=0..16 private=0..32
+nr_paging_lab: submit=00000000 flags=0 fence=1
+nr_paging_lab: execute fence=1 commands=1 status=00000000 irql=0
+nr_paging_lab: standard_allocation type=3 status=c00000bb
+nr_paging_lab: aperture operation=6 pages=60 status=00000000 live=0
+Break instruction exception - code 80000003 (first chance)
+*******************************************************************************
+*                                                                             *
+*   You are seeing this message because you pressed either                    *
+*       CTRL+C (if you run console kernel debugger) or,                       *
+*       CTRL+BREAK (if you run GUI kernel debugger),                          *
+*   on your debugger machine's keyboard.                                      *
+*                                                                             *
+*                   THIS IS NOT A BUG OR A SYSTEM CRASH                       *
+*                                                                             *
+* If you did not intend to break into the debugger, press the "g" key, then   *
+* press the "Enter" key now.  This message might immediately reappear.  If it *
+* does, press "g" and "Enter" again.                                          *
+*                                                                             *
+*******************************************************************************
+nt!DbgBreakPointWithStatus:
+fffff804`a52fdfb0 cc              int     3
+0: kd> .reload /f nr_render_kmd.sys; x nr_render_kmd!*standard*
+
+
+Press ctrl-c (cdb, kd, ntsd) or ctrl-break (windbg) to abort symbol loads that take too long.
+Run !sym noisy before .reload to track down problems loading symbols.
+
+fffff804`3be63320 nr_render_kmd!nr::kmd::StandardAllocation::describe (struct _DXGKARG_GETSTANDARDALLOCATIONDRIVERDATA *)
+fffff804`3be66d80 nr_render_kmd!`anonymous namespace'::standard_allocation (void *, struct _DXGKARG_GETSTANDARDALLOCATIONDRIVERDATA *)
+0: kd> dt nr_render_kmd!_DXGKARG_GETSTANDARDALLOCATIONDRIVERDATA; dt nr_render_kmd!_D3DKMDT_GDISURFACEDATA
+   +0x000 StandardAllocationType : _D3DKMDT_STANDARDALLOCATION_TYPE
+   +0x008 pCreateSharedPrimarySurfaceData : Ptr64 _D3DKMDT_SHAREDPRIMARYSURFACEDATA
+   +0x008 pCreateShadowSurfaceData : Ptr64 _D3DKMDT_SHADOWSURFACEDATA
+   +0x008 pCreateStagingSurfaceData : Ptr64 _D3DKMDT_STAGINGSURFACEDATA
+   +0x008 pCreateGdiSurfaceData : Ptr64 _D3DKMDT_GDISURFACEDATA
+   +0x010 pAllocationPrivateDriverData : Ptr64 Void
+   +0x018 AllocationPrivateDriverDataSize : Uint4B
+   +0x020 pResourcePrivateDriverData : Ptr64 Void
+   +0x028 ResourcePrivateDriverDataSize : Uint4B
+   +0x02c PhysicalAdapterIndex : Uint4B
+   +0x000 Width            : Uint4B
+   +0x004 Height           : Uint4B
+   +0x008 Format           : _D3DDDIFORMAT
+   +0x00c Type             : _D3DKMDT_GDISURFACETYPE
+   +0x010 Flags            : _D3DKMDT_GDISURFACEFLAGS
+   +0x014 Pitch            : Uint4B
+0: kd> bp fffff804`3be66d80 "dt nr_render_kmd!_DXGKARG_GETSTANDARDALLOCATIONDRIVERDATA @rdx; dd poi(@rdx+8) L6; g"; g
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: create_context node=0 affinity=1 flags=0 private=0
+nr_paging_lab: render_fill=00000000
+nr_paging_lab: aperture operation=5 pages=60 status=00000000 live=60
+nr_paging_lab: patch=00000000 flags=0 fence=2 dma=0..16 private=0..32
+nr_paging_lab: submit=00000000 flags=0 fence=2
+nr_paging_lab: execute fence=2 commands=1 status=00000000 irql=0
+   +0x000 StandardAllocationType : 3 ( D3DKMDT_STANDARDALLOCATION_STAGINGSURFACE )
+   +0x008 pCreateSharedPrimarySurfaceData : 0xfffffa83`1cdbec88 _D3DKMDT_SHAREDPRIMARYSURFACEDATA
+   +0x008 pCreateShadowSurfaceData : 0xfffffa83`1cdbec88 _D3DKMDT_SHADOWSURFACEDATA
+   +0x008 pCreateStagingSurfaceData : 0xfffffa83`1cdbec88 _D3DKMDT_STAGINGSURFACEDATA
+   +0x008 pCreateGdiSurfaceData : 0xfffffa83`1cdbec88 _D3DKMDT_GDISURFACEDATA
+   +0x010 pAllocationPrivateDriverData : (null) 
+   +0x018 AllocationPrivateDriverDataSize : 0
+   +0x020 pResourcePrivateDriverData : (null) 
+   +0x028 ResourcePrivateDriverDataSize : 0
+   +0x02c PhysicalAdapterIndex : 0
+fffffa83`1cdbec88  00000140 000000c0 00000000 00000000
+fffffa83`1cdbec98  75625906 ffff5eb5
+nr_paging_lab: standard_allocation type=3 status=c00000bb
+nr_paging_lab: aperture operation=6 pages=60 status=00000000 live=0
+Unload module \SystemRoot\System32\DriverStore\FileRepository\nr_render_lab.inf_amd64_e45b2b5130e3aa2f\nr_render_kmd.sys at fffff804`3be60000
+Break instruction exception - code 80000003 (first chance)
+*******************************************************************************
+*                                                                             *
+*   You are seeing this message because you pressed either                    *
+*       CTRL+C (if you run console kernel debugger) or,                       *
+*       CTRL+BREAK (if you run GUI kernel debugger),                          *
+*   on your debugger machine's keyboard.                                      *
+*                                                                             *
+*                   THIS IS NOT A BUG OR A SYSTEM CRASH                       *
+*                                                                             *
+* If you did not intend to break into the debugger, press the "g" key, then   *
+* press the "Enter" key now.  This message might immediately reappear.  If it *
+* does, press "g" and "Enter" again.                                          *
+*                                                                             *
+*******************************************************************************
+nt!DbgBreakPointWithStatus:
+fffff804`a52fdfb0 cc              int     3
+0: kd> .sympath srv*C:\Users\tatef\AppData\Local\npu-render\vm\symbols*https://msdl.microsoft.com/download/symbols;C:\Users\tatef\AppData\Local\npu-render\builds\present-staging-v1\Release
+Symbol search path is: srv*C:\Users\tatef\AppData\Local\npu-render\vm\symbols*https://msdl.microsoft.com/download/symbols;C:\Users\tatef\AppData\Local\npu-render\builds\present-staging-v1\Release
+Expanded Symbol search path is: srv*c:\users\tatef\appdata\local\npu-render\vm\symbols*https://msdl.microsoft.com/download/symbols;c:\users\tatef\appdata\local\npu-render\builds\present-staging-v1\release
+
+************* Path validation summary **************
+Response                         Time (ms)     Location
+Deferred                                       srv*C:\Users\tatef\AppData\Local\npu-render\vm\symbols*https://msdl.microsoft.com/download/symbols
+OK                                             C:\Users\tatef\AppData\Local\npu-render\builds\present-staging-v1\Release
+0: kd> bc *; .logclose; .logopen C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-present-v38-oct9.log; g
+Closing open log file C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-present-v37-oct9.log

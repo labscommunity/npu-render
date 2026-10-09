@@ -1,0 +1,115 @@
+{
+  "schema": 1,
+  "kind": "registered-window-presentation-staging-rejection",
+  "date_utc": "2026-10-09",
+  "package": "v37-backbuffer",
+  "driver_version": "0.0.26.0",
+  "source_revisions": {
+    "kernel": "86354cc97534cdfdd29541bcc3fda604d5476df3",
+    "umd": "41502451736750b7ae5fe0d2a011009a9e15f214"
+  },
+  "result": "swapchain-and-clear-pass-staging-allocation-rejected",
+  "cases": {
+    "window": {
+      "process": {
+        "started": "2026-10-09T23:33:30.8932160Z",
+        "finished": "2026-10-09T23:33:35.9273620Z",
+        "probe_sha256": "267E31481245DE69FD091593121DF2EBFADA505E88ED8C877B42465A234D5409",
+        "exit_code": 1,
+        "npu_execution_tested": false
+      },
+      "operations": {
+        "create_factory": "00000000",
+        "select_paired_adapter": "00000000",
+        "create_registered_device": "00000000",
+        "create_registered_hwnd_swapchain": "00000000",
+        "get_registered_backbuffer": "00000000",
+        "create_registered_backbuffer_view": "00000000",
+        "present_clear_status": "00000000",
+        "registered_hwnd_present": "087a0001"
+      },
+      "stats": {
+        "failed": true,
+        "rejected": 0,
+        "last_unsupported_offset": 18446744073709551615,
+        "cleanup_errors": 0,
+        "executions": 0,
+        "cpu_executions": 0,
+        "gpu_executions": 0,
+        "npu_executions": 0,
+        "live_allocations": 0,
+        "live_contexts": 0,
+        "present_requests": 1,
+        "accepted_present_callbacks": 1
+      },
+      "verified_presented_frames": 0
+    },
+    "window-trace": {
+      "process": {
+        "started": "2026-10-09T23:36:10.1237770Z",
+        "finished": "2026-10-09T23:36:12.6004950Z",
+        "probe_sha256": "267E31481245DE69FD091593121DF2EBFADA505E88ED8C877B42465A234D5409",
+        "exit_code": 1,
+        "npu_execution_tested": false
+      },
+      "operations": {
+        "create_factory": "00000000",
+        "select_paired_adapter": "00000000",
+        "create_registered_device": "00000000",
+        "create_registered_hwnd_swapchain": "00000000",
+        "get_registered_backbuffer": "00000000",
+        "create_registered_backbuffer_view": "00000000",
+        "present_clear_status": "00000000",
+        "registered_hwnd_present": "087a0001"
+      },
+      "stats": {
+        "failed": true,
+        "rejected": 0,
+        "last_unsupported_offset": 18446744073709551615,
+        "cleanup_errors": 0,
+        "executions": 0,
+        "cpu_executions": 0,
+        "gpu_executions": 0,
+        "npu_executions": 0,
+        "live_allocations": 0,
+        "live_contexts": 0,
+        "present_requests": 1,
+        "accepted_present_callbacks": 1
+      },
+      "verified_presented_frames": 0
+    }
+  },
+  "interactive_session": 1,
+  "requested_client_extent": [
+    320,
+    192
+  ],
+  "verified_presented_frames": 0,
+  "successful_cpu_clear_fences": 2,
+  "requested_standard_allocation": {
+    "type": 3,
+    "name": "D3DKMDT_STANDARDALLOCATION_STAGINGSURFACE",
+    "width": 320,
+    "height": 192,
+    "initial_pitch": 0,
+    "size_query": true,
+    "status": "c00000bb"
+  },
+  "mapped_pages_after_tests": 0,
+  "kernel_module_unloaded": true,
+  "owned_device_removed": true,
+  "owned_inf_deleted": true,
+  "prior_display_status_preserved": true,
+  "registered_npu_execution_tested": false,
+  "desktop_offload_tested": false,
+  "tahoma_benefit_tested": false,
+  "notes": [
+    "The registered adapter creates an ordinary HWND swap chain and back buffer, and its kernel CPU worker completes the first clear. Both attempts reach PresentCb and receive DXGI_STATUS_OCCLUDED, a positive status that is explicitly not treated as delivered output. No screen-pixel oracle succeeds.",
+    "Kernel tracing observes the standard staging allocation size query for 320x192 with pitch initially zero. This KMD supports only GDI standard allocations, so it returns STATUS_NOT_SUPPORTED. Windows requires this lockable BGRX8 staging surface for this presentation path. The broader Windows control flow and any additional occlusion conditions were not traced.",
+    "Revision a95a58c adds allocation-only metadata for standard BGRX8 staging surfaces, permits BGRA-to-BGRX copies without channel conversion and rejects the reverse alpha-undefined path. Host tests cover allocation lifetime and actual queued rectangle copying; the next signed package must establish live acceptance.",
+    "The two successful fences are CPU clears, not NPU execution or presentation. Component NPU execution, registered presentation, DWM migration and Tahoma benefit remain separate acceptance gates."
+  ],
+  "references": [
+    "https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmdt/ns-d3dkmdt-_d3dkmdt_stagingsurfacedata"
+  ]
+}
