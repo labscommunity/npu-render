@@ -7,6 +7,7 @@ extern "C" {
 }
 #include "scheduler.hpp"
 #include "contract.hpp"
+#include "segment.hpp"
 
 inline void *operator new(size_t, void *p) noexcept { return p; }
 
@@ -17,6 +18,7 @@ struct Adapter {
     const DEVICE_OBJECT *physical;
     DXGKRNL_INTERFACE kernel;
     nr::kmd::Scheduler scheduler;
+    nr::kmd::Segment segment;
     LONG devices;
     LONG allocations;
     bool started;
@@ -58,9 +60,14 @@ NTSTATUS start_device(void *context, DXGK_START_INFO *start,
     if (a->started) return STATUS_INVALID_DEVICE_STATE;
     // Do not let Dxgkrnl select an adapter with incomplete mandatory DDIs.
     if (!runtime_ready) return STATUS_NOT_SUPPORTED;
+    const auto memory_status = a->segment.prepare();
+    if (!NT_SUCCESS(memory_status)) return memory_status;
     a->kernel = *kernel;
-    if (a->scheduler.start() != nr::kmd::QueueResult::ok)
+    if (a->scheduler.start() != nr::kmd::QueueResult::ok) {
+        a->segment.release();
+        RtlZeroMemory(&a->kernel, sizeof(a->kernel));
         return STATUS_INVALID_DEVICE_STATE;
+    }
     a->started = true;
     return STATUS_SUCCESS;
 }
@@ -71,6 +78,7 @@ NTSTATUS stop_device(void *context) {
     if (a->devices || a->allocations || a->scheduler.active()) return STATUS_DEVICE_BUSY;
     a->scheduler.stop();
     a->started = false;
+    a->segment.release();
     RtlZeroMemory(&a->kernel, sizeof(a->kernel));
     return STATUS_SUCCESS;
 }
@@ -78,7 +86,8 @@ DXGKDDI_REMOVE_DEVICE remove_device;
 NTSTATUS remove_device(void *context) {
     if (!context) return STATUS_INVALID_PARAMETER;
     auto a = static_cast<Adapter *>(context);
-    if (a->started || a->devices || a->allocations || a->scheduler.active()) return STATUS_DEVICE_BUSY;
+    if (a->started || a->devices || a->allocations || a->scheduler.active() ||
+        a->segment.ready()) return STATUS_DEVICE_BUSY;
     release(a);
     return STATUS_SUCCESS;
 }
@@ -106,6 +115,14 @@ void control_etw(BOOLEAN, ULONG, UCHAR) {}
 DXGKDDI_QUERYADAPTERINFO query_adapter;
 NTSTATUS APIENTRY query_adapter(HANDLE adapter, const DXGKARG_QUERYADAPTERINFO *args) {
     if (!adapter || !args || !args->pOutputData) return STATUS_INVALID_PARAMETER;
+    if (args->Type == DXGKQAITYPE_QUERYSEGMENT3) {
+        if (!args->pInputData || args->InputDataSize != sizeof(DXGK_QUERYSEGMENTIN))
+            return STATUS_INVALID_PARAMETER;
+        if (args->OutputDataSize < sizeof(DXGK_QUERYSEGMENTOUT3))
+            return STATUS_BUFFER_TOO_SMALL;
+        return static_cast<Adapter *>(adapter)->segment.describe(
+            *static_cast<DXGK_QUERYSEGMENTOUT3 *>(args->pOutputData));
+    }
     if (args->Type != DXGKQAITYPE_UMDRIVERPRIVATE) return STATUS_NOT_SUPPORTED;
     if (args->InputDataSize || args->OutputDataSize != sizeof(nr::kernel_contract::AdapterInfo))
         return STATUS_INVALID_PARAMETER;
@@ -120,7 +137,7 @@ NTSTATUS APIENTRY create_allocation(HANDLE adapter, DXGKARG_CREATEALLOCATION *ar
         args->NumAllocations > 16 || args->Flags.Value || args->hResource ||
         args->PrivateDriverDataSize) return STATUS_INVALID_PARAMETER;
     auto a = static_cast<Adapter *>(adapter);
-    if (!a->started) return STATUS_DEVICE_NOT_READY;
+    if (!a->started || !a->segment.ready()) return STATUS_DEVICE_NOT_READY;
     nr::kernel_contract::Surface descriptions[16]{};
     // Validate and snapshot every descriptor before publishing any handle.
     for (UINT i = 0; i < args->NumAllocations; ++i) {
@@ -129,6 +146,8 @@ NTSTATUS APIENTRY create_allocation(HANDLE adapter, DXGKARG_CREATEALLOCATION *ar
             return STATUS_INVALID_PARAMETER;
         RtlCopyMemory(&descriptions[i], in.pPrivateDriverData, sizeof(descriptions[i]));
         if (!nr::kernel_contract::valid(descriptions[i])) return STATUS_INVALID_PARAMETER;
+        if (descriptions[i].allocation_bytes > nr::kmd::Segment::bytes)
+            return STATUS_INSUFFICIENT_RESOURCES;
     }
     LONG previous;
     do {

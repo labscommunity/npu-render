@@ -1,4 +1,4 @@
-// Executes the actual DDI implementation with pool/registration shims. This
+// Executes the actual DDI implementation with memory/registration shims. This
 // tests validation and unwinding only; it is not a kernel/IRQL or Dxgkrnl test.
 extern "C" {
 #include <ntddk.h>
@@ -9,6 +9,33 @@ void nr_host_free(void *pointer);
 namespace {
 DRIVER_INITIALIZATION_DATA registration{};
 long fail_after = -1, outstanding = 0;
+void *segment_memory = nullptr;
+bool segment_fail = false, segment_contract_error = false;
+LONGLONG segment_physical = 0x20000000; // Host-only physical-address model.
+unsigned segment_allocations = 0, segment_frees = 0;
+void *segment_allocate(SIZE_T bytes, PHYSICAL_ADDRESS low, PHYSICAL_ADDRESS high,
+                       PHYSICAL_ADDRESS boundary, MEMORY_CACHING_TYPE cache) {
+    ++segment_allocations;
+    if (segment_memory || bytes != 64 * 1024 * 1024 || low.QuadPart ||
+        high.QuadPart != MAXLONGLONG || boundary.QuadPart || cache != MmCached)
+        segment_contract_error = true;
+    if (segment_fail) return nullptr;
+    segment_memory = nr_host_allocate(bytes);
+    if (segment_memory) RtlFillMemory(segment_memory, bytes, 0xA5);
+    return segment_memory;
+}
+PHYSICAL_ADDRESS segment_address(void *p) {
+    if (!p || p != segment_memory) segment_contract_error = true;
+    PHYSICAL_ADDRESS result{};
+    result.QuadPart = segment_physical;
+    return result;
+}
+void segment_free(void *p) {
+    if (!p || p != segment_memory) segment_contract_error = true;
+    ++segment_frees;
+    nr_host_free(p);
+    segment_memory = nullptr;
+}
 void *pool_allocate(POOL_FLAGS, SIZE_T bytes, ULONG) {
     if (fail_after == 0) return nullptr;
     if (fail_after > 0) --fail_after;
@@ -25,6 +52,9 @@ NTSTATUS initialize(DRIVER_OBJECT *, UNICODE_STRING *, DRIVER_INITIALIZATION_DAT
 #define ExAllocatePool2 pool_allocate
 #define ExFreePoolWithTag pool_free
 #define DxgkInitialize initialize
+#define MmAllocateContiguousMemorySpecifyCache segment_allocate
+#define MmGetPhysicalAddress segment_address
+#define MmFreeContiguousMemory segment_free
 #define DriverEntry NrHostDriverEntry
 #include "driver.cpp"
 #undef DriverEntry
@@ -62,6 +92,66 @@ extern "C" int nr_kernel_host_test() {
     NR_CHECK(info.ready == 99);
     query.OutputDataSize = sizeof(info);
     NR_CHECK(NT_SUCCESS(registration.DxgkDdiQueryAdapterInfo(a, &query)) && !info.ready);
+    DXGK_QUERYSEGMENTIN segment_in{};
+    DXGK_QUERYSEGMENTOUT3 segment_out{};
+    segment_out.NbSegment = 99;
+    segment_out.PagingBufferSize = 123;
+    query.Type = DXGKQAITYPE_QUERYSEGMENT3;
+    query.pInputData = &segment_in;
+    query.InputDataSize = sizeof(segment_in);
+    query.pOutputData = &segment_out;
+    query.OutputDataSize = sizeof(segment_out);
+    NR_CHECK(registration.DxgkDdiQueryAdapterInfo(a, &query) == STATUS_DEVICE_NOT_READY);
+    NR_CHECK(segment_out.NbSegment == 99);
+    // Exercise dormant segment code through OS allocation/address test shims.
+    // No real physical mapping, residency or kernel execution is established.
+    segment_fail = true;
+    NR_CHECK(a->segment.prepare() == STATUS_INSUFFICIENT_RESOURCES);
+    NR_CHECK(!a->segment.ready() && !segment_memory && segment_frees == 0);
+    segment_fail = false;
+    const LONGLONG invalid_addresses[] = {-1, 1, MAXLONGLONG - 4095};
+    for (const auto invalid_address : invalid_addresses) {
+        segment_physical = invalid_address;
+        NR_CHECK(a->segment.prepare() == STATUS_INVALID_ADDRESS);
+        NR_CHECK(!a->segment.ready() && !segment_memory);
+    }
+    NR_CHECK(segment_frees == 3);
+    segment_physical = 0x20000000;
+    NR_CHECK(NT_SUCCESS(a->segment.prepare()));
+    NR_CHECK(a->segment.prepare() == STATUS_INVALID_DEVICE_STATE);
+    NR_CHECK(segment_allocations == 5 && segment_frees == 3);
+    NR_CHECK(registration.DxgkDdiRemoveDevice(a) == STATUS_DEVICE_BUSY);
+    NR_CHECK(a->segment.range(0, nr::kmd::Segment::bytes) == segment_memory);
+    for (SIZE_T i = 0; i < nr::kmd::Segment::bytes; ++i)
+        NR_CHECK(static_cast<UCHAR *>(segment_memory)[i] == 0);
+    NR_CHECK(!a->segment.range(0, 0));
+    NR_CHECK(!a->segment.range(~ULONGLONG(0), 1));
+    NR_CHECK(!a->segment.range(nr::kmd::Segment::bytes - 1, 2));
+    NR_CHECK(!a->segment.range(1, ~SIZE_T(0)));
+    NR_CHECK(a->segment.range(nr::kmd::Segment::bytes - 1, 1));
+    query.InputDataSize--;
+    NR_CHECK(registration.DxgkDdiQueryAdapterInfo(a, &query) == STATUS_INVALID_PARAMETER);
+    query.InputDataSize++;
+    query.OutputDataSize--;
+    NR_CHECK(registration.DxgkDdiQueryAdapterInfo(a, &query) == STATUS_BUFFER_TOO_SMALL);
+    NR_CHECK(segment_out.NbSegment == 99);
+    query.OutputDataSize++;
+    NR_CHECK(NT_SUCCESS(registration.DxgkDdiQueryAdapterInfo(a, &query)));
+    NR_CHECK(segment_out.NbSegment == 1 && segment_out.PagingBufferSize == 123);
+    DXGK_SEGMENTDESCRIPTOR3 descriptor{};
+    descriptor.Reserved = 999;
+    segment_out.pSegmentDescriptor = &descriptor;
+    segment_out.NbSegment = 0;
+    NR_CHECK(registration.DxgkDdiQueryAdapterInfo(a, &query) == STATUS_INVALID_PARAMETER);
+    NR_CHECK(descriptor.Reserved == 999 && segment_out.PagingBufferSize == 123);
+    segment_out.NbSegment = 1;
+    NR_CHECK(NT_SUCCESS(registration.DxgkDdiQueryAdapterInfo(a, &query)));
+    NR_CHECK(descriptor.CpuTranslatedAddress.QuadPart == segment_physical);
+    NR_CHECK(!descriptor.BaseAddress.QuadPart && !descriptor.Reserved && !descriptor.Flags.Aperture);
+    NR_CHECK(descriptor.Flags.CpuVisible && descriptor.Flags.CacheCoherent);
+    NR_CHECK(descriptor.Size == nr::kmd::Segment::bytes && descriptor.CommitLimit == descriptor.Size);
+    NR_CHECK(!segment_out.PagingBufferSegmentId && segment_out.PagingBufferSize == PAGE_SIZE);
+    NR_CHECK(!segment_out.PagingBufferPrivateDataSize);
     // Exercise the dormant allocation implementation without enabling StartDevice.
     // This is a local model state, never a live adapter registration.
     a->started = true;
@@ -106,6 +196,10 @@ extern "C" int nr_kernel_host_test() {
         NR_CHECK(outstanding == 1 && !a->allocations && !allocations[0].hAllocation);
     }
     surface = valid_surface;
+    surface.allocation_bytes = nr::kmd::Segment::bytes + 4096;
+    NR_CHECK(registration.DxgkDdiCreateAllocation(a, &create) == STATUS_INSUFFICIENT_RESOURCES);
+    NR_CHECK(outstanding == 1 && !a->allocations && !allocations[0].hAllocation);
+    surface = valid_surface;
     NR_CHECK(NT_SUCCESS(registration.DxgkDdiCreateAllocation(a, &create)));
     NR_CHECK(outstanding == 4 && a->allocations == 3);
     HANDLE handles[3]{};
@@ -123,6 +217,11 @@ extern "C" int nr_kernel_host_test() {
     NR_CHECK(NT_SUCCESS(registration.DxgkDdiDestroyAllocation(a, &destroy)));
     NR_CHECK(outstanding == 1 && !a->allocations);
     NR_CHECK(NT_SUCCESS(registration.DxgkDdiStopDevice(a)));
+    NR_CHECK(!segment_memory && !a->segment.ready() && segment_frees == 4);
+    NR_CHECK(!a->segment.range(0, 1));
+    NR_CHECK(registration.DxgkDdiQueryAdapterInfo(a, &query) == STATUS_DEVICE_NOT_READY);
+    NR_CHECK(NT_SUCCESS(registration.DxgkDdiStopDevice(a)) && segment_frees == 4);
+    NR_CHECK(!segment_contract_error);
     NR_CHECK(NT_SUCCESS(registration.DxgkDdiRemoveDevice(a)) && !outstanding);
     return 0;
 }

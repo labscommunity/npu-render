@@ -24,7 +24,11 @@ The implementation currently provides:
 - A versioned adapter identity query; it explicitly reports `ready = 0`.
 - Bounded surface metadata validation and transactional allocation metadata
   creation. Allocation failure releases every partial object before returning.
-  These descriptors do **not** yet have a working VidMm segment or paging path.
+  A dormant memory-segment implementation reserves and clears 64 MiB of actual
+  contiguous system memory and reports its physical address through the two-pass
+  WDDM 1.3 segment query. It rejects larger individual allocations. The startup
+  gate still prevents this allocation on a live system: only its host model has
+  run. Windows acceptance, paging, residency and NPU mapping remain unvalidated.
 - A bounded FIFO state machine that distinguishes a completed Windows fence
   from the lifetime of a worker ticket. Stopping invalidates completions;
   restarting remains forbidden until an active worker separately acknowledges
@@ -57,8 +61,9 @@ After those contracts, normal adapter creation, shared-resource opening, NPU
 execution, presentation, DWM selection, original GPU work retirement, and Tahoma
 benefit each need separate end-to-end evidence.
 
-The host DDI test replaces only pool allocation and `DxgkInitialize` with test
-shims. It exercises descriptor validation, allocator failure at each position,
+The host DDI test replaces pool/contiguous allocation, physical-address lookup
+and `DxgkInitialize` with test shims. It exercises descriptor validation,
+memory clearing, two-pass segment queries, allocator failure at each position,
 duplicate destruction, startup rejection, and cleanup. It cannot validate IRQL,
 Windows scheduling, kernel memory mappings, driver signing, or PnP behavior.
 The portable scheduler test compares 200,000 lifecycle operations against an
