@@ -136,6 +136,9 @@ The implementation currently provides:
   releasing storage; failures do not produce successful completion notifications.
   Host tests manually step the actual engine through callback shims, including
   a failed completion synchronization, coalesced DPCs, reset cleanup and restart.
+  After an adapter reset drains the worker, it advances the scheduling baseline
+  to the last submitted fence as WDDM requires. This does not emit a completion
+  notification or claim the cancelled work executed.
   These tests do not establish concurrency, Windows scheduler acceptance or
   valid per-engine TDR. The current queue admits one pending preemption request;
   the OS behavior at that boundary still needs validation.
@@ -192,3 +195,5 @@ Submission contracts: [required preallocation](https://learn.microsoft.com/en-us
 Engine contracts: [interrupt notification](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/nc-d3dkmddi-dxgkcb_notify_interrupt),
 [preemption](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/nc-d3dkmddi-dxgkddi_preemptcommand),
 [reset synchronization and zero-byte eviction](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/thread-synchronization-and-tdr).
+[Reset fence semantics](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/tdr-changes-in-windows-8)
+require distinguishing recovery baselines from successful execution.

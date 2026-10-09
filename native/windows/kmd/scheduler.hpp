@@ -40,6 +40,7 @@ public:
         if (bytes > max_bytes || serial_ == ~uint64_t(0)) return QueueResult::invalid;
         if (count_ + size_t(active_) == entries_) return QueueResult::full;
         ticket = {++serial_, epoch_};
+        submitted_ = fence;
         // Avoid overflowing head + count even for a caller's large capacity.
         const auto tail = count_ >= entries_ - head_ ? count_ - (entries_ - head_) : head_ + count_;
         storage_[tail] = {ticket, fence, bytes};
@@ -112,6 +113,15 @@ public:
     size_t pending() const { return count_; }
     size_t limit() const { return entries_; }
     uint32_t completed() const { return completed_; }
+    uint32_t submitted() const { return submitted_; }
+    // WDDM adapter recovery advances the scheduling baseline to the last
+    // submitted fence after all users drain. This is not a DMA completion and
+    // must never generate a successful execution notification.
+    QueueResult reset_adapter_fence() {
+        if (running_ || active_ || count_) return QueueResult::busy;
+        completed_ = submitted_;
+        return QueueResult::ok;
+    }
 private:
     Work pending_[capacity]{};
     Work *storage_ = pending_;
@@ -121,6 +131,7 @@ private:
     uint64_t epoch_ = 0, serial_ = 0;
     uint64_t preempt_cut_ = 0;
     uint32_t completed_ = 0;
+    uint32_t submitted_ = 0;
     uint32_t preempt_fence_ = 0;
     bool running_ = false, active_ = false, preempting_ = false;
 };

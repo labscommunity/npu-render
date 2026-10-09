@@ -87,7 +87,8 @@ int engine_test(Adapter *a) {
     NR_CHECK(a->resetting && !a->engine.alive() && thread_joined && thread_closed);
     NR_CHECK(a->segment.ready() && a->submissions.ready() && outstanding == baseline + 2);
     query.CurrentFence = 999;
-    NR_CHECK(registration.DxgkDdiQueryCurrentFence(a, &query) == STATUS_SUCCESS && query.CurrentFence == 22);
+    NR_CHECK(registration.DxgkDdiQueryCurrentFence(a, &query) == STATUS_SUCCESS && query.CurrentFence == 23);
+    NR_CHECK(notification_count == 4); // Recovery baseline is not a completion.
     DXGKARG_BUILDPAGINGBUFFER eviction{};
     eviction.Operation = DXGK_OPERATION_TRANSFER;
     const auto before = eviction;
@@ -110,6 +111,7 @@ int engine_test(Adapter *a) {
     sync_fail_call = 0;
     NR_CHECK(registration.DxgkDdiResetFromTimeout(a) == STATUS_SUCCESS);
     NR_CHECK(!a->scheduler.active() && !a->engine.alive() && notification_count == 4);
+    NR_CHECK(registration.DxgkDdiQueryCurrentFence(a, &query) == STATUS_SUCCESS && query.CurrentFence == 30);
     NR_CHECK(registration.DxgkDdiRestartFromTimeout(a) == STATUS_SUCCESS);
 
     // Multiple interrupts can share one queued DPC. Stop must drain it while

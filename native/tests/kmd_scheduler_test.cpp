@@ -22,8 +22,9 @@ void exercise(Scheduler &q) {
     uint32_t preempt_fence = 0;
     Work worker{};
     uint32_t completed = q.completed();
+    uint32_t submitted = q.submitted();
     for (unsigned step = 0; step < 200000; ++step) {
-        switch (random() % 8) {
+        switch (random() % 9) {
         case 0: {
             // Include repeated and wrapped OS fence IDs. Ordering is queue
             // ordering, never an ordinary unsigned comparison of fence IDs.
@@ -36,6 +37,7 @@ void exercise(Scheduler &q) {
             else {
                 check(result == QueueResult::ok, "unexpected submission failure");
                 reference.push_back({ticket, fence, step % 65537});
+                submitted = fence;
             }
             break;
         }
@@ -118,10 +120,20 @@ void exercise(Scheduler &q) {
                 check(fence == 99 && last == 99, "rejected preemption changed output");
             break;
         }
+        case 8: {
+            const auto result = q.reset_adapter_fence();
+            if (running || active || !reference.empty())
+                check(result == QueueResult::busy, "reset baseline advanced before drain");
+            else {
+                check(result == QueueResult::ok, "drained reset rejected");
+                completed = submitted;
+            }
+            break;
+        }
         }
         check(q.running() == running && q.active() == active &&
               q.pending() == reference.size() && q.completed() == completed &&
-              q.preempting() == preempting,
+              q.preempting() == preempting && q.submitted() == submitted,
               "scheduler diverged from independent lifecycle model");
     }
     // Exercise a full queue, including the active worker consuming a slot.

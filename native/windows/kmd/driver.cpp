@@ -207,7 +207,7 @@ NTSTATUS APIENTRY current_fence(HANDLE adapter, DXGKARG_QUERYCURRENTFENCE *args)
     auto a = static_cast<Adapter *>(adapter);
     if (!a->started) return STATUS_DEVICE_NOT_READY;
     if (a->resetting) {
-        // Reset joined the sole producer and retains the last reported fence.
+        // Reset joined the sole producer and established the recovery baseline.
         args->CurrentFence = a->scheduler.completed();
         return STATUS_SUCCESS;
     }
@@ -219,7 +219,11 @@ NTSTATUS APIENTRY reset_from_timeout(HANDLE adapter) {
     auto a = static_cast<Adapter *>(adapter);
     if (!a->started) return STATUS_DEVICE_NOT_READY;
     const auto status = a->engine.stop();
-    if (status == STATUS_SUCCESS) a->resetting = true;
+    if (status == STATUS_SUCCESS) {
+        if (a->scheduler.reset_adapter_fence() != nr::kmd::QueueResult::ok)
+            return STATUS_INVALID_DEVICE_STATE;
+        a->resetting = true;
+    }
     return status;
 }
 DXGKDDI_RESTARTFROMTIMEOUT restart_from_timeout;
