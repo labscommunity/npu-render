@@ -651,7 +651,8 @@ NTSTATUS APIENTRY describe_allocation(HANDLE adapter, DXGKARG_DESCRIBEALLOCATION
     const auto &surface = allocation->surface;
     args->Width = surface.width;
     args->Height = surface.height;
-    args->Format = surface.format == 87 ? D3DDDIFMT_A8R8G8B8 : D3DDDIFMT_A8B8G8R8;
+    args->Format = surface.format == 88 ? D3DDDIFMT_X8R8G8B8 :
+                   surface.format == 87 ? D3DDDIFMT_A8R8G8B8 : D3DDDIFMT_A8B8G8R8;
     args->MultisampleMethod = {};
     args->RefreshRate = {}; // No primary/scanout mode belongs to this allocation.
     args->PrivateDriverFormatAttribute = 0;

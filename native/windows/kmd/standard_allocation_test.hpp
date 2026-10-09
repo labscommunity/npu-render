@@ -142,6 +142,9 @@ int standard_allocation_ddi_test(Adapter *a) {
     }
     NR_CHECK(registration.DxgkDdiCreateAllocation(a, &create) == STATUS_SUCCESS && info.hAllocation && create.hResource);
     NR_CHECK(info.Size == 245760 && info.Flags.CpuVisible && info.Flags.Cached && a->allocations == 1 && a->resources == 1);
+    DXGKARG_DESCRIBEALLOCATION description{}; description.hAllocation = info.hAllocation;
+    NR_CHECK(registration.DxgkDdiDescribeAllocation(a, &description) == STATUS_SUCCESS &&
+             description.Width == 320 && description.Height == 192 && description.Format == D3DDDIFMT_X8R8G8B8);
     destroy.hResource = create.hResource; destroy.Flags.DestroyResource = 1;
     NR_CHECK(registration.DxgkDdiDestroyAllocation(a, &destroy) == STATUS_SUCCESS && !a->allocations && !a->resources);
     return 0;
