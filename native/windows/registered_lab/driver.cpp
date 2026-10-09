@@ -147,7 +147,7 @@ void APIENTRY create_resource(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATERESOUR
                              D3D10DDI_HRESOURCE out, D3D10DDI_HRTRESOURCE rt) {
     new (out.pDrvPrivate) Resource();
     guard(h, [&] {
-        if (a && (a->MiscFlags || a->pPrimaryDesc)) {
+        if (a && (a->MiscFlags || a->pPrimaryDesc || (a->BindFlags & D3D10_DDI_BIND_PRESENT))) {
             std::fprintf(stderr, "nr_fill_umd: resource dimension=%u mips=%u array=%u format=%u samples=%u/%u misc=%x usage=%u bind=%x map=%x primary=%u initial=%u runtime_resource=%u\n",
                 UINT(a->ResourceDimension), a->MipLevels, a->ArraySize, UINT(a->Format), a->SampleDesc.Count,
                 a->SampleDesc.Quality, a->MiscFlags, UINT(a->Usage), a->BindFlags, a->MapFlags,
@@ -155,13 +155,17 @@ void APIENTRY create_resource(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATERESOUR
             if (a->pMipInfoList) std::fprintf(stderr, "nr_fill_umd: resource extent=%ux%ux%u\n",
                 a->pMipInfoList[0].TexelWidth, a->pMipInfoList[0].TexelHeight, a->pMipInfoList[0].TexelDepth);
         }
+        constexpr UINT allowed_misc = D3D10_DDI_RESOURCE_MISC_SHARED | D3D10_DDI_RESOURCE_MISC_DISCARD_ON_PRESENT;
         require(a && a->ResourceDimension == D3D10DDIRESOURCE_TEXTURE2D && a->MipLevels == 1 &&
                 a->ArraySize == 1 && a->pMipInfoList && format_ok(a->Format) && a->SampleDesc.Count == 1 &&
-                !a->SampleDesc.Quality && !(a->MiscFlags & ~D3D10_DDI_RESOURCE_MISC_SHARED) && !a->pPrimaryDesc);
-        const bool shared = a->MiscFlags == D3D10_DDI_RESOURCE_MISC_SHARED;
+                !a->SampleDesc.Quality && !(a->MiscFlags & ~allowed_misc) && !a->pPrimaryDesc);
+        const bool shared = (a->MiscFlags & D3D10_DDI_RESOURCE_MISC_SHARED) != 0;
+        const bool presentation = (a->BindFlags & D3D10_DDI_BIND_PRESENT) != 0;
+        require(!(a->MiscFlags & D3D10_DDI_RESOURCE_MISC_DISCARD_ON_PRESENT) || presentation);
+        require(!presentation || (a->BindFlags & D3D10_DDI_BIND_RENDER_TARGET));
         require(!shared || rt.handle);
         const bool staging = a->Usage == D3D10_DDI_USAGE_STAGING && !a->BindFlags && a->MapFlags == D3D10_DDI_CPU_ACCESS_READ && !shared;
-        constexpr UINT bindings = D3D10_DDI_BIND_RENDER_TARGET | D3D10_DDI_BIND_SHADER_RESOURCE;
+        constexpr UINT bindings = D3D10_DDI_BIND_RENDER_TARGET | D3D10_DDI_BIND_SHADER_RESOURCE | D3D10_DDI_BIND_PRESENT;
         const bool target = a->Usage == D3D10_DDI_USAGE_DEFAULT && a->BindFlags && !(a->BindFlags & ~bindings) && !a->MapFlags;
         require((staging || target) && (!a->pInitialDataUP || target));
         const auto &m = a->pMipInfoList[0];

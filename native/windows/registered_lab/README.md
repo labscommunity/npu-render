@@ -94,6 +94,12 @@ capture is only the independent output oracle. An occluded present, pixel
 mismatch or rejected callback fails the test. This tests CPU clear presentation;
 it does not move DWM or establish NPU execution. Unsupported DXGI callbacks now
 emit their table offset to aid diagnosis without claiming implementation.
+The first live window attempt reaches back-buffer creation with
+`PRESENT|RENDER_TARGET`, `DISCARD_ON_PRESENT`, and no primary descriptor; the old
+resource filter rejects those flags. The next revision admits this copy-style
+back buffer with real VidMm storage, while still rejecting primary scanout,
+unrelated miscellaneous flags and CPU-mapped presentation targets. Its component
+checks cover both color formats, discard/non-discard buffers and invalid inputs.
 
 `--upload` exercises initial texture data, full and partial `UpdateSubresource`,
 and empty updates for ordinary, legacy shared and NT keyed textures in both

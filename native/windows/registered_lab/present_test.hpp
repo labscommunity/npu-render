@@ -25,6 +25,39 @@ int test_present(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER_DEVI
     create.Interface = D3D10_0_DDI_INTERFACE_VERSION;
     TEST(create_device({}, &create) == S_OK);
     const auto h = create.hDrvDevice;
+    // The live DXGI discard swap chain requests PRESENT|RENDER_TARGET with
+    // DISCARD_ON_PRESENT and no primary description. It remains a real VidMm
+    // allocation; discarding permits undefined old contents, not fake scanout.
+    D3D10DDI_MIPINFO mip{}; mip.TexelWidth = 65; mip.TexelHeight = 13; mip.TexelDepth = 1;
+    mip.PhysicalWidth = 65; mip.PhysicalHeight = 13; mip.PhysicalDepth = 1;
+    D3D10DDIARG_CREATERESOURCE descriptor{};
+    descriptor.ResourceDimension = D3D10DDIRESOURCE_TEXTURE2D; descriptor.MipLevels = descriptor.ArraySize = 1;
+    descriptor.pMipInfoList = &mip; descriptor.SampleDesc.Count = 1; descriptor.Usage = D3D10_DDI_USAGE_DEFAULT;
+    descriptor.BindFlags = D3D10_DDI_BIND_RENDER_TARGET | D3D10_DDI_BIND_PRESENT;
+    alignas(Resource) unsigned char backbuffer[sizeof(Resource)]{};
+    D3D10DDI_HRESOURCE back{}; back.pDrvPrivate = backbuffer;
+    for (auto format : {DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM}) for (UINT discard = 0; discard < 2; ++discard) {
+        descriptor.Format = format; descriptor.MiscFlags = discard ? D3D10_DDI_RESOURCE_MISC_DISCARD_ON_PRESENT : 0;
+        last_error = S_OK; f.pfnCreateResource(h, &descriptor, back, {});
+        TEST(last_error == S_OK && resource(back).allocation->handle && counters.live_allocations == 1);
+        TEST(resource(back).allocation->surface.width == 65 && resource(back).allocation->surface.format == UINT(format));
+        f.pfnDestroyResource(h, back); TEST(!counters.live_allocations);
+    }
+    const auto valid_descriptor = descriptor;
+    DXGI_DDI_PRIMARY_DESC primary{};
+    for (UINT failure = 0; failure < 5; ++failure) {
+        switch (failure) {
+        case 0: descriptor.BindFlags = D3D10_DDI_BIND_RENDER_TARGET; break;
+        case 1: descriptor.pPrimaryDesc = &primary; break;
+        case 2: descriptor.MiscFlags = 4; break;
+        case 3: descriptor.Usage = D3D10_DDI_USAGE_STAGING; break;
+        case 4: descriptor.MapFlags = D3D10_DDI_CPU_ACCESS_READ; break;
+        }
+        last_error = S_OK; f.pfnCreateResource(h, &descriptor, back, {});
+        TEST(last_error == E_INVALIDARG && !counters.live_allocations);
+        f.pfnDestroyResource(h, back); descriptor = valid_descriptor;
+    }
+    last_error = S_OK;
     Resource source{}, destination{}; source.usage = destination.usage = D3D10_DDI_USAGE_DEFAULT;
     source.allocation = std::make_shared<Allocation>(device(h).context);
     destination.allocation = std::make_shared<Allocation>(device(h).context);
