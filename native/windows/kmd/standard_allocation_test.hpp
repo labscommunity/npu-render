@@ -124,5 +124,25 @@ int standard_allocation_ddi_test(Adapter *a) {
     NR_CHECK(info.Size == 245760 && info.Flags.CpuVisible && info.Flags.Cached);
     destroy = {}; destroy.NumAllocations = 1; destroy.pAllocationList = &info.hAllocation;
     NR_CHECK(registration.DxgkDdiDestroyAllocation(a, &destroy) == STATUS_SUCCESS && !a->allocations && !a->resources);
+    // Reproduce Windows' live staging request: Resource=1, no resource-private
+    // metadata, one BGRX allocation. The returned resource owns its allocation.
+    info.hAllocation = nullptr; create.hResource = nullptr; create.Flags.Resource = 1;
+    for (UINT invalid = 0; invalid < 5; ++invalid) {
+        const auto original = allocation;
+        switch (invalid) {
+        case 0: allocation.flags = 0; allocation.format = 87; break;
+        case 1: allocation.flags = nr::kernel_contract::cross_adapter_surface; allocation.format = 87; break;
+        case 2: create.NumAllocations = 2; break;
+        case 3: create.pPrivateDriverData = &resource; break;
+        case 4: create.PrivateDriverDataSize = 1; break;
+        }
+        NR_CHECK(registration.DxgkDdiCreateAllocation(a, &create) == STATUS_INVALID_PARAMETER &&
+                 !info.hAllocation && !create.hResource && !a->allocations && !a->resources);
+        allocation = original; create.NumAllocations = 1; create.pPrivateDriverData = nullptr; create.PrivateDriverDataSize = 0;
+    }
+    NR_CHECK(registration.DxgkDdiCreateAllocation(a, &create) == STATUS_SUCCESS && info.hAllocation && create.hResource);
+    NR_CHECK(info.Size == 245760 && info.Flags.CpuVisible && info.Flags.Cached && a->allocations == 1 && a->resources == 1);
+    destroy.hResource = create.hResource; destroy.Flags.DestroyResource = 1;
+    NR_CHECK(registration.DxgkDdiDestroyAllocation(a, &destroy) == STATUS_SUCCESS && !a->allocations && !a->resources);
     return 0;
 }

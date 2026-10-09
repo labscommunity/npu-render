@@ -81,6 +81,12 @@ the size/fill queries, allocation lifetime, clipped copy, padding preservation,
 queue ownership and completion. Live presentation still requires a new package.
 This follows the [Windows presentation staging contract](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmdt/ns-d3dkmdt-_d3dkmdt_stagingsurfacedata);
 the CPU readout and original display path remain separate from NPU rendering.
+The live v38 request sets `Resource=1` while supplying zero resource-private
+bytes. Allocation creation now accepts this combination only for a single
+validated presentation staging surface, returns a real resource owner, and
+tracks its allocation through destruction. Other resource kinds still require
+their matching resource metadata. Host tests reproduce the observed request
+and reject ordinary/cross-adapter surfaces and malformed metadata in this path.
 
 The design follows the documented [linear aperture address-space contract](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/linear-aperture-space-segments)
 and [map/unmap requirements](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/nc-d3dkmddi-dxgkddi_buildpagingbuffer).

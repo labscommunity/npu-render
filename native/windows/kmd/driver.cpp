@@ -515,8 +515,14 @@ NTSTATUS APIENTRY create_allocation(HANDLE adapter, DXGKARG_CREATEALLOCATION *ar
         args->NumAllocations > 16 || (args->Flags.Value & ~1u) || args->hResource)
         return STATUS_INVALID_PARAMETER;
     const bool resource_owned = args->Flags.Resource != 0;
+    // Windows creates its presentation staging surface as a resource even
+    // when GetStandardAllocationDriverData returns zero resource-private bytes.
+    // Its single allocation descriptor remains the complete pixel contract.
+    const bool allocation_only_resource = resource_owned && !args->pPrivateDriverData && !args->PrivateDriverDataSize;
     nr::kernel_contract::Surface resource_description{};
-    if (resource_owned) {
+    if (allocation_only_resource) {
+        if (args->NumAllocations != 1) return STATUS_INVALID_PARAMETER;
+    } else if (resource_owned) {
         if (args->NumAllocations != 1 || !args->pPrivateDriverData ||
             args->PrivateDriverDataSize != sizeof(resource_description)) return STATUS_INVALID_PARAMETER;
         RtlCopyMemory(&resource_description, args->pPrivateDriverData, sizeof(resource_description));
@@ -536,7 +542,9 @@ NTSTATUS APIENTRY create_allocation(HANDLE adapter, DXGKARG_CREATEALLOCATION *ar
             return STATUS_NOT_SUPPORTED;
         if (descriptions[i].flags == nr::kernel_contract::cross_adapter_surface && !resource_owned)
             return STATUS_NOT_SUPPORTED;
-        if (resource_owned && !same_surface(resource_description, descriptions[i]))
+        if (allocation_only_resource && descriptions[i].flags != nr::kernel_contract::presentation_staging_surface)
+            return STATUS_INVALID_PARAMETER;
+        if (resource_owned && !allocation_only_resource && !same_surface(resource_description, descriptions[i]))
             return STATUS_INVALID_PARAMETER;
         if (descriptions[i].allocation_bytes > a->segment.capacity())
             return STATUS_INSUFFICIENT_RESOURCES;
@@ -585,8 +593,8 @@ NTSTATUS APIENTRY create_allocation(HANDLE adapter, DXGKARG_CREATEALLOCATION *ar
         out.EvictionSegmentSet = 0;
         out.MaximumRenamingListLength = 0;
         out.Flags.Value = 0;
-        // Shared allocations in a memory segment cannot be CPU visible. This
-        // laboratory admits resource-owned allocations only for shared targets.
+        // Shared allocations in a memory segment cannot be CPU visible.
+        // Resource-owned presentation staging uses the cache-coherent aperture.
         // Readback uses a submitted copy into a separate lockable staging image.
         out.Flags.CpuVisible = a->segment.is_aperture() || !resource_owned;
         out.Flags.Cached = a->segment.is_aperture() ? 1 : 0;
