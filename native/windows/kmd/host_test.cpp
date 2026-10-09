@@ -54,7 +54,8 @@ PMDL mdl_allocate(void *start, ULONG bytes, BOOLEAN secondary, BOOLEAN quota, PI
     if (secondary || quota || irp) mdl_contract_error = true;
     if (mdl_fail_after == 0) return nullptr;
     if (mdl_fail_after > 0) --mdl_fail_after;
-    auto mdl = static_cast<PMDL>(nr_host_allocate(sizeof(MDL)));
+    const auto pages = (ULONG_PTR(start) % PAGE_SIZE + bytes + PAGE_SIZE - 1) / PAGE_SIZE;
+    auto mdl = static_cast<PMDL>(nr_host_allocate(sizeof(MDL) + pages * sizeof(PFN_NUMBER)));
     if (!mdl) return nullptr;
     RtlZeroMemory(mdl, sizeof(MDL));
     mdl->StartVa = reinterpret_cast<void *>(ULONG_PTR(start) & ~ULONG_PTR(PAGE_SIZE - 1));
@@ -246,9 +247,11 @@ NTSTATUS initialize(DRIVER_OBJECT *, UNICODE_STRING *, DRIVER_INITIALIZATION_DAT
 #define ZwClose thread_close
 #define KeDelayExecutionThread retry_delay
 #define KeFlushQueuedDpcs flush_dpcs
+#include "aperture_host.hpp"
 #include "driver.cpp"
 #undef DriverEntry
 #define NR_CHECK(expression) do { if (!(expression)) return __LINE__; } while (false)
+#include "aperture_test.hpp"
 #include "paging_test.hpp"
 #include "segment_capacity_test.hpp"
 #include "submission_test.hpp"
@@ -265,6 +268,8 @@ NTSTATUS initialize(DRIVER_OBJECT *, UNICODE_STRING *, DRIVER_INITIALIZATION_DAT
 #include "worker_probe_test.hpp"
 #endif
 extern "C" int nr_kernel_host_test() {
+    const auto aperture_result = aperture_test();
+    if (aperture_result) return aperture_result;
     NR_CHECK(NT_SUCCESS(NrHostDriverEntry(nullptr, nullptr)));
 #if NR_KMD_LAB_PAGING_ADAPTER
     return lab_start_test();

@@ -70,6 +70,9 @@ jobs:
       - name: Build disposable-VM paging adapter and test startup unwind
         if: runner.os == 'Windows'
         run: uv run --frozen python tools/build_windows_driver.py --lab-paging-adapter --build-dir build/windows-kernel-paging-lab
+      - name: Build owned-page translation probe and test mapping contracts
+        if: runner.os == 'Windows'
+        run: uv run --frozen python tools/build_windows_driver.py --lab-aperture-probe --build-dir build/windows-kernel-aperture-probe
       - name: Build public KMT paging probe and check adapter enumeration
         if: runner.os == 'Windows'
         run: |

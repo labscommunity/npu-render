@@ -43,7 +43,19 @@ def main():
         action="store_true",
         help="Enable paging-only startup for a disposable kernel-debug VM; UMD stays unready",
     )
+    parser.add_argument(
+        "--lab-aperture-probe",
+        action="store_true",
+        help="Check owned system-page translations in a disposable VM; startup stays disabled",
+    )
     args = parser.parse_args()
+    if args.lab_aperture_probe and (
+        args.lab_sync_probe
+        or args.lab_worker_probe
+        or args.lab_engine_probe
+        or args.lab_paging_adapter
+    ):
+        parser.error("The aperture diagnostic must run in isolation")
     if args.lab_paging_adapter and (
         args.lab_sync_probe or args.lab_worker_probe or args.lab_engine_probe
     ):
@@ -66,6 +78,7 @@ def main():
             f"-DNR_KMD_LAB_WORKER_PROBE={'ON' if args.lab_worker_probe else 'OFF'}",
             f"-DNR_KMD_LAB_ENGINE_PROBE={'ON' if args.lab_engine_probe else 'OFF'}",
             f"-DNR_KMD_LAB_PAGING_ADAPTER={'ON' if args.lab_paging_adapter else 'OFF'}",
+            f"-DNR_KMD_LAB_APERTURE_PROBE={'ON' if args.lab_aperture_probe else 'OFF'}",
         ],
         check=True,
     )
@@ -100,6 +113,7 @@ def main():
         "lab_sync_probe_enabled": args.lab_sync_probe,
         "lab_worker_probe_enabled": args.lab_worker_probe,
         "lab_engine_probe_enabled": args.lab_engine_probe,
+        "lab_aperture_probe_enabled": args.lab_aperture_probe,
         "installation_performed": False,
         "signing_performed": False,
         "npu_execution_tested": False,

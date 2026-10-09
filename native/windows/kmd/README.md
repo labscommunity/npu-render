@@ -15,6 +15,27 @@ advertise cross-adapter resources or an aperture segment. Host tests cover faile
 allocation unwind, import metadata rejection and combined/separate destruction;
 live sharing requires the registered UMD probe.
 
+`aperture.hpp` implements a separate software-engine translation table for
+locked system pages. It snapshots page numbers from a kernel-owned MDL, creates
+temporary CPU mappings, and directs unmapped ranges to the actual supplied dummy
+page. Bounds, ownership, partial unmap/remap, allocation failures and cleanup are
+covered by an explicit host memory model. It is not yet exposed as a VidMm segment
+and gives the NPU no direct access to these pages.
+
+`--lab-aperture-probe` builds an isolated, start-disabled diagnostic. It allocates
+enough owned noncontiguous system memory for a 2880×1800 image, releases the input
+MDL descriptor, verifies writes through the copied page table against the original
+memory, then checks dummy-page aliases. This tests real kernel mappings separately
+from Windows allocation/paging acceptance. Live validation is pending. Do not
+advertise aperture or cross-adapter capabilities on the strength of its host model.
+
+The design follows the documented [linear aperture address-space contract](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/linear-aperture-space-segments)
+and [map/unmap requirements](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/nc-d3dkmddi-dxgkddi_buildpagingbuffer).
+This software translation table is an implementation experiment; it does not
+declare a CPU-visible hardware address or reuse the sample driver's fabricated
+CPU aperture address. Integration must preserve VidMm's page lifetimes, scheduler
+ordering and dummy-page accesses before any capability is enabled.
+
 Build on x64 Windows with MSVC and the pinned SDK:
 
 ```powershell

@@ -20,6 +20,9 @@ inline void *operator new(size_t, void *p) noexcept { return p; }
 #include "copy.hpp"
 #include "submission.hpp"
 #include "engine.hpp"
+#if NR_KMD_LAB_APERTURE_PROBE
+#include "aperture_probe.hpp"
+#endif
 #if NR_KMD_LAB_ENGINE_PROBE
 #include "engine_probe.hpp"
 #endif
@@ -125,6 +128,14 @@ NTSTATUS start_device(void *context, DXGK_START_INFO *start,
     *children = 0;
     auto a = static_cast<Adapter *>(context);
     if (a->started) return STATUS_INVALID_DEVICE_STATE;
+#if NR_KMD_LAB_APERTURE_PROBE
+    nr::kmd::ApertureProbe aperture_probe;
+    aperture_probe.run();
+    DbgPrintEx(DPFLTR_IHVVIDEO_ID, DPFLTR_ERROR_LEVEL,
+        "nr_render_lab: aperture status=%08lx phase=%lu verified_bytes=%llu released_pages=%llu cleaned=%u; owned-memory diagnostic only; startup remains disabled\n",
+        ULONG(aperture_probe.status), aperture_probe.phase, ULONGLONG(aperture_probe.verified_bytes),
+        ULONGLONG(aperture_probe.released_pages), UINT(aperture_probe.cleaned));
+#endif
 #if NR_KMD_LAB_SYNC_PROBE
     a->synchronization.run(*kernel);
     // Error-level filtering makes this explicit lab diagnostic visible in a
