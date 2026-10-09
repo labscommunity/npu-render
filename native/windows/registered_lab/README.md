@@ -30,10 +30,17 @@ initial uploads, shader execution and display operations remain unsupported.
 The target is built with the native DDI build or independently:
 
 ```powershell
-cmake -S native/windows/registered_lab -B build/registered-lab -A x64 -DNR_WDK_INCLUDE_ROOT=PATH_TO_WDK_HEADERS
-cmake --build build/registered-lab --config Release
-ctest --test-dir build/registered-lab -C Release --output-on-failure
+python tools/build_registered_lab.py --build-dir build/registered-lab --wdk-include-root PATH_TO_WDK_HEADERS
 ```
+
+The standalone builder always rebuilds from clean objects, runs the contract test,
+and records source and binary hashes. MSBuild reused a previous UMD after an
+included header changed in the v27 laboratory build; that image lacked the new
+callback diagnostics despite the source snapshot including them. Preserve that
+build's evidence, but do not treat its source snapshot as an exact build proof.
+The clean v28 diagnostic image shows the shared allocation callback returning
+`E_INVALIDARG`; this corrects the earlier inference that UMD descriptor validation
+rejected the request before the callback.
 
 The host test calls the actual UMD callbacks with owned runtime shims. It checks
 allocation failure cleanup, rotated submission buffers, absence of a CPU clear
