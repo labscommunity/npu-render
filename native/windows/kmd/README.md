@@ -148,11 +148,21 @@ The implementation currently provides:
   After an adapter reset drains the worker, it advances the scheduling baseline
   to the last submitted fence as WDDM requires. This does not emit a completion
   notification or claim the cancelled work executed.
-  These tests do not establish concurrency, Windows scheduler acceptance or
-  valid per-engine TDR. The current queue admits one pending preemption request;
+  These host tests do not establish concurrency or Windows scheduler acceptance.
+  The current queue admits one pending preemption request;
   the OS behavior at that boundary still needs validation.
+- Dormant per-engine recovery callbacks for the single node. Node reset joins
+  the worker, identifies the active aborted packet (or last completed packet),
+  resets the scheduling baseline, and starts an empty queue before succeeding.
+  Host tests distinguish active work from later queued work, replay unaffected
+  paging fences, preserve faults and escalate a failed restart to adapter reset.
+  Progress queries report unresponsive for failed synchronization, a terminated
+  worker or outstanding work with no progress for one second. Debug collection
+  uses individually atomic observations without allocating, waiting or calling
+  Dxgkrnl; it does not promise a simultaneous snapshot across fields. Actual
+  Windows-initiated per-engine TDR remains untested.
 - Explicit failing callbacks for unsupported rendering, presentation, paging
-  operations and per-engine recovery. Display callbacks are null.
+  operations and remaining adapter capabilities. Display callbacks are null.
 
 The separate `nr_render_umd` target uses the existing restricted renderer
 without the software laboratory's KMT replacement exports. Its `OpenAdapter`
@@ -172,7 +182,7 @@ fails; there is no default-adapter or WARP retry. Current validation covers
 rejection only, since the kernel startup gate remains closed.
 
 Before enabling `StartDevice`, validate the paging engine in the isolated kernel
-and finish per-engine recovery and all mandatory render DDIs/caps. Submission,
+and finish all mandatory render DDIs/caps. Submission,
 notifications, preemption and reset still need actual Windows-scheduler evidence.
 A successful compiler,
 host test, or even an eventual adapter enumeration is not graphics conformance.

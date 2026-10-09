@@ -13,6 +13,8 @@ enum class SyncMode {
 };
 SyncMode sync_mode = SyncMode::failed;
 KIRQL simulated_irql = PASSIVE_LEVEL;
+ULONGLONG simulated_time = 100000000;
+ULONGLONG interrupt_time() { return simulated_time; }
 ULONG sync_calls = 0;
 ULONG sync_fail_call = 0;
 bool sync_contract_error = false;
@@ -225,6 +227,8 @@ NTSTATUS initialize(DRIVER_OBJECT *, UNICODE_STRING *, DRIVER_INITIALIZATION_DAT
 #define MmGetSystemAddressForMdlSafe mdl_map
 #define DriverEntry NrHostDriverEntry
 #define KeGetCurrentIrql current_irql
+#undef KeQueryInterruptTime
+#define KeQueryInterruptTime interrupt_time
 #if NR_KMD_LAB_SYNC_PROBE || NR_KMD_LAB_WORKER_PROBE || NR_KMD_LAB_ENGINE_PROBE
 #define DbgPrintEx lab_print
 #endif
@@ -247,6 +251,7 @@ NTSTATUS initialize(DRIVER_OBJECT *, UNICODE_STRING *, DRIVER_INITIALIZATION_DAT
 #include "segment_capacity_test.hpp"
 #include "submission_test.hpp"
 #include "engine_test.hpp"
+#include "recovery_test.hpp"
 #if NR_KMD_LAB_WORKER_PROBE
 #include "worker_probe_test.hpp"
 #endif
@@ -454,6 +459,8 @@ extern "C" int nr_kernel_host_test() {
     if (submission_result) return submission_result;
     const auto engine_result = engine_test(a);
     if (engine_result) return engine_result;
+    const auto recovery_result = recovery_test(a);
+    if (recovery_result) return recovery_result;
     NR_CHECK(NT_SUCCESS(registration.DxgkDdiRemoveDevice(a)) && !outstanding);
     return 0;
 }

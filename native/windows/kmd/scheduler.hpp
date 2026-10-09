@@ -118,8 +118,11 @@ public:
     // submitted fence after all users drain. This is not a DMA completion and
     // must never generate a successful execution notification.
     QueueResult reset_adapter_fence() {
+        return reset_engine_fence(submitted_);
+    }
+    QueueResult reset_engine_fence(uint32_t aborted) {
         if (running_ || active_ || count_) return QueueResult::busy;
-        completed_ = submitted_;
+        completed_ = aborted;
         return QueueResult::ok;
     }
 private:

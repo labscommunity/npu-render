@@ -235,6 +235,43 @@ NTSTATUS APIENTRY restart_from_timeout(HANDLE adapter) {
     if (status == STATUS_SUCCESS) a->resetting = false;
     return status;
 }
+DXGKDDI_QUERYDEPENDENTENGINEGROUP dependent_engines;
+NTSTATUS APIENTRY dependent_engines(HANDLE adapter, DXGKARG_QUERYDEPENDENTENGINEGROUP *args) {
+    if (!adapter || !args) return STATUS_INVALID_PARAMETER;
+    if (args->NodeOrdinal || args->EngineOrdinal) return STATUS_NOT_SUPPORTED;
+    args->DependentNodeOrdinalMask = 1; // The single node depends only on itself.
+    return STATUS_SUCCESS;
+}
+DXGKDDI_QUERYENGINESTATUS engine_status;
+NTSTATUS APIENTRY engine_status(HANDLE adapter, DXGKARG_QUERYENGINESTATUS *args) {
+    if (!adapter || !args) return STATUS_INVALID_PARAMETER;
+    if (args->NodeOrdinal || args->EngineOrdinal) return STATUS_NOT_SUPPORTED;
+    return static_cast<Adapter *>(adapter)->engine.health(args->EngineStatus);
+}
+DXGKDDI_RESETENGINE reset_engine;
+NTSTATUS APIENTRY reset_engine(HANDLE adapter, DXGKARG_RESETENGINE *args) {
+    if (!adapter || !args) return STATUS_INVALID_PARAMETER;
+    if (args->NodeOrdinal || args->EngineOrdinal) return STATUS_NOT_SUPPORTED;
+    auto a = static_cast<Adapter *>(adapter);
+    if (!a->started || a->resetting) return STATUS_DEVICE_NOT_READY;
+    auto status = a->engine.stop();
+    if (status != STATUS_SUCCESS) return status;
+    const auto aborted = a->engine.aborted_fence_after_join();
+    if (a->scheduler.reset_engine_fence(aborted) != nr::kmd::QueueResult::ok)
+        return STATUS_INVALID_DEVICE_STATE;
+    // Per-engine reset returns only with an empty queue ready for new packets.
+    status = a->engine.start(a->kernel, a->scheduler, a->submissions, a->segment);
+    if (status == STATUS_SUCCESS) args->LastAbortedFenceId = aborted;
+    return status;
+}
+DXGKDDI_COLLECTDBGINFO collect_debug;
+NTSTATUS APIENTRY collect_debug(HANDLE adapter, const DXGKARG_COLLECTDBGINFO *args) {
+    if (!adapter || !args || !args->pBuffer) return STATUS_INVALID_PARAMETER;
+    if (args->BufferSize < sizeof(nr::kmd::Engine::DebugInfo)) return STATUS_BUFFER_TOO_SMALL;
+    const auto data = static_cast<Adapter *>(adapter)->engine.debug_snapshot(args->Reason);
+    RtlCopyMemory(args->pBuffer, &data, sizeof(data));
+    return STATUS_SUCCESS;
+}
 DXGKDDI_UNLOAD unload;
 void unload() {}
 DXGKDDI_CONTROL_ETW_LOGGING control_etw;
@@ -437,13 +474,13 @@ extern "C" NTSTATUS DriverEntry(DRIVER_OBJECT *driver, UNICODE_STRING *registry)
     data.DxgkDdiResetFromTimeout = reset_from_timeout;
     data.DxgkDdiRestartFromTimeout = restart_from_timeout;
     NR_REJECT(DxgkDdiEscape);
-    NR_REJECT(DxgkDdiCollectDbgInfo);
+    data.DxgkDdiCollectDbgInfo = collect_debug;
     data.DxgkDdiQueryCurrentFence = current_fence;
     NR_REJECT(DxgkDdiControlInterrupt);
     NR_REJECT(DxgkDdiRenderKm);
-    NR_REJECT(DxgkDdiQueryDependentEngineGroup);
-    NR_REJECT(DxgkDdiQueryEngineStatus);
-    NR_REJECT(DxgkDdiResetEngine);
+    data.DxgkDdiQueryDependentEngineGroup = dependent_engines;
+    data.DxgkDdiQueryEngineStatus = engine_status;
+    data.DxgkDdiResetEngine = reset_engine;
     NR_REJECT(DxgkDdiCancelCommand);
     NR_REJECT(DxgkDdiGetNodeMetadata);
 #undef NR_REJECT
