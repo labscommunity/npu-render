@@ -83,6 +83,15 @@ to Windows' `NotifyInterrupt` or `NotifyDpc` callbacks and still rejects startup
 This diagnostic can establish kernel concurrency behavior, not Windows scheduler
 acceptance. It is separately opt-in and omitted from default builds.
 
+The [first live engine run](../../../docs/validation/2026-10-09/kernel-engine-v12/report.json)
+passed: Windows requested 32 queue entries, the driver reserved 33 slots, and
+the worker completed the fill, idle preemption and restart checks. The observer
+received three records through real DPC deliveries at IRQL 2; the worker ran at
+IRQL 0 and the synchronized observer at IRQL 3. Cleanup joined the worker,
+unloaded the module and removed the package while preserving the original
+display. Actual Windows DMA submission and GPU-scheduler notification acceptance
+remain untested.
+
 The [October 9 registration trace](../../../docs/validation/2026-10-09/kernel-registration/report.json)
 validated the earlier `288be1a` baseline in an isolated Windows guest. Windows
 called `DriverEntry`, `AddDevice`, `StartDevice` and `RemoveDevice`; the first,
