@@ -148,7 +148,18 @@ The corrected validation admits the documented
 [`SystemContext`](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/ns-d3dkmddi-_dxgk_createcontextflags)
 flag, retains its identity, and rejects user rendering on that context. Other
 context flags remain unsupported. Host tests cover system-context lifetime and
-flag combinations; a separate live retry must validate the actual fill path.
+flag combinations.
+
+The [corrected live retry](../../../docs/validation/2026-10-09/kernel-paging-v23/report.json)
+passed the actual Windows submission path. Windows created a system context with
+flags `1` and a user context with flags `0`, paged in a 12 KiB allocation, patched
+and submitted the private fill, and accepted its completion. The software worker
+executed rendering fence `3` at IRQL `0`; the public probe's queued CPU event and
+subsequent lock verified all 12,288 bytes changed to `0x7ab35c1f`. Every public
+cleanup call succeeded. Driver removal unloaded the module and preserved the
+original display. This is CPU execution behind public KMT submission, not a D3D
+UMD, NPU renderer, or desktop result. The next integration uses ordinary D3D11
+texture operations on the registered adapter.
 
 The [first live engine run](../../../docs/validation/2026-10-09/kernel-engine-v12/report.json)
 passed: Windows requested 32 queue entries, the driver reserved 33 slots, and
@@ -156,8 +167,8 @@ the worker completed the fill, idle preemption and restart checks. The observer
 received three records through real DPC deliveries at IRQL 2; the worker ran at
 IRQL 0 and the synchronized observer at IRQL 3. Cleanup joined the worker,
 unloaded the module and removed the package while preserving the original
-display. Actual Windows DMA submission and GPU-scheduler notification acceptance
-remain untested.
+display. That observer-only run did not test actual Windows DMA submission or
+GPU-scheduler notification acceptance; the later v23 run above does.
 
 The [October 9 registration trace](../../../docs/validation/2026-10-09/kernel-registration/report.json)
 validated the earlier `288be1a` baseline in an isolated Windows guest. Windows
