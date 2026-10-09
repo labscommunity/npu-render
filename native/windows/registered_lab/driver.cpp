@@ -1,0 +1,248 @@
+// Guest-only normal-loader D3D10 DDI bridge. Admits texture clears and staging
+// readback through real kernel allocations. No shaders, NPU or presentation.
+#define NOMINMAX
+#pragma warning(push)
+#pragma warning(disable: 4201) // Anonymous structures in Microsoft DDI headers.
+#include <windows.h>
+#include <d3d10_1.h>
+#include <d3d10umddi.h>
+#pragma warning(pop)
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <memory>
+#include <mutex>
+#include <new>
+#include <type_traits>
+#include "contract.hpp"
+#include "kernel_memory.hpp"
+namespace {
+using namespace nr::registered_lab;
+std::recursive_mutex mutex;
+Counters counters;
+struct Device {
+    D3D10DDI_HRTCORELAYER core{};
+    D3D10DDI_CORELAYER_DEVICECALLBACKS callbacks{};
+    D3D10DDI_DEVICEFUNCS functions{};
+    std::shared_ptr<Context> context;
+};
+struct Resource {
+    std::shared_ptr<Allocation> allocation;
+    UINT usage = 0, map_flags = 0;
+};
+struct View { std::shared_ptr<Allocation> allocation; };
+Device &device(D3D10DDI_HDEVICE h) { return *static_cast<Device *>(h.pDrvPrivate); }
+void reject(D3D10DDI_HDEVICE h, HRESULT status) {
+    ++counters.rejected;
+    auto &d = device(h);
+    d.callbacks.pfnSetErrorCb(d.core, status);
+}
+template<class F> void guard(D3D10DDI_HDEVICE h, F f) noexcept {
+    std::lock_guard<std::recursive_mutex> lock(mutex);
+    try { f(); }
+    catch (const Error &e) { reject(h, e.status); }
+    catch (const std::bad_alloc &) { reject(h, E_OUTOFMEMORY); }
+    catch (...) { reject(h, E_FAIL); }
+}
+template<class T, size_t Offset> struct Unsupported;
+template<class R, class... A, size_t Offset> struct Unsupported<R(APIENTRY *)(D3D10DDI_HDEVICE, A...), Offset> {
+    static R APIENTRY call(D3D10DDI_HDEVICE h, A...) {
+        guard(h, [] { counters.last_unsupported_offset = Offset; throw Error{DXGI_ERROR_UNSUPPORTED}; });
+        if constexpr (!std::is_void_v<R>) return R{};
+    }
+};
+template<class T> struct UnsupportedDxgi;
+template<class R, class... A> struct UnsupportedDxgi<R(APIENTRY *)(A...)> {
+    static R APIENTRY call(A...) { return DXGI_ERROR_UNSUPPORTED; }
+};
+bool format_ok(DXGI_FORMAT f) { return f == DXGI_FORMAT_R8G8B8A8_UNORM || f == DXGI_FORMAT_B8G8R8A8_UNORM; }
+Resource &resource(D3D10DDI_HRESOURCE h) {
+    require(h.pDrvPrivate != nullptr);
+    auto &r = *static_cast<Resource *>(h.pDrvPrivate);
+    require(bool(r.allocation));
+    return r;
+}
+SIZE_T APIENTRY resource_size(D3D10DDI_HDEVICE, const D3D10DDIARG_CREATERESOURCE *) { return sizeof(Resource); }
+void APIENTRY create_resource(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATERESOURCE *a,
+                             D3D10DDI_HRESOURCE out, D3D10DDI_HRTRESOURCE) {
+    new (out.pDrvPrivate) Resource();
+    guard(h, [&] {
+        require(a && a->ResourceDimension == D3D10DDIRESOURCE_TEXTURE2D && a->MipLevels == 1 &&
+                a->ArraySize == 1 && a->pMipInfoList && format_ok(a->Format) && a->SampleDesc.Count == 1 &&
+                !a->SampleDesc.Quality && !a->MiscFlags && !a->pPrimaryDesc && !a->pInitialDataUP);
+        const bool staging = a->Usage == D3D10_DDI_USAGE_STAGING && !a->BindFlags && a->MapFlags == D3D10_DDI_CPU_ACCESS_READ;
+        const bool target = a->Usage == D3D10_DDI_USAGE_DEFAULT && a->BindFlags == D3D10_DDI_BIND_RENDER_TARGET && !a->MapFlags;
+        require(staging || target);
+        const auto &m = a->pMipInfoList[0];
+        require(m.TexelDepth == 1);
+        auto allocation = std::make_shared<Allocation>(device(h).context);
+        allocation->create(m.TexelWidth, m.TexelHeight, UINT(a->Format));
+        auto &r = *static_cast<Resource *>(out.pDrvPrivate);
+        r.allocation = std::move(allocation); r.usage = a->Usage; r.map_flags = a->MapFlags;
+    });
+}
+void APIENTRY destroy_resource(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE r) {
+    guard(h, [&] { static_cast<Resource *>(r.pDrvPrivate)->~Resource(); });
+}
+SIZE_T APIENTRY view_size(D3D10DDI_HDEVICE, const D3D10DDIARG_CREATERENDERTARGETVIEW *) { return sizeof(View); }
+void APIENTRY create_view(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATERENDERTARGETVIEW *a,
+                         D3D10DDI_HRENDERTARGETVIEW v, D3D10DDI_HRTRENDERTARGETVIEW) {
+    new (v.pDrvPrivate) View();
+    guard(h, [&] {
+        require(a != nullptr);
+        auto &r = resource(a->hDrvResource);
+        require(r.usage == D3D10_DDI_USAGE_DEFAULT && a->ResourceDimension == D3D10DDIRESOURCE_TEXTURE2D &&
+                UINT(a->Format) == r.allocation->surface.format && !a->Tex2D.MipSlice &&
+                !a->Tex2D.FirstArraySlice && a->Tex2D.ArraySize == 1);
+        static_cast<View *>(v.pDrvPrivate)->allocation = r.allocation;
+    });
+}
+void APIENTRY destroy_view(D3D10DDI_HDEVICE h, D3D10DDI_HRENDERTARGETVIEW v) {
+    guard(h, [&] { static_cast<View *>(v.pDrvPrivate)->~View(); });
+}
+void APIENTRY clear(D3D10DDI_HDEVICE h, D3D10DDI_HRENDERTARGETVIEW v, FLOAT color[4]) {
+    guard(h, [&] {
+        require(v.pDrvPrivate && color);
+        auto a = static_cast<View *>(v.pDrvPrivate)->allocation;
+        require(a && !a->locked && a->context == device(h).context);
+        std::array<unsigned char, 4> bytes{};
+        for (size_t i = 0; i < 4; ++i) {
+            require(std::isfinite(color[i]));
+            bytes[i] = static_cast<unsigned char>(std::nearbyint(std::clamp(color[i], 0.f, 1.f) * 255));
+        }
+        if (a->surface.format == UINT(DXGI_FORMAT_B8G8R8A8_UNORM)) std::swap(bytes[0], bytes[2]);
+        ULONG pattern = 0;
+        std::memcpy(&pattern, bytes.data(), sizeof(pattern));
+        a->context->fill(a->handle, pattern);
+    });
+}
+void APIENTRY copy_resource(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE dst, D3D10DDI_HRESOURCE src) {
+    guard(h, [&] {
+        auto &d = resource(dst); auto &s = resource(src);
+        require(d.usage == D3D10_DDI_USAGE_STAGING && s.usage == D3D10_DDI_USAGE_DEFAULT);
+        auto a = d.allocation, b = s.allocation;
+        require(a != b && a->context == device(h).context && b->context == a->context &&
+                a->surface.width == b->surface.width && a->surface.height == b->surface.height &&
+                a->surface.format == b->surface.format);
+        // This explicit CPU staging copy waits for submitted writes through the
+        // blocking source lock. It is not a GPU or NPU copy implementation.
+        Mapping read(*b, true), write(*a, false);
+        std::memcpy(write.data, read.data, size_t(a->surface.allocation_bytes));
+        write.finish(); read.finish();
+        counters.copies += a->surface.allocation_bytes;
+    });
+}
+void APIENTRY map(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE r, UINT sub, D3D10_DDI_MAP type,
+                  UINT flags, D3D10DDI_MAPPED_SUBRESOURCE *out) {
+    if (out) *out = {};
+    guard(h, [&] {
+        auto &v = resource(r);
+        require(out && !sub && !flags && type == D3D10_DDI_MAP_READ && v.usage == D3D10_DDI_USAGE_STAGING &&
+                v.map_flags == D3D10_DDI_CPU_ACCESS_READ && v.allocation->context == device(h).context);
+        out->pData = v.allocation->lock(true);
+        out->RowPitch = v.allocation->surface.row_pitch;
+        out->DepthPitch = UINT(v.allocation->surface.allocation_bytes);
+    });
+}
+void APIENTRY unmap(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE r, UINT sub) {
+    guard(h, [&] { auto &a = *resource(r).allocation; require(!sub && a.locked); check(a.unlock()); });
+}
+void APIENTRY flush(D3D10DDI_HDEVICE) {} // Every clear is submitted immediately.
+void APIENTRY hazard(D3D10DDI_HDEVICE, D3D10DDI_HRESOURCE) {} // Blocking locks order our staging copies.
+void APIENTRY format_support(D3D10DDI_HDEVICE, DXGI_FORMAT f, UINT *out) {
+    *out = format_ok(f) ? D3D10_DDI_FORMAT_SUPPORT_RENDERTARGET : 0;
+}
+void APIENTRY multisample(D3D10DDI_HDEVICE, DXGI_FORMAT f, UINT samples, UINT *out) { *out = format_ok(f) && samples == 1 ? 1 : 0; }
+void APIENTRY counter_info(D3D10DDI_HDEVICE, D3D10DDI_COUNTER_INFO *out) { *out = {}; }
+void APIENTRY relocate(D3D10DDI_HDEVICE h, D3D10DDI_DEVICEFUNCS *out) { *out = device(h).functions; }
+void APIENTRY destroy_device(D3D10DDI_HDEVICE h) { std::lock_guard<std::recursive_mutex> lock(mutex); device(h).~Device(); }
+SIZE_T APIENTRY device_size(D3D10DDI_HADAPTER, const D3D10DDIARG_CALCPRIVATEDEVICESIZE *) { return sizeof(Device); }
+HRESULT APIENTRY create_device(D3D10DDI_HADAPTER, D3D10DDIARG_CREATEDEVICE *a) {
+    std::lock_guard<std::recursive_mutex> lock(mutex);
+    if (!a || !a->hDrvDevice.pDrvPrivate || !a->pUMCallbacks || !a->pUMCallbacks->pfnSetErrorCb ||
+        !a->pKTCallbacks || !a->pDeviceFuncs || !a->DXGIBaseDDI.pDXGIDDIBaseFunctions) return E_INVALIDARG;
+    if (a->Interface != D3D10_0_DDI_INTERFACE_VERSION && a->Interface != D3D10_0_x_DDI_INTERFACE_VERSION &&
+        a->Interface != D3D10_0_7_DDI_INTERFACE_VERSION) return E_NOINTERFACE;
+    auto d = new (a->hDrvDevice.pDrvPrivate) Device();
+    HRESULT status = E_FAIL;
+    try {
+        d->core = a->hRTCoreLayer; d->callbacks = *a->pUMCallbacks;
+        d->context = std::make_shared<Context>(counters);
+        d->context->create(a->hRTDevice.handle, *a->pKTCallbacks);
+        auto &f = d->functions;
+#define NR_REJECT(field) f.field = &Unsupported<decltype(f.field), offsetof(D3D10DDI_DEVICEFUNCS, field)>::call
+#include "../ddi/unsupported.inc"
+#undef NR_REJECT
+        f.pfnCalcPrivateResourceSize = resource_size; f.pfnCreateResource = create_resource;
+        f.pfnDestroyResource = destroy_resource; f.pfnResourceCopy = copy_resource;
+        f.pfnResourceMap = f.pfnStagingResourceMap = map;
+        f.pfnResourceUnmap = f.pfnStagingResourceUnmap = unmap;
+        f.pfnCalcPrivateRenderTargetViewSize = view_size; f.pfnCreateRenderTargetView = create_view;
+        f.pfnDestroyRenderTargetView = destroy_view; f.pfnClearRenderTargetView = clear;
+        f.pfnFlush = flush; f.pfnResourceReadAfterWriteHazard = hazard;
+        f.pfnCheckFormatSupport = format_support; f.pfnCheckMultisampleQualityLevels = multisample;
+        f.pfnCheckCounterInfo = counter_info; f.pfnRelocateDeviceFuncs = relocate; f.pfnDestroyDevice = destroy_device;
+        auto &dxgi = *a->DXGIBaseDDI.pDXGIDDIBaseFunctions;
+        dxgi = {};
+#define NR_DXGI(field) dxgi.field = &UnsupportedDxgi<decltype(dxgi.field)>::call
+        NR_DXGI(pfnPresent); NR_DXGI(pfnGetGammaCaps); NR_DXGI(pfnSetDisplayMode);
+        NR_DXGI(pfnSetResourcePriority); NR_DXGI(pfnQueryResourceResidency);
+        NR_DXGI(pfnRotateResourceIdentities); NR_DXGI(pfnBlt);
+#undef NR_DXGI
+        *a->pDeviceFuncs = f;
+        return S_OK;
+    } catch (const Error &e) { status = e.status; }
+    catch (const std::bad_alloc &) { status = E_OUTOFMEMORY; }
+    catch (...) {}
+    d->~Device();
+    return status;
+}
+HRESULT APIENTRY close_adapter(D3D10DDI_HADAPTER) { return S_OK; }
+HRESULT APIENTRY versions(D3D10DDI_HADAPTER, UINT32 *count, UINT64 *out) {
+    const UINT64 supported[] = {D3D10_0_DDI_SUPPORTED, D3D10_0_x_DDI_SUPPORTED, D3D10_0_7_DDI_SUPPORTED};
+    if (!count) return E_INVALIDARG;
+    if (out && *count < 3) return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
+    *count = 3;
+    if (out) std::memcpy(out, supported, sizeof(supported));
+    return S_OK;
+}
+HRESULT APIENTRY caps(D3D10DDI_HADAPTER, const D3D10_2DDIARG_GETCAPS *a) {
+    if (!a || !a->pData) return E_INVALIDARG;
+    std::memset(a->pData, 0, a->DataSize);
+    if (a->Type == D3D11DDICAPS_3DPIPELINESUPPORT && a->DataSize == sizeof(D3D11DDI_3DPIPELINESUPPORT_CAPS))
+        static_cast<D3D11DDI_3DPIPELINESUPPORT_CAPS *>(a->pData)->Caps = D3D11DDI_ENCODE_3DPIPELINESUPPORT_CAP(D3D11DDI_3DPIPELINELEVEL_10_0);
+    return S_OK; // Negotiation for this restricted test is not feature-level conformance.
+}
+} // namespace
+extern "C" __declspec(dllexport) HRESULT APIENTRY OpenAdapter10(D3D10DDIARG_OPENADAPTER *a) {
+    if (!a || !a->pAdapterFuncs || !a->pAdapterCallbacks || !a->pAdapterCallbacks->pfnQueryAdapterInfoCb) return E_INVALIDARG;
+    if (!nr_fill_guest()) return DXGI_ERROR_UNSUPPORTED;
+    nr::kernel_contract::AdapterInfo info{};
+    std::memset(&info, 0, sizeof(info));
+    D3DDDICB_QUERYADAPTERINFO query{};
+    query.pPrivateDriverData = &info; query.PrivateDriverDataSize = sizeof(info);
+    const auto status = a->pAdapterCallbacks->pfnQueryAdapterInfoCb(a->hRTAdapter.handle, &query);
+    if (FAILED(status)) return status;
+    const nr::kernel_contract::AdapterInfo expected{};
+    if (info.signature != expected.signature || info.abi != expected.abi || info.bytes != expected.bytes || info.ready != 0)
+        return DXGI_ERROR_UNSUPPORTED;
+    a->hAdapter.pDrvPrivate = reinterpret_cast<void *>(1);
+    a->pAdapterFuncs->pfnCalcPrivateDeviceSize = device_size;
+    a->pAdapterFuncs->pfnCreateDevice = create_device;
+    a->pAdapterFuncs->pfnCloseAdapter = close_adapter;
+    return S_OK;
+}
+extern "C" __declspec(dllexport) HRESULT APIENTRY OpenAdapter10_2(D3D10DDIARG_OPENADAPTER *a) {
+    const auto status = OpenAdapter10(a);
+    if (SUCCEEDED(status)) { a->pAdapterFuncs_2->pfnGetSupportedVersions = versions; a->pAdapterFuncs_2->pfnGetCaps = caps; }
+    return status;
+}
+extern "C" __declspec(dllexport) BOOL nr_fill_stats(NrFillStats *out) {
+    if (!out || out->bytes != sizeof(*out) || out->version != 1) return FALSE;
+    std::lock_guard<std::recursive_mutex> lock(mutex);
+    out->allocations = counters.allocations; out->fills = counters.fills; out->staging_copy_bytes = counters.copies;
+    out->live_allocations = counters.live_allocations; out->live_contexts = counters.live_contexts;
+    out->cleanup_errors = counters.cleanup_errors; out->rejected = counters.rejected;
+    out->last_unsupported_offset = counters.last_unsupported_offset;
+    return TRUE;
+}

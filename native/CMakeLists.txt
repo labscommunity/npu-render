@@ -43,6 +43,7 @@ if(WIN32)
     if(NOT EXISTS "${NR_WDK_INCLUDE_ROOT}/um/d3d10umddi.h")
       message(FATAL_ERROR "NR_WDK_INCLUDE_ROOT must contain um/d3d10umddi.h")
     endif()
+    add_subdirectory(windows/registered_lab)
     # Normal adapter-loading ABI; no process-local KMT replacements. Not
     # installable until the paired kernel adapter's readiness check succeeds.
     add_library(nr_render_umd SHARED windows/ddi/driver.cpp windows/ddi/registered.def)
