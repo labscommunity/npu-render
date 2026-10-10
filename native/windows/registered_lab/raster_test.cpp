@@ -82,6 +82,26 @@ int main(int argc, char **argv) try {
     }
     const auto after = executor.execute(samples);
     for (size_t i = 0; i < count; ++i) TEST(bool(after.covered[i]) == reference(samples[i]));
+    uint64_t cull_checked=0;
+    const std::array<int32_t,4> scissor{5*256,7*256,29*256,25*256};
+    for(const auto cull:{CullMode::none,CullMode::front,CullMode::back})for(const bool ccw:{false,true}) {
+        CoverageExecutor culled(count,backend,cull,ccw);
+        for(size_t i=0;i<count;++i){
+            auto &s=samples[i];s.triangle={{{0,0},{8192,0},{0,8192}}};
+            if(i&1)std::swap(s.triangle[1],s.triangle[2]);
+            if(i%7==0)s.triangle[2]=s.triangle[1];
+            s.point={int32_t((i/2)%32)*256+128,int32_t((i/64)%32)*256+128};
+        }
+        const auto result=culled.execute(samples,scissor);
+        for(size_t i=0;i<count;++i){
+            const auto &s=samples[i];const auto area=edge(s.triangle[0],s.triangle[1],s.triangle[2]);
+            const bool front=(area<0)==ccw;
+            const bool retained=cull==CullMode::none || (cull==CullMode::back?front:!front);
+            const bool clipped=s.point[0]>=scissor[0] && s.point[1]>=scissor[1] && s.point[0]<scissor[2] && s.point[1]<scissor[3];
+            TEST(bool(result.covered[i])==(reference(s) && retained && clipped));++cull_checked;
+        }
+    }
+    std::printf("{\"culling_and_scissor_samples\":%llu,\"exact\":true,\"all_face_modes\":true}\n",static_cast<unsigned long long>(cull_checked));
     std::printf("{\"checked_samples\":%llu,\"invalid_coordinate_requests_rejected\":8,\"request_reusable_after_input_rejection\":true}\n",
                 static_cast<unsigned long long>(checked + count));
     return 0;

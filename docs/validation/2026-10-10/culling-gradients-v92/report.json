@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "kind": "npu-culling-scissor-and-color-interpolation-qualification",
+  "umd_build": "present-umd-v92",
+  "native_cpu_suites_passed": 15,
+  "npu_coverage_samples": 61440,
+  "npu_coverage_exact": true,
+  "npu_uniform_gradient_components": 173056,
+  "gradient_max_byte_error": 0.5,
+  "npu_ddi_draws_passed": 32,
+  "dwm_capture": {
+    "source": "v74-dwm-draw-6148.bin",
+    "vertices": 60,
+    "covered_samples": 50176,
+    "oracle_max_byte_error": 0,
+    "npu_draw_ms": 6342.997,
+    "npu_compile_ms": 1625.414,
+    "tile_executions": 240
+  },
+  "shell_capture": {
+    "source": "v74-shell-draw-3604.bin",
+    "vertices_after_strip_expansion": 12,
+    "covered_samples": 36,
+    "oracle_max_byte_error": 0,
+    "npu_draw_ms": 34.832,
+    "npu_compile_ms": 1528.912
+  },
+  "implemented": "NPU exact facing/scissor masks and interpolated float4 passthrough pixel shader; CPU stages input formats and schedules scissor-overlapping tiles",
+  "limitations": [
+    "nonuniform general pixel programs remain rejected",
+    "texture paths still reject face culling",
+    "depth clipping, depth/stencil and arbitrary graphics remain incomplete",
+    "6.3-second taskbar draw is not interactive performance"
+  ],
+  "full_desktop_offload": false,
+  "tahoma_performance_tested": false,
+  "final_umd_build": "present-umd-v93",
+  "final_build_change": "Only uniform_draw_test.cpp changed from v92: analytic perspective and no-perspective checks",
+  "final_native_cpu_suites_passed": 15,
+  "perspective_and_screen_linear_verified": true,
+  "report_sharing_failure_reproduced": true,
+  "cleanup_continued_under_report_lock": true
+}

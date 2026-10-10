@@ -572,3 +572,28 @@ components to their 32-bit register representation and preserves integer default
 for absent channels, following
 [sections 3.2.3 and 19.1.3.3 of the Direct3D specification](https://microsoft.github.io/DirectX-Specs/d3d/archive/D3D11_3_FunctionalSpec.htm).
 This is host input preparation; it does not move shader work to the CPU.
+
+The [v74 trial](../../../docs/validation/2026-10-10/sole-display-v74/report.json)
+passed the former allocation limit and executed 27 DWM draws on the physical NPU.
+Its sole indirect display delivered wallpaper, then black frames. The shell
+rejected back-face culling; a taskbar draw required nonuniform vertex colors and
+a partial scissor. A status-file sharing error also interrupted automatic
+cleanup. Recovery preserved the failed trial, removed the renderer, and restarted
+only the disposable VM to complete indirect-device removal after an IddCx
+watchdog failure. No watchdog setting was changed.
+
+The [culling and interpolation qualification](../../../docs/validation/2026-10-10/culling-gradients-v92/report.json)
+adds exact NPU facing/scissor masks and perspective or screen-linear float4
+interpolation for an identity pixel shader. General nonuniform pixel programs
+still fail closed. ABI 6 carries culling state for the untextured pipeline.
+The CPU prepares input formats and conservatively schedules tiles overlapping
+the explicit scissor; coverage, interpolation, and output merging execute on
+the selected device. Both actual v74 failed draws replay byte-exactly against
+an independent scalar oracle on the NPU. The taskbar draw takes 6.3 seconds;
+these are correctness results, not interactive desktop performance.
+
+`tools/observe_registered_desktop.ps1` now owns the finite guest observation and
+removal sequence. Atomic status replacement and best-effort cleanup reporting
+prevent a reader's file lock from skipping removal. The Windows regression test
+holds such a lock, confirms cleanup still executes, then checks reporting recovers.
+Full desktop offload and a Tahoma performance benefit remain unproven.

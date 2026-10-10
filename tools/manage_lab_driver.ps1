@@ -7,13 +7,14 @@ param(
 )
 $ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue'
 . "$PSScriptRoot\lab_device_identity.ps1"
+. "$PSScriptRoot\lab_report.ps1"
 Assert-NrLabGuest
 $Package=[IO.Path]::GetFullPath($Package)
 if(!$Package.StartsWith('C:\npu-lab\driver-package-',[StringComparison]::OrdinalIgnoreCase) -or !(Test-Path $Package -PathType Container) -or ((Get-Item $Package).Attributes -band [IO.FileAttributes]::ReparsePoint)){throw 'Owned package directory required'}
 $root='C:\npu-lab';$prefix="$root\$Name-$Action";$savedPath="$root\$Name-owned.json"
 if(Test-Path "$prefix.json"){throw 'Action evidence already exists'}
 $report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');action=$Action;hardware_id=$HardwareId;expected_version=$Version;completed=$false;passed=$false}
-$report | ConvertTo-Json | Set-Content "$prefix.json"
+Write-NrLabReport "$prefix.json" $report
 try {
  $current=@(Get-NrLabDevice -HardwareId $HardwareId)
  $current | ConvertTo-Json -Depth 5 | Set-Content "$prefix-before.json"
@@ -53,7 +54,7 @@ try {
 } catch {$report.error=$_.Exception.Message}
 finally {
  $report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o')
- $report | ConvertTo-Json -Depth 5 | Set-Content "$prefix.json"
+ Write-NrLabReport "$prefix.json" $report
 }
 Get-Content "$prefix.json"
 if(!$report.passed){exit 1}

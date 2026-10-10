@@ -54,12 +54,26 @@ std::vector<nr::shader::VertexRegisters> fetch(const nr::capture::Snapshot &s, u
         nr::capture::check(description.size() == 4 && description[0] == vb.size() && description[1] <= 2048);
         // Captured desktop layout formats: float1/2/3/4 and RGBA8 UNORM.
         const auto lanes = format == 2 ? 4u : (format == 6 ? 3u : (format == 16 ? 2u : (format == 41 ? 1u : 0u)));
-        nr::capture::check(lanes || format == 28); const auto bytes = format == 28 ? 4u : lanes * 4;
+        uint32_t integer_lanes=0,component_bytes=0;bool signed_integer=false;
+        switch(format) {
+        case 62:case 64:integer_lanes=1;component_bytes=1;signed_integer=format==64;break;
+        case 50:case 52:integer_lanes=2;component_bytes=1;signed_integer=format==52;break;
+        case 30:case 32:integer_lanes=4;component_bytes=1;signed_integer=format==32;break;
+        case 57:case 59:integer_lanes=1;component_bytes=2;signed_integer=format==59;break;
+        case 38:case 40:integer_lanes=2;component_bytes=2;signed_integer=format==40;break;
+        case 12:case 14:integer_lanes=4;component_bytes=2;signed_integer=format==14;break;
+        }
+        nr::capture::check(lanes || format == 28 || integer_lanes);
+        const auto bytes = integer_lanes ? integer_lanes*component_bytes : format == 28 ? 4u : lanes * 4;
         for (uint32_t i = 0; i < count; ++i) {
             const uint64_t begin = uint64_t(description[2]) + offset + uint64_t(indices[i]) * description[1];
             nr::capture::check(begin <= vb.size() && bytes <= vb.size() - begin);
-            auto &v = result[i][reg]; v = {0, 0, 0, 0x3f800000};
+            auto &v = result[i][reg]; v = {0, 0, 0, integer_lanes?1u:0x3f800000u};
             if (format == 28) for (unsigned c = 0; c < 4; ++c) v[c] = nr::shader::as_bits(float(vb[size_t(begin) + c]) / 255);
+            else if(integer_lanes)for(unsigned c=0;c<integer_lanes;++c){
+                uint32_t raw=0;std::memcpy(&raw,vb.data()+size_t(begin)+c*component_bytes,component_bytes);
+                const auto sign=1u<<(component_bytes*8-1);if(signed_integer && (raw&sign))raw|=~((sign<<1)-1);v[c]=raw;
+            }
             else std::memcpy(v.data(), vb.data() + size_t(begin), bytes);
         }
     }
@@ -100,7 +114,7 @@ int main(int argc, char **argv) try {
     // Only target zero is bound in this captured draw; other blend slots are unused.
     const bool blending = blend[1] != 0;
     if (blending) nr::capture::check(blend[9] == 2 && blend[10] == 6 && blend[11] == 1 && blend[12] == 2 && blend[13] == 6 && blend[14] == 1);
-    nr::capture::check(raster.size() == 10 && raster[0] == 3 && raster[1] == 1 && !raster[3] && !raster[4] && !raster[5] && !raster[8] && !raster[9]);
+    nr::capture::check(raster.size() == 10 && raster[0] == 3 && raster[1] >= 1 && raster[1] <= 3 && !raster[3] && !raster[4] && !raster[5] && !raster[8] && !raster[9]);
     std::array<int32_t,4> clip{0,0,int32_t(width),int32_t(height)};
     if (raster[7]) {
         const auto scissor = snapshot.values<int32_t>("scissors");
@@ -130,6 +144,7 @@ int main(int argc, char **argv) try {
     PackedTexture texture;
     std::vector<PackedColor> texture_reference;
     if (textured) {
+        nr::capture::check(raster[1]==1);
         const auto source = snapshot.values<uint32_t>("source-description"), sampler = snapshot.values<uint32_t>("sampler-2-0");
         nr::capture::check(args[0] == 6 && (blend[15] & 255) == 15 && source.size() == 10 && source[0] == 0x4e52574b && source[1] == 1 && source[2] == 40 && !source[7]);
         nr::capture::check(sampler.size() == 13 && (sampler[0]==0 || sampler[0]==21) && sampler[1] == 3 && sampler[2] == 3 && sampler[3] == 3 && !sampler[4] && !sampler[11]);
@@ -180,7 +195,10 @@ int main(int argc, char **argv) try {
             if(format!=texture.format) std::swap(p[0],p[2]); p[3]=255; texture_reference[size_t(y)*width+x]=p;
         }
         }
-    } else executor = std::make_unique<UniformDrawExecutor>(vs, ps, args[0], width, height, backend, blending, format == 87, uint8_t(blend[15] & 255), batch);
+    } else {
+        while(uint64_t(width)*height%batch)batch/=2;
+        executor = std::make_unique<UniformDrawExecutor>(vs, ps, args[0], width, height, backend, blending, format == 87, uint8_t(blend[15] & 255), batch,static_cast<CullMode>(raster[1]-1),raster[2]!=0);
+    }
     const auto compile_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - compile_start).count();
     UniformDrawExecutor::Result result;
     std::vector<PackedColor> reference_pixels;
@@ -203,34 +221,61 @@ int main(int argc, char **argv) try {
         else {
             VertexRegisters uniform{};
             for (unsigned r = 0; r < 16; ++r) if (ps.inputs[r] && r != ps.position_input) uniform[r] = result.vertices[0][r];
-            nr::capture::check(result.fragment == reference_vertex(ps, uniform, pixel_cb)[0]);
+            bool is_uniform=true;
+            for(const auto &v:result.vertices)for(unsigned r=0;r<16;++r)if(ps.inputs[r] && r!=ps.position_input)
+                for(unsigned c=0;c<4;++c)if(ps.inputs[r]&(1u<<c))is_uniform=is_uniform && v[r][c]==uniform[r][c];
+            if(is_uniform)nr::capture::check(result.fragment == reference_vertex(ps, uniform, pixel_cb)[0]);
             // Independent scalar coverage and byte-color oracle for this replay.
             // A transparent draw still must preserve every destination byte.
             auto expected=pixels;uint64_t covered=0;
             std::vector<Point> points(inputs.size());
+            std::vector<std::array<double,3>> screen(inputs.size());
             for(size_t i=0;i<inputs.size();++i) {
                 const auto v=reference_vertex(vs,inputs[i],cb)[vs.position_output];
                 volatile float nx=as_float(v[0])/as_float(v[3]),ny=as_float(v[1])/as_float(v[3]);
                 volatile float sx=nx+1,sy=1-ny;sx=sx*(float(width)*.5f);sy=sy*(float(height)*.5f);
                 points[i]={int32_t(std::nearbyint(float(sx)*256)),int32_t(std::nearbyint(float(sy)*256))};
+                screen[i]={float(sx),float(sy),1./as_float(v[3])};
             }
             const auto edge=[](Point a,Point b,Point p){return (int64_t(b[0])-a[0])*(int64_t(p[1])-a[1])-(int64_t(b[1])-a[1])*(int64_t(p[0])-a[0]);};
             for(size_t t=0;t<points.size();t+=3) {
                 std::array<Point,3> triangle{points[t],points[t+1],points[t+2]};const auto area=edge(triangle[0],triangle[1],triangle[2]);
-                if(!area)continue;if(area<0)std::swap(triangle[1],triangle[2]);
+                const bool front=(area<0)==(raster[2]!=0);
+                if(!area || (raster[1]==2 && front) || (raster[1]==3 && !front))continue;
+                if(area<0)std::swap(triangle[1],triangle[2]);
                 for(int32_t y=clip[1];y<clip[3];++y)for(int32_t x=clip[0];x<clip[2];++x){
                     const Point p{x*256+128,y*256+128};bool inside=true;
                     for(size_t e=0;e<3;++e){const auto a=triangle[e],b=triangle[(e+1)%3];const auto value=edge(a,b,p);const bool top=b[1]<a[1]||(b[1]==a[1]&&b[0]>a[0]);if(value<0||(!value&&!top))inside=false;}
                     if(!inside)continue;++covered;
+                    auto fragment=result.fragment;
+                    if(!is_uniform) {
+                        VertexRegisters interpolated{};
+                        for(unsigned r=0;r<16;++r)if(ps.inputs[r] && r!=ps.position_input){
+                            const auto mode=ps.interpolation[r];nr::capture::check(mode==2 || mode==4);
+                            double weight[3]{},denominator=0;
+                            for(unsigned v=0;v<3;++v){const auto &a=screen[t+(v+1)%3],&b=screen[t+(v+2)%3];
+                                weight[v]=((b[0]-a[0])*(y+.5-a[1])-(b[1]-a[1])*(x+.5-a[0]))*(mode==2?screen[t+v][2]:1);denominator+=weight[v];}
+                            nr::capture::check(denominator!=0);
+                            for(unsigned c=0;c<4;++c)if(ps.inputs[r]&(1u<<c)){
+                                double value=0;for(unsigned v=0;v<3;++v)value+=weight[v]*as_float(result.vertices[t+v][r][c]);
+                                interpolated[r][c]=as_bits(float(value/denominator));
+                            }
+                        }
+                        fragment=reference_vertex(ps,interpolated,pixel_cb)[0];
+                    }
                     auto &pixel=expected[size_t(y)*width+size_t(x)];
-                    for(unsigned c=0;c<4;++c)if((blend[15]&255)&(1u<<c)){
+                    for(unsigned c=0;c<4;++c){
                         const auto lane=format==87 && c<3 ? 2-c : c;
-                        const double value=double(as_float(result.fragment[lane]))*255+(blending?double(pixel[c])*(1-double(as_float(result.fragment[3]))):0);
+                        if(!((blend[15]&255)&(1u<<lane)))continue;
+                        const double value=double(as_float(fragment[lane]))*255+(blending?double(pixel[c])*(1-double(as_float(fragment[3]))):0);
                         pixel[c]=uint8_t(std::nearbyint((std::clamp)(value,0.,255.)));
                     }
                 }
             }
-            nr::capture::check(result.covered_samples==covered && result.pixels==expected);
+            unsigned maximum=0;uint64_t differences=0;
+            for(size_t i=0;i<expected.size();++i)for(unsigned c=0;c<4;++c){const auto error=unsigned(std::abs(int(result.pixels[i][c])-int(expected[i][c])));maximum=(std::max)(maximum,error);differences+=error!=0;}
+            nr::capture::check(result.covered_samples==covered && maximum<=(is_uniform?0u:1u));
+            std::printf("{\"uniform_inputs\":%s,\"oracle_max_byte_error\":%u,\"differing_components\":%llu,\"coverage_exact\":true}\n",is_uniform?"true":"false",maximum,static_cast<unsigned long long>(differences));
         }
         if (!iteration) reference_pixels = result.pixels; else nr::capture::check(result.pixels == reference_pixels);
         const auto &t = result.timings;

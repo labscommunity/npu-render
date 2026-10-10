@@ -55,10 +55,13 @@ struct CoverageExecutor::State {
     ov::InferRequest request;
     std::string execution_device;
     bool failed = false;
-    State(uint32_t size, const std::string &backend) : count(size) {
+    State(uint32_t size, const std::string &backend, CullMode cull, bool front_ccw) : count(size) {
         require(count && count <= 65536 && (backend == "NPU" || backend == "GPU" || backend == "CPU"));
+        require(cull == CullMode::none || cull == CullMode::front || cull == CullMode::back);
         auto vertices = std::make_shared<op::Parameter>(ov::element::i32, ov::Shape{count, 6});
         auto points = std::make_shared<op::Parameter>(ov::element::i32, ov::Shape{count, 2});
+        auto scissor = std::make_shared<op::Parameter>(ov::element::i32, ov::Shape{1, 4});
+        scissor->output(0).get_tensor().set_names({"scissor"});
         vertices->output(0).get_tensor().set_names({"vertices"});
         points->output(0).get_tensor().set_names({"points"});
         std::array<Node, 6> v;
@@ -66,6 +69,12 @@ struct CoverageExecutor::State {
         auto px = lane(points, 0), py = lane(points, 1);
         const auto area = determinant(sub(v[2], v[0]), sub(v[5], v[1]), sub(v[3], v[1]), sub(v[4], v[0]));
         auto covered = either(area.positive, area.negative);
+        // Positive area is clockwise in the screen's downward Y direction.
+        if (cull != CullMode::none) covered = ((cull == CullMode::back) != front_ccw) ? area.positive : area.negative;
+        covered = both(covered, pred(std::make_shared<op::GreaterEqual>(px, lane(scissor, 0))));
+        covered = both(covered, pred(std::make_shared<op::GreaterEqual>(py, lane(scissor, 1))));
+        covered = both(covered, pred(std::make_shared<op::Less>(px, lane(scissor, 2))));
+        covered = both(covered, pred(std::make_shared<op::Less>(py, lane(scissor, 3))));
         for (size_t a = 0; a < 6; a += 2) {
             const auto b = (a + 2) % 6;
             auto dx = sub(v[b], v[a]), dy = sub(v[b + 1], v[a + 1]);
@@ -76,7 +85,7 @@ struct CoverageExecutor::State {
                                  both(area.negative, either(e.negative, both(e.zero, reverse_top_left))));
             covered = both(covered, inside);
         }
-        auto model = std::make_shared<ov::Model>(ov::OutputVector{covered}, ov::ParameterVector{vertices, points});
+        auto model = std::make_shared<ov::Model>(ov::OutputVector{covered}, ov::ParameterVector{vertices, points, scissor});
         ov::AnyMap properties{ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY)};
         if (backend == "NPU") {
             for (const auto &node : model->get_ops()) node->get_rt_info()["precise_0"] = std::string{};
@@ -94,10 +103,14 @@ struct CoverageExecutor::State {
         execution_device = devices[0]; request = compiled.create_infer_request();
     }
 };
-CoverageExecutor::CoverageExecutor(uint32_t samples, const std::string &backend) : state(std::make_unique<State>(samples, backend)) {}
+CoverageExecutor::CoverageExecutor(uint32_t samples, const std::string &backend, CullMode cull, bool front_ccw)
+    : state(std::make_unique<State>(samples, backend, cull, front_ccw)) {}
 CoverageExecutor::~CoverageExecutor() = default;
-CoverageExecutor::Result CoverageExecutor::execute(const std::vector<Sample> &samples) {
+CoverageExecutor::Result CoverageExecutor::execute(const std::vector<Sample> &samples, const std::optional<std::array<int32_t,4>> &scissor) {
     auto &s = *state; require(!s.failed && samples.size() == s.count);
+    const auto clip = scissor.value_or(std::array<int32_t,4>{-coordinate_limit,-coordinate_limit,coordinate_limit+1,coordinate_limit+1});
+    require(clip[0] <= clip[2] && clip[1] <= clip[3]);
+    for (const auto coordinate : clip) require(coordinate >= -coordinate_limit && coordinate <= coordinate_limit+1);
     for (const auto &sample : samples) {
         for (const auto &point : sample.triangle) for (const auto coordinate : point)
             require(coordinate >= -coordinate_limit && coordinate <= coordinate_limit);
@@ -105,6 +118,7 @@ CoverageExecutor::Result CoverageExecutor::execute(const std::vector<Sample> &sa
     }
     s.failed = true;
     auto vertices = s.request.get_tensor("vertices"), points = s.request.get_tensor("points");
+    std::memcpy(s.request.get_tensor("scissor").data<int32_t>(), clip.data(), sizeof(clip));
     for (size_t i = 0; i < samples.size(); ++i) {
         std::memcpy(vertices.data<int32_t>() + i * 6, samples[i].triangle.data(), 6 * sizeof(int32_t));
         std::memcpy(points.data<int32_t>() + i * 2, samples[i].point.data(), 2 * sizeof(int32_t));

@@ -58,7 +58,8 @@ int wmain(int argc, wchar_t **argv) try {
                     previous.vertex.bytecode != request.vertex.bytecode || previous.pixel.bytecode != request.pixel.bytecode) {
                     uint32_t batch = 4096; while (uint64_t(h.width) * h.height % batch) batch /= 2;
                     auto candidate = std::make_unique<nr::raster::UniformDrawExecutor>(request.vertex, request.pixel, h.vertices, h.width, h.height,
-                        "NPU", (h.flags & 1) != 0, h.format == 87, uint8_t((h.flags >> 8) & 15), batch);
+                        "NPU", (h.flags & 1) != 0, h.format == 87, uint8_t((h.flags >> 8) & 15), batch,
+                        static_cast<nr::raster::CullMode>((h.flags>>5)&3),(h.flags&128)!=0);
                     executor = std::move(candidate);
                     previous = {}; previous.header = h; previous.vertex = request.vertex; previous.pixel = request.pixel;
                 }

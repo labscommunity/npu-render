@@ -108,6 +108,14 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
     auto clipped=r;clipped.header.abi=3;clipped.header.flags|=4;
     clipped.scissor=std::array<int32_t,4>{0,7,int32_t(r.header.width),int32_t(r.header.height)};
     const auto clip_packet=ex::encode(clipped);test(ex::decode(clip_packet).scissor==clipped.scissor);
+    for(uint32_t cull=1;cull<=2;++cull)for(uint32_t ccw=0;ccw<2;++ccw){
+        auto faces=clipped;faces.header.abi=6;faces.header.flags|=(cull<<5)|(ccw<<7);
+        const auto packet=ex::encode(faces);const auto decoded_faces=ex::decode(packet);
+        test(decoded_faces.header.flags==faces.header.flags && decoded_faces.scissor==faces.scissor);
+        for(unsigned failure=0;failure<5;++failure){auto bad=packet;auto h=faces.header;
+            if(failure==0)h.abi=3;if(failure==1)h.flags|=96;if(failure==2)h.flags|=2;if(failure==3)h.flags|=16;if(failure==4)h.flags=(h.flags&~96u)|128u;
+            std::memcpy(bad.data(),&h,sizeof(h));rejects(bad);}
+    }
     for(unsigned i=0;i<5;++i) {
         auto bad=clip_packet;
         auto bounds=*clipped.scissor;

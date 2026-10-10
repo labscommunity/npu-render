@@ -58,7 +58,7 @@ public:
         if(uniform_cache.size()==8)uniform_cache.erase(uniform_cache.begin());
         uint32_t batch=4096;while(uint64_t(h.width)*h.height%batch)batch/=2;
         auto candidate=std::make_unique<raster::UniformDrawExecutor>(request.vertex,request.pixel,h.vertices,h.width,h.height,
-            "NPU",(h.flags&1)!=0,h.format==87,uint8_t((h.flags>>8)&15),batch);
+            "NPU",(h.flags&1)!=0,h.format==87,uint8_t((h.flags>>8)&15),batch,static_cast<raster::CullMode>((h.flags>>5)&3),(h.flags&128)!=0);
         auto result=candidate->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,request.background,request.scissor);
         uniform_cache.push_back({h,request.vertex.bytecode,request.pixel.bytecode,std::move(candidate)});
         return result;

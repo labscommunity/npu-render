@@ -4,7 +4,8 @@
 #include "output_merger.hpp"
 #include <optional>
 namespace nr::raster {
-// Reusable graphics pipeline for a checked uniform-varying triangle list.
+// Reusable triangle pipeline: uniform shader inputs or an interpolated float4
+// passthrough pixel shader. Unsupported shader interpolation fails closed.
 // Host code supplies decoded vertex data and copies bytes; all five rendering
 // stages execute on the requested provider. No display or transport ownership.
 class UniformDrawExecutor {
@@ -14,7 +15,7 @@ public:
     UniformDrawExecutor(const shader::Program &vertex, const shader::Program &pixel,
                         uint32_t vertices, uint32_t width, uint32_t height,
                         const std::string &backend, bool blend, bool bgra, uint8_t write_mask,
-                        uint32_t batch = 4096);
+                        uint32_t batch = 4096, CullMode cull = CullMode::none, bool front_ccw = false);
     ~UniformDrawExecutor();
     UniformDrawExecutor(const UniformDrawExecutor &) = delete;
     UniformDrawExecutor &operator=(const UniformDrawExecutor &) = delete;

@@ -80,7 +80,7 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
     require((s.format == 28 || s.format == 87) && d.viewport_count == 1 && d.viewport.TopLeftX == 0 && d.viewport.TopLeftY == 0 &&
         d.viewport.Width == FLOAT(s.width) && d.viewport.Height == FLOAT(s.height) &&
         !d.depth.DepthEnable && !d.depth.StencilEnable && d.raster.FillMode == D3D10_DDI_FILL_SOLID &&
-        d.raster.CullMode == D3D10_DDI_CULL_NONE && !d.raster.MultisampleEnable && !d.raster.AntialiasedLineEnable &&
+        d.raster.CullMode >= D3D10_DDI_CULL_NONE && d.raster.CullMode <= D3D10_DDI_CULL_BACK && !d.raster.MultisampleEnable && !d.raster.AntialiasedLineEnable &&
         !d.raster.DepthBias && d.raster.DepthBiasClamp == 0 && d.raster.SlopeScaledDepthBias == 0 &&
         !d.blend.AlphaToCoverageEnable && d.sample_mask == ~0u && d.blend.RenderTargetWriteMask[0] && d.blend.RenderTargetWriteMask[0] <= 15);
     const std::array<int32_t,4> full{0,0,int32_t(s.width),int32_t(s.height)};
@@ -95,8 +95,11 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
         d.blend.DestBlendAlpha == D3D10_DDI_BLEND_INV_SRC_ALPHA && d.blend.BlendOpAlpha == D3D10_DDI_BLEND_OP_ADD);
     const auto vc = fetch_constants(d, 0, *d.vertex_program), pc = fetch_constants(d, 2, *d.pixel_program);
     const bool textured = std::any_of(d.pixel_program->textures.begin(),d.pixel_program->textures.end(),[](bool v){return v;});
+    const auto cull=static_cast<nr::raster::CullMode>(UINT(d.raster.CullMode)-1);
+    const bool front_ccw=d.raster.FrontCounterClockwise!=0;
     nr::raster::PackedTexture texture; bool linear=false, modulated=false;
     if (textured) {
+        require(cull==nr::raster::CullMode::none);
         const auto source = d.bound_source; const auto &sampler = d.samplers[2][0];
         linear=sampler.desc.Filter==D3D10_DDI_FILTER_MIN_MAG_MIP_LINEAR;
         modulated=linear || d.pixel_program->instructions.size()==2 || blend || clip!=full;
@@ -128,6 +131,7 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
         if (textured) { request.header.abi = 2; request.header.flags |= 2; request.texture = std::move(texture); }
         if (clip != full) { request.header.abi = 3; request.header.flags |= 4; request.scissor = clip; }
         if (modulated) {request.header.abi=linear?4:5;request.header.flags|=linear?8:16;}
+        if(cull!=nr::raster::CullMode::none){request.header.abi=6;request.header.flags|=(UINT(cull)<<5)|(front_ccw?128u:0u);}
         request.viewport = viewport; request.vertex = *d.vertex_program; request.pixel = *d.pixel_program;
         request.inputs = inputs; request.vertex_constants = vc; request.pixel_constants = pc; request.background = std::move(background);
         result = d.indexed_exchange->execute(std::move(request));
@@ -152,7 +156,7 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
         }
         result = d.point_texture_executor->execute(inputs,vc,viewport,texture);
     } else {
-        const std::array<uint64_t, 5> key{s.width, s.height, s.format, count, uint64_t(d.blend.RenderTargetWriteMask[0]) | (uint64_t(blend) << 8)};
+        const std::array<uint64_t, 5> key{s.width, s.height, s.format, count, uint64_t(d.blend.RenderTargetWriteMask[0]) | (uint64_t(blend) << 8) | (uint64_t(cull)<<9) | (uint64_t(front_ccw)<<11)};
         if (!d.indexed_executor || d.indexed_vertex != d.vertex_program || d.indexed_pixel != d.pixel_program || d.indexed_key != key) {
             // Driver 5540 loses the new NPU vertex request if the old cache
             // entry is destroyed between new-model creation and first inference.
@@ -161,7 +165,7 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
             if (d.backend == "NPU") d.indexed_executor.reset();
             uint32_t batch = 4096; while (uint64_t(s.width) * s.height % batch) batch /= 2;
             auto candidate = std::make_unique<nr::raster::UniformDrawExecutor>(*d.vertex_program, *d.pixel_program, count,
-                s.width, s.height, d.backend, blend, s.format == 87, d.blend.RenderTargetWriteMask[0], batch);
+                s.width, s.height, d.backend, blend, s.format == 87, d.blend.RenderTargetWriteMask[0], batch, cull, front_ccw);
             d.indexed_executor = std::move(candidate); d.indexed_key = key; d.indexed_vertex = d.vertex_program; d.indexed_pixel = d.pixel_program;
         }
         result = d.indexed_executor->execute(inputs, vc, pc, viewport, background, clip);

@@ -24,13 +24,14 @@ struct Receipt {
 static_assert(sizeof(Receipt) == 48);
 inline void require(bool value) { if (!value) throw std::invalid_argument("invalid indexed NPU exchange packet"); }
 inline bool shape_valid(const Header &h) {
-    const bool valid = h.signature == magic && h.abi == ((h.flags & 16) ? 5u : ((h.flags & 8) ? 4u : ((h.flags & 4) ? 3u : ((h.flags & 2) ? 2u : 1u)))) && (h.nonce[0] || h.nonce[1]) && h.client_pid &&
+    const bool valid = h.signature == magic && h.abi == ((h.flags & 0xe0) ? 6u : ((h.flags & 16) ? 5u : ((h.flags & 8) ? 4u : ((h.flags & 4) ? 3u : ((h.flags & 2) ? 2u : 1u))))) && (h.nonce[0] || h.nonce[1]) && h.client_pid &&
         h.width && h.width <= 8192 && h.height && h.height <= 8192 && uint64_t(h.width) * h.height <= 4 * 1024 * 1024 &&
         h.vertices && h.vertices <= 4096 && !(h.vertices % 3) && (h.format == 28 || h.format == 87) &&
-        !(h.flags & ~0xf1fu) && (h.flags & 0xf00u) && h.vs_words >= 3 && h.vs_words <= 16384 &&
+        !(h.flags & ~0xfffu) && (h.flags & 0xf00u) && h.vs_words >= 3 && h.vs_words <= 16384 &&
         h.ps_words >= 3 && h.ps_words <= 16384 && h.sequence && h.sequence <= max_requests &&
         h.body_bytes <= max_packet_bytes - sizeof(Header) && !h.reserved;
     if (!valid) return false;
+    if((h.flags & 0xe0) && ((h.flags & 26) || !(h.flags & 96) || (h.flags & 96)==96))return false;
     if (h.flags & 16) return h.vertices == 6 && h.width <= 4096 && (h.flags & ~5u) == 0xf12;
     if (h.flags & 8) return h.vertices == 6 && h.width <= 4096 && (h.flags & ~5u) == 0xf0a;
     if (h.flags & 2) return h.vertices == 6 && h.flags == 0xf02;

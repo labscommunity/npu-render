@@ -46,11 +46,6 @@ O main(float4 p:POSITION,float4 c:COLOR) {O o;o.p=p;o.c=c*color;return o;})", "v
             test(result.pixels[size_t(y) * 64 + x][c] == expected); ++checked;
         }
         test(background == std::vector<PackedColor>(4096, old));
-        if (frame == 1) {
-            auto nonuniform = inputs; nonuniform[2][1][0] = as_bits(0.f); bool rejected = false;
-            try { (void)executor.execute(nonuniform, cb, {}, viewport, background); } catch (const std::invalid_argument &) { rejected = true; }
-            test(rejected && background == std::vector<PackedColor>(4096, old));
-        }
         std::printf("{\"uniform_draw\":true,\"frame\":%u,\"covered_samples\":%llu,\"draw_ms\":%.3f,\"execution_device\":\"%s\",\"desktop_offload_tested\":false}\n",
             frame, static_cast<unsigned long long>(result.covered_samples), result.timings.total_ms, result.execution_device.c_str());
     }
@@ -70,6 +65,59 @@ O main(float4 p:POSITION,float4 c:COLOR) {O o;o.p=p;o.c=c*color;return o;})", "v
             test(result.pixels[size_t(y)*64+x][c]==expected);++checked;
         }
     }
-    std::printf("{\"checked_components\":%llu,\"dynamic_geometry_and_constants\":true,\"nonuniform_rejected\":true,\"background_unchanged\":true}\n", static_cast<unsigned long long>(checked));
+    auto gradient=quad(1,false);VertexConstants white;white[0].push_back({as_bits(1.f),as_bits(1.f),as_bits(1.f),as_bits(1.f)});
+    for(auto &v:gradient)v[1]={as_bits((as_float(v[0][0])+1)*.25f),as_bits((1-as_float(v[0][1]))*.125f),as_bits(.125f),as_bits(.5f)};
+    const std::array<int32_t,4> clip{8,4,56,28};
+    const auto shaded=executor.execute(gradient,white,{},viewport,background,clip);
+    test(!shaded.used_rectangle && shaded.covered_samples==48*24);
+    double max_error=0;
+    for(unsigned y=0;y<64;++y)for(unsigned x=0;x<64;++x)for(unsigned c=0;c<4;++c){
+        const bool inside=x>=8 && x<56 && y>=4 && y<28;
+        const double rgba[]{(x+.5)/128,(y+.5)/256,.125,.5};const auto lane=c<3?2-c:c;
+        const double expected=inside?rgba[lane]*255+old[c]*.5:old[c];
+        const auto error=std::abs(shaded.pixels[size_t(y)*64+x][c]-expected);max_error=(std::max)(max_error,error);test(error<=.51);++checked;
+    }
+    // Arbitrary nonuniform pixel programs remain rejected until their complete
+    // interpolation and shader path is implemented, with no target mutation.
+    const auto bad_words=nr::registered_lab::shader_tokens("float4 main(float4 c:COLOR):SV_Target{return c*c;}","ps_4_0");
+    const auto bad_ps=parse_pixel(bad_words.data(),bad_words.size());
+    UniformDrawExecutor unsupported(vs,bad_ps,6,64,64,backend,true,true,15,256);
+    bool rejected=false;try{(void)unsupported.execute(gradient,white,{},viewport,background,clip);}catch(const std::invalid_argument &){rejected=true;}
+    test(rejected && background==std::vector<PackedColor>(4096,old));
+    for(const auto cull:{CullMode::front,CullMode::back})for(const bool ccw:{false,true}){
+        UniformDrawExecutor faces(vs,ps,6,64,64,backend,false,true,15,256,cull,ccw);
+        const auto result=faces.execute(quad(1,false),white,{},viewport,background,clip);
+        const bool visible=(cull==CullMode::back)!=ccw;
+        test(result.covered_samples==(visible?48*24:0));
+        for(unsigned y=0;y<64;++y)for(unsigned x=0;x<64;++x)
+            test(result.pixels[size_t(y)*64+x]==(visible && x>=8 && x<56 && y>=4 && y<28?PackedColor{255,255,255,255}:old));
+    }
+    // Same projected square, different clip-space w: test perspective correction
+    // against analytic barycentric weights, then explicitly disable correction.
+    const float weights[]{1,2,4,4,3,1};
+    auto perspective=gradient;
+    for(size_t v=0;v<perspective.size();++v)for(unsigned c=0;c<4;++c)
+        perspective[v][0][c]=as_bits(as_float(perspective[v][0][c])*weights[v]);
+    const auto np_words=nr::registered_lab::shader_tokens("float4 main(float4 p:SV_Position,noperspective float4 c:COLOR):SV_Target{return c;}","ps_4_0");
+    const auto np=parse_pixel(np_words.data(),np_words.size());
+    UniformDrawExecutor affine(vs,np,6,64,64,backend,true,true,15,256);
+    for(const bool correction:{true,false}){
+        const auto result=(correction?executor:affine).execute(perspective,white,{},viewport,background,clip);
+        test(result.covered_samples==48*24);
+        for(unsigned y=4;y<28;++y)for(unsigned x=8;x<56;++x){
+            const double px=(x+.5)/64,py=(y+.5)/64;
+            const bool first=py<=px;const size_t base=first?0u:3u;
+            double bary[3]{first?1-px:px,first?px-py:py-px,first?py:1-py};
+            double denominator=0;for(unsigned v=0;v<3;++v){if(correction)bary[v]/=weights[base+v];denominator+=bary[v];}
+            for(unsigned c=0;c<4;++c){
+                const auto lane=c<3?2-c:c;double value=0;
+                for(unsigned v=0;v<3;++v)value+=bary[v]*as_float(gradient[base+v][1][lane]);
+                const double expected=value/denominator*255+old[c]*.5;
+                const auto error=std::abs(result.pixels[size_t(y)*64+x][c]-expected);
+                max_error=(std::max)(max_error,error);test(error<=.51);++checked;
+            }
+        }
+    }
+    std::printf("{\"checked_components\":%llu,\"gradient_max_byte_error\":%.9g,\"dynamic_geometry_and_constants\":true,\"unsupported_nonuniform_program_rejected\":true,\"background_unchanged\":true}\n", static_cast<unsigned long long>(checked),max_error);
     return 0;
 } catch (const std::exception &e) { std::fprintf(stderr, "%s\n", e.what()); return 1; }
