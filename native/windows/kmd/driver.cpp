@@ -506,8 +506,9 @@ NTSTATUS APIENTRY standard_allocation(HANDLE adapter, DXGKARG_GETSTANDARDALLOCAT
     const auto a = static_cast<Adapter *>(adapter);
     if (!a->started || !a->segment.is_aperture()) return STATUS_DEVICE_NOT_READY;
     if (args->StandardAllocationType == D3DKMDT_STANDARDALLOCATION_SHADOWSURFACE && args->pCreateShadowSurfaceData) {
-        const auto &input = *args->pCreateShadowSurfaceData;
-        NR_LAB_TRACE("nr_paging_lab: shadow_surface width=%u height=%u format=%u\n", input.Width, input.Height, UINT(input.Format));
+        NR_LAB_TRACE("nr_paging_lab: shadow_surface width=%u height=%u format=%u\n",
+                     args->pCreateShadowSurfaceData->Width, args->pCreateShadowSurfaceData->Height,
+                     UINT(args->pCreateShadowSurfaceData->Format));
     }
     const auto status = nr::kmd::StandardAllocation::describe(*args);
     NR_LAB_TRACE("nr_paging_lab: standard_allocation type=%u status=%08lx\n", UINT(args->StandardAllocationType), ULONG(status));
