@@ -3,6 +3,7 @@
 #include <openvino/opsets/opset13.hpp>
 #include <openvino/pass/serialize.hpp>
 #include <cstring>
+#include <cmath>
 #include <set>
 #include <functional>
 #include <sstream>
@@ -46,7 +47,7 @@ struct RegisterExecutor::State {
         std::array<Lanes, 16> input{}, temporary{}, output{};
         std::array<Value, 14> constants{};
         std::array<Value,16> literal_tables{};
-        std::array<Node, 16> textures{};
+        std::array<Node, 16> textures{}, texture_bits{};
         Node half_texel;
         std::vector<Node> invalid_coordinates;
         auto parameter_pair = [&](bool constant, unsigned index, size_t rows) {
@@ -229,6 +230,73 @@ struct RegisterExecutor::State {
             };
             return mix(mix(fetch(0, 0), fetch(1, 0), tx), mix(fetch(0, 1), fetch(1, 1), tx), ty);
         };
+        auto load_texture = [&](const Instruction &instruction) -> Lanes {
+            const auto slot=instruction.sources[1].index;const auto shape=texture_shapes[slot];
+            const bool integer_resource=program.texture_uint[slot],buffer=program.texture_dimensions[slot]==1;
+            Lanes result{};
+            if(!shape.width && !shape.height){
+                for(auto &v:result)v={integer_resource?Node{}:number(0),integer(0)};
+                return result;
+            }
+            check(shape.width && shape.height && uint64_t(shape.width)*shape.height<=4194304 && shape.components && shape.components<=15 &&
+                (buffer?shape.height==1:shape.width<=8192 && shape.height<=8192));
+            const auto address=load(instruction.sources[0]);check(bool(address[0].integer));
+            auto predicate=[](const Node &v)->Node{return std::make_shared<op::Convert>(v,ov::element::i32);};
+            auto in_range=[&](const Node &v,uint32_t extent)->Node{return std::make_shared<op::BitwiseAnd>(
+                predicate(std::make_shared<op::GreaterEqual>(v,integer(0))),predicate(std::make_shared<op::Less>(v,integer(int32_t(extent)))));};
+            Node valid_bits=in_range(address[0].integer,shape.width);
+            Node offset=address[0].integer;
+            if(!buffer){
+                check(bool(address[1].integer) && bool(address[3].integer));
+                valid_bits=std::make_shared<op::BitwiseAnd>(valid_bits,in_range(address[1].integer,shape.height));
+                valid_bits=std::make_shared<op::BitwiseAnd>(valid_bits,predicate(std::make_shared<op::Equal>(address[3].integer,integer(0))));
+                offset=std::make_shared<op::Add>(offset,std::make_shared<op::Multiply>(address[1].integer,integer(int32_t(shape.width))));
+            }
+            const auto valid=std::make_shared<op::NotEqual>(valid_bits,integer(0));
+            const auto size=size_t(shape.width)*shape.height;
+            const auto index=std::make_shared<op::Reshape>(choose(valid,offset,integer(int32_t(size))),indices({int64_t(count)}),false);
+            auto fetch=[&](bool bits)->Node{
+                auto &storage=bits?texture_bits[slot]:textures[slot];
+                const auto type=bits?ov::element::i32:ov::element::f32;
+                if(!storage){
+                    auto parameter=std::make_shared<op::Parameter>(type,ov::Shape{size,4});
+                    const auto name="texture_"+std::to_string(slot)+(bits?"_bits":"");
+                    parameter->set_friendly_name(name);parameter->output(0).get_tensor().set_names({name});
+                    bindings.push_back({parameter,false,slot,name,true});storage=parameter;
+                }
+                const auto padded=std::make_shared<op::Concat>(ov::OutputVector{storage,op::Constant::create(type,ov::Shape{1,4},{0})},0);
+                return std::make_shared<op::Gather>(padded,index,integer(0));
+            };
+            const auto bits=fetch(true);const Node floats=integer_resource?Node{}:fetch(false);
+            for(unsigned c=0;c<4;++c){const auto component=instruction.sources[1].lanes[c];
+                if(shape.components&(1u<<component))result[c]={floats?lane(floats,component):Node{},lane(bits,component)};
+                else result[c]={integer_resource?Node{}:number(component==3?1.f:0.f),integer(component==3?(integer_resource?1:0x3f800000):0)};
+            }
+            return result;
+        };
+        auto shift_right = [&](Node value,const Node &raw_amount)->Node {
+            const auto amount=std::make_shared<op::BitwiseAnd>(raw_amount,integer(31));
+            // Mask before conversion: high lanes have at most 24 significant
+            // bits and low lanes at most 8. Four <=8-bit stages avoid NPU
+            // flushing tiny reciprocal scales; each quotient is exact.
+            for(unsigned step=0;step<4;++step){
+                const auto chunk=std::make_shared<op::Minimum>(std::make_shared<op::Maximum>(
+                    std::make_shared<op::Subtract>(amount,integer(int32_t(step*8))),integer(0)),integer(8));
+                const auto index=std::make_shared<op::Reshape>(batch(chunk),indices({int64_t(count)}),false);
+                std::vector<float> scales(9);for(unsigned n=0;n<9;++n)scales[n]=std::ldexp(1.f,-int(n));
+                const auto scale=std::make_shared<op::Reshape>(std::make_shared<op::Gather>(
+                    op::Constant::create(ov::element::f32,ov::Shape{9},scales),index,integer(0)),batch_shape,false);
+                auto part=[&](bool high)->Node{
+                    std::vector<int32_t> masks(9);for(unsigned n=0;n<9;++n){const auto bits=(high?0xffffff00u:255u)&(~0u<<n);std::memcpy(&masks[n],&bits,4);}
+                    const auto mask=std::make_shared<op::Reshape>(std::make_shared<op::Gather>(
+                        op::Constant::create(ov::element::i32,ov::Shape{9},masks),index,integer(0)),batch_shape,false);
+                    const auto integral=std::make_shared<op::Convert>(std::make_shared<op::BitwiseAnd>(value,mask),ov::element::f32);
+                    return std::make_shared<op::Convert>(std::make_shared<op::Multiply>(integral,scale),ov::element::i32);
+                };
+                value=std::make_shared<op::Add>(part(true),part(false));
+            }
+            return value;
+        };
         for (const auto &instruction : program.instructions) {
             check(!instruction.saturate); // NaN/denormal saturation is not qualified on NPU yet.
             if (instruction.opcode == Opcode::begin_if) {
@@ -258,6 +326,12 @@ struct RegisterExecutor::State {
                 merge(output, b.has_else ? b.then_outputs : b.before_outputs);
                 branches.pop_back(); continue;
             }
+            if(instruction.opcode==Opcode::load){
+                const auto values=load_texture(instruction);
+                auto &destination=(instruction.destination.kind==Register::temporary?temporary:output)[instruction.destination.index];
+                for(unsigned c=0;c<4;++c)if(instruction.destination.mask&(1u<<c))destination[c]=values[c];
+                continue;
+            }
             if (instruction.opcode == Opcode::sample) {
                 const auto sampled = sample_texture(instruction);
                 auto &destination = (instruction.destination.kind == Register::temporary ? temporary : output)[instruction.destination.index];
@@ -277,7 +351,7 @@ struct RegisterExecutor::State {
                 auto source = instruction.sources[i];
                 if (int(i) == subtract_source)
                     source.modifier = source.modifier == Modifier::negate ? Modifier::none : Modifier::absolute;
-                sources[i] = load(source, instruction.opcode == Opcode::integer_add);
+                sources[i] = load(source, instruction.opcode == Opcode::integer_add || instruction.opcode==Opcode::integer_mad);
             }
             Lanes result{};
             for (unsigned c = 0; c < 4; ++c) if (instruction.destination.mask & (1u << c)) {
@@ -285,6 +359,35 @@ struct RegisterExecutor::State {
                 else if (instruction.opcode == Opcode::integer_add) {
                     check(bool(sources[0][c].integer) && bool(sources[1][c].integer));
                     result[c].integer = std::make_shared<op::Add>(sources[0][c].integer, sources[1][c].integer);
+                } else if(instruction.opcode==Opcode::integer_mad){
+                    check(bool(sources[0][c].integer) && bool(sources[1][c].integer) && bool(sources[2][c].integer));
+                    result[c].integer=std::make_shared<op::Add>(std::make_shared<op::Multiply>(sources[0][c].integer,sources[1][c].integer),sources[2][c].integer);
+                } else if(instruction.opcode==Opcode::shift_right){
+                    check(bool(sources[0][c].integer) && bool(sources[1][0].integer));
+                    result[c].integer=shift_right(sources[0][c].integer,sources[1][0].integer);
+                } else if(instruction.opcode==Opcode::float_to_integer){
+                    // Decode the IEEE representation with integer operations.
+                    // Native NPU Convert/clamp hangs on nonfinite and extreme
+                    // inputs. A bit view also preserves NaN payloads and -0.
+                    const auto raw=sources[0][c].integer;check(bool(raw));
+                    const auto exponent=shift_right(std::make_shared<op::BitwiseAnd>(raw,integer(0x7f800000)),integer(23));
+                    const auto fraction=std::make_shared<op::BitwiseAnd>(raw,integer(0x7fffff));
+                    const auto mantissa=std::make_shared<op::BitwiseOr>(fraction,integer(0x800000));
+                    const auto right=shift_right(mantissa,std::make_shared<op::Subtract>(integer(150),exponent));
+                    const auto left_amount=std::make_shared<op::BitwiseAnd>(std::make_shared<op::Subtract>(exponent,integer(150)),integer(31));
+                    std::vector<int32_t> powers(32);for(unsigned n=0;n<32;++n){const auto bits=1u<<n;std::memcpy(&powers[n],&bits,4);}
+                    const auto index=std::make_shared<op::Reshape>(batch(left_amount),indices({int64_t(count)}),false);
+                    const auto factor=std::make_shared<op::Reshape>(std::make_shared<op::Gather>(
+                        op::Constant::create(ov::element::i32,ov::Shape{32},powers),index,integer(0)),batch_shape,false);
+                    auto magnitude=choose(std::make_shared<op::GreaterEqual>(exponent,integer(150)),std::make_shared<op::Multiply>(mantissa,factor),right);
+                    magnitude=choose(std::make_shared<op::Less>(exponent,integer(127)),integer(0),magnitude);
+                    const auto sign_negative=std::make_shared<op::Less>(raw,integer(0));
+                    auto value=choose(sign_negative,std::make_shared<op::Negative>(magnitude),magnitude);
+                    value=choose(std::make_shared<op::GreaterEqual>(exponent,integer(158)),choose(sign_negative,integer(INT32_MIN),integer(INT32_MAX)),value);
+                    const auto nan_bits=std::make_shared<op::BitwiseAnd>(
+                        std::make_shared<op::Convert>(std::make_shared<op::Equal>(exponent,integer(255)),ov::element::i32),
+                        std::make_shared<op::Convert>(std::make_shared<op::NotEqual>(fraction,integer(0)),ov::element::i32));
+                    result[c].integer=choose(std::make_shared<op::NotEqual>(nan_bits,integer(0)),integer(0),value);
                 } else if(instruction.opcode==Opcode::shift_left){
                     check(bool(sources[0][c].integer) && bool(sources[1][0].integer));
                     std::vector<int32_t> powers(32);for(unsigned n=0;n<32;++n){const uint32_t value=uint32_t(1)<<n;std::memcpy(&powers[n],&value,4);}
@@ -473,9 +576,15 @@ void RegisterExecutor::validate(const Program &program) {
             check(!(mask & ~available(instruction.sources[0], true)));
             floating_views = available(instruction.sources[1], false) & available(instruction.sources[2], false);
             bit_views = available(instruction.sources[1], true) & available(instruction.sources[2], true);
-        } else if (instruction.opcode == Opcode::integer_add || instruction.opcode == Opcode::shift_left || instruction.opcode == Opcode::integer_to_float) {
+        } else if (instruction.opcode == Opcode::integer_add || instruction.opcode == Opcode::integer_mad || instruction.opcode==Opcode::shift_right || instruction.opcode == Opcode::shift_left || instruction.opcode == Opcode::integer_to_float) {
             for (unsigned i = 0; i < instruction.source_count; ++i) check(!(mask & ~available(instruction.sources[i], true)));
             if (instruction.opcode != Opcode::integer_to_float) bit_views = mask; else floating_views = mask;
+        } else if(instruction.opcode==Opcode::float_to_integer){
+            check(!(mask&~available(instruction.sources[0],true)));bit_views=mask;
+        } else if(instruction.opcode==Opcode::load){
+            const auto slot=instruction.sources[1].index,used=program.texture_dimensions[slot]==1?1u:11u;
+            check(!(used&~available(instruction.sources[0],true)));bit_views=mask;
+            if(!program.texture_uint[slot])floating_views=mask;
         } else if (instruction.opcode == Opcode::sample) {
             check(program.stage == Stage::pixel && (available(instruction.sources[0], false) & 3u) == 3u);
             floating_views = mask;

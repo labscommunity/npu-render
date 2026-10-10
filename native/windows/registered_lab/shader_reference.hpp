@@ -54,14 +54,34 @@ inline Registers reference_vertex(const Program &program, const Registers &input
         if (instruction.opcode == Opcode::end_if) { active = branches.back().parent; branches.pop_back(); continue; }
         if (!active) continue;
         std::array<Bits, 3> values{};
-        for (unsigned i = 0; i < (instruction.opcode == Opcode::sample ? 1u : instruction.source_count); ++i)
-            values[i] = load(instruction.sources[i], instruction.opcode == Opcode::integer_add);
+        for (unsigned i = 0; i < ((instruction.opcode == Opcode::sample || instruction.opcode==Opcode::load) ? 1u : instruction.source_count); ++i)
+            values[i] = load(instruction.sources[i], instruction.opcode == Opcode::integer_add || instruction.opcode==Opcode::integer_mad);
         Bits value{};
         for (unsigned i = 0; i < 4; ++i) {
             if (!(instruction.destination.mask & (1u << i))) continue;
             if (instruction.opcode == Opcode::move) value[i] = values[0][i];
             else if (instruction.opcode == Opcode::select) value[i] = values[0][i] ? values[1][i] : values[2][i];
             else if (instruction.opcode == Opcode::integer_add) value[i] = values[0][i] + values[1][i];
+            else if(instruction.opcode==Opcode::integer_mad)value[i]=values[0][i]*values[1][i]+values[2][i];
+            else if(instruction.opcode==Opcode::shift_right){
+                const auto amount=values[1][0]&31,raw=values[0][i];
+                value[i]=(raw>>amount)|((raw&0x80000000u) && amount ? (~0u<<(32-amount)):0u);
+            }
+            else if(instruction.opcode==Opcode::float_to_integer){
+                const auto v=as_float(values[0][i]);int32_t converted=std::isnan(v)?0:v>=2147483648.f?INT32_MAX:v<=-2147483648.f?INT32_MIN:int32_t(v);
+                std::memcpy(&value[i],&converted,4);
+            }
+            else if(instruction.opcode==Opcode::load){
+                const auto slot=instruction.sources[1].index,component=instruction.sources[1].lanes[i];const auto shape=shapes[slot];
+                if(!shape.width && !shape.height)value[i]=0;
+                else if(!(shape.components&(1u<<component)))value[i]=component==3?(program.texture_uint[slot]?1u:as_bits(1.f)):0;
+                else {
+                    const auto x=values[0][0],y=program.texture_dimensions[slot]==1?0u:values[0][1];
+                    const bool valid=x<shape.width && y<shape.height && (program.texture_dimensions[slot]==1 || values[0][3]==0);
+                    check(textures[slot].size()==size_t(shape.width)*shape.height);
+                    value[i]=valid?as_bits(textures[slot][size_t(y)*shape.width+x][component]):0;
+                }
+            }
             else if (instruction.opcode == Opcode::shift_left) value[i] = values[0][i] << (values[1][0]&31);
             else if (instruction.opcode == Opcode::less)
                 value[i] = as_float(values[0][i]) < as_float(values[1][i]) ? 0xffffffffu : 0;

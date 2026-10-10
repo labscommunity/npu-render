@@ -3,6 +3,7 @@
 #include "shader_reference.hpp"
 #include "point_texture_fixture.hpp"
 #include "linear_texture_fixture.hpp"
+#include "typed_load_fixture.hpp"
 #include <fstream>
 #include <cstdio>
 #include <thread>
@@ -104,6 +105,23 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
     for(unsigned n=0;n<6;++n){auto bad=triangle_bytes;auto h=triangles.header;
         if(n==0)h.abi=6;if(n==1)h.flags&=~2u;if(n==2)h.flags&=~24u;if(n==3)h.flags|=24u;if(n==4)h.flags|=96u;if(n==5)h.vertices=4095;
         std::memcpy(bad.data(),&h,sizeof(h));rejects(bad);}
+    auto resources=r;resources.header.abi=8;resources.header.flags=0x2f42;
+    const auto &lookup=nr::registered_lab::test_fixture::typed_lookup_pixel_words;
+    resources.pixel=nr::shader::parse_pixel(lookup,std::size(lookup));
+    resources.resources[0]={4,1,42,{{0,0,0,0},{1,0,0,0},{2,0,0,0},{3,0,0,0}}};
+    resources.resources[1]={2,2,28,{{1,2,3,4},{5,6,7,8},{9,10,11,12},{13,14,15,16}}};
+    const auto resource_packet=ex::encode(resources);const auto resource_decoded=ex::decode(resource_packet);
+    test(resource_decoded.resources[0].pixels==resources.resources[0].pixels && resource_decoded.resources[1].pixels==resources.resources[1].pixels &&
+        nr::raster::resource_layout_equal(resources.resources,resource_decoded.resources));
+    for(unsigned n=0;n<5;++n){auto bad=resource_packet;auto h=resources.header;
+        if(n==0)h.abi=7;if(n==1)h.flags|=8;if(n==2)h.flags|=16;if(n==3)h.flags|=0x1000;if(n==4)h.flags&=~2u;
+        std::memcpy(bad.data(),&h,sizeof(h));rejects(bad);}
+    // The first resource descriptor follows the fixed shader/input/target data.
+    const auto resource_offset=sizeof(ex::Header)+sizeof(nr::raster::Viewport)+resources.vertex.bytecode.size()*4+resources.pixel.bytecode.size()*4+
+        resources.inputs.size()*sizeof(nr::shader::VertexRegisters)+resources.background.size()*4;
+    for(unsigned n=0;n<4;++n){auto bad=resource_packet;ex::TextureDescription d{};std::memcpy(&d,bad.data()+resource_offset,sizeof(d));
+        if(n==0)d.width=UINT32_MAX;if(n==1)d.height=2;if(n==2)d.format=87;if(n==3)d.reserved=1;
+        std::memcpy(bad.data()+resource_offset,&d,sizeof(d));rejects(bad);}
     const size_t description_offset = texture_bytes.size()-textured.texture.pixels.size()*4-sizeof(ex::TextureDescription);
     for(uint32_t bad=0;bad<5;++bad) {
         auto packet = texture_bytes; ex::TextureDescription desc{}; std::memcpy(&desc,packet.data()+description_offset,sizeof(desc));

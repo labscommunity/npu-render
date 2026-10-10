@@ -14,8 +14,24 @@ class Pipeline {
     Request previous_linear;
     std::unique_ptr<raster::TriangleTextureDrawExecutor> triangle_executor;
     Request previous_triangle;
+    std::unique_ptr<raster::TriangleTextureDrawExecutor> resources_executor;
+    Request previous_resources;
 public:
     raster::UniformDrawExecutor::Result execute(const Request &request) {
+        if(request.header.flags & 0x2000){
+            const auto &h=request.header,&old=previous_resources.header;require(shape_valid(h) && h.abi==8);
+            if(!resources_executor || old.width!=h.width || old.height!=h.height || old.vertices!=h.vertices || old.format!=h.format ||
+                (old.flags&~4u)!=(h.flags&~4u) || !raster::resource_layout_equal(request.resources,previous_resources.resources) ||
+                !raster::sampler_layout_equal(request.samplers,previous_resources.samplers) ||
+                previous_resources.vertex.bytecode!=request.vertex.bytecode || previous_resources.pixel.bytecode!=request.pixel.bytecode){
+                resources_executor.reset();uint32_t batch=4096;while(uint64_t(h.width)*h.height%batch)batch/=2;
+                resources_executor=std::make_unique<raster::TriangleTextureDrawExecutor>(request.vertex,request.pixel,h.vertices,h.width,h.height,h.format,
+                    request.resources,request.samplers,"NPU",(h.flags&1)!=0,uint8_t((h.flags>>8)&15),static_cast<raster::CullMode>((h.flags>>5)&3),(h.flags&128)!=0,batch);
+                previous_resources={};previous_resources.header=h;previous_resources.vertex=request.vertex;previous_resources.pixel=request.pixel;
+                previous_resources.resources=raster::resource_layout(request.resources);previous_resources.samplers=request.samplers;
+            }
+            return resources_executor->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,request.resources,request.background,request.scissor);
+        }
         if(request.header.flags & 0x1000) {
             const auto &h=request.header,&old=previous_triangle.header;
             const auto &t=request.texture,&pt=previous_triangle.texture;

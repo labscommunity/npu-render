@@ -56,6 +56,11 @@ struct Device {
     std::unique_ptr<nr::raster::TriangleTextureDrawExecutor> triangle_texture_executor;
     std::shared_ptr<const nr::shader::Program> triangle_texture_vertex, triangle_texture_pixel;
     std::array<uint64_t, 8> triangle_texture_key{};
+    std::unique_ptr<nr::raster::TriangleTextureDrawExecutor> resources_executor;
+    std::shared_ptr<const nr::shader::Program> resources_vertex,resources_pixel;
+    std::array<uint64_t,5> resources_key{};
+    nr::raster::PackedResources resources_layout{};
+    nr::shader::TextureSamplers resources_samplers{};
     std::unique_ptr<IndexedNpuExchange> indexed_exchange;
     std::shared_ptr<const nr::shader::Program> indexed_vertex, indexed_pixel;
     std::array<uint64_t, 5> indexed_key{};

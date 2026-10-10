@@ -5,7 +5,9 @@
 namespace nr::shader {
 // Decoded float texels, one mip, edge-clamped 2D sampling. Resource format
 // decoding and D3D sampler-state validation belong to the graphics boundary.
-struct TextureShape { uint32_t width = 0, height = 0; };
+// UINT resources transport unchanged 32-bit lane representations in the same
+// storage; consumers use memcpy, never a numerical float conversion.
+struct TextureShape { uint32_t width = 0, height = 0, components = 15; };
 enum class TextureFilter { point, linear };
 struct TextureSampler { TextureFilter filter = TextureFilter::linear; };
 using TextureShapes = std::array<TextureShape, 16>;

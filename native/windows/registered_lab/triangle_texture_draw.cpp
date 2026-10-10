@@ -11,9 +11,9 @@ double ms(Clock::time_point start){return std::chrono::duration<double,std::mill
 void require(bool v){if(!v)throw std::invalid_argument("unsupported textured triangle draw");}
 }
 void TriangleTextureDrawExecutor::validate_shader(const shader::Program &p){
-    require(p.stage==shader::Stage::pixel && p.outputs[0]==15 && p.textures[0] && p.samplers[0]);
+    require(p.stage==shader::Stage::pixel && p.outputs[0]==15);
     for(unsigned r=0;r<16;++r){
-        if(r)require(!p.textures[r] && !p.samplers[r] && !p.outputs[r]);
+        if(r)require(!p.outputs[r]);
         if(p.inputs[r] && r!=p.position_input)require(p.interpolation[r]==1 || p.interpolation[r]==2 || p.interpolation[r]==4);
     }
     for(const auto &i:p.instructions)for(unsigned a=0;a<i.source_count;++a)
@@ -22,7 +22,8 @@ void TriangleTextureDrawExecutor::validate_shader(const shader::Program &p){
 }
 struct TriangleTextureDrawExecutor::State {
     shader::Program vs,ps;
-    uint32_t count,width,height,format,sw,sh,sf,batch;
+    uint32_t count,width,height,format,batch;
+    PackedResources layout;
     shader::VertexExecutor vertex;
     ProjectionExecutor projection;
     std::unique_ptr<shader::PixelExecutor> pixel;
@@ -30,16 +31,15 @@ struct TriangleTextureDrawExecutor::State {
     OutputMerger merger;
     std::unique_ptr<ColorInterpolator> perspective,affine;
     State(const shader::Program &v,const shader::Program &p,uint32_t n,uint32_t w,uint32_t h,uint32_t f,
-        uint32_t source_width,uint32_t source_height,uint32_t source_format,const std::string &backend,
-        bool blend,uint8_t mask,shader::TextureFilter filter,CullMode cull,bool ccw,uint32_t b)
-        :vs(v),ps(p),count(n),width(w),height(h),format(f),sw(source_width),sh(source_height),sf(source_format),batch(b),
+        const PackedResources &resources,const shader::TextureSamplers &samplers,const std::string &backend,
+        bool blend,uint8_t mask,CullMode cull,bool ccw,uint32_t b)
+        :vs(v),ps(p),count(n),width(w),height(h),format(f),batch(b),layout(resource_layout(resources)),
          vertex(v,n,backend),projection(n,backend),coverage(b,backend,cull,ccw),merger(b,backend,blend,f==87,mask){
         validate_shader(ps);
         require(n && n<=4096 && !(n%3) && w && w<=8192 && h && h<=8192 && uint64_t(w)*h<=4*1024*1024 &&
             b && b<=4096 && !(uint64_t(w)*h%b) && uint64_t(n/3)*(uint64_t(w)*h/b)<=4096 &&
-            (f==28 || f==87) && (sf==28 || sf==87) && sw && sw<=8192 && sh && sh<=8192 && uint64_t(sw)*sh<=4*1024*1024 &&
-            vs.stage==shader::Stage::vertex && vs.position_output<16 && (filter==shader::TextureFilter::point || filter==shader::TextureFilter::linear));
-        shader::TextureShapes shapes{};shapes[0]={sw,sh};shader::TextureSamplers samplers{};samplers[0].filter=filter;
+            (f==28 || f==87) && vs.stage==shader::Stage::vertex && vs.position_output<16);
+        const auto shapes=resource_shapes(ps,resources);
         pixel=std::make_unique<shader::PixelExecutor>(ps,batch,backend,shapes,samplers);
         for(unsigned r=0;r<16;++r)if(ps.inputs[r] && r!=ps.position_input){
             require((vs.outputs[r]&ps.inputs[r])==ps.inputs[r]);
@@ -51,14 +51,25 @@ struct TriangleTextureDrawExecutor::State {
 TriangleTextureDrawExecutor::TriangleTextureDrawExecutor(const shader::Program &v,const shader::Program &p,
     uint32_t n,uint32_t w,uint32_t h,uint32_t f,uint32_t sw,uint32_t sh,uint32_t sf,const std::string &backend,
     bool blend,uint8_t mask,shader::TextureFilter filter,CullMode cull,bool ccw,uint32_t batch)
-    :state(std::make_unique<State>(v,p,n,w,h,f,sw,sh,sf,backend,blend,mask,filter,cull,ccw,batch)){}
+    :state(nullptr){
+    PackedResources resources{};resources[0]={sw,sh,sf,{}};shader::TextureSamplers samplers{};samplers[0].filter=filter;
+    state=std::make_unique<State>(v,p,n,w,h,f,resources,samplers,backend,blend,mask,cull,ccw,batch);
+}
+TriangleTextureDrawExecutor::TriangleTextureDrawExecutor(const shader::Program &v,const shader::Program &p,
+    uint32_t n,uint32_t w,uint32_t h,uint32_t f,const PackedResources &resources,const shader::TextureSamplers &samplers,const std::string &backend,
+    bool blend,uint8_t mask,CullMode cull,bool ccw,uint32_t batch)
+    :state(std::make_unique<State>(v,p,n,w,h,f,resources,samplers,backend,blend,mask,cull,ccw,batch)){}
 TriangleTextureDrawExecutor::~TriangleTextureDrawExecutor()=default;
 UniformDrawExecutor::Result TriangleTextureDrawExecutor::execute(const std::vector<shader::VertexRegisters> &inputs,
     const shader::VertexConstants &vc,const shader::VertexConstants &pc,const Viewport &viewport,const PackedTexture &source,
     const std::vector<PackedColor> &background,const std::optional<std::array<int32_t,4>> &scissor){
+    PackedResources resources{};resources[0]=source;return execute(inputs,vc,pc,viewport,resources,background,scissor);
+}
+UniformDrawExecutor::Result TriangleTextureDrawExecutor::execute(const std::vector<shader::VertexRegisters> &inputs,
+    const shader::VertexConstants &vc,const shader::VertexConstants &pc,const Viewport &viewport,const PackedResources &resources,
+    const std::vector<PackedColor> &background,const std::optional<std::array<int32_t,4>> &scissor){
     auto &s=*state;const auto start=Clock::now();
-    require(inputs.size()==s.count && background.size()==size_t(s.width)*s.height && source.width==s.sw && source.height==s.sh &&
-        source.format==s.sf && source.pixels.size()==size_t(s.sw)*s.sh && viewport.x==0 && viewport.y==0 &&
+    require(inputs.size()==s.count && background.size()==size_t(s.width)*s.height && resource_layout_equal(resources,s.layout) && viewport.x==0 && viewport.y==0 &&
         viewport.width==float(s.width) && viewport.height==float(s.height));
     const auto clip=scissor.value_or(std::array<int32_t,4>{0,0,int32_t(s.width),int32_t(s.height)});
     require(clip[0]>=0 && clip[1]>=0 && clip[0]<=clip[2] && clip[1]<=clip[3] && clip[2]<=int32_t(s.width) && clip[3]<=int32_t(s.height));
@@ -70,9 +81,7 @@ UniformDrawExecutor::Result TriangleTextureDrawExecutor::execute(const std::vect
     for(size_t v=0;v<s.count;++v)std::memcpy(clips[v].data(),shaded.vertices[v][s.vs.position_output].data(),16);
     began=Clock::now();const auto projected=s.projection.execute(clips,viewport);require(projected.execution_device==result.execution_device);
     result.timings.projection_ms=ms(began);result.input_bytes+=uint64_t(s.count)*16+24;result.output_bytes+=uint64_t(s.count)*24;++result.provider_requests;
-    shader::TexturePixels textures;auto &texels=textures[0];texels.resize(source.pixels.size());
-    // Resource-format decoding only. NPU sampling reads these normalized texels.
-    for(size_t n=0;n<texels.size();++n)for(unsigned c=0;c<4;++c)texels[n][c]=float(source.pixels[n][s.sf==87 && c<3?2-c:c])/255;
+    const auto textures=decode_resources(s.ps,resources);
     result.pixels=background;std::vector<Sample> samples(s.batch);std::vector<Point> points(s.batch);
     std::vector<PackedColor> tile(s.batch);std::vector<Color> colors(s.batch);std::vector<shader::VertexRegisters> fragments(s.batch);
     const size_t first_tile=(size_t(clip[1])*s.width/s.batch)*s.batch;

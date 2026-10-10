@@ -1,0 +1,31 @@
+{"kind": "ishr-split", "compiled": true, "device": "NPU"}
+python.exe : Traceback (most recent call last):
+At line:2 char:1
++ & "$src\venv\Scripts\python.exe" "$r\vm\probe-npu-integer-load-v4.py" ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], Remot
+   eException
+    + FullyQualifiedErrorId : NativeCommandError
+
+  File "C:\Users\tatef\AppData\Local\npu-render\vm\probe-npu-integer-load-v4.py", line 35, in
+<module>
+    for idx,value in enumerate([a,b] if kind=='ishr-split' else
+[a,b,c]):request.set_input_tensor(idx,ov.Tensor(value))
+
+    ^^^^^^^^^^^^^^^^
+RuntimeError: Check 'ov_type_it != dtype_map.end()' failed at core\common.cpp:92:
+Unsupported data type: int32
+
+{"kind": "ishr-split", "error": "Check 'ov_type_it != dtype_map.end()' failed at core\\common.cpp:92:\nUnsupported data type: int32\n"}
+{"kind": "imad", "compiled": true, "device": "NPU"}
+Traceback (most recent call last):
+  File "C:\Users\tatef\AppData\Local\npu-render\vm\probe-npu-integer-load-v4.py", line 35, in
+<module>
+    for idx,value in enumerate([a,b] if kind=='ishr-split' else
+[a,b,c]):request.set_input_tensor(idx,ov.Tensor(value))
+
+    ^^^^^^^^^^^^^^^^
+RuntimeError: Check 'ov_type_it != dtype_map.end()' failed at core\common.cpp:92:
+Unsupported data type: int32
+
+{"kind": "imad", "error": "Check 'ov_type_it != dtype_map.end()' failed at core\\common.cpp:92:\nUnsupported data type: int32\n"}

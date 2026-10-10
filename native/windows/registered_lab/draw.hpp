@@ -38,8 +38,8 @@ void APIENTRY set_sources(D3D10DDI_HDEVICE h, UINT start, UINT count, const D3D1
             require(!views[i].pDrvPrivate || (source && source->context == d.context));
         }
         d.shader_sources[Stage] = std::move(next);
-        // The current SAMPLE renderer only admits texture slot zero. Typed
-        // buffer views retain their identity and cannot masquerade as textures.
+        // Keep the legacy slot-zero SAMPLE alias separate from the complete
+        // view table used by typed resource loads.
         if constexpr (Stage == 2) d.bound_source = d.shader_sources[2][0].buffer ? nullptr : d.shader_sources[2][0].allocation;
     });
 }

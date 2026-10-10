@@ -1,0 +1,48 @@
+{
+  "build": "present-umd-v101",
+  "clean_build": true,
+  "source_hashes_match": true,
+  "cpu_contract_suites_passed": 17,
+  "npu_contracts": {
+    "integer_components_exact": 1536,
+    "typed_load_components_exact": 2560,
+    "synthetic_lookup_draw_pixels_exact": 4096,
+    "synthetic_lookup_draw_coverage_samples": 3132,
+    "textured_triangle_components": 16384,
+    "textured_triangle_maximum_byte_error": 1,
+    "registered_ddi_contract_passed": true
+  },
+  "transport_abi": 8,
+  "full_desktop_offload": false,
+  "live_trial_pending": true,
+  "tahoma_performance_tested": false,
+  "preserved_failures": [
+    "Native right-shift node rejected by NPU compiler; masked four-stage lowering passes all 32 shift counts.",
+    "Direct FTOI conversion/clamp caused NPU device loss in v98 and standalone probe; integer IEEE decoding avoids that route.",
+    "v99 compilation rejected a shadowed local; renamed before v100.",
+    "v100 initial NaN result was INT_MAX; i32 bitwise predicate combination corrects it.",
+    "NPU emits a function-outliner empty-function diagnostic for an unbound constant graph; the test still completes and its exact outputs pass."
+  ],
+  "limits": [
+    "FTOI requires an integer bit view of the float source; float-only arithmetic temporaries remain rejected.",
+    "Only admitted buffer and 2D view formats; not arbitrary Direct3D conformance.",
+    "No live desktop qualification in these component checks; no frame delivery or speedup claim."
+  ],
+  "references": [
+    "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/ftoi--sm4---asm-",
+    "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/ishr--sm4---asm-",
+    "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/imad--sm4---asm-",
+    "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/ld--sm4---asm-"
+  ],
+  "captured_dwm_replay": {
+    "byte_exact": true,
+    "target": [
+      1024,
+      768
+    ],
+    "covered_samples": 34,
+    "draw_ms": 497.06,
+    "compile_ms": 2355.217,
+    "execution_device": "NPU"
+  }
+}

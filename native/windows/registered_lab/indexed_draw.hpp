@@ -98,7 +98,40 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
     const auto cull=static_cast<nr::raster::CullMode>(UINT(d.raster.CullMode)-1);
     const bool front_ccw=d.raster.FrontCounterClockwise!=0;
     nr::raster::PackedTexture texture; bool linear=false, modulated=false, general_texture=false;
-    if (textured) {
+    bool general_resources=false;
+    for(unsigned slot=0;slot<16;++slot)general_resources=general_resources ||
+        (d.pixel_program->textures[slot] && (slot || d.pixel_program->texture_dimensions[slot]!=3 || d.pixel_program->texture_uint[slot])) ||
+        (slot && d.pixel_program->samplers[slot]);
+    for(const auto &instruction:d.pixel_program->instructions)general_resources=general_resources || instruction.opcode==nr::shader::Opcode::load;
+    nr::raster::PackedResources resources{};nr::shader::TextureSamplers resource_samplers{};
+    if(general_resources){
+        nr::raster::TriangleTextureDrawExecutor::validate_shader(*d.pixel_program);
+        for(unsigned slot=0;slot<16;++slot){
+            if(d.pixel_program->samplers[slot]){
+                const auto &samp=d.samplers[2][slot];require(samp.bound &&
+                    (samp.desc.Filter==D3D10_DDI_FILTER_MIN_MAG_MIP_LINEAR || samp.desc.Filter==D3D10_DDI_FILTER_MIN_MAG_MIP_POINT) &&
+                    samp.desc.AddressU==D3D10_DDI_TEXTURE_ADDRESS_CLAMP && samp.desc.AddressV==D3D10_DDI_TEXTURE_ADDRESS_CLAMP &&
+                    samp.desc.AddressW==D3D10_DDI_TEXTURE_ADDRESS_CLAMP && samp.desc.MipLODBias==0 && samp.desc.MinLOD==0 && samp.desc.MaxLOD>=0);
+                resource_samplers[slot].filter=samp.desc.Filter==D3D10_DDI_FILTER_MIN_MAG_MIP_LINEAR?nr::shader::TextureFilter::linear:nr::shader::TextureFilter::point;
+            }
+            if(!d.pixel_program->textures[slot])continue;
+            const auto &view=d.shader_sources[2][slot];const auto source=view.allocation;if(!source)continue;
+            require(source!=target && source->handle!=target->handle && source->context==d.context && !source->locked);
+            auto &t=resources[slot];
+            if(view.buffer){
+                require(d.pixel_program->texture_dimensions[slot]==1 && d.pixel_program->texture_uint[slot] && view.format==62 && view.elements && view.elements<=4194304 &&
+                    uint64_t(view.first_element)+view.elements<=source->surface.allocation_bytes);
+                t={view.elements,1,42,{}};t.pixels.resize(view.elements);Mapping read(*source,true);
+                const auto data=static_cast<const uint8_t *>(read.data)+view.first_element;
+                for(size_t n=0;n<t.pixels.size();++n){const uint32_t value=data[n];std::memcpy(t.pixels[n].data(),&value,4);}read.finish();
+            }else{
+                const auto &ss=source->surface;require(d.pixel_program->texture_dimensions[slot]==3 && !d.pixel_program->texture_uint[slot] &&
+                    (ss.format==28 || ss.format==87 || ss.format==65) && ss.width<=8192 && ss.height<=8192 && uint64_t(ss.width)*ss.height<=4194304);
+                const auto data=read_pixels(*source);t={ss.width,ss.height,ss.format==65?28u:ss.format,{}};t.pixels.resize(size_t(ss.width)*ss.height);
+                if(ss.format==65)for(size_t n=0;n<data.size();++n)t.pixels[n]={0,0,0,data[n]};else std::memcpy(t.pixels.data(),data.data(),data.size());
+            }
+        }
+    }else if (textured) {
         const auto source = d.bound_source; const auto &sampler = d.samplers[2][0];
         linear=sampler.desc.Filter==D3D10_DDI_FILTER_MIN_MAG_MIP_LINEAR;
         modulated=linear || d.pixel_program->instructions.size()==2 || blend || clip!=full;
@@ -133,14 +166,27 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
         indexed_exchange::Request request;
         request.header.width = s.width; request.header.height = s.height; request.header.vertices = count;
         request.header.format = s.format; request.header.flags = (UINT(d.blend.RenderTargetWriteMask[0]) << 8) | UINT(blend);
-        if (textured) { request.header.abi = 2; request.header.flags |= 2; request.texture = std::move(texture); }
+        if (textured && !general_resources) { request.header.abi = 2; request.header.flags |= 2; request.texture = std::move(texture); }
         if (clip != full) { request.header.abi = 3; request.header.flags |= 4; request.scissor = clip; }
         if (modulated) {request.header.abi=linear?4:5;request.header.flags|=linear?8:16;}
         if(cull!=nr::raster::CullMode::none){request.header.abi=6;request.header.flags|=(UINT(cull)<<5)|(front_ccw?128u:0u);}
         if(general_texture){request.header.abi=7;request.header.flags|=0x1000|(linear?8u:16u);}
+        if(general_resources){request.header.abi=8;request.header.flags|=0x2002;request.resources=std::move(resources);request.samplers=resource_samplers;}
         request.viewport = viewport; request.vertex = *d.vertex_program; request.pixel = *d.pixel_program;
         request.inputs = inputs; request.vertex_constants = vc; request.pixel_constants = pc; request.background = std::move(background);
         result = d.indexed_exchange->execute(std::move(request));
+    } else if(general_resources){
+        const uint64_t options=uint64_t(d.blend.RenderTargetWriteMask[0])|(uint64_t(blend)<<4)|(uint64_t(cull)<<6)|(uint64_t(front_ccw)<<8);
+        const std::array<uint64_t,5> key{s.width,s.height,s.format,count,options};
+        if(!d.resources_executor || d.resources_vertex!=d.vertex_program || d.resources_pixel!=d.pixel_program || d.resources_key!=key ||
+            !nr::raster::resource_layout_equal(resources,d.resources_layout) || !nr::raster::sampler_layout_equal(resource_samplers,d.resources_samplers)){
+            if(d.backend=="NPU")d.resources_executor.reset();uint32_t batch=4096;while(uint64_t(s.width)*s.height%batch)batch/=2;
+            auto candidate=std::make_unique<nr::raster::TriangleTextureDrawExecutor>(*d.vertex_program,*d.pixel_program,count,s.width,s.height,s.format,
+                resources,resource_samplers,d.backend,blend,d.blend.RenderTargetWriteMask[0],cull,front_ccw,batch);
+            d.resources_executor=std::move(candidate);d.resources_key=key;d.resources_layout=nr::raster::resource_layout(resources);d.resources_samplers=resource_samplers;
+            d.resources_vertex=d.vertex_program;d.resources_pixel=d.pixel_program;
+        }
+        result=d.resources_executor->execute(inputs,vc,pc,viewport,resources,background,clip);
     } else if(general_texture) {
         const uint64_t options=uint64_t(d.blend.RenderTargetWriteMask[0])|(uint64_t(blend)<<4)|(uint64_t(linear)<<5)|(uint64_t(cull)<<6)|(uint64_t(front_ccw)<<8);
         const std::array<uint64_t,8> key{s.width,s.height,s.format,texture.width,texture.height,texture.format,count,options};

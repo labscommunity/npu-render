@@ -145,9 +145,32 @@ int main(int argc, char **argv) try {
     TextureShapes texture_shapes{};TexturePixels texture_pixels{};TextureSamplers texture_samplers{};
     std::vector<std::array<double,4>> linear_reference;
     uint64_t linear_covered=0;
-    PackedTexture texture;
+    PackedTexture texture;PackedResources resources{};
+    const bool general_resources=std::any_of(ps.instructions.begin(),ps.instructions.end(),[](const auto &i){return i.opcode==Opcode::load;});
     std::vector<PackedColor> texture_reference;
-    if (textured) {
+    if(general_resources){
+        for(unsigned slot=0;slot<16;++slot){
+            if(ps.samplers[slot]){
+                const auto sampler=snapshot.values<uint32_t>("sampler-2-"+std::to_string(slot));
+                nr::capture::check(sampler.size()==13 && (sampler[0]==0 || sampler[0]==21) && sampler[1]==3 && sampler[2]==3 && sampler[3]==3 && !sampler[4] && !sampler[11] && as_float(sampler[12])>=0);
+                texture_samplers[slot].filter=sampler[0]==0?TextureFilter::point:TextureFilter::linear;
+            }
+            if(!ps.textures[slot])continue;const auto name="resource-2-"+std::to_string(slot);if(!snapshot.has(name))continue;
+            const auto description=snapshot.values<uint32_t>(name+"-description"),view_desc=snapshot.values<uint32_t>(name+"-view");
+            nr::capture::check(description.size()==10 && view_desc.size()==4);auto &t=resources[slot];
+            if(view_desc[3]){
+                const auto &data=snapshot.bytes(name);nr::capture::check(view_desc[0]==62 && uint64_t(view_desc[1])+view_desc[2]<=data.size());
+                t={view_desc[2],1,42,{}};t.pixels.resize(view_desc[2]);
+                for(size_t n=0;n<t.pixels.size();++n){const uint32_t v=data[size_t(view_desc[1])+n];std::memcpy(t.pixels[n].data(),&v,4);}
+            }else if(description[5]==65){const auto &data=snapshot.bytes(name);t={description[3],description[4],28,{}};
+                nr::capture::check(data.size()==size_t(t.width)*t.height);t.pixels.resize(data.size());for(size_t n=0;n<data.size();++n)t.pixels[n]={0,0,0,data[n]};
+            }else t={description[3],description[4],description[5],snapshot.values<PackedColor>(name)};
+        }
+        texture_shapes=resource_shapes(ps,resources);texture_pixels=decode_resources(ps,resources);
+        while(uint64_t(width)*height%batch)batch/=2;
+        triangle_executor=std::make_unique<TriangleTextureDrawExecutor>(vs,ps,args[0],width,height,format,resources,texture_samplers,backend,
+            blending,uint8_t(blend[15]&255),static_cast<CullMode>(raster[1]-1),raster[2]!=0,batch);
+    }else if (textured) {
         const auto source = snapshot.values<uint32_t>("source-description"), sampler = snapshot.values<uint32_t>("sampler-2-0");
         nr::capture::check(source.size() == 10 && source[0] == 0x4e52574b && source[1] == 1 && source[2] == 40 && !source[7]);
         nr::capture::check(sampler.size() == 13 && (sampler[0]==0 || sampler[0]==21) && sampler[1] == 3 && sampler[2] == 3 && sampler[3] == 3 && !sampler[4] && !sampler[11]);
@@ -217,7 +240,7 @@ int main(int argc, char **argv) try {
     std::vector<PackedColor> reference_pixels;
     for (uint32_t iteration = 0; iteration < repeats; ++iteration) {
         const Viewport viewport{view[0],view[1],view[2],view[3],view[4],view[5]};
-        phase="provider execute";result = triangle_executor ? triangle_executor->execute(inputs,cb,pixel_cb,viewport,texture,pixels,clip) : linear_executor ? linear_executor->execute(inputs,cb,viewport,texture,pixels,clip) : textured ? texture_executor->execute(inputs,cb,viewport,texture) : executor->execute(inputs, cb, pixel_cb, viewport, pixels, clip);
+        phase="provider execute";result = general_resources ? triangle_executor->execute(inputs,cb,pixel_cb,viewport,resources,pixels,clip) : triangle_executor ? triangle_executor->execute(inputs,cb,pixel_cb,viewport,texture,pixels,clip) : linear_executor ? linear_executor->execute(inputs,cb,viewport,texture,pixels,clip) : textured ? texture_executor->execute(inputs,cb,viewport,texture) : executor->execute(inputs, cb, pixel_cb, viewport, pixels, clip);
         uint64_t fused_matches=0;
         phase="vertex oracle";for (size_t i = 0; i < inputs.size(); ++i) {
             const auto expected = reference_vertex(vs, inputs[i], cb);

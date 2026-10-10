@@ -25,13 +25,20 @@ struct Receipt {
 static_assert(sizeof(Receipt) == 48);
 inline void require(bool value) { if (!value) throw std::invalid_argument("invalid indexed NPU exchange packet"); }
 inline bool shape_valid(const Header &h) {
-    const bool valid = h.signature == magic && h.abi == ((h.flags & 0x1000) ? 7u : ((h.flags & 0xe0) ? 6u : ((h.flags & 16) ? 5u : ((h.flags & 8) ? 4u : ((h.flags & 4) ? 3u : ((h.flags & 2) ? 2u : 1u)))))) && (h.nonce[0] || h.nonce[1]) && h.client_pid &&
+    const uint32_t abi=(h.flags&0x2000)?8u:(h.flags&0x1000)?7u:(h.flags&0xe0)?6u:(h.flags&16)?5u:(h.flags&8)?4u:(h.flags&4)?3u:(h.flags&2)?2u:1u;
+    const bool valid = h.signature == magic && h.abi == abi && (h.nonce[0] || h.nonce[1]) && h.client_pid &&
         h.width && h.width <= 8192 && h.height && h.height <= 8192 && uint64_t(h.width) * h.height <= 4 * 1024 * 1024 &&
         h.vertices && h.vertices <= 4096 && !(h.vertices % 3) && (h.format == 28 || h.format == 87) &&
-        !(h.flags & ~0x1fffu) && (h.flags & 0xf00u) && h.vs_words >= 3 && h.vs_words <= 16384 &&
+        !(h.flags & ~0x3fffu) && (h.flags & 0xf00u) && h.vs_words >= 3 && h.vs_words <= 16384 &&
         h.ps_words >= 3 && h.ps_words <= 16384 && h.sequence && h.sequence <= max_requests &&
         h.body_bytes <= max_packet_bytes - sizeof(Header) && !h.reserved;
     if (!valid) return false;
+    if(h.flags & 0x2000) {
+        if(!(h.flags&2) || (h.flags&0x1018) || (h.flags&96)==96)return false;
+        uint32_t batch=4096;const uint64_t pixels=uint64_t(h.width)*h.height;
+        while(pixels%batch)batch/=2;
+        return uint64_t(h.vertices/3)*(pixels/batch)<=4096;
+    }
     if(h.flags & 0x1000) {
         if(!(h.flags & 2) || ((h.flags & 24)!=8 && (h.flags & 24)!=16) || (h.flags & 96)==96)return false;
         uint32_t batch=4096;const uint64_t pixels=uint64_t(h.width)*h.height;
@@ -72,6 +79,8 @@ struct Request {
     shader::VertexConstants vertex_constants, pixel_constants;
     std::vector<raster::PackedColor> background;
     raster::PackedTexture texture;
+    raster::PackedResources resources{};
+    shader::TextureSamplers samplers{};
 };
 inline bool scissor_valid(const std::array<int32_t,4> &s, const Header &h) {
     return s[0] >= 0 && s[1] >= 0 && s[0] <= s[2] && s[1] <= s[3] && s[2] <= int32_t(h.width) && s[3] <= int32_t(h.height);
@@ -123,7 +132,12 @@ inline std::vector<uint8_t> encode(Request &r) {
     };
     constants(r.vertex, r.vertex_constants); constants(r.pixel, r.pixel_constants);
     w.append(r.background.data(), r.background.size() * sizeof(raster::PackedColor));
-    if (h.flags & 2) {
+    if(h.flags & 0x2000){
+        (void)raster::resource_shapes(r.pixel,r.resources);
+        for(const auto &t:r.resources){const TextureDescription description{t.width,t.height,t.format,0};
+            require(t.pixels.size()==size_t(t.width)*t.height);w.value(description);w.append(t.pixels.data(),t.pixels.size()*sizeof(raster::PackedColor));}
+        for(const auto &sampler:r.samplers){const auto filter=uint32_t(sampler.filter);require(filter<=1);w.value(filter);}
+    } else if (h.flags & 2) {
         const auto &t = r.texture; const TextureDescription description{t.width,t.height,t.format,0};
         require(texture_valid(description,h) && t.pixels.size() == size_t(t.width)*t.height);
         w.value(description); w.append(t.pixels.data(),t.pixels.size()*sizeof(raster::PackedColor));
@@ -143,7 +157,12 @@ inline Request decode(const std::vector<uint8_t> &bytes) {
     for (size_t i = 0; i < r.vertex_constants.size(); ++i) r.vertex_constants[i] = reader.vector<shader::VertexBits>(r.vertex.constants[i]);
     for (size_t i = 0; i < r.pixel_constants.size(); ++i) r.pixel_constants[i] = reader.vector<shader::VertexBits>(r.pixel.constants[i]);
     r.background = reader.vector<raster::PackedColor>(size_t(h.width) * h.height);
-    if (h.flags & 2) {
+    if(h.flags & 0x2000){
+        for(auto &t:r.resources){const auto d=reader.value<TextureDescription>();require(!d.reserved);
+            t={d.width,d.height,d.format,reader.vector<raster::PackedColor>(size_t(d.width)*d.height)};}
+        (void)raster::resource_shapes(r.pixel,r.resources);
+        for(auto &sampler:r.samplers){const auto filter=reader.value<uint32_t>();require(filter<=1);sampler.filter=static_cast<shader::TextureFilter>(filter);}
+    } else if (h.flags & 2) {
         const auto t = reader.value<TextureDescription>(); require(texture_valid(t,h));
         r.texture = {t.width,t.height,t.format,reader.vector<raster::PackedColor>(size_t(t.width)*t.height)};
     }

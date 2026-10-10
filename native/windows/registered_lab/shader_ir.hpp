@@ -15,7 +15,7 @@ inline void check(bool value) {
 enum class Register : uint32_t { temporary = 0, input = 1, output = 2, indexable = 3, immediate = 4, sampler = 6, texture = 7, constant = 8 };
 enum class Opcode : uint32_t {
     add = 0, divide = 14, dot2 = 15, dot3 = 16, dot4 = 17, otherwise = 18, end_if = 21,
-    integer_add = 30, begin_if = 31, shift_left = 41, integer_to_float = 43, less = 49,
+    float_to_integer = 27, integer_add = 30, begin_if = 31, integer_mad = 35, shift_left = 41, shift_right = 42, integer_to_float = 43, load = 45, less = 49,
     mad = 50, minimum = 51, maximum = 52, move = 54, select = 55,
     multiply = 56, reciprocal_sqrt = 68, sample = 69
 };
@@ -45,7 +45,8 @@ struct Program {
     Stage stage = Stage::vertex;
     std::array<uint32_t, 16> inputs{}, outputs{};
     std::array<uint32_t, 16> interpolation{};
-    std::array<bool, 16> textures{}, samplers{};
+    std::array<bool, 16> textures{}, samplers{}, texture_uint{};
+    std::array<uint32_t, 16> texture_dimensions{};
     std::array<uint32_t, 14> constants{};
     std::array<bool, 14> dynamic_constants{};
     uint32_t temporaries = 0, position_output = 16, position_input = 16;
@@ -184,11 +185,12 @@ inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
             check(a.kind == Register::constant && a.element && a.element <= 4096 && !result.constants[a.index]);
             result.constants[a.index] = a.element; result.dynamic_constants[a.index] = controls != 0;
         } else if (opcode == 88 || opcode == 90) {
-            check(stage == Stage::pixel && !body && controls == (opcode == 88 ? 0x1800u : 0u));
+            check(stage == Stage::pixel && !body && (opcode==88 ? (controls==0x1800u || controls==0x800u) : controls==0));
             const auto a = in.operand(false, true);
             if (opcode == 88) {
-                check(a.kind == Register::texture && !result.textures[a.index] && in.read() == 0x5555u);
-                result.textures[a.index] = true;
+                check(a.kind == Register::texture && !result.textures[a.index]);const auto returns=in.read();
+                check(returns==0x5555u || returns==0x4444u);
+                result.textures[a.index] = true;result.texture_dimensions[a.index]=controls>>11;result.texture_uint[a.index]=returns==0x4444u;
             } else {
                 check(a.kind == Register::sampler && !result.samplers[a.index]); result.samplers[a.index] = true;
             }
@@ -245,7 +247,7 @@ inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
         } else if (opcode == 62) {
             check(!controls && body && branches.empty()); returned = true;
         } else {
-            check(opcode == 0 || opcode == 14 || opcode == 15 || opcode == 16 || opcode == 17 || opcode == 30 || opcode == 41 ||
+            check(opcode == 0 || opcode == 14 || opcode == 15 || opcode == 16 || opcode == 17 || opcode == 27 || opcode == 30 || opcode == 35 || opcode == 41 || opcode == 42 || opcode == 45 ||
                   opcode == 43 || opcode == 49 || opcode == 50 || opcode == 51 || opcode == 52 ||
                   opcode == 54 || opcode == 55 || opcode == 56 || opcode == 68 || opcode == 69);
             check(!(controls & ~0x2000u) && result.instructions.size() < 1024);
@@ -266,25 +268,32 @@ inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
             }
             check((d.kind == Register::temporary && d.index < result.temporaries) ||
                   (d.kind == Register::output && !(d.mask & ~result.outputs[d.index])));
-            instruction.source_count = (opcode == 43 || opcode == 54 || opcode == 68) ? 1u :
-                                       ((opcode == 50 || opcode == 55 || opcode == 69) ? 3u : 2u);
+            instruction.source_count = (opcode == 27 || opcode == 43 || opcode == 54 || opcode == 68) ? 1u :
+                                       ((opcode == 35 || opcode == 50 || opcode == 55 || opcode == 69) ? 3u : 2u);
             for (unsigned i = 0; i < instruction.source_count; ++i) {
                 instruction.sources[i] = in.operand(false);
+                if(opcode==45)continue; // Validate its dimension-dependent address after both operands.
                 if (opcode == 69 && i) {
                     const auto &a = instruction.sources[i];
                     check(stage == Stage::pixel && !controls && a.modifier == Modifier::none &&
-                          (i == 1 ? a.kind == Register::texture && result.textures[a.index] :
+                          (i == 1 ? a.kind == Register::texture && result.textures[a.index] && result.texture_dimensions[a.index]==3 && !result.texture_uint[a.index] :
                                     a.kind == Register::sampler && result.samplers[a.index]));
                     continue;
                 }
                 if (opcode == 69) { check(stage == Stage::pixel && !controls); source_valid(instruction.sources[i], 3); continue; }
                 source_valid(instruction.sources[i], opcode == 15 ? 3u : (opcode == 16 ? 7u : (opcode == 17 ? 15u : d.mask)));
-                if (opcode == 30) check(instruction.sources[i].modifier == Modifier::none ||
+                if (opcode == 30 || opcode==35) check(instruction.sources[i].modifier == Modifier::none ||
                                         instruction.sources[i].modifier == Modifier::negate);
                 if (opcode == 43 || (opcode == 55 && !i)) check(instruction.sources[i].modifier == Modifier::none);
-                if(opcode==41)check(instruction.sources[i].modifier==Modifier::none);
+                if(opcode==41 || opcode==42)check(instruction.sources[i].modifier==Modifier::none);
             }
-            if(opcode==41){const auto &amount=instruction.sources[1];
+            if(opcode==45){
+                const auto &address=instruction.sources[0],&resource=instruction.sources[1];
+                check(stage==Stage::pixel && !controls && resource.kind==Register::texture && resource.modifier==Modifier::none && result.textures[resource.index]);
+                check(address.modifier==Modifier::none && address.kind!=Register::immediate);
+                source_valid(address,result.texture_dimensions[resource.index]==1?1u:11u);
+            }
+            if(opcode==41 || opcode==42){const auto &amount=instruction.sources[1];
                 check((amount.kind==Register::immediate && amount.literal[0]==amount.literal[1] && amount.literal[0]==amount.literal[2] && amount.literal[0]==amount.literal[3]) ||
                       (amount.lanes[0]==amount.lanes[1] && amount.lanes[0]==amount.lanes[2] && amount.lanes[0]==amount.lanes[3]));}
             (d.kind == Register::temporary ? written_temps : written_outputs)[d.index] |= d.mask;

@@ -12,9 +12,10 @@ import json
 import re
 import subprocess
 import threading
+from datetime import UTC, datetime
 from pathlib import Path
 
-from npu_render.indirect_frame import MAX_BYTES, parse_frame
+from npu_render.indirect_frame import MAX_BYTES, confirmed_sole_display, parse_frame
 
 SCRIPT = r"""
 $ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue'
@@ -96,6 +97,8 @@ try {
 def run(args):
     if not 1 <= args.seconds <= 300 or args.host.startswith("-"):
         raise ValueError("expected SSH host and duration 1–300 seconds")
+    if not 0 <= args.keep_frames <= 16:
+        raise ValueError("keep-frames must be between 0 and 16")
     args.output.mkdir(parents=True, exist_ok=False)
     if args.topology_name and not re.fullmatch(r"idd-topology-[a-z0-9-]+", args.topology_name):
         raise ValueError("expected owned topology report name")
@@ -148,7 +151,13 @@ def run(args):
                     temporary.write_bytes(data)
                     temporary.replace(args.output / "latest.bin")
                     count += 1
+                    if count <= args.keep_frames:
+                        (args.output / f"frame-{count:03d}.bin").write_bytes(data)
                     record = {
+                        "received_at": datetime.now(UTC).isoformat(),
+                        "sole_indirect_at_receive": confirmed_sole_display(
+                            args.output / "input-ready.json"
+                        ),
                         "identity": frame.identity,
                         "width": frame.width,
                         "height": frame.height,
@@ -178,4 +187,7 @@ if __name__ == "__main__":
     parser.add_argument("--seconds", type=int, default=120)
     parser.add_argument("--topology-name", help="finite sole-indirect trial's report name")
     parser.add_argument("--output", type=Path, required=True, help="new local evidence directory")
+    parser.add_argument(
+        "--keep-frames", type=int, default=0, help="archive the first 0–16 validated frames"
+    )
     run(parser.parse_args())

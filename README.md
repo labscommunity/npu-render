@@ -119,8 +119,11 @@ not show a usable desktop; both guest drivers were removed successfully. The
 next [captured textured-triangle draw](docs/validation/2026-10-10/textured-triangles-v97/report.json)
 now matches the scalar pixel reference exactly on the NPU, including backface
 culling, interpolated alpha, a narrow scissor and source-over blending. The shell's
-typed-buffer lookup shader remains unsupported. Full desktop offload and a
-Tahoma benefit are still unproven.
+typed-buffer lookup shader now passes [isolated NPU checks](docs/validation/2026-10-10/typed-resources-v101/report.json),
+including its integer operations and a complete synthetic lookup draw. The driver
+now carries multiple resource bindings through the laboratory transport; its next
+live desktop trial is pending. Full desktop offload and a Tahoma benefit remain
+unproven.
 
 The [captured-window desktop experiment](native/windows/capture/README.md) now
 presents an NPU-composed 2880×1800 desktop with input passing through to the

@@ -51,6 +51,10 @@ void lab_capture_indexed_draw(Device &d, UINT count, UINT first, INT base, bool 
             if (a) buffer_size(a, a->surface.allocation_bytes);
         for (const auto &a : {d.bound_source, d.bound_target})
             if (a) buffer_size(a, uint64_t(a->surface.width) * a->surface.height * 4);
+        if(d.pixel_program)for(unsigned slot=0;slot<16;++slot)if(d.pixel_program->textures[slot]){
+            const auto &view=d.shader_sources[2][slot];const auto &a=view.allocation;
+            if(a)buffer_size(a,view.buffer?a->surface.allocation_bytes:uint64_t(a->surface.width)*a->surface.height*4);
+        }
         DrawCapture capture(path); if (!capture.opened()) return;
         capture.write("NPDRAW01", 8);
         const uint32_t args[]{count, first, uint32_t(base), UINT(d.topology), d.viewport_count,
@@ -97,6 +101,14 @@ void lab_capture_indexed_draw(Device &d, UINT count, UINT first, INT base, bool 
             const auto pixels = read_pixels(*a); capture.record(name, pixels.data(), pixels.size());
         };
         texture("source", d.bound_source); texture("target", d.bound_target);
+        if(d.pixel_program)for(unsigned slot=0;slot<16;++slot)if(d.pixel_program->textures[slot]){
+            const auto &view=d.shader_sources[2][slot];const auto &a=view.allocation;if(!a)continue;
+            char label[32]{};sprintf_s(label,"resource-2-%u-view",slot);
+            const uint32_t description[]{view.format,view.first_element,view.elements,view.buffer?1u:0u};capture.value(label,description);
+            sprintf_s(label,"resource-2-%u",slot);
+            if(view.buffer){char surface_label[32]{};sprintf_s(surface_label,"resource-2-%u-description",slot);capture.value(surface_label,a->surface);raw(label,*a,a->surface.allocation_bytes);}
+            else texture(label,a);
+        }
         capture.record("complete", nullptr, 0);
         lab_trace("{\"event\":\"indexed_draw_capture\",\"count\":%u,\"first\":%u,\"base\":%d,\"indexed\":%s,\"complete\":true,\"execution_performed\":false}\n", count, first, base, indexed ? "true" : "false");
     } catch (...) {

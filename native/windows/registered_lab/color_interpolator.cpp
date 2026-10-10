@@ -77,7 +77,7 @@ ColorInterpolator::Result ColorInterpolator::execute(const std::array<ProjectedV
     for(unsigned v=0;v<3;++v) {
         for(const auto f:triangle[v].screen)require(std::isfinite(f) && std::abs(f)<=16384);
         require(std::isfinite(triangle[v].inverse_w) && triangle[v].inverse_w>0 && triangle[v].inverse_w<=65536);
-        for(const auto f:colors[v])require(std::isfinite(f) && std::abs(f)<=16);
+        for(const auto f:colors[v])require(std::isfinite(f) && std::abs(f)<=16384);
         vertices[v*3]=triangle[v].screen[0];vertices[v*3+1]=triangle[v].screen[1];vertices[v*3+2]=triangle[v].inverse_w;
     }
     for(size_t i=0;i<points.size();++i) {

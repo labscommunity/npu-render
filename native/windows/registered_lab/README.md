@@ -597,3 +597,15 @@ removal sequence. Atomic status replacement and best-effort cleanup reporting
 prevent a reader's file lock from skipping removal. The Windows regression test
 holds such a lock, confirms cleanup still executes, then checks reporting recovers.
 Full desktop offload and a Tahoma performance benefit remain unproven.
+
+The typed-resource path adds SM4 `ftoi`, `imad`, `ishr` and `ld` for the captured
+shell lookup shader. Integer buffer views are normalized to R32_UINT transport
+elements, with up to sixteen resource and sampler bindings. Packet ABI 8 retains
+strict bounds and explicit NPU execution. Integer operations, missing components,
+unbound resources and out-of-range loads have independent scalar checks; a
+64×64 synthetic triangle using the captured pixel shader matches every output
+pixel on the NPU. FTOI currently requires a preserved integer bit view of its
+source (inputs, constants and MOV chains); float-only arithmetic temporaries are
+rejected. This remains a restricted renderer: those tests do not establish a
+usable Windows desktop or a Tahoma improvement. See the
+[clean-build qualification](../../../docs/validation/2026-10-10/typed-resources-v101/report.json).
