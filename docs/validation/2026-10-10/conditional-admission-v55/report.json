@@ -1,0 +1,49 @@
+{
+  "scope": "Disposable Windows guest DWM shader-object admission; no shader execution claim",
+  "package": "driver-package-v55-conditional-vertex",
+  "version": "0.0.44.0",
+  "source_revision": "22fb057765e997d9241d1680a5a03c064b162dd9",
+  "registered_build": "present-umd-v38",
+  "signed_umd_sha256": "3ef65f5fbb3a1544e9e92f9e83474540340c9a5ab79c800ca8ea851f79978e5c",
+  "signed_kmd_sha256": "73e1b99256c48e96681778e4eceae3d5203cc4ac3bbc533243827e73422420aa",
+  "dwm_processes": [
+    5288,
+    1804,
+    5888,
+    4448
+  ],
+  "accepted_vertex_words": [
+    90,
+    116,
+    144,
+    1053,
+    1073,
+    1150
+  ],
+  "accepted_objects": 168,
+  "next_rejected_vertex_words": 174,
+  "next_rejected_sha256": "0d4a43a5c3f0f49aef50caad03d8be71ab03dcf5425b82c70e4f852e1affc28d",
+  "missing_operation": "DP2, subsequently qualified by compositor-vertex-inventory-v39",
+  "prepared_render_luid": 15998136,
+  "indirect_luid": 16034538,
+  "original_luid": 23654,
+  "topology_probe": {
+    "passed": false,
+    "reason": "Windows automatically activated the indirect path between the before and available queries; stale supplied topology validation returned 31. No topology apply was issued.",
+    "original_path_present": true,
+    "automatic_45_second_observation_completed": false
+  },
+  "etw": {
+    "events": 733827,
+    "events_lost": 0,
+    "seconds": 155,
+    "cdd_primary_failures": 17
+  },
+  "swapchain_assigned": false,
+  "desktop_frames_delivered": 0,
+  "full_desktop_offload": false,
+  "performance_tested": false,
+  "both_custom_drivers_removed": true,
+  "watchdog_configuration_changed": false,
+  "raw_snapshot_files_sha256_verified": 87
+}

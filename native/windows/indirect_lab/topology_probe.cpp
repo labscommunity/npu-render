@@ -92,6 +92,22 @@ int run_probe(bool sole_indirect = false) {
             Sleep(250);
         }
         before = query(QDC_ONLY_ACTIVE_PATHS); print("before", before);
+        if (before.paths.size() == 1 && !sole_indirect) {
+            // Monitor arrival and automatic activation are separate updates.
+            // v55 observed one active path here and two in the next query;
+            // constructing a second extension from the stale snapshot failed.
+            const auto activation_deadline = GetTickCount64() + 5000;
+            while (GetTickCount64() < activation_deadline) {
+                const auto active = query(QDC_ONLY_ACTIVE_PATHS);
+                if (!position_preserved(before, active))
+                    throw std::runtime_error("original display changed during monitor arrival");
+                if (active.paths.size() == 2) {
+                    before = active; print("activated_after_arrival", before); break;
+                }
+                if (active.paths.size() != 1) throw std::runtime_error("unexpected active display count");
+                Sleep(250);
+            }
+        }
         if (before.paths.size() == 2 && !sole_indirect) {
             UINT indirect = 0;
             for (const auto &path : before.paths)
