@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "kind": "installed-indexed-npu-dwm-attempt",
+  "source_revision": "a497ed3e82c08c61e93ded536a2422a01a7c7a8a",
+  "umd_build": "present-umd-v65",
+  "render_package_version": "0.0.50.0",
+  "idd_package_version": "0.0.7.0",
+  "first_attempt": "v61: captured packet warmup passed, no live DWM draw; display later observed blanked.",
+  "repeat_condition": "v61b: same binaries, laboratory display woken through QEMU keyboard before installation and during observation.",
+  "live_dwm_pid": 1048,
+  "live_dwm_indexed_npu_draws": 3,
+  "live_dwm_draws_committed_to_runtime": 3,
+  "npu_worker_successes_including_one_warmup": 4,
+  "npu_worker_request_limit": 128,
+  "npu_worker_draw_rejections": 124,
+  "umd_draw_rejections": 323,
+  "set_device_successes": 264,
+  "set_device_access_lost": 386,
+  "received_frames": 0,
+  "displayed_frames": 0,
+  "full_desktop_offload": false,
+  "tahoma_performance_tested": false,
+  "topology_probe_passed": false,
+  "topology_note": "Only original display remained at end of v61b observation; new helper logs and checks input-desktop/screen-saver state.",
+  "first_failed_draw": {
+    "sha256": "32927638eb35a3b1f3114c410d4d5740511d9446d88043e1eeb431d2b0bb8e10",
+    "complete_capture": true,
+    "vertices": 6,
+    "start_index": 6,
+    "source": [
+      2304,
+      800,
+      87
+    ],
+    "target": [
+      1024,
+      768,
+      87
+    ],
+    "shader": "42-word point-sampled texture, forced opaque alpha, multiplied by uniform white vertex color",
+    "sampling": "clamp; source crop x=1280, y=0; 1:1 texel mapping",
+    "raw_pixels_committed": false
+  },
+  "cleanup": "Both experimental devices removed successfully after each attempt; stream configurations and temporary firewall rules removed.",
+  "unresolved": [
+    "Textured draw pipeline",
+    "Complete desktop frame acquisition and display",
+    "Application shader-resource buffers",
+    "End-to-end performance"
+  ]
+}

@@ -78,6 +78,21 @@ int run_probe(bool sole_indirect = false) {
     if (!awake.previous) return 2;
     Topology before; bool restore = false, passed = false;
     try {
+        BOOL screen_saver = FALSE;
+        if (!SystemParametersInfoW(SPI_GETSCREENSAVERRUNNING, 0, &screen_saver, 0))
+            throw std::runtime_error("screen-saver state unavailable");
+        const auto input = OpenInputDesktop(0, FALSE, DESKTOP_READOBJECTS);
+        if (!input) throw std::runtime_error("input desktop unavailable");
+        WCHAR input_name[64]{}; DWORD needed = 0;
+        const bool default_input = GetUserObjectInformationW(input, UOI_NAME, input_name, sizeof(input_name), &needed) &&
+            !lstrcmpiW(input_name, L"Default");
+        CloseDesktop(input);
+        std::fprintf(output, "{\"event\":\"interactive_state\",\"default_input_desktop\":%s,\"screen_saver_running\":%s,\"display_power_requested\":true}\n",
+            default_input ? "true" : "false", screen_saver ? "true" : "false");
+        std::fflush(output);
+        // A topology can stay active while DWM stops composing a blanked or
+        // secure desktop. KeepAwake does not dismiss an existing screen saver.
+        if (!default_input || screen_saver) throw std::runtime_error("active Default desktop required for composition observation");
         // Adapter startup precedes asynchronous D3D preparation and monitor
         // arrival. Wait for a usable target before judging its topology.
         const auto deadline = GetTickCount64() + 30000;
