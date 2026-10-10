@@ -1,0 +1,21 @@
+import os,json,hashlib,subprocess
+from datetime import datetime,timezone
+from pathlib import Path
+root=Path(os.environ['LOCALAPPDATA'])/'npu-render';src=Path(r'C:\path\to\source')
+out=root/'vm/dwm-inventory-v39';out.mkdir(exist_ok=False)
+exe=root/'builds/present-umd-v39/Release/nr_registered_vertex_stream_probe.exe'
+sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+assert sha(exe)=='ea624ed3c6f8e1a2ce7196bee4b26b5b9682481dba270d1d1e3d393649dee938'
+env=os.environ.copy();env['PATH']=str(src/'venv/Lib/site-packages/openvino/libs')+os.pathsep+env['PATH']
+report={'started':datetime.now(timezone.utc).isoformat(),'binary_sha256':sha(exe),'backend':'NPU','static_inventory_not_desktop_trace':True,'desktop_offload_tested':False,'shaders':[]}
+for p in sorted((root/'vm/dwm-vs-inventory-v1').glob('*.bin')):
+ assert sha(p)==p.stem
+ record={'shader_sha256':p.stem,'words':p.stat().st_size//4}
+ try:
+  r=subprocess.run([str(exe),'--shader',str(p),'--backend','NPU'],capture_output=True,timeout=120,env=env)
+  (out/(p.stem+'.stdout.log')).write_bytes(r.stdout);(out/(p.stem+'.stderr.log')).write_bytes(r.stderr)
+  record.update(exit_code=r.returncode,passed=r.returncode==0)
+ except subprocess.TimeoutExpired:record.update(passed=False,error='120 second deadline')
+ report['shaders'].append(record);print(json.dumps(record),flush=True)
+report.update(completed=True,finished=datetime.now(timezone.utc).isoformat(),all_passed=all(r['passed'] for r in report['shaders']))
+(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')

@@ -1,0 +1,20 @@
+{
+  "scope": "Static embedded DWM vertex shader inventory on physical NPU, not a desktop execution trace",
+  "module": "dwmcore.dll",
+  "unique_vertex_shaders": 9,
+  "passes": 36,
+  "checked_components": 223232,
+  "exact_bits_verified": true,
+  "execution_device": "NPU",
+  "new_operation": "DP2",
+  "authored_nested_branches_and_math": "passed on NPU",
+  "clean_build_cpu_tests": "3/3 passed",
+  "source_revision_before_dp2": "22fb057765e997d9241d1680a5a03c064b162dd9",
+  "desktop_offload_tested": false,
+  "full_desktop_offload": false,
+  "limitations": [
+    "Shaders embedded in this module are not an exhaustive inventory of desktop/application shaders.",
+    "Fixed synthetic inputs and constants, not a Direct3D conformance suite.",
+    "No new generic draw, pixel shading or desktop frame delivery is established."
+  ]
+}

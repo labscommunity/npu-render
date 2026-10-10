@@ -14,7 +14,7 @@ inline void check(bool value) {
 }
 enum class Register : uint32_t { temporary = 0, input = 1, output = 2, immediate = 4, constant = 8 };
 enum class Opcode : uint32_t {
-    add = 0, divide = 14, dot3 = 16, dot4 = 17, otherwise = 18, end_if = 21,
+    add = 0, divide = 14, dot2 = 15, dot3 = 16, dot4 = 17, otherwise = 18, end_if = 21,
     integer_add = 30, begin_if = 31, integer_to_float = 43, less = 49,
     mad = 50, minimum = 51, maximum = 52, move = 54, select = 55,
     multiply = 56, reciprocal_sqrt = 68
@@ -192,7 +192,7 @@ inline Program parse_vertex(const uint32_t *words, size_t count) {
         } else if (opcode == 62) {
             check(!controls && body && branches.empty()); returned = true;
         } else {
-            check(opcode == 0 || opcode == 14 || opcode == 16 || opcode == 17 || opcode == 30 ||
+            check(opcode == 0 || opcode == 14 || opcode == 15 || opcode == 16 || opcode == 17 || opcode == 30 ||
                   opcode == 43 || opcode == 49 || opcode == 50 || opcode == 51 || opcode == 52 ||
                   opcode == 54 || opcode == 55 || opcode == 56 || opcode == 68);
             check(!(controls & ~0x2000u) && result.instructions.size() < 1024);
@@ -206,7 +206,7 @@ inline Program parse_vertex(const uint32_t *words, size_t count) {
                                        ((opcode == 50 || opcode == 55) ? 3u : 2u);
             for (unsigned i = 0; i < instruction.source_count; ++i) {
                 instruction.sources[i] = in.operand(false);
-                source_valid(instruction.sources[i], opcode == 16 ? 7u : (opcode == 17 ? 15u : d.mask));
+                source_valid(instruction.sources[i], opcode == 15 ? 3u : (opcode == 16 ? 7u : (opcode == 17 ? 15u : d.mask)));
                 if (opcode == 30) check(instruction.sources[i].modifier == Modifier::none ||
                                         instruction.sources[i].modifier == Modifier::negate);
                 if (opcode == 43 || (opcode == 55 && !i)) check(instruction.sources[i].modifier == Modifier::none);

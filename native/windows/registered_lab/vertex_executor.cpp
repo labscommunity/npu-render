@@ -195,7 +195,7 @@ struct VertexExecutor::State {
                 }
                 else {
                     const auto a = sources[0][c].floating, b = sources[1][c].floating;
-                    if (instruction.opcode != Opcode::dot3 && instruction.opcode != Opcode::dot4)
+                    if (instruction.opcode != Opcode::dot2 && instruction.opcode != Opcode::dot3 && instruction.opcode != Opcode::dot4)
                         check(bool(a) && (instruction.source_count == 1 || bool(b)));
                     Node value;
                     if (instruction.opcode == Opcode::add) {
@@ -225,9 +225,9 @@ struct VertexExecutor::State {
                         const auto less = std::make_shared<op::Less>(a, b);
                         Node numeric = instruction.opcode == Opcode::minimum ? choose(less, a, b) : choose(less, b, a);
                         value = choose(std::make_shared<op::IsNaN>(a), b, choose(std::make_shared<op::IsNaN>(b), a, numeric));
-                    } else if (instruction.opcode == Opcode::dot3 || instruction.opcode == Opcode::dot4) {
+                    } else if (instruction.opcode == Opcode::dot2 || instruction.opcode == Opcode::dot3 || instruction.opcode == Opcode::dot4) {
                         value = std::make_shared<op::Multiply>(sources[0][0].floating, sources[1][0].floating);
-                        for (unsigned i = 1; i < (instruction.opcode == Opcode::dot3 ? 3u : 4u); ++i)
+                        for (unsigned i = 1; i < (instruction.opcode == Opcode::dot2 ? 2u : (instruction.opcode == Opcode::dot3 ? 3u : 4u)); ++i)
                             value = std::make_shared<op::Add>(value,
                                 std::make_shared<op::Multiply>(sources[0][i].floating, sources[1][i].floating));
                     } else check(false);
@@ -358,7 +358,7 @@ void VertexExecutor::validate(const Program &program) {
             for (unsigned i = 0; i < instruction.source_count; ++i) check(!(mask & ~available(instruction.sources[i], true)));
             if (instruction.opcode == Opcode::integer_add) bit_views = mask; else floating_views = mask;
         } else {
-            const auto used = instruction.opcode == Opcode::dot3 ? 7u : (instruction.opcode == Opcode::dot4 ? 15u : mask);
+            const auto used = instruction.opcode == Opcode::dot2 ? 3u : (instruction.opcode == Opcode::dot3 ? 7u : (instruction.opcode == Opcode::dot4 ? 15u : mask));
             for (unsigned i = 0; i < instruction.source_count; ++i) check(!(used & ~available(instruction.sources[i], false)));
             if (instruction.opcode == Opcode::less) bit_views = mask; else floating_views = mask;
         }

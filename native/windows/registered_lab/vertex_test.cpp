@@ -28,16 +28,19 @@ struct O {float4 p:SV_Position;float4 n:NORMAL;};
 O main(float4 v:POSITION) {
     O o; float3 q;
     [branch] if(mode.w>0.5) {
-        q=float3(dot(v.xyz,mode.xyz),dot(v,float4(1,2,3,4)),min(max(sign(v.w),-0.5),0.5));
+        q=float3(dot(v.xy,mode.xy),dot(v,float4(1,2,3,4)),min(max(sign(v.w),-0.5),0.5));
         [branch] if(v.x<0) q=q/2; else q=q*2;
     } else {q=v.xyz/float3(2,4,8);}
     o.p=float4(q,1);o.n=float4(normalize(v.xyz),sign(v.w));return o;
 })";
     const auto words = nr::registered_lab::shader_tokens(text, "vs_4_0");
     const auto program = parse_vertex(words.data(), words.size());
-    unsigned branches = 0;
-    for (const auto &instruction : program.instructions) if (instruction.opcode == Opcode::begin_if) ++branches;
-    test(branches >= 2);
+    unsigned branches = 0, dot2 = 0;
+    for (const auto &instruction : program.instructions) {
+        if (instruction.opcode == Opcode::begin_if) ++branches;
+        if (instruction.opcode == Opcode::dot2) ++dot2;
+    }
+    test(branches >= 2 && dot2);
     for (size_t i = 0; i < words.size(); ++i) {
         std::vector<uint32_t> prefix(words.begin(), words.begin() + i);
         if (i > 1) prefix[1] = uint32_t(i); rejects(prefix);

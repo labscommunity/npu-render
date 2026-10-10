@@ -73,9 +73,9 @@ inline Registers reference_vertex(const Program &program, const Registers &input
                 else if (instruction.opcode == Opcode::reciprocal_sqrt) v = 1.0f / std::sqrt(a);
                 else if (instruction.opcode == Opcode::minimum) v = std::fmin(a, b);
                 else if (instruction.opcode == Opcode::maximum) v = std::fmax(a, b);
-                else if (instruction.opcode == Opcode::dot3 || instruction.opcode == Opcode::dot4) {
+                else if (instruction.opcode == Opcode::dot2 || instruction.opcode == Opcode::dot3 || instruction.opcode == Opcode::dot4) {
                     v = as_float(values[0][0]) * as_float(values[1][0]);
-                    for (unsigned c = 1; c < (instruction.opcode == Opcode::dot3 ? 3u : 4u); ++c)
+                    for (unsigned c = 1; c < (instruction.opcode == Opcode::dot2 ? 2u : (instruction.opcode == Opcode::dot3 ? 3u : 4u)); ++c)
                         v += as_float(values[0][c]) * as_float(values[1][c]);
                 }
                 else check(false);
