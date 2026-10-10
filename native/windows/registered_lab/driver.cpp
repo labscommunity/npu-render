@@ -39,6 +39,7 @@ struct Device {
     std::shared_ptr<Allocation> bound_source;
     std::unique_ptr<BlendExecutor> executor;
     std::shared_ptr<const nr::shader::Program> vertex_program;
+    std::shared_ptr<const nr::shader::Program> pixel_program;
     std::shared_ptr<const InputElements> input_elements;
     std::string backend;
     std::vector<UINT> vertex_code, pixel_code;
@@ -71,7 +72,7 @@ struct Resource {
     bool mapped_write = false;
 };
 struct View { std::shared_ptr<Allocation> allocation; };
-struct Shader { UINT kind = 0; std::shared_ptr<const nr::shader::Program> vertex_program; };
+struct Shader { UINT kind = 0; std::shared_ptr<const nr::shader::Program> vertex_program, pixel_program; };
 Device &device(D3D10DDI_HDEVICE h) { return *static_cast<Device *>(h.pDrvPrivate); }
 void reject(D3D10DDI_HDEVICE h, HRESULT status, const char *operation) {
     lab_trace("{\"event\":\"reject\",\"operation\":\"%s\",\"status\":\"%08lx\"}\n", operation, ULONG(status));

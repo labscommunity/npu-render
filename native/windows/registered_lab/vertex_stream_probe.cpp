@@ -52,7 +52,7 @@ int main(int argc, char **argv) {
         std::vector<uint32_t> words(size_t(bytes) / 4);
         file.seekg(0); file.read(reinterpret_cast<char *>(words.data()), std::streamsize(bytes));
         if (!file) throw std::runtime_error("shader stream read failed");
-        const auto program = parse_vertex(words.data(), words.size());
+        const auto program = words[0] == 0x40 ? parse_pixel(words.data(), words.size()) : parse_vertex(words.data(), words.size());
         VertexConstants constants;
         for (unsigned b = 0; b < 14; ++b) {
             constants[b].resize(program.constants[b]);

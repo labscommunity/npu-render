@@ -24,7 +24,7 @@ Node lane(const Node &value, unsigned component) {
     return std::make_shared<op::Gather>(value, indices({int64_t(component)}), integer(1));
 }
 }
-struct VertexExecutor::State {
+struct RegisterExecutor::State {
     Program program;
     uint32_t count;
     struct Binding { std::shared_ptr<op::Parameter> parameter; bool constant; unsigned index; std::string name; };
@@ -38,7 +38,7 @@ struct VertexExecutor::State {
     bool failed = false;
     State(const Program &p, uint32_t vertices, const std::string &backend) : program(p), count(vertices) {
         check(count && count <= 65536 && (backend == "CPU" || backend == "GPU" || backend == "NPU"));
-        VertexExecutor::validate(program);
+        RegisterExecutor::validate(program);
         std::array<Lanes, 16> input{}, temporary{}, output{};
         std::array<Value, 14> constants{};
         auto parameter_pair = [&](bool constant, unsigned index, size_t rows) {
@@ -305,7 +305,7 @@ struct VertexExecutor::State {
         execution_device = devices[0]; request = compiled.create_infer_request();
     }
 };
-void VertexExecutor::validate(const Program &program) {
+void RegisterExecutor::validate(const Program &program) {
     // Type views are properties of each SSA value, not permanent register
     // types. Branch joins retain only the views available on both paths.
     using Masks = std::array<uint32_t, 16>;
@@ -370,10 +370,10 @@ void VertexExecutor::validate(const Program &program) {
     }
     for (unsigned i = 0; i < 16; ++i) check(!(program.outputs[i] & ~(views.output_float[i] | views.output_bits[i])));
 }
-VertexExecutor::VertexExecutor(const Program &p, uint32_t count, const std::string &backend)
+RegisterExecutor::RegisterExecutor(const Program &p, uint32_t count, const std::string &backend)
     : state(std::make_unique<State>(p, count, backend)) {}
-VertexExecutor::~VertexExecutor() = default;
-VertexExecutor::Result VertexExecutor::execute(const std::vector<VertexRegisters> &vertices, const VertexConstants &constants) {
+RegisterExecutor::~RegisterExecutor() = default;
+RegisterExecutor::Result RegisterExecutor::execute(const std::vector<VertexRegisters> &vertices, const VertexConstants &constants) {
     check(!state->failed && vertices.size() == state->count);
     for (unsigned i = 0; i < 14; ++i) check(constants[i].size() >= state->program.constants[i]);
     try {

@@ -109,6 +109,22 @@ int test_draws(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER_DEVICE
                 last_error = S_OK; f.pfnVsSetShader(h, hv);
                 TEST(last_error == S_OK && retained.expired());
                 std::printf("{\"bound_vertex_stage\":true,\"vertices\":16,\"execution_device\":\"%s\",\"exact_bits_verified\":true,\"desktop_offload_tested\":false}\n", output.execution_device.c_str());
+                const auto pixel_code = shader_tokens("float4 main(float4 c:COLOR):SV_Target{return c*2;}", "ps_4_0");
+                f.pfnCreatePixelShader(h, pixel_code.data(), generic, {}, nullptr);
+                TEST(last_error == S_OK);
+                f.pfnPsSetShader(h, generic); TEST(d.pixel_program);
+                const std::weak_ptr<const nr::shader::Program> pixel_retained = d.pixel_program;
+                f.pfnDestroyShader(h, generic); TEST(last_error == S_OK && !pixel_retained.expired());
+                nr::shader::PixelExecutor pixel_executor(*d.pixel_program, UINT(vertices.size()), backend);
+                const auto pixel_output = pixel_executor.execute(vertices, {});
+                const std::array<float, 4> pixel_expected{0.5f, -1.0f, 0.25f, 2.0f};
+                for (const auto &v : pixel_output.vertices)
+                    TEST(!std::memcmp(v[0].data(), pixel_expected.data(), sizeof(pixel_expected)));
+                f.pfnDraw(h, 3, 0);
+                TEST(last_error == E_INVALIDARG && counters.executions == executions &&
+                     counters.allocations == allocations && memory[target_index] == before);
+                last_error = S_OK; f.pfnPsSetShader(h, hp); TEST(last_error == S_OK && pixel_retained.expired());
+                std::printf("{\"bound_pixel_stage\":true,\"samples\":16,\"execution_device\":\"%s\",\"exact_bits_verified\":true,\"desktop_offload_tested\":false}\n", pixel_output.execution_device.c_str());
             }
             depth.DepthEnable = TRUE; f.pfnSetDepthStencilState(h, hd, 0);
             f.pfnDraw(h, 3, 0);

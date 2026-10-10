@@ -20,6 +20,7 @@ enum class Opcode : uint32_t {
     multiply = 56, reciprocal_sqrt = 68
 };
 enum class Modifier : uint32_t { none = 0, negate = 1, absolute = 2, absolute_negate = 3 };
+enum class Stage { vertex, pixel };
 struct RelativeIndex {
     bool enabled = false;
     Register kind = Register::temporary;
@@ -41,10 +42,12 @@ struct Instruction {
     bool test_nonzero = true;
 };
 struct Program {
+    Stage stage = Stage::vertex;
     std::array<uint32_t, 16> inputs{}, outputs{};
+    std::array<uint32_t, 16> interpolation{};
     std::array<uint32_t, 14> constants{};
     std::array<bool, 14> dynamic_constants{};
-    uint32_t temporaries = 0, position_output = 16;
+    uint32_t temporaries = 0, position_output = 16, position_input = 16;
     std::vector<Instruction> instructions;
 };
 class Reader {
@@ -109,9 +112,10 @@ public:
         return value;
     }
 };
-inline Program parse_vertex(const uint32_t *words, size_t count) {
-    check(words && count >= 3 && count <= 16384 && words[0] == 0x00010040 && words[1] == count);
-    Program result;
+inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
+    check(words && count >= 3 && count <= 16384 &&
+          words[0] == (stage == Stage::vertex ? 0x00010040u : 0x00000040u) && words[1] == count);
+    Program result; result.stage = stage;
     bool body = false, returned = false, temps_declared = false, flags_declared = false;
     std::array<uint32_t, 16> written_temps{}, written_outputs{};
     struct Branch {
@@ -153,16 +157,29 @@ inline Program parse_vertex(const uint32_t *words, size_t count) {
             check(!body && !(controls & ~0x800u)); const auto a = in.operand(false, true);
             check(a.kind == Register::constant && a.element && a.element <= 4096 && !result.constants[a.index]);
             result.constants[a.index] = a.element; result.dynamic_constants[a.index] = controls != 0;
+        } else if (opcode == 98 || opcode == 100) {
+            check(stage == Stage::pixel && !body && !(controls & ~0x7800u));
+            const auto interpolation = controls >> 11;
+            check(interpolation >= 1 && interpolation <= 7);
+            const auto a = in.operand(true, true);
+            check(a.kind == Register::input && !(result.inputs[a.index] & a.mask));
+            if (result.inputs[a.index]) check(result.interpolation[a.index] == interpolation);
+            result.inputs[a.index] |= a.mask; result.interpolation[a.index] = interpolation;
+            if (opcode == 100) {
+                check(in.read() == 1 && result.position_input == 16);
+                result.position_input = a.index;
+            }
         } else if (opcode == 95 || opcode == 101 || opcode == 103) {
             check(!body && !controls); const auto a = in.operand(true, true);
             if (opcode == 95) {
-                check(a.kind == Register::input && !(result.inputs[a.index] & a.mask));
+                check(stage == Stage::vertex && a.kind == Register::input && !(result.inputs[a.index] & a.mask));
                 result.inputs[a.index] |= a.mask;
             } else {
                 check(a.kind == Register::output && !(result.outputs[a.index] & a.mask));
                 result.outputs[a.index] |= a.mask;
+                if (stage == Stage::pixel) check(a.index < 8);
                 if (opcode == 103) {
-                    check(in.read() == 1 && result.position_output == 16 && a.mask == 15);
+                    check(stage == Stage::vertex && in.read() == 1 && result.position_output == 16 && a.mask == 15);
                     result.position_output = a.index;
                 }
             }
@@ -216,8 +233,10 @@ inline Program parse_vertex(const uint32_t *words, size_t count) {
         }
         check(in.done()); offset += length;
     }
-    check(returned && result.position_output < 16);
+    check(returned && (stage == Stage::vertex ? result.position_output < 16 : result.outputs[0] != 0));
     for (unsigned i = 0; i < 16; ++i) check(!(result.outputs[i] & ~written_outputs[i]));
     return result;
 }
+inline Program parse_vertex(const uint32_t *words, size_t count) { return parse_program(words, count, Stage::vertex); }
+inline Program parse_pixel(const uint32_t *words, size_t count) { return parse_program(words, count, Stage::pixel); }
 } // namespace nr::shader

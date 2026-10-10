@@ -8,19 +8,22 @@ using VertexRegisters = std::array<VertexBits, 16>;
 using VertexConstants = std::array<std::vector<VertexBits>, 14>;
 // Host input decoding preserves both FP32 and integer bit views. Arithmetic and
 // indexed constant reads execute on the explicitly selected compiled provider.
-// This is a vertex stage, not a rasterizer or a completed desktop renderer.
-class VertexExecutor {
+// Shared vertex/pixel arithmetic. Inputs are already decoded/interpolated; this
+// does not implement rasterization, interpolation or texture sampling.
+class RegisterExecutor {
     struct State;
     std::unique_ptr<State> state;
 public:
-    // Validate lowering constraints after parse_vertex, without choosing a
+    // Validate lowering constraints after parse_vertex/parse_pixel, without choosing a
     // device or claiming that a complete graphics pipeline can execute.
     static void validate(const Program &program);
-    VertexExecutor(const Program &program, uint32_t vertices, const std::string &backend);
-    ~VertexExecutor();
-    VertexExecutor(const VertexExecutor &) = delete;
-    VertexExecutor &operator=(const VertexExecutor &) = delete;
+    RegisterExecutor(const Program &program, uint32_t vertices, const std::string &backend);
+    ~RegisterExecutor();
+    RegisterExecutor(const RegisterExecutor &) = delete;
+    RegisterExecutor &operator=(const RegisterExecutor &) = delete;
     struct Result { std::vector<VertexRegisters> vertices; std::string execution_device; };
     Result execute(const std::vector<VertexRegisters> &vertices, const VertexConstants &constants);
 };
+using VertexExecutor = RegisterExecutor;
+using PixelExecutor = RegisterExecutor;
 }

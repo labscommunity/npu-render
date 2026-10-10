@@ -15,9 +15,9 @@ Output main(Vertex v) {
     Output o; o.position = float4(v.xy * transform.xz + transform.yw, 0.5, 1.0);
     o.color = colors[v.index]; return o;
 })";
-void rejects(const std::vector<uint32_t> &code) {
+void rejects(const std::vector<uint32_t> &code, Stage stage = Stage::vertex) {
     bool rejected = false;
-    try { (void)parse_vertex(code.data(), code.size()); }
+    try { (void)parse_program(code.data(), code.size(), stage); }
     catch (const std::invalid_argument &) { rejected = true; }
     test(rejected);
 }
@@ -90,6 +90,30 @@ void test_math_precision(const std::string &backend) {
     }
     std::printf("{\"math_precision\":true,\"vertices\":256,\"exact_bits_verified\":true,\"execution_device\":\"%s\",\"desktop_offload_tested\":false}\n", backend.c_str());
 }
+void test_pixel_arithmetic(const std::string &backend) {
+    const auto code = nr::registered_lab::shader_tokens(
+        "float4 main(float4 p:SV_Position,float4 c:COLOR):SV_Target{return p*float4(.5,.25,0,0)+c;}", "ps_4_0");
+    const auto program = parse_pixel(code.data(), code.size());
+    test(program.stage == Stage::pixel && program.position_input == 0 && program.outputs[0] == 15);
+    rejects(code); // A pixel program must never be admitted as a vertex program.
+    for (size_t i = 0; i < code.size(); ++i) {
+        std::vector<uint32_t> prefix(code.begin(), code.begin() + i);
+        if (i > 1) prefix[1] = uint32_t(i); rejects(prefix, Stage::pixel);
+    }
+    std::vector<VertexRegisters> input(64);
+    for (unsigned i = 0; i < input.size(); ++i) {
+        input[i][0] = {as_bits(float(i) + .5f), as_bits(float(i) * .5f + .5f), as_bits(.5f), as_bits(1.0f)};
+        input[i][1] = {as_bits(.125f), as_bits(.25f), as_bits(.5f), as_bits(1.0f)};
+    }
+    PixelExecutor executor(program, uint32_t(input.size()), backend);
+    const auto result = executor.execute(input, {});
+    for (unsigned i = 0; i < input.size(); ++i) {
+        const auto expected = reference_vertex(program, input[i], {});
+        test(result.vertices[i][0] == expected[0]);
+        test(as_float(result.vertices[i][0][0]) == (float(i) + .5f) * .5f + .125f);
+    }
+    std::printf("{\"pixel_arithmetic\":true,\"samples\":64,\"exact_bits_verified\":true,\"execution_device\":\"%s\",\"rasterization_tested\":false,\"desktop_offload_tested\":false}\n", result.execution_device.c_str());
+}
 }
 int main(int argc, char **argv) {
     try {
@@ -98,6 +122,7 @@ int main(int argc, char **argv) {
         else test(argc == 1);
         test_branches(backend);
         test_math_precision(backend);
+        test_pixel_arithmetic(backend);
         const auto modifier_tokens = nr::registered_lab::shader_tokens(
             "struct O {float4 p:SV_Position;float4 a:COLOR;};O main(float4 v:POSITION){O o;o.p=-v;o.a=-abs(v);return o;}", "vs_4_0");
         const auto modifier_program = parse_vertex(modifier_tokens.data(), modifier_tokens.size());

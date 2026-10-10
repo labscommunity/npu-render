@@ -37,14 +37,16 @@ void APIENTRY create_shader(D3D10DDI_HDEVICE h, const UINT *code, D3D10DDI_HSHAD
     guard(h, __FUNCTION__, [&] {
         const auto &expected = Kind == 1 ? device(h).vertex_code : device(h).pixel_code;
         bool supported = code && expected.size() >= 2 && code[1] == expected.size() && std::equal(expected.begin(), expected.end(), code);
-        if constexpr (Kind == 1) {
+        if constexpr (Kind == 1 || Kind == 2) {
             if (!supported && code && code[1] >= 3 && code[1] <= 16384) {
                 try {
-                    auto program = std::make_shared<nr::shader::Program>(nr::shader::parse_vertex(code, code[1]));
+                    auto program = std::make_shared<nr::shader::Program>(Kind == 1 ?
+                        nr::shader::parse_vertex(code, code[1]) : nr::shader::parse_pixel(code, code[1]));
                     nr::shader::VertexExecutor::validate(*program);
-                    static_cast<Shader *>(out.pDrvPrivate)->vertex_program = std::move(program);
+                    auto &shader = *static_cast<Shader *>(out.pDrvPrivate);
+                    (Kind == 1 ? shader.vertex_program : shader.pixel_program) = std::move(program);
                     supported = true;
-                    lab_trace("{\"event\":\"vertex_program_created\",\"words\":%u,\"execution_performed\":false}\n", code[1]);
+                    lab_trace("{\"event\":\"%s_program_created\",\"words\":%u,\"execution_performed\":false}\n", Kind == 1 ? "vertex" : "pixel", code[1]);
                 } catch (const std::invalid_argument &) { /* Preserve the rejected stream below. */ }
             }
         }
@@ -64,6 +66,8 @@ void APIENTRY set_shader(D3D10DDI_HDEVICE h, D3D10DDI_HSHADER shader) {
         (Kind == 1 ? device(h).vertex_shader : device(h).pixel_shader) = value;
         if constexpr (Kind == 1)
             device(h).vertex_program = shader.pDrvPrivate ? static_cast<Shader *>(shader.pDrvPrivate)->vertex_program : nullptr;
+        else
+            device(h).pixel_program = shader.pDrvPrivate ? static_cast<Shader *>(shader.pDrvPrivate)->pixel_program : nullptr;
     });
 }
 void APIENTRY set_viewports(D3D10DDI_HDEVICE h, UINT count, UINT, const D3D10_DDI_VIEWPORT *values) {
@@ -101,7 +105,7 @@ void APIENTRY draw(D3D10DDI_HDEVICE h, UINT count, UINT first) {
         auto &d = device(h);
         const auto target = d.bound_target, source = d.bound_source;
         require(count == 3 && !first && d.topology == D3D10_DDI_PRIMITIVE_TOPOLOGY_TRIANGLELIST &&
-                d.vertex_shader == 1 && !d.vertex_program && d.pixel_shader == 2 && target && source && target != source &&
+                d.vertex_shader == 1 && !d.vertex_program && d.pixel_shader == 2 && !d.pixel_program && target && source && target != source &&
                 target->handle != source->handle && target->context == d.context && source->context == d.context &&
                 !target->locked && !source->locked && !d.context->poisoned);
         const auto &s = target->surface;
