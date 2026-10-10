@@ -11,16 +11,27 @@ inline void lab_trace(const char *format, ...) noexcept {
     static std::mutex trace_mutex;
     std::lock_guard<std::mutex> lock(trace_mutex);
     static UINT lines = 0;
-    if (lines >= 4096) return;
-    WCHAR path[MAX_PATH]{};
-    swprintf_s(path, L"C:\\npu-lab\\umd-trace\\process-%lu.jsonl", GetCurrentProcessId());
-    HANDLE file = CreateFileW(path, FILE_APPEND_DATA | FILE_READ_ATTRIBUTES, FILE_SHARE_READ,
-                             nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (file == INVALID_HANDLE_VALUE) return;
-    LARGE_INTEGER size{};
-    if (!GetFileSizeEx(file, &size) || size.QuadPart > 4 * 1024 * 1024 - 2048) {
-        CloseHandle(file); return;
-    }
+    // Opening the file for every DDI enters the filesystem filter stack on each
+    // call. Retain one handle per loaded UMD and stop I/O once its budget is used.
+    // Read the existing length at load time so device/DLL retries share the cap.
+    struct TraceFile {
+        HANDLE handle = INVALID_HANDLE_VALUE;
+        uint64_t bytes = 0;
+        TraceFile() noexcept {
+            WCHAR path[MAX_PATH]{};
+            swprintf_s(path, L"C:\\npu-lab\\umd-trace\\process-%lu.jsonl", GetCurrentProcessId());
+            handle = CreateFileW(path, FILE_APPEND_DATA | FILE_READ_ATTRIBUTES, FILE_SHARE_READ,
+                                 nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+            LARGE_INTEGER size{};
+            if (handle != INVALID_HANDLE_VALUE && GetFileSizeEx(handle, &size) && size.QuadPart >= 0)
+                bytes = uint64_t(size.QuadPart);
+            else bytes = 4 * 1024 * 1024;
+        }
+        ~TraceFile() { if (handle != INVALID_HANDLE_VALUE) CloseHandle(handle); }
+    };
+    static TraceFile trace;
+    if (lines >= 4096 || trace.handle == INVALID_HANDLE_VALUE || trace.bytes > 4 * 1024 * 1024 - 2048) return;
+    const auto file = trace.handle;
     if (!lines) {
         WCHAR module[MAX_PATH]{};
         const auto count = GetModuleFileNameW(nullptr, module, MAX_PATH);
@@ -37,7 +48,10 @@ inline void lab_trace(const char *format, ...) noexcept {
         char header[512]{};
         const auto length = sprintf_s(header, "{\"event\":\"process\",\"pid\":%lu,\"image\":\"%s\"}\n", GetCurrentProcessId(), safe);
         DWORD written = 0;
-        if (length > 0) WriteFile(file, header, DWORD(length), &written, nullptr);
+        if (length > 0) {
+            WriteFile(file, header, DWORD(length), &written, nullptr);
+            trace.bytes += written;
+        }
     }
     ++lines;
     {
@@ -46,9 +60,11 @@ inline void lab_trace(const char *format, ...) noexcept {
         const auto length = _vsnprintf_s(line, sizeof(line), _TRUNCATE, format, args);
         va_end(args);
         DWORD written = 0;
-        if (length > 0) WriteFile(file, line, DWORD(length), &written, nullptr);
+        if (length > 0) {
+            WriteFile(file, line, DWORD(length), &written, nullptr);
+            trace.bytes += written;
+        }
     }
-    CloseHandle(file);
 }
 inline void lab_shader_capture(UINT kind, const UINT *code) noexcept {
     if (!nr_fill_guest() || !code || code[1] < 2 || code[1] > 16384) return;
