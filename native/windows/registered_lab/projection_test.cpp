@@ -22,6 +22,46 @@ ProjectedVertex reference(const ClipPosition &p, const Viewport &v) {
     return {{int32_t(std::nearbyint(float(x) * 256)), int32_t(std::nearbyint(float(y) * 256))},
             {x, y}, z, 1.0f / p[3]};
 }
+void check_triangle_bounds(const std::string &backend) {
+    constexpr uint32_t count=96;
+    ProjectionExecutor executor(count,backend);
+    const Viewport viewport{0,0,8192,8192,0,1};
+    std::vector<ClipPosition> vertices(count);
+    for(auto &p:vertices){
+        const float x=float(int32_t(random32()%3000000)-500000)/256;
+        const float y=float(int32_t(random32()%3000000)-500000)/256;
+        p={x/4096-1,1-y/4096,.5f,1};
+    }
+    // Fully outside both sides, zero-area geometry, integer edges, and
+    // subpixel bounds on either side of the pixel-center threshold.
+    const float edges[18][2]{{-8,-8},{-1,-8},{-1,-1},
+        {8193,8193},{8200,8193},{8200,8200},
+        {17,17},{17,17},{17,17},
+        {0,0},{8192,0},{8192,8192},
+        {.49609375f,.5f},{1.00390625f,.5f},{.5f,1.00390625f},
+        {-.00390625f,8191.99609375f},{.00390625f,8192},{0,8192.00390625f}};
+    for(size_t i=0;i<18;++i)vertices[i]={edges[i][0]/4096-1,1-edges[i][1]/4096,.5f,1};
+    const auto result=executor.execute(vertices,viewport);
+    TEST(result.triangle_bounds.size()==count/3);
+    for(size_t t=0;t<count/3;++t){
+        const auto &bounds=result.triangle_bounds[t];
+        for(size_t axis=0;axis<2;++axis){
+            double low=1e20,high=-1e20;
+            for(size_t v=0;v<3;++v){
+                const auto &p=result.vertices[t*3+v];
+                if(backend!="CPU")TEST(p.snapped==reference(vertices[t*3+v],viewport).snapped);
+                const auto coordinate=double(p.snapped[axis])/256;
+                low=(std::min)(low,coordinate);high=(std::max)(high,coordinate);
+            }
+            const auto expected_low=int32_t(std::clamp(std::floor(low),0.,8192.));
+            const auto expected_high=int32_t(std::clamp(std::ceil(high),0.,8192.));
+            if(bounds[axis]!=expected_low || bounds[axis+2]!=expected_high)
+                std::fprintf(stderr,"triangle=%zu axis=%zu actual=%d,%d expected=%d,%d fixed_range=%.9g,%.9g\n",t,axis,bounds[axis],bounds[axis+2],expected_low,expected_high,low*256,high*256);
+            TEST(bounds[axis]==expected_low && bounds[axis+2]==expected_high);
+        }
+    }
+    std::printf("{\"triangle_bounds\":32,\"exact_scalar_bounds\":true,\"outside_degenerate_subpixel_cases\":true,\"execution_device\":\"%s\",\"desktop_offload_tested\":false}\n",result.execution_device.c_str());
+}
 }
 int main(int argc, char **argv) try {
     const std::string backend = argc > 1 ? argv[1] : "CPU";
@@ -84,6 +124,7 @@ int main(int argc, char **argv) try {
         TEST(rejected); vertices[0] = valid;
     }
     TEST(executor.execute(vertices, viewport).vertices[0].snapped == reference(valid, viewport).snapped);
+    check_triangle_bounds(backend);
     std::puts("{\"invalid_projection_requests_rejected\":4,\"reusable_after_input_rejection\":true}");
     return 0;
 } catch (const std::exception &e) { std::fprintf(stderr, "%s\n", e.what()); return 1; }

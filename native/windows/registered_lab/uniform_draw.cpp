@@ -74,8 +74,9 @@ UniformDrawExecutor::Result UniformDrawExecutor::execute(const std::vector<shade
     std::vector<ClipPosition> clips(s.count);
     for (size_t i = 0; i < clips.size(); ++i) std::memcpy(clips[i].data(), shaded.vertices[i][s.vs.position_output].data(), 16);
     began = Clock::now(); const auto projected = s.projection->execute(clips, viewport);
-    result.input_bytes += uint64_t(s.count) * 16 + 24; result.output_bytes += uint64_t(s.count) * 24; ++result.provider_requests;
+    result.input_bytes += uint64_t(s.count) * 16 + 24; result.output_bytes += uint64_t(s.count) * 24 + uint64_t(s.count/3)*16; ++result.provider_requests;
     result.timings.projection_ms = milliseconds(began); require(projected.execution_device == result.execution_device);
+    require(projected.triangle_bounds.size()==s.count/3);
     shader::VertexRegisters uniform{};
     bool uniform_inputs=true;
     for (unsigned r = 0; r < 16; ++r) if (s.ps.inputs[r] && r != s.ps.position_input) {
@@ -122,12 +123,17 @@ UniformDrawExecutor::Result UniformDrawExecutor::execute(const std::vector<shade
     // The caller's target is unchanged unless it explicitly commits this result.
     result.pixels = background;
     std::vector<Sample> samples(s.batch); std::vector<PackedColor> tile(s.batch);std::vector<Point> points(s.batch);
-    // Pack the explicit scissor. Exact coverage, clipping and culling remain
-    // device operations; padding lanes are outside every admitted scissor.
-    const size_t clip_width=size_t(clip[2]-clip[0]),clip_pixels=clip_width*size_t(clip[3]-clip[1]);
-    for (size_t t = 0; t < clips.size(); t += 3) for (size_t first = 0; first < clip_pixels; first += s.batch) {
-        const auto valid=(std::min)(size_t(s.batch),clip_pixels-first);
-        const auto pixel_index=[&](size_t n){const auto i=first+n;return (size_t(clip[1])+i/clip_width)*s.width+size_t(clip[0])+i%clip_width;};
+    // Pack the NPU's triangle bounds intersected with the explicit scissor.
+    // Exact coverage, clipping and culling remain device operations.
+    for (size_t t = 0; t < clips.size(); t += 3) {
+      const auto &bounds=projected.triangle_bounds[t/3];
+      const std::array<int32_t,4> region{(std::max)(clip[0],bounds[0]),(std::max)(clip[1],bounds[1]),
+          (std::min)(clip[2],bounds[2]),(std::min)(clip[3],bounds[3])};
+      if(region[0]>=region[2] || region[1]>=region[3])continue;
+      const size_t region_width=size_t(region[2]-region[0]),region_pixels=region_width*size_t(region[3]-region[1]);
+      for (size_t first = 0; first < region_pixels; first += s.batch) {
+        const auto valid=(std::min)(size_t(s.batch),region_pixels-first);
+        const auto pixel_index=[&](size_t n){const auto i=first+n;return (size_t(region[1])+i/region_width)*s.width+size_t(region[0])+i%region_width;};
         for (size_t i = 0; i < s.batch; ++i) {
             for (size_t v = 0; v < 3; ++v) samples[i].triangle[v] = projected.vertices[t + v].snapped;
             if(i<valid){const auto index=pixel_index(i);samples[i].point={int32_t(index%s.width)*256+128,int32_t(index/s.width)*256+128};}
@@ -153,6 +159,7 @@ UniformDrawExecutor::Result UniformDrawExecutor::execute(const std::vector<shade
         result.timings.merger_ms += milliseconds(began); require(merged.execution_device == result.execution_device);
         for(size_t i=0;i<valid;++i)result.pixels[pixel_index(i)]=merged.pixels[i];
         ++result.tile_executions;
+      }
     }
     result.vertices = std::move(shaded.vertices); result.timings.total_ms = milliseconds(start); return result;
 }

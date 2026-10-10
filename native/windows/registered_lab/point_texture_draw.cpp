@@ -76,7 +76,7 @@ UniformDrawExecutor::Result PointTextureDrawExecutor::execute(const std::vector<
     }
     began = Clock::now(); const auto projected = s.projection.execute(clips, viewport); result.timings.projection_ms = elapsed(began);
     require(projected.execution_device == result.execution_device);
-    result.input_bytes += 6*16+24; result.output_bytes += 6*24; ++result.provider_requests;
+    result.input_bytes += 6*16+24; result.output_bytes += 6*24+2*16; ++result.provider_requests;
     const std::array<std::array<uint32_t,2>,6> corners{{{0,0},{s.width,0},{s.width,s.height},{s.width,s.height},{0,s.height},{0,0}}};
     std::array<double,2> origin{};
     for (size_t i = 0; i < 6; ++i) {

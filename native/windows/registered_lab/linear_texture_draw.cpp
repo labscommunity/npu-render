@@ -175,7 +175,7 @@ UniformDrawExecutor::Result LinearTextureDrawExecutor::execute(const std::vector
         std::memcpy(positions[n].data(),shaded.vertices[n][s.vs.position_output].data(),16);require(positions[n][3]==1.f);
     }
     began=Clock::now();const auto projected=s.projection.execute(positions,viewport);result.timings.projection_ms=elapsed(began);require(projected.execution_device==s.device);
-    result.input_bytes+=6*16+24;result.output_bytes+=6*24;++result.provider_requests;
+    result.input_bytes+=6*16+24;result.output_bytes+=6*24+2*16;++result.provider_requests;
     const auto &a=projected.vertices[0],&b=projected.vertices[2];
     const std::array<float,4> rect{a.screen[0],a.screen[1],b.screen[0],b.screen[1]};
     const std::array<int32_t,4> bounds{a.snapped[0],a.snapped[1],b.snapped[0],b.snapped[1]};

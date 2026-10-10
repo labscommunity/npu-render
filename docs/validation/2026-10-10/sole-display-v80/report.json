@@ -1,0 +1,31 @@
+{
+  "trial": "v80",
+  "source_commit": "ccf59df5e9e58bdadd1eae28d4aefa8d1710aa3e",
+  "umd_build": "present-umd-v108",
+  "kmd_build": "allocation-capacity-v3",
+  "package_version": "0.0.68.0",
+  "fresh_guest_boot": true,
+  "npu_preflight_packets_passed": 13,
+  "explorer_successful_npu_packets": 20,
+  "explorer_traced_completed_draws": 19,
+  "explorer_traced_present_callbacks": 2,
+  "dwm_npu_draws": 0,
+  "received_frames": 0,
+  "viewer_window_submissions": 0,
+  "input_actions": [],
+  "sole_gate_observed": true,
+  "full_desktop_offload": false,
+  "performance_tested": false,
+  "cleanup_passed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "captured_slow_packets": 4,
+  "findings": [
+    "All 33 NPU packets pass. The fresh guest and 120-second sole-indirect display observation still deliver no frames. DWM and Explorer both run in session 1.",
+    "DWM creates two devices and produces the same 123-event trace structure as v79, with no draw or Present. IDD prepares its device and commits a display mode but receives no swapchain.",
+    "The slow-packet mechanism preserves four complete real Explorer requests. One is dominated by compilation (11.25 s total versus 47 ms draw); others visit 432, 90 and 234 triangle tiles for 49152, 868 and 872 covered samples.",
+    "A later 36-vertex shell draw visits 1296 tiles for only 373 covered samples, taking 21.35 s draw time and 33.27 s including compilation.",
+    "The final successful NPU request is not recorded as a completed UMD draw before teardown; one Explorer draw rejection follows during cleanup. Both custom devices are removed, topology restored, and ETW stopped successfully.",
+    "No physical driver or Tahoma changes are made. This experiment does not establish performance benefit or full desktop rendering."
+  ]
+}

@@ -1,0 +1,70 @@
+{
+  "build": "present-umd-v112",
+  "clean_build": true,
+  "compiled_source_hashes_match": true,
+  "cpu_contract_suites_passed": 17,
+  "physical_npu_tests_passed": [
+    "projection",
+    "uniform_draw",
+    "triangle_texture_draw",
+    "driver_callbacks"
+  ],
+  "exact_bounds_cases": 32,
+  "npu_uniform_draw_checked_components": 222208,
+  "uniform_gradient_max_byte_error": 0.5,
+  "npu_textured_triangle_checked_components": 98304,
+  "textured_max_byte_error": 1,
+  "exact_npu_replay_packets": 8,
+  "warm_replay_comparison": [
+    {
+      "source_packet": 1,
+      "exact_pixels": 256,
+      "covered_samples": 12,
+      "baseline_tiles": 2,
+      "bounded_tiles": 2,
+      "baseline_draw_ms": 25.937,
+      "bounded_draw_ms": 25.911,
+      "speedup": 1.001
+    },
+    {
+      "source_packet": 2,
+      "exact_pixels": 442368,
+      "covered_samples": 49152,
+      "baseline_tiles": 432,
+      "bounded_tiles": 24,
+      "baseline_draw_ms": 8266.725,
+      "bounded_draw_ms": 823.129,
+      "speedup": 10.043
+    },
+    {
+      "source_packet": 3,
+      "exact_pixels": 20480,
+      "covered_samples": 868,
+      "baseline_tiles": 90,
+      "bounded_tiles": 18,
+      "baseline_draw_ms": 1747.236,
+      "bounded_draw_ms": 585.291,
+      "speedup": 2.985
+    },
+    {
+      "source_packet": 4,
+      "exact_pixels": 442368,
+      "covered_samples": 872,
+      "baseline_tiles": 234,
+      "bounded_tiles": 18,
+      "baseline_draw_ms": 4426.018,
+      "bounded_draw_ms": 580.755,
+      "speedup": 7.621
+    }
+  ],
+  "host_work": "Input validation, scheduling within NPU-produced rectangles, and address generation/gather/scatter. Triangle bounds, coverage, interpolation, shading and merging execute on the selected device. Existing kernel clear/copy and presentation paths remain separate.",
+  "performance_scope": "One warm repeat per captured operation on each build, run serially on Delta; no frame delivery or Tahoma performance claim.",
+  "preserved_failures": [
+    "v109 first build failed due mixed C++ initializer-list element types.",
+    "v110 initial CPU tests exposed incorrect integer Add/Convert fusion after a clamp. A standalone graph reproduced the error.",
+    "Subsequent NPU diagnostics exposed large-coordinate errors in reduction/clamp and fixed-point bias paths. Explicit integer comparisons/bit selection plus low-byte ceil adjustment pass the same exact oracle on CPU and NPU.",
+    "A diagnostic command initially used a nonexistent venv CMake path, then used the installed cmake command."
+  ],
+  "full_desktop_offload": false,
+  "tahoma_performance_tested": false
+}

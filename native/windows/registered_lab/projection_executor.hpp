@@ -16,7 +16,13 @@ public:
     ~ProjectionExecutor();
     ProjectionExecutor(const ProjectionExecutor &) = delete;
     ProjectionExecutor &operator=(const ProjectionExecutor &) = delete;
-    struct Result { std::vector<ProjectedVertex> vertices; std::string execution_device; };
+    struct Result {
+        std::vector<ProjectedVertex> vertices;
+        std::string execution_device;
+        // Device-computed conservative pixel rectangles, clamped to the
+        // supported nonnegative target range. Present for triangle lists.
+        std::vector<std::array<int32_t,4>> triangle_bounds;
+    };
     // Finite, already depth-clipped vertices with positive w. Clipping itself
     // is not implemented. Host validation rejects unsupported requests.
     Result execute(const std::vector<ClipPosition> &vertices, const Viewport &viewport);

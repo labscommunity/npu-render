@@ -22,6 +22,11 @@ Node mul(const Node &a, const Node &b) { return std::make_shared<op::Multiply>(a
 Node div(const Node &a, const Node &b) { return std::make_shared<op::Divide>(a, b); }
 Node both(const Node &a, const Node &b) { return std::make_shared<op::BitwiseAnd>(a, b); }
 Node pred(const Node &a) { return std::make_shared<op::Convert>(a, ov::element::i32); }
+Node pick(const Node &condition, const Node &yes, const Node &no) {
+    auto mask=sub(integer(0),pred(condition));
+    return std::make_shared<op::BitwiseOr>(both(yes,mask),
+        both(no,std::make_shared<op::BitwiseXor>(mask,integer(-1))));
+}
 Node snap(const Node &screen) {
     // Native Round corrupts values on the tested NPU. A masked truncation
     // preserves the integer conversion, then explicit tie-to-even uses i32 masks.
@@ -54,7 +59,36 @@ struct ProjectionExecutor::State {
         auto depth = add(mul(div(lane(clip, 2), w), sub(lane(viewport, 5), lane(viewport, 4))), lane(viewport, 4));
         auto floating = std::make_shared<op::Concat>(ov::OutputVector{x, y, depth, div(number(1), w)}, 1);
         auto snapped = snap(std::make_shared<op::Concat>(ov::OutputVector{x, y}, 1));
-        auto model = std::make_shared<ov::Model>(ov::OutputVector{floating, snapped}, ov::ParameterVector{clip, viewport});
+        ov::OutputVector outputs{floating, snapped};
+        if (!(count % 3)) {
+            // Native reduction/clamp graphs lose large coordinates on the
+            // qualified NPU. Compare and select intact integer bit patterns.
+            auto triangles = std::make_shared<op::Reshape>(snapped,
+                op::Constant::create<int64_t>(ov::element::i64, ov::Shape{3}, {count/3,3,2}), false);
+            const auto vertex = [&](int64_t i) -> Node {
+                return std::make_shared<op::Gather>(triangles,
+                    op::Constant::create(ov::element::i64,ov::Shape{},{i}),integer(1));
+            };
+            Node minimum=vertex(0),maximum=minimum;
+            for(int64_t i=1;i<3;++i){
+                auto v=vertex(i);
+                minimum=pick(std::make_shared<op::Less>(minimum,v),minimum,v);
+                maximum=pick(std::make_shared<op::Greater>(maximum,v),maximum,v);
+            }
+            const auto pixels = [](const Node &fixed, bool upper) -> Node {
+                auto positive=pick(std::make_shared<op::Less>(fixed,integer(0)),integer(0),fixed);
+                auto bounded=pick(std::make_shared<op::Greater>(positive,integer(8192*256)),integer(8192*256),positive);
+                // Scale before the ceil adjustment: adding a fixed-point bias
+                // to a large coordinate is incorrectly fused on both tested
+                // providers. The integer low byte gives the exact remainder.
+                auto whole=both(pred(mul(std::make_shared<op::Convert>(bounded,ov::element::f32),number(1.0f/256))),integer(0x7fffffff));
+                return upper ? add(whole,pred(std::make_shared<op::Greater>(both(bounded,integer(255)),integer(0)))) : whole;
+            };
+            auto lower = pixels(minimum, false);
+            auto upper = pixels(maximum, true);
+            outputs.push_back(std::make_shared<op::Concat>(ov::OutputVector{lower,upper}, 1));
+        }
+        auto model = std::make_shared<ov::Model>(outputs, ov::ParameterVector{clip, viewport});
         ov::AnyMap properties{ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY)};
         if (backend == "NPU") {
             for (const auto &node : model->get_ops()) node->get_rt_info()["precise_0"] = std::string{};
@@ -95,8 +129,9 @@ ProjectionExecutor::Result ProjectionExecutor::execute(const std::vector<ClipPos
     std::memcpy(vp.data<float>(), v.data(), sizeof(v));
     s.request.infer();
     const auto floating = s.request.get_output_tensor(0), snapped = s.request.get_output_tensor(1);
-    require(floating.get_element_type() == ov::element::f32 && floating.get_size() == size_t(s.count) * 4 &&
-            snapped.get_element_type() == ov::element::i32 && snapped.get_size() == size_t(s.count) * 2);
+    if(floating.get_element_type() != ov::element::f32 || floating.get_size() != size_t(s.count) * 4 ||
+       snapped.get_element_type() != ov::element::i32 || snapped.get_size() != size_t(s.count) * 2)
+        throw std::runtime_error("unexpected projection vertex output layout");
     Result result{{}, s.execution_device}; result.vertices.resize(s.count);
     for (size_t i = 0; i < s.count; ++i) {
         const auto f = floating.data<const float>() + i * 4;
@@ -104,6 +139,16 @@ ProjectionExecutor::Result ProjectionExecutor::execute(const std::vector<ClipPos
         for (unsigned c = 0; c < 4; ++c) require(std::isfinite(f[c]));
         for (unsigned c = 0; c < 2; ++c) require(q[c] >= -coordinate_limit && q[c] <= coordinate_limit);
         result.vertices[i] = {{q[0], q[1]}, {f[0], f[1]}, f[2], f[3]};
+    }
+    if (!(s.count % 3)) {
+        const auto bounds = s.request.get_output_tensor(2);
+        if(bounds.get_element_type() != ov::element::i32 || bounds.get_size() != size_t(s.count/3)*4)
+            throw std::runtime_error("unexpected projection bounds output layout");
+        result.triangle_bounds.resize(s.count/3);
+        std::memcpy(result.triangle_bounds.data(), bounds.data<const int32_t>(), bounds.get_byte_size());
+        for (const auto &b : result.triangle_bounds)
+            if(!(b[0]>=0 && b[1]>=0 && b[0]<=b[2] && b[1]<=b[3] && b[2]<=8192 && b[3]<=8192))
+                throw std::runtime_error("invalid projected triangle bounds: "+std::to_string(b[0])+","+std::to_string(b[1])+","+std::to_string(b[2])+","+std::to_string(b[3]));
     }
     s.failed = false; return result;
 }

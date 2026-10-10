@@ -33,9 +33,8 @@ float4 main(float4 p:SV_Position,noperspective float4 c:COLOR,noperspective floa
         TriangleTextureDrawExecutor executor(vs,ps,9,32,32,format,3,2,87,backend,true,mask,filter,CullMode::back,false,256);
         for(const std::array<int32_t,4> clip: {std::array<int32_t,4>{7,8,26,24}, {7,8,26,9}, {0,0,32,32}, {31,31,32,32}, {17,0,17,32}, {0,17,32,17}}){
         const auto result=executor.execute(inputs,{}, {},viewport,texture,bg,clip);
-        const auto area=unsigned(clip[2]-clip[0])*unsigned(clip[3]-clip[1]);
         const auto covered=unsigned((std::max)(0,(std::min)(28,clip[2])-(std::max)(4,clip[0])))*unsigned((std::max)(0,(std::min)(28,clip[3])-(std::max)(4,clip[1])));
-        TEST(result.execution_device.rfind(backend,0)==0 && result.covered_samples==covered && result.tile_executions==3*((area+255)/256));
+        TEST(result.execution_device.rfind(backend,0)==0 && result.covered_samples==covered && result.tile_executions==3*((covered+255)/256));
         for(unsigned y=0;y<32;++y)for(unsigned x=0;x<32;++x){const auto n=size_t(y)*32+x;auto expected=bg[n];
             if(x>=unsigned(clip[0]) && x<unsigned(clip[2]) && y>=unsigned(clip[1]) && y<unsigned(clip[3]) && x>=4 && x<28 && y>=4 && y<28){
                 const double tx=(x+.5-4)/24*3-(filter==TextureFilter::linear?.5:0),ty=(y+.5-4)/24*2-(filter==TextureFilter::linear?.5:0);

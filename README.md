@@ -113,14 +113,19 @@ now has an exact NPU specialization for opaque, one-to-one point-sampled quads.
 Its captured 1024×768 replay passes, as do changing-image and driver callback
 tests. This is a checked subset, not general desktop rendering.
 
-The [latest installed trial](docs/validation/2026-10-10/sole-display-v79/report.json)
-resolves Explorer's staging-map rejection loop and completes 20 Explorer NPU
-requests, including additional text and image draws. DWM still completes no draw,
-and no desktop frame arrives during the sole-display observation. Both guest
-drivers were removed successfully. Packed scissor batches preserve exact DWM
-pixels and reduce isolated draw time; adaptive batches and a fresh VM session
-are prepared for the next trial. Full desktop offload and a Tahoma benefit remain
+The [latest installed trial](docs/validation/2026-10-10/sole-display-v80/report.json)
+completes 20 Explorer NPU requests in a freshly booted VM. DWM still completes no
+draw, and no desktop frame arrives during the 120-second sole-display observation.
+Both guest drivers were removed successfully. Four captured slow shell draws
+separate compilation delays from rendering work; another draw visits 1,296 tiles
+for only 373 covered samples. Full desktop offload and a Tahoma benefit remain
 unproven.
+
+[NPU-computed triangle bounds](docs/validation/2026-10-10/triangle-bounds-v112/report.json)
+now restrict tile dispatch while preserving exact output in eight replays of four
+captured shell operations. Three warm draws drop from 8.27/1.75/4.43 seconds to
+0.82/0.59/0.58 seconds. These are individual draw measurements; usable desktop
+frame delivery remains the next validation boundary.
 
 The [captured-window desktop experiment](native/windows/capture/README.md) now
 presents an NPU-composed 2880×1800 desktop with input passing through to the
@@ -284,9 +289,3 @@ uv run ruff format --check .
 ```
 
 Keep this repository private. There is no package-publication workflow.
-
-The latest [installed desktop attempt](docs/validation/2026-10-10/indexed-dwm-v62/report.json)
-completed 126 live compositor draws on the physical NPU but received no display
-frames. Its next unsupported operation—clipped transparent rectangles—now has a
-checked NPU path. Validation remains incremental; full desktop offload and a
-Tahoma performance improvement have not been demonstrated.
