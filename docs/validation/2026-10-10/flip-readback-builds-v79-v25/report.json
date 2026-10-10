@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "kind": "flip-callback-and-frame-readback-component-validation",
+  "registered_build": "present-umd-v79",
+  "registered_cpu_tests_passed": 13,
+  "indirect_build": "indirect-lab-v25",
+  "indirect_tests_passed": 2,
+  "readback_device": "WARP (explicit CPU fixture, not NPU)",
+  "fixture_frames": 12,
+  "fixture_formats": [
+    "RGBA8",
+    "BGRA8"
+  ],
+  "fixture_shapes": [
+    [
+      65,
+      13
+    ],
+    [
+      1024,
+      768
+    ]
+  ],
+  "contracts": [
+    "Pure flip forwards source allocation, kernel context and opaque DXGI context through the actual callback. Callback HRESULT is preserved.",
+    "Reject flags combinations, non-PRESENT/private allocations, destination-bound flips and invalid intervals before calling the runtime.",
+    "Readback preserves changing pixels across staging reuse and strips source/upload row padding. Unsupported input does not replace output.",
+    "File publication preserves complete prior frame for a concurrently open reader, exposes the new complete frame to a new reader, and rejects malformed pixels before publication."
+  ],
+  "preserved_failure": "indirect-lab-v24: MoveFileEx(REPLACE_EXISTING) failed with an existing FILE_SHARE_DELETE reader. A separate Win32 probe returned access denied for MoveFileEx, but ReplaceFile succeeded. v25 uses ReplaceFile for replacement and non-overwriting MoveFileEx only for initial publication.",
+  "live_display_delivery_tested": false,
+  "full_desktop_offload": false,
+  "sources": [
+    "https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-replacefilew",
+    "https://learn.microsoft.com/en-us/windows/win32/api/d3d11/nf-d3d11-id3d11devicecontext-map",
+    "https://learn.microsoft.com/en-us/windows/win32/direct3d11/overviews-direct3d-11-render-multi-thread-intro"
+  ]
+}

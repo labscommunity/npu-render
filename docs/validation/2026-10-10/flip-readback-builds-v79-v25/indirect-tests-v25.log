@@ -1,0 +1,35 @@
+Start testing: Oct 10 04:21 Pacific Daylight Time
+----------------------------------------------------------
+1/2 Testing: indirect_consumer_ownership
+1/2 Test: indirect_consumer_ownership
+Command: "C:/Users/tatef/AppData/Local/npu-render/builds/indirect-lab-v25/Release/nr_indirect_consumer_test.exe"
+Directory: C:/Users/tatef/AppData/Local/npu-render/builds/indirect-lab-v25
+"indirect_consumer_ownership" start time: Oct 10 04:21 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+{"consumer_ownership":true,"reentrant_retirement":true,"stale_publication_rejected":true,"concurrent_consumers_destroyed_once":8000,"desktop_offload_tested":false}
+<end of output>
+Test time =   0.30 sec
+----------------------------------------------------------
+Test Passed.
+"indirect_consumer_ownership" end time: Oct 10 04:21 Pacific Daylight Time
+"indirect_consumer_ownership" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/2 Testing: indirect_frame_readback
+2/2 Test: indirect_frame_readback
+Command: "C:/Users/tatef/AppData/Local/npu-render/builds/indirect-lab-v25/Release/nr_indirect_frame_readback_test.exe"
+Directory: C:/Users/tatef/AppData/Local/npu-render/builds/indirect-lab-v25
+"indirect_frame_readback" start time: Oct 10 04:21 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+{"kind":"received-frame-readback-fixture","device":"WARP","frames":12,"verified_bytes":18894648,"npu_execution_tested":false,"display_delivery_tested":false,"passed":true}
+<end of output>
+Test time =   0.34 sec
+----------------------------------------------------------
+Test Passed.
+"indirect_frame_readback" end time: Oct 10 04:21 Pacific Daylight Time
+"indirect_frame_readback" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 10 04:21 Pacific Daylight Time

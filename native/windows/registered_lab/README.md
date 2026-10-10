@@ -78,8 +78,12 @@ unsupported flags and mismatched resources, and invalidates the context after
 a failed callback. Statistics ABI 6 distinguishes requests from accepted
 callbacks; neither counter means a frame reached a display. The component test
 uses explicit callback shims and verifies that forwarding does not secretly
-copy pixels. Live swap-chain presentation remains a separate test; flips,
-cross-adapter imports and the other DXGI display functions are still unsupported.
+copy pixels. The indirect desktop also requests pure flips with no destination.
+Those now forward shared, runtime-owned PRESENT allocations through the same
+callback, retaining DXGI's opaque flip metadata. Combined/extra flags, private
+allocations and invalid intervals remain rejected. This adds no physical scanout
+engine. Live delivery, cross-adapter imports and the other DXGI functions remain
+separate requirements.
 The driver retains the callback table address so runtime updates between calls
 take effect, as required by the
 [DXGI DDI contract](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/supporting-the-dxgi-ddi).

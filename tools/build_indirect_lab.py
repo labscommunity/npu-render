@@ -76,6 +76,7 @@ def main():
                 "nr_indirect_topology_probe.exe",
                 "nr_indirect_topology_gui.exe",
                 "nr_indirect_consumer_test.exe",
+                "nr_indirect_frame_readback_test.exe",
                 "nr_indirect_lab.pdb",
             )
         },

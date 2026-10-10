@@ -1,0 +1,43 @@
+-- Building for: Visual Studio 17 2022
+-- Selecting Windows SDK version 10.0.26100.0 to target Windows 10.0.26200.
+-- The CXX compiler identification is MSVC 19.44.35229.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/cl.exe - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Configuring done (1.5s)
+-- Generating done (0.0s)
+-- Build files have been written to: C:/Users/tatef/AppData/Local/npu-render/builds/indirect-lab-v25
+MSBuild version 17.14.60+43b635718 for .NET Framework
+
+MSBuild version 17.14.60+43b635718 for .NET Framework
+
+  1>Checking Build System
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/indirect_lab/CMakeLists.txt
+  consumer_slot_test.cpp
+  nr_indirect_consumer_test.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\indirect-lab-v25\Release\nr_indirect_consumer_test.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/indirect_lab/CMakeLists.txt
+  frame_readback_test.cpp
+  nr_indirect_frame_readback_test.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\indirect-lab-v25\Release\nr_indirect_frame_readback_test.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/indirect_lab/CMakeLists.txt
+  driver.cpp
+     Creating library C:/Users/tatef/AppData/Local/npu-render/builds/indirect-lab-v25/Release/nr_indirect_lab.lib and object C:/Users/tatef/AppData/Local/npu-render/builds/indirect-lab-v25/Release/nr_indirect_lab.exp
+  nr_indirect_lab.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\indirect-lab-v25\Release\nr_indirect_lab.dll
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/indirect_lab/CMakeLists.txt
+  topology_probe.cpp
+  nr_indirect_topology_gui.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\indirect-lab-v25\Release\nr_indirect_topology_gui.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/indirect_lab/CMakeLists.txt
+  topology_probe.cpp
+  nr_indirect_topology_probe.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\indirect-lab-v25\Release\nr_indirect_topology_probe.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/indirect_lab/CMakeLists.txt
+Test project C:/Users/tatef/AppData/Local/npu-render/builds/indirect-lab-v25
+    Start 1: indirect_consumer_ownership
+1/2 Test #1: indirect_consumer_ownership ......   Passed    0.30 sec
+    Start 2: indirect_frame_readback
+2/2 Test #2: indirect_frame_readback ..........   Passed    0.34 sec
+
+100% tests passed out of 2
+
+Total Test time (real) =   0.64 sec
+{"schema": 1, "kind": "indirect-display-admission-build-only", "clean_build": true, "system_renderer_control": false, "source_sha256": {"native/windows/indirect_lab/CMakeLists.txt": "1914b4510470549a0c133baad23232bde9d6904ebe2db6343d6d8b97b01c126c", "native/windows/indirect_lab/consumer_slot.hpp": "9045a6b2c9b75c6076fdf8ea5c1236c30555c441dd025cd92ecf8b754a6bebf8", "native/windows/indirect_lab/consumer_slot_test.cpp": "18737c813e47bc6fece50276724c206373030e1a8141a78a6e0ee155d861e6b1", "native/windows/indirect_lab/driver.cpp": "0f350872bb47f06865afff49306d353dadc2d609a5a355710ba6bb4d10e58523", "native/windows/indirect_lab/frame_file.hpp": "eca50678bab809cab7b95312645a91406e1dd1e14d37fe4eef6650451a94e232", "native/windows/indirect_lab/frame_readback.hpp": "80e650cc6b214adb6ffefffada8d8cd01cd073b43e841566415474f399e49302", "native/windows/indirect_lab/frame_readback_test.cpp": "d002bf199a1b3a6f2377e8d32a11a189e5bf8ef1d5aecd70090017a0e3ce983e", "native/windows/indirect_lab/nr_indirect_lab.inf": "59b94e6b8ba19246c9c993941d092b9aee40c23017d678cd3358d76bb6caa375", "native/windows/indirect_lab/README.md": "8923fa2d14725bc50c57129d9a60ca6233a7ff1536872fbd28136b17210e80b3", "native/windows/indirect_lab/topology_probe.cpp": "97cbd4f80bcab60c4c2082047a52ed3110e2fd4651676c566b6bae5187a485a2", "native/windows/registered_lab/contract.hpp": "675e9ea5ee23282f6b6cf40a2b51d0e09a945e5b31214d01af52e29fd416386c", "native/windows/kmd/contract.hpp": "9c35ef2bd7ae8c900a461bcdf53c612f1aa0dd6be558422db083e37ecc7ed0a6"}, "sha256": "754ecd668c3a38113f83f33dccca8c1223ba4389ea0c847f173fbc0ce625235b", "binary_sha256": {"nr_indirect_lab.dll": "754ecd668c3a38113f83f33dccca8c1223ba4389ea0c847f173fbc0ce625235b", "nr_indirect_topology_probe.exe": "ff10c2e30ad4139b45f6ebcdcb67e2eb1dbad10855ad393b121ccbce801a20b1", "nr_indirect_topology_gui.exe": "ca0c08c3cec8ebfe1676460963c5bd73ee7c7b6404d27d62692a559fd965df3a", "nr_indirect_consumer_test.exe": "8cb0774197f2866a2458362261b1e5fcc5091595f02577e55d19b13d2dded7a0", "nr_indirect_frame_readback_test.exe": "f4018627333a3cac3c7ae42da9cc687636de58661e0e5ca9567b449fcb146a25", "nr_indirect_lab.pdb": "030195e7ec0d9ad699496cc62d0ed7ada13af3ec59233acc2afb5adfc2d04b77"}, "installation_performed": false, "desktop_offload_tested": false}

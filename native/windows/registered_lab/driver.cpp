@@ -219,6 +219,7 @@ void APIENTRY create_resource(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATERESOUR
         if (a->pInitialDataUP) upload(*allocation, nullptr, a->pInitialDataUP->pSysMem, a->pInitialDataUP->SysMemPitch);
         auto &r = *static_cast<Resource *>(out.pDrvPrivate);
         r.allocation = std::move(allocation); r.usage = a->Usage; r.map_flags = a->MapFlags;
+        r.bind_flags = a->BindFlags;
     });
 }
 SIZE_T APIENTRY opened_resource_size(D3D10DDI_HDEVICE, const D3D10DDIARG_OPENRESOURCE *) { return sizeof(Resource); }
@@ -424,12 +425,20 @@ HRESULT APIENTRY present(DXGI_DDI_ARG_PRESENT *a) {
               a->hDstResource ? "true" : "false", UINT(a->FlipInterval),
               d.context && d.context->poisoned ? "true" : "false");
     try {
-        require(a->Flags.Value == 1 && !a->SrcSubResourceIndex && !a->DstSubResourceIndex &&
+        require((a->Flags.Value == 1 || a->Flags.Value == 2) && !a->SrcSubResourceIndex && !a->DstSubResourceIndex &&
                 d.context && !d.context->poisoned && d.dxgi_callbacks &&
                 d.dxgi_callbacks->pfnPresentCb && a->hSurfaceToPresent);
         D3D10DDI_HRESOURCE hs{}; hs.pDrvPrivate = reinterpret_cast<void *>(a->hSurfaceToPresent);
         const auto &source = resource(hs);
         require(source.usage == D3D10_DDI_USAGE_DEFAULT && source.allocation->context == d.context && !source.allocation->locked);
+        if (a->Flags.Flip) {
+            // DWM's indirect swapchain submits a shared PRESENT allocation.
+            // DXGI retains flip/target metadata in its opaque callback context;
+            // the runtime must perform the actual handoff. This does not add a
+            // physical scanout engine or convert the request to a local blit.
+            require(!a->hDstResource && !source.buffer_bytes && source.allocation->runtime_resource &&
+                    (source.bind_flags & D3D10_DDI_BIND_PRESENT) && UINT(a->FlipInterval) <= 4);
+        }
         DXGIDDICB_PRESENT callback{};
         callback.hSrcAllocation = source.allocation->handle;
         callback.hContext = d.context->command.hContext;

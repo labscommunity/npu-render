@@ -98,8 +98,46 @@ int test_present(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER_DEVI
     TEST(stats.present_requests == 3 && stats.accepted_present_callbacks == 2);
     TEST(!stats.remote_npu_executions);
     stats.version = 5; TEST(!nr_fill_stats(&stats));
+    // The live indirect desktop asks for Flip, with a runtime-owned shared
+    // PRESENT allocation and no destination. Preserve the opaque DXGI context
+    // and propagate the callback result; never manufacture a successful flip.
+    device(h).context->poisoned = false; present_callback_status = S_OK;
+    descriptor = valid_descriptor; descriptor.MiscFlags = D3D10_DDI_RESOURCE_MISC_SHARED;
+    D3D10DDI_HRTRESOURCE rt{}; rt.handle = reinterpret_cast<HANDLE>(uintptr_t(0x9017));
+    f.pfnCreateResource(h, &descriptor, back, rt);
+    TEST(last_error == S_OK && resource(back).allocation->runtime_resource == rt.handle &&
+         (resource(back).bind_flags & D3D10_DDI_BIND_PRESENT));
+    args = original; args.Flags.Value = 2; args.hDstResource = 0;
+    args.hSurfaceToPresent = UINT_PTR(back.pDrvPrivate);
+    const auto flip = args; const auto flip_pixels = memory;
+    for (UINT failure = 0; failure < 7; ++failure) {
+        switch (failure) {
+        case 0: args.Flags.Value = 3; break;
+        case 1: args.Flags.Value = 0; break;
+        case 2: args.Flags.Value = 6; break;
+        case 3: args.hDstResource = UINT_PTR(&destination); break;
+        case 4: args.FlipInterval = DXGI_DDI_FLIP_INTERVAL_TYPE(5); break;
+        case 5: args.hSurfaceToPresent = UINT_PTR(&source); break;
+        case 6: resource(back).bind_flags = D3D10_DDI_BIND_RENDER_TARGET; break;
+        }
+        TEST(dxgi.pfnPresent(&args) == E_INVALIDARG && present_callback_calls == 3 && memory == flip_pixels);
+        args = flip; resource(back).bind_flags = descriptor.BindFlags;
+    }
+    for (UINT interval = 0; interval <= 4; ++interval) {
+        args.FlipInterval = DXGI_DDI_FLIP_INTERVAL_TYPE(interval);
+        TEST(dxgi.pfnPresent(&args) == S_OK && present_callback_calls == 4 + interval);
+        TEST(observed_present.hSrcAllocation == resource(back).allocation->handle && !observed_present.hDstAllocation &&
+             observed_present.hContext == context_handle && observed_present.pDXGIContext == args.pDXGIContext &&
+             !observed_present.SyncIntervalOverrideValid && memory == flip_pixels);
+    }
+    present_callback_status = DXGI_ERROR_DEVICE_REMOVED;
+    TEST(dxgi.pfnPresent(&args) == DXGI_ERROR_DEVICE_REMOVED && present_callback_calls == 9 && device(h).context->poisoned);
+    TEST(dxgi.pfnPresent(&args) == E_INVALIDARG && present_callback_calls == 9);
+    stats = {}; TEST(nr_fill_stats(&stats));
+    TEST(stats.present_requests == 9 && stats.accepted_present_callbacks == 7);
+    f.pfnDestroyResource(h, back);
     source.allocation.reset(); destination.allocation.reset(); f.pfnDestroyDevice(h);
     TEST(!counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
-    std::puts("{\"kind\":\"registered-present-callback-shim\",\"callback_requests\":3,\"accepted_callbacks\":2,\"display_delivery_tested\":false}");
+    std::puts("{\"kind\":\"registered-present-callback-shim\",\"callback_requests\":9,\"accepted_callbacks\":7,\"flip_callbacks\":6,\"display_delivery_tested\":false}");
     return 0;
 }

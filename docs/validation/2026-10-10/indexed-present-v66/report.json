@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "kind": "indirect-desktop-flip-rejection-attributed",
+  "source_revision": "29b4ff188ac09ce5ad44dcb75a5a46a803cbe332",
+  "umd_build": "present-umd-v78",
+  "render_version": "0.0.55.0",
+  "idd_version": "0.0.8.0",
+  "cause": "DWM requested DXGI_DDI_PRESENT_FLAGS.Flip (value 2), no destination, subresource 0, interval 1. The UMD accepted only Blt (value 1) and returned E_INVALIDARG before calling PresentCb. DXGI reported device removed and discarded the swapchain.",
+  "present_validation_rejections": 3,
+  "present_callback_calls": 0,
+  "displayed_frames": 0,
+  "full_desktop_offload": false,
+  "cleanup": "Both devices and packages removed successfully. The finite observer stopped after finding the rejection, so the concurrent 45-second topology-only observer later reported the removed monitor; that is expected teardown, not a new activation failure.",
+  "fix_under_test": "Forward pure flips for runtime-owned shared PRESENT allocations to the actual DXGI PresentCb. Preserve real HRESULT, opaque context and allocation/context ownership. Reject combinations, unsupported intervals and private allocations.",
+  "sources": [
+    "https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/dxgiddi/ns-dxgiddi-dxgi_ddi_present_flags",
+    "https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/dxgiddi/ns-dxgiddi-dxgiddicb_present"
+  ]
+}

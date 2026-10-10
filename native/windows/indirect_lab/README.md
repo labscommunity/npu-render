@@ -3,8 +3,9 @@
 This driver provides one 1024×768 diagnostic monitor in the owned disposable
 Windows guest. It discovers the paired laboratory render adapter through its
 public KMT private-information contract, requests that adapter before announcing
-the monitor, and records the actual render LUID supplied by Windows. It consumes
-and releases returned desktop surfaces without displaying or encoding them.
+the monitor, and records the actual render LUID supplied by Windows. It reads back
+returned desktop surfaces through a staging texture and releases them. No viewer
+or encoder runs inside the driver.
 
 This answers whether Windows admits the experimental adapter for an indirect
 desktop and how far swapchain creation progresses. A received surface is not
@@ -18,6 +19,16 @@ UMDF host before use. Each host process records at most 4 MiB of JSON diagnostic
 requested and actual adapter identities, device creation status, frame dimensions,
 and swapchain cleanup. `preferred_selected` is explicit when Windows chooses a
 different adapter. No received frame is counted as displayed.
+
+Each UMDF process also writes `latest-frame-<pid>.bin`, replacing the prior file
+only after a complete readback has been written. Its 64-byte `FrameHeader` records
+shape, RGBA/BGRA format, sequence and timestamp, followed by tightly packed pixels.
+An incomplete write stays in `pending-frame-<pid>.bin`; it is never published as
+a completed frame. Readers must use `FILE_SHARE_DELETE`. Storage is bounded by
+two full frames per process. The shared immediate context is serialized across
+consumer replacements. The WARP fixture validates changing pixel patterns,
+padding removal, invalid-input rejection and replacement while an old reader is
+open; it establishes no NPU execution or desktop delivery.
 
 Build with `tools/build_indirect_lab.py --wdk-root <pinned-dependency-directory>`.
 The builder extracts checksum-pinned UMDF 2.25 / IddCx 1.4 dependencies and creates

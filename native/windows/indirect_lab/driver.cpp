@@ -20,12 +20,15 @@
 #include <memory>
 #include <vector>
 #include "consumer_slot.hpp"
+#include "frame_file.hpp"
 #include "../registered_lab/contract.hpp"
 #include "../kmd/contract.hpp"
 using Microsoft::WRL::ComPtr;
 namespace {
 constexpr UINT width = 1024, height = 768;
 std::mutex log_mutex;
+std::mutex frame_output_mutex;
+uint64_t frame_sequence = 0;
 void trace(const char *format, ...) {
     std::lock_guard<std::mutex> lock(log_mutex);
     WCHAR path[MAX_PATH]{};
@@ -129,6 +132,7 @@ class Consumer {
     WDFWORKITEM release = nullptr;
     ComPtr<ID3D11Device> device;
     ComPtr<ID3D11DeviceContext> context;
+    nr::indirect::FrameReadback readback;
     static DWORD WINAPI run_thread(void *self) { static_cast<Consumer *>(self)->run(); return 0; }
     void run() {
         ComPtr<IDXGIDevice> dxgi;
@@ -158,6 +162,21 @@ class Consumer {
                 if (frames < 8) trace("{\"event\":\"frame\",\"index\":%u,\"width\":%u,\"height\":%u,\"format\":%u}\n",
                                      frames, desc.Width, desc.Height, UINT(desc.Format));
                 ++frames;
+                // Serialize the shared immediate context across swapchain
+                // replacements. The latest file contains received pixels only;
+                // it is neither an NPU attribution nor a displayed-frame claim.
+                std::lock_guard<std::mutex> lock(frame_output_mutex);
+                nr::indirect::FramePixels pixels;
+                status = readback.read(device.Get(), context.Get(), texture.Get(), pixels);
+                if (SUCCEEDED(status)) {
+                    WCHAR temporary[MAX_PATH]{}, destination[MAX_PATH]{};
+                    swprintf_s(temporary, L"C:\\npu-lab\\idd-trace\\pending-frame-%lu.bin", GetCurrentProcessId());
+                    swprintf_s(destination, L"C:\\npu-lab\\idd-trace\\latest-frame-%lu.bin", GetCurrentProcessId());
+                    status = nr::indirect::write_frame_file(temporary, destination, pixels, ++frame_sequence);
+                    if (frames <= 8 || FAILED(status))
+                        trace("{\"event\":\"frame_readback\",\"sequence\":%llu,\"bytes\":%zu,\"status\":\"%08lx\",\"displayed_frames\":0}\n",
+                              frame_sequence, pixels.bytes.size(), ULONG(status));
+                } else trace("{\"event\":\"frame_readback_failed\",\"status\":\"%08lx\"}\n", ULONG(status));
             }
             resource.Reset(); texture.Reset();
             if (FAILED(status)) break;

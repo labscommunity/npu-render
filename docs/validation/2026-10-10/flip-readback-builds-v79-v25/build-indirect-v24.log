@@ -1,0 +1,68 @@
+-- Building for: Visual Studio 17 2022
+-- Selecting Windows SDK version 10.0.26100.0 to target Windows 10.0.26200.
+-- The CXX compiler identification is MSVC 19.44.35229.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/cl.exe - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Configuring done (1.5s)
+-- Generating done (0.0s)
+-- Build files have been written to: C:/Users/tatef/AppData/Local/npu-render/builds/indirect-lab-v24
+MSBuild version 17.14.60+43b635718 for .NET Framework
+
+MSBuild version 17.14.60+43b635718 for .NET Framework
+
+  1>Checking Build System
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/indirect_lab/CMakeLists.txt
+  consumer_slot_test.cpp
+  nr_indirect_consumer_test.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\indirect-lab-v24\Release\nr_indirect_consumer_test.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/indirect_lab/CMakeLists.txt
+  frame_readback_test.cpp
+  nr_indirect_frame_readback_test.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\indirect-lab-v24\Release\nr_indirect_frame_readback_test.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/indirect_lab/CMakeLists.txt
+  driver.cpp
+     Creating library C:/Users/tatef/AppData/Local/npu-render/builds/indirect-lab-v24/Release/nr_indirect_lab.lib and object C:/Users/tatef/AppData/Local/npu-render/builds/indirect-lab-v24/Release/nr_indirect_lab.exp
+  nr_indirect_lab.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\indirect-lab-v24\Release\nr_indirect_lab.dll
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/indirect_lab/CMakeLists.txt
+  topology_probe.cpp
+  nr_indirect_topology_gui.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\indirect-lab-v24\Release\nr_indirect_topology_gui.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/indirect_lab/CMakeLists.txt
+  topology_probe.cpp
+  nr_indirect_topology_probe.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\indirect-lab-v24\Release\nr_indirect_topology_probe.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/indirect_lab/CMakeLists.txt
+Test project C:/Users/tatef/AppData/Local/npu-render/builds/indirect-lab-v24
+    Start 1: indirect_consumer_ownership
+1/2 Test #1: indirect_consumer_ownership ......   Passed    0.30 sec
+    Start 2: indirect_frame_readback
+2/2 Test #2: indirect_frame_readback ..........***Failed    0.35 sec
+readback check failed: C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\indirect_lab\frame_readback_test.cpp:61: SUCCEEDED(nr::indirect::write_frame_file(temporary, destination, frame, 2))
+
+
+50% tests passed, 1 tests failed out of 2
+
+Total Test time (real) =   0.65 sec
+
+The following tests FAILED:
+	  2 - indirect_frame_readback (Failed)
+python.exe : Errors while running CTest
+At line:4 char:1
++ & "$src\venv\Scripts\python.exe" build_indirect_lab.py --build-dir "$ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Errors while running CTest:String) [], RemoteExcepti 
+   on
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Traceback (most recent call last):
+  File "C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\build_indirect_lab.py", 
+line 91, in <module>
+    main()
+  File "C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\build_indirect_lab.py", 
+line 57, in main
+    subprocess.run(
+  File "C:\Users\tatef\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 571, in 
+run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['ctest', '--test-dir', 
+'C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\indirect-lab-v24', '-C', 'Release', 
+'--output-on-failure']' returned non-zero exit status 8.
