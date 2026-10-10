@@ -1,0 +1,402 @@
+Last event: Break instruction exception - code 80000003 (first chance)
+  debugger time: Fri Oct  9 19:36:46.848 2026 (UTC - 7:00)
+PROCESS ffffd586d2e66080
+    SessionId: none  Cid: 1dd0    Peb: af7cb9d000  ParentCid: 0308
+    DirBase: 6c251000  ObjectTable: ffffe78cfd8de880  HandleCount: 292.
+    Image: WUDFHost.exe
+
+ # Child-SP          RetAddr               Call Site
+00 000000af`7d07fa00 00000000`00000001     0x00007fff`52aeeffa
+01 000000af`7d07fa08 00000000`00000000     0x1
+1: kd> .process /p /r ffffd586d2e66080
+Implicit process is now ffffd586`d2e66080
+.cache forcedecodeuser done
+Loading User Symbols
+...................................
+1: kd> ln @rip; kP; .exr -1
+Browse module
+Set bu breakpoint
+
+(00007fff`52aeedbc)   iddcx!IddWatchdog::WatchdogThread+0x23e   |  (00007fff`52aef0c0)   iddcx!FxDriverEntryUm
+ # Child-SP          RetAddr               Call Site
+00 000000af`7d07fa00 00007fff`6760cd87     iddcx!IddWatchdog::WatchdogThread+0x23e
+01 000000af`7d07fae0 00007fff`68eacaec     KERNEL32!BaseThreadInitThunk+0x17
+02 000000af`7d07fb10 00000000`00000000     ntdll!RtlUserThreadStart+0x2c
+ExceptionAddress: 00007fff52aeeffa (iddcx!IddWatchdog::WatchdogThread+0x000000000000023e)
+   ExceptionCode: 80000003 (Break instruction exception)
+  ExceptionFlags: 00000000
+NumberParameters: 1
+   Parameter[0]: 0000000000000000
+1: kd> !process -1 7
+PROCESS ffffd586d2e66080
+    SessionId: none  Cid: 1dd0    Peb: af7cb9d000  ParentCid: 0308
+    DirBase: 6c251000  ObjectTable: ffffe78cfd8de880  HandleCount: 292.
+    Image: WUDFHost.exe
+    VadRoot ffffd586d2e06bc0 Vads 101 Clone 0 Private 607. Modified 1. Locked 0.
+    DeviceMap ffffe78cf60596f0
+    Token                             ffffe78cfb9a7650
+    ElapsedTime                       00:00:20.950
+    UserTime                          00:00:00.000
+    KernelTime                        00:00:00.000
+    QuotaPoolUsage[PagedPool]         143928
+    QuotaPoolUsage[NonPagedPool]      14272
+    Working Set Sizes (now,min,max)  (3636, 50, 345) (14544KB, 200KB, 1380KB)
+    PeakWorkingSetSize                3550
+    VirtualSize                       2101379 Mb
+    PeakVirtualSize                   2101379 Mb
+    PageFaultCount                    3660
+    MemoryPriority                    BACKGROUND
+    BasePriority                      8
+    CommitCharge                      766
+
+        THREAD ffffd586dfaf5080  Cid 1dd0.18d4  Teb: 000000af7cb9e000 Win32Thread: 0000000000000000 WAIT: (UserRequest) UserMode Non-Alertable
+            ffffd586d18d35e0  SynchronizationEvent
+        Not impersonating
+        DeviceMap                 ffffe78cf60596f0
+        Owning Process            ffffd586d2e66080       Image:         WUDFHost.exe
+        Attached Process          N/A            Image:         N/A
+        Wait Start TickCount      558153         Ticks: 1330 (0:00:00:20.781)
+        Context Switch Count      36             IdealProcessor: 1             
+        UserTime                  00:00:00.015
+        KernelTime                00:00:00.093
+        Win32 Start Address WUDFHost!wmainCRTStartup (0x00007ff694d861f0)
+        Stack Init ffffd18674964c70 Current ffffd186749646c0
+        Base ffffd18674965000 Limit ffffd1867495f000 Call 0000000000000000
+        Priority 9  BasePriority 8  Decay Boost 1  IoPriority 2  PagePriority 5
+        Child-SP          RetAddr               : Args to Child                                                           : Call Site
+        ffffd186`74964700 fffff807`782cc438     : 00000000`00000047 ffffa901`651c0180 00000000`00000000 ffffa901`651ca2a8 : nt!KiSwapContext+0x76
+        ffffd186`74964840 fffff807`78217a05     : 00000000`00000000 00000000`00000000 ffffd586`dfaf5080 ffffa901`651c0180 : nt!KiSwapThread+0x248
+        ffffd186`749648b0 fffff807`782186f6     : 000000af`00000000 ffffa901`651c0180 00000000`00000000 00000000`00000000 : nt!KiCommitThreadWait+0x225
+        ffffd186`74964950 fffff807`788713af     : ffffd586`d18d35e0 80000000`00000006 00000000`00000001 0000025a`3a7fee00 : nt!KeWaitForSingleObject+0x846
+        ffffd186`74964a40 fffff807`788712da     : ffffd586`dfaf5080 00000000`ffffffff 00000000`00000000 00007ff6`94da5cf0 : nt!ObWaitForSingleObject+0xbf
+        ffffd186`74964aa0 fffff807`786c1d55     : 00000014`c52b5cbc 0000025a`3a7f2e40 00000000`00000000 00000000`00000000 : nt!NtWaitForSingleObject+0x6a
+        ffffd186`74964ae0 00007fff`68f60e44     : 00007fff`6626be9f 000000af`7cc7f7c0 00007ff6`94d62282 00000000`00000000 : nt!KiSystemServiceCopyEnd+0x25 (TrapFrame @ ffffd186`74964ae0)
+        000000af`7cc7f638 00007fff`6626be9f     : 000000af`7cc7f7c0 00007ff6`94d62282 00000000`00000000 00007fff`66261d00 : ntdll!NtWaitForSingleObject+0x14
+        000000af`7cc7f640 00007ff6`94d8168d     : 00000000`00000000 00000000`00000004 0000c2cf`00000000 00000000`0000024c : KERNELBASE!WaitForSingleObjectEx+0xaf
+        000000af`7cc7f6e0 00007ff6`94d7f7a8     : 00000000`00000000 00000000`00000000 000000af`7cc7f7c0 00000000`00000000 : WUDFHost!CLpcNotification::Run+0x1d
+        000000af`7cc7f710 00007ff6`94d7ef2e     : 0000025a`3a7f48b0 00000000`00000000 0000025a`3a7fed40 00000000`00000000 : WUDFHost!WudfMain+0x7ac
+        000000af`7cc7f7a0 00007ff6`94d8616b     : 0000025a`3a7f48b0 00000000`00000001 00000000`00000000 00000000`00000000 : WUDFHost!wmain+0x112
+        (Inline Function) --------`--------     : --------`-------- --------`-------- --------`-------- --------`-------- : WUDFHost!invoke_main+0x22 (Inline Function @ 00007ff6`94d8616b)
+        000000af`7cc7f820 00007fff`6760cd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : WUDFHost!__scrt_common_main_seh+0x10b
+        000000af`7cc7f860 00007fff`68eacaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+        000000af`7cc7f890 00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+        THREAD ffffd586dfcf3080  Cid 1dd0.1af8  Teb: 000000af7cba0000 Win32Thread: 0000000000000000 WAIT: (WrQueue) UserMode Alertable
+            ffffd586d1b26c80  QueueObject
+        Not impersonating
+        DeviceMap                 ffffe78cf60596f0
+        Owning Process            ffffd586d2e66080       Image:         WUDFHost.exe
+        Attached Process          N/A            Image:         N/A
+        Wait Start TickCount      559222         Ticks: 261 (0:00:00:04.078)
+        Context Switch Count      21             IdealProcessor: 0             
+        UserTime                  00:00:00.015
+        KernelTime                00:00:00.000
+        Win32 Start Address ntdll!TppWorkerThread (0x00007fff68e1a2e0)
+        Stack Init ffffd18675811c70 Current ffffd18675811420
+        Base ffffd18675812000 Limit ffffd1867580c000 Call 0000000000000000
+        Priority 8  BasePriority 8  IoPriority 2  PagePriority 5
+        Child-SP          RetAddr               : Args to Child                                                           : Call Site
+        ffffd186`75811460 fffff807`782cc438     : 00000000`00000047 ffffa901`651c0180 00000000`00000000 ffffa901`651ca2a8 : nt!KiSwapContext+0x76
+        ffffd186`758115a0 fffff807`78217a05     : 00000000`00000000 00000000`00000000 ffffd586`dfcf3080 ffffa901`651c0180 : nt!KiSwapThread+0x248
+        ffffd186`75811610 fffff807`78215dc6     : 00000000`00000000 ffffa901`651c0180 00000000`00000000 00000000`00000000 : nt!KiCommitThreadWait+0x225
+        ffffd186`758116b0 fffff807`78214e12     : ffffd586`d1b26c80 00000000`00000001 00000000`00000001 ffffffff`ffffffff : nt!KeRemoveQueueEx+0x896
+        ffffd186`75811750 fffff807`7832b51f     : ffffd186`7581193c 00000000`00000000 ffffd586`d2ae51f0 00000000`00000000 : nt!IoRemoveIoCompletion+0x92
+        ffffd186`75811870 fffff807`786c1d55     : ffffd586`d18e8be0 0000025a`3a7ec2c0 ffffd186`75811b60 00007fff`68e18d70 : nt!NtWaitForWorkViaWorkerFactory+0x6bf
+        ffffd186`75811a70 00007fff`68f64a74     : 00007fff`68e1a65e 00000000`00000000 00000000`00000000 00007fff`68e18d70 : nt!KiSystemServiceCopyEnd+0x25 (TrapFrame @ ffffd186`75811ae0)
+        000000af`7ccff858 00007fff`68e1a65e     : 00000000`00000000 00000000`00000000 00007fff`68e18d70 0000025a`3a7ead90 : ntdll!NtWaitForWorkViaWorkerFactory+0x14
+        000000af`7ccff860 00007fff`6760cd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!TppWorkerThread+0x37e
+        000000af`7ccffbc0 00007fff`68eacaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+        000000af`7ccffbf0 00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+        THREAD ffffd586d1fd4080  Cid 1dd0.1b08  Teb: 000000af7cba2000 Win32Thread: 0000000000000000 WAIT: (WrQueue) UserMode Alertable
+            ffffd586d1b26c80  QueueObject
+        Not impersonating
+        DeviceMap                 ffffe78cf60596f0
+        Owning Process            ffffd586d2e66080       Image:         WUDFHost.exe
+        Attached Process          N/A            Image:         N/A
+        Wait Start TickCount      558969         Ticks: 514 (0:00:00:08.031)
+        Context Switch Count      21             IdealProcessor: 1             
+        UserTime                  00:00:00.000
+        KernelTime                00:00:00.015
+        Win32 Start Address ntdll!TppWorkerThread (0x00007fff68e1a2e0)
+        Stack Init ffffd18675818c70 Current ffffd18675818420
+        Base ffffd18675819000 Limit ffffd18675813000 Call 0000000000000000
+        Priority 8  BasePriority 8  IoPriority 2  PagePriority 5
+        Child-SP          RetAddr               : Args to Child                                                           : Call Site
+        ffffd186`75818460 fffff807`782cc438     : 00000000`00000047 fffff807`07953180 00000000`00000000 fffff807`0795d2a8 : nt!KiSwapContext+0x76
+        ffffd186`758185a0 fffff807`78217a05     : 00000000`00000000 00000000`00000000 ffffd586`d1fd4080 fffff807`07953180 : nt!KiSwapThread+0x248
+        ffffd186`75818610 fffff807`78215dc6     : 00000000`00000000 fffff807`07953180 00000000`00000000 00000000`00000000 : nt!KiCommitThreadWait+0x225
+        ffffd186`758186b0 fffff807`78214e12     : ffffd586`d1b26c80 00000000`00000001 00000000`00000001 ffffffff`ffffffff : nt!KeRemoveQueueEx+0x896
+        ffffd186`75818750 fffff807`7832b51f     : ffffd586`e00c52d0 ffffd586`d24e1bf0 ffffd586`d24e1bf0 ffffd586`00000180 : nt!IoRemoveIoCompletion+0x92
+        ffffd186`75818870 fffff807`786c1d55     : 00000000`00000000 ffffd586`d1b26c80 ffffd186`75818a00 00000000`00000000 : nt!NtWaitForWorkViaWorkerFactory+0x6bf
+        ffffd186`75818a70 00007fff`68f64a74     : 00007fff`68e1a65e 00000000`00000000 00000000`00000000 00007fff`68e18d70 : nt!KiSystemServiceCopyEnd+0x25 (TrapFrame @ ffffd186`75818ae0)
+        000000af`7cd7f6d8 00007fff`68e1a65e     : 00000000`00000000 00000000`00000000 00007fff`68e18d70 0000025a`3a7ead90 : ntdll!NtWaitForWorkViaWorkerFactory+0x14
+        000000af`7cd7f6e0 00007fff`6760cd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!TppWorkerThread+0x37e
+        000000af`7cd7fa40 00007fff`68eacaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+        000000af`7cd7fa70 00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+        THREAD ffffd586d1df5080  Cid 1dd0.0518  Teb: 000000af7cba4000 Win32Thread: ffffd586d1ab5420 READY on processor 80000000
+        Not impersonating
+        DeviceMap                 ffffe78cf60596f0
+        Owning Process            ffffd586d2e66080       Image:         WUDFHost.exe
+        Attached Process          N/A            Image:         N/A
+        Wait Start TickCount      559482         Ticks: 1 (0:00:00:00.015)
+        Context Switch Count      119            IdealProcessor: 0             
+        UserTime                  00:00:00.109
+        KernelTime                00:00:00.062
+        Win32 Start Address ntdll!TppWorkerThread (0x00007fff68e1a2e0)
+        Stack Init ffffd18675826c70 Current ffffd186758267e0
+        Base ffffd18675827000 Limit ffffd18675821000 Call 0000000000000000
+        Priority 8  BasePriority 8  IoPriority 2  PagePriority 5
+        Child-SP          RetAddr               : Args to Child                                                           : Call Site
+        ffffd186`75826820 fffff807`78225e6b     : 00000000`00000000 ffffd186`00000001 00000000`00000000 00000000`00000000 : nt!KiSwapContext+0x76
+        ffffd186`75826960 fffff807`782251b8     : fffff807`07953101 fffff807`78401c2d 00000000`00000000 0000025a`3a812ec0 : nt!KiQuantumEnd+0xbdb
+        ffffd186`75826a80 fffff807`786b5c1b     : 00000000`00000000 0000025a`3a84b180 0000025a`3a84c850 00000000`ffffffff : nt!KiDispatchInterrupt+0x1c8
+        ffffd186`75826ab0 fffff807`786b1074     : 00000014`d18c3a80 ffffd186`75826b60 00000014`d18c3cba 00000821`dac7b8a8 : nt!KiDpcInterruptBypass+0x1b
+        ffffd186`75826ae0 00007fff`60339630     : 00007fff`603ce6a5 0000025a`3a84c850 0000025a`3a84c850 0000025a`3a8436c0 : nt!KiInterruptDispatchNoLockNoEtw+0x64 (TrapFrame @ ffffd186`75826ae0)
+        000000af`7cdfb248 00007fff`603ce6a5     : 0000025a`3a84c850 0000025a`3a84c850 0000025a`3a8436c0 0000025a`3a84c850 : d3d11!CContext::InitializeDefaults
+        000000af`7cdfb250 00007fff`6036580b     : 0000025a`3a84a938 0000025a`3a84a938 0000025a`3a84a9a0 0000025a`3a84a958 : d3d11!CDevice::LLOCompleteLayerConstruction+0x22e5
+        000000af`7cdfb950 00007fff`60368ef4     : 0000025a`3a84a938 0000025a`3a84a938 000000af`7cdfbd30 0000025a`3a84a940 : d3d11!NDXGI::CDevice::LLOCompleteLayerConstruction+0xdf
+        000000af`7cdfbc20 00007fff`6036538a     : 0000025a`3a84a938 00007fff`6052a390 000000af`7cdfbd30 00007fff`60333384 : d3d11!NOutermost::CDevice::LLOCompleteLayerConstruction+0x14
+        000000af`7cdfbc50 00007fff`60365641     : 0000025a`3a84a900 0000025a`3a84a900 000000af`7cdfbe20 00007fff`6240c0d8 : d3d11!TComObject<NOutermost::CDevice>::TComObject<NOutermost::CDevice>+0xf6
+        000000af`7cdfbcc0 00007fff`6036799b     : 00007fff`6052ab88 00007fff`6230872b 00000000`ffffffff 00007fff`603b4a70 : d3d11!D3D11CreateLayeredDevice+0x231
+        000000af`7cdfbdc0 00007fff`60368397     : 0000025a`3a83ffec 000000af`7cdfbf90 0000025a`3a83ffec 00000000`00000000 : d3d11!D3D11CoreCreateLayeredDevice+0x11b
+        000000af`7cdfbe90 00007fff`60366b9f     : 00000000`00000000 0000025a`3a83fa40 000000af`7cdfc410 00000000`00000000 : d3d11!D3D11RegisterLayersAndCreateDevice+0x57f
+        000000af`7cdfbff0 00007fff`603693c3     : 00000000`00000020 000000af`7cdfc410 00000000`00000000 00000000`00000000 : d3d11!D3D11CoreCreateDevice+0x40f
+        000000af`7cdfc310 00007fff`603b252e     : 0000025a`3a840370 00000000`00000000 00000000`00000000 00000000`00000000 : d3d11!D3D11CreateDeviceAndSwapChainImpl+0x2a3
+        000000af`7cdfc580 00007fff`603b247c     : 00000000`00000020 0000025a`3a840370 00000000`00000000 0000025a`3a840370 : d3d11!D3D11CreateDeviceAndSwapChain+0x9e
+        000000af`7cdfc600 00007fff`603b3e06     : 0000025a`3a840370 00000000`00000000 00000000`00000000 00000000`00000000 : d3d11!D3D11CreateDeviceImpl+0x5c
+        000000af`7cdfc670 00007fff`52b81eca     : 0000025a`3a8271d8 00007fff`6232c390 0000025a`3a8271b0 0000025a`3a840370 : d3d11!D3D11CreateDevice+0x86
+        000000af`7cdfc6e0 00007fff`52b8152b     : 0000025a`3a8271b0 000000af`7cdfc869 00000000`00000000 0000025a`3a840370 : nr_indirect_lab+0x1eca
+        000000af`7cdfc760 00007fff`52ada743     : 00000000`0000000f 000000af`7cdfc800 0000025a`3a8271b0 0000025a`3a839630 : nr_indirect_lab+0x152b
+        000000af`7cdfc7a0 00007fff`52ad13f2     : 0000025a`3a7e27a0 0000025a`3a839650 00000000`00000001 00007fff`52b0c518 : iddcx!IddMonitor::HandleNewSwapChain+0x627
+        000000af`7cdfc8d0 00007fff`52acc3f3     : 00000001`00000000 00000000`00040006 00007fff`49ea6348 0000025a`3a82aec0 : iddcx!IddAdapter::HandleKernelModeMessage+0x97a
+        000000af`7cdfeb50 00007fff`52acc151     : 0000025a`3a834c00 fffffda5`c57c3f48 00000000`00000000 000000af`00000001 : iddcx!IddDevice::IoDeviceControl+0x283
+        000000af`7cdfec00 00007fff`49e19e2c     : 0000025a`3a83c0b0 000000af`7cdfecc8 00007fff`49ea6420 00000000`0000001b : iddcx!IddCxEvtIoDeviceControl+0x101
+        (Inline Function) --------`--------     : --------`-------- --------`-------- --------`-------- --------`-------- : WUDFx02000!FxIoQueueIoDeviceControl::Invoke+0x43 (Inline Function @ 00007fff`49e19e2c)
+        000000af`7cdfec60 00007fff`49e191d1     : 0000025a`3a83be00 00000000`00000018 00000000`00000000 0000025a`00230c00 : WUDFx02000!FxIoQueue::DispatchRequestToDriver+0x51c
+        000000af`7cdfed10 00007fff`49e17594     : 0000025a`3a839c00 00000000`00000000 00000000`00000000 0000025a`3a839ce0 : WUDFx02000!FxIoQueue::DispatchEvents+0x4c1
+        (Inline Function) --------`--------     : --------`-------- --------`-------- --------`-------- --------`-------- : WUDFx02000!FxIoQueue::QueueRequest+0xb1 (Inline Function @ 00007fff`49e17594)
+        (Inline Function) --------`--------     : --------`-------- --------`-------- --------`-------- --------`-------- : WUDFx02000!FxPkgIo::DispatchStep2+0x5d7 (Inline Function @ 00007fff`49e17594)
+        000000af`7cdfedd0 00007fff`49e1cafc     : 0000025a`3a839b00 0000025a`3a839b00 0000025a`3a839ce0 0000025a`3a839be0 : WUDFx02000!FxPkgIo::DispatchStep1+0x6b4
+        (Inline Function) --------`--------     : --------`-------- --------`-------- --------`-------- --------`-------- : WUDFx02000!DispatchWorker+0xd3 (Inline Function @ 00007fff`49e1cafc)
+        (Inline Function) --------`--------     : --------`-------- --------`-------- --------`-------- --------`-------- : WUDFx02000!FxDevice::Dispatch+0xe5 (Inline Function @ 00007fff`49e1cafc)
+        000000af`7cdfeed0 00007ff6`94d6564e     : 0000025a`3a839be0 00000000`00000000 0000025a`3a839be0 00007ff6`94d683a0 : WUDFx02000!FxDevice::DispatchUm+0xfc
+        000000af`7cdfef70 00007ff6`94d64f32     : 0000025a`3a839be0 0000025a`3a839a40 00000000`0000000a 00000000`00000005 : WUDFHost!CWudfIoIrp::Dispatch+0x21e
+        000000af`7cdff000 00007ff6`94d660e3     : 0000025a`3a7f3718 0000025a`3a839a40 000000af`7cdff159 0000025a`3a839a40 : WUDFHost!CWudfDeviceStack::Forward+0x3f2
+        000000af`7cdff090 00007ff6`94d9bca7     : 0000025a`3a80c9b0 0000025a`3a839a40 0000025a`3a82c570 000000af`7cdff540 : WUDFHost!CLpcNotification::UnloadSafeDispatchIrp+0x43
+        000000af`7cdff0c0 00007ff6`94d82a42     : 0000025a`3a7fed40 00000000`00000000 00000000`00000000 00000000`00000000 : WUDFHost!CLpcNotification::MessageIoctlReadWrite+0x167
+        000000af`7cdff1b0 00007fff`6351537f     : 000000af`7cdff500 0000025a`3a7f36c0 000000af`7cdff518 00007ff6`94d827c0 : WUDFHost!CLpcNotification::Message+0x282
+        000000af`7cdff2f0 00007fff`63514f5f     : 0000da55`91730452 00000000`00000000 00007fff`63532e98 00007fff`68ee35f3 : WUDFPlatform!WdfLpcPort::ProcessMessage+0x1df
+        000000af`7cdff3b0 00007fff`6351b672     : 000000af`7cdff5b0 0000025a`0000093c 0000025a`3a7f36c0 0000025a`3a7f36c0 : WUDFPlatform!WdfLpcCommPort::ProcessMessage+0x6f
+
+        THREAD ffffd586dfff6080  Cid 1dd0.1640  Teb: 000000af7cba6000 Win32Thread: 0000000000000000 WAIT: (WrQueue) UserMode Alertable
+            ffffd586d1b2e640  QueueObject
+        Not impersonating
+        DeviceMap                 ffffe78cf60596f0
+        Owning Process            ffffd586d2e66080       Image:         WUDFHost.exe
+        Attached Process          N/A            Image:         N/A
+        Wait Start TickCount      558986         Ticks: 497 (0:00:00:07.765)
+        Context Switch Count      5              IdealProcessor: 1             
+        UserTime                  00:00:00.000
+        KernelTime                00:00:00.000
+        Win32 Start Address ntdll!TppWorkerThread (0x00007fff68e1a2e0)
+        Stack Init ffffd1867582dc70 Current ffffd1867582d420
+        Base ffffd1867582e000 Limit ffffd18675828000 Call 0000000000000000
+        Priority 12  BasePriority 8  Decay Boost 1  Unusual Boost 12  IoPriority 2  PagePriority 5
+        Child-SP          RetAddr               : Args to Child                                                           : Call Site
+        ffffd186`7582d460 fffff807`782cc438     : 00000000`00000047 ffffa901`651c0180 00000000`00000000 ffffa901`651ca2a8 : nt!KiSwapContext+0x76
+        ffffd186`7582d5a0 fffff807`78217a05     : 00000000`00000000 00000000`00000000 ffffd586`dfff6080 ffffa901`651c0180 : nt!KiSwapThread+0x248
+        ffffd186`7582d610 fffff807`78215dc6     : 00000014`00000000 ffffa901`651c0180 00000014`cceedfa0 00000000`00000000 : nt!KiCommitThreadWait+0x225
+        ffffd186`7582d6b0 fffff807`78214e12     : ffffd586`d1b2e640 00000000`00000001 00000000`00000001 ffffffff`ffffffff : nt!KeRemoveQueueEx+0x896
+        ffffd186`7582d750 fffff807`7832b51f     : ffffd586`e00c5d10 ffffd586`d13f2780 ffffd586`d13f2780 00000000`00000000 : nt!IoRemoveIoCompletion+0x92
+        ffffd186`7582d870 fffff807`786c1d55     : ffffd186`7582db60 00000000`00000000 ffffd186`7582db60 00000000`00000000 : nt!NtWaitForWorkViaWorkerFactory+0x6bf
+        ffffd186`7582da70 00007fff`68f64a74     : 00007fff`68e1a65e 00000000`00000000 00000000`00000000 00007fff`68e19aa0 : nt!KiSystemServiceCopyEnd+0x25 (TrapFrame @ ffffd186`7582dae0)
+        000000af`7ce7f8a8 00007fff`68e1a65e     : 00000000`00000000 00000000`00000000 00007fff`68e19aa0 0000025a`3a7ffcf0 : ntdll!NtWaitForWorkViaWorkerFactory+0x14
+        000000af`7ce7f8b0 00007fff`6760cd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!TppWorkerThread+0x37e
+        000000af`7ce7fc10 00007fff`68eacaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+        000000af`7ce7fc40 00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+        THREAD ffffd586d2ae5080  Cid 1dd0.1bf8  Teb: 000000af7cba8000 Win32Thread: ffffd586d1ab6aa0 WAIT: (WrQueue) UserMode Alertable
+            ffffd586d1b30d80  QueueObject
+        Not impersonating
+        DeviceMap                 ffffe78cf60596f0
+        Owning Process            ffffd586d2e66080       Image:         WUDFHost.exe
+        Attached Process          N/A            Image:         N/A
+        Wait Start TickCount      558983         Ticks: 500 (0:00:00:07.812)
+        Context Switch Count      117            IdealProcessor: 0             
+        UserTime                  00:00:00.046
+        KernelTime                00:00:00.296
+        Win32 Start Address ntdll!TppWorkerThread (0x00007fff68e1a2e0)
+        Stack Init ffffd18675834c70 Current ffffd18675834420
+        Base ffffd18675835000 Limit ffffd1867582f000 Call 0000000000000000
+        Priority 8  BasePriority 8  IoPriority 2  PagePriority 5
+        Child-SP          RetAddr               : Args to Child                                                           : Call Site
+        ffffd186`75834460 fffff807`782cc438     : 00000000`00000047 fffff807`07953180 00000000`00000000 fffff807`0795d2a8 : nt!KiSwapContext+0x76
+        ffffd186`758345a0 fffff807`78217a05     : 00000000`00000000 00000000`00000000 ffffd586`d2ae5080 fffff807`07953180 : nt!KiSwapThread+0x248
+        ffffd186`75834610 fffff807`78215dc6     : ffffd586`00000000 fffff807`07953180 ffffd586`e00c5150 00000000`00000000 : nt!KiCommitThreadWait+0x225
+        ffffd186`758346b0 fffff807`78214e12     : ffffd586`d1b30d80 00000000`00000001 00000000`00000001 ffffffff`ffffffff : nt!KeRemoveQueueEx+0x896
+        ffffd186`75834750 fffff807`7832b51f     : ffffd586`e00c5190 ffffd586`d1a106c0 ffffd586`d1a106c0 00000000`00000000 : nt!IoRemoveIoCompletion+0x92
+        ffffd186`75834870 fffff807`786c1d55     : ffffd186`75834b60 00000000`000026ec ffffd186`75834b60 00000000`00000000 : nt!NtWaitForWorkViaWorkerFactory+0x6bf
+        ffffd186`75834a70 00007fff`68f64a74     : 00007fff`68e1a65e 00000000`00000000 00000000`00000000 00007fff`68e19aa0 : nt!KiSystemServiceCopyEnd+0x25 (TrapFrame @ ffffd186`75834ae0)
+        000000af`7ceff838 00007fff`68e1a65e     : 00000000`00000000 00000000`00000000 00007fff`68e19aa0 0000025a`3a800150 : ntdll!NtWaitForWorkViaWorkerFactory+0x14
+        000000af`7ceff840 00007fff`6760cd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!TppWorkerThread+0x37e
+        000000af`7ceffba0 00007fff`68eacaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+        000000af`7ceffbd0 00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+        THREAD ffffd586d280f080  Cid 1dd0.1e84  Teb: 000000af7cbaa000 Win32Thread: 0000000000000000 WAIT: (WrQueue) UserMode Alertable
+            ffffd586d1b30840  QueueObject
+        Not impersonating
+        DeviceMap                 ffffe78cf60596f0
+        Owning Process            ffffd586d2e66080       Image:         WUDFHost.exe
+        Attached Process          N/A            Image:         N/A
+        Wait Start TickCount      558983         Ticks: 500 (0:00:00:07.812)
+        Context Switch Count      12             IdealProcessor: 1             
+        UserTime                  00:00:00.015
+        KernelTime                00:00:00.000
+        Win32 Start Address ntdll!TppWorkerThread (0x00007fff68e1a2e0)
+        Stack Init ffffd1867583bc70 Current ffffd1867583b420
+        Base ffffd1867583c000 Limit ffffd18675836000 Call 0000000000000000
+        Priority 12  BasePriority 8  Decay Boost 1  Unusual Boost 12  IoPriority 2  PagePriority 5
+        Child-SP          RetAddr               : Args to Child                                                           : Call Site
+        ffffd186`7583b460 fffff807`782cc438     : 00000000`00000047 ffffa901`651c0180 00000000`00000000 ffffa901`651ca2a8 : nt!KiSwapContext+0x76
+        ffffd186`7583b5a0 fffff807`78217a05     : 00000000`00000000 00000000`00000000 ffffd586`d280f080 ffffa901`651c0180 : nt!KiSwapThread+0x248
+        ffffd186`7583b610 fffff807`78215dc6     : ffffd586`00000000 ffffa901`651c0180 ffffd586`cd832dd0 00000000`00000000 : nt!KiCommitThreadWait+0x225
+        ffffd186`7583b6b0 fffff807`78214e12     : ffffd586`d1b30840 00000000`00000001 00000000`00000001 ffffffff`ffffffff : nt!KeRemoveQueueEx+0x896
+        ffffd186`7583b750 fffff807`7832b51f     : ffffd586`e00c59d0 ffffd586`d23aa2f0 ffffd586`d23aa2f0 00000000`00000000 : nt!IoRemoveIoCompletion+0x92
+        ffffd186`7583b870 fffff807`786c1d55     : ffffd186`7583bb60 00000000`00000000 ffffd186`7583bb60 00000000`00000000 : nt!NtWaitForWorkViaWorkerFactory+0x6bf
+        ffffd186`7583ba70 00007fff`68f64a74     : 00007fff`68e1a65e 00000000`00000000 00000000`00000000 00007fff`68e19aa0 : nt!KiSystemServiceCopyEnd+0x25 (TrapFrame @ ffffd186`7583bae0)
+        000000af`7cf7fad8 00007fff`68e1a65e     : 00000000`00000000 00000000`00000000 00007fff`68e19aa0 0000025a`3a8015b0 : ntdll!NtWaitForWorkViaWorkerFactory+0x14
+        000000af`7cf7fae0 00007fff`6760cd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!TppWorkerThread+0x37e
+        000000af`7cf7fe40 00007fff`68eacaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+        000000af`7cf7fe70 00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+        THREAD ffffd586d0399040  Cid 1dd0.1598  Teb: 000000af7cbac000 Win32Thread: 0000000000000000 WAIT: (WrQueue) UserMode Alertable
+            ffffd586d1b30d80  QueueObject
+        Not impersonating
+        DeviceMap                 ffffe78cf60596f0
+        Owning Process            ffffd586d2e66080       Image:         WUDFHost.exe
+        Attached Process          N/A            Image:         N/A
+        Wait Start TickCount      558983         Ticks: 500 (0:00:00:07.812)
+        Context Switch Count      4              IdealProcessor: 0             
+        UserTime                  00:00:00.015
+        KernelTime                00:00:00.000
+        Win32 Start Address ntdll!TppWorkerThread (0x00007fff68e1a2e0)
+        Stack Init ffffd18675849c70 Current ffffd18675849420
+        Base ffffd1867584a000 Limit ffffd18675844000 Call 0000000000000000
+        Priority 9  BasePriority 8  Decay Boost 1  IoPriority 2  PagePriority 5
+        Child-SP          RetAddr               : Args to Child                                                           : Call Site
+        ffffd186`75849460 fffff807`782cc438     : 00000000`00000047 fffff807`07953180 00000000`00000000 fffff807`0795d2a8 : nt!KiSwapContext+0x76
+        ffffd186`758495a0 fffff807`78217a05     : 00000000`00000000 00000000`00000000 ffffd586`d0399040 fffff807`07953180 : nt!KiSwapThread+0x248
+        ffffd186`75849610 fffff807`78215dc6     : ffffd586`00000000 fffff807`07953180 ffffd586`e00c5150 00000000`00000000 : nt!KiCommitThreadWait+0x225
+        ffffd186`758496b0 fffff807`78214e12     : ffffd586`d1b30d80 00000000`00000001 00000000`00000001 ffffffff`ffffffff : nt!KeRemoveQueueEx+0x896
+        ffffd186`75849750 fffff807`7832b51f     : ffffd186`758498f0 fffff807`782c7b46 00000000`00000000 00000000`00000000 : nt!IoRemoveIoCompletion+0x92
+        ffffd186`75849870 fffff807`786c1d55     : 00000000`00000001 ffffd586`cbdc6040 ffffd586`d0399040 00000000`7ffe03b0 : nt!NtWaitForWorkViaWorkerFactory+0x6bf
+        ffffd186`75849a70 00007fff`68f64a74     : 00007fff`68e1a65e 00000000`00000000 00000000`00000000 00007fff`68e19aa0 : nt!KiSystemServiceCopyEnd+0x25 (TrapFrame @ ffffd186`75849ae0)
+        000000af`7cfffbd8 00007fff`68e1a65e     : 00000000`00000000 00000000`00000000 00007fff`68e19aa0 0000025a`3a800150 : ntdll!NtWaitForWorkViaWorkerFactory+0x14
+        000000af`7cfffbe0 00007fff`6760cd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!TppWorkerThread+0x37e
+        000000af`7cffff40 00007fff`68eacaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+        000000af`7cffff70 00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+        THREAD ffffd586d1a25080  Cid 1dd0.0b60  Teb: 000000af7cbae000 Win32Thread: 0000000000000000 RUNNING on processor 1
+        Not impersonating
+        DeviceMap                 ffffe78cf60596f0
+        Owning Process            ffffd586d2e66080       Image:         WUDFHost.exe
+        Attached Process          N/A            Image:         N/A
+        Wait Start TickCount      559481         Ticks: 2 (0:00:00:00.031)
+        Context Switch Count      29             IdealProcessor: 1             
+        UserTime                  00:00:00.000
+        KernelTime                00:00:00.000
+        Win32 Start Address iddcx!<lambda_a71aab5a7b17acdd11a02d66371e2ecb>::<lambda_invoker_cdecl> (0x00007fff52aee5e0)
+        Stack Init ffffd18675969c70 Current ffffd186759696c0
+        Base ffffd1867596a000 Limit ffffd18675964000 Call 0000000000000000
+        Priority 8  BasePriority 8  IoPriority 2  PagePriority 5
+        Child-SP          RetAddr               : Args to Child                                                           : Call Site
+        000000af`7d07fa00 00007fff`6760cd87     : 0000025a`3a7e27a0 00000000`00000000 00000000`00000000 00000000`00000000 : iddcx!IddWatchdog::WatchdogThread+0x23e
+        000000af`7d07fae0 00007fff`68eacaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+        000000af`7d07fb10 00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+        THREAD ffffd586d10a1040  Cid 1dd0.0724  Teb: 000000af7cbb0000 Win32Thread: 0000000000000000 WAIT: (WrQueue) UserMode Alertable
+            ffffd586d1b27480  QueueObject
+        Not impersonating
+        DeviceMap                 ffffe78cf60596f0
+        Owning Process            ffffd586d2e66080       Image:         WUDFHost.exe
+        Attached Process          N/A            Image:         N/A
+        Wait Start TickCount      558983         Ticks: 500 (0:00:00:07.812)
+        Context Switch Count      1              IdealProcessor: 0             
+        UserTime                  00:00:00.000
+        KernelTime                00:00:00.000
+        Win32 Start Address ntdll!TppWorkerThread (0x00007fff68e1a2e0)
+        Stack Init ffffd18675985c70 Current ffffd18675985420
+        Base ffffd18675986000 Limit ffffd18675980000 Call 0000000000000000
+        Priority 8  BasePriority 8  IoPriority 2  PagePriority 5
+        Child-SP          RetAddr               : Args to Child                                                           : Call Site
+        ffffd186`75985460 fffff807`782cc438     : 00000000`00000047 fffff807`07953180 00000000`00000000 fffff807`0795d2a8 : nt!KiSwapContext+0x76
+        ffffd186`759855a0 fffff807`78217a05     : 00000000`00000000 00000000`00000000 ffffd586`d10a1040 fffff807`07953180 : nt!KiSwapThread+0x248
+        ffffd186`75985610 fffff807`78215dc6     : 00000000`00000000 fffff807`07953180 00000000`00000001 00000000`00000000 : nt!KiCommitThreadWait+0x225
+        ffffd186`759856b0 fffff807`78214e12     : ffffd586`d1b27480 ffffe78c`ef2a1c01 0a000001`52ed5101 ffffffff`ffffffff : nt!KeRemoveQueueEx+0x896
+        ffffd186`75985750 fffff807`7832b51f     : ffffd586`cd831490 ffffd586`d23996b0 ffffd586`d23996b0 00000000`00000014 : nt!IoRemoveIoCompletion+0x92
+        ffffd186`75985870 fffff807`786c1d55     : ffffd586`d18e97e0 0000025a`3a806980 ffffd186`75985b60 00007fff`68e18d70 : nt!NtWaitForWorkViaWorkerFactory+0x6bf
+        ffffd186`75985a70 00007fff`68f64a74     : 00007fff`68e1a65e 00000000`00010002 00000000`00000001 0000025a`3a806980 : nt!KiSystemServiceCopyEnd+0x25 (TrapFrame @ ffffd186`75985ae0)
+        000000af`7d0ffb28 00007fff`68e1a65e     : 00000000`00010002 00000000`00000001 0000025a`3a806980 0000025a`3a7e1a80 : ntdll!NtWaitForWorkViaWorkerFactory+0x14
+        000000af`7d0ffb30 00007fff`6760cd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!TppWorkerThread+0x37e
+        000000af`7d0ffe90 00007fff`68eacaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+        000000af`7d0ffec0 00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+        THREAD ffffd586d24d0080  Cid 1dd0.12bc  Teb: 000000af7cbb2000 Win32Thread: ffffd586d1ab8360 WAIT: (WrQueue) UserMode Alertable
+            ffffd586d1b27480  QueueObject
+        Not impersonating
+        DeviceMap                 ffffe78cf60596f0
+        Owning Process            ffffd586d2e66080       Image:         WUDFHost.exe
+        Attached Process          N/A            Image:         N/A
+        Wait Start TickCount      559111         Ticks: 372 (0:00:00:05.812)
+        Context Switch Count      26             IdealProcessor: 1             
+        UserTime                  00:00:00.031
+        KernelTime                00:00:00.031
+        Win32 Start Address ntdll!TppWorkerThread (0x00007fff68e1a2e0)
+        Stack Init ffffd1867599ac70 Current ffffd1867599a420
+        Base ffffd1867599b000 Limit ffffd18675995000 Call 0000000000000000
+        Priority 11  BasePriority 8  Unusual Boost 11  IoPriority 2  PagePriority 5
+        Child-SP          RetAddr               : Args to Child                                                           : Call Site
+        ffffd186`7599a460 fffff807`782cc438     : 00000000`00000047 fffff807`07953180 00000000`00000000 fffff807`0795d2a8 : nt!KiSwapContext+0x76
+        ffffd186`7599a5a0 fffff807`78217a05     : 00000000`00000000 00000000`00000000 ffffd586`d24d0080 fffff807`07953180 : nt!KiSwapThread+0x248
+        ffffd186`7599a610 fffff807`78215dc6     : ffffd586`00000000 fffff807`07953180 ffffd186`7599a8c8 00000000`00000000 : nt!KiCommitThreadWait+0x225
+        ffffd186`7599a6b0 fffff807`78214e12     : ffffd586`d1b27480 fffff807`78fd1e01 ffffd186`00000001 ffffffff`ffffffff : nt!KeRemoveQueueEx+0x896
+        ffffd186`7599a750 fffff807`7832b51f     : ffffd586`d1a25080 00000000`00000000 ffffd586`d1a251f0 00000000`00000000 : nt!IoRemoveIoCompletion+0x92
+        ffffd186`7599a870 fffff807`786c1d55     : ffffd586`d18db260 00000000`00000000 00000000`00000000 00000000`00000000 : nt!NtWaitForWorkViaWorkerFactory+0x6bf
+        ffffd186`7599aa70 00007fff`68f64a74     : 00007fff`68e1a65e 00000000`00000000 00000000`00000000 00007fff`68e19aa0 : nt!KiSystemServiceCopyEnd+0x25 (TrapFrame @ ffffd186`7599aae0)
+        000000af`7d17f8c8 00007fff`68e1a65e     : 00000000`00000000 00000000`00000000 00007fff`68e19aa0 0000025a`3a7e1a80 : ntdll!NtWaitForWorkViaWorkerFactory+0x14
+        000000af`7d17f8d0 00007fff`6760cd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!TppWorkerThread+0x37e
+        000000af`7d17fc30 00007fff`68eacaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+        000000af`7d17fc60 00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+        THREAD ffffd586d0a2c040  Cid 1dd0.1848  Teb: 000000af7cbb4000 Win32Thread: 0000000000000000 WAIT: (WrQueue) UserMode Alertable
+            ffffd586d1b2b700  QueueObject
+        Not impersonating
+        DeviceMap                 ffffe78cf60596f0
+        Owning Process            ffffd586d2e66080       Image:         WUDFHost.exe
+        Attached Process          N/A            Image:         N/A
+        Wait Start TickCount      559146         Ticks: 337 (0:00:00:05.265)
+        Context Switch Count      3              IdealProcessor: 0             
+        UserTime                  00:00:00.015
+        KernelTime                00:00:00.000
+        Win32 Start Address ntdll!TppWorkerThread (0x00007fff68e1a2e0)
+        Stack Init ffffd18675a14c70 Current ffffd18675a14420
+        Base ffffd18675a15000 Limit ffffd18675a0f000 Call 0000000000000000
+        Priority 8  BasePriority 8  IoPriority 2  PagePriority 5
+        Child-SP          RetAddr               : Args to Child                                                           : Call Site
+        ffffd186`75a14460 fffff807`782cc438     : 00000000`00000047 ffffa901`651c0180 00000000`00000000 ffffa901`651ca2a8 : nt!KiSwapContext+0x76
+        ffffd186`75a145a0 fffff807`78217a05     : 00000000`00000000 00000000`00000000 ffffd586`d0a2c040 ffffa901`651c0180 : nt!KiSwapThread+0x248
+        ffffd186`75a14610 fffff807`78215dc6     : 0000025a`00000000 ffffa901`651c0180 ffffd586`e0326b90 00000000`00000000 : nt!KiCommitThreadWait+0x225
+        ffffd186`75a146b0 fffff807`78214e12     : ffffd586`d1b2b700 00000000`00000001 ffffee80`80018401 ffffffff`ffffffff : nt!KeRemoveQueueEx+0x896
+        ffffd186`75a14750 fffff807`7832b51f     : ffffd586`e00c5dd0 ffffd186`75a14b60 ffffd586`d224b300 00000000`00000004 : nt!IoRemoveIoCompletion+0x92
+        ffffd186`75a14870 fffff807`786c1d55     : 00000000`00000000 00000000`00000000 ffffd186`75a14b60 000000af`7d1ff0b8 : nt!NtWaitForWorkViaWorkerFactory+0x6bf
+        ffffd186`75a14a70 00007fff`68f64a74     : 00007fff`68e1a65e 00000000`00000000 00000000`00000000 00007fff`68e19aa0 : nt!KiSystemServiceCopyEnd+0x25 (TrapFrame @ ffffd186`75a14ae0)
+        000000af`7d1ffbf8 00007fff`68e1a65e     : 00000000`00000000 00000000`00000000 00007fff`68e19aa0 0000025a`3a7ff8a0 : ntdll!NtWaitForWorkViaWorkerFactory+0x14
+        000000af`7d1ffc00 00007fff`6760cd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!TppWorkerThread+0x37e
+        000000af`7d1fff60 00007fff`68eacaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+        000000af`7d1fff90 00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+
+1: kd> .logclose; .logopen C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-idd-control-v4-oct10.log; g
+Closing open log file C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-idd-admission-v1-oct10.log

@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "kind": "indirect-display-system-renderer-control",
+  "source_revision": "b03867f239326b3cedb1dbc615fb8c05c89149f7",
+  "system_renderer_control": true,
+  "custom_render_adapter_installed": false,
+  "preferred_adapter_requested": false,
+  "assigned_render_luid": {
+    "low": 24589,
+    "high": 0
+  },
+  "received_desktop_frames_observed": true,
+  "displayed_frames": 0,
+  "npu_execution_tested": false,
+  "desktop_offload_tested": false,
+  "clean_removal": true,
+  "debug_log_sha256": "d7d41467c7c26e311292fa8ea2cedd5f98811dee166c2566d972ea2ed10dfcfb",
+  "debug_log_excerpt_start": "Last event: Break instruction exception",
+  "notes": [
+    "The same virtual monitor reaches commit-modes and assign-swapchain when the experimental render adapter is removed and no render preference is requested. Desktop surfaces are received at 1024x768 BGRA8. This isolates monitor viability; it does not establish that every failure with the experimental renderer has the same cause.",
+    "The first host reaches the IddCx watchdog breakpoint. A simultaneous thread stack shows Direct3D device construction inside the driver assign-swapchain callback. The breakpoint pauses the VM and interrupts WinRM; the debugger resumes without changing watchdog settings. The framework reports fatal driver error 0x50100040000010f and starts another host.",
+    "The completed consumer records report 14 and 28 received frames; an interrupted consumer has no final count, so these are not an exact run total. No image is displayed by this diagnostic sink.",
+    "The installed device remains observable as started after host recovery; that status alone is not evidence of uninterrupted operation. The exact owned device and package are removed afterward.",
+    "A subsequent source revision prepares and retains the Direct3D device before monitor arrival, using a framework work item. Its live behavior is tested separately."
+  ],
+  "references": [
+    "https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/iddcx/nc-iddcx-evt_idd_cx_monitor_assign_swapchain",
+    "https://learn.microsoft.com/en-us/windows-hardware/drivers/display/indirect-display-debugging"
+  ]
+}
