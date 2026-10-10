@@ -25,13 +25,14 @@ Node pred(const Node &a) { return std::make_shared<op::Convert>(a, ov::element::
 }
 struct OutputMerger::State {
     uint32_t count;
-    bool blend;
+    BlendMode blend;
     ov::Core core;
     ov::CompiledModel compiled;
     ov::InferRequest request;
     std::string execution_device;
     bool failed = false;
-    State(uint32_t size, const std::string &backend, bool blending, bool bgra, uint8_t mask) : count(size), blend(blending) {
+    State(uint32_t size, const std::string &backend, BlendMode blending, bool bgra, uint8_t mask) : count(size), blend(blending) {
+        require(blend == BlendMode::source_copy || blend == BlendMode::source_over || blend == BlendMode::destination_in);
         require(count && count <= 65536 && mask && mask <= 15 && (backend == "NPU" || backend == "CPU" || backend == "GPU"));
         auto colors = std::make_shared<op::Parameter>(ov::element::f32, ov::Shape{count, 4});
         auto background = std::make_shared<op::Parameter>(ov::element::u8, ov::Shape{count, 4});
@@ -63,8 +64,9 @@ struct OutputMerger::State {
             // Multi-index channel Gather corrupts this mixed-type NPU graph.
             // Separate lanes also prevent flattened clamp selection losing FP32.
             auto fg = clamp_source(lane(colors, source));
-            auto value = mul(fg, number(255));
-            if (blend) value = add(value, mul(std::make_shared<op::Convert>(bc, ov::element::f32), sub(number(1), alpha)));
+            Node value = mul(fg, number(255));
+            if (blend == BlendMode::source_over) value = add(value, mul(std::make_shared<op::Convert>(bc, ov::element::f32), sub(number(1), alpha)));
+            else if (blend == BlendMode::destination_in) value = mul(std::make_shared<op::Convert>(bc, ov::element::f32), alpha);
             value = choose(std::make_shared<op::Less>(value, number(0)), number(0),
                 choose(std::make_shared<op::Greater>(value, number(255)), number(255), value));
             auto base = both(pred(value), integer(255));
@@ -95,6 +97,8 @@ struct OutputMerger::State {
     }
 };
 OutputMerger::OutputMerger(uint32_t samples, const std::string &backend, bool blend, bool bgra, uint8_t mask)
+    : OutputMerger(samples, backend, source_blend(blend), bgra, mask) {}
+OutputMerger::OutputMerger(uint32_t samples, const std::string &backend, BlendMode blend, bool bgra, uint8_t mask)
     : state(std::make_unique<State>(samples, backend, blend, bgra, mask)) {}
 OutputMerger::~OutputMerger() = default;
 OutputMerger::Result OutputMerger::execute(const std::vector<Color> &colors, const std::vector<PackedColor> &background,

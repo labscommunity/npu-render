@@ -94,6 +94,27 @@ int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
             TEST(memory[target_index][byte_offset]==expected);
         }
     }
+    blend.SrcBlend=blend.SrcBlendAlpha=D3D10_DDI_BLEND_ZERO;
+    blend.DestBlend=blend.DestBlendAlpha=D3D10_DDI_BLEND_SRC_ALPHA;
+    f.pfnSetBlendState(h,bs,nullptr,~0u);
+    for(const float alpha : {0.f,.5f,1.f}) {
+        std::fill(memory[target_index].begin(),memory[target_index].end(),uint8_t(103));
+        const auto before=memory[target_index];const auto draws=counters.draws;
+        color[0]=.75f;color[1]=.25f;color[2]=1.f;color[3]=alpha;
+        f.pfnDefaultConstantBufferUpdateSubresourceUP(h,resources[3],0,nullptr,color,0,0);
+        f.pfnDrawIndexed(h,6,1,1);TEST(last_error==S_OK && counters.draws==draws+1);
+        for(UINT y=0;y<height;++y)for(UINT x=0;x<width;++x)for(UINT c=0;c<4;++c) {
+            const auto at=(size_t(y)*width+x)*4+c;
+            const bool inside=x>=5 && x<width-3 && y>=7 && y<height-5;
+            TEST(memory[target_index][at]==(inside?uint8_t(std::nearbyint(double(before[at])*alpha)):before[at]));
+        }
+    }
+    // A blend factor we have not implemented remains rejected without writes.
+    blend.DestBlend=D3D10_DDI_BLEND_DEST_COLOR;f.pfnSetBlendState(h,bs,nullptr,~0u);
+    {const auto before=memory[target_index];const auto draws=counters.draws;
+     f.pfnDrawIndexed(h,6,1,1);TEST(last_error==E_INVALIDARG && counters.draws==draws && memory[target_index]==before);last_error=S_OK;}
+    blend.SrcBlend=blend.SrcBlendAlpha=D3D10_DDI_BLEND_ONE;
+    blend.DestBlend=blend.DestBlendAlpha=D3D10_DDI_BLEND_INV_SRC_ALPHA;
     blend.BlendEnable[0]=FALSE;f.pfnSetBlendState(h,bs,nullptr,~0u);
     scissor={0,0,width,height};f.pfnSetScissorRects(h,1,0,&scissor);
     // Exercise the textured specialization through actual binding and DrawIndexed
@@ -131,7 +152,7 @@ int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
     D3D10DDI_HSAMPLER hs{};hs.pDrvPrivate=&sampler;f.pfnPsSetSamplers(h,0,1,&hs);TEST(last_error==S_OK);
     for(unsigned frame=0;frame<2;++frame){
         if(frame){for(auto &c:source)c=uint8_t(c+43);f.pfnResourceUpdateSubresourceUP(h,resources[4],0,nullptr,source.data(),sw*4,0);}
-        f.pfnDrawIndexed(h,6,1,1);TEST(last_error==S_OK && counters.draws==draws_before+6+frame);
+        f.pfnDrawIndexed(h,6,1,1);TEST(last_error==S_OK && counters.draws==draws_before+9+frame);
         for(UINT y=0;y<height;++y)for(UINT x=0;x<width;++x)for(UINT c=0;c<4;++c)
             TEST(memory[target_index][(size_t(y)*width+x)*4+c]==(c==3?uint8_t(255):source[(size_t(y+16)*sw+x+32)*4+c]));
         const auto before=memory[target_index];const auto draws=counters.draws;
@@ -153,7 +174,7 @@ int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
         sampler.Filter=frame>=2?D3D10_DDI_FILTER_MIN_MAG_MIP_POINT:D3D10_DDI_FILTER_MIN_MAG_MIP_LINEAR;f.pfnPsSetSamplers(h,0,1,&hs);
         for(size_t n=0;n<size_t(sw)*sh;++n)for(unsigned c=0;c<4;++c)source[n*4+c]=uint8_t(c==3?128:(n*13+c*29+frame*41)%129);
         f.pfnResourceUpdateSubresourceUP(h,resources[4],0,nullptr,source.data(),sw*4,0);
-        const auto before=memory[target_index];f.pfnDrawIndexed(h,6,1,1);TEST(last_error==S_OK && counters.draws==draws_before+8+frame);
+        const auto before=memory[target_index];f.pfnDrawIndexed(h,6,1,1);TEST(last_error==S_OK && counters.draws==draws_before+11+frame);
         for(UINT y=0;y<height;++y)for(UINT x=0;x<width;++x){const auto at=(size_t(y)*width+x)*4;
             if(x<7 || x>=60 || y<5 || y>=60){for(UINT c=0;c<4;++c)TEST(memory[target_index][at+c]==before[at+c]);continue;}
             const double tx=(x+.5-4)/56*sw-(frame>=2?0:.5),ty=(y+.5-3)/58*sh-(frame>=2?0:.5);const auto ix=int(std::floor(tx)),iy=int(std::floor(ty));
@@ -241,7 +262,7 @@ int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
     f.pfnDestroyRenderTargetView(h, view);
     for (const auto r : resources) f.pfnDestroyResource(h, r);
     f.pfnDestroyDevice(h);
-    TEST(counters.executions == executions_before + 18 && !counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
-    std::printf("{\"kind\":\"indexed-ddi-runtime-shim\",\"requested_backend\":\"%s\",\"execution_device\":\"%s\",\"verified_draws\":11,\"verified_components\":147456,\"blended_scissored_draws\":3,\"textured_draws\":6,\"point_scaled_blended_draws\":2,\"linear_scaled_blended_draws\":2,\"base_vertex_and_start_index\":true,\"invalid_ranges_and_sampler_rejected\":true,\"registered_adapter_tested\":false,\"desktop_offload_tested\":false}\n", backend, counters.last_execution_device);
+    TEST(counters.executions == executions_before + 21 && !counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
+    std::printf("{\"kind\":\"indexed-ddi-runtime-shim\",\"requested_backend\":\"%s\",\"execution_device\":\"%s\",\"verified_draws\":14,\"verified_components\":196608,\"blended_scissored_draws\":6,\"textured_draws\":6,\"point_scaled_blended_draws\":2,\"linear_scaled_blended_draws\":2,\"base_vertex_and_start_index\":true,\"invalid_ranges_and_sampler_rejected\":true,\"registered_adapter_tested\":false,\"desktop_offload_tested\":false}\n", backend, counters.last_execution_device);
     return 0;
 }

@@ -33,7 +33,7 @@ struct TriangleTextureDrawExecutor::State {
     std::unique_ptr<ColorInterpolator> perspective,affine;
     State(const shader::Program &v,const shader::Program &p,uint32_t n,uint32_t w,uint32_t h,uint32_t f,
         const PackedResources &resources,const shader::TextureSamplers &samplers,const std::string &backend,
-        bool blend,uint8_t mask,CullMode cull,bool ccw,uint32_t b)
+        BlendMode blend,uint8_t mask,CullMode cull,bool ccw,uint32_t b)
         :vs(v),ps(p),count(n),width(w),height(h),format(f),batch(b),layout(resource_layout(resources)),
          vertex(v,n,backend),projection(n,backend),coverage(b,backend,cull,ccw),merger(b,backend,blend,f==87,mask){
         validate_shader(ps);
@@ -49,16 +49,24 @@ struct TriangleTextureDrawExecutor::State {
         }
     }
 };
+TriangleTextureDrawExecutor::TriangleTextureDrawExecutor(const shader::Program &v,const shader::Program &p,uint32_t n,uint32_t w,uint32_t h,uint32_t f,
+    uint32_t tw,uint32_t th,uint32_t tf,const std::string &backend,
+    bool blend,uint8_t mask,shader::TextureFilter filter,CullMode cull,bool ccw,uint32_t batch)
+    :TriangleTextureDrawExecutor(v,p,n,w,h,f,tw,th,tf,backend,source_blend(blend),mask,filter,cull,ccw,batch){}
+TriangleTextureDrawExecutor::TriangleTextureDrawExecutor(const shader::Program &v,const shader::Program &p,uint32_t n,uint32_t w,uint32_t h,uint32_t f,
+    const PackedResources &resources,const shader::TextureSamplers &samplers,const std::string &backend,
+    bool blend,uint8_t mask,CullMode cull,bool ccw,uint32_t batch)
+    :TriangleTextureDrawExecutor(v,p,n,w,h,f,resources,samplers,backend,source_blend(blend),mask,cull,ccw,batch){}
 TriangleTextureDrawExecutor::TriangleTextureDrawExecutor(const shader::Program &v,const shader::Program &p,
     uint32_t n,uint32_t w,uint32_t h,uint32_t f,uint32_t sw,uint32_t sh,uint32_t sf,const std::string &backend,
-    bool blend,uint8_t mask,shader::TextureFilter filter,CullMode cull,bool ccw,uint32_t batch)
+    BlendMode blend,uint8_t mask,shader::TextureFilter filter,CullMode cull,bool ccw,uint32_t batch)
     :state(nullptr){
     PackedResources resources{};resources[0]={sw,sh,sf,{}};shader::TextureSamplers samplers{};samplers[0].filter=filter;
     state=std::make_unique<State>(v,p,n,w,h,f,resources,samplers,backend,blend,mask,cull,ccw,batch);
 }
 TriangleTextureDrawExecutor::TriangleTextureDrawExecutor(const shader::Program &v,const shader::Program &p,
     uint32_t n,uint32_t w,uint32_t h,uint32_t f,const PackedResources &resources,const shader::TextureSamplers &samplers,const std::string &backend,
-    bool blend,uint8_t mask,CullMode cull,bool ccw,uint32_t batch)
+    BlendMode blend,uint8_t mask,CullMode cull,bool ccw,uint32_t batch)
     :state(std::make_unique<State>(v,p,n,w,h,f,resources,samplers,backend,blend,mask,cull,ccw,batch)){}
 TriangleTextureDrawExecutor::~TriangleTextureDrawExecutor()=default;
 UniformDrawExecutor::Result TriangleTextureDrawExecutor::execute(const std::vector<shader::VertexRegisters> &inputs,

@@ -16,6 +16,10 @@ public:
                         uint32_t vertices, uint32_t width, uint32_t height,
                         const std::string &backend, bool blend, bool bgra, uint8_t write_mask,
                         uint32_t batch = 4096, CullMode cull = CullMode::none, bool front_ccw = false);
+    UniformDrawExecutor(const shader::Program &vertex, const shader::Program &pixel,
+                        uint32_t vertices, uint32_t width, uint32_t height,
+                        const std::string &backend, BlendMode blend, bool bgra, uint8_t write_mask,
+                        uint32_t batch = 4096, CullMode cull = CullMode::none, bool front_ccw = false);
     ~UniformDrawExecutor();
     UniformDrawExecutor(const UniformDrawExecutor &) = delete;
     UniformDrawExecutor &operator=(const UniformDrawExecutor &) = delete;

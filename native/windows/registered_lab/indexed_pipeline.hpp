@@ -27,8 +27,8 @@ public:
             const auto &h=request.header;require(shape_valid(h));
             const auto batch=triangle_batch(request);
             raster::PackedResources resources;shader::TextureSamplers samplers{};
-            if(h.flags&0x2000){require(h.abi==8);resources=request.resources;samplers=request.samplers;}
-            else {require(h.abi==7);resources[0]=request.texture;samplers[0].filter=(h.flags&16)?shader::TextureFilter::point:shader::TextureFilter::linear;}
+            if(h.flags&0x2000){require(h.abi==8 || h.abi==9);resources=request.resources;samplers=request.samplers;}
+            else {require(h.abi==7 || h.abi==9);resources[0]=request.texture;samplers[0].filter=(h.flags&16)?shader::TextureFilter::point:shader::TextureFilter::linear;}
             for(auto &entry:triangle_cache){const auto &old=entry.header;
                 if(entry.batch==batch && old.width==h.width && old.height==h.height && old.vertices==h.vertices && old.format==h.format &&
                     (old.flags&~4u)==(h.flags&~4u) && raster::resource_layout_equal(resources,entry.layout) &&
@@ -39,7 +39,7 @@ public:
             // Evict before constructing a successor for the qualified NPU driver.
             if(triangle_cache.size()==4)triangle_cache.erase(triangle_cache.begin());
             auto candidate=std::make_unique<raster::TriangleTextureDrawExecutor>(request.vertex,request.pixel,h.vertices,h.width,h.height,h.format,
-                resources,samplers,"NPU",(h.flags&1)!=0,uint8_t((h.flags>>8)&15),static_cast<raster::CullMode>((h.flags>>5)&3),(h.flags&128)!=0,batch);
+                resources,samplers,"NPU",blend_mode(h),uint8_t((h.flags>>8)&15),static_cast<raster::CullMode>((h.flags>>5)&3),(h.flags&128)!=0,batch);
             auto result=candidate->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,resources,request.background,request.scissor);
             triangle_cache.push_back({h,batch,request.vertex.bytecode,request.pixel.bytecode,raster::resource_layout(resources),samplers,std::move(candidate)});
             return result;
@@ -88,7 +88,7 @@ public:
         if(uniform_cache.size()==8)uniform_cache.erase(uniform_cache.begin());
         uint32_t batch=4096;while(uint64_t(h.width)*h.height%batch)batch/=2;
         auto candidate=std::make_unique<raster::UniformDrawExecutor>(request.vertex,request.pixel,h.vertices,h.width,h.height,
-            "NPU",(h.flags&1)!=0,h.format==87,uint8_t((h.flags>>8)&15),batch,static_cast<raster::CullMode>((h.flags>>5)&3),(h.flags&128)!=0);
+            "NPU",blend_mode(h),h.format==87,uint8_t((h.flags>>8)&15),batch,static_cast<raster::CullMode>((h.flags>>5)&3),(h.flags&128)!=0);
         auto result=candidate->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,request.background,request.scissor);
         uniform_cache.push_back({h,request.vertex.bytecode,request.pixel.bytecode,std::move(candidate)});
         return result;

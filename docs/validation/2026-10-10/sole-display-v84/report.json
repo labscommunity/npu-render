@@ -1,0 +1,33 @@
+{
+  "trial": "v84",
+  "source_commit": "329ddd5642a07b3e6f4a78e6e328e56acf184bdf",
+  "umd_build": "present-umd-v118",
+  "kmd_build": "allocation-capacity-v3",
+  "package_version": "0.0.72.0",
+  "npu_preflight_packets_passed": 13,
+  "successful_npu_packets_by_process": {
+    "dwm-1092": 29,
+    "dwm-4476": 4,
+    "Explorer-5404": 42,
+    "StartMenu-5100": 50
+  },
+  "received_frames": 5,
+  "received_frames_with_nonblack_pixels": 1,
+  "nonblack_frame_during_sole_topology": false,
+  "viewer_window_submissions": 5,
+  "collector_completed_without_error": true,
+  "input_actions": 0,
+  "full_desktop_offload": false,
+  "performance_tested": false,
+  "device_cleanup_passed": true,
+  "transport_configuration_removed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "findings": [
+    "The original DWM process completed 29 NPU draws and three Present callbacks, then rejected a complete captured 24 by 24 draw. Its source and destination blend factors are ZERO and SRC_ALPHA for both color and alpha: destination-in. The existing UMD and offline replay reject this blend operation.",
+    "Four received frames are opaque black. Sequence 6 contains color but arrived after the sole-indirect gate closed during cleanup; it is not evidence of usable offloaded desktop rendering.",
+    "DWM restarted in the observation/cleanup interval. The new process completed four NPU draws and four Present callbacks. This does not establish continuous operation or an interactive desktop.",
+    "The fixed collector completes without the prior Substring error. The input gate opens only during the sole-indirect interval; no test input is injected because all frames received while it is open are black.",
+    "Both devices and transport configuration are removed. A non-pausing wait-chain sample after DWM restarted reports no cycles; it does not localize the earlier rejected draw."
+  ]
+}

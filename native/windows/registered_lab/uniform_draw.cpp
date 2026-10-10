@@ -14,7 +14,8 @@ void require(bool value) { if (!value) throw std::invalid_argument("unsupported 
 struct UniformDrawExecutor::State {
     shader::Program vs, ps;
     uint32_t count, width, height, batch;
-    bool blending, bgra;
+    BlendMode blending;
+    bool bgra;
     CullMode cull;
     bool front_ccw;
     uint32_t color_input = 16;
@@ -27,7 +28,7 @@ struct UniformDrawExecutor::State {
     std::unique_ptr<OutputMerger> merger;
     std::unique_ptr<ColorInterpolator> interpolator;
     State(const shader::Program &v, const shader::Program &p, uint32_t n, uint32_t w, uint32_t h,
-          const std::string &device, bool blend, bool swizzle, uint8_t mask, uint32_t b, CullMode c, bool ccw)
+          const std::string &device, BlendMode blend, bool swizzle, uint8_t mask, uint32_t b, CullMode c, bool ccw)
         : vs(v), ps(p), count(n), width(w), height(h), batch(b), blending(blend), bgra(swizzle), cull(c), front_ccw(ccw), backend(device) {
         require(vs.stage == shader::Stage::vertex && ps.stage == shader::Stage::pixel && count && count <= 65536 && !(count % 3));
         require(width && width <= 8192 && height && height <= 8192 && uint64_t(width) * height <= 8 * 1024 * 1024);
@@ -51,12 +52,15 @@ struct UniformDrawExecutor::State {
                !a.relative.enabled && a.lanes==std::array<uint32_t,4>{0,1,2,3} &&
                (ps.interpolation[a.index]==2 || ps.interpolation[a.index]==4)) color_input=a.index;
         }
-        if (count == 6 && mask == 15 && !(width % 4) && uint64_t(width) * height <= 4 * 1024 * 1024)
+        if (blend != BlendMode::destination_in && count == 6 && mask == 15 && !(width % 4) && uint64_t(width) * height <= 4 * 1024 * 1024)
             rectangle = std::make_unique<SolidRectangleExecutor>(width, height, backend, bgra);
     }
 };
 UniformDrawExecutor::UniformDrawExecutor(const shader::Program &vs, const shader::Program &ps, uint32_t count,
     uint32_t width, uint32_t height, const std::string &backend, bool blend, bool bgra, uint8_t mask, uint32_t batch, CullMode cull, bool front_ccw)
+    : UniformDrawExecutor(vs, ps, count, width, height, backend, source_blend(blend), bgra, mask, batch, cull, front_ccw) {}
+UniformDrawExecutor::UniformDrawExecutor(const shader::Program &vs, const shader::Program &ps, uint32_t count,
+    uint32_t width, uint32_t height, const std::string &backend, BlendMode blend, bool bgra, uint8_t mask, uint32_t batch, CullMode cull, bool front_ccw)
     : state(std::make_unique<State>(vs, ps, count, width, height, backend, blend, bgra, mask, batch, cull, front_ccw)) {}
 UniformDrawExecutor::~UniformDrawExecutor() = default;
 UniformDrawExecutor::Result UniformDrawExecutor::execute(const std::vector<shader::VertexRegisters> &inputs,
@@ -97,7 +101,7 @@ UniformDrawExecutor::Result UniformDrawExecutor::execute(const std::vector<shade
     const auto &p = projected.vertices;
     // Admit precisely the two nonoverlapping triangles of an axis-aligned quad.
     // This is a shape check. Pixel coverage and all color writes remain on device.
-    const bool needs_blend = s.blending && color[3] != 1;
+    const bool needs_blend = s.blending == BlendMode::source_over && color[3] != 1;
     const bool first_order = s.count == 6 && p[0].snapped == p[5].snapped && p[2].snapped == p[3].snapped;
     const bool second_order = s.count == 6 && p[0].snapped == p[3].snapped && p[2].snapped == p[4].snapped;
     const size_t bottom_left = second_order ? 5 : 4;

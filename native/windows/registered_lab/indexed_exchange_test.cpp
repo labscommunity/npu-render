@@ -65,6 +65,15 @@ int main(int argc, char **argv) try {
     const auto bytes = ex::encode(r); const auto decoded = ex::decode(bytes);
     test(decoded.header.body_bytes + sizeof(ex::Header) == bytes.size() && decoded.inputs == r.inputs && decoded.background == r.background &&
          decoded.vertex.bytecode == vw && decoded.pixel.bytecode == pw && ex::same_request(decoded.header, r.header));
+    auto destination_in=r;destination_in.header.abi=9;destination_in.header.flags|=0x4001;
+    const auto mask_words=nr::registered_lab::shader_tokens("float4 main():SV_Target{return float4(1,.75,.25,.5);}","ps_4_0");
+    destination_in.pixel=nr::shader::parse_pixel(mask_words.data(),mask_words.size());
+    const auto destination_packet=ex::encode(destination_in);const auto destination_decoded=ex::decode(destination_packet);
+    test(destination_decoded.header.abi==9 && ex::blend_mode(destination_decoded.header)==nr::raster::BlendMode::destination_in &&
+        destination_decoded.inputs==r.inputs && destination_decoded.background==r.background);
+    for(unsigned n=0;n<4;++n){auto bad=destination_packet;auto h=destination_decoded.header;
+        if(n==0)h.abi=1;if(n==1)h.flags&=~1u;if(n==2)h.flags|=0x8000;if(n==3)h.flags&=~0x4000u;
+        std::memcpy(bad.data(),&h,sizeof(h));rejects(bad);}
     auto textured = r; textured.header.abi = 2; textured.header.flags = 0xf02;
     const auto textured_vs = nr::registered_lab::shader_tokens(R"(
 struct O {float4 p:SV_Position;float4 c:COLOR0;float2 uv:TEXCOORD0;};
@@ -92,6 +101,8 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
     for(unsigned n=0;n<5;++n){auto bad=linear_bytes;auto h=linear.header;
         if(n==0)h.abi=3;if(n==1)h.flags&=~2u;if(n==2)h.flags&=~8u;if(n==3)h.vertices=3;if(n==4)h.width=4097;
         std::memcpy(bad.data(),&h,sizeof(h));rejects(bad);}
+    {auto invalid=linear;invalid.header.abi=9;invalid.header.flags|=0x4001;
+     test(!ex::shape_valid(invalid.header));}
     auto point=linear;point.header.abi=5;point.header.flags=0xf17;
     const auto point_bytes=ex::encode(point);const auto point_decoded=ex::decode(point_bytes);
     test(point_decoded.texture.pixels==point.texture.pixels && point_decoded.header.abi==5 && point_decoded.scissor==point.scissor);
@@ -102,6 +113,9 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
     triangles.header.vertices=30;triangles.inputs.resize(30);
     const auto triangle_bytes=ex::encode(triangles);const auto triangle_decoded=ex::decode(triangle_bytes);
     test(triangle_decoded.inputs==triangles.inputs && triangle_decoded.texture.pixels==triangles.texture.pixels && triangle_decoded.scissor==triangles.scissor);
+    {auto masked=triangles;masked.header.abi=9;masked.header.flags|=0x4001;
+     const auto decoded_mask=ex::decode(ex::encode(masked));
+     test(ex::blend_mode(decoded_mask.header)==nr::raster::BlendMode::destination_in && decoded_mask.texture.pixels==triangles.texture.pixels);}
     for(unsigned n=0;n<6;++n){auto bad=triangle_bytes;auto h=triangles.header;
         if(n==0)h.abi=6;if(n==1)h.flags&=~2u;if(n==2)h.flags&=~24u;if(n==3)h.flags|=24u;if(n==4)h.flags|=96u;if(n==5)h.vertices=4095;
         std::memcpy(bad.data(),&h,sizeof(h));rejects(bad);}
@@ -199,10 +213,11 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
     result.execution_device = "CPU"; rejected = false;
     try { (void)ex::response(r.header, result); } catch (const std::invalid_argument &) { rejected = true; } test(rejected);
     if (argc == 3) {
-        if (!std::strcmp(argv[1], "--emit-request")) {
+        if (!std::strcmp(argv[1], "--emit-request") || !std::strcmp(argv[1], "--emit-destination-in")) {
+            const auto &emitted = !std::strcmp(argv[1], "--emit-destination-in") ? destination_packet : bytes;
             std::ifstream old(argv[2], std::ios::binary); test(!old); old.close();
             std::ofstream out(argv[2], std::ios::binary); test(bool(out));
-            out.write(reinterpret_cast<const char *>(bytes.data()), std::streamsize(bytes.size())); out.close(); test(bool(out));
+            out.write(reinterpret_cast<const char *>(emitted.data()), std::streamsize(emitted.size())); out.close(); test(bool(out));
         } else if (scissor_packet) {
             const auto blend_vs=nr::registered_lab::shader_tokens("struct O{float4 p:SV_Position;float4 c:COLOR;};O main(float4 p:POSITION,float4 c:COLOR){O o;o.p=p;o.c=c;return o;}","vs_4_0");
             const auto blend_ps=nr::registered_lab::shader_tokens("float4 main(float4 p:SV_Position,float4 c:COLOR):SV_Target{return c;}","ps_4_0");

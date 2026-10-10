@@ -99,9 +99,13 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
         require(clip[0] >= 0 && clip[1] >= 0 && clip[0] <= clip[2] && clip[1] <= clip[3] && clip[2] <= full[2] && clip[3] <= full[3]);
     }
     const bool blend = d.blend.BlendEnable[0] != 0;
-    if (blend) require(d.blend.SrcBlend == D3D10_DDI_BLEND_ONE && d.blend.DestBlend == D3D10_DDI_BLEND_INV_SRC_ALPHA &&
-        d.blend.BlendOp == D3D10_DDI_BLEND_OP_ADD && d.blend.SrcBlendAlpha == D3D10_DDI_BLEND_ONE &&
-        d.blend.DestBlendAlpha == D3D10_DDI_BLEND_INV_SRC_ALPHA && d.blend.BlendOpAlpha == D3D10_DDI_BLEND_OP_ADD);
+    const bool destination_in = blend && d.blend.SrcBlend == D3D10_DDI_BLEND_ZERO &&
+        d.blend.DestBlend == D3D10_DDI_BLEND_SRC_ALPHA && d.blend.SrcBlendAlpha == D3D10_DDI_BLEND_ZERO &&
+        d.blend.DestBlendAlpha == D3D10_DDI_BLEND_SRC_ALPHA;
+    if (blend) require(d.blend.BlendOp == D3D10_DDI_BLEND_OP_ADD && d.blend.BlendOpAlpha == D3D10_DDI_BLEND_OP_ADD &&
+        (destination_in || (d.blend.SrcBlend == D3D10_DDI_BLEND_ONE && d.blend.DestBlend == D3D10_DDI_BLEND_INV_SRC_ALPHA &&
+        d.blend.SrcBlendAlpha == D3D10_DDI_BLEND_ONE && d.blend.DestBlendAlpha == D3D10_DDI_BLEND_INV_SRC_ALPHA)));
+    const auto blend_mode = destination_in ? nr::raster::BlendMode::destination_in : nr::raster::source_blend(blend);
     const auto vc = fetch_constants(d, 0, *d.vertex_program), pc = fetch_constants(d, 2, *d.pixel_program);
     const bool textured = std::any_of(d.pixel_program->textures.begin(),d.pixel_program->textures.end(),[](bool v){return v;});
     const auto cull=static_cast<nr::raster::CullMode>(UINT(d.raster.CullMode)-1);
@@ -144,7 +148,7 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
         const auto source = d.bound_source; const auto &sampler = d.samplers[2][0];
         linear=sampler.desc.Filter==D3D10_DDI_FILTER_MIN_MAG_MIP_LINEAR;
         modulated=linear || d.pixel_program->instructions.size()==2 || blend || clip!=full;
-        general_texture=count!=6 || cull!=nr::raster::CullMode::none || d.blend.RenderTargetWriteMask[0]!=15;
+        general_texture=destination_in || count!=6 || cull!=nr::raster::CullMode::none || d.blend.RenderTargetWriteMask[0]!=15;
         if(!general_texture) {
             try {
                 if(modulated) nr::raster::LinearTextureDrawExecutor::validate_shader(*d.pixel_program);
@@ -181,29 +185,30 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
         if(cull!=nr::raster::CullMode::none){request.header.abi=6;request.header.flags|=(UINT(cull)<<5)|(front_ccw?128u:0u);}
         if(general_texture){request.header.abi=7;request.header.flags|=0x1000|(linear?8u:16u);}
         if(general_resources){request.header.abi=8;request.header.flags|=0x2002;request.resources=std::move(resources);request.samplers=resource_samplers;}
+        if(destination_in){request.header.abi=9;request.header.flags|=0x4000;}
         request.viewport = viewport; request.vertex = *d.vertex_program; request.pixel = *d.pixel_program;
         request.inputs = inputs; request.vertex_constants = vc; request.pixel_constants = pc; request.background = std::move(background);
         result = d.indexed_exchange->execute(std::move(request));
     } else if(general_resources){
-        const uint64_t options=uint64_t(d.blend.RenderTargetWriteMask[0])|(uint64_t(blend)<<4)|(uint64_t(cull)<<6)|(uint64_t(front_ccw)<<8);
+        const uint64_t options=(uint64_t(destination_in)<<12)|uint64_t(d.blend.RenderTargetWriteMask[0])|(uint64_t(blend)<<4)|(uint64_t(cull)<<6)|(uint64_t(front_ccw)<<8);
         const std::array<uint64_t,5> key{s.width,s.height,s.format,count,options};
         if(!d.resources_executor || d.resources_vertex!=d.vertex_program || d.resources_pixel!=d.pixel_program || d.resources_key!=key ||
             !nr::raster::resource_layout_equal(resources,d.resources_layout) || !nr::raster::sampler_layout_equal(resource_samplers,d.resources_samplers)){
             if(d.backend=="NPU")d.resources_executor.reset();uint32_t batch=4096;while(uint64_t(s.width)*s.height%batch)batch/=2;
             auto candidate=std::make_unique<nr::raster::TriangleTextureDrawExecutor>(*d.vertex_program,*d.pixel_program,count,s.width,s.height,s.format,
-                resources,resource_samplers,d.backend,blend,d.blend.RenderTargetWriteMask[0],cull,front_ccw,batch);
+                resources,resource_samplers,d.backend,blend_mode,d.blend.RenderTargetWriteMask[0],cull,front_ccw,batch);
             d.resources_executor=std::move(candidate);d.resources_key=key;d.resources_layout=nr::raster::resource_layout(resources);d.resources_samplers=resource_samplers;
             d.resources_vertex=d.vertex_program;d.resources_pixel=d.pixel_program;
         }
         result=d.resources_executor->execute(inputs,vc,pc,viewport,resources,background,clip);
     } else if(general_texture) {
-        const uint64_t options=uint64_t(d.blend.RenderTargetWriteMask[0])|(uint64_t(blend)<<4)|(uint64_t(linear)<<5)|(uint64_t(cull)<<6)|(uint64_t(front_ccw)<<8);
+        const uint64_t options=(uint64_t(destination_in)<<12)|uint64_t(d.blend.RenderTargetWriteMask[0])|(uint64_t(blend)<<4)|(uint64_t(linear)<<5)|(uint64_t(cull)<<6)|(uint64_t(front_ccw)<<8);
         const std::array<uint64_t,8> key{s.width,s.height,s.format,texture.width,texture.height,texture.format,count,options};
         if(!d.triangle_texture_executor || d.triangle_texture_vertex!=d.vertex_program || d.triangle_texture_pixel!=d.pixel_program || d.triangle_texture_key!=key){
             if(d.backend=="NPU")d.triangle_texture_executor.reset();
             uint32_t batch=4096;while(uint64_t(s.width)*s.height%batch)batch/=2;
             auto candidate=std::make_unique<nr::raster::TriangleTextureDrawExecutor>(*d.vertex_program,*d.pixel_program,count,s.width,s.height,s.format,
-                texture.width,texture.height,texture.format,d.backend,blend,d.blend.RenderTargetWriteMask[0],
+                texture.width,texture.height,texture.format,d.backend,blend_mode,d.blend.RenderTargetWriteMask[0],
                 linear?nr::shader::TextureFilter::linear:nr::shader::TextureFilter::point,cull,front_ccw,batch);
             d.triangle_texture_executor=std::move(candidate);d.triangle_texture_key=key;
             d.triangle_texture_vertex=d.vertex_program;d.triangle_texture_pixel=d.pixel_program;
@@ -230,7 +235,7 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
         }
         result = d.point_texture_executor->execute(inputs,vc,viewport,texture);
     } else {
-        const std::array<uint64_t, 5> key{s.width, s.height, s.format, count, uint64_t(d.blend.RenderTargetWriteMask[0]) | (uint64_t(blend) << 8) | (uint64_t(cull)<<9) | (uint64_t(front_ccw)<<11)};
+        const std::array<uint64_t, 5> key{s.width, s.height, s.format, count, uint64_t(d.blend.RenderTargetWriteMask[0]) | (uint64_t(blend) << 8) | (uint64_t(cull)<<9) | (uint64_t(front_ccw)<<11) | (uint64_t(destination_in)<<12)};
         if (!d.indexed_executor || d.indexed_vertex != d.vertex_program || d.indexed_pixel != d.pixel_program || d.indexed_key != key) {
             // Driver 5540 loses the new NPU vertex request if the old cache
             // entry is destroyed between new-model creation and first inference.
@@ -239,7 +244,7 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
             if (d.backend == "NPU") d.indexed_executor.reset();
             uint32_t batch = 4096; while (uint64_t(s.width) * s.height % batch) batch /= 2;
             auto candidate = std::make_unique<nr::raster::UniformDrawExecutor>(*d.vertex_program, *d.pixel_program, count,
-                s.width, s.height, d.backend, blend, s.format == 87, d.blend.RenderTargetWriteMask[0], batch, cull, front_ccw);
+                s.width, s.height, d.backend, blend_mode, s.format == 87, d.blend.RenderTargetWriteMask[0], batch, cull, front_ccw);
             d.indexed_executor = std::move(candidate); d.indexed_key = key; d.indexed_vertex = d.vertex_program; d.indexed_pixel = d.pixel_program;
         }
         result = d.indexed_executor->execute(inputs, vc, pc, viewport, background, clip);

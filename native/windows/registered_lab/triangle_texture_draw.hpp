@@ -16,8 +16,17 @@ public:
         CullMode cull,bool front_ccw,uint32_t batch=4096);
     TriangleTextureDrawExecutor(const shader::Program &vertex,const shader::Program &pixel,
         uint32_t vertices,uint32_t width,uint32_t height,uint32_t format,
+        uint32_t source_width,uint32_t source_height,uint32_t source_format,
+        const std::string &backend,BlendMode blend,uint8_t mask,shader::TextureFilter filter,
+        CullMode cull,bool front_ccw,uint32_t batch=4096);
+    TriangleTextureDrawExecutor(const shader::Program &vertex,const shader::Program &pixel,
+        uint32_t vertices,uint32_t width,uint32_t height,uint32_t format,
         const PackedResources &resources,const shader::TextureSamplers &samplers,
         const std::string &backend,bool blend,uint8_t mask,CullMode cull,bool front_ccw,uint32_t batch=4096);
+    TriangleTextureDrawExecutor(const shader::Program &vertex,const shader::Program &pixel,
+        uint32_t vertices,uint32_t width,uint32_t height,uint32_t format,
+        const PackedResources &resources,const shader::TextureSamplers &samplers,
+        const std::string &backend,BlendMode blend,uint8_t mask,CullMode cull,bool front_ccw,uint32_t batch=4096);
     ~TriangleTextureDrawExecutor();
     UniformDrawExecutor::Result execute(const std::vector<shader::VertexRegisters> &vertices,
         const shader::VertexConstants &vertex_constants,const shader::VertexConstants &pixel_constants,

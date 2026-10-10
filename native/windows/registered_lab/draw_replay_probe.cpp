@@ -125,7 +125,10 @@ int main(int argc, char **argv) try {
     nr::capture::check(blend.size() == 17 && !blend[0] && depth.size() == 15 && !depth[0] && !depth[3]);
     // Only target zero is bound in this captured draw; other blend slots are unused.
     const bool blending = blend[1] != 0;
-    if (blending) nr::capture::check(blend[9] == 2 && blend[10] == 6 && blend[11] == 1 && blend[12] == 2 && blend[13] == 6 && blend[14] == 1);
+    const bool destination_in = blending && blend[9] == 1 && blend[10] == 5 && blend[12] == 1 && blend[13] == 5;
+    if (blending) nr::capture::check(blend[11] == 1 && blend[14] == 1 &&
+        (destination_in || (blend[9] == 2 && blend[10] == 6 && blend[12] == 2 && blend[13] == 6)));
+    const auto blend_mode = destination_in ? BlendMode::destination_in : source_blend(blending);
     nr::capture::check(raster.size() == 10 && raster[0] == 3 && raster[1] >= 1 && raster[1] <= 3 && !raster[3] && !raster[4] && !raster[5] && !raster[8] && !raster[9]);
     std::array<int32_t,4> clip{0,0,int32_t(width),int32_t(height)};
     if (raster[7]) {
@@ -179,7 +182,7 @@ int main(int argc, char **argv) try {
         texture_shapes=resource_shapes(ps,resources);texture_pixels=decode_resources(ps,resources);
         while(uint64_t(width)*height%batch)batch/=2;
         triangle_executor=std::make_unique<TriangleTextureDrawExecutor>(vs,ps,args[0],width,height,format,resources,texture_samplers,backend,
-            blending,uint8_t(blend[15]&255),static_cast<CullMode>(raster[1]-1),raster[2]!=0,batch);
+            blend_mode,uint8_t(blend[15]&255),static_cast<CullMode>(raster[1]-1),raster[2]!=0,batch);
     }else if (textured) {
         const auto source = snapshot.values<uint32_t>("source-description"), sampler = snapshot.values<uint32_t>("sampler-2-0");
         nr::capture::check(source.size() == 10 && source[0] == 0x4e52574b && source[1] == 1 && source[2] == 40 && !source[7]);
@@ -191,12 +194,12 @@ int main(int argc, char **argv) try {
             texture={source[3],source[4],28,{}};texture.pixels.resize(alpha.size());
             for(size_t i=0;i<alpha.size();++i)texture.pixels[i]={0,0,0,alpha[i]};
         } else texture = {source[3],source[4],source[5],snapshot.values<PackedColor>("source")};
-        bool general_texture=args[0]!=6 || raster[1]!=1 || (blend[15]&255)!=15;
+        bool general_texture=destination_in || args[0]!=6 || raster[1]!=1 || (blend[15]&255)!=15;
         if(!general_texture)try{LinearTextureDrawExecutor::validate_shader(ps);}catch(const std::invalid_argument &){general_texture=true;}
         if(general_texture){
             while(uint64_t(width)*height%batch)batch/=2;
             triangle_executor=std::make_unique<TriangleTextureDrawExecutor>(vs,ps,args[0],width,height,format,texture.width,texture.height,texture.format,
-                backend,blending,uint8_t(blend[15]&255),sampler[0]==0?TextureFilter::point:TextureFilter::linear,static_cast<CullMode>(raster[1]-1),raster[2]!=0,batch);
+                backend,blend_mode,uint8_t(blend[15]&255),sampler[0]==0?TextureFilter::point:TextureFilter::linear,static_cast<CullMode>(raster[1]-1),raster[2]!=0,batch);
             texture_shapes[0]={texture.width,texture.height};texture_samplers[0].filter=sampler[0]==0?TextureFilter::point:TextureFilter::linear;
             texture_pixels[0].resize(texture.pixels.size());
             for(size_t n=0;n<texture.pixels.size();++n)for(unsigned c=0;c<4;++c)
@@ -243,7 +246,7 @@ int main(int argc, char **argv) try {
         }
     } else {
         while(uint64_t(width)*height%batch)batch/=2;
-        executor = std::make_unique<UniformDrawExecutor>(vs, ps, args[0], width, height, backend, blending, format == 87, uint8_t(blend[15] & 255), batch,static_cast<CullMode>(raster[1]-1),raster[2]!=0);
+        executor = std::make_unique<UniformDrawExecutor>(vs, ps, args[0], width, height, backend, blend_mode, format == 87, uint8_t(blend[15] & 255), batch,static_cast<CullMode>(raster[1]-1),raster[2]!=0);
     }
     const auto compile_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - compile_start).count();
     const auto cache=nr::provider::compile_statistics();
@@ -326,7 +329,8 @@ int main(int argc, char **argv) try {
                     for(unsigned c=0;c<4;++c){
                         const auto lane=format==87 && c<3 ? 2-c : c;
                         if(!((blend[15]&255)&(1u<<lane)))continue;
-                        const double value=std::clamp(double(as_float(fragment[lane])),0.,1.)*255+(blending?double(pixel[c])*(1-std::clamp(double(as_float(fragment[3])),0.,1.)):0);
+                        const double alpha=std::clamp(double(as_float(fragment[3])),0.,1.);
+                        const double value=destination_in ? double(pixel[c])*alpha : std::clamp(double(as_float(fragment[lane])),0.,1.)*255+(blending?double(pixel[c])*(1-alpha):0);
                         pixel[c]=uint8_t(std::nearbyint((std::clamp)(value,0.,255.)));
                     }
                 }

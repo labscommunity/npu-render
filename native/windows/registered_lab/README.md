@@ -660,3 +660,26 @@ batch; cache identity includes that size. Four alternating real/derived DWM
 packets return exact NPU pixels. The physical worker also retains at most four
 slow non-preflight packets in its owned evidence directory for offline diagnosis;
 these captures do not include the transport authentication secret.
+
+The [v84 desktop trial](../../../docs/validation/2026-10-10/sole-display-v84/report.json)
+reaches a 24×24 DWM alpha-mask draw using `ZERO, SRC_ALPHA, ADD` for both
+color and alpha. The output merger now represents this destination-in operation
+explicitly: covered, enabled channels become the previous channel multiplied
+by clamped source alpha. Source-copy and premultiplied source-over remain
+separate operations. The source-copy rectangle shortcut is disabled for
+this mask, including opaque alpha. Clipping, culling, channel masks and UNORM
+rounding retain their existing contracts. These factors follow the
+[Direct3D blend definitions](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3d10umddi/ne-d3d10umddi-d3d10_ddi_blend).
+
+Transport ABI 9 carries destination-in for uniform or general textured triangles;
+legacy ABI 1–8 packets retain their meaning. Unsupported specialized texture
+packets, missing blend enable, mismatched versions and unknown flag bits are
+rejected. Blend mode is included in executor cache identity. The offline replay
+also applies the new mode in its independent scalar pixel oracle. This remains
+a bounded laboratory renderer, with a usable desktop and Tahoma benefit still
+requiring live evidence.
+
+The [v120 qualification](../../../docs/validation/2026-10-10/destination-in-v120/report.json)
+records byte-exact CPU, scalar and NPU replay of that DWM mask, 18 clean CPU
+contract suites, real NPU mask checks and an ABI 9 worker response with all
+16,384 output components verified. Live desktop delivery remains the next test.
