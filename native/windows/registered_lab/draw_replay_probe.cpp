@@ -18,21 +18,36 @@ nr::shader::VertexConstants constants(const nr::capture::Snapshot &s, unsigned s
     }
     return result;
 }
-std::vector<nr::shader::VertexRegisters> fetch(const nr::capture::Snapshot &s, uint32_t count, uint32_t first, int32_t base) {
-    const auto id = s.values<uint32_t>("indices-description"), elements = s.values<uint32_t>("layout");
-    nr::capture::check(id.size() == 4 && ((id[1] == 2 && id[3] == 57) || (id[1] == 4 && id[3] == 42)) && elements.size() % 6 == 0);
-    const auto &ib = s.bytes("indices");
-    nr::capture::check(id[0] == ib.size() && uint64_t(id[2]) + (uint64_t(first) + count) * id[1] <= ib.size());
-    std::vector<uint32_t> indices(count);
-    for (uint32_t i = 0; i < count; ++i) {
-        uint32_t index = 0; std::memcpy(&index, ib.data() + id[2] + size_t(first + i) * id[1], id[1]);
-        const int64_t adjusted = int64_t(index) + base; nr::capture::check(adjusted >= 0 && adjusted <= UINT32_MAX); indices[i] = uint32_t(adjusted);
+std::vector<nr::shader::VertexRegisters> fetch(const nr::capture::Snapshot &s, uint32_t count, uint32_t first, int32_t base,
+                                                   const nr::shader::Program &vs, bool indexed, uint32_t topology) {
+    const auto elements = s.has("layout") ? s.values<uint32_t>("layout") : std::vector<uint32_t>{};
+    nr::capture::check(elements.size() % 6 == 0);
+    std::vector<uint32_t> indices, ids;
+    if (indexed) {
+        const auto id = s.values<uint32_t>("indices-description");
+        nr::capture::check(topology == 4 && id.size() == 4 && ((id[1] == 2 && id[3] == 57) || (id[1] == 4 && id[3] == 42)));
+        const auto &ib = s.bytes("indices");
+        nr::capture::check(id[0] == ib.size() && uint64_t(id[2]) + (uint64_t(first) + count) * id[1] <= ib.size());
+        for (uint32_t i = 0; i < count; ++i) {
+            uint32_t index = 0; std::memcpy(&index, ib.data() + id[2] + size_t(first + i) * id[1], id[1]);
+            const int64_t adjusted = int64_t(index) + base; nr::capture::check(adjusted >= 0 && adjusted <= UINT32_MAX);
+            indices.push_back(uint32_t(adjusted)); ids.push_back(index);
+        }
+    } else {
+        nr::capture::check(count >= 3 && uint64_t(first) + count - 1 <= UINT32_MAX);
+        auto append = [&](uint32_t id) { indices.push_back(first + id); ids.push_back(id); };
+        if (topology == 4) { nr::capture::check(!(count % 3)); for(uint32_t i=0;i<count;++i) append(i); }
+        else {
+            nr::capture::check(topology == 5 && uint64_t(count-2)*3 <= 65536);
+            for(uint32_t i=0;i<count-2;++i) { append(i+(i&1));append(i+((i&1)?0:1));append(i+2); }
+        }
     }
+    count=uint32_t(indices.size());
     std::vector<nr::shader::VertexRegisters> result(count);
     uint32_t registers = 0;
     for (size_t e = 0; e < elements.size(); e += 6) {
         const auto slot = elements[e], offset = elements[e + 1], format = elements[e + 2], reg = elements[e + 5];
-        nr::capture::check(slot < 16 && reg < 16 && !elements[e + 3] && !elements[e + 4] && !(registers & (1u << reg)));
+        nr::capture::check(slot < 16 && reg < 16 && reg != vs.vertex_id_input && !elements[e + 3] && !elements[e + 4] && !(registers & (1u << reg)));
         registers |= 1u << reg;
         const auto name = "vertices-" + std::to_string(slot);
         const auto description = s.values<uint32_t>(name + "-description"); const auto &vb = s.bytes(name);
@@ -48,6 +63,8 @@ std::vector<nr::shader::VertexRegisters> fetch(const nr::capture::Snapshot &s, u
             else std::memcpy(v.data(), vb.data() + size_t(begin), bytes);
         }
     }
+    for(uint32_t reg=0;reg<16;++reg) nr::capture::check(!vs.inputs[reg] || reg==vs.vertex_id_input || (registers & (1u<<reg)));
+    if(vs.vertex_id_input<16) for(uint32_t n=0;n<count;++n) result[n][vs.vertex_id_input][0]=ids[n];
     return result;
 }
 }
@@ -68,8 +85,10 @@ int main(int argc, char **argv) try {
     std::ifstream existing(argv[6], std::ios::binary); nr::capture::check(!existing); existing.close();
     const auto start = std::chrono::steady_clock::now();
     const nr::capture::Snapshot snapshot(argv[2]);
-    const auto args = snapshot.values<uint32_t>("arguments");
-    nr::capture::check(args.size() == 9 && args[0] && args[0] <= 65536 && !(args[0] % 3) && args[3] == 4 && args[4] == 1 && args[7] == UINT32_MAX);
+    auto args = snapshot.values<uint32_t>("arguments");
+    const auto call = snapshot.has("draw-indexed") ? snapshot.values<uint32_t>("draw-indexed") : std::vector<uint32_t>{1};
+    nr::capture::check(call.size()==1 && call[0]<=1); const bool indexed=call[0]!=0;
+    nr::capture::check(args.size() == 9 && args[0] && args[0] <= 65536 && (args[3] == 4 || (!indexed && args[3] == 5)) && args[4] == 1 && args[7] == UINT32_MAX);
     const auto view = snapshot.values<float>("viewport");
     const auto surface = snapshot.values<uint32_t>("target-description");
     nr::capture::check(view.size() == 6 && surface.size() == 10 && surface[0] == 0x4e52574b && surface[1] == 1 && surface[2] == 40 && !surface[7]);
@@ -98,7 +117,8 @@ int main(int argc, char **argv) try {
     for (const auto &instruction : ps.instructions) for (unsigned i = 0; i < instruction.source_count; ++i)
         nr::capture::check(instruction.sources[i].kind != Register::input || instruction.sources[i].index != ps.position_input);
     int32_t base; std::memcpy(&base, &args[2], 4);
-    const auto inputs = fetch(snapshot, args[0], args[1], base);
+    const auto inputs = fetch(snapshot, args[0], args[1], base, vs, indexed, args[3]);
+    args[0]=uint32_t(inputs.size()); nr::capture::check(!(args[0]%3));
     const auto cb = constants(snapshot, 0, vs);
     const auto pixel_cb = constants(snapshot, 2, ps);
     const auto compile_start = std::chrono::steady_clock::now();

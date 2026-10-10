@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.25)
+project(vertex_id_oracle LANGUAGES CXX)
+add_executable(vertex_id_oracle main.cpp)
+target_compile_features(vertex_id_oracle PRIVATE cxx_std_17)
+target_link_libraries(vertex_id_oracle PRIVATE d3d11 d3dcompiler)

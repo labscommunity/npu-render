@@ -1,27 +1,20 @@
-// Included after diagnostic capture. Decode owned state, execute a checked
-// graphics pipeline, then commit to VidMm only after the whole draw succeeds.
-std::vector<nr::shader::VertexRegisters> fetch_indexed_vertices(Device &d, UINT count, UINT first, INT base) {
-    const auto &ib = d.index_buffer;
-    require(d.input_elements && count && count <= 65536 && !(count % 3) && ib.allocation &&
-        ib.allocation->context == d.context && !ib.allocation->locked && !d.context->poisoned &&
-        (ib.stride == 2 || ib.stride == 4) && uint64_t(ib.offset) + (uint64_t(first) + count) * ib.stride <= ib.bytes);
-    std::vector<UINT> indices(count);
-    {
-        Mapping read(*ib.allocation, true);
-        for (UINT i = 0; i < count; ++i) {
-            UINT index = 0; std::memcpy(&index, static_cast<const uint8_t *>(read.data) + ib.offset + (uint64_t(first) + i) * ib.stride, ib.stride);
-            const int64_t adjusted = int64_t(index) + base;
-            require(adjusted >= 0 && adjusted <= UINT_MAX); indices[i] = UINT(adjusted);
-        }
-        read.finish();
-    }
-    std::vector<nr::shader::VertexRegisters> result(count);
-    for (const auto &e : *d.input_elements) {
+// Decode IA inputs separately from shader arithmetic. Vertex IDs follow the
+// D3D10/11 system-value contract: draw-local ordinal or raw index, without the
+// vertex-buffer start/base address offset (functional spec sections 8.4/8.6).
+std::vector<nr::shader::VertexRegisters> fetch_vertices_at(Device &d, const std::vector<UINT> &indices,
+                                                        const std::vector<UINT> &vertex_ids) {
+    require(d.context && !d.context->poisoned && !indices.empty() && indices.size() <= 65536 && indices.size() == vertex_ids.size());
+    const UINT builtin = d.vertex_program ? d.vertex_program->vertex_id_input : 16;
+    std::vector<nr::shader::VertexRegisters> result(indices.size());
+    uint32_t bound = 0;
+    if (d.input_elements) for (const auto &e : *d.input_elements) {
+        require(e.InputRegister < 16 && e.InputRegister != builtin && e.InputSlot < d.vertex_buffers.size());
+        bound |= 1u << e.InputRegister;
         const auto format = element_format(e.Format); const auto &b = d.vertex_buffers[e.InputSlot];
         require(b.allocation && b.allocation->context == d.context && !b.allocation->locked);
         for (const auto index : indices) require(uint64_t(b.offset) + e.AlignedByteOffset + uint64_t(index) * b.stride + format.bytes <= b.bytes);
         Mapping read(*b.allocation, true);
-        for (UINT i = 0; i < count; ++i) {
+        for (size_t i = 0; i < indices.size(); ++i) {
             auto &v = result[i][e.InputRegister]; v = {0, 0, 0, format.integer ? 1u : 0x3f800000u};
             const auto *data = static_cast<const uint8_t *>(read.data) + b.offset + e.AlignedByteOffset + uint64_t(indices[i]) * b.stride;
             if (format.normalized) for (UINT c = 0; c < 4; ++c) { const float f = float(data[c]) / 255; std::memcpy(&v[c], &f, 4); }
@@ -30,7 +23,42 @@ std::vector<nr::shader::VertexRegisters> fetch_indexed_vertices(Device &d, UINT 
         }
         read.finish();
     }
+    if (d.vertex_program) for (UINT reg = 0; reg < 16; ++reg)
+        require(!d.vertex_program->inputs[reg] || reg == builtin || (bound & (1u << reg)));
+    if (builtin < 16) for (size_t i = 0; i < result.size(); ++i) result[i][builtin][0] = vertex_ids[i];
     return result;
+}
+std::vector<nr::shader::VertexRegisters> fetch_indexed_vertices(Device &d, UINT count, UINT first, INT base) {
+    const auto &ib = d.index_buffer;
+    require(count && count <= 65536 && !(count % 3) && ib.allocation &&
+        ib.allocation->context == d.context && !ib.allocation->locked && !d.context->poisoned &&
+        (ib.stride == 2 || ib.stride == 4) && uint64_t(ib.offset) + (uint64_t(first) + count) * ib.stride <= ib.bytes);
+    std::vector<UINT> indices(count), ids(count);
+    {
+        Mapping read(*ib.allocation, true);
+        for (UINT i = 0; i < count; ++i) {
+            UINT index = 0; std::memcpy(&index, static_cast<const uint8_t *>(read.data) + ib.offset + (uint64_t(first) + i) * ib.stride, ib.stride);
+            const int64_t adjusted = int64_t(index) + base;
+            require(adjusted >= 0 && adjusted <= UINT_MAX); indices[i] = UINT(adjusted); ids[i] = index;
+        }
+        read.finish();
+    }
+    return fetch_vertices_at(d, indices, ids);
+}
+std::vector<nr::shader::VertexRegisters> fetch_draw_vertices(Device &d, UINT count, UINT first) {
+    require(count >= 3 && count <= 65536 && uint64_t(first) + count - 1 <= UINT_MAX);
+    std::vector<UINT> indices, ids;
+    auto append = [&](UINT id) { indices.push_back(first + id); ids.push_back(id); };
+    if (d.topology == D3D10_DDI_PRIMITIVE_TOPOLOGY_TRIANGLELIST) {
+        require(!(count % 3));
+        for (UINT i = 0; i < count; ++i) append(i);
+    } else {
+        require(d.topology == D3D10_DDI_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP && uint64_t(count - 2) * 3 <= 65536);
+        for (UINT i = 0; i < count - 2; ++i) {
+            append(i + (i & 1)); append(i + ((i & 1) ? 0 : 1)); append(i + 2);
+        }
+    }
+    return fetch_vertices_at(d, indices, ids);
 }
 nr::shader::VertexConstants fetch_constants(Device &d, UINT stage, const nr::shader::Program &program) {
     nr::shader::VertexConstants values;
@@ -42,12 +70,14 @@ nr::shader::VertexConstants fetch_constants(Device &d, UINT stage, const nr::sha
     }
     return values;
 }
-void execute_indexed_draw(Device &d, UINT count, UINT first, INT base) {
+void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegisters> &inputs, bool indexed) {
+    const auto count = UINT(inputs.size());
+    require(count && count <= 65536 && !(count % 3));
     const auto started = GetTickCount64();
     if (!d.vertex_program || !d.pixel_program) throw Error{DXGI_ERROR_UNSUPPORTED};
     const auto target = d.bound_target;
     require(target && target->context == d.context && !target->locked && !d.context->poisoned &&
-        d.topology == D3D10_DDI_PRIMITIVE_TOPOLOGY_TRIANGLELIST && d.vertex_shader == 1 && d.pixel_shader == 2);
+        d.vertex_shader == 1 && d.pixel_shader == 2);
     const auto &s = target->surface;
     require((s.format == 28 || s.format == 87) && d.viewport_count == 1 && d.viewport.TopLeftX == 0 && d.viewport.TopLeftY == 0 &&
         d.viewport.Width == FLOAT(s.width) && d.viewport.Height == FLOAT(s.height) &&
@@ -65,7 +95,6 @@ void execute_indexed_draw(Device &d, UINT count, UINT first, INT base) {
     if (blend) require(d.blend.SrcBlend == D3D10_DDI_BLEND_ONE && d.blend.DestBlend == D3D10_DDI_BLEND_INV_SRC_ALPHA &&
         d.blend.BlendOp == D3D10_DDI_BLEND_OP_ADD && d.blend.SrcBlendAlpha == D3D10_DDI_BLEND_ONE &&
         d.blend.DestBlendAlpha == D3D10_DDI_BLEND_INV_SRC_ALPHA && d.blend.BlendOpAlpha == D3D10_DDI_BLEND_OP_ADD);
-    const auto inputs = fetch_indexed_vertices(d, count, first, base);
     const auto vc = fetch_constants(d, 0, *d.vertex_program), pc = fetch_constants(d, 2, *d.pixel_program);
     const bool textured = std::any_of(d.pixel_program->textures.begin(),d.pixel_program->textures.end(),[](bool v){return v;});
     nr::raster::PackedTexture texture; bool linear=false;
@@ -102,6 +131,7 @@ void execute_indexed_draw(Device &d, UINT count, UINT first, INT base) {
     } else if (linear) {
         const std::array<uint64_t,7> key{s.width,s.height,s.format,texture.width,texture.height,texture.format,uint64_t(blend)};
         if(!d.linear_texture_executor || d.linear_texture_vertex!=d.vertex_program || d.linear_texture_pixel!=d.pixel_program || d.linear_texture_key!=key){
+            if (d.backend == "NPU") d.linear_texture_executor.reset();
             auto candidate=std::make_unique<nr::raster::LinearTextureDrawExecutor>(*d.vertex_program,*d.pixel_program,s.width,s.height,s.format,
                 texture.width,texture.height,texture.format,d.backend,blend);
             d.linear_texture_executor=std::move(candidate);d.linear_texture_key=key;
@@ -111,6 +141,7 @@ void execute_indexed_draw(Device &d, UINT count, UINT first, INT base) {
     } else if (textured) {
         const std::array<uint64_t,6> key{s.width,s.height,s.format,texture.width,texture.height,texture.format};
         if (!d.point_texture_executor || d.point_texture_vertex != d.vertex_program || d.point_texture_pixel != d.pixel_program || d.point_texture_key != key) {
+            if (d.backend == "NPU") d.point_texture_executor.reset();
             auto candidate = std::make_unique<nr::raster::PointTextureDrawExecutor>(*d.vertex_program,*d.pixel_program,s.width,s.height,s.format,
                 texture.width,texture.height,texture.format,d.backend);
             d.point_texture_executor = std::move(candidate); d.point_texture_key = key;
@@ -120,6 +151,11 @@ void execute_indexed_draw(Device &d, UINT count, UINT first, INT base) {
     } else {
         const std::array<uint64_t, 5> key{s.width, s.height, s.format, count, uint64_t(d.blend.RenderTargetWriteMask[0]) | (uint64_t(blend) << 8)};
         if (!d.indexed_executor || d.indexed_vertex != d.vertex_program || d.indexed_pixel != d.pixel_program || d.indexed_key != key) {
+            // Driver 5540 loses the new NPU vertex request if the old cache
+            // entry is destroyed between new-model creation and first inference.
+            // Retire the cache first. Pixels and current bindings stay intact if
+            // compilation fails; a subsequent draw can rebuild the cache.
+            if (d.backend == "NPU") d.indexed_executor.reset();
             uint32_t batch = 4096; while (uint64_t(s.width) * s.height % batch) batch /= 2;
             auto candidate = std::make_unique<nr::raster::UniformDrawExecutor>(*d.vertex_program, *d.pixel_program, count,
                 s.width, s.height, d.backend, blend, s.format == 87, d.blend.RenderTargetWriteMask[0], batch);
@@ -137,6 +173,12 @@ void execute_indexed_draw(Device &d, UINT count, UINT first, INT base) {
     counters.inference_input_bytes += result.input_bytes;
     counters.inference_output_bytes += result.output_bytes;
     upload(*target, nullptr, result.pixels.data(), s.width * 4); ++counters.draws;
-    lab_trace("{\"event\":\"indexed_draw_executed\",\"vertices\":%u,\"textured\":%s,\"covered_samples\":%llu,\"rectangle_path\":%s,\"execution_device\":\"%s\",\"wall_ms\":%llu}\n",
-        count, textured ? "true" : "false", static_cast<unsigned long long>(result.covered_samples), result.used_rectangle ? "true" : "false", result.execution_device.c_str(), static_cast<unsigned long long>(GetTickCount64()-started));
+    lab_trace("{\"event\":\"%s\",\"vertices\":%u,\"textured\":%s,\"covered_samples\":%llu,\"rectangle_path\":%s,\"execution_device\":\"%s\",\"wall_ms\":%llu}\n",
+        indexed ? "indexed_draw_executed" : "draw_executed", count, textured ? "true" : "false", static_cast<unsigned long long>(result.covered_samples), result.used_rectangle ? "true" : "false", result.execution_device.c_str(), static_cast<unsigned long long>(GetTickCount64()-started));
+}
+void execute_indexed_draw(Device &d, UINT count, UINT first, INT base) {
+    if (!count) return;
+    if (!d.vertex_program || !d.pixel_program) throw Error{DXGI_ERROR_UNSUPPORTED};
+    require(d.topology == D3D10_DDI_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    execute_triangle_draw(d, fetch_indexed_vertices(d, count, first, base), true);
 }

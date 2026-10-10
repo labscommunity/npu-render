@@ -12,10 +12,10 @@ using std::size_t;
 inline void check(bool value) {
     if (!value) throw std::invalid_argument("unsupported or malformed SM4 vertex program");
 }
-enum class Register : uint32_t { temporary = 0, input = 1, output = 2, immediate = 4, sampler = 6, texture = 7, constant = 8 };
+enum class Register : uint32_t { temporary = 0, input = 1, output = 2, indexable = 3, immediate = 4, sampler = 6, texture = 7, constant = 8 };
 enum class Opcode : uint32_t {
     add = 0, divide = 14, dot2 = 15, dot3 = 16, dot4 = 17, otherwise = 18, end_if = 21,
-    integer_add = 30, begin_if = 31, integer_to_float = 43, less = 49,
+    integer_add = 30, begin_if = 31, shift_left = 41, integer_to_float = 43, less = 49,
     mad = 50, minimum = 51, maximum = 52, move = 54, select = 55,
     multiply = 56, reciprocal_sqrt = 68, sample = 69
 };
@@ -49,6 +49,10 @@ struct Program {
     std::array<uint32_t, 14> constants{};
     std::array<bool, 14> dynamic_constants{};
     uint32_t temporaries = 0, position_output = 16, position_input = 16;
+    uint32_t vertex_id_input = 16;
+    // Constant-initialized indexable temporaries are folded into immutable
+    // tables. Runtime lookup and its bounds check still execute on the provider.
+    std::array<std::vector<std::array<uint32_t,4>>,16> literal_tables;
     std::vector<Instruction> instructions;
     // Owned token stream for replay/transport; the caller may free its storage.
     std::vector<uint32_t> bytecode;
@@ -92,8 +96,8 @@ public:
             return value;
         }
         check(value.kind == Register::temporary || value.kind == Register::input ||
-              value.kind == Register::output || value.kind == Register::constant || handle);
-        check(dimensions == (value.kind == Register::constant ? 2u : 1u));
+              value.kind == Register::output || value.kind == Register::constant || value.kind == Register::indexable || handle);
+        check(dimensions == (value.kind == Register::constant || value.kind == Register::indexable ? 2u : 1u));
         check(!((token >> 22) & 7u)); // First index is immediate32.
         value.index = read();
         check(value.index < (value.kind == Register::constant ? 14u : 16u));
@@ -122,6 +126,9 @@ inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
     Program result; result.stage = stage; result.bytecode.assign(words, words + count);
     bool body = false, returned = false, temps_declared = false, flags_declared = false;
     std::array<uint32_t, 16> written_temps{}, written_outputs{};
+    std::array<std::vector<uint32_t>,16> table_written;
+    std::array<uint32_t,16> table_components{};
+    uint32_t table_elements = 0;
     struct Branch {
         std::array<uint32_t, 16> before_temps, before_outputs, then_temps{}, then_outputs{};
         bool has_else = false;
@@ -144,6 +151,14 @@ inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
                 check(result.dynamic_constants[source.index]);
                 initialized(source.relative.kind, source.relative.index, 1u << source.relative.component);
             }
+        } else if(source.kind == Register::indexable) {
+            check(branches.empty() && !table_written[source.index].empty());
+            if(source.relative.enabled) {
+                initialized(source.relative.kind,source.relative.index,1u<<source.relative.component);
+                for(const auto mask:table_written[source.index])check(!(lanes&~mask));
+            } else {
+                check(source.element<table_written[source.index].size() && !(lanes&~table_written[source.index][source.element]));
+            }
         } else check(source.kind == Register::immediate);
     };
     for (size_t offset = 2; offset < count;) {
@@ -157,6 +172,13 @@ inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
         } else if (opcode == 104) { // dcl_temps
             check(!body && !temps_declared && !controls); result.temporaries = in.read();
             check(result.temporaries <= 16); temps_declared = true;
+        } else if(opcode == 105) { // dcl_indexableTemp, bounded literal initialization below
+            check(!body && !controls);
+            const auto index=in.read(),elements=in.read(),components=in.read();
+            check(index<16 && elements && elements<=4096 && components && components<=4 && result.literal_tables[index].empty());
+            check(elements<=4096-table_elements);table_elements+=elements;
+            result.literal_tables[index].resize(elements);table_written[index].resize(elements);
+            table_components[index]=(1u<<components)-1;
         } else if (opcode == 89) { // dcl_constantbuffer
             check(!body && !(controls & ~0x800u)); const auto a = in.operand(false, true);
             check(a.kind == Register::constant && a.element && a.element <= 4096 && !result.constants[a.index]);
@@ -182,11 +204,12 @@ inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
                 check(in.read() == 1 && result.position_input == 16);
                 result.position_input = a.index;
             }
-        } else if (opcode == 95 || opcode == 101 || opcode == 103) {
+        } else if (opcode == 95 || opcode == 96 || opcode == 101 || opcode == 103) {
             check(!body && !controls); const auto a = in.operand(true, true);
-            if (opcode == 95) {
+            if (opcode == 95 || opcode == 96) {
                 check(stage == Stage::vertex && a.kind == Register::input && !(result.inputs[a.index] & a.mask));
                 result.inputs[a.index] |= a.mask;
+                if(opcode==96){check(in.read()==6 && a.mask==1 && result.vertex_id_input==16);result.vertex_id_input=a.index;}
             } else {
                 check(a.kind == Register::output && !(result.outputs[a.index] & a.mask));
                 result.outputs[a.index] |= a.mask;
@@ -222,7 +245,7 @@ inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
         } else if (opcode == 62) {
             check(!controls && body && branches.empty()); returned = true;
         } else {
-            check(opcode == 0 || opcode == 14 || opcode == 15 || opcode == 16 || opcode == 17 || opcode == 30 ||
+            check(opcode == 0 || opcode == 14 || opcode == 15 || opcode == 16 || opcode == 17 || opcode == 30 || opcode == 41 ||
                   opcode == 43 || opcode == 49 || opcode == 50 || opcode == 51 || opcode == 52 ||
                   opcode == 54 || opcode == 55 || opcode == 56 || opcode == 68 || opcode == 69);
             check(!(controls & ~0x2000u) && result.instructions.size() < 1024);
@@ -230,6 +253,17 @@ inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
             Instruction instruction; instruction.opcode = Opcode(opcode); instruction.saturate = controls != 0;
             instruction.destination = in.operand(true);
             const auto &d = instruction.destination;
+            if(d.kind == Register::indexable){
+                // Only unconditional literal writes before executable work are
+                // folded. Later writes, dynamic writes and partially initialized
+                // reads cannot silently become immutable table accesses.
+                check(opcode==54 && !controls && branches.empty() && result.instructions.empty() &&
+                      !d.relative.enabled && d.element<result.literal_tables[d.index].size() && !(d.mask&~table_components[d.index]));
+                const auto literal=in.operand(false);check(literal.kind==Register::immediate && literal.modifier==Modifier::none);
+                for(unsigned c=0;c<4;++c)if(d.mask&(1u<<c))result.literal_tables[d.index][d.element][c]=literal.literal[literal.lanes[c]];
+                table_written[d.index][d.element]|=d.mask;
+                check(in.done());offset+=length;continue;
+            }
             check((d.kind == Register::temporary && d.index < result.temporaries) ||
                   (d.kind == Register::output && !(d.mask & ~result.outputs[d.index])));
             instruction.source_count = (opcode == 43 || opcode == 54 || opcode == 68) ? 1u :
@@ -248,13 +282,18 @@ inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
                 if (opcode == 30) check(instruction.sources[i].modifier == Modifier::none ||
                                         instruction.sources[i].modifier == Modifier::negate);
                 if (opcode == 43 || (opcode == 55 && !i)) check(instruction.sources[i].modifier == Modifier::none);
+                if(opcode==41)check(instruction.sources[i].modifier==Modifier::none);
             }
+            if(opcode==41){const auto &amount=instruction.sources[1];
+                check((amount.kind==Register::immediate && amount.literal[0]==amount.literal[1] && amount.literal[0]==amount.literal[2] && amount.literal[0]==amount.literal[3]) ||
+                      (amount.lanes[0]==amount.lanes[1] && amount.lanes[0]==amount.lanes[2] && amount.lanes[0]==amount.lanes[3]));}
             (d.kind == Register::temporary ? written_temps : written_outputs)[d.index] |= d.mask;
             result.instructions.push_back(instruction);
         }
         check(in.done()); offset += length;
     }
     check(returned && (stage == Stage::vertex ? result.position_output < 16 : result.outputs[0] != 0));
+    check(table_elements+result.temporaries<=4096);
     for (unsigned i = 0; i < 16; ++i) check(!(result.outputs[i] & ~written_outputs[i]));
     return result;
 }

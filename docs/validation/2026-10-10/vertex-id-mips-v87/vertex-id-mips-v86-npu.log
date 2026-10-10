@@ -1,0 +1,123 @@
+nr_registered_lab_test.exe : nr_fill_umd: AllocateCb HRESULT=8007000e
+At line:3 char:1
++ & "$r\builds\present-umd-v86\Release\nr_registered_lab_test.exe" NPU  ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (nr_fill_umd: AllocateCb HRESULT=8007000e:String) [], 
+    RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+nr_fill_umd: LockCb HRESULT=80070005
+nr_fill_umd: resource dimension=3 mips=1 array=1 format=28 samples=1/0 misc=2 usage=0 bind=20 
+map=0 primary=0 initial=0 runtime_resource=1
+nr_fill_umd: resource extent=64x48x1
+nr_fill_umd: RenderCb HRESULT=80070005
+nr_fill_umd: LockCb HRESULT=80070005
+nr_fill_umd: resource dimension=3 mips=1 array=1 format=28 samples=1/0 misc=2 usage=0 bind=20 
+map=0 primary=0 initial=1 runtime_resource=1
+nr_fill_umd: resource extent=65x7x1
+nr_fill_umd: LockCb HRESULT=80070005
+nr_fill_umd: LockCb HRESULT=80070005
+nr_fill_umd: resource dimension=3 mips=1 array=1 format=87 samples=1/0 misc=2 usage=0 bind=20 
+map=0 primary=0 initial=1 runtime_resource=1
+nr_fill_umd: resource extent=65x7x1
+nr_fill_umd: LockCb HRESULT=80070005
+nr_fill_umd: resource dimension=3 mips=1 array=1 format=87 samples=1/0 misc=0 usage=0 bind=a0 
+map=0 primary=0 initial=0 runtime_resource=0
+nr_fill_umd: resource extent=65x13x1
+nr_fill_umd: resource dimension=3 mips=1 array=1 format=87 samples=1/0 misc=8 usage=0 bind=a0 
+map=0 primary=0 initial=0 runtime_resource=0
+nr_fill_umd: resource extent=65x13x1
+nr_fill_umd: resource dimension=3 mips=1 array=1 format=28 samples=1/0 misc=0 usage=0 bind=a0 
+map=0 primary=0 initial=0 runtime_resource=0
+nr_fill_umd: resource extent=65x13x1
+nr_fill_umd: resource dimension=3 mips=1 array=1 format=28 samples=1/0 misc=8 usage=0 bind=a0 
+map=0 primary=0 initial=0 runtime_resource=0
+nr_fill_umd: resource extent=65x13x1
+nr_fill_umd: resource dimension=3 mips=1 array=1 format=28 samples=1/0 misc=8 usage=0 bind=20 
+map=0 primary=0 initial=0 runtime_resource=0
+nr_fill_umd: resource extent=65x13x1
+nr_fill_umd: resource dimension=3 mips=1 array=1 format=28 samples=1/0 misc=8 usage=0 bind=a0 
+map=0 primary=1 initial=0 runtime_resource=0
+nr_fill_umd: resource extent=65x13x1
+nr_fill_umd: resource dimension=3 mips=1 array=1 format=28 samples=1/0 misc=4 usage=0 bind=a0 
+map=0 primary=0 initial=0 runtime_resource=0
+nr_fill_umd: resource extent=65x13x1
+nr_fill_umd: resource dimension=3 mips=1 array=1 format=28 samples=1/0 misc=8 usage=3 bind=a0 
+map=0 primary=0 initial=0 runtime_resource=0
+nr_fill_umd: resource extent=65x13x1
+nr_fill_umd: resource dimension=3 mips=1 array=1 format=28 samples=1/0 misc=8 usage=0 bind=a0 
+map=2 primary=0 initial=0 runtime_resource=0
+nr_fill_umd: resource extent=65x13x1
+nr_fill_umd: resource dimension=3 mips=1 array=1 format=28 samples=1/0 misc=2 usage=0 bind=a0 
+map=0 primary=0 initial=0 runtime_resource=1
+nr_fill_umd: resource extent=65x13x1
+{"kind":"registered-present-callback-shim","callback_requests":9,"accepted_callbacks":7,"flip_callbacks":6,"display_delivery_tested":false}
+{"kind":"registered-rotation-shim","shared_and_private":true,"view_and_binding_follow_backing":true,"display_delivery_tested":false}
+{"kind":"registered-region-copy-shim","shared_and_private":true,"padding_preserved":true,"npu_execution_tested":false}
+nr_fill_umd: resource dimension=3 mips=11 array=1 format=28 samples=1/0 misc=2 usage=0 bind=28 
+map=0 primary=0 initial=1 runtime_resource=0
+nr_fill_umd: resource extent=1025x769x1
+nr_fill_umd: resource dimension=3 mips=11 array=1 format=87 samples=1/0 misc=2 usage=0 bind=28 
+map=0 primary=0 initial=1 runtime_resource=0
+nr_fill_umd: resource extent=1025x769x1
+{"kind":"mip-resource-ddi-shim","levels":11,"formats":2,"odd_extents_and_pitches":true,"mip_isolation_and_lifetime":true,"npu_execution_tested":false}
+nr_fill_umd: LockCb HRESULT=80070005
+nr_fill_umd: LockCb HRESULT=80070005
+nr_fill_umd: LockCb HRESULT=80070005
+nr_fill_umd: LockCb HRESULT=80070005
+nr_fill_umd: LockCb HRESULT=80070005
+{"half_input_decoder":true,"encodings_checked":65536,"formats_checked":3,"host_decode_only":true}
+{"half_input_decoder":true,"encodings_checked":65536,"formats_checked":3,"host_decode_only":true}
+{"bound_vertex_stage":true,"vertices":16,"execution_device":"NPU","exact_bits_verified":true,"desktop_offload_tested":false}
+{"bound_pixel_stage":true,"samples":16,"execution_device":"NPU","exact_bits_verified":true,"desktop_offload_tested":false}
+{"component_draw":true,"format":28,"width":64,"height":16,"shared":false,"pass":0,"max_error":1,"verified_bytes":4096}
+{"component_draw":true,"format":28,"width":64,"height":16,"shared":false,"pass":1,"max_error":0,"verified_bytes":4096}
+{"component_draw":true,"format":28,"width":132,"height":16,"shared":false,"pass":0,"max_error":1,"verified_bytes":8448}
+{"component_draw":true,"format":28,"width":132,"height":16,"shared":false,"pass":1,"max_error":0,"verified_bytes":8448}
+nr_fill_umd: resource dimension=3 mips=1 array=1 format=28 samples=1/0 misc=2 usage=0 bind=20 
+map=0 primary=0 initial=1 runtime_resource=1
+nr_fill_umd: resource extent=64x16x1
+nr_fill_umd: resource dimension=3 mips=1 array=1 format=28 samples=1/0 misc=2 usage=0 bind=8 
+map=0 primary=0 initial=1 runtime_resource=1
+nr_fill_umd: resource extent=64x16x1
+{"component_draw":true,"format":28,"width":64,"height":16,"shared":true,"pass":0,"max_error":1,"verified_bytes":4096}
+{"component_draw":true,"format":28,"width":64,"height":16,"shared":true,"pass":1,"max_error":0,"verified_bytes":4096}
+nr_fill_umd: resource dimension=3 mips=1 array=1 format=28 samples=1/0 misc=2 usage=0 bind=20 
+map=0 primary=0 initial=1 runtime_resource=1
+nr_fill_umd: resource extent=132x16x1
+nr_fill_umd: resource dimension=3 mips=1 array=1 format=28 samples=1/0 misc=2 usage=0 bind=8 
+map=0 primary=0 initial=1 runtime_resource=1
+nr_fill_umd: resource extent=132x16x1
+{"component_draw":true,"format":28,"width":132,"height":16,"shared":true,"pass":0,"max_error":1,"verified_bytes":8448}
+{"component_draw":true,"format":28,"width":132,"height":16,"shared":true,"pass":1,"max_error":0,"verified_bytes":8448}
+{"component_draw":true,"format":87,"width":64,"height":16,"shared":false,"pass":0,"max_error":1,"verified_bytes":4096}
+{"component_draw":true,"format":87,"width":64,"height":16,"shared":false,"pass":1,"max_error":0,"verified_bytes":4096}
+{"component_draw":true,"format":87,"width":132,"height":16,"shared":false,"pass":0,"max_error":1,"verified_bytes":8448}
+{"component_draw":true,"format":87,"width":132,"height":16,"shared":false,"pass":1,"max_error":0,"verified_bytes":8448}
+nr_fill_umd: resource dimension=3 mips=1 array=1 format=87 samples=1/0 misc=2 usage=0 bind=20 
+map=0 primary=0 initial=1 runtime_resource=1
+nr_fill_umd: resource extent=64x16x1
+nr_fill_umd: resource dimension=3 mips=1 array=1 format=87 samples=1/0 misc=2 usage=0 bind=8 
+map=0 primary=0 initial=1 runtime_resource=1
+nr_fill_umd: resource extent=64x16x1
+{"component_draw":true,"format":87,"width":64,"height":16,"shared":true,"pass":0,"max_error":1,"verified_bytes":4096}
+{"component_draw":true,"format":87,"width":64,"height":16,"shared":true,"pass":1,"max_error":0,"verified_bytes":4096}
+nr_fill_umd: resource dimension=3 mips=1 array=1 format=87 samples=1/0 misc=2 usage=0 bind=20 
+map=0 primary=0 initial=1 runtime_resource=1
+nr_fill_umd: resource extent=132x16x1
+nr_fill_umd: resource dimension=3 mips=1 array=1 format=87 samples=1/0 misc=2 usage=0 bind=8 
+map=0 primary=0 initial=1 runtime_resource=1
+nr_fill_umd: resource extent=132x16x1
+{"component_draw":true,"format":87,"width":132,"height":16,"shared":true,"pass":0,"max_error":1,"verified_bytes":8448}
+{"component_draw":true,"format":87,"width":132,"height":16,"shared":true,"pass":1,"max_error":0,"verified_bytes":8448}
+{"kind":"registered-ddi-runtime-shim","requested_backend":"NPU","execution_device":"NPU","verified_draws":16,"registered_adapter_tested":false,"desktop_offload_tested":false}
+nr_fill_umd: unsupported linear-textured rectangle draw
+nr_fill_umd: unsupported linear-textured rectangle draw
+nr_fill_umd: Exception from src\inference\src\cpp\infer_request.cpp:224:
+Exception from src\plugins\intel_npu\src\utils\src\zero\zero_wrappers.cpp:258:
+L0 zeFenceHostSynchronize result: ZE_RESULT_ERROR_DEVICE_LOST, code 0x70000001 - device hung, 
+reset, was removed, or driver update occurred
+
+
+line 180: last_error==S_OK && counters.draws==before+1
+line 304: test_indexed_draw(kt, um, backend) == 0

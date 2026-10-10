@@ -28,7 +28,7 @@ public:
     }
     template<class T> void value(const char *name, const T &data) { record(name, &data, sizeof(data)); }
 };
-void lab_capture_indexed_draw(Device &d, UINT count, UINT first, INT base) noexcept {
+void lab_capture_indexed_draw(Device &d, UINT count, UINT first, INT base, bool indexed = true) noexcept {
     if (!nr_fill_guest()) return;
     static bool attempted = false; // Called under the UMD device mutex.
     if (attempted) return;
@@ -56,6 +56,7 @@ void lab_capture_indexed_draw(Device &d, UINT count, UINT first, INT base) noexc
         const uint32_t args[]{count, first, uint32_t(base), UINT(d.topology), d.viewport_count,
             d.vertex_shader, d.pixel_shader, d.sample_mask, d.stencil_ref};
         capture.value("arguments", args);
+        const uint32_t call_kind = indexed ? 1u : 0u; capture.value("draw-indexed", call_kind);
         capture.value("viewport", d.viewport); capture.value("blend", d.blend);
         capture.value("blend-factor", d.blend_factor); capture.value("depth", d.depth);
         capture.value("raster", d.raster);
@@ -75,7 +76,7 @@ void lab_capture_indexed_draw(Device &d, UINT count, UINT first, INT base) noexc
             const uint32_t description[]{b.bytes, b.stride, b.offset, UINT(b.format)};
             capture.value(label, description); raw(name, *b.allocation, b.bytes);
         };
-        geometry("indices", d.index_buffer);
+        if (indexed) geometry("indices", d.index_buffer);
         for (UINT i = 0; i < d.vertex_buffers.size(); ++i) {
             char label[32]{}; sprintf_s(label, "vertices-%u", i); geometry(label, d.vertex_buffers[i]);
         }
@@ -97,7 +98,7 @@ void lab_capture_indexed_draw(Device &d, UINT count, UINT first, INT base) noexc
         };
         texture("source", d.bound_source); texture("target", d.bound_target);
         capture.record("complete", nullptr, 0);
-        lab_trace("{\"event\":\"indexed_draw_capture\",\"count\":%u,\"first\":%u,\"base\":%d,\"complete\":true,\"execution_performed\":false}\n", count, first, base);
+        lab_trace("{\"event\":\"indexed_draw_capture\",\"count\":%u,\"first\":%u,\"base\":%d,\"indexed\":%s,\"complete\":true,\"execution_performed\":false}\n", count, first, base, indexed ? "true" : "false");
     } catch (...) {
         lab_trace("{\"event\":\"indexed_draw_capture\",\"complete\":false,\"execution_performed\":false}\n");
     }

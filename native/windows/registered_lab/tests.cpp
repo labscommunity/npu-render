@@ -6,9 +6,10 @@
 #include <cmath>
 #define TEST(x) do { if (!(x)) { std::fprintf(stderr, "line %d: %s\n", __LINE__, #x); return 1; } } while (false)
 namespace {
-std::array<std::vector<unsigned char>, 8> memory;
-std::array<bool, 8> locked{};
-std::array<UINT, 8> references{};
+// Two complete 11-level textures plus transfer allocations in the mip tests.
+std::array<std::vector<unsigned char>, 64> memory;
+std::array<bool, 64> locked{};
+std::array<UINT, 64> references{};
 std::map<HANDLE, UINT> resource_handles;
 nr::kernel_contract::FillSurface commands[2]{};
 D3DDDI_ALLOCATIONLIST lists[2][2]{};
@@ -128,6 +129,7 @@ HRESULT APIENTRY render_cb(HANDLE rt, D3DDDICB_RENDER *a) {
 #include "present_test.hpp"
 #include "rotate_test.hpp"
 #include "copy_region_test.hpp"
+#include "mip_test.hpp"
 #include "geometry_test.hpp"
 #include "buffer_test.hpp"
 int main(int argc, char **argv) {
@@ -296,6 +298,7 @@ int main(int argc, char **argv) {
     TEST(test_present(kt, um) == 0);
     TEST(test_rotation(kt, um) == 0);
     TEST(test_copy_regions(kt, um) == 0);
+    TEST(test_mips(kt, um) == 0);
     TEST(test_buffers(kt, um) == 0);
     TEST(test_draws(kt, um, backend, desktop_size) == 0);
     TEST(test_indexed_draw(kt, um, backend) == 0);

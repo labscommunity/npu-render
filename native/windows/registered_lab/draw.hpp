@@ -8,8 +8,8 @@ void APIENTRY create_srv(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATESHADERRESOU
         auto &r = resource(a->hDrvResource);
         require(!r.buffer_bytes && r.usage == D3D10_DDI_USAGE_DEFAULT && r.allocation->context == device(h).context &&
                 a->ResourceDimension == D3D10DDIRESOURCE_TEXTURE2D && UINT(a->Format) == r.allocation->surface.format &&
-                !a->Tex2D.MostDetailedMip && a->Tex2D.MipLevels == 1 && !a->Tex2D.FirstArraySlice && a->Tex2D.ArraySize == 1);
-        static_cast<View *>(out.pDrvPrivate)->allocation = r.allocation;
+                a->Tex2D.MostDetailedMip < mip_count(r) && a->Tex2D.MipLevels == 1 && !a->Tex2D.FirstArraySlice && a->Tex2D.ArraySize == 1);
+        static_cast<View *>(out.pDrvPrivate)->allocation = mip_allocation(r, a->Tex2D.MostDetailedMip);
     });
 }
 void APIENTRY destroy_srv(D3D10DDI_HDEVICE h, D3D10DDI_HSHADERRESOURCEVIEW out) {
@@ -111,6 +111,13 @@ void APIENTRY draw_indexed(D3D10DDI_HDEVICE h, UINT count, UINT first, INT base)
 void APIENTRY draw(D3D10DDI_HDEVICE h, UINT count, UINT first) {
     guard(h, __FUNCTION__, [&] {
         auto &d = device(h);
+        if (!count) return;
+        if (d.vertex_program || d.pixel_program) {
+            require(d.vertex_program && d.pixel_program);
+            try { execute_triangle_draw(d, fetch_draw_vertices(d, count, first), false); }
+            catch (...) { lab_capture_indexed_draw(d, count, first, 0, false); throw; }
+            return;
+        }
         const auto target = d.bound_target, source = d.bound_source;
         require(count == 3 && !first && d.topology == D3D10_DDI_PRIMITIVE_TOPOLOGY_TRIANGLELIST &&
                 d.vertex_shader == 1 && !d.vertex_program && d.pixel_shader == 2 && !d.pixel_program && target && source && target != source &&

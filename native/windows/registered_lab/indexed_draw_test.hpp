@@ -2,6 +2,7 @@
 #include "point_texture_fixture.hpp"
 #include "linear_texture_fixture.hpp"
 #include <cfloat>
+#include "vertex_id_fixture.hpp"
 int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER_DEVICECALLBACKS &um, const char *backend) {
     TEST(nr_fill_configure(backend)); emulate_copies = true; last_error = S_OK;
     const auto draws_before = counters.draws, executions_before = counters.executions;
@@ -159,11 +160,44 @@ int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
             for(UINT c=0;c<4;++c)TEST(std::abs(memory[target_index][at+c]-(sample[c]+before[at+c]*(1-sample[3]/255)))<=.6);
         }
     }
+    // Actual Draw DDI with no layout or vertex buffers: the captured desktop
+    // shader synthesizes a quad from the generated IDs. Start/base offsets
+    // affect IA addresses, not the system value. Invalid lookup stays atomic.
+    f.pfnCreateVertexShader(h,nr::registered_lab::test_fixture::vertex_id_quad_words,shaders[0],{},nullptr);
+    const auto id_ps=shader_tokens("cbuffer C {float4 color;};float4 main():SV_Target{return color;}","ps_4_0");
+    f.pfnCreatePixelShader(h,id_ps.data(),shaders[1],{},nullptr);
+    f.pfnVsSetShader(h,shaders[0]);f.pfnPsSetShader(h,shaders[1]);
+    f.pfnDestroyShader(h,shaders[0]);f.pfnDestroyShader(h,shaders[1]);
+    f.pfnIaSetInputLayout(h,{});const D3D10DDI_HRESOURCE empty{};
+    f.pfnIaSetVertexBuffers(h,0,1,&empty,&stride,&offset);
+    f.pfnPsSetConstantBuffers(h,0,1,&resources[3]);
+    color[0]=.25f;color[1]=.5f;color[2]=.75f;color[3]=1;
+    f.pfnDefaultConstantBufferUpdateSubresourceUP(h,resources[3],0,nullptr,color,0,0);
+    blend.BlendEnable[0]=FALSE;f.pfnSetBlendState(h,bs,nullptr,~0u);
+    scissor={0,0,width,height};f.pfnSetScissorRects(h,1,0,&scissor);
+    f.pfnIaSetTopology(h,D3D10_DDI_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+    for(const UINT start : {0u,777u}) {
+        const auto before=counters.draws;f.pfnDraw(h,4,start);TEST(last_error==S_OK && counters.draws==before+1);
+        for(size_t n=0;n<size_t(width)*height;++n)for(UINT c=0;c<4;++c)
+            TEST(memory[target_index][n*4+c]==uint8_t(std::nearbyint(double(color[c<3?2-c:c])*255)));
+    }
+    const uint16_t raw_ids[]{9999,9999,0,1,2,2,1,3};
+    f.pfnResourceUpdateSubresourceUP(h,resources[2],0,nullptr,raw_ids,0,0);
+    f.pfnIaSetTopology(h,D3D10_DDI_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    const auto ids=fetch_indexed_vertices(device(h),6,1,1000);
+    for(UINT n=0;n<6;++n)TEST(ids[n][0][0]==raw_ids[n+2]);
+    const auto draws=counters.draws;f.pfnDrawIndexed(h,6,1,1000);TEST(last_error==S_OK && counters.draws==draws+1);
+    const auto before=memory[target_index];
+    f.pfnIaSetTopology(h,D3D10_DDI_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+    f.pfnDraw(h,5,0);TEST(FAILED(last_error) && counters.draws==draws+1 && memory[target_index]==before);last_error=S_OK;
+    f.pfnDraw(h,4,UINT_MAX);TEST(last_error==E_INVALIDARG && memory[target_index]==before);last_error=S_OK;
+    f.pfnDraw(h,0,0);TEST(last_error==S_OK && counters.draws==draws+1);
+    std::printf("{\"vertex_id_draw_ddi\":true,\"verified_draws\":3,\"null_layout\":true,\"start_and_base_offsets\":true,\"invalid_lookup_atomic\":true,\"execution_device\":\"%s\"}\n",counters.last_execution_device);
     f.pfnDestroyShaderResourceView(h,srv);
     f.pfnDestroyRenderTargetView(h, view);
     for (const auto r : resources) f.pfnDestroyResource(h, r);
     f.pfnDestroyDevice(h);
-    TEST(counters.executions == executions_before + 9 && !counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
+    TEST(counters.executions == executions_before + 12 && !counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
     std::printf("{\"kind\":\"indexed-ddi-runtime-shim\",\"requested_backend\":\"%s\",\"execution_device\":\"%s\",\"verified_draws\":9,\"verified_components\":147456,\"blended_scissored_draws\":3,\"textured_draws\":4,\"linear_scaled_blended_draws\":2,\"base_vertex_and_start_index\":true,\"invalid_ranges_and_sampler_rejected\":true,\"registered_adapter_tested\":false,\"desktop_offload_tested\":false}\n", backend, counters.last_execution_device);
     return 0;
 }

@@ -495,3 +495,35 @@ replays are exact. DXGI identity rotation validates the entire list, then rotate
 kernel allocation handles in place. Runtime resource handles stay fixed; existing
 views and bound targets see the new backing through their retained allocation
 objects. These results do not establish interactive desktop performance.
+
+The sole-display v70 trial activated one indirect display and restored the
+previous topology, but DWM recovery rejected a vertex-ID shader and then an
+11-level texture. [Its evidence](../../../docs/validation/2026-10-10/sole-display-v70/report.json)
+records 17 NPU draws and ten received frames, with no full-desktop claim.
+
+The next implementation admits the captured vertex-ID shader's immutable,
+fully initialized indexable tables and integer left shifts. Table lookup,
+bounds checking and integer arithmetic execute on the selected provider.
+Out-of-range table reads fail before target pixels are committed. `Draw` now
+assembles triangle lists/strips, including bufferless geometry; generated IDs
+remain separate from vertex-buffer addressing offsets, following sections
+[8.4 and 8.6 of the Direct3D functional specification](https://microsoft.github.io/DirectX-Specs/d3d/archive/D3D11_3_FunctionalSpec.htm).
+Failures preserve the original call type in the draw capture for replay.
+
+Unshared RGBA/BGRA textures can own a validated mip chain. Initial data, updates,
+copy regions, staging maps and single-level render/shader views address the
+selected mip. The resource validates every extent before allocation; views retain
+the selected storage after the resource object is destroyed. Transfers remain
+explicit CPU staging. Multi-level sampling, array textures and shared mip chains
+remain unsupported and fail explicitly rather than silently sampling level zero.
+
+The mixed-draw qualification exposed an NPU request-lifetime failure: constructing
+an executor, then destroying the prior cached executor before the first inference,
+repeatedly produced `ZE_RESULT_ERROR_DEVICE_LOST`. The same new graph passed in
+isolation, including three complete draws. Retiring the prior cache entry before
+compiling its replacement made the instrumented combined test pass. Direct NPU
+caches and the remote worker now use this order; eviction likewise precedes new
+model creation. A failed preparation leaves target pixels unchanged. This is a
+hardware-qualified runtime workaround, not evidence of a Tahoma speedup.
+The [v87 qualification](../../../docs/validation/2026-10-10/vertex-id-mips-v87/report.json)
+preserves both failures, the stage isolation, and two passing clean-build NPU runs.

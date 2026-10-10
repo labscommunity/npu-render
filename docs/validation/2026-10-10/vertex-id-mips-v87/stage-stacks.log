@@ -1,0 +1,790 @@
+Opened log file 'C:\Users\tatef\AppData\Local\npu-render\vm\ddi-npu-isolation\stage-stacks.log'
+
+************* Preparing the environment for Debugger Extensions Gallery repositories **************
+   ExtensionRepository : Implicit
+   UseExperimentalFeatureForNugetShare : true
+   AllowNugetExeUpdate : true
+   NonInteractiveNuget : true
+   AllowNugetMSCredentialProviderInstall : true
+   AllowParallelInitializationOfLocalRepositories : true
+
+   EnableRedirectToV8JsProvider : false
+
+   -- Configuring repositories
+      ----> Repository : LocalInstalled, Enabled: true
+      ----> Repository : UserExtensions, Enabled: true
+
+>>>>>>>>>>>>> Preparing the environment for Debugger Extensions Gallery repositories completed, duration 0.000 seconds
+
+************* Waiting for Debugger Extensions Gallery to Initialize **************
+
+>>>>>>>>>>>>> Waiting for Debugger Extensions Gallery to Initialize completed, duration 0.031 seconds
+   ----> Repository : UserExtensions, Enabled: true, Packages count: 0
+   ----> Repository : LocalInstalled, Enabled: true, Packages count: 29
+
+Microsoft (R) Windows Debugger Version 10.0.26100.6584 AMD64
+Copyright (c) Microsoft Corporation. All rights reserved.
+
+*** wait with pending attach
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\atlmfc.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\ObjectiveC.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\concurrency.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\cpp_rest.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\stl.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\Windows.Data.Json.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\Windows.Devices.Geolocation.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\Windows.Devices.Sensors.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\Windows.Media.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\windows.natvis'
+NatVis script successfully loaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\winrt.natvis'
+
+************* Path validation summary **************
+Response                         Time (ms)     Location
+Deferred                                       srv*
+Symbol search path is: srv*
+Executable search path is: 
+
++------------------------------------------------------------------------+
+| This target supports Hardware-enforced Stack Protection. A HW based    |
+| "Shadow Stack" may be available to assist in debugging and analysis.   |
+| See aka.ms/userhsp for more info.                                      |
+|                                                                        |
+| dps @ssp                                                               |
+|                                                                        |
++------------------------------------------------------------------------+
+
+ModLoad: 00007ff6`b6eb0000 00007ff6`b6fa1000   C:\Users\tatef\AppData\Local\npu-render\vm\ddi-npu-isolation\build\Release\ddi_npu_isolation.exe
+ModLoad: 00007ff9`b9540000 00007ff9`b97a7000   C:\Windows\SYSTEM32\ntdll.dll
+ModLoad: 00007ff9`b7880000 00007ff9`b794b000   C:\Windows\System32\KERNEL32.DLL
+ModLoad: 00007ff9`b6a10000 00007ff9`b6e12000   C:\Windows\System32\KERNELBASE.dll
+ModLoad: 00007ff9`b3050000 00007ff9`b30ef000   C:\Windows\SYSTEM32\apphelp.dll
+ModLoad: 00007ff9`b13a0000 00007ff9`b181f000   C:\Windows\SYSTEM32\D3DCOMPILER_47.dll
+ModLoad: 00007ff9`b6630000 00007ff9`b665a000   C:\Windows\SYSTEM32\bcrypt.dll
+ModLoad: 00007ff9`b6740000 00007ff9`b688c000   C:\Windows\System32\ucrtbase.dll
+ModLoad: 00007ff9`b7490000 00007ff9`b7539000   C:\Windows\System32\sechost.dll
+ModLoad: 00007ff9`b7260000 00007ff9`b7378000   C:\Windows\System32\RPCRT4.dll
+ModLoad: 00007ff9`b68a0000 00007ff9`b6943000   C:\Windows\System32\msvcp_win.dll
+ModLoad: 00007ff9`b5d90000 00007ff9`b5dab000   C:\Windows\SYSTEM32\cryptsp.dll
+ModLoad: 00007ff8`d5c20000 00007ff8`d6b05000   C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\venv\Lib\site-packages\openvino\libs\openvino.dll
+ModLoad: 00007ff9`94cc0000 00007ff9`94ccb000   C:\Windows\SYSTEM32\VCRUNTIME140_1.dll
+ModLoad: 00007ff9`8b660000 00007ff9`8b6e8000   C:\Windows\SYSTEM32\MSVCP140.dll
+ModLoad: 00007ff9`8b6f0000 00007ff9`8b70e000   C:\Windows\SYSTEM32\VCRUNTIME140.dll
+ModLoad: 00007ff9`9e680000 00007ff9`9e6d7000   C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\venv\Lib\site-packages\openvino\libs\tbb12.dll
+ModLoad: 00007ff9`8ac60000 00007ff9`8ac9f000   C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\venv\Lib\site-packages\openvino\libs\tbbmalloc.dll
+ModLoad: 00007ff9`7f260000 00007ff9`7f2d1000   C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\venv\Lib\site-packages\openvino\libs\openvino_ir_frontend.dll
+ModLoad: 00007ff9`38790000 00007ff9`38884000   C:\Windows\SYSTEM32\ze_loader.dll
+ModLoad: 00007ff9`b8000000 00007ff9`b819a000   C:\Windows\System32\ole32.dll
+ModLoad: 00007ff9`b8820000 00007ff9`b884b000   C:\Windows\System32\GDI32.dll
+ModLoad: 00007ff9`b62f0000 00007ff9`b6342000   C:\Windows\SYSTEM32\CFGMGR32.dll
+ModLoad: 00007ff9`b7170000 00007ff9`b7197000   C:\Windows\System32\win32u.dll
+ModLoad: 00007ff9`b6e20000 00007ff9`b6f49000   C:\Windows\System32\gdi32full.dll
+ModLoad: 00007ff9`b7ab0000 00007ff9`b7c7f000   C:\Windows\System32\USER32.dll
+ModLoad: 00007ff9`b89d0000 00007ff9`b8d55000   C:\Windows\System32\combase.dll
+ModLoad: 00007ff9`b79e0000 00007ff9`b7a9c000   C:\Windows\System32\ADVAPI32.dll
+ModLoad: 00007ff9`b7640000 00007ff9`b76e9000   C:\Windows\System32\msvcrt.dll
+ModLoad: 00007ff9`72320000 00007ff9`723e6000   C:\Windows\SYSTEM32\ze_tracing_layer.dll
+ModLoad: 00007ff9`81480000 00007ff9`816ff000   C:\Windows\System32\DriverStore\FileRepository\npu.inf_amd64_597e96d1fdad31a4\npu_level_zero_umd.dll
+ModLoad: 00007ff9`b8390000 00007ff9`b8817000   C:\Windows\System32\SETUPAPI.dll
+ModLoad: 00007ff9`9d690000 00007ff9`9d69b000   C:\Windows\SYSTEM32\VERSION.dll
+ModLoad: 00007ff9`b3580000 00007ff9`b3676000   C:\Windows\SYSTEM32\wer.dll
+ModLoad: 00007ff9`b3510000 00007ff9`b3554000   C:\Windows\SYSTEM32\dxcore.dll
+ModLoad: 00007ff9`94bc0000 00007ff9`94c75000   C:\Windows\WinSxS\amd64_microsoft.windows.common-controls_6595b64144ccf1df_5.82.26100.8328_none_87eede957a2ccddd\Comctl32.dll
+ModLoad: 00007ff9`83560000 00007ff9`835e4000   C:\Windows\System32\DriverStore\FileRepository\npu.inf_amd64_597e96d1fdad31a4\openvino_intel_npu_compiler_loader.dll
+ModLoad: 00007ff9`b8d60000 00007ff9`b94f8000   C:\Windows\System32\shell32.dll
+ModLoad: 00007ff9`b4160000 00007ff9`b4a0e000   C:\Windows\SYSTEM32\windows.storage.dll
+ModLoad: 00007ff9`b76f0000 00007ff9`b77eb000   C:\Windows\System32\SHCORE.dll
+ModLoad: 00007ff9`b75d0000 00007ff9`b7636000   C:\Windows\System32\shlwapi.dll
+ModLoad: 00007ff9`b53d0000 00007ff9`b53eb000   C:\Windows\SYSTEM32\kernel.appcore.dll
+ModLoad: 00007ff9`b5bd0000 00007ff9`b5bdc000   C:\Windows\SYSTEM32\CRYPTBASE.DLL
+ModLoad: 00007ff9`b6950000 00007ff9`b69fc000   C:\Windows\System32\bcryptPrimitives.dll
+ModLoad: 00007ff9`80890000 00007ff9`808c5000   C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\venv\Lib\site-packages\openvino\libs\tbbbind_2_5.dll
+ModLoad: 00007ff9`809c0000 00007ff9`809f4000   C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\venv\Lib\site-packages\openvino\libs\openvino_auto_batch_plugin.dll
+ModLoad: 00007ff8`f9400000 00007ff8`f99ed000   C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\venv\Lib\site-packages\openvino\libs\openvino_intel_npu_plugin.dll
+ModLoad: 00007ff8`d0090000 00007ff8`d4a66000   C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\venv\Lib\site-packages\openvino\libs\openvino_intel_npu_compiler.dll
+(4718.b94): Break instruction exception - code 80000003 (first chance)
+ntdll!DbgBreakPoint:
+00007ff9`b9663ab0 cc              int     3
+0:048> ~*kb;qd
+
+   0  Id: 4718.2c48 Suspend: 1 Teb: 0000005e`08d79000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`814eee1a     : 00000000`00000000 00000000`00000000 0000005e`08ef8359 00007ff9`816beb78 : win32u!NtGdiDdDDIWaitForSynchronizationObjectFromCpu+0x14
+00007ff9`8150ab8d     : 0000005e`08ef8449 0000005e`08ef8450 0000db22`ef6faee4 00000169`cff8c1b0 : npu_level_zero_umd!ZE::DDI::COMMANDLIST::ddi_functions<ZE::platform_traits_4_t>::ze_command_list_host_synchronize+0x404fa
+00007ff9`814f538c     : 0000005e`08ef8450 00007ff9`8159e0d8 0000005e`08ef8460 00000000`00000000 : npu_level_zero_umd!ZE::DDI::COMMANDLIST::ddi_functions<ZE::platform_traits_4_t>::ze_command_list_host_synchronize+0x5c26d
+00007ff9`815da393     : 0000005e`08ef84d0 0000005e`08ef8510 0000005e`08ef86a0 0000005e`08ef8650 : npu_level_zero_umd!ZE::DDI::COMMANDLIST::ddi_functions<ZE::platform_traits_4_t>::ze_command_list_host_synchronize+0x46a6c
+00007ff9`814de383     : 0000005e`08ef8650 0000005e`08ef8650 00007ff9`816beb78 00000000`00000000 : npu_level_zero_umd!ZE::DDI::COMMANDLIST::ddi_functions<ZE::platform_traits_4_t>::ze_command_list_host_synchronize+0x12ba73
+00007ff9`815da393     : 00007ff9`816269f0 0000005e`08ef8688 00000169`d022d360 00000000`00000003 : npu_level_zero_umd!ZE::DDI::COMMANDLIST::ddi_functions<ZE::platform_traits_4_t>::ze_command_list_host_synchronize+0x2fa63
+00007ff9`814ad909     : 00000000`ffffffff 00000000`00000000 00007ff9`816beb78 00007ff9`816beb78 : npu_level_zero_umd!ZE::DDI::COMMANDLIST::ddi_functions<ZE::platform_traits_4_t>::ze_command_list_host_synchronize+0x12ba73
+00007ff8`f980dc34     : 0000005e`08ef8710 00007ff8`f99be0b0 00000169`d1537dc0 00000000`00000000 : npu_level_zero_umd!ZE::DDI::COMMANDLIST::ddi_functions<ZE::platform_traits_2_7_t>::ze_command_list_host_synchronize+0x10589
+00007ff8`f98100a7     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : openvino_intel_npu_plugin!create_extensions+0x3b1914
+00007ff8`f97e323a     : 00000000`00000000 00000000`00000000 00000000`00002c48 00007ff9`b956670b : openvino_intel_npu_plugin!create_extensions+0x3b3d87
+00007ff8`f97d98a8     : 00000000`00000000 0000005e`08ef8a50 00000169`d1779218 00000169`d3c0f5b0 : openvino_intel_npu_plugin!create_extensions+0x386f1a
+00007ff8`f97da824     : 00000000`00000000 00000000`00000000 00000169`d1779218 00000169`d3c0f5b0 : openvino_intel_npu_plugin!create_extensions+0x37d588
+00007ff8`d605d71e     : 00000169`d1b52140 00000000`00000000 00007ff9`b68798b0 0000005e`08ef8d50 : openvino_intel_npu_plugin!create_extensions+0x37e504
+00007ff8`d6088199     : 00000169`cffc54f0 00000000`00000000 00000000`00000001 00000169`cfc638f8 : openvino!ov::IAsyncInferRequest::~IAsyncInferRequest+0x63e
+00007ff8`d60897b6     : 00000169`d1ec9a70 00007ff9`8b66209c 00000169`d1ec9a70 0000005e`08ef8eb0 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0x1489
+00007ff8`d605f08d     : 00007ff8`d6089780 0000005e`08ef8de0 00007ff8`d6089780 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::execute+0x36
+00007ff8`d605f188     : 00000000`00000010 00007ff8`d66ac278 0000005e`08ef8f20 00007ff8`d605ceeb : openvino!ov::IAsyncInferRequest::query_state+0x21d
+00007ff8`d605ecc7     : 0000005e`08ef9010 00000169`cfc63968 0000005e`08ef9740 0000005e`08ef8f20 : openvino!ov::IAsyncInferRequest::run_first_stage+0xa8
+00007ff8`d605be10     : 00000169`d29f7230 00000169`cfc63968 0000005e`08ef9740 00000000`00000000 : openvino!ov::IAsyncInferRequest::infer_thread_unsafe+0x47
+00007ff8`d605eb4d     : 00000169`d06d3100 00000000`00000000 00000000`00000000 0000005e`08ef9740 : openvino!ov::exec_model_info::ExecutionNode::get_type_info_static+0xaa0
+00007ff8`d602f665     : 00000000`00000000 00000000`00000000 00000169`d0c3bb90 00000000`00000000 : openvino!ov::IAsyncInferRequest::infer+0x8d
+*** WARNING: Unable to verify checksum for C:\Users\tatef\AppData\Local\npu-render\vm\ddi-npu-isolation\build\Release\ddi_npu_isolation.exe
+00007ff6`b6f01bc5     : 00000000`00000000 0000005e`08ef9740 00000169`d0a5a420 00000169`d0a5a420 : openvino!ov::InferRequest::infer+0x95
+00007ff6`b6ee04cf     : 0000005e`08ef9aa0 00000000`00000018 00000169`d1665710 0000005e`08efa600 : ddi_npu_isolation!nr_fill_stats+0x23175
+00007ff6`b6ec66f0     : 00000000`00001001 00000169`d08a1ed0 0000005e`08ef9c40 00000000`00000000 : ddi_npu_isolation!nr_fill_stats+0x1a7f
+00007ff6`b6ebf27c     : 0000005e`08efb488 0000005e`08efc0a0 00000000`00000002 0000005e`08efc0a0 : ddi_npu_isolation+0x166f0
+00007ff6`b6eb56e3     : 0000005e`08efb5c0 00007ff6`b6f90050 00000000`00000002 00000000`00000002 : ddi_npu_isolation+0xf27c
+00007ff6`b6ec39ac     : 0000005e`08efc0a0 00007ff6`b6f5a478 00000000`00000000 00007ff6`b6f90050 : ddi_npu_isolation+0x56e3
+00007ff6`b6ed65a8     : 0000005e`08efc0a0 0000005e`00000004 00000000`00000000 0000005e`08efbc00 : ddi_npu_isolation+0x139ac
+00007ff6`b6ede5a9     : 0000005e`08efe3c0 0000005e`08efe300 00000000`00000002 00000000`00000002 : ddi_npu_isolation+0x265a8
+00007ff6`b6f24e04     : 00000000`00000000 00007ff6`b6f24e7d 00000169`cdf4f920 00000000`00000000 : ddi_npu_isolation!OpenAdapter10_2+0x1239
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ddi_npu_isolation!nr_fill_stats+0x463b4
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+   1  Id: 4718.3208 Suspend: 1 Teb: 0000005e`08d7b000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b955a65e     : 00000000`00000000 00000000`00000000 00007ff9`b9558d70 00000169`cdf3e400 : ntdll!NtWaitForWorkViaWorkerFactory+0x14
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!TppWorkerThread+0x37e
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+   2  Id: 4718.4c18 Suspend: 1 Teb: 0000005e`08d7d000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b955a65e     : 00000000`00000000 00000000`00000000 00007ff9`b9558d70 00000169`cdf3e400 : ntdll!NtWaitForWorkViaWorkerFactory+0x14
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!TppWorkerThread+0x37e
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+   3  Id: 4718.1404 Suspend: 1 Teb: 0000005e`08d7f000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b955a65e     : 00000000`00000000 00000000`00000000 00007ff9`b9558d70 00000169`cdf3e400 : ntdll!NtWaitForWorkViaWorkerFactory+0x14
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!TppWorkerThread+0x37e
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+   4  Id: 4718.2b10 Suspend: 1 Teb: 0000005e`08de1000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00007ff9`8159e0d8 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`cf68e7b8 0000005e`092ff970 00000169`d157e1c0 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8159f0f4     : 00000000`00000000 00007ff9`8159e127 0000db2c`797952f8 00000000`00000001 : KERNELBASE!SleepConditionVariableSRW+0x38
+00007ff9`81544697     : 0000db2c`797952f8 00000000`00000000 00000169`cf621110 00000169`cf621110 : npu_level_zero_umd!ZE::DDI::COMMANDLIST::ddi_functions<ZE::platform_traits_4_t>::ze_command_list_host_synchronize+0xf07d4
+00007ff9`815b30df     : 0000db25`7d55a6f8 00000000`00000000 00000000`00000000 00000000`00000000 : npu_level_zero_umd!ZE::DDI::COMMANDLIST::ddi_functions<ZE::platform_traits_4_t>::ze_command_list_host_synchronize+0x95d77
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : npu_level_zero_umd!ZE::DDI::COMMANDLIST::ddi_functions<ZE::platform_traits_4_t>::ze_command_list_host_synchronize+0x1047bf
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+   5  Id: 4718.2d58 Suspend: 1 Teb: 0000005e`08df7000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d0978250 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d0978250 00000000`00000000 00009159`a6e360d9 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d1566400 0000005e`094ffa70 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d1566400 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`cfd94300 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+   6  Id: 4718.4aac Suspend: 1 Teb: 0000005e`08c10000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d09799f0 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d09799f0 00000000`00000000 00009159`a6d36009 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d156e2d0 0000005e`097ffb40 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d156e2d0 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d0e0d9f0 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+   7  Id: 4718.27d0 Suspend: 1 Teb: 0000005e`08c38000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d0979c90 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d0979c90 00000000`00000000 00009159`a6636349 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d0a5e810 0000005e`09cffc00 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d0a5e810 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d06ef930 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+   8  Id: 4718.2290 Suspend: 1 Teb: 0000005e`08c52000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d3232bd0 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d3232bd0 00000000`00000000 00009159`a6536369 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`ce023470 0000005e`09fffbe0 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`ce023470 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d06f2720 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+   9  Id: 4718.d44 Suspend: 1 Teb: 0000005e`08c6c000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d3233b90 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d3233b90 00000000`00000000 00009159`a5836c59 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d1566500 0000005e`0a2ff6f0 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d1566500 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`cfc11e10 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  10  Id: 4718.263c Suspend: 1 Teb: 0000005e`08c92000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d3233110 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d3233110 00000000`00000000 00009159`a5d36f99 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d156eaf0 0000005e`0a7ff7b0 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d156eaf0 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d06f5360 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  11  Id: 4718.3320 Suspend: 1 Teb: 0000005e`08cba000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d3233e30 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d3233e30 00000000`00000000 00009159`a56361b9 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d2d78ec0 0000005e`0acff990 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d2d78ec0 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d272d240 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  12  Id: 4718.2e60 Suspend: 1 Teb: 0000005e`08cd4000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d32309b0 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d32309b0 00000000`00000000 00009159`a5536e79 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d130e9e0 0000005e`0afff8d0 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d130e9e0 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d19c7670 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  13  Id: 4718.798 Suspend: 1 Teb: 0000005e`08cee000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d3232150 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d3232150 00000000`00000000 00009159`a4836ec9 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d1676300 0000005e`0b2ff880 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d1676300 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d0e0eef0 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  14  Id: 4718.60c Suspend: 1 Teb: 0000005e`08cf8000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b955a65e     : 00000000`00000000 00000000`00000000 00007ff9`b9559aa0 00000169`cdf31a80 : ntdll!NtWaitForWorkViaWorkerFactory+0x14
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!TppWorkerThread+0x37e
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  15  Id: 4718.1100 Suspend: 1 Teb: 0000005e`08d0a000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d0978790 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d0978790 00000000`00000000 00009159`a6f36499 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d12449e0 0000005e`095ffeb0 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d12449e0 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d0e0bad0 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  16  Id: 4718.4940 Suspend: 1 Teb: 0000005e`08d16000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d3231190 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d3231190 00000000`00000001 00009159`a6236fa9 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`cfc5fba0 0000005e`098ff7a0 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`cfc5fba0 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d11ed180 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  17  Id: 4718.4178 Suspend: 1 Teb: 0000005e`08d1a000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d3232690 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d3232690 00000000`00000000 00009159`a6136149 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d09bebd0 0000005e`09bffa00 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d09bebd0 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d0e0d870 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  18  Id: 4718.2cf4 Suspend: 1 Teb: 0000005e`08d28000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d0979210 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d0979210 00000000`00000001 00009159`a6036159 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d1a64370 0000005e`09aff9f0 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d1a64370 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d33ed240 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  19  Id: 4718.4998 Suspend: 1 Teb: 0000005e`08d2c000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d0978cd0 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d0978cd0 00000000`00000000 00009159`a6436589 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d1c70590 0000005e`09effdc0 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d1c70590 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d2b61750 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  20  Id: 4718.2a38 Suspend: 1 Teb: 0000005e`08d2e000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d0978a30 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d0978a30 00000000`00000000 00009159`a6736019 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d0a5c140 0000005e`09dffb30 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d0a5c140 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d1605400 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  21  Id: 4718.3ba0 Suspend: 1 Teb: 0000005e`08d38000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d3231430 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d3231430 00000000`00000001 00009159`a5a364f9 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d3337960 0000005e`0a0ffe50 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d3337960 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d08eb6c0 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  22  Id: 4718.2924 Suspend: 1 Teb: 0000005e`08d3c000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d32316d0 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d32316d0 00000000`00000000 00009159`a5936259 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d3337a20 0000005e`0a3ffcf0 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d3337a20 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d1663450 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  23  Id: 4718.30bc Suspend: 1 Teb: 0000005e`08d3e000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d32338f0 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d32338f0 00000000`00000000 00009159`a5b36359 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d3337700 0000005e`0a1ffbf0 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d3337700 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d1662d00 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  24  Id: 4718.2790 Suspend: 1 Teb: 0000005e`08d4a000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d0978f70 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d0978f70 00000000`00000001 00009159`a4e36329 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d2226d70 0000005e`0b4ffc20 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d2226d70 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d0937410 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  25  Id: 4718.4ec Suspend: 1 Teb: 0000005e`08d4e000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d3232930 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d3232930 00000000`00000000 00009159`a4c36329 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d2227330 0000005e`0b6ffc20 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d2227330 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d1557740 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  26  Id: 4718.1b08 Suspend: 1 Teb: 0000005e`08d5c000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d09794b0 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d09794b0 00000000`00000001 00009159`a4f36299 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d212a4d0 0000005e`0b5ffcb0 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d212a4d0 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d0d0c050 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  27  Id: 4718.5148 Suspend: 1 Teb: 0000005e`08d60000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d1ec9e40 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d1ec9e40 00000000`00000000 00009159`a4236e59 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d212a970 0000005e`0b8ff8f0 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d212a970 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d0d08990 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  28  Id: 4718.53d4 Suspend: 1 Teb: 0000005e`08d62000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d1ec6f00 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d1ec6f00 00000000`00000000 00009159`a4d361f9 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d2d78be0 0000005e`0b7ff950 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d2d78be0 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d2726430 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  29  Id: 4718.3600 Suspend: 1 Teb: 0000005e`08d76000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d1ec7980 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d1ec7980 00000000`00000001 00009159`a4336289 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`cfaec430 0000005e`0b9ffcc0 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`cfaec430 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d272dc00 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  30  Id: 4718.764 Suspend: 1 Teb: 0000005e`08d83000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d1ec86a0 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d1ec86a0 00000000`00000000 00009159`a4136379 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`cfaec250 0000005e`0bbffbd0 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`cfaec250 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d272e2c0 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  31  Id: 4718.4c2c Suspend: 1 Teb: 0000005e`08d85000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d1ec8160 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d1ec8160 00000000`00000000 00009159`a4036fb9 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`cfaec210 0000005e`0baff790 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`cfaec210 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d272e920 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  32  Id: 4718.45d4 Suspend: 1 Teb: 0000005e`08d91000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d1eca620 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d1eca620 00000000`00000001 00009159`a4636f89 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d156ed10 0000005e`0bcff7c0 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d156ed10 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d1552d10 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  33  Id: 4718.3438 Suspend: 1 Teb: 0000005e`08d95000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d1ec9ba0 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d1ec9ba0 00000000`00000000 00009159`a4436e79 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d156b150 0000005e`0beff8d0 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d156b150 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d154c920 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  34  Id: 4718.25cc Suspend: 1 Teb: 0000005e`08da1000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d1eca380 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d1eca380 00000000`00000001 00009159`a4736039 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d2d7cca0 0000005e`0bdffb10 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d2d7cca0 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d154da60 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  35  Id: 4718.3aac Suspend: 1 Teb: 0000005e`08da5000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d1ec9900 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d1ec9900 00000000`00000000 00009159`a3a36f29 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d2d7cfe0 0000005e`0c0ff820 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d2d7cfe0 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d154fe60 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  36  Id: 4718.37b8 Suspend: 1 Teb: 0000005e`08da7000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d1ec71a0 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d1ec71a0 00000000`00000000 00009159`a4536ee9 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d2d7ca80 0000005e`0bfff860 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d2d7ca80 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d15507c0 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  37  Id: 4718.398c Suspend: 1 Teb: 0000005e`08db3000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d1ec7440 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d1ec7440 00000000`00000001 00009159`a3b36069 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d2d7d2c0 0000005e`0c1ffae0 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d2d7d2c0 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`cfcd65b0 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  38  Id: 4718.3248 Suspend: 1 Teb: 0000005e`08db7000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d1ec8940 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d1ec8940 00000000`00000000 00009159`a3936f89 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d2d7d240 0000005e`0c3ff7c0 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d2d7d240 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d09caf10 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  39  Id: 4718.1028 Suspend: 1 Teb: 0000005e`08dcb000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d1ec7ec0 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d1ec7ec0 00000000`00000001 00009159`a3836fb9 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d1393980 0000005e`0c2ff790 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d1393980 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`cfb7d5e0 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  40  Id: 4718.1e08 Suspend: 1 Teb: 0000005e`08dcf000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d1eca0e0 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d1eca0e0 00000000`00000000 00009159`a3f36359 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d1394560 0000005e`0c5ffbf0 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d1394560 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`cfb7e420 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  41  Id: 4718.b78 Suspend: 1 Teb: 0000005e`08dd1000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d1eca8c0 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d1eca8c0 00000000`00000000 00009159`a3e36f19 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d13942c0 0000005e`0c4ff830 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d13942c0 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`cfb7e780 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  42  Id: 4718.30dc Suspend: 1 Teb: 0000005e`08de7000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d1ec93c0 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d1ec93c0 00000000`00000001 00009159`a3c364e9 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d6b964c0 0000005e`0c6ffe60 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d6b964c0 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`cfb7f8f0 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  43  Id: 4718.3704 Suspend: 1 Teb: 0000005e`08deb000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d1ec76e0 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d1ec76e0 00000000`00000000 00009159`a3236e19 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d6b966a0 0000005e`0c8ff930 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d6b966a0 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`cfb79e60 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  44  Id: 4718.4f8 Suspend: 1 Teb: 0000005e`08ded000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d1ec8400 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d1ec8400 00000000`00000000 00009159`a3d36499 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d6b966e0 0000005e`0c7ffeb0 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d6b966e0 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`cfb7a3a0 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  45  Id: 4718.89c Suspend: 1 Teb: 0000005e`08c04000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d1ecab60 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d1ecab60 00000000`00000001 00009159`a33364b9 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d1387c60 0000005e`0c9ffe90 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d1387c60 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d1d618c0 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  46  Id: 4718.2cfc Suspend: 1 Teb: 0000005e`08c08000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d1ec7c20 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d1ec7c20 00000000`00000000 00009159`a3136fa9 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d1388080 0000005e`0cbff7a0 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d1388080 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d1d65ee0 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+  47  Id: 4718.2590 Suspend: 1 Teb: 0000005e`08c0a000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b95e298e     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!NtWaitForAlertByThreadId+0x14
+00007ff9`b6a32a58     : 00000000`00000000 00000169`d1ec8be0 00000000`00000000 00000000`00000001 : ntdll!RtlSleepConditionVariableSRW+0x1de
+00007ff9`8b671c98     : 00000169`d1ec8be0 00000000`00000000 00009159`a3036059 00000000`00000000 : KERNELBASE!SleepConditionVariableSRW+0x38
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait_for+0x15
+(Inline Function)     : --------`-------- --------`-------- --------`-------- --------`-------- : MSVCP140!_Primitive_wait+0x15
+00007ff8`d6087936     : 00000000`00000000 00000169`d1388020 0000005e`0caffaf0 00000000`00000000 : MSVCP140!_Cnd_wait+0x28
+00007ff8`d60859ce     : 00000000`00000000 00000169`d1388020 00000000`00000000 00000000`00000000 : openvino!ov::threading::CPUStreamsExecutor::~CPUStreamsExecutor+0xc26
+00007ff9`b676cd30     : 00000169`d1d65f70 00000000`00000000 00000000`00000000 00000000`00000000 : openvino!ov::threading::MessageManager::set_num_sub_streams+0x90e
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ucrtbase!thread_start<unsigned int (__cdecl*)(void *),1>+0x30
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+
+# 48  Id: 4718.b94 Suspend: 1 Teb: 0000005e`08c0c000 Unfrozen
+RetAddr               : Args to Child                                                           : Call Site
+00007ff9`b9675bde     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!DbgBreakPoint
+00007ff9`b78acd87     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!DbgUiRemoteBreakin+0x4e
+00007ff9`b95ecaec     : 00000000`00000000 00000000`00000000 000004f0`fffffb30 000004d0`fffffb30 : KERNEL32!BaseThreadInitThunk+0x17
+00000000`00000000     : 00000000`00000000 00000000`00000000 00000000`00000000 00000000`00000000 : ntdll!RtlUserThreadStart+0x2c
+quit:
+NatVis script unloaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\atlmfc.natvis'
+NatVis script unloaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\ObjectiveC.natvis'
+NatVis script unloaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\concurrency.natvis'
+NatVis script unloaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\cpp_rest.natvis'
+NatVis script unloaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\stl.natvis'
+NatVis script unloaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\Windows.Data.Json.natvis'
+NatVis script unloaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\Windows.Devices.Geolocation.natvis'
+NatVis script unloaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\Windows.Devices.Sensors.natvis'
+NatVis script unloaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\Windows.Media.natvis'
+NatVis script unloaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\windows.natvis'
+NatVis script unloaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\winrt.natvis'

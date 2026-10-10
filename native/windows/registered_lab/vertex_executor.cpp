@@ -45,6 +45,7 @@ struct RegisterExecutor::State {
         RegisterExecutor::validate(program);
         std::array<Lanes, 16> input{}, temporary{}, output{};
         std::array<Value, 14> constants{};
+        std::array<Value,16> literal_tables{};
         std::array<Node, 16> textures{};
         Node half_texel;
         std::vector<Node> invalid_coordinates;
@@ -66,6 +67,15 @@ struct RegisterExecutor::State {
         }
         for (unsigned i = 0; i < 14; ++i) if (program.constants[i])
             constants[i] = parameter_pair(true, i, program.constants[i]);
+        for(unsigned i=0;i<16;++i)if(!program.literal_tables[i].empty()){
+            const auto size=program.literal_tables[i].size();std::vector<float> floats(size*4);std::vector<int32_t> bits(size*4);
+            for(size_t n=0;n<size;++n)for(unsigned c=0;c<4;++c){
+                std::memcpy(&floats[n*4+c],&program.literal_tables[i][n][c],4);
+                std::memcpy(&bits[n*4+c],&program.literal_tables[i][n][c],4);
+            }
+            literal_tables[i]={op::Constant::create(ov::element::f32,ov::Shape{size,4},floats),
+                               op::Constant::create(ov::element::i32,ov::Shape{size,4},bits)};
+        }
         const auto batch_shape = indices({int64_t(count), 1});
         auto batch = [&](const Node &value) -> Node {
             check(bool(value)); return std::make_shared<op::Broadcast>(value, batch_shape);
@@ -88,7 +98,8 @@ struct RegisterExecutor::State {
             else if (a.kind == Register::temporary) raw = temporary[a.index];
             else if (a.kind == Register::immediate) {
                 for (unsigned c = 0; c < 4; ++c) raw[c] = {floating(a.literal[c]), integer(int32_t(a.literal[c]))};
-            } else if (a.kind == Register::constant) {
+            } else if (a.kind == Register::constant || a.kind == Register::indexable) {
+                const auto size=a.kind==Register::constant?program.constants[a.index]:uint32_t(program.literal_tables[a.index].size());
                 Node index = integer(int32_t(a.element));
                 if (a.relative.enabled) {
                     const auto &registers = a.relative.kind == Register::input ? input : temporary;
@@ -100,13 +111,15 @@ struct RegisterExecutor::State {
                 index = std::make_shared<op::Reshape>(batch(index), indices({int64_t(count)}), false);
                 const auto valid = std::make_shared<op::LogicalAnd>(
                     std::make_shared<op::GreaterEqual>(index, integer(0)),
-                    std::make_shared<op::Less>(index, integer(int32_t(program.constants[a.index]))));
+                    std::make_shared<op::Less>(index, integer(int32_t(size))));
+                if(a.kind==Register::indexable)invalid_coordinates.push_back(std::make_shared<op::Reshape>(
+                    std::make_shared<op::Convert>(std::make_shared<op::LogicalNot>(valid),ov::element::i32),batch_shape,false));
                 // Route out-of-range reads to an appended zero row. The Intel
                 // NPU compiler miscompiled broadcast floating Select masks in
                 // both default and precision-preserving graphs. Integer index
                 // selection followed by Gather avoids that operation entirely.
-                const auto safe = std::make_shared<op::Select>(valid, index, integer(int32_t(program.constants[a.index])));
-                const auto &buffer = constants[a.index];
+                const auto safe = std::make_shared<op::Select>(valid, index, integer(int32_t(size)));
+                const auto &buffer = a.kind==Register::constant?constants[a.index]:literal_tables[a.index];
                 const auto padded_f = std::make_shared<op::Concat>(ov::OutputVector{buffer.floating,
                     op::Constant::create(ov::element::f32, ov::Shape{1, 4}, {0.0f})}, 0);
                 const auto padded_i = std::make_shared<op::Concat>(ov::OutputVector{buffer.integer,
@@ -272,6 +285,14 @@ struct RegisterExecutor::State {
                 else if (instruction.opcode == Opcode::integer_add) {
                     check(bool(sources[0][c].integer) && bool(sources[1][c].integer));
                     result[c].integer = std::make_shared<op::Add>(sources[0][c].integer, sources[1][c].integer);
+                } else if(instruction.opcode==Opcode::shift_left){
+                    check(bool(sources[0][c].integer) && bool(sources[1][0].integer));
+                    std::vector<int32_t> powers(32);for(unsigned n=0;n<32;++n){const uint32_t value=uint32_t(1)<<n;std::memcpy(&powers[n],&value,4);}
+                    const auto amount=std::make_shared<op::BitwiseAnd>(sources[1][0].integer,integer(31));
+                    const auto index=std::make_shared<op::Reshape>(batch(amount),indices({int64_t(count)}),false);
+                    const auto factor=std::make_shared<op::Reshape>(std::make_shared<op::Gather>(
+                        op::Constant::create(ov::element::i32,ov::Shape{32},powers),index,integer(0)),batch_shape,false);
+                    result[c].integer=std::make_shared<op::Multiply>(sources[0][c].integer,factor);
                 } else if (instruction.opcode == Opcode::integer_to_float) {
                     check(bool(sources[0][c].integer));
                     result[c].floating = std::make_shared<op::Convert>(sources[0][c].integer, ov::element::f32);
@@ -452,9 +473,9 @@ void RegisterExecutor::validate(const Program &program) {
             check(!(mask & ~available(instruction.sources[0], true)));
             floating_views = available(instruction.sources[1], false) & available(instruction.sources[2], false);
             bit_views = available(instruction.sources[1], true) & available(instruction.sources[2], true);
-        } else if (instruction.opcode == Opcode::integer_add || instruction.opcode == Opcode::integer_to_float) {
+        } else if (instruction.opcode == Opcode::integer_add || instruction.opcode == Opcode::shift_left || instruction.opcode == Opcode::integer_to_float) {
             for (unsigned i = 0; i < instruction.source_count; ++i) check(!(mask & ~available(instruction.sources[i], true)));
-            if (instruction.opcode == Opcode::integer_add) bit_views = mask; else floating_views = mask;
+            if (instruction.opcode != Opcode::integer_to_float) bit_views = mask; else floating_views = mask;
         } else if (instruction.opcode == Opcode::sample) {
             check(program.stage == Stage::pixel && (available(instruction.sources[0], false) & 3u) == 3u);
             floating_views = mask;
@@ -507,7 +528,7 @@ RegisterExecutor::Result RegisterExecutor::execute(const std::vector<VertexRegis
             const auto status = state->request.get_tensor("invalid_sample_coordinates");
             result.output_bytes += status.get_byte_size();
             check(status.get_size() == 1 && status.get_element_type() == ov::element::i32);
-            if (*status.data<const int32_t>()) throw std::runtime_error("nonfinite sample coordinate on active shader path");
+            if (*status.data<const int32_t>()) throw std::runtime_error("invalid texture coordinate or indexable temporary lookup");
         }
         result.vertices.resize(vertices.size()); result.execution_device = state->execution_device;
         for (size_t i = 0; i < state->outputs.size(); ++i) {

@@ -20,14 +20,15 @@ inline Registers reference_vertex(const Program &program, const Registers &input
         if (a.kind == Register::temporary) raw = temporary[a.index];
         else if (a.kind == Register::input) raw = inputs[a.index];
         else if (a.kind == Register::immediate) raw = a.literal;
-        else if (a.kind == Register::constant) {
+        else if (a.kind == Register::constant || a.kind == Register::indexable) {
             auto index = a.element;
             if (a.relative.enabled) {
                 const auto &registers = a.relative.kind == Register::temporary ? temporary : inputs;
                 index += registers[a.relative.index][a.relative.component];
             }
             // Unsigned 32-bit addressing and zero on an out-of-range CB read.
-            if (index < program.constants[a.index]) raw = constants[a.index][index];
+            if(a.kind==Register::indexable){check(index<program.literal_tables[a.index].size());raw=program.literal_tables[a.index][index];}
+            else if (index < program.constants[a.index]) raw = constants[a.index][index];
         } else check(false);
         Bits result{};
         for (unsigned i = 0; i < 4; ++i) {
@@ -61,6 +62,7 @@ inline Registers reference_vertex(const Program &program, const Registers &input
             if (instruction.opcode == Opcode::move) value[i] = values[0][i];
             else if (instruction.opcode == Opcode::select) value[i] = values[0][i] ? values[1][i] : values[2][i];
             else if (instruction.opcode == Opcode::integer_add) value[i] = values[0][i] + values[1][i];
+            else if (instruction.opcode == Opcode::shift_left) value[i] = values[0][i] << (values[1][0]&31);
             else if (instruction.opcode == Opcode::less)
                 value[i] = as_float(values[0][i]) < as_float(values[1][i]) ? 0xffffffffu : 0;
             else if (instruction.opcode == Opcode::integer_to_float) {

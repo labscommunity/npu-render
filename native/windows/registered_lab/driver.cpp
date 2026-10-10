@@ -81,6 +81,7 @@ struct Device {
 };
 struct Resource {
     std::shared_ptr<Allocation> allocation;
+    std::vector<std::shared_ptr<Allocation>> additional_mips;
     UINT usage = 0, map_flags = 0;
     UINT buffer_bytes = 0, bind_flags = 0;
     bool mapped_write = false;
@@ -130,6 +131,11 @@ Resource &resource(D3D10DDI_HRESOURCE h) {
     auto &r = *static_cast<Resource *>(h.pDrvPrivate);
     require(bool(r.allocation));
     return r;
+}
+UINT mip_count(const Resource &r) { return 1u + UINT(r.additional_mips.size()); }
+std::shared_ptr<Allocation> mip_allocation(const Resource &r, UINT sub) {
+    require(sub < mip_count(r));
+    return sub ? r.additional_mips[sub - 1] : r.allocation;
 }
 #include "buffer.hpp"
 #include "input_assembler.hpp"
@@ -200,7 +206,7 @@ void APIENTRY create_resource(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATERESOUR
                 a->pMipInfoList[0].TexelWidth, a->pMipInfoList[0].TexelHeight, a->pMipInfoList[0].TexelDepth);
         }
         constexpr UINT allowed_misc = D3D10_DDI_RESOURCE_MISC_SHARED | D3D10_DDI_RESOURCE_MISC_DISCARD_ON_PRESENT;
-        require(a && a->ResourceDimension == D3D10DDIRESOURCE_TEXTURE2D && a->MipLevels == 1 &&
+        require(a && a->ResourceDimension == D3D10DDIRESOURCE_TEXTURE2D && a->MipLevels && a->MipLevels <= 14 &&
                 a->ArraySize == 1 && a->pMipInfoList && format_ok(a->Format) && a->SampleDesc.Count == 1 &&
                 !a->SampleDesc.Quality && !(a->MiscFlags & ~allowed_misc) && !a->pPrimaryDesc);
         const bool shared = (a->MiscFlags & D3D10_DDI_RESOURCE_MISC_SHARED) != 0;
@@ -208,17 +214,36 @@ void APIENTRY create_resource(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATERESOUR
         require(!(a->MiscFlags & D3D10_DDI_RESOURCE_MISC_DISCARD_ON_PRESENT) || presentation);
         require(!presentation || (a->BindFlags & D3D10_DDI_BIND_RENDER_TARGET));
         require(!shared || rt.handle);
+        require(a->MipLevels == 1 || (!shared && !presentation && !a->MiscFlags));
         const bool staging = a->Usage == D3D10_DDI_USAGE_STAGING && !a->BindFlags && a->MapFlags == D3D10_DDI_CPU_ACCESS_READ && !shared;
         constexpr UINT bindings = D3D10_DDI_BIND_RENDER_TARGET | D3D10_DDI_BIND_SHADER_RESOURCE | D3D10_DDI_BIND_PRESENT;
         const bool target = a->Usage == D3D10_DDI_USAGE_DEFAULT && a->BindFlags && !(a->BindFlags & ~bindings) && !a->MapFlags;
         require((staging || target) && (!a->pInitialDataUP || target));
-        const auto &m = a->pMipInfoList[0];
-        require(m.TexelDepth == 1);
-        auto allocation = std::make_shared<Allocation>(device(h).context);
-        allocation->create(m.TexelWidth, m.TexelHeight, UINT(a->Format), shared ? rt.handle : nullptr);
-        if (a->pInitialDataUP) upload(*allocation, nullptr, a->pInitialDataUP->pSysMem, a->pInitialDataUP->SysMemPitch);
+        const auto &base = a->pMipInfoList[0];
+        require(base.TexelWidth && base.TexelWidth <= 8192 && base.TexelHeight && base.TexelHeight <= 8192);
+        UINT max_levels = 1;
+        for (UINT extent = (std::max)(base.TexelWidth, base.TexelHeight); extent > 1; extent >>= 1) ++max_levels;
+        require(a->MipLevels <= max_levels);
+        // Validate every level before creating any VidMm allocation. Each
+        // unshared mip has independent storage and its own pitch/lock lifetime.
+        for (UINT i = 0; i < a->MipLevels; ++i) {
+            const auto &m = a->pMipInfoList[i];
+            require(m.TexelDepth == 1 && m.TexelWidth == (std::max)(1u, base.TexelWidth >> i) &&
+                    m.TexelHeight == (std::max)(1u, base.TexelHeight >> i));
+            if(a->pInitialDataUP) require(a->pInitialDataUP[i].pSysMem && a->pInitialDataUP[i].SysMemPitch >= m.TexelWidth * 4);
+        }
+        std::vector<std::shared_ptr<Allocation>> levels;
+        for (UINT i = 0; i < a->MipLevels; ++i) {
+            const auto &m = a->pMipInfoList[i];
+            auto allocation = std::make_shared<Allocation>(device(h).context);
+            allocation->create(m.TexelWidth, m.TexelHeight, UINT(a->Format), shared ? rt.handle : nullptr);
+            if(a->pInitialDataUP) upload(*allocation, nullptr, a->pInitialDataUP[i].pSysMem, a->pInitialDataUP[i].SysMemPitch);
+            levels.push_back(std::move(allocation));
+        }
         auto &r = *static_cast<Resource *>(out.pDrvPrivate);
-        r.allocation = std::move(allocation); r.usage = a->Usage; r.map_flags = a->MapFlags;
+        r.allocation = std::move(levels[0]);
+        r.additional_mips.assign(std::make_move_iterator(levels.begin()+1), std::make_move_iterator(levels.end()));
+        r.usage = a->Usage; r.map_flags = a->MapFlags;
         r.bind_flags = a->BindFlags;
     });
 }
@@ -252,9 +277,9 @@ void APIENTRY create_view(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATERENDERTARG
         require(a != nullptr);
         auto &r = resource(a->hDrvResource);
         require(!r.buffer_bytes && r.usage == D3D10_DDI_USAGE_DEFAULT && a->ResourceDimension == D3D10DDIRESOURCE_TEXTURE2D &&
-                UINT(a->Format) == r.allocation->surface.format && !a->Tex2D.MipSlice &&
+                UINT(a->Format) == r.allocation->surface.format && a->Tex2D.MipSlice < mip_count(r) &&
                 !a->Tex2D.FirstArraySlice && a->Tex2D.ArraySize == 1);
-        static_cast<View *>(v.pDrvPrivate)->allocation = r.allocation;
+        static_cast<View *>(v.pDrvPrivate)->allocation = mip_allocation(r, a->Tex2D.MipSlice);
     });
 }
 void APIENTRY destroy_view(D3D10DDI_HDEVICE h, D3D10DDI_HRENDERTARGETVIEW v) {
@@ -282,33 +307,35 @@ void APIENTRY copy_resource(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE dst, D3D10DDI
         require(d.usage == D3D10_DDI_USAGE_STAGING && d.buffer_bytes == s.buffer_bytes &&
             (s.usage == D3D10_DDI_USAGE_DEFAULT || (s.buffer_bytes &&
              (s.usage == D3D10_DDI_USAGE_DYNAMIC || s.usage == D3D10_DDI_USAGE_IMMUTABLE))));
-        auto a = d.allocation, b = s.allocation;
-        require(a != b && a->context == device(h).context && b->context == a->context &&
+        require(mip_count(d) == mip_count(s));
+        for (UINT sub = 0; sub < mip_count(d); ++sub) {
+            const auto a = mip_allocation(d, sub), b = mip_allocation(s, sub);
+            require(a != b && a->handle != b->handle && a->context == device(h).context && b->context == a->context &&
                 a->surface.width == b->surface.width && a->surface.height == b->surface.height &&
                 a->surface.format == b->surface.format && a->surface.row_pitch == b->surface.row_pitch &&
                 a->surface.allocation_bytes == b->surface.allocation_bytes && !a->locked && !b->locked);
-        if (b->runtime_resource) {
-            // Shared memory-segment targets cannot be locked by the UMD. The
-            // OS orders this submitted copy; staging Map waits on its write.
-            a->context->copy(b->handle, a->handle);
-            counters.copies += a->surface.allocation_bytes;
-            return;
         }
-        // This explicit CPU staging copy waits for submitted writes through the
-        // blocking source lock. It is not a GPU or NPU copy implementation.
-        Mapping read(*b, true), write(*a, false);
-        std::memcpy(write.data, read.data, size_t(a->surface.allocation_bytes));
-        write.finish(); read.finish();
-        counters.copies += a->surface.allocation_bytes;
+        for (UINT sub = 0; sub < mip_count(d); ++sub) {
+            const auto a = mip_allocation(d, sub), b = mip_allocation(s, sub);
+            if (b->runtime_resource) a->context->copy(b->handle, a->handle);
+            else {
+                // Explicit CPU staging, never counted as NPU rendering.
+                Mapping read(*b, true), write(*a, false);
+                std::memcpy(write.data, read.data, size_t(a->surface.allocation_bytes));
+                write.finish(); read.finish();
+            }
+            counters.copies += a->surface.allocation_bytes;
+        }
     });
 }
 void APIENTRY update_resource(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE dst, UINT sub,
                              const D3D10_DDI_BOX *box, const void *source, UINT pitch, UINT) {
     guard(h, __FUNCTION__, [&] {
         auto &r = resource(dst);
-        require(!sub && r.usage == D3D10_DDI_USAGE_DEFAULT && r.allocation->context == device(h).context);
+        require(r.usage == D3D10_DDI_USAGE_DEFAULT && r.allocation->context == device(h).context);
+        const auto allocation = mip_allocation(r, sub);
         if (r.buffer_bytes) { require(!box); update_buffer(r, source); return; }
-        upload(*r.allocation, box, source, pitch); // CPU upload bytes are counted separately from submitted work.
+        upload(*allocation, box, source, pitch); // CPU upload bytes are counted separately from submitted work.
     });
 }
 void APIENTRY map(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE r, UINT sub, D3D10_DDI_MAP type,
@@ -316,7 +343,8 @@ void APIENTRY map(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE r, UINT sub, D3D10_DDI_
     if (out) *out = {};
     guard(h, __FUNCTION__, [&] {
         auto &v = resource(r);
-        require(out && !sub && !flags && v.allocation->context == device(h).context);
+        require(out && !flags && v.allocation->context == device(h).context);
+        const auto allocation = mip_allocation(v, sub);
         const bool read = type == D3D10_DDI_MAP_READ && v.usage == D3D10_DDI_USAGE_STAGING &&
             v.map_flags == D3D10_DDI_CPU_ACCESS_READ;
         const bool geometry = (v.bind_flags & (D3D10_DDI_BIND_VERTEX_BUFFER | D3D10_DDI_BIND_INDEX_BUFFER)) != 0;
@@ -324,15 +352,15 @@ void APIENTRY map(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE r, UINT sub, D3D10_DDI_
             (geometry && type == D3D10_DDI_MAP_WRITE_NOOVERWRITE)) &&
             v.usage == D3D10_DDI_USAGE_DYNAMIC && v.map_flags == D3D10_DDI_CPU_ACCESS_WRITE;
         require(read || discard);
-        out->pData = v.allocation->lock(read); v.mapped_write = discard;
-        out->RowPitch = v.allocation->surface.row_pitch;
-        out->DepthPitch = UINT(v.allocation->surface.allocation_bytes);
+        out->pData = allocation->lock(read); v.mapped_write = discard;
+        out->RowPitch = allocation->surface.row_pitch;
+        out->DepthPitch = UINT(allocation->surface.allocation_bytes);
     });
 }
 void APIENTRY unmap(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE r, UINT sub) {
     guard(h, __FUNCTION__, [&] {
-        auto &v = resource(r); auto &a = *v.allocation;
-        require(!sub && a.locked && a.context == device(h).context); check(a.unlock());
+        auto &v = resource(r); const auto allocation = mip_allocation(v, sub); auto &a = *allocation;
+        require(a.locked && a.context == device(h).context); check(a.unlock());
         if (v.mapped_write) counters.upload_bytes += v.buffer_bytes;
         v.mapped_write = false;
     });

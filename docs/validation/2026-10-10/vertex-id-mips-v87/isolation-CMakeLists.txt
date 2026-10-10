@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.25)
+project(vertex_id_isolation LANGUAGES CXX)
+find_package(OpenVINO REQUIRED COMPONENTS Runtime)
+add_executable(vertex_id_isolation main.cpp)
+target_compile_features(vertex_id_isolation PRIVATE cxx_std_17)
+target_include_directories(vertex_id_isolation PRIVATE "C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/registered_lab")
+target_link_libraries(vertex_id_isolation PRIVATE "C:/Users/tatef/AppData/Local/npu-render/builds/present-umd-v86/Release/nr_registered_vertex.lib" openvino::runtime d3dcompiler)
+set_property(TARGET vertex_id_isolation PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded")

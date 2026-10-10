@@ -1,8 +1,10 @@
 #include "shader_contract.hpp"
 #include "shader_reference.hpp"
 #include "vertex_executor.hpp"
+#include "vertex_id_fixture.hpp"
 #include <cstdio>
 #include <cmath>
+#include <algorithm>
 namespace {
 using namespace nr::shader;
 void test(bool value) { if (!value) throw std::runtime_error("vertex program test failed"); }
@@ -20,6 +22,48 @@ void rejects(const std::vector<uint32_t> &code, Stage stage = Stage::vertex) {
     try { (void)parse_program(code.data(), code.size(), stage); }
     catch (const std::invalid_argument &) { rejected = true; }
     test(rejected);
+}
+void test_vertex_id_tables(const std::string &backend){
+    const auto &words=nr::registered_lab::test_fixture::vertex_id_quad_words;
+    const auto program=parse_vertex(words,std::size(words));
+    test(program.vertex_id_input==0 && program.literal_tables[0].size()==8 && program.instructions.size()==4);
+    std::vector<VertexRegisters> input(32);VertexExecutor executor(program,32,backend);
+    const float xy[4][2]{{-1,-1},{-1,1},{1,-1},{1,1}};
+    for(unsigned pass=0;pass<3;++pass){
+        for(unsigned n=0;n<input.size();++n)input[n][0][0]=(n+pass)%4;
+        const auto result=executor.execute(input,{});test(result.execution_device.rfind(backend,0)==0);
+        for(unsigned n=0;n<input.size();++n){const auto id=input[n][0][0];
+            const VertexBits expected{as_bits(xy[id][0]),as_bits(xy[id][1]),0,as_bits(1.f)};
+            test(result.vertices[n][program.position_output]==expected);
+            test(result.vertices[n]==reference_vertex(program,input[n],{}));
+        }
+    }
+    input[0][0][0]=4;bool failed=false;
+    try{(void)executor.execute(input,{});}catch(const std::runtime_error &){failed=true;}test(failed);
+    // Reject malformed tables, undeclared system values and truncated streams.
+    for(size_t n=0;n<std::size(words);++n){std::vector<uint32_t> bad(words,words+n);if(n>1)bad[1]=uint32_t(n);rejects(bad);}
+    for(unsigned kind=0;kind<4;++kind){std::vector<uint32_t> bad(words,words+std::size(words));
+        if(kind==0)bad[5]=7; // unsupported system value
+        if(kind==1)bad[14]=0; // zero table length
+        if(kind==2)bad[15]=0; // zero component count
+        // Remove the first table write: a dynamic read must not see an
+        // uninitialized element even though its storage default is zero.
+        if(kind==3){bad.erase(bad.begin()+16,bad.begin()+22);bad[1]=uint32_t(bad.size());}
+        rejects(bad);
+    }
+    std::printf("{\"vertex_id_literal_table\":true,\"vertices\":96,\"exact_bits_verified\":true,\"invalid_lookup_rejected\":true,\"execution_device\":\"%s\",\"desktop_offload_tested\":false}\n",backend.c_str());
+}
+void test_integer_shift(const std::string &backend){
+    const auto words=nr::registered_lab::shader_tokens(R"(
+struct O{float4 p:SV_Position;uint4 bits:COLOR;};
+O main(uint4 v:POSITION,uint s:INDEX){O o;o.p=float4(0,0,0,1);o.bits=v<<s;return o;})","vs_4_0");
+    const auto program=parse_vertex(words.data(),words.size());
+    test(std::any_of(program.instructions.begin(),program.instructions.end(),[](const auto &i){return i.opcode==Opcode::shift_left;}));
+    std::vector<VertexRegisters> input(64);
+    for(unsigned n=0;n<input.size();++n){input[n][0]={0x80000001u,0xffffffffu,0x12345678u,n*374763u};input[n][1][0]=n;}
+    VertexExecutor executor(program,64,backend);const auto result=executor.execute(input,{});
+    for(unsigned n=0;n<input.size();++n)test(result.vertices[n]==reference_vertex(program,input[n],{}));
+    std::printf("{\"integer_shift_left\":true,\"vertices\":64,\"all_shift_counts_and_wrap\":true,\"exact_bits_verified\":true,\"execution_device\":\"%s\"}\n",backend.c_str());
 }
 void test_branches(const std::string &backend) {
     const char *text = R"(
@@ -123,6 +167,8 @@ int main(int argc, char **argv) {
         test_branches(backend);
         test_math_precision(backend);
         test_pixel_arithmetic(backend);
+        test_vertex_id_tables(backend);
+        test_integer_shift(backend);
         const auto modifier_tokens = nr::registered_lab::shader_tokens(
             "struct O {float4 p:SV_Position;float4 a:COLOR;};O main(float4 v:POSITION){O o;o.p=-v;o.a=-abs(v);return o;}", "vs_4_0");
         const auto modifier_program = parse_vertex(modifier_tokens.data(), modifier_tokens.size());

@@ -5,8 +5,8 @@ void APIENTRY copy_region(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE destination, UI
                          const D3D10_DDI_BOX *box) {
     guard(h, __FUNCTION__, [&] {
         auto &d=resource(destination); auto &s=resource(source);
-        const auto da=d.allocation,sa=s.allocation;
-        require(!dst_sub && !src_sub && da!=sa && da->handle!=sa->handle &&
+        const auto da=mip_allocation(d,dst_sub),sa=mip_allocation(s,src_sub);
+        require(da!=sa && da->handle!=sa->handle &&
                 da->context==device(h).context && sa->context==da->context && !da->context->poisoned &&
                 !da->locked && !sa->locked && d.usage!=D3D10_DDI_USAGE_IMMUTABLE &&
                 bool(d.buffer_bytes)==bool(s.buffer_bytes) && da->surface.format==sa->surface.format);

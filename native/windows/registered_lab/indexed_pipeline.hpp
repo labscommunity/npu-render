@@ -21,6 +21,7 @@ public:
             if(!linear_executor || old.width!=h.width || old.height!=h.height || old.format!=h.format ||
                 (old.flags & ~4u)!=(h.flags & ~4u) || pt.width!=t.width || pt.height!=t.height || pt.format!=t.format ||
                 previous_linear.vertex.bytecode!=request.vertex.bytecode || previous_linear.pixel.bytecode!=request.pixel.bytecode){
+                linear_executor.reset();
                 auto candidate=std::make_unique<raster::LinearTextureDrawExecutor>(request.vertex,request.pixel,h.width,h.height,h.format,t.width,t.height,t.format,"NPU",(h.flags&1)!=0);
                 linear_executor=std::move(candidate);previous_linear={};previous_linear.header=h;
                 previous_linear.vertex=request.vertex;previous_linear.pixel=request.pixel;previous_linear.texture={t.width,t.height,t.format,{}};
@@ -34,6 +35,7 @@ public:
             if (!texture_executor || old.width != h.width || old.height != h.height || old.format != h.format ||
                 pt.width != t.width || pt.height != t.height || pt.format != t.format ||
                 previous_texture.vertex.bytecode != request.vertex.bytecode || previous_texture.pixel.bytecode != request.pixel.bytecode) {
+                texture_executor.reset();
                 auto candidate = std::make_unique<raster::PointTextureDrawExecutor>(request.vertex,request.pixel,h.width,h.height,h.format,t.width,t.height,t.format,"NPU");
                 texture_executor = std::move(candidate);
                 previous_texture = {}; previous_texture.header = h; previous_texture.vertex = request.vertex; previous_texture.pixel = request.pixel;
@@ -50,11 +52,14 @@ public:
                (old.flags & ~4u)==(h.flags & ~4u) && entry.vertex==request.vertex.bytecode && entry.pixel==request.pixel.bytecode)
                 return entry.executor->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,request.background,request.scissor);
         }
+        // Complete eviction before constructing a new NPU model. Releasing an
+        // old entry after creating its successor triggers a device-loss failure
+        // with the qualified 5540 runtime during mixed desktop draws.
+        if(uniform_cache.size()==8)uniform_cache.erase(uniform_cache.begin());
         uint32_t batch=4096;while(uint64_t(h.width)*h.height%batch)batch/=2;
         auto candidate=std::make_unique<raster::UniformDrawExecutor>(request.vertex,request.pixel,h.vertices,h.width,h.height,
             "NPU",(h.flags&1)!=0,h.format==87,uint8_t((h.flags>>8)&15),batch);
         auto result=candidate->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,request.background,request.scissor);
-        if(uniform_cache.size()==8)uniform_cache.erase(uniform_cache.begin());
         uniform_cache.push_back({h,request.vertex.bytecode,request.pixel.bytecode,std::move(candidate)});
         return result;
     }

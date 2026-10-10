@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "kind": "vertex-id-mips-and-npu-cache-lifetime-qualification",
+  "clean_build": "present-umd-v87",
+  "source_files_verified": 87,
+  "native_cpu_tests_passed": 13,
+  "npu_ddi_runs_passed": 2,
+  "successful_npu_draws_per_ddi_run": 28,
+  "new_vertex_id_draws_per_ddi_run": 3,
+  "vertex_id_table_vertices_exact": 96,
+  "integer_shift_vertices_exact": 64,
+  "out_of_range_table_lookup_rejected": true,
+  "target_preserved_on_invalid_draw": true,
+  "mip_resource_levels": 11,
+  "mip_formats": [
+    28,
+    87
+  ],
+  "mip_transfer_execution": "CPU staging and existing ordered kernel copy; never NPU inference",
+  "mip_checks": [
+    "independent storage",
+    "odd logical extents",
+    "padded initial rows",
+    "all-level staging copy/map",
+    "isolated updates",
+    "cross-mip region copy",
+    "single-level RTV/SRV selection",
+    "view lifetime after resource destruction",
+    "invalid level and malformed chain rejection before allocation"
+  ],
+  "warp_oracle": {
+    "draw_start_7": [
+      0,
+      1,
+      2
+    ],
+    "indexed_base_5": [
+      2,
+      0,
+      1
+    ]
+  },
+  "failures_retained": [
+    "v84 old mixed-shader rejection HRESULT changed; restored pre-fetch validation",
+    "v85 allocation shim had seven live slots; expanded to hold two 11-level chains",
+    "v86 NPU DDI failed twice with ZE_RESULT_ERROR_DEVICE_LOST; instrumented reproduction located vertex inference"
+  ],
+  "isolation": "All five individual graphics stages and three full new draws pass independently. Retiring old uniform executor before replacement construction makes the same instrumented mixed workload pass. The clean v87 build then passes twice.",
+  "cache_correction": "Retire direct NPU cache entries before constructing replacements. Apply the same order to remote point/linear replacement and bounded uniform-cache eviction. No CPU fallback or target commitment after failure.",
+  "not_supported": [
+    "multi-level sampling",
+    "texture arrays",
+    "shared mip chains",
+    "general desktop shader coverage"
+  ],
+  "custom_driver_installed_for_this_qualification": false,
+  "full_desktop_offload": false,
+  "tahoma_performance_tested": false
+}
