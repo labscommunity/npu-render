@@ -1,6 +1,7 @@
 #include "uniform_draw.hpp"
 #include "solid_rectangle.hpp"
 #include "color_interpolator.hpp"
+#include "triangle_regions.hpp"
 #include <algorithm>
 #include <chrono>
 #include <cstring>
@@ -81,6 +82,7 @@ UniformDrawExecutor::Result UniformDrawExecutor::execute(const std::vector<shade
     result.input_bytes += uint64_t(s.count) * 16 + 24; result.output_bytes += uint64_t(s.count) * 24 + uint64_t(s.count/3)*16; ++result.provider_requests;
     result.timings.projection_ms = milliseconds(began); require(projected.execution_device == result.execution_device);
     require(projected.triangle_bounds.size()==s.count/3);
+    const auto regions=bounded_triangle_regions(projected.triangle_bounds,clip,s.batch);
     shader::VertexRegisters uniform{};
     bool uniform_inputs=true;
     for (unsigned r = 0; r < 16; ++r) if (s.ps.inputs[r] && r != s.ps.position_input) {
@@ -130,9 +132,7 @@ UniformDrawExecutor::Result UniformDrawExecutor::execute(const std::vector<shade
     // Pack the NPU's triangle bounds intersected with the explicit scissor.
     // Exact coverage, clipping and culling remain device operations.
     for (size_t t = 0; t < clips.size(); t += 3) {
-      const auto &bounds=projected.triangle_bounds[t/3];
-      const std::array<int32_t,4> region{(std::max)(clip[0],bounds[0]),(std::max)(clip[1],bounds[1]),
-          (std::min)(clip[2],bounds[2]),(std::min)(clip[3],bounds[3])};
+      const auto &region=regions[t/3];
       if(region[0]>=region[2] || region[1]>=region[3])continue;
       const size_t region_width=size_t(region[2]-region[0]),region_pixels=region_width*size_t(region[3]-region[1]);
       for (size_t first = 0; first < region_pixels; first += s.batch) {

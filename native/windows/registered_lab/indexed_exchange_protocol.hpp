@@ -73,9 +73,10 @@ inline bool shape_valid(const Header &h) {
     if (h.flags & 16) return h.vertices == 6 && h.width <= 4096 && (h.flags & ~5u) == 0xf12;
     if (h.flags & 8) return h.vertices == 6 && h.width <= 4096 && (h.flags & ~5u) == 0xf0a;
     if (h.flags & 2) return h.vertices == 6 && h.flags == 0xf02;
-    uint32_t batch = 4096; const uint64_t pixels = uint64_t(h.width) * h.height;
-    while (pixels % batch) batch /= 2;
-    return uint64_t(h.vertices / 3) * (pixels / batch) <= 4096;
+    // Uniform draws also use device-computed bounds. A full-target estimate
+    // rejects DWM's 66-vertex sparse draw before it can reach the provider.
+    // The executor enforces the 4096-tile limit after projection and clipping.
+    return true;
 }
 inline bool request_valid(const Header &h, uint64_t bytes) {
     return shape_valid(h) && h.kind == 1 && !h.device && bytes == sizeof(Header) + uint64_t(h.body_bytes);

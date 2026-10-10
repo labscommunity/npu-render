@@ -29,6 +29,22 @@ struct O {float4 p:SV_Position; float4 c:COLOR;};
 O main(float4 p:POSITION,float4 c:COLOR) {O o;o.p=p;o.c=c*color;return o;})", "vs_4_0");
     const auto pw = nr::registered_lab::shader_tokens("float4 main(float4 p:SV_Position,float4 c:COLOR):SV_Target{return c;}", "ps_4_0");
     const auto vs = parse_vertex(vw.data(), vw.size()), ps = parse_pixel(pw.data(), pw.size());
+    {
+        const std::vector<PackedColor> old_pixels(1024*768,PackedColor{7,11,13,17});
+        UniformDrawExecutor sparse(vs,ps,66,1024,768,backend,false,true,15,4096);
+        VertexConstants constants;constants[0].push_back({as_bits(1),as_bits(1),as_bits(1),as_bits(1)});
+        std::vector<VertexRegisters> sparse_vertices,dense;auto tiny=quad(1,false);const auto full=quad(1,false);
+        for(auto &v:tiny){v[0][0]=as_bits(-1+(as_float(v[0][0])+1)/32);v[0][1]=as_bits(1-(1-as_float(v[0][1]))/24);}
+        for(unsigned n=0;n<11;++n){sparse_vertices.insert(sparse_vertices.end(),tiny.begin(),tiny.end());dense.insert(dense.end(),full.begin(),full.end());}
+        const Viewport desktop{0,0,1024,768,0,1};
+        const auto result=sparse.execute(sparse_vertices,constants,{},desktop,old_pixels);
+        test(result.execution_device.rfind(backend,0)==0 && result.covered_samples==11*32*32 && result.tile_executions==22);
+        for(unsigned y=0;y<768;++y)for(unsigned x=0;x<1024;++x)
+            test(result.pixels[size_t(y)*1024+x]==(x<32 && y<32?PackedColor{255,255,255,255}:old_pixels[size_t(y)*1024+x]));
+        bool rejected=false;try{(void)sparse.execute(dense,constants,{},desktop,old_pixels);}catch(const std::invalid_argument&){rejected=true;}
+        test(rejected && old_pixels==std::vector<PackedColor>(1024*768,PackedColor{7,11,13,17}));
+        std::printf("{\"sparse_uniform_vertices\":66,\"covered_samples\":11264,\"tile_executions\":22,\"dense_budget_rejected\":true,\"execution_device\":\"%s\"}\n",backend.c_str());
+    }
     const Viewport viewport{0, 0, 64, 64, 0, 1};
     const PackedColor old{8, 20, 80, 100}; const std::vector<PackedColor> background(4096, old);
     UniformDrawExecutor executor(vs, ps, 6, 64, 64, backend, true, true, 15, 256);

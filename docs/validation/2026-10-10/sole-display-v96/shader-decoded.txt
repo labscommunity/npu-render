@@ -1,0 +1,118 @@
+slot 0 input=15 texture=1 sampler=1
+slot 1 input=15 texture=1 sampler=1
+slot 2 input=15 texture=0 sampler=0
+slot 3 input=15 texture=0 sampler=0
+cb 0 rows=8
+op 54 dest r0 mask=15 sat=0 src0 (8,0,4,0123,mod=0)
+op 14 dest r1 mask=3 sat=0 src0 (1,2,0,0100,mod=0) src1 (1,2,0,2222,mod=0)
+op 52 dest r2 mask=3 sat=0 src0 (0,1,0,0100,mod=0) src1 (0,0,0,0100,mod=0)
+op 51 dest r1 mask=12 sat=0 src0 (0,2,0,0001,mod=0) src1 (0,0,0,2223,mod=0)
+op 69 dest r0 mask=15 sat=0 src0 (0,1,0,2322,mod=0) src1 (7,0,0,0123,mod=0) src2 (6,0,0,0123,mod=0)
+op 54 dest r1 mask=15 sat=0 src0 (8,0,6,0123,mod=0)
+op 54 dest r2 mask=15 sat=0 src0 (8,0,7,0123,mod=0)
+op 14 dest r3 mask=3 sat=0 src0 (1,3,0,0100,mod=0) src1 (1,3,0,2222,mod=0)
+op 54 dest r3 mask=12 sat=0 src0 (0,3,0,0001,mod=0)
+op 56 dest r5 mask=3 sat=0 src0 (0,3,0,2322,mod=0) src1 (0,2,0,0100,mod=0)
+op 65 dest r5 mask=3 sat=0 src0 (0,5,0,0100,mod=0)
+op 0 dest r5 mask=3 sat=0 src0 (0,5,0,0100,mod=0) src1 (4,0,0,0123,mod=0) 0.5 0.5 0 0
+op 50 dest r6 mask=3 sat=0 src0 (0,3,0,2322,mod=0) src1 (0,2,0,0100,mod=0) src2 (0,5,0,0100,mod=1)
+op 49 dest r6 mask=12 sat=0 src0 (4,0,0,0123,mod=0) 0 0 0 0 src1 (0,6,0,0001,mod=0)
+op 49 dest r7 mask=3 sat=0 src0 (0,6,0,0100,mod=0) src1 (4,0,0,0123,mod=0) 0 0 0 0
+op 30 dest r6 mask=12 sat=0 src0 (0,6,0,2223,mod=1) src1 (0,7,0,0001,mod=0)
+op 43 dest r6 mask=12 sat=0 src0 (0,6,0,2223,mod=0)
+op 0 dest r5 mask=12 sat=0 src0 (0,5,0,0001,mod=0) src1 (0,6,0,2223,mod=0)
+op 50 dest r5 mask=15 sat=0 src0 (0,5,0,0123,mod=0) src1 (0,2,0,2323,mod=0) src2 (0,1,0,0101,mod=1)
+op 0 dest r7 mask=15 sat=0 src0 (0,1,0,0101,mod=1) src1 (0,1,0,2323,mod=0)
+op 14 dest r5 mask=15 sat=0 src0 (0,5,0,0123,mod=0) src1 (0,7,0,0123,mod=0)
+op 29 dest r8 mask=15 sat=0 src0 (0,5,0,0123,mod=0) src1 (0,5,0,0123,mod=1)
+op 26 dest r5 mask=15 sat=0 src0 (0,5,0,0123,mod=2)
+op 55 dest r5 mask=15 sat=0 src0 (0,8,0,0123,mod=0) src1 (0,5,0,0123,mod=0) src2 (0,5,0,0123,mod=1)
+op 50 dest r8 mask=15 sat=0 src0 (0,5,0,0123,mod=0) src1 (0,7,0,0123,mod=0) src2 (0,7,0,0123,mod=0)
+op 50 dest r9 mask=15 sat=0 src0 (0,5,0,0123,mod=0) src1 (0,7,0,0123,mod=0) src2 (0,8,0,0123,mod=1)
+op 56 dest r5 mask=15 sat=0 src0 (0,7,0,0123,mod=0) src1 (0,5,0,0123,mod=0)
+op 29 dest r5 mask=15 sat=0 src0 (0,5,0,0123,mod=0) src1 (4,0,0,0123,mod=0) 0 0 0 0
+op 1 dest r5 mask=15 sat=0 src0 (0,5,0,0123,mod=0) src1 (4,0,0,0123,mod=0) 1 1 1 1
+op 50 dest r5 mask=15 sat=0 src0 (0,5,0,0123,mod=0) src1 (0,9,0,0123,mod=0) src2 (0,8,0,0123,mod=0)
+op 0 dest r5 mask=15 sat=0 src0 (0,5,0,0123,mod=0) src1 (0,1,0,0101,mod=0)
+op 69 dest r7 mask=15 sat=0 src0 (0,5,0,2322,mod=0) src1 (7,1,0,0123,mod=0) src2 (6,1,0,0123,mod=0)
+op 69 dest r8 mask=15 sat=0 src0 (0,5,0,0300,mod=0) src1 (7,1,0,0123,mod=0) src2 (6,1,0,0123,mod=0)
+op 0 dest r7 mask=15 sat=0 src0 (0,7,0,0123,mod=0) src1 (0,8,0,0123,mod=1)
+op 50 dest r7 mask=15 sat=0 src0 (0,6,0,0000,mod=2) src1 (0,7,0,0123,mod=0) src2 (0,8,0,0123,mod=0)
+op 69 dest r8 mask=15 sat=0 src0 (0,5,0,2122,mod=0) src1 (7,1,0,0123,mod=0) src2 (6,1,0,0123,mod=0)
+op 69 dest r5 mask=15 sat=0 src0 (0,5,0,0100,mod=0) src1 (7,1,0,0123,mod=0) src2 (6,1,0,0123,mod=0)
+op 0 dest r8 mask=15 sat=0 src0 (0,5,0,0123,mod=1) src1 (0,8,0,0123,mod=0)
+op 50 dest r5 mask=15 sat=0 src0 (0,6,0,0000,mod=2) src1 (0,8,0,0123,mod=0) src2 (0,5,0,0123,mod=0)
+op 0 dest r7 mask=15 sat=0 src0 (0,5,0,0123,mod=1) src1 (0,7,0,0123,mod=0)
+op 50 dest r4 mask=15 sat=0 src0 (0,6,0,1111,mod=2) src1 (0,7,0,0123,mod=0) src2 (0,5,0,0123,mod=0)
+op 24 dest r2 mask=1 sat=0 src0 (0,0,0,3333,mod=0) src1 (4,0,0,0123,mod=0) 0 0 0 0
+op 14 dest r2 mask=14 sat=0 src0 (0,0,0,0012,mod=0) src1 (0,0,0,3333,mod=0)
+op 55 dest r2 mask=7 sat=0 src0 (0,2,0,0000,mod=0) src1 (4,0,0,0123,mod=0) 0 0 0 0 src2 (0,2,0,1231,mod=0)
+op 16 dest r2 mask=8 sat=0 src0 (4,0,0,0123,mod=0) 0.3 0.59 0.11 0 src1 (0,2,0,0120,mod=0)
+op 24 dest r3 mask=1 sat=0 src0 (4,0,0,0123,mod=0) 0 0 0 0 src1 (8,0,1,3333,mod=0)
+op 14 dest r3 mask=14 sat=0 src0 (8,0,1,0012,mod=0) src1 (8,0,1,3333,mod=0)
+op 55 dest r3 mask=7 sat=0 src0 (0,3,0,0000,mod=0) src1 (4,0,0,0123,mod=0) 0 0 0 0 src2 (0,3,0,1231,mod=0)
+op 16 dest r3 mask=1 sat=0 src0 (4,0,0,0123,mod=0) 0.3 0.59 0.11 0 src1 (0,3,0,0120,mod=0)
+op 0 dest r2 mask=8 sat=0 src0 (0,2,0,3333,mod=1) src1 (0,3,0,0000,mod=0)
+op 0 dest r2 mask=7 sat=0 src0 (0,2,0,3333,mod=0) src1 (0,2,0,0120,mod=0)
+op 0 dest r3 mask=14 sat=0 src0 (0,2,0,0012,mod=1) src1 (4,0,0,0123,mod=0) 0 1 1 1
+op 0 dest r5 mask=7 sat=0 src0 (0,2,0,0120,mod=1) src1 (0,3,0,0000,mod=0)
+op 14 dest r3 mask=7 sat=0 src0 (0,3,0,1231,mod=0) src1 (0,5,0,0120,mod=0)
+op 29 dest r6 mask=7 sat=0 src0 (0,2,0,0120,mod=0) src1 (4,0,0,0123,mod=0) 1 1 1 0
+op 1 dest r6 mask=7 sat=0 src0 (0,6,0,0120,mod=0) src1 (4,0,0,0123,mod=0) 1 1 1 0
+op 56 dest r3 mask=7 sat=0 src0 (0,3,0,0120,mod=0) src1 (0,6,0,0120,mod=0)
+op 14 dest r6 mask=7 sat=0 src0 (0,2,0,0120,mod=1) src1 (0,5,0,0120,mod=0)
+op 29 dest r7 mask=7 sat=0 src0 (0,2,0,0120,mod=0) src1 (4,0,0,0123,mod=0) 0 0 0 0
+op 55 dest r7 mask=7 sat=0 src0 (0,7,0,0120,mod=0) src1 (4,0,0,0123,mod=0) 0 0 0 0 src2 (4,0,0,0123,mod=0) 1 1 1 0
+op 56 dest r6 mask=7 sat=0 src0 (0,6,0,0120,mod=0) src1 (0,7,0,0120,mod=0)
+op 52 dest r3 mask=7 sat=0 src0 (0,3,0,0120,mod=0) src1 (0,6,0,0120,mod=0)
+op 52 dest r2 mask=8 sat=0 src0 (0,3,0,1111,mod=0) src1 (0,3,0,0000,mod=0)
+op 52 dest r2 mask=8 sat=0 src0 (0,3,0,2222,mod=0) src1 (0,2,0,3333,mod=0)
+op 52 dest r2 mask=8 sat=0 src0 (0,2,0,3333,mod=0) src1 (4,0,0,0123,mod=0) 0 0 0 0
+op 50 dest r2 mask=7 sat=0 src0 (0,2,0,3333,mod=0) src1 (0,5,0,0120,mod=0) src2 (0,2,0,0120,mod=0)
+op 56 dest r2 mask=7 sat=0 src0 (0,2,0,0120,mod=0) src1 (8,0,1,3333,mod=0)
+op 0 dest r2 mask=8 sat=0 src0 (0,0,0,3333,mod=1) src1 (4,0,0,0123,mod=0) 1 1 1 1
+op 56 dest r3 mask=7 sat=0 src0 (0,2,0,3333,mod=0) src1 (8,0,1,0120,mod=0)
+op 50 dest r2 mask=7 sat=0 src0 (0,2,0,0120,mod=0) src1 (0,0,0,3333,mod=0) src2 (0,3,0,0120,mod=0)
+op 0 dest r2 mask=8 sat=0 src0 (4,0,0,0123,mod=0) 1 1 1 1 src1 (8,0,1,3333,mod=1)
+op 50 dest r2 mask=7 sat=1 src0 (0,0,0,0120,mod=0) src1 (0,2,0,3333,mod=0) src2 (0,2,0,0120,mod=0)
+op 0 dest r2 mask=8 sat=0 src0 (4,0,0,0123,mod=0) 1 1 1 1 src1 (8,0,2,3333,mod=1)
+op 56 dest r3 mask=7 sat=0 src0 (0,2,0,3333,mod=0) src1 (0,2,0,0120,mod=0)
+op 0 dest r2 mask=8 sat=0 src0 (0,0,0,3333,mod=0) src1 (8,0,1,3333,mod=0)
+op 50 dest r2 mask=8 sat=0 src0 (0,0,0,3333,mod=1) src1 (8,0,1,3333,mod=0) src2 (0,2,0,3333,mod=0)
+op 14 dest r2 mask=7 sat=0 src0 (0,2,0,0120,mod=0) src1 (0,2,0,3333,mod=0)
+op 24 dest r3 mask=8 sat=0 src0 (0,2,0,3333,mod=0) src1 (4,0,0,0123,mod=0) 0 0 0 0
+op 55 dest r2 mask=7 sat=0 src0 (0,3,0,3333,mod=0) src1 (4,0,0,0123,mod=0) 0 0 0 0 src2 (0,2,0,0120,mod=0)
+op 16 dest r2 mask=1 sat=0 src0 (4,0,0,0123,mod=0) 0.3 0.59 0.11 0 src1 (0,2,0,0120,mod=0)
+op 24 dest r2 mask=2 sat=0 src0 (4,0,0,0123,mod=0) 0 0 0 0 src1 (8,0,2,3333,mod=0)
+op 14 dest r5 mask=7 sat=0 src0 (8,0,2,0120,mod=0) src1 (8,0,2,3333,mod=0)
+op 55 dest r5 mask=7 sat=0 src0 (0,2,0,1111,mod=0) src1 (4,0,0,0123,mod=0) 0 0 0 0 src2 (0,5,0,0120,mod=0)
+op 16 dest r2 mask=2 sat=0 src0 (4,0,0,0123,mod=0) 0.3 0.59 0.11 0 src1 (0,5,0,0120,mod=0)
+op 0 dest r2 mask=2 sat=0 src0 (0,2,0,1111,mod=1) src1 (0,2,0,0000,mod=0)
+op 0 dest r5 mask=7 sat=0 src0 (0,2,0,1111,mod=0) src1 (0,5,0,0120,mod=0)
+op 0 dest r6 mask=7 sat=0 src0 (0,5,0,0120,mod=1) src1 (4,0,0,0123,mod=0) 1 1 1 0
+op 0 dest r2 mask=7 sat=0 src0 (0,2,0,0000,mod=0) src1 (0,5,0,0120,mod=1)
+op 14 dest r6 mask=7 sat=0 src0 (0,6,0,0120,mod=0) src1 (0,2,0,0120,mod=0)
+op 29 dest r7 mask=7 sat=0 src0 (0,5,0,0120,mod=0) src1 (4,0,0,0123,mod=0) 1 1 1 0
+op 1 dest r7 mask=7 sat=0 src0 (0,7,0,0120,mod=0) src1 (4,0,0,0123,mod=0) 1 1 1 0
+op 56 dest r6 mask=7 sat=0 src0 (0,6,0,0120,mod=0) src1 (0,7,0,0120,mod=0)
+op 14 dest r7 mask=7 sat=0 src0 (0,5,0,0120,mod=1) src1 (0,2,0,0120,mod=0)
+op 29 dest r8 mask=7 sat=0 src0 (0,5,0,0120,mod=0) src1 (4,0,0,0123,mod=0) 0 0 0 0
+op 55 dest r8 mask=7 sat=0 src0 (0,8,0,0120,mod=0) src1 (4,0,0,0123,mod=0) 0 0 0 0 src2 (4,0,0,0123,mod=0) 1 1 1 0
+op 56 dest r7 mask=7 sat=0 src0 (0,7,0,0120,mod=0) src1 (0,8,0,0120,mod=0)
+op 52 dest r6 mask=7 sat=0 src0 (0,6,0,0120,mod=0) src1 (0,7,0,0120,mod=0)
+op 52 dest r3 mask=8 sat=0 src0 (0,6,0,1111,mod=0) src1 (0,6,0,0000,mod=0)
+op 52 dest r3 mask=8 sat=0 src0 (0,6,0,2222,mod=0) src1 (0,3,0,3333,mod=0)
+op 52 dest r3 mask=8 sat=0 src0 (0,3,0,3333,mod=0) src1 (4,0,0,0123,mod=0) 0 0 0 0
+op 50 dest r2 mask=7 sat=0 src0 (0,3,0,3333,mod=0) src1 (0,2,0,0120,mod=0) src2 (0,5,0,0120,mod=0)
+op 56 dest r2 mask=7 sat=0 src0 (0,2,0,3333,mod=0) src1 (0,2,0,0120,mod=0)
+op 50 dest r2 mask=7 sat=0 src0 (0,2,0,0120,mod=0) src1 (8,0,2,3333,mod=0) src2 (0,3,0,0120,mod=0)
+op 0 dest r3 mask=1 sat=0 src0 (0,2,0,3333,mod=1) src1 (4,0,0,0123,mod=0) 1 1 1 1
+op 50 dest r3 mask=7 sat=1 src0 (8,0,2,0120,mod=0) src1 (0,3,0,0000,mod=0) src2 (0,2,0,0120,mod=0)
+op 56 dest r5 mask=15 sat=0 src0 (0,4,0,0123,mod=0) src1 (4,0,0,0123,mod=0) 0.02 0.02 0.02 0.02
+op 50 dest r2 mask=1 sat=0 src0 (0,4,0,3333,mod=1) src1 (4,0,0,0123,mod=0) 0.02 0.02 0.02 0.02 src2 (4,0,0,0123,mod=0) 1 1 1 1
+op 0 dest r2 mask=2 sat=0 src0 (0,2,0,3333,mod=0) src1 (8,0,2,3333,mod=0)
+op 50 dest r3 mask=8 sat=0 src0 (0,2,0,3333,mod=1) src1 (8,0,2,3333,mod=0) src2 (0,2,0,1111,mod=0)
+op 50 dest r2 mask=15 sat=0 src0 (0,2,0,0000,mod=0) src1 (0,3,0,0123,mod=0) src2 (0,5,0,0123,mod=0)
+op 0 dest r2 mask=15 sat=0 src0 (0,2,0,0123,mod=0) src1 (8,0,0,0123,mod=1)
+op 50 dest r1 mask=15 sat=0 src0 (8,0,3,0000,mod=0) src1 (0,2,0,0123,mod=0) src2 (8,0,0,0123,mod=0)
+op 56 dest r0 mask=15 sat=0 src0 (0,1,0,0123,mod=0) src1 (1,1,0,3333,mod=0)

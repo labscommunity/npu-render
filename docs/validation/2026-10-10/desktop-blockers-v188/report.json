@@ -1,0 +1,33 @@
+{
+  "build": "present-umd-v188",
+  "all_checks_passed": true,
+  "arithmetic_components": 19456,
+  "captured_shader_components": 52224,
+  "captured_dwm_pixels": 786432,
+  "captured_fade_covered_samples": 49152,
+  "sparse_uniform_vertices": 66,
+  "sparse_uniform_dense_rejection": true,
+  "compositor_batch_limit": 512,
+  "native_npu_execution": true,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "cpu_suites_passed": 23,
+  "cpu_suite_elapsed_seconds": 128.51,
+  "source_hashes_verified": 111,
+  "binary_hashes_verified": 29,
+  "compositor_verified_components": 71680,
+  "compositor_maximum_error": 3.93390656e-06,
+  "ddi_draws_verified": 58,
+  "full_desktop_offload": false,
+  "installed_driver_tested": false,
+  "physical_driver_changed": false,
+  "findings": [
+    "The 66-vertex captured DWM draw previously failed a full-target work estimate before transport. Admission now defers the uniform raster budget to projected and clipped triangle bounds. CPU and NPU replay have exact scalar coverage and pixels: 33792 covered samples in 28 tiles.",
+    "A varied 66-vertex sparse regression checks every pixel of a 1024x768 target and completes in 22 tiles. A full-target draw with the same vertex count still rejects the 4096-tile work budget before modifying output. Packet encode/decode and executor tests both cover this case.",
+    "The exact captured 1008-word opacity shader is bounded to 512 lanes, matching the previously qualified 988-word variant. Native NPU tests check 71680 arithmetic and shader components including realistic 192x64 and 768x576 textures with point and linear sampling and changing opacity.",
+    "The captured fade packet is explicitly converted to a diagnostic capture as documented in sole-display-v96. Its CPU and NPU replays match every scalar pixel and coverage sample: 49152 covered samples in 202 tiles. Requested batch is 4096 and the internal shader batch is 512. NPU draw time remains 4513.013 ms after 335.521 ms compilation/cache load; this is still unsuitable for interactive rendering.",
+    "Clean build v187 failed because the test variable small conflicts with a Windows header macro. The failure and original source are retained. Renaming it sparse_vertices produced clean build v188 with all 23 CPU suites passing. No v187 driver was installed.",
+    "All relevant NPU compositor, uniform and 58 DDI draw regressions pass. Lab stderr includes deliberate invalid-input tests. No installed-adapter or Tahoma improvement is established by these checks.",
+    "Next: installed v97 desktop and input trial. CPU clears and the severe rendering latency remain unresolved."
+  ]
+}

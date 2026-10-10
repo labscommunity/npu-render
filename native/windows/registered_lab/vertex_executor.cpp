@@ -826,6 +826,9 @@ uint32_t RegisterExecutor::maximum_batch(const Program &p){
     const auto &words=nr::registered_lab::test_fixture::compositor_pixel_words;
     if(p.stage==Stage::pixel && p.bytecode.size()==std::size(words) &&
         std::equal(p.bytecode.begin(),p.bytecode.end(),std::begin(words)))return 512u;
+    const auto &fade=nr::registered_lab::test_fixture::compositor_fade_pixel_words;
+    if(p.stage==Stage::pixel && p.bytecode.size()==std::size(fade) &&
+        std::equal(p.bytecode.begin(),p.bytecode.end(),std::begin(fade)))return 512u;
     return 65536u;
 }
 RegisterExecutor::RegisterExecutor(const Program &p, uint32_t count, const std::string &backend,

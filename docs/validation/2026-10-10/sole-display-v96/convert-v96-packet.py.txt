@@ -1,0 +1,44 @@
+from pathlib import Path
+import struct,hashlib,json,subprocess
+root=Path('results/render-driver');raw=(root/'v96-live-packets/slow-request-3.bin').read_bytes()
+header=struct.unpack_from('<3Q14I',raw);h=header[3:];abi,width,height,count,format,flags,vsn,psn,sequence,body,pid,kind,device,reserved=h
+assert header[0]==0x4e525f4452415731 and len(raw)==80+body and (abi,format,flags,vsn,psn,kind,device,reserved)==(8,87,0x2f07,116,1008,1,0,0)
+at=80
+records=[]
+def take(n):
+ global at
+ b=raw[at:at+n];at+=n;assert len(b)==n;return b
+def add(k,b):records.append((k,b))
+def ints(*v):return struct.pack('<'+'I'*len(v),*v)
+def surface(w,h,f):return ints(0x4e52574b,1,40,w,h,f,w*4,0,w*h*4,0)
+viewport=take(24);clip=take(16);vs=take(vsn*4);ps=take(psn*4)
+meta=[]
+for stage,b in [('vs',vs),('ps',ps)]:
+ p=root/'shader-v96'/f'{stage}.bin';p.write_bytes(b);meta.append(json.loads(subprocess.check_output([str(root/'packet-program-metadata'),stage,str(p)],text=True)))
+inputs=take(count*256);constants=[]
+for stage,m in zip([0,2],meta):
+ for slot,rows in enumerate(m['constants']):
+  if rows:constants.append((f'constants-{stage}-{slot}',take(rows*16)))
+target=take(width*height*4);textures=[]
+for slot in range(16):
+ w,z,f,res=struct.unpack('<4I',take(16));assert not res;textures.append((w,z,f,take(w*z*4)))
+samplers=struct.unpack('<16I',take(64));assert at==len(raw)
+add('arguments',ints(count,0,0,4,1,1,2,0xffffffff,0));add('draw-indexed',ints(0));add('instances',ints(1,0));add('viewport',viewport)
+add('blend',ints(0,1,0,0,0,0,0,0,0,2,6,1,2,6,1,0x0f0f0f0f,0x0f0f0f0f));add('blend-factor',struct.pack('<4f',1,1,1,1))
+add('depth',ints(0,1,2,0,0,0,0,1,1,8,1,1,1,8,0));add('raster',ints(3,1,0,0,0,0,1,1,0,0));add('scissors',clip)
+elements=[]
+for reg,mask in enumerate(meta[0]['inputs']):
+ if mask:elements.extend([0,reg*16,2,0,0,reg])
+add('layout',ints(*elements));add('vertex-shader',vs);add('pixel-shader',ps);add('vertices-0-description',ints(len(inputs),256,0,0));add('vertices-0',inputs)
+for k,b in constants:add(k,b)
+for slot,encoded in enumerate(samplers):
+ assert encoded in [0,1];add(f'sampler-2-{slot}',ints(21 if encoded else 0,3,3,3,0,1,0,0,0,0,0,0,0x7f7fffff))
+add('target-description',surface(width,height,format));add('target',target)
+for slot,(w,z,f,data) in enumerate(textures):
+ if not w:assert not z and not data;continue
+ assert f in [28,87];name=f'resource-2-{slot}';add(name+'-view',ints(0,0,0,0));add(name+'-description',surface(w,z,f));add(name,data)
+ if slot==0:add('source-description',surface(w,z,f));add('source',data)
+add('complete',b'');out=b'NPDRAW01'+b''.join(k.encode().ljust(32,b'\0')+struct.pack('<Q',len(b))+b for k,b in records)
+p=root/'v96-packet-derived-draw.bin';p.write_bytes(out)
+report={'original_packet_sha256':hashlib.sha256(raw).hexdigest(),'derived_capture_sha256':hashlib.sha256(out).hexdigest(),'derived_capture_bytes':len(out),'target':[width,height],'vertices':count,'pixel_shader_words':psn,'texture_shapes':[[w,z,f] for w,z,f,data in textures if w],'scissor':list(struct.unpack('<4i',clip)),'shader_metadata':meta,'conversion':'Re-encode already-fetched packet vertices as a nonindexed triangle list with 256-byte float4 register rows; retain shaders, constants, textures, viewport, scissor, source-over blend and target bytes. This is a derived diagnostic capture, not the original DDI capture.'}
+(root/'v96-packet-conversion.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report))

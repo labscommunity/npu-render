@@ -113,16 +113,20 @@ now has an exact NPU specialization for opaque, one-to-one point-sampled quads.
 Its captured 1024×768 replay passes, as do changing-image and driver callback
 tests. This is a checked subset, not general desktop rendering.
 
-The [latest installed trial](docs/validation/2026-10-10/sole-display-v95/report.json)
-completes 269 live desktop NPU draws plus 13 prewarm requests. Four frames arrive
-through the sole indirect display, including wallpaper, icons and taskbar
-controls. A complete taskbar draw then exposes an NPU compiler layout failure.
-Offline replay reproduces the failure at 4096 and 1024 pixels per batch; 512 and
-256 pixels pass with exact coverage and at most one color-byte error against the
-scalar reference. The input test incorrectly required an opaque taskbar and
-never sent Start or Escape. Both custom drivers unload cleanly and the normal VM
-desktop returns. Stable interactive desktop offload and a Tahoma benefit remain
-unproven; pixel clears also still use the CPU.
+The [latest installed trial](docs/validation/2026-10-10/sole-display-v96/report.json)
+completes 276 live desktop NPU draws plus 13 prewarm requests. Seven frames arrive
+through the sole indirect display, but the Start-menu input test does not produce
+a verified response. A valid sparse draw is rejected before transport; an opacity
+shader fails NPU compilation, followed by runtime device loss. Both custom drivers
+unload cleanly and the normal VM desktop returns.
+
+The [next clean build](docs/validation/2026-10-10/desktop-blockers-v188/report.json)
+uses actual projected bounds to admit sparse draws and a qualified 512-pixel batch
+for the captured opacity shader. Both failed desktop draws now replay on the NPU
+with exact scalar coverage and pixel bytes. All 23 CPU suites, 71,680 NPU shader
+components and 58 driver draws pass. The taskbar draw still takes 4.5 seconds;
+installed desktop/input validation is next. Stable interactive desktop offload
+and a Tahoma benefit remain unproven; pixel clears also still use the CPU.
 
 [Mirrored-texture qualification](docs/validation/2026-10-10/mirror-v174/report.json)
 now replays that failed DWM blur draw on the NPU with all 8,192 output pixels

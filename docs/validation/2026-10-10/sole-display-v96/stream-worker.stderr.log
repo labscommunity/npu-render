@@ -1,0 +1,22 @@
+loc(fused<{name = "Add_564571", type = "Add"}>["Add_564571", "add_0"]): error: failed to legalize unresolved materialization from ('tensor<1x4096x1x1xf32>') to ('tensor<1x4096x1x1xf32, {order = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3, d1)>}>') that remained live after conversion
+indexed stream draw rejected: Exception from src\inference\src\cpp\core.cpp:121:
+Exception from src\inference\src\dev\plugin.cpp:54:
+Exception from src\plugins\intel_npu\src\plugin\src\plugin.cpp:642:
+Exception from src\plugins\intel_npu\src\compiler_adapter\src\compiler_impl.cpp:433:
+Compilation failed. vclAllocatedExecutableCreate2 result: 0x78000004 - [NPU_VCL] Compiler returned msg:
+Compilation failed
+
+
+
+
+indexed stream draw rejected: Exception from src\inference\src\cpp\infer_request.cpp:224:
+Exception from src\plugins\intel_npu\src\utils\src\zero\zero_wrappers.cpp:258:
+L0 zeFenceHostSynchronize result: ZE_RESULT_ERROR_DEVICE_LOST, code 0x70000001 - device hung, reset, was removed, or driver update occurred
+
+
+indexed stream draw rejected: Exception from src\inference\src\cpp\compiled_model.cpp:128:
+Exception from src\plugins\intel_npu\src\plugin\src\compiled_model.cpp:69:
+The driver is not applicable. The driver doesn't exist or is too old to run inference for this blob.
+
+
+indexed socket closed or timed out

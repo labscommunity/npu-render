@@ -1,0 +1,47 @@
+{
+  "trial": "v96",
+  "source_commit": "fa321d7140e777e087d8830fcc78fdeb543e5184",
+  "umd_build": "present-umd-v185",
+  "package_version": "0.0.84.0",
+  "worker_successes_by_client": {
+    "42": 13,
+    "4876": 34,
+    "6428": 100,
+    "388": 36,
+    "7616": 42,
+    "7860": 64
+  },
+  "acknowledged_successes_by_client": {
+    "42": 13,
+    "4876": 33,
+    "6428": 100,
+    "388": 35,
+    "7616": 42,
+    "7860": 64
+  },
+  "acknowledged_failures": 3,
+  "received_frames": 7,
+  "full_desktop_offload": false,
+  "usable_interactive_desktop": false,
+  "tahoma_performance_tested": false,
+  "original_cleanup_passed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "guest_restart": false,
+  "findings": [
+    "289 successful native NPU requests include 13 prewarm and 276 live draws. Relay logs acknowledge 287 successes and three failures. Explorer and the initial StartMenuExperienceHost each have one successful worker output without a relay receipt.",
+    "The first complete DWM capture is a 66-vertex solid draw with 90-word VS and 18-word PS. Its shape is rejected by the uniform packet admission estimate: 22 triangles times 192 full-target tiles is 4224, exceeding 4096. This occurs before transport. The actual device-computed triangle regions must determine its raster budget, as already done for textured draws.",
+    "A later DWM request reaches a 1008-word compositor opacity variant. Its native compiler fails with the same 4096-lane layout legalization error as the earlier 988-word shader. The 4977144-byte original packet is preserved as slow-request-3.bin, SHA256 af0c0afae342b78ad965d36c843d142a188c287c62e16db80d9f93be92a2bd1b. It samples 192x64 and 768x576 textures into a 1024x48 taskbar scissor.",
+    "The original packet is independently re-encoded as a diagnostic NPDRAW01 capture retaining already-fetched vertices, shaders, constants, source-over state, textures and target. CPU replay is exact at 4096 and 512 lanes. Native NPU reproduces the compiler failure at 4096; 512 lanes has exact scalar coverage and all pixel bytes match the reference, with 49152 covered samples and 202 tiles. CPU build work overlaps these replays; timings are diagnostic and not isolated performance comparisons.",
+    "After the compilation failure, Explorer PID 7860 loses the NPU device after about 61 seconds, and StartMenuExperienceHost PID 7616 reports a driver applicability error. A fresh native vertex regression process succeeds without a driver change or physical restart. The causal mechanism for the runtime errors is not established.",
+    "Seven frames arrive under the sole-display gate. The input harness sends Control, Start and Escape. Before-Start and after-Start snapshots are identical; after-Escape is a dark frame. The final received frame shows wallpaper, icons and watermark without a taskbar. No usable input response is verified.",
+    "Both custom drivers unload cleanly; stream configuration is removed and the original VM desktop is visually verified. The worker exits with socket-closed status during shutdown.",
+    "Next: qualify real-bounds admission for uniform draws, rejection of genuinely excessive work, the opacity shader batch bound and a subsequent installed desktop trial. CPU clears, general functionality and interactive performance remain unfinished."
+  ],
+  "source_ci": {
+    "run_id": 38090989948,
+    "initial_conclusion": "failure",
+    "failure": "Five hosted-Windows CPU tests terminate with illegal-instruction exceptions; compositor shader test passes. Root cause unverified. Failed job rerun requested.",
+    "rerun_pending": true
+  }
+}

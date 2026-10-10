@@ -113,6 +113,12 @@ int main(int argc, char **argv) try {
     test(nr::shader::quad_derivatives(derivative_roundtrip.pixel) && derivative_roundtrip.inputs==derivative.inputs && ex::triangle_batch(derivative_roundtrip)%4==0);
     {auto tiny=derivative;tiny.header.width=tiny.header.height=1;tiny.viewport={0,0,1,1,0,1};tiny.background.resize(1);
      test(ex::triangle_batch(ex::decode(ex::encode(tiny)))==4);}
+    // DWM's sparse 66-vertex solid draw exceeds the old full-target estimate
+    // (22*192 tiles). Admission must defer the real work bound to projection.
+    {auto sparse=r;sparse.header.width=1024;sparse.header.height=768;sparse.header.vertices=66;
+     sparse.viewport={0,0,1024,768,0,1};sparse.inputs.resize(66);sparse.background.resize(1024*768);
+     const auto packet=ex::encode(sparse);const auto decoded_sparse=ex::decode(packet);
+     test(decoded_sparse.inputs.size()==66 && decoded_sparse.background.size()==1024*768);}
     auto textured = r; textured.header.abi = 2; textured.header.flags = 0xf02;
     const auto textured_vs = nr::registered_lab::shader_tokens(R"(
 struct O {float4 p:SV_Position;float4 c:COLOR0;float2 uv:TEXCOORD0;};

@@ -1,0 +1,104 @@
+{
+  "original_packet_sha256": "af0c0afae342b78ad965d36c843d142a188c287c62e16db80d9f93be92a2bd1b",
+  "derived_capture_sha256": "fd32b199b5e9a133624b6de06185d38ff379296a3e207d66855325e1d9a4caa3",
+  "derived_capture_bytes": 5028992,
+  "target": [
+    1024,
+    768
+  ],
+  "vertices": 30,
+  "pixel_shader_words": 1008,
+  "texture_shapes": [
+    [
+      192,
+      64,
+      87
+    ],
+    [
+      768,
+      576,
+      87
+    ]
+  ],
+  "scissor": [
+    0,
+    720,
+    1024,
+    768
+  ],
+  "shader_metadata": [
+    {
+      "constants": [
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "inputs": [
+        7,
+        15,
+        3,
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "constants": [
+        8,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "inputs": [
+        15,
+        15,
+        15,
+        15,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "conversion": "Re-encode already-fetched packet vertices as a nonindexed triangle list with 256-byte float4 register rows; retain shaders, constants, textures, viewport, scissor, source-over blend and target bytes. This is a derived diagnostic capture, not the original DDI capture."
+}

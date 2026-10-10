@@ -854,3 +854,19 @@ the normal requested batch because the executor applies the bound internally.
 The 58 NPU DDI draws and loop regressions also pass. Installed trial v96 will
 check desktop progression and input; these component results do not establish
 that outcome.
+
+The [v96 installed trial](../../../docs/validation/2026-10-10/sole-display-v96/report.json)
+receives seven frames after 276 live NPU draws, without a verified Start-menu
+response. Its 66-vertex solid draw is incorrectly rejected by estimating every
+triangle as full-target work. Uniform admission now uses projected and clipped
+triangle regions, while retaining the 4096-tile budget. A sparse regression passes
+and a genuinely excessive draw rejects before changing output.
+
+A second captured compositor shader adds opacity blending and triggers the same
+NPU compiler layout failure. Its exact bytecode now shares the qualified 512-lane
+limit. [Clean build v188](../../../docs/validation/2026-10-10/desktop-blockers-v188/report.json)
+passes all 23 CPU suites, 71,680 NPU shader components, uniform tests and 58 driver
+draws. Both captured draws replay with exact scalar pixels and coverage. The fade
+draw takes 4.5 seconds on the NPU; these fixes require installed trial v97 and do
+not establish interactive desktop offload. Runtime device loss in v96 remains
+unexplained; a fresh NPU regression process recovered without a driver change.
