@@ -50,6 +50,8 @@ struct Program {
     std::array<bool, 14> dynamic_constants{};
     uint32_t temporaries = 0, position_output = 16, position_input = 16;
     std::vector<Instruction> instructions;
+    // Owned token stream for replay/transport; the caller may free its storage.
+    std::vector<uint32_t> bytecode;
 };
 class Reader {
     const uint32_t *words;
@@ -117,7 +119,7 @@ public:
 inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
     check(words && count >= 3 && count <= 16384 &&
           words[0] == (stage == Stage::vertex ? 0x00010040u : 0x00000040u) && words[1] == count);
-    Program result; result.stage = stage;
+    Program result; result.stage = stage; result.bytecode.assign(words, words + count);
     bool body = false, returned = false, temps_declared = false, flags_declared = false;
     std::array<uint32_t, 16> written_temps{}, written_outputs{};
     struct Branch {

@@ -100,6 +100,15 @@ std::vector<uint8_t> read_pixels(Allocation &source) {
     read.finish();
     return result;
 }
+#include "draw_capture.hpp"
+void APIENTRY draw_indexed(D3D10DDI_HDEVICE h, UINT count, UINT first, INT base) {
+    guard(h, __FUNCTION__, [&] {
+        lab_capture_indexed_draw(device(h), count, first, base);
+        // Capturing the request is diagnostic only. No target writes, shader
+        // execution, successful draw, or frame delivery are reported.
+        throw Error{DXGI_ERROR_UNSUPPORTED};
+    });
+}
 void APIENTRY draw(D3D10DDI_HDEVICE h, UINT count, UINT first) {
     guard(h, __FUNCTION__, [&] {
         auto &d = device(h);
@@ -151,7 +160,11 @@ void APIENTRY null_stream(D3D10DDI_HDEVICE h, UINT count, UINT, const D3D10DDI_H
 }
 void APIENTRY null_predication(D3D10DDI_HDEVICE h, D3D10DDI_HQUERY value, BOOL) { guard(h, __FUNCTION__, [&] { require(!value.pDrvPrivate); }); }
 void APIENTRY set_scissors(D3D10DDI_HDEVICE h, UINT count, UINT, const D3D10_DDI_RECT *values) {
-    guard(h, __FUNCTION__, [&] { require(count <= 16 && (!count || values)); }); // Enabled scissoring is rejected before drawing.
+    guard(h, __FUNCTION__, [&] {
+        require(count <= 16 && (!count || values));
+        auto &scissors = device(h).scissors;
+        if (count) scissors.assign(values, values + count); else scissors.clear();
+    }); // Enabled scissoring is still rejected before drawing.
 }
 void APIENTRY view_hazard(D3D10DDI_HDEVICE, D3D10DDI_HSHADERRESOURCEVIEW, D3D10DDI_HRESOURCE) {} // Blocking mappings/submissions order access.
 void bind_draw_functions(D3D10DDI_DEVICEFUNCS &f) {
@@ -160,6 +173,7 @@ void bind_draw_functions(D3D10DDI_DEVICEFUNCS &f) {
     f.pfnCalcPrivateShaderSize = shader_size; f.pfnCreateVertexShader = create_shader<1>; f.pfnCreatePixelShader = create_shader<2>;
     f.pfnDestroyShader = destroy_shader; f.pfnVsSetShader = set_shader<1>; f.pfnPsSetShader = set_shader<2>;
     f.pfnSetViewports = set_viewports; f.pfnIaSetTopology = set_topology; f.pfnDraw = draw;
+    f.pfnDrawIndexed = draw_indexed;
     f.pfnGsSetShader = null_shader; f.pfnIaSetInputLayout = set_layout;
     f.pfnCalcPrivateElementLayoutSize = layout_size; f.pfnCreateElementLayout = create_layout;
     f.pfnDestroyElementLayout = destroy_layout;

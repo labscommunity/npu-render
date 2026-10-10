@@ -1,0 +1,16 @@
+import json,tempfile
+from pathlib import Path
+import numpy as np
+import openvino as ov
+from openvino import opset13 as o
+x=o.parameter([256,1],np.int64,name='x');y=o.parameter([256,1],np.int64,name='y')
+z=o.multiply(x,y);area=o.subtract(z,o.constant(1,np.int64));positive=o.greater(area,o.constant(0,np.int64))
+values=np.array([0,1,-1,32767,32768,65535,65536,2**20,2**21,-2**21,2**30,-2**30],np.int64)
+a=np.resize(values,256).reshape(256,1);b=np.resize(values[::-1],256).reshape(256,1)
+try:
+ with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
+  m=ov.Model([z,area,positive],[x,y]);p=Path(d)/'m.xml'
+  for nd in m.get_ops():nd.set_rt_info('','precise_0')
+  ov.serialize(m,p);core=ov.Core();c=core.compile_model(core.read_model(p),'NPU',{'EXECUTION_MODE_HINT':'ACCURACY'});r=c({'x':a,'y':b});expected=[a*b,a*b-1,a*b-1>0]
+  for i,wanted in enumerate(expected):print(json.dumps({'output':i,'execution_device':c.get_property('EXECUTION_DEVICES'),'dtype':str(r[i].dtype),'exact':bool(np.array_equal(r[i],wanted)),'first12':r[i][:12].ravel().tolist(),'expected12':wanted[:12].ravel().tolist(),'desktop_offload_tested':False}),flush=True)
+except Exception as e:print(json.dumps({'error':str(e),'desktop_offload_tested':False}),flush=True);raise

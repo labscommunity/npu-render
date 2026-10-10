@@ -94,6 +94,7 @@ int test_draws(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER_DEVICE
                 const std::weak_ptr<const nr::shader::Program> retained = d.vertex_program;
                 f.pfnDestroyShader(h, generic);
                 TEST(last_error == S_OK && !retained.expired());
+                TEST(d.vertex_program->bytecode == code && d.vertex_program->bytecode.data() != code.data());
                 std::vector<nr::shader::VertexRegisters> vertices(16);
                 const std::array<float, 4> input{0.25f, -0.5f, 0.125f, 1.0f};
                 for (auto &v : vertices) std::memcpy(v[0].data(), input.data(), sizeof(input));
@@ -115,6 +116,7 @@ int test_draws(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER_DEVICE
                 f.pfnPsSetShader(h, generic); TEST(d.pixel_program);
                 const std::weak_ptr<const nr::shader::Program> pixel_retained = d.pixel_program;
                 f.pfnDestroyShader(h, generic); TEST(last_error == S_OK && !pixel_retained.expired());
+                TEST(d.pixel_program->bytecode == pixel_code && d.pixel_program->bytecode.data() != pixel_code.data());
                 nr::shader::PixelExecutor pixel_executor(*d.pixel_program, UINT(vertices.size()), backend);
                 const auto pixel_output = pixel_executor.execute(vertices, {});
                 const std::array<float, 4> pixel_expected{0.5f, -1.0f, 0.25f, 2.0f};
@@ -124,6 +126,15 @@ int test_draws(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER_DEVICE
                 TEST(last_error == E_INVALIDARG && counters.executions == executions &&
                      counters.allocations == allocations && memory[target_index] == before);
                 last_error = S_OK; f.pfnPsSetShader(h, hp); TEST(last_error == S_OK && pixel_retained.expired());
+                D3D10_DDI_RECT scissors[]{ {1, 2, 7, 9}, {3, 4, 5, 6} };
+                f.pfnSetScissorRects(h, 2, 0, scissors);
+                scissors[0].left = 99;
+                TEST(d.scissors.size() == 2 && d.scissors[0].left == 1);
+                f.pfnSetScissorRects(h, 0, 2, nullptr); TEST(d.scissors.empty());
+                f.pfnDrawIndexed(h, 6, 0, 0);
+                TEST(last_error == DXGI_ERROR_UNSUPPORTED && counters.executions == executions &&
+                     counters.allocations == allocations && memory[target_index] == before);
+                last_error = S_OK;
                 std::printf("{\"bound_pixel_stage\":true,\"samples\":16,\"execution_device\":\"%s\",\"exact_bits_verified\":true,\"desktop_offload_tested\":false}\n", pixel_output.execution_device.c_str());
             }
             depth.DepthEnable = TRUE; f.pfnSetDepthStencilState(h, hd, 0);

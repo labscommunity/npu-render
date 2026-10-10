@@ -335,6 +335,16 @@ it does not perform rasterization.
 
 Generic draw execution still requires rasterization, resource decoding and complete
 pipeline integration. The existing exact fullscreen composition path remains the
-only supported Draw path. The indirect desktop activates, but no DWM swapchain
-or desktop frames have been delivered. Windows also rejects a later CDD allocation;
-its relationship to the incomplete DWM initialization remains unresolved.
+only supported Draw path. In the v59 live attempt, DWM reaches DrawIndexed and
+781 indirect swapchain assignments select our prepared adapter. SetDevice fails;
+no frames are received or displayed. The trace also records a NoGPUAccess flag
+mismatch while opening synchronization objects. Its relationship to the failed
+indexed draws is not established.
+
+The guest-only DrawIndexed diagnostic preserves one read-only snapshot per
+process (32 MiB cap), including owned shader tokens, state, geometry, constants,
+and packed texture pixels. Its `NPDRAW01` records use the locked x64 WDK ABI for
+state and require a terminal `complete` record. Shader binaries and captured
+pixels stay in private ignored experiment storage. DrawIndexed still returns
+DXGI_ERROR_UNSUPPORTED and never reports an execution or writes its target.
+These snapshots are inputs for implementation and replay, not desktop offload.

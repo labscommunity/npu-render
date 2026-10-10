@@ -45,6 +45,7 @@ struct Device {
     std::vector<UINT> vertex_code, pixel_code;
     UINT vertex_shader = 0, pixel_shader = 0, viewport_count = 0;
     D3D10_DDI_VIEWPORT viewport{};
+    std::vector<D3D10_DDI_RECT> scissors;
     D3D10_DDI_PRIMITIVE_TOPOLOGY topology{};
     D3D10_DDI_BLEND_DESC blend{};
     D3D10_DDI_DEPTH_STENCIL_DESC depth{};

@@ -1,0 +1,10 @@
+{
+  "kind": "Rejected native i64 raster arithmetic experiment",
+  "execution_device": "NPU",
+  "runtime": "OpenVINO 2026.1",
+  "npu_driver": "32.0.100.5540",
+  "passed": false,
+  "failure": "Products and dependent predicates match truncated 32-bit arithmetic despite int64 output type",
+  "desktop_offload_tested": false,
+  "decision": "Do not use native i64 for raster coverage without a passing independent oracle"
+}
