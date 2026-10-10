@@ -10,7 +10,8 @@ namespace nr::raster {
 // Projection, interpolation, depth, scissoring and blending are separate stages.
 using Point = std::array<int32_t, 2>;
 struct Sample { std::array<Point, 3> triangle; Point point; };
-constexpr int32_t coordinate_limit = (1 << 22) - 1;
+// Edge-difference magnitudes fit 29 bits; triangle determinants fit signed 59 bits.
+constexpr int32_t coordinate_limit = (1 << 28) - 1;
 enum class CullMode : uint32_t { none = 0, front = 1, back = 2 };
 class CoverageExecutor {
     struct State;

@@ -704,3 +704,27 @@ input. The [v123 qualification](../../../docs/validation/2026-10-10/point-upscal
 records all three NPU sampler suites passing both initially and with reused
 cache entries, plus byte-exact replay of the captured DWM draw. Live desktop
 delivery remains unproven.
+
+The v86 desktop capture adds a 24×24 inverse-alpha mask: `ZERO, INV_SRC_ALPHA,
+ADD` for both color and alpha. The explicit destination-out operation multiplies
+existing channels by one minus clamped shader alpha. ABI 10 carries this mode
+separately from ABI 9 destination-in, with both mask bits together rejected.
+Both destination modes bypass source-copy rectangle shortcuts and participate in
+executor cache identity. The NPU tests cover varying alpha, clipping, channel
+masks, byte rounding, driver binding and the worker packet.
+
+That same draw has vertices approximately 524,312 pixels off-screen. Projection
+and coverage now admit a larger guard band. Coverage uses three signed base-1024
+limbs per edge difference and five product coefficients; it keeps exact integer
+edge signs without relying on the NPU's truncated native i64 operations. Edge
+magnitudes fit 29 bits, and intermediate coefficients fit i32. Tests include
+opposite extremes, degenerate triangles, both windings and nearly cancelling
+long, thin triangles, checked against scalar i64 coverage. This extends x/y
+admission; depth clipping and the other pipeline limits remain explicit.
+
+The [v127 qualification](../../../docs/validation/2026-10-10/destination-out-v127/report.json)
+records exact CPU, scalar and NPU replay, all 18 clean CPU suites, 61,440 exact
+NPU coverage checks and the ABI 10 worker response. The
+[v86 live trial](../../../docs/validation/2026-10-10/sole-display-v86/report.json)
+preserves the failing draw and black received frames; a usable desktop remains
+unproven.

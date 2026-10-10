@@ -74,6 +74,15 @@ int main(int argc, char **argv) try {
     for(unsigned n=0;n<4;++n){auto bad=destination_packet;auto h=destination_decoded.header;
         if(n==0)h.abi=1;if(n==1)h.flags&=~1u;if(n==2)h.flags|=0x8000;if(n==3)h.flags&=~0x4000u;
         std::memcpy(bad.data(),&h,sizeof(h));rejects(bad);}
+    auto destination_out=r;destination_out.header.abi=10;destination_out.header.flags|=0x8001;
+    const auto erase_words=nr::registered_lab::shader_tokens("float4 main():SV_Target{return float4(1,.75,.5,.25);}","ps_4_0");
+    destination_out.pixel=nr::shader::parse_pixel(erase_words.data(),erase_words.size());
+    const auto erase_packet=ex::encode(destination_out);const auto erase_decoded=ex::decode(erase_packet);
+    test(erase_decoded.header.abi==10 && ex::blend_mode(erase_decoded.header)==nr::raster::BlendMode::destination_out &&
+        erase_decoded.inputs==r.inputs && erase_decoded.background==r.background);
+    for(unsigned n=0;n<5;++n){auto bad=erase_packet;auto h=erase_decoded.header;
+        if(n==0)h.abi=9;if(n==1)h.flags&=~1u;if(n==2)h.flags|=0x4000;if(n==3)h.flags&=~0x8000u;if(n==4)h.flags|=0x10000;
+        std::memcpy(bad.data(),&h,sizeof(h));rejects(bad);}
     auto textured = r; textured.header.abi = 2; textured.header.flags = 0xf02;
     const auto textured_vs = nr::registered_lab::shader_tokens(R"(
 struct O {float4 p:SV_Position;float4 c:COLOR0;float2 uv:TEXCOORD0;};
@@ -116,6 +125,11 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
     {auto masked=triangles;masked.header.abi=9;masked.header.flags|=0x4001;
      const auto decoded_mask=ex::decode(ex::encode(masked));
      test(ex::blend_mode(decoded_mask.header)==nr::raster::BlendMode::destination_in && decoded_mask.texture.pixels==triangles.texture.pixels);}
+    {auto masked=triangles;masked.header.abi=10;masked.header.flags|=0x8001;
+     const auto decoded_mask=ex::decode(ex::encode(masked));
+     test(ex::blend_mode(decoded_mask.header)==nr::raster::BlendMode::destination_out && decoded_mask.texture.pixels==triangles.texture.pixels);}
+    {auto invalid=linear;invalid.header.abi=10;invalid.header.flags|=0x8001;
+     bool rejected=false;try{(void)ex::encode(invalid);}catch(const std::invalid_argument&){rejected=true;}test(rejected);}
     for(unsigned n=0;n<6;++n){auto bad=triangle_bytes;auto h=triangles.header;
         if(n==0)h.abi=6;if(n==1)h.flags&=~2u;if(n==2)h.flags&=~24u;if(n==3)h.flags|=24u;if(n==4)h.flags|=96u;if(n==5)h.vertices=4095;
         std::memcpy(bad.data(),&h,sizeof(h));rejects(bad);}
@@ -213,8 +227,8 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
     result.execution_device = "CPU"; rejected = false;
     try { (void)ex::response(r.header, result); } catch (const std::invalid_argument &) { rejected = true; } test(rejected);
     if (argc == 3) {
-        if (!std::strcmp(argv[1], "--emit-request") || !std::strcmp(argv[1], "--emit-destination-in")) {
-            const auto &emitted = !std::strcmp(argv[1], "--emit-destination-in") ? destination_packet : bytes;
+        if (!std::strcmp(argv[1], "--emit-request") || !std::strcmp(argv[1], "--emit-destination-in") || !std::strcmp(argv[1], "--emit-destination-out")) {
+            const auto &emitted = !std::strcmp(argv[1], "--emit-destination-out") ? erase_packet : !std::strcmp(argv[1], "--emit-destination-in") ? destination_packet : bytes;
             std::ifstream old(argv[2], std::ios::binary); test(!old); old.close();
             std::ofstream out(argv[2], std::ios::binary); test(bool(out));
             out.write(reinterpret_cast<const char *>(emitted.data()), std::streamsize(emitted.size())); out.close(); test(bool(out));

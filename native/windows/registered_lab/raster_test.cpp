@@ -54,6 +54,13 @@ int main(int argc, char **argv) try {
                 s.triangle = {{{-k, -k}, {k, -k}, {k, k}}};
                 const auto p = coordinate(); s.point = {p, p};
                 if (i & 1) std::swap(s.triangle[0], s.triangle[1]);
+            } else if (frame == 5) {
+                // Near-cancelling wide determinants, both windings and points
+                // separated by one fixed-point unit around a narrow diagonal.
+                const auto k=coordinate_limit;
+                s.triangle={{{-k,-k},{k,k},{k,k-8}}};
+                s.point={0,int32_t(i%13)-6};
+                if(i&1)std::swap(s.triangle[0],s.triangle[1]);
             }
         }
         const auto result = executor.execute(samples);

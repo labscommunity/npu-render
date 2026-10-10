@@ -34,13 +34,15 @@ void check_triangle_bounds(const std::string &backend) {
     }
     // Fully outside both sides, zero-area geometry, integer edges, and
     // subpixel bounds on either side of the pixel-center threshold.
-    const float edges[18][2]{{-8,-8},{-1,-8},{-1,-1},
+    const float edges[24][2]{{-8,-8},{-1,-8},{-1,-1},
         {8193,8193},{8200,8193},{8200,8200},
         {17,17},{17,17},{17,17},
         {0,0},{8192,0},{8192,8192},
         {.49609375f,.5f},{1.00390625f,.5f},{.5f,1.00390625f},
-        {-.00390625f,8191.99609375f},{.00390625f,8192},{0,8192.00390625f}};
-    for(size_t i=0;i<18;++i)vertices[i]={edges[i][0]/4096-1,1-edges[i][1]/4096,.5f,1};
+        {-.00390625f,8191.99609375f},{.00390625f,8192},{0,8192.00390625f},
+        {-524312,0},{524288,0},{524288,24},
+        {-900000,-900000},{900000,-900000},{900000,900000}};
+    for(size_t i=0;i<24;++i)vertices[i]={edges[i][0]/4096-1,1-edges[i][1]/4096,.5f,1};
     const auto result=executor.execute(vertices,viewport);
     TEST(result.triangle_bounds.size()==count/3);
     for(size_t t=0;t<count/3;++t){
@@ -118,7 +120,7 @@ int main(int argc, char **argv) try {
         if (i == 0) vertices[0][3] = 0;
         if (i == 1) vertices[0][0] = std::numeric_limits<float>::quiet_NaN();
         if (i == 2) vertices[0][2] = 2;
-        if (i == 3) vertices[0][0] = 100000;
+        if (i == 3) vertices[0][0] = float(coordinate_limit)/64;
         bool rejected = false;
         try { (void)executor.execute(vertices, viewport); } catch (const std::invalid_argument &) { rejected = true; }
         TEST(rejected); vertices[0] = valid;

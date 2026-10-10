@@ -32,7 +32,7 @@ struct OutputMerger::State {
     std::string execution_device;
     bool failed = false;
     State(uint32_t size, const std::string &backend, BlendMode blending, bool bgra, uint8_t mask) : count(size), blend(blending) {
-        require(blend == BlendMode::source_copy || blend == BlendMode::source_over || blend == BlendMode::destination_in);
+        require(blend == BlendMode::source_copy || blend == BlendMode::source_over || destination_blend(blend));
         require(count && count <= 65536 && mask && mask <= 15 && (backend == "NPU" || backend == "CPU" || backend == "GPU"));
         auto colors = std::make_shared<op::Parameter>(ov::element::f32, ov::Shape{count, 4});
         auto background = std::make_shared<op::Parameter>(ov::element::u8, ov::Shape{count, 4});
@@ -66,7 +66,7 @@ struct OutputMerger::State {
             auto fg = clamp_source(lane(colors, source));
             Node value = mul(fg, number(255));
             if (blend == BlendMode::source_over) value = add(value, mul(std::make_shared<op::Convert>(bc, ov::element::f32), sub(number(1), alpha)));
-            else if (blend == BlendMode::destination_in) value = mul(std::make_shared<op::Convert>(bc, ov::element::f32), alpha);
+            else if (destination_blend(blend)) value = mul(std::make_shared<op::Convert>(bc, ov::element::f32), blend == BlendMode::destination_in ? alpha : sub(number(1), alpha));
             value = choose(std::make_shared<op::Less>(value, number(0)), number(0),
                 choose(std::make_shared<op::Greater>(value, number(255)), number(255), value));
             auto base = both(pred(value), integer(255));

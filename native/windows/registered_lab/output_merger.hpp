@@ -7,7 +7,8 @@
 namespace nr::raster {
 using Color = std::array<float, 4>;
 using PackedColor = std::array<uint8_t, 4>;
-enum class BlendMode { source_copy, source_over, destination_in };
+enum class BlendMode { source_copy, source_over, destination_in, destination_out };
+constexpr bool destination_blend(BlendMode mode) { return mode == BlendMode::destination_in || mode == BlendMode::destination_out; }
 constexpr BlendMode source_blend(bool enabled) { return enabled ? BlendMode::source_over : BlendMode::source_copy; }
 // Single-sample RGBA8/BGRA8 with explicit blend operation and channel masks.
 class OutputMerger {

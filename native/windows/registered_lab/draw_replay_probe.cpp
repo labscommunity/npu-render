@@ -126,9 +126,10 @@ int main(int argc, char **argv) try {
     // Only target zero is bound in this captured draw; other blend slots are unused.
     const bool blending = blend[1] != 0;
     const bool destination_in = blending && blend[9] == 1 && blend[10] == 5 && blend[12] == 1 && blend[13] == 5;
+    const bool destination_out = blending && blend[9] == 1 && blend[10] == 6 && blend[12] == 1 && blend[13] == 6;
     if (blending) nr::capture::check(blend[11] == 1 && blend[14] == 1 &&
-        (destination_in || (blend[9] == 2 && blend[10] == 6 && blend[12] == 2 && blend[13] == 6)));
-    const auto blend_mode = destination_in ? BlendMode::destination_in : source_blend(blending);
+        (destination_in || destination_out || (blend[9] == 2 && blend[10] == 6 && blend[12] == 2 && blend[13] == 6)));
+    const auto blend_mode = destination_in ? BlendMode::destination_in : destination_out ? BlendMode::destination_out : source_blend(blending);
     nr::capture::check(raster.size() == 10 && raster[0] == 3 && raster[1] >= 1 && raster[1] <= 3 && !raster[3] && !raster[4] && !raster[5] && !raster[8] && !raster[9]);
     std::array<int32_t,4> clip{0,0,int32_t(width),int32_t(height)};
     if (raster[7]) {
@@ -194,7 +195,7 @@ int main(int argc, char **argv) try {
             texture={source[3],source[4],28,{}};texture.pixels.resize(alpha.size());
             for(size_t i=0;i<alpha.size();++i)texture.pixels[i]={0,0,0,alpha[i]};
         } else texture = {source[3],source[4],source[5],snapshot.values<PackedColor>("source")};
-        bool general_texture=destination_in || args[0]!=6 || raster[1]!=1 || (blend[15]&255)!=15;
+        bool general_texture=destination_in || destination_out || args[0]!=6 || raster[1]!=1 || (blend[15]&255)!=15;
         if(!general_texture)try{LinearTextureDrawExecutor::validate_shader(ps);}catch(const std::invalid_argument &){general_texture=true;}
         if(general_texture){
             while(uint64_t(width)*height%batch)batch/=2;
@@ -330,7 +331,7 @@ int main(int argc, char **argv) try {
                         const auto lane=format==87 && c<3 ? 2-c : c;
                         if(!((blend[15]&255)&(1u<<lane)))continue;
                         const double alpha=std::clamp(double(as_float(fragment[3])),0.,1.);
-                        const double value=destination_in ? double(pixel[c])*alpha : std::clamp(double(as_float(fragment[lane])),0.,1.)*255+(blending?double(pixel[c])*(1-alpha):0);
+                        const double value=destination_in ? double(pixel[c])*alpha : destination_out ? double(pixel[c])*(1-alpha) : std::clamp(double(as_float(fragment[lane])),0.,1.)*255+(blending?double(pixel[c])*(1-alpha):0);
                         pixel[c]=uint8_t(std::nearbyint((std::clamp)(value,0.,255.)));
                     }
                 }

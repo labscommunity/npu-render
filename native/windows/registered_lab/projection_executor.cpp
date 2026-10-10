@@ -122,7 +122,8 @@ ProjectionExecutor::Result ProjectionExecutor::execute(const std::vector<ClipPos
         // Keep enough margin for FP32 rounding before conversion to signed i32.
         const double bound_x = (std::abs(double(p[0]) / p[3]) + 1) * v[2] * .5 + std::abs(v[0]);
         const double bound_y = (std::abs(double(p[1]) / p[3]) + 1) * v[3] * .5 + std::abs(v[1]);
-        require(bound_x <= 16383 && bound_y <= 16383);
+        const double guard_band=double(coordinate_limit)/256-1;
+        require(bound_x <= guard_band && bound_y <= guard_band);
     }
     s.failed = true;
     auto clip = s.request.get_tensor("clip"), vp = s.request.get_tensor("viewport");

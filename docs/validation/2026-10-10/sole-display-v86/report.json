@@ -1,0 +1,38 @@
+{
+  "trial": "v86",
+  "source_commit": "ca3268a3c553a89773884c29ebe6e501be852968",
+  "umd_build": "present-umd-v123",
+  "kmd_build": "allocation-capacity-v3",
+  "package_version": "0.0.74.0",
+  "npu_preflight_packets_passed": 13,
+  "successful_npu_packets_by_process": {
+    "dwm-6660": 71,
+    "Explorer-5404": 36,
+    "StartMenu-5100": 56
+  },
+  "received_frames": 2,
+  "received_frames_with_nonblack_pixels": 0,
+  "frames_received_while_sole_gate_true": 1,
+  "viewer_window_submissions": 2,
+  "harness_input_actions": [
+    "wake-shift"
+  ],
+  "visual_response_verified": false,
+  "collector_completed_without_error": false,
+  "collector_failure": "WinRM transport interruption after the trial during two KD assertion prompts",
+  "full_desktop_offload": false,
+  "performance_tested": false,
+  "device_cleanup_passed": true,
+  "transport_configuration_removed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "findings": [
+    "The first complete failed DWM draw has a 24x24 BGRA target, 72 nonindexed vertices forming 24 triangles, and a [2,0,24,18] scissor. Its color and alpha blend factors are ZERO and INV_SRC_ALPHA with ADD. The current renderer supports destination-in but rejects this inverse mask before dispatch; offline CPU replay reproduces rejection.",
+    "DWM records 70 completed draws and 5 successful Present callbacks. The physical NPU worker returns 71 successful DWM packets. Receipt, callback and delivered-frame counts are separate observations.",
+    "Two opaque-black frames reach the collector and software viewer. One arrives while the collector sole-display gate is true. The harness sends Shift once on sole entry and never attempts Start because no visible desktop content arrives.",
+    "After the first failure, DWM also records vertex-buffer binding rejections and captures a 200-word pixel shader containing derivative opcodes 11 and 12, which the parser does not support. The next build adds targeted binding diagnostics; these later failures do not yet establish which path a successful primary device would take.",
+    "The package was initially generated with an incorrectly transcribed source revision. That uninstalled package is preserved as driver-package-v86-metadata-rejected. A fresh package using git rev-parse HEAD was built, verified, and is the only v86 package transferred to the guest.",
+    "The collector later exits with a WinRM transport failure while the debugger is awaiting two DWM assertion responses. This occurs after both devices are removed; frame and sole-gate observations above remain bounded to their timestamps. The raw stderr and subsequent recovery are retained.",
+    "Both custom devices and transport configuration are removed. No usable desktop, physical scanout offload or Tahoma benefit is established."
+  ]
+}

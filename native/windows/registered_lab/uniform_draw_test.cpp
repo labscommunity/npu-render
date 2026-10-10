@@ -49,17 +49,18 @@ O main(float4 p:POSITION,float4 c:COLOR) {O o;o.p=p;o.c=c*color;return o;})", "v
         std::printf("{\"uniform_draw\":true,\"frame\":%u,\"covered_samples\":%llu,\"draw_ms\":%.3f,\"execution_device\":\"%s\",\"desktop_offload_tested\":false}\n",
             frame, static_cast<unsigned long long>(result.covered_samples), result.timings.total_ms, result.execution_device.c_str());
     }
-    // Destination-in masks must not enter the source-copy rectangle shortcut,
+    // Destination masks must not enter the source-copy rectangle shortcut,
     // including alpha=1. Verify spatially varying alpha, swizzle and write masks.
-    for(const bool bgra : {false,true}) {
-        UniformDrawExecutor mask_draw(vs,ps,6,64,64,backend,BlendMode::destination_in,bgra,5,256);
+    for(const auto mode : {BlendMode::destination_in,BlendMode::destination_out}) for(const bool bgra : {false,true}) {
+        UniformDrawExecutor mask_draw(vs,ps,6,64,64,backend,mode,bgra,5,256);
         auto inputs=quad(1,false);VertexConstants cb;cb[0].push_back({as_bits(1.f),as_bits(1.f),as_bits(1.f),as_bits(1.f)});
         for(auto &v:inputs)v[1]={as_bits(.75f),as_bits(.25f),as_bits(1.f),as_bits((as_float(v[0][0])+1)*.5f)};
         const auto result=mask_draw.execute(inputs,cb,{},viewport,background,std::array<int32_t,4>{5,7,61,59});
         test(!result.used_rectangle && result.covered_samples==56*52);
         for(unsigned y=0;y<64;++y)for(unsigned x=0;x<64;++x)for(unsigned c=0;c<4;++c) {
             const auto lane=bgra && c<3?2-c:c;const bool changed=x>=5 && x<61 && y>=7 && y<59 && (5&(1u<<lane));
-            const double expected=changed?old[c]*(x+.5)/64:old[c];
+            const double alpha=(x+.5)/64;
+            const double expected=changed?old[c]*(mode==BlendMode::destination_in?alpha:1-alpha):old[c];
             test(std::abs(result.pixels[size_t(y)*64+x][c]-expected)<=.51);++checked;
         }
     }

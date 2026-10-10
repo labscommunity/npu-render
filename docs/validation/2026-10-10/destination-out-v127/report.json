@@ -1,0 +1,40 @@
+{
+  "build": "present-umd-v127",
+  "clean_cpu_suites_passed": 18,
+  "source_hashes_verified": 101,
+  "binary_hashes_verified_on_delta": 24,
+  "captured_draw": "v86-dwm-6660",
+  "target": [
+    24,
+    24
+  ],
+  "vertices": 72,
+  "triangles": 24,
+  "covered_samples": 76,
+  "tile_executions": 8,
+  "cpu_scalar_and_npu_pixels_exact": true,
+  "cpu_npu_pixel_sha256": "6b2e09e1198af741fb9b8545b26c0398ea445d1fa4fea2c7e920189a1205ff44",
+  "npu_replays_passed": 2,
+  "npu_draw_ms": [
+    76.929,
+    48.067
+  ],
+  "npu_output_merger_components_checked": 196608,
+  "npu_uniform_components_checked": 287744,
+  "npu_driver_callback_components_checked": 262144,
+  "abi10_worker_components_checked": 16384,
+  "npu_exact_coverage_checks": 61440,
+  "npu_large_and_degenerate_projection_bounds": 32,
+  "host_integer_sign_diagnostic_cases": 200000,
+  "fixed_coordinate_limit": 268435455,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "findings": [
+    "Explicit destination-out implements ZERO/INV_SRC_ALPHA/ADD for color and alpha on the selected provider. ABI 10 carries it without changing ABI 9 destination-in or earlier packets. Opposing mask bits, missing enable, unsupported texture specializations and mismatched versions remain rejected.",
+    "A first clean v124 build fails an existing cumulative draw-count assertion after the new mask checks pass. The affected texture assertions now check each draw increment directly. v125 passes all 18 CPU suites and the real NPU mask/component/packet checks.",
+    "v125 offline replay then reaches a second admission failure: 28 of the captured 72 vertex positions exceed the previous projection guard band, reaching approximately 524312 pixels off-screen. Those inputs are preserved.",
+    "v126 expands projection and interpolation coordinate admission and evaluates exact coverage determinants using three base-1024 edge limbs and five product coefficients. CPU and NPU replay agree with the scalar coverage and pixel oracle; randomized, winding, extreme, degenerate and narrow-diagonal NPU checks pass.",
+    "v127 clarifies the coordinate-bound comment and repeats clean source/binary verification plus the NPU qualification for the final packaged build. No functional code differs from v126.",
+    "The next VM trial must establish visible desktop delivery and interaction. This isolated replay does not establish full desktop offload or improved Tahoma performance."
+  ]
+}

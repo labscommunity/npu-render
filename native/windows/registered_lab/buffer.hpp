@@ -40,9 +40,12 @@ void APIENTRY set_vertex_buffers(D3D10DDI_HDEVICE h, UINT start, UINT count,
             auto &binding = next[start + i]; binding = {};
             if (!values[i].pDrvPrivate) continue;
             auto &r = resource(values[i]);
-            require(r.buffer_bytes && (r.bind_flags & D3D10_DDI_BIND_VERTEX_BUFFER) &&
+            const bool valid=r.buffer_bytes && (r.bind_flags & D3D10_DDI_BIND_VERTEX_BUFFER) &&
                 r.allocation->context == device(h).context && !r.allocation->locked &&
-                strides[i] <= 2048 && offsets[i] <= r.buffer_bytes);
+                strides[i] <= 2048 && offsets[i] <= r.buffer_bytes;
+            if(!valid)lab_trace("{\"event\":\"vertex_binding_rejected\",\"start\":%u,\"count\":%u,\"slot\":%u,\"bytes\":%u,\"bind_flags\":%u,\"stride\":%u,\"offset\":%u,\"locked\":%s,\"same_context\":%s}\n",
+                start,count,start+i,r.buffer_bytes,r.bind_flags,strides[i],offsets[i],r.allocation->locked?"true":"false",r.allocation->context==device(h).context?"true":"false");
+            require(valid);
             binding.allocation = r.allocation; binding.bytes = r.buffer_bytes;
             binding.stride = strides[i]; binding.offset = offsets[i];
         }

@@ -52,7 +52,7 @@ struct UniformDrawExecutor::State {
                !a.relative.enabled && a.lanes==std::array<uint32_t,4>{0,1,2,3} &&
                (ps.interpolation[a.index]==2 || ps.interpolation[a.index]==4)) color_input=a.index;
         }
-        if (blend != BlendMode::destination_in && count == 6 && mask == 15 && !(width % 4) && uint64_t(width) * height <= 4 * 1024 * 1024)
+        if (!destination_blend(blend) && count == 6 && mask == 15 && !(width % 4) && uint64_t(width) * height <= 4 * 1024 * 1024)
             rectangle = std::make_unique<SolidRectangleExecutor>(width, height, backend, bgra);
     }
 };

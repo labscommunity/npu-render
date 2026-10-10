@@ -25,12 +25,13 @@ struct Receipt {
 static_assert(sizeof(Receipt) == 48);
 inline void require(bool value) { if (!value) throw std::invalid_argument("invalid indexed NPU exchange packet"); }
 inline raster::BlendMode blend_mode(const Header &h) {
-    return (h.flags & 0x4000) ? raster::BlendMode::destination_in : raster::source_blend((h.flags & 1) != 0);
+    return (h.flags & 0x8000) ? raster::BlendMode::destination_out : (h.flags & 0x4000) ? raster::BlendMode::destination_in : raster::source_blend((h.flags & 1) != 0);
 }
 inline bool shape_valid(const Header &h) {
-    if (h.flags & 0x4000) {
-        if (h.abi != 9 || !(h.flags & 1) || ((h.flags & 2) && !(h.flags & 0x3000))) return false;
-        auto legacy = h; legacy.flags &= ~0x4000u;
+    if (h.flags & 0xc000) {
+        const auto mode=h.flags & 0xc000;
+        if (mode==0xc000 || h.abi != (mode==0x8000?10u:9u) || !(h.flags & 1) || ((h.flags & 2) && !(h.flags & 0x3000))) return false;
+        auto legacy = h; legacy.flags &= ~0xc000u;
         legacy.abi = (legacy.flags & 0x2000) ? 8u : (legacy.flags & 0x1000) ? 7u :
             (legacy.flags & 0xe0) ? 6u : (legacy.flags & 4) ? 3u : 1u;
         return shape_valid(legacy);

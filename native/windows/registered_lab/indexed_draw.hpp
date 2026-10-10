@@ -102,10 +102,13 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
     const bool destination_in = blend && d.blend.SrcBlend == D3D10_DDI_BLEND_ZERO &&
         d.blend.DestBlend == D3D10_DDI_BLEND_SRC_ALPHA && d.blend.SrcBlendAlpha == D3D10_DDI_BLEND_ZERO &&
         d.blend.DestBlendAlpha == D3D10_DDI_BLEND_SRC_ALPHA;
+    const bool destination_out = blend && d.blend.SrcBlend == D3D10_DDI_BLEND_ZERO &&
+        d.blend.DestBlend == D3D10_DDI_BLEND_INV_SRC_ALPHA && d.blend.SrcBlendAlpha == D3D10_DDI_BLEND_ZERO &&
+        d.blend.DestBlendAlpha == D3D10_DDI_BLEND_INV_SRC_ALPHA;
     if (blend) require(d.blend.BlendOp == D3D10_DDI_BLEND_OP_ADD && d.blend.BlendOpAlpha == D3D10_DDI_BLEND_OP_ADD &&
-        (destination_in || (d.blend.SrcBlend == D3D10_DDI_BLEND_ONE && d.blend.DestBlend == D3D10_DDI_BLEND_INV_SRC_ALPHA &&
+        (destination_in || destination_out || (d.blend.SrcBlend == D3D10_DDI_BLEND_ONE && d.blend.DestBlend == D3D10_DDI_BLEND_INV_SRC_ALPHA &&
         d.blend.SrcBlendAlpha == D3D10_DDI_BLEND_ONE && d.blend.DestBlendAlpha == D3D10_DDI_BLEND_INV_SRC_ALPHA)));
-    const auto blend_mode = destination_in ? nr::raster::BlendMode::destination_in : nr::raster::source_blend(blend);
+    const auto blend_mode = destination_in ? nr::raster::BlendMode::destination_in : destination_out ? nr::raster::BlendMode::destination_out : nr::raster::source_blend(blend);
     const auto vc = fetch_constants(d, 0, *d.vertex_program), pc = fetch_constants(d, 2, *d.pixel_program);
     const bool textured = std::any_of(d.pixel_program->textures.begin(),d.pixel_program->textures.end(),[](bool v){return v;});
     const auto cull=static_cast<nr::raster::CullMode>(UINT(d.raster.CullMode)-1);
@@ -151,7 +154,7 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
         // affine point sampler handles scaling/clamping on the selected device.
         const bool source_smaller=source && (source->surface.width<s.width || source->surface.height<s.height);
         modulated=linear || d.pixel_program->instructions.size()==2 || blend || clip!=full || source_smaller;
-        general_texture=destination_in || count!=6 || cull!=nr::raster::CullMode::none || d.blend.RenderTargetWriteMask[0]!=15;
+        general_texture=destination_in || destination_out || count!=6 || cull!=nr::raster::CullMode::none || d.blend.RenderTargetWriteMask[0]!=15;
         if(!general_texture) {
             try {
                 if(modulated) nr::raster::LinearTextureDrawExecutor::validate_shader(*d.pixel_program);
@@ -189,11 +192,12 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
         if(general_texture){request.header.abi=7;request.header.flags|=0x1000|(linear?8u:16u);}
         if(general_resources){request.header.abi=8;request.header.flags|=0x2002;request.resources=std::move(resources);request.samplers=resource_samplers;}
         if(destination_in){request.header.abi=9;request.header.flags|=0x4000;}
+        if(destination_out){request.header.abi=10;request.header.flags|=0x8000;}
         request.viewport = viewport; request.vertex = *d.vertex_program; request.pixel = *d.pixel_program;
         request.inputs = inputs; request.vertex_constants = vc; request.pixel_constants = pc; request.background = std::move(background);
         result = d.indexed_exchange->execute(std::move(request));
     } else if(general_resources){
-        const uint64_t options=(uint64_t(destination_in)<<12)|uint64_t(d.blend.RenderTargetWriteMask[0])|(uint64_t(blend)<<4)|(uint64_t(cull)<<6)|(uint64_t(front_ccw)<<8);
+        const uint64_t options=(uint64_t(destination_in)<<12)|(uint64_t(destination_out)<<13)|uint64_t(d.blend.RenderTargetWriteMask[0])|(uint64_t(blend)<<4)|(uint64_t(cull)<<6)|(uint64_t(front_ccw)<<8);
         const std::array<uint64_t,5> key{s.width,s.height,s.format,count,options};
         if(!d.resources_executor || d.resources_vertex!=d.vertex_program || d.resources_pixel!=d.pixel_program || d.resources_key!=key ||
             !nr::raster::resource_layout_equal(resources,d.resources_layout) || !nr::raster::sampler_layout_equal(resource_samplers,d.resources_samplers)){
@@ -205,7 +209,7 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
         }
         result=d.resources_executor->execute(inputs,vc,pc,viewport,resources,background,clip);
     } else if(general_texture) {
-        const uint64_t options=(uint64_t(destination_in)<<12)|uint64_t(d.blend.RenderTargetWriteMask[0])|(uint64_t(blend)<<4)|(uint64_t(linear)<<5)|(uint64_t(cull)<<6)|(uint64_t(front_ccw)<<8);
+        const uint64_t options=(uint64_t(destination_in)<<12)|(uint64_t(destination_out)<<13)|uint64_t(d.blend.RenderTargetWriteMask[0])|(uint64_t(blend)<<4)|(uint64_t(linear)<<5)|(uint64_t(cull)<<6)|(uint64_t(front_ccw)<<8);
         const std::array<uint64_t,8> key{s.width,s.height,s.format,texture.width,texture.height,texture.format,count,options};
         if(!d.triangle_texture_executor || d.triangle_texture_vertex!=d.vertex_program || d.triangle_texture_pixel!=d.pixel_program || d.triangle_texture_key!=key){
             if(d.backend=="NPU")d.triangle_texture_executor.reset();
@@ -238,7 +242,7 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
         }
         result = d.point_texture_executor->execute(inputs,vc,viewport,texture);
     } else {
-        const std::array<uint64_t, 5> key{s.width, s.height, s.format, count, uint64_t(d.blend.RenderTargetWriteMask[0]) | (uint64_t(blend) << 8) | (uint64_t(cull)<<9) | (uint64_t(front_ccw)<<11) | (uint64_t(destination_in)<<12)};
+        const std::array<uint64_t, 5> key{s.width, s.height, s.format, count, uint64_t(d.blend.RenderTargetWriteMask[0]) | (uint64_t(blend) << 8) | (uint64_t(cull)<<9) | (uint64_t(front_ccw)<<11) | (uint64_t(destination_in)<<12)|(uint64_t(destination_out)<<13)};
         if (!d.indexed_executor || d.indexed_vertex != d.vertex_program || d.indexed_pixel != d.pixel_program || d.indexed_key != key) {
             // Driver 5540 loses the new NPU vertex request if the old cache
             // entry is destroyed between new-model creation and first inference.

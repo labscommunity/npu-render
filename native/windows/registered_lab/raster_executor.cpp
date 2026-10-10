@@ -33,20 +33,28 @@ Node high(const Node &a) {
     auto scale = op::Constant::create(ov::element::f32, ov::Shape{}, {1.0f / 1024.0f});
     return pred(mul(integral, scale));
 }
-std::array<Node, 3> product(const Node &a, const Node &b) {
-    auto al = low(a), ah = high(a), bl = low(b), bh = high(b);
-    return {mul(al, bl), add(mul(ah, bl), mul(al, bh)), mul(ah, bh)};
+std::array<Node, 5> product(const Node &a, const Node &b) {
+    // Three base-1024 limbs retain the complete signed edge difference. Each
+    // coefficient stays below 2^23 at the admitted coordinate bound, so all
+    // i32 products and carry conversions are exact on the selected provider.
+    auto al=low(a),am=low(high(a)),ah=high(high(a));
+    auto bl=low(b),bm=low(high(b)),bh=high(high(b));
+    return {mul(al,bl),add(mul(am,bl),mul(al,bm)),
+        add(add(mul(ah,bl),mul(am,bm)),mul(al,bh)),
+        add(mul(ah,bm),mul(am,bh)),mul(ah,bh)};
 }
 struct Sign { Node positive, negative, zero; };
 Sign determinant(const Node &ax, const Node &by, const Node &ay, const Node &bx) {
-    const auto p = product(ax, by), q = product(ay, bx);
-    auto lo = sub(p[0], q[0]);
-    auto mid = add(sub(p[1], q[1]), high(lo));
-    auto hi = add(sub(p[2], q[2]), high(mid));
-    lo = low(lo); mid = low(mid);
-    // Integer masks avoid a separate NPU miscompile of compound boolean logic.
-    return {either(positive(hi), both(zero(hi), either(positive(mid), positive(lo)))),
-            negative(hi), both(zero(hi), both(zero(mid), zero(lo)))};
+    const auto p=product(ax,by),q=product(ay,bx);
+    Node carry=integer(0),lower_nonzero=integer(0);
+    for(size_t i=0;i<4;++i){
+        auto value=add(sub(p[i],q[i]),carry);
+        lower_nonzero=either(lower_nonzero,positive(low(value)));
+        carry=high(value);
+    }
+    auto hi=add(sub(p[4],q[4]),carry);
+    return {either(positive(hi),both(zero(hi),lower_nonzero)),negative(hi),
+        both(zero(hi),zero(lower_nonzero))};
 }
 }
 struct CoverageExecutor::State {
