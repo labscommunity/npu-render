@@ -252,6 +252,7 @@ NTSTATUS initialize(DRIVER_OBJECT *, UNICODE_STRING *, DRIVER_INITIALIZATION_DAT
 #undef DriverEntry
 #define NR_CHECK(expression) do { if (!(expression)) return __LINE__; } while (false)
 #include "standard_allocation_test.hpp"
+#include "shadow_surface_test.hpp"
 #include "aperture_test.hpp"
 #include "paging_test.hpp"
 #include "segment_capacity_test.hpp"

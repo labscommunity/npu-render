@@ -22,6 +22,8 @@ int aperture_adapter_test() {
     NR_CHECK(!sources && !children && a->segment.is_aperture() && a->segment.capacity() == Aperture::bytes);
     const auto standard_result = standard_allocation_ddi_test(a);
     if (standard_result) return standard_result;
+    const auto shadow_result = shadow_surface_test(a);
+    if (shadow_result) return shadow_result;
     DXGK_SEGMENTDESCRIPTOR3 descriptor{}; DXGK_QUERYSEGMENTOUT3 segment{};
     segment.NbSegment = 1; segment.pSegmentDescriptor = &descriptor;
     NR_CHECK(a->segment.describe(segment) == STATUS_SUCCESS);

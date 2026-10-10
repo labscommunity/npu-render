@@ -8,6 +8,7 @@ constexpr u32 version = 1;
 constexpr u64 max_surface_bytes = 128ull * 1024 * 1024;
 constexpr u32 cross_adapter_surface = 1;
 constexpr u32 presentation_staging_surface = 2;
+constexpr u32 shadow_surface = 4;
 struct AdapterInfo {
     u32 signature = magic;
     u32 abi = version;
@@ -50,10 +51,11 @@ static_assert(sizeof(AdapterInfo) == 16 && sizeof(Surface) == 40);
 constexpr bool valid(const Surface &s) {
     const bool cross = s.flags == cross_adapter_surface;
     const bool staging = s.flags == presentation_staging_surface;
+    const bool shadow = s.flags == shadow_surface;
     const u64 rows = cross ? (u64(s.height) + 3) & ~u64(3) : s.height;
     return s.signature == magic && s.abi == version && s.bytes == sizeof(Surface) &&
-           (s.flags == 0 || cross || staging) && s.width && s.width <= 8192 && s.height && s.height <= 8192 &&
-           (staging ? s.format == 88 : (s.format == 28 || s.format == 87)) && // BGRX8 / RGBA8 / BGRA8
+           (s.flags == 0 || cross || staging || shadow) && s.width && s.width <= 8192 && s.height && s.height <= 8192 &&
+           (staging ? s.format == 88 : (s.format == 28 || s.format == 87 || (shadow && s.format == 88))) &&
            (cross ? s.row_pitch == ((u64(s.width) * 4 + 127) & ~u64(127)) :
                     s.row_pitch >= u64(s.width) * 4 && !(s.row_pitch % 256)) &&
            s.allocation_bytes && s.allocation_bytes <= max_surface_bytes &&

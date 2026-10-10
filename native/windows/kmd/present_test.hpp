@@ -4,6 +4,7 @@ int present_test(Adapter *a, Allocation *source, Allocation *destination, UCHAR 
     const auto source_before = source->surface, destination_before = destination->surface;
     source->surface.width = destination->surface.width = 65;
     source->surface.height = destination->surface.height = 13;
+    if (gdi) source->surface.flags = nr::kernel_contract::shadow_surface;
     destination->surface.flags = nr::kernel_contract::cross_adapter_surface;
     destination->surface.row_pitch = 384;
     Device device{}; device.adapter = a;

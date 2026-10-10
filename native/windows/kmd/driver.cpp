@@ -505,6 +505,10 @@ NTSTATUS APIENTRY standard_allocation(HANDLE adapter, DXGKARG_GETSTANDARDALLOCAT
     if (!adapter || !args) return STATUS_INVALID_PARAMETER;
     const auto a = static_cast<Adapter *>(adapter);
     if (!a->started || !a->segment.is_aperture()) return STATUS_DEVICE_NOT_READY;
+    if (args->StandardAllocationType == D3DKMDT_STANDARDALLOCATION_SHADOWSURFACE && args->pCreateShadowSurfaceData) {
+        const auto &input = *args->pCreateShadowSurfaceData;
+        NR_LAB_TRACE("nr_paging_lab: shadow_surface width=%u height=%u format=%u\n", input.Width, input.Height, UINT(input.Format));
+    }
     const auto status = nr::kmd::StandardAllocation::describe(*args);
     NR_LAB_TRACE("nr_paging_lab: standard_allocation type=%u status=%08lx\n", UINT(args->StandardAllocationType), ULONG(status));
     return status;
@@ -542,7 +546,8 @@ NTSTATUS APIENTRY create_allocation(HANDLE adapter, DXGKARG_CREATEALLOCATION *ar
             return STATUS_NOT_SUPPORTED;
         if (descriptions[i].flags == nr::kernel_contract::cross_adapter_surface && !resource_owned)
             return STATUS_NOT_SUPPORTED;
-        if (allocation_only_resource && descriptions[i].flags != nr::kernel_contract::presentation_staging_surface)
+        if (allocation_only_resource && descriptions[i].flags != nr::kernel_contract::presentation_staging_surface &&
+            descriptions[i].flags != nr::kernel_contract::shadow_surface)
             return STATUS_INVALID_PARAMETER;
         if (resource_owned && !allocation_only_resource && !same_surface(resource_description, descriptions[i]))
             return STATUS_INVALID_PARAMETER;
@@ -690,7 +695,8 @@ NTSTATUS APIENTRY open_allocation(HANDLE device, const DXGKARG_OPENALLOCATION *a
         allocations[i] = static_cast<Allocation *>(a->kernel.DxgkCbGetHandleData(&lookup));
         if (!allocations[i] || allocations[i]->adapter != a) return STATUS_INVALID_HANDLE;
         const bool staging_without_resource_data = allocations[i]->resource && !args->PrivateDriverSize &&
-            args->NumAllocations == 1 && allocations[i]->surface.flags == nr::kernel_contract::presentation_staging_surface;
+            args->NumAllocations == 1 && (allocations[i]->surface.flags == nr::kernel_contract::presentation_staging_surface ||
+                                       allocations[i]->surface.flags == nr::kernel_contract::shadow_surface);
         if ((!staging_without_resource_data && bool(allocations[i]->resource) != bool(args->PrivateDriverSize)) ||
             (args->PrivateDriverSize && !same_surface(resource_description, allocations[i]->surface)))
             return STATUS_INVALID_PARAMETER;
@@ -879,8 +885,8 @@ extern "C" NTSTATUS DriverEntry(DRIVER_OBJECT *driver, UNICODE_STRING *registry)
     data.DxgkDdiQueryCurrentFence = current_fence;
     NR_REJECT(DxgkDdiControlInterrupt);
     // A non-null RenderKm advertises GDI hardware acceleration to CDD. Leave
-    // this optional callback absent until we implement its command contract;
-    // a rejection stub causes Windows to request unsupported GDI contexts.
+    // this optional callback absent until we implement its command contract.
+    // CDD still requests GDI contexts when this acceleration is absent.
     data.DxgkDdiQueryDependentEngineGroup = dependent_engines;
     data.DxgkDdiQueryEngineStatus = engine_status;
     data.DxgkDdiResetEngine = reset_engine;
