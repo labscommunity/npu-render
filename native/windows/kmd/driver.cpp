@@ -788,7 +788,10 @@ NTSTATUS APIENTRY create_context(HANDLE device, DXGKARG_CREATECONTEXT *args) {
     InterlockedIncrement(&d->contexts);
     RtlZeroMemory(&args->ContextInfo, sizeof(args->ContextInfo));
     args->ContextInfo.DmaBufferSize = nr::kmd::Scheduler::max_bytes;
-    args->ContextInfo.DmaBufferPrivateDataSize = sizeof(nr::kmd::CopyRecord);
+    // Present records are larger than copy records. Advertising only the copy
+    // size makes even one present permanently unable to fit a fresh buffer.
+    args->ContextInfo.DmaBufferPrivateDataSize = NR_KMD_LAB_APERTURE_ADAPTER ?
+        sizeof(nr::kmd::PresentRecord) * nr::kmd::Present::max_records : sizeof(nr::kmd::CopyRecord);
     args->ContextInfo.AllocationListSize = 64;
     args->ContextInfo.PatchLocationListSize = 64;
     args->hContext = c;

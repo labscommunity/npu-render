@@ -87,6 +87,13 @@ validated presentation staging surface, returns a real resource owner, and
 tracks its allocation through destruction. Other resource kinds still require
 their matching resource metadata. Host tests reproduce the observed request
 and reject ordinary/cross-adapter surfaces and malformed metadata in this path.
+The v40 guest reaches `DxgkDdiPresent`, but its 64-byte records cannot fit the
+40-byte private-buffer size advertised by context creation. Repeated
+`STATUS_GRAPHICS_INSUFFICIENT_DMA_BUFFER` responses leave an empty presentation
+packet; rejecting its patch causes guest bugcheck `0x119/3`. The aperture context
+now advertises space for the bounded presentation record array. The presentation
+test creates its context through the actual DDI and checks those advertised
+budgets before exercising copies. This fix still requires live acceptance.
 
 The design follows the documented [linear aperture address-space contract](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/linear-aperture-space-segments)
 and [map/unmap requirements](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/nc-d3dkmddi-dxgkddi_buildpagingbuffer).
