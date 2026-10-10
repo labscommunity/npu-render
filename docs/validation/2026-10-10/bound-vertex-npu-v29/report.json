@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "kind": "registered-shader-binding-npu-stage-validation",
+  "source_revision": "66feaa7",
+  "passed": true,
+  "bound_vertex_stage_results": 16,
+  "exact_bits_verified": true,
+  "execution_device": "NPU",
+  "shader_wrapper_destroyed_while_bound": true,
+  "unsupported_generic_draw_rejected": true,
+  "existing_composition_draws_checked": 16,
+  "registered_adapter_tested": false,
+  "desktop_offload_tested": false,
+  "performance_tested": false,
+  "notes": [
+    "The shader is authored HLSL compiled during the test. The retained shader program executes through the vertex executor after DDI shader-wrapper destruction.",
+    "The driver-shim component suite checks sixteen existing composition draws; these do not constitute DWM frames.",
+    "The raw runner includes an unused shader-file precondition and shader_sha256 copied from the earlier captured-shader runner. That file is not passed to this executable. This report identifies the actual authored shader test.",
+    "Three CPU build-contract tests passed. Runtime output explicitly identifies NPU execution and verifies values; no fallback is admitted."
+  ]
+}

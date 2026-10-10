@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "kind": "desktop-shadow-allocation-admission",
+  "source_revision": "95ae954",
+  "driver_version": "0.0.41.0",
+  "shadow_metadata_accepted": true,
+  "swapchain_assigned": false,
+  "frames_received": 0,
+  "frames_displayed": 0,
+  "clean_removal": true,
+  "npu_execution_tested": false,
+  "desktop_offload_tested": false,
+  "performance_tested": false,
+  "sharing_flag_rejections": 12,
+  "notes": [
+    "All 53 raw snapshot files were hash-verified. Text evidence normalizes CRLF to LF.",
+    "The topology probe ran before the indirect monitor was available; preparation took 8562 ms. A later monitor-arrival event and commit_modes paths=1 are present.",
+    "SHADOWSURFACE 1024x768 format 21 metadata is accepted. CreateAllocation and OpenAllocation events precede the first sharing-flags rejection. The exact failing flags are not yet identified.",
+    "The OS reports twelve failures creating CDD primary allocations. No desktop frames are received or displayed."
+  ]
+}
