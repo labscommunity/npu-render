@@ -128,6 +128,13 @@ captured shell operations. Three warm draws drop from 8.27/1.75/4.43 seconds to
 0.82/0.59/0.58 seconds. These are individual draw measurements; usable desktop
 frame delivery remains the next validation boundary.
 
+The [next Start menu capture](docs/validation/2026-10-10/sparse-budget-v116/report.json)
+now passes on the NPU with exact CPU/reference pixels. Its 35 instances need 70
+raster tiles; the old estimate rejected it as 7,560 tiles. Admission now uses
+device-computed bounds and retains the 4,096-tile maximum. The v82 desktop
+attempt failed to start tracing before installing any drivers; the disposable
+VM was restarted and the [failure preserved](docs/validation/2026-10-10/sole-display-v82-preinstall/report.json).
+
 The [captured-window desktop experiment](native/windows/capture/README.md) now
 presents an NPU-composed 2880×1800 desktop with input passing through to the
 original applications, a disable/enable control, and an external hang watchdog.

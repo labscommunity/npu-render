@@ -111,8 +111,9 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
     test(ex::triangle_batch(desktop_clipped)==1024);
     const auto desktop_clipped_packet=ex::encode(desktop_clipped);test(ex::decode(desktop_clipped_packet).inputs.size()==81);
     auto excessive=desktop_clipped_packet;const std::array<int32_t,4> full_clip{0,0,1024,768};
-    std::memcpy(excessive.data()+sizeof(ex::Header)+sizeof(nr::raster::Viewport),full_clip.data(),sizeof(full_clip));rejects(excessive);
-    desktop_clipped.scissor=full_clip;bool oversized_rejected=false;try{(void)ex::encode(desktop_clipped);}catch(const std::invalid_argument &){oversized_rejected=true;}test(oversized_rejected);
+    std::memcpy(excessive.data()+sizeof(ex::Header)+sizeof(nr::raster::Viewport),full_clip.data(),sizeof(full_clip));
+    test(ex::decode(excessive).inputs.size()==81); // Raster budget follows device-computed bounds.
+    desktop_clipped.scissor=full_clip;test(ex::decode(ex::encode(desktop_clipped)).inputs.size()==81);
     // A thin, full-height scissor is one packed batch, not 192 full rows.
     desktop_clipped.header.vertices=4095;desktop_clipped.inputs.resize(4095);
     for(const std::array<int32_t,4> clip: {std::array<int32_t,4>{429,0,430,768},{429,0,429,768},{0,768,1024,768}}){

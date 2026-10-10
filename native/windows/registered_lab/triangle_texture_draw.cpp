@@ -1,4 +1,5 @@
 #include "triangle_texture_draw.hpp"
+#include "triangle_regions.hpp"
 #include "color_interpolator.hpp"
 #include <algorithm>
 #include <chrono>
@@ -73,10 +74,6 @@ UniformDrawExecutor::Result TriangleTextureDrawExecutor::execute(const std::vect
         viewport.width==float(s.width) && viewport.height==float(s.height));
     const auto clip=scissor.value_or(std::array<int32_t,4>{0,0,int32_t(s.width),int32_t(s.height)});
     require(clip[0]>=0 && clip[1]>=0 && clip[0]<=clip[2] && clip[1]<=clip[3] && clip[2]<=int32_t(s.width) && clip[3]<=int32_t(s.height));
-    const size_t clip_width=size_t(clip[2]-clip[0]),clip_pixels=clip_width*size_t(clip[3]-clip[1]);
-    // Bound the work actually requested by the scissor, not an unrelated
-    // full-target estimate. Validate before executing any provider request.
-    require(uint64_t(s.count/3)*((clip_pixels+s.batch-1)/s.batch)<=4096);
     const std::array<int32_t,4> fixed_clip{clip[0]*256,clip[1]*256,clip[2]*256,clip[3]*256};
     UniformDrawExecutor::Result result{};auto began=Clock::now();auto shaded=s.vertex.execute(inputs,vc);
     result.execution_device=shaded.execution_device;result.timings.shader_ms=ms(began);
@@ -86,13 +83,15 @@ UniformDrawExecutor::Result TriangleTextureDrawExecutor::execute(const std::vect
     began=Clock::now();const auto projected=s.projection.execute(clips,viewport);require(projected.execution_device==result.execution_device);
     result.timings.projection_ms=ms(began);result.input_bytes+=uint64_t(s.count)*16+24;result.output_bytes+=uint64_t(s.count)*24+uint64_t(s.count/3)*16;++result.provider_requests;
     require(projected.triangle_bounds.size()==s.count/3);
+    // Vertex count and shader graphs are bounded before compilation. Once the
+    // device establishes geometry bounds, admit at most 4096 raster tiles.
+    // Reject the whole draw before coverage or destination modification.
+    const auto regions=bounded_triangle_regions(projected.triangle_bounds,clip,s.batch);
     const auto textures=decode_resources(s.ps,resources);
     result.pixels=background;std::vector<Sample> samples(s.batch);std::vector<Point> points(s.batch);
     std::vector<PackedColor> tile(s.batch);std::vector<Color> colors(s.batch);std::vector<shader::VertexRegisters> fragments(s.batch);
     for(size_t triangle=0;triangle<s.count;triangle+=3){
-      const auto &bounds=projected.triangle_bounds[triangle/3];
-      const std::array<int32_t,4> region{(std::max)(clip[0],bounds[0]),(std::max)(clip[1],bounds[1]),
-          (std::min)(clip[2],bounds[2]),(std::min)(clip[3],bounds[3])};
+      const auto &region=regions[triangle/3];
       if(region[0]>=region[2] || region[1]>=region[3])continue;
       const size_t region_width=size_t(region[2]-region[0]),region_pixels=region_width*size_t(region[3]-region[1]);
       for(size_t first=0;first<region_pixels;first+=s.batch){

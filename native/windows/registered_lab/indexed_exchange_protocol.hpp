@@ -115,13 +115,14 @@ public:
     }
     bool done() const { return cursor == data.size(); }
 };
-inline bool triangle_work_valid(const Request &r){
+inline bool triangle_scissor_valid(const Request &r){
     const auto &h=r.header;if(!(h.flags&0x3000))return true;
     const auto clip=r.scissor.value_or(std::array<int32_t,4>{0,0,int32_t(h.width),int32_t(h.height)});
     if(!scissor_valid(clip,h))return false;
-    uint32_t batch=4096;const uint64_t pixels=uint64_t(h.width)*h.height;while(pixels%batch)batch/=2;
-    const auto clipped_pixels=uint64_t(clip[2]-clip[0])*uint64_t(clip[3]-clip[1]);
-    return uint64_t(h.vertices/3)*((clipped_pixels+batch-1)/batch)<=4096;
+    // Shape limits bound vertex/shader input. The selected device computes
+    // each triangle's bounds before the executor enforces its 4096-tile cap.
+    // A full-scissor estimate would reject sparse instanced desktop geometry.
+    return true;
 }
 inline uint32_t triangle_batch(const Request &r){
     const auto &h=r.header;require(shape_valid(h) && (h.flags&0x3000));
@@ -142,7 +143,7 @@ inline std::vector<uint8_t> encode(Request &r) {
     Writer w; w.value(h); w.value(r.viewport);
     if (h.flags & 4) { require(r.scissor.has_value() && scissor_valid(*r.scissor,h)); w.value(*r.scissor); }
     else require(!r.scissor.has_value());
-    require(triangle_work_valid(r));
+    require(triangle_scissor_valid(r));
     w.append(r.vertex.bytecode.data(), size_t(h.vs_words) * 4); w.append(r.pixel.bytecode.data(), size_t(h.ps_words) * 4);
     w.append(r.inputs.data(), r.inputs.size() * sizeof(shader::VertexRegisters));
     auto constants = [&](const shader::Program &p, const shader::VertexConstants &c) {
@@ -167,7 +168,7 @@ inline Request decode(const std::vector<uint8_t> &bytes) {
     Reader reader(bytes); Request r; r.header = reader.value<Header>(); const auto &h = r.header;
     require(request_valid(h, bytes.size())); r.viewport = reader.value<raster::Viewport>();
     if (h.flags & 4) { r.scissor = reader.value<std::array<int32_t,4>>(); require(scissor_valid(*r.scissor,h)); }
-    require(triangle_work_valid(r));
+    require(triangle_scissor_valid(r));
     require(r.viewport.x == 0 && r.viewport.y == 0 && r.viewport.width == float(h.width) && r.viewport.height == float(h.height) &&
         r.viewport.min_depth >= 0 && r.viewport.min_depth <= r.viewport.max_depth && r.viewport.max_depth <= 1);
     const auto vs = reader.vector<uint32_t>(h.vs_words), ps = reader.vector<uint32_t>(h.ps_words);

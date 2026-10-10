@@ -1,0 +1,39 @@
+{
+  "build": "present-umd-v116",
+  "clean_cpu_contract_suites_passed": 18,
+  "npu_contracts_passed": [
+    "textured triangles including sparse 210-vertex geometry",
+    "registered driver callback contracts"
+  ],
+  "capture_process": "StartMenuExperienceHost.exe",
+  "capture_trial": "v81",
+  "capture_complete": true,
+  "vertices": 210,
+  "instances": 35,
+  "triangles": 70,
+  "target": [
+    768,
+    576
+  ],
+  "old_estimated_tiles": 7560,
+  "actual_tiles": 70,
+  "maximum_raster_tiles": 4096,
+  "covered_samples": 2077,
+  "npu_replays_passed": 2,
+  "pixel_oracle_maximum_byte_error": 0,
+  "cpu_npu_pixel_sha256": "967048bdec4affa842185c9e1ffb715aafd9741fa989a592e5f590de1313be87",
+  "npu_compile_ms": 4473.263,
+  "npu_draw_ms": [
+    3963.54,
+    3928.689
+  ],
+  "desktop_offload_tested": false,
+  "findings": [
+    "Replay v114 adds the R32 integer vertex formats already accepted by the UMD and reaches the provider work rejection.",
+    "The old admission estimate multiplies full scissor area by all 70 triangles. The selected device now computes bounds first, then a complete tile plan is checked against the unchanged 4096-tile limit before coverage or destination modification.",
+    "The captured Start menu draw executes on the physical NPU with 2077 covered samples. Both replays match the independent scalar pixel oracle exactly, and final pixels hash-identically to CPU replay.",
+    "Contract checks admit exactly 4096 planned tiles, reject an excess, reject invalid bounds, and verify a 70-triangle sparse draw that the old scissor estimate rejected.",
+    "The first v115 build failed because Windows defines small as a macro; the diagnostic variable was renamed. v115a is an incremental diagnostic build. v116 is the separately qualified clean build.",
+    "These are isolated draw and contract checks; no usable desktop or performance benefit is established."
+  ]
+}

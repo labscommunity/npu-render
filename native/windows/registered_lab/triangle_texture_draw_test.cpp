@@ -1,4 +1,5 @@
 #include "triangle_texture_draw.hpp"
+#include "triangle_regions.hpp"
 #include "shader_contract.hpp"
 #include "shader_reference.hpp"
 #include <algorithm>
@@ -8,6 +9,14 @@ using namespace nr::shader;
 #define TEST(v) do{if(!(v))throw std::runtime_error(#v);}while(false)
 int main(int argc,char **argv)try{
     TEST(argc<=2);const std::string backend=argc==2?argv[1]:"CPU";
+    const std::array<int32_t,4> full{0,0,1024,1024};
+    TEST(bounded_triangle_regions(std::vector<std::array<int32_t,4>>(16,full),full,4096).size()==16);
+    bool rejected=false;try{bounded_triangle_regions(std::vector<std::array<int32_t,4>>(17,full),full,4096);}catch(const std::invalid_argument &){rejected=true;}TEST(rejected);
+    TEST(bounded_triangle_regions(std::vector<std::array<int32_t,4>>(70,{4,4,6,6}),full,256).size()==70);
+    TEST(bounded_triangle_regions(std::vector<std::array<int32_t,4>>(70,full),{0,0,0,0},1).size()==70);
+    for(const std::array<int32_t,4> bad:{std::array<int32_t,4>{-1,0,2,2},{0,0,8193,2},{2,2,1,1}}){
+        rejected=false;try{bounded_triangle_regions({bad},full,4096);}catch(const std::invalid_argument &){rejected=true;}TEST(rejected);
+    }
     const auto vw=nr::registered_lab::shader_tokens(R"(
 struct O{float4 p:SV_Position;noperspective float4 c:COLOR;noperspective float2 uv:TEXCOORD;};
 O main(float4 p:POSITION,float4 c:COLOR,float2 uv:TEXCOORD){O o;o.p=p;o.c=c;o.uv=uv;return o;})","vs_4_0");
@@ -51,5 +60,19 @@ float4 main(float4 p:SV_Position,noperspective float4 c:COLOR,noperspective floa
         }
         }
     }
-    std::printf("{\"textured_triangle_components\":%llu,\"maximum_byte_error\":%u,\"execution_device\":\"%s\",\"coverage_exact\":true,\"packed_scissor_cases\":6,\"partial_batch_and_empty_regions\":true,\"desktop_offload_tested\":false}\n",static_cast<unsigned long long>(checked),maximum,backend.c_str());return 0;
+    // Seventy small triangles share a full-size scissor. The old estimate
+    // charged 4480 tiles; device bounds require only 70, preserving the cap.
+    std::vector<VertexRegisters> sparse(210);const float sparse_positions[3][2]{{4,4},{6,4},{6,6}};
+    for(size_t i=0;i<sparse.size();++i){
+        sparse[i][0]={as_bits(sparse_positions[i%3][0]/64-1),as_bits(1-sparse_positions[i%3][1]/64),as_bits(.5f),as_bits(1)};
+        sparse[i][1]={as_bits(1),as_bits(1),as_bits(1),as_bits(1)};
+        sparse[i][2]={as_bits(.5f),as_bits(.5f),0,0};
+    }
+    const PackedTexture tiny{1,1,28,{{23,51,79,255}}};const std::vector<PackedColor> bg(128*128,{1,2,3,4});
+    TriangleTextureDrawExecutor sparse_executor(vs,ps,210,128,128,28,1,1,28,backend,false,15,TextureFilter::point,CullMode::none,false,256);
+    const auto sparse_result=sparse_executor.execute(sparse,{}, {},{0,0,128,128,0,1},tiny,bg);
+    TEST(sparse_result.execution_device.rfind(backend,0)==0 && sparse_result.tile_executions==70 && sparse_result.covered_samples==210);
+    for(unsigned y=0;y<128;++y)for(unsigned x=0;x<128;++x)
+        TEST(sparse_result.pixels[y*128+x]==(x>=4 && x<6 && y>=4 && y<=x?tiny.pixels[0]:bg[0]));
+    std::printf("{\"textured_triangle_components\":%llu,\"maximum_byte_error\":%u,\"execution_device\":\"%s\",\"coverage_exact\":true,\"packed_scissor_cases\":6,\"partial_batch_and_empty_regions\":true,\"sparse_triangle_tiles\":70,\"raster_tile_budget\":4096,\"desktop_offload_tested\":false}\n",static_cast<unsigned long long>(checked),maximum,backend.c_str());return 0;
 }catch(const std::exception &e){std::fprintf(stderr,"%s\n",e.what());return 1;}

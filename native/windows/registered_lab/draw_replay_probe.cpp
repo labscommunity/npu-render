@@ -68,6 +68,10 @@ std::vector<nr::shader::VertexRegisters> fetch(const nr::capture::Snapshot &s, u
         case 57:case 59:integer_lanes=1;component_bytes=2;signed_integer=format==59;break;
         case 38:case 40:integer_lanes=2;component_bytes=2;signed_integer=format==40;break;
         case 12:case 14:integer_lanes=4;component_bytes=2;signed_integer=format==14;break;
+        case 42:case 43:integer_lanes=1;component_bytes=4;break;
+        case 17:case 18:integer_lanes=2;component_bytes=4;break;
+        case 7:case 8:integer_lanes=3;component_bytes=4;break;
+        case 3:case 4:integer_lanes=4;component_bytes=4;break;
         }
         nr::capture::check(lanes || format == 28 || integer_lanes);
         const auto bytes = integer_lanes ? integer_lanes*component_bytes : format == 28 ? 4u : lanes * 4;

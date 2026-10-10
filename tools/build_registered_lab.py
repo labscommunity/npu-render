@@ -88,6 +88,7 @@ def main():
         "nr_registered_indexed_worker.exe",
         "nr_registered_indexed_stream_worker.exe",
         "nr_registered_indexed_stream_relay.exe",
+        "nr_registered_fifo_dispatch_test.exe",
         "nr_registered_texture_crop_test.exe",
         "nr_registered_point_texture_draw_test.exe",
         "nr_registered_linear_texture_draw_test.exe",

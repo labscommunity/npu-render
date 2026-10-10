@@ -1,0 +1,20 @@
+{
+  "trial": "v82",
+  "source_commit": "7dcbfdf4278badd69589aa979421ff01b8a80f61",
+  "umd_build": "present-umd-v113",
+  "package_version": "0.0.70.0",
+  "preflight_npu_packets_passed": 13,
+  "driver_installation_attempted": false,
+  "sole_display_attempted": false,
+  "received_frames": 0,
+  "full_desktop_offload": false,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "owned_vm_restarted": true,
+  "findings": [
+    "Graphics trace creation fails with No more data is available before the first driver installation. Querying active ETW sessions also fails although provider lookup succeeds.",
+    "The observer records cleanup_passed=false because it has no removal reports for devices that were never installed. Independent enumeration confirms zero custom devices and Microsoft Basic Display Adapter status OK. Stream configuration is removed.",
+    "All thirteen preflight NPU packets passed. The live desktop portion did not run and cannot evaluate FIFO scheduling.",
+    "The owned disposable VM is restarted at approximately 17:06 UTC; physical Delta is not restarted. Failed observation logs and restart precheck are preserved."
+  ]
+}
