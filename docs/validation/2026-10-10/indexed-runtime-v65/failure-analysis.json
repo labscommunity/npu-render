@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "kind": "incomplete-physical-worker-runtime",
+  "cause": "Controller selected the CPU-only v31 guest DLL closure for the physical NPU worker; it lacks both openvino_ir_frontend.dll and openvino_intel_npu_plugin.dll. The first prewarm failed during IR model reading.",
+  "completed_npu_requests": 0,
+  "drivers_installed": false,
+  "configuration_removed": true,
+  "correction": "Require and record hashes of OpenVINO core, IR frontend and NPU plugin before configuring the guest. Retry with the complete locked runtime used for component qualification.",
+  "retry": "indexed-dwm-stream-v65b",
+  "full_desktop_offload": false
+}

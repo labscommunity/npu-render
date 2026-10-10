@@ -19,7 +19,12 @@ if(!$build.clean_build){throw 'Clean build required'}
 foreach($item in $build.binary_sha256.psobject.Properties){
  if($item.Name -notmatch '^[a-zA-Z0-9_.-]+$' -or (Get-FileHash (Join-Path "$BuildDirectory\Release" $item.Name)).Hash -ne $item.Value){throw 'Build binary hash mismatch'}
 }
-if(!(Test-Path "$RuntimeDirectory\openvino.dll")){throw 'Pinned runtime required'}
+$runtimeManifest=@()
+foreach($name in 'openvino.dll','openvino_ir_frontend.dll','openvino_intel_npu_plugin.dll'){
+ $path=Join-Path $RuntimeDirectory $name
+ if(!(Test-Path -LiteralPath $path -PathType Leaf)){throw "Native NPU worker runtime is incomplete: missing $name"}
+ $runtimeManifest += [ordered]@{name=$name;sha256=(Get-FileHash -LiteralPath $path).Hash;file_version=(Get-Item -LiteralPath $path).VersionInfo.FileVersion}
+}
 if($DesktopSmokeTest -and !$SmokeTest){throw 'DesktopSmokeTest requires SmokeTest'}
 if($TextureSmokeTest -and (!$SmokeTest -or $DesktopSmokeTest)){throw 'TextureSmokeTest requires SmokeTest and excludes DesktopSmokeTest'}
 if($ScissorSmokeTest -and (!$SmokeTest -or $DesktopSmokeTest -or $TextureSmokeTest)){throw 'ScissorSmokeTest requires SmokeTest and excludes other fixtures'}
@@ -29,6 +34,7 @@ New-Item -ItemType Directory $EvidenceDirectory|Out-Null
 Copy-Item "$BuildDirectory\registered-build-report.json" $EvidenceDirectory
 $token="$EvidenceDirectory\private-token.bin";$worker=$null;$stdout=$null;$stderr=$null;$prepared=$false;$oldPath=$env:PATH
 $report=[ordered]@{schema=1;kind='indexed-npu-native-stream';job_id=$job;started=[DateTime]::UtcNow.ToString('o');completed=$false;transport='local named pipe and authenticated SSH-carried stream';smoke_test=[bool]$SmokeTest;desktop_offload_tested=$false;displayed_frames=0}
+$report.physical_runtime=$runtimeManifest
 function Save-Report {$report|ConvertTo-Json -Depth 8|Set-Content "$EvidenceDirectory\report.json"}
 Save-Report
 try {

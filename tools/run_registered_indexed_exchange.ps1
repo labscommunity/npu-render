@@ -14,7 +14,12 @@ if(!$build.clean_build){throw 'Clean build required'}
 foreach($item in $build.binary_sha256.psobject.Properties){
  if($item.Name -notmatch '^[a-zA-Z0-9_.-]+$' -or (Get-FileHash (Join-Path "$BuildDirectory\Release" $item.Name)).Hash -ne $item.Value){throw 'Build binary hash mismatch'}
 }
-if(!(Test-Path "$RuntimeDirectory\openvino.dll")){throw 'Pinned OpenVINO runtime required'}
+$runtimeManifest=@()
+foreach($name in 'openvino.dll','openvino_ir_frontend.dll','openvino_intel_npu_plugin.dll'){
+ $path=Join-Path $RuntimeDirectory $name
+ if(!(Test-Path -LiteralPath $path -PathType Leaf)){throw "Native NPU worker runtime is incomplete: missing $name"}
+ $runtimeManifest += [ordered]@{name=$name;sha256=(Get-FileHash -LiteralPath $path).Hash;file_version=(Get-Item -LiteralPath $path).VersionInfo.FileVersion}
+}
 $job=[Guid]::NewGuid().ToString('N');$guest="C:\npu-lab\indexed-exchange-$job";$active='C:\npu-lab\indexed-exchange-active.txt'
 New-Item -ItemType Directory $EvidenceDirectory|Out-Null
 $packets=Join-Path $EvidenceDirectory 'packets';New-Item -ItemType Directory $packets|Out-Null
@@ -22,6 +27,7 @@ Copy-Item "$BuildDirectory\registered-build-report.json" $EvidenceDirectory
 $worker=Join-Path "$BuildDirectory\Release" 'nr_registered_indexed_worker.exe'
 $process=$null;$stdout=$null;$stderr=$null;$configured=$false;$prepared=$false;$workerStarted=$false;$oldPath=$env:PATH;$seen=@{};$requests=@()
 $report=[ordered]@{schema=1;kind='indexed-npu-authenticated-relay';started=[DateTime]::UtcNow.ToString('o');completed=$false;state='preparing';job_id=$job;transport='authenticated WinRM file copies';worker_sha256=(Get-FileHash $worker).Hash;runtime_sha256=(Get-FileHash "$RuntimeDirectory\openvino.dll").Hash;desktop_offload_tested=$false;displayed_frames=0;performance_tested=$false}
+$report.physical_runtime=$runtimeManifest
 function Save-Report {$report.requests=$requests;$report|ConvertTo-Json -Depth 8|Set-Content "$EvidenceDirectory\report.json"}
 Save-Report
 try {

@@ -468,3 +468,11 @@ passes 12,910,592 component checks on the NPU with maximum error 0.5183 byte uni
 including that regression, and three exact captured-draw replays. A separate
 separable-matrix sampling prototype is faster but is not integrated or qualified
 as a complete rendering path.
+
+The physical indexed workers require `openvino.dll`, `openvino_ir_frontend.dll`
+and `openvino_intel_npu_plugin.dll` from the same complete runtime used for
+hardware qualification. The older CPU-only guest DLL bundle is insufficient.
+Both indexed controllers check these dependencies before guest configuration and
+record their hashes and file versions. The [v65 startup failure and regression
+check](../../../docs/validation/2026-10-10/indexed-runtime-v65/failure-analysis.json)
+preserve the rejected launch; no drivers were installed during that failure.
