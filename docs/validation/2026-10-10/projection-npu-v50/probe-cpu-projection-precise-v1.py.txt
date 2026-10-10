@@ -1,0 +1,35 @@
+import json,tempfile
+from pathlib import Path
+import numpy as np
+import openvino as ov
+from openvino import opset13 as o
+n=256
+clip=o.parameter([n,4],np.float32,name='clip');viewport=o.parameter([1,4],np.float32,name='viewport')
+def c(x):return o.constant(x,np.float32)
+def col(x,i):return o.gather(x,[i],1)
+w=col(clip,3);inv=o.divide(c(1),w)
+x=o.add(o.multiply(o.add(o.divide(col(clip,0),w),c(1)),o.multiply(col(viewport,2),c(.5))),col(viewport,0))
+y=o.add(o.multiply(o.subtract(c(1),o.divide(col(clip,1),w)),o.multiply(col(viewport,3),c(.5))),col(viewport,1))
+screen=o.concat([x,y],1)
+q=o.multiply(screen,c(256));aq=o.abs(q)
+base=o.bitwise_and(o.convert(aq,np.int32),o.constant(0x7fffffff,np.int32))
+fraction=o.subtract(aq,o.convert(base,np.float32))
+greater=o.convert(o.greater(fraction,c(.5)),np.int32);equal=o.convert(o.equal(fraction,c(.5)),np.int32)
+increment=o.bitwise_or(greater,o.bitwise_and(equal,o.bitwise_and(base,o.constant(1,np.int32))))
+sign=o.subtract(o.constant(1,np.int32),o.multiply(o.convert(o.less(q,c(0)),np.int32),o.constant(2,np.int32)))
+snapped=o.multiply(o.add(base,increment),sign)
+with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
+ m=ov.Model([screen,snapped,inv],[clip,viewport]);path=Path(d)/'m.xml'
+ for node in m.get_ops():node.set_rt_info('','precise_0')
+ ov.serialize(m,path);core=ov.Core();compiled=core.compile_model(core.read_model(path),'CPU',{'EXECUTION_MODE_HINT':'ACCURACY'})
+ rng=np.random.default_rng(9845)
+ for frame in range(4):
+  p=rng.uniform(-1,1,(n,4)).astype(np.float32);p[:,3]=1 if frame<2 else rng.uniform(.125,4,n).astype(np.float32)
+  v=np.array([[0,0,1024,768] if frame%2==0 else [-.125,.375,8192,4320]],np.float32)
+  if frame==0:p[:4]=np.array([[-1,1,1,1],[1,1,1,1],[1,-1,1,1],[-1,-1,1,1]],np.float32)
+  xx=((p[:,0]/p[:,3]+np.float32(1))*(v[0,2]*np.float32(.5))+v[0,0]).astype(np.float32)
+  yy=((np.float32(1)-p[:,1]/p[:,3])*(v[0,3]*np.float32(.5))+v[0,1]).astype(np.float32)
+  ref=np.stack([xx,yy],1);snap=np.rint(ref*np.float32(256)).astype(np.int32)
+  outputs=compiled({'clip':p,'viewport':v});error=np.abs(outputs[0]-ref)
+  exact=np.array_equal(outputs[1],snap)
+  print(json.dumps({'frame':frame,'execution_device':compiled.get_property('EXECUTION_DEVICES'),'max_screen_error':float(error.max()),'exact_snapped':bool(exact),'snap_mismatches':int(np.count_nonzero(outputs[1]!=snap)),'screen_first4':outputs[0][:4].tolist(),'snap_first4':outputs[1][:4].tolist(),'desktop_offload_tested':False}),flush=True)

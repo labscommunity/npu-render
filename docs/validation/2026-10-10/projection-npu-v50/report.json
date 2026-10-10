@@ -1,0 +1,18 @@
+{
+  "scope": "NPU perspective divide, viewport transform and 8-bit subpixel snapping; not clipping or draw execution",
+  "build": "present-umd-v50",
+  "cpu_contract_tests_passed": 6,
+  "npu_cpp_vertices_checked": 1024,
+  "npu_scalar_snap_differences": 0,
+  "npu_screen_depth_inverse_w_max_error": 0,
+  "negative_and_positive_halfway_ties": "nearest even",
+  "invalid_requests_rejected": 4,
+  "runtime": "OpenVINO 2026.1",
+  "npu_driver": "32.0.100.5540",
+  "cpu_reference_difference": "One sequential-f32 snapping difference at a rounding boundary in initial test; CPU and NPU pass the independent ideal-coordinate tolerance from D3D11. NPU additionally retains exact sequential-f32 requirements.",
+  "native_round_rejected": true,
+  "snapping_implementation": "masked integer truncation, fraction comparison, integer tie-to-even masks, sign restoration",
+  "full_desktop_offload": false,
+  "performance_tested": false,
+  "reference": "https://microsoft.github.io/DirectX-Specs/d3d/archive/D3D11_3_FunctionalSpec.htm#3.2.4.1"
+}

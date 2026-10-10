@@ -366,3 +366,16 @@ to f32, power-of-two scaling and conversion back are exact. Separate integer
 predicate masks avoid a second miscompilation of compound boolean expressions.
 Failed reproductions are retained with the qualification. Edge ownership follows
 the [Direct3D rasterization rules](https://microsoft.github.io/DirectX-Specs/d3d/archive/D3D11_3_FunctionalSpec.htm#3.4).
+
+
+`ProjectionExecutor` performs perspective division, viewport transformation,
+depth mapping and nearest-even 1/256-pixel snapping on the selected device.
+The [v50 NPU qualification](../../../docs/validation/2026-10-10/projection-npu-v50/report.json)
+matches 1,024 scalar-reference vertices exactly, including signed halfway ties.
+Inputs must be finite, within conservative guard-band bounds, depth-clipped, and
+have positive bounded w; clipping is not supplied by this component.
+Native Round corrupts even whole-pixel coordinates on the tested NPU. Explicit
+masked truncation, fraction comparisons and integer tie masks preserve the result.
+The CPU reference provider differs at a rounding boundary; its test uses the
+Direct3D ideal-coordinate tolerance while retaining the stricter exact scalar
+comparison for NPU qualification. No fallback provider is selected implicitly.
