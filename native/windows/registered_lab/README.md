@@ -270,3 +270,13 @@ Bounds reads now gather from an appended zero row, avoiding a floating mask that
 failed with precision preservation. The translator still runs independently of
 the registered driver; this establishes neither general shader conformance nor
 desktop migration.
+
+The [v51 desktop admission test](../../../docs/validation/2026-10-10/desktop-active-v51/report.json)
+activates an indirect desktop and records DWM loading this UMD. Initialization
+then rejects a 90-word vertex program and kernel shadow-surface requests. The
+[v28 captured-stage test](../../../docs/validation/2026-10-10/dwm-vertex-npu-v28/report.json)
+executes that exact vertex token stream on the physical NPU and checks 8,192
+output components bit for bit against the reference, with a separate CPU control.
+`nr_registered_vertex_stream_probe --shader <token-stream> --backend NPU` runs
+this qualification without embedding captured system binaries in the repository.
+It does not establish driver admission, rasterization or desktop frame delivery.

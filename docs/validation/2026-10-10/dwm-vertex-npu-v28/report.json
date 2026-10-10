@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "kind": "captured-dwm-vertex-stage-npu-validation",
+  "passed": true,
+  "shader_words": 90,
+  "instructions": 9,
+  "shader_sha256": "26bba297ecd8dd974198912272d887a232815dd5e4ebfc2a4843294a8e1f7856",
+  "shader_capture_process": "dwm.exe",
+  "vertex_results_checked": 512,
+  "output_components_checked": 8192,
+  "output_bits_exact": true,
+  "backend": "NPU",
+  "npu_driver": "32.0.100.5540",
+  "openvino": "2026.1",
+  "registered_driver_shader_admission_tested": false,
+  "desktop_offload_tested": false,
+  "performance_tested": false,
+  "notes": [
+    "The exact token stream rejected by DWM during v51 is parsed and translated by the existing generic vertex executor. It is not replaced by an exact-match implementation.",
+    "Two runs use deterministic binary-fraction vertex fixtures and changed constant data. Every declared output component matches the scalar reference exactly. CPU control also passes.",
+    "The execution device is checked and fallback is forbidden. Host packing and transfers are CPU work.",
+    "This is an independently invoked stage test. Rasterization, pixel shading and DWM draws are not established by it.",
+    "The raw captured shader stays in local results; the repository contains no compiled system shader binary. Text evidence normalizes CRLF to LF."
+  ]
+}
