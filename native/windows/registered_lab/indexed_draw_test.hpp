@@ -123,6 +123,14 @@ int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
     blend.DestBlend=blend.DestBlendAlpha=D3D10_DDI_BLEND_INV_SRC_ALPHA;
     blend.BlendEnable[0]=FALSE;f.pfnSetBlendState(h,bs,nullptr,~0u);
     scissor={0,0,width,height};f.pfnSetScissorRects(h,1,0,&scissor);
+    // A derivative-only shader still needs the general quad pipeline, even
+    // though it has no bound textures. Exercise the real DDI route on the NPU.
+    const auto derivative_vs=shader_tokens("struct O{float4 p:SV_Position;noperspective float2 uv:TEXCOORD;};O main(float4 p:POSITION){O o;o.p=p;o.uv=float2(p.x+1,1-p.y)*.5;return o;}","vs_4_0");
+    const auto derivative_ps=shader_tokens("float4 main(float4 p:SV_Position,noperspective float2 uv:TEXCOORD):SV_Target{return float4(ddx(uv.x)*64,ddy(uv.y)*64,.25,1);}","ps_4_0");
+    f.pfnCreateVertexShader(h,derivative_vs.data(),shaders[0],{},nullptr);f.pfnCreatePixelShader(h,derivative_ps.data(),shaders[1],{},nullptr);
+    f.pfnVsSetShader(h,shaders[0]);f.pfnPsSetShader(h,shaders[1]);f.pfnDestroyShader(h,shaders[0]);f.pfnDestroyShader(h,shaders[1]);
+    {const auto prior=counters.draws;f.pfnDrawIndexed(h,6,1,1);TEST(last_error==S_OK && counters.draws==prior+1);
+     const uint8_t expected[]{64,255,255,255};for(size_t n=0;n<size_t(width)*height*4;++n)TEST(memory[target_index][n]==expected[n%4]);}
     // Exercise the textured specialization through actual binding and DrawIndexed
     // DDIs, including nonzero first/base offsets and failed-state preservation.
     const auto texture_vs=shader_tokens("cbuffer C {float4 color;};struct O {float4 p:SV_Position;float4 c:COLOR0;float2 uv:TEXCOORD0;};O main(float4 p:POSITION,float2 uv:TEXCOORD0){O o;o.p=p;o.c=color;o.uv=uv;return o;}","vs_4_0");
@@ -284,7 +292,7 @@ int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
     f.pfnDestroyRenderTargetView(h, view);
     for (const auto r : resources) f.pfnDestroyResource(h, r);
     f.pfnDestroyDevice(h);
-    TEST(counters.executions == executions_before + 52 && !counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
-    std::printf("{\"kind\":\"indexed-ddi-runtime-shim\",\"requested_backend\":\"%s\",\"execution_device\":\"%s\",\"verified_draws\":%llu,\"porter_duff_components\":540672,\"porter_duff_additional_modes\":11,\"blended_scissored_draws\":6,\"textured_draws\":7,\"point_scaled_blended_draws\":2,\"linear_scaled_blended_draws\":2,\"base_vertex_and_start_index\":true,\"invalid_ranges_and_sampler_rejected\":true,\"registered_adapter_tested\":false,\"desktop_offload_tested\":false}\n", backend, counters.last_execution_device, static_cast<unsigned long long>(counters.draws-draws_before));
+    TEST(counters.executions == executions_before + 53 && !counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
+    std::printf("{\"kind\":\"indexed-ddi-runtime-shim\",\"requested_backend\":\"%s\",\"execution_device\":\"%s\",\"verified_draws\":%llu,\"porter_duff_components\":540672,\"porter_duff_additional_modes\":11,\"derivative_ddi_components\":16384,\"blended_scissored_draws\":6,\"textured_draws\":7,\"point_scaled_blended_draws\":2,\"linear_scaled_blended_draws\":2,\"base_vertex_and_start_index\":true,\"invalid_ranges_and_sampler_rejected\":true,\"registered_adapter_tested\":false,\"desktop_offload_tested\":false}\n", backend, counters.last_execution_device, static_cast<unsigned long long>(counters.draws-draws_before));
     return 0;
 }

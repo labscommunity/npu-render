@@ -147,6 +147,10 @@ inline uint32_t triangle_batch(const Request &r){
     const auto &h=r.header;require(shape_valid(h) && (h.flags&0x3000));
     const auto clip=r.scissor.value_or(std::array<int32_t,4>{0,0,int32_t(h.width),int32_t(h.height)});
     require(scissor_valid(clip,h));
+    if(shader::quad_derivatives(r.pixel)){
+        const auto area=uint64_t(clip[2]-clip[0])*uint64_t(clip[3]-clip[1]);
+        uint32_t batch=4096;while(batch>4 && area<=batch/2)batch/=2;return batch;
+    }
     uint32_t batch=4096;while(uint64_t(h.width)*h.height%batch)batch/=2;
     const auto area=uint64_t(clip[2]-clip[0])*uint64_t(clip[3]-clip[1]);
     // Shrink only while the complete region still fits in one batch. This

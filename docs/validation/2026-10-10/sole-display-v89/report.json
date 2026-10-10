@@ -1,0 +1,41 @@
+{
+  "trial": "v89",
+  "source_commit": "3a654524b32da18af4fe823482b4da8a753785eb",
+  "umd_build": "present-umd-v133",
+  "package_version": "0.0.77.0",
+  "worker_successes_by_client": {
+    "42": 13,
+    "7588": 37,
+    "7412": 54,
+    "1140": 54,
+    "7272": 3
+  },
+  "acknowledged_successes_by_client": {
+    "42": 13,
+    "7588": 37,
+    "7412": 54,
+    "1140": 54,
+    "7272": 3
+  },
+  "isolated_client_departures": 0,
+  "received_frames": 3,
+  "received_nonblack_frames": 0,
+  "nonblack_frames_with_sole_gate_true": 0,
+  "viewer_submissions": 3,
+  "full_desktop_offload": false,
+  "usable_interactive_desktop": false,
+  "tahoma_performance_tested": false,
+  "collector_completed_without_error": true,
+  "original_cleanup_passed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "guest_restart": false,
+  "findings": [
+    "161 NPU requests succeed, including 13 warmups and 148 live desktop draws. All successful responses are acknowledged.",
+    "Two DWM draws fail with invalid texture-coordinate or indexable-temporary lookup. A complete 3346460-byte capture preserves a 1024 by 768 source-over draw with two textures, 30 vertices and a narrow scissor.",
+    "A later rejected pixel shader contains 200 words including x and y derivatives.",
+    "All three received frames are black; only the first arrives with the sole-display gate true. No Start action or visual input response is verified.",
+    "Both owned custom devices are removed successfully and the original desktop is visually restored. The stream controller removes its configuration.",
+    "The next CPU build starts during the tail of this trial; these observations are not performance comparisons."
+  ]
+}

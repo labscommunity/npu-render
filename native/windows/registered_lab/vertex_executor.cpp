@@ -45,6 +45,7 @@ struct RegisterExecutor::State {
           const TextureShapes &shapes, const TextureSamplers &samplers) : program(p), count(vertices), texture_shapes(shapes) {
         check(count && count <= 65536 && (backend == "CPU" || backend == "GPU" || backend == "NPU"));
         RegisterExecutor::validate(program);
+        check(!quad_derivatives(program) || !(count%4));
         std::array<Lanes, 16> input{}, temporary{}, output{};
         std::array<Value, 14> constants{};
         std::array<Value,16> literal_tables{};
@@ -428,6 +429,16 @@ struct RegisterExecutor::State {
                             value = subtract_source == 2 ? Node(std::make_shared<op::Subtract>(value, sources[2][c].floating)) :
                                                            Node(std::make_shared<op::Add>(value, sources[2][c].floating));
                         }
+                    } else if(instruction.opcode==Opcode::derivative_x || instruction.opcode==Opcode::derivative_y){
+                        // The caller packs each aligned 2x2 quad TL, TR, BL, BR.
+                        // Derivative arithmetic remains entirely on the provider.
+                        const uint32_t axis=instruction.opcode==Opcode::derivative_x?1u:2u;
+                        std::vector<int32_t> low(count),high(count);
+                        for(uint32_t n=0;n<count;++n){low[n]=int32_t(n&~axis);high[n]=int32_t(n|axis);}
+                        const auto source=batch(a);
+                        const auto lo=std::make_shared<op::Gather>(source,op::Constant::create(ov::element::i32,ov::Shape{count},low),integer(0));
+                        const auto hi=std::make_shared<op::Gather>(source,op::Constant::create(ov::element::i32,ov::Shape{count},high),integer(0));
+                        value=std::make_shared<op::Subtract>(hi,lo);
                     } else if (instruction.opcode == Opcode::divide) value = std::make_shared<op::Divide>(a, b);
                     else if (instruction.opcode == Opcode::reciprocal_sqrt)
                         value = std::make_shared<op::Divide>(floating(0x3f800000), std::make_shared<op::Sqrt>(a));
@@ -547,6 +558,7 @@ void RegisterExecutor::validate(const Program &program) {
     };
     for (const auto &instruction : program.instructions) {
         check(!instruction.saturate);
+        if(instruction.opcode==Opcode::derivative_x || instruction.opcode==Opcode::derivative_y)check(program.stage==Stage::pixel && branches.empty());
         for (unsigned i = 0; i < instruction.source_count; ++i) {
             const auto &source = instruction.sources[i];
             if (source.relative.enabled && source.relative.kind == Register::temporary)

@@ -14,7 +14,7 @@ inline void check(bool value) {
 }
 enum class Register : uint32_t { temporary = 0, input = 1, output = 2, indexable = 3, immediate = 4, sampler = 6, texture = 7, constant = 8 };
 enum class Opcode : uint32_t {
-    add = 0, divide = 14, dot2 = 15, dot3 = 16, dot4 = 17, otherwise = 18, end_if = 21,
+    add = 0, derivative_x = 11, derivative_y = 12, divide = 14, dot2 = 15, dot3 = 16, dot4 = 17, otherwise = 18, end_if = 21,
     float_to_integer = 27, integer_add = 30, begin_if = 31, integer_mad = 35, shift_left = 41, shift_right = 42, integer_to_float = 43, load = 45, less = 49,
     mad = 50, minimum = 51, maximum = 52, move = 54, select = 55,
     multiply = 56, reciprocal_sqrt = 68, sample = 69
@@ -249,11 +249,12 @@ inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
         } else if (opcode == 62) {
             check(!controls && body && branches.empty()); returned = true;
         } else {
-            check(opcode == 0 || opcode == 14 || opcode == 15 || opcode == 16 || opcode == 17 || opcode == 27 || opcode == 30 || opcode == 35 || opcode == 41 || opcode == 42 || opcode == 45 ||
+            check(opcode == 0 || opcode == 11 || opcode == 12 || opcode == 14 || opcode == 15 || opcode == 16 || opcode == 17 || opcode == 27 || opcode == 30 || opcode == 35 || opcode == 41 || opcode == 42 || opcode == 45 ||
                   opcode == 43 || opcode == 49 || opcode == 50 || opcode == 51 || opcode == 52 ||
                   opcode == 54 || opcode == 55 || opcode == 56 || opcode == 68 || opcode == 69);
             check(!(controls & ~0x2000u) && result.instructions.size() < 1024);
             body = true;
+            if(opcode==11 || opcode==12)check(stage==Stage::pixel && branches.empty());
             Instruction instruction; instruction.opcode = Opcode(opcode); instruction.saturate = controls != 0;
             instruction.destination = in.operand(true);
             const auto &d = instruction.destination;
@@ -270,7 +271,7 @@ inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
             }
             check((d.kind == Register::temporary && d.index < result.temporaries) ||
                   (d.kind == Register::output && !(d.mask & ~result.outputs[d.index])));
-            instruction.source_count = (opcode == 27 || opcode == 43 || opcode == 54 || opcode == 68) ? 1u :
+            instruction.source_count = (opcode == 11 || opcode == 12 || opcode == 27 || opcode == 43 || opcode == 54 || opcode == 68) ? 1u :
                                        ((opcode == 35 || opcode == 50 || opcode == 55 || opcode == 69) ? 3u : 2u);
             for (unsigned i = 0; i < instruction.source_count; ++i) {
                 instruction.sources[i] = in.operand(false);
@@ -307,6 +308,10 @@ inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
     check(table_elements+result.temporaries<=4096);
     for (unsigned i = 0; i < 16; ++i) check(!(result.outputs[i] & ~written_outputs[i]));
     return result;
+}
+inline bool quad_derivatives(const Program &p) {
+    for(const auto &i:p.instructions)if(i.opcode==Opcode::derivative_x || i.opcode==Opcode::derivative_y)return true;
+    return false;
 }
 inline Program parse_vertex(const uint32_t *words, size_t count) { return parse_program(words, count, Stage::vertex); }
 inline Program parse_pixel(const uint32_t *words, size_t count) { return parse_program(words, count, Stage::pixel); }

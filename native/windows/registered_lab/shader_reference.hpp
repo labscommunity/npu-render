@@ -12,7 +12,8 @@ inline float as_float(uint32_t value) { float result; std::memcpy(&result, &valu
 inline uint32_t as_bits(float value) { uint32_t result; std::memcpy(&result, &value, 4); return result; }
 inline Registers reference_vertex(const Program &program, const Registers &inputs, const Constants &constants,
                                  const TextureShapes &shapes = {}, const TextureSamplers &samplers = {},
-                                 const TexturePixels &textures = {}, unsigned fused_arithmetic = 0) {
+                                 const TexturePixels &textures = {}, unsigned fused_arithmetic = 0,
+                                 const std::vector<Bits> *derivatives = nullptr) {
     Registers temporary{}, output{};
     for (unsigned i = 0; i < 14; ++i) check(constants[i].size() >= program.constants[i]);
     auto load = [&](const Operand &a, bool integer_modifier = false) {
@@ -43,7 +44,8 @@ inline Registers reference_vertex(const Program &program, const Registers &input
     struct Branch { bool parent, condition; };
     std::vector<Branch> branches;
     bool active = true;
-    for (const auto &instruction : program.instructions) {
+    for (size_t instruction_index=0;instruction_index<program.instructions.size();++instruction_index) {
+        const auto &instruction=program.instructions[instruction_index];
         if (instruction.opcode == Opcode::begin_if) {
             const bool condition = active && ((load(instruction.sources[0])[0] != 0) == instruction.test_nonzero);
             branches.push_back({active, condition}); active = active && condition; continue;
@@ -59,7 +61,10 @@ inline Registers reference_vertex(const Program &program, const Registers &input
         Bits value{};
         for (unsigned i = 0; i < 4; ++i) {
             if (!(instruction.destination.mask & (1u << i))) continue;
-            if (instruction.opcode == Opcode::move) value[i] = values[0][i];
+            if(instruction.opcode==Opcode::derivative_x || instruction.opcode==Opcode::derivative_y){
+                check(derivatives && instruction_index<derivatives->size());value[i]=(*derivatives)[instruction_index][i];
+            }
+            else if (instruction.opcode == Opcode::move) value[i] = values[0][i];
             else if (instruction.opcode == Opcode::select) value[i] = values[0][i] ? values[1][i] : values[2][i];
             else if (instruction.opcode == Opcode::integer_add) value[i] = values[0][i] + values[1][i];
             else if(instruction.opcode==Opcode::integer_mad)value[i]=values[0][i]*values[1][i]+values[2][i];
@@ -152,5 +157,27 @@ inline Registers reference_vertex(const Program &program, const Registers &input
             if (instruction.destination.mask & (1u << i)) destination[i] = value[i];
     }
     return output;
+}
+// Independent quad oracle. Evaluate each derivative's source through the scalar
+// interpreter, including earlier derivative values, before subtracting neighbors.
+inline std::array<Registers,4> reference_pixel_quad(const Program &program,const std::array<Registers,4> &inputs,
+    const Constants &constants,const TextureShapes &shapes={},const TextureSamplers &samplers={},const TexturePixels &textures={}){
+    check(program.stage==Stage::pixel);
+    std::array<std::vector<Bits>,4> derivatives;
+    for(auto &v:derivatives)v.resize(program.instructions.size());
+    for(size_t i=0;i<program.instructions.size();++i){const auto &instruction=program.instructions[i];
+        if(instruction.opcode!=Opcode::derivative_x && instruction.opcode!=Opcode::derivative_y)continue;
+        Program prefix=program;prefix.instructions.resize(i);
+        Instruction read{};read.opcode=Opcode::move;read.destination.kind=Register::output;read.destination.index=0;read.destination.mask=15;
+        read.source_count=1;read.sources[0]=instruction.sources[0];prefix.instructions.push_back(read);
+        std::array<Bits,4> values;
+        for(unsigned lane=0;lane<4;++lane)values[lane]=reference_vertex(prefix,inputs[lane],constants,shapes,samplers,textures,0,&derivatives[lane])[0];
+        const unsigned stride=instruction.opcode==Opcode::derivative_x?1u:2u;
+        for(unsigned lane=0;lane<4;++lane)for(unsigned c=0;c<4;++c)
+            derivatives[lane][i][c]=as_bits(as_float(values[lane|stride][c])-as_float(values[lane&~stride][c]));
+    }
+    std::array<Registers,4> result;
+    for(unsigned lane=0;lane<4;++lane)result[lane]=reference_vertex(program,inputs[lane],constants,shapes,samplers,textures,0,&derivatives[lane]);
+    return result;
 }
 } // namespace nr::shader

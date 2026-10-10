@@ -1,0 +1,49 @@
+{
+  "build": "present-umd-v136",
+  "cpu_suites_passed": 19,
+  "source_hashes_verified": 104,
+  "binary_hashes_verified_on_delta": 25,
+  "captured_draw": "v89-dwm-7412",
+  "cpu_scalar_npu_pixels_exact": true,
+  "pixel_sha256": "ea86e6e3ee097d1f9dd5ce3d93bfc3e8ccdb1c52e89c55325e518d4efec48ff4",
+  "npu_derivative_summary": {
+    "derivative_shader_components": 128,
+    "quad_draw_components": 119168,
+    "execution_device": "NPU",
+    "odd_target_sizes": true,
+    "helper_pixels": true,
+    "partial_tiles": true,
+    "scissor_and_masks": true,
+    "desktop_offload_tested": false
+  },
+  "npu_ddi_summary": [
+    {
+      "kind": "indexed-ddi-runtime-shim",
+      "requested_backend": "NPU",
+      "execution_device": "NPU",
+      "verified_draws": 53,
+      "porter_duff_components": 540672,
+      "porter_duff_additional_modes": 11,
+      "derivative_ddi_components": 16384,
+      "blended_scissored_draws": 6,
+      "textured_draws": 7,
+      "point_scaled_blended_draws": 2,
+      "linear_scaled_blended_draws": 2,
+      "base_vertex_and_start_index": true,
+      "invalid_ranges_and_sampler_rejected": true,
+      "registered_adapter_tested": false,
+      "desktop_offload_tested": false
+    }
+  ],
+  "derivative_worker_verified_components": 16384,
+  "full_desktop_offload": false,
+  "tahoma_performance_tested": false,
+  "findings": [
+    "The captured dual-texture draw divides UV by W. Inactive raster slots previously held zero, causing 0/0 and a global lookup rejection despite valid covered pixels. Copying a device-selected live fragment into inactive input slots avoids those nonexistent shader invocations without altering the device coverage mask.",
+    "A corrected replay decoder routes multiple resources through the general executor. Linked against the old v133 library it reproduces the lookup failure; the same decoder linked against v134 passes. The clean v136 replay matches scalar, CPU and NPU bytes exactly.",
+    "SM4 x/y derivatives use aligned 2x2 quads and device Gather/Subtract nodes. Helper pixels are interpolated outside the primitive/scissor; whole inactive quads clone a live quad. Odd targets and partial batches retain bounded writes and masks.",
+    "The captured 200-word DWM shader passes direct CPU/NPU and scalar-quad checks. A separate analytic test checks nested derivatives and actual raster scheduling.",
+    "The first v136 qualifier used the wrong texture-test CLI syntax; baseline v133/v134 reject it too. The resumed qualifier uses --backend NPU and passes active nonfinite rejection and inactive-branch checks. Failed logs are preserved.",
+    "NPU qualification also covers ordinary textured triangles, typed loads, 53 DDI draws and an ABI8 derivative-only packet. This is component qualification, not desktop completion."
+  ]
+}

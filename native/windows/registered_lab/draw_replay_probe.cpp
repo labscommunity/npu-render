@@ -165,7 +165,10 @@ int main(int argc, char **argv) try {
     std::vector<std::array<double,4>> linear_reference;
     uint64_t linear_covered=0;
     PackedTexture texture;PackedResources resources{};
-    const bool general_resources=std::any_of(ps.instructions.begin(),ps.instructions.end(),[](const auto &i){return i.opcode==Opcode::load;});
+    bool general_resources=quad_derivatives(ps);
+    for(unsigned slot=0;slot<16;++slot)general_resources=general_resources ||
+        (ps.textures[slot] && (slot || ps.texture_dimensions[slot]!=3 || ps.texture_uint[slot])) || (slot && ps.samplers[slot]);
+    for(const auto &instruction:ps.instructions)general_resources=general_resources || instruction.opcode==Opcode::load;
     std::vector<PackedColor> texture_reference;
     if(general_resources){
         for(unsigned slot=0;slot<16;++slot){
@@ -186,7 +189,8 @@ int main(int argc, char **argv) try {
             }else t={description[3],description[4],description[5],snapshot.values<PackedColor>(name)};
         }
         texture_shapes=resource_shapes(ps,resources);texture_pixels=decode_resources(ps,resources);
-        while(uint64_t(width)*height%batch)batch/=2;
+        if(quad_derivatives(ps)){while(batch>4 && uint64_t(clip[2]-clip[0])*uint64_t(clip[3]-clip[1])<=batch/2)batch/=2;batch=(std::max)(4u,batch);}
+        else while(uint64_t(width)*height%batch)batch/=2;
         triangle_executor=std::make_unique<TriangleTextureDrawExecutor>(vs,ps,args[0],width,height,format,resources,texture_samplers,backend,
             blend_mode,uint8_t(blend[15]&255),static_cast<CullMode>(raster[1]-1),raster[2]!=0,batch);
     }else if (textured) {
@@ -203,7 +207,8 @@ int main(int argc, char **argv) try {
         bool general_texture=general_blend(blend_mode) || args[0]!=6 || raster[1]!=1 || (blend[15]&255)!=15;
         if(!general_texture)try{LinearTextureDrawExecutor::validate_shader(ps);}catch(const std::invalid_argument &){general_texture=true;}
         if(general_texture){
-            while(uint64_t(width)*height%batch)batch/=2;
+            if(quad_derivatives(ps)){while(batch>4 && uint64_t(clip[2]-clip[0])*uint64_t(clip[3]-clip[1])<=batch/2)batch/=2;batch=(std::max)(4u,batch);}
+        else while(uint64_t(width)*height%batch)batch/=2;
             triangle_executor=std::make_unique<TriangleTextureDrawExecutor>(vs,ps,args[0],width,height,format,texture.width,texture.height,texture.format,
                 backend,blend_mode,uint8_t(blend[15]&255),sampler[0]==0?TextureFilter::point:TextureFilter::linear,static_cast<CullMode>(raster[1]-1),raster[2]!=0,batch);
             texture_shapes[0]={texture.width,texture.height};texture_samplers[0].filter=sampler[0]==0?TextureFilter::point:TextureFilter::linear;
@@ -251,7 +256,8 @@ int main(int argc, char **argv) try {
         }
         }
     } else {
-        while(uint64_t(width)*height%batch)batch/=2;
+        if(quad_derivatives(ps)){while(batch>4 && uint64_t(clip[2]-clip[0])*uint64_t(clip[3]-clip[1])<=batch/2)batch/=2;batch=(std::max)(4u,batch);}
+        else while(uint64_t(width)*height%batch)batch/=2;
         executor = std::make_unique<UniformDrawExecutor>(vs, ps, args[0], width, height, backend, blend_mode, format == 87, uint8_t(blend[15] & 255), batch,static_cast<CullMode>(raster[1]-1),raster[2]!=0);
     }
     const auto compile_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - compile_start).count();
@@ -315,21 +321,28 @@ int main(int argc, char **argv) try {
                     if(!inside)continue;++covered;
                     auto fragment=result.fragment;
                     if(!is_uniform) {
-                        VertexRegisters interpolated{};
-                        for(unsigned r=0;r<16;++r)if(ps.inputs[r] && r!=ps.position_input){
-                            const auto mode=ps.interpolation[r];
-                            if(mode==1){interpolated[r]=result.vertices[t][r];continue;}
-                            nr::capture::check(mode==2 || mode==4);
-                            double weight[3]{},denominator=0;
-                            for(unsigned v=0;v<3;++v){const auto &a=screen[t+(v+1)%3],&b=screen[t+(v+2)%3];
-                                weight[v]=((b[0]-a[0])*(y+.5-a[1])-(b[1]-a[1])*(x+.5-a[0]))*(mode==2?screen[t+v][2]:1);denominator+=weight[v];}
-                            nr::capture::check(denominator!=0);
-                            for(unsigned c=0;c<4;++c)if(ps.inputs[r]&(1u<<c)){
-                                double value=0;for(unsigned v=0;v<3;++v)value+=weight[v]*as_float(result.vertices[t+v][r][c]);
-                                interpolated[r][c]=as_bits(float(value/denominator));
+                        const auto interpolate_at=[&](double px,double py){
+                            VertexRegisters interpolated{};
+                            for(unsigned r=0;r<16;++r)if(ps.inputs[r] && r!=ps.position_input){
+                                const auto mode=ps.interpolation[r];
+                                if(mode==1){interpolated[r]=result.vertices[t][r];continue;}
+                                nr::capture::check(mode==2 || mode==4);
+                                double weight[3]{},denominator=0;
+                                for(unsigned v=0;v<3;++v){const auto &a=screen[t+(v+1)%3],&b=screen[t+(v+2)%3];
+                                    weight[v]=((b[0]-a[0])*(py-a[1])-(b[1]-a[1])*(px-a[0]))*(mode==2?screen[t+v][2]:1);denominator+=weight[v];}
+                                nr::capture::check(denominator!=0);
+                                for(unsigned c=0;c<4;++c)if(ps.inputs[r]&(1u<<c)){
+                                    double value=0;for(unsigned v=0;v<3;++v)value+=weight[v]*as_float(result.vertices[t+v][r][c]);
+                                    interpolated[r][c]=as_bits(float(value/denominator));
+                                }
                             }
-                        }
-                        fragment=reference_vertex(ps,interpolated,pixel_cb,texture_shapes,texture_samplers,texture_pixels)[0];
+                            return interpolated;
+                        };
+                        if(quad_derivatives(ps)){
+                            std::array<VertexRegisters,4> quad;
+                            for(unsigned lane=0;lane<4;++lane)quad[lane]=interpolate_at((x&~1)+(lane&1)+.5,(y&~1)+(lane>>1)+.5);
+                            fragment=reference_pixel_quad(ps,quad,pixel_cb,texture_shapes,texture_samplers,texture_pixels)[unsigned(x&1)|unsigned((y&1)<<1)][0];
+                        }else fragment=reference_vertex(ps,interpolate_at(x+.5,y+.5),pixel_cb,texture_shapes,texture_samplers,texture_pixels)[0];
                     }
                     auto &pixel=expected[size_t(y)*width+size_t(x)];
                     for(unsigned c=0;c<4;++c){

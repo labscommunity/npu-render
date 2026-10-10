@@ -776,3 +776,29 @@ The exact captured CPU/NPU replay has 396 covered samples and zero-valued output
 the varied component fixtures establish the blend arithmetic beyond that capture.
 The worker emits a compiler diagnostic while still returning verified NPU pixels;
 its raw log is preserved.
+
+The [v89 installed trial](../../../docs/validation/2026-10-10/sole-display-v89/report.json)
+completes 148 live NPU draws but produces three black frames. A captured DWM draw
+uses two textures and divides interpolated UV coordinates by W. Zero-filled
+inactive raster slots create an invalid lookup and reject the whole draw. The
+renderer now copies a device-selected live fragment into those inactive input
+slots while retaining the original device coverage mask and output addresses.
+The replay decoder also recognizes multiple resources independently of typed loads.
+
+Pixel shaders can now use SM4 `deriv_rtx` and `deriv_rty` outside dynamic branches.
+The scheduler packs aligned 2×2 quads and interpolates helper pixels beyond the
+primitive and scissor. Provider Gather/Subtract nodes compute the derivatives.
+Fully inactive quads clone a live quad; helper pixels never write outside the
+image. This follows the reference pattern documented for
+[deriv_rtx](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/deriv-rtx--sm4---asm-)
+and [deriv_rty](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/deriv-rty--sm4---asm-).
+Other derivative variants and derivatives inside branches remain unsupported.
+
+The [v136 qualification](../../../docs/validation/2026-10-10/derivatives-v136/report.json)
+passes 19 CPU suites, 128 NPU shader components, 119,168 raster components,
+53 DDI draws and a 16,384-component derivative worker response. Tests cover the
+captured 200-word DWM shader, nested derivatives, odd image sizes, helper pixels,
+partial batches, scissor and channel masks. The formerly rejected dual-texture
+capture now matches scalar, CPU and NPU pixels exactly. Valid nonfinite-coordinate
+rejection remains tested. This qualifies the renderer for another VM trial;
+it does not establish a usable desktop or improved Tahoma throughput.

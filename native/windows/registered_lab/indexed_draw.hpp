@@ -121,7 +121,7 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
     const auto cull=static_cast<nr::raster::CullMode>(UINT(d.raster.CullMode)-1);
     const bool front_ccw=d.raster.FrontCounterClockwise!=0;
     nr::raster::PackedTexture texture; bool linear=false, modulated=false, general_texture=false;
-    bool general_resources=false;
+    bool general_resources=nr::shader::quad_derivatives(*d.pixel_program);
     for(unsigned slot=0;slot<16;++slot)general_resources=general_resources ||
         (d.pixel_program->textures[slot] && (slot || d.pixel_program->texture_dimensions[slot]!=3 || d.pixel_program->texture_uint[slot])) ||
         (slot && d.pixel_program->samplers[slot]);
