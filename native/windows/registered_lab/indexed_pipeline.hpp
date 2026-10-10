@@ -2,9 +2,13 @@
 #include "indexed_exchange_protocol.hpp"
 namespace nr::registered_lab::indexed_exchange {
 class Pipeline {
-    std::unique_ptr<raster::UniformDrawExecutor> executor;
+    struct UniformEntry {
+        Header header;
+        std::vector<uint32_t> vertex, pixel;
+        std::unique_ptr<raster::UniformDrawExecutor> executor;
+    };
+    std::vector<UniformEntry> uniform_cache;
     std::unique_ptr<raster::PointTextureDrawExecutor> texture_executor;
-    Request previous;
     Request previous_texture;
 public:
     raster::UniformDrawExecutor::Result execute(const Request &request) {
@@ -22,16 +26,22 @@ public:
             }
             return texture_executor->execute(request.inputs,request.vertex_constants,request.viewport,t);
         }
-        const auto &h = request.header, &old = previous.header;
-        if (!executor || old.width != h.width || old.height != h.height || old.vertices != h.vertices || old.format != h.format || old.flags != h.flags ||
-            previous.vertex.bytecode != request.vertex.bytecode || previous.pixel.bytecode != request.pixel.bytecode) {
-            uint32_t batch = 4096; while (uint64_t(h.width) * h.height % batch) batch /= 2;
-            auto candidate = std::make_unique<raster::UniformDrawExecutor>(request.vertex, request.pixel, h.vertices, h.width, h.height,
-                "NPU", (h.flags & 1) != 0, h.format == 87, uint8_t((h.flags >> 8) & 15), batch);
-            executor = std::move(candidate);
-            previous = {}; previous.header = h; previous.vertex = request.vertex; previous.pixel = request.pixel;
+        const auto &h = request.header;
+        // Constants and scissor are graph inputs. Keep a bounded set of compiled
+        // programs across DWM's alternating solid and transparent draws.
+        for (auto &entry : uniform_cache) {
+            const auto &old=entry.header;
+            if(old.width==h.width && old.height==h.height && old.vertices==h.vertices && old.format==h.format &&
+               (old.flags & ~4u)==(h.flags & ~4u) && entry.vertex==request.vertex.bytecode && entry.pixel==request.pixel.bytecode)
+                return entry.executor->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,request.background,request.scissor);
         }
-        return executor->execute(request.inputs, request.vertex_constants, request.pixel_constants, request.viewport, request.background);
+        uint32_t batch=4096;while(uint64_t(h.width)*h.height%batch)batch/=2;
+        auto candidate=std::make_unique<raster::UniformDrawExecutor>(request.vertex,request.pixel,h.vertices,h.width,h.height,
+            "NPU",(h.flags&1)!=0,h.format==87,uint8_t((h.flags>>8)&15),batch);
+        auto result=candidate->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,request.background,request.scissor);
+        if(uniform_cache.size()==8)uniform_cache.erase(uniform_cache.begin());
+        uniform_cache.push_back({h,request.vertex.bytecode,request.pixel.bytecode,std::move(candidate)});
+        return result;
     }
 };
 }

@@ -1,5 +1,6 @@
 #include "indexed_pipe.hpp"
 #include "shader_contract.hpp"
+#include "shader_reference.hpp"
 #include "point_texture_fixture.hpp"
 #include <fstream>
 #include <cstdio>
@@ -50,8 +51,9 @@ int main(int argc, char **argv) try {
     const auto vw = nr::registered_lab::shader_tokens("float4 main(float4 v:POSITION):SV_Position{return v;}", "vs_4_0");
     const auto pw = nr::registered_lab::shader_tokens("float4 main():SV_Target{return float4(0,0,0,1);}", "ps_4_0");
     ex::Request r; r.header.nonce[0] = 0x12345678; r.header.nonce[1] = 0xabcdef; r.header.client_pid = 42;
+    const bool scissor_packet = argc == 3 && !std::strcmp(argv[1], "--pipe-scissor");
     const bool texture_packet = argc == 3 && !std::strcmp(argv[1], "--pipe-texture");
-    const bool desktop_packet = argc == 3 && (!std::strcmp(argv[1], "--pipe-desktop") || texture_packet);
+    const bool desktop_packet = argc == 3 && (!std::strcmp(argv[1], "--pipe-desktop") || texture_packet || scissor_packet);
     r.header.width = desktop_packet ? 1024u : 64u; r.header.height = desktop_packet ? 768u : 64u;
     const auto pixel_count = size_t(r.header.width) * r.header.height; r.header.vertices = 6; r.header.format = 87; r.header.flags = 0xf00; r.header.sequence = 1;
     r.vertex = nr::shader::parse_vertex(vw.data(), vw.size()); r.pixel = nr::shader::parse_pixel(pw.data(), pw.size());
@@ -88,6 +90,19 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
     }
     auto truncated_texture=texture_bytes;truncated_texture.pop_back();auto th=textured.header;--th.body_bytes;
     std::memcpy(truncated_texture.data(),&th,sizeof(th));rejects(truncated_texture);
+    auto clipped=r;clipped.header.abi=3;clipped.header.flags|=4;
+    clipped.scissor=std::array<int32_t,4>{0,7,int32_t(r.header.width),int32_t(r.header.height)};
+    const auto clip_packet=ex::encode(clipped);test(ex::decode(clip_packet).scissor==clipped.scissor);
+    for(unsigned i=0;i<5;++i) {
+        auto bad=clip_packet;
+        auto bounds=*clipped.scissor;
+        if(i==0) bounds[0]=-1;
+        if(i==1) bounds[2]=int32_t(r.header.width)+1;
+        if(i==2) bounds[3]=6;
+        if(i<3) std::memcpy(bad.data()+sizeof(ex::Header)+sizeof(nr::raster::Viewport),bounds.data(),sizeof(bounds));
+        else {auto h=clipped.header;if(i==3)h.abi=1;else h.flags|=2;std::memcpy(bad.data(),&h,sizeof(h));}
+        rejects(bad);
+    }
     for (const auto size : {size_t(0), size_t(79), size_t(80), size_t(103), bytes.size() - 1}) rejects({bytes.begin(), bytes.begin() + size});
     for (unsigned i = 0; i < 12; ++i) {
         auto h = r.header; switch (i) {
@@ -123,6 +138,30 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
             std::ifstream old(argv[2], std::ios::binary); test(!old); old.close();
             std::ofstream out(argv[2], std::ios::binary); test(bool(out));
             out.write(reinterpret_cast<const char *>(bytes.data()), std::streamsize(bytes.size())); out.close(); test(bool(out));
+        } else if (scissor_packet) {
+            const auto blend_vs=nr::registered_lab::shader_tokens("struct O{float4 p:SV_Position;float4 c:COLOR;};O main(float4 p:POSITION,float4 c:COLOR){O o;o.p=p;o.c=c;return o;}","vs_4_0");
+            const auto blend_ps=nr::registered_lab::shader_tokens("float4 main(float4 p:SV_Position,float4 c:COLOR):SV_Target{return c;}","ps_4_0");
+            clipped.vertex=nr::shader::parse_vertex(blend_vs.data(),blend_vs.size());clipped.pixel=nr::shader::parse_pixel(blend_ps.data(),blend_ps.size());
+            clipped.header.flags=0xf05;clipped.scissor=std::array<int32_t,4>{5,7,int32_t(r.header.width)-3,int32_t(r.header.height)-5};
+            const auto original=clipped.inputs;clipped.inputs[3]=original[0];clipped.inputs[4]=original[2];clipped.inputs[5]=original[4];
+            const std::string argument=argv[2];const std::wstring name(argument.begin(),argument.end());
+            const unsigned alphas[]{0,128,255};
+            for(uint32_t frame=0;frame<3;++frame) {
+                const auto alpha=alphas[frame];clipped.header.sequence=frame+1;clipped.header.nonce[0]=0xabce0000+frame;
+                const std::array<unsigned,4> tint{(std::min)(17u,alpha),(std::min)(73u,alpha),(std::min)(123u,alpha),alpha};
+                for(auto &v:clipped.inputs)for(unsigned c=0;c<4;++c)v[1][c]=nr::shader::as_bits(float(tint[c])/255);
+                for(size_t i=0;i<clipped.background.size();++i)for(unsigned c=0;c<4;++c)clipped.background[i][c]=uint8_t(i+c*31+frame*17);
+                const auto packet=ex::encode(clipped);const auto started=GetTickCount64();
+                const auto output=ex::decode_response(stream::exchange_packet(name,packet),clipped.header);
+                for(uint32_t y=0;y<r.header.height;++y)for(uint32_t x=0;x<r.header.width;++x)for(unsigned c=0;c<4;++c){
+                    const bool inside=x>=5 && x<r.header.width-3 && y>=7 && y<r.header.height-5;
+                    const auto old=clipped.background[size_t(y)*r.header.width+x][c];const auto lane=c<3?2-c:c;
+                    const auto expected=inside?uint8_t((tint[lane]*255+unsigned(old)*(255-alpha)+127)/255):old;
+                    test(output.pixels[size_t(y)*r.header.width+x][c]==expected);
+                }
+                test(output.used_rectangle && output.covered_samples==uint64_t(r.header.width-8)*(r.header.height-12));
+                std::printf("{\"indexed_pipe_npu_scissor\":true,\"sequence\":%u,\"alpha\":%u,\"verified_components\":%zu,\"roundtrip_ms\":%llu,\"displayed_frames\":0}\n",frame+1,alpha,pixel_count*4,static_cast<unsigned long long>(GetTickCount64()-started));
+            }
         } else if (!std::strcmp(argv[1], "--pipe-texture")) {
             const std::string argument=argv[2];const std::wstring name(argument.begin(),argument.end());
             for(uint32_t frame=1;frame<=3;++frame) {

@@ -1,6 +1,7 @@
 #pragma once
 #include "output_merger.hpp"
 #include "raster_executor.hpp"
+#include <optional>
 namespace nr::raster {
 // Exact single-sample rectangle coverage and unblended uniform-color writes.
 // Bounds are snapped 1/256-pixel coordinates, with top/left inclusion. Color
@@ -9,11 +10,13 @@ class SolidRectangleExecutor {
     struct State;
     std::unique_ptr<State> state;
 public:
-    SolidRectangleExecutor(uint32_t width, uint32_t height, const std::string &backend, bool bgra);
+    SolidRectangleExecutor(uint32_t width, uint32_t height, const std::string &backend, bool bgra, bool blend = false);
     ~SolidRectangleExecutor();
     SolidRectangleExecutor(const SolidRectangleExecutor &) = delete;
     SolidRectangleExecutor &operator=(const SolidRectangleExecutor &) = delete;
     struct Result { std::vector<PackedColor> pixels; uint32_t covered_samples; std::string execution_device; };
-    Result execute(const std::array<int32_t, 4> &bounds, const Color &color, const std::vector<PackedColor> &background);
+    static bool supports_blend_color(const Color &color);
+    Result execute(const std::array<int32_t, 4> &bounds, const Color &color, const std::vector<PackedColor> &background,
+                   const std::optional<std::array<int32_t, 4>> &scissor = std::nullopt);
 };
 }

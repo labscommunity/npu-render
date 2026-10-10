@@ -2,6 +2,7 @@
 #include "vertex_executor.hpp"
 #include "projection_executor.hpp"
 #include "output_merger.hpp"
+#include <optional>
 namespace nr::raster {
 // Reusable graphics pipeline for a checked uniform-varying triangle list.
 // Host code supplies decoded vertex data and copies bytes; all five rendering
@@ -31,6 +32,7 @@ public:
     Result execute(const std::vector<shader::VertexRegisters> &vertices,
                    const shader::VertexConstants &vertex_constants,
                    const shader::VertexConstants &pixel_constants,
-                   const Viewport &viewport, const std::vector<PackedColor> &background);
+                   const Viewport &viewport, const std::vector<PackedColor> &background,
+                   const std::optional<std::array<int32_t,4>> &scissor = std::nullopt);
 };
 }

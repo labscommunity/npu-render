@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "kind": "installed-point-texture-npu-dwm-attempt",
+  "source_revision": "775cdfbd85c01545ae0702026958a9586aabe9b0",
+  "umd_build": "present-umd-v71",
+  "render_version": "0.0.51.0",
+  "idd_version": "0.0.7.0",
+  "live_dwm_pid": 1048,
+  "live_draws_completed_and_uploaded": 126,
+  "live_solid_draws": 2,
+  "live_textured_draws": 124,
+  "worker_rejected_draws": 0,
+  "request_limit_including_warmups": 128,
+  "live_roundtrip_median_ms": 422,
+  "first_local_draw_state_rejections": 124,
+  "later_draw_rejections_after_limit": 392,
+  "idd_set_device_successes": 191,
+  "idd_set_device_access_lost": 957,
+  "idd_set_device_removed": 10,
+  "received_frames": 0,
+  "displayed_frames": 0,
+  "full_desktop_offload": false,
+  "tahoma_performance_tested": false,
+  "first_failed_draw": {
+    "sha256": "3f26217c3abe4bc17df7c8d0a9d82b1d9670b3a328e065e4b39b7baf3af5b5f4",
+    "capture_complete": true,
+    "vertices": 6,
+    "source_over_blend": true,
+    "vertex_color_rgba": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "scissor": [
+      0,
+      720,
+      1024,
+      768
+    ],
+    "target": [
+      1024,
+      768,
+      87
+    ],
+    "pixel_shader_words": 18,
+    "triangle_order": "0,1,2,0,2,3",
+    "raw_pixels_committed": false
+  },
+  "observation": "Topology helper confirmed Default input desktop with no screen saver, but its report ended incomplete. Guest became CPU-bound and management lagged; scheduled-task polling was not a reliable wall-clock deadline.",
+  "debugger": "Intentional read-only break examined running threads and memory; approximately 1.4 GiB remained available. No private pointers modified; resumed with g. Break affected timing.",
+  "cleanup": "KMD removal passed. IDD devcon returned 1 (Removed on reboot). Only disposable VM restarted; devices verified absent and saved INF hash verified before package deletion. Recovery passed. Physical Delta not restarted."
+}

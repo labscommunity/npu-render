@@ -8,7 +8,8 @@ param(
  [string]$GuestActionScript='',
  [switch]$SmokeTest,
  [switch]$DesktopSmokeTest,
- [switch]$TextureSmokeTest
+ [switch]$TextureSmokeTest,
+ [switch]$ScissorSmokeTest
 )
 $ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue'
 if($Session.State -ne 'Opened' -or (Test-Path $EvidenceDirectory)){throw 'Opened guest session and new evidence directory required'}
@@ -21,6 +22,7 @@ foreach($item in $build.binary_sha256.psobject.Properties){
 if(!(Test-Path "$RuntimeDirectory\openvino.dll")){throw 'Pinned runtime required'}
 if($DesktopSmokeTest -and !$SmokeTest){throw 'DesktopSmokeTest requires SmokeTest'}
 if($TextureSmokeTest -and (!$SmokeTest -or $DesktopSmokeTest)){throw 'TextureSmokeTest requires SmokeTest and excludes DesktopSmokeTest'}
+if($ScissorSmokeTest -and (!$SmokeTest -or $DesktopSmokeTest -or $TextureSmokeTest)){throw 'ScissorSmokeTest requires SmokeTest and excludes other fixtures'}
 $job=[Guid]::NewGuid().ToString('N');$guest="C:\npu-lab\indexed-stream-$job";$pipe="\\.\pipe\npu-render-indexed-$job"
 $active='C:\npu-lab\indexed-pipe-active.txt';$rule="NpuRenderIndexed-$job";$limit=128;if($SmokeTest){$limit=3}
 New-Item -ItemType Directory $EvidenceDirectory|Out-Null
@@ -82,9 +84,9 @@ try {
  }
  $report.state='relay_ready';Save-Report
  if($SmokeTest){
-  $report.guest_test_exit=Invoke-Command -Session $Session -ArgumentList $guest,$pipe,([bool]$DesktopSmokeTest),([bool]$TextureSmokeTest) -ScriptBlock {
-   param($directory,$name,$desktop,$texture)
-   $mode='--pipe';if($desktop){$mode='--pipe-desktop'};if($texture){$mode='--pipe-texture'}
+  $report.guest_test_exit=Invoke-Command -Session $Session -ArgumentList $guest,$pipe,([bool]$DesktopSmokeTest),([bool]$TextureSmokeTest),([bool]$ScissorSmokeTest) -ScriptBlock {
+   param($directory,$name,$desktop,$texture,$scissor)
+   $mode='--pipe';if($desktop){$mode='--pipe-desktop'};if($texture){$mode='--pipe-texture'};if($scissor){$mode='--pipe-scissor'}
    & "$directory\nr_registered_indexed_exchange_test.exe" $mode $name *> "$directory\smoke.log"
    $LASTEXITCODE
   }

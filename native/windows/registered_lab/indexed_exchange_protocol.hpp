@@ -23,10 +23,10 @@ struct Receipt {
 static_assert(sizeof(Receipt) == 48);
 inline void require(bool value) { if (!value) throw std::invalid_argument("invalid indexed NPU exchange packet"); }
 inline bool shape_valid(const Header &h) {
-    const bool valid = h.signature == magic && h.abi == ((h.flags & 2) ? 2u : 1u) && (h.nonce[0] || h.nonce[1]) && h.client_pid &&
+    const bool valid = h.signature == magic && h.abi == ((h.flags & 4) ? 3u : ((h.flags & 2) ? 2u : 1u)) && (h.nonce[0] || h.nonce[1]) && h.client_pid &&
         h.width && h.width <= 8192 && h.height && h.height <= 8192 && uint64_t(h.width) * h.height <= 4 * 1024 * 1024 &&
         h.vertices && h.vertices <= 4096 && !(h.vertices % 3) && (h.format == 28 || h.format == 87) &&
-        !(h.flags & ~0xf03u) && (h.flags & 0xf00u) && h.vs_words >= 3 && h.vs_words <= 16384 &&
+        !(h.flags & ~0xf07u) && (h.flags & 0xf00u) && h.vs_words >= 3 && h.vs_words <= 16384 &&
         h.ps_words >= 3 && h.ps_words <= 16384 && h.sequence && h.sequence <= max_requests &&
         h.body_bytes <= max_packet_bytes - sizeof(Header) && !h.reserved;
     if (!valid) return false;
@@ -55,12 +55,16 @@ inline bool failure_valid(const Header &h, const Header &request, uint64_t bytes
 struct Request {
     Header header;
     raster::Viewport viewport{};
+    std::optional<std::array<int32_t,4>> scissor;
     shader::Program vertex, pixel;
     std::vector<shader::VertexRegisters> inputs;
     shader::VertexConstants vertex_constants, pixel_constants;
     std::vector<raster::PackedColor> background;
     raster::PackedTexture texture;
 };
+inline bool scissor_valid(const std::array<int32_t,4> &s, const Header &h) {
+    return s[0] >= 0 && s[1] >= 0 && s[0] <= s[2] && s[1] <= s[3] && s[2] <= int32_t(h.width) && s[3] <= int32_t(h.height);
+}
 struct TextureDescription { uint32_t width, height, format, reserved; };
 static_assert(sizeof(TextureDescription) == 16);
 inline bool texture_valid(const TextureDescription &t, const Header &h) {
@@ -99,6 +103,8 @@ inline std::vector<uint8_t> encode(Request &r) {
     h.vs_words = uint32_t(r.vertex.bytecode.size()); h.ps_words = uint32_t(r.pixel.bytecode.size());
     require(shape_valid(h) && h.kind == 1 && !h.device && r.inputs.size() == h.vertices && r.background.size() == size_t(h.width) * h.height);
     Writer w; w.value(h); w.value(r.viewport);
+    if (h.flags & 4) { require(r.scissor.has_value() && scissor_valid(*r.scissor,h)); w.value(*r.scissor); }
+    else require(!r.scissor.has_value());
     w.append(r.vertex.bytecode.data(), size_t(h.vs_words) * 4); w.append(r.pixel.bytecode.data(), size_t(h.ps_words) * 4);
     w.append(r.inputs.data(), r.inputs.size() * sizeof(shader::VertexRegisters));
     auto constants = [&](const shader::Program &p, const shader::VertexConstants &c) {
@@ -117,6 +123,7 @@ inline std::vector<uint8_t> encode(Request &r) {
 inline Request decode(const std::vector<uint8_t> &bytes) {
     Reader reader(bytes); Request r; r.header = reader.value<Header>(); const auto &h = r.header;
     require(request_valid(h, bytes.size())); r.viewport = reader.value<raster::Viewport>();
+    if (h.flags & 4) { r.scissor = reader.value<std::array<int32_t,4>>(); require(scissor_valid(*r.scissor,h)); }
     require(r.viewport.x == 0 && r.viewport.y == 0 && r.viewport.width == float(h.width) && r.viewport.height == float(h.height) &&
         r.viewport.min_depth >= 0 && r.viewport.min_depth <= r.viewport.max_depth && r.viewport.max_depth <= 1);
     const auto vs = reader.vector<uint32_t>(h.vs_words), ps = reader.vector<uint32_t>(h.ps_words);

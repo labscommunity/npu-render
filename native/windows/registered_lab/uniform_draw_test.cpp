@@ -54,6 +54,22 @@ O main(float4 p:POSITION,float4 c:COLOR) {O o;o.p=p;o.c=c*color;return o;})", "v
         std::printf("{\"uniform_draw\":true,\"frame\":%u,\"covered_samples\":%llu,\"draw_ms\":%.3f,\"execution_device\":\"%s\",\"desktop_offload_tested\":false}\n",
             frame, static_cast<unsigned long long>(result.covered_samples), result.timings.total_ms, result.execution_device.c_str());
     }
+    // Alternate indexed triangle order, nontrivial alpha and partial scissor.
+    for(const unsigned alpha : {0u,128u,255u}) {
+        auto inputs=quad(1,false);const auto original=inputs;
+        inputs[3]=original[0];inputs[4]=original[2];inputs[5]=original[4];
+        const Color color{float((std::min)(17u,alpha))/255,float((std::min)(73u,alpha))/255,float((std::min)(123u,alpha))/255,float(alpha)/255};
+        VertexConstants cb;cb[0].resize(1);std::memcpy(cb[0][0].data(),color.data(),16);
+        const std::array<int32_t,4> clip{5,7,61,59};
+        const auto result=executor.execute(inputs,cb,{},viewport,background,clip);
+        test(result.used_rectangle && result.covered_samples==56*52);
+        for(unsigned y=0;y<64;++y) for(unsigned x=0;x<64;++x) for(unsigned c=0;c<4;++c) {
+            const bool inside=x>=5 && x<61 && y>=7 && y<59;const auto lane=c<3 ? 2-c : c;
+            const unsigned source=unsigned(std::round(color[lane]*255));
+            const auto expected=inside ? uint8_t((source*255+unsigned(old[c])*(255-alpha)+127)/255) : old[c];
+            test(result.pixels[size_t(y)*64+x][c]==expected);++checked;
+        }
+    }
     std::printf("{\"checked_components\":%llu,\"dynamic_geometry_and_constants\":true,\"nonuniform_rejected\":true,\"background_unchanged\":true}\n", static_cast<unsigned long long>(checked));
     return 0;
 } catch (const std::exception &e) { std::fprintf(stderr, "%s\n", e.what()); return 1; }

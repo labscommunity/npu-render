@@ -1,0 +1,34 @@
+[ERROR] 02:41:26.651 [vpux-compiler] Got Diagnostic at loc(fused<{name = "main", type = "Func"}>["main"]) : InferenceExecutionAnalysis Pass failed : Can't convert a F32/SI32 workload as CostModel does not support
+python.exe : loc(fused<{name = "main", type = "Func"}>["main"]): error: 
+InferenceExecutionAnalysis Pass failed : Can't convert a F32/SI32 workload as CostModel does not 
+support
+At line:2 char:1
++ & "$src\venv\Scripts\python.exe" "$r\vm\probe-npu-byte-blend-v2.py" * ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (loc(fused<{name...oes not support:String) [], Remote 
+   Exception
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[ERROR] 02:41:26.651 [vpux-compiler] Failed Pass InferenceExecutionAnalysis on Operation loc(fused<{name = "main", type = "Func"}>["main"])
+Traceback (most recent call last):
+  File "C:\Users\tatef\AppData\Local\npu-render\vm\probe-npu-byte-blend-v2.py", line 16, in 
+<module>
+    ov.serialize(model,p);core=ov.Core();start=time.perf_counter();compiled=core.compile_model(cor
+e.read_model(p),'NPU',{'EXECUTION_MODE_HINT':'ACCURACY'})
+                                                                            
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\venv\Lib\site-packages\o
+penvino\_ov_api.py", line 646, in compile_model
+    super().compile_model(model, device_name, {} if config is None else config),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: Exception from src\inference\src\cpp\core.cpp:121:
+Exception from src\inference\src\dev\plugin.cpp:54:
+Exception from src\plugins\intel_npu\src\plugin\src\plugin.cpp:642:
+Exception from src\plugins\intel_npu\src\compiler_adapter\src\compiler_impl.cpp:433:
+Compilation failed. vclAllocatedExecutableCreate2 result: 0x78000004 - [NPU_VCL] Compiler 
+returned msg:
+Compilation failed
+
+
+
+

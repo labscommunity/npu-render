@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "kind": "checked-npu-scissored-premultiplied-byte-blend",
+  "build": "present-umd-v73",
+  "cpu_contracts_passed": 12,
+  "npu_rectangle_build": "present-umd-v72",
+  "runtime_sources_unchanged_between_rectangle_test_and_v73": true,
+  "unblended_components_checked": 37945344,
+  "blended_scissored_components_checked": 46137344,
+  "exhaustive_opacity_levels": 256,
+  "pixel_formats": [
+    "RGBA8",
+    "BGRA8"
+  ],
+  "desktop_fixture": [
+    1024,
+    768
+  ],
+  "uniform_pipeline_components_checked": 147456,
+  "indexed_ddi_draws_checked": 7,
+  "indexed_ddi_components_checked": 114688,
+  "indexed_ddi_blended_scissored_draws": 3,
+  "captured_failed_dwm_draw": {
+    "sha256": "3f26217c3abe4bc17df7c8d0a9d82b1d9670b3a328e065e4b39b7baf3af5b5f4",
+    "repeats": 3,
+    "covered_samples": 49152,
+    "scissor": [
+      0,
+      720,
+      1024,
+      768
+    ],
+    "reference": "independent scalar vertex, projected triangle coverage and color oracle",
+    "warm_draw_ms": [
+      424.736,
+      348.264
+    ]
+  },
+  "vm_npu_vm_scissor_packets": {
+    "passed": true,
+    "alpha": [
+      0,
+      128,
+      255
+    ],
+    "components_checked": 9437184,
+    "roundtrip_ms": [
+      14171,
+      609,
+      281
+    ],
+    "worker_exit_code": 0,
+    "configuration_removed": true
+  },
+  "failures_preserved": [
+    "Two full-image i32 arithmetic prototypes failed NPU compilation.",
+    "Direct float arithmetic prototype passed alpha endpoints but mismatched 730 components at alpha 128.",
+    "First replay invocation named an unextracted host path and failed before inference; corrected transferred capture hash was verified."
+  ],
+  "algorithm": "Exact nibble products form high and low product bytes; round((256H+L)/255)=H+[H+L>=128]+[H+L>=383]. All arithmetic stays in exactly representable small values. Device applies scissor and selects pixels.",
+  "admission": "Axis-aligned nonoverlapping quad in either checked index order; premultiplied exact byte-grid source color; bounded integer pixel scissor. Other partial-scissor operations remain rejected.",
+  "uniform_stream_cache_limit": 8,
+  "packet_abi": 3,
+  "displayed_frames": 0,
+  "full_desktop_offload": false,
+  "tahoma_performance_tested": false,
+  "timing_caveat": "Diagnostic runs; not controlled desktop or Tahoma performance measurements."
+}

@@ -55,8 +55,12 @@ void execute_indexed_draw(Device &d, UINT count, UINT first, INT base) {
         d.raster.CullMode == D3D10_DDI_CULL_NONE && !d.raster.MultisampleEnable && !d.raster.AntialiasedLineEnable &&
         !d.raster.DepthBias && d.raster.DepthBiasClamp == 0 && d.raster.SlopeScaledDepthBias == 0 &&
         !d.blend.AlphaToCoverageEnable && d.sample_mask == ~0u && d.blend.RenderTargetWriteMask[0] && d.blend.RenderTargetWriteMask[0] <= 15);
-    if (d.raster.ScissorEnable) require(d.scissors.size() == 1 && d.scissors[0].left == 0 && d.scissors[0].top == 0 &&
-        d.scissors[0].right == LONG(s.width) && d.scissors[0].bottom == LONG(s.height));
+    const std::array<int32_t,4> full{0,0,int32_t(s.width),int32_t(s.height)};
+    auto clip = full;
+    if (d.raster.ScissorEnable) {
+        require(d.scissors.size() == 1); const auto &r = d.scissors[0]; clip = {r.left,r.top,r.right,r.bottom};
+        require(clip[0] >= 0 && clip[1] >= 0 && clip[0] <= clip[2] && clip[1] <= clip[3] && clip[2] <= full[2] && clip[3] <= full[3]);
+    }
     const bool blend = d.blend.BlendEnable[0] != 0;
     if (blend) require(d.blend.SrcBlend == D3D10_DDI_BLEND_ONE && d.blend.DestBlend == D3D10_DDI_BLEND_INV_SRC_ALPHA &&
         d.blend.BlendOp == D3D10_DDI_BLEND_OP_ADD && d.blend.SrcBlendAlpha == D3D10_DDI_BLEND_ONE &&
@@ -66,6 +70,7 @@ void execute_indexed_draw(Device &d, UINT count, UINT first, INT base) {
     const bool textured = std::any_of(d.pixel_program->textures.begin(),d.pixel_program->textures.end(),[](bool v){return v;});
     nr::raster::PackedTexture texture;
     if (textured) {
+        require(clip == full);
         nr::raster::PointTextureDrawExecutor::validate_shader(*d.pixel_program);
         const auto source = d.bound_source; const auto &sampler = d.samplers[2][0];
         require(count == 6 && !blend && d.blend.RenderTargetWriteMask[0] == 15 && source && source != target && source->handle != target->handle &&
@@ -88,6 +93,7 @@ void execute_indexed_draw(Device &d, UINT count, UINT first, INT base) {
         request.header.width = s.width; request.header.height = s.height; request.header.vertices = count;
         request.header.format = s.format; request.header.flags = (UINT(d.blend.RenderTargetWriteMask[0]) << 8) | UINT(blend);
         if (textured) { request.header.abi = 2; request.header.flags |= 2; request.texture = std::move(texture); }
+        if (clip != full) { request.header.abi = 3; request.header.flags |= 4; request.scissor = clip; }
         request.viewport = viewport; request.vertex = *d.vertex_program; request.pixel = *d.pixel_program;
         request.inputs = inputs; request.vertex_constants = vc; request.pixel_constants = pc; request.background = std::move(background);
         result = d.indexed_exchange->execute(std::move(request));
@@ -108,7 +114,7 @@ void execute_indexed_draw(Device &d, UINT count, UINT first, INT base) {
                 s.width, s.height, d.backend, blend, s.format == 87, d.blend.RenderTargetWriteMask[0], batch);
             d.indexed_executor = std::move(candidate); d.indexed_key = key; d.indexed_vertex = d.vertex_program; d.indexed_pixel = d.pixel_program;
         }
-        result = d.indexed_executor->execute(inputs, vc, pc, viewport, background);
+        result = d.indexed_executor->execute(inputs, vc, pc, viewport, background, clip);
     }
     ++counters.executions;
     if (d.backend == "NPU_LAB_INDEXED") ++counters.remote_npu_executions;

@@ -275,3 +275,9 @@ uv run ruff format --check .
 ```
 
 Keep this repository private. There is no package-publication workflow.
+
+The latest [installed desktop attempt](docs/validation/2026-10-10/indexed-dwm-v62/report.json)
+completed 126 live compositor draws on the physical NPU but received no display
+frames. Its next unsupported operation—clipped transparent rectangles—now has a
+checked NPU path. Validation remains incremental; full desktop offload and a
+Tahoma performance improvement have not been demonstrated.

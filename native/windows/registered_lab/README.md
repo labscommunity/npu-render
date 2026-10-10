@@ -396,3 +396,26 @@ size limits and explicit physical NPU execution. Texture frames are exercised by
 `run_registered_indexed_stream.ps1 -SmokeTest -TextureSmokeTest`. The controller
 still requires an owned disposable guest, a finite task and the private lab
 transport. See the [hardware and failure evidence](../../../docs/validation/2026-10-10/point-texture-npu-v71/report.json).
+
+The [v62 installed attempt](../../../docs/validation/2026-10-10/indexed-dwm-v62/report.json)
+completed and uploaded 126 live DWM draws through the physical NPU, including 124
+opaque texture copies. It delivered no indirect-display frames. The next draw
+was a transparent uniform quad clipped to the bottom 48 pixels of the screen.
+Repeated rejection caused compositor retries; the finite request limit then
+rejected further draws. The guest-only IDD removal required a disposable-VM
+restart, followed by verified device and package removal.
+
+`SolidRectangleExecutor` now intersects rectangle coverage with a bounded scissor
+on the selected provider. Its optional source-over path admits premultiplied
+colors exactly on the UNORM8 grid. Nibble arithmetic keeps byte products exact
+under the tested NPU's floating-point lowering. Arbitrary fractional colors use
+the existing bounded merger only with full-target scissor; unsupported partial
+scissor draws fail without committing target bytes. Both checked quad index
+orders are admitted. Pixel scissor coordinates travel in packet version 3;
+versions 1 and 2 remain compatible, and partial texture scissor remains rejected.
+The stream caches up to eight uniform programs, retaining compiled programs
+across alternating draw states. `-SmokeTest -ScissorSmokeTest` checks three
+1024×768 packets against independent byte arithmetic and preserved outside pixels.
+The [v73 qualification](../../../docs/validation/2026-10-10/scissor-blend-npu-v73/report.json)
+records the exact pixel checks, captured-draw replay, VM packet checks and failed
+arithmetic prototypes. It does not establish display frame delivery.

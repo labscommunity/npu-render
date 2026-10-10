@@ -77,13 +77,15 @@ int main(int argc, char **argv) try {
           view[0] == 0 && view[1] == 0 && view[2] == float(width) && view[3] == float(height));
     const auto blend = snapshot.values<uint32_t>("blend"), raster = snapshot.values<uint32_t>("raster"), depth = snapshot.values<uint32_t>("depth");
     nr::capture::check(blend.size() == 17 && !blend[0] && depth.size() == 15 && !depth[0] && !depth[3]);
-    for (size_t i = 2; i < 9; ++i) nr::capture::check(!blend[i]);
+    // Only target zero is bound in this captured draw; other blend slots are unused.
     const bool blending = blend[1] != 0;
     if (blending) nr::capture::check(blend[9] == 2 && blend[10] == 6 && blend[11] == 1 && blend[12] == 2 && blend[13] == 6 && blend[14] == 1);
     nr::capture::check(raster.size() == 10 && raster[0] == 3 && raster[1] == 1 && !raster[3] && !raster[4] && !raster[5] && !raster[8] && !raster[9]);
+    std::array<int32_t,4> clip{0,0,int32_t(width),int32_t(height)};
     if (raster[7]) {
         const auto scissor = snapshot.values<int32_t>("scissors");
-        nr::capture::check(scissor.size() == 4 && scissor[0] == 0 && scissor[1] == 0 && scissor[2] == int32_t(width) && scissor[3] == int32_t(height));
+        nr::capture::check(scissor.size() == 4 && scissor[0] >= 0 && scissor[1] >= 0 && scissor[0] <= scissor[2] && scissor[1] <= scissor[3] && scissor[2] <= int32_t(width) && scissor[3] <= int32_t(height));
+        std::copy(scissor.begin(),scissor.end(),clip.begin());
     }
     auto pixels = snapshot.values<PackedColor>("target"); nr::capture::check(pixels.size() == size_t(width) * height);
     const auto vs_words = snapshot.values<uint32_t>("vertex-shader"), ps_words = snapshot.values<uint32_t>("pixel-shader");
@@ -104,6 +106,7 @@ int main(int argc, char **argv) try {
     PackedTexture texture;
     std::vector<PackedColor> texture_reference;
     if (textured) {
+        nr::capture::check(clip == std::array<int32_t,4>{0,0,int32_t(width),int32_t(height)});
         const auto source = snapshot.values<uint32_t>("source-description"), sampler = snapshot.values<uint32_t>("sampler-2-0");
         nr::capture::check(args[0] == 6 && !blending && (blend[15] & 255) == 15 && source.size() == 10 && source[0] == 0x4e52574b && source[1] == 1 && source[2] == 40 && !source[7]);
         nr::capture::check(sampler.size() == 13 && !sampler[0] && sampler[1] == 3 && sampler[2] == 3 && sampler[3] == 3 && !sampler[4] && !sampler[11]);
@@ -129,7 +132,7 @@ int main(int argc, char **argv) try {
     std::vector<PackedColor> reference_pixels;
     for (uint32_t iteration = 0; iteration < repeats; ++iteration) {
         const Viewport viewport{view[0],view[1],view[2],view[3],view[4],view[5]};
-        result = textured ? texture_executor->execute(inputs,cb,viewport,texture) : executor->execute(inputs, cb, pixel_cb, viewport, pixels);
+        result = textured ? texture_executor->execute(inputs,cb,viewport,texture) : executor->execute(inputs, cb, pixel_cb, viewport, pixels, clip);
         for (size_t i = 0; i < inputs.size(); ++i) {
             const auto expected = reference_vertex(vs, inputs[i], cb);
             for (unsigned r = 0; r < 16; ++r) for (unsigned c = 0; c < 4; ++c) if (vs.outputs[r] & (1u << c))
@@ -140,6 +143,33 @@ int main(int argc, char **argv) try {
             VertexRegisters uniform{};
             for (unsigned r = 0; r < 16; ++r) if (ps.inputs[r] && r != ps.position_input) uniform[r] = result.vertices[0][r];
             nr::capture::check(result.fragment == reference_vertex(ps, uniform, pixel_cb)[0]);
+            // Independent scalar coverage and byte-color oracle for this replay.
+            // A transparent draw still must preserve every destination byte.
+            auto expected=pixels;uint64_t covered=0;
+            std::vector<Point> points(inputs.size());
+            for(size_t i=0;i<inputs.size();++i) {
+                const auto v=reference_vertex(vs,inputs[i],cb)[vs.position_output];
+                volatile float nx=as_float(v[0])/as_float(v[3]),ny=as_float(v[1])/as_float(v[3]);
+                volatile float sx=nx+1,sy=1-ny;sx=sx*(float(width)*.5f);sy=sy*(float(height)*.5f);
+                points[i]={int32_t(std::nearbyint(float(sx)*256)),int32_t(std::nearbyint(float(sy)*256))};
+            }
+            const auto edge=[](Point a,Point b,Point p){return (int64_t(b[0])-a[0])*(int64_t(p[1])-a[1])-(int64_t(b[1])-a[1])*(int64_t(p[0])-a[0]);};
+            for(size_t t=0;t<points.size();t+=3) {
+                std::array<Point,3> triangle{points[t],points[t+1],points[t+2]};const auto area=edge(triangle[0],triangle[1],triangle[2]);
+                if(!area)continue;if(area<0)std::swap(triangle[1],triangle[2]);
+                for(int32_t y=clip[1];y<clip[3];++y)for(int32_t x=clip[0];x<clip[2];++x){
+                    const Point p{x*256+128,y*256+128};bool inside=true;
+                    for(size_t e=0;e<3;++e){const auto a=triangle[e],b=triangle[(e+1)%3];const auto value=edge(a,b,p);const bool top=b[1]<a[1]||(b[1]==a[1]&&b[0]>a[0]);if(value<0||(!value&&!top))inside=false;}
+                    if(!inside)continue;++covered;
+                    auto &pixel=expected[size_t(y)*width+size_t(x)];
+                    for(unsigned c=0;c<4;++c)if((blend[15]&255)&(1u<<c)){
+                        const auto lane=format==87 && c<3 ? 2-c : c;
+                        const double value=double(as_float(result.fragment[lane]))*255+(blending?double(pixel[c])*(1-double(as_float(result.fragment[3]))):0);
+                        pixel[c]=uint8_t(std::nearbyint((std::clamp)(value,0.,255.)));
+                    }
+                }
+            }
+            nr::capture::check(result.covered_samples==covered && result.pixels==expected);
         }
         if (!iteration) reference_pixels = result.pixels; else nr::capture::check(result.pixels == reference_pixels);
         const auto &t = result.timings;

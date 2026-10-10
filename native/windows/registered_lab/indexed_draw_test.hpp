@@ -75,6 +75,25 @@ int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
         last_error = S_OK; f.pfnDrawIndexed(h, 6, UINT_MAX, 1);
         TEST(last_error == E_INVALIDARG && memory[target_index] == before && counters.draws == draws); last_error = S_OK;
     }
+    blend.BlendEnable[0]=TRUE;blend.SrcBlend=blend.SrcBlendAlpha=D3D10_DDI_BLEND_ONE;
+    blend.DestBlend=blend.DestBlendAlpha=D3D10_DDI_BLEND_INV_SRC_ALPHA;blend.BlendOp=blend.BlendOpAlpha=D3D10_DDI_BLEND_OP_ADD;
+    f.pfnSetBlendState(h,bs,nullptr,~0u);scissor={5,7,width-3,height-5};f.pfnSetScissorRects(h,1,0,&scissor);
+    for(const unsigned alpha : {0u,128u,255u}) {
+        const auto before=memory[target_index];const auto draws=counters.draws;
+        color[0]=float((std::min)(17u,alpha))/255;color[1]=float((std::min)(73u,alpha))/255;
+        color[2]=float((std::min)(123u,alpha))/255;color[3]=float(alpha)/255;
+        f.pfnDefaultConstantBufferUpdateSubresourceUP(h,resources[3],0,nullptr,color,0,0);
+        f.pfnDrawIndexed(h,6,1,1);TEST(last_error==S_OK && counters.draws==draws+1);
+        for(UINT y=0;y<height;++y)for(UINT x=0;x<width;++x)for(UINT c=0;c<4;++c) {
+            const auto byte_offset=(size_t(y)*width+x)*4+c;const auto lane=c<3 ? 2-c : c;
+            const bool inside=x>=5 && x<width-3 && y>=7 && y<height-5;
+            const auto source=unsigned(std::round(color[lane]*255));
+            const auto expected=inside ? uint8_t((source*255+unsigned(before[byte_offset])*(255-alpha)+127)/255) : before[byte_offset];
+            TEST(memory[target_index][byte_offset]==expected);
+        }
+    }
+    blend.BlendEnable[0]=FALSE;f.pfnSetBlendState(h,bs,nullptr,~0u);
+    scissor={0,0,width,height};f.pfnSetScissorRects(h,1,0,&scissor);
     // Exercise the textured specialization through actual binding and DrawIndexed
     // DDIs, including nonzero first/base offsets and failed-state preservation.
     const auto texture_vs=shader_tokens("cbuffer C {float4 color;};struct O {float4 p:SV_Position;float4 c:COLOR0;float2 uv:TEXCOORD0;};O main(float4 p:POSITION,float2 uv:TEXCOORD0){O o;o.p=p;o.c=color;o.uv=uv;return o;}","vs_4_0");
@@ -110,7 +129,7 @@ int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
     D3D10DDI_HSAMPLER hs{};hs.pDrvPrivate=&sampler;f.pfnPsSetSamplers(h,0,1,&hs);TEST(last_error==S_OK);
     for(unsigned frame=0;frame<2;++frame){
         if(frame){for(auto &c:source)c=uint8_t(c+43);f.pfnResourceUpdateSubresourceUP(h,resources[4],0,nullptr,source.data(),sw*4,0);}
-        f.pfnDrawIndexed(h,6,1,1);TEST(last_error==S_OK && counters.draws==draws_before+3+frame);
+        f.pfnDrawIndexed(h,6,1,1);TEST(last_error==S_OK && counters.draws==draws_before+6+frame);
         for(UINT y=0;y<height;++y)for(UINT x=0;x<width;++x)for(UINT c=0;c<4;++c)
             TEST(memory[target_index][(size_t(y)*width+x)*4+c]==(c==3?uint8_t(255):source[(size_t(y+16)*sw+x+32)*4+c]));
         const auto before=memory[target_index];const auto draws=counters.draws;
@@ -122,7 +141,7 @@ int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
     f.pfnDestroyRenderTargetView(h, view);
     for (const auto r : resources) f.pfnDestroyResource(h, r);
     f.pfnDestroyDevice(h);
-    TEST(counters.executions == executions_before + 4 && !counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
-    std::printf("{\"kind\":\"indexed-ddi-runtime-shim\",\"requested_backend\":\"%s\",\"execution_device\":\"%s\",\"verified_draws\":4,\"verified_components\":65536,\"textured_draws\":2,\"base_vertex_and_start_index\":true,\"invalid_ranges_and_sampler_rejected\":true,\"registered_adapter_tested\":false,\"desktop_offload_tested\":false}\n", backend, counters.last_execution_device);
+    TEST(counters.executions == executions_before + 7 && !counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
+    std::printf("{\"kind\":\"indexed-ddi-runtime-shim\",\"requested_backend\":\"%s\",\"execution_device\":\"%s\",\"verified_draws\":7,\"verified_components\":114688,\"blended_scissored_draws\":3,\"textured_draws\":2,\"base_vertex_and_start_index\":true,\"invalid_ranges_and_sampler_rejected\":true,\"registered_adapter_tested\":false,\"desktop_offload_tested\":false}\n", backend, counters.last_execution_device);
     return 0;
 }

@@ -13,16 +13,17 @@ void require(bool value) { if (!value) throw std::invalid_argument("unsupported 
 struct UniformDrawExecutor::State {
     shader::Program vs, ps;
     uint32_t count, width, height, batch;
-    bool blending;
-    std::unique_ptr<SolidRectangleExecutor> rectangle;
+    bool blending, bgra;
+    std::string backend;
+    std::unique_ptr<SolidRectangleExecutor> rectangle, blended_rectangle;
     std::unique_ptr<shader::VertexExecutor> vertex;
     std::unique_ptr<shader::PixelExecutor> pixel;
     std::unique_ptr<ProjectionExecutor> projection;
     std::unique_ptr<CoverageExecutor> coverage;
     std::unique_ptr<OutputMerger> merger;
     State(const shader::Program &v, const shader::Program &p, uint32_t n, uint32_t w, uint32_t h,
-          const std::string &backend, bool blend, bool bgra, uint8_t mask, uint32_t b)
-        : vs(v), ps(p), count(n), width(w), height(h), batch(b), blending(blend) {
+          const std::string &device, bool blend, bool swizzle, uint8_t mask, uint32_t b)
+        : vs(v), ps(p), count(n), width(w), height(h), batch(b), blending(blend), bgra(swizzle), backend(device) {
         require(vs.stage == shader::Stage::vertex && ps.stage == shader::Stage::pixel && count && count <= 65536 && !(count % 3));
         require(width && width <= 8192 && height && height <= 8192 && uint64_t(width) * height <= 8 * 1024 * 1024);
         require(batch && batch <= 4096 && !(uint64_t(width) * height % batch) && vs.position_output < 16 && ps.outputs[0] == 15);
@@ -47,10 +48,13 @@ UniformDrawExecutor::UniformDrawExecutor(const shader::Program &vs, const shader
 UniformDrawExecutor::~UniformDrawExecutor() = default;
 UniformDrawExecutor::Result UniformDrawExecutor::execute(const std::vector<shader::VertexRegisters> &inputs,
     const shader::VertexConstants &vc, const shader::VertexConstants &pc, const Viewport &viewport,
-    const std::vector<PackedColor> &background) {
+    const std::vector<PackedColor> &background, const std::optional<std::array<int32_t,4>> &scissor) {
     auto &s = *state; const auto start = Clock::now(); Result result{};
     require(inputs.size() == s.count && background.size() == size_t(s.width) * s.height &&
         viewport.x == 0 && viewport.y == 0 && viewport.width == float(s.width) && viewport.height == float(s.height));
+    const std::array<int32_t,4> full{0,0,int32_t(s.width),int32_t(s.height)};
+    const auto clip = scissor.value_or(full);
+    require(clip[0] >= 0 && clip[1] >= 0 && clip[0] <= clip[2] && clip[1] <= clip[3] && clip[2] <= full[2] && clip[3] <= full[3]);
     auto began = Clock::now(); auto shaded = s.vertex->execute(inputs, vc);
     result.timings.shader_ms = milliseconds(began); result.execution_device = shaded.execution_device;
     result.input_bytes = shaded.input_bytes; result.output_bytes = shaded.output_bytes; ++result.provider_requests;
@@ -72,20 +76,28 @@ UniformDrawExecutor::Result UniformDrawExecutor::execute(const std::vector<shade
     const auto &p = projected.vertices;
     // Admit precisely the two nonoverlapping triangles of an axis-aligned quad.
     // This is a shape check. Pixel coverage and all color writes remain on device.
-    if (s.rectangle && (!s.blending || color[3] == 1) &&
+    const bool needs_blend = s.blending && color[3] != 1;
+    const bool first_order = s.count == 6 && p[0].snapped == p[5].snapped && p[2].snapped == p[3].snapped;
+    const bool second_order = s.count == 6 && p[0].snapped == p[3].snapped && p[2].snapped == p[4].snapped;
+    const size_t bottom_left = second_order ? 5 : 4;
+    if (s.rectangle && (!needs_blend || SolidRectangleExecutor::supports_blend_color(color)) && (first_order || second_order) &&
         std::all_of(color.begin(), color.end(), [](float c) { return c >= 0 && c <= 1; }) &&
-        p[0].snapped == p[5].snapped && p[2].snapped == p[3].snapped &&
         p[0].snapped[1] == p[1].snapped[1] && p[1].snapped[0] == p[2].snapped[0] &&
-        p[2].snapped[1] == p[4].snapped[1] && p[4].snapped[0] == p[0].snapped[0] &&
+        p[2].snapped[1] == p[bottom_left].snapped[1] && p[bottom_left].snapped[0] == p[0].snapped[0] &&
         p[0].snapped[0] < p[2].snapped[0] && p[0].snapped[1] < p[2].snapped[1]) {
         began = Clock::now();
-        auto rect = s.rectangle->execute({p[0].snapped[0], p[0].snapped[1], p[2].snapped[0], p[2].snapped[1]}, color, background);
+        if (needs_blend && !s.blended_rectangle)
+            s.blended_rectangle = std::make_unique<SolidRectangleExecutor>(s.width,s.height,s.backend,s.bgra,true);
+        auto &executor = needs_blend ? s.blended_rectangle : s.rectangle;
+        auto rect = executor->execute({p[0].snapped[0], p[0].snapped[1], p[2].snapped[0], p[2].snapped[1]}, color, background, clip);
         result.timings.merger_ms = milliseconds(began); require(rect.execution_device == result.execution_device);
         result.pixels = std::move(rect.pixels); result.covered_samples = rect.covered_samples;
-        result.input_bytes += uint64_t(background.size()) * 4 + 32; result.output_bytes += uint64_t(background.size()) * 5; ++result.provider_requests;
+        result.input_bytes += uint64_t(background.size()) * 4 + 48; result.output_bytes += uint64_t(background.size()) * 5; ++result.provider_requests;
         result.tile_executions = 1; result.used_rectangle = true; result.vertices = std::move(shaded.vertices);
         result.timings.total_ms = milliseconds(start); return result;
     }
+    // Partial clipping is currently qualified only for the rectangle pipeline.
+    require(clip == full);
     const std::vector<Color> colors(s.batch, color);
     // The caller's target is unchanged unless it explicitly commits this result.
     result.pixels = background;
