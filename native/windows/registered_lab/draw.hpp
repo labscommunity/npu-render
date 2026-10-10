@@ -6,7 +6,7 @@ void APIENTRY create_srv(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATESHADERRESOU
     guard(h, __FUNCTION__, [&] {
         require(a != nullptr);
         auto &r = resource(a->hDrvResource);
-        require(r.usage == D3D10_DDI_USAGE_DEFAULT && r.allocation->context == device(h).context &&
+        require(!r.buffer_bytes && r.usage == D3D10_DDI_USAGE_DEFAULT && r.allocation->context == device(h).context &&
                 a->ResourceDimension == D3D10DDIRESOURCE_TEXTURE2D && UINT(a->Format) == r.allocation->surface.format &&
                 !a->Tex2D.MostDetailedMip && a->Tex2D.MipLevels == 1 && !a->Tex2D.FirstArraySlice && a->Tex2D.ArraySize == 1);
         static_cast<View *>(out.pDrvPrivate)->allocation = r.allocation;
@@ -122,10 +122,6 @@ void APIENTRY draw(D3D10DDI_HDEVICE h, UINT count, UINT first) {
 }
 void APIENTRY null_shader(D3D10DDI_HDEVICE h, D3D10DDI_HSHADER value) { guard(h, __FUNCTION__, [&] { require(!value.pDrvPrivate); }); }
 void APIENTRY null_layout(D3D10DDI_HDEVICE h, D3D10DDI_HELEMENTLAYOUT value) { guard(h, __FUNCTION__, [&] { require(!value.pDrvPrivate); }); }
-void APIENTRY null_buffers(D3D10DDI_HDEVICE h, UINT start, UINT count, const D3D10DDI_HRESOURCE *values) {
-    guard(h, __FUNCTION__, [&] { require(start <= 14 && count <= 14 - start && (!count || values));
-        for (UINT i = 0; i < count; ++i) require(!values[i].pDrvPrivate); });
-}
 void APIENTRY null_views(D3D10DDI_HDEVICE h, UINT start, UINT count, const D3D10DDI_HSHADERRESOURCEVIEW *values) {
     guard(h, __FUNCTION__, [&] { require(start <= 128 && count <= 128 - start && (!count || values));
         for (UINT i = 0; i < count; ++i) require(!values[i].pDrvPrivate); });
@@ -152,7 +148,9 @@ void bind_draw_functions(D3D10DDI_DEVICEFUNCS &f) {
     f.pfnDestroyShader = destroy_shader; f.pfnVsSetShader = set_shader<1>; f.pfnPsSetShader = set_shader<2>;
     f.pfnSetViewports = set_viewports; f.pfnIaSetTopology = set_topology; f.pfnDraw = draw;
     f.pfnGsSetShader = null_shader; f.pfnIaSetInputLayout = null_layout;
-    f.pfnVsSetConstantBuffers = f.pfnGsSetConstantBuffers = f.pfnPsSetConstantBuffers = null_buffers;
+    f.pfnVsSetConstantBuffers = set_constant_buffers<0>;
+    f.pfnGsSetConstantBuffers = set_constant_buffers<1>;
+    f.pfnPsSetConstantBuffers = set_constant_buffers<2>;
     f.pfnVsSetShaderResources = f.pfnGsSetShaderResources = null_views;
     f.pfnIaSetVertexBuffers = null_vertices; f.pfnIaSetIndexBuffer = null_index;
     f.pfnSoSetTargets = null_stream; f.pfnSetPredication = null_predication;

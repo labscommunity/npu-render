@@ -124,6 +124,7 @@ HRESULT APIENTRY render_cb(HANDLE rt, D3DDDICB_RENDER *a) {
 #include "upload_test.hpp"
 #include "draw_test.hpp"
 #include "present_test.hpp"
+#include "buffer_test.hpp"
 int main(int argc, char **argv) {
     const char *backend = argc >= 2 ? argv[1] : "CPU";
     const bool desktop_size = argc == 3 && !std::strcmp(argv[2], "--desktop-size");
@@ -287,6 +288,7 @@ int main(int argc, char **argv) {
     TEST(released == 4 && destroys == 1);
     TEST(test_uploads(kt, um) == 0);
     TEST(test_present(kt, um) == 0);
+    TEST(test_buffers(kt, um) == 0);
     TEST(test_draws(kt, um, backend, desktop_size) == 0);
     std::puts("registered lab allocation and submission contracts passed");
     return 0;

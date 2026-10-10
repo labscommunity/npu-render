@@ -50,10 +50,13 @@ struct Device {
         D3D10_DDI_SAMPLER_DESC desc{};
     };
     std::array<std::array<SamplerBinding, 16>, 3> samplers{};
+    std::array<std::array<std::shared_ptr<Allocation>, 14>, 3> constant_buffers{};
 };
 struct Resource {
     std::shared_ptr<Allocation> allocation;
     UINT usage = 0, map_flags = 0;
+    UINT buffer_bytes = 0, bind_flags = 0;
+    bool mapped_write = false;
 };
 struct View { std::shared_ptr<Allocation> allocation; };
 struct Shader { UINT kind = 0; };
@@ -101,6 +104,7 @@ Resource &resource(D3D10DDI_HRESOURCE h) {
     require(bool(r.allocation));
     return r;
 }
+#include "buffer.hpp"
 void upload(Allocation &target, const D3D10_DDI_BOX *box, const void *source, UINT pitch) {
     require(!target.locked && !target.context->poisoned);
     const auto &s = target.surface;
@@ -156,6 +160,9 @@ void APIENTRY create_resource(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATERESOUR
             UINT(a->ResourceDimension), UINT(a->Format), a->MipLevels, a->ArraySize, UINT(a->Usage),
             a->BindFlags, a->MapFlags, a->MiscFlags, a->SampleDesc.Count, a->SampleDesc.Quality,
             a->pPrimaryDesc ? "true" : "false");
+        if (a && a->ResourceDimension == D3D10DDIRESOURCE_BUFFER) {
+            create_buffer(device(h), *a, *static_cast<Resource *>(out.pDrvPrivate)); return;
+        }
         if (a && (a->MiscFlags || a->pPrimaryDesc || (a->BindFlags & D3D10_DDI_BIND_PRESENT))) {
             std::fprintf(stderr, "nr_fill_umd: resource dimension=%u mips=%u array=%u format=%u samples=%u/%u misc=%x usage=%u bind=%x map=%x primary=%u initial=%u runtime_resource=%u\n",
                 UINT(a->ResourceDimension), a->MipLevels, a->ArraySize, UINT(a->Format), a->SampleDesc.Count,
@@ -215,7 +222,7 @@ void APIENTRY create_view(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATERENDERTARG
     guard(h, __FUNCTION__, [&] {
         require(a != nullptr);
         auto &r = resource(a->hDrvResource);
-        require(r.usage == D3D10_DDI_USAGE_DEFAULT && a->ResourceDimension == D3D10DDIRESOURCE_TEXTURE2D &&
+        require(!r.buffer_bytes && r.usage == D3D10_DDI_USAGE_DEFAULT && a->ResourceDimension == D3D10DDIRESOURCE_TEXTURE2D &&
                 UINT(a->Format) == r.allocation->surface.format && !a->Tex2D.MipSlice &&
                 !a->Tex2D.FirstArraySlice && a->Tex2D.ArraySize == 1);
         static_cast<View *>(v.pDrvPrivate)->allocation = r.allocation;
@@ -243,7 +250,8 @@ void APIENTRY clear(D3D10DDI_HDEVICE h, D3D10DDI_HRENDERTARGETVIEW v, FLOAT colo
 void APIENTRY copy_resource(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE dst, D3D10DDI_HRESOURCE src) {
     guard(h, __FUNCTION__, [&] {
         auto &d = resource(dst); auto &s = resource(src);
-        require(d.usage == D3D10_DDI_USAGE_STAGING && s.usage == D3D10_DDI_USAGE_DEFAULT);
+        require(d.usage == D3D10_DDI_USAGE_STAGING && d.buffer_bytes == s.buffer_bytes &&
+            (s.usage == D3D10_DDI_USAGE_DEFAULT || (s.buffer_bytes && s.usage == D3D10_DDI_USAGE_DYNAMIC)));
         auto a = d.allocation, b = s.allocation;
         require(a != b && a->context == device(h).context && b->context == a->context &&
                 a->surface.width == b->surface.width && a->surface.height == b->surface.height &&
@@ -269,6 +277,7 @@ void APIENTRY update_resource(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE dst, UINT s
     guard(h, __FUNCTION__, [&] {
         auto &r = resource(dst);
         require(!sub && r.usage == D3D10_DDI_USAGE_DEFAULT && r.allocation->context == device(h).context);
+        if (r.buffer_bytes) { require(!box); update_buffer(r, source); return; }
         upload(*r.allocation, box, source, pitch); // CPU upload bytes are counted separately from submitted work.
     });
 }
@@ -277,15 +286,24 @@ void APIENTRY map(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE r, UINT sub, D3D10_DDI_
     if (out) *out = {};
     guard(h, __FUNCTION__, [&] {
         auto &v = resource(r);
-        require(out && !sub && !flags && type == D3D10_DDI_MAP_READ && v.usage == D3D10_DDI_USAGE_STAGING &&
-                v.map_flags == D3D10_DDI_CPU_ACCESS_READ && v.allocation->context == device(h).context);
-        out->pData = v.allocation->lock(true);
+        require(out && !sub && !flags && v.allocation->context == device(h).context);
+        const bool read = type == D3D10_DDI_MAP_READ && v.usage == D3D10_DDI_USAGE_STAGING &&
+            v.map_flags == D3D10_DDI_CPU_ACCESS_READ;
+        const bool discard = v.buffer_bytes && type == D3D10_DDI_MAP_WRITE_DISCARD &&
+            v.usage == D3D10_DDI_USAGE_DYNAMIC && v.map_flags == D3D10_DDI_CPU_ACCESS_WRITE;
+        require(read || discard);
+        out->pData = v.allocation->lock(read); v.mapped_write = discard;
         out->RowPitch = v.allocation->surface.row_pitch;
         out->DepthPitch = UINT(v.allocation->surface.allocation_bytes);
     });
 }
 void APIENTRY unmap(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE r, UINT sub) {
-    guard(h, __FUNCTION__, [&] { auto &a = *resource(r).allocation; require(!sub && a.locked); check(a.unlock()); });
+    guard(h, __FUNCTION__, [&] {
+        auto &v = resource(r); auto &a = *v.allocation;
+        require(!sub && a.locked && a.context == device(h).context); check(a.unlock());
+        if (v.mapped_write) counters.upload_bytes += v.buffer_bytes;
+        v.mapped_write = false;
+    });
 }
 // The runtime constructs default pipeline state while initializing a device.
 // Retain those descriptors even though ClearRenderTargetView ignores them.
@@ -426,6 +444,8 @@ HRESULT APIENTRY create_device(D3D10DDI_HADAPTER, D3D10DDIARG_CREATEDEVICE *a) {
         f.pfnResourceUpdateSubresourceUP = update_resource;
         f.pfnResourceMap = f.pfnStagingResourceMap = map;
         f.pfnResourceUnmap = f.pfnStagingResourceUnmap = unmap;
+        f.pfnDynamicConstantBufferMapDiscard = map;
+        f.pfnDynamicConstantBufferUnmap = unmap;
         f.pfnCalcPrivateRenderTargetViewSize = view_size; f.pfnCreateRenderTargetView = create_view;
         f.pfnDestroyRenderTargetView = destroy_view; f.pfnClearRenderTargetView = clear;
         f.pfnSetRenderTargets = targets;
