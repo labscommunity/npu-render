@@ -74,8 +74,11 @@ or display driver is installed by the collector.
 displays the received pixels in an SDL software window. Optional `--vm-pid` and
 `--qmp-port` enable keyboard and mouse input through the existing local QEMU monitor.
 The tool checks process identity and releases held inputs on loss of focus or exit.
-Use input only after verifying a sole-indirect topology; extended-display pointer
-coordinates would refer to a different desktop layout. The topology diagnostic
+Input also requires `--input-ready <new-directory>/input-ready.json`; run the
+collector with `--topology-name <idd-topology-trial-name>` to publish that status.
+The viewer gates input on a sole-indirect layout confirmed within the last 15
+seconds, releasing held inputs when confirmation expires or restoration starts.
+Extended-display pointer coordinates refer to a different desktop layout. The topology diagnostic
 accepts an automatically activated indirect monitor when making this switch and
 restores the exact prior paths after its finite observation.
 

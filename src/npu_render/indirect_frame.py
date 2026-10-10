@@ -1,7 +1,11 @@
 """Validate the bounded NRFRAME1 readback format; no rendering or device claims."""
 
+import json
+import os
 import struct
+import time
 from dataclasses import dataclass
+from pathlib import Path
 
 HEADER = struct.Struct("<QIIQIIIIQQII")
 MAX_PIXELS = 4 * 1024 * 1024
@@ -40,3 +44,23 @@ def parse_frame(data: bytes) -> IndirectFrame:
     if len(data) != HEADER.size + count:
         raise ValueError("truncated frame or trailing bytes")
     return IndirectFrame(seq, w, h, fmt, qpc, pid, data[HEADER.size :])
+
+
+def confirmed_sole_display(path: Path, now: float | None = None) -> bool:
+    """Fail closed if the collector's layout confirmation is absent or stale."""
+    try:
+        with path.open("rb") as source:
+            published = os.fstat(source.fileno()).st_mtime
+            age = (time.time() if now is None else now) - published
+            data = source.read(4097)
+        if not 0 <= age <= 15 or len(data) > 4096:
+            return False
+        state = json.loads(data)
+        return (
+            isinstance(state, dict)
+            and isinstance(state.get("topology_name"), str)
+            and state["topology_name"].startswith("idd-topology-")
+            and state.get("sole_indirect") is True
+        )
+    except (OSError, ValueError):
+        return False

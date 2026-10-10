@@ -1,6 +1,8 @@
+import os
+
 import pytest
 
-from npu_render.indirect_frame import HEADER, MAX_BYTES, parse_frame
+from npu_render.indirect_frame import HEADER, MAX_BYTES, confirmed_sole_display, parse_frame
 
 
 def packet(**changes):
@@ -58,3 +60,28 @@ def test_reject_truncation_trailer_and_oversized_payload():
     for data in (b"", packet()[:63], packet()[:-1], packet() + b"x", bytes(MAX_BYTES + 1)):
         with pytest.raises(ValueError):
             parse_frame(data)
+
+
+def test_input_requires_fresh_valid_sole_layout(tmp_path):
+    path = tmp_path / "state.json"
+    assert not confirmed_sole_display(path, 100)
+    valid = b'{"topology_name":"idd-topology-test","sole_indirect":true}'
+    for content in (
+        b"",
+        b"{",
+        b"[]",
+        b"true",
+        b"x" * 4097,
+        valid.replace(b"true", b"false"),
+        valid.replace(b"true", b"1"),
+        valid.replace(b"idd-topology-", b"unrelated-"),
+    ):
+        path.write_bytes(content)
+        os.utime(path, (100, 100))
+        assert not confirmed_sole_display(path, 105)
+    path.write_bytes(valid)
+    os.utime(path, (100, 100))
+    assert confirmed_sole_display(path, 100)
+    assert confirmed_sole_display(path, 115)
+    assert not confirmed_sole_display(path, 115.01)
+    assert not confirmed_sole_display(path, 99.99)

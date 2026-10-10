@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "kind": "primary-topology-launcher-version-mismatch",
+  "source_revision": "7dd57d441230158427f092849368790aac1389aa",
+  "live_dwm_npu_draws": 5,
+  "successful_cpu_region_copies": [
+    122880,
+    118080
+  ],
+  "dwm_device_created": 1,
+  "received_frames": 2,
+  "viewer_submissions": 1,
+  "viewer_backend": "SDL software window / Cocoa",
+  "sole_indirect_activated": false,
+  "full_desktop_offload": false,
+  "displayed_frames_verified": 0,
+  "failure": "The guest copy of start_indirect_topology_task.ps1 predates the SoleIndirect parameter already present in repository source. The finite trial recorded the parameter binding error and removed both devices successfully. The later snapshot copy of the nonexistent topology log also failed; the archive, trace and kernel-admission report were retained.",
+  "correction": "Deploy current launcher and verify its SHA-256 and parsed SoleIndirect parameter before another trial. Gate viewer input on fresh verified sole-indirect topology.",
+  "correct_launcher_sha256": "3616d1b23d8bc7725719a6e3590c5c3976c4423a8f5815a41429194477906ecf"
+}

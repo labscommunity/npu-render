@@ -15,7 +15,7 @@ from pathlib import Path
 
 import numpy as np
 
-from npu_render.indirect_frame import MAX_BYTES, parse_frame
+from npu_render.indirect_frame import MAX_BYTES, confirmed_sole_display, parse_frame
 from npu_render.presentation import WindowPresenter
 
 
@@ -140,12 +140,21 @@ KEYS.update({f"f{i}": f"f{i}" for i in range(1, 13)})
 def run(args):
     if not 1 <= args.seconds <= 300 or bool(args.vm_pid) != bool(args.qmp_port):
         raise ValueError("duration 1–300 seconds; input needs both VM PID and QMP port")
+    if args.vm_pid and not args.input_ready:
+        raise ValueError("input requires the collector's fresh sole-indirect status file")
     control = LabInput(args.vm_pid, args.qmp_port) if args.vm_pid else None
     presenter, identity, count, frame = None, None, 0, None
     started = time.monotonic()
+    input_active = False
     try:
         with args.report.open("x", encoding="utf-8") as log:
             while time.monotonic() - started < args.seconds:
+                admitted = False
+                if control:
+                    admitted = confirmed_sole_display(args.input_ready)
+                if input_active and not admitted:
+                    control.release()
+                input_active = admitted
                 if args.frame.exists():
                     with args.frame.open("rb") as source:
                         if os.fstat(source.fileno()).st_size > MAX_BYTES:
@@ -178,7 +187,7 @@ def run(args):
                             "frame": identity,
                             "window_submissions": count,
                             "displayed_frames_verified": 0,
-                            "input_enabled": bool(control),
+                            "input_enabled": input_active,
                         }
                         log.write(json.dumps(record) + "\n")
                         log.flush()
@@ -188,7 +197,7 @@ def run(args):
                     for event in pg.event.get():
                         if event.type == pg.QUIT:
                             return
-                        if not control:
+                        if not input_active:
                             continue
                         if event.type in (pg.KEYDOWN, pg.KEYUP):
                             code = KEYS.get(pg.key.name(event.key))
@@ -228,4 +237,5 @@ if __name__ == "__main__":
     parser.add_argument("--seconds", type=int, default=120)
     parser.add_argument("--vm-pid", type=int)
     parser.add_argument("--qmp-port", type=int)
+    parser.add_argument("--input-ready", type=Path, help="collector's fresh input-ready.json")
     run(parser.parse_args())

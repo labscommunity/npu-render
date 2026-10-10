@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "kind": "sole-indirect-desktop-trial",
+  "source_revision": "7dd57d441230158427f092849368790aac1389aa",
+  "sole_indirect_activated": true,
+  "active_paths_before": 2,
+  "active_paths_during": 1,
+  "topology_restore_succeeded": true,
+  "live_dwm_npu_draws": 17,
+  "successful_present_callbacks": 10,
+  "successful_buffer_rotations": 10,
+  "received_frame_sequence": 10,
+  "dwm_device_creations": 145,
+  "dwm_rejections": 144,
+  "first_failure": "CreateShader rejected 95-word vertex-ID quad with ISHL and indexable temporaries. Recovery then rejected 11-mip BGRA texture resources.",
+  "observer_reason_note": "Historical dwm-present-failure-recorded label also matches any DWM DDI rejection. This trial first rejected shader creation, not Present.",
+  "viewer": "Two early frames submitted to Cocoa SDL software window; physical display verification absent. Input test issued no input because sole-topology freshness gate never became ready.",
+  "collector_failure": "Transient file replacement caused an active frame-file sharing conflict; bounded retry now handles missing/locked replacement races. A later collector retained sequence 10.",
+  "custom_devices_removed": true,
+  "full_desktop_offload": false,
+  "tahoma_performance_tested": false,
+  "physical_delta_display_driver_changed": false
+}
