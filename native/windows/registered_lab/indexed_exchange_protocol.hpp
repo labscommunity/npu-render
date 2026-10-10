@@ -35,15 +35,13 @@ inline bool shape_valid(const Header &h) {
     if (!valid) return false;
     if(h.flags & 0x2000) {
         if(!(h.flags&2) || (h.flags&0x1018) || (h.flags&96)==96)return false;
-        uint32_t batch=4096;const uint64_t pixels=uint64_t(h.width)*h.height;
-        while(pixels%batch)batch/=2;
-        return uint64_t(h.vertices/3)*(pixels/batch)<=4096;
+        // The payload's scissor determines work; validate it after decoding.
+        return true;
     }
     if(h.flags & 0x1000) {
         if(!(h.flags & 2) || ((h.flags & 24)!=8 && (h.flags & 24)!=16) || (h.flags & 96)==96)return false;
-        uint32_t batch=4096;const uint64_t pixels=uint64_t(h.width)*h.height;
-        while(pixels%batch)batch/=2;
-        return uint64_t(h.vertices/3)*(pixels/batch)<=4096;
+        // The payload's scissor determines work; validate it after decoding.
+        return true;
     }
     if((h.flags & 0xe0) && ((h.flags & 26) || !(h.flags & 96) || (h.flags & 96)==96))return false;
     if (h.flags & 16) return h.vertices == 6 && h.width <= 4096 && (h.flags & ~5u) == 0xf12;
@@ -117,6 +115,15 @@ public:
     }
     bool done() const { return cursor == data.size(); }
 };
+inline bool triangle_work_valid(const Request &r){
+    const auto &h=r.header;if(!(h.flags&0x3000))return true;
+    const auto clip=r.scissor.value_or(std::array<int32_t,4>{0,0,int32_t(h.width),int32_t(h.height)});
+    if(!scissor_valid(clip,h))return false;
+    uint32_t batch=4096;const uint64_t pixels=uint64_t(h.width)*h.height;while(pixels%batch)batch/=2;
+    const auto first=uint64_t(clip[1])*h.width/batch;
+    const auto end=(uint64_t(clip[3])*h.width+batch-1)/batch;
+    return uint64_t(h.vertices/3)*(end-first)<=4096;
+}
 inline std::vector<uint8_t> encode(Request &r) {
     auto &h = r.header;
     require(r.vertex.bytecode.size() <= 16384 && r.pixel.bytecode.size() <= 16384);
@@ -125,6 +132,7 @@ inline std::vector<uint8_t> encode(Request &r) {
     Writer w; w.value(h); w.value(r.viewport);
     if (h.flags & 4) { require(r.scissor.has_value() && scissor_valid(*r.scissor,h)); w.value(*r.scissor); }
     else require(!r.scissor.has_value());
+    require(triangle_work_valid(r));
     w.append(r.vertex.bytecode.data(), size_t(h.vs_words) * 4); w.append(r.pixel.bytecode.data(), size_t(h.ps_words) * 4);
     w.append(r.inputs.data(), r.inputs.size() * sizeof(shader::VertexRegisters));
     auto constants = [&](const shader::Program &p, const shader::VertexConstants &c) {
@@ -149,6 +157,7 @@ inline Request decode(const std::vector<uint8_t> &bytes) {
     Reader reader(bytes); Request r; r.header = reader.value<Header>(); const auto &h = r.header;
     require(request_valid(h, bytes.size())); r.viewport = reader.value<raster::Viewport>();
     if (h.flags & 4) { r.scissor = reader.value<std::array<int32_t,4>>(); require(scissor_valid(*r.scissor,h)); }
+    require(triangle_work_valid(r));
     require(r.viewport.x == 0 && r.viewport.y == 0 && r.viewport.width == float(h.width) && r.viewport.height == float(h.height) &&
         r.viewport.min_depth >= 0 && r.viewport.min_depth <= r.viewport.max_depth && r.viewport.max_depth <= 1);
     const auto vs = reader.vector<uint32_t>(h.vs_words), ps = reader.vector<uint32_t>(h.ps_words);

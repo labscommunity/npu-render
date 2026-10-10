@@ -1,0 +1,28 @@
+{
+  "trial": "v76",
+  "source_commit": "ecabcb1da7b67fdcd90bd33eb807968a59644ad4",
+  "umd_build": "present-umd-v101",
+  "kmd_build": "allocation-capacity-v3",
+  "package_version": "0.0.64.0",
+  "machine_scope": "disposable guest; physical NPU executes explicit remote draw packets",
+  "npu_preflight_packets_passed": 9,
+  "dwm_npu_draws": 22,
+  "dwm_present_callbacks": 7,
+  "received_frames": 3,
+  "received_frames_all_black": true,
+  "received_frames_with_sole_display_gate": 2,
+  "viewer_window_submissions": 3,
+  "input_actions": [],
+  "input_visual_response_verified": false,
+  "full_desktop_offload": false,
+  "performance_tested": false,
+  "cleanup_passed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "findings": [
+    "The previous textured draw executes on NPU; next draw has 81 vertices with a 24x24 scissor on a 1024x768 target. Its conservative full-target estimate exceeds the 4096-tile budget, although the requested scissor uses only 162 triangle tiles.",
+    "StartMenuExperienceHost and Explorer now create the typed-lookup shader, then reject PER_INSTANCE input layouts. Explorer also requests an immutable initialized texture.",
+    "Collection stopped on a sharing race because its retry handler assigned to PowerShell reserved $Error. Three validated frames are retained; later frames were not observed.",
+    "All three received frames are black; input automation intentionally waited for visible content and sent no keys. Both guest devices were removed and original display paths restored."
+  ]
+}

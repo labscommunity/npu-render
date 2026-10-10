@@ -113,17 +113,15 @@ now has an exact NPU specialization for opaque, one-to-one point-sampled quads.
 Its captured 1024×768 replay passes, as do changing-image and driver callback
 tests. This is a checked subset, not general desktop rendering.
 
-The [latest installed trial](docs/validation/2026-10-10/sole-display-v75/report.json)
-completed 36 DWM draws on the NPU and received five frames. Its input test did
-not show a usable desktop; both guest drivers were removed successfully. The
-next [captured textured-triangle draw](docs/validation/2026-10-10/textured-triangles-v97/report.json)
-now matches the scalar pixel reference exactly on the NPU, including backface
-culling, interpolated alpha, a narrow scissor and source-over blending. The shell's
-typed-buffer lookup shader now passes [isolated NPU checks](docs/validation/2026-10-10/typed-resources-v101/report.json),
-including its integer operations and a complete synthetic lookup draw. The driver
-now carries multiple resource bindings through the laboratory transport; its next
-live desktop trial is pending. Full desktop offload and a Tahoma benefit remain
-unproven.
+The [latest installed trial](docs/validation/2026-10-10/sole-display-v76/report.json)
+completed 22 DWM draws on the NPU and received three black frames. Both guest
+drivers were removed successfully. Its next rejected draw has a small scissor
+but exceeded a conservative full-screen work estimate; an offline replay now
+matches the scalar reference on the NPU after bounding actual clipped work.
+The shell's [typed-buffer lookup shader](docs/validation/2026-10-10/typed-resources-v101/report.json)
+passes isolated NPU checks, while the live shell advances to instanced input
+layouts and immutable textures. Support for those is under qualification. Full
+desktop offload and a Tahoma benefit remain unproven.
 
 The [captured-window desktop experiment](native/windows/capture/README.md) now
 presents an NPU-composed 2880×1800 desktop with input passing through to the

@@ -12,42 +12,36 @@ class Pipeline {
     Request previous_texture;
     std::unique_ptr<raster::LinearTextureDrawExecutor> linear_executor;
     Request previous_linear;
-    std::unique_ptr<raster::TriangleTextureDrawExecutor> triangle_executor;
-    Request previous_triangle;
-    std::unique_ptr<raster::TriangleTextureDrawExecutor> resources_executor;
-    Request previous_resources;
+    struct TriangleEntry {
+        Header header;
+        std::vector<uint32_t> vertex,pixel;
+        raster::PackedResources layout;
+        shader::TextureSamplers samplers;
+        std::unique_ptr<raster::TriangleTextureDrawExecutor> executor;
+    };
+    std::vector<TriangleEntry> triangle_cache;
 public:
     raster::UniformDrawExecutor::Result execute(const Request &request) {
-        if(request.header.flags & 0x2000){
-            const auto &h=request.header,&old=previous_resources.header;require(shape_valid(h) && h.abi==8);
-            if(!resources_executor || old.width!=h.width || old.height!=h.height || old.vertices!=h.vertices || old.format!=h.format ||
-                (old.flags&~4u)!=(h.flags&~4u) || !raster::resource_layout_equal(request.resources,previous_resources.resources) ||
-                !raster::sampler_layout_equal(request.samplers,previous_resources.samplers) ||
-                previous_resources.vertex.bytecode!=request.vertex.bytecode || previous_resources.pixel.bytecode!=request.pixel.bytecode){
-                resources_executor.reset();uint32_t batch=4096;while(uint64_t(h.width)*h.height%batch)batch/=2;
-                resources_executor=std::make_unique<raster::TriangleTextureDrawExecutor>(request.vertex,request.pixel,h.vertices,h.width,h.height,h.format,
-                    request.resources,request.samplers,"NPU",(h.flags&1)!=0,uint8_t((h.flags>>8)&15),static_cast<raster::CullMode>((h.flags>>5)&3),(h.flags&128)!=0,batch);
-                previous_resources={};previous_resources.header=h;previous_resources.vertex=request.vertex;previous_resources.pixel=request.pixel;
-                previous_resources.resources=raster::resource_layout(request.resources);previous_resources.samplers=request.samplers;
+        if(request.header.flags & 0x3000){
+            const auto &h=request.header;require(shape_valid(h));
+            raster::PackedResources resources;shader::TextureSamplers samplers{};
+            if(h.flags&0x2000){require(h.abi==8);resources=request.resources;samplers=request.samplers;}
+            else {require(h.abi==7);resources[0]=request.texture;samplers[0].filter=(h.flags&16)?shader::TextureFilter::point:shader::TextureFilter::linear;}
+            for(auto &entry:triangle_cache){const auto &old=entry.header;
+                if(old.width==h.width && old.height==h.height && old.vertices==h.vertices && old.format==h.format &&
+                    (old.flags&~4u)==(h.flags&~4u) && raster::resource_layout_equal(resources,entry.layout) &&
+                    raster::sampler_layout_equal(samplers,entry.samplers) && entry.vertex==request.vertex.bytecode && entry.pixel==request.pixel.bytecode)
+                    return entry.executor->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,resources,request.background,request.scissor);
             }
-            return resources_executor->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,request.resources,request.background,request.scissor);
-        }
-        if(request.header.flags & 0x1000) {
-            const auto &h=request.header,&old=previous_triangle.header;
-            const auto &t=request.texture,&pt=previous_triangle.texture;
-            require(shape_valid(h) && h.abi==7);
-            if(!triangle_executor || old.width!=h.width || old.height!=h.height || old.vertices!=h.vertices || old.format!=h.format ||
-                (old.flags&~4u)!=(h.flags&~4u) || pt.width!=t.width || pt.height!=t.height || pt.format!=t.format ||
-                previous_triangle.vertex.bytecode!=request.vertex.bytecode || previous_triangle.pixel.bytecode!=request.pixel.bytecode){
-                triangle_executor.reset();
-                uint32_t batch=4096;while(uint64_t(h.width)*h.height%batch)batch/=2;
-                triangle_executor=std::make_unique<raster::TriangleTextureDrawExecutor>(request.vertex,request.pixel,h.vertices,h.width,h.height,h.format,
-                    t.width,t.height,t.format,"NPU",(h.flags&1)!=0,uint8_t((h.flags>>8)&15),(h.flags&16)?shader::TextureFilter::point:shader::TextureFilter::linear,
-                    static_cast<raster::CullMode>((h.flags>>5)&3),(h.flags&128)!=0,batch);
-                previous_triangle={};previous_triangle.header=h;previous_triangle.vertex=request.vertex;previous_triangle.pixel=request.pixel;
-                previous_triangle.texture={t.width,t.height,t.format,{}};
-            }
-            return triangle_executor->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,t,request.background,request.scissor);
+            // Alternating desktop draw sizes must not recompile each frame.
+            // Evict before constructing a successor for the qualified NPU driver.
+            if(triangle_cache.size()==4)triangle_cache.erase(triangle_cache.begin());
+            uint32_t batch=4096;while(uint64_t(h.width)*h.height%batch)batch/=2;
+            auto candidate=std::make_unique<raster::TriangleTextureDrawExecutor>(request.vertex,request.pixel,h.vertices,h.width,h.height,h.format,
+                resources,samplers,"NPU",(h.flags&1)!=0,uint8_t((h.flags>>8)&15),static_cast<raster::CullMode>((h.flags>>5)&3),(h.flags&128)!=0,batch);
+            auto result=candidate->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,resources,request.background,request.scissor);
+            triangle_cache.push_back({h,request.vertex.bytecode,request.pixel.bytecode,raster::resource_layout(resources),samplers,std::move(candidate)});
+            return result;
         }
         if (request.header.flags & 24) {
             const auto &h=request.header,&old=previous_linear.header;

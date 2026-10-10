@@ -18,7 +18,7 @@ void APIENTRY create_srv(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATESHADERRESOU
             view.first_element = a->Buffer.FirstElement; view.elements = a->Buffer.NumElements;
             return;
         }
-        require(!r.buffer_bytes && r.usage == D3D10_DDI_USAGE_DEFAULT && r.allocation->context == device(h).context &&
+        require(!r.buffer_bytes && (r.usage == D3D10_DDI_USAGE_DEFAULT || r.usage == D3D10_DDI_USAGE_IMMUTABLE) && r.allocation->context == device(h).context &&
                 a->ResourceDimension == D3D10DDIRESOURCE_TEXTURE2D && UINT(a->Format) == r.allocation->surface.format &&
                 a->Tex2D.MostDetailedMip < mip_count(r) && a->Tex2D.MipLevels == 1 && !a->Tex2D.FirstArraySlice && a->Tex2D.ArraySize == 1);
         static_cast<View *>(out.pDrvPrivate)->allocation = mip_allocation(r, a->Tex2D.MostDetailedMip);
@@ -123,6 +123,19 @@ void APIENTRY draw_indexed(D3D10DDI_HDEVICE h, UINT count, UINT first, INT base)
         catch (...) { lab_capture_indexed_draw(device(h), count, first, base); throw; }
     });
 }
+void APIENTRY draw_instanced(D3D10DDI_HDEVICE h,UINT count,UINT instances,UINT first,UINT first_instance){
+    guard(h,__FUNCTION__,[&]{auto &d=device(h);if(!count || !instances)return;
+        try{execute_triangle_draw(d,fetch_draw_vertices(d,count,first,instances,first_instance),false);}
+        catch(...){lab_capture_indexed_draw(d,count,first,0,false,instances,first_instance);throw;}
+    });
+}
+void APIENTRY draw_indexed_instanced(D3D10DDI_HDEVICE h,UINT count,UINT instances,UINT first,INT base,UINT first_instance){
+    guard(h,__FUNCTION__,[&]{auto &d=device(h);if(!count || !instances)return;
+        try{require(d.topology==D3D10_DDI_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            execute_triangle_draw(d,fetch_indexed_vertices(d,count,first,base,instances,first_instance),true);}
+        catch(...){lab_capture_indexed_draw(d,count,first,base,true,instances,first_instance);throw;}
+    });
+}
 void APIENTRY draw(D3D10DDI_HDEVICE h, UINT count, UINT first) {
     guard(h, __FUNCTION__, [&] {
         auto &d = device(h);
@@ -191,6 +204,7 @@ void bind_draw_functions(D3D10DDI_DEVICEFUNCS &f) {
     f.pfnDestroyShader = destroy_shader; f.pfnVsSetShader = set_shader<1>; f.pfnPsSetShader = set_shader<2>;
     f.pfnSetViewports = set_viewports; f.pfnIaSetTopology = set_topology; f.pfnDraw = draw;
     f.pfnDrawIndexed = draw_indexed;
+    f.pfnDrawInstanced=draw_instanced;f.pfnDrawIndexedInstanced=draw_indexed_instanced;
     f.pfnGsSetShader = null_shader; f.pfnIaSetInputLayout = set_layout;
     f.pfnCalcPrivateElementLayoutSize = layout_size; f.pfnCreateElementLayout = create_layout;
     f.pfnDestroyElementLayout = destroy_layout;

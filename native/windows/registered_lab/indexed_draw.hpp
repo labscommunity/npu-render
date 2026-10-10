@@ -2,31 +2,40 @@
 // D3D10/11 system-value contract: draw-local ordinal or raw index, without the
 // vertex-buffer start/base address offset (functional spec sections 8.4/8.6).
 std::vector<nr::shader::VertexRegisters> fetch_vertices_at(Device &d, const std::vector<UINT> &indices,
-                                                        const std::vector<UINT> &vertex_ids) {
-    require(d.context && !d.context->poisoned && !indices.empty() && indices.size() <= 65536 && indices.size() == vertex_ids.size());
-    const UINT builtin = d.vertex_program ? d.vertex_program->vertex_id_input : 16;
-    std::vector<nr::shader::VertexRegisters> result(indices.size());
-    uint32_t bound = 0;
-    if (d.input_elements) for (const auto &e : *d.input_elements) {
-        require(e.InputRegister < 16 && e.InputRegister != builtin && e.InputSlot < d.vertex_buffers.size());
-        bound |= 1u << e.InputRegister;
-        const auto format = element_format(e.Format); const auto &b = d.vertex_buffers[e.InputSlot];
-        require(b.allocation && b.allocation->context == d.context && !b.allocation->locked);
-        for (const auto index : indices) require(uint64_t(b.offset) + e.AlignedByteOffset + uint64_t(index) * b.stride + format.bytes <= b.bytes);
-        Mapping read(*b.allocation, true);
-        for (size_t i = 0; i < indices.size(); ++i) {
-            auto &v = result[i][e.InputRegister]; v = {0, 0, 0, format.integer ? 1u : 0x3f800000u};
-            const auto *data = static_cast<const uint8_t *>(read.data) + b.offset + e.AlignedByteOffset + uint64_t(indices[i]) * b.stride;
-            decode_element(v, data, format);
-        }
+    const std::vector<UINT> &vertex_ids, UINT instances=1, UINT first_instance=0) {
+    require(d.context && !d.context->poisoned && !indices.empty() && instances &&
+        uint64_t(indices.size())*instances<=65536 && indices.size()==vertex_ids.size());
+    const UINT builtin=d.vertex_program?d.vertex_program->vertex_id_input:16;
+    const UINT instance_builtin=d.vertex_program?d.vertex_program->instance_id_input:16;
+    std::vector<nr::shader::VertexRegisters> result(indices.size()*instances);
+    uint32_t bound=0;
+    if(d.input_elements)for(const auto &e:*d.input_elements){
+        require(e.InputRegister<16 && e.InputRegister!=builtin && e.InputRegister!=instance_builtin && e.InputSlot<d.vertex_buffers.size());
+        bound|=1u<<e.InputRegister;
+        const auto format=element_format(e.Format);const auto &b=d.vertex_buffers[e.InputSlot];
+        require(b.allocation && b.allocation->context==d.context && !b.allocation->locked);
+        auto address=[&](size_t n){
+            const auto instance=n/indices.size();
+            const uint64_t index=e.InputSlotClass==D3D10_DDI_INPUT_PER_INSTANCE_DATA?
+                uint64_t(first_instance)+(e.InstanceDataStepRate?instance/e.InstanceDataStepRate:0):indices[n%indices.size()];
+            require(index<=UINT_MAX);
+            return uint64_t(b.offset)+e.AlignedByteOffset+index*b.stride;
+        };
+        for(size_t n=0;n<result.size();++n)require(address(n)+format.bytes<=b.bytes);
+        Mapping read(*b.allocation,true);
+        for(size_t n=0;n<result.size();++n)decode_element(result[n][e.InputRegister],
+            static_cast<const uint8_t *>(read.data)+size_t(address(n)),format);
         read.finish();
     }
-    if (d.vertex_program) for (UINT reg = 0; reg < 16; ++reg)
-        require(!d.vertex_program->inputs[reg] || reg == builtin || (bound & (1u << reg)));
-    if (builtin < 16) for (size_t i = 0; i < result.size(); ++i) result[i][builtin][0] = vertex_ids[i];
+    if(d.vertex_program)for(UINT reg=0;reg<16;++reg)
+        require(!d.vertex_program->inputs[reg] || reg==builtin || reg==instance_builtin || (bound&(1u<<reg)));
+    for(size_t n=0;n<result.size();++n){
+        if(builtin<16)result[n][builtin][0]=vertex_ids[n%indices.size()];
+        if(instance_builtin<16)result[n][instance_builtin][0]=UINT(n/indices.size());
+    }
     return result;
 }
-std::vector<nr::shader::VertexRegisters> fetch_indexed_vertices(Device &d, UINT count, UINT first, INT base) {
+std::vector<nr::shader::VertexRegisters> fetch_indexed_vertices(Device &d, UINT count, UINT first, INT base, UINT instances=1, UINT first_instance=0) {
     const auto &ib = d.index_buffer;
     require(count && count <= 65536 && !(count % 3) && ib.allocation &&
         ib.allocation->context == d.context && !ib.allocation->locked && !d.context->poisoned &&
@@ -41,9 +50,9 @@ std::vector<nr::shader::VertexRegisters> fetch_indexed_vertices(Device &d, UINT 
         }
         read.finish();
     }
-    return fetch_vertices_at(d, indices, ids);
+    return fetch_vertices_at(d, indices, ids, instances, first_instance);
 }
-std::vector<nr::shader::VertexRegisters> fetch_draw_vertices(Device &d, UINT count, UINT first) {
+std::vector<nr::shader::VertexRegisters> fetch_draw_vertices(Device &d, UINT count, UINT first, UINT instances=1, UINT first_instance=0) {
     require(count >= 3 && count <= 65536 && uint64_t(first) + count - 1 <= UINT_MAX);
     std::vector<UINT> indices, ids;
     auto append = [&](UINT id) { indices.push_back(first + id); ids.push_back(id); };
@@ -56,7 +65,7 @@ std::vector<nr::shader::VertexRegisters> fetch_draw_vertices(Device &d, UINT cou
             append(i + (i & 1)); append(i + ((i & 1) ? 0 : 1)); append(i + 2);
         }
     }
-    return fetch_vertices_at(d, indices, ids);
+    return fetch_vertices_at(d, indices, ids, instances, first_instance);
 }
 nr::shader::VertexConstants fetch_constants(Device &d, UINT stage, const nr::shader::Program &program) {
     nr::shader::VertexConstants values;

@@ -1,0 +1,72 @@
+{
+  "build": "present-umd-v105",
+  "clean_build": true,
+  "source_hashes_match": true,
+  "cpu_contract_suites_passed": 17,
+  "npu_contract_build": "present-umd-v103",
+  "npu_contract_build_source_differences": [
+    "indexed_exchange_protocol.hpp",
+    "indexed_exchange_test.cpp"
+  ],
+  "npu_contracts": {
+    "instanced_draws": 2,
+    "instances_per_draw": 2,
+    "indexed_and_nonindexed": true,
+    "other_registered_ddi_contracts_passed": true,
+    "typed_lookup_exact_pixels": 4096,
+    "typed_load_components_exact": 2560,
+    "textured_triangle_components": 16384,
+    "textured_triangle_maximum_byte_error": 1
+  },
+  "input_contracts": {
+    "instance_step_rates": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "nonzero_start_instance": true,
+    "vertex_and_instance_ids_exact": true,
+    "immutable_texture_initialization_and_view": true,
+    "immutable_writes_rejected_atomically": true
+  },
+  "actual_dwm_replay": {
+    "capture": "v76-dwm-draw-1076.bin",
+    "vertices": 81,
+    "triangles": 27,
+    "scissor": [
+      429,
+      732,
+      453,
+      756
+    ],
+    "target": [
+      1024,
+      768
+    ],
+    "covered_samples": 125,
+    "tile_executions": 162,
+    "cpu_byte_exact": true,
+    "npu_byte_exact": true,
+    "npu_draw_ms": 3148.133,
+    "npu_compile_ms": 2377.021,
+    "replay_build": "present-umd-v102"
+  },
+  "large_resource_probe": {
+    "buffer_elements": 524288,
+    "execution_device": "NPU",
+    "exact_pixels": 4096,
+    "request_source": "synthetic typed-lookup triangle with buffer expanded to observed shell view size",
+    "captured_shell_resources_replayed": false
+  },
+  "bounded_triangle_cache_entries": 4,
+  "mixed_cached_transport_qualification_pending": true,
+  "full_desktop_offload": false,
+  "tahoma_performance_tested": false,
+  "preserved_failures": [
+    "v102 input-fetch fixture used unsupported UTOF; replaced that unrelated conversion with a bit-preserving output while retaining system-value declarations.",
+    "Incremental MSBuild did not rebuild a changed included test header; touching its translation unit rebuilt the diagnostic. Final release qualification uses a fresh clean build.",
+    "v104 packet test declared a duplicate local variable; renamed before v105.",
+    "The v76 collector sharing-conflict handler used reserved PowerShell $Error. Renamed it and exercised the exact handler against a locked, unlocked and missing file on Windows."
+  ]
+}

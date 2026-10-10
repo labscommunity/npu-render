@@ -70,7 +70,10 @@ void APIENTRY create_layout(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATEELEMENTL
             lab_trace("{\"event\":\"input_element\",\"slot\":%u,\"offset\":%u,\"format\":%u,\"classification\":%u,\"step\":%u,\"register\":%u}\n",
                       e.InputSlot, e.AlignedByteOffset, UINT(e.Format), UINT(e.InputSlotClass), e.InstanceDataStepRate, e.InputRegister);
             require(e.InputRegister < 16 && e.InputSlot < 16 && !(registers & (1u << e.InputRegister)) &&
-                    e.InputSlotClass == D3D10_DDI_INPUT_PER_VERTEX_DATA && !e.InstanceDataStepRate);
+                    ((e.InputSlotClass == D3D10_DDI_INPUT_PER_VERTEX_DATA && !e.InstanceDataStepRate) ||
+                     e.InputSlotClass == D3D10_DDI_INPUT_PER_INSTANCE_DATA));
+            for(const auto &other:*elements)if(other.InputSlot==e.InputSlot)
+                require(other.InputSlotClass==e.InputSlotClass && other.InstanceDataStepRate==e.InstanceDataStepRate);
             const auto format = element_format(e.Format);
             const auto alignment = format.normalized ? 1u : (format.half ? 2u : format.component_bytes);
             require(e.AlignedByteOffset <= 2048 - format.bytes && !(e.AlignedByteOffset % alignment));
@@ -92,6 +95,7 @@ void APIENTRY set_layout(D3D10DDI_HDEVICE h, D3D10DDI_HELEMENTLAYOUT value) {
     require(d.input_elements && count && count <= 65536 && first <= UINT_MAX - (count - 1));
     std::vector<nr::shader::VertexRegisters> result(count);
     for (const auto &e : *d.input_elements) {
+        require(e.InputSlotClass==D3D10_DDI_INPUT_PER_VERTEX_DATA);
         const auto format = element_format(e.Format);
         const auto &binding = d.vertex_buffers[e.InputSlot];
         require(binding.allocation && binding.allocation->context == d.context &&

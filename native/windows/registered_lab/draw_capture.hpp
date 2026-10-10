@@ -28,7 +28,7 @@ public:
     }
     template<class T> void value(const char *name, const T &data) { record(name, &data, sizeof(data)); }
 };
-void lab_capture_indexed_draw(Device &d, UINT count, UINT first, INT base, bool indexed = true) noexcept {
+void lab_capture_indexed_draw(Device &d, UINT count, UINT first, INT base, bool indexed = true, UINT instances=1, UINT first_instance=0) noexcept {
     if (!nr_fill_guest()) return;
     static bool attempted = false; // Called under the UMD device mutex.
     if (attempted) return;
@@ -61,6 +61,7 @@ void lab_capture_indexed_draw(Device &d, UINT count, UINT first, INT base, bool 
             d.vertex_shader, d.pixel_shader, d.sample_mask, d.stencil_ref};
         capture.value("arguments", args);
         const uint32_t call_kind = indexed ? 1u : 0u; capture.value("draw-indexed", call_kind);
+        const uint32_t instance_args[]{instances,first_instance};capture.value("instances",instance_args);
         capture.value("viewport", d.viewport); capture.value("blend", d.blend);
         capture.value("blend-factor", d.blend_factor); capture.value("depth", d.depth);
         capture.value("raster", d.raster);

@@ -84,6 +84,22 @@ int test_uploads(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER_DEVI
             TEST(!counters.live_allocations && resource_handles.empty());
         }
     }
+    // Immutable textures require initial data, permit sampling/readback, and
+    // reject subsequent writes without altering their stored pixels.
+    {
+        const uint32_t pixel=0x80402010;D3D10DDI_MIPINFO mip{};mip.TexelWidth=mip.TexelHeight=mip.TexelDepth=1;
+        D3D10_DDIARG_SUBRESOURCE_UP up{};up.pSysMem=const_cast<uint32_t *>(&pixel);up.SysMemPitch=4;
+        D3D10DDIARG_CREATERESOURCE args{};args.ResourceDimension=D3D10DDIRESOURCE_TEXTURE2D;args.MipLevels=args.ArraySize=args.SampleDesc.Count=1;
+        args.pMipInfoList=&mip;args.Format=DXGI_FORMAT_B8G8R8A8_UNORM;args.Usage=D3D10_DDI_USAGE_IMMUTABLE;args.BindFlags=D3D10_DDI_BIND_SHADER_RESOURCE;args.pInitialDataUP=&up;
+        alignas(Resource) unsigned char storage_r[sizeof(Resource)]{};D3D10DDI_HRESOURCE r{};r.pDrvPrivate=storage_r;
+        f.pfnCreateResource(h,&args,r,{});TEST(last_error==S_OK);const auto allocation=resource(r).allocation->handle;uint32_t actual=0;std::memcpy(&actual,memory[allocation].data(),4);TEST(actual==pixel);
+        alignas(View) unsigned char storage_v[sizeof(View)]{};D3D10DDI_HSHADERRESOURCEVIEW v{};v.pDrvPrivate=storage_v;
+        D3D10DDIARG_CREATESHADERRESOURCEVIEW desc{};desc.hDrvResource=r;desc.ResourceDimension=D3D10DDIRESOURCE_TEXTURE2D;desc.Format=args.Format;desc.Tex2D.MipLevels=desc.Tex2D.ArraySize=1;
+        f.pfnCreateShaderResourceView(h,&desc,v,{});TEST(last_error==S_OK);f.pfnDestroyShaderResourceView(h,v);
+        const auto before=memory[allocation];f.pfnResourceUpdateSubresourceUP(h,r,0,nullptr,&pixel,4,0);TEST(last_error==E_INVALIDARG && memory[allocation]==before);last_error=S_OK;f.pfnDestroyResource(h,r);
+        args.pInitialDataUP=nullptr;f.pfnCreateResource(h,&args,r,{});TEST(last_error==E_INVALIDARG && !counters.live_allocations);f.pfnDestroyResource(h,r);last_error=S_OK;
+        std::puts("{\"immutable_texture_initialization\":true,\"sampling_view\":true,\"write_rejected_atomically\":true}");
+    }
     f.pfnDestroyDevice(h);
     TEST(!counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
     emulate_copies = false;

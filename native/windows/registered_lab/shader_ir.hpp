@@ -51,6 +51,7 @@ struct Program {
     std::array<bool, 14> dynamic_constants{};
     uint32_t temporaries = 0, position_output = 16, position_input = 16;
     uint32_t vertex_id_input = 16;
+    uint32_t instance_id_input = 16;
     // Constant-initialized indexable temporaries are folded into immutable
     // tables. Runtime lookup and its bounds check still execute on the provider.
     std::array<std::vector<std::array<uint32_t,4>>,16> literal_tables;
@@ -211,7 +212,8 @@ inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
             if (opcode == 95 || opcode == 96) {
                 check(stage == Stage::vertex && a.kind == Register::input && !(result.inputs[a.index] & a.mask));
                 result.inputs[a.index] |= a.mask;
-                if(opcode==96){check(in.read()==6 && a.mask==1 && result.vertex_id_input==16);result.vertex_id_input=a.index;}
+                if(opcode==96){const auto semantic=in.read();check((semantic==6 || semantic==8) && a.mask==1);
+                    auto &slot=semantic==6?result.vertex_id_input:result.instance_id_input;check(slot==16);slot=a.index;}
             } else {
                 check(a.kind == Register::output && !(result.outputs[a.index] & a.mask));
                 result.outputs[a.index] |= a.mask;

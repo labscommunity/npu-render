@@ -226,11 +226,22 @@ int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
     f.pfnDraw(h,4,UINT_MAX);TEST(last_error==E_INVALIDARG && memory[target_index]==before);last_error=S_OK;
     f.pfnDraw(h,0,0);TEST(last_error==S_OK && counters.draws==draws+1);
     std::printf("{\"vertex_id_draw_ddi\":true,\"verified_draws\":3,\"null_layout\":true,\"start_and_base_offsets\":true,\"invalid_lookup_atomic\":true,\"execution_device\":\"%s\"}\n",counters.last_execution_device);
+    for(bool indexed:{false,true}){
+        const auto prior=counters.draws;
+        f.pfnIaSetTopology(h,indexed?D3D10_DDI_PRIMITIVE_TOPOLOGY_TRIANGLELIST:D3D10_DDI_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+        if(indexed)f.pfnDrawIndexedInstanced(h,6,2,1,1000,7);else f.pfnDrawInstanced(h,4,2,777,7);
+        TEST(last_error==S_OK && counters.draws==prior+1);
+        for(size_t n=0;n<size_t(width)*height;++n)for(UINT c=0;c<4;++c)
+            TEST(memory[target_index][n*4+c]==uint8_t(std::nearbyint(double(color[c<3?2-c:c])*255)));
+        if(indexed)f.pfnDrawIndexedInstanced(h,6,0,1,1000,7);else f.pfnDrawInstanced(h,4,0,777,7);
+        TEST(last_error==S_OK && counters.draws==prior+1);
+    }
+    std::printf("{\"instanced_draw_ddi\":true,\"verified_draws\":2,\"instances_per_draw\":2,\"indexed_and_nonindexed\":true,\"execution_device\":\"%s\"}\n",counters.last_execution_device);
     f.pfnDestroyShaderResourceView(h,srv);
     f.pfnDestroyRenderTargetView(h, view);
     for (const auto r : resources) f.pfnDestroyResource(h, r);
     f.pfnDestroyDevice(h);
-    TEST(counters.executions == executions_before + 16 && !counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
+    TEST(counters.executions == executions_before + 18 && !counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
     std::printf("{\"kind\":\"indexed-ddi-runtime-shim\",\"requested_backend\":\"%s\",\"execution_device\":\"%s\",\"verified_draws\":11,\"verified_components\":147456,\"blended_scissored_draws\":3,\"textured_draws\":6,\"point_scaled_blended_draws\":2,\"linear_scaled_blended_draws\":2,\"base_vertex_and_start_index\":true,\"invalid_ranges_and_sampler_rejected\":true,\"registered_adapter_tested\":false,\"desktop_offload_tested\":false}\n", backend, counters.last_execution_device);
     return 0;
 }

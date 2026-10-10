@@ -97,6 +97,34 @@ int test_integer_input(D3D10DDI_HDEVICE h, const D3D10DDI_DEVICEFUNCS &f, D3D10D
     std::printf("{\"integer_input_decoder\":true,\"formats_checked\":12,\"components_checked\":%llu,\"host_decode_only\":true}\n", static_cast<unsigned long long>(checked));
     return 0;
 }
+int test_instance_input(D3D10DDI_HDEVICE h,const D3D10DDI_DEVICEFUNCS &f,D3D10DDI_HRESOURCE buffer)try{
+    D3D10DDI_MAPPED_SUBRESOURCE mapped{};
+    f.pfnDynamicIABufferMapDiscard(h,buffer,0,D3D10_DDI_MAP_WRITE_DISCARD,0,&mapped);TEST(last_error==S_OK && mapped.pData);
+    for(UINT i=0;i<16;++i){const uint32_t value=0x81230000u+i;std::memcpy(static_cast<uint8_t *>(mapped.pData)+4+i*8,&value,4);}
+    f.pfnDynamicIABufferUnmap(h,buffer,0);const UINT stride=8,offset=4;f.pfnIaSetVertexBuffers(h,3,1,&buffer,&stride,&offset);
+    const auto previous=device(h).vertex_program;
+    const auto tokens=nr::registered_lab::shader_tokens("float4 main(uint a:A,uint v:SV_VertexID,uint i:SV_InstanceID):SV_Position{return asfloat(uint4(a,v,i,0x3f800000));}","vs_4_0");
+    auto program=std::make_shared<nr::shader::Program>(nr::shader::parse_vertex(tokens.data(),tokens.size()));
+    TEST(program->vertex_id_input<16 && program->instance_id_input<16);
+    // The semantic register for A is the remaining declared input.
+    UINT attribute=16;for(UINT r=0;r<16;++r)if(program->inputs[r] && r!=program->vertex_id_input && r!=program->instance_id_input)attribute=r;
+    TEST(attribute<16);device(h).vertex_program=program;
+    for(UINT rate:{0u,1u,2u,3u}){
+        D3D10DDIARG_INPUT_ELEMENT_DESC element{3,0,DXGI_FORMAT_R32_UINT,D3D10_DDI_INPUT_PER_INSTANCE_DATA,rate,attribute};
+        D3D10DDIARG_CREATEELEMENTLAYOUT args{&element,1};alignas(ElementLayout) unsigned char storage[sizeof(ElementLayout)]{};
+        D3D10DDI_HELEMENTLAYOUT layout{};layout.pDrvPrivate=storage;f.pfnCreateElementLayout(h,&args,layout,{});f.pfnIaSetInputLayout(h,layout);TEST(last_error==S_OK);f.pfnDestroyElementLayout(h,layout);
+        const auto data=fetch_vertices_at(device(h),{5,2,9},{10,7,14},5,3);
+        TEST(data.size()==15);
+        for(UINT n=0;n<15;++n){const auto instance=n/3;const UINT ids[]{10,7,14};
+            TEST(data[n][attribute][0]==0x81230003u+(rate?instance/rate:0));
+            TEST(data[n][program->vertex_id_input][0]==ids[n%3] && data[n][program->instance_id_input][0]==instance);
+        }
+        bool rejected=false;try{(void)fetch_vertices_at(device(h),{0},{0},2,UINT_MAX);}catch(...){rejected=true;}TEST(rejected);
+        f.pfnIaSetInputLayout(h,{});
+    }
+    device(h).vertex_program=previous;
+    std::puts("{\"instanced_input_fetch\":true,\"step_rates\":[0,1,2,3],\"nonzero_start_instance\":true,\"system_ids_exact\":true}");return 0;
+}catch(const std::exception &e){std::fprintf(stderr,"instance fixture: %s\n",e.what());return 1;}
 int test_input_layout(D3D10DDI_HDEVICE h, const D3D10DDI_DEVICEFUNCS &f, D3D10DDI_HRESOURCE buffer) {
     D3D10DDI_MAPPED_SUBRESOURCE mapped{};
     f.pfnDynamicIABufferMapNoOverwrite(h, buffer, 0, D3D10_DDI_MAP_WRITE_NOOVERWRITE, 0, &mapped);
@@ -181,6 +209,7 @@ int test_geometry_buffers(D3D10DDI_HDEVICE h, const D3D10DDI_DEVICEFUNCS &f) {
             TEST(test_input_layout(h, f, value) == 0);
             TEST(test_half_input(h, f, value) == 0);
             TEST(test_integer_input(h, f, value) == 0);
+            TEST(test_instance_input(h,f,value)==0);
         }
         if (bind & D3D10_DDI_BIND_INDEX_BUFFER) {
             f.pfnIaSetIndexBuffer(h, value, DXGI_FORMAT_R16_UINT, 2);

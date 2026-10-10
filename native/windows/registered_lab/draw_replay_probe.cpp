@@ -44,12 +44,16 @@ std::vector<nr::shader::VertexRegisters> fetch(const nr::capture::Snapshot &s, u
             for(uint32_t i=0;i<count-2;++i) { append(i+(i&1));append(i+((i&1)?0:1));append(i+2); }
         }
     }
+    const auto instance_args=s.has("instances")?s.values<uint32_t>("instances"):std::vector<uint32_t>{1,0};
+    nr::capture::check(instance_args.size()==2 && instance_args[0] && uint64_t(indices.size())*instance_args[0]<=65536);
+    const size_t per_instance=indices.size();const auto original_indices=indices,original_ids=ids;
+    for(uint32_t n=1;n<instance_args[0];++n){indices.insert(indices.end(),original_indices.begin(),original_indices.end());ids.insert(ids.end(),original_ids.begin(),original_ids.end());}
     count=uint32_t(indices.size());
     std::vector<nr::shader::VertexRegisters> result(count);
     uint32_t registers = 0;
     for (size_t e = 0; e < elements.size(); e += 6) {
         const auto slot = elements[e], offset = elements[e + 1], format = elements[e + 2], reg = elements[e + 5];
-        nr::capture::check(slot < 16 && reg < 16 && reg != vs.vertex_id_input && !elements[e + 3] && !elements[e + 4] && !(registers & (1u << reg)));
+        nr::capture::check(slot < 16 && reg < 16 && reg != vs.vertex_id_input && reg != vs.instance_id_input && elements[e+3]<=1 && (elements[e+3] || !elements[e+4]) && !(registers & (1u << reg)));
         registers |= 1u << reg;
         const auto name = "vertices-" + std::to_string(slot);
         const auto description = s.values<uint32_t>(name + "-description"); const auto &vb = s.bytes(name);
@@ -68,7 +72,7 @@ std::vector<nr::shader::VertexRegisters> fetch(const nr::capture::Snapshot &s, u
         nr::capture::check(lanes || format == 28 || integer_lanes);
         const auto bytes = integer_lanes ? integer_lanes*component_bytes : format == 28 ? 4u : lanes * 4;
         for (uint32_t i = 0; i < count; ++i) {
-            const uint64_t begin = uint64_t(description[2]) + offset + uint64_t(indices[i]) * description[1];
+            const uint64_t begin = uint64_t(description[2]) + offset + (elements[e+3]?uint64_t(instance_args[1])+(elements[e+4]?(i/per_instance)/elements[e+4]:0):indices[i]) * description[1];
             nr::capture::check(begin <= vb.size() && bytes <= vb.size() - begin);
             auto &v = result[i][reg]; v = {0, 0, 0, integer_lanes?1u:0x3f800000u};
             if (format == 28) for (unsigned c = 0; c < 4; ++c) v[c] = nr::shader::as_bits(float(vb[size_t(begin) + c]) / 255);
@@ -79,8 +83,9 @@ std::vector<nr::shader::VertexRegisters> fetch(const nr::capture::Snapshot &s, u
             else std::memcpy(v.data(), vb.data() + size_t(begin), bytes);
         }
     }
-    for(uint32_t reg=0;reg<16;++reg) nr::capture::check(!vs.inputs[reg] || reg==vs.vertex_id_input || (registers & (1u<<reg)));
+    for(uint32_t reg=0;reg<16;++reg) nr::capture::check(!vs.inputs[reg] || reg==vs.vertex_id_input || reg==vs.instance_id_input || (registers & (1u<<reg)));
     if(vs.vertex_id_input<16) for(uint32_t n=0;n<count;++n) result[n][vs.vertex_id_input][0]=ids[n];
+    if(vs.instance_id_input<16)for(uint32_t n=0;n<count;++n)result[n][vs.instance_id_input][0]=uint32_t(n/per_instance);
     return result;
 }
 }

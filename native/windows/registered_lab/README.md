@@ -609,3 +609,16 @@ source (inputs, constants and MOV chains); float-only arithmetic temporaries are
 rejected. This remains a restricted renderer: those tests do not establish a
 usable Windows desktop or a Tahoma improvement. See the
 [clean-build qualification](../../../docs/validation/2026-10-10/typed-resources-v101/report.json).
+
+The next instancing path admits per-instance input streams with step rates
+including zero, nonzero instance starts, and generated `SV_InstanceID`. Indexed
+triangle lists and nonindexed lists/strips expand into the existing NPU triangle
+pipeline; host work is input decoding. Captures retain both instance arguments.
+The input fetch follows the [D3D11.3 drawing contract](https://microsoft.github.io/DirectX-Specs/d3d/archive/D3D11_3_FunctionalSpec.htm#8.4).
+Immutable, initialized shader-resource textures are admitted while later writes
+remain rejected. Textured work bounds use the actual scissor in both the packet
+decoder and executor, and the physical worker retains four compiled textured
+draw shapes. These changes are laboratory capabilities, pending the next live
+desktop trial.
+
+The [v105 qualification](../../../docs/validation/2026-10-10/instanced-desktop-v105/report.json) records the CPU and physical NPU checks and their exact build provenance.

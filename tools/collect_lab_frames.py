@@ -59,10 +59,11 @@ try {
    $share=[IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete
    try {$stream=[IO.File]::Open($file.FullName,[IO.FileMode]::Open,[IO.FileAccess]::Read,$share)}
    catch {
-    $error=$_.Exception;while($error.InnerException){$error=$error.InnerException}
+    $nrFrameReadError=$_.Exception
+    while($nrFrameReadError.InnerException){$nrFrameReadError=$nrFrameReadError.InnerException}
     # Atomic replacement can briefly deny a new reader. Retry only absence or
     # sharing/lock conflicts; retain the last complete local frame meanwhile.
-    if(($error.HResult -band 65535) -in @(2,32,33)){return}
+    if(($nrFrameReadError.HResult -band 65535) -in @(2,32,33)){return}
     throw
    }
    try {

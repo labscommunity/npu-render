@@ -105,6 +105,13 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
     for(unsigned n=0;n<6;++n){auto bad=triangle_bytes;auto h=triangles.header;
         if(n==0)h.abi=6;if(n==1)h.flags&=~2u;if(n==2)h.flags&=~24u;if(n==3)h.flags|=24u;if(n==4)h.flags|=96u;if(n==5)h.vertices=4095;
         std::memcpy(bad.data(),&h,sizeof(h));rejects(bad);}
+    auto desktop_clipped=triangles;desktop_clipped.header.width=1024;desktop_clipped.header.height=768;desktop_clipped.header.vertices=81;
+    desktop_clipped.viewport={0,0,1024,768,0,1};desktop_clipped.inputs.resize(81);desktop_clipped.background.resize(1024*768);
+    desktop_clipped.scissor=std::array<int32_t,4>{429,732,453,756};
+    const auto desktop_clipped_packet=ex::encode(desktop_clipped);test(ex::decode(desktop_clipped_packet).inputs.size()==81);
+    auto excessive=desktop_clipped_packet;const std::array<int32_t,4> full_clip{0,0,1024,768};
+    std::memcpy(excessive.data()+sizeof(ex::Header)+sizeof(nr::raster::Viewport),full_clip.data(),sizeof(full_clip));rejects(excessive);
+    desktop_clipped.scissor=full_clip;bool oversized_rejected=false;try{(void)ex::encode(desktop_clipped);}catch(const std::invalid_argument &){oversized_rejected=true;}test(oversized_rejected);
     auto resources=r;resources.header.abi=8;resources.header.flags=0x2f42;
     const auto &lookup=nr::registered_lab::test_fixture::typed_lookup_pixel_words;
     resources.pixel=nr::shader::parse_pixel(lookup,std::size(lookup));

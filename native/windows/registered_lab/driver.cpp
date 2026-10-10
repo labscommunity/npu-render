@@ -238,7 +238,8 @@ void APIENTRY create_resource(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATERESOUR
         const bool staging = a->Usage == D3D10_DDI_USAGE_STAGING && !a->BindFlags && a->MapFlags == D3D10_DDI_CPU_ACCESS_READ && !shared;
         constexpr UINT bindings = D3D10_DDI_BIND_RENDER_TARGET | D3D10_DDI_BIND_SHADER_RESOURCE | D3D10_DDI_BIND_PRESENT;
         const bool target = a->Usage == D3D10_DDI_USAGE_DEFAULT && a->BindFlags && !(a->BindFlags & ~bindings) && !a->MapFlags;
-        require((staging || target) && (!a->pInitialDataUP || target));
+        const bool immutable=a->Usage==D3D10_DDI_USAGE_IMMUTABLE && a->BindFlags==D3D10_DDI_BIND_SHADER_RESOURCE && !a->MapFlags && !a->MiscFlags && a->pInitialDataUP;
+        require((staging || target || immutable) && (!a->pInitialDataUP || target || immutable));
         const auto &base = a->pMipInfoList[0];
         require(base.TexelWidth && base.TexelWidth <= 8192 && base.TexelHeight && base.TexelHeight <= 8192);
         UINT max_levels = 1;
@@ -325,7 +326,7 @@ void APIENTRY copy_resource(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE dst, D3D10DDI
     guard(h, __FUNCTION__, [&] {
         auto &d = resource(dst); auto &s = resource(src);
         require(d.usage == D3D10_DDI_USAGE_STAGING && d.buffer_bytes == s.buffer_bytes &&
-            (s.usage == D3D10_DDI_USAGE_DEFAULT || (s.buffer_bytes &&
+            (s.usage == D3D10_DDI_USAGE_DEFAULT || s.usage == D3D10_DDI_USAGE_IMMUTABLE || (s.buffer_bytes &&
              (s.usage == D3D10_DDI_USAGE_DYNAMIC || s.usage == D3D10_DDI_USAGE_IMMUTABLE))));
         require(mip_count(d) == mip_count(s));
         for (UINT sub = 0; sub < mip_count(d); ++sub) {
