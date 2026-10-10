@@ -77,6 +77,7 @@ def main():
         "nr_registered_exchange_test.exe",
         "nr_registered_vertex_test.exe",
         "nr_registered_vertex_stream_probe.exe",
+        "nr_registered_texture_test.exe",
     ):
         binaries[name] = hashlib.sha256(
             (args.build_dir / "Release" / name).read_bytes()

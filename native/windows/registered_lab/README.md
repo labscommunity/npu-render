@@ -290,7 +290,26 @@ declarations and retained pixel interpolation metadata. The
 executes that captured 18-word pixel program and checks 4,096 output components
 exactly. Authored pixel arithmetic and bound shader lifetime also pass. Input
 values are supplied to the pixel stage; interpolation and rasterization are
-not performed by these tests. Texture declarations/sampling remain unsupported.
+not performed by these tests. In the
+[v57 live run](../../../docs/validation/2026-10-10/pixel-arithmetic-admission-v57/report.json),
+DWM creates that pixel program and next requests a 37-word texture shader.
+
+The [v45 texture qualification](../../../docs/validation/2026-10-10/texture-sampling-npu-v45/report.json)
+executes this captured shader and an authored counterpart on the physical NPU.
+It checks 8,192 components across point and bilinear filters and changing images.
+Point results match exactly; maximum bilinear error is 1.20e-7 against the
+independent scalar reference. The provider accepts decoded float4 texels with
+one mip and edge-clamped 2D addressing. Active nonfinite coordinates fail;
+skipped branches containing them do not. Mips, other addressing/filter modes,
+explicit LOD and texture format decoding are not implemented.
+
+The qualification retains failed compiler reproductions. Native Floor and a
+plain float/integer/float round trip produce incorrect indices; bounded
+nonnegative indices use truncation plus an integer mask. Separate integer
+NaN/infinity status bits avoid a miscompiled combined selection condition.
+A runtime half-texel parameter prevents constant scale/offset fusion from
+silently reducing coordinate precision to FP16. Sampling arithmetic remains
+on the selected device; these workarounds do not introduce CPU evaluation.
 
 OpenVINO 2026.1 requires serialized legacy precision metadata plus the accuracy
 hint to preserve the tested FP32 arithmetic. Indexed reads gather from an appended
@@ -310,7 +329,7 @@ RGBA8 UNORM, including offsets, strides and missing-component defaults. Instanci
 and out-of-range vertex fetch remain unsupported. This prepares shader inputs;
 it does not perform rasterization.
 
-Generic draw execution still requires rasterization, texture sampling and complete
+Generic draw execution still requires rasterization, resource decoding and complete
 pipeline integration. The existing exact fullscreen composition path remains the
 only supported Draw path. The indirect desktop activates, but no DWM swapchain
 or desktop frames have been delivered. Windows also rejects a later CDD allocation;

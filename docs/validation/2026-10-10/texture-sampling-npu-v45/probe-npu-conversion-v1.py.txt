@@ -1,0 +1,13 @@
+import json,tempfile
+from pathlib import Path
+import numpy as np
+import openvino as ov
+from openvino import opset13 as o
+x=o.parameter([256,1],np.float32,name='x');i=o.convert(x,np.int32);f=o.convert(i,np.float32);less=o.less(x,f);mask=o.convert(less,np.int32);fixed=o.subtract(i,mask)
+outputs=[i,f,less,mask,fixed,o.convert(fixed,np.float32),o.floor(x),o.convert(o.less(x,o.constant(0,np.float32)),np.int32)]
+a=np.resize(np.array([-.5,0,.25,.5,.75,1,1.25,1.5,1.75,2,8190.75,-8190.75],np.float32),256).reshape(256,1)
+with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
+ m=ov.Model(outputs,[x]);p=Path(d)/'m.xml'
+ for nd in m.get_ops():nd.set_rt_info('','precise_0')
+ ov.serialize(m,p);core=ov.Core();c=core.compile_model(core.read_model(p),'NPU',{'EXECUTION_MODE_HINT':'ACCURACY'});r=c([a])
+ for n,v in zip(['i32','roundtrip','less','mask','corrected_int','corrected_float','floor','negative'],r.values()):print(json.dumps({'node':n,'dtype':str(v.dtype),'values':v[:12].ravel().tolist(),'execution_device':c.get_property('EXECUTION_DEVICES')}),flush=True)

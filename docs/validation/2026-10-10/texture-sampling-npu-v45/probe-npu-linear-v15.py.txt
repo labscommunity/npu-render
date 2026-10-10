@@ -1,0 +1,39 @@
+import json,tempfile
+from pathlib import Path
+import numpy as np
+import openvino as ov
+from openvino import opset13 as o
+n=256;w=17;h=13
+texture=o.parameter([w*h,4],np.float32,name='texture');uv=o.parameter([n,2],np.float32,name='uv')
+def scalar(v,t=np.float32):return o.constant(v,t)
+def choose(c,a,b):
+ a=o.broadcast(a,[n,1]);b=o.broadcast(b,[n,1]);c=o.broadcast(c,[n,1])
+ index=o.add(o.constant(np.arange(n,dtype=np.int32)),o.multiply(o.reshape(o.convert(o.logical_not(c),np.int32),[n],False),scalar(n,np.int32)))
+ return o.gather(o.concat([a,b],0),index,0)
+def coord(axis,size):
+ v=o.gather(uv,[axis],1);v=choose(o.is_nan(v),scalar(0),v);v=choose(o.less(v,scalar(0)),scalar(0),choose(o.greater(v,scalar(1)),scalar(1),v))
+ v=o.subtract(o.multiply(v,scalar(size)),scalar(.5))
+ return choose(o.less(v,scalar(0)),scalar(0),choose(o.greater(v,scalar(size-1)),scalar(size-1),v))
+x=coord(0,w);y=coord(1,h);xf=o.convert(o.bitwise_and(o.convert(x,np.int32),scalar(0x7fffffff,np.int32)),np.float32);yf=o.convert(o.bitwise_and(o.convert(y,np.int32),scalar(0x7fffffff,np.int32)),np.float32);tx=o.subtract(x,xf);ty=o.subtract(y,yf);ix=o.convert(xf,np.int32);iy=o.convert(yf,np.int32)
+def fetch(dx,dy):
+ cx=o.minimum(o.maximum(o.add(ix,scalar(dx,np.int32)),scalar(0,np.int32)),scalar(w-1,np.int32))
+ cy=o.minimum(o.maximum(o.add(iy,scalar(dy,np.int32)),scalar(0,np.int32)),scalar(h-1,np.int32))
+ index=o.reshape(o.add(cx,o.multiply(cy,scalar(w,np.int32))),[n],False)
+ return o.gather(texture,index,0)
+a=o.add(o.multiply(fetch(0,0),o.subtract(scalar(1),tx)),o.multiply(fetch(1,0),tx))
+b=o.add(o.multiply(fetch(0,1),o.subtract(scalar(1),tx)),o.multiply(fetch(1,1),tx))
+node=o.multiply(o.add(o.multiply(a,o.subtract(scalar(1),ty)),o.multiply(b,ty)),o.constant(np.array([[.5,.25,.75,1]],np.float32)))
+with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
+ m=ov.Model([node],[texture,uv]);p=Path(d)/'m.xml'
+ for nd in m.get_ops():nd.set_rt_info('','precise_0')
+ ov.serialize(m,p);core=ov.Core();c=core.compile_model(core.read_model(p),'NPU',{'EXECUTION_MODE_HINT':'ACCURACY'})
+ for frame in range(2):
+  image=((np.arange(w*h,dtype=np.int32)[:,None]*37+np.arange(4)[None,:]*59+frame*83)%256).astype(np.float32)/255
+  q=np.array([-.25,0,.5/17,1/17,.125,.25,.33333334,.5,.75,.999,1,1.25],np.float32);coords=np.stack([q[np.arange(n)%12],q[(np.arange(n)//12)%12]],1)
+  if frame:coords=coords[::-1].copy()
+  res=c({'texture':image,'uv':coords});result=res[0];expected=np.empty((n,4),np.float32)
+  for i,(u,v) in enumerate(coords):
+   px=float(np.clip(u,0,1))*w-.5;py=float(np.clip(v,0,1))*h-.5;lx=int(np.floor(px));ly=int(np.floor(py));fx=px-lx;fy=py-ly
+   def sample(a,b):return image[min(h-1,max(0,b))*w+min(w-1,max(0,a))].astype(np.float64)
+   expected[i]=((sample(lx,ly)*(1-fx)+sample(lx+1,ly)*fx)*(1-fy)+(sample(lx,ly+1)*(1-fx)+sample(lx+1,ly+1)*fx)*fy)*np.array([.5,.25,.75,1])
+  error=np.abs(result-expected);print(json.dumps({'frame':frame,'execution_device':c.get_property('EXECUTION_DEVICES'),'samples':n,'components':int(result.size),'maximum_absolute_error':float(error.max()),'within_1e_6':bool(np.all(error<=1e-6)),'desktop_offload_tested':False}),flush=True)

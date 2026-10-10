@@ -1,0 +1,40 @@
+{
+  "scope": "Bounded shader texture sampling on physical NPU; no desktop draw or rasterization",
+  "build": "present-umd-v45",
+  "captured_shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+  "captured_shader_words": 37,
+  "filters": [
+    "point",
+    "linear"
+  ],
+  "addressing": "edge-clamped 2D, one mip, decoded float4 texels",
+  "texture_dimensions": [
+    17,
+    13
+  ],
+  "texture_versions": 2,
+  "samples": 2048,
+  "checked_components": 8192,
+  "point_bits_exact": true,
+  "linear_maximum_absolute_error": 1.1920929e-07,
+  "linear_threshold": 1e-06,
+  "active_nan_and_infinity_rejected": true,
+  "inactive_nonfinite_coordinates_ignored": true,
+  "conditional_samples": 64,
+  "largest_finite_coordinates_tested": true,
+  "cpu_contracts": "4/4 passed",
+  "local_python_tests": "110 passed",
+  "desktop_offload_tested": false,
+  "performance_tested": false,
+  "compiler_workarounds": [
+    "Integer index mask retains lossy float/int/float conversion",
+    "Separate integer NaN/infinity status avoids miscompiled isfinite selection",
+    "Runtime half-texel parameter avoids FP16 constant scale/offset fusion"
+  ],
+  "limitations": [
+    "No mips, wrap/mirror/border, anisotropy, explicit LOD, gradients or format decoding",
+    "Generic Draw and rasterization remain unimplemented",
+    "Diagnostic Python probes report pass/fail in JSON; process exit zero alone is not qualification"
+  ],
+  "raw_reproductions": "Python source snapshots are stored as .py.txt to preserve the exact diagnostic programs; copy to .py to run with OpenVINO on Delta."
+}

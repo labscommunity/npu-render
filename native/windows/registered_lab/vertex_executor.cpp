@@ -20,6 +20,7 @@ Node floating(uint32_t bits) {
     float value; std::memcpy(&value, &bits, sizeof(value));
     return op::Constant::create(ov::element::f32, ov::Shape{1, 1}, {value});
 }
+Node number(float value) { return op::Constant::create(ov::element::f32, ov::Shape{1, 1}, {value}); }
 Node lane(const Node &value, unsigned component) {
     return std::make_shared<op::Gather>(value, indices({int64_t(component)}), integer(1));
 }
@@ -27,7 +28,9 @@ Node lane(const Node &value, unsigned component) {
 struct RegisterExecutor::State {
     Program program;
     uint32_t count;
-    struct Binding { std::shared_ptr<op::Parameter> parameter; bool constant; unsigned index; std::string name; };
+    TextureShapes texture_shapes;
+    bool checks_sample_coordinates = false;
+    struct Binding { std::shared_ptr<op::Parameter> parameter; bool constant; unsigned index; std::string name; bool texture = false, half_texel = false; };
     std::vector<Binding> bindings;
     std::vector<unsigned> outputs;
     std::array<uint32_t, 16> output_bit_masks{};
@@ -36,11 +39,15 @@ struct RegisterExecutor::State {
     ov::InferRequest request;
     std::string execution_device;
     bool failed = false;
-    State(const Program &p, uint32_t vertices, const std::string &backend) : program(p), count(vertices) {
+    State(const Program &p, uint32_t vertices, const std::string &backend,
+          const TextureShapes &shapes, const TextureSamplers &samplers) : program(p), count(vertices), texture_shapes(shapes) {
         check(count && count <= 65536 && (backend == "CPU" || backend == "GPU" || backend == "NPU"));
         RegisterExecutor::validate(program);
         std::array<Lanes, 16> input{}, temporary{}, output{};
         std::array<Value, 14> constants{};
+        std::array<Node, 16> textures{};
+        Node half_texel;
+        std::vector<Node> invalid_coordinates;
         auto parameter_pair = [&](bool constant, unsigned index, size_t rows) {
             Value result;
             for (unsigned i = 0; i < 2; ++i) {
@@ -133,6 +140,82 @@ struct RegisterExecutor::State {
         using Registers = std::array<Lanes, 16>;
         struct Branch { Node condition; Registers before_temps, before_outputs, then_temps{}, then_outputs{}; bool has_else = false; };
         std::vector<Branch> branches;
+        auto sample_texture = [&](const Instruction &instruction) -> Node {
+            const auto slot = instruction.sources[1].index;
+            const auto shape = texture_shapes[slot];
+            const auto filter = samplers[instruction.sources[2].index].filter;
+            check(shape.width && shape.width <= 8192 && shape.height && shape.height <= 8192 &&
+                  uint64_t(shape.width) * shape.height <= 4194304 &&
+                  (filter == TextureFilter::point || filter == TextureFilter::linear));
+            if (!textures[slot]) {
+                auto parameter = std::make_shared<op::Parameter>(ov::element::f32, ov::Shape{size_t(shape.width) * shape.height, 4});
+                const auto name = "texture_" + std::to_string(slot);
+                parameter->set_friendly_name(name); parameter->output(0).get_tensor().set_names({name});
+                bindings.push_back({parameter, false, slot, name, true}); textures[slot] = parameter;
+            }
+            const auto values = load(instruction.sources[0]);
+            if (filter == TextureFilter::linear && !half_texel) {
+                // Constant scale/offset fusion demotes the coordinate to FP16
+                // despite precise metadata. A runtime half-texel parameter
+                // preserves the qualified FP32 multiply/subtract path.
+                auto parameter = std::make_shared<op::Parameter>(ov::element::f32, ov::Shape{1, 1});
+                const std::string name = "texture_half_texel";
+                parameter->set_friendly_name(name); parameter->output(0).get_tensor().set_names({name});
+                bindings.push_back({parameter, false, 0, name, false, true}); half_texel = parameter;
+            }
+            auto coordinate = [&](unsigned axis, uint32_t extent) -> Node {
+                Node value = values[axis].floating; check(bool(value));
+                const auto nan = std::make_shared<op::IsNaN>(value);
+                // A combined floating isfinite pattern misclassifies ordinary
+                // coordinates after NPU optimization. Keep the predicates as
+                // integer status bits, separate from coordinate selection.
+                const auto invalid = std::make_shared<op::BitwiseOr>(
+                    std::make_shared<op::Convert>(nan, ov::element::i32),
+                    std::make_shared<op::Convert>(std::make_shared<op::IsInf>(value), ov::element::i32));
+                Node active_invalid = batch(invalid);
+                for (const auto &branch : branches) {
+                    Node active = branch.has_else ? Node(std::make_shared<op::LogicalNot>(branch.condition)) : branch.condition;
+                    active_invalid = std::make_shared<op::BitwiseAnd>(active_invalid,
+                        std::make_shared<op::Convert>(batch(active), ov::element::i32));
+                }
+                invalid_coordinates.push_back(active_invalid);
+                // Keep every speculative read in bounds. Nonfinite coordinates
+                // on an active path fail explicitly after inference.
+                value = choose(nan, number(0), value); // Infinities clamp at the comparisons below.
+                value = choose(std::make_shared<op::Less>(value, number(0)), number(0),
+                    choose(std::make_shared<op::Greater>(value, number(1)), number(1), value));
+                value = std::make_shared<op::Multiply>(value, number(float(extent)));
+                if (filter == TextureFilter::linear) value = std::make_shared<op::Subtract>(value, half_texel);
+                // For CLAMP, clamping the continuous texel coordinate before
+                // filtering is equivalent to clamping the individual taps.
+                return choose(std::make_shared<op::Less>(value, number(0)), number(0),
+                    choose(std::make_shared<op::Greater>(value, number(float(extent - 1))), number(float(extent - 1)), value));
+            };
+            const auto x = coordinate(0, shape.width), y = coordinate(1, shape.height);
+            auto floor_index = [&](const Node &value) -> Node {
+                // Coordinates are nonnegative and bounded. Native NPU Floor
+                // miscomputes FP32; Convert gives truncation here. The AND is
+                // an identity on this range but prevents the compiler from
+                // incorrectly deleting the lossy float/int/float round trip.
+                return std::make_shared<op::BitwiseAnd>(std::make_shared<op::Convert>(value, ov::element::i32), integer(0x7fffffff));
+            };
+            const auto ix = floor_index(x), iy = floor_index(y);
+            auto fetch = [&](int dx, int dy) -> Node {
+                const auto sx = std::make_shared<op::Minimum>(std::make_shared<op::Add>(ix, integer(dx)), integer(int32_t(shape.width - 1)));
+                const auto sy = std::make_shared<op::Minimum>(std::make_shared<op::Add>(iy, integer(dy)), integer(int32_t(shape.height - 1)));
+                const auto index = std::make_shared<op::Reshape>(std::make_shared<op::Add>(sx,
+                    std::make_shared<op::Multiply>(sy, integer(int32_t(shape.width)))), indices({int64_t(count)}), false);
+                return std::make_shared<op::Gather>(textures[slot], index, integer(0));
+            };
+            if (filter == TextureFilter::point) return fetch(0, 0);
+            const auto tx = std::make_shared<op::Subtract>(x, std::make_shared<op::Convert>(ix, ov::element::f32));
+            const auto ty = std::make_shared<op::Subtract>(y, std::make_shared<op::Convert>(iy, ov::element::f32));
+            auto mix = [&](const Node &a, const Node &b, const Node &weight) -> Node {
+                return std::make_shared<op::Add>(std::make_shared<op::Multiply>(a, std::make_shared<op::Subtract>(number(1), weight)),
+                    std::make_shared<op::Multiply>(b, weight));
+            };
+            return mix(mix(fetch(0, 0), fetch(1, 0), tx), mix(fetch(0, 1), fetch(1, 1), tx), ty);
+        };
         for (const auto &instruction : program.instructions) {
             check(!instruction.saturate); // NaN/denormal saturation is not qualified on NPU yet.
             if (instruction.opcode == Opcode::begin_if) {
@@ -161,6 +244,13 @@ struct RegisterExecutor::State {
                 merge(temporary, b.has_else ? b.then_temps : b.before_temps);
                 merge(output, b.has_else ? b.then_outputs : b.before_outputs);
                 branches.pop_back(); continue;
+            }
+            if (instruction.opcode == Opcode::sample) {
+                const auto sampled = sample_texture(instruction);
+                auto &destination = (instruction.destination.kind == Register::temporary ? temporary : output)[instruction.destination.index];
+                for (unsigned c = 0; c < 4; ++c) if (instruction.destination.mask & (1u << c))
+                    destination[c] = {lane(sampled, instruction.sources[1].lanes[c]), {}};
+                continue;
             }
             std::array<Lanes, 3> sources{};
             int subtract_source = -1;
@@ -264,6 +354,14 @@ struct RegisterExecutor::State {
                 results.push_back(bits);
             }
         }
+        if (!invalid_coordinates.empty()) {
+            Node invalid = invalid_coordinates.front();
+            for (size_t i = 1; i < invalid_coordinates.size(); ++i)
+                invalid = std::make_shared<op::BitwiseOr>(invalid, invalid_coordinates[i]);
+            auto status = std::make_shared<op::ReduceMax>(invalid, indices({0, 1}), false);
+            status->output(0).get_tensor().set_names({"invalid_sample_coordinates"}); results.push_back(status);
+            checks_sample_coordinates = true;
+        }
         check(!results.empty());
         // Drop unused bit/float views before creating the model's public inputs.
         std::set<const ov::Node *> reachable;
@@ -357,6 +455,9 @@ void RegisterExecutor::validate(const Program &program) {
         } else if (instruction.opcode == Opcode::integer_add || instruction.opcode == Opcode::integer_to_float) {
             for (unsigned i = 0; i < instruction.source_count; ++i) check(!(mask & ~available(instruction.sources[i], true)));
             if (instruction.opcode == Opcode::integer_add) bit_views = mask; else floating_views = mask;
+        } else if (instruction.opcode == Opcode::sample) {
+            check(program.stage == Stage::pixel && (available(instruction.sources[0], false) & 3u) == 3u);
+            floating_views = mask;
         } else {
             const auto used = instruction.opcode == Opcode::dot2 ? 3u : (instruction.opcode == Opcode::dot3 ? 7u : (instruction.opcode == Opcode::dot4 ? 15u : mask));
             for (unsigned i = 0; i < instruction.source_count; ++i) check(!(used & ~available(instruction.sources[i], false)));
@@ -370,16 +471,26 @@ void RegisterExecutor::validate(const Program &program) {
     }
     for (unsigned i = 0; i < 16; ++i) check(!(program.outputs[i] & ~(views.output_float[i] | views.output_bits[i])));
 }
-RegisterExecutor::RegisterExecutor(const Program &p, uint32_t count, const std::string &backend)
-    : state(std::make_unique<State>(p, count, backend)) {}
+RegisterExecutor::RegisterExecutor(const Program &p, uint32_t count, const std::string &backend,
+                                   const TextureShapes &textures, const TextureSamplers &samplers)
+    : state(std::make_unique<State>(p, count, backend, textures, samplers)) {}
 RegisterExecutor::~RegisterExecutor() = default;
-RegisterExecutor::Result RegisterExecutor::execute(const std::vector<VertexRegisters> &vertices, const VertexConstants &constants) {
+RegisterExecutor::Result RegisterExecutor::execute(const std::vector<VertexRegisters> &vertices, const VertexConstants &constants,
+                                                   const TexturePixels &textures) {
     check(!state->failed && vertices.size() == state->count);
     for (unsigned i = 0; i < 14; ++i) check(constants[i].size() >= state->program.constants[i]);
     try {
         for (size_t i = 0; i < state->bindings.size(); ++i) {
             const auto &binding = state->bindings[i]; auto tensor = state->request.get_tensor(binding.name);
-            if (binding.constant) {
+            if (binding.half_texel) {
+                check(tensor.get_size() == 1 && tensor.get_element_type() == ov::element::f32);
+                *tensor.data<float>() = .5f;
+            } else if (binding.texture) {
+                const auto shape = state->texture_shapes[binding.index];
+                check(textures[binding.index].size() == size_t(shape.width) * shape.height &&
+                      tensor.get_byte_size() == textures[binding.index].size() * sizeof(std::array<float, 4>));
+                std::memcpy(tensor.data(), textures[binding.index].data(), tensor.get_byte_size());
+            } else if (binding.constant) {
                 check(tensor.get_byte_size() == size_t(state->program.constants[binding.index]) * sizeof(VertexBits));
                 std::memcpy(tensor.data(), constants[binding.index].data(), tensor.get_byte_size());
             } else {
@@ -390,6 +501,11 @@ RegisterExecutor::Result RegisterExecutor::execute(const std::vector<VertexRegis
             }
         }
         state->request.infer();
+        if (state->checks_sample_coordinates) {
+            const auto status = state->request.get_tensor("invalid_sample_coordinates");
+            check(status.get_size() == 1 && status.get_element_type() == ov::element::i32);
+            if (*status.data<const int32_t>()) throw std::runtime_error("nonfinite sample coordinate on active shader path");
+        }
         Result result; result.vertices.resize(vertices.size()); result.execution_device = state->execution_device;
         for (size_t i = 0; i < state->outputs.size(); ++i) {
             const auto tensor = state->request.get_tensor("vs_output_" + std::to_string(state->outputs[i]));

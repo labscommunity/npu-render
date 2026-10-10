@@ -12,12 +12,12 @@ using std::size_t;
 inline void check(bool value) {
     if (!value) throw std::invalid_argument("unsupported or malformed SM4 vertex program");
 }
-enum class Register : uint32_t { temporary = 0, input = 1, output = 2, immediate = 4, constant = 8 };
+enum class Register : uint32_t { temporary = 0, input = 1, output = 2, immediate = 4, sampler = 6, texture = 7, constant = 8 };
 enum class Opcode : uint32_t {
     add = 0, divide = 14, dot2 = 15, dot3 = 16, dot4 = 17, otherwise = 18, end_if = 21,
     integer_add = 30, begin_if = 31, integer_to_float = 43, less = 49,
     mad = 50, minimum = 51, maximum = 52, move = 54, select = 55,
-    multiply = 56, reciprocal_sqrt = 68
+    multiply = 56, reciprocal_sqrt = 68, sample = 69
 };
 enum class Modifier : uint32_t { none = 0, negate = 1, absolute = 2, absolute_negate = 3 };
 enum class Stage { vertex, pixel };
@@ -45,6 +45,7 @@ struct Program {
     Stage stage = Stage::vertex;
     std::array<uint32_t, 16> inputs{}, outputs{};
     std::array<uint32_t, 16> interpolation{};
+    std::array<bool, 16> textures{}, samplers{};
     std::array<uint32_t, 14> constants{};
     std::array<bool, 14> dynamic_constants{};
     uint32_t temporaries = 0, position_output = 16, position_input = 16;
@@ -70,7 +71,8 @@ public:
         const auto components = token & 3u, selection = (token >> 2) & 3u;
         const auto dimensions = (token >> 20) & 3u;
         Operand value; value.kind = Register((token >> 12) & 255u); value.modifier = modifier;
-        check(components == 1 || components == 2);
+        const bool handle = value.kind == Register::sampler || value.kind == Register::texture;
+        check(components == 1 || components == 2 || (handle && components == 0));
         if (components == 1) { value.mask = 1; value.lanes.fill(0); }
         else if (!selection) { value.mask = (token >> 4) & 15u; }
         else if (selection == 1) {
@@ -88,7 +90,7 @@ public:
             return value;
         }
         check(value.kind == Register::temporary || value.kind == Register::input ||
-              value.kind == Register::output || value.kind == Register::constant);
+              value.kind == Register::output || value.kind == Register::constant || handle);
         check(dimensions == (value.kind == Register::constant ? 2u : 1u));
         check(!((token >> 22) & 7u)); // First index is immediate32.
         value.index = read();
@@ -108,7 +110,7 @@ public:
                 value.relative = {true, index.kind, index.index, index.lanes[0]};
             }
         }
-        if (!destination && !declaration) check(components == 1 || selection == 1 || selection == 2);
+        if (!destination && !declaration) check(components == 1 || selection == 1 || selection == 2 || (handle && !components));
         return value;
     }
 };
@@ -157,6 +159,15 @@ inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
             check(!body && !(controls & ~0x800u)); const auto a = in.operand(false, true);
             check(a.kind == Register::constant && a.element && a.element <= 4096 && !result.constants[a.index]);
             result.constants[a.index] = a.element; result.dynamic_constants[a.index] = controls != 0;
+        } else if (opcode == 88 || opcode == 90) {
+            check(stage == Stage::pixel && !body && controls == (opcode == 88 ? 0x1800u : 0u));
+            const auto a = in.operand(false, true);
+            if (opcode == 88) {
+                check(a.kind == Register::texture && !result.textures[a.index] && in.read() == 0x5555u);
+                result.textures[a.index] = true;
+            } else {
+                check(a.kind == Register::sampler && !result.samplers[a.index]); result.samplers[a.index] = true;
+            }
         } else if (opcode == 98 || opcode == 100) {
             check(stage == Stage::pixel && !body && !(controls & ~0x7800u));
             const auto interpolation = controls >> 11;
@@ -211,7 +222,7 @@ inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
         } else {
             check(opcode == 0 || opcode == 14 || opcode == 15 || opcode == 16 || opcode == 17 || opcode == 30 ||
                   opcode == 43 || opcode == 49 || opcode == 50 || opcode == 51 || opcode == 52 ||
-                  opcode == 54 || opcode == 55 || opcode == 56 || opcode == 68);
+                  opcode == 54 || opcode == 55 || opcode == 56 || opcode == 68 || opcode == 69);
             check(!(controls & ~0x2000u) && result.instructions.size() < 1024);
             body = true;
             Instruction instruction; instruction.opcode = Opcode(opcode); instruction.saturate = controls != 0;
@@ -220,9 +231,17 @@ inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
             check((d.kind == Register::temporary && d.index < result.temporaries) ||
                   (d.kind == Register::output && !(d.mask & ~result.outputs[d.index])));
             instruction.source_count = (opcode == 43 || opcode == 54 || opcode == 68) ? 1u :
-                                       ((opcode == 50 || opcode == 55) ? 3u : 2u);
+                                       ((opcode == 50 || opcode == 55 || opcode == 69) ? 3u : 2u);
             for (unsigned i = 0; i < instruction.source_count; ++i) {
                 instruction.sources[i] = in.operand(false);
+                if (opcode == 69 && i) {
+                    const auto &a = instruction.sources[i];
+                    check(stage == Stage::pixel && !controls && a.modifier == Modifier::none &&
+                          (i == 1 ? a.kind == Register::texture && result.textures[a.index] :
+                                    a.kind == Register::sampler && result.samplers[a.index]));
+                    continue;
+                }
+                if (opcode == 69) { check(stage == Stage::pixel && !controls); source_valid(instruction.sources[i], 3); continue; }
                 source_valid(instruction.sources[i], opcode == 15 ? 3u : (opcode == 16 ? 7u : (opcode == 17 ? 15u : d.mask)));
                 if (opcode == 30) check(instruction.sources[i].modifier == Modifier::none ||
                                         instruction.sources[i].modifier == Modifier::negate);
