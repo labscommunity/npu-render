@@ -78,6 +78,19 @@ int run_probe(bool sole_indirect = false) {
     if (!awake.previous) return 2;
     Topology before; bool restore = false, passed = false;
     try {
+        // Adapter startup precedes asynchronous D3D preparation and monitor
+        // arrival. Wait for a usable target before judging its topology.
+        const auto deadline = GetTickCount64() + 30000;
+        bool ready = false;
+        while (!ready) {
+            for (const auto &path : query(QDC_ALL_PATHS).paths)
+                if (path.targetInfo.targetAvailable &&
+                    path.targetInfo.outputTechnology == DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INDIRECT_WIRED)
+                    ready = true;
+            if (ready) break;
+            if (GetTickCount64() >= deadline) throw std::runtime_error("indirect monitor arrival timed out");
+            Sleep(250);
+        }
         before = query(QDC_ONLY_ACTIVE_PATHS); print("before", before);
         if (before.paths.size() == 2 && !sole_indirect) {
             UINT indirect = 0;
