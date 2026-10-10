@@ -103,6 +103,12 @@ capture is only the independent output oracle. An occluded present, pixel
 mismatch or rejected callback fails the test. This tests CPU clear presentation;
 it does not move DWM or establish NPU execution. Unsupported DXGI callbacks now
 emit their table offset to aid diagnosis without claiming implementation.
+The probe now keeps the display awake for its lifetime, requires its thread's
+desktop to match the input desktop, explicitly shows its owned window even if
+the launcher supplied a hidden startup state, and records visibility, minimized
+and DWM-cloaked state before testing. Earlier probes only checked the window
+station and session; those checks did not prove that the HWND was visible or
+the display awake. Existing failed measurements are retained unchanged.
 The first live window attempt reaches back-buffer creation with
 `PRESENT|RENDER_TARGET`, `DISCARD_ON_PRESENT`, and no primary descriptor; the old
 resource filter rejects those flags. The next revision admits this copy-style

@@ -5,17 +5,31 @@ struct PresentWindow {
     static constexpr UINT width = 320, height = 192;
     HWND window = nullptr;
     ATOM type = 0;
+    EXECUTION_STATE prior_execution_state = 0;
     PresentWindow() = default;
     PresentWindow(const PresentWindow &) = delete;
     ~PresentWindow() {
         if (window) DestroyWindow(window);
         if (type) UnregisterClassW(MAKEINTRESOURCEW(type), GetModuleHandleW(nullptr));
+        if (prior_execution_state) SetThreadExecutionState(prior_execution_state);
     }
     void open() {
         USEROBJECTFLAGS flags{}; DWORD bytes = 0, session = 0;
         require(ProcessIdToSessionId(GetCurrentProcessId(), &session) && session &&
                 GetUserObjectInformationW(GetProcessWindowStation(), UOI_FLAGS, &flags, sizeof(flags), &bytes) &&
                 (flags.dwFlags & WSF_VISIBLE), "interactive guest desktop required");
+        struct InputDesktop {
+            HDESK handle = OpenInputDesktop(0, FALSE, DESKTOP_READOBJECTS);
+            ~InputDesktop() { if (handle) CloseDesktop(handle); }
+        } input;
+        WCHAR input_name[256]{}, thread_name[256]{};
+        require(input.handle &&
+                GetUserObjectInformationW(input.handle, UOI_NAME, input_name, sizeof(input_name), &bytes) &&
+                GetUserObjectInformationW(GetThreadDesktop(GetCurrentThreadId()), UOI_NAME,
+                                          thread_name, sizeof(thread_name), &bytes) &&
+                !std::wcscmp(input_name, thread_name), "presentation desktop is not the input desktop");
+        prior_execution_state = SetThreadExecutionState(ES_CONTINUOUS | ES_DISPLAY_REQUIRED | ES_SYSTEM_REQUIRED);
+        require(prior_execution_state != 0, "keep presentation display awake");
         std::printf("{\"presentation_session\":%lu,\"screen_oracle_width\":%u,\"screen_oracle_height\":%u}\n", session, width, height);
         WNDCLASSW cls{}; cls.lpfnWndProc = DefWindowProcW; cls.hInstance = GetModuleHandleW(nullptr);
         cls.lpszClassName = L"NpuRenderRegisteredPresentOracle";
@@ -23,7 +37,25 @@ struct PresentWindow {
         window = CreateWindowExW(WS_EX_TOPMOST, MAKEINTRESOURCEW(type), L"NPU Render VM presentation test",
                                  WS_POPUP | WS_VISIBLE, 64, 64, width, height, nullptr, nullptr, cls.hInstance, nullptr);
         require(window != nullptr, "create presentation window");
-        ShowWindow(window, SW_SHOW); UpdateWindow(window); pump();
+        // STARTUPINFO can override the first ShowWindow call, including when
+        // a launcher hides the console. Explicitly show this owned test HWND.
+        ShowWindow(window, SW_SHOWNORMAL);
+        require(SetWindowPos(window, HWND_TOPMOST, 64, 64, width, height, SWP_SHOWWINDOW) != FALSE,
+                "show presentation window");
+        UpdateWindow(window); pump();
+        check(DwmFlush(), "presentation_window_dwm_flush");
+        DWORD cloaked = 0;
+        check(DwmGetWindowAttribute(window, DWMWA_CLOAKED, &cloaked, sizeof(cloaked)), "presentation_window_cloaked");
+        RECT client{}; require(GetClientRect(window, &client) != FALSE, "presentation client extent");
+        STARTUPINFOW startup{}; startup.cb = sizeof(startup); GetStartupInfoW(&startup);
+        std::printf("{\"window_visible\":%s,\"window_minimized\":%s,\"window_cloaked\":%lu,"
+                    "\"startup_show_specified\":%s,\"startup_show\":%u,\"display_required\":true}\n",
+                    IsWindowVisible(window) ? "true" : "false", IsIconic(window) ? "true" : "false", cloaked,
+                    startup.dwFlags & STARTF_USESHOWWINDOW ? "true" : "false", UINT(startup.wShowWindow));
+        std::fflush(stdout);
+        require(IsWindowVisible(window) && !IsIconic(window) && !cloaked &&
+                client.right - client.left == LONG(width) && client.bottom - client.top == LONG(height),
+                "presentation window is not visible at its required extent");
     }
     void pump() {
         MSG message{};
