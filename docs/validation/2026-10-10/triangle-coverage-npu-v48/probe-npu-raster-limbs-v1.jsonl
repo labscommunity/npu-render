@@ -1,0 +1,29 @@
+python.exe : Traceback (most recent call last):
+At line:3 char:1
++ & "$source\venv\Scripts\python.exe" "$p.py" *> "$p.jsonl"
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], Remot 
+   eException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "C:\Users\tatef\AppData\Local\npu-render\vm\probe-npu-raster-limbs-v1.py", line 22, in 
+<module>
+    ov.serialize(m,path);core=ov.Core();compiled=core.compile_model(core.read_model(path),'NPU',{'
+EXECUTION_MODE_HINT':'ACCURACY'})
+                                                 
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\venv\Lib\site-packages\o
+penvino\_ov_api.py", line 646, in compile_model
+    super().compile_model(model, device_name, {} if config is None else config),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: Exception from src\inference\src\cpp\core.cpp:121:
+Exception from src\inference\src\dev\plugin.cpp:54:
+Exception from src\plugins\intel_npu\src\plugin\src\plugin.cpp:642:
+Exception from src\plugins\intel_npu\src\compiler_adapter\src\compiler_impl.cpp:433:
+Compilation failed. vclAllocatedExecutableCreate2 result: 0x78000004 - [NPU_VCL] Compiler 
+returned msg:
+String attribute auto_broadcast is not supported
+
+
+
+

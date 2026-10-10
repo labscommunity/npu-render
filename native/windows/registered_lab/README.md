@@ -348,3 +348,21 @@ state and require a terminal `complete` record. Shader binaries and captured
 pixels stay in private ignored experiment storage. DrawIndexed still returns
 DXGI_ERROR_UNSUPPORTED and never reports an execution or writes its target.
 These snapshots are inputs for implementation and replay, not desktop offload.
+
+
+`CoverageExecutor` computes triangle sample coverage on the selected provider.
+The [v48 qualification](../../../docs/validation/2026-10-10/triangle-coverage-npu-v48/report.json)
+checks 36,864 C++ NPU results against independent 64-bit edge functions, including
+both windings, shared edges, degenerate triangles and large signed coordinates.
+Inputs are already projected and quantized to 1/256 pixel units, bounded to
+±4,194,303 units. Coordinate validation occurs before inference; it does not
+compute coverage on the host. Projection, interpolation and draw integration
+remain separate unfinished work.
+
+Native i64 arithmetic truncates in the tested compiler. Coverage uses three
+base-1024 digits instead: every intermediate fits i32. For a signed carry,
+masking away the ten low bits leaves at most 22 significant bits, so conversion
+to f32, power-of-two scaling and conversion back are exact. Separate integer
+predicate masks avoid a second miscompilation of compound boolean expressions.
+Failed reproductions are retained with the qualification. Edge ownership follows
+the [Direct3D rasterization rules](https://microsoft.github.io/DirectX-Specs/d3d/archive/D3D11_3_FunctionalSpec.htm#3.4).

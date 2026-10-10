@@ -1,0 +1,28 @@
+{
+  "scope": "NPU triangle coverage for preprojected signed fixed-point coordinates; not a draw implementation",
+  "runtime": "OpenVINO 2026.1",
+  "npu_driver": "32.0.100.5540",
+  "registered_build": "present-umd-v48",
+  "cpu_contract_tests_passed": 5,
+  "cpp_npu_samples": 36864,
+  "independent_reference": "signed 64-bit integer edge functions and top-left rule",
+  "windings_tested": "both",
+  "shared_edges": "no gap or double coverage",
+  "degenerate_triangles": "no coverage",
+  "coordinate_limit_in_1_over_256_pixel_units": 4194303,
+  "invalid_coordinate_requests_rejected": 8,
+  "integer_determinant_diagnostic_samples": 16384,
+  "python_coverage_diagnostic_samples": 24576,
+  "exact_results": true,
+  "npu_arithmetic": "three base-1024 digits in i32; exact masked f32 scaling for signed carry; integer predicate masks",
+  "unimplemented": [
+    "projection",
+    "interpolation",
+    "clipping",
+    "depth",
+    "blending",
+    "DrawIndexed integration"
+  ],
+  "full_desktop_offload": false,
+  "performance_tested": false
+}

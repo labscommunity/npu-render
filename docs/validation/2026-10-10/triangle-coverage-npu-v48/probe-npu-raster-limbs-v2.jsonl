@@ -1,0 +1,14 @@
+{"frame": 0, "samples": 4096, "execution_device": "NPU", "exact_value": true, "exact_positive": false, "exact_zero": false, "first_mismatch": [], "desktop_offload_tested": false}
+python.exe : Traceback (most recent call last):
+At line:3 char:1
++ & "$source\venv\Scripts\python.exe" "$p.py" *> "$p.jsonl"
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], Remot 
+   eException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "C:\Users\tatef\AppData\Local\npu-render\vm\probe-npu-raster-limbs-v2.py", line 36, in 
+<module>
+    if not all(checks):raise RuntimeError('Split integer raster determinant mismatch')
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: Split integer raster determinant mismatch

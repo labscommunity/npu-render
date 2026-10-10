@@ -1,0 +1,66 @@
+import json,tempfile
+from pathlib import Path
+import numpy as np
+import openvino as ov
+from openvino import opset15 as o
+n=4096
+vertices=o.parameter([n,6],np.int32,name='vertices');points=o.parameter([n,2],np.int32,name='points')
+def ci(v):return o.constant(v,np.int32)
+def low(x):return o.bitwise_and(x,ci(1023))
+def high(x):return o.convert(o.multiply(o.convert(o.bitwise_and(x,ci(-1024)),np.float32),o.constant(1/1024,np.float32)),np.int32)
+def product(a,b):
+ al,ah,bl,bh=low(a),high(a),low(b),high(b)
+ return [o.multiply(al,bl),o.add(o.multiply(ah,bl),o.multiply(al,bh)),o.multiply(ah,bh)]
+def pred(x):return o.convert(x,np.int32)
+def both(a,b):return o.bitwise_and(a,b)
+def either(a,b):return o.bitwise_or(a,b)
+def determinant(ax,by,ay,bx):
+ p=product(ax,by);q=product(ay,bx)
+ lo=o.subtract(p[0],q[0]);mid=o.add(o.subtract(p[1],q[1]),high(lo));hi=o.add(o.subtract(p[2],q[2]),high(mid))
+ lo=low(lo);mid=low(mid)
+ pos=either(pred(o.greater(hi,ci(0))),both(pred(o.equal(hi,ci(0))),either(pred(o.greater(mid,ci(0))),pred(o.greater(lo,ci(0))))))
+ neg=pred(o.less(hi,ci(0)))
+ zero=both(pred(o.equal(hi,ci(0))),both(pred(o.equal(mid,ci(0))),pred(o.equal(lo,ci(0)))))
+ return pos,neg,zero
+v=[o.gather(vertices,[i],1) for i in range(6)];px=o.gather(points,[0],1);py=o.gather(points,[1],1)
+pos,neg,zero=determinant(o.subtract(v[2],v[0]),o.subtract(v[5],v[1]),o.subtract(v[3],v[1]),o.subtract(v[4],v[0]))
+coverage=either(pos,neg)
+for a,b in [(0,2),(2,4),(4,0)]:
+ dx=o.subtract(v[b],v[a]);dy=o.subtract(v[b+1],v[a+1])
+ ep,en,ez=determinant(dx,o.subtract(py,v[a+1]),dy,o.subtract(px,v[a]))
+ top_left=either(pred(o.less(dy,ci(0))),both(pred(o.equal(dy,ci(0))),pred(o.greater(dx,ci(0)))))
+ reversed_top_left=either(pred(o.greater(dy,ci(0))),both(pred(o.equal(dy,ci(0))),pred(o.less(dx,ci(0)))))
+ inside=either(both(pos,either(ep,both(ez,top_left))),both(neg,either(en,both(ez,reversed_top_left))))
+ coverage=both(coverage,inside)
+with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
+ m=ov.Model([coverage],[vertices,points]);path=Path(d)/'m.xml'
+ for node in m.get_ops():node.set_rt_info('','precise_0')
+ ov.serialize(m,path);core=ov.Core();compiled=core.compile_model(core.read_model(path),'NPU',{'EXECUTION_MODE_HINT':'ACCURACY'})
+ rng=np.random.default_rng(4639)
+ for frame in range(6):
+  vv=rng.integers(-2**22,2**22,size=(n,6),dtype=np.int32)
+  pp=rng.integers(-2**22,2**22,size=(n,2),dtype=np.int32)
+  if frame<2:
+   # A pair of triangles sharing the pixel-center diagonal; reverse winding.
+   tris=np.array([[0,0,32*256,0,0,32*256],[32*256,0,32*256,32*256,0,32*256]],np.int32)
+   for i in range(n):vv[i]=tris[(i//1024)%2];pp[i]=[(i%32)*256+128,((i//32)%32)*256+128]
+   if frame:vv=vv.reshape(n,3,2)[:,[0,2,1],:].reshape(n,6).copy()
+  if frame==2:pp=vv[:,0:2].copy()
+  if frame==3:vv[:,4:6]=vv[:,2:4]
+  def oracle(t,p):
+   q=[(int(t[j]),int(t[j+1])) for j in (0,2,4)];p=tuple(map(int,p))
+   def edge(a,b,c):return (b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0])
+   area=edge(*q)
+   if not area:return 0
+   if area<0:q[1],q[2]=q[2],q[1]
+   for a,b in zip(q,q[1:]+q[:1]):
+    e=edge(a,b,p);top=b[1]<a[1] or (b[1]==a[1] and b[0]>a[0])
+    if e<0 or (e==0 and not top):return 0
+   return 1
+  expected=np.array([oracle(t,p) for t,p in zip(vv,pp)],np.int32).reshape(n,1)
+  actual=compiled({'vertices':vv,'points':pp})[0]
+  exact=np.array_equal(actual,expected)
+  print(json.dumps({'frame':frame,'samples':n,'execution_device':compiled.get_property('EXECUTION_DEVICES'),'exact_coverage':bool(exact),'covered':int(actual.sum()),'expected_covered':int(expected.sum()),'first_mismatch':np.flatnonzero(actual!=expected)[:4].tolist(),'desktop_offload_tested':False}),flush=True)
+  if frame<2:
+   counts=actual[:2048].reshape(2,1024).sum(axis=0);assert np.all(counts==1),'Shared-edge gap or double coverage'
+  if not exact:raise RuntimeError('Triangle coverage mismatch')

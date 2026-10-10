@@ -1,0 +1,36 @@
+import json,tempfile
+from pathlib import Path
+import numpy as np
+import openvino as ov
+from openvino import opset15 as o
+n=4096
+args=[o.parameter([n,1],np.int32,name=k) for k in ['ax','by','ay','bx']]
+def ci(v):return o.constant(v,np.int32)
+def low(x):return o.bitwise_and(x,ci(1023))
+def high(x):return o.convert(o.multiply(o.convert(o.bitwise_and(x,ci(-1024)),np.float32),o.constant(1/1024,np.float32)),np.int32)
+def product(a,b):
+ al,ah,bl,bh=low(a),high(a),low(b),high(b)
+ return [o.multiply(al,bl),o.add(o.multiply(ah,bl),o.multiply(al,bh)),o.multiply(ah,bh)]
+p=product(args[0],args[1]);q=product(args[2],args[3])
+lo=o.subtract(p[0],q[0]);mid=o.add(o.subtract(p[1],q[1]),high(lo));hi=o.add(o.subtract(p[2],q[2]),high(mid))
+lo=low(lo);mid=low(mid)
+pos=o.logical_or(o.greater(hi,ci(0)),o.logical_and(o.equal(hi,ci(0)),o.logical_or(o.greater(mid,ci(0)),o.greater(lo,ci(0)))))
+zero=o.logical_and(o.equal(hi,ci(0)),o.logical_and(o.equal(mid,ci(0)),o.equal(lo,ci(0))))
+with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
+ m=ov.Model([hi,mid,lo,pos,zero],args);path=Path(d)/'m.xml'
+ for node in m.get_ops():node.set_rt_info('','precise_0')
+ ov.serialize(m,path);core=ov.Core();compiled=core.compile_model(core.read_model(path),'NPU',{'EXECUTION_MODE_HINT':'ACCURACY'})
+ rng=np.random.default_rng(6193)
+ for frame in range(4):
+  a=rng.integers(-(2**23-1),2**23,size=(4,n,1),dtype=np.int32)
+  if frame==0:
+   special=np.array([0,1,-1,1023,-1023,1024,-1024,2**21-1,-2**21,2**23-1,-(2**23-1)],np.int32)
+   for i in range(4):a[i,:,0]=np.resize(np.roll(special,i),n)
+  if frame==1:a[2]=a[0];a[3]=a[1]
+  if frame==2:a[2]=a[0];a[3]=a[1]-1
+  wide=a.astype(np.int64);ref=wide[0]*wide[1]-wide[2]*wide[3]
+  outputs=compiled(dict(zip(['ax','by','ay','bx'],a)))
+  rebuilt=(outputs[0].astype(np.int64)*1024+outputs[1])*1024+outputs[2]
+  checks=[np.array_equal(rebuilt,ref),np.array_equal(outputs[3],ref>0),np.array_equal(outputs[4],ref==0)]
+  print(json.dumps({'frame':frame,'samples':n,'execution_device':compiled.get_property('EXECUTION_DEVICES'),'exact_value':bool(checks[0]),'exact_positive':bool(checks[1]),'exact_zero':bool(checks[2]),'first_mismatch':np.flatnonzero(rebuilt!=ref)[:4].tolist(),'desktop_offload_tested':False}),flush=True)
+  if not all(checks):raise RuntimeError('Split integer raster determinant mismatch')

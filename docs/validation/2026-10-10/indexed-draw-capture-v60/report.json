@@ -1,0 +1,99 @@
+{
+  "scope": "Read-only capture of first real compositor indexed draw; not execution",
+  "source_revision": "1d03d586d58dee1ad3fcf5b542ea69f2c2fff6bb",
+  "registered_build": "present-umd-v47",
+  "package": "driver-package-v60-draw-capture",
+  "version": "0.0.49.0",
+  "indirect_package": "driver-package-idd-owned-v7",
+  "indirect_source_revision": "c17732dcfdce0446ec4fac14a2df9eaa32b5c58f",
+  "dwm_pid": 1048,
+  "swapchains_assigned": 664,
+  "swapchains_using_preferred_adapter": 664,
+  "set_device_status": "0x887a0026",
+  "capture_complete": true,
+  "capture_bytes": 3338628,
+  "capture_sha256": "a0525404fbdb34f4f16e496671ceab3bba8f4b827102d080b72829ba655210bf",
+  "first_draw": {
+    "indices": [
+      0,
+      1,
+      2,
+      2,
+      3,
+      0
+    ],
+    "topology": "triangle list",
+    "vertex_shader_words": 90,
+    "pixel_shader_words": 18,
+    "viewport": [
+      0,
+      0,
+      1024,
+      768,
+      0,
+      1
+    ],
+    "scissor": [
+      0,
+      0,
+      1024,
+      768
+    ],
+    "corners": [
+      [
+        0,
+        0,
+        1
+      ],
+      [
+        1024,
+        0,
+        1
+      ],
+      [
+        1024,
+        768,
+        1
+      ],
+      [
+        0,
+        768,
+        1
+      ]
+    ],
+    "color_rgba8": [
+      0,
+      0,
+      0,
+      255
+    ],
+    "blending": false,
+    "depth": false,
+    "stencil": false,
+    "cull": "none",
+    "target_format": "BGRA8_UNORM",
+    "source_texture_bound": false
+  },
+  "dwm_trace_sha256": "b36ad50b9fab7823356d7e3a4259537c1c27fa085100ac9bc3a45396aac33062",
+  "dwm_events": {
+    "process": 666,
+    "open_adapter": 1332,
+    "caps": 666,
+    "versions": 2664,
+    "create_device": 333,
+    "device_created": 333,
+    "resource": 6654,
+    "vertex_program_created": 2997,
+    "pixel_program_created": 2329,
+    "input_element": 9657,
+    "indexed_draw_capture": 1,
+    "reject": 331
+  },
+  "frames_received": 0,
+  "frames_displayed": 0,
+  "full_desktop_offload": false,
+  "performance_tested": false,
+  "both_custom_drivers_removed": true,
+  "debugger_heap_exception_observed": false,
+  "raw_snapshot_files_sha256_verified": 127
+}
