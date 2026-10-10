@@ -20,6 +20,7 @@
 #include "kernel_memory.hpp"
 #include "blend_executor.hpp"
 #include "shader_contract.hpp"
+#include "lab_trace.hpp"
 namespace {
 using namespace nr::registered_lab;
 std::recursive_mutex mutex;
@@ -58,6 +59,7 @@ struct View { std::shared_ptr<Allocation> allocation; };
 struct Shader { UINT kind = 0; };
 Device &device(D3D10DDI_HDEVICE h) { return *static_cast<Device *>(h.pDrvPrivate); }
 void reject(D3D10DDI_HDEVICE h, HRESULT status) {
+    lab_trace("{\"event\":\"reject\",\"status\":\"%08lx\"}\n", ULONG(status));
     ++counters.rejected;
     auto &d = device(h);
     d.callbacks.pfnSetErrorCb(d.core, status);
@@ -75,6 +77,7 @@ template<class R, class... A, size_t Offset> struct Unsupported<R(APIENTRY *)(D3
     static R APIENTRY call(D3D10DDI_HDEVICE h, A...) {
         guard(h, [] {
             counters.last_unsupported_offset = Offset;
+            lab_trace("{\"event\":\"unsupported_ddi\",\"offset\":%zu}\n", Offset);
             std::fprintf(stderr, "nr_fill_umd: unsupported DDI offset=%zu\n", Offset);
             throw Error{DXGI_ERROR_UNSUPPORTED};
         });
@@ -86,6 +89,7 @@ template<class R, class... A, size_t Offset> struct UnsupportedDxgi<R(APIENTRY *
     static R APIENTRY call(A...) {
         std::lock_guard<std::recursive_mutex> lock(mutex);
         ++counters.rejected;
+        lab_trace("{\"event\":\"unsupported_dxgi\",\"offset\":%zu}\n", Offset);
         std::fprintf(stderr, "nr_fill_umd: unsupported DXGI DDI offset=%zu\n", Offset);
         return DXGI_ERROR_UNSUPPORTED;
     }
@@ -390,6 +394,7 @@ HRESULT APIENTRY present(DXGI_DDI_ARG_PRESENT *a) {
 SIZE_T APIENTRY device_size(D3D10DDI_HADAPTER, const D3D10DDIARG_CALCPRIVATEDEVICESIZE *) { return sizeof(Device); }
 HRESULT APIENTRY create_device(D3D10DDI_HADAPTER, D3D10DDIARG_CREATEDEVICE *a) {
     std::lock_guard<std::recursive_mutex> lock(mutex);
+    if (a) lab_trace("{\"event\":\"create_device\",\"interface\":%u,\"version\":%u}\n", a->Interface, a->Version);
     if (!a || !a->hDrvDevice.pDrvPrivate || !a->pUMCallbacks || !a->pUMCallbacks->pfnSetErrorCb ||
         !a->pKTCallbacks || !a->pDeviceFuncs || !a->DXGIBaseDDI.pDXGIDDIBaseFunctions) return E_INVALIDARG;
     if (a->Interface != D3D10_0_DDI_INTERFACE_VERSION && a->Interface != D3D10_0_x_DDI_INTERFACE_VERSION &&
@@ -442,15 +447,18 @@ HRESULT APIENTRY create_device(D3D10DDI_HADAPTER, D3D10DDIARG_CREATEDEVICE *a) {
         // This adapter has no shared D3D9 hardware implementation. The DXGI
         // contract requires CPU-accessible presentation instead of D3D9/DWM
         // resource redirection, even when the selected draw provider is NPU.
+        lab_trace("{\"event\":\"device_created\",\"status\":\"%08lx\"}\n", ULONG(DXGI_STATUS_NO_REDIRECTION));
         return DXGI_STATUS_NO_REDIRECTION;
     } catch (const Error &e) { status = e.status; }
     catch (const std::bad_alloc &) { status = E_OUTOFMEMORY; }
     catch (...) {}
     d->~Device();
+    lab_trace("{\"event\":\"device_failed\",\"status\":\"%08lx\"}\n", ULONG(status));
     return status;
 }
 HRESULT APIENTRY close_adapter(D3D10DDI_HADAPTER) { return S_OK; }
 HRESULT APIENTRY versions(D3D10DDI_HADAPTER, UINT32 *count, UINT64 *out) {
+    lab_trace("{\"event\":\"versions\",\"output_requested\":%s}\n", out ? "true" : "false");
     const UINT64 supported[] = {D3D10_0_DDI_SUPPORTED, D3D10_0_x_DDI_SUPPORTED, D3D10_0_7_DDI_SUPPORTED};
     if (!count) return E_INVALIDARG;
     if (out && *count < 3) return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
@@ -460,6 +468,7 @@ HRESULT APIENTRY versions(D3D10DDI_HADAPTER, UINT32 *count, UINT64 *out) {
 }
 HRESULT APIENTRY caps(D3D10DDI_HADAPTER, const D3D10_2DDIARG_GETCAPS *a) {
     if (!a || !a->pData) return E_INVALIDARG;
+    lab_trace("{\"event\":\"caps\",\"type\":%u,\"bytes\":%u}\n", UINT(a->Type), a->DataSize);
     std::memset(a->pData, 0, a->DataSize);
     if (a->Type == D3D11DDICAPS_3DPIPELINESUPPORT && a->DataSize == sizeof(D3D11DDI_3DPIPELINESUPPORT_CAPS))
         static_cast<D3D11DDI_3DPIPELINESUPPORT_CAPS *>(a->pData)->Caps = D3D11DDI_ENCODE_3DPIPELINESUPPORT_CAP(D3D11DDI_3DPIPELINELEVEL_10_0);
@@ -469,6 +478,7 @@ HRESULT APIENTRY caps(D3D10DDI_HADAPTER, const D3D10_2DDIARG_GETCAPS *a) {
 extern "C" __declspec(dllexport) HRESULT APIENTRY OpenAdapter10(D3D10DDIARG_OPENADAPTER *a) {
     if (!a || !a->pAdapterFuncs || !a->pAdapterCallbacks || !a->pAdapterCallbacks->pfnQueryAdapterInfoCb) return E_INVALIDARG;
     if (!nr_fill_guest()) return DXGI_ERROR_UNSUPPORTED;
+    lab_trace("{\"event\":\"open_adapter\",\"interface\":%u,\"version\":%u}\n", a->Interface, a->Version);
     nr::kernel_contract::AdapterInfo info{};
     std::memset(&info, 0, sizeof(info));
     D3DDDICB_QUERYADAPTERINFO query{};
