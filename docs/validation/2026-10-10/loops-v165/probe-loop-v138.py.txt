@@ -1,0 +1,23 @@
+import json,time,sys
+import numpy as np
+import openvino as ov
+from openvino import opset13 as op
+mode=sys.argv[1]
+x=op.parameter([16,4],np.float32,name='x');y=op.parameter([16,4],np.float32,name='state')
+step=op.add(y,op.constant(np.float32(.25)))
+limit=op.parameter([],np.float32,name='limit');bound=op.parameter([],np.float32,name='body_limit')
+condition=op.less(op.reduce_max(step,op.constant([0,1],np.int64),False),bound) if mode=='dynamic' else op.constant(True)
+body=ov.Model([condition,step],[y,bound] if mode=='dynamic' else [y],'loop_body')
+loop=op.loop(op.constant(np.int64(4)),op.constant(True));loop.set_function(body);loop.set_special_body_ports([-1,0]);loop.set_merged_input(y,x.output(0),step.output(0))
+if mode=='dynamic':loop.set_invariant_input(bound,limit.output(0))
+model=ov.Model([loop.get_iter_value(step.output(0),-1)],[x,limit] if mode=='dynamic' else [x],'four_steps')
+core=ov.Core();data=np.zeros((16,4),np.float32)
+for backend in ['CPU','NPU']:
+ start=time.monotonic()
+ try:
+  compiled=core.compile_model(model,backend,{'EXECUTION_MODE_HINT':'ACCURACY'} if backend=='NPU' else {'INFERENCE_PRECISION_HINT':'f32'})
+  for stop,expected in ([(.1,.25),(.6,.75),(2,1)] if mode=='dynamic' else [(2,1)]):
+   result=compiled([data,np.array(stop,np.float32)] if mode=='dynamic' else [data])[0]
+   error=float(np.max(np.abs(result-expected)))
+   print(json.dumps({'mode':mode,'backend':backend,'execution_devices':compiled.get_property('EXECUTION_DEVICES'),'stop':stop,'maximum_error':error,'elapsed_seconds':time.monotonic()-start,'passed':error==0}),flush=True)
+ except Exception as e:print(json.dumps({'mode':mode,'backend':backend,'error':str(e),'elapsed_seconds':time.monotonic()-start}),flush=True)

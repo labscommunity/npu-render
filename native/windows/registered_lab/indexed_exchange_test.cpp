@@ -98,6 +98,12 @@ int main(int argc, char **argv) try {
             std::memcpy(bad.data(),&h,sizeof(h));rejects(bad);
         }
     }
+    auto loop=r;
+    const auto loop_words=nr::registered_lab::shader_tokens("cbuffer C {int count;};float4 main():SV_Target{float3 sum=0;[loop]for(int i=0;i<count;++i)sum+=float3(.03125,.015625,.0625);return float4(sum,1);}","ps_4_0");
+    loop.pixel=nr::shader::parse_pixel(loop_words.data(),loop_words.size());loop.pixel_constants[0].push_back({8,0,0,0});
+    const auto loop_packet=ex::encode(loop);const auto loop_roundtrip=ex::decode(loop_packet);
+    test(loop_roundtrip.pixel.bytecode==loop_words && loop_roundtrip.pixel_constants==loop.pixel_constants);
+    test(nr::shader::lower_bounded_loops(loop_roundtrip.pixel).instructions.size()>loop_roundtrip.pixel.instructions.size());
     auto derivative=r;derivative.header.abi=8;derivative.header.flags=0x2f02;
     const auto derivative_vs=nr::registered_lab::shader_tokens("struct O{float4 p:SV_Position;noperspective float2 uv:TEXCOORD;};O main(float4 p:POSITION,float2 uv:TEXCOORD){O o;o.p=p;o.uv=uv;return o;}","vs_4_0");
     const auto derivative_ps=nr::registered_lab::shader_tokens("float4 main(float4 p:SV_Position,noperspective float2 uv:TEXCOORD):SV_Target{return float4(ddx(uv.x)*64,ddy(uv.y)*64,.25,1);}","ps_4_0");
@@ -259,8 +265,8 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
     result.execution_device = "CPU"; rejected = false;
     try { (void)ex::response(r.header, result); } catch (const std::invalid_argument &) { rejected = true; } test(rejected);
     if (argc == 3) {
-        if (!std::strcmp(argv[1], "--emit-request") || !std::strcmp(argv[1], "--emit-destination-in") || !std::strcmp(argv[1], "--emit-destination-out") || !std::strcmp(argv[1], "--emit-destination-over") || !std::strcmp(argv[1], "--emit-derivatives")) {
-            const auto &emitted = !std::strcmp(argv[1], "--emit-derivatives") ? derivative_packet : !std::strcmp(argv[1], "--emit-destination-over") ? behind_packet : !std::strcmp(argv[1], "--emit-destination-out") ? erase_packet : !std::strcmp(argv[1], "--emit-destination-in") ? destination_packet : bytes;
+        if (!std::strcmp(argv[1], "--emit-request") || !std::strcmp(argv[1], "--emit-destination-in") || !std::strcmp(argv[1], "--emit-destination-out") || !std::strcmp(argv[1], "--emit-destination-over") || !std::strcmp(argv[1], "--emit-derivatives") || !std::strcmp(argv[1], "--emit-loops")) {
+            const auto &emitted = !std::strcmp(argv[1], "--emit-loops") ? loop_packet : !std::strcmp(argv[1], "--emit-derivatives") ? derivative_packet : !std::strcmp(argv[1], "--emit-destination-over") ? behind_packet : !std::strcmp(argv[1], "--emit-destination-out") ? erase_packet : !std::strcmp(argv[1], "--emit-destination-in") ? destination_packet : bytes;
             std::ifstream old(argv[2], std::ios::binary); test(!old); old.close();
             std::ofstream out(argv[2], std::ios::binary); test(bool(out));
             out.write(reinterpret_cast<const char *>(emitted.data()), std::streamsize(emitted.size())); out.close(); test(bool(out));

@@ -14,10 +14,11 @@ inline void check(bool value) {
 }
 enum class Register : uint32_t { temporary = 0, input = 1, output = 2, indexable = 3, immediate = 4, sampler = 6, texture = 7, constant = 8 };
 enum class Opcode : uint32_t {
-    add = 0, derivative_x = 11, derivative_y = 12, divide = 14, dot2 = 15, dot3 = 16, dot4 = 17, otherwise = 18, end_if = 21,
-    float_to_integer = 27, integer_add = 30, begin_if = 31, integer_mad = 35, shift_left = 41, shift_right = 42, integer_to_float = 43, load = 45, less = 49,
+    add = 0, break_if = 3, derivative_x = 11, derivative_y = 12, divide = 14, dot2 = 15, dot3 = 16, dot4 = 17, otherwise = 18, end_if = 21, end_loop = 22,
+    fraction = 26, float_to_integer = 27, greater_equal = 29, integer_add = 30, begin_if = 31, integer_greater_equal = 33, integer_mad = 35, shift_left = 41, shift_right = 42, integer_to_float = 43, load = 45, begin_loop = 48, less = 49,
     mad = 50, minimum = 51, maximum = 52, move = 54, select = 55,
-    multiply = 56, reciprocal_sqrt = 68, sample = 69
+    multiply = 56, reciprocal_sqrt = 68, sample = 69,
+    loop_overflow = 0x10000 // Internal checked lowering only; never a bytecode opcode.
 };
 enum class Modifier : uint32_t { none = 0, negate = 1, absolute = 2, absolute_negate = 3 };
 enum class Stage { vertex, pixel };
@@ -136,6 +137,8 @@ inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
         bool has_else = false;
     };
     std::vector<Branch> branches;
+    bool in_loop=false, loop_has_break=false;
+    std::array<uint32_t,16> loop_exit_temps{},loop_exit_outputs{};
     auto source_valid = [&](const Operand &source, uint32_t used_mask) {
         auto initialized = [&](Register kind, uint32_t index, uint32_t lanes) {
             check(index < 16);
@@ -223,6 +226,20 @@ inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
                     result.position_output = a.index;
                 }
             }
+        } else if(opcode==48){
+            check(!controls && !in_loop && branches.empty());body=true;in_loop=true;loop_has_break=false;
+            Instruction instruction;instruction.opcode=Opcode::begin_loop;result.instructions.push_back(instruction);
+        } else if(opcode==3){
+            check(in_loop && !loop_has_break && branches.empty() && !(controls&~0x40000u));
+            Instruction instruction;instruction.opcode=Opcode::break_if;instruction.source_count=1;instruction.test_nonzero=controls!=0;
+            instruction.sources[0]=in.operand(false);source_valid(instruction.sources[0],1);
+            const auto &condition=instruction.sources[0];
+            check(condition.modifier==Modifier::none && condition.lanes[0]==condition.lanes[1] && condition.lanes[0]==condition.lanes[2] && condition.lanes[0]==condition.lanes[3]);
+            loop_has_break=true;loop_exit_temps=written_temps;loop_exit_outputs=written_outputs;result.instructions.push_back(instruction);
+        } else if(opcode==22){
+            check(!controls && in_loop && loop_has_break && branches.empty());in_loop=false;
+            written_temps=loop_exit_temps;written_outputs=loop_exit_outputs;
+            Instruction instruction;instruction.opcode=Opcode::end_loop;result.instructions.push_back(instruction);
         } else if (opcode == 31) {
             check(!(controls & ~0x40000u) && branches.size() < 8 && result.instructions.size() < 1024);
             body = true; Instruction instruction; instruction.opcode = Opcode::begin_if;
@@ -247,14 +264,14 @@ inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
             }
             Instruction instruction; instruction.opcode = Opcode(opcode); result.instructions.push_back(instruction);
         } else if (opcode == 62) {
-            check(!controls && body && branches.empty()); returned = true;
+            check(!controls && body && branches.empty() && !in_loop); returned = true;
         } else {
-            check(opcode == 0 || opcode == 11 || opcode == 12 || opcode == 14 || opcode == 15 || opcode == 16 || opcode == 17 || opcode == 27 || opcode == 30 || opcode == 35 || opcode == 41 || opcode == 42 || opcode == 45 ||
+            check(opcode == 0 || opcode == 11 || opcode == 12 || opcode == 14 || opcode == 15 || opcode == 16 || opcode == 17 || opcode == 26 || opcode == 27 || opcode == 29 || opcode == 30 || opcode == 33 || opcode == 35 || opcode == 41 || opcode == 42 || opcode == 45 ||
                   opcode == 43 || opcode == 49 || opcode == 50 || opcode == 51 || opcode == 52 ||
                   opcode == 54 || opcode == 55 || opcode == 56 || opcode == 68 || opcode == 69);
             check(!(controls & ~0x2000u) && result.instructions.size() < 1024);
             body = true;
-            if(opcode==11 || opcode==12)check(stage==Stage::pixel && branches.empty());
+            if(opcode==11 || opcode==12)check(stage==Stage::pixel && branches.empty() && !in_loop);
             Instruction instruction; instruction.opcode = Opcode(opcode); instruction.saturate = controls != 0;
             instruction.destination = in.operand(true);
             const auto &d = instruction.destination;
@@ -271,7 +288,7 @@ inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
             }
             check((d.kind == Register::temporary && d.index < result.temporaries) ||
                   (d.kind == Register::output && !(d.mask & ~result.outputs[d.index])));
-            instruction.source_count = (opcode == 11 || opcode == 12 || opcode == 27 || opcode == 43 || opcode == 54 || opcode == 68) ? 1u :
+            instruction.source_count = (opcode == 11 || opcode == 12 || opcode == 26 || opcode == 27 || opcode == 43 || opcode == 54 || opcode == 68) ? 1u :
                                        ((opcode == 35 || opcode == 50 || opcode == 55 || opcode == 69) ? 3u : 2u);
             for (unsigned i = 0; i < instruction.source_count; ++i) {
                 instruction.sources[i] = in.operand(false);
@@ -289,6 +306,7 @@ inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
                                         instruction.sources[i].modifier == Modifier::negate);
                 if (opcode == 43 || (opcode == 55 && !i)) check(instruction.sources[i].modifier == Modifier::none);
                 if(opcode==41 || opcode==42)check(instruction.sources[i].modifier==Modifier::none);
+                if(opcode==33)check(instruction.sources[i].modifier==Modifier::none);
             }
             if(opcode==45){
                 const auto &address=instruction.sources[0],&resource=instruction.sources[1];
@@ -312,6 +330,34 @@ inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
 inline bool quad_derivatives(const Program &p) {
     for(const auto &i:p.instructions)if(i.opcode==Opcode::derivative_x || i.opcode==Opcode::derivative_y)return true;
     return false;
+}
+constexpr unsigned maximum_loop_iterations=16;
+// Single-exit, nonnested loops become nested conditional blocks. The final
+// guard checks termination on the provider instead of silently truncating work.
+inline Program lower_bounded_loops(const Program &p){
+    Program result=p;result.instructions.clear();
+    for(size_t at=0;at<p.instructions.size();++at){
+        const auto &instruction=p.instructions[at];
+        if(instruction.opcode!=Opcode::begin_loop){result.instructions.push_back(instruction);continue;}
+        size_t stop=at+1,guard=p.instructions.size();
+        for(;stop<p.instructions.size() && p.instructions[stop].opcode!=Opcode::end_loop;++stop){
+            check(p.instructions[stop].opcode!=Opcode::begin_loop);
+            if(p.instructions[stop].opcode==Opcode::break_if){check(guard==p.instructions.size());guard=stop;}
+        }
+        check(stop<p.instructions.size() && guard<stop);
+        const auto needed=(stop-at+2)*(maximum_loop_iterations+1);
+        check(needed<=8192 && result.instructions.size()<=8192-needed);
+        for(unsigned n=0;n<=maximum_loop_iterations;++n){
+            result.instructions.insert(result.instructions.end(),p.instructions.begin()+at+1,p.instructions.begin()+guard);
+            auto condition=p.instructions[guard];condition.opcode=Opcode::begin_if;condition.test_nonzero=!condition.test_nonzero;
+            result.instructions.push_back(condition);
+            if(n<maximum_loop_iterations)result.instructions.insert(result.instructions.end(),p.instructions.begin()+guard+1,p.instructions.begin()+stop);
+            else {Instruction failure;failure.opcode=Opcode::loop_overflow;result.instructions.push_back(failure);}
+        }
+        for(unsigned n=0;n<=maximum_loop_iterations;++n){Instruction end;end.opcode=Opcode::end_if;result.instructions.push_back(end);}
+        at=stop;
+    }
+    check(result.instructions.size()<=8192);return result;
 }
 inline Program parse_vertex(const uint32_t *words, size_t count) { return parse_program(words, count, Stage::vertex); }
 inline Program parse_pixel(const uint32_t *words, size_t count) { return parse_program(words, count, Stage::pixel); }

@@ -1,0 +1,32 @@
+numeric_v141.exe : arithmetic opcode=26 sample=6 component=3 actual=00000000 expected=3f000000
+At line:6 char:30
++ ... in 140,141){& "$d\build\Release\numeric_v$version.exe" NPU arithmetic ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (arithmetic opco...pected=3f000000:String) [], Remote
+   Exception
+    + FullyQualifiedErrorId : NativeCommandError
+
+arithmetic opcode=26 sample=7 component=2 actual=00000000 expected=3f000000
+arithmetic opcode=26 sample=8 component=1 actual=00000000 expected=3f000000
+arithmetic opcode=26 sample=9 component=0 actual=00000000 expected=3f000000
+arithmetic opcode=26 sample=22 component=3 actual=00000000 expected=3f000000
+arithmetic opcode=26 sample=23 component=2 actual=00000000 expected=3f000000
+arithmetic opcode=26 sample=24 component=1 actual=00000000 expected=3f000000
+arithmetic opcode=26 sample=25 component=0 actual=00000000 expected=3f000000
+arithmetic opcode=26 sample=38 component=3 actual=00000000 expected=3f000000
+arithmetic opcode=26 sample=39 component=2 actual=00000000 expected=3f000000
+arithmetic opcode=26 sample=40 component=1 actual=00000000 expected=3f000000
+arithmetic opcode=26 sample=41 component=0 actual=00000000 expected=3f000000
+arithmetic opcode=26 sample=54 component=3 actual=00000000 expected=3f000000
+arithmetic opcode=26 sample=55 component=2 actual=00000000 expected=3f000000
+arithmetic opcode=26 sample=56 component=1 actual=00000000 expected=3f000000
+arithmetic opcode=26 sample=57 component=0 actual=00000000 expected=3f000000
+{"opcode":26,"exact_components":256,"execution_device":"NPU"}
+arithmetic opcode=29 sample=11 component=2 actual=ffffffff expected=00000000
+{"opcode":29,"exact_components":256,"execution_device":"NPU"}
+arithmetic opcode=29 sample=12 component=1 actual=ffffffff expected=00000000
+arithmetic opcode=29 sample=13 component=0 actual=ffffffff expected=00000000
+arithmetic opcode=29 sample=43 component=2 actual=ffffffff expected=00000000
+arithmetic opcode=29 sample=44 component=1 actual=ffffffff expected=00000000
+arithmetic opcode=29 sample=51 component=0 actual=ffffffff expected=00000000
+{"opcode":33,"exact_components":256,"execution_device":"NPU"}

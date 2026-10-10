@@ -1,0 +1,22 @@
+import json,time
+import numpy as np
+import openvino as ov
+from openvino import opset13 as op
+x=op.parameter([16,4],np.float32,name='x')
+y=op.parameter([16,4],np.float32,name='state')
+step=op.add(y,op.constant(np.float32(.25)))
+condition=op.constant(True)
+body=ov.Model([condition,step],[y],'loop_body')
+loop=op.loop(op.constant(np.int64(4)),op.constant(True))
+loop.set_function(body);loop.set_special_body_ports([-1,0]);loop.set_merged_input(y,x.output(0),step.output(0))
+value=loop.get_iter_value(step.output(0),-1)
+model=ov.Model([value],[x],'four_steps')
+core=ov.Core();data=np.arange(64,dtype=np.float32).reshape(16,4)/64
+for backend in ['CPU','NPU']:
+ start=time.monotonic()
+ try:
+  compiled=core.compile_model(model,backend,{'INFERENCE_PRECISION_HINT':'f32'})
+  result=compiled([data])[0]
+  error=float(np.max(np.abs(result-(data+1))))
+  print(json.dumps({'backend':backend,'execution_devices':compiled.get_property('EXECUTION_DEVICES'),'maximum_error':error,'elapsed_seconds':time.monotonic()-start,'passed':error==0}),flush=True)
+ except Exception as e:print(json.dumps({'backend':backend,'error':str(e),'elapsed_seconds':time.monotonic()-start}),flush=True)

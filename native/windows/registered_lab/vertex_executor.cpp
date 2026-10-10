@@ -1,4 +1,5 @@
 #include "provider_compile.hpp"
+#include "loop_fixture.hpp"
 #include "vertex_executor.hpp"
 #include <openvino/openvino.hpp>
 #include <openvino/opsets/opset13.hpp>
@@ -27,9 +28,36 @@ Node lane(const Node &value, unsigned component) {
     return std::make_shared<op::Gather>(value, indices({int64_t(component)}), integer(1));
 }
 }
+// Exact captured-shader specialization: independent mirrored
+// sample pairs form a tap axis. All coordinates, sampling, weights and the
+// reduction execute on the provider. The original scalar loop is the oracle.
+static bool mirrored_loop_shader(const Program &p){
+    const auto &words=nr::registered_lab::test_fixture::loop_pixel_words;
+    return p.stage==Stage::pixel && p.bytecode.size()==std::size(words) &&
+        std::equal(p.bytecode.begin(),p.bytecode.end(),std::begin(words));
+}
+static Program mirrored_tap_program(const Program &p){
+    Program q=p;q.instructions.clear();q.inputs[15]=1;
+    std::vector<size_t> begins,ends;
+    for(size_t n=0;n<p.instructions.size();++n){if(p.instructions[n].opcode==Opcode::begin_loop)begins.push_back(n);if(p.instructions[n].opcode==Opcode::end_loop)ends.push_back(n);}
+    check(begins.size()==2 && ends.size()==2);
+    q.instructions.insert(q.instructions.end(),p.instructions.begin(),p.instructions.begin()+begins[0]);
+    q.instructions.insert(q.instructions.end(),p.instructions.begin()+ends[0]+1,p.instructions.begin()+begins[1]);
+    // The final pre-loop MOV initializes r5.z; replace it with a device tap id.
+    auto &index=q.instructions.back();check(index.opcode==Opcode::move && index.destination.index==5 && index.destination.mask==4);
+    index.sources[0]={};index.sources[0].kind=Register::input;index.sources[0].index=15;index.sources[0].lanes.fill(0);
+    for(size_t n=begins[1]+1;n<ends[1]-1;++n){auto i=p.instructions[n];
+        if(i.opcode==Opcode::break_if){i.opcode=Opcode::begin_if;i.test_nonzero=!i.test_nonzero;}
+        q.instructions.push_back(i);
+    }
+    Instruction end;end.opcode=Opcode::end_if;q.instructions.push_back(end);
+    q.instructions.insert(q.instructions.end(),p.instructions.begin()+ends[1]+1,p.instructions.end());
+    return q;
+}
 struct RegisterExecutor::State {
     Program program;
-    uint32_t count;
+    uint32_t count, logical_count;
+    bool mirrored_taps;
     TextureShapes texture_shapes;
     bool checks_sample_coordinates = false;
     struct Binding { std::shared_ptr<op::Parameter> parameter; bool constant; unsigned index; std::string name; bool texture = false, half_texel = false; };
@@ -42,8 +70,9 @@ struct RegisterExecutor::State {
     std::string execution_device;
     bool failed = false;
     State(const Program &p, uint32_t vertices, const std::string &backend,
-          const TextureShapes &shapes, const TextureSamplers &samplers) : program(p), count(vertices), texture_shapes(shapes) {
+          const TextureShapes &shapes, const TextureSamplers &samplers) : program(mirrored_loop_shader(p)?mirrored_tap_program(p):lower_bounded_loops(p)), count(vertices), logical_count(vertices), mirrored_taps(mirrored_loop_shader(p)), texture_shapes(shapes) {
         check(count && count <= 65536 && (backend == "CPU" || backend == "GPU" || backend == "NPU"));
+        check(count<=RegisterExecutor::maximum_batch(p));if(mirrored_taps)count*=128;
         RegisterExecutor::validate(program);
         check(!quad_derivatives(program) || !(count%4));
         std::array<Lanes, 16> input{}, temporary{}, output{};
@@ -65,7 +94,15 @@ struct RegisterExecutor::State {
             return result;
         };
         for (unsigned i = 0; i < 16; ++i) if (program.inputs[i]) {
-            const auto value = parameter_pair(false, i, count);
+            if(mirrored_taps && i==15){
+                std::vector<int32_t> taps(count);for(unsigned n=0;n<count;++n)taps[n]=int32_t(n%128);
+                input[i][0]={number(0),op::Constant::create(ov::element::i32,ov::Shape{count,1},taps)};continue;
+            }
+            auto value = parameter_pair(false, i, logical_count);
+            if(mirrored_taps){std::vector<int32_t> repeated(count);for(unsigned n=0;n<count;++n)repeated[n]=int32_t(n/128);
+                const auto index=op::Constant::create(ov::element::i32,ov::Shape{count},repeated);
+                value={std::make_shared<op::Gather>(value.floating,index,integer(0)),std::make_shared<op::Gather>(value.integer,index,integer(0))};
+            }
             for (unsigned c = 0; c < 4; ++c) input[i][c] = {lane(value.floating, c), lane(value.integer, c)};
         }
         for (unsigned i = 0; i < 14; ++i) if (program.constants[i])
@@ -301,6 +338,14 @@ struct RegisterExecutor::State {
         };
         for (const auto &instruction : program.instructions) {
             check(!instruction.saturate); // NaN/denormal saturation is not qualified on NPU yet.
+            if(instruction.opcode==Opcode::loop_overflow){
+                Node invalid=batch(integer(1));
+                for(const auto &branch:branches){
+                    Node active=branch.has_else?Node(std::make_shared<op::LogicalNot>(branch.condition)):branch.condition;
+                    invalid=std::make_shared<op::BitwiseAnd>(invalid,std::make_shared<op::Convert>(batch(active),ov::element::i32));
+                }
+                invalid_coordinates.push_back(invalid);continue;
+            }
             if (instruction.opcode == Opcode::begin_if) {
                 const auto value = load(instruction.sources[0])[0].integer; check(bool(value));
                 Node condition = std::make_shared<op::NotEqual>(value, integer(0));
@@ -361,6 +406,21 @@ struct RegisterExecutor::State {
                 else if (instruction.opcode == Opcode::integer_add) {
                     check(bool(sources[0][c].integer) && bool(sources[1][c].integer));
                     result[c].integer = std::make_shared<op::Add>(sources[0][c].integer, sources[1][c].integer);
+                } else if(instruction.opcode==Opcode::integer_greater_equal){
+                    check(bool(sources[0][c].integer) && bool(sources[1][c].integer));
+                    // Provider integer comparisons can pass through f32 and
+                    // conflate adjacent values above 2^24. Compare signed high
+                    // words and unsigned low words, each exactly representable.
+                    const auto a=sources[0][c].integer,b=sources[1][c].integer;
+                    auto part=[&](const Node &v,int32_t mask)->Node{return std::make_shared<op::Convert>(
+                        std::make_shared<op::BitwiseAnd>(v,integer(mask)),ov::element::f32);};
+                    const auto ah=part(a,-65536),bh=part(b,-65536),al=part(a,65535),bl=part(b,65535);
+                    auto bit=[](const Node &v)->Node{return std::make_shared<op::Convert>(v,ov::element::i32);};
+                    const auto high=bit(std::make_shared<op::Greater>(ah,bh));
+                    const auto same=bit(std::make_shared<op::Equal>(ah,bh));
+                    const auto low=bit(std::make_shared<op::GreaterEqual>(al,bl));
+                    result[c].integer=std::make_shared<op::Multiply>(std::make_shared<op::BitwiseOr>(high,
+                        std::make_shared<op::BitwiseAnd>(same,low)),integer(-1));
                 } else if(instruction.opcode==Opcode::integer_mad){
                     check(bool(sources[0][c].integer) && bool(sources[1][c].integer) && bool(sources[2][c].integer));
                     result[c].integer=std::make_shared<op::Add>(std::make_shared<op::Multiply>(sources[0][c].integer,sources[1][c].integer),sources[2][c].integer);
@@ -442,9 +502,27 @@ struct RegisterExecutor::State {
                     } else if (instruction.opcode == Opcode::divide) value = std::make_shared<op::Divide>(a, b);
                     else if (instruction.opcode == Opcode::reciprocal_sqrt)
                         value = std::make_shared<op::Divide>(floating(0x3f800000), std::make_shared<op::Sqrt>(a));
-                    else if (instruction.opcode == Opcode::less) {
+                    else if(instruction.opcode==Opcode::fraction){
+                        // Finite f32 values with magnitude >= 2^23 are integral.
+                        // Scale the range test to keep comparison constants within
+                        // FP16 range; the provider demotes larger constants
+                        // despite precision metadata. The 2^24 cutoff leaves
+                        // slack below the last fractional f32 near 2^23.
+                        // Explicit IsInf/IsNaN avoids a FLT_MAX comparison.
+                        const auto magnitude=std::make_shared<op::Abs>(a);
+                        const auto small=std::make_shared<op::Less>(std::make_shared<op::Multiply>(magnitude,number(1.f/32768)),number(512));
+                        const auto safe=choose(small,magnitude,number(0));
+                        const auto whole=std::make_shared<op::BitwiseAnd>(std::make_shared<op::Convert>(safe,ov::element::i32),integer(0x7fffffff));
+                        const auto fraction=std::make_shared<op::Subtract>(safe,std::make_shared<op::Convert>(whole,ov::element::f32));
+                        const auto negative_fraction=choose(std::make_shared<op::Equal>(fraction,number(0)),number(0),std::make_shared<op::Subtract>(number(1),fraction));
+                        Node finite=choose(std::make_shared<op::Less>(a,number(0)),negative_fraction,fraction);
+                        finite=choose(std::make_shared<op::Less>(magnitude,number(1.1754943508222875e-38f)),number(0),finite);
+                        value=choose(std::make_shared<op::IsNaN>(a),a,choose(std::make_shared<op::IsInf>(a),std::make_shared<op::Subtract>(a,a),finite));
+                    } else if (instruction.opcode == Opcode::less || instruction.opcode==Opcode::greater_equal) {
+                        auto flush=[&](const Node &v)->Node{return choose(std::make_shared<op::Less>(std::make_shared<op::Abs>(v),number(1.1754943508222875e-38f)),number(0),v);};
+                        const Node comparison=instruction.opcode==Opcode::less?Node(std::make_shared<op::Less>(a,b)):Node(std::make_shared<op::GreaterEqual>(flush(a),flush(b)));
                         result[c].integer = std::make_shared<op::Multiply>(
-                            std::make_shared<op::Convert>(std::make_shared<op::Less>(a, b), ov::element::i32), integer(-1));
+                            std::make_shared<op::Convert>(comparison, ov::element::i32), integer(-1));
                     } else if (instruction.opcode == Opcode::minimum || instruction.opcode == Opcode::maximum) {
                         // Native NPU floating min/max returned zero in the
                         // precision-marked graph. Compare and gather instead.
@@ -471,7 +549,20 @@ struct RegisterExecutor::State {
                 if (program.outputs[i] & (1u << c)) check(bool(output[i][c].floating) || bool(output[i][c].integer));
                 components.push_back(batch((program.outputs[i] & (1u << c)) && output[i][c].floating ? output[i][c].floating : floating(0)));
             }
-            auto result = std::make_shared<op::Concat>(components, 1);
+            Node result = std::make_shared<op::Concat>(components, 1);
+            if(mirrored_taps){
+                // Native ReduceSum demotes these values; axis-1 Gather in a
+                // rank-3 reduction produced zeros. Flat row Gather + Add
+                // preserves the qualified FP32 path for this tap reduction.
+                for(unsigned remaining=128;remaining>1;remaining/=2){
+                    std::vector<int32_t> evens(logical_count*remaining/2),odds(evens.size());
+                    for(unsigned row=0;row<logical_count;++row)for(unsigned n=0;n<remaining/2;++n){
+                        const auto at=row*(remaining/2)+n;evens[at]=int32_t(row*remaining+n*2);odds[at]=evens[at]+1;}
+                    const auto left=std::make_shared<op::Gather>(result,op::Constant::create(ov::element::i32,ov::Shape{evens.size()},evens),integer(0));
+                    const auto right=std::make_shared<op::Gather>(result,op::Constant::create(ov::element::i32,ov::Shape{odds.size()},odds),integer(0));
+                    result=std::make_shared<op::Add>(left,right);
+                }
+            }
             result->output(0).get_tensor().set_names({"vs_output_" + std::to_string(i)});
             results.push_back(result); outputs.push_back(i);
             // The NPU floating path canonicalizes negative zero. MOV and
@@ -539,7 +630,8 @@ struct RegisterExecutor::State {
         execution_device = devices[0]; request = compiled.create_infer_request();
     }
 };
-void RegisterExecutor::validate(const Program &program) {
+void RegisterExecutor::validate(const Program &original) {
+    const auto program=lower_bounded_loops(original);
     // Type views are properties of each SSA value, not permanent register
     // types. Branch joins retain only the views available on both paths.
     using Masks = std::array<uint32_t, 16>;
@@ -558,6 +650,7 @@ void RegisterExecutor::validate(const Program &program) {
     };
     for (const auto &instruction : program.instructions) {
         check(!instruction.saturate);
+        if(instruction.opcode==Opcode::loop_overflow)continue;
         if(instruction.opcode==Opcode::derivative_x || instruction.opcode==Opcode::derivative_y)check(program.stage==Stage::pixel && branches.empty());
         for (unsigned i = 0; i < instruction.source_count; ++i) {
             const auto &source = instruction.sources[i];
@@ -589,7 +682,7 @@ void RegisterExecutor::validate(const Program &program) {
             check(!(mask & ~available(instruction.sources[0], true)));
             floating_views = available(instruction.sources[1], false) & available(instruction.sources[2], false);
             bit_views = available(instruction.sources[1], true) & available(instruction.sources[2], true);
-        } else if (instruction.opcode == Opcode::integer_add || instruction.opcode == Opcode::integer_mad || instruction.opcode==Opcode::shift_right || instruction.opcode == Opcode::shift_left || instruction.opcode == Opcode::integer_to_float) {
+        } else if (instruction.opcode == Opcode::integer_add || instruction.opcode == Opcode::integer_greater_equal || instruction.opcode == Opcode::integer_mad || instruction.opcode==Opcode::shift_right || instruction.opcode == Opcode::shift_left || instruction.opcode == Opcode::integer_to_float) {
             for (unsigned i = 0; i < instruction.source_count; ++i) check(!(mask & ~available(instruction.sources[i], true)));
             if (instruction.opcode != Opcode::integer_to_float) bit_views = mask; else floating_views = mask;
         } else if(instruction.opcode==Opcode::float_to_integer){
@@ -604,7 +697,7 @@ void RegisterExecutor::validate(const Program &program) {
         } else {
             const auto used = instruction.opcode == Opcode::dot2 ? 3u : (instruction.opcode == Opcode::dot3 ? 7u : (instruction.opcode == Opcode::dot4 ? 15u : mask));
             for (unsigned i = 0; i < instruction.source_count; ++i) check(!(used & ~available(instruction.sources[i], false)));
-            if (instruction.opcode == Opcode::less) bit_views = mask; else floating_views = mask;
+            if (instruction.opcode == Opcode::less || instruction.opcode==Opcode::greater_equal) bit_views = mask; else floating_views = mask;
         }
         check(!(mask & ~(floating_views | bit_views)));
         auto &floats = destination.kind == Register::temporary ? views.temporary_float : views.output_float;
@@ -614,15 +707,19 @@ void RegisterExecutor::validate(const Program &program) {
     }
     for (unsigned i = 0; i < 16; ++i) check(!(program.outputs[i] & ~(views.output_float[i] | views.output_bits[i])));
 }
+// The 65,536-tap raster graph lost the NPU device during qualification.
+// Bound this specialization to the verified 32,768-tap graph shape.
+uint32_t RegisterExecutor::maximum_batch(const Program &p){return mirrored_loop_shader(p)?256u:65536u;}
 RegisterExecutor::RegisterExecutor(const Program &p, uint32_t count, const std::string &backend,
                                    const TextureShapes &textures, const TextureSamplers &samplers)
     : state(std::make_unique<State>(p, count, backend, textures, samplers)) {}
 RegisterExecutor::~RegisterExecutor() = default;
 RegisterExecutor::Result RegisterExecutor::execute(const std::vector<VertexRegisters> &vertices, const VertexConstants &constants,
                                                    const TexturePixels &textures) {
-    check(!state->failed && vertices.size() == state->count);
+    check(!state->failed && vertices.size() == state->logical_count);
     for (unsigned i = 0; i < 14; ++i) check(constants[i].size() >= state->program.constants[i]);
     Result result;
+    if(state->mirrored_taps){int32_t taps;std::memcpy(&taps,&constants[0][0][3],4);check(taps<=128);}
     try {
         for (size_t i = 0; i < state->bindings.size(); ++i) {
             const auto &binding = state->bindings[i]; auto tensor = state->request.get_tensor(binding.name);
@@ -650,7 +747,7 @@ RegisterExecutor::Result RegisterExecutor::execute(const std::vector<VertexRegis
             const auto status = state->request.get_tensor("invalid_sample_coordinates");
             result.output_bytes += status.get_byte_size();
             check(status.get_size() == 1 && status.get_element_type() == ov::element::i32);
-            if (*status.data<const int32_t>()) throw std::runtime_error("invalid texture coordinate or indexable temporary lookup");
+            if (*status.data<const int32_t>()) throw std::runtime_error("invalid texture coordinate, indexable temporary lookup, or loop iteration budget");
         }
         result.vertices.resize(vertices.size()); result.execution_device = state->execution_device;
         for (size_t i = 0; i < state->outputs.size(); ++i) {

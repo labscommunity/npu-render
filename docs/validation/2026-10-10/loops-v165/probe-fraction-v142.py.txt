@@ -1,0 +1,16 @@
+import json,os,tempfile
+from pathlib import Path
+import numpy as np
+import openvino as ov
+from openvino import opset13 as op
+x=op.parameter([16],np.float32,name='x')
+const=lambda v:op.constant(np.float32(v))
+mag=op.abs(x);small=op.less(mag,const(8388608));safe=op.select(small,mag,const(0));whole=op.bitwise_and(op.convert(safe,'i32'),op.constant(np.int32(0x7fffffff)));back=op.convert(whole,'f32');frac=op.subtract(safe,back)
+values=np.array([-17.75,-3,-.125,-0.,0,.125,.75,1,3.125,8388607.5,8388608,np.finfo(np.float32).max,np.finfo(np.float32).smallest_subnormal,-np.finfo(np.float32).smallest_subnormal,np.inf,np.nan],np.float32)
+model=ov.Model([mag,small,safe,whole,back,frac],[x]);core=ov.Core()
+for node in model.get_ops():node.get_rt_info()['precise_0']=''
+with tempfile.TemporaryDirectory(prefix='nr-fraction-v142-') as temp:
+ ov.serialize(model,str(Path(temp)/'model.xml'),str(Path(temp)/'model.bin'));model=core.read_model(str(Path(temp)/'model.xml'))
+ for backend in ['CPU','NPU']:
+  compiled=core.compile_model(model,backend,{'EXECUTION_MODE_HINT':'ACCURACY'} if backend=='NPU' else {'INFERENCE_PRECISION_HINT':'f32'})
+  result=compiled([values]);print(json.dumps({'backend':backend,'execution_devices':compiled.get_property('EXECUTION_DEVICES'),'rows':[{'input':float(values[n]),'stages':[float(result[i][n]) for i in range(6)]} for n in range(16)]}),flush=True)

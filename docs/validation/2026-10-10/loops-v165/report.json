@@ -1,0 +1,58 @@
+{
+  "build": "present-umd-v165",
+  "all_checks_passed": true,
+  "captured_packet_components": 4096,
+  "uniform_packet_components": 16384,
+  "native_npu_execution": true,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "cpu_suites_passed": 20,
+  "source_hashes_verified": 106,
+  "binary_hashes_verified_on_delta": 26,
+  "captured_shader_words": 1850,
+  "captured_shader_sha256": "e3ebf67c53b678eb5b77e36cec775237832c2ce5d606d6b0ef8d44f362447872",
+  "direct_npu_cases": 33,
+  "direct_npu_components": 528,
+  "direct_npu_maximum_error": 2.38418579e-07,
+  "ddi_summary": [
+    {
+      "kind": "indexed-ddi-runtime-shim",
+      "requested_backend": "NPU",
+      "execution_device": "NPU",
+      "verified_draws": 57,
+      "porter_duff_components": 540672,
+      "porter_duff_additional_modes": 11,
+      "derivative_ddi_components": 16384,
+      "loop_ddi_components": 65536,
+      "loop_overflow_preserved_target": true,
+      "blended_scissored_draws": 6,
+      "textured_draws": 7,
+      "point_scaled_blended_draws": 2,
+      "linear_scaled_blended_draws": 2,
+      "base_vertex_and_start_index": true,
+      "invalid_ranges_and_sampler_rejected": true,
+      "registered_adapter_tested": false,
+      "desktop_offload_tested": false
+    }
+  ],
+  "full_desktop_offload": false,
+  "findings": [
+    "Single-exit, nonnested SM4 loops are lowered to bounded conditional execution with a provider-side overflow check after 16 iterations. General unbounded or nested loops remain unsupported.",
+    "FRC, GE and signed IGE pass 768 direct NPU arithmetic components. GE flushes denormals as required by SM4. Splitting integer comparisons into high/low parts avoids a CPU provider comparison mismatch above 2^24.",
+    "NPU FRC failed because large floating comparison constants were demoted. A scaled guard and explicit IsInf/IsNaN preserve the qualified results, including large fractional values and nonfinite inputs.",
+    "The captured mirrored filter originally expanded from 224 instructions to 3395. CPU qualification took about seven minutes; the corresponding v151 NPU attempt was deliberately canceled after 496873 ms without a result, not labeled a timeout or correctness failure.",
+    "An exact-bytecode specialization evaluates independent mirrored sample pairs along a 128-tap axis and reduces on the provider. Host code admits at most 128 coefficients and copies inputs; it does not evaluate pixels. Summation order differs, so scalar comparisons use an explicit 1e-5 absolute tolerance.",
+    "Native ReduceSum reduced precision. A rank-three axis-one Gather/Add reduction produced incorrect outputs. Flat row Gather/Add passes the scalar reference. The diagnostic per-tap comparison checks 67584 components; 23 of 33 cases are byte exact and the maximum difference is 4.470348358154297e-8.",
+    "The v157 512-pixel specialization expanded to 65536 tap lanes and lost the NPU device during raster inference. A subsequent fresh arithmetic process passed without a restart. Smaller 64- and 256-pixel raster batches passed. The shipped bound is 256 pixels, expanding to 32768 tap lanes.",
+    "Diagnostic v144 and v155/v158 builds intentionally disabled mismatch assertions to collect failures; their printed component labels and exit status are not qualification passes.",
+    "Build v139 failed /WX shadowing; v140 exposed integer comparison error; v148 first failed from a diagnostic PATH error, then its rounding-bias candidate failed CPU arithmetic. v162 scratch build failed from duplicate header identities. Failed logs and sources remain preserved.",
+    "The observer now takes bounded snapshots of growing logs instead of reading through concurrent appends. A separate test completed 100 snapshots while the writer grew the file and rejected an oversized log.",
+    "These are component, raster, DDI and packet checks. Installed desktop behavior, physical scanout and a Tahoma benefit remain unproven for this change."
+  ],
+  "sources": [
+    "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/frc--sm4---asm-",
+    "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/ge--sm4---asm-",
+    "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/ige--sm4---asm-",
+    "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/loop--sm4---asm-"
+  ]
+}

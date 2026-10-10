@@ -1,0 +1,33 @@
+MSBuild version 17.14.60+43b635718 for .NET Framework
+
+  1>Checking Build System
+  Building Custom Rule C:/Users/tatef/AppData/Local/npu-render/vm/raster-scratch-v162/CMakeLists.txt
+  loop_test.cpp
+C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.hpp(15,7): error C2011: 'nr::shader::RegisterExecutor': 'class' type redefinition [C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\build\raster_test.vcxproj]
+  (compiling source file '../loop_test.cpp')
+      C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\vertex_executor.hpp(15,7):
+      see declaration of 'nr::shader::RegisterExecutor'
+
+C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\loop_test.cpp(29,16): error C2079: 'executor' uses undefined class 'nr::shader::RegisterExecutor' [C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\build\raster_test.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\loop_test.cpp(29,70): error C2737: 'result': const object must be initialized [C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\build\raster_test.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\loop_test.cpp(29,104): error C3536: 'result': cannot be used before it is initialized [C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\build\raster_test.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\loop_test.cpp(43,17): error C2079: 'executor' uses undefined class 'nr::shader::RegisterExecutor' [C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\build\raster_test.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\loop_test.cpp(43,71): error C2737: 'result': const object must be initialized [C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\build\raster_test.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\loop_test.cpp(43,105): error C3536: 'result': cannot be used before it is initialized [C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\build\raster_test.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\loop_test.cpp(45,41): error C2737: 'actual': const object must be initialized [C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\build\raster_test.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\loop_test.cpp(45,110): error C3536: 'actual': cannot be used before it is initialized [C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\build\raster_test.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\loop_test.cpp(45,116): warning C4389: '==': signed/unsigned mismatch [C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\build\raster_test.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\loop_test.cpp(45,104): error C2737: 'equal': const object must be initialized [C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\build\raster_test.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\loop_test.cpp(57,16): error C2079: 'executor' uses undefined class 'nr::shader::RegisterExecutor' [C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\build\raster_test.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\loop_test.cpp(66,14): error C2737: 'result': const object must be initialized [C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\build\raster_test.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\loop_test.cpp(66,64): error C3536: 'result': cannot be used before it is initialized [C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\build\raster_test.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\loop_test.cpp(68,41): error C2737: 'error': const object must be initialized [C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\build\raster_test.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\loop_test.cpp(68,148): error C3536: 'error': cannot be used before it is initialized [C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\build\raster_test.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\loop_test.cpp(77,2): error C2027: use of undefined type 'nr::shader::RegisterExecutor' [C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\build\raster_test.vcxproj]
+      C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\vertex_executor.hpp(15,7):
+      see declaration of 'nr::shader::RegisterExecutor'
+
+C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\loop_test.cpp(77,2): error C3861: 'maximum_batch': identifier not found [C:\Users\tatef\AppData\Local\npu-render\vm\raster-scratch-v162\build\raster_test.vcxproj]
+  vertex_executor.cpp
+  triangle_texture_draw.cpp
+  Generating Code...

@@ -120,6 +120,15 @@ is rejected. Start-menu input has no verified visual response. Driver cleanup
 requires a separate verified recovery, after which the normal VM desktop is
 restored. Full desktop offload and a Tahoma benefit remain unproven.
 
+The [next loop-shader qualification](docs/validation/2026-10-10/loops-v165/report.json)
+passes the captured 1,850-word mirrored filter on the NPU, including 33 scalar
+comparisons, a scissored raster draw and native draw-packet delivery. General
+admitted loops use a checked 16-iteration bound. The captured filter has an exact
+bytecode specialization with up to 128 sample pairs and a verified 256-pixel
+batch limit. A larger batch lost the NPU device during qualification; the failed
+experiment and subsequent recovery check are retained. Twenty CPU suites and
+57 NPU indexed DDI draws pass. Installed desktop behavior remains the next test.
+
 [NPU-computed triangle bounds](docs/validation/2026-10-10/triangle-bounds-v112/report.json)
 now restrict tile dispatch while preserving exact output in eight replays of four
 captured shell operations. Three warm draws drop from 8.27/1.75/4.43 seconds to

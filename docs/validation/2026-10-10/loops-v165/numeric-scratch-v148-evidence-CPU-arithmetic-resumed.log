@@ -1,0 +1,9 @@
+numeric_test.exe : arithmetic opcode=26 sample=0 component=0 actual=00000000 expected=3e800000
+At line:7 char:2
++  & "$d\build\Release\numeric_test.exe" $backend $section *> "$d\$back ...
++  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (arithmetic opco...pected=3e800000:String) [], Remote
+   Exception
+    + FullyQualifiedErrorId : NativeCommandError
+
+loop test: equal

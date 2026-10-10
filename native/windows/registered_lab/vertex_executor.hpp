@@ -19,6 +19,8 @@ public:
     // Validate lowering constraints after parse_vertex/parse_pixel, without choosing a
     // device or claiming that a complete graphics pipeline can execute.
     static void validate(const Program &program);
+    // Bounded internal expansion for qualified shader specializations.
+    static uint32_t maximum_batch(const Program &program);
     RegisterExecutor(const Program &program, uint32_t vertices, const std::string &backend,
                      const TextureShapes &textures = {}, const TextureSamplers &samplers = {});
     ~RegisterExecutor();

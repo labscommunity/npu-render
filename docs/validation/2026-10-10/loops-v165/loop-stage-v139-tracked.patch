@@ -1,0 +1,333 @@
+diff --git a/README.md b/README.md
+index 6aaccda..d7a115e 100644
+--- a/README.md
++++ b/README.md
+@@ -113,13 +113,12 @@ now has an exact NPU specialization for opaque, one-to-one point-sampled quads.
+ Its captured 1024×768 replay passes, as do changing-image and driver callback
+ tests. This is a checked subset, not general desktop rendering.
+
+-The [latest installed trial](docs/validation/2026-10-10/sole-display-v89/report.json)
+-completes 148 live desktop NPU draws plus 13 prewarm requests. All successful
+-responses are acknowledged, but invalid texture lookups and an unsupported
+-derivative shader prevent a usable desktop. Three black frames arrive. Both
+-guest drivers are removed successfully and the normal VM desktop is restored.
+-The next renderer adds pixel derivatives and fixes inactive shader inputs;
+-full desktop offload and a Tahoma benefit remain unproven.
++The [latest installed trial](docs/validation/2026-10-10/sole-display-v90/report.json)
++completes 184 live desktop NPU draws plus 13 prewarm requests. Eleven frames arrive,
++including a partial desktop, but a newly encountered compositor shader with loops
++is rejected. Start-menu input has no verified visual response. Driver cleanup
++requires a separate verified recovery, after which the normal VM desktop is
++restored. Full desktop offload and a Tahoma benefit remain unproven.
+
+ [NPU-computed triangle bounds](docs/validation/2026-10-10/triangle-bounds-v112/report.json)
+ now restrict tile dispatch while preserving exact output in eight replays of four
+diff --git a/native/windows/registered_lab/CMakeLists.txt b/native/windows/registered_lab/CMakeLists.txt
+index 28a82f0..34af3b0 100644
+--- a/native/windows/registered_lab/CMakeLists.txt
++++ b/native/windows/registered_lab/CMakeLists.txt
+@@ -174,3 +174,10 @@ target_compile_options(nr_registered_derivative_test PRIVATE /W4 /WX)
+ target_link_libraries(nr_registered_derivative_test PRIVATE d3dcompiler nr_registered_vertex)
+ set_property(TARGET nr_registered_derivative_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+ add_test(NAME registered_derivative_contract COMMAND nr_registered_derivative_test)
++
++add_executable(nr_registered_loop_test loop_test.cpp)
++target_link_libraries(nr_registered_loop_test PRIVATE nr_registered_vertex)
++target_compile_features(nr_registered_loop_test PRIVATE cxx_std_17)
++target_compile_options(nr_registered_loop_test PRIVATE /W4 /WX)
++set_property(TARGET nr_registered_loop_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
++add_test(NAME registered_loop_contract COMMAND nr_registered_loop_test)
+diff --git a/native/windows/registered_lab/shader_ir.hpp b/native/windows/registered_lab/shader_ir.hpp
+index c6714d2..ca08def 100644
+--- a/native/windows/registered_lab/shader_ir.hpp
++++ b/native/windows/registered_lab/shader_ir.hpp
+@@ -14,10 +14,11 @@ inline void check(bool value) {
+ }
+ enum class Register : uint32_t { temporary = 0, input = 1, output = 2, indexable = 3, immediate = 4, sampler = 6, texture = 7, constant = 8 };
+ enum class Opcode : uint32_t {
+-    add = 0, derivative_x = 11, derivative_y = 12, divide = 14, dot2 = 15, dot3 = 16, dot4 = 17, otherwise = 18, end_if = 21,
+-    float_to_integer = 27, integer_add = 30, begin_if = 31, integer_mad = 35, shift_left = 41, shift_right = 42, integer_to_float = 43, load = 45, less = 49,
++    add = 0, break_if = 3, derivative_x = 11, derivative_y = 12, divide = 14, dot2 = 15, dot3 = 16, dot4 = 17, otherwise = 18, end_if = 21, end_loop = 22,
++    fraction = 26, float_to_integer = 27, greater_equal = 29, integer_add = 30, begin_if = 31, integer_greater_equal = 33, integer_mad = 35, shift_left = 41, shift_right = 42, integer_to_float = 43, load = 45, begin_loop = 48, less = 49,
+     mad = 50, minimum = 51, maximum = 52, move = 54, select = 55,
+-    multiply = 56, reciprocal_sqrt = 68, sample = 69
++    multiply = 56, reciprocal_sqrt = 68, sample = 69,
++    loop_overflow = 0x10000 // Internal checked lowering only; never a bytecode opcode.
+ };
+ enum class Modifier : uint32_t { none = 0, negate = 1, absolute = 2, absolute_negate = 3 };
+ enum class Stage { vertex, pixel };
+@@ -136,6 +137,8 @@ inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
+         bool has_else = false;
+     };
+     std::vector<Branch> branches;
++    bool in_loop=false, loop_has_break=false;
++    std::array<uint32_t,16> loop_exit_temps{},loop_exit_outputs{};
+     auto source_valid = [&](const Operand &source, uint32_t used_mask) {
+         auto initialized = [&](Register kind, uint32_t index, uint32_t lanes) {
+             check(index < 16);
+@@ -223,6 +226,20 @@ inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
+                     result.position_output = a.index;
+                 }
+             }
++        } else if(opcode==48){
++            check(!controls && !in_loop && branches.empty());body=true;in_loop=true;loop_has_break=false;
++            Instruction instruction;instruction.opcode=Opcode::begin_loop;result.instructions.push_back(instruction);
++        } else if(opcode==3){
++            check(in_loop && !loop_has_break && branches.empty() && !(controls&~0x40000u));
++            Instruction instruction;instruction.opcode=Opcode::break_if;instruction.source_count=1;instruction.test_nonzero=controls!=0;
++            instruction.sources[0]=in.operand(false);source_valid(instruction.sources[0],1);
++            const auto &condition=instruction.sources[0];
++            check(condition.modifier==Modifier::none && condition.lanes[0]==condition.lanes[1] && condition.lanes[0]==condition.lanes[2] && condition.lanes[0]==condition.lanes[3]);
++            loop_has_break=true;loop_exit_temps=written_temps;loop_exit_outputs=written_outputs;result.instructions.push_back(instruction);
++        } else if(opcode==22){
++            check(!controls && in_loop && loop_has_break && branches.empty());in_loop=false;
++            written_temps=loop_exit_temps;written_outputs=loop_exit_outputs;
++            Instruction instruction;instruction.opcode=Opcode::end_loop;result.instructions.push_back(instruction);
+         } else if (opcode == 31) {
+             check(!(controls & ~0x40000u) && branches.size() < 8 && result.instructions.size() < 1024);
+             body = true; Instruction instruction; instruction.opcode = Opcode::begin_if;
+@@ -247,14 +264,14 @@ inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
+             }
+             Instruction instruction; instruction.opcode = Opcode(opcode); result.instructions.push_back(instruction);
+         } else if (opcode == 62) {
+-            check(!controls && body && branches.empty()); returned = true;
++            check(!controls && body && branches.empty() && !in_loop); returned = true;
+         } else {
+-            check(opcode == 0 || opcode == 11 || opcode == 12 || opcode == 14 || opcode == 15 || opcode == 16 || opcode == 17 || opcode == 27 || opcode == 30 || opcode == 35 || opcode == 41 || opcode == 42 || opcode == 45 ||
++            check(opcode == 0 || opcode == 11 || opcode == 12 || opcode == 14 || opcode == 15 || opcode == 16 || opcode == 17 || opcode == 26 || opcode == 27 || opcode == 29 || opcode == 30 || opcode == 33 || opcode == 35 || opcode == 41 || opcode == 42 || opcode == 45 ||
+                   opcode == 43 || opcode == 49 || opcode == 50 || opcode == 51 || opcode == 52 ||
+                   opcode == 54 || opcode == 55 || opcode == 56 || opcode == 68 || opcode == 69);
+             check(!(controls & ~0x2000u) && result.instructions.size() < 1024);
+             body = true;
+-            if(opcode==11 || opcode==12)check(stage==Stage::pixel && branches.empty());
++            if(opcode==11 || opcode==12)check(stage==Stage::pixel && branches.empty() && !in_loop);
+             Instruction instruction; instruction.opcode = Opcode(opcode); instruction.saturate = controls != 0;
+             instruction.destination = in.operand(true);
+             const auto &d = instruction.destination;
+@@ -271,7 +288,7 @@ inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
+             }
+             check((d.kind == Register::temporary && d.index < result.temporaries) ||
+                   (d.kind == Register::output && !(d.mask & ~result.outputs[d.index])));
+-            instruction.source_count = (opcode == 11 || opcode == 12 || opcode == 27 || opcode == 43 || opcode == 54 || opcode == 68) ? 1u :
++            instruction.source_count = (opcode == 11 || opcode == 12 || opcode == 26 || opcode == 27 || opcode == 43 || opcode == 54 || opcode == 68) ? 1u :
+                                        ((opcode == 35 || opcode == 50 || opcode == 55 || opcode == 69) ? 3u : 2u);
+             for (unsigned i = 0; i < instruction.source_count; ++i) {
+                 instruction.sources[i] = in.operand(false);
+@@ -289,6 +306,7 @@ inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
+                                         instruction.sources[i].modifier == Modifier::negate);
+                 if (opcode == 43 || (opcode == 55 && !i)) check(instruction.sources[i].modifier == Modifier::none);
+                 if(opcode==41 || opcode==42)check(instruction.sources[i].modifier==Modifier::none);
++                if(opcode==33)check(instruction.sources[i].modifier==Modifier::none);
+             }
+             if(opcode==45){
+                 const auto &address=instruction.sources[0],&resource=instruction.sources[1];
+@@ -313,6 +331,34 @@ inline bool quad_derivatives(const Program &p) {
+     for(const auto &i:p.instructions)if(i.opcode==Opcode::derivative_x || i.opcode==Opcode::derivative_y)return true;
+     return false;
+ }
++constexpr unsigned maximum_loop_iterations=16;
++// Single-exit, nonnested loops become nested conditional blocks. The final
++// guard checks termination on the provider instead of silently truncating work.
++inline Program lower_bounded_loops(const Program &p){
++    Program result=p;result.instructions.clear();
++    for(size_t at=0;at<p.instructions.size();++at){
++        const auto &instruction=p.instructions[at];
++        if(instruction.opcode!=Opcode::begin_loop){result.instructions.push_back(instruction);continue;}
++        size_t stop=at+1,guard=p.instructions.size();
++        for(;stop<p.instructions.size() && p.instructions[stop].opcode!=Opcode::end_loop;++stop){
++            check(p.instructions[stop].opcode!=Opcode::begin_loop);
++            if(p.instructions[stop].opcode==Opcode::break_if){check(guard==p.instructions.size());guard=stop;}
++        }
++        check(stop<p.instructions.size() && guard<stop);
++        const auto needed=(stop-at+2)*(maximum_loop_iterations+1);
++        check(needed<=8192 && result.instructions.size()<=8192-needed);
++        for(unsigned n=0;n<=maximum_loop_iterations;++n){
++            result.instructions.insert(result.instructions.end(),p.instructions.begin()+at+1,p.instructions.begin()+guard);
++            auto condition=p.instructions[guard];condition.opcode=Opcode::begin_if;condition.test_nonzero=!condition.test_nonzero;
++            result.instructions.push_back(condition);
++            if(n<maximum_loop_iterations)result.instructions.insert(result.instructions.end(),p.instructions.begin()+guard+1,p.instructions.begin()+stop);
++            else {Instruction failure;failure.opcode=Opcode::loop_overflow;result.instructions.push_back(failure);}
++        }
++        for(unsigned n=0;n<=maximum_loop_iterations;++n){Instruction end;end.opcode=Opcode::end_if;result.instructions.push_back(end);}
++        at=stop;
++    }
++    check(result.instructions.size()<=8192);return result;
++}
+ inline Program parse_vertex(const uint32_t *words, size_t count) { return parse_program(words, count, Stage::vertex); }
+ inline Program parse_pixel(const uint32_t *words, size_t count) { return parse_program(words, count, Stage::pixel); }
+ } // namespace nr::shader
+diff --git a/native/windows/registered_lab/shader_reference.hpp b/native/windows/registered_lab/shader_reference.hpp
+index aeb1c99..c64022b 100644
+--- a/native/windows/registered_lab/shader_reference.hpp
++++ b/native/windows/registered_lab/shader_reference.hpp
+@@ -43,9 +43,23 @@ inline Registers reference_vertex(const Program &program, const Registers &input
+     };
+     struct Branch { bool parent, condition; };
+     std::vector<Branch> branches;
++    struct Loop {size_t begin,end;unsigned iterations=0;};
++    std::vector<Loop> loops;
+     bool active = true;
+     for (size_t instruction_index=0;instruction_index<program.instructions.size();++instruction_index) {
+         const auto &instruction=program.instructions[instruction_index];
++        if(instruction.opcode==Opcode::begin_loop){
++            check(active && loops.empty());size_t end=instruction_index+1;
++            while(end<program.instructions.size() && program.instructions[end].opcode!=Opcode::end_loop)++end;
++            check(end<program.instructions.size());loops.push_back({instruction_index,end});continue;
++        }
++        if(instruction.opcode==Opcode::break_if){
++            check(active && !loops.empty());
++            if((load(instruction.sources[0])[0]!=0)==instruction.test_nonzero){instruction_index=loops.back().end;loops.pop_back();}
++            else if(++loops.back().iterations>maximum_loop_iterations)throw std::runtime_error("shader loop iteration budget exceeded");
++            continue;
++        }
++        if(instruction.opcode==Opcode::end_loop){check(active && !loops.empty());instruction_index=loops.back().begin;continue;}
+         if (instruction.opcode == Opcode::begin_if) {
+             const bool condition = active && ((load(instruction.sources[0])[0] != 0) == instruction.test_nonzero);
+             branches.push_back({active, condition}); active = active && condition; continue;
+@@ -55,6 +69,7 @@ inline Registers reference_vertex(const Program &program, const Registers &input
+         }
+         if (instruction.opcode == Opcode::end_if) { active = branches.back().parent; branches.pop_back(); continue; }
+         if (!active) continue;
++        if(instruction.opcode==Opcode::loop_overflow)throw std::runtime_error("shader loop iteration budget exceeded");
+         std::array<Bits, 3> values{};
+         for (unsigned i = 0; i < ((instruction.opcode == Opcode::sample || instruction.opcode==Opcode::load) ? 1u : instruction.source_count); ++i)
+             values[i] = load(instruction.sources[i], instruction.opcode == Opcode::integer_add || instruction.opcode==Opcode::integer_mad);
+@@ -90,6 +105,8 @@ inline Registers reference_vertex(const Program &program, const Registers &input
+             else if (instruction.opcode == Opcode::shift_left) value[i] = values[0][i] << (values[1][0]&31);
+             else if (instruction.opcode == Opcode::less)
+                 value[i] = as_float(values[0][i]) < as_float(values[1][i]) ? 0xffffffffu : 0;
++            else if(instruction.opcode==Opcode::greater_equal)value[i]=as_float(values[0][i])>=as_float(values[1][i])?0xffffffffu:0;
++            else if(instruction.opcode==Opcode::integer_greater_equal){int32_t a,b;std::memcpy(&a,&values[0][i],4);std::memcpy(&b,&values[1][i],4);value[i]=a>=b?0xffffffffu:0;}
+             else if (instruction.opcode == Opcode::integer_to_float) {
+                 int32_t source; std::memcpy(&source, &values[0][i], sizeof(source)); value[i] = as_bits(float(source));
+             }
+@@ -132,6 +149,7 @@ inline Registers reference_vertex(const Program &program, const Registers &input
+                     else {volatile float product=a*b;v=product+as_float(values[2][i]);}
+                 }
+                 else if (instruction.opcode == Opcode::divide) v = a / b;
++                else if(instruction.opcode==Opcode::fraction)v=std::fpclassify(a)==FP_SUBNORMAL?0.f:a-std::floor(a);
+                 else if (instruction.opcode == Opcode::reciprocal_sqrt) v = 1.0f / std::sqrt(a);
+                 else if (instruction.opcode == Opcode::minimum) v = std::fmin(a, b);
+                 else if (instruction.opcode == Opcode::maximum) v = std::fmax(a, b);
+diff --git a/native/windows/registered_lab/vertex_executor.cpp b/native/windows/registered_lab/vertex_executor.cpp
+index d2b0adf..8923041 100644
+--- a/native/windows/registered_lab/vertex_executor.cpp
++++ b/native/windows/registered_lab/vertex_executor.cpp
+@@ -42,7 +42,7 @@ struct RegisterExecutor::State {
+     std::string execution_device;
+     bool failed = false;
+     State(const Program &p, uint32_t vertices, const std::string &backend,
+-          const TextureShapes &shapes, const TextureSamplers &samplers) : program(p), count(vertices), texture_shapes(shapes) {
++          const TextureShapes &shapes, const TextureSamplers &samplers) : program(lower_bounded_loops(p)), count(vertices), texture_shapes(shapes) {
+         check(count && count <= 65536 && (backend == "CPU" || backend == "GPU" || backend == "NPU"));
+         RegisterExecutor::validate(program);
+         check(!quad_derivatives(program) || !(count%4));
+@@ -301,6 +301,14 @@ struct RegisterExecutor::State {
+         };
+         for (const auto &instruction : program.instructions) {
+             check(!instruction.saturate); // NaN/denormal saturation is not qualified on NPU yet.
++            if(instruction.opcode==Opcode::loop_overflow){
++                Node invalid=batch(integer(1));
++                for(const auto &branch:branches){
++                    Node active=branch.has_else?Node(std::make_shared<op::LogicalNot>(branch.condition)):branch.condition;
++                    invalid=std::make_shared<op::BitwiseAnd>(invalid,std::make_shared<op::Convert>(batch(active),ov::element::i32));
++                }
++                invalid_coordinates.push_back(invalid);continue;
++            }
+             if (instruction.opcode == Opcode::begin_if) {
+                 const auto value = load(instruction.sources[0])[0].integer; check(bool(value));
+                 Node condition = std::make_shared<op::NotEqual>(value, integer(0));
+@@ -361,6 +369,10 @@ struct RegisterExecutor::State {
+                 else if (instruction.opcode == Opcode::integer_add) {
+                     check(bool(sources[0][c].integer) && bool(sources[1][c].integer));
+                     result[c].integer = std::make_shared<op::Add>(sources[0][c].integer, sources[1][c].integer);
++                } else if(instruction.opcode==Opcode::integer_greater_equal){
++                    check(bool(sources[0][c].integer) && bool(sources[1][c].integer));
++                    result[c].integer=std::make_shared<op::Multiply>(std::make_shared<op::Convert>(
++                        std::make_shared<op::GreaterEqual>(sources[0][c].integer,sources[1][c].integer),ov::element::i32),integer(-1));
+                 } else if(instruction.opcode==Opcode::integer_mad){
+                     check(bool(sources[0][c].integer) && bool(sources[1][c].integer) && bool(sources[2][c].integer));
+                     result[c].integer=std::make_shared<op::Add>(std::make_shared<op::Multiply>(sources[0][c].integer,sources[1][c].integer),sources[2][c].integer);
+@@ -442,9 +454,23 @@ struct RegisterExecutor::State {
+                     } else if (instruction.opcode == Opcode::divide) value = std::make_shared<op::Divide>(a, b);
+                     else if (instruction.opcode == Opcode::reciprocal_sqrt)
+                         value = std::make_shared<op::Divide>(floating(0x3f800000), std::make_shared<op::Sqrt>(a));
+-                    else if (instruction.opcode == Opcode::less) {
++                    else if(instruction.opcode==Opcode::fraction){
++                        // Finite f32 values with magnitude >= 2^23 are integral.
++                        // A guarded conversion avoids the NPU Floor issue and
++                        // never converts a nonfinite or out-of-range value.
++                        const auto magnitude=std::make_shared<op::Abs>(a);
++                        const auto small=std::make_shared<op::Less>(magnitude,number(8388608.f));
++                        const auto safe=choose(small,magnitude,number(0));
++                        const auto whole=std::make_shared<op::BitwiseAnd>(std::make_shared<op::Convert>(safe,ov::element::i32),integer(0x7fffffff));
++                        const auto fraction=std::make_shared<op::Subtract>(safe,std::make_shared<op::Convert>(whole,ov::element::f32));
++                        const auto negative=choose(std::make_shared<op::Equal>(fraction,number(0)),number(0),std::make_shared<op::Subtract>(number(1),fraction));
++                        Node finite=choose(std::make_shared<op::Less>(a,number(0)),negative,fraction);
++                        finite=choose(std::make_shared<op::Less>(magnitude,number(1.1754943508222875e-38f)),number(0),finite);
++                        value=choose(std::make_shared<op::LessEqual>(magnitude,number(3.4028234663852886e38f)),finite,std::make_shared<op::Subtract>(a,a));
++                    } else if (instruction.opcode == Opcode::less || instruction.opcode==Opcode::greater_equal) {
++                        const Node comparison=instruction.opcode==Opcode::less?Node(std::make_shared<op::Less>(a,b)):Node(std::make_shared<op::GreaterEqual>(a,b));
+                         result[c].integer = std::make_shared<op::Multiply>(
+-                            std::make_shared<op::Convert>(std::make_shared<op::Less>(a, b), ov::element::i32), integer(-1));
++                            std::make_shared<op::Convert>(comparison, ov::element::i32), integer(-1));
+                     } else if (instruction.opcode == Opcode::minimum || instruction.opcode == Opcode::maximum) {
+                         // Native NPU floating min/max returned zero in the
+                         // precision-marked graph. Compare and gather instead.
+@@ -539,7 +565,8 @@ struct RegisterExecutor::State {
+         execution_device = devices[0]; request = compiled.create_infer_request();
+     }
+ };
+-void RegisterExecutor::validate(const Program &program) {
++void RegisterExecutor::validate(const Program &original) {
++    const auto program=lower_bounded_loops(original);
+     // Type views are properties of each SSA value, not permanent register
+     // types. Branch joins retain only the views available on both paths.
+     using Masks = std::array<uint32_t, 16>;
+@@ -558,6 +585,7 @@ void RegisterExecutor::validate(const Program &program) {
+     };
+     for (const auto &instruction : program.instructions) {
+         check(!instruction.saturate);
++        if(instruction.opcode==Opcode::loop_overflow)continue;
+         if(instruction.opcode==Opcode::derivative_x || instruction.opcode==Opcode::derivative_y)check(program.stage==Stage::pixel && branches.empty());
+         for (unsigned i = 0; i < instruction.source_count; ++i) {
+             const auto &source = instruction.sources[i];
+@@ -589,7 +617,7 @@ void RegisterExecutor::validate(const Program &program) {
+             check(!(mask & ~available(instruction.sources[0], true)));
+             floating_views = available(instruction.sources[1], false) & available(instruction.sources[2], false);
+             bit_views = available(instruction.sources[1], true) & available(instruction.sources[2], true);
+-        } else if (instruction.opcode == Opcode::integer_add || instruction.opcode == Opcode::integer_mad || instruction.opcode==Opcode::shift_right || instruction.opcode == Opcode::shift_left || instruction.opcode == Opcode::integer_to_float) {
++        } else if (instruction.opcode == Opcode::integer_add || instruction.opcode == Opcode::integer_greater_equal || instruction.opcode == Opcode::integer_mad || instruction.opcode==Opcode::shift_right || instruction.opcode == Opcode::shift_left || instruction.opcode == Opcode::integer_to_float) {
+             for (unsigned i = 0; i < instruction.source_count; ++i) check(!(mask & ~available(instruction.sources[i], true)));
+             if (instruction.opcode != Opcode::integer_to_float) bit_views = mask; else floating_views = mask;
+         } else if(instruction.opcode==Opcode::float_to_integer){
+@@ -604,7 +632,7 @@ void RegisterExecutor::validate(const Program &program) {
+         } else {
+             const auto used = instruction.opcode == Opcode::dot2 ? 3u : (instruction.opcode == Opcode::dot3 ? 7u : (instruction.opcode == Opcode::dot4 ? 15u : mask));
+             for (unsigned i = 0; i < instruction.source_count; ++i) check(!(used & ~available(instruction.sources[i], false)));
+-            if (instruction.opcode == Opcode::less) bit_views = mask; else floating_views = mask;
++            if (instruction.opcode == Opcode::less || instruction.opcode==Opcode::greater_equal) bit_views = mask; else floating_views = mask;
+         }
+         check(!(mask & ~(floating_views | bit_views)));
+         auto &floats = destination.kind == Register::temporary ? views.temporary_float : views.output_float;
+@@ -650,7 +678,7 @@ RegisterExecutor::Result RegisterExecutor::execute(const std::vector<VertexRegis
+             const auto status = state->request.get_tensor("invalid_sample_coordinates");
+             result.output_bytes += status.get_byte_size();
+             check(status.get_size() == 1 && status.get_element_type() == ov::element::i32);
+-            if (*status.data<const int32_t>()) throw std::runtime_error("invalid texture coordinate or indexable temporary lookup");
++            if (*status.data<const int32_t>()) throw std::runtime_error("invalid texture coordinate, indexable temporary lookup, or loop iteration budget");
+         }
+         result.vertices.resize(vertices.size()); result.execution_device = state->execution_device;
+         for (size_t i = 0; i < state->outputs.size(); ++i) {
+diff --git a/tools/build_registered_lab.py b/tools/build_registered_lab.py
+index c80b3f8..90fcc99 100644
+--- a/tools/build_registered_lab.py
++++ b/tools/build_registered_lab.py
+@@ -95,6 +95,7 @@ def main():
+         "nr_registered_triangle_texture_draw_test.exe",
+         "nr_registered_typed_load_test.exe",
+         "nr_registered_derivative_test.exe",
++        "nr_registered_loop_test.exe",
+     ):
+         binaries[name] = hashlib.sha256(
+             (args.build_dir / "Release" / name).read_bytes()

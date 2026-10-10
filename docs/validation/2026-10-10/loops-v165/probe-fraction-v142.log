@@ -1,0 +1,42 @@
+{"backend": "CPU", "execution_devices": ["CPU"], "rows": [{"input": -17.75, "stages": [17.75, 1.0, 17.75, 17.0, 17.0, 0.75]}, {"input": -3.0, "stages": [3.0, 1.0, 3.0, 3.0, 3.0, 0.0]}, {"input": -0.125, "stages": [0.125, 1.0, 0.125, 0.0, 0.0, 0.125]}, {"input": -0.0, "stages": [0.0, 1.0, 0.0, 0.0, 0.0, 0.0]}, {"input": 0.0, "stages": [0.0, 1.0, 0.0, 0.0, 0.0, 0.0]}, {"input": 0.125, "stages": [0.125, 1.0, 0.125, 0.0, 0.0, 0.125]}, {"input": 0.75, "stages": [0.75, 1.0, 0.75, 0.0, 0.0, 0.75]}, {"input": 1.0, "stages": [1.0, 1.0, 1.0, 1.0, 1.0, 0.0]}, {"input": 3.125, "stages": [3.125, 1.0, 3.125, 3.0, 3.0, 0.125]}, {"input": 8388607.5, "stages": [8388607.5, 1.0, 8388607.5, 8388607.0, 8388607.0, 0.5]}, {"input": 8388608.0, "stages": [8388608.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"input": 3.4028234663852886e+38, "stages": [3.4028234663852886e+38, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"input": 1.401298464324817e-45, "stages": [1.401298464324817e-45, 1.0, 1.401298464324817e-45, 0.0, 0.0, 1.401298464324817e-45]}, {"input": -1.401298464324817e-45, "stages": [1.401298464324817e-45, 1.0, 1.401298464324817e-45, 0.0, 0.0, 1.401298464324817e-45]}, {"input": Infinity, "stages": [Infinity, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"input": NaN, "stages": [NaN, 0.0, 0.0, 0.0, 0.0, 0.0]}]}
+{"backend": "NPU", "execution_devices": "NPU", "rows": [{"input": -17.75, "stages": [17.75, 1.0, 17.75, 17.0, 17.0, 0.75]}, {"input": -3.0, "stages": [3.0, 1.0, 3.0, 3.0, 3.0, 0.0]}, {"input": -0.125, "stages": [0.125, 1.0, 0.0, 0.0, 0.0, 0.0]}, {"input": -0.0, "stages": [0.0, 1.0, 0.0, 0.0, 0.0, 0.0]}, {"input": 0.0, "stages": [0.0, 1.0, 0.0, 0.0, 0.0, 0.0]}, {"input": 0.125, "stages": [0.125, 1.0, 0.125, 0.0, 0.0, 0.125]}, {"input": 0.75, "stages": [0.75, 1.0, 0.75, 0.0, 0.0, 0.75]}, {"input": 1.0, "stages": [1.0, 1.0, 1.0, 1.0, 1.0, 0.0]}, {"input": 3.125, "stages": [3.125, 1.0, 0.0, 0.0, 0.0, 0.0]}, {"input": 8388607.5, "stages": [8388607.5, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"input": 8388608.0, "stages": [8388608.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"input": 3.4028234663852886e+38, "stages": [3.4028234663852886e+38, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"input": 1.401298464324817e-45, "stages": [0.0, 1.0, 0.0, 0.0, 0.0, 0.0]}, {"input": -1.401298464324817e-45, "stages": [0.0, 1.0, 0.0, 0.0, 0.0, 0.0]}, {"input": Infinity, "stages": [Infinity, 0.0, 0.0, 0.0, 0.0, 0.0]}, {"input": NaN, "stages": [NaN, 0.0, 0.0, 0.0, 0.0, 0.0]}]}
+python.exe : Traceback (most recent call last):
+At line:1 char:69
++ ... npu-render";& 'C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0 ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], Remot
+   eException
+    + FullyQualifiedErrorId : NativeCommandError
+
+  File "C:\Users\tatef\AppData\Local\Programs\Python\Python312\Lib\shutil.py", line 633, in
+_rmtree_unsafe
+    os.unlink(fullname)
+PermissionError: [WinError 32] The process cannot access the file because it is being used by
+another process: 'C:\\Users\\tatef\\AppData\\Local\\Temp\\nr-fraction-v142-qgh8lirk\\model.bin'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\tatef\AppData\Local\npu-render\vm\probe-fraction-v142.py", line 12, in <module>
+    with tempfile.TemporaryDirectory(prefix='nr-fraction-v142-') as temp:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\tatef\AppData\Local\Programs\Python\Python312\Lib\tempfile.py", line 950, in
+__exit__
+    self.cleanup()
+  File "C:\Users\tatef\AppData\Local\Programs\Python\Python312\Lib\tempfile.py", line 954, in
+cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+  File "C:\Users\tatef\AppData\Local\Programs\Python\Python312\Lib\tempfile.py", line 934, in
+_rmtree
+    _shutil.rmtree(name, onexc=onexc)
+  File "C:\Users\tatef\AppData\Local\Programs\Python\Python312\Lib\shutil.py", line 781, in rmtree
+    return _rmtree_unsafe(path, onexc)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\tatef\AppData\Local\Programs\Python\Python312\Lib\shutil.py", line 635, in
+_rmtree_unsafe
+    onexc(os.unlink, fullname, err)
+  File "C:\Users\tatef\AppData\Local\Programs\Python\Python312\Lib\tempfile.py", line 909, in
+onexc
+    _os.unlink(path)
+PermissionError: [WinError 32] The process cannot access the file because it is being used by
+another process: 'C:\\Users\\tatef\\AppData\\Local\\Temp\\nr-fraction-v142-qgh8lirk\\model.bin'

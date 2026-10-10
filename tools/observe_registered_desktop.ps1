@@ -15,6 +15,17 @@ $ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue'
 . "$PSScriptRoot\lab_device_identity.ps1"
 . "$PSScriptRoot\lab_report.ps1"
 Assert-NrLabGuest
+# Read only the length observed when opening a live log. Read-to-EOF helpers
+# can follow a busy writer past the observation deadline and delay cleanup.
+function Read-NrLabLog([string]$Path){
+ $stream=[IO.File]::Open($Path,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::ReadWrite)
+ try {
+  $observed=$stream.Length;if($observed -gt 16777216){throw 'Live laboratory log exceeds 16 MiB snapshot limit'}
+  $length=[int]$observed;$bytes=New-Object byte[] $length;$offset=0
+  while($offset -lt $length){$n=$stream.Read($bytes,$offset,$length-$offset);if(!$n){break};$offset+=$n}
+  return [Text.Encoding]::UTF8.GetString($bytes,0,$offset)
+ }finally{$stream.Dispose()}
+}
 $prefix="C:\npu-lab\$RenderName-observation";$trace="NpuRender-$RenderName"
 if(Test-Path "$prefix.json"){throw 'Evidence exists'}
 foreach($id in 'ROOT\NPURENDER_KMD_LAB','ROOT\NPURENDER_INDIRECT_LAB'){if(@(Get-NrLabDevice -HardwareId $id).Count){throw 'A custom guest device is already present'}}
@@ -46,7 +57,7 @@ try {
   $failed=$false
   foreach($processId in $knownDwm){
    $file="C:\npu-lab\umd-trace\process-$processId.jsonl"
-   if([IO.File]::Exists($file) -and (Select-String -LiteralPath $file -Pattern '"event":"reject"|"event":"present_rejected"|"event":"rotate_rejected"|"event":"present_callback_result","status":"8' -Quiet)){
+   if([IO.File]::Exists($file) -and ((Read-NrLabLog $file) -match '"event":"reject"|"event":"present_rejected"|"event":"rotate_rejected"|"event":"present_callback_result","status":"8')){
     $report.stop_reason='dwm-ddi-rejection-recorded';$failed=$true;break
    }
   }
@@ -65,7 +76,7 @@ try {
   }
   if($failed){break}
   foreach($iddLog in [IO.Directory]::GetFiles('C:\npu-lab\idd-trace','process-*.jsonl')){
-   $lines=(Get-Content -LiteralPath $iddLog -Raw) -split "`n"
+   $lines=(Read-NrLabLog $iddLog) -split "`n"
    if(@($lines|Where-Object {$_ -match '"event":"frame_readback_failed"|"event":"frame_readback".*"status":"8'}).Count){$report.stop_reason='frame-readback-failure-recorded';$failed=$true;break}
   }
   if($failed){break}
@@ -82,7 +93,7 @@ finally {
  while($restoring.ElapsedMilliseconds -lt (($ObservationSeconds+30)*1000)){
   $topology="C:\npu-lab\$TopologyName.jsonl"
   if(!(Test-Path $topology)){break}
-  try {if((Get-Content $topology -Raw) -match '"passed":(true|false)'){break}}catch {$report.topology_read_error=$_.Exception.Message;break}
+  try {if((Read-NrLabLog $topology) -match '"passed":(true|false)'){break}}catch {$report.topology_read_error=$_.Exception.Message;break}
   Start-Sleep -Milliseconds 500
  }
  $report.topology_wait_ms=$restoring.ElapsedMilliseconds

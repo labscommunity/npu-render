@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cstring>
 #include <stdexcept>
+#include <numeric>
 namespace nr::raster {
 namespace {
 using Clock=std::chrono::steady_clock;
@@ -35,8 +36,8 @@ struct TriangleTextureDrawExecutor::State {
     State(const shader::Program &v,const shader::Program &p,uint32_t n,uint32_t w,uint32_t h,uint32_t f,
         const PackedResources &resources,const shader::TextureSamplers &samplers,const std::string &backend,
         BlendMode blend,uint8_t mask,CullMode cull,bool ccw,uint32_t b)
-        :vs(v),ps(p),count(n),width(w),height(h),format(f),batch(b),quads(shader::quad_derivatives(p)),layout(resource_layout(resources)),
-         vertex(v,n,backend),projection(n,backend),coverage(b,backend,cull,ccw),merger(b,backend,blend,f==87,mask){
+        :vs(v),ps(p),count(n),width(w),height(h),format(f),batch(b<=shader::RegisterExecutor::maximum_batch(p)?b:std::gcd(b,shader::RegisterExecutor::maximum_batch(p))),quads(shader::quad_derivatives(p)),layout(resource_layout(resources)),
+         vertex(v,n,backend),projection(n,backend),coverage(batch,backend,cull,ccw),merger(batch,backend,blend,f==87,mask){
         validate_shader(ps);
         require(n && n<=4096 && !(n%3) && w && w<=8192 && h && h<=8192 && uint64_t(w)*h<=4*1024*1024 &&
             b && b<=4096 && (quads?!(b%4):!(uint64_t(w)*h%b)) &&

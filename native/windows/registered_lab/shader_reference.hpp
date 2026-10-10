@@ -43,9 +43,23 @@ inline Registers reference_vertex(const Program &program, const Registers &input
     };
     struct Branch { bool parent, condition; };
     std::vector<Branch> branches;
+    struct Loop {size_t begin,end;unsigned iterations=0;};
+    std::vector<Loop> loops;
     bool active = true;
     for (size_t instruction_index=0;instruction_index<program.instructions.size();++instruction_index) {
         const auto &instruction=program.instructions[instruction_index];
+        if(instruction.opcode==Opcode::begin_loop){
+            check(active && loops.empty());size_t end=instruction_index+1;
+            while(end<program.instructions.size() && program.instructions[end].opcode!=Opcode::end_loop)++end;
+            check(end<program.instructions.size());loops.push_back({instruction_index,end});continue;
+        }
+        if(instruction.opcode==Opcode::break_if){
+            check(active && !loops.empty());
+            if((load(instruction.sources[0])[0]!=0)==instruction.test_nonzero){instruction_index=loops.back().end;loops.pop_back();}
+            else if(++loops.back().iterations>maximum_loop_iterations)throw std::runtime_error("shader loop iteration budget exceeded");
+            continue;
+        }
+        if(instruction.opcode==Opcode::end_loop){check(active && !loops.empty());instruction_index=loops.back().begin;continue;}
         if (instruction.opcode == Opcode::begin_if) {
             const bool condition = active && ((load(instruction.sources[0])[0] != 0) == instruction.test_nonzero);
             branches.push_back({active, condition}); active = active && condition; continue;
@@ -55,6 +69,7 @@ inline Registers reference_vertex(const Program &program, const Registers &input
         }
         if (instruction.opcode == Opcode::end_if) { active = branches.back().parent; branches.pop_back(); continue; }
         if (!active) continue;
+        if(instruction.opcode==Opcode::loop_overflow)throw std::runtime_error("shader loop iteration budget exceeded");
         std::array<Bits, 3> values{};
         for (unsigned i = 0; i < ((instruction.opcode == Opcode::sample || instruction.opcode==Opcode::load) ? 1u : instruction.source_count); ++i)
             values[i] = load(instruction.sources[i], instruction.opcode == Opcode::integer_add || instruction.opcode==Opcode::integer_mad);
@@ -90,6 +105,8 @@ inline Registers reference_vertex(const Program &program, const Registers &input
             else if (instruction.opcode == Opcode::shift_left) value[i] = values[0][i] << (values[1][0]&31);
             else if (instruction.opcode == Opcode::less)
                 value[i] = as_float(values[0][i]) < as_float(values[1][i]) ? 0xffffffffu : 0;
+            else if(instruction.opcode==Opcode::greater_equal){auto flush=[](float v){return std::fpclassify(v)==FP_SUBNORMAL?0.f:v;};value[i]=flush(as_float(values[0][i]))>=flush(as_float(values[1][i]))?0xffffffffu:0;}
+            else if(instruction.opcode==Opcode::integer_greater_equal){int32_t a,b;std::memcpy(&a,&values[0][i],4);std::memcpy(&b,&values[1][i],4);value[i]=a>=b?0xffffffffu:0;}
             else if (instruction.opcode == Opcode::integer_to_float) {
                 int32_t source; std::memcpy(&source, &values[0][i], sizeof(source)); value[i] = as_bits(float(source));
             }
@@ -132,6 +149,7 @@ inline Registers reference_vertex(const Program &program, const Registers &input
                     else {volatile float product=a*b;v=product+as_float(values[2][i]);}
                 }
                 else if (instruction.opcode == Opcode::divide) v = a / b;
+                else if(instruction.opcode==Opcode::fraction)v=std::fpclassify(a)==FP_SUBNORMAL?0.f:a-std::floor(a);
                 else if (instruction.opcode == Opcode::reciprocal_sqrt) v = 1.0f / std::sqrt(a);
                 else if (instruction.opcode == Opcode::minimum) v = std::fmin(a, b);
                 else if (instruction.opcode == Opcode::maximum) v = std::fmax(a, b);

@@ -131,6 +131,20 @@ int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
     f.pfnVsSetShader(h,shaders[0]);f.pfnPsSetShader(h,shaders[1]);f.pfnDestroyShader(h,shaders[0]);f.pfnDestroyShader(h,shaders[1]);
     {const auto prior=counters.draws;f.pfnDrawIndexed(h,6,1,1);TEST(last_error==S_OK && counters.draws==prior+1);
      const uint8_t expected[]{64,255,255,255};for(size_t n=0;n<size_t(width)*height*4;++n)TEST(memory[target_index][n]==expected[n%4]);}
+    // Constant-controlled shader loops through the real DDI. The overflow
+    // must fail before touching the render target.
+    const auto loop_ps=shader_tokens("cbuffer C {int count;};float4 main():SV_Target{float3 sum=0;[loop]for(int i=0;i<count;++i)sum+=float3(.03125,.015625,.0625);return float4(sum,1);}","ps_4_0");
+    f.pfnCreateVertexShader(h,vw.data(),shaders[0],{},nullptr);f.pfnCreatePixelShader(h,loop_ps.data(),shaders[1],{},nullptr);
+    f.pfnVsSetShader(h,shaders[0]);f.pfnPsSetShader(h,shaders[1]);f.pfnDestroyShader(h,shaders[0]);f.pfnDestroyShader(h,shaders[1]);
+    f.pfnPsSetConstantBuffers(h,0,1,&resources[3]);
+    for(const int iterations:{0,1,8,16,17}){
+        std::array<int,4> data{iterations,0,0,0};f.pfnDefaultConstantBufferUpdateSubresourceUP(h,resources[3],0,nullptr,data.data(),0,0);
+        const auto before=memory[target_index];const auto prior=counters.draws;f.pfnDrawIndexed(h,6,1,1);
+        if(iterations==17){TEST(FAILED(last_error) && counters.draws==prior && memory[target_index]==before);last_error=S_OK;continue;}
+        TEST(last_error==S_OK && counters.draws==prior+1);
+        const float expected[]{float(iterations)/16,float(iterations)/64,float(iterations)/32,1};
+        for(size_t n=0;n<size_t(width)*height*4;++n)TEST(std::abs(float(memory[target_index][n])-expected[n%4]*255)<=.501f);
+    }
     // Exercise the textured specialization through actual binding and DrawIndexed
     // DDIs, including nonzero first/base offsets and failed-state preservation.
     const auto texture_vs=shader_tokens("cbuffer C {float4 color;};struct O {float4 p:SV_Position;float4 c:COLOR0;float2 uv:TEXCOORD0;};O main(float4 p:POSITION,float2 uv:TEXCOORD0){O o;o.p=p;o.c=color;o.uv=uv;return o;}","vs_4_0");
@@ -292,7 +306,7 @@ int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
     f.pfnDestroyRenderTargetView(h, view);
     for (const auto r : resources) f.pfnDestroyResource(h, r);
     f.pfnDestroyDevice(h);
-    TEST(counters.executions == executions_before + 53 && !counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
-    std::printf("{\"kind\":\"indexed-ddi-runtime-shim\",\"requested_backend\":\"%s\",\"execution_device\":\"%s\",\"verified_draws\":%llu,\"porter_duff_components\":540672,\"porter_duff_additional_modes\":11,\"derivative_ddi_components\":16384,\"blended_scissored_draws\":6,\"textured_draws\":7,\"point_scaled_blended_draws\":2,\"linear_scaled_blended_draws\":2,\"base_vertex_and_start_index\":true,\"invalid_ranges_and_sampler_rejected\":true,\"registered_adapter_tested\":false,\"desktop_offload_tested\":false}\n", backend, counters.last_execution_device, static_cast<unsigned long long>(counters.draws-draws_before));
+    TEST(counters.executions == executions_before + 57 && !counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
+    std::printf("{\"kind\":\"indexed-ddi-runtime-shim\",\"requested_backend\":\"%s\",\"execution_device\":\"%s\",\"verified_draws\":%llu,\"porter_duff_components\":540672,\"porter_duff_additional_modes\":11,\"derivative_ddi_components\":16384,\"loop_ddi_components\":65536,\"loop_overflow_preserved_target\":true,\"blended_scissored_draws\":6,\"textured_draws\":7,\"point_scaled_blended_draws\":2,\"linear_scaled_blended_draws\":2,\"base_vertex_and_start_index\":true,\"invalid_ranges_and_sampler_rejected\":true,\"registered_adapter_tested\":false,\"desktop_offload_tested\":false}\n", backend, counters.last_execution_device, static_cast<unsigned long long>(counters.draws-draws_before));
     return 0;
 }
