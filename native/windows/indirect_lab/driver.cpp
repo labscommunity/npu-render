@@ -247,12 +247,18 @@ NTSTATUS add_device(WDFDRIVER, PWDFDEVICE_INIT init) {
     power.EvtDeviceD0Entry = power_on; WdfDeviceInitSetPnpPowerEventCallbacks(init, &power);
     IDD_CX_CLIENT_CONFIG config; IDD_CX_CLIENT_CONFIG_INIT(&config);
     config.EvtIddCxAdapterInitFinished = initialized; config.EvtIddCxAdapterCommitModes = commit_modes;
+    config.EvtIddCxParseMonitorDescription = [](const IDARG_IN_PARSEMONITORDESCRIPTION *, IDARG_OUT_PARSEMONITORDESCRIPTION *) -> NTSTATUS {
+        // This diagnostic advertises no EDID; only the default mode contract applies.
+        return STATUS_NOT_SUPPORTED;
+    };
     config.EvtIddCxMonitorGetDefaultDescriptionModes = modes; config.EvtIddCxMonitorQueryTargetModes = targets;
     config.EvtIddCxMonitorAssignSwapChain = assign; config.EvtIddCxMonitorUnassignSwapChain = unassign;
     auto status = IddCxDeviceInitConfig(init, &config);
+    trace("{\"event\":\"client_config\",\"status\":\"%08lx\"}\n", ULONG(status));
     if (!NT_SUCCESS(status)) return status;
     WDF_OBJECT_ATTRIBUTES attributes; WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attributes, DeviceState);
     WDFDEVICE device = nullptr; status = WdfDeviceCreate(&init, &attributes, &device);
+    trace("{\"event\":\"framework_device\",\"status\":\"%08lx\"}\n", ULONG(status));
     if (NT_SUCCESS(status)) status = IddCxDeviceInitialize(device);
     trace("{\"event\":\"device_added\",\"status\":\"%08lx\"}\n", ULONG(status));
     return status;
@@ -263,5 +269,8 @@ extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT object, PUNICODE_STRING path) {
     if (!nr_fill_guest()) return STATUS_NOT_SUPPORTED;
     WDF_DRIVER_CONFIG config; WDF_DRIVER_CONFIG_INIT(&config, add_device);
     WDF_OBJECT_ATTRIBUTES attributes; WDF_OBJECT_ATTRIBUTES_INIT(&attributes);
-    return WdfDriverCreate(object, path, &attributes, &config, WDF_NO_HANDLE);
+    trace("{\"event\":\"driver_entry\"}\n");
+    const auto status = WdfDriverCreate(object, path, &attributes, &config, WDF_NO_HANDLE);
+    trace("{\"event\":\"framework_driver\",\"status\":\"%08lx\"}\n", ULONG(status));
+    return status;
 }
