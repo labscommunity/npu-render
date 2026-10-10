@@ -113,9 +113,11 @@ int aperture_adapter_test() {
         const auto source_index = 7 + (i - 19) / 256 * 128 + (i - 19) % 256;
         NR_CHECK(backing[8192 + i] == (copied ? backing[source_index] : 0xc3));
     }
-    const auto present_result = present_test(a, static_cast<Allocation *>(info[0].hAllocation),
-                                            static_cast<Allocation *>(info[1].hAllocation), backing, offsets);
-    if (present_result) return present_result;
+    for (UINT gdi = 0; gdi < 2; ++gdi) {
+        const auto present_result = present_test(a, static_cast<Allocation *>(info[0].hAllocation),
+                                                static_cast<Allocation *>(info[1].hAllocation), backing, offsets, gdi != 0);
+        if (present_result) return present_result;
+    }
     for (UINT i = 0; i < 2; ++i) {
         DXGKARG_BUILDPAGINGBUFFER unmap{}; unmap.Operation = DXGK_OPERATION_UNMAP_APERTURE_SEGMENT;
         auto &u = unmap.UnmapApertureSegment;

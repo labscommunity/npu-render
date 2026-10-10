@@ -67,7 +67,7 @@ struct Adapter {
 struct Resource { Adapter *adapter; LONG allocations; };
 struct Allocation { Adapter *adapter; nr::kernel_contract::Surface surface; LONG opens; Resource *resource; };
 struct Device { Adapter *adapter; HANDLE runtime; LONG contexts; LONG opens; };
-struct Context { Device *device; HANDLE runtime; bool system; };
+struct Context { Device *device; HANDLE runtime; bool system; bool gdi; };
 struct OpenAllocation { Device *device; Allocation *allocation; bool read_only; };
 bool same_surface(const nr::kernel_contract::Surface &a, const nr::kernel_contract::Surface &b) {
     return a.width == b.width && a.height == b.height && a.format == b.format &&
@@ -777,13 +777,15 @@ NTSTATUS APIENTRY create_context(HANDLE device, DXGKARG_CREATECONTEXT *args) {
     // It uses the same engine, but must not admit user rendering commands.
     DXGK_CREATECONTEXTFLAGS allowed{};
     allowed.SystemContext = 1;
+    allowed.GdiContext = 1;
     if (args->NodeOrdinal || args->EngineAffinity != 1 || args->PrivateDriverDataSize ||
-        (args->Flags.Value & ~allowed.Value))
+        (args->Flags.Value & ~allowed.Value) || (args->Flags.SystemContext && args->Flags.GdiContext))
         return STATUS_NOT_SUPPORTED;
     auto c = allocate<Context>();
     if (!c) return STATUS_INSUFFICIENT_RESOURCES;
     c->device = d;
     c->system = args->Flags.SystemContext != 0;
+    c->gdi = args->Flags.GdiContext != 0;
     c->runtime = args->hContext;
     InterlockedIncrement(&d->contexts);
     RtlZeroMemory(&args->ContextInfo, sizeof(args->ContextInfo));
@@ -792,8 +794,12 @@ NTSTATUS APIENTRY create_context(HANDLE device, DXGKARG_CREATECONTEXT *args) {
     // size makes even one present permanently unable to fit a fresh buffer.
     args->ContextInfo.DmaBufferPrivateDataSize = NR_KMD_LAB_APERTURE_ADAPTER ?
         sizeof(nr::kmd::PresentRecord) * nr::kmd::Present::max_records : sizeof(nr::kmd::CopyRecord);
-    args->ContextInfo.AllocationListSize = 64;
-    args->ContextInfo.PatchLocationListSize = 64;
+    // CDD requests these contexts even with RenderKm absent. They share our
+    // resource ownership and validated present-copy engine, but cannot submit
+    // the private user-mode rendering command format. No GDI acceleration is
+    // advertised; RenderKm remains absent until that command set is implemented.
+    args->ContextInfo.AllocationListSize = c->gdi ? DXGK_ALLOCATION_LIST_SIZE_GDICONTEXT : 64;
+    args->ContextInfo.PatchLocationListSize = c->gdi ? DXGK_ALLOCATION_LIST_SIZE_GDICONTEXT : 64;
     args->hContext = c;
     return STATUS_SUCCESS;
 }
@@ -802,7 +808,7 @@ NTSTATUS APIENTRY render(HANDLE context, DXGKARG_RENDER *args) {
     if (!lab_fill_enabled) return STATUS_NOT_SUPPORTED;
     if (!context || !args) return STATUS_INVALID_PARAMETER;
     const auto c = static_cast<Context *>(context);
-    if (c->system) return STATUS_NOT_SUPPORTED;
+    if (c->system || c->gdi) return STATUS_NOT_SUPPORTED;
     const auto a = c->device->adapter;
     if (!a->started || a->resetting) return STATUS_DEVICE_NOT_READY;
     if (args->AllocationListSize == 2) {
