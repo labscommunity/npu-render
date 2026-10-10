@@ -1,0 +1,74 @@
+{
+  "schema": 1,
+  "kind": "checked-point-texture-npu-draw",
+  "build": "present-umd-v71",
+  "cpu_contracts_passed": 12,
+  "repeated_cpu_driver_runs_passed": 20,
+  "python_tests_passed": 110,
+  "texture_crop_verified_components": 25296896,
+  "texture_crop_invalid_offsets_rejected": 12,
+  "point_draw_verified_components": 131072,
+  "point_draw_invalid_requests_rejected": 12,
+  "npu_driver_draws": 4,
+  "npu_driver_textured_draws": 2,
+  "npu_driver_verified_components": 65536,
+  "captured_dwm_draw": {
+    "sha256": "32927638eb35a3b1f3114c410d4d5740511d9446d88043e1eeb431d2b0bb8e10",
+    "source": [
+      2304,
+      800,
+      87
+    ],
+    "target": [
+      1024,
+      768,
+      87
+    ],
+    "crop_origin": [
+      1280,
+      0
+    ],
+    "exact_scalar_point_reference": true,
+    "npu_replays": 3,
+    "compile_ms": 391.284,
+    "draw_ms": [
+      188.388,
+      99.377,
+      54.968
+    ],
+    "raw_pixels_committed": false
+  },
+  "stream": {
+    "execution_device": "NPU",
+    "frames": 3,
+    "dimensions": [
+      1024,
+      768
+    ],
+    "changing_source_images": true,
+    "verified_components": 9437184,
+    "roundtrip_ms": [
+      1406,
+      266,
+      281
+    ],
+    "worker_draw_ms": [
+      312.43,
+      75.052,
+      73.187
+    ],
+    "worker_exit": 0,
+    "config_firewall_token_removed": true
+  },
+  "scope": "Opaque single-mip point-clamp SAMPLE, forced alpha 1, multiplied by white, complete 1:1 quad. Host validates shader/geometry and copies bytes; vertex, projection and exact crop run on the requested provider. Stream carries source texture in bounded ABI2 packet.",
+  "failures_preserved": [
+    "Prototype v1 stopped at an execution-device property type assertion before inference.",
+    "Prototype v2 large dynamic Gather returned ZE_RESULT_ERROR_DEVICE_LOST; existing NPU output-merger recovery passed without reboot or driver change. Static Slice prototype v3 passed exact output.",
+    "v67 captured replay rejected a packed blend-mask field incorrectly; corrected low-byte check passed in v69.",
+    "v70 CPU driver test intermittently crashed: automatic test View was destroyed by both the DDI and C++ scope exit. Debugger detected freed heap modification; raw runtime-style storage fixes double destruction. v71 clean build, 20 CPU repeats and NPU driver test pass."
+  ],
+  "received_desktop_frames": 0,
+  "displayed_frames": 0,
+  "full_desktop_offload": false,
+  "tahoma_performance_tested": false
+}

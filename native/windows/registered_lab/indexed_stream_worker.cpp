@@ -24,12 +24,14 @@ int wmain(int argc, wchar_t **argv) try {
         try {
             const auto request = ex::decode(bytes); const auto start = GetTickCount64();
             const auto result = pipeline.execute(request); reply = ex::response(h, result);
-            std::printf("{\"sequence\":%u,\"client_pid\":%u,\"execution_device\":\"%s\",\"width\":%u,\"height\":%u,\"provider_requests\":%llu,\"draw_ms\":%.3f,\"compile_and_draw_ms\":%llu,\"displayed_frames\":0,\"passed\":true}\n", h.sequence, h.client_pid, result.execution_device.c_str(), h.width, h.height,
+            std::printf("{\"sequence\":%u,\"client_pid\":%u,\"execution_device\":\"%s\",\"width\":%u,\"height\":%u,\"textured\":%s,\"provider_requests\":%llu,\"draw_ms\":%.3f,\"compile_and_draw_ms\":%llu,\"displayed_frames\":0,\"passed\":true}\n", h.sequence, h.client_pid, result.execution_device.c_str(), h.width, h.height, (h.flags & 2) ? "true" : "false",
                 static_cast<unsigned long long>(result.provider_requests), result.timings.total_ms, static_cast<unsigned long long>(GetTickCount64() - start));
         } catch (const std::exception &e) {
             std::fprintf(stderr, "indexed stream draw rejected: %.32000s\n", e.what());
             auto failed = h; failed.kind = 3; failed.body_bytes = 0; failed.device = 0; ex::Writer writer; writer.value(failed); reply = writer.finish();
-            pipeline = ex::Pipeline{};
+            // Unsupported draw state must not discard already qualified models.
+            // Provider/runtime failures reset the cache before another request.
+            if (!dynamic_cast<const std::invalid_argument *>(&e)) pipeline = ex::Pipeline{};
         }
         std::fflush(stdout); std::fflush(stderr); stream::socket_write(socket.value, reply, (std::min)(deadline, GetTickCount64() + 90000));
     }

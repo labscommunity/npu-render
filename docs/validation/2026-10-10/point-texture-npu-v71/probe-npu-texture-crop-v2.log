@@ -1,0 +1,29 @@
+{"raw_execution_devices": "NPU"}
+python.exe : Traceback (most recent call last):
+At line:2 char:1
++ & "$src\venv\Scripts\python.exe" "$r\vm\probe-npu-texture-crop-v2.py" ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], Remot 
+   eException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "C:\Users\tatef\AppData\Local\npu-render\vm\probe-npu-texture-crop-v2.py", line 21, in 
+<module>
+    start=time.perf_counter();actual=compiled({'source':pixels.reshape(-1,4),'offset':np.array([x,
+y],np.int32)})[0].reshape(h,w,4);elapsed=(time.perf_counter()-start)*1000
+                                     
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\venv\Lib\site-packages\o
+penvino\_ov_api.py", line 470, in __call__
+    return self._infer_request.infer(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\venv\Lib\site-packages\o
+penvino\_ov_api.py", line 202, in infer
+    return OVDict(super().infer(_data_dispatch(
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: Exception from src\inference\src\cpp\infer_request.cpp:224:
+Exception from src\plugins\intel_npu\src\utils\src\zero\zero_wrappers.cpp:258:
+L0 zeFenceHostSynchronize result: ZE_RESULT_ERROR_DEVICE_LOST, code 0x70000001 - device hung, 
+reset, was removed, or driver update occurred
+
+

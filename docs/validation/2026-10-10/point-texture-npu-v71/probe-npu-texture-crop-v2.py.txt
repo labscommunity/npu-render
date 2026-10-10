@@ -1,0 +1,23 @@
+import json,tempfile,time
+from pathlib import Path
+import numpy as np
+import openvino as ov
+from openvino import opset15 as o
+sw,sh,w,h=2304,800,1024,768
+source=o.parameter([sw*sh,4],np.uint8,name='source');offset=o.parameter([2],np.int32,name='offset')
+base=(np.arange(h,dtype=np.int32)[:,None]*sw+np.arange(w,dtype=np.int32)[None,:]).reshape(-1)
+origin=o.add(o.gather(offset,[0],0),o.multiply(o.gather(offset,[1],0),o.constant(sw,np.int32)))
+indices=o.add(o.constant(base),origin);sampled=o.gather(source,indices,0)
+channels=[o.gather(sampled,[c],1) for c in range(3)]+[o.constant(np.full((w*h,1),255,np.uint8))]
+output=o.concat(channels,1)
+with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
+ model=ov.Model([output],[source,offset]);path=Path(d)/'m.xml'
+ for node in model.get_ops():node.set_rt_info('','precise_0')
+ ov.serialize(model,path);core=ov.Core();start=time.perf_counter();compiled=core.compile_model(core.read_model(path),'NPU',{'EXECUTION_MODE_HINT':'ACCURACY'});compile_ms=(time.perf_counter()-start)*1000
+ raw_devices=compiled.get_property('EXECUTION_DEVICES');devices=[raw_devices] if isinstance(raw_devices,str) else list(raw_devices);print(json.dumps({'raw_execution_devices':raw_devices}),flush=True);assert len(devices)==1 and devices[0].split('.')[0]=='NPU'
+ rng=np.random.default_rng(8312)
+ for frame,(x,y) in enumerate([(1280,0),(0,0),(640,16),(1280,32)]):
+  pixels=rng.integers(0,256,(sh,sw,4),dtype=np.uint8);expected=pixels[y:y+h,x:x+w].copy();expected[:,:,3]=255
+  start=time.perf_counter();actual=compiled({'source':pixels.reshape(-1,4),'offset':np.array([x,y],np.int32)})[0].reshape(h,w,4);elapsed=(time.perf_counter()-start)*1000
+  exact=np.array_equal(actual,expected);print(json.dumps({'frame':frame,'offset':[x,y],'execution_devices':devices,'compile_ms':compile_ms,'elapsed_ms':elapsed,'verified_components':actual.size,'exact':bool(exact),'mismatches':int(np.sum(actual!=expected))}),flush=True)
+  assert exact

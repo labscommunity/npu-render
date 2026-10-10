@@ -41,6 +41,9 @@ struct Device {
     std::shared_ptr<Allocation> bound_source;
     std::unique_ptr<BlendExecutor> executor;
     std::unique_ptr<nr::raster::UniformDrawExecutor> indexed_executor;
+    std::unique_ptr<nr::raster::PointTextureDrawExecutor> point_texture_executor;
+    std::shared_ptr<const nr::shader::Program> point_texture_vertex, point_texture_pixel;
+    std::array<uint64_t, 6> point_texture_key{};
     std::unique_ptr<IndexedNpuExchange> indexed_exchange;
     std::shared_ptr<const nr::shader::Program> indexed_vertex, indexed_pixel;
     std::array<uint64_t, 5> indexed_key{};

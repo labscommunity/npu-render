@@ -92,9 +92,11 @@ coverage, pixel shading and BGRA output, matching all 786,432 output pixels.
 This draw is an opaque uniform-color quad. The
 [indexed driver callback](docs/validation/2026-10-10/indexed-ddi-npu-v60/report.json)
 now passes two NPU draws through test allocation callbacks, including constant
-updates and checked index offsets. General textured desktop draws, installed
-adapter validation of indexed rendering and indirect-display frame delivery
-remain unfinished. The
+updates and checked index offsets. An
+[installed compositor test](docs/validation/2026-10-10/indexed-dwm-v61b/report.json)
+then executed three real DWM draws on the physical NPU, with zero received or
+displayed frames. General textured desktop rendering and indirect-display frame
+delivery remain unfinished. The
 first cold replay took 9.76 seconds including compilation. A subsequent
 [rectangle specialization](docs/validation/2026-10-10/solid-rectangle-npu-v58/report.json)
 preserves the exact image and reduces repeated draw time to 42–49 ms in the
@@ -105,7 +107,11 @@ interactive desktop performance or a Tahoma benefit. A
 now returns exact 1024×768 NPU output from the physical machine to the disposable
 VM. Warm roundtrips took 203 ms in the diagnostic run. The bridge uses a local
 named pipe and a bounded authenticated stream; it is laboratory infrastructure,
-and its successful packet tests do not establish desktop frame delivery.
+and its successful packet tests do not establish desktop frame delivery. The
+[next textured draw](docs/validation/2026-10-10/point-texture-npu-v71/report.json)
+now has an exact NPU specialization for opaque, one-to-one point-sampled quads.
+Its captured 1024×768 replay passes, as do changing-image and driver callback
+tests. This is a checked subset, not general desktop rendering.
 
 The [captured-window desktop experiment](native/windows/capture/README.md) now
 presents an NPU-composed 2880×1800 desktop with input passing through to the

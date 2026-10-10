@@ -3,6 +3,7 @@
 #include "vertex_executor.hpp"
 #include "shader_reference.hpp"
 #include "uniform_draw.hpp"
+#include "point_texture_draw.hpp"
 #include <cstdlib>
 #include <algorithm>
 #include <chrono>
@@ -89,7 +90,7 @@ int main(int argc, char **argv) try {
     const auto vs = parse_vertex(vs_words.data(), vs_words.size()), ps = parse_pixel(ps_words.data(), ps_words.size());
     nr::capture::check(vs.position_output < 16 && ps.outputs[0] == 15);
     for (size_t i = 1; i < ps.outputs.size(); ++i) nr::capture::check(!ps.outputs[i]);
-    for (const auto used : ps.textures) nr::capture::check(!used);
+    const bool textured = std::any_of(ps.textures.begin(), ps.textures.end(), [](bool v) { return v; });
     // Uniform specialization is valid only when PS does not read position.
     for (const auto &instruction : ps.instructions) for (unsigned i = 0; i < instruction.source_count; ++i)
         nr::capture::check(instruction.sources[i].kind != Register::input || instruction.sources[i].index != ps.position_input);
@@ -98,20 +99,48 @@ int main(int argc, char **argv) try {
     const auto cb = constants(snapshot, 0, vs);
     const auto pixel_cb = constants(snapshot, 2, ps);
     const auto compile_start = std::chrono::steady_clock::now();
-    UniformDrawExecutor executor(vs, ps, args[0], width, height, backend, blending, format == 87, uint8_t(blend[15] & 255), batch);
+    std::unique_ptr<UniformDrawExecutor> executor;
+    std::unique_ptr<PointTextureDrawExecutor> texture_executor;
+    PackedTexture texture;
+    std::vector<PackedColor> texture_reference;
+    if (textured) {
+        const auto source = snapshot.values<uint32_t>("source-description"), sampler = snapshot.values<uint32_t>("sampler-2-0");
+        nr::capture::check(args[0] == 6 && !blending && (blend[15] & 255) == 15 && source.size() == 10 && source[0] == 0x4e52574b && source[1] == 1 && source[2] == 40 && !source[7]);
+        nr::capture::check(sampler.size() == 13 && !sampler[0] && sampler[1] == 3 && sampler[2] == 3 && sampler[3] == 3 && !sampler[4] && !sampler[11]);
+        nr::capture::check(as_float(sampler[12]) >= 0);
+        texture = {source[3],source[4],source[5],snapshot.values<PackedColor>("source")};
+        texture_executor = std::make_unique<PointTextureDrawExecutor>(vs,ps,width,height,format,texture.width,texture.height,texture.format,backend);
+        // Independent scalar point-sampling oracle for this capture. The runtime
+        // specialization validates the complete shader and affine-quad proof.
+        const auto first_vertex = reference_vertex(vs,inputs[0],cb);
+        const auto uv_register = ps.instructions[0].sources[0].index;
+        const double ox = double(as_float(first_vertex[uv_register][0]))*texture.width;
+        const double oy = double(as_float(first_vertex[uv_register][1]))*texture.height;
+        texture_reference.resize(size_t(width)*height);
+        for (uint32_t y=0;y<height;++y) for(uint32_t x=0;x<width;++x) {
+            const auto sx = int64_t(std::floor(ox+x+.5)), sy = int64_t(std::floor(oy+y+.5));
+            nr::capture::check(sx>=0 && sy>=0 && sx<texture.width && sy<texture.height);
+            auto p = texture.pixels[size_t(sy)*texture.width+size_t(sx)];
+            if(format!=texture.format) std::swap(p[0],p[2]); p[3]=255; texture_reference[size_t(y)*width+x]=p;
+        }
+    } else executor = std::make_unique<UniformDrawExecutor>(vs, ps, args[0], width, height, backend, blending, format == 87, uint8_t(blend[15] & 255), batch);
     const auto compile_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - compile_start).count();
     UniformDrawExecutor::Result result;
     std::vector<PackedColor> reference_pixels;
     for (uint32_t iteration = 0; iteration < repeats; ++iteration) {
-        result = executor.execute(inputs, cb, pixel_cb, {view[0], view[1], view[2], view[3], view[4], view[5]}, pixels);
+        const Viewport viewport{view[0],view[1],view[2],view[3],view[4],view[5]};
+        result = textured ? texture_executor->execute(inputs,cb,viewport,texture) : executor->execute(inputs, cb, pixel_cb, viewport, pixels);
         for (size_t i = 0; i < inputs.size(); ++i) {
             const auto expected = reference_vertex(vs, inputs[i], cb);
             for (unsigned r = 0; r < 16; ++r) for (unsigned c = 0; c < 4; ++c) if (vs.outputs[r] & (1u << c))
                 nr::capture::check(result.vertices[i][r][c] == expected[r][c]);
         }
-        VertexRegisters uniform{};
-        for (unsigned r = 0; r < 16; ++r) if (ps.inputs[r] && r != ps.position_input) uniform[r] = result.vertices[0][r];
-        nr::capture::check(result.fragment == reference_vertex(ps, uniform, pixel_cb)[0]);
+        if (textured) nr::capture::check(result.pixels == texture_reference);
+        else {
+            VertexRegisters uniform{};
+            for (unsigned r = 0; r < 16; ++r) if (ps.inputs[r] && r != ps.position_input) uniform[r] = result.vertices[0][r];
+            nr::capture::check(result.fragment == reference_vertex(ps, uniform, pixel_cb)[0]);
+        }
         if (!iteration) reference_pixels = result.pixels; else nr::capture::check(result.pixels == reference_pixels);
         const auto &t = result.timings;
         std::printf("{\"kind\":\"draw_stage_timing\",\"iteration\":%u,\"batch\":%u,\"compile_ms\":%.3f,\"shader_ms\":%.3f,\"projection_ms\":%.3f,\"coverage_ms\":%.3f,\"merger_ms\":%.3f,\"draw_ms\":%.3f,\"rectangle_path\":%s,\"execution_device\":\"%s\"}\n",
@@ -121,8 +150,8 @@ int main(int argc, char **argv) try {
     std::ofstream output(argv[6], std::ios::binary); nr::capture::check(bool(output));
     output.write(reinterpret_cast<const char *>(pixels.data()), std::streamsize(pixels.size() * sizeof(PackedColor))); output.close(); nr::capture::check(bool(output));
     const auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
-    std::printf("{\"kind\":\"offline_uniform_draw_replay\",\"width\":%u,\"height\":%u,\"vertices\":%u,\"triangles\":%u,\"covered_samples\":%llu,\"tile_executions\":%llu,\"execution_device\":\"%s\",\"elapsed_ms\":%lld,\"displayed_frames\":0,\"desktop_offload_tested\":false}\n",
-        width, height, args[0], args[0] / 3, static_cast<unsigned long long>(result.covered_samples), static_cast<unsigned long long>(result.tile_executions),
+    std::printf("{\"kind\":\"offline_draw_replay\",\"textured\":%s,\"width\":%u,\"height\":%u,\"vertices\":%u,\"triangles\":%u,\"covered_samples\":%llu,\"tile_executions\":%llu,\"execution_device\":\"%s\",\"elapsed_ms\":%lld,\"displayed_frames\":0,\"desktop_offload_tested\":false}\n",
+        textured ? "true" : "false", width, height, args[0], args[0] / 3, static_cast<unsigned long long>(result.covered_samples), static_cast<unsigned long long>(result.tile_executions),
         result.execution_device.c_str(), static_cast<long long>(milliseconds));
     return 0;
 } catch (const std::exception &e) { std::fprintf(stderr, "%s\n", e.what()); return 1; }

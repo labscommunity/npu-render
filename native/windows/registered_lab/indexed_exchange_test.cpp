@@ -1,5 +1,6 @@
 #include "indexed_pipe.hpp"
 #include "shader_contract.hpp"
+#include "point_texture_fixture.hpp"
 #include <fstream>
 #include <cstdio>
 #include <thread>
@@ -49,7 +50,8 @@ int main(int argc, char **argv) try {
     const auto vw = nr::registered_lab::shader_tokens("float4 main(float4 v:POSITION):SV_Position{return v;}", "vs_4_0");
     const auto pw = nr::registered_lab::shader_tokens("float4 main():SV_Target{return float4(0,0,0,1);}", "ps_4_0");
     ex::Request r; r.header.nonce[0] = 0x12345678; r.header.nonce[1] = 0xabcdef; r.header.client_pid = 42;
-    const bool desktop_packet = argc == 3 && !std::strcmp(argv[1], "--pipe-desktop");
+    const bool texture_packet = argc == 3 && !std::strcmp(argv[1], "--pipe-texture");
+    const bool desktop_packet = argc == 3 && (!std::strcmp(argv[1], "--pipe-desktop") || texture_packet);
     r.header.width = desktop_packet ? 1024u : 64u; r.header.height = desktop_packet ? 768u : 64u;
     const auto pixel_count = size_t(r.header.width) * r.header.height; r.header.vertices = 6; r.header.format = 87; r.header.flags = 0xf00; r.header.sequence = 1;
     r.vertex = nr::shader::parse_vertex(vw.data(), vw.size()); r.pixel = nr::shader::parse_pixel(pw.data(), pw.size());
@@ -59,6 +61,33 @@ int main(int argc, char **argv) try {
     const auto bytes = ex::encode(r); const auto decoded = ex::decode(bytes);
     test(decoded.header.body_bytes + sizeof(ex::Header) == bytes.size() && decoded.inputs == r.inputs && decoded.background == r.background &&
          decoded.vertex.bytecode == vw && decoded.pixel.bytecode == pw && ex::same_request(decoded.header, r.header));
+    auto textured = r; textured.header.abi = 2; textured.header.flags = 0xf02;
+    const auto textured_vs = nr::registered_lab::shader_tokens(R"(
+struct O {float4 p:SV_Position;float4 c:COLOR0;float2 uv:TEXCOORD0;};
+O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.uv=uv;return o;})","vs_4_0");
+    const auto &textured_ps = nr::registered_lab::test_fixture::point_texture_pixel_words;
+    textured.vertex = nr::shader::parse_vertex(textured_vs.data(),textured_vs.size());
+    textured.pixel = nr::shader::parse_pixel(textured_ps,std::size(textured_ps));
+    textured.texture = {r.header.width+32,r.header.height+16,87,{}};
+    textured.texture.pixels.resize(size_t(textured.texture.width)*textured.texture.height);
+    for (size_t i=0;i<textured.texture.pixels.size();++i) for(uint32_t c=0;c<4;++c) textured.texture.pixels[i][c]=uint8_t((i*17+c*71)&255);
+    const uint32_t corners[6][2]{{0,0},{r.header.width,0},{r.header.width,r.header.height},{r.header.width,r.header.height},{0,r.header.height},{0,0}};
+    for(size_t i=0;i<6;++i) {
+        textured.inputs[i][1] = {0x3f800000,0x3f800000,0x3f800000,0x3f800000};
+        const float uv[]{float(32+corners[i][0])/textured.texture.width,float(16+corners[i][1])/textured.texture.height};
+        std::memcpy(textured.inputs[i][2].data(),uv,8);
+    }
+    const auto texture_bytes = ex::encode(textured); const auto texture_decoded = ex::decode(texture_bytes);
+    test(texture_decoded.texture.pixels == textured.texture.pixels && texture_decoded.texture.width == textured.texture.width &&
+         texture_decoded.texture.height == textured.texture.height && texture_decoded.texture.format == 87 && texture_decoded.inputs == textured.inputs);
+    const size_t description_offset = texture_bytes.size()-textured.texture.pixels.size()*4-sizeof(ex::TextureDescription);
+    for(uint32_t bad=0;bad<5;++bad) {
+        auto packet = texture_bytes; ex::TextureDescription desc{}; std::memcpy(&desc,packet.data()+description_offset,sizeof(desc));
+        switch(bad){case 0:desc.width=UINT32_MAX;break;case 1:desc.height=8193;break;case 2:desc.format=1;break;case 3:desc.reserved=1;break;case 4:desc.width++;break;}
+        std::memcpy(packet.data()+description_offset,&desc,sizeof(desc)); rejects(packet);
+    }
+    auto truncated_texture=texture_bytes;truncated_texture.pop_back();auto th=textured.header;--th.body_bytes;
+    std::memcpy(truncated_texture.data(),&th,sizeof(th));rejects(truncated_texture);
     for (const auto size : {size_t(0), size_t(79), size_t(80), size_t(103), bytes.size() - 1}) rejects({bytes.begin(), bytes.begin() + size});
     for (unsigned i = 0; i < 12; ++i) {
         auto h = r.header; switch (i) {
@@ -94,6 +123,19 @@ int main(int argc, char **argv) try {
             std::ifstream old(argv[2], std::ios::binary); test(!old); old.close();
             std::ofstream out(argv[2], std::ios::binary); test(bool(out));
             out.write(reinterpret_cast<const char *>(bytes.data()), std::streamsize(bytes.size())); out.close(); test(bool(out));
+        } else if (!std::strcmp(argv[1], "--pipe-texture")) {
+            const std::string argument=argv[2];const std::wstring name(argument.begin(),argument.end());
+            for(uint32_t frame=1;frame<=3;++frame) {
+                textured.header.sequence=frame;textured.header.nonce[0]=0xabcd0000+frame;
+                for(auto &p:textured.texture.pixels) for(auto &c:p) c=uint8_t(c+17);
+                const auto packet=ex::encode(textured);const auto started=GetTickCount64();
+                const auto output=ex::decode_response(stream::exchange_packet(name,packet),textured.header);
+                for(uint32_t y=0;y<r.header.height;++y) for(uint32_t x=0;x<r.header.width;++x) {
+                    auto expected=textured.texture.pixels[size_t(y+16)*textured.texture.width+x+32];expected[3]=255;
+                    test(output.pixels[size_t(y)*r.header.width+x]==expected);
+                }
+                std::printf("{\"indexed_pipe_npu_texture\":true,\"sequence\":%u,\"verified_components\":%zu,\"roundtrip_ms\":%llu,\"displayed_frames\":0}\n",frame,pixel_count*4,static_cast<unsigned long long>(GetTickCount64()-started));
+            }
         } else if (!std::strcmp(argv[1], "--pipe") || desktop_packet) {
             const std::string argument = argv[2]; const std::wstring name(argument.begin(), argument.end());
             for (uint32_t i = 1; i <= 3; ++i) {

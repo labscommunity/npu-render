@@ -7,7 +7,8 @@ param(
  [Parameter(Mandatory=$true)][string]$EvidenceDirectory,
  [string]$GuestActionScript='',
  [switch]$SmokeTest,
- [switch]$DesktopSmokeTest
+ [switch]$DesktopSmokeTest,
+ [switch]$TextureSmokeTest
 )
 $ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue'
 if($Session.State -ne 'Opened' -or (Test-Path $EvidenceDirectory)){throw 'Opened guest session and new evidence directory required'}
@@ -19,6 +20,7 @@ foreach($item in $build.binary_sha256.psobject.Properties){
 }
 if(!(Test-Path "$RuntimeDirectory\openvino.dll")){throw 'Pinned runtime required'}
 if($DesktopSmokeTest -and !$SmokeTest){throw 'DesktopSmokeTest requires SmokeTest'}
+if($TextureSmokeTest -and (!$SmokeTest -or $DesktopSmokeTest)){throw 'TextureSmokeTest requires SmokeTest and excludes DesktopSmokeTest'}
 $job=[Guid]::NewGuid().ToString('N');$guest="C:\npu-lab\indexed-stream-$job";$pipe="\\.\pipe\npu-render-indexed-$job"
 $active='C:\npu-lab\indexed-pipe-active.txt';$rule="NpuRenderIndexed-$job";$limit=128;if($SmokeTest){$limit=3}
 New-Item -ItemType Directory $EvidenceDirectory|Out-Null
@@ -80,9 +82,9 @@ try {
  }
  $report.state='relay_ready';Save-Report
  if($SmokeTest){
-  $report.guest_test_exit=Invoke-Command -Session $Session -ArgumentList $guest,$pipe,([bool]$DesktopSmokeTest) -ScriptBlock {
-   param($directory,$name,$desktop)
-   $mode='--pipe';if($desktop){$mode='--pipe-desktop'}
+  $report.guest_test_exit=Invoke-Command -Session $Session -ArgumentList $guest,$pipe,([bool]$DesktopSmokeTest),([bool]$TextureSmokeTest) -ScriptBlock {
+   param($directory,$name,$desktop,$texture)
+   $mode='--pipe';if($desktop){$mode='--pipe-desktop'};if($texture){$mode='--pipe-texture'}
    & "$directory\nr_registered_indexed_exchange_test.exe" $mode $name *> "$directory\smoke.log"
    $LASTEXITCODE
   }

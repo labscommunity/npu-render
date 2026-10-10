@@ -379,3 +379,20 @@ masked truncation, fraction comparisons and integer tie masks preserve the resul
 The CPU reference provider differs at a rounding boundary; its test uses the
 Direct3D ideal-coordinate tolerance while retaining the stricter exact scalar
 comparison for NPU qualification. No fallback provider is selected implicitly.
+
+
+The first unsupported draw after installed solid fills is now covered by
+`PointTextureDrawExecutor`: a full-target, one-to-one point-sampled quad with
+uniform white vertex color and forced opaque alpha. Vertex shading and projection
+run on the selected provider; checked shader and geometry admission reduces the
+remaining rendering to an exact uint8 texture crop on that same provider. Source
+and target may use RGBA or BGRA. Scaling, blending, partial coverage and other
+shader forms are rejected. This is an incremental desktop operation, not a
+complete compositor.
+
+The bounded stream protocol carries one packed source texture in version 2;
+version 1 solid draws remain compatible. Both packet versions preserve identity,
+size limits and explicit physical NPU execution. Texture frames are exercised by
+`run_registered_indexed_stream.ps1 -SmokeTest -TextureSmokeTest`. The controller
+still requires an owned disposable guest, a finite task and the private lab
+transport. See the [hardware and failure evidence](../../../docs/validation/2026-10-10/point-texture-npu-v71/report.json).

@@ -129,6 +129,7 @@ HRESULT APIENTRY render_cb(HANDLE rt, D3DDDICB_RENDER *a) {
 #include "geometry_test.hpp"
 #include "buffer_test.hpp"
 int main(int argc, char **argv) {
+    std::setvbuf(stdout, nullptr, _IONBF, 0); // Preserve the last completed check if a callback crashes.
     const char *backend = argc >= 2 ? argv[1] : "CPU";
     const bool desktop_size = argc == 3 && !std::strcmp(argv[2], "--desktop-size");
     TEST(argc <= 2 || desktop_size);

@@ -1,0 +1,15 @@
+python.exe : Traceback (most recent call last):
+At line:2 char:1
++ & "$src\venv\Scripts\python.exe" "$r\vm\probe-npu-texture-crop-v1.py" ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], Remot 
+   eException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "C:\Users\tatef\AppData\Local\npu-render\vm\probe-npu-texture-crop-v1.py", line 17, in 
+<module>
+    devices=compiled.get_property('EXECUTION_DEVICES');assert len(devices)==1 and 
+devices[0].split('.')[0]=='NPU'
+                                                              
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

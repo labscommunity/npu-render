@@ -1,0 +1,15 @@
+ModLoad: 00007ff9`94cc0000 00007ff9`94ccb000   C:\Windows\SYSTEM32\VCRUNTIME140_1.dll
+(3124.2f28): Break instruction exception - code 80000003 (first chance)
+ntdll!LdrpDoDebuggerBreak+0x35:
+00007ff9`b9662239 cc              int     3
+0:000> sxd eh; sxe -c ".ecxr; k; q" av; g
+ModLoad: 00007ff9`9fd90000 00007ff9`9fdcf000   C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\venv\Lib\site-packages\openvino\libs\tbbmalloc.dll
+(3124.2f28): C++ EH exception - code e06d7363 (first chance)
+registered lab allocation and submission contracts passed
+HEAP[nr_registered_lab_test.exe]: HEAP: Free Heap block 00000222C7350070 modified at 00000222C7371468 after it was freed
+ntdll!RtlpBreakPointHeap+0x16:
+00007ff9`b959e39a cc              int     3
+0:000> NatVis script unloaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\atlmfc.natvis'
+NatVis script unloaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\ObjectiveC.natvis'
+NatVis script unloaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\concurrency.natvis'
+NatVis script unloaded from 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\Visualizers\cpp_rest.natvis'

@@ -3,9 +3,25 @@
 namespace nr::registered_lab::indexed_exchange {
 class Pipeline {
     std::unique_ptr<raster::UniformDrawExecutor> executor;
+    std::unique_ptr<raster::PointTextureDrawExecutor> texture_executor;
     Request previous;
+    Request previous_texture;
 public:
     raster::UniformDrawExecutor::Result execute(const Request &request) {
+        if (request.header.flags & 2) {
+            const auto &h = request.header, &old = previous_texture.header;
+            const auto &t = request.texture, &pt = previous_texture.texture;
+            require(h.vertices == 6 && h.flags == 0xf02 && h.abi == 2);
+            if (!texture_executor || old.width != h.width || old.height != h.height || old.format != h.format ||
+                pt.width != t.width || pt.height != t.height || pt.format != t.format ||
+                previous_texture.vertex.bytecode != request.vertex.bytecode || previous_texture.pixel.bytecode != request.pixel.bytecode) {
+                auto candidate = std::make_unique<raster::PointTextureDrawExecutor>(request.vertex,request.pixel,h.width,h.height,h.format,t.width,t.height,t.format,"NPU");
+                texture_executor = std::move(candidate);
+                previous_texture = {}; previous_texture.header = h; previous_texture.vertex = request.vertex; previous_texture.pixel = request.pixel;
+                previous_texture.texture = {t.width,t.height,t.format,{}};
+            }
+            return texture_executor->execute(request.inputs,request.vertex_constants,request.viewport,t);
+        }
         const auto &h = request.header, &old = previous.header;
         if (!executor || old.width != h.width || old.height != h.height || old.vertices != h.vertices || old.format != h.format || old.flags != h.flags ||
             previous.vertex.bytecode != request.vertex.bytecode || previous.pixel.bytecode != request.pixel.bytecode) {

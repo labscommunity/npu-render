@@ -2,6 +2,7 @@
 // Bounded, versioned laboratory draw packets. Shader tokens are parsed SM4 data,
 // never native code or an imported OpenVINO model. Transport is defined separately.
 #include "uniform_draw.hpp"
+#include "point_texture_draw.hpp"
 #include <cstring>
 #include <limits>
 #include <stdexcept>
@@ -22,13 +23,14 @@ struct Receipt {
 static_assert(sizeof(Receipt) == 48);
 inline void require(bool value) { if (!value) throw std::invalid_argument("invalid indexed NPU exchange packet"); }
 inline bool shape_valid(const Header &h) {
-    const bool valid = h.signature == magic && h.abi == 1 && (h.nonce[0] || h.nonce[1]) && h.client_pid &&
+    const bool valid = h.signature == magic && h.abi == ((h.flags & 2) ? 2u : 1u) && (h.nonce[0] || h.nonce[1]) && h.client_pid &&
         h.width && h.width <= 8192 && h.height && h.height <= 8192 && uint64_t(h.width) * h.height <= 4 * 1024 * 1024 &&
         h.vertices && h.vertices <= 4096 && !(h.vertices % 3) && (h.format == 28 || h.format == 87) &&
-        !(h.flags & ~0xf01u) && (h.flags & 0xf00u) && h.vs_words >= 3 && h.vs_words <= 16384 &&
+        !(h.flags & ~0xf03u) && (h.flags & 0xf00u) && h.vs_words >= 3 && h.vs_words <= 16384 &&
         h.ps_words >= 3 && h.ps_words <= 16384 && h.sequence && h.sequence <= max_requests &&
         h.body_bytes <= max_packet_bytes - sizeof(Header) && !h.reserved;
     if (!valid) return false;
+    if (h.flags & 2) return h.vertices == 6 && h.flags == 0xf02;
     uint32_t batch = 4096; const uint64_t pixels = uint64_t(h.width) * h.height;
     while (pixels % batch) batch /= 2;
     return uint64_t(h.vertices / 3) * (pixels / batch) <= 4096;
@@ -37,7 +39,7 @@ inline bool request_valid(const Header &h, uint64_t bytes) {
     return shape_valid(h) && h.kind == 1 && !h.device && bytes == sizeof(Header) + uint64_t(h.body_bytes);
 }
 inline bool same_request(const Header &a, const Header &b) {
-    return a.nonce[0] == b.nonce[0] && a.nonce[1] == b.nonce[1] && a.client_pid == b.client_pid && a.sequence == b.sequence &&
+    return a.abi == b.abi && a.nonce[0] == b.nonce[0] && a.nonce[1] == b.nonce[1] && a.client_pid == b.client_pid && a.sequence == b.sequence &&
         a.width == b.width && a.height == b.height && a.vertices == b.vertices && a.format == b.format && a.flags == b.flags &&
         a.vs_words == b.vs_words && a.ps_words == b.ps_words;
 }
@@ -57,7 +59,15 @@ struct Request {
     std::vector<shader::VertexRegisters> inputs;
     shader::VertexConstants vertex_constants, pixel_constants;
     std::vector<raster::PackedColor> background;
+    raster::PackedTexture texture;
 };
+struct TextureDescription { uint32_t width, height, format, reserved; };
+static_assert(sizeof(TextureDescription) == 16);
+inline bool texture_valid(const TextureDescription &t, const Header &h) {
+    return t.width && t.width <= 8192 && t.height && t.height <= 8192 &&
+        uint64_t(t.width)*t.height <= 4*1024*1024 && t.width >= h.width && t.height >= h.height &&
+        (t.format == 28 || t.format == 87) && !t.reserved;
+}
 class Writer {
     std::vector<uint8_t> data;
 public:
@@ -96,6 +106,11 @@ inline std::vector<uint8_t> encode(Request &r) {
     };
     constants(r.vertex, r.vertex_constants); constants(r.pixel, r.pixel_constants);
     w.append(r.background.data(), r.background.size() * sizeof(raster::PackedColor));
+    if (h.flags & 2) {
+        const auto &t = r.texture; const TextureDescription description{t.width,t.height,t.format,0};
+        require(texture_valid(description,h) && t.pixels.size() == size_t(t.width)*t.height);
+        w.value(description); w.append(t.pixels.data(),t.pixels.size()*sizeof(raster::PackedColor));
+    } else require(!r.texture.width && !r.texture.height && !r.texture.format && r.texture.pixels.empty());
     auto bytes = w.finish(); h.body_bytes = uint32_t(bytes.size() - sizeof(Header));
     std::memcpy(bytes.data(), &h, sizeof(h)); require(request_valid(h, bytes.size())); return bytes;
 }
@@ -110,6 +125,10 @@ inline Request decode(const std::vector<uint8_t> &bytes) {
     for (size_t i = 0; i < r.vertex_constants.size(); ++i) r.vertex_constants[i] = reader.vector<shader::VertexBits>(r.vertex.constants[i]);
     for (size_t i = 0; i < r.pixel_constants.size(); ++i) r.pixel_constants[i] = reader.vector<shader::VertexBits>(r.pixel.constants[i]);
     r.background = reader.vector<raster::PackedColor>(size_t(h.width) * h.height);
+    if (h.flags & 2) {
+        const auto t = reader.value<TextureDescription>(); require(texture_valid(t,h));
+        r.texture = {t.width,t.height,t.format,reader.vector<raster::PackedColor>(size_t(t.width)*t.height)};
+    }
     require(reader.done()); return r;
 }
 inline std::vector<uint8_t> response(const Header &request, const raster::UniformDrawExecutor::Result &r) {

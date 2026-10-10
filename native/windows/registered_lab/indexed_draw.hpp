@@ -43,6 +43,7 @@ nr::shader::VertexConstants fetch_constants(Device &d, UINT stage, const nr::sha
     return values;
 }
 void execute_indexed_draw(Device &d, UINT count, UINT first, INT base) {
+    const auto started = GetTickCount64();
     if (!d.vertex_program || !d.pixel_program) throw Error{DXGI_ERROR_UNSUPPORTED};
     const auto target = d.bound_target;
     require(target && target->context == d.context && !target->locked && !d.context->poisoned &&
@@ -62,6 +63,21 @@ void execute_indexed_draw(Device &d, UINT count, UINT first, INT base) {
         d.blend.DestBlendAlpha == D3D10_DDI_BLEND_INV_SRC_ALPHA && d.blend.BlendOpAlpha == D3D10_DDI_BLEND_OP_ADD);
     const auto inputs = fetch_indexed_vertices(d, count, first, base);
     const auto vc = fetch_constants(d, 0, *d.vertex_program), pc = fetch_constants(d, 2, *d.pixel_program);
+    const bool textured = std::any_of(d.pixel_program->textures.begin(),d.pixel_program->textures.end(),[](bool v){return v;});
+    nr::raster::PackedTexture texture;
+    if (textured) {
+        nr::raster::PointTextureDrawExecutor::validate_shader(*d.pixel_program);
+        const auto source = d.bound_source; const auto &sampler = d.samplers[2][0];
+        require(count == 6 && !blend && d.blend.RenderTargetWriteMask[0] == 15 && source && source != target && source->handle != target->handle &&
+            source->context == d.context && !source->locked && sampler.bound &&
+            sampler.desc.Filter == D3D10_DDI_FILTER_MIN_MAG_MIP_POINT &&
+            sampler.desc.AddressU == D3D10_DDI_TEXTURE_ADDRESS_CLAMP && sampler.desc.AddressV == D3D10_DDI_TEXTURE_ADDRESS_CLAMP &&
+            sampler.desc.AddressW == D3D10_DDI_TEXTURE_ADDRESS_CLAMP && sampler.desc.MipLODBias == 0 && sampler.desc.MinLOD == 0 && sampler.desc.MaxLOD >= 0);
+        const auto &ss = source->surface;
+        require((ss.format == 28 || ss.format == 87) && ss.width <= 8192 && ss.height <= 8192 && uint64_t(ss.width)*ss.height <= 4*1024*1024);
+        const auto source_bytes = read_pixels(*source); texture = {ss.width,ss.height,ss.format,{}}; texture.pixels.resize(source_bytes.size()/4);
+        std::memcpy(texture.pixels.data(),source_bytes.data(),source_bytes.size());
+    }
     const auto bytes = read_pixels(*target); std::vector<nr::raster::PackedColor> background(bytes.size() / 4);
     std::memcpy(background.data(), bytes.data(), bytes.size());
     const nr::raster::Viewport viewport{d.viewport.TopLeftX, d.viewport.TopLeftY, d.viewport.Width, d.viewport.Height, d.viewport.MinDepth, d.viewport.MaxDepth};
@@ -71,9 +87,19 @@ void execute_indexed_draw(Device &d, UINT count, UINT first, INT base) {
         indexed_exchange::Request request;
         request.header.width = s.width; request.header.height = s.height; request.header.vertices = count;
         request.header.format = s.format; request.header.flags = (UINT(d.blend.RenderTargetWriteMask[0]) << 8) | UINT(blend);
+        if (textured) { request.header.abi = 2; request.header.flags |= 2; request.texture = std::move(texture); }
         request.viewport = viewport; request.vertex = *d.vertex_program; request.pixel = *d.pixel_program;
         request.inputs = inputs; request.vertex_constants = vc; request.pixel_constants = pc; request.background = std::move(background);
         result = d.indexed_exchange->execute(std::move(request));
+    } else if (textured) {
+        const std::array<uint64_t,6> key{s.width,s.height,s.format,texture.width,texture.height,texture.format};
+        if (!d.point_texture_executor || d.point_texture_vertex != d.vertex_program || d.point_texture_pixel != d.pixel_program || d.point_texture_key != key) {
+            auto candidate = std::make_unique<nr::raster::PointTextureDrawExecutor>(*d.vertex_program,*d.pixel_program,s.width,s.height,s.format,
+                texture.width,texture.height,texture.format,d.backend);
+            d.point_texture_executor = std::move(candidate); d.point_texture_key = key;
+            d.point_texture_vertex = d.vertex_program; d.point_texture_pixel = d.pixel_program;
+        }
+        result = d.point_texture_executor->execute(inputs,vc,viewport,texture);
     } else {
         const std::array<uint64_t, 5> key{s.width, s.height, s.format, count, uint64_t(d.blend.RenderTargetWriteMask[0]) | (uint64_t(blend) << 8)};
         if (!d.indexed_executor || d.indexed_vertex != d.vertex_program || d.indexed_pixel != d.pixel_program || d.indexed_key != key) {
@@ -94,6 +120,6 @@ void execute_indexed_draw(Device &d, UINT count, UINT first, INT base) {
     counters.inference_input_bytes += result.input_bytes;
     counters.inference_output_bytes += result.output_bytes;
     upload(*target, nullptr, result.pixels.data(), s.width * 4); ++counters.draws;
-    lab_trace("{\"event\":\"indexed_draw_executed\",\"vertices\":%u,\"covered_samples\":%llu,\"rectangle_path\":%s,\"execution_device\":\"%s\",\"draw_ms\":%.3f}\n",
-        count, static_cast<unsigned long long>(result.covered_samples), result.used_rectangle ? "true" : "false", result.execution_device.c_str(), result.timings.total_ms);
+    lab_trace("{\"event\":\"indexed_draw_executed\",\"vertices\":%u,\"textured\":%s,\"covered_samples\":%llu,\"rectangle_path\":%s,\"execution_device\":\"%s\",\"wall_ms\":%llu}\n",
+        count, textured ? "true" : "false", static_cast<unsigned long long>(result.covered_samples), result.used_rectangle ? "true" : "false", result.execution_device.c_str(), static_cast<unsigned long long>(GetTickCount64()-started));
 }
