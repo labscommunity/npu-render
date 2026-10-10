@@ -3,7 +3,7 @@ SIZE_T APIENTRY srv_size(D3D10DDI_HDEVICE, const D3D10DDIARG_CREATESHADERRESOURC
 void APIENTRY create_srv(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATESHADERRESOURCEVIEW *a,
                         D3D10DDI_HSHADERRESOURCEVIEW out, D3D10DDI_HRTSHADERRESOURCEVIEW) {
     new (out.pDrvPrivate) View();
-    guard(h, [&] {
+    guard(h, __FUNCTION__, [&] {
         require(a != nullptr);
         auto &r = resource(a->hDrvResource);
         require(r.usage == D3D10_DDI_USAGE_DEFAULT && r.allocation->context == device(h).context &&
@@ -13,10 +13,10 @@ void APIENTRY create_srv(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATESHADERRESOU
     });
 }
 void APIENTRY destroy_srv(D3D10DDI_HDEVICE h, D3D10DDI_HSHADERRESOURCEVIEW out) {
-    guard(h, [&] { static_cast<View *>(out.pDrvPrivate)->~View(); });
+    guard(h, __FUNCTION__, [&] { static_cast<View *>(out.pDrvPrivate)->~View(); });
 }
 void APIENTRY set_sources(D3D10DDI_HDEVICE h, UINT start, UINT count, const D3D10DDI_HSHADERRESOURCEVIEW *views) {
-    guard(h, [&] {
+    guard(h, __FUNCTION__, [&] {
         require(start < 128 && count <= 128 - start && (!count || views));
         std::shared_ptr<Allocation> source = device(h).bound_source;
         for (UINT i = 0; i < count; ++i) {
@@ -34,7 +34,7 @@ template<UINT Kind>
 void APIENTRY create_shader(D3D10DDI_HDEVICE h, const UINT *code, D3D10DDI_HSHADER out,
                            D3D10DDI_HRTSHADER, const D3D10DDIARG_STAGE_IO_SIGNATURES *) {
     new (out.pDrvPrivate) Shader();
-    guard(h, [&] {
+    guard(h, __FUNCTION__, [&] {
         const auto &expected = Kind == 1 ? device(h).vertex_code : device(h).pixel_code;
         require(code && expected.size() >= 2 && code[1] == expected.size() && std::equal(expected.begin(), expected.end(), code));
         static_cast<Shader *>(out.pDrvPrivate)->kind = Kind;
@@ -43,21 +43,21 @@ void APIENTRY create_shader(D3D10DDI_HDEVICE h, const UINT *code, D3D10DDI_HSHAD
 void APIENTRY destroy_shader(D3D10DDI_HDEVICE, D3D10DDI_HSHADER) {}
 template<UINT Kind>
 void APIENTRY set_shader(D3D10DDI_HDEVICE h, D3D10DDI_HSHADER shader) {
-    guard(h, [&] {
+    guard(h, __FUNCTION__, [&] {
         const UINT value = shader.pDrvPrivate ? static_cast<Shader *>(shader.pDrvPrivate)->kind : 0;
         require(!shader.pDrvPrivate || value == Kind);
         (Kind == 1 ? device(h).vertex_shader : device(h).pixel_shader) = value;
     });
 }
 void APIENTRY set_viewports(D3D10DDI_HDEVICE h, UINT count, UINT, const D3D10_DDI_VIEWPORT *values) {
-    guard(h, [&] {
+    guard(h, __FUNCTION__, [&] {
         require(count <= 16 && (!count || values));
         device(h).viewport_count = count;
         device(h).viewport = count == 1 ? values[0] : D3D10_DDI_VIEWPORT{};
     });
 }
 void APIENTRY set_topology(D3D10DDI_HDEVICE h, D3D10_DDI_PRIMITIVE_TOPOLOGY value) {
-    guard(h, [&] { device(h).topology = value; });
+    guard(h, __FUNCTION__, [&] { device(h).topology = value; });
 }
 std::vector<uint8_t> read_pixels(Allocation &source) {
     require(!source.locked && !source.context->poisoned);
@@ -80,7 +80,7 @@ std::vector<uint8_t> read_pixels(Allocation &source) {
     return result;
 }
 void APIENTRY draw(D3D10DDI_HDEVICE h, UINT count, UINT first) {
-    guard(h, [&] {
+    guard(h, __FUNCTION__, [&] {
         auto &d = device(h);
         const auto target = d.bound_target, source = d.bound_source;
         require(count == 3 && !first && d.topology == D3D10_DDI_PRIMITIVE_TOPOLOGY_TRIANGLELIST &&
@@ -120,29 +120,29 @@ void APIENTRY draw(D3D10DDI_HDEVICE h, UINT count, UINT first) {
         ++counters.draws;
     });
 }
-void APIENTRY null_shader(D3D10DDI_HDEVICE h, D3D10DDI_HSHADER value) { guard(h, [&] { require(!value.pDrvPrivate); }); }
-void APIENTRY null_layout(D3D10DDI_HDEVICE h, D3D10DDI_HELEMENTLAYOUT value) { guard(h, [&] { require(!value.pDrvPrivate); }); }
+void APIENTRY null_shader(D3D10DDI_HDEVICE h, D3D10DDI_HSHADER value) { guard(h, __FUNCTION__, [&] { require(!value.pDrvPrivate); }); }
+void APIENTRY null_layout(D3D10DDI_HDEVICE h, D3D10DDI_HELEMENTLAYOUT value) { guard(h, __FUNCTION__, [&] { require(!value.pDrvPrivate); }); }
 void APIENTRY null_buffers(D3D10DDI_HDEVICE h, UINT start, UINT count, const D3D10DDI_HRESOURCE *values) {
-    guard(h, [&] { require(start <= 14 && count <= 14 - start && (!count || values));
+    guard(h, __FUNCTION__, [&] { require(start <= 14 && count <= 14 - start && (!count || values));
         for (UINT i = 0; i < count; ++i) require(!values[i].pDrvPrivate); });
 }
 void APIENTRY null_views(D3D10DDI_HDEVICE h, UINT start, UINT count, const D3D10DDI_HSHADERRESOURCEVIEW *values) {
-    guard(h, [&] { require(start <= 128 && count <= 128 - start && (!count || values));
+    guard(h, __FUNCTION__, [&] { require(start <= 128 && count <= 128 - start && (!count || values));
         for (UINT i = 0; i < count; ++i) require(!values[i].pDrvPrivate); });
 }
 void APIENTRY null_vertices(D3D10DDI_HDEVICE h, UINT start, UINT count, const D3D10DDI_HRESOURCE *values, const UINT *, const UINT *) {
-    guard(h, [&] { require(start <= 16 && count <= 16 - start && (!count || values));
+    guard(h, __FUNCTION__, [&] { require(start <= 16 && count <= 16 - start && (!count || values));
         for (UINT i = 0; i < count; ++i) require(!values[i].pDrvPrivate); });
 }
 void APIENTRY null_index(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE value, DXGI_FORMAT, UINT) {
-    guard(h, [&] { require(!value.pDrvPrivate); });
+    guard(h, __FUNCTION__, [&] { require(!value.pDrvPrivate); });
 }
 void APIENTRY null_stream(D3D10DDI_HDEVICE h, UINT count, UINT, const D3D10DDI_HRESOURCE *values, const UINT *) {
-    guard(h, [&] { require(count <= 4 && (!count || values)); for (UINT i = 0; i < count; ++i) require(!values[i].pDrvPrivate); });
+    guard(h, __FUNCTION__, [&] { require(count <= 4 && (!count || values)); for (UINT i = 0; i < count; ++i) require(!values[i].pDrvPrivate); });
 }
-void APIENTRY null_predication(D3D10DDI_HDEVICE h, D3D10DDI_HQUERY value, BOOL) { guard(h, [&] { require(!value.pDrvPrivate); }); }
+void APIENTRY null_predication(D3D10DDI_HDEVICE h, D3D10DDI_HQUERY value, BOOL) { guard(h, __FUNCTION__, [&] { require(!value.pDrvPrivate); }); }
 void APIENTRY set_scissors(D3D10DDI_HDEVICE h, UINT count, UINT, const D3D10_DDI_RECT *values) {
-    guard(h, [&] { require(count <= 16 && (!count || values)); }); // Enabled scissoring is rejected before drawing.
+    guard(h, __FUNCTION__, [&] { require(count <= 16 && (!count || values)); }); // Enabled scissoring is rejected before drawing.
 }
 void APIENTRY view_hazard(D3D10DDI_HDEVICE, D3D10DDI_HSHADERRESOURCEVIEW, D3D10DDI_HRESOURCE) {} // Blocking mappings/submissions order access.
 void bind_draw_functions(D3D10DDI_DEVICEFUNCS &f) {

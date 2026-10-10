@@ -58,24 +58,24 @@ struct Resource {
 struct View { std::shared_ptr<Allocation> allocation; };
 struct Shader { UINT kind = 0; };
 Device &device(D3D10DDI_HDEVICE h) { return *static_cast<Device *>(h.pDrvPrivate); }
-void reject(D3D10DDI_HDEVICE h, HRESULT status) {
-    lab_trace("{\"event\":\"reject\",\"status\":\"%08lx\"}\n", ULONG(status));
+void reject(D3D10DDI_HDEVICE h, HRESULT status, const char *operation) {
+    lab_trace("{\"event\":\"reject\",\"operation\":\"%s\",\"status\":\"%08lx\"}\n", operation, ULONG(status));
     ++counters.rejected;
     auto &d = device(h);
     d.callbacks.pfnSetErrorCb(d.core, status);
 }
-template<class F> void guard(D3D10DDI_HDEVICE h, F f) noexcept {
+template<class F> void guard(D3D10DDI_HDEVICE h, const char *operation, F f) noexcept {
     std::lock_guard<std::recursive_mutex> lock(mutex);
     try { f(); }
-    catch (const Error &e) { reject(h, e.status); }
-    catch (const std::bad_alloc &) { reject(h, E_OUTOFMEMORY); }
-    catch (const std::exception &e) { std::fprintf(stderr, "nr_fill_umd: %s\n", e.what()); reject(h, E_FAIL); }
-    catch (...) { reject(h, E_FAIL); }
+    catch (const Error &e) { reject(h, e.status, operation); }
+    catch (const std::bad_alloc &) { reject(h, E_OUTOFMEMORY, operation); }
+    catch (const std::exception &e) { std::fprintf(stderr, "nr_fill_umd: %s\n", e.what()); reject(h, E_FAIL, operation); }
+    catch (...) { reject(h, E_FAIL, operation); }
 }
 template<class T, size_t Offset> struct Unsupported;
 template<class R, class... A, size_t Offset> struct Unsupported<R(APIENTRY *)(D3D10DDI_HDEVICE, A...), Offset> {
     static R APIENTRY call(D3D10DDI_HDEVICE h, A...) {
-        guard(h, [] {
+        guard(h, __FUNCTION__, [] {
             counters.last_unsupported_offset = Offset;
             lab_trace("{\"event\":\"unsupported_ddi\",\"offset\":%zu}\n", Offset);
             std::fprintf(stderr, "nr_fill_umd: unsupported DDI offset=%zu\n", Offset);
@@ -150,7 +150,12 @@ SIZE_T APIENTRY resource_size(D3D10DDI_HDEVICE, const D3D10DDIARG_CREATERESOURCE
 void APIENTRY create_resource(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATERESOURCE *a,
                              D3D10DDI_HRESOURCE out, D3D10DDI_HRTRESOURCE rt) {
     new (out.pDrvPrivate) Resource();
-    guard(h, [&] {
+    guard(h, __FUNCTION__, [&] {
+        if (a) lab_trace("{\"event\":\"resource\",\"dimension\":%u,\"format\":%u,\"mips\":%u,\"array\":%u,"
+            "\"usage\":%u,\"bind\":%u,\"map\":%u,\"misc\":%u,\"samples\":%u,\"quality\":%u,\"primary\":%s}\n",
+            UINT(a->ResourceDimension), UINT(a->Format), a->MipLevels, a->ArraySize, UINT(a->Usage),
+            a->BindFlags, a->MapFlags, a->MiscFlags, a->SampleDesc.Count, a->SampleDesc.Quality,
+            a->pPrimaryDesc ? "true" : "false");
         if (a && (a->MiscFlags || a->pPrimaryDesc || (a->BindFlags & D3D10_DDI_BIND_PRESENT))) {
             std::fprintf(stderr, "nr_fill_umd: resource dimension=%u mips=%u array=%u format=%u samples=%u/%u misc=%x usage=%u bind=%x map=%x primary=%u initial=%u runtime_resource=%u\n",
                 UINT(a->ResourceDimension), a->MipLevels, a->ArraySize, UINT(a->Format), a->SampleDesc.Count,
@@ -185,7 +190,7 @@ SIZE_T APIENTRY opened_resource_size(D3D10DDI_HDEVICE, const D3D10DDIARG_OPENRES
 void APIENTRY open_resource(D3D10DDI_HDEVICE h, const D3D10DDIARG_OPENRESOURCE *a,
                            D3D10DDI_HRESOURCE out, D3D10DDI_HRTRESOURCE rt) {
     new (out.pDrvPrivate) Resource();
-    guard(h, [&] {
+    guard(h, __FUNCTION__, [&] {
         require(a && rt.handle && a->hKMResource.handle && a->NumAllocations == 1 && a->pOpenAllocationInfo &&
                 a->pPrivateDriverData && a->PrivateDriverDataSize == sizeof(nr::kernel_contract::Surface));
         const auto &item = a->pOpenAllocationInfo[0];
@@ -201,13 +206,13 @@ void APIENTRY open_resource(D3D10DDI_HDEVICE h, const D3D10DDIARG_OPENRESOURCE *
     });
 }
 void APIENTRY destroy_resource(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE r) {
-    guard(h, [&] { static_cast<Resource *>(r.pDrvPrivate)->~Resource(); });
+    guard(h, __FUNCTION__, [&] { static_cast<Resource *>(r.pDrvPrivate)->~Resource(); });
 }
 SIZE_T APIENTRY view_size(D3D10DDI_HDEVICE, const D3D10DDIARG_CREATERENDERTARGETVIEW *) { return sizeof(View); }
 void APIENTRY create_view(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATERENDERTARGETVIEW *a,
                          D3D10DDI_HRENDERTARGETVIEW v, D3D10DDI_HRTRENDERTARGETVIEW) {
     new (v.pDrvPrivate) View();
-    guard(h, [&] {
+    guard(h, __FUNCTION__, [&] {
         require(a != nullptr);
         auto &r = resource(a->hDrvResource);
         require(r.usage == D3D10_DDI_USAGE_DEFAULT && a->ResourceDimension == D3D10DDIRESOURCE_TEXTURE2D &&
@@ -217,10 +222,10 @@ void APIENTRY create_view(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATERENDERTARG
     });
 }
 void APIENTRY destroy_view(D3D10DDI_HDEVICE h, D3D10DDI_HRENDERTARGETVIEW v) {
-    guard(h, [&] { static_cast<View *>(v.pDrvPrivate)->~View(); });
+    guard(h, __FUNCTION__, [&] { static_cast<View *>(v.pDrvPrivate)->~View(); });
 }
 void APIENTRY clear(D3D10DDI_HDEVICE h, D3D10DDI_HRENDERTARGETVIEW v, FLOAT color[4]) {
-    guard(h, [&] {
+    guard(h, __FUNCTION__, [&] {
         require(v.pDrvPrivate && color);
         auto a = static_cast<View *>(v.pDrvPrivate)->allocation;
         require(a && !a->locked && a->context == device(h).context);
@@ -236,7 +241,7 @@ void APIENTRY clear(D3D10DDI_HDEVICE h, D3D10DDI_HRENDERTARGETVIEW v, FLOAT colo
     });
 }
 void APIENTRY copy_resource(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE dst, D3D10DDI_HRESOURCE src) {
-    guard(h, [&] {
+    guard(h, __FUNCTION__, [&] {
         auto &d = resource(dst); auto &s = resource(src);
         require(d.usage == D3D10_DDI_USAGE_STAGING && s.usage == D3D10_DDI_USAGE_DEFAULT);
         auto a = d.allocation, b = s.allocation;
@@ -261,7 +266,7 @@ void APIENTRY copy_resource(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE dst, D3D10DDI
 }
 void APIENTRY update_resource(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE dst, UINT sub,
                              const D3D10_DDI_BOX *box, const void *source, UINT pitch, UINT) {
-    guard(h, [&] {
+    guard(h, __FUNCTION__, [&] {
         auto &r = resource(dst);
         require(!sub && r.usage == D3D10_DDI_USAGE_DEFAULT && r.allocation->context == device(h).context);
         upload(*r.allocation, box, source, pitch); // CPU upload bytes are counted separately from submitted work.
@@ -270,7 +275,7 @@ void APIENTRY update_resource(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE dst, UINT s
 void APIENTRY map(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE r, UINT sub, D3D10_DDI_MAP type,
                   UINT flags, D3D10DDI_MAPPED_SUBRESOURCE *out) {
     if (out) *out = {};
-    guard(h, [&] {
+    guard(h, __FUNCTION__, [&] {
         auto &v = resource(r);
         require(out && !sub && !flags && type == D3D10_DDI_MAP_READ && v.usage == D3D10_DDI_USAGE_STAGING &&
                 v.map_flags == D3D10_DDI_CPU_ACCESS_READ && v.allocation->context == device(h).context);
@@ -280,7 +285,7 @@ void APIENTRY map(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE r, UINT sub, D3D10_DDI_
     });
 }
 void APIENTRY unmap(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE r, UINT sub) {
-    guard(h, [&] { auto &a = *resource(r).allocation; require(!sub && a.locked); check(a.unlock()); });
+    guard(h, __FUNCTION__, [&] { auto &a = *resource(r).allocation; require(!sub && a.locked); check(a.unlock()); });
 }
 // The runtime constructs default pipeline state while initializing a device.
 // Retain those descriptors even though ClearRenderTargetView ignores them.
@@ -288,7 +293,7 @@ void APIENTRY unmap(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE r, UINT sub) {
 #define NR_STATE(Name, Type, Handle, RtHandle) \
     SIZE_T APIENTRY Name##_size(D3D10DDI_HDEVICE, const Type *) { return sizeof(Type); } \
     void APIENTRY create_##Name(D3D10DDI_HDEVICE h, const Type *desc, Handle out, RtHandle) { \
-        guard(h, [&] { require(desc && out.pDrvPrivate); *static_cast<Type *>(out.pDrvPrivate) = *desc; }); \
+        guard(h, __FUNCTION__, [&] { require(desc && out.pDrvPrivate); *static_cast<Type *>(out.pDrvPrivate) = *desc; }); \
     } \
     void APIENTRY destroy_##Name(D3D10DDI_HDEVICE, Handle) {}
 NR_STATE(blend, D3D10_DDI_BLEND_DESC, D3D10DDI_HBLENDSTATE, D3D10DDI_HRTBLENDSTATE)
@@ -298,7 +303,7 @@ NR_STATE(sampler, D3D10_DDI_SAMPLER_DESC, D3D10DDI_HSAMPLER, D3D10DDI_HRTSAMPLER
 #undef NR_STATE
 template<size_t Stage>
 void APIENTRY set_samplers(D3D10DDI_HDEVICE h, UINT start, UINT count, const D3D10DDI_HSAMPLER *states) {
-    guard(h, [&] {
+    guard(h, __FUNCTION__, [&] {
         auto &slots = device(h).samplers[Stage];
         require(start < slots.size() && count <= slots.size() - start && (!count || states));
         for (UINT i = 0; i < count; ++i) {
@@ -310,7 +315,7 @@ void APIENTRY set_samplers(D3D10DDI_HDEVICE h, UINT start, UINT count, const D3D
     });
 }
 void APIENTRY set_blend(D3D10DDI_HDEVICE h, D3D10DDI_HBLENDSTATE state, const FLOAT factor[4], UINT mask) {
-    guard(h, [&] {
+    guard(h, __FUNCTION__, [&] {
         auto &d = device(h);
         d.blend = state.pDrvPrivate ? *static_cast<D3D10_DDI_BLEND_DESC *>(state.pDrvPrivate) : D3D10_DDI_BLEND_DESC{};
         if (!state.pDrvPrivate) d.blend.RenderTargetWriteMask[0] = 15;
@@ -319,7 +324,7 @@ void APIENTRY set_blend(D3D10DDI_HDEVICE h, D3D10DDI_HBLENDSTATE state, const FL
     });
 }
 void APIENTRY set_depth(D3D10DDI_HDEVICE h, D3D10DDI_HDEPTHSTENCILSTATE state, UINT ref) {
-    guard(h, [&] {
+    guard(h, __FUNCTION__, [&] {
         auto &d = device(h);
         d.depth = state.pDrvPrivate ? *static_cast<D3D10_DDI_DEPTH_STENCIL_DESC *>(state.pDrvPrivate) : D3D10_DDI_DEPTH_STENCIL_DESC{};
         if (!state.pDrvPrivate) { d.depth.DepthEnable = TRUE; d.depth.DepthWriteMask = D3D10_DDI_DEPTH_WRITE_MASK_ALL; d.depth.DepthFunc = D3D10_DDI_COMPARISON_LESS; }
@@ -327,7 +332,7 @@ void APIENTRY set_depth(D3D10DDI_HDEVICE h, D3D10DDI_HDEPTHSTENCILSTATE state, U
     });
 }
 void APIENTRY set_raster(D3D10DDI_HDEVICE h, D3D10DDI_HRASTERIZERSTATE state) {
-    guard(h, [&] {
+    guard(h, __FUNCTION__, [&] {
         auto &d = device(h);
         d.raster = state.pDrvPrivate ? *static_cast<D3D10_DDI_RASTERIZER_DESC *>(state.pDrvPrivate) : D3D10_DDI_RASTERIZER_DESC{};
         if (!state.pDrvPrivate) { d.raster.FillMode = D3D10_DDI_FILL_SOLID; d.raster.CullMode = D3D10_DDI_CULL_BACK; d.raster.DepthClipEnable = TRUE; }
@@ -335,7 +340,7 @@ void APIENTRY set_raster(D3D10DDI_HDEVICE h, D3D10DDI_HRASTERIZERSTATE state) {
 }
 void APIENTRY targets(D3D10DDI_HDEVICE h, const D3D10DDI_HRENDERTARGETVIEW *views, UINT count, UINT,
                       D3D10DDI_HDEPTHSTENCILVIEW depth) {
-    guard(h, [&] {
+    guard(h, __FUNCTION__, [&] {
         require(count <= 8 && (!count || views) && !depth.pDrvPrivate);
         std::shared_ptr<Allocation> selected;
         for (UINT i = 0; i < count; ++i) {

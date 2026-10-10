@@ -10,11 +10,32 @@ inline void lab_trace(const char *format, ...) noexcept {
     if (!enabled) return;
     static std::mutex trace_mutex;
     std::lock_guard<std::mutex> lock(trace_mutex);
+    static UINT lines = 0;
+    if (lines >= 4096) return;
     WCHAR path[MAX_PATH]{};
     swprintf_s(path, L"C:\\npu-lab\\umd-trace\\process-%lu.jsonl", GetCurrentProcessId());
     HANDLE file = CreateFileW(path, FILE_APPEND_DATA | FILE_READ_ATTRIBUTES, FILE_SHARE_READ,
                              nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (file == INVALID_HANDLE_VALUE) return;
+    if (!lines) {
+        WCHAR module[MAX_PATH]{};
+        const auto count = GetModuleFileNameW(nullptr, module, MAX_PATH);
+        const WCHAR *name = module;
+        if (count && count < MAX_PATH) {
+            for (const WCHAR *p = module; *p; ++p) if (*p == L'\\') name = p + 1;
+        } else name = L"unknown";
+        char safe[MAX_PATH]{};
+        for (UINT i = 0; name[i] && i + 1 < MAX_PATH; ++i) {
+            const auto c = name[i];
+            safe[i] = ((c >= L'a' && c <= L'z') || (c >= L'A' && c <= L'Z') ||
+                (c >= L'0' && c <= L'9') || c == L'.' || c == L'-' || c == L'_') ? char(c) : '?';
+        }
+        char header[512]{};
+        const auto length = sprintf_s(header, "{\"event\":\"process\",\"pid\":%lu,\"image\":\"%s\"}\n", GetCurrentProcessId(), safe);
+        DWORD written = 0;
+        if (length > 0) WriteFile(file, header, DWORD(length), &written, nullptr);
+    }
+    ++lines;
     LARGE_INTEGER size{};
     if (GetFileSizeEx(file, &size) && size.QuadPart < 4 * 1024 * 1024) {
         char line[1024]{};
