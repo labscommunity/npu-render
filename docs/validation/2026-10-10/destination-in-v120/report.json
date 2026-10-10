@@ -1,0 +1,48 @@
+{
+  "build": "present-umd-v120",
+  "clean_cpu_contract_suites_passed": 18,
+  "npu_contracts_passed": [
+    "output merger: source-copy, source-over, destination-in",
+    "uniform draws with varying alpha and channel masks",
+    "driver binding and draw callbacks",
+    "ABI 9 packet through physical NPU worker"
+  ],
+  "npu_output_merger_components_checked": 147456,
+  "npu_uniform_components_checked": 254976,
+  "abi9_packet_components_checked": 16384,
+  "capture_trial": "v84",
+  "capture_process": "dwm.exe (1092)",
+  "capture_complete": true,
+  "blend_factors": {
+    "source": "ZERO",
+    "destination": "SRC_ALPHA",
+    "operation": "ADD",
+    "same_for_color_and_alpha": true
+  },
+  "target": [
+    24,
+    24
+  ],
+  "draw_vertices": 6,
+  "expanded_vertices": 12,
+  "topology": "triangle strip",
+  "triangles": 4,
+  "covered_samples": 396,
+  "tiles": 14,
+  "cpu_npu_pixel_sha256": "6b2e09e1198af741fb9b8545b26c0398ea445d1fa4fea2c7e920189a1205ff44",
+  "cpu_scalar_and_npu_pixels_exact": true,
+  "npu_replays_passed": 2,
+  "npu_draw_ms": [
+    70.492,
+    64.638
+  ],
+  "desktop_offload_tested": false,
+  "findings": [
+    "The captured desktop draw previously failed the UMD and offline replay blend-state admission. Both now admit explicit destination-in while retaining rejection of other unsupported factors.",
+    "The selected provider multiplies clamped shader alpha by the previous destination channel and performs coverage, write-mask selection and UNORM quantization. The source-copy rectangle shortcut is never used for this mode.",
+    "ABI 9 distinguishes destination-in from legacy blend modes, rejects malformed flags/version combinations, and includes the operation in cache identity. A real physical NPU worker returns all 16384 expected components for its emitted test packet.",
+    "The initial v119 CPU build passed the new pixel checks but failed an unchanged expected total execution count at the end of the driver test. v120 updates that assertion for the three added draws and passes all 18 suites from a clean build.",
+    "The NPU compiler emits an outliner diagnostic during the packet check but successfully compiles and executes on NPU. The raw diagnostic is preserved; no fallback occurs.",
+    "These are isolated NPU rendering and transport checks, not usable desktop delivery or a Tahoma benchmark."
+  ]
+}
