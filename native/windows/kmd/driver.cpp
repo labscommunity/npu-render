@@ -872,7 +872,9 @@ extern "C" NTSTATUS DriverEntry(DRIVER_OBJECT *driver, UNICODE_STRING *registry)
     data.DxgkDdiCollectDbgInfo = collect_debug;
     data.DxgkDdiQueryCurrentFence = current_fence;
     NR_REJECT(DxgkDdiControlInterrupt);
-    NR_REJECT(DxgkDdiRenderKm);
+    // A non-null RenderKm advertises GDI hardware acceleration to CDD. Leave
+    // this optional callback absent until we implement its command contract;
+    // a rejection stub causes Windows to request unsupported GDI contexts.
     data.DxgkDdiQueryDependentEngineGroup = dependent_engines;
     data.DxgkDdiQueryEngineStatus = engine_status;
     data.DxgkDdiResetEngine = reset_engine;

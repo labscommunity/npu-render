@@ -278,6 +278,9 @@ extern "C" int nr_kernel_host_test() {
     const auto aperture_result = aperture_test();
     if (aperture_result) return aperture_result;
     NR_CHECK(NT_SUCCESS(NrHostDriverEntry(nullptr, nullptr)));
+    // Callback presence itself is a capability declaration, even if a stub
+    // would return NOT_SUPPORTED when called by CDD.
+    NR_CHECK(!registration.DxgkDdiRenderKm);
 #if NR_KMD_LAB_APERTURE_ADAPTER
     return aperture_adapter_test();
 #elif NR_KMD_LAB_PAGING_ADAPTER
