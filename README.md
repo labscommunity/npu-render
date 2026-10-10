@@ -85,6 +85,15 @@ and the original desktop compositor remain. The
 [indirect-display diagnostic](native/windows/indirect_lab/README.md) is the next
 adapter-selection test, not an implemented desktop mode.
 
+The isolated desktop work now captures DWM's real shader and draw state. An
+[offline NPU replay](docs/validation/2026-10-10/dwm-draw-replay-npu-v53/report.json)
+executes its first indexed draw through vertex shading, projection, triangle
+coverage, pixel shading and BGRA output, matching all 786,432 output pixels.
+This draw is an opaque uniform-color quad. General textured desktop draws, live
+draw integration and indirect-display frame delivery remain unfinished. The
+single cold replay took 9.76 seconds including compilation; it does not establish
+interactive performance or a Tahoma benefit.
+
 The [captured-window desktop experiment](native/windows/capture/README.md) now
 presents an NPU-composed 2880×1800 desktop with input passing through to the
 original applications, a disable/enable control, and an external hang watchdog.

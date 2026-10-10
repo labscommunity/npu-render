@@ -1,0 +1,14 @@
+{"frame": 0, "execution_device": "NPU", "exact": false, "max_byte_error": 255, "masked_background_exact": true, "desktop_offload_tested": false}
+python.exe : Traceback (most recent call last):
+At line:2 char:1
++ & "$source\venv\Scripts\python.exe" "$p.py" *> "$p.jsonl"
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], Remot 
+   eException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "C:\Users\tatef\AppData\Local\npu-render\vm\probe-npu-output-merger-v1.py", line 37, in 
+<module>
+    assert np.array_equal(actual,expected)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

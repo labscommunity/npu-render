@@ -1,0 +1,33 @@
+{
+  "scope": "NPU color blending, RGBA/BGRA channel ordering, write masks, UNORM quantization and coverage selection",
+  "build": "present-umd-v51",
+  "cpu_contract_tests_passed": 7,
+  "npu_checked_components": 98304,
+  "npu_byte_differences": 0,
+  "invalid_requests_rejected": 24,
+  "runtime": "OpenVINO 2026.1",
+  "npu_driver": "32.0.100.5540",
+  "configurations": {
+    "source_over_blending": [
+      false,
+      true
+    ],
+    "bgra": [
+      false,
+      true
+    ],
+    "rgba_write_masks": [
+      15,
+      5,
+      10
+    ]
+  },
+  "implementation": "Independent per-channel float gathers and clamps; explicit integer nearest-even quantization; integer coverage selection",
+  "rejected_lowerings": [
+    "multi-index float channel Gather corrupts mixed f32/u8 graph",
+    "flattened Nx4 clamp selection loses FP32 precision"
+  ],
+  "full_desktop_offload": false,
+  "performance_tested": false,
+  "evidence_notes": "Text evidence normalized to UTF-8 LF; raw files retained locally. Standalone qualification does not install or exercise display drivers."
+}

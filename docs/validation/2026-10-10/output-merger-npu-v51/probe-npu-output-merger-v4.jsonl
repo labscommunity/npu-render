@@ -1,0 +1,16 @@
+{"frame": 0, "execution_device": "NPU", "exact": true, "max_byte_error": 0, "masked_background_exact": true, "desktop_offload_tested": false}
+{"frame": 1, "execution_device": "NPU", "exact": true, "max_byte_error": 0, "masked_background_exact": true, "desktop_offload_tested": false}
+{"frame": 2, "execution_device": "NPU", "exact": false, "max_byte_error": 1, "masked_background_exact": true, "desktop_offload_tested": false}
+python.exe : Traceback (most recent call last):
+At line:2 char:75
++ ... erger-v5') {& "$source\venv\Scripts\python.exe" "$r\$n.py" *> "$r\$n. ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], Remot 
+   eException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "C:\Users\tatef\AppData\Local\npu-render\vm\probe-npu-output-merger-v4.py", line 37, in 
+<module>
+    assert np.array_equal(actual,expected)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

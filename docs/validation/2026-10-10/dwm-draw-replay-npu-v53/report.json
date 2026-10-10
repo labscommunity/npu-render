@@ -1,0 +1,37 @@
+{
+  "scope": "Offline replay of actual first DWM DrawIndexed captured in disposable VM v60",
+  "capture_sha256": "a0525404fbdb34f4f16e496671ceab3bba8f4b827102d080b72829ba655210bf",
+  "build": "present-umd-v53",
+  "exe_sha256": "d8c2dd171b78e2b9ada390379b0d1ad8bc73280687f16f1971d30463fd42a946",
+  "cpu_contract_tests_passed": 7,
+  "npu_stages": [
+    "captured 90-word vertex shader on six indexed vertices",
+    "perspective divide, viewport transform and fixed-point snapping",
+    "captured 18-word pixel shader on validated uniform inputs",
+    "exact top-left triangle coverage",
+    "BGRA quantization and coverage write selection"
+  ],
+  "pixels_exact": 786432,
+  "image_sha256": "d2cdb07798b599560e35abad5e4f87f4205ee60e72e14d850b9590f801080978",
+  "npu_cold_elapsed_ms": 9760,
+  "cpu_cold_elapsed_ms": 1421,
+  "timing_scope": "One diagnostic run including compilation and host packing; not a frame-rate benchmark",
+  "host_work": [
+    "input decoding",
+    "reference validation",
+    "tensor packing",
+    "output copies",
+    "file IO"
+  ],
+  "limits": [
+    "uniform non-textured triangle lists only",
+    "already depth-clipped positive-w geometry",
+    "full-surface viewport and scissor",
+    "single-sample RGBA/BGRA8 output",
+    "live DrawIndexed still rejects; this replay is standalone"
+  ],
+  "displayed_frames": 0,
+  "full_desktop_offload": false,
+  "tahoma_performance_tested": false,
+  "evidence_notes": "Raw capture and images retained privately outside git; no shader binaries committed. Text logs normalized UTF-8 LF."
+}

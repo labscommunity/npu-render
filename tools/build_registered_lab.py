@@ -80,6 +80,8 @@ def main():
         "nr_registered_texture_test.exe",
         "nr_registered_raster_test.exe",
         "nr_registered_projection_test.exe",
+        "nr_registered_output_merger_test.exe",
+        "nr_registered_draw_replay_probe.exe",
     ):
         binaries[name] = hashlib.sha256(
             (args.build_dir / "Release" / name).read_bytes()
