@@ -71,8 +71,12 @@ shader draws, image uploads, clears and process sharing pass 62 image checks wit
 clean removal in the [v31 test](docs/validation/2026-10-09/registered-draw-v31/report.json).
 These registered draws explicitly use the CPU provider. The same draw callbacks
 separately pass 16 checks on Delta's NPU using test allocation callbacks;
-installed-adapter NPU execution and desktop presentation remain unproven.
-This milestone establishes no Tahoma speedup.
+installed-adapter NPU execution remains unproven. The
+[v42 presentation test](docs/validation/2026-10-10/registered-window-v42/report.json)
+now verifies 12 displayed frames through the registered adapter, including three
+patterned CPU shader blends. It checks the actual window's screen pixels and
+unloads cleanly. The original desktop and DWM remain active, and no Tahoma
+speedup is established.
 
 The [captured-window desktop experiment](native/windows/capture/README.md) now
 presents an NPU-composed 2880×1800 desktop with input passing through to the

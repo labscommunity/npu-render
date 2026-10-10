@@ -69,7 +69,7 @@ passes 24 registered CPU draws at both sizes plus six clear regressions: 30
 readbacks verify 348,438,528 bytes. Delta's CPU and NPU each separately pass 16
 native-size component draws. The driver unloads, mapped pages return to zero,
 and the original display stays healthy. Registered NPU execution, presentation
-and DWM migration remain untested.
+and DWM migration are not tested in that v34 run.
 
 The DXGI blit-present entrypoint now forwards the actual source/destination
 allocation handles, kernel context and opaque DXGI context to the runtime's
@@ -93,7 +93,12 @@ shared-resource redirection; it does not change the explicitly selected draw
 provider or establish frame delivery. The component tests require this exact
 successful status and continue to exercise resource, draw and present callbacks.
 Earlier live packages through v41 returned `S_OK`; their measurements remain
-unchanged, and the new status needs a separate live presentation check.
+unchanged. The [v42 live test](../../../docs/validation/2026-10-10/registered-window-v42/report.json)
+verifies 12 displayed frames: nine primary-color clears across three startup
+variants, followed by three patterned CPU shader blends. The explicit-visibility
+probe reports a visible, nonminimized, uncloaked window and holds the display
+awake. The NPU-only request separately fails without fallback in the CPU-only
+guest. All resources are released and the registered driver unloads cleanly.
 The [v7 physical NPU component run](../../../docs/validation/2026-10-10/registered-component-v7/report.json)
 passes all 16 native-size draws with this status change and test allocation
 callbacks. It establishes neither installed-adapter execution nor screen output.

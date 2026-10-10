@@ -100,6 +100,12 @@ CPU-worker completion. DXGI still reports occlusion and no screen pixels are
 verified; hidden startup and display-idle state need separate controls. The
 driver unloads cleanly and mapped pages return to zero.
 
+The [v42 presentation run](../../../docs/validation/2026-10-10/registered-window-v42/report.json)
+then passes the screen oracle for 12 frames with the corrected DXGI device
+creation status. Twelve kernel presentation copies complete alongside their
+clears; three frames include the UMD's CPU shader provider. This establishes
+restricted registered-window presentation, not NPU execution or DWM migration.
+
 The design follows the documented [linear aperture address-space contract](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/linear-aperture-space-segments)
 and [map/unmap requirements](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/nc-d3dkmddi-dxgkddi_buildpagingbuffer).
 This software translation table is an implementation experiment; it does not
