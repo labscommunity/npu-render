@@ -61,7 +61,8 @@ struct PresentWindow {
         MSG message{};
         while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&message); DispatchMessageW(&message); }
     }
-    bool pixels(UINT channel) {
+    bool pixels(const std::vector<unsigned char> &expected, UINT tolerance) {
+        require(expected.size() == size_t(width) * height * 4, "screen oracle reference extent");
         POINT origin{}; require(ClientToScreen(window, &origin), "presentation client position");
         struct Capture {
             HDC screen = GetDC(nullptr), memory = nullptr;
@@ -86,11 +87,13 @@ struct PresentWindow {
         require(BitBlt(capture.memory, 0, 0, width, height, capture.screen, origin.x, origin.y, SRCCOPY | CAPTUREBLT) && GdiFlush(), "screen oracle capture");
         const auto pixels = static_cast<const unsigned char *>(data);
         for (size_t i = 0; i < size_t(width) * height; ++i)
-            for (UINT c = 0; c < 3; ++c) if (pixels[i * 4 + c] != (c == 2 - channel ? 255 : 0)) return false;
+            for (UINT c = 0; c < 3; ++c)
+                if (UINT(std::abs(int(pixels[i * 4 + c]) - int(expected[i * 4 + c]))) > tolerance) return false;
         return true;
     }
 };
-void exercise_present(IDXGIFactory *factory, ID3D11Device *device, ID3D11DeviceContext *context) {
+#include "present_draw_probe.hpp"
+void exercise_present(IDXGIFactory *factory, ID3D11Device *device, ID3D11DeviceContext *context, bool draws) {
     PresentWindow window; window.open();
     DXGI_SWAP_CHAIN_DESC desc{};
     desc.BufferDesc.Width = PresentWindow::width; desc.BufferDesc.Height = PresentWindow::height;
@@ -103,10 +106,15 @@ void exercise_present(IDXGIFactory *factory, ID3D11Device *device, ID3D11DeviceC
     check(swap->GetBuffer(0, IID_PPV_ARGS(&target)), "get_registered_backbuffer");
     ComPtr<ID3D11RenderTargetView> view;
     check(device->CreateRenderTargetView(target.Get(), nullptr, &view), "create_registered_backbuffer_view");
+    PresentDraw draw;
+    if (draws) draw.prepare(device, PresentWindow::width, PresentWindow::height);
     for (UINT pass = 0; pass < 3; ++pass) {
         FLOAT color[4]{}; color[pass] = color[3] = 1.f;
         context->ClearRenderTargetView(view.Get(), color);
         check(device->GetDeviceRemovedReason(), "present_clear_status");
+        std::vector<unsigned char> expected(size_t(PresentWindow::width) * PresentWindow::height * 4);
+        for (size_t i = 0; i < expected.size(); i += 4) { expected[i + 2 - pass] = 255; expected[i + 3] = 255; }
+        if (draws) draw.render(device, context, view.Get(), PresentWindow::width, PresentWindow::height, pass, expected);
         const auto status = swap->Present(0, 0);
         check(status, "registered_hwnd_present");
         require(status == S_OK, "presentation was occluded or incomplete");
@@ -114,12 +122,13 @@ void exercise_present(IDXGIFactory *factory, ID3D11Device *device, ID3D11DeviceC
         const auto started = GetTickCount64();
         do {
             window.pump(); check(DwmFlush(), "screen_oracle_dwm_flush");
-            matched = window.pixels(pass);
+            matched = window.pixels(expected, draws ? 1u : 0u);
             if (!matched) Sleep(20);
         } while (!matched && GetTickCount64() - started < 2000);
         require(matched, "presented window pixels did not match");
-        std::printf("{\"presented_pass\":%u,\"verified_rgb_bytes\":%u,\"screen_delivery_verified\":true,\"dwm_migrated\":false}\n",
-                    pass, PresentWindow::width * PresentWindow::height * 3);
+        std::printf("{\"presented_pass\":%u,\"verified_rgb_bytes\":%u,\"screen_delivery_verified\":true,"
+                    "\"shader_draw\":%s,\"byte_tolerance\":%u,\"dwm_migrated\":false}\n",
+                    pass, PresentWindow::width * PresentWindow::height * 3, draws ? "true" : "false", draws ? 1u : 0u);
     }
     context->Flush();
 }

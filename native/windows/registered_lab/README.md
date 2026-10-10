@@ -112,6 +112,17 @@ the launcher supplied a hidden startup state, and records visibility, minimized
 and DWM-cloaked state before testing. Earlier probes only checked the window
 station and session; those checks did not prove that the HWND was visible or
 the display awake. Existing failed measurements are retained unchanged.
+
+`--present-draw-cpu` and `--present-draw-npu` connect the admitted texture shader
+to that same swap-chain screen oracle. Each of three frames blends a different
+spatial alpha pattern over an opaque primary color. An independent integer
+reference checks every displayed RGB byte, with the existing one-byte blend
+tolerance. The selected provider must account for exactly three executions;
+fallback and unsupported shaders remain disallowed. CPU uploads and kernel
+copies are still explicit. A passing CPU run does not establish NPU execution,
+and neither mode migrates DWM. The v42 guest's CPU mode passes three patterned
+screen frames with exactly three CPU executions and no cleanup errors. Its NPU
+mode still requires a device-backed validation path; the guest has no NPU.
 The first live window attempt reaches back-buffer creation with
 `PRESENT|RENDER_TARGET`, `DISCARD_ON_PRESENT`, and no primary descriptor; the old
 resource filter rejects those flags. The next revision admits this copy-style
