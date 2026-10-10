@@ -261,3 +261,12 @@ reconstructs a 0/1 bounds mask before color selection to avoid an observed NPU
 compiler error while preserving integer address comparisons. No backend fallback
 is permitted. The standalone translator is not yet admitted by the registered
 UMD and supplies neither rasterization nor pixel shading or desktop migration.
+
+The [v26 precision follow-up](../../../docs/validation/2026-10-10/vertex-npu-v26/report.json)
+adds 4,096 screen-coordinate vertices and non-FP16 palette values. Default NPU
+lowering introduced subpixel errors. For OpenVINO 2026.1, serialized legacy
+precision metadata plus the accuracy hint preserves the tested FP32 arithmetic.
+Bounds reads now gather from an appended zero row, avoiding a floating mask that
+failed with precision preservation. The translator still runs independently of
+the registered driver; this establishes neither general shader conformance nor
+desktop migration.

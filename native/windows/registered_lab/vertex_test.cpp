@@ -111,6 +111,34 @@ int main(int argc, char **argv) {
         }
         std::printf("{\"constant_buffer_rows\":4096,\"vertices\":%zu,\"execution_device\":\"%s\",\"exact_bits_verified\":true,\"desktop_offload_tested\":false}\n",
             vertices.size(), large_result.execution_device.c_str());
+        // Screen transforms and palette values not representable in FP16 catch
+        // silent lowering even when an NPU graph declares f32 input/output.
+        constants[0][0] = {as_bits(2.0f / 1920), as_bits(-1.0f), as_bits(2.0f / 1080), as_bits(-1.0f)};
+        for (unsigned i = 0; i < 4096; ++i)
+            constants[1][i] = {as_bits(float(i % 251) / 251), as_bits(0.1234567f), as_bits(0.7654321f), as_bits(1.0f)};
+        vertices.resize(4096);
+        for (unsigned i = 0; i < vertices.size(); ++i) {
+            vertices[i][0] = {as_bits(float(2 * i) / 8), as_bits(float(2 * i + 1) / 8), 0, 0};
+            vertices[i][1][0] = i;
+        }
+        VertexExecutor precise_executor(large_program, uint32_t(vertices.size()), backend);
+        const auto precise = precise_executor.execute(vertices, constants);
+        for (unsigned i = 0; i < vertices.size(); ++i) {
+            test(precise.vertices[i][1] == constants[1][i]);
+            const auto &position = precise.vertices[i][large_program.position_output];
+            for (unsigned c = 0; c < 2; ++c) {
+                const auto x = as_float(vertices[i][0][c]), scale = as_float(constants[0][0][c * 2]);
+                volatile float product = x * scale;
+                const auto separate = as_bits(product - 1.0f), fused = as_bits(std::fma(x, scale, -1.0f));
+                if (position[c] != separate && position[c] != fused) {
+                    std::fprintf(stderr, "precision mismatch vertex=%u lane=%u actual=%08x separate=%08x fused=%08x\n", i, c, position[c], separate, fused);
+                    test(false);
+                }
+            }
+            test(position[2] == as_bits(0.5f) && position[3] == as_bits(1.0f));
+        }
+        std::printf("{\"fp32_screen_vertices\":%zu,\"execution_device\":\"%s\",\"palette_bits_exact\":true,\"position_matches_fp32_mad\":true,\"desktop_offload_tested\":false}\n",
+            vertices.size(), precise.execution_device.c_str());
         std::puts("vertex parser, reference and explicit provider checks passed");
         return 0;
     } catch (const std::exception &e) { std::fprintf(stderr, "%s\n", e.what()); return 1; }

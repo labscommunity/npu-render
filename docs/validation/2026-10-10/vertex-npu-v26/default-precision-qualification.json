@@ -1,0 +1,220 @@
+[
+  {
+    "backend": "CPU",
+    "config": {},
+    "execution_devices": [
+      "CPU"
+    ],
+    "max_absolute_error": 5.960464477539063e-08,
+    "mismatched_values": 4069,
+    "max_pixel_error": [
+      5.7220458984375e-05,
+      3.218650817871094e-05
+    ],
+    "samples": [
+      {
+        "input": [
+          0.0,
+          0.125
+        ],
+        "actual": [
+          -1.0,
+          -0.9997684955596924
+        ],
+        "expected": [
+          -1.0,
+          -0.9997684955596924
+        ]
+      },
+      {
+        "input": [
+          0.25,
+          0.375
+        ],
+        "actual": [
+          -0.9997395873069763,
+          -0.9993055462837219
+        ],
+        "expected": [
+          -0.9997395873069763,
+          -0.9993055462837219
+        ]
+      },
+      {
+        "input": [
+          256.25,
+          256.375
+        ],
+        "actual": [
+          -0.7330728769302368,
+          -0.5252314805984497
+        ],
+        "expected": [
+          -0.7330728769302368,
+          -0.5252314805984497
+        ]
+      },
+      {
+        "input": [
+          1023.75,
+          1023.875
+        ],
+        "actual": [
+          0.06640630215406418,
+          0.8960647583007812
+        ],
+        "expected": [
+          0.06640625,
+          0.8960647583007812
+        ]
+      }
+    ]
+  },
+  {
+    "backend": "NPU",
+    "config": {},
+    "execution_devices": "NPU",
+    "max_absolute_error": 0.0006546974182128906,
+    "mismatched_values": 8046,
+    "max_pixel_error": [
+      0.5312919616699219,
+      0.35353660583496094
+    ],
+    "samples": [
+      {
+        "input": [
+          0.0,
+          0.125
+        ],
+        "actual": [
+          -1.0,
+          -1.0
+        ],
+        "expected": [
+          -1.0,
+          -0.9997684955596924
+        ]
+      },
+      {
+        "input": [
+          0.25,
+          0.375
+        ],
+        "actual": [
+          -0.99951171875,
+          -0.99951171875
+        ],
+        "expected": [
+          -0.9997395873069763,
+          -0.9993055462837219
+        ]
+      },
+      {
+        "input": [
+          256.25,
+          256.375
+        ],
+        "actual": [
+          -0.73291015625,
+          -0.52490234375
+        ],
+        "expected": [
+          -0.7330728769302368,
+          -0.5252314805984497
+        ]
+      },
+      {
+        "input": [
+          1023.75,
+          1023.875
+        ],
+        "actual": [
+          0.06640625,
+          0.896484375
+        ],
+        "expected": [
+          0.06640625,
+          0.8960647583007812
+        ]
+      }
+    ]
+  },
+  {
+    "backend": "NPU",
+    "config": {
+      "INFERENCE_PRECISION_HINT": "f32"
+    },
+    "error": "Exception from src\\inference\\src\\cpp\\core.cpp:121:\nException from src\\inference\\src\\dev\\plugin.cpp:54:\nException from src\\plugins\\intel_npu\\src\\al\\include\\intel_npu/config/config.hpp:403:\nFailed to parse 'INFERENCE_PRECISION_HINT' option : Exception from src\\plugins\\intel_npu\\src\\al\\include\\intel_npu/config/options.hpp:171:\nWrong value f32 for property key INFERENCE_PRECISION_HINT. Supported values: f16, i8\n\n\n\n"
+  },
+  {
+    "backend": "NPU",
+    "config": {
+      "EXECUTION_MODE_HINT": "ACCURACY"
+    },
+    "execution_devices": "NPU",
+    "max_absolute_error": 0.0006546974182128906,
+    "mismatched_values": 8046,
+    "max_pixel_error": [
+      0.5312919616699219,
+      0.35353660583496094
+    ],
+    "samples": [
+      {
+        "input": [
+          0.0,
+          0.125
+        ],
+        "actual": [
+          -1.0,
+          -1.0
+        ],
+        "expected": [
+          -1.0,
+          -0.9997684955596924
+        ]
+      },
+      {
+        "input": [
+          0.25,
+          0.375
+        ],
+        "actual": [
+          -0.99951171875,
+          -0.99951171875
+        ],
+        "expected": [
+          -0.9997395873069763,
+          -0.9993055462837219
+        ]
+      },
+      {
+        "input": [
+          256.25,
+          256.375
+        ],
+        "actual": [
+          -0.73291015625,
+          -0.52490234375
+        ],
+        "expected": [
+          -0.7330728769302368,
+          -0.5252314805984497
+        ]
+      },
+      {
+        "input": [
+          1023.75,
+          1023.875
+        ],
+        "actual": [
+          0.06640625,
+          0.896484375
+        ],
+        "expected": [
+          0.06640625,
+          0.8960647583007812
+        ]
+      }
+    ]
+  }
+]

@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "kind": "standalone-vertex-npu-precision-validation",
+  "build": "present-umd-v26",
+  "passed": true,
+  "provider": "NPU",
+  "npu_driver": "32.0.100.5540",
+  "openvino": "2026.1",
+  "exact_fixture_vertex_results": 768,
+  "fp32_screen_vertices": 4096,
+  "palette_bits_exact": true,
+  "position_matches_fp32_multiply_add": true,
+  "registered_driver_integration_tested": false,
+  "desktop_offload_tested": false,
+  "performance_tested": false,
+  "notes": [
+    "Three CPU contract tests pass; all build source hashes match this revision.",
+    "Default F32 graphs lose screen-coordinate precision through internal FP16 lowering. ACCURACY alone did not prevent it.",
+    "Legacy precise_0 metadata materialized by the public OpenVINO serializer and ACCURACY preserve the tested F32 values. This is version-specific qualification, not full shader conformance.",
+    "The former floating bounds mask fails with precision preservation. Appending a zero constant-buffer row and selecting its integer index passes out-of-range and 4096-row checks.",
+    "MAD coordinates may match separate FP32 multiplication/addition or fused FP32 multiply-add; palette values must be bit exact.",
+    "Execution devices are checked and fallback is forbidden. Host packing and transfers remain CPU work.",
+    "Text copies normalize CRLF to LF; original bytes remain in the local results archive."
+  ]
+}

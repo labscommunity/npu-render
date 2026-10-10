@@ -1,9 +1,11 @@
 #include "vertex_executor.hpp"
 #include <openvino/openvino.hpp>
 #include <openvino/opsets/opset13.hpp>
+#include <openvino/pass/serialize.hpp>
 #include <cstring>
 #include <set>
 #include <functional>
+#include <sstream>
 namespace nr::shader {
 namespace {
 namespace op = ov::opset13;
@@ -25,7 +27,7 @@ Node lane(const Node &value, unsigned component) {
 struct VertexExecutor::State {
     Program program;
     uint32_t count;
-    struct Binding { std::shared_ptr<op::Parameter> parameter; bool constant; unsigned index; };
+    struct Binding { std::shared_ptr<op::Parameter> parameter; bool constant; unsigned index; std::string name; };
     std::vector<Binding> bindings;
     std::vector<unsigned> outputs;
     ov::Core core;
@@ -41,8 +43,10 @@ struct VertexExecutor::State {
             Value result;
             for (unsigned i = 0; i < 2; ++i) {
                 auto parameter = std::make_shared<op::Parameter>(i ? ov::element::i32 : ov::element::f32, ov::Shape{rows, 4});
-                parameter->set_friendly_name(std::string(constant ? "cb" : "v") + std::to_string(index) + (i ? "_bits" : "_float"));
-                bindings.push_back({parameter, constant, index});
+                const auto name = std::string(constant ? "cb" : "v") + std::to_string(index) + (i ? "_bits" : "_float");
+                parameter->set_friendly_name(name);
+                parameter->output(0).get_tensor().set_names({name});
+                bindings.push_back({parameter, constant, index, name});
                 (i ? result.integer : result.floating) = parameter;
             }
             return result;
@@ -76,20 +80,18 @@ struct VertexExecutor::State {
                 const auto valid = std::make_shared<op::LogicalAnd>(
                     std::make_shared<op::GreaterEqual>(index, integer(0)),
                     std::make_shared<op::Less>(index, integer(int32_t(program.constants[a.index]))));
-                const auto safe = std::make_shared<op::Select>(valid, index, integer(0));
-                // Intel NPU 5540/OpenVINO 2026.1 miscompiles the broadcast
-                // Select when this boolean comes directly from i32 comparisons.
-                // Rebuild only the 0/1 mask through f32; keep addresses and bounds
-                // comparisons integer so large valid indices retain precision.
-                const auto mask = std::make_shared<op::Greater>(
-                    std::make_shared<op::Convert>(
-                        std::make_shared<op::Reshape>(valid, batch_shape, false), ov::element::f32),
-                    op::Constant::create(ov::element::f32, ov::Shape{}, {0.5f}));
+                // Route out-of-range reads to an appended zero row. The Intel
+                // NPU compiler miscompiled broadcast floating Select masks in
+                // both default and precision-preserving graphs. Integer index
+                // selection followed by Gather avoids that operation entirely.
+                const auto safe = std::make_shared<op::Select>(valid, index, integer(int32_t(program.constants[a.index])));
                 const auto &buffer = constants[a.index];
-                const auto f = std::make_shared<op::Select>(mask,
-                    std::make_shared<op::Gather>(buffer.floating, safe, integer(0)), floating(0));
-                const auto i = std::make_shared<op::Select>(mask,
-                    std::make_shared<op::Gather>(buffer.integer, safe, integer(0)), integer(0));
+                const auto padded_f = std::make_shared<op::Concat>(ov::OutputVector{buffer.floating,
+                    op::Constant::create(ov::element::f32, ov::Shape{1, 4}, {0.0f})}, 0);
+                const auto padded_i = std::make_shared<op::Concat>(ov::OutputVector{buffer.integer,
+                    op::Constant::create(ov::element::i32, ov::Shape{1, 4}, {0})}, 0);
+                const auto f = std::make_shared<op::Gather>(padded_f, safe, integer(0));
+                const auto i = std::make_shared<op::Gather>(padded_i, safe, integer(0));
                 for (unsigned c = 0; c < 4; ++c) raw[c] = {lane(f, c), lane(i, c)};
             } else check(false);
             Lanes result{};
@@ -126,7 +128,9 @@ struct VertexExecutor::State {
             ov::OutputVector components;
             for (unsigned c = 0; c < 4; ++c)
                 components.push_back(batch((program.outputs[i] & (1u << c)) ? output[i][c].floating : floating(0)));
-            results.push_back(std::make_shared<op::Concat>(components, 1)); outputs.push_back(i);
+            auto result = std::make_shared<op::Concat>(components, 1);
+            result->output(0).get_tensor().set_names({"vs_output_" + std::to_string(i)});
+            results.push_back(result); outputs.push_back(i);
         }
         check(!results.empty());
         // Drop unused bit/float views before creating the model's public inputs.
@@ -142,7 +146,27 @@ struct VertexExecutor::State {
         }
         bindings = std::move(used);
         auto model = std::make_shared<ov::Model>(results, parameters, "SM4_vertex_arithmetic");
-        compiled = core.compile_model(model, backend, ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY));
+        ov::AnyMap properties{ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY)};
+        if (backend == "NPU") {
+            // OpenVINO 2026.1 uses the legacy precise_0 runtime attribute.
+            // Its serializer materializes the typed precision marker; loading
+            // the in-memory IR keeps it across the compiler boundary. A plain
+            // f32 input type or ACCURACY hint alone still computes in f16.
+            // No private runtime symbols, disk models or CPU fallback are used.
+            for (const auto &node : model->get_ops()) node->get_rt_info()["precise_0"] = std::string{};
+            std::ostringstream xml, weights;
+            ov::pass::Serialize serializer(xml, weights);
+            serializer.run_on_model(model);
+            const auto bytes = weights.str();
+            ov::Tensor data(ov::element::u8, ov::Shape{bytes.size()});
+            if (!bytes.empty()) std::memcpy(data.data(), bytes.data(), bytes.size());
+            model = core.read_model(xml.str(), data);
+            for (const auto &node : model->get_ops())
+                if (!node->get_rt_info().count("precise_0")) throw std::runtime_error("vertex precision marker was lost");
+            properties.emplace(ov::hint::execution_mode(ov::hint::ExecutionMode::ACCURACY));
+        }
+        compiled = core.compile_model(model, backend, properties);
+        check(compiled.inputs().size() == bindings.size() && compiled.outputs().size() == outputs.size());
         const auto devices = compiled.get_property(ov::execution_devices);
         if (devices.size() != 1 || !(devices[0] == backend || devices[0].rfind(backend + ".", 0) == 0))
             throw std::runtime_error("unexpected vertex execution device");
@@ -157,7 +181,7 @@ VertexExecutor::Result VertexExecutor::execute(const std::vector<VertexRegisters
     for (unsigned i = 0; i < 14; ++i) check(constants[i].size() >= state->program.constants[i]);
     try {
         for (size_t i = 0; i < state->bindings.size(); ++i) {
-            const auto &binding = state->bindings[i]; auto tensor = state->request.get_input_tensor(i);
+            const auto &binding = state->bindings[i]; auto tensor = state->request.get_tensor(binding.name);
             if (binding.constant) {
                 check(tensor.get_byte_size() == size_t(state->program.constants[binding.index]) * sizeof(VertexBits));
                 std::memcpy(tensor.data(), constants[binding.index].data(), tensor.get_byte_size());
@@ -171,7 +195,7 @@ VertexExecutor::Result VertexExecutor::execute(const std::vector<VertexRegisters
         state->request.infer();
         Result result; result.vertices.resize(vertices.size()); result.execution_device = state->execution_device;
         for (size_t i = 0; i < state->outputs.size(); ++i) {
-            const auto tensor = state->request.get_output_tensor(i);
+            const auto tensor = state->request.get_tensor("vs_output_" + std::to_string(state->outputs[i]));
             check(tensor.get_element_type() == ov::element::f32 && tensor.get_byte_size() == vertices.size() * sizeof(VertexBits));
             const auto *source = static_cast<const uint8_t *>(tensor.data());
             for (size_t v = 0; v < vertices.size(); ++v)

@@ -1,0 +1,147 @@
+[
+  {
+    "backend": "NPU",
+    "config": {
+      "EXECUTION_MODE_HINT": "ACCURACY",
+      "NPU_COMPILER_TYPE": "DRIVER"
+    },
+    "rt_info": "precise legacy attribute all nodes",
+    "execution_devices": "NPU",
+    "max_absolute_error": 0.0,
+    "mismatched_values": 0,
+    "max_pixel_error": [
+      0.0,
+      0.0
+    ],
+    "samples": [
+      {
+        "input": [
+          0.0,
+          0.125
+        ],
+        "actual": [
+          -1.0,
+          -0.9997684955596924
+        ],
+        "expected": [
+          -1.0,
+          -0.9997684955596924
+        ]
+      },
+      {
+        "input": [
+          0.25,
+          0.375
+        ],
+        "actual": [
+          -0.9997395873069763,
+          -0.9993055462837219
+        ],
+        "expected": [
+          -0.9997395873069763,
+          -0.9993055462837219
+        ]
+      },
+      {
+        "input": [
+          256.25,
+          256.375
+        ],
+        "actual": [
+          -0.7330728769302368,
+          -0.5252314805984497
+        ],
+        "expected": [
+          -0.7330728769302368,
+          -0.5252314805984497
+        ]
+      },
+      {
+        "input": [
+          1023.75,
+          1023.875
+        ],
+        "actual": [
+          0.06640625,
+          0.8960647583007812
+        ],
+        "expected": [
+          0.06640625,
+          0.8960647583007812
+        ]
+      }
+    ]
+  },
+  {
+    "backend": "NPU",
+    "config": {
+      "EXECUTION_MODE_HINT": "ACCURACY"
+    },
+    "rt_info": "precise legacy attribute all nodes",
+    "execution_devices": "NPU",
+    "max_absolute_error": 0.0,
+    "mismatched_values": 0,
+    "max_pixel_error": [
+      0.0,
+      0.0
+    ],
+    "samples": [
+      {
+        "input": [
+          0.0,
+          0.125
+        ],
+        "actual": [
+          -1.0,
+          -0.9997684955596924
+        ],
+        "expected": [
+          -1.0,
+          -0.9997684955596924
+        ]
+      },
+      {
+        "input": [
+          0.25,
+          0.375
+        ],
+        "actual": [
+          -0.9997395873069763,
+          -0.9993055462837219
+        ],
+        "expected": [
+          -0.9997395873069763,
+          -0.9993055462837219
+        ]
+      },
+      {
+        "input": [
+          256.25,
+          256.375
+        ],
+        "actual": [
+          -0.7330728769302368,
+          -0.5252314805984497
+        ],
+        "expected": [
+          -0.7330728769302368,
+          -0.5252314805984497
+        ]
+      },
+      {
+        "input": [
+          1023.75,
+          1023.875
+        ],
+        "actual": [
+          0.06640625,
+          0.8960647583007812
+        ],
+        "expected": [
+          0.06640625,
+          0.8960647583007812
+        ]
+      }
+    ]
+  }
+]
