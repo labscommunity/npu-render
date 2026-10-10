@@ -305,8 +305,13 @@ int main(int argc, char **argv) {
                     result.inference_input_bytes == (desktop_size ? 696729600ull : 301056ull) &&
                     result.inference_output_bytes == (desktop_size ? 348364800ull : 150528ull),
                     "unexpected draw traffic counters");
-        } else if (buffers) require(result.allocations == 15 && !result.fills && !result.submitted_copies &&
-                             result.upload_bytes == 525504 && result.staging_copy_bytes == 573440, "unexpected buffer traffic");
+        } else if (buffers) {
+            std::printf("{\"buffer_allocations\":%llu,\"buffer_upload_bytes\":%llu,\"buffer_copy_bytes\":%llu}\n",
+                        result.allocations, result.upload_bytes, result.staging_copy_bytes);
+            // The 32 KiB+16-byte case occupies two complete 32 KiB storage rows.
+            require(result.allocations == 15 && !result.fills && !result.submitted_copies &&
+                    result.upload_bytes == 525504 && result.staging_copy_bytes == 688128, "unexpected buffer traffic");
+        }
         else if (uploads) require(result.allocations == 24 && !result.fills && result.staging_copy_bytes == 819200 &&
                              result.submitted_copies == 32 && result.upload_bytes == 119496, "unexpected upload counters");
         else require(result.allocations == (child ? 1u : 4u) && result.fills == (child ? 1u : (processes ? 2u : 6u)) &&
