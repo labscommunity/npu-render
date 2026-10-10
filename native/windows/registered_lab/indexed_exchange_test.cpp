@@ -163,7 +163,7 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
         auto h = r.header; switch (i) {
         case 0: h.signature ^= 1; break; case 1: h.abi = 2; break; case 2: h.nonce[0] = h.nonce[1] = 0; break;
         case 3: h.client_pid = 0; break; case 4: h.width = UINT32_MAX; break; case 5: h.vertices = 4098; break;
-        case 6: h.flags = 0x10000; break; case 7: h.vs_words = 16385; break; case 8: h.sequence = 129; break;
+        case 6: h.flags = 0x10000; break; case 7: h.vs_words = 16385; break; case 8: h.sequence = ex::max_requests + 1; break;
         case 9: h.kind = 2; break; case 10: h.device = 1; break; case 11: h.body_bytes++; break;
         }
         auto bad = bytes; std::memcpy(bad.data(), &h, sizeof(h)); rejects(bad);

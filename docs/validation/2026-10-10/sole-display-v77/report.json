@@ -1,0 +1,29 @@
+{
+  "trial": "v77",
+  "source_commit": "bf68153ec1352778ad988be4fa90bb0603b69d82",
+  "umd_build": "present-umd-v105",
+  "kmd_build": "allocation-capacity-v3",
+  "package_version": "0.0.65.0",
+  "machine_scope": "disposable guest; physical NPU executes explicit remote draw packets",
+  "npu_preflight_packets_passed": 13,
+  "explorer_npu_draws": 115,
+  "explorer_present_callbacks": 1,
+  "dwm_npu_draws": 0,
+  "worker_request_limit": 128,
+  "successful_worker_requests": 128,
+  "received_frames": 0,
+  "viewer_window_submissions": 0,
+  "input_actions": [],
+  "input_visual_response_verified": false,
+  "full_desktop_offload": false,
+  "performance_tested": false,
+  "cleanup_passed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "findings": [
+    "Explorer repeatedly rejects 26x26 BGRA staging textures requesting both CPU_READ and CPU_WRITE, recreating its rendering device. The 13 preflights and 115 Explorer draws exhaust the finite 128-request worker before DWM completes a draw.",
+    "The last captured Explorer draw replays byte-exactly on NPU in isolation: 16x16 target, 12 expanded vertices, 4 triangles, 36 covered samples; 35.975ms draw plus 1831.691ms compilation. The capture does not identify a shader failure.",
+    "The topology helper reports a temporary sole indirect display and successful restoration. The collector did not observe its live sole-display gate; no input or visible desktop response was verified.",
+    "Repeated cached 81-vertex and 24-vertex DWM preflights return exact pixels in 3295ms and 1460ms, respectively. These remain far slower than interactive display requirements. Both guest devices were removed successfully."
+  ]
+}

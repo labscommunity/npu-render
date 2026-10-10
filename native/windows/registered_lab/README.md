@@ -16,7 +16,8 @@ the probe and UMD refuse to operate outside the owned `NR-GFX-LAB` guest with th
 `NR_WINDOWS` volume. The production UMD's readiness gate remains closed.
 
 The admitted operations are 2D render targets, staging textures, clears,
-staging copies, and staging read maps. Resource data uses VidMm
+staging copies, and staging read/write maps limited to the resource's declared
+CPU access. Resource data uses VidMm
 allocations with no private pixel-buffer fallback. Clears submit immediately and
 replace all command-buffer pointers with the runtime's returned pointers. Failed
 submission invalidates the context's writable command pointers. Unsupported
@@ -622,3 +623,15 @@ draw shapes. These changes are laboratory capabilities, pending the next live
 desktop trial.
 
 The [v105 qualification](../../../docs/validation/2026-10-10/instanced-desktop-v105/report.json) records the CPU and physical NPU checks and their exact build provenance.
+
+The [v77 trial](../../../docs/validation/2026-10-10/sole-display-v77/report.json)
+completed 115 Explorer NPU draws, then exhausted its 128-request allowance while
+Explorer repeatedly retried an unsupported read/write staging texture. No DWM
+draw or received frame completed. Staging textures now permit READ, WRITE and
+READWRITE maps according to creation access; READWRITE sets neither the kernel
+ReadOnly nor WriteOnly flag. Copies involving either runtime-owned allocation
+use VidMm submission. Callback tests cover private/shared roundtrips, access
+denial and exact pixels; these are memory-contract tests, not NPU evidence.
+The stream controller defaults to 512 requests within ten minutes, with a strict
+4096-request protocol ceiling. The sole-display observation is separately bounded
+and always attempts topology restoration and removal.

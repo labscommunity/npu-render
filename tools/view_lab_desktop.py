@@ -138,8 +138,8 @@ KEYS.update({f"f{i}": f"f{i}" for i in range(1, 13)})
 
 
 def run(args):
-    if not 1 <= args.seconds <= 300 or bool(args.vm_pid) != bool(args.qmp_port):
-        raise ValueError("duration 1–300 seconds; input needs both VM PID and QMP port")
+    if not 1 <= args.seconds <= 600 or bool(args.vm_pid) != bool(args.qmp_port):
+        raise ValueError("duration 1–600 seconds; input needs both VM PID and QMP port")
     if args.vm_pid and not args.input_ready:
         raise ValueError("input requires the collector's fresh sole-indirect status file")
     control = LabInput(args.vm_pid, args.qmp_port) if args.vm_pid else None

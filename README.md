@@ -113,15 +113,15 @@ now has an exact NPU specialization for opaque, one-to-one point-sampled quads.
 Its captured 1024×768 replay passes, as do changing-image and driver callback
 tests. This is a checked subset, not general desktop rendering.
 
-The [latest installed trial](docs/validation/2026-10-10/sole-display-v76/report.json)
-completed 22 DWM draws on the NPU and received three black frames. Both guest
-drivers were removed successfully. Its next rejected draw has a small scissor
-but exceeded a conservative full-screen work estimate; an offline replay now
-matches the scalar reference on the NPU after bounding actual clipped work.
-The shell's [typed-buffer lookup shader](docs/validation/2026-10-10/typed-resources-v101/report.json)
-passes isolated NPU checks, while the live shell advances to instanced input
-layouts and immutable textures. Support for those is under qualification. Full
-desktop offload and a Tahoma benefit remain unproven.
+The [latest installed trial](docs/validation/2026-10-10/sole-display-v77/report.json)
+completed 115 Explorer draws on the NPU but received no desktop frames. Explorer
+repeatedly requested an unsupported read/write staging texture; its retries and
+13 preflights exhausted the test worker's 128-request allowance before DWM drew.
+Both guest drivers were removed successfully. Instanced input, immutable textures,
+and typed lookups now pass isolated NPU checks. Read/write staging textures and a
+larger finite observation budget are under qualification. Cached DWM draw
+roundtrips still take 1.5–3.3 seconds; full desktop offload and a Tahoma benefit
+remain unproven.
 
 The [captured-window desktop experiment](native/windows/capture/README.md) now
 presents an NPU-composed 2880×1800 desktop with input passing through to the

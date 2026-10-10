@@ -8,7 +8,8 @@ param(
  [Parameter(Mandatory=$true)][string]$IndirectPackage,
  [Parameter(Mandatory=$true)][ValidatePattern('^idd-topology-[a-z0-9-]+$')][string]$TopologyName,
  [Parameter(Mandatory=$true)][string]$TopologyProbe,
- [Parameter(Mandatory=$true)][ValidatePattern('^[a-fA-F0-9]{64}$')][string]$TopologySha256
+ [Parameter(Mandatory=$true)][ValidatePattern('^[a-fA-F0-9]{64}$')][string]$TopologySha256,
+ [ValidateRange(5,120)][int]$ObservationSeconds=90
 )
 $ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue'
 . "$PSScriptRoot\lab_device_identity.ps1"
@@ -35,12 +36,12 @@ try {
  $r=Get-Content "C:\npu-lab\$RenderName-install.json" -Raw|ConvertFrom-Json;if(!$r.passed){throw 'Render install failed'}
  & C:\npu-lab\manage_lab_driver.ps1 -Action install -HardwareId 'ROOT\NPURENDER_INDIRECT_LAB' -Name $IndirectName -Version $IndirectVersion -Package $IndirectPackage | Out-Null
  $r=Get-Content "C:\npu-lab\$IndirectName-install.json" -Raw|ConvertFrom-Json;if(!$r.passed){throw 'Indirect install failed'}
- & C:\npu-lab\start_indirect_topology_task.ps1 -Probe $TopologyProbe -Sha256 $TopologySha256 -Name $TopologyName -SoleIndirect | Out-Null
+ & C:\npu-lab\start_indirect_topology_task.ps1 -Probe $TopologyProbe -Sha256 $TopologySha256 -Name $TopologyName -SoleIndirect -ObservationSeconds $ObservationSeconds | Out-Null
  $watch=[Diagnostics.Stopwatch]::StartNew()
  $knownDwm=New-Object 'System.Collections.Generic.HashSet[int]'
  # Native process enumeration and footer reads avoid blocking CIM task polling.
  # Stop promptly after a complete failed DWM draw; retain its input evidence.
- while($watch.ElapsedMilliseconds -lt 90000){
+ while($watch.ElapsedMilliseconds -lt (($ObservationSeconds+30)*1000)){
   foreach($process in [Diagnostics.Process]::GetProcessesByName('dwm')){[void]$knownDwm.Add($process.Id);$process.Dispose()}
   $failed=$false
   foreach($processId in $knownDwm){
@@ -76,9 +77,9 @@ try {
 } catch {$report.error=$_.Exception.Message}
 finally {
  # Let the finite topology helper restore its original paths before removing
- # the monitor. It has its own 45-second observation and three-minute task cap.
+ # the monitor. It has its own bounded observation and five-minute task cap.
  $restoring=[Diagnostics.Stopwatch]::StartNew()
- while($restoring.ElapsedMilliseconds -lt 65000){
+ while($restoring.ElapsedMilliseconds -lt (($ObservationSeconds+30)*1000)){
   $topology="C:\npu-lab\$TopologyName.jsonl"
   if(!(Test-Path $topology)){break}
   try {if((Get-Content $topology -Raw) -match '"passed":(true|false)'){break}}catch {$report.topology_read_error=$_.Exception.Message;break}

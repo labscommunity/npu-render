@@ -14,7 +14,7 @@ int wmain(int argc, wchar_t **argv) try {
     if (setsockopt(listener.value, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, reinterpret_cast<const char *>(&exclusive), sizeof(exclusive))) throw std::runtime_error("relay socket exclusivity failed");
     sockaddr_in address{}; address.sin_family = AF_INET; address.sin_port = htons(49406); address.sin_addr.s_addr = htonl(INADDR_ANY);
     if (bind(listener.value, reinterpret_cast<sockaddr *>(&address), sizeof(address)) || listen(listener.value, 1)) throw std::runtime_error("relay listen failed");
-    const auto deadline = GetTickCount64() + 300000;
+    const auto deadline = GetTickCount64() + 600000;
     stream::wait_socket(listener.value, POLLRDNORM, deadline);
     stream::Socket socket(accept(listener.value, nullptr, nullptr)); stream::nonblocking(socket.value);
     stream::authenticate(socket.value, stream::secret(argv[2]), true, GetTickCount64() + 15000);

@@ -96,8 +96,8 @@ try {
 
 
 def run(args):
-    if not 1 <= args.seconds <= 300 or args.host.startswith("-"):
-        raise ValueError("expected SSH host and duration 1–300 seconds")
+    if not 1 <= args.seconds <= 600 or args.host.startswith("-"):
+        raise ValueError("expected SSH host and duration 1–600 seconds")
     if not 0 <= args.keep_frames <= 16:
         raise ValueError("keep-frames must be between 0 and 16")
     args.output.mkdir(parents=True, exist_ok=False)

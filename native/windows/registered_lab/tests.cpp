@@ -15,7 +15,7 @@ nr::kernel_contract::FillSurface commands[2]{};
 D3DDDI_ALLOCATIONLIST lists[2][2]{};
 UINT current_buffer = 0, renders = 0, destroys = 0, released = 0;
 bool contract_error = false, allocation_failure = false, render_failure = false;
-bool lock_failure = false;
+bool lock_failure = false, last_lock_read_only=false, last_lock_write_only=false;
 bool emulate_copies = false;
 std::vector<std::pair<UINT, UINT>> pending_copies;
 HRESULT last_error = S_OK;
@@ -80,7 +80,9 @@ HRESULT APIENTRY deallocate_cb(HANDLE rt, const D3DDDICB_DEALLOCATE *a) {
 }
 HRESULT APIENTRY lock_cb(HANDLE rt, D3DDDICB_LOCK *a) {
     verify(rt == runtime_handle && a->Flags.LockEntire && a->Flags.DonotEvict && !a->Flags.Discard);
-    if (lock_failure && a->Flags.WriteOnly) return E_ACCESSDENIED;
+    last_lock_read_only=a->Flags.ReadOnly!=0;last_lock_write_only=a->Flags.WriteOnly!=0;
+    verify(!(last_lock_read_only && last_lock_write_only));
+    if (lock_failure && !a->Flags.ReadOnly) return E_ACCESSDENIED;
     const auto i = a->hAllocation;
     for (const auto &resource : resource_handles) if (resource.second == i) return E_ACCESSDENIED;
     if (i >= memory.size() || memory[i].empty() || locked[i]) return E_INVALIDARG;
@@ -124,6 +126,7 @@ HRESULT APIENTRY render_cb(HANDLE rt, D3DDDICB_RENDER *a) {
 }
 }
 #include "upload_test.hpp"
+#include "staging_map_test.hpp"
 #include "draw_test.hpp"
 #include "indexed_draw_test.hpp"
 #include "present_test.hpp"
@@ -295,6 +298,7 @@ int main(int argc, char **argv) {
     TEST(!counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
     TEST(released == 4 && destroys == 1);
     TEST(test_uploads(kt, um) == 0);
+    TEST(test_staging_maps(kt, um) == 0);
     TEST(test_present(kt, um) == 0);
     TEST(test_rotation(kt, um) == 0);
     TEST(test_copy_regions(kt, um) == 0);

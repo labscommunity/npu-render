@@ -1,0 +1,38 @@
+{
+  "build": "present-umd-v106",
+  "clean_build": true,
+  "compiled_source_hashes_match": true,
+  "cpu_contract_suites_passed": 17,
+  "physical_npu_callback_contracts_passed": true,
+  "staging_memory_contracts": {
+    "dimensions": [
+      26,
+      26
+    ],
+    "format": "BGRA8",
+    "access_modes": [
+      "READ",
+      "WRITE",
+      "READWRITE"
+    ],
+    "private_and_runtime_owned_copy_roundtrips": true,
+    "unsupported_access_rejected": true,
+    "read_write_lock_sets_neither_readonly_nor_writeonly": true,
+    "exact_pixel_roundtrip": true,
+    "npu_execution_tested": false
+  },
+  "topology_build": "indirect-lab-v27",
+  "topology_cpu_suites_passed": 2,
+  "topology_manifest_local_differences": [
+    "native/windows/indirect_lab/README.md (documentation only; all compiled inputs match)"
+  ],
+  "observation_defaults": {
+    "requests": 512,
+    "protocol_maximum_requests": 4096,
+    "worker_deadline_seconds": 600,
+    "sole_display_seconds": 90,
+    "topology_task_limit_seconds": 300
+  },
+  "full_desktop_offload": false,
+  "tahoma_performance_tested": false
+}

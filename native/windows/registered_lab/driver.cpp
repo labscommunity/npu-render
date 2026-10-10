@@ -235,7 +235,7 @@ void APIENTRY create_resource(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATERESOUR
         require(!presentation || (a->BindFlags & D3D10_DDI_BIND_RENDER_TARGET));
         require(!shared || rt.handle);
         require(a->MipLevels == 1 || (!shared && !presentation && !a->MiscFlags));
-        const bool staging = a->Usage == D3D10_DDI_USAGE_STAGING && !a->BindFlags && a->MapFlags == D3D10_DDI_CPU_ACCESS_READ && !shared;
+        const bool staging = a->Usage == D3D10_DDI_USAGE_STAGING && !a->BindFlags && a->MapFlags && !(a->MapFlags & ~(D3D10_DDI_CPU_ACCESS_READ | D3D10_DDI_CPU_ACCESS_WRITE)) && !shared;
         constexpr UINT bindings = D3D10_DDI_BIND_RENDER_TARGET | D3D10_DDI_BIND_SHADER_RESOURCE | D3D10_DDI_BIND_PRESENT;
         const bool target = a->Usage == D3D10_DDI_USAGE_DEFAULT && a->BindFlags && !(a->BindFlags & ~bindings) && !a->MapFlags;
         const bool immutable=a->Usage==D3D10_DDI_USAGE_IMMUTABLE && a->BindFlags==D3D10_DDI_BIND_SHADER_RESOURCE && !a->MapFlags && !a->MiscFlags && a->pInitialDataUP;
@@ -325,8 +325,8 @@ void APIENTRY clear(D3D10DDI_HDEVICE h, D3D10DDI_HRENDERTARGETVIEW v, FLOAT colo
 void APIENTRY copy_resource(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE dst, D3D10DDI_HRESOURCE src) {
     guard(h, __FUNCTION__, [&] {
         auto &d = resource(dst); auto &s = resource(src);
-        require(d.usage == D3D10_DDI_USAGE_STAGING && d.buffer_bytes == s.buffer_bytes &&
-            (s.usage == D3D10_DDI_USAGE_DEFAULT || s.usage == D3D10_DDI_USAGE_IMMUTABLE || (s.buffer_bytes &&
+        require((d.usage == D3D10_DDI_USAGE_STAGING || d.usage == D3D10_DDI_USAGE_DEFAULT) && d.buffer_bytes == s.buffer_bytes &&
+            (s.usage == D3D10_DDI_USAGE_DEFAULT || s.usage == D3D10_DDI_USAGE_STAGING || s.usage == D3D10_DDI_USAGE_IMMUTABLE || (s.buffer_bytes &&
              (s.usage == D3D10_DDI_USAGE_DYNAMIC || s.usage == D3D10_DDI_USAGE_IMMUTABLE))));
         require(mip_count(d) == mip_count(s));
         for (UINT sub = 0; sub < mip_count(d); ++sub) {
@@ -338,7 +338,7 @@ void APIENTRY copy_resource(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE dst, D3D10DDI
         }
         for (UINT sub = 0; sub < mip_count(d); ++sub) {
             const auto a = mip_allocation(d, sub), b = mip_allocation(s, sub);
-            if (b->runtime_resource) a->context->copy(b->handle, a->handle);
+            if (a->runtime_resource || b->runtime_resource) a->context->copy(b->handle, a->handle);
             else {
                 // Explicit CPU staging, never counted as NPU rendering.
                 Mapping read(*b, true), write(*a, false);
@@ -366,14 +366,18 @@ void APIENTRY map(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE r, UINT sub, D3D10_DDI_
         auto &v = resource(r);
         require(out && !flags && v.allocation->context == device(h).context);
         const auto allocation = mip_allocation(v, sub);
-        const bool read = type == D3D10_DDI_MAP_READ && v.usage == D3D10_DDI_USAGE_STAGING &&
-            v.map_flags == D3D10_DDI_CPU_ACCESS_READ;
+        const bool wants_read=type==D3D10_DDI_MAP_READ || type==D3D10_DDI_MAP_READWRITE;
+        const bool wants_write=type==D3D10_DDI_MAP_WRITE || type==D3D10_DDI_MAP_READWRITE;
+        const bool staging=v.usage==D3D10_DDI_USAGE_STAGING && (wants_read || wants_write) &&
+            (!wants_read || (v.map_flags&D3D10_DDI_CPU_ACCESS_READ)) &&
+            (!wants_write || (v.map_flags&D3D10_DDI_CPU_ACCESS_WRITE));
         const bool geometry = (v.bind_flags & (D3D10_DDI_BIND_VERTEX_BUFFER | D3D10_DDI_BIND_INDEX_BUFFER)) != 0;
         const bool discard = v.buffer_bytes && (type == D3D10_DDI_MAP_WRITE_DISCARD ||
             (geometry && type == D3D10_DDI_MAP_WRITE_NOOVERWRITE)) &&
             v.usage == D3D10_DDI_USAGE_DYNAMIC && v.map_flags == D3D10_DDI_CPU_ACCESS_WRITE;
-        require(read || discard);
-        out->pData = allocation->lock(read); v.mapped_write = discard;
+        require(staging || discard);
+        out->pData = allocation->lock(staging && wants_read && !wants_write,staging && wants_read && wants_write);
+        v.mapped_write = discard || (staging && wants_write);
         out->RowPitch = allocation->surface.row_pitch;
         out->DepthPitch = UINT(allocation->surface.allocation_bytes);
     });
@@ -382,7 +386,8 @@ void APIENTRY unmap(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE r, UINT sub) {
     guard(h, __FUNCTION__, [&] {
         auto &v = resource(r); const auto allocation = mip_allocation(v, sub); auto &a = *allocation;
         require(a.locked && a.context == device(h).context); check(a.unlock());
-        if (v.mapped_write) counters.upload_bytes += v.buffer_bytes;
+        if (v.mapped_write) counters.upload_bytes += v.buffer_bytes ? v.buffer_bytes :
+            uint64_t(a.surface.width)*a.surface.height*texel_bytes(a.surface.format);
         v.mapped_write = false;
     });
 }

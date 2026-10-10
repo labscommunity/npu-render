@@ -67,7 +67,7 @@ void print(const char *phase, const Topology &value) {
     std::fflush(output);
 }
 }
-int run_probe(bool sole_indirect = false) {
+int run_probe(bool sole_indirect = false, UINT observation_seconds = 45) {
     if (!nr_fill_guest()) return 2;
     DWORD session = 0;
     if (!ProcessIdToSessionId(GetCurrentProcessId(), &session) || !session) return 2;
@@ -129,9 +129,9 @@ int run_probe(bool sole_indirect = false) {
                 if (path.targetInfo.targetAvailable && path.targetInfo.outputTechnology == DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INDIRECT_WIRED)
                     ++indirect;
             if (indirect != 1) throw std::runtime_error("one original and one active indirect display required");
-            std::fputs("{\"automatic_activation_observed\":true,\"topology_changed_by_probe\":false,\"observation_seconds\":45}\n", output);
+            std::fprintf(output, "{\"automatic_activation_observed\":true,\"topology_changed_by_probe\":false,\"observation_seconds\":%u}\n", observation_seconds);
             std::fflush(output);
-            for (UINT i = 0; i < 45; ++i) Sleep(1000);
+            for (UINT i = 0; i < observation_seconds; ++i) Sleep(1000);
             const auto current = query(QDC_ONLY_ACTIVE_PATHS); print("observed", current);
             if (current.paths.size() != before.paths.size() || !position_preserved(before, current))
                 throw std::runtime_error("automatically activated topology changed during observation");
@@ -194,9 +194,9 @@ int run_probe(bool sole_indirect = false) {
         print("extended", active);
         if (!contains(active, target) || (sole_indirect ? active.paths.size() != 1 : !position_preserved(before, active)))
             throw std::runtime_error("indirect display activation or original-display preservation failed");
-        std::fprintf(output, "{\"indirect_display_active\":true,\"original_display_preserved\":%s,\"observation_seconds\":45}\n", sole_indirect ? "false" : "true");
+        std::fprintf(output, "{\"indirect_display_active\":true,\"original_display_preserved\":%s,\"observation_seconds\":%u}\n", sole_indirect ? "false" : "true", observation_seconds);
         std::fflush(output);
-        for (UINT i = 0; i < 45; ++i) Sleep(1000);
+        for (UINT i = 0; i < observation_seconds; ++i) Sleep(1000);
         passed = true;
     } catch (const std::exception &e) { std::fprintf(output, "{\"error\":\"%s\"}\n", e.what()); }
     if (restore) {
@@ -222,8 +222,16 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     int argc = 0;
     auto args = CommandLineToArgvW(GetCommandLineW(), &argc);
     if (!args) return 2;
-    const bool sole_indirect = argc == 4 && !lstrcmpW(args[3], L"--sole-indirect");
-    bool valid = (argc == 3 || sole_indirect) && !lstrcmpW(args[1], L"--report") &&
+    bool sole_indirect = false; UINT observation_seconds = 45; int next = 3;
+    if (argc > next && !lstrcmpW(args[next], L"--sole-indirect")) { sole_indirect = true; ++next; }
+    bool duration_valid = true;
+    if (argc == next + 2 && !lstrcmpW(args[next], L"--seconds")) {
+        wchar_t *end = nullptr; const auto seconds = wcstoul(args[next + 1], &end, 10);
+        duration_valid = end != args[next + 1] && !*end && seconds >= 5 && seconds <= 120;
+        if (duration_valid) observation_seconds = UINT(seconds);
+        next += 2;
+    }
+    bool valid = argc >= 3 && argc == next && duration_valid && !lstrcmpW(args[1], L"--report") &&
         !wcsncmp(args[2], L"idd-topology-", 13) && wcslen(args[2]) < 100;
     if (valid) for (const WCHAR *p = args[2]; *p; ++p)
         if (!((*p >= L'a' && *p <= L'z') || (*p >= L'0' && *p <= L'9') || *p == L'-')) valid = false;
@@ -240,7 +248,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     if (!output) { _close(fd); return 2; }
     setvbuf(output, nullptr, _IONBF, 0);
     std::fprintf(output, "{\"event\":\"probe_started\",\"pid\":%lu,\"console_required\":false}\n", GetCurrentProcessId());
-    const auto result = run_probe(sole_indirect);
+    const auto result = run_probe(sole_indirect, observation_seconds);
     fclose(output); return result;
 }
 #endif

@@ -8,7 +8,7 @@ int wmain(int argc, wchar_t **argv) try {
     wchar_t *end = nullptr; const auto limit = std::wcstoul(argv[2], &end, 10);
     ex::require(end != argv[2] && !*end && limit && limit <= ex::max_requests);
     stream::Winsock startup; stream::Socket socket(::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)); stream::nonblocking(socket.value);
-    const auto deadline = GetTickCount64() + 300000;
+    const auto deadline = GetTickCount64() + 600000;
     sockaddr_in address{}; address.sin_family = AF_INET; address.sin_port = htons(49406); address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     if (connect(socket.value, reinterpret_cast<sockaddr *>(&address), sizeof(address)) == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK)
         throw std::runtime_error("indexed loopback connect failed");

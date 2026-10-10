@@ -10,7 +10,7 @@
 #include <stdexcept>
 namespace nr::registered_lab::indexed_exchange {
 constexpr uint64_t magic = 0x4e525f4452415731ull;
-constexpr uint32_t max_packet_bytes = 32u * 1024 * 1024, max_requests = 128;
+constexpr uint32_t max_packet_bytes = 32u * 1024 * 1024, max_requests = 4096;
 struct Header {
     uint64_t signature = magic, nonce[2]{};
     uint32_t abi = 1, width = 0, height = 0, vertices = 0, format = 0, flags = 0;

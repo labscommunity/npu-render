@@ -158,13 +158,13 @@ struct Allocation {
         surface = description; runtime_resource = resource; handle = allocation;
         ++context->stats.live_allocations;
     }
-    void *lock(bool read_only) {
-        require(handle && !locked);
+    void *lock(bool read_only, bool read_write=false) {
+        require(handle && !locked && !(read_only && read_write));
         D3DDDICB_LOCK args{};
         args.hAllocation = handle;
         args.Flags.LockEntire = args.Flags.DonotEvict = 1;
         args.Flags.ReadOnly = read_only;
-        args.Flags.WriteOnly = !read_only;
+        args.Flags.WriteOnly = !read_only && !read_write;
         check(context->callbacks.pfnLockCb(context->runtime, &args), "LockCb");
         locked = true; mapping = args.pData;
         require(mapping && args.hAllocation == handle);
