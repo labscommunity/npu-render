@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "kind": "npu-uniform-texture-color-and-dxgi-buffer-rotation",
+  "npu_qualification": {
+    "checked_components": 20054016,
+    "rounded_oracle_differences": 27868,
+    "maximum_byte_error": 0.518258361,
+    "invalid_draws_rejected": 64,
+    "desktop_offload_tested": false,
+    "displayed_frames": 0
+  },
+  "captured_replays": 3,
+  "capture_sha256": "fb5f1a37d23ed1689f1ea83dc4b7c6f79614ab4013dda2b5eb48a3d012f8f0df",
+  "captured_replay_maximum_byte_error": 0,
+  "cpu_tests_passed": 13,
+  "rotation": "Actual DXGI DDI shim verifies cyclic kernel-handle changes, stable runtime handles, existing render-target view and bound-target updates, invalid-list atomicity, presentation using rotated allocation, and destruction without leaks. Shared runtime bookkeeping emulated explicitly outside UMD.",
+  "npu_qualification_build": "present-umd-v80",
+  "combined_build": "present-umd-v81",
+  "qualification_relationship": "The provider implementation and NPU fixtures are unchanged between v80 and v81; v81 adds DXGI resource rotation and its CPU shim tests.",
+  "full_desktop_offload": false,
+  "displayed_frames_verified": 0,
+  "sources": [
+    "https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/dxgiddi/ns-dxgiddi-dxgi_ddi_base_functions"
+  ]
+}

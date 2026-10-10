@@ -427,7 +427,7 @@ arithmetic prototypes. It does not establish display frame delivery.
 
 
 `LinearTextureDrawExecutor` handles the next captured DWM shader: SAMPLE followed
-by white color modulation, retaining sampled alpha. A checked axis-aligned quad
+by uniform RGBA color modulation, retaining and modulating sampled alpha. A checked axis-aligned quad
 with unit clip w supports fractional bounds, scaling, edge-clamped bilinear
 sampling, RGBA/BGRA conversion, partial scissor and optional premultiplied
 source-over. Vertex shading, projection, coverage, UV interpolation, filtering,
@@ -440,7 +440,7 @@ model reused for every row group. A direct GridSample prototype produced corrupt
 NPU output; the implementation uses the previously qualified bounded Gather and
 integer-predicate lowering. Packet version 4 adds a checked linear-filter bit;
 versions 1–3 remain compatible. Unsupported shaders, perspective/rotated geometry,
-non-white vertex color and unsupported filtering still fail without committing
+varying vertex color, color outside [0,1] and unsupported filtering still fail without committing
 the target. This is an incremental operation, not full desktop offload.
 
 The [v63b installed trial](../../../docs/validation/2026-10-10/indexed-dwm-v63b/report.json)
@@ -480,3 +480,18 @@ Both indexed controllers check these dependencies before guest configuration and
 record their hashes and file versions. The [v65 startup failure and regression
 check](../../../docs/validation/2026-10-10/indexed-runtime-v65/failure-analysis.json)
 preserve the rejected launch; no drivers were installed during that failure.
+
+The [v67 live trial](../../../docs/validation/2026-10-10/received-desktop-v67/report.json)
+completed nine DWM draws on the physical NPU and read back three indirect-display
+frames. The latest contains the desktop wallpaper and Windows watermark. Five
+Present callbacks succeeded. There is no viewer delivery or full desktop claim:
+the trial exposed uniform opacity and buffer-identity rotation as further gaps.
+
+Uniform RGBA modulation now runs on the NPU before source-over blending, including
+the modulated alpha. The [v80/v81 qualification](../../../docs/validation/2026-10-10/fade-rotation-v81/report.json)
+checks 20,054,016 components, both storage formats, color/opacity changes and 64
+invalid draws. Maximum error remains 0.5183 byte units; three captured fade-draw
+replays are exact. DXGI identity rotation validates the entire list, then rotates
+kernel allocation handles in place. Runtime resource handles stay fixed; existing
+views and bound targets see the new backing through their retained allocation
+objects. These results do not establish interactive desktop performance.

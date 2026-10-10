@@ -121,6 +121,8 @@ int main(int argc, char **argv) try {
             const std::array<float,4> screen{(as_float(a[pr][0])+1)*(float(width)*.5f),(1-as_float(a[pr][1]))*(float(height)*.5f),
                 (as_float(b[pr][0])+1)*(float(width)*.5f),(1-as_float(b[pr][1]))*(float(height)*.5f)};
             const std::array<double,4> uv{as_float(a[ur][0]),as_float(a[ur][1]),as_float(b[ur][0]),as_float(b[ur][1])};
+            const auto cr=ps.instructions[1].sources[1].index;
+            const std::array<double,4> color{as_float(a[cr][0]),as_float(a[cr][1]),as_float(a[cr][2]),as_float(a[cr][3])};
             std::array<int32_t,4> snapped{};for(unsigned c=0;c<4;++c)snapped[c]=int32_t(std::nearbyint(double(screen[c])*256));
             linear_reference.resize(size_t(width)*height);
             for(uint32_t y=0;y<height;++y)for(uint32_t x=0;x<width;++x){
@@ -132,7 +134,7 @@ int main(int argc, char **argv) try {
                 const auto ix=int64_t(std::floor(tx)),iy=int64_t(std::floor(ty));const double fx=tx-double(ix),fy=ty-double(iy);double sample[4]{};
                 for(int dy=0;dy<2;++dy)for(int dx=0;dx<2;++dx){const auto sx=std::clamp(ix+dx,int64_t(0),int64_t(texture.width)-1),sy=std::clamp(iy+dy,int64_t(0),int64_t(texture.height)-1);
                     for(unsigned c=0;c<4;++c)sample[c]+=texture.pixels[size_t(sy)*texture.width+size_t(sx)][c]*(dx?fx:1-fx)*(dy?fy:1-fy);}
-                for(unsigned c=0;c<4;++c)linear_reference[at][c]=std::clamp(sample[format!=texture.format&&c<3?2-c:c]+(blending?pixels[at][c]*(1-sample[3]/255):0),0.,255.);
+                for(unsigned c=0;c<4;++c)linear_reference[at][c]=std::clamp(sample[format!=texture.format&&c<3?2-c:c]*color[format==87&&c<3?2-c:c]+(blending?pixels[at][c]*(1-sample[3]*color[3]/255):0),0.,255.);
             }
         }else{
             nr::capture::check(!blending && clip==std::array<int32_t,4>{0,0,int32_t(width),int32_t(height)});

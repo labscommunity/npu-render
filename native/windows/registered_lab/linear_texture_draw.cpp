@@ -73,6 +73,7 @@ struct LinearTextureDrawExecutor::State {
         auto source=parameter(ov::element::f32,{size_t(sw)*sh,4},"source");
         auto bg=parameter(ov::element::u8,{count,4},"background");
         auto uv=parameter(ov::element::f32,{1,4},"uv");
+        auto color=parameter(ov::element::f32,{1,4},"color");
         auto bounds=parameter(ov::element::i32,{1,4},"bounds"),clip=parameter(ov::element::i32,{1,4},"scissor");
         auto origin=parameter(ov::element::f32,{1,1},"origin"),origin_i=parameter(ov::element::i32,{1,1},"origin_i");
         auto half=parameter(ov::element::f32,{1,1},"half");
@@ -106,7 +107,10 @@ struct LinearTextureDrawExecutor::State {
         };
         auto mix=[](const Node &a,const Node &b,const Node &t)->Node{return add(mul(a,sub(number(1),t)),mul(b,t));};
         auto tx=sub(x,floating(ix)),ty=sub(y,floating(iy));
-        auto sampled=mix(mix(fetch(0,0),fetch(1,0),tx),mix(fetch(0,1),fetch(1,1),tx),ty);
+        // The shader multiplies sampled RGBA by a uniform vertex color. Source
+        // storage remains packed, so map the color to that storage order first.
+        auto packed_color=std::make_shared<op::Gather>(color,sf==87?axes({2,1,0,3}):axes({0,1,2,3}),op::Constant::create(ov::element::i32,ov::Shape{},{1}));
+        auto sampled=mul(mix(mix(fetch(0,0),fetch(1,0),tx),mix(fetch(0,1),fetch(1,1),tx),ty),packed_color);
         auto px=op::Constant::create(ov::element::i32,ov::Shape{count,1},xx);
         auto py=add(op::Constant::create(ov::element::i32,ov::Shape{count,1},yy),mul(origin_i,integer(256)));
         auto inside=[&](const Node &r)->Node {
@@ -124,7 +128,7 @@ struct LinearTextureDrawExecutor::State {
             channels.push_back(add(mul(add(base,inc),covered),mul(pred(bc),sub(integer(1),covered))));
         }
         auto output=std::make_shared<op::Convert>(std::make_shared<op::Concat>(channels,1),ov::element::u8);
-        auto model=std::make_shared<ov::Model>(ov::OutputVector{output,std::make_shared<op::Convert>(covered,ov::element::u8)},ov::ParameterVector{source,bg,uv,bounds,clip,origin,origin_i,half});
+        auto model=std::make_shared<ov::Model>(ov::OutputVector{output,std::make_shared<op::Convert>(covered,ov::element::u8)},ov::ParameterVector{source,bg,uv,color,bounds,clip,origin,origin_i,half});
         ov::AnyMap properties{ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY)};
         if(backend=="NPU"){
             for(const auto &node:model->get_ops())node->get_rt_info()["precise_0"]=std::string{};
@@ -152,8 +156,11 @@ UniformDrawExecutor::Result LinearTextureDrawExecutor::execute(const std::vector
     result.execution_device=shaded.execution_device;result.timings.shader_ms=elapsed(began);require(result.execution_device==s.device);
     result.input_bytes=shaded.input_bytes;result.output_bytes=shaded.output_bytes;++result.provider_requests;
     std::vector<ClipPosition> positions(6);
+    const auto color_bits=shaded.vertices[0][s.pixel.color];std::array<float,4> color{};
+    std::memcpy(color.data(),color_bits.data(),16);
+    for(const auto v:color)require(std::isfinite(v) && v>=0 && v<=1);
     for(size_t n=0;n<6;++n){
-        require(shaded.vertices[n][s.pixel.color]==shader::VertexBits{0x3f800000,0x3f800000,0x3f800000,0x3f800000});
+        require(shaded.vertices[n][s.pixel.color]==color_bits);
         std::memcpy(positions[n].data(),shaded.vertices[n][s.vs.position_output].data(),16);require(positions[n][3]==1.f);
     }
     began=Clock::now();const auto projected=s.projection.execute(positions,viewport);result.timings.projection_ms=elapsed(began);require(projected.execution_device==s.device);
@@ -175,6 +182,7 @@ UniformDrawExecutor::Result LinearTextureDrawExecutor::execute(const std::vector
     auto *texels=s.request.get_tensor("source").data<float>();
     for(size_t n=0;n<source.pixels.size();++n)for(size_t c=0;c<4;++c)texels[n*4+c]=float(source.pixels[n][c])/255;
     std::memcpy(s.request.get_tensor("uv").data<float>(),uv.data(),16);
+    std::memcpy(s.request.get_tensor("color").data<float>(),color.data(),16);
     std::memcpy(s.request.get_tensor("bounds").data<int32_t>(),bounds.data(),16);std::memcpy(s.request.get_tensor("scissor").data<int32_t>(),clip.data(),16);
     s.request.get_tensor("half").data<float>()[0]=.5f;result.pixels.resize(background.size());
     for(uint32_t y=0;y<s.height;y+=s.rows){
@@ -184,7 +192,7 @@ UniformDrawExecutor::Result LinearTextureDrawExecutor::execute(const std::vector
         require(output.get_element_type()==ov::element::u8 && output.get_byte_size()==size_t(s.count)*4 && coverage.get_element_type()==ov::element::u8 && coverage.get_size()==s.count);
         std::memcpy(result.pixels.data()+offset,output.data<const uint8_t>(),size_t(s.count)*4);
         for(size_t n=0;n<s.count;++n){const auto value=coverage.data<const uint8_t>()[n];require(value<=1);result.covered_samples+=value;}
-        result.input_bytes+=uint64_t(s.sw)*s.sh*16+uint64_t(s.count)*4+60;result.output_bytes+=uint64_t(s.count)*5;++result.provider_requests;++result.tile_executions;
+        result.input_bytes+=uint64_t(s.sw)*s.sh*16+uint64_t(s.count)*4+76;result.output_bytes+=uint64_t(s.count)*5;++result.provider_requests;++result.tile_executions;
     }
     result.timings.merger_ms=elapsed(began);result.timings.total_ms=elapsed(start);result.used_rectangle=true;result.vertices=std::move(shaded.vertices);s.failed=false;return result;
 }

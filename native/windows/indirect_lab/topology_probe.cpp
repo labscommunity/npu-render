@@ -139,17 +139,25 @@ int run_probe(bool sole_indirect = false) {
             return 0;
         }
         const auto all = query(QDC_ALL_PATHS); print("available", all);
-        if (before.paths.size() != 1) throw std::runtime_error("exactly one original active display required");
+        if (before.paths.size() != 1 && !(sole_indirect && before.paths.size() == 2))
+            throw std::runtime_error("one original display and at most one indirect display required");
+        UINT original_path = UINT(before.paths.size()), originals = 0, active_indirect = 0;
+        for (UINT i = 0; i < before.paths.size(); ++i) {
+            if (before.paths[i].targetInfo.outputTechnology == DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INDIRECT_WIRED) ++active_indirect;
+            else { original_path = i; ++originals; }
+        }
+        if (originals != 1 || active_indirect > 1) throw std::runtime_error("one original non-indirect display required");
         DISPLAYCONFIG_PATH_INFO target{}; UINT candidates = 0;
         for (const auto &path : all.paths) if (path.targetInfo.targetAvailable &&
             path.targetInfo.outputTechnology == DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INDIRECT_WIRED) {
             target = path; ++candidates;
         }
-        if (candidates != 1 || contains(before, target)) throw std::runtime_error("one new inactive indirect monitor required");
+        if (candidates != 1 || (!sole_indirect && contains(before, target)))
+            throw std::runtime_error("one available indirect monitor required");
         // Supply the exact additional path: a remembered EXTEND topology may
         // successfully return without including a newly arrived indirect target.
         auto desired = before;
-        const auto original = before.paths[0].sourceInfo.modeInfoIdx;
+        const auto original = before.paths[original_path].sourceInfo.modeInfoIdx;
         if (original >= before.modes.size() || before.modes[original].infoType != DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE)
             throw std::runtime_error("original source mode unavailable");
         const auto &source = before.modes[original].sourceMode;

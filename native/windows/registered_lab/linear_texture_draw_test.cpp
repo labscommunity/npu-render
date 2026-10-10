@@ -4,6 +4,7 @@
 #include "shader_reference.hpp"
 #include <algorithm>
 #include <cstdio>
+#include <limits>
 using namespace nr::raster;
 using namespace nr::shader;
 #define TEST(v) do {if(!(v))throw std::runtime_error(#v);}while(false)
@@ -14,13 +15,14 @@ struct O{float4 p:SV_Position;float4 c:COLOR0;float2 uv:TEXCOORD0;};
 O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.uv=uv;return o;})","vs_4_0");
     const auto vs=parse_vertex(words.data(),words.size()),ps=parse_pixel(nr::registered_lab::test_fixture::linear_texture_pixel_words,std::size(nr::registered_lab::test_fixture::linear_texture_pixel_words));
     uint64_t checked=0,different=0;unsigned rejected=0;double maximum=0;
-    for(const bool desktop:{false,true})for(const bool blend:{false,true})for(const bool swap:{false,true}){
-        if(desktop && (!blend || swap))continue;
+    for(const bool desktop:{false,true})for(const bool blend:{false,true})for(const bool swap:{false,true})for(const uint32_t sf:{28u,87u}){
+        if(desktop && (!blend || swap || sf!=87))continue;
         const uint32_t w=desktop?1024u:64u,h=desktop?768u:64u,sw=desktop?w:96u,sh=desktop?h:80u;
         const Viewport view{0,0,float(w),float(h),0,1};
-        PackedTexture source{sw,sh,87,std::vector<PackedColor>(size_t(sw)*sh)};std::vector<PackedColor> bg(size_t(w)*h);
-        LinearTextureDrawExecutor executor(vs,ps,w,h,swap?28u:87u,sw,sh,87,backend,blend);
-        for(unsigned frame=0;frame<(desktop?4u:5u);++frame){
+        const uint32_t format=swap?(sf==87?28u:87u):sf;
+        PackedTexture source{sw,sh,sf,std::vector<PackedColor>(size_t(sw)*sh)};std::vector<PackedColor> bg(size_t(w)*h);
+        LinearTextureDrawExecutor executor(vs,ps,w,h,format,sw,sh,sf,backend,blend);
+        for(unsigned frame=0;frame<(desktop?6u:9u);++frame){
             for(size_t n=0;n<source.pixels.size();++n){const auto alpha=frame==0?0u:frame==1?255u:unsigned((n*37+frame*17)%256);
                 for(unsigned c=0;c<4;++c)source.pixels[n][c]=uint8_t(c==3?alpha:(n*71+c*51+frame*19)%(alpha+1));}
             for(size_t n=0;n<bg.size();++n)for(unsigned c=0;c<4;++c)bg[n][c]=uint8_t((n*13+c*37+frame*31)%256);
@@ -28,13 +30,18 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
             const std::array<float,4> rectangle=frame==4?std::array<float,4>{12.0009f,13.0011f,20.0482f,29.0519f}:
                 std::array<float,4>{2.07861328125f,1.5589599609375f,float(w)-2.07861328125f,float(h)-1.5589599609375f};
             const std::array<float,4> uv{frame==3?-.125f:4.912726581096649e-08f,0,1.0000001192092896f,frame==3?1.25f:1.0000001192092896f};
+            const std::array<float,4> color=frame==4?std::array<float,4>{221.f/255,221.f/255,221.f/255,221.f/255}:
+                frame==5?std::array<float,4>{.125f,.75f,.375f,.8125f}:frame==6?std::array<float,4>{1,.5f,.25f,0}:
+                frame==7?std::array<float,4>{0,0,0,0}:frame==8?std::array<float,4>{.25f,.5f,.75f,1}:std::array<float,4>{1,1,1,1};
             const uint32_t orders[2][6]{{0,1,2,2,3,0},{0,1,2,0,2,3}};std::vector<VertexRegisters> inputs(6);
             for(size_t n=0;n<6;++n){const auto corner=orders[frame&1][n];const bool right=corner==1||corner==2,bottom=corner>=2;
                 inputs[n][0]={as_bits(rectangle[right?2:0]/(float(w)*.5f)-1),as_bits(1-rectangle[bottom?3:1]/(float(h)*.5f)),as_bits(.5f),as_bits(1.f)};
-                inputs[n][1]={as_bits(1.f),as_bits(1.f),as_bits(1.f),as_bits(1.f)};inputs[n][2]={as_bits(uv[right?2:0]),as_bits(uv[bottom?3:1]),0,0};}
+                for(unsigned c=0;c<4;++c)inputs[n][1][c]=as_bits(color[c]);inputs[n][2]={as_bits(uv[right?2:0]),as_bits(uv[bottom?3:1]),0,0};}
             const std::array<int32_t,4> clip=frame==2?std::array<int32_t,4>{5,7,int32_t(w)-9,int32_t(h)-11}:std::array<int32_t,4>{0,0,int32_t(w),int32_t(h)};
-            if(!frame && !desktop)for(unsigned bad=0;bad<4;++bad){auto invalid=inputs;
+            if(!frame && !desktop)for(unsigned bad=0;bad<8;++bad){auto invalid=inputs;
                 if(bad==0)invalid[1][1][0]=as_bits(.5f);if(bad==1)invalid[2][2][0]=as_bits(.5f);if(bad==2)invalid[1][0][0]=as_bits(.5f);if(bad==3)invalid[3][0][3]=as_bits(2.f);
+                if(bad>=4){const float value=bad==4?-.01f:bad==5?1.01f:bad==6?std::numeric_limits<float>::quiet_NaN():std::numeric_limits<float>::infinity();
+                    for(auto &v:invalid)v[1][0]=as_bits(value);}
                 bool failed=false;try{(void)executor.execute(invalid,{},view,source,bg,clip);}catch(const std::invalid_argument&){failed=true;}TEST(failed);++rejected;}
             const auto result=executor.execute(inputs,{},view,source,bg,clip);TEST(result.execution_device.rfind(backend,0)==0);
             // Independent scalar VS, projection and double bilinear/source-over oracle.
@@ -52,13 +59,13 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
                 double sample[4]{};for(int dy=0;dy<2;++dy)for(int dx=0;dx<2;++dx){
                     const auto sx=std::clamp(ix+dx,int64_t(0),int64_t(sw)-1),sy=std::clamp(iy+dy,int64_t(0),int64_t(sh)-1);
                     for(unsigned c=0;c<4;++c)sample[c]+=source.pixels[size_t(sy)*sw+size_t(sx)][c]*(dx?fx:1-fx)*(dy?fy:1-fy);}
-                for(unsigned c=0;c<4;++c){const auto lane=swap&&c<3?2-c:c;const double ideal=std::clamp(sample[lane]+(blend?bg[at][c]*(1-sample[3]/255):0),0.,255.);
+                for(unsigned c=0;c<4;++c){const auto lane=swap&&c<3?2-c:c;const double ideal=std::clamp(sample[lane]*color[format==87&&c<3?2-c:c]+(blend?bg[at][c]*(1-sample[3]*color[3]/255):0),0.,255.);
                     const auto actual=result.pixels[at][c];const double error=std::abs(actual-ideal);maximum=(std::max)(maximum,error);
                     if(error>.6){std::fprintf(stderr,"mismatch w=%u blend=%u swap=%u frame=%u x=%u y=%u c=%u got=%u ideal=%.9g\n",w,unsigned(blend),unsigned(swap),frame,x,y,c,unsigned(actual),ideal);TEST(false);}
                     if(actual!=uint8_t(std::nearbyint(ideal)))++different;++checked;}
             }
             TEST(result.covered_samples==covered);
-            std::printf("{\"linear_texture_draw\":true,\"width\":%u,\"height\":%u,\"blend\":%s,\"swap\":%s,\"frame\":%u,\"draw_ms\":%.3f,\"covered_samples\":%llu,\"execution_device\":\"%s\"}\n",w,h,blend?"true":"false",swap?"true":"false",frame,result.timings.total_ms,static_cast<unsigned long long>(covered),result.execution_device.c_str());std::fflush(stdout);
+            std::printf("{\"linear_texture_draw\":true,\"width\":%u,\"height\":%u,\"source_format\":%u,\"blend\":%s,\"swap\":%s,\"frame\":%u,\"draw_ms\":%.3f,\"covered_samples\":%llu,\"execution_device\":\"%s\"}\n",w,h,sf,blend?"true":"false",swap?"true":"false",frame,result.timings.total_ms,static_cast<unsigned long long>(covered),result.execution_device.c_str());std::fflush(stdout);
         }
     }
     std::printf("{\"checked_components\":%llu,\"rounded_oracle_differences\":%llu,\"maximum_byte_error\":%.9g,\"invalid_draws_rejected\":%u,\"desktop_offload_tested\":false,\"displayed_frames\":0}\n",static_cast<unsigned long long>(checked),static_cast<unsigned long long>(different),maximum,rejected);return 0;

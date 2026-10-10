@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "kind": "live-dwm-npu-draws-with-indirect-frame-readback",
+  "source_revision": "169c9ab033626580f3b8e5efbb4bd16b6b99cb77",
+  "umd_build": "present-umd-v79",
+  "idd_build": "indirect-lab-v25",
+  "render_version": "0.0.56.0",
+  "idd_version": "0.0.9.0",
+  "live_dwm_npu_draws": 9,
+  "successful_present_callbacks": 5,
+  "received_frames": 3,
+  "successful_frame_readbacks": 3,
+  "latest_frame": {
+    "file": "idd-v9a-latest-frame-3752.bin",
+    "sequence": 3,
+    "width": 1024,
+    "height": 768,
+    "format": 87,
+    "producer_pid": 3752,
+    "qpc": 444758324500,
+    "pixel_sha256": "3ef25894f5d622c78bc23fe984eca9227c1236d3497dd71d64d457e9f0b279a6",
+    "raw_sha256": "69503d196641ccf776566472ed6eaabd08fa961541e3c3afdb3da74869cb0f75",
+    "nonblack_pixels": 786429,
+    "alpha_min": 255,
+    "alpha_max": 255,
+    "screen_delivery_verified": false
+  },
+  "displayed_frames_verified": 0,
+  "full_desktop_offload": false,
+  "tahoma_performance_tested": false,
+  "next_failures": [
+    "Uniform opacity 221/255 rejected by white-only linear texture path; complete draw retained.",
+    "DXGI resource identity rotation still unsupported (table offset 40), causing presentation recovery.",
+    "Other desktop clients still reject typed shader-resource buffers."
+  ],
+  "observation": "Received RGB preview is Windows bamboo wallpaper plus test-mode watermark. It is a completed indirect-display surface, not proof of visible interactive desktop delivery or that every surface was produced by the NPU. Original display and other CPU/OS work remain.",
+  "cleanup": "Both driver devices and packages removed successfully; stream configuration removed. Early finite-observer cleanup caused the separate topology task to report a missing monitor.",
+  "raw_zip_sha256": "4a322e6f9d446f202cabc906400e08749855d122c5cde75b08a2fa3fa505ff90"
+}

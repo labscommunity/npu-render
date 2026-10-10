@@ -465,6 +465,38 @@ HRESULT APIENTRY present(DXGI_DDI_ARG_PRESENT *a) {
         ++counters.rejected; return E_FAIL;
     }
 }
+HRESULT APIENTRY rotate_resources(DXGI_DDI_ARG_ROTATE_RESOURCE_IDENTITIES *a) {
+    if (!a || !a->hDevice) return E_INVALIDARG;
+    std::lock_guard<std::recursive_mutex> lock(mutex);
+    auto &d = *reinterpret_cast<Device *>(a->hDevice);
+    try {
+        require(d.context && !d.context->poisoned && a->pResources && a->Resources && a->Resources <= 16);
+        std::array<Allocation *,16> allocations{};
+        for (UINT i = 0; i < a->Resources; ++i) {
+            D3D10DDI_HRESOURCE h{}; h.pDrvPrivate = reinterpret_cast<void *>(a->pResources[i]);
+            const auto &r = resource(h); auto *allocation = r.allocation.get();
+            require(!r.buffer_bytes && r.usage == D3D10_DDI_USAGE_DEFAULT && (r.bind_flags & D3D10_DDI_BIND_PRESENT) &&
+                    !r.mapped_write && allocation->context == d.context && allocation->handle && !allocation->locked && !allocation->mapping);
+            for (UINT j = 0; j < i; ++j) require(allocations[j] != allocation && allocations[j]->handle != allocation->handle);
+            if (i) require(std::memcmp(&allocation->surface,&allocations[0]->surface,sizeof(allocation->surface)) == 0 &&
+                           bool(allocation->runtime_resource) == bool(allocations[0]->runtime_resource));
+            allocations[i] = allocation;
+        }
+        // Validate the complete list before changing any identity. Views and
+        // current bindings retain these Allocation objects, so they observe the
+        // new backing handle on their next use without stale embedded addresses.
+        // DXGI rotates the runtime's backing association separately: do not
+        // rotate runtime_resource, copy pixels, or replace the resource objects.
+        const auto first = allocations[0]->handle;
+        for (UINT i = 1; i < a->Resources; ++i) allocations[i-1]->handle = allocations[i]->handle;
+        allocations[a->Resources-1]->handle = first;
+        lab_trace("{\"event\":\"resource_identities_rotated\",\"resources\":%u}\n", a->Resources);
+        return S_OK;
+    } catch (const Error &e) {
+        lab_trace("{\"event\":\"rotate_rejected\",\"status\":\"%08lx\"}\n",ULONG(e.status));
+        ++counters.rejected; return e.status;
+    } catch (...) { ++counters.rejected; return E_FAIL; }
+}
 SIZE_T APIENTRY device_size(D3D10DDI_HADAPTER, const D3D10DDIARG_CALCPRIVATEDEVICESIZE *) { return sizeof(Device); }
 HRESULT APIENTRY create_device(D3D10DDI_HADAPTER, D3D10DDIARG_CREATEDEVICE *a) {
     std::lock_guard<std::recursive_mutex> lock(mutex);
@@ -521,7 +553,7 @@ HRESULT APIENTRY create_device(D3D10DDI_HADAPTER, D3D10DDIARG_CREATEDEVICE *a) {
 #define NR_DXGI(field) dxgi.field = &UnsupportedDxgi<decltype(dxgi.field), offsetof(DXGI_DDI_BASE_FUNCTIONS, field)>::call
         dxgi.pfnPresent = present; NR_DXGI(pfnGetGammaCaps); NR_DXGI(pfnSetDisplayMode);
         NR_DXGI(pfnSetResourcePriority); NR_DXGI(pfnQueryResourceResidency);
-        NR_DXGI(pfnRotateResourceIdentities); NR_DXGI(pfnBlt);
+        dxgi.pfnRotateResourceIdentities = rotate_resources; NR_DXGI(pfnBlt);
 #undef NR_DXGI
         *a->pDeviceFuncs = f;
         // This adapter has no shared D3D9 hardware implementation. The DXGI
