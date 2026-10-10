@@ -1,0 +1,46 @@
+{
+  "trial": "v90",
+  "source_commit": "40487306962d0fc798bb03a735bc5d6b3ed28ce3",
+  "umd_build": "present-umd-v136",
+  "package_version": "0.0.78.0",
+  "worker_successes_by_client": {
+    "42": 13,
+    "1140": 37,
+    "7272": 62,
+    "7588": 32,
+    "7260": 28,
+    "1740": 25
+  },
+  "acknowledged_successes_by_client": {
+    "42": 13,
+    "1140": 36,
+    "7272": 62,
+    "7588": 31,
+    "7260": 28,
+    "1740": 25
+  },
+  "isolated_client_departures": 2,
+  "received_frames": 11,
+  "received_nonblack_frames": 7,
+  "nonblack_frames_with_sole_gate_true": 6,
+  "viewer_submissions": 11,
+  "full_desktop_offload": false,
+  "usable_interactive_desktop": false,
+  "tahoma_performance_tested": false,
+  "collector_completed_without_error": true,
+  "original_cleanup_passed": false,
+  "recovery_cleanup_passed": true,
+  "guest_shutdown_after_trial": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "guest_restart": false,
+  "findings": [
+    "197 NPU requests succeed: 13 warmups and 184 live desktop draws. No provider draw rejection is recorded. The relay acknowledges 195 successful replies; two additional successful worker results have no acknowledged receipt. Both missing acknowledgments correspond to isolated client departures with successful provider responses.",
+    "The compositor rejects a new 1850-word pixel shader containing two loops, integer greater-equal, float greater-equal and fractional-part operations. Its raw token stream and SHA256 are preserved.",
+    "Eleven frames arrive. The first four are black; frame 5 shows a scaled partial desktop with black icon backgrounds and a clipped taskbar. Frame 6 is uniform dark gray. The last five show wallpaper and icons without a taskbar, matching the earlier partial-desktop pixel hash.",
+    "Start and Escape are sent after visible pixels arrive through the sole-display path. The before/after snapshots remain identical; no usable interactive desktop or visual input response is verified.",
+    "Render-device removal passes. Indirect-device removal reports devcon exit 1 (removed on reboot). A separate identity-checked recovery confirms zero custom devices, deletes the owned oem3.inf and verifies its absence. Original failures remain preserved.",
+    "The normal desktop with icons and taskbar is visually restored. The finite controller removes its stream configuration. The disposable VM is then gracefully shut down before its four-hour deadline; physical Delta is not restarted."
+  ],
+  "unacknowledged_successful_worker_results": 2
+}

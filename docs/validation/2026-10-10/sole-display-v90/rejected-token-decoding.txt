@@ -1,0 +1,233 @@
+2 declaration 89 208e46 0 82
+6 declaration 90 106000 0
+9 declaration 88 107000 0 5555
+13 declaration 100 1010f2 0 1
+17 declaration 98 1010f2 1
+20 declaration 98 1010f2 2
+23 declaration 101 1020f2 0
+26 declaration 104 a
+28 mov reg0[0].xyzw, reg8[0][128].xyzw
+34 mov reg0[1].xyzw, reg8[0][129].xyzw
+40 div reg0[2].xy, reg1[2].xyxx, reg1[2].zzzz
+47 add reg0[3].xy, mod1(reg0[0].xyxx), reg0[0].zwzz
+55 add reg0[3].zw, reg0[3].xxxy, reg0[3].xxxy
+62 mov reg0[4].xyzw, literal(0/0,0/0,0/0,0/0).xyzw
+70 mov reg0[5].x, reg8[0][0].wwww
+76 loop
+77 ige reg0[5].y, literal(8/1.12104e-44,8/1.12104e-44,8/1.12104e-44,8/1.12104e-44).xyzw, reg0[5].xxxx
+84 breakc reg0[5].yyyy test=1
+87 iadd reg0[5].y, mod1(reg0[5].xxxx), reg8[0][0].wwww
+96 mad reg0[5].zw, reg8[0][0].xxxy + reg0[5].y, reg0[1].zzzw, reg0[2].xxxy
+107 add reg0[5].zw, reg0[5].zzzw, mod1(reg0[0].xxxy)
+115 div reg0[5].zw, reg0[5].zzzw, reg0[3].zzzw
+122 ge reg0[6].xy, reg0[5].zwzz, mod1(reg0[5].zwzz)
+130 frc reg0[5].zw, mod2(reg0[5].zzzw)
+136 movc reg0[5].zw, reg0[6].xxxy, reg0[5].zzzw, mod1(reg0[5].zzzw)
+146 mul reg0[5].zw, reg0[3].zzzw, reg0[5].zzzw
+153 add reg0[5].zw, mod1(reg0[3].xxxy), mod2(reg0[5].zzzw)
+162 add reg0[5].zw, mod3(reg0[5].zzzw), reg0[0].zzzw
+170 sample reg0[6].xyzw, reg0[5].zwzz, reg7[0].xyzw, reg6[0].xyzw
+179 mad reg0[5].zw, mod1(reg8[0][0].xxxy + reg0[5].y), reg0[1].zzzw, reg0[2].xxxy
+191 add reg0[5].zw, reg0[5].zzzw, mod1(reg0[0].xxxy)
+199 div reg0[5].zw, reg0[5].zzzw, reg0[3].zzzw
+206 ge reg0[7].xy, reg0[5].zwzz, mod1(reg0[5].zwzz)
+214 frc reg0[5].zw, mod2(reg0[5].zzzw)
+220 movc reg0[5].zw, reg0[7].xxxy, reg0[5].zzzw, mod1(reg0[5].zzzw)
+230 mul reg0[5].zw, reg0[3].zzzw, reg0[5].zzzw
+237 add reg0[5].zw, mod1(reg0[3].xxxy), mod2(reg0[5].zzzw)
+246 add reg0[5].zw, mod3(reg0[5].zzzw), reg0[0].zzzw
+254 sample reg0[7].xyzw, reg0[5].zwzz, reg7[0].xyzw, reg6[0].xyzw
+263 add reg0[6].xyzw, reg0[6].xyzw, reg0[7].xyzw
+270 iadd reg0[7].xyzw, reg0[5].yyyy, literal(1/1.4013e-45,2/2.8026e-45,3/4.2039e-45,4/5.60519e-45).xyzw
+280 mad reg0[5].zw, reg8[0][0].xxxy + reg0[7].x, reg0[1].zzzw, reg0[2].xxxy
+291 add reg0[5].zw, reg0[5].zzzw, mod1(reg0[0].xxxy)
+299 div reg0[5].zw, reg0[5].zzzw, reg0[3].zzzw
+306 ge reg0[8].xy, reg0[5].zwzz, mod1(reg0[5].zwzz)
+314 frc reg0[5].zw, mod2(reg0[5].zzzw)
+320 movc reg0[5].zw, reg0[8].xxxy, reg0[5].zzzw, mod1(reg0[5].zzzw)
+330 mul reg0[5].zw, reg0[3].zzzw, reg0[5].zzzw
+337 add reg0[5].zw, mod1(reg0[3].xxxy), mod2(reg0[5].zzzw)
+346 add reg0[5].zw, mod3(reg0[5].zzzw), reg0[0].zzzw
+354 sample reg0[8].xyzw, reg0[5].zwzz, reg7[0].xyzw, reg6[0].xyzw
+363 mad reg0[5].zw, mod1(reg8[0][0].xxxy + reg0[7].x), reg0[1].zzzw, reg0[2].xxxy
+375 add reg0[5].zw, reg0[5].zzzw, mod1(reg0[0].xxxy)
+383 div reg0[5].zw, reg0[5].zzzw, reg0[3].zzzw
+390 ge reg0[9].xy, reg0[5].zwzz, mod1(reg0[5].zwzz)
+398 frc reg0[5].zw, mod2(reg0[5].zzzw)
+404 movc reg0[5].zw, reg0[9].xxxy, reg0[5].zzzw, mod1(reg0[5].zzzw)
+414 mul reg0[5].zw, reg0[3].zzzw, reg0[5].zzzw
+421 add reg0[5].zw, mod1(reg0[3].xxxy), mod2(reg0[5].zzzw)
+430 add reg0[5].zw, mod3(reg0[5].zzzw), reg0[0].zzzw
+438 sample reg0[9].xyzw, reg0[5].zwzz, reg7[0].xyzw, reg6[0].xyzw
+447 add reg0[8].xyzw, reg0[8].xyzw, reg0[9].xyzw
+454 mul reg0[8].xyzw, reg0[8].xyzw, reg8[0][0].zzzz + reg0[7].x
+463 mad reg0[6].xyzw, reg0[6].xyzw, reg8[0][0].zzzz + reg0[5].y, reg0[8].xyzw
+474 mad reg0[5].zw, reg8[0][0].xxxy + reg0[7].y, reg0[1].zzzw, reg0[2].xxxy
+485 add reg0[5].zw, reg0[5].zzzw, mod1(reg0[0].xxxy)
+493 div reg0[5].zw, reg0[5].zzzw, reg0[3].zzzw
+500 ge reg0[8].xy, reg0[5].zwzz, mod1(reg0[5].zwzz)
+508 frc reg0[5].zw, mod2(reg0[5].zzzw)
+514 movc reg0[5].zw, reg0[8].xxxy, reg0[5].zzzw, mod1(reg0[5].zzzw)
+524 mul reg0[5].zw, reg0[3].zzzw, reg0[5].zzzw
+531 add reg0[5].zw, mod1(reg0[3].xxxy), mod2(reg0[5].zzzw)
+540 add reg0[5].zw, mod3(reg0[5].zzzw), reg0[0].zzzw
+548 sample reg0[8].xyzw, reg0[5].zwzz, reg7[0].xyzw, reg6[0].xyzw
+557 mad reg0[5].zw, mod1(reg8[0][0].xxxy + reg0[7].y), reg0[1].zzzw, reg0[2].xxxy
+569 add reg0[5].zw, reg0[5].zzzw, mod1(reg0[0].xxxy)
+577 div reg0[5].zw, reg0[5].zzzw, reg0[3].zzzw
+584 ge reg0[9].xy, reg0[5].zwzz, mod1(reg0[5].zwzz)
+592 frc reg0[5].zw, mod2(reg0[5].zzzw)
+598 movc reg0[5].zw, reg0[9].xxxy, reg0[5].zzzw, mod1(reg0[5].zzzw)
+608 mul reg0[5].zw, reg0[3].zzzw, reg0[5].zzzw
+615 add reg0[5].zw, mod1(reg0[3].xxxy), mod2(reg0[5].zzzw)
+624 add reg0[5].zw, mod3(reg0[5].zzzw), reg0[0].zzzw
+632 sample reg0[9].xyzw, reg0[5].zwzz, reg7[0].xyzw, reg6[0].xyzw
+641 add reg0[8].xyzw, reg0[8].xyzw, reg0[9].xyzw
+648 mad reg0[6].xyzw, reg0[8].xyzw, reg8[0][0].zzzz + reg0[7].y, reg0[6].xyzw
+659 mad reg0[5].zw, reg8[0][0].xxxy + reg0[7].z, reg0[1].zzzw, reg0[2].xxxy
+670 add reg0[5].zw, reg0[5].zzzw, mod1(reg0[0].xxxy)
+678 div reg0[5].zw, reg0[5].zzzw, reg0[3].zzzw
+685 ge reg0[7].xy, reg0[5].zwzz, mod1(reg0[5].zwzz)
+693 frc reg0[5].zw, mod2(reg0[5].zzzw)
+699 movc reg0[5].zw, reg0[7].xxxy, reg0[5].zzzw, mod1(reg0[5].zzzw)
+709 mul reg0[5].zw, reg0[3].zzzw, reg0[5].zzzw
+716 add reg0[5].zw, mod1(reg0[3].xxxy), mod2(reg0[5].zzzw)
+725 add reg0[5].zw, mod3(reg0[5].zzzw), reg0[0].zzzw
+733 sample reg0[8].xyzw, reg0[5].zwzz, reg7[0].xyzw, reg6[0].xyzw
+742 mad reg0[5].zw, mod1(reg8[0][0].xxxy + reg0[7].z), reg0[1].zzzw, reg0[2].xxxy
+754 add reg0[5].zw, reg0[5].zzzw, mod1(reg0[0].xxxy)
+762 div reg0[5].zw, reg0[5].zzzw, reg0[3].zzzw
+769 ge reg0[7].xy, reg0[5].zwzz, mod1(reg0[5].zwzz)
+777 frc reg0[5].zw, mod2(reg0[5].zzzw)
+783 movc reg0[5].zw, reg0[7].xxxy, reg0[5].zzzw, mod1(reg0[5].zzzw)
+793 mul reg0[5].zw, reg0[3].zzzw, reg0[5].zzzw
+800 add reg0[5].zw, mod1(reg0[3].xxxy), mod2(reg0[5].zzzw)
+809 add reg0[5].zw, mod3(reg0[5].zzzw), reg0[0].zzzw
+817 sample reg0[9].xyzw, reg0[5].zwzz, reg7[0].xyzw, reg6[0].xyzw
+826 add reg0[8].xyzw, reg0[8].xyzw, reg0[9].xyzw
+833 mad reg0[6].xyzw, reg0[8].xyzw, reg8[0][0].zzzz + reg0[7].z, reg0[6].xyzw
+844 mad reg0[5].zw, reg8[0][0].xxxy + reg0[7].w, reg0[1].zzzw, reg0[2].xxxy
+855 add reg0[5].zw, reg0[5].zzzw, mod1(reg0[0].xxxy)
+863 div reg0[5].zw, reg0[5].zzzw, reg0[3].zzzw
+870 ge reg0[7].xy, reg0[5].zwzz, mod1(reg0[5].zwzz)
+878 frc reg0[5].zw, mod2(reg0[5].zzzw)
+884 movc reg0[5].zw, reg0[7].xxxy, reg0[5].zzzw, mod1(reg0[5].zzzw)
+894 mul reg0[5].zw, reg0[3].zzzw, reg0[5].zzzw
+901 add reg0[5].zw, mod1(reg0[3].xxxy), mod2(reg0[5].zzzw)
+910 add reg0[5].zw, mod3(reg0[5].zzzw), reg0[0].zzzw
+918 sample reg0[8].xyzw, reg0[5].zwzz, reg7[0].xyzw, reg6[0].xyzw
+927 mad reg0[5].zw, mod1(reg8[0][0].xxxy + reg0[7].w), reg0[1].zzzw, reg0[2].xxxy
+939 add reg0[5].zw, reg0[5].zzzw, mod1(reg0[0].xxxy)
+947 div reg0[5].zw, reg0[5].zzzw, reg0[3].zzzw
+954 ge reg0[7].xy, reg0[5].zwzz, mod1(reg0[5].zwzz)
+962 frc reg0[5].zw, mod2(reg0[5].zzzw)
+968 movc reg0[5].zw, reg0[7].xxxy, reg0[5].zzzw, mod1(reg0[5].zzzw)
+978 mul reg0[5].zw, reg0[3].zzzw, reg0[5].zzzw
+985 add reg0[5].zw, mod1(reg0[3].xxxy), mod2(reg0[5].zzzw)
+994 add reg0[5].zw, mod3(reg0[5].zzzw), reg0[0].zzzw
+1002 sample reg0[9].xyzw, reg0[5].zwzz, reg7[0].xyzw, reg6[0].xyzw
+1011 add reg0[8].xyzw, reg0[8].xyzw, reg0[9].xyzw
+1018 mad reg0[6].xyzw, reg0[8].xyzw, reg8[0][0].zzzz + reg0[7].w, reg0[6].xyzw
+1029 iadd reg0[5].yzw, reg0[5].yyyy, literal(0/0,5/7.00649e-45,6/8.40779e-45,7/9.80909e-45).xyzw
+1039 mad reg0[7].xy, reg8[0][0].xyxx + reg0[5].y, reg0[1].zwzz, reg0[2].xyxx
+1050 add reg0[7].xy, reg0[7].xyxx, mod1(reg0[0].xyxx)
+1058 div reg0[7].xy, reg0[7].xyxx, reg0[3].zwzz
+1065 ge reg0[7].zw, reg0[7].xxxy, mod1(reg0[7].xxxy)
+1073 frc reg0[7].xy, mod2(reg0[7].xyxx)
+1079 movc reg0[7].xy, reg0[7].zwzz, reg0[7].xyxx, mod1(reg0[7].xyxx)
+1089 mul reg0[7].xy, reg0[3].zwzz, reg0[7].xyxx
+1096 add reg0[7].xy, mod1(reg0[3].xyxx), mod2(reg0[7].xyxx)
+1105 add reg0[7].xy, mod3(reg0[7].xyxx), reg0[0].zwzz
+1113 sample reg0[7].xyzw, reg0[7].xyxx, reg7[0].xyzw, reg6[0].xyzw
+1122 mad reg0[8].xy, mod1(reg8[0][0].xyxx + reg0[5].y), reg0[1].zwzz, reg0[2].xyxx
+1134 add reg0[8].xy, reg0[8].xyxx, mod1(reg0[0].xyxx)
+1142 div reg0[8].xy, reg0[8].xyxx, reg0[3].zwzz
+1149 ge reg0[8].zw, reg0[8].xxxy, mod1(reg0[8].xxxy)
+1157 frc reg0[8].xy, mod2(reg0[8].xyxx)
+1163 movc reg0[8].xy, reg0[8].zwzz, reg0[8].xyxx, mod1(reg0[8].xyxx)
+1173 mul reg0[8].xy, reg0[3].zwzz, reg0[8].xyxx
+1180 add reg0[8].xy, mod1(reg0[3].xyxx), mod2(reg0[8].xyxx)
+1189 add reg0[8].xy, mod3(reg0[8].xyxx), reg0[0].zwzz
+1197 sample reg0[8].xyzw, reg0[8].xyxx, reg7[0].xyzw, reg6[0].xyzw
+1206 add reg0[7].xyzw, reg0[7].xyzw, reg0[8].xyzw
+1213 mad reg0[6].xyzw, reg0[7].xyzw, reg8[0][0].zzzz + reg0[5].y, reg0[6].xyzw
+1224 mad reg0[7].xy, reg8[0][0].xyxx + reg0[5].z, reg0[1].zwzz, reg0[2].xyxx
+1235 add reg0[7].xy, reg0[7].xyxx, mod1(reg0[0].xyxx)
+1243 div reg0[7].xy, reg0[7].xyxx, reg0[3].zwzz
+1250 ge reg0[7].zw, reg0[7].xxxy, mod1(reg0[7].xxxy)
+1258 frc reg0[7].xy, mod2(reg0[7].xyxx)
+1264 movc reg0[7].xy, reg0[7].zwzz, reg0[7].xyxx, mod1(reg0[7].xyxx)
+1274 mul reg0[7].xy, reg0[3].zwzz, reg0[7].xyxx
+1281 add reg0[7].xy, mod1(reg0[3].xyxx), mod2(reg0[7].xyxx)
+1290 add reg0[7].xy, mod3(reg0[7].xyxx), reg0[0].zwzz
+1298 sample reg0[7].xyzw, reg0[7].xyxx, reg7[0].xyzw, reg6[0].xyzw
+1307 mad reg0[8].xy, mod1(reg8[0][0].xyxx + reg0[5].z), reg0[1].zwzz, reg0[2].xyxx
+1319 add reg0[8].xy, reg0[8].xyxx, mod1(reg0[0].xyxx)
+1327 div reg0[8].xy, reg0[8].xyxx, reg0[3].zwzz
+1334 ge reg0[8].zw, reg0[8].xxxy, mod1(reg0[8].xxxy)
+1342 frc reg0[8].xy, mod2(reg0[8].xyxx)
+1348 movc reg0[8].xy, reg0[8].zwzz, reg0[8].xyxx, mod1(reg0[8].xyxx)
+1358 mul reg0[8].xy, reg0[3].zwzz, reg0[8].xyxx
+1365 add reg0[8].xy, mod1(reg0[3].xyxx), mod2(reg0[8].xyxx)
+1374 add reg0[8].xy, mod3(reg0[8].xyxx), reg0[0].zwzz
+1382 sample reg0[8].xyzw, reg0[8].xyxx, reg7[0].xyzw, reg6[0].xyzw
+1391 add reg0[7].xyzw, reg0[7].xyzw, reg0[8].xyzw
+1398 mad reg0[6].xyzw, reg0[7].xyzw, reg8[0][0].zzzz + reg0[5].z, reg0[6].xyzw
+1409 mad reg0[5].yz, reg8[0][0].xxyx + reg0[5].w, reg0[1].zzwz, reg0[2].xxyx
+1420 add reg0[5].yz, reg0[5].yyzy, mod1(reg0[0].xxyx)
+1428 div reg0[5].yz, reg0[5].yyzy, reg0[3].zzwz
+1435 ge reg0[7].xy, reg0[5].yzyy, mod1(reg0[5].yzyy)
+1443 frc reg0[5].yz, mod2(reg0[5].yyzy)
+1449 movc reg0[5].yz, reg0[7].xxyx, reg0[5].yyzy, mod1(reg0[5].yyzy)
+1459 mul reg0[5].yz, reg0[3].zzwz, reg0[5].yyzy
+1466 add reg0[5].yz, mod1(reg0[3].xxyx), mod2(reg0[5].yyzy)
+1475 add reg0[5].yz, mod3(reg0[5].yyzy), reg0[0].zzwz
+1483 sample reg0[7].xyzw, reg0[5].yzyy, reg7[0].xyzw, reg6[0].xyzw
+1492 mad reg0[5].yz, mod1(reg8[0][0].xxyx + reg0[5].w), reg0[1].zzwz, reg0[2].xxyx
+1504 add reg0[5].yz, reg0[5].yyzy, mod1(reg0[0].xxyx)
+1512 div reg0[5].yz, reg0[5].yyzy, reg0[3].zzwz
+1519 ge reg0[8].xy, reg0[5].yzyy, mod1(reg0[5].yzyy)
+1527 frc reg0[5].yz, mod2(reg0[5].yyzy)
+1533 movc reg0[5].yz, reg0[8].xxyx, reg0[5].yyzy, mod1(reg0[5].yyzy)
+1543 mul reg0[5].yz, reg0[3].zzwz, reg0[5].yyzy
+1550 add reg0[5].yz, mod1(reg0[3].xxyx), mod2(reg0[5].yyzy)
+1559 add reg0[5].yz, mod3(reg0[5].yyzy), reg0[0].zzwz
+1567 sample reg0[8].xyzw, reg0[5].yzyy, reg7[0].xyzw, reg6[0].xyzw
+1576 add reg0[7].xyzw, reg0[7].xyzw, reg0[8].xyzw
+1583 mad reg0[6].xyzw, reg0[7].xyzw, reg8[0][0].zzzz + reg0[5].w, reg0[6].xyzw
+1594 add reg0[4].xyzw, reg0[4].xyzw, reg0[6].xyzw
+1601 iadd reg0[5].x, reg0[5].xxxx, literal(fffffff8/nan,fffffff8/nan,fffffff8/nan,fffffff8/nan).xyzw
+1608 endloop
+1609 iadd reg0[5].y, mod1(reg0[5].xxxx), reg8[0][0].wwww
+1618 mov reg0[6].xyzw, literal(0/0,0/0,0/0,0/0).xyzw
+1626 mov reg0[5].z, literal(0/0,0/0,0/0,0/0).xyzw
+1631 loop
+1632 ige reg0[5].w, reg0[5].zzzz, reg0[5].xxxx
+1639 breakc reg0[5].wwww test=1
+1642 iadd reg0[5].w, reg0[5].zzzz, reg0[5].yyyy
+1649 mad reg0[7].xy, reg8[0][0].xyxx + reg0[5].w, reg0[1].zwzz, reg0[2].xyxx
+1660 add reg0[7].xy, reg0[7].xyxx, mod1(reg0[0].xyxx)
+1668 div reg0[7].xy, reg0[7].xyxx, reg0[3].zwzz
+1675 ge reg0[7].zw, reg0[7].xxxy, mod1(reg0[7].xxxy)
+1683 frc reg0[7].xy, mod2(reg0[7].xyxx)
+1689 movc reg0[7].xy, reg0[7].zwzz, reg0[7].xyxx, mod1(reg0[7].xyxx)
+1699 mul reg0[7].xy, reg0[3].zwzz, reg0[7].xyxx
+1706 add reg0[7].xy, mod1(reg0[3].xyxx), mod2(reg0[7].xyxx)
+1715 add reg0[7].xy, mod3(reg0[7].xyxx), reg0[0].zwzz
+1723 sample reg0[7].xyzw, reg0[7].xyxx, reg7[0].xyzw, reg6[0].xyzw
+1732 mad reg0[8].xy, mod1(reg8[0][0].xyxx + reg0[5].w), reg0[1].zwzz, reg0[2].xyxx
+1744 add reg0[8].xy, reg0[8].xyxx, mod1(reg0[0].xyxx)
+1752 div reg0[8].xy, reg0[8].xyxx, reg0[3].zwzz
+1759 ge reg0[8].zw, reg0[8].xxxy, mod1(reg0[8].xxxy)
+1767 frc reg0[8].xy, mod2(reg0[8].xyxx)
+1773 movc reg0[8].xy, reg0[8].zwzz, reg0[8].xyxx, mod1(reg0[8].xyxx)
+1783 mul reg0[8].xy, reg0[3].zwzz, reg0[8].xyxx
+1790 add reg0[8].xy, mod1(reg0[3].xyxx), mod2(reg0[8].xyxx)
+1799 add reg0[8].xy, mod3(reg0[8].xyxx), reg0[0].zwzz
+1807 sample reg0[8].xyzw, reg0[8].xyxx, reg7[0].xyzw, reg6[0].xyzw
+1816 add reg0[7].xyzw, reg0[7].xyzw, reg0[8].xyzw
+1823 mad reg0[6].xyzw, reg0[7].xyzw, reg8[0][0].zzzz + reg0[5].w, reg0[6].xyzw
+1834 iadd reg0[5].z, reg0[5].zzzz, literal(1/1.4013e-45,1/1.4013e-45,1/1.4013e-45,1/1.4013e-45).xyzw
+1841 endloop
+1842 add reg2[0].xyzw, reg0[4].xyzw, reg0[6].xyzw
+1849 ret

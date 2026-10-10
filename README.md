@@ -113,13 +113,12 @@ now has an exact NPU specialization for opaque, one-to-one point-sampled quads.
 Its captured 1024×768 replay passes, as do changing-image and driver callback
 tests. This is a checked subset, not general desktop rendering.
 
-The [latest installed trial](docs/validation/2026-10-10/sole-display-v89/report.json)
-completes 148 live desktop NPU draws plus 13 prewarm requests. All successful
-responses are acknowledged, but invalid texture lookups and an unsupported
-derivative shader prevent a usable desktop. Three black frames arrive. Both
-guest drivers are removed successfully and the normal VM desktop is restored.
-The next renderer adds pixel derivatives and fixes inactive shader inputs;
-full desktop offload and a Tahoma benefit remain unproven.
+The [latest installed trial](docs/validation/2026-10-10/sole-display-v90/report.json)
+completes 184 live desktop NPU draws plus 13 prewarm requests. Eleven frames arrive,
+including a partial desktop, but a newly encountered compositor shader with loops
+is rejected. Start-menu input has no verified visual response. Driver cleanup
+requires a separate verified recovery, after which the normal VM desktop is
+restored. Full desktop offload and a Tahoma benefit remain unproven.
 
 [NPU-computed triangle bounds](docs/validation/2026-10-10/triangle-bounds-v112/report.json)
 now restrict tile dispatch while preserving exact output in eight replays of four
