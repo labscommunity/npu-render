@@ -20,7 +20,7 @@ inline void lab_trace(const char *format, ...) noexcept {
         TraceFile() noexcept {
             WCHAR path[MAX_PATH]{};
             swprintf_s(path, L"C:\\npu-lab\\umd-trace\\process-%lu.jsonl", GetCurrentProcessId());
-            handle = CreateFileW(path, FILE_APPEND_DATA | FILE_READ_ATTRIBUTES, FILE_SHARE_READ,
+            handle = CreateFileW(path, FILE_APPEND_DATA | FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_DELETE,
                                  nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
             LARGE_INTEGER size{};
             if (handle != INVALID_HANDLE_VALUE && GetFileSizeEx(handle, &size) && size.QuadPart >= 0)
