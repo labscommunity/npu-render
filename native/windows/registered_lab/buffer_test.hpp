@@ -95,7 +95,29 @@ int test_buffers(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER_DEVI
         f.pfnCreateResource(h,&a,stage,{});f.pfnResourceCopy(h,stage,source);
         D3D10DDI_MAPPED_SUBRESOURCE mapped{};f.pfnStagingResourceMap(h,stage,0,D3D10_DDI_MAP_READ,0,&mapped);
         TEST(last_error==S_OK && mapped.pData && !std::memcmp(mapped.pData,input.data(),bytes));
-        f.pfnStagingResourceUnmap(h,stage,0);f.pfnDestroyResource(h,source);f.pfnDestroyResource(h,stage);
+        f.pfnStagingResourceUnmap(h,stage,0);
+        alignas(View) unsigned char views[2][sizeof(View)]{};D3D10DDI_HSHADERRESOURCEVIEW view{},bad{};
+        view.pDrvPrivate=views[0];bad.pDrvPrivate=views[1];
+        D3D10DDIARG_CREATESHADERRESOURCEVIEW desc{};desc.hDrvResource=source;desc.ResourceDimension=D3D10DDIRESOURCE_BUFFER;
+        desc.Format=DXGI_FORMAT_R8_UINT;desc.Buffer.FirstElement=7;desc.Buffer.NumElements=bytes-9;
+        f.pfnCreateShaderResourceView(h,&desc,view,{});TEST(last_error==S_OK);
+        f.pfnVsSetShaderResources(h,3,1,&view);f.pfnGsSetShaderResources(h,5,1,&view);f.pfnPsSetShaderResources(h,0,1,&view);
+        TEST(last_error==S_OK && !device(h).bound_source && device(h).shader_sources[2][0].buffer &&
+            device(h).shader_sources[2][0].format==62 && device(h).shader_sources[2][0].first_element==7 &&
+            device(h).shader_sources[2][0].elements==bytes-9);
+        const auto valid=desc;const auto handle=resource(source).allocation->handle;
+        for(UINT invalid=0;invalid<4;++invalid){
+            desc=valid;if(invalid==0)desc.Buffer.FirstElement=UINT_MAX;if(invalid==1)desc.Buffer.NumElements=0;
+            if(invalid==2)desc.Buffer.NumElements=bytes;if(invalid==3)desc.Format=DXGI_FORMAT_R8_UNORM;
+            f.pfnCreateShaderResourceView(h,&desc,bad,{});TEST(FAILED(last_error));last_error=S_OK;
+            f.pfnPsSetShaderResources(h,0,1,&bad);TEST(FAILED(last_error) && device(h).shader_sources[2][0].allocation->handle==handle);
+            f.pfnDestroyShaderResourceView(h,bad);last_error=S_OK;
+        }
+        f.pfnDestroyShaderResourceView(h,view);f.pfnDestroyResource(h,source);f.pfnDestroyResource(h,stage);
+        TEST(counters.live_allocations==1 && !memory[handle].empty());
+        const D3D10DDI_HSHADERRESOURCEVIEW empty{};
+        f.pfnVsSetShaderResources(h,3,1,&empty);f.pfnGsSetShaderResources(h,5,1,&empty);f.pfnPsSetShaderResources(h,0,1,&empty);
+        TEST(last_error==S_OK && !counters.live_allocations && memory[handle].empty());
     }
     f.pfnDestroyDevice(h);
     TEST(!counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);

@@ -542,3 +542,24 @@ filtering, shader multiplication and blending still execute on the NPU. Two new
 filtered/blended draws pass 32,768 component checks within 0.6 byte units. A8
 render targets and shared resources remain rejected. Shader-readable buffers can
 own ordinary byte storage; typed buffer views are a separate unsupported operation.
+
+The [v72 trial](../../../docs/validation/2026-10-10/sole-display-v72/report.json)
+advanced to point-filtered texture draws with blending and clipping. Its captured
+render target contains wallpaper and desktop icons, but the last delivered frame
+is black. Explorer/Start progressed to creation of an R8_UINT buffer view.
+
+The modulated rectangle executor now supports point filtering with sampled alpha,
+and point shaders that explicitly replace sampled alpha with one. Both paths
+perform coverage, sampling, modulation, blending and quantization on the selected
+provider. The original unblended full-frame point-copy path remains available.
+Lab packet ABI 5 identifies the new point path; mixed filter flags are rejected.
+[Qualification](../../../docs/validation/2026-10-10/modulated-point-v90/report.json)
+checks 40,108,032 components on the NPU within half a byte and replays both failed
+DWM draws exactly three times each. Full-frame draw times remain approximately
+1.8 seconds; these are correctness results, not interactive-performance claims.
+
+R8_UINT buffer views now validate and retain their element ranges. Resource views
+can bind independently to all three shader stages, and a failed binding preserves
+the old state. Typed buffers cannot masquerade as textures in the current SAMPLE
+path. Buffer-load shader execution remains unsupported and is not counted as
+migrated work. Opaque-alpha linear filtering is also still explicitly rejected.

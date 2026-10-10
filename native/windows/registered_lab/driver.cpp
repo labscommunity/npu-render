@@ -31,6 +31,11 @@ Counters counters;
 std::string selected_backend = "NPU";
 using InputElements = std::vector<D3D10DDIARG_INPUT_ELEMENT_DESC>;
 struct ElementLayout { std::shared_ptr<const InputElements> elements; };
+struct View {
+    std::shared_ptr<Allocation> allocation;
+    UINT format = 0, first_element = 0, elements = 0;
+    bool buffer = false;
+};
 struct Device {
     D3D10DDI_HRTCORELAYER core{};
     D3D10DDI_CORELAYER_DEVICECALLBACKS callbacks{};
@@ -39,6 +44,7 @@ struct Device {
     std::shared_ptr<Context> context;
     std::shared_ptr<Allocation> bound_target;
     std::shared_ptr<Allocation> bound_source;
+    std::array<std::array<View, 128>, 3> shader_sources{};
     std::unique_ptr<BlendExecutor> executor;
     std::unique_ptr<nr::raster::UniformDrawExecutor> indexed_executor;
     std::unique_ptr<nr::raster::PointTextureDrawExecutor> point_texture_executor;
@@ -46,7 +52,7 @@ struct Device {
     std::array<uint64_t, 6> point_texture_key{};
     std::unique_ptr<nr::raster::LinearTextureDrawExecutor> linear_texture_executor;
     std::shared_ptr<const nr::shader::Program> linear_texture_vertex, linear_texture_pixel;
-    std::array<uint64_t, 7> linear_texture_key{};
+    std::array<uint64_t, 8> linear_texture_key{};
     std::unique_ptr<IndexedNpuExchange> indexed_exchange;
     std::shared_ptr<const nr::shader::Program> indexed_vertex, indexed_pixel;
     std::array<uint64_t, 5> indexed_key{};
@@ -86,7 +92,6 @@ struct Resource {
     UINT buffer_bytes = 0, bind_flags = 0;
     bool mapped_write = false;
 };
-struct View { std::shared_ptr<Allocation> allocation; };
 struct Shader { UINT kind = 0; std::shared_ptr<const nr::shader::Program> vertex_program, pixel_program; };
 Device &device(D3D10DDI_HDEVICE h) { return *static_cast<Device *>(h.pDrvPrivate); }
 void reject(D3D10DDI_HDEVICE h, HRESULT status, const char *operation) {

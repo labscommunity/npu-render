@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "kind": "modulated-point-filter-and-buffer-view-qualification",
+  "clean_build": "present-umd-v90",
+  "source_files_verified": 87,
+  "native_cpu_tests_passed": 15,
+  "npu_ddi_runs_passed": 1,
+  "successful_npu_ddi_draws": 32,
+  "point_filter_suites": [
+    "sampled alpha",
+    "forced alpha one"
+  ],
+  "point_suite_checked_components_each": 20054016,
+  "point_suite_maximum_byte_error_each": 0.5,
+  "point_suite_invalid_draws_rejected_each": 64,
+  "captured_dwm_replays": [
+    {
+      "pid": 7464,
+      "runs": 3,
+      "maximum_byte_error": 0,
+      "output_sha256": "5ec41466efdca5f29f20aacf776a731cfd2a5bcf36ae9c0a3391731b0985b157",
+      "covered_samples": 16384
+    },
+    {
+      "pid": 6064,
+      "runs": 3,
+      "maximum_byte_error": 0,
+      "output_sha256": "4a8f1d391538d641c9ac1a3a3845a1b523310a6098e2cf3ab80f491647f7095d",
+      "covered_samples": 753
+    }
+  ],
+  "full_frame_replay_draw_ms_range": [
+    1738,
+    1902
+  ],
+  "full_frame_provider_tile_executions": 192,
+  "lab_packet_abi": 5,
+  "new_packet_flag": 16,
+  "buffer_views": "R8_UINT ranges, overflow rejection, all-stage binding, transactional failure and retained lifetime verified with owned runtime shims. Buffer-load shader execution remains unsupported.",
+  "full_desktop_offload": false,
+  "tahoma_performance_tested": false
+}

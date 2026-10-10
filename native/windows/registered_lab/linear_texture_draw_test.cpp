@@ -1,5 +1,6 @@
 #include "linear_texture_draw.hpp"
 #include "linear_texture_fixture.hpp"
+#include "point_texture_fixture.hpp"
 #include "shader_contract.hpp"
 #include "shader_reference.hpp"
 #include <algorithm>
@@ -10,10 +11,12 @@ using namespace nr::shader;
 #define TEST(v) do {if(!(v))throw std::runtime_error(#v);}while(false)
 int main(int argc,char **argv)try{
     const std::string backend=argc>1?argv[1]:"CPU";
+    TEST(argc<=3 && (argc<3 || !std::strcmp(argv[2],"--point") || !std::strcmp(argv[2],"--point-opaque")));
+    const bool point=argc==3,opaque=argc==3 && !std::strcmp(argv[2],"--point-opaque");
     const auto words=nr::registered_lab::shader_tokens(R"(
 struct O{float4 p:SV_Position;float4 c:COLOR0;float2 uv:TEXCOORD0;};
 O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.uv=uv;return o;})","vs_4_0");
-    const auto vs=parse_vertex(words.data(),words.size()),ps=parse_pixel(nr::registered_lab::test_fixture::linear_texture_pixel_words,std::size(nr::registered_lab::test_fixture::linear_texture_pixel_words));
+    const auto vs=parse_vertex(words.data(),words.size()),ps=opaque ? parse_pixel(nr::registered_lab::test_fixture::point_texture_pixel_words,std::size(nr::registered_lab::test_fixture::point_texture_pixel_words)) : parse_pixel(nr::registered_lab::test_fixture::linear_texture_pixel_words,std::size(nr::registered_lab::test_fixture::linear_texture_pixel_words));
     uint64_t checked=0,different=0;unsigned rejected=0;double maximum=0;
     for(const bool desktop:{false,true})for(const bool blend:{false,true})for(const bool swap:{false,true})for(const uint32_t sf:{28u,87u}){
         if(desktop && (!blend || swap || sf!=87))continue;
@@ -21,7 +24,7 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
         const Viewport view{0,0,float(w),float(h),0,1};
         const uint32_t format=swap?(sf==87?28u:87u):sf;
         PackedTexture source{sw,sh,sf,std::vector<PackedColor>(size_t(sw)*sh)};std::vector<PackedColor> bg(size_t(w)*h);
-        LinearTextureDrawExecutor executor(vs,ps,w,h,format,sw,sh,sf,backend,blend);
+        LinearTextureDrawExecutor executor(vs,ps,w,h,format,sw,sh,sf,backend,blend,point?TextureFilter::point:TextureFilter::linear);
         for(unsigned frame=0;frame<(desktop?6u:9u);++frame){
             for(size_t n=0;n<source.pixels.size();++n){const auto alpha=frame==0?0u:frame==1?255u:unsigned((n*37+frame*17)%256);
                 for(unsigned c=0;c<4;++c)source.pixels[n][c]=uint8_t(c==3?alpha:(n*71+c*51+frame*19)%(alpha+1));}
@@ -55,17 +58,18 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
                 if(!inside){TEST(result.pixels[at]==bg[at]);checked+=4;continue;}++covered;
                 const double u=double(uv[0])+(x+.5-double(snapped[0])/256)/(double(snapped[2]-snapped[0])/256)*(double(uv[2])-uv[0]);
                 const double v=double(uv[1])+(y+.5-double(snapped[1])/256)/(double(snapped[3]-snapped[1])/256)*(double(uv[3])-uv[1]);
-                const double tx=u*sw-.5,ty=v*sh-.5;const auto ix=int64_t(std::floor(tx)),iy=int64_t(std::floor(ty));const double fx=tx-double(ix),fy=ty-double(iy);
+                const double tx=u*sw-(point?0:.5),ty=v*sh-(point?0:.5);const auto ix=int64_t(std::floor(tx)),iy=int64_t(std::floor(ty));const double fx=point?0:tx-double(ix),fy=point?0:ty-double(iy);
                 double sample[4]{};for(int dy=0;dy<2;++dy)for(int dx=0;dx<2;++dx){
                     const auto sx=std::clamp(ix+dx,int64_t(0),int64_t(sw)-1),sy=std::clamp(iy+dy,int64_t(0),int64_t(sh)-1);
                     for(unsigned c=0;c<4;++c)sample[c]+=source.pixels[size_t(sy)*sw+size_t(sx)][c]*(dx?fx:1-fx)*(dy?fy:1-fy);}
+                if(opaque)sample[3]=255;
                 for(unsigned c=0;c<4;++c){const auto lane=swap&&c<3?2-c:c;const double ideal=std::clamp(sample[lane]*color[format==87&&c<3?2-c:c]+(blend?bg[at][c]*(1-sample[3]*color[3]/255):0),0.,255.);
                     const auto actual=result.pixels[at][c];const double error=std::abs(actual-ideal);maximum=(std::max)(maximum,error);
                     if(error>.6){std::fprintf(stderr,"mismatch w=%u blend=%u swap=%u frame=%u x=%u y=%u c=%u got=%u ideal=%.9g\n",w,unsigned(blend),unsigned(swap),frame,x,y,c,unsigned(actual),ideal);TEST(false);}
                     if(actual!=uint8_t(std::nearbyint(ideal)))++different;++checked;}
             }
             TEST(result.covered_samples==covered);
-            std::printf("{\"linear_texture_draw\":true,\"width\":%u,\"height\":%u,\"source_format\":%u,\"blend\":%s,\"swap\":%s,\"frame\":%u,\"draw_ms\":%.3f,\"covered_samples\":%llu,\"execution_device\":\"%s\"}\n",w,h,sf,blend?"true":"false",swap?"true":"false",frame,result.timings.total_ms,static_cast<unsigned long long>(covered),result.execution_device.c_str());std::fflush(stdout);
+            std::printf("{\"modulated_texture_draw\":true,\"point_filter\":%s,\"width\":%u,\"height\":%u,\"source_format\":%u,\"blend\":%s,\"swap\":%s,\"frame\":%u,\"draw_ms\":%.3f,\"covered_samples\":%llu,\"execution_device\":\"%s\"}\n",point?"true":"false",w,h,sf,blend?"true":"false",swap?"true":"false",frame,result.timings.total_ms,static_cast<unsigned long long>(covered),result.execution_device.c_str());std::fflush(stdout);
         }
     }
     std::printf("{\"checked_components\":%llu,\"rounded_oracle_differences\":%llu,\"maximum_byte_error\":%.9g,\"invalid_draws_rejected\":%u,\"desktop_offload_tested\":false,\"displayed_frames\":0}\n",static_cast<unsigned long long>(checked),static_cast<unsigned long long>(different),maximum,rejected);return 0;

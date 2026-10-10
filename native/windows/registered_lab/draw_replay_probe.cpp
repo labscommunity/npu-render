@@ -140,13 +140,14 @@ int main(int argc, char **argv) try {
             texture={source[3],source[4],28,{}};texture.pixels.resize(alpha.size());
             for(size_t i=0;i<alpha.size();++i)texture.pixels[i]={0,0,0,alpha[i]};
         } else texture = {source[3],source[4],source[5],snapshot.values<PackedColor>("source")};
-        if(sampler[0]==21){
-            linear_executor=std::make_unique<LinearTextureDrawExecutor>(vs,ps,width,height,format,texture.width,texture.height,texture.format,backend,blending);
+        if(sampler[0]==21 || ps.instructions.size()==2 || blending || clip!=std::array<int32_t,4>{0,0,int32_t(width),int32_t(height)}){
+            const bool point=sampler[0]==0;
+            linear_executor=std::make_unique<LinearTextureDrawExecutor>(vs,ps,width,height,format,texture.width,texture.height,texture.format,backend,blending,point?TextureFilter::point:TextureFilter::linear);
             const auto a=reference_vertex(vs,inputs[0],cb),b=reference_vertex(vs,inputs[2],cb);const auto pr=vs.position_output,ur=ps.instructions[0].sources[0].index;
             const std::array<float,4> screen{(as_float(a[pr][0])+1)*(float(width)*.5f),(1-as_float(a[pr][1]))*(float(height)*.5f),
                 (as_float(b[pr][0])+1)*(float(width)*.5f),(1-as_float(b[pr][1]))*(float(height)*.5f)};
             const std::array<double,4> uv{as_float(a[ur][0]),as_float(a[ur][1]),as_float(b[ur][0]),as_float(b[ur][1])};
-            const auto cr=ps.instructions[1].sources[1].index;
+            const auto cr=ps.instructions.back().sources[1].index;
             const std::array<double,4> color{as_float(a[cr][0]),as_float(a[cr][1]),as_float(a[cr][2]),as_float(a[cr][3])};
             std::array<int32_t,4> snapped{};for(unsigned c=0;c<4;++c)snapped[c]=int32_t(std::nearbyint(double(screen[c])*256));
             linear_reference.resize(size_t(width)*height);
@@ -154,11 +155,12 @@ int main(int argc, char **argv) try {
                 const auto at=size_t(y)*width+x;const int32_t px=int32_t(x)*256+128,py=int32_t(y)*256+128;
                 const bool covered=px>=snapped[0]&&px<snapped[2]&&py>=snapped[1]&&py<snapped[3]&&int32_t(x)>=clip[0]&&int32_t(y)>=clip[1]&&int32_t(x)<clip[2]&&int32_t(y)<clip[3];
                 if(!covered){for(unsigned c=0;c<4;++c)linear_reference[at][c]=pixels[at][c];continue;}++linear_covered;
-                const double tx=(uv[0]+(x+.5-double(snapped[0])/256)/(double(snapped[2]-snapped[0])/256)*(uv[2]-uv[0]))*texture.width-.5;
-                const double ty=(uv[1]+(y+.5-double(snapped[1])/256)/(double(snapped[3]-snapped[1])/256)*(uv[3]-uv[1]))*texture.height-.5;
-                const auto ix=int64_t(std::floor(tx)),iy=int64_t(std::floor(ty));const double fx=tx-double(ix),fy=ty-double(iy);double sample[4]{};
+                const double tx=(uv[0]+(x+.5-double(snapped[0])/256)/(double(snapped[2]-snapped[0])/256)*(uv[2]-uv[0]))*texture.width-(point?0:.5);
+                const double ty=(uv[1]+(y+.5-double(snapped[1])/256)/(double(snapped[3]-snapped[1])/256)*(uv[3]-uv[1]))*texture.height-(point?0:.5);
+                const auto ix=int64_t(std::floor(tx)),iy=int64_t(std::floor(ty));const double fx=point?0:tx-double(ix),fy=point?0:ty-double(iy);double sample[4]{};
                 for(int dy=0;dy<2;++dy)for(int dx=0;dx<2;++dx){const auto sx=std::clamp(ix+dx,int64_t(0),int64_t(texture.width)-1),sy=std::clamp(iy+dy,int64_t(0),int64_t(texture.height)-1);
                     for(unsigned c=0;c<4;++c)sample[c]+=texture.pixels[size_t(sy)*texture.width+size_t(sx)][c]*(dx?fx:1-fx)*(dy?fy:1-fy);}
+                if(ps.instructions.size()==3)sample[3]=255;
                 for(unsigned c=0;c<4;++c)linear_reference[at][c]=std::clamp(sample[format!=texture.format&&c<3?2-c:c]*color[format==87&&c<3?2-c:c]+(blending?pixels[at][c]*(1-sample[3]*color[3]/255):0),0.,255.);
             }
         }else{

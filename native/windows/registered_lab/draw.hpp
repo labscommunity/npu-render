@@ -8,6 +8,16 @@ void APIENTRY create_srv(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATESHADERRESOU
         lab_trace("{\"event\":\"shader_resource_view\",\"dimension\":%u,\"format\":%u,\"first\":%u,\"count\":%u}\n",
             UINT(a->ResourceDimension), UINT(a->Format), a->Buffer.FirstElement, a->Buffer.NumElements);
         auto &r = resource(a->hDrvResource);
+        require(r.allocation->context == device(h).context);
+        if (r.buffer_bytes) {
+            require((r.bind_flags & D3D10_DDI_BIND_SHADER_RESOURCE) &&
+                a->ResourceDimension == D3D10DDIRESOURCE_BUFFER && a->Format == DXGI_FORMAT_R8_UINT &&
+                a->Buffer.NumElements && uint64_t(a->Buffer.FirstElement) + a->Buffer.NumElements <= r.buffer_bytes);
+            auto &view = *static_cast<View *>(out.pDrvPrivate);
+            view.allocation = r.allocation; view.format = UINT(a->Format); view.buffer = true;
+            view.first_element = a->Buffer.FirstElement; view.elements = a->Buffer.NumElements;
+            return;
+        }
         require(!r.buffer_bytes && r.usage == D3D10_DDI_USAGE_DEFAULT && r.allocation->context == device(h).context &&
                 a->ResourceDimension == D3D10DDIRESOURCE_TEXTURE2D && UINT(a->Format) == r.allocation->surface.format &&
                 a->Tex2D.MostDetailedMip < mip_count(r) && a->Tex2D.MipLevels == 1 && !a->Tex2D.FirstArraySlice && a->Tex2D.ArraySize == 1);
@@ -17,18 +27,20 @@ void APIENTRY create_srv(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATESHADERRESOU
 void APIENTRY destroy_srv(D3D10DDI_HDEVICE h, D3D10DDI_HSHADERRESOURCEVIEW out) {
     guard(h, __FUNCTION__, [&] { static_cast<View *>(out.pDrvPrivate)->~View(); });
 }
+template<UINT Stage>
 void APIENTRY set_sources(D3D10DDI_HDEVICE h, UINT start, UINT count, const D3D10DDI_HSHADERRESOURCEVIEW *views) {
     guard(h, __FUNCTION__, [&] {
-        require(start < 128 && count <= 128 - start && (!count || views));
-        std::shared_ptr<Allocation> source = device(h).bound_source;
+        require(start <= 128 && count <= 128 - start && (!count || views));
+        auto &d = device(h); auto next = d.shader_sources[Stage];
         for (UINT i = 0; i < count; ++i) {
-            require(start + i == 0 || !views[i].pDrvPrivate);
-            if (start + i == 0) {
-                source = views[i].pDrvPrivate ? static_cast<View *>(views[i].pDrvPrivate)->allocation : nullptr;
-                require(!views[i].pDrvPrivate || (source && source->context == device(h).context));
-            }
+            next[start+i] = views[i].pDrvPrivate ? *static_cast<View *>(views[i].pDrvPrivate) : View{};
+            const auto &source = next[start+i].allocation;
+            require(!views[i].pDrvPrivate || (source && source->context == d.context));
         }
-        device(h).bound_source = std::move(source);
+        d.shader_sources[Stage] = std::move(next);
+        // The current SAMPLE renderer only admits texture slot zero. Typed
+        // buffer views retain their identity and cannot masquerade as textures.
+        if constexpr (Stage == 2) d.bound_source = d.shader_sources[2][0].buffer ? nullptr : d.shader_sources[2][0].allocation;
     });
 }
 SIZE_T APIENTRY shader_size(D3D10DDI_HDEVICE, const UINT *, const D3D10DDIARG_STAGE_IO_SIGNATURES *) { return sizeof(Shader); }
@@ -160,10 +172,6 @@ void APIENTRY draw(D3D10DDI_HDEVICE h, UINT count, UINT first) {
     });
 }
 void APIENTRY null_shader(D3D10DDI_HDEVICE h, D3D10DDI_HSHADER value) { guard(h, __FUNCTION__, [&] { require(!value.pDrvPrivate); }); }
-void APIENTRY null_views(D3D10DDI_HDEVICE h, UINT start, UINT count, const D3D10DDI_HSHADERRESOURCEVIEW *values) {
-    guard(h, __FUNCTION__, [&] { require(start <= 128 && count <= 128 - start && (!count || values));
-        for (UINT i = 0; i < count; ++i) require(!values[i].pDrvPrivate); });
-}
 void APIENTRY null_stream(D3D10DDI_HDEVICE h, UINT count, UINT, const D3D10DDI_HRESOURCE *values, const UINT *) {
     guard(h, __FUNCTION__, [&] { require(count <= 4 && (!count || values)); for (UINT i = 0; i < count; ++i) require(!values[i].pDrvPrivate); });
 }
@@ -178,7 +186,7 @@ void APIENTRY set_scissors(D3D10DDI_HDEVICE h, UINT count, UINT, const D3D10_DDI
 void APIENTRY view_hazard(D3D10DDI_HDEVICE, D3D10DDI_HSHADERRESOURCEVIEW, D3D10DDI_HRESOURCE) {} // Blocking mappings/submissions order access.
 void bind_draw_functions(D3D10DDI_DEVICEFUNCS &f) {
     f.pfnCalcPrivateShaderResourceViewSize = srv_size; f.pfnCreateShaderResourceView = create_srv;
-    f.pfnDestroyShaderResourceView = destroy_srv; f.pfnPsSetShaderResources = set_sources;
+    f.pfnDestroyShaderResourceView = destroy_srv; f.pfnPsSetShaderResources = set_sources<2>;
     f.pfnCalcPrivateShaderSize = shader_size; f.pfnCreateVertexShader = create_shader<1>; f.pfnCreatePixelShader = create_shader<2>;
     f.pfnDestroyShader = destroy_shader; f.pfnVsSetShader = set_shader<1>; f.pfnPsSetShader = set_shader<2>;
     f.pfnSetViewports = set_viewports; f.pfnIaSetTopology = set_topology; f.pfnDraw = draw;
@@ -189,7 +197,7 @@ void bind_draw_functions(D3D10DDI_DEVICEFUNCS &f) {
     f.pfnVsSetConstantBuffers = set_constant_buffers<0>;
     f.pfnGsSetConstantBuffers = set_constant_buffers<1>;
     f.pfnPsSetConstantBuffers = set_constant_buffers<2>;
-    f.pfnVsSetShaderResources = f.pfnGsSetShaderResources = null_views;
+    f.pfnVsSetShaderResources = set_sources<0>; f.pfnGsSetShaderResources = set_sources<1>;
     f.pfnIaSetVertexBuffers = set_vertex_buffers; f.pfnIaSetIndexBuffer = set_index_buffer;
     f.pfnSoSetTargets = null_stream; f.pfnSetPredication = null_predication;
     f.pfnSetScissorRects = set_scissors; f.pfnShaderResourceViewReadAfterWriteHazard = view_hazard;

@@ -14,15 +14,15 @@ class Pipeline {
     Request previous_linear;
 public:
     raster::UniformDrawExecutor::Result execute(const Request &request) {
-        if (request.header.flags & 8) {
+        if (request.header.flags & 24) {
             const auto &h=request.header,&old=previous_linear.header;
             const auto &t=request.texture,&pt=previous_linear.texture;
-            require(shape_valid(h) && h.abi==4);
+            require(shape_valid(h) && h.abi==((h.flags&16)?5u:4u));
             if(!linear_executor || old.width!=h.width || old.height!=h.height || old.format!=h.format ||
                 (old.flags & ~4u)!=(h.flags & ~4u) || pt.width!=t.width || pt.height!=t.height || pt.format!=t.format ||
                 previous_linear.vertex.bytecode!=request.vertex.bytecode || previous_linear.pixel.bytecode!=request.pixel.bytecode){
                 linear_executor.reset();
-                auto candidate=std::make_unique<raster::LinearTextureDrawExecutor>(request.vertex,request.pixel,h.width,h.height,h.format,t.width,t.height,t.format,"NPU",(h.flags&1)!=0);
+                auto candidate=std::make_unique<raster::LinearTextureDrawExecutor>(request.vertex,request.pixel,h.width,h.height,h.format,t.width,t.height,t.format,"NPU",(h.flags&1)!=0,(h.flags&16)?shader::TextureFilter::point:shader::TextureFilter::linear);
                 linear_executor=std::move(candidate);previous_linear={};previous_linear.header=h;
                 previous_linear.vertex=request.vertex;previous_linear.pixel=request.pixel;previous_linear.texture={t.width,t.height,t.format,{}};
             }

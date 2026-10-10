@@ -97,11 +97,12 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
         d.blend.DestBlendAlpha == D3D10_DDI_BLEND_INV_SRC_ALPHA && d.blend.BlendOpAlpha == D3D10_DDI_BLEND_OP_ADD);
     const auto vc = fetch_constants(d, 0, *d.vertex_program), pc = fetch_constants(d, 2, *d.pixel_program);
     const bool textured = std::any_of(d.pixel_program->textures.begin(),d.pixel_program->textures.end(),[](bool v){return v;});
-    nr::raster::PackedTexture texture; bool linear=false;
+    nr::raster::PackedTexture texture; bool linear=false, modulated=false;
     if (textured) {
         const auto source = d.bound_source; const auto &sampler = d.samplers[2][0];
         linear=sampler.desc.Filter==D3D10_DDI_FILTER_MIN_MAG_MIP_LINEAR;
-        if(linear) nr::raster::LinearTextureDrawExecutor::validate_shader(*d.pixel_program);
+        modulated=linear || d.pixel_program->instructions.size()==2 || blend || clip!=full;
+        if(modulated) nr::raster::LinearTextureDrawExecutor::validate_shader(*d.pixel_program);
         else { require(clip==full && !blend); nr::raster::PointTextureDrawExecutor::validate_shader(*d.pixel_program); }
         require(count == 6 && d.blend.RenderTargetWriteMask[0] == 15 && source && source != target && source->handle != target->handle &&
             source->context == d.context && !source->locked && sampler.bound &&
@@ -128,16 +129,16 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
         request.header.format = s.format; request.header.flags = (UINT(d.blend.RenderTargetWriteMask[0]) << 8) | UINT(blend);
         if (textured) { request.header.abi = 2; request.header.flags |= 2; request.texture = std::move(texture); }
         if (clip != full) { request.header.abi = 3; request.header.flags |= 4; request.scissor = clip; }
-        if (linear) {request.header.abi=4;request.header.flags|=8;}
+        if (modulated) {request.header.abi=linear?4:5;request.header.flags|=linear?8:16;}
         request.viewport = viewport; request.vertex = *d.vertex_program; request.pixel = *d.pixel_program;
         request.inputs = inputs; request.vertex_constants = vc; request.pixel_constants = pc; request.background = std::move(background);
         result = d.indexed_exchange->execute(std::move(request));
-    } else if (linear) {
-        const std::array<uint64_t,7> key{s.width,s.height,s.format,texture.width,texture.height,texture.format,uint64_t(blend)};
+    } else if (modulated) {
+        const std::array<uint64_t,8> key{s.width,s.height,s.format,texture.width,texture.height,texture.format,uint64_t(blend),uint64_t(linear)};
         if(!d.linear_texture_executor || d.linear_texture_vertex!=d.vertex_program || d.linear_texture_pixel!=d.pixel_program || d.linear_texture_key!=key){
             if (d.backend == "NPU") d.linear_texture_executor.reset();
             auto candidate=std::make_unique<nr::raster::LinearTextureDrawExecutor>(*d.vertex_program,*d.pixel_program,s.width,s.height,s.format,
-                texture.width,texture.height,texture.format,d.backend,blend);
+                texture.width,texture.height,texture.format,d.backend,blend,linear ? nr::shader::TextureFilter::linear : nr::shader::TextureFilter::point);
             d.linear_texture_executor=std::move(candidate);d.linear_texture_key=key;
             d.linear_texture_vertex=d.vertex_program;d.linear_texture_pixel=d.pixel_program;
         }

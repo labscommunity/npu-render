@@ -147,16 +147,20 @@ int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
         textured_positions[n][0]=(right?60.f:4.f)/32-1;textured_positions[n][1]=1-(bottom?61.f:3.f)/32;
         textured_positions[n][4]=right?1.f:0.f;textured_positions[n][5]=bottom?1.f:0.f;}
     f.pfnResourceUpdateSubresourceUP(h,resources[5],0,nullptr,textured_positions,0,0);
-    for(unsigned frame=0;frame<2;++frame){
+    for(unsigned frame=0;frame<4;++frame){
+        if(frame==3){f.pfnCreatePixelShader(h,nr::registered_lab::test_fixture::point_texture_pixel_words,shaders[1],{},nullptr);
+            f.pfnPsSetShader(h,shaders[1]);f.pfnDestroyShader(h,shaders[1]);}
+        sampler.Filter=frame>=2?D3D10_DDI_FILTER_MIN_MAG_MIP_POINT:D3D10_DDI_FILTER_MIN_MAG_MIP_LINEAR;f.pfnPsSetSamplers(h,0,1,&hs);
         for(size_t n=0;n<size_t(sw)*sh;++n)for(unsigned c=0;c<4;++c)source[n*4+c]=uint8_t(c==3?128:(n*13+c*29+frame*41)%129);
         f.pfnResourceUpdateSubresourceUP(h,resources[4],0,nullptr,source.data(),sw*4,0);
         const auto before=memory[target_index];f.pfnDrawIndexed(h,6,1,1);TEST(last_error==S_OK && counters.draws==draws_before+8+frame);
         for(UINT y=0;y<height;++y)for(UINT x=0;x<width;++x){const auto at=(size_t(y)*width+x)*4;
             if(x<7 || x>=60 || y<5 || y>=60){for(UINT c=0;c<4;++c)TEST(memory[target_index][at+c]==before[at+c]);continue;}
-            const double tx=(x+.5-4)/56*sw-.5,ty=(y+.5-3)/58*sh-.5;const auto ix=int(std::floor(tx)),iy=int(std::floor(ty));
-            const double fx=tx-ix,fy=ty-iy;double sample[4]{};
+            const double tx=(x+.5-4)/56*sw-(frame>=2?0:.5),ty=(y+.5-3)/58*sh-(frame>=2?0:.5);const auto ix=int(std::floor(tx)),iy=int(std::floor(ty));
+            const double fx=frame>=2?0:tx-ix,fy=frame>=2?0:ty-iy;double sample[4]{};
             for(int dy=0;dy<2;++dy)for(int dx=0;dx<2;++dx){const auto sx=(std::clamp)(ix+dx,0,int(sw)-1),sy=(std::clamp)(iy+dy,0,int(sh)-1);
                 for(UINT c=0;c<4;++c)sample[c]+=source[(size_t(sy)*sw+size_t(sx))*4+c]*(dx?fx:1-fx)*(dy?fy:1-fy);}
+            if(frame==3)sample[3]=255;
             for(UINT c=0;c<4;++c)TEST(std::abs(memory[target_index][at+c]-(sample[c]+before[at+c]*(1-sample[3]/255)))<=.6);
         }
     }
@@ -165,6 +169,9 @@ int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
     // and allocation ownership, and compare against independent bilinear math.
     const D3D10DDI_HSHADERRESOURCEVIEW no_source{};f.pfnPsSetShaderResources(h,0,1,&no_source);
     f.pfnDestroyShaderResourceView(h,srv);f.pfnDestroyResource(h,resources[4]);
+    f.pfnCreatePixelShader(h,nr::registered_lab::test_fixture::linear_texture_pixel_words,shaders[1],{},nullptr);
+    f.pfnPsSetShader(h,shaders[1]);f.pfnDestroyShader(h,shaders[1]);
+    sampler.Filter=D3D10_DDI_FILTER_MIN_MAG_MIP_LINEAR;f.pfnPsSetSamplers(h,0,1,&hs);
     std::vector<uint8_t> alpha(size_t(sw)*sh);
     args.Format=DXGI_FORMAT_A8_UNORM;initial.pSysMem=alpha.data();initial.SysMemPitch=sw;
     f.pfnCreateResource(h,&args,resources[4],{});sva.Format=args.Format;
@@ -223,7 +230,7 @@ int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
     f.pfnDestroyRenderTargetView(h, view);
     for (const auto r : resources) f.pfnDestroyResource(h, r);
     f.pfnDestroyDevice(h);
-    TEST(counters.executions == executions_before + 14 && !counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
-    std::printf("{\"kind\":\"indexed-ddi-runtime-shim\",\"requested_backend\":\"%s\",\"execution_device\":\"%s\",\"verified_draws\":9,\"verified_components\":147456,\"blended_scissored_draws\":3,\"textured_draws\":4,\"linear_scaled_blended_draws\":2,\"base_vertex_and_start_index\":true,\"invalid_ranges_and_sampler_rejected\":true,\"registered_adapter_tested\":false,\"desktop_offload_tested\":false}\n", backend, counters.last_execution_device);
+    TEST(counters.executions == executions_before + 16 && !counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
+    std::printf("{\"kind\":\"indexed-ddi-runtime-shim\",\"requested_backend\":\"%s\",\"execution_device\":\"%s\",\"verified_draws\":11,\"verified_components\":147456,\"blended_scissored_draws\":3,\"textured_draws\":6,\"point_scaled_blended_draws\":2,\"linear_scaled_blended_draws\":2,\"base_vertex_and_start_index\":true,\"invalid_ranges_and_sampler_rejected\":true,\"registered_adapter_tested\":false,\"desktop_offload_tested\":false}\n", backend, counters.last_execution_device);
     return 0;
 }

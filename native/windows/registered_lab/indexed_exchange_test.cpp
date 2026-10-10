@@ -91,6 +91,12 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
     for(unsigned n=0;n<5;++n){auto bad=linear_bytes;auto h=linear.header;
         if(n==0)h.abi=3;if(n==1)h.flags&=~2u;if(n==2)h.flags&=~8u;if(n==3)h.vertices=3;if(n==4)h.width=4097;
         std::memcpy(bad.data(),&h,sizeof(h));rejects(bad);}
+    auto point=linear;point.header.abi=5;point.header.flags=0xf17;
+    const auto point_bytes=ex::encode(point);const auto point_decoded=ex::decode(point_bytes);
+    test(point_decoded.texture.pixels==point.texture.pixels && point_decoded.header.abi==5 && point_decoded.scissor==point.scissor);
+    for(unsigned n=0;n<5;++n){auto bad=point_bytes;auto h=point.header;
+        if(n==0)h.abi=4;if(n==1)h.flags|=8;if(n==2)h.flags&=~2u;if(n==3)h.flags&=~16u;if(n==4)h.vertices=3;
+        std::memcpy(bad.data(),&h,sizeof(h));rejects(bad);}
     const size_t description_offset = texture_bytes.size()-textured.texture.pixels.size()*4-sizeof(ex::TextureDescription);
     for(uint32_t bad=0;bad<5;++bad) {
         auto packet = texture_bytes; ex::TextureDescription desc{}; std::memcpy(&desc,packet.data()+description_offset,sizeof(desc));

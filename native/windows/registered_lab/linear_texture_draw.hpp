@@ -1,8 +1,8 @@
 #pragma once
 #include "point_texture_draw.hpp"
 namespace nr::raster {
-// Checked fusion of a white-modulated SAMPLE shader on an axis-aligned,
-// unit-clip-w quad. Coverage, affine interpolation, bilinear clamp sampling,
+// Checked fusion of a color-modulated SAMPLE shader on an axis-aligned,
+// unit-clip-w quad. Coverage, affine interpolation, point or bilinear clamp sampling,
 // source-over and byte conversion all execute on the selected provider.
 class LinearTextureDrawExecutor {
     struct State;
@@ -11,7 +11,7 @@ public:
     static void validate_shader(const shader::Program &pixel);
     LinearTextureDrawExecutor(const shader::Program &vertex, const shader::Program &pixel,
         uint32_t width, uint32_t height, uint32_t format, uint32_t source_width,
-        uint32_t source_height, uint32_t source_format, const std::string &backend, bool blend);
+        uint32_t source_height, uint32_t source_format, const std::string &backend, bool blend, shader::TextureFilter filter = shader::TextureFilter::linear);
     ~LinearTextureDrawExecutor();
     LinearTextureDrawExecutor(const LinearTextureDrawExecutor &) = delete;
     LinearTextureDrawExecutor &operator=(const LinearTextureDrawExecutor &) = delete;

@@ -13,11 +13,11 @@ bool plain(const shader::Operand &o, shader::Register kind, uint32_t index) {
     return o.kind == kind && o.index == index && !o.element && !o.relative.enabled && o.modifier == shader::Modifier::none;
 }
 bool identity(const shader::Operand &o) { return o.lanes == std::array<uint32_t,4>{0,1,2,3}; }
-struct Pattern { uint32_t color, uv; };
+struct Pattern { uint32_t color, uv; bool opaque; };
 Pattern pattern(const shader::Program &p) {
     using namespace shader;
-    require(p.stage == Stage::pixel && p.instructions.size() == 2 && p.outputs[0] == 15 && p.position_input == 16);
-    const auto &sample = p.instructions[0], &multiply = p.instructions[1];
+    require(p.stage == Stage::pixel && (p.instructions.size() == 2 || p.instructions.size() == 3) && p.outputs[0] == 15 && p.position_input == 16);
+    const auto &sample = p.instructions[0], &multiply = p.instructions.back();
     require(sample.opcode == Opcode::sample && sample.source_count == 3 && !sample.saturate &&
         sample.destination.kind == Register::temporary && sample.destination.mask == 15 &&
         plain(sample.destination, Register::temporary, sample.destination.index) &&
@@ -25,11 +25,18 @@ Pattern pattern(const shader::Program &p) {
         sample.sources[0].lanes[0] == 0 && sample.sources[0].lanes[1] == 1 &&
         plain(sample.sources[1], Register::texture, 0) && identity(sample.sources[1]) && plain(sample.sources[2], Register::sampler, 0));
     const auto temporary = sample.destination.index;
+    if(p.instructions.size()==3) {
+        const auto &alpha=p.instructions[1];
+        require(alpha.opcode==Opcode::move && alpha.source_count==1 && !alpha.saturate &&
+            plain(alpha.destination,Register::temporary,temporary) && alpha.destination.mask==8 &&
+            alpha.sources[0].kind==Register::immediate && alpha.sources[0].modifier==Modifier::none &&
+            !alpha.sources[0].relative.enabled && alpha.sources[0].literal==std::array<uint32_t,4>{0x3f800000,0x3f800000,0x3f800000,0x3f800000});
+    }
     require(multiply.opcode == Opcode::multiply && multiply.source_count == 2 && !multiply.saturate &&
         plain(multiply.destination, Register::output, 0) && multiply.destination.mask == 15 &&
         plain(multiply.sources[0], Register::temporary, temporary) && identity(multiply.sources[0]) &&
         multiply.sources[1].kind == Register::input && plain(multiply.sources[1], Register::input, multiply.sources[1].index) && identity(multiply.sources[1]));
-    Pattern result{multiply.sources[1].index, sample.sources[0].index};
+    Pattern result{multiply.sources[1].index, sample.sources[0].index, p.instructions.size()==3};
     require(result.color < 16 && result.uv < 16 && result.color != result.uv && p.textures[0] && p.samplers[0]);
     for (uint32_t i = 0; i < 16; ++i) {
         require(p.inputs[i] == (i == result.color ? 15u : (i == result.uv ? 3u : 0u)));
@@ -56,13 +63,14 @@ Node both(const Node &a,const Node &b) { return std::make_shared<op::BitwiseAnd>
 }
 struct LinearTextureDrawExecutor::State {
     shader::Program vs; Pattern pixel;
-    uint32_t width,height,sw,sh,sf,rows,count; bool failed=false;
+    uint32_t width,height,sw,sh,sf,rows,count; bool failed=false, point=false;
     shader::VertexExecutor vertex; ProjectionExecutor projection;
     ov::Core core; ov::CompiledModel compiled; ov::InferRequest request; std::string device;
     State(const shader::Program &v,const shader::Program &p,uint32_t w,uint32_t h,uint32_t format,
-        uint32_t source_width,uint32_t source_height,uint32_t source_format,const std::string &backend,bool blend)
+        uint32_t source_width,uint32_t source_height,uint32_t source_format,const std::string &backend,bool blend,shader::TextureFilter filter)
         : vs(v),pixel(pattern(p)),width(w),height(h),sw(source_width),sh(source_height),sf(source_format),
-          rows(1),count(w),vertex(v,6,backend),projection(6,backend) {
+          rows(1),count(w),point(filter==shader::TextureFilter::point),vertex(v,6,backend),projection(6,backend) {
+        require((filter==shader::TextureFilter::point || filter==shader::TextureFilter::linear) && (!pixel.opaque || point));
         require(w && w<=4096 && h && h<=8192 && uint64_t(w)*h<=4*1024*1024 && sw && sw<=8192 && sh && sh<=8192 && uint64_t(sw)*sh<=4*1024*1024);
         require((format==28 || format==87) && (sf==28 || sf==87) && vs.stage==shader::Stage::vertex && vs.position_output<16 &&
             (vs.outputs[pixel.color]&15)==15 && (vs.outputs[pixel.uv]&3)==3);
@@ -110,7 +118,10 @@ struct LinearTextureDrawExecutor::State {
         // The shader multiplies sampled RGBA by a uniform vertex color. Source
         // storage remains packed, so map the color to that storage order first.
         auto packed_color=std::make_shared<op::Gather>(color,sf==87?axes({2,1,0,3}):axes({0,1,2,3}),op::Constant::create(ov::element::i32,ov::Shape{},{1}));
-        auto sampled=mul(mix(mix(fetch(0,0),fetch(1,0),tx),mix(fetch(0,1),fetch(1,1),tx),ty),packed_color);
+        Node sampled=point ? fetch(0,0) : mix(mix(fetch(0,0),fetch(1,0),tx),mix(fetch(0,1),fetch(1,1),tx),ty);
+        if(pixel.opaque)sampled=std::make_shared<op::Concat>(ov::OutputVector{lane(sampled,0),lane(sampled,1),lane(sampled,2),
+            std::make_shared<op::Broadcast>(number(1),axes({count,1}))},1);
+        sampled=mul(sampled,packed_color);
         auto px=op::Constant::create(ov::element::i32,ov::Shape{count,1},xx);
         auto py=add(op::Constant::create(ov::element::i32,ov::Shape{count,1},yy),mul(origin_i,integer(256)));
         auto inside=[&](const Node &r)->Node {
@@ -142,8 +153,8 @@ struct LinearTextureDrawExecutor::State {
     }
 };
 void LinearTextureDrawExecutor::validate_shader(const shader::Program &p){(void)pattern(p);}
-LinearTextureDrawExecutor::LinearTextureDrawExecutor(const shader::Program &v,const shader::Program &p,uint32_t w,uint32_t h,uint32_t f,uint32_t sw,uint32_t sh,uint32_t sf,const std::string &b,bool blend)
-    :state(std::make_unique<State>(v,p,w,h,f,sw,sh,sf,b,blend)){}
+LinearTextureDrawExecutor::LinearTextureDrawExecutor(const shader::Program &v,const shader::Program &p,uint32_t w,uint32_t h,uint32_t f,uint32_t sw,uint32_t sh,uint32_t sf,const std::string &b,bool blend,shader::TextureFilter filter)
+    :state(std::make_unique<State>(v,p,w,h,f,sw,sh,sf,b,blend,filter)){}
 LinearTextureDrawExecutor::~LinearTextureDrawExecutor()=default;
 UniformDrawExecutor::Result LinearTextureDrawExecutor::execute(const std::vector<shader::VertexRegisters> &inputs,const shader::VertexConstants &constants,
     const Viewport &viewport,const PackedTexture &source,const std::vector<PackedColor> &background,const std::optional<std::array<int32_t,4>> &scissor){
@@ -184,7 +195,7 @@ UniformDrawExecutor::Result LinearTextureDrawExecutor::execute(const std::vector
     std::memcpy(s.request.get_tensor("uv").data<float>(),uv.data(),16);
     std::memcpy(s.request.get_tensor("color").data<float>(),color.data(),16);
     std::memcpy(s.request.get_tensor("bounds").data<int32_t>(),bounds.data(),16);std::memcpy(s.request.get_tensor("scissor").data<int32_t>(),clip.data(),16);
-    s.request.get_tensor("half").data<float>()[0]=.5f;result.pixels.resize(background.size());
+    s.request.get_tensor("half").data<float>()[0]=s.point?0.f:.5f;result.pixels.resize(background.size());
     for(uint32_t y=0;y<s.height;y+=s.rows){
         const auto offset=size_t(y)*s.width;s.request.get_tensor("origin").data<float>()[0]=float(y);s.request.get_tensor("origin_i").data<int32_t>()[0]=int32_t(y);
         std::memcpy(s.request.get_tensor("background").data<uint8_t>(),background.data()+offset,size_t(s.count)*4);s.request.infer();

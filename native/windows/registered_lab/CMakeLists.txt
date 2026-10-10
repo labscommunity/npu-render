@@ -144,3 +144,6 @@ target_compile_options(nr_registered_linear_texture_draw_test PRIVATE /W4 /WX)
 target_link_libraries(nr_registered_linear_texture_draw_test PRIVATE d3dcompiler nr_registered_vertex)
 set_property(TARGET nr_registered_linear_texture_draw_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 add_test(NAME registered_linear_texture_draw_contract COMMAND nr_registered_linear_texture_draw_test)
+
+add_test(NAME registered_modulated_point_texture_contract COMMAND nr_registered_linear_texture_draw_test CPU --point)
+add_test(NAME registered_opaque_point_texture_contract COMMAND nr_registered_linear_texture_draw_test CPU --point-opaque)
