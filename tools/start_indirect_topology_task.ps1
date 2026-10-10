@@ -1,7 +1,8 @@
 param(
  [Parameter(Mandatory=$true)][string]$Probe,
  [Parameter(Mandatory=$true)][ValidatePattern('^[0-9A-Fa-f]{64}$')][string]$Sha256,
- [Parameter(Mandatory=$true)][ValidatePattern('^idd-topology-[a-z0-9-]+$')][string]$Name
+ [Parameter(Mandatory=$true)][ValidatePattern('^idd-topology-[a-z0-9-]+$')][string]$Name,
+ [switch]$SystemRendererControl
 )
 $ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue'
 . "$PSScriptRoot\lab_device_identity.ps1"
@@ -12,6 +13,10 @@ if(@(Get-ChildItem "C:\npu-lab\$Name*").Count){throw 'Evidence name already used
 $devices=@()
 foreach($id in 'ROOT\NPURENDER_KMD_LAB','ROOT\NPURENDER_INDIRECT_LAB'){
  $found=@(Get-NrLabDevice -HardwareId $id)
+ if($SystemRendererControl -and $id -eq 'ROOT\NPURENDER_KMD_LAB'){
+  if($found.Count){throw 'System-renderer control requires the experimental render device removed'}
+  continue
+ }
  if($found.Count -ne 1 -or !$found[0].started){throw 'Both owned adapters must be healthy'}
  $devices += $found[0]
 }
@@ -30,7 +35,7 @@ $action.Path=$Probe;$action.Arguments="--report $Name"
 $taskName="NpuRender-$Name"
 # TASK_CREATE fails on an existing task; never replace another run's evidence.
 $task=$service.GetFolder('\').RegisterTaskDefinition($taskName,$definition,2,'NR-GFX-LAB\npu-lab',$null,3)
-$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');task=$taskName;probe_sha256=$Sha256;devices=$devices;maximum_seconds=180;desktop_offload_tested=$false}
+$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');task=$taskName;probe_sha256=$Sha256;devices=$devices;system_renderer_control=[bool]$SystemRendererControl;maximum_seconds=180;desktop_offload_tested=$false}
 $report | ConvertTo-Json -Depth 6 | Set-Content "C:\npu-lab\$Name-launch.json"
 $task.Run($null) | Out-Null
 Get-Content "C:\npu-lab\$Name-launch.json"

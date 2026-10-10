@@ -24,6 +24,12 @@ The builder extracts checksum-pinned UMDF 2.25 / IddCx 1.4 dependencies and crea
 a source/binary hash report. It never signs or installs a driver. Installation and
 removal are restricted to the disposable VM; this is not a deployable desktop mode.
 
+`--system-renderer-control` builds an explicit control that omits the render-adapter
+preference and leaves selection to Windows. Run it with the experimental render
+device removed. The topology task's matching `-SystemRendererControl` flag checks
+that prerequisite. This separates monitor activation from the custom renderer;
+even a successful control establishes no NPU execution or desktop offload.
+
 The lifecycle follows Microsoft's public
 [IndirectDisplay sample](https://github.com/microsoft/Windows-driver-samples/tree/2dc3fd3a0cc84a2933f2194e7ec0871584979071/video/IndirectDisplay).
 The selection contract is

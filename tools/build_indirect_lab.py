@@ -23,6 +23,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--build-dir", type=Path, default=Path("build/windows-indirect-lab"))
     parser.add_argument("--wdk-root", type=Path, default=DEFAULT_ROOT)
+    parser.add_argument("--system-renderer-control", action="store_true")
     args = parser.parse_args()
     if os.name != "nt":
         raise RuntimeError("Windows and MSVC required")
@@ -38,6 +39,7 @@ def main():
             "-A",
             "x64",
             f"-DNR_WDK_ROOT={args.wdk_root.resolve()}",
+            f"-DNR_IDD_SYSTEM_RENDERER_CONTROL={'ON' if args.system_renderer_control else 'OFF'}",
         ],
         check=True,
     )
@@ -58,6 +60,7 @@ def main():
         "schema": 1,
         "kind": "indirect-display-admission-build-only",
         "clean_build": True,
+        "system_renderer_control": args.system_renderer_control,
         "source_sha256": sources,
         "sha256": hashlib.sha256(
             (args.build_dir / "Release/nr_indirect_lab.dll").read_bytes()

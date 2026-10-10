@@ -43,7 +43,7 @@ void trace(const char *format, ...) {
     }
     CloseHandle(file);
 }
-HRESULT paired_adapter(LUID &luid) {
+[[maybe_unused]] HRESULT paired_adapter(LUID &luid) {
     D3DKMT_ENUMADAPTERS2 list{};
     auto status = D3DKMTEnumAdapters2(&list);
     trace("{\"event\":\"adapter_capacity\",\"status\":\"%08lx\",\"capacity\":%u}\n", ULONG(status), list.NumAdapters);
@@ -175,7 +175,8 @@ EVT_IDD_CX_MONITOR_ASSIGN_SWAPCHAIN assign;
 NTSTATUS assign(IDDCX_MONITOR monitor, const IDARG_IN_SETSWAPCHAIN *in) {
     auto state = WdfObjectGet_MonitorState(monitor);
     delete state->consumer; state->consumer = nullptr;
-    const bool paired = in->RenderAdapterLuid.LowPart == state->preferred.LowPart &&
+    const bool paired = (state->preferred.LowPart || state->preferred.HighPart) &&
+                        in->RenderAdapterLuid.LowPart == state->preferred.LowPart &&
                         in->RenderAdapterLuid.HighPart == state->preferred.HighPart;
     trace("{\"event\":\"assigned\",\"actual_low\":%lu,\"actual_high\":%ld,\"preferred_selected\":%s}\n",
           in->RenderAdapterLuid.LowPart, in->RenderAdapterLuid.HighPart, paired ? "true" : "false");
@@ -199,9 +200,13 @@ NTSTATUS initialized(IDDCX_ADAPTER adapter, const IDARG_IN_ADAPTER_INIT_FINISHED
     trace("{\"event\":\"adapter_initialized\",\"status\":\"%08lx\"}\n", ULONG(in->AdapterInitStatus));
     if (!NT_SUCCESS(in->AdapterInitStatus)) return STATUS_SUCCESS;
     auto state = WdfObjectGet_DeviceState(adapter);
+#ifndef NR_IDD_SYSTEM_RENDERER_CONTROL
     IDARG_IN_ADAPTERSETRENDERADAPTER preference{}; preference.PreferredRenderAdapter = state->preferred;
     IddCxAdapterSetRenderAdapter(adapter, &preference);
     trace("{\"event\":\"preferred\",\"low\":%lu,\"high\":%ld}\n", state->preferred.LowPart, state->preferred.HighPart);
+#else
+    trace("{\"event\":\"system_renderer_control\",\"experimental_adapter_requested\":false}\n");
+#endif
     WDF_OBJECT_ATTRIBUTES attributes; WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attributes, MonitorState);
     attributes.EvtCleanupCallback = [](WDFOBJECT object) {
         auto monitor = WdfObjectGet_MonitorState(object); delete monitor->consumer; monitor->consumer = nullptr;
@@ -223,9 +228,11 @@ EVT_WDF_DEVICE_D0_ENTRY power_on;
 NTSTATUS power_on(WDFDEVICE device, WDF_POWER_DEVICE_STATE) {
     auto state = WdfObjectGet_DeviceState(device);
     if (state->adapter) return STATUS_SUCCESS;
+#ifndef NR_IDD_SYSTEM_RENDERER_CONTROL
     const auto found = paired_adapter(state->preferred);
     trace("{\"event\":\"paired_adapter\",\"status\":\"%08lx\"}\n", ULONG(found));
     if (FAILED(found)) return STATUS_DEVICE_NOT_READY;
+#endif
     IDDCX_ADAPTER_CAPS caps{}; caps.Size = sizeof(caps); caps.MaxMonitorsSupported = 1;
     caps.EndPointDiagnostics.Size = sizeof(caps.EndPointDiagnostics);
     caps.EndPointDiagnostics.GammaSupport = IDDCX_FEATURE_IMPLEMENTATION_NONE;
