@@ -28,7 +28,7 @@ int main(int argc, char **argv) try {
                     colors[i][c] = uniform() * 1.25f - .125f;
                     background[i][c] = uint8_t(random32());
                 }
-                colors[i][3] = uniform(); coverage[i] = uint8_t(random32() & 1);
+                colors[i][3] = uniform()*1.5f-.25f; coverage[i] = uint8_t(random32() & 1);
                 if (frame == 0) { colors[i] = {0, 0, 0, 1}; coverage[i] = 1; }
                 if (frame == 1) coverage[i] = 0;
                 if (frame == 2) colors[i][3] = 1;
@@ -41,13 +41,13 @@ int main(int argc, char **argv) try {
                 const auto actual = result.pixels[i][channel], old = background[i][channel];
                 if (!coverage[i] || !(mask & (1u << source))) TEST(actual == old);
                 else {
-                    volatile float foreground = colors[i][source] * 255;
-                    volatile float contribution = blend ? float(old) * (1 - colors[i][3]) : 0;
+                    volatile float foreground = std::clamp(colors[i][source],0.f,1.f) * 255;
+                    volatile float contribution = blend ? float(old) * (1 - std::clamp(colors[i][3],0.f,1.f)) : 0;
                     volatile float value = foreground + contribution;
                     const auto expected = uint8_t(std::nearbyint(std::clamp(float(value), 0.f, 255.f)));
                     if (actual != expected) ++scalar_differences;
-                    const double ideal = std::clamp(double(colors[i][source]) * 255 +
-                        (blend ? double(old) * (1 - double(colors[i][3])) : 0), 0.0, 255.0);
+                    const double ideal = std::clamp(std::clamp(double(colors[i][source]),0.,1.) * 255 +
+                        (blend ? double(old) * (1 - std::clamp(double(colors[i][3]),0.,1.)) : 0), 0.0, 255.0);
                     TEST(std::abs(double(actual) - ideal) <= .6);
                     if (backend == "NPU" && actual != expected) {
                         std::fprintf(stderr, "merger mismatch blend=%u bgra=%u mask=%u frame=%u sample=%zu channel=%u actual=%u expected=%u\n",

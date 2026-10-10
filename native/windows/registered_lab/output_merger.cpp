@@ -48,14 +48,20 @@ struct OutputMerger::State {
             return std::make_shared<op::Gather>(choices, index, integer(0));
         };
         ov::OutputVector channels;
-        auto alpha = lane(colors, 3);
+        // D3D11.3 section 17.5: UNORM inputs are clamped before blending,
+        // including alpha used as the destination factor, and again afterward.
+        auto clamp_source = [&](const Node &v) -> Node {
+            return choose(std::make_shared<op::Less>(v,number(0)),number(0),
+                choose(std::make_shared<op::Greater>(v,number(1)),number(1),v));
+        };
+        auto alpha = clamp_source(lane(colors, 3));
         for (unsigned ch = 0; ch < 4; ++ch) {
             const auto source = bgra && ch < 3 ? 2 - ch : ch;
             auto bc = lane(background, ch);
             if (!(mask & (1u << source))) { channels.push_back(pred(bc)); continue; }
             // Multi-index channel Gather corrupts this mixed-type NPU graph.
             // Separate lanes also prevent flattened clamp selection losing FP32.
-            auto fg = lane(colors, source);
+            auto fg = clamp_source(lane(colors, source));
             auto value = mul(fg, number(255));
             if (blend) value = add(value, mul(std::make_shared<op::Convert>(bc, ov::element::f32), sub(number(1), alpha)));
             value = choose(std::make_shared<op::Less>(value, number(0)), number(0),
@@ -97,7 +103,6 @@ OutputMerger::Result OutputMerger::execute(const std::vector<Color> &colors, con
     for (size_t i = 0; i < s.count; ++i) {
         require(coverage[i] <= 1);
         for (const auto value : colors[i]) require(std::isfinite(value) && std::abs(value) <= 16);
-        if (s.blend) require(colors[i][3] >= 0 && colors[i][3] <= 1);
     }
     s.failed = true;
     auto col = s.request.get_tensor("colors"), bg = s.request.get_tensor("background"), cov = s.request.get_tensor("coverage");

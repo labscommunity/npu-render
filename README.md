@@ -113,6 +113,15 @@ now has an exact NPU specialization for opaque, one-to-one point-sampled quads.
 Its captured 1024×768 replay passes, as do changing-image and driver callback
 tests. This is a checked subset, not general desktop rendering.
 
+The [latest installed trial](docs/validation/2026-10-10/sole-display-v75/report.json)
+completed 36 DWM draws on the NPU and received five frames. Its input test did
+not show a usable desktop; both guest drivers were removed successfully. The
+next [captured textured-triangle draw](docs/validation/2026-10-10/textured-triangles-v97/report.json)
+now matches the scalar pixel reference exactly on the NPU, including backface
+culling, interpolated alpha, a narrow scissor and source-over blending. The shell's
+typed-buffer lookup shader remains unsupported. Full desktop offload and a
+Tahoma benefit are still unproven.
+
 The [captured-window desktop experiment](native/windows/capture/README.md) now
 presents an NPU-composed 2880×1800 desktop with input passing through to the
 original applications, a disable/enable control, and an external hang watchdog.

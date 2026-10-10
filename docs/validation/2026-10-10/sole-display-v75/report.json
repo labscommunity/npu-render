@@ -1,0 +1,33 @@
+{
+  "trial": "v75",
+  "source_commit": "e9dd74650da6948d74327df7b6195865255100ee",
+  "umd_build": "present-umd-v93",
+  "kmd_build": "allocation-capacity-v3",
+  "package_version": "0.0.63.0",
+  "machine_scope": "disposable NR-GFX-LAB guest only; physical NPU executes bounded draw packets",
+  "npu_preflight_packets_passed": 7,
+  "dwm_npu_draws": 36,
+  "dwm_present_callbacks": 9,
+  "idd_readbacks": 9,
+  "received_frames": 5,
+  "viewer_window_submissions": 5,
+  "sole_indirect_path_observed": true,
+  "input_visual_response_verified": false,
+  "displayed_frames_verified": 0,
+  "full_desktop_offload": false,
+  "performance_tested": false,
+  "cleanup_passed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "findings": [
+    "DWM rejected a nonindexed 30-vertex, backface-culled linear-textured triangle list with noperspective UV/alpha and a 24 by 4 scissor.",
+    "Shell processes advanced past the previous culling failure and rejected a typed-buffer lookup shader using FTOI, ISHR, IMAD and LD.",
+    "The first tested input snapshots stayed black. Received sequence 9 shows wallpaper and desktop icons with no taskbar, but its viewer input gate was already false; this is not evidence of a usable sole-display desktop.",
+    "Both custom guest devices were removed successfully and normal guest desktop was restored without reboot."
+  ],
+  "latest_received_frame": {
+    "sequence": 9,
+    "pixel_sha256": "7fe9298d31fc03f8299e7fd76229470d091754d8a7cb895fd0a2b4124a271011",
+    "sole_input_gate_at_submission": false
+  }
+}

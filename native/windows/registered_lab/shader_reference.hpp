@@ -12,7 +12,7 @@ inline float as_float(uint32_t value) { float result; std::memcpy(&result, &valu
 inline uint32_t as_bits(float value) { uint32_t result; std::memcpy(&result, &value, 4); return result; }
 inline Registers reference_vertex(const Program &program, const Registers &inputs, const Constants &constants,
                                  const TextureShapes &shapes = {}, const TextureSamplers &samplers = {},
-                                 const TexturePixels &textures = {}) {
+                                 const TexturePixels &textures = {}, unsigned fused_arithmetic = 0) {
     Registers temporary{}, output{};
     for (unsigned i = 0; i < 14; ++i) check(constants[i].size() >= program.constants[i]);
     auto load = [&](const Operand &a, bool integer_modifier = false) {
@@ -99,15 +99,25 @@ inline Registers reference_vertex(const Program &program, const Registers &input
                 float v = 0;
                 if (instruction.opcode == Opcode::add) v = a + b;
                 else if (instruction.opcode == Opcode::multiply) v = a * b;
-                else if (instruction.opcode == Opcode::mad) v = a * b + as_float(values[2][i]);
+                else if (instruction.opcode == Opcode::mad) {
+                    // D3D11.3 section 3.1.3 permits fused MAD precision. Replay
+                    // can test that exact alternative without an arbitrary ULP
+                    // tolerance or relaxing integer/MOV bit comparisons.
+                    if(fused_arithmetic)v=std::fma(a,b,as_float(values[2][i]));
+                    else {volatile float product=a*b;v=product+as_float(values[2][i]);}
+                }
                 else if (instruction.opcode == Opcode::divide) v = a / b;
                 else if (instruction.opcode == Opcode::reciprocal_sqrt) v = 1.0f / std::sqrt(a);
                 else if (instruction.opcode == Opcode::minimum) v = std::fmin(a, b);
                 else if (instruction.opcode == Opcode::maximum) v = std::fmax(a, b);
                 else if (instruction.opcode == Opcode::dot2 || instruction.opcode == Opcode::dot3 || instruction.opcode == Opcode::dot4) {
-                    v = as_float(values[0][0]) * as_float(values[1][0]);
-                    for (unsigned c = 1; c < (instruction.opcode == Opcode::dot2 ? 2u : (instruction.opcode == Opcode::dot3 ? 3u : 4u)); ++c)
-                        v += as_float(values[0][c]) * as_float(values[1][c]);
+                    const unsigned count=instruction.opcode==Opcode::dot2?2u:instruction.opcode==Opcode::dot3?3u:4u;
+                    const unsigned first=fused_arithmetic==2?count-1:0;
+                    v=as_float(values[0][first])*as_float(values[1][first]);
+                    for(unsigned n=1;n<count;++n){const unsigned c=fused_arithmetic==2?count-1-n:n;
+                        if(fused_arithmetic)v=std::fma(as_float(values[0][c]),as_float(values[1][c]),v);
+                        else {volatile float product=as_float(values[0][c])*as_float(values[1][c]);v+=product;}
+                    }
                 }
                 else check(false);
                 value[i] = as_bits(v);

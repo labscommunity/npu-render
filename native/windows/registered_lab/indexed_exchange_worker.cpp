@@ -1,6 +1,6 @@
 // Finite physical-NPU filesystem worker. Its controller uses authenticated WinRM.
 #define NOMINMAX
-#include "indexed_exchange_protocol.hpp"
+#include "indexed_pipeline.hpp"
 #include "lab_exchange_io.hpp"
 #include <cstdio>
 #include <set>
@@ -27,8 +27,8 @@ int wmain(int argc, wchar_t **argv) try {
     const auto attributes = GetFileAttributesW(directory.c_str());
     ex::require(attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) && !(attributes & FILE_ATTRIBUTE_REPARSE_POINT));
     const auto started = GetTickCount64(); std::set<std::wstring> handled;
-    std::unique_ptr<nr::raster::UniformDrawExecutor> executor;
-    ex::Request previous; uint32_t succeeded = 0, failed = 0;
+    auto pipeline=std::make_unique<ex::Pipeline>();
+    uint32_t succeeded = 0, failed = 0;
     while (handled.size() < limit && GetTickCount64() - started < 300000 && GetFileAttributesW((directory + L"\\stop").c_str()) == INVALID_FILE_ATTRIBUTES) {
         WIN32_FIND_DATAW found{}; HANDLE search = FindFirstFileW((directory + L"\\request-*.bin").c_str(), &found);
         if (search == INVALID_HANDLE_VALUE) {
@@ -53,23 +53,13 @@ int wmain(int argc, wchar_t **argv) try {
                 std::memcpy(&header, bytes.data(), sizeof(header));
                 ex::require(ex::request_valid(header, bytes.size()) && packet_name(header, false) == name); identified = true;
                 const auto request = ex::decode(bytes); const auto &h = request.header;
-                const auto &old = previous.header;
-                if (!executor || old.width != h.width || old.height != h.height || old.vertices != h.vertices || old.format != h.format || old.flags != h.flags ||
-                    previous.vertex.bytecode != request.vertex.bytecode || previous.pixel.bytecode != request.pixel.bytecode) {
-                    uint32_t batch = 4096; while (uint64_t(h.width) * h.height % batch) batch /= 2;
-                    auto candidate = std::make_unique<nr::raster::UniformDrawExecutor>(request.vertex, request.pixel, h.vertices, h.width, h.height,
-                        "NPU", (h.flags & 1) != 0, h.format == 87, uint8_t((h.flags >> 8) & 15), batch,
-                        static_cast<nr::raster::CullMode>((h.flags>>5)&3),(h.flags&128)!=0);
-                    executor = std::move(candidate);
-                    previous = {}; previous.header = h; previous.vertex = request.vertex; previous.pixel = request.pixel;
-                }
-                const auto result = executor->execute(request.inputs, request.vertex_constants, request.pixel_constants, request.viewport, request.background, request.scissor);
+                const auto result=pipeline->execute(request);
                 publish(directory + L"\\" + packet_name(h, true), ex::response(h, result)); ++succeeded;
                 std::printf("{\"client_pid\":%u,\"sequence\":%u,\"execution_device\":\"%s\",\"width\":%u,\"height\":%u,\"provider_requests\":%llu,\"draw_ms\":%.3f,\"passed\":true,\"displayed_frames\":0}\n",
                     h.client_pid, h.sequence, result.execution_device.c_str(), h.width, h.height,
                     static_cast<unsigned long long>(result.provider_requests), result.timings.total_ms); std::fflush(stdout);
             } catch (const std::exception &error) {
-                ++failed; executor.reset(); std::fprintf(stderr, "indexed NPU request failed: %.32000s\n", error.what()); std::fflush(stderr);
+                ++failed; pipeline=std::make_unique<ex::Pipeline>(); std::fprintf(stderr, "indexed NPU request failed: %.32000s\n", error.what()); std::fflush(stderr);
                 if (identified) {
                     auto h = header; h.kind = 3; h.device = 0; h.body_bytes = 0; ex::Writer writer; writer.value(h);
                     publish(directory + L"\\" + packet_name(h, true), writer.finish());

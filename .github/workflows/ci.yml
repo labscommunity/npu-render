@@ -112,6 +112,10 @@ jobs:
       - name: Build registered graphics bridge and test CPU and exchange contracts
         if: runner.os == 'Windows'
         run: uv run --frozen python tools/build_registered_lab.py --wdk-include-root build/dependencies/wdk-10.0.26100.6584/include
+      - name: Verify laboratory cleanup survives report file contention
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: .\tools\test_lab_report.ps1 -Helper "$pwd\tools\lab_report.ps1"
       - name: Build disposable-guest indirect display diagnostic
         if: runner.os == 'Windows'
         run: uv run --frozen python tools/build_indirect_lab.py

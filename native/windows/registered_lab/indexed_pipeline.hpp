@@ -12,8 +12,27 @@ class Pipeline {
     Request previous_texture;
     std::unique_ptr<raster::LinearTextureDrawExecutor> linear_executor;
     Request previous_linear;
+    std::unique_ptr<raster::TriangleTextureDrawExecutor> triangle_executor;
+    Request previous_triangle;
 public:
     raster::UniformDrawExecutor::Result execute(const Request &request) {
+        if(request.header.flags & 0x1000) {
+            const auto &h=request.header,&old=previous_triangle.header;
+            const auto &t=request.texture,&pt=previous_triangle.texture;
+            require(shape_valid(h) && h.abi==7);
+            if(!triangle_executor || old.width!=h.width || old.height!=h.height || old.vertices!=h.vertices || old.format!=h.format ||
+                (old.flags&~4u)!=(h.flags&~4u) || pt.width!=t.width || pt.height!=t.height || pt.format!=t.format ||
+                previous_triangle.vertex.bytecode!=request.vertex.bytecode || previous_triangle.pixel.bytecode!=request.pixel.bytecode){
+                triangle_executor.reset();
+                uint32_t batch=4096;while(uint64_t(h.width)*h.height%batch)batch/=2;
+                triangle_executor=std::make_unique<raster::TriangleTextureDrawExecutor>(request.vertex,request.pixel,h.vertices,h.width,h.height,h.format,
+                    t.width,t.height,t.format,"NPU",(h.flags&1)!=0,uint8_t((h.flags>>8)&15),(h.flags&16)?shader::TextureFilter::point:shader::TextureFilter::linear,
+                    static_cast<raster::CullMode>((h.flags>>5)&3),(h.flags&128)!=0,batch);
+                previous_triangle={};previous_triangle.header=h;previous_triangle.vertex=request.vertex;previous_triangle.pixel=request.pixel;
+                previous_triangle.texture={t.width,t.height,t.format,{}};
+            }
+            return triangle_executor->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,t,request.background,request.scissor);
+        }
         if (request.header.flags & 24) {
             const auto &h=request.header,&old=previous_linear.header;
             const auto &t=request.texture,&pt=previous_linear.texture;

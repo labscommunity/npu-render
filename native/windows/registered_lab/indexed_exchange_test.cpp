@@ -97,6 +97,13 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
     for(unsigned n=0;n<5;++n){auto bad=point_bytes;auto h=point.header;
         if(n==0)h.abi=4;if(n==1)h.flags|=8;if(n==2)h.flags&=~2u;if(n==3)h.flags&=~16u;if(n==4)h.vertices=3;
         std::memcpy(bad.data(),&h,sizeof(h));rejects(bad);}
+    auto triangles=linear;triangles.header.abi=7;triangles.header.flags=0x1f4f;
+    triangles.header.vertices=30;triangles.inputs.resize(30);
+    const auto triangle_bytes=ex::encode(triangles);const auto triangle_decoded=ex::decode(triangle_bytes);
+    test(triangle_decoded.inputs==triangles.inputs && triangle_decoded.texture.pixels==triangles.texture.pixels && triangle_decoded.scissor==triangles.scissor);
+    for(unsigned n=0;n<6;++n){auto bad=triangle_bytes;auto h=triangles.header;
+        if(n==0)h.abi=6;if(n==1)h.flags&=~2u;if(n==2)h.flags&=~24u;if(n==3)h.flags|=24u;if(n==4)h.flags|=96u;if(n==5)h.vertices=4095;
+        std::memcpy(bad.data(),&h,sizeof(h));rejects(bad);}
     const size_t description_offset = texture_bytes.size()-textured.texture.pixels.size()*4-sizeof(ex::TextureDescription);
     for(uint32_t bad=0;bad<5;++bad) {
         auto packet = texture_bytes; ex::TextureDescription desc{}; std::memcpy(&desc,packet.data()+description_offset,sizeof(desc));

@@ -97,15 +97,20 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
     const bool textured = std::any_of(d.pixel_program->textures.begin(),d.pixel_program->textures.end(),[](bool v){return v;});
     const auto cull=static_cast<nr::raster::CullMode>(UINT(d.raster.CullMode)-1);
     const bool front_ccw=d.raster.FrontCounterClockwise!=0;
-    nr::raster::PackedTexture texture; bool linear=false, modulated=false;
+    nr::raster::PackedTexture texture; bool linear=false, modulated=false, general_texture=false;
     if (textured) {
-        require(cull==nr::raster::CullMode::none);
         const auto source = d.bound_source; const auto &sampler = d.samplers[2][0];
         linear=sampler.desc.Filter==D3D10_DDI_FILTER_MIN_MAG_MIP_LINEAR;
         modulated=linear || d.pixel_program->instructions.size()==2 || blend || clip!=full;
-        if(modulated) nr::raster::LinearTextureDrawExecutor::validate_shader(*d.pixel_program);
-        else { require(clip==full && !blend); nr::raster::PointTextureDrawExecutor::validate_shader(*d.pixel_program); }
-        require(count == 6 && d.blend.RenderTargetWriteMask[0] == 15 && source && source != target && source->handle != target->handle &&
+        general_texture=count!=6 || cull!=nr::raster::CullMode::none || d.blend.RenderTargetWriteMask[0]!=15;
+        if(!general_texture) {
+            try {
+                if(modulated) nr::raster::LinearTextureDrawExecutor::validate_shader(*d.pixel_program);
+                else nr::raster::PointTextureDrawExecutor::validate_shader(*d.pixel_program);
+            } catch(const std::invalid_argument &) { general_texture=true; }
+        }
+        if(general_texture) nr::raster::TriangleTextureDrawExecutor::validate_shader(*d.pixel_program);
+        require(source && source != target && source->handle != target->handle &&
             source->context == d.context && !source->locked && sampler.bound &&
             (linear || sampler.desc.Filter == D3D10_DDI_FILTER_MIN_MAG_MIP_POINT) &&
             sampler.desc.AddressU == D3D10_DDI_TEXTURE_ADDRESS_CLAMP && sampler.desc.AddressV == D3D10_DDI_TEXTURE_ADDRESS_CLAMP &&
@@ -132,9 +137,23 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
         if (clip != full) { request.header.abi = 3; request.header.flags |= 4; request.scissor = clip; }
         if (modulated) {request.header.abi=linear?4:5;request.header.flags|=linear?8:16;}
         if(cull!=nr::raster::CullMode::none){request.header.abi=6;request.header.flags|=(UINT(cull)<<5)|(front_ccw?128u:0u);}
+        if(general_texture){request.header.abi=7;request.header.flags|=0x1000|(linear?8u:16u);}
         request.viewport = viewport; request.vertex = *d.vertex_program; request.pixel = *d.pixel_program;
         request.inputs = inputs; request.vertex_constants = vc; request.pixel_constants = pc; request.background = std::move(background);
         result = d.indexed_exchange->execute(std::move(request));
+    } else if(general_texture) {
+        const uint64_t options=uint64_t(d.blend.RenderTargetWriteMask[0])|(uint64_t(blend)<<4)|(uint64_t(linear)<<5)|(uint64_t(cull)<<6)|(uint64_t(front_ccw)<<8);
+        const std::array<uint64_t,8> key{s.width,s.height,s.format,texture.width,texture.height,texture.format,count,options};
+        if(!d.triangle_texture_executor || d.triangle_texture_vertex!=d.vertex_program || d.triangle_texture_pixel!=d.pixel_program || d.triangle_texture_key!=key){
+            if(d.backend=="NPU")d.triangle_texture_executor.reset();
+            uint32_t batch=4096;while(uint64_t(s.width)*s.height%batch)batch/=2;
+            auto candidate=std::make_unique<nr::raster::TriangleTextureDrawExecutor>(*d.vertex_program,*d.pixel_program,count,s.width,s.height,s.format,
+                texture.width,texture.height,texture.format,d.backend,blend,d.blend.RenderTargetWriteMask[0],
+                linear?nr::shader::TextureFilter::linear:nr::shader::TextureFilter::point,cull,front_ccw,batch);
+            d.triangle_texture_executor=std::move(candidate);d.triangle_texture_key=key;
+            d.triangle_texture_vertex=d.vertex_program;d.triangle_texture_pixel=d.pixel_program;
+        }
+        result=d.triangle_texture_executor->execute(inputs,vc,pc,viewport,texture,background,clip);
     } else if (modulated) {
         const std::array<uint64_t,8> key{s.width,s.height,s.format,texture.width,texture.height,texture.format,uint64_t(blend),uint64_t(linear)};
         if(!d.linear_texture_executor || d.linear_texture_vertex!=d.vertex_program || d.linear_texture_pixel!=d.pixel_program || d.linear_texture_key!=key){

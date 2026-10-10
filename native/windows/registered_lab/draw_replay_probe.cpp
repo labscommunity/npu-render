@@ -5,11 +5,13 @@
 #include "uniform_draw.hpp"
 #include "point_texture_draw.hpp"
 #include "linear_texture_draw.hpp"
+#include "triangle_texture_draw.hpp"
 #include <cstdlib>
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
 namespace {
+const char *phase="arguments";
 nr::shader::VertexConstants constants(const nr::capture::Snapshot &s, unsigned stage, const nr::shader::Program &p) {
     nr::shader::VertexConstants result;
     for (unsigned i = 0; i < result.size(); ++i) if (p.constants[i]) {
@@ -98,7 +100,7 @@ int main(int argc, char **argv) try {
     const std::string backend = argv[4]; nr::capture::check(backend == "CPU" || backend == "NPU");
     std::ifstream existing(argv[6], std::ios::binary); nr::capture::check(!existing); existing.close();
     const auto start = std::chrono::steady_clock::now();
-    const nr::capture::Snapshot snapshot(argv[2]);
+    phase="capture decode";const nr::capture::Snapshot snapshot(argv[2]);
     auto args = snapshot.values<uint32_t>("arguments");
     const auto call = snapshot.has("draw-indexed") ? snapshot.values<uint32_t>("draw-indexed") : std::vector<uint32_t>{1};
     nr::capture::check(call.size()==1 && call[0]<=1); const bool indexed=call[0]!=0;
@@ -123,7 +125,7 @@ int main(int argc, char **argv) try {
     }
     auto pixels = snapshot.values<PackedColor>("target"); nr::capture::check(pixels.size() == size_t(width) * height);
     const auto vs_words = snapshot.values<uint32_t>("vertex-shader"), ps_words = snapshot.values<uint32_t>("pixel-shader");
-    const auto vs = parse_vertex(vs_words.data(), vs_words.size()), ps = parse_pixel(ps_words.data(), ps_words.size());
+    phase="shader parse";const auto vs = parse_vertex(vs_words.data(), vs_words.size()), ps = parse_pixel(ps_words.data(), ps_words.size());
     nr::capture::check(vs.position_output < 16 && ps.outputs[0] == 15);
     for (size_t i = 1; i < ps.outputs.size(); ++i) nr::capture::check(!ps.outputs[i]);
     const bool textured = std::any_of(ps.textures.begin(), ps.textures.end(), [](bool v) { return v; });
@@ -131,22 +133,23 @@ int main(int argc, char **argv) try {
     for (const auto &instruction : ps.instructions) for (unsigned i = 0; i < instruction.source_count; ++i)
         nr::capture::check(instruction.sources[i].kind != Register::input || instruction.sources[i].index != ps.position_input);
     int32_t base; std::memcpy(&base, &args[2], 4);
-    const auto inputs = fetch(snapshot, args[0], args[1], base, vs, indexed, args[3]);
+    phase="vertex fetch";const auto inputs = fetch(snapshot, args[0], args[1], base, vs, indexed, args[3]);
     args[0]=uint32_t(inputs.size()); nr::capture::check(!(args[0]%3));
     const auto cb = constants(snapshot, 0, vs);
     const auto pixel_cb = constants(snapshot, 2, ps);
-    const auto compile_start = std::chrono::steady_clock::now();
+    phase="executor construction";const auto compile_start = std::chrono::steady_clock::now();
     std::unique_ptr<UniformDrawExecutor> executor;
     std::unique_ptr<PointTextureDrawExecutor> texture_executor;
     std::unique_ptr<LinearTextureDrawExecutor> linear_executor;
+    std::unique_ptr<TriangleTextureDrawExecutor> triangle_executor;
+    TextureShapes texture_shapes{};TexturePixels texture_pixels{};TextureSamplers texture_samplers{};
     std::vector<std::array<double,4>> linear_reference;
     uint64_t linear_covered=0;
     PackedTexture texture;
     std::vector<PackedColor> texture_reference;
     if (textured) {
-        nr::capture::check(raster[1]==1);
         const auto source = snapshot.values<uint32_t>("source-description"), sampler = snapshot.values<uint32_t>("sampler-2-0");
-        nr::capture::check(args[0] == 6 && (blend[15] & 255) == 15 && source.size() == 10 && source[0] == 0x4e52574b && source[1] == 1 && source[2] == 40 && !source[7]);
+        nr::capture::check(source.size() == 10 && source[0] == 0x4e52574b && source[1] == 1 && source[2] == 40 && !source[7]);
         nr::capture::check(sampler.size() == 13 && (sampler[0]==0 || sampler[0]==21) && sampler[1] == 3 && sampler[2] == 3 && sampler[3] == 3 && !sampler[4] && !sampler[11]);
         nr::capture::check(as_float(sampler[12]) >= 0);
         if(source[5] == 65) {
@@ -155,7 +158,17 @@ int main(int argc, char **argv) try {
             texture={source[3],source[4],28,{}};texture.pixels.resize(alpha.size());
             for(size_t i=0;i<alpha.size();++i)texture.pixels[i]={0,0,0,alpha[i]};
         } else texture = {source[3],source[4],source[5],snapshot.values<PackedColor>("source")};
-        if(sampler[0]==21 || ps.instructions.size()==2 || blending || clip!=std::array<int32_t,4>{0,0,int32_t(width),int32_t(height)}){
+        bool general_texture=args[0]!=6 || raster[1]!=1 || (blend[15]&255)!=15;
+        if(!general_texture)try{LinearTextureDrawExecutor::validate_shader(ps);}catch(const std::invalid_argument &){general_texture=true;}
+        if(general_texture){
+            while(uint64_t(width)*height%batch)batch/=2;
+            triangle_executor=std::make_unique<TriangleTextureDrawExecutor>(vs,ps,args[0],width,height,format,texture.width,texture.height,texture.format,
+                backend,blending,uint8_t(blend[15]&255),sampler[0]==0?TextureFilter::point:TextureFilter::linear,static_cast<CullMode>(raster[1]-1),raster[2]!=0,batch);
+            texture_shapes[0]={texture.width,texture.height};texture_samplers[0].filter=sampler[0]==0?TextureFilter::point:TextureFilter::linear;
+            texture_pixels[0].resize(texture.pixels.size());
+            for(size_t n=0;n<texture.pixels.size();++n)for(unsigned c=0;c<4;++c)
+                texture_pixels[0][n][c]=float(texture.pixels[n][texture.format==87 && c<3?2-c:c])/255;
+        }else if(sampler[0]==21 || ps.instructions.size()==2 || blending || clip!=std::array<int32_t,4>{0,0,int32_t(width),int32_t(height)}){
             const bool point=sampler[0]==0;
             linear_executor=std::make_unique<LinearTextureDrawExecutor>(vs,ps,width,height,format,texture.width,texture.height,texture.format,backend,blending,point?TextureFilter::point:TextureFilter::linear);
             const auto a=reference_vertex(vs,inputs[0],cb),b=reference_vertex(vs,inputs[2],cb);const auto pr=vs.position_output,ur=ps.instructions[0].sources[0].index;
@@ -204,24 +217,32 @@ int main(int argc, char **argv) try {
     std::vector<PackedColor> reference_pixels;
     for (uint32_t iteration = 0; iteration < repeats; ++iteration) {
         const Viewport viewport{view[0],view[1],view[2],view[3],view[4],view[5]};
-        result = linear_executor ? linear_executor->execute(inputs,cb,viewport,texture,pixels,clip) : textured ? texture_executor->execute(inputs,cb,viewport,texture) : executor->execute(inputs, cb, pixel_cb, viewport, pixels, clip);
-        for (size_t i = 0; i < inputs.size(); ++i) {
+        phase="provider execute";result = triangle_executor ? triangle_executor->execute(inputs,cb,pixel_cb,viewport,texture,pixels,clip) : linear_executor ? linear_executor->execute(inputs,cb,viewport,texture,pixels,clip) : textured ? texture_executor->execute(inputs,cb,viewport,texture) : executor->execute(inputs, cb, pixel_cb, viewport, pixels, clip);
+        uint64_t fused_matches=0;
+        phase="vertex oracle";for (size_t i = 0; i < inputs.size(); ++i) {
             const auto expected = reference_vertex(vs, inputs[i], cb);
+            const auto fused = reference_vertex(vs, inputs[i], cb, {}, {}, {}, 1);
+            const auto reverse_fused = reference_vertex(vs, inputs[i], cb, {}, {}, {}, 2);
             for (unsigned r = 0; r < 16; ++r) for (unsigned c = 0; c < 4; ++c) if (vs.outputs[r] & (1u << c))
-                nr::capture::check(result.vertices[i][r][c] == expected[r][c]);
+                if(result.vertices[i][r][c]!=expected[r][c]){
+                    if(result.vertices[i][r][c]==fused[r][c] || result.vertices[i][r][c]==reverse_fused[r][c]){++fused_matches;continue;}
+                    std::fprintf(stderr,"vertex mismatch v=%zu register=%u lane=%u actual=%08x expected=%08x\n",i,r,c,result.vertices[i][r][c],expected[r][c]);
+                    nr::capture::check(false);
+                }
         }
-        if(linear_executor){
+        std::printf("{\"vertex_oracle_fused_arithmetic_matches\":%llu}\n",static_cast<unsigned long long>(fused_matches));
+        phase="pixel oracle";if(linear_executor){
             double maximum=0;uint64_t differing=0;
             nr::capture::check(result.covered_samples==linear_covered);
             for(size_t n=0;n<result.pixels.size();++n)for(unsigned c=0;c<4;++c){const auto wanted=linear_reference[n][c];
                 maximum=(std::max)(maximum,std::abs(result.pixels[n][c]-wanted));if(result.pixels[n][c]!=uint8_t(std::nearbyint(wanted)))++differing;}
             nr::capture::check(maximum<=.6);
             std::printf("{\"linear_oracle_max_byte_error\":%.9g,\"rounded_oracle_differences\":%llu}\n",maximum,static_cast<unsigned long long>(differing));
-        }else if (textured) nr::capture::check(result.pixels == texture_reference);
+        }else if (textured && !triangle_executor) nr::capture::check(result.pixels == texture_reference);
         else {
             VertexRegisters uniform{};
             for (unsigned r = 0; r < 16; ++r) if (ps.inputs[r] && r != ps.position_input) uniform[r] = result.vertices[0][r];
-            bool is_uniform=true;
+            bool is_uniform=!triangle_executor;
             for(const auto &v:result.vertices)for(unsigned r=0;r<16;++r)if(ps.inputs[r] && r!=ps.position_input)
                 for(unsigned c=0;c<4;++c)if(ps.inputs[r]&(1u<<c))is_uniform=is_uniform && v[r][c]==uniform[r][c];
             if(is_uniform)nr::capture::check(result.fragment == reference_vertex(ps, uniform, pixel_cb)[0]);
@@ -231,7 +252,7 @@ int main(int argc, char **argv) try {
             std::vector<Point> points(inputs.size());
             std::vector<std::array<double,3>> screen(inputs.size());
             for(size_t i=0;i<inputs.size();++i) {
-                const auto v=reference_vertex(vs,inputs[i],cb)[vs.position_output];
+                const auto v=result.vertices[i][vs.position_output]; // Verified against scalar fused/unfused shader evaluations above.
                 volatile float nx=as_float(v[0])/as_float(v[3]),ny=as_float(v[1])/as_float(v[3]);
                 volatile float sx=nx+1,sy=1-ny;sx=sx*(float(width)*.5f);sy=sy*(float(height)*.5f);
                 points[i]={int32_t(std::nearbyint(float(sx)*256)),int32_t(std::nearbyint(float(sy)*256))};
@@ -251,7 +272,9 @@ int main(int argc, char **argv) try {
                     if(!is_uniform) {
                         VertexRegisters interpolated{};
                         for(unsigned r=0;r<16;++r)if(ps.inputs[r] && r!=ps.position_input){
-                            const auto mode=ps.interpolation[r];nr::capture::check(mode==2 || mode==4);
+                            const auto mode=ps.interpolation[r];
+                            if(mode==1){interpolated[r]=result.vertices[t][r];continue;}
+                            nr::capture::check(mode==2 || mode==4);
                             double weight[3]{},denominator=0;
                             for(unsigned v=0;v<3;++v){const auto &a=screen[t+(v+1)%3],&b=screen[t+(v+2)%3];
                                 weight[v]=((b[0]-a[0])*(y+.5-a[1])-(b[1]-a[1])*(x+.5-a[0]))*(mode==2?screen[t+v][2]:1);denominator+=weight[v];}
@@ -261,19 +284,21 @@ int main(int argc, char **argv) try {
                                 interpolated[r][c]=as_bits(float(value/denominator));
                             }
                         }
-                        fragment=reference_vertex(ps,interpolated,pixel_cb)[0];
+                        fragment=reference_vertex(ps,interpolated,pixel_cb,texture_shapes,texture_samplers,texture_pixels)[0];
                     }
                     auto &pixel=expected[size_t(y)*width+size_t(x)];
                     for(unsigned c=0;c<4;++c){
                         const auto lane=format==87 && c<3 ? 2-c : c;
                         if(!((blend[15]&255)&(1u<<lane)))continue;
-                        const double value=double(as_float(fragment[lane]))*255+(blending?double(pixel[c])*(1-double(as_float(fragment[3]))):0);
+                        const double value=std::clamp(double(as_float(fragment[lane])),0.,1.)*255+(blending?double(pixel[c])*(1-std::clamp(double(as_float(fragment[3])),0.,1.)):0);
                         pixel[c]=uint8_t(std::nearbyint((std::clamp)(value,0.,255.)));
                     }
                 }
             }
             unsigned maximum=0;uint64_t differences=0;
             for(size_t i=0;i<expected.size();++i)for(unsigned c=0;c<4;++c){const auto error=unsigned(std::abs(int(result.pixels[i][c])-int(expected[i][c])));maximum=(std::max)(maximum,error);differences+=error!=0;}
+            if(result.covered_samples!=covered || maximum>(is_uniform?0u:1u))
+                std::fprintf(stderr,"oracle mismatch covered=%llu expected=%llu maximum_byte_error=%u differing_components=%llu\n",static_cast<unsigned long long>(result.covered_samples),static_cast<unsigned long long>(covered),maximum,static_cast<unsigned long long>(differences));
             nr::capture::check(result.covered_samples==covered && maximum<=(is_uniform?0u:1u));
             std::printf("{\"uniform_inputs\":%s,\"oracle_max_byte_error\":%u,\"differing_components\":%llu,\"coverage_exact\":true}\n",is_uniform?"true":"false",maximum,static_cast<unsigned long long>(differences));
         }
@@ -290,4 +315,4 @@ int main(int argc, char **argv) try {
         textured ? "true" : "false", width, height, args[0], args[0] / 3, static_cast<unsigned long long>(result.covered_samples), static_cast<unsigned long long>(result.tile_executions),
         result.execution_device.c_str(), static_cast<long long>(milliseconds));
     return 0;
-} catch (const std::exception &e) { std::fprintf(stderr, "%s\n", e.what()); return 1; }
+} catch (const std::exception &e) { std::fprintf(stderr, "%s: %s\n", phase, e.what()); return 1; }
