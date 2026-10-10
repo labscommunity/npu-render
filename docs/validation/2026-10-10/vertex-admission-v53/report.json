@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "kind": "dwm-generic-vertex-object-admission",
+  "source_revision": "ff0f62442e3ce2f9634d752909d8638ab692c10e",
+  "driver_version": "0.0.42.0",
+  "active_indirect_path_observed": true,
+  "observation_seconds": 45,
+  "custom_render_luid": 11277086,
+  "indirect_display_luid": 11313544,
+  "dwm_generic_vertex_words_accepted": 90,
+  "accepted_shader_objects": 28,
+  "dwm_process_ids": [
+    1940,
+    5400,
+    4496,
+    1600
+  ],
+  "next_rejected_vertex_words": 116,
+  "next_vertex_sha256": "5206f958ed82db3692b2a0f34e08300091ddde34e86d1b2ef94a418d7434ceed",
+  "swapchain_assigned": false,
+  "frames_received": 0,
+  "frames_displayed": 0,
+  "trace_events": 687649,
+  "trace_events_lost": 0,
+  "shadow_input_flags": 0,
+  "shadow_output_flags": 5,
+  "sharing_flag_rejections": 16,
+  "clean_removal": true,
+  "npu_execution_tested": false,
+  "desktop_offload_tested": false,
+  "performance_tested": false,
+  "notes": [
+    "All 66 raw snapshot files were hash-verified. Text evidence normalizes CRLF to LF. Older process logs are excluded from the new admission count.",
+    "Four DWM processes each create the supported vertex object seven times during initialization retries. The next vertex stream uses an extended negate source operand, which this installed build rejects.",
+    "The probe observes automatic activation and does not change topology. The original BasicDisplay remains active.",
+    "Kernel shadow resource flags=1, allocation input flags=0, output flags=5 (CpuVisible|Cached). The cause of the later sharing-flags rejection remains unestablished.",
+    "Both devices are removed cleanly. No desktop draw execution or frame delivery is demonstrated."
+  ]
+}
