@@ -243,3 +243,9 @@ transport, performance benchmark, DWM migration, or full desktop offload. CPU
 uploads, kernel copies, management transfers and the original display adapter
 remain involved. Local NPU configuration continues to fail when no local NPU
 is available; remote operation requires the explicit laboratory mode.
+
+The [v43 hardware and screen run](../../../docs/validation/2026-10-10/registered-npu-window-v43/report.json)
+passes all three remote NPU draws and independently checks 552,960 screen RGB
+bytes within one byte. It records zero local CPU/GPU/NPU draw executions, exactly
+three remote NPU executions, and zero live resources or cleanup errors. The
+earlier withheld-reply attempt times out without fallback or a successful present.
