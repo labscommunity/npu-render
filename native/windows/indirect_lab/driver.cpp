@@ -46,11 +46,15 @@ void trace(const char *format, ...) {
 HRESULT paired_adapter(LUID &luid) {
     D3DKMT_ENUMADAPTERS2 list{};
     auto status = D3DKMTEnumAdapters2(&list);
-    if (status || !list.NumAdapters || list.NumAdapters > 32) return E_FAIL;
+    trace("{\"event\":\"adapter_capacity\",\"status\":\"%08lx\",\"capacity\":%u}\n", ULONG(status), list.NumAdapters);
+    if (status) return HRESULT_FROM_NT(status);
+    if (!list.NumAdapters || list.NumAdapters > 64) return E_UNEXPECTED;
     std::vector<D3DKMT_ADAPTERINFO> adapters(list.NumAdapters);
     list.pAdapters = adapters.data();
     status = D3DKMTEnumAdapters2(&list);
-    if (status) return E_FAIL;
+    trace("{\"event\":\"adapter_enumeration\",\"status\":\"%08lx\",\"returned\":%u}\n", ULONG(status), list.NumAdapters);
+    if (status) return HRESULT_FROM_NT(status);
+    adapters.resize(list.NumAdapters);
     UINT matches = 0;
     for (const auto &adapter : adapters) {
         nr::kernel_contract::AdapterInfo info{};
