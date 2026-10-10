@@ -62,6 +62,10 @@ def main():
         "sha256": hashlib.sha256(
             (args.build_dir / "Release/nr_indirect_lab.dll").read_bytes()
         ).hexdigest(),
+        "binary_sha256": {
+            name: hashlib.sha256((args.build_dir / "Release" / name).read_bytes()).hexdigest()
+            for name in ("nr_indirect_lab.dll", "nr_indirect_topology_probe.exe")
+        },
         "installation_performed": False,
         "desktop_offload_tested": False,
     }

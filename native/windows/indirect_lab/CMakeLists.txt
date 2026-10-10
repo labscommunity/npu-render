@@ -16,3 +16,8 @@ target_link_libraries(nr_indirect_lab PRIVATE
   ntdll dxgi d3d11 gdi32 ole32)
 set_property(TARGET nr_indirect_lab PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 target_link_options(nr_indirect_lab PRIVATE /EXPORT:FxDriverEntryUm)
+add_executable(nr_indirect_topology_probe topology_probe.cpp)
+target_compile_features(nr_indirect_topology_probe PRIVATE cxx_std_17)
+target_compile_options(nr_indirect_topology_probe PRIVATE /W4 /WX)
+target_link_libraries(nr_indirect_topology_probe PRIVATE user32)
+set_property(TARGET nr_indirect_topology_probe PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
