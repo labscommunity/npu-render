@@ -2,10 +2,16 @@
 #define NOMINMAX
 #include <windows.h>
 #include <cstdio>
+#ifdef NR_TOPOLOGY_GUI
+#include <shellapi.h>
+#include <io.h>
+#include <fcntl.h>
+#endif
 #include <vector>
 #include <stdexcept>
 #include "../registered_lab/contract.hpp"
 namespace {
+FILE *output = stdout;
 struct KeepAwake {
     EXECUTION_STATE previous = SetThreadExecutionState(ES_CONTINUOUS | ES_DISPLAY_REQUIRED | ES_SYSTEM_REQUIRED);
     ~KeepAwake() { if (previous) SetThreadExecutionState(previous); }
@@ -50,18 +56,18 @@ bool position_preserved(const Topology &before, const Topology &after) {
     return true;
 }
 void print(const char *phase, const Topology &value) {
-    std::printf("{\"phase\":\"%s\",\"path_count\":%zu,\"mode_count\":%zu}\n", phase, value.paths.size(), value.modes.size());
-    for (const auto &path : value.paths) std::printf(
+    std::fprintf(output, "{\"phase\":\"%s\",\"path_count\":%zu,\"mode_count\":%zu}\n", phase, value.paths.size(), value.modes.size());
+    for (const auto &path : value.paths) std::fprintf(output,
         "{\"phase\":\"%s\",\"source_low\":%lu,\"source_high\":%ld,\"source_id\":%u,"
         "\"target_low\":%lu,\"target_high\":%ld,\"target_id\":%u,\"technology\":%u,\"available\":%s,\"active\":%s}\n",
         phase, path.sourceInfo.adapterId.LowPart, path.sourceInfo.adapterId.HighPart, path.sourceInfo.id,
         path.targetInfo.adapterId.LowPart, path.targetInfo.adapterId.HighPart, path.targetInfo.id,
         UINT(path.targetInfo.outputTechnology), path.targetInfo.targetAvailable ? "true" : "false",
         (path.flags & DISPLAYCONFIG_PATH_ACTIVE) ? "true" : "false");
-    std::fflush(stdout);
+    std::fflush(output);
 }
 }
-int main() {
+int run_probe() {
     if (!nr_fill_guest()) return 2;
     DWORD session = 0;
     if (!ProcessIdToSessionId(GetCurrentProcessId(), &session) || !session) return 2;
@@ -105,11 +111,11 @@ int main() {
         constexpr UINT flags = SDC_USE_SUPPLIED_DISPLAY_CONFIG | SDC_ALLOW_CHANGES;
         const auto validation = SetDisplayConfig(UINT(desired.paths.size()), desired.paths.data(),
             UINT(desired.modes.size()), desired.modes.data(), flags | SDC_VALIDATE);
-        std::printf("{\"operation\":\"validate\",\"win32_status\":%ld}\n", validation); std::fflush(stdout);
+        std::fprintf(output, "{\"operation\":\"validate\",\"win32_status\":%ld}\n", validation); std::fflush(output);
         if (validation) throw std::runtime_error("supplied indirect display topology invalid");
         const auto status = SetDisplayConfig(UINT(desired.paths.size()), desired.paths.data(),
             UINT(desired.modes.size()), desired.modes.data(), flags | SDC_APPLY);
-        std::printf("{\"operation\":\"extend\",\"win32_status\":%ld}\n", status); std::fflush(stdout);
+        std::fprintf(output, "{\"operation\":\"extend\",\"win32_status\":%ld}\n", status); std::fflush(output);
         restore = true; // Restore even if Windows partially applied a failing request.
         if (status) throw std::runtime_error("display extension failed");
         auto active = query(QDC_ONLY_ACTIVE_PATHS);
@@ -119,21 +125,52 @@ int main() {
         print("extended", active);
         if (!contains(active, target) || !position_preserved(before, active))
             throw std::runtime_error("indirect display activation or original-display preservation failed");
-        std::puts("{\"indirect_display_active\":true,\"original_display_preserved\":true,\"observation_seconds\":45}");
-        std::fflush(stdout);
+        std::fputs("{\"indirect_display_active\":true,\"original_display_preserved\":true,\"observation_seconds\":45}\n", output);
+        std::fflush(output);
         for (UINT i = 0; i < 45; ++i) Sleep(1000);
         passed = true;
-    } catch (const std::exception &e) { std::fprintf(stderr, "topology probe failed: %s\n", e.what()); }
+    } catch (const std::exception &e) { std::fprintf(output, "{\"error\":\"%s\"}\n", e.what()); }
     if (restore) {
         const auto status = SetDisplayConfig(UINT(before.paths.size()), before.paths.data(), UINT(before.modes.size()),
             before.modes.data(), SDC_USE_SUPPLIED_DISPLAY_CONFIG | SDC_APPLY | SDC_ALLOW_CHANGES);
-        std::printf("{\"operation\":\"restore\",\"win32_status\":%ld}\n", status);
+        std::fprintf(output, "{\"operation\":\"restore\",\"win32_status\":%ld}\n", status);
         if (status) passed = false;
         else try {
             const auto current = query(QDC_ONLY_ACTIVE_PATHS); print("restored", current);
             if (current.paths.size() != before.paths.size() || !position_preserved(before, current)) passed = false;
         } catch (...) { passed = false; }
     }
-    std::printf("{\"passed\":%s,\"desktop_offload_tested\":false,\"render_device_verified\":false}\n", passed ? "true" : "false");
+    std::fprintf(output, "{\"passed\":%s,\"desktop_offload_tested\":false,\"render_device_verified\":false}\n", passed ? "true" : "false");
     return passed ? 0 : 1;
 }
+
+#ifndef NR_TOPOLOGY_GUI
+int main() { return run_probe(); }
+#else
+// Direct interactive scheduled-task entry avoids console-host initialization.
+int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
+    if (!nr_fill_guest()) return 2;
+    int argc = 0;
+    auto args = CommandLineToArgvW(GetCommandLineW(), &argc);
+    if (!args) return 2;
+    bool valid = argc == 3 && !lstrcmpW(args[1], L"--report") &&
+        !wcsncmp(args[2], L"idd-topology-", 13) && wcslen(args[2]) < 100;
+    if (valid) for (const WCHAR *p = args[2]; *p; ++p)
+        if (!((*p >= L'a' && *p <= L'z') || (*p >= L'0' && *p <= L'9') || *p == L'-')) valid = false;
+    WCHAR path[MAX_PATH]{};
+    if (valid) swprintf_s(path, L"C:\\npu-lab\\%s.jsonl", args[2]);
+    LocalFree(args);
+    if (!valid) return 2;
+    const auto handle = CreateFileW(path, GENERIC_WRITE, FILE_SHARE_READ, nullptr,
+                                    CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (handle == INVALID_HANDLE_VALUE) return 2;
+    const auto fd = _open_osfhandle(intptr_t(handle), _O_WRONLY | _O_TEXT);
+    if (fd < 0) { CloseHandle(handle); return 2; }
+    output = _fdopen(fd, "w");
+    if (!output) { _close(fd); return 2; }
+    setvbuf(output, nullptr, _IONBF, 0);
+    std::fprintf(output, "{\"event\":\"probe_started\",\"pid\":%lu,\"console_required\":false}\n", GetCurrentProcessId());
+    const auto result = run_probe();
+    fclose(output); return result;
+}
+#endif

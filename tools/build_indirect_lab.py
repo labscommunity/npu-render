@@ -64,7 +64,11 @@ def main():
         ).hexdigest(),
         "binary_sha256": {
             name: hashlib.sha256((args.build_dir / "Release" / name).read_bytes()).hexdigest()
-            for name in ("nr_indirect_lab.dll", "nr_indirect_topology_probe.exe")
+            for name in (
+                "nr_indirect_lab.dll",
+                "nr_indirect_topology_probe.exe",
+                "nr_indirect_topology_gui.exe",
+            )
         },
         "installation_performed": False,
         "desktop_offload_tested": False,
