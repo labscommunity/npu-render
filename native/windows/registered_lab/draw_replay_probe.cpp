@@ -204,7 +204,7 @@ int main(int argc, char **argv) try {
             texture_pixels[0].resize(texture.pixels.size());
             for(size_t n=0;n<texture.pixels.size();++n)for(unsigned c=0;c<4;++c)
                 texture_pixels[0][n][c]=float(texture.pixels[n][texture.format==87 && c<3?2-c:c])/255;
-        }else if(sampler[0]==21 || ps.instructions.size()==2 || blending || clip!=std::array<int32_t,4>{0,0,int32_t(width),int32_t(height)}){
+        }else if(sampler[0]==21 || ps.instructions.size()==2 || blending || texture.width<width || texture.height<height || clip!=std::array<int32_t,4>{0,0,int32_t(width),int32_t(height)}){
             const bool point=sampler[0]==0;
             linear_executor=std::make_unique<LinearTextureDrawExecutor>(vs,ps,width,height,format,texture.width,texture.height,texture.format,backend,blending,point?TextureFilter::point:TextureFilter::linear);
             const auto a=reference_vertex(vs,inputs[0],cb),b=reference_vertex(vs,inputs[2],cb);const auto pr=vs.position_output,ur=ps.instructions[0].sources[0].index;

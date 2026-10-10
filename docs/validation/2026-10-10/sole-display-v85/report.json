@@ -1,0 +1,35 @@
+{
+  "trial": "v85",
+  "source_commit": "364d06b7aa07ef639f8e2403c21606647fd01443",
+  "umd_build": "present-umd-v120",
+  "kmd_build": "allocation-capacity-v3",
+  "package_version": "0.0.73.0",
+  "npu_preflight_packets_passed": 13,
+  "successful_npu_packets_by_process": {
+    "dwm-4476": 12,
+    "dwm-6660": 2,
+    "Explorer-5404": 51,
+    "StartMenu-5100": 55
+  },
+  "received_frames": 1,
+  "received_frames_with_nonblack_pixels": 0,
+  "frames_received_during_sole_topology": 0,
+  "viewer_window_submissions": 1,
+  "collector_completed_without_error": true,
+  "harness_input_actions": 0,
+  "manual_wake_actions": 1,
+  "full_desktop_offload": false,
+  "performance_tested": false,
+  "device_cleanup_passed": true,
+  "transport_configuration_removed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "findings": [
+    "DWM completes 12 NPU draws, then rejects a complete captured point-sampled draw. The target is 1280 by 48, larger in width than its 1024 by 768 texture. The crop specialization requires the entire target to fit inside the source and rejects before NPU dispatch.",
+    "Offline CPU replay reproduces unsupported point texture crop. The affine point sampler already implements scaling, clamping, opacity and color modulation; its selection must include source dimensions smaller than the target.",
+    "No frame arrives during the sole-indirect interval. One opaque-black frame arrives during cleanup after the sole gate closes. A replacement DWM process completes two NPU draws and two Present callbacks, one accepted and one E_INVALIDARG during teardown.",
+    "A Shift wake was sent to the owned VM at 17:49:37 UTC because no DWM draw or swapchain assignment had appeared in the earlier snapshots. This trial alone does not establish whether waking changed progress.",
+    "An attempted guarded compositor-restart diagnostic failed while opening the actively written topology log, before any Stop-Process call. No manual DWM restart occurred.",
+    "Both devices and transport configuration are removed. The next trial addresses the captured point-sampling admission failure."
+  ]
+}

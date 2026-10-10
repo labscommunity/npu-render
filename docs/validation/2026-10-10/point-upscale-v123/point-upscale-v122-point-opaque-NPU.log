@@ -1,0 +1,24 @@
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":28,"blend":false,"swap":false,"frame":0,"draw_ms":20.429,"covered_samples":3600,"execution_device":"NPU"}
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":28,"blend":false,"swap":false,"frame":1,"draw_ms":20.235,"covered_samples":3600,"execution_device":"NPU"}
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":28,"blend":false,"swap":false,"frame":2,"draw_ms":20.913,"covered_samples":2300,"execution_device":"NPU"}
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":28,"blend":false,"swap":false,"frame":3,"draw_ms":20.566,"covered_samples":3600,"execution_device":"NPU"}
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":28,"blend":false,"swap":false,"frame":4,"draw_ms":19.448,"covered_samples":128,"execution_device":"NPU"}
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":28,"blend":false,"swap":false,"frame":5,"draw_ms":18.577,"covered_samples":3600,"execution_device":"NPU"}
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":28,"blend":false,"swap":false,"frame":6,"draw_ms":16.759,"covered_samples":3600,"execution_device":"NPU"}
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":28,"blend":false,"swap":false,"frame":7,"draw_ms":16.397,"covered_samples":3600,"execution_device":"NPU"}
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":28,"blend":false,"swap":false,"frame":8,"draw_ms":15.481,"covered_samples":3600,"execution_device":"NPU"}
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":87,"blend":false,"swap":false,"frame":0,"draw_ms":22.253,"covered_samples":3600,"execution_device":"NPU"}
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":87,"blend":false,"swap":false,"frame":1,"draw_ms":21.069,"covered_samples":3600,"execution_device":"NPU"}
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":87,"blend":false,"swap":false,"frame":2,"draw_ms":19.419,"covered_samples":2300,"execution_device":"NPU"}
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":87,"blend":false,"swap":false,"frame":3,"draw_ms":18.681,"covered_samples":3600,"execution_device":"NPU"}
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":87,"blend":false,"swap":false,"frame":4,"draw_ms":17.431,"covered_samples":128,"execution_device":"NPU"}
+nr_registered_linear_texture_draw_test.exe : mismatch w=64 blend=0 swap=0 frame=5 x=2 y=2 c=0
+got=7 ideal=19.875
+At line:23 char:3
++   & "$build\Release\nr_registered_linear_texture_draw_test.exe" @argu ...
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (mismatch w=64 b...=7 ideal=19.875:String) [], Remote
+   Exception
+    + FullyQualifiedErrorId : NativeCommandError
+
+false

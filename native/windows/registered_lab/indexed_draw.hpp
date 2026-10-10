@@ -147,7 +147,10 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
     }else if (textured) {
         const auto source = d.bound_source; const auto &sampler = d.samplers[2][0];
         linear=sampler.desc.Filter==D3D10_DDI_FILTER_MIN_MAG_MIP_LINEAR;
-        modulated=linear || d.pixel_program->instructions.size()==2 || blend || clip!=full;
+        // A target larger than its source cannot be a one-to-one crop. The
+        // affine point sampler handles scaling/clamping on the selected device.
+        const bool source_smaller=source && (source->surface.width<s.width || source->surface.height<s.height);
+        modulated=linear || d.pixel_program->instructions.size()==2 || blend || clip!=full || source_smaller;
         general_texture=destination_in || count!=6 || cull!=nr::raster::CullMode::none || d.blend.RenderTargetWriteMask[0]!=15;
         if(!general_texture) {
             try {

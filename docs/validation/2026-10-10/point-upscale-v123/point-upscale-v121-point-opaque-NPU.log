@@ -1,0 +1,29 @@
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":28,"blend":false,"swap":false,"frame":0,"draw_ms":20.575,"covered_samples":3600,"execution_device":"NPU"}
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":28,"blend":false,"swap":false,"frame":1,"draw_ms":18.932,"covered_samples":3600,"execution_device":"NPU"}
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":28,"blend":false,"swap":false,"frame":2,"draw_ms":19.807,"covered_samples":2300,"execution_device":"NPU"}
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":28,"blend":false,"swap":false,"frame":3,"draw_ms":19.578,"covered_samples":3600,"execution_device":"NPU"}
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":28,"blend":false,"swap":false,"frame":4,"draw_ms":18.124,"covered_samples":128,"execution_device":"NPU"}
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":28,"blend":false,"swap":false,"frame":5,"draw_ms":16.728,"covered_samples":3600,"execution_device":"NPU"}
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":28,"blend":false,"swap":false,"frame":6,"draw_ms":16.736,"covered_samples":3600,"execution_device":"NPU"}
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":28,"blend":false,"swap":false,"frame":7,"draw_ms":15.585,"covered_samples":3600,"execution_device":"NPU"}
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":28,"blend":false,"swap":false,"frame":8,"draw_ms":14.885,"covered_samples":3600,"execution_device":"NPU"}
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":87,"blend":false,"swap":false,"frame":0,"draw_ms":21.219,"covered_samples":3600,"execution_device":"NPU"}
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":87,"blend":false,"swap":false,"frame":1,"draw_ms":20.149,"covered_samples":3600,"execution_device":"NPU"}
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":87,"blend":false,"swap":false,"frame":2,"draw_ms":20.258,"covered_samples":2300,"execution_device":"NPU"}
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":87,"blend":false,"swap":false,"frame":3,"draw_ms":20.619,"covered_samples":3600,"execution_device":"NPU"}
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":87,"blend":false,"swap":false,"frame":4,"draw_ms":19.964,"covered_samples":128,"execution_device":"NPU"}
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":87,"blend":false,"swap":false,"frame":5,"draw_ms":18.417,"covered_samples":3600,"execution_device":"NPU"}
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":87,"blend":false,"swap":false,"frame":6,"draw_ms":17.475,"covered_samples":3600,"execution_device":"NPU"}
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":87,"blend":false,"swap":false,"frame":7,"draw_ms":16.684,"covered_samples":3600,"execution_device":"NPU"}
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":87,"blend":false,"swap":false,"frame":8,"draw_ms":16.049,"covered_samples":3600,"execution_device":"NPU"}
+{"modulated_texture_draw":true,"point_filter":true,"width":64,"height":64,"source_format":28,"blend":false,"swap":true,"frame":0,"draw_ms":21.597,"covered_samples":3600,"execution_device":"NPU"}
+nr_registered_linear_texture_draw_test.exe : mismatch w=64 blend=0 swap=1 frame=1 x=2 y=2 c=0
+got=179 ideal=25
+At line:21 char:2
++  & "$build\Release\nr_registered_linear_texture_draw_test.exe" NPU -- ...
++  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (mismatch w=64 b...ot=179 ideal=25:String) [], Remote
+   Exception
+    + FullyQualifiedErrorId : NativeCommandError
+
+false

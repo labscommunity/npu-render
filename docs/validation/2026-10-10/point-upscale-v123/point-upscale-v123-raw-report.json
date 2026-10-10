@@ -1,0 +1,35 @@
+{
+    "checks":  [
+                   {
+                       "build":  "v123",
+                       "cache":  "existing",
+                       "mode":  "point-opaque",
+                       "exit_code":  0
+                   },
+                   {
+                       "build":  "v123",
+                       "cache":  "existing",
+                       "mode":  "point",
+                       "exit_code":  0
+                   },
+                   {
+                       "build":  "v123",
+                       "cache":  "existing",
+                       "mode":  "linear",
+                       "exit_code":  0
+                   },
+                   {
+                       "build":  "v121",
+                       "cache":  "cold",
+                       "mode":  "point-opaque",
+                       "exit_code":  1
+                   },
+                   {
+                       "build":  "v121",
+                       "cache":  "warm",
+                       "mode":  "point-opaque",
+                       "exit_code":  1
+                   }
+               ],
+    "desktop_offload_tested":  false
+}

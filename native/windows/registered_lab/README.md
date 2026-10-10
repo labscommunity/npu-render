@@ -683,3 +683,24 @@ The [v120 qualification](../../../docs/validation/2026-10-10/destination-in-v120
 records byte-exact CPU, scalar and NPU replay of that DWM mask, 18 clean CPU
 contract suites, real NPU mask checks and an ABI 9 worker response with all
 16,384 output components verified. Live desktop delivery remains the next test.
+
+The [v85 trial](../../../docs/validation/2026-10-10/sole-display-v85/report.json)
+captures a point-sampled DWM draw with a 1280×48 target and 1024×768 source.
+A one-to-one crop cannot cover that target. Draw selection now uses the existing
+affine point sampler whenever either source dimension is smaller, preserving
+clipping, clamped coordinates, opaque alpha and modulation on the selected
+provider. The driver contract additionally enlarges a 4×4 texture into a 64×64
+target and checks every resulting byte.
+
+Broader NPU checks exposed incorrect RGB ordering in the opaque sampler graph
+with explicit model caching enabled, including a fresh cache. The earlier graph
+passes with that cache disabled; the underlying runtime cause is unresolved.
+Sampling now uses separate source and modulation channel inputs, avoiding packed
+channel gathers and the intermediate opaque-alpha concatenation. Host work
+deinterleaves input storage; texture lookup, modulation, blending and quantization
+remain on the selected provider. The scalar texture oracle checks both storage
+orders, source-over blending, opacity, clipping, fractional positions and dynamic
+input. The [v123 qualification](../../../docs/validation/2026-10-10/point-upscale-v123/report.json)
+records all three NPU sampler suites passing both initially and with reused
+cache entries, plus byte-exact replay of the captured DWM draw. Live desktop
+delivery remains unproven.

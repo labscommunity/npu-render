@@ -79,10 +79,18 @@ struct LinearTextureDrawExecutor::State {
         auto parameter=[](ov::element::Type type,ov::Shape shape,const char *name) {
             auto p=std::make_shared<op::Parameter>(type,shape);p->output(0).get_tensor().set_names({name});return p;
         };
-        auto source=parameter(ov::element::f32,{size_t(sw)*sh,4},"source");
+        std::array<std::shared_ptr<op::Parameter>,4> source{},color{};
+        ov::ParameterVector parameters;
+        for(unsigned c=0;c<(pixel.opaque?3u:4u);++c) {
+            source[c]=parameter(ov::element::f32,{size_t(sw)*sh,1},("source"+std::to_string(c)).c_str());
+            parameters.push_back(source[c]);
+        }
+        for(unsigned c=0;c<4;++c) {
+            color[c]=parameter(ov::element::f32,{1,1},("color"+std::to_string(c)).c_str());
+            parameters.push_back(color[c]);
+        }
         auto bg=parameter(ov::element::u8,{count,4},"background");
         auto uv=parameter(ov::element::f32,{1,4},"uv");
-        auto color=parameter(ov::element::f32,{1,4},"color");
         auto bounds=parameter(ov::element::i32,{1,4},"bounds"),clip=parameter(ov::element::i32,{1,4},"scissor");
         auto origin=parameter(ov::element::f32,{1,1},"origin"),origin_i=parameter(ov::element::i32,{1,1},"origin_i");
         auto half=parameter(ov::element::f32,{1,1},"half");
@@ -108,21 +116,21 @@ struct LinearTextureDrawExecutor::State {
             return choose(std::make_shared<op::Less>(value,number(0)),number(0),choose(std::make_shared<op::Greater>(value,number(float(extent-1))),number(float(extent-1)),value));
         };
         auto x=coordinate(0,sw),y=coordinate(1,sh),ix=both(pred(x),integer(0x7fffffff)),iy=both(pred(y),integer(0x7fffffff));
-        auto fetch=[&](int dx,int dy)->Node {
+        auto fetch=[&](unsigned channel,int dx,int dy)->Node {
             auto sx=std::make_shared<op::Minimum>(add(ix,integer(dx)),integer(int32_t(sw-1)));
             auto sy=std::make_shared<op::Minimum>(add(iy,integer(dy)),integer(int32_t(sh-1)));
             auto index=std::make_shared<op::Reshape>(add(sx,mul(sy,integer(int32_t(sw)))),axes({count}),false);
-            return std::make_shared<op::Gather>(source,index,op::Constant::create(ov::element::i32,ov::Shape{},{0}));
+            return std::make_shared<op::Gather>(source[channel],index,op::Constant::create(ov::element::i32,ov::Shape{},{0}));
         };
         auto mix=[](const Node &a,const Node &b,const Node &t)->Node{return add(mul(a,sub(number(1),t)),mul(b,t));};
         auto tx=sub(x,floating(ix)),ty=sub(y,floating(iy));
-        // The shader multiplies sampled RGBA by a uniform vertex color. Source
-        // storage remains packed, so map the color to that storage order first.
-        auto packed_color=std::make_shared<op::Gather>(color,sf==87?axes({2,1,0,3}):axes({0,1,2,3}),op::Constant::create(ov::element::i32,ov::Shape{},{1}));
-        Node sampled=point ? fetch(0,0) : mix(mix(fetch(0,0),fetch(1,0),tx),mix(fetch(0,1),fetch(1,1),tx),ty);
-        if(pixel.opaque)sampled=std::make_shared<op::Concat>(ov::OutputVector{lane(sampled,0),lane(sampled,1),lane(sampled,2),
-            std::make_shared<op::Broadcast>(number(1),axes({count,1}))},1);
-        sampled=mul(sampled,packed_color);
+        // Independent channel ports avoid the NPU graph's incorrect packed
+        // channel selection. Host work only decodes packed bytes into float
+        // channels; sampling and modulation remain selected-device operations.
+        std::array<Node,4> sampled{};
+        for(unsigned c=0;c<(pixel.opaque?3u:4u);++c)
+            sampled[c]=point ? fetch(c,0,0) : mix(mix(fetch(c,0,0),fetch(c,1,0),tx),mix(fetch(c,0,1),fetch(c,1,1),tx),ty);
+        Node alpha=pixel.opaque ? Node(color[3]) : mul(sampled[3],color[3]);
         auto px=op::Constant::create(ov::element::i32,ov::Shape{count,1},xx);
         auto py=add(op::Constant::create(ov::element::i32,ov::Shape{count,1},yy),mul(origin_i,integer(256)));
         auto inside=[&](const Node &r)->Node {
@@ -132,15 +140,19 @@ struct LinearTextureDrawExecutor::State {
         auto covered=both(inside(bounds),inside(clip));
         ov::OutputVector channels;
         for(int c=0;c<4;++c){
-            auto bc=lane(bg,c),fg=lane(sampled,format!=sf && c<3 ? 2-c : c);
-            auto value=mul(fg,number(255));if(blend)value=add(value,mul(floating(bc),sub(number(1),lane(sampled,3))));
+            const int source_lane=format!=sf && c<3 ? 2-c : c;
+            const int color_lane=format==87 && c<3 ? 2-c : c;
+            auto bc=lane(bg,c);
+            Node fg=pixel.opaque && c==3 ? Node(color[3]) : mul(sampled[source_lane],color[color_lane]);
+            auto value=mul(fg,number(255));if(blend)value=add(value,mul(floating(bc),sub(number(1),alpha)));
             value=choose(std::make_shared<op::Less>(value,number(0)),number(0),choose(std::make_shared<op::Greater>(value,number(255)),number(255),value));
             auto base=both(pred(value),integer(255)),fraction=sub(value,floating(base));
             auto inc=std::make_shared<op::BitwiseOr>(pred(std::make_shared<op::Greater>(fraction,number(.5f))),both(pred(std::make_shared<op::Equal>(fraction,number(.5f))),both(base,integer(1))));
             channels.push_back(add(mul(add(base,inc),covered),mul(pred(bc),sub(integer(1),covered))));
         }
         auto output=std::make_shared<op::Convert>(std::make_shared<op::Concat>(channels,1),ov::element::u8);
-        auto model=std::make_shared<ov::Model>(ov::OutputVector{output,std::make_shared<op::Convert>(covered,ov::element::u8)},ov::ParameterVector{source,bg,uv,color,bounds,clip,origin,origin_i,half});
+        parameters.insert(parameters.end(),{bg,uv,bounds,clip,origin,origin_i,half});
+        auto model=std::make_shared<ov::Model>(ov::OutputVector{output,std::make_shared<op::Convert>(covered,ov::element::u8)},parameters);
         ov::AnyMap properties{ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY)};
         if(backend=="NPU"){
             for(const auto &node:model->get_ops())node->get_rt_info()["precise_0"]=std::string{};
@@ -191,10 +203,12 @@ UniformDrawExecutor::Result LinearTextureDrawExecutor::execute(const std::vector
         matches &= u==uv[right?2:0] && v==uv[bottom?3:1];}accepted |= matches;}
     require(accepted);for(auto &v:clip)v*=256;
     s.failed=true;began=Clock::now();
-    auto *texels=s.request.get_tensor("source").data<float>();
-    for(size_t n=0;n<source.pixels.size();++n)for(size_t c=0;c<4;++c)texels[n*4+c]=float(source.pixels[n][c])/255;
+    for(unsigned c=0;c<(s.pixel.opaque?3u:4u);++c) {
+        auto *texels=s.request.get_tensor("source"+std::to_string(c)).data<float>();
+        for(size_t n=0;n<source.pixels.size();++n)texels[n]=float(source.pixels[n][c])/255;
+    }
+    for(unsigned c=0;c<4;++c)s.request.get_tensor("color"+std::to_string(c)).data<float>()[0]=color[c];
     std::memcpy(s.request.get_tensor("uv").data<float>(),uv.data(),16);
-    std::memcpy(s.request.get_tensor("color").data<float>(),color.data(),16);
     std::memcpy(s.request.get_tensor("bounds").data<int32_t>(),bounds.data(),16);std::memcpy(s.request.get_tensor("scissor").data<int32_t>(),clip.data(),16);
     s.request.get_tensor("half").data<float>()[0]=s.point?0.f:.5f;result.pixels.resize(background.size());
     for(uint32_t y=0;y<s.height;y+=s.rows){
@@ -204,7 +218,7 @@ UniformDrawExecutor::Result LinearTextureDrawExecutor::execute(const std::vector
         require(output.get_element_type()==ov::element::u8 && output.get_byte_size()==size_t(s.count)*4 && coverage.get_element_type()==ov::element::u8 && coverage.get_size()==s.count);
         std::memcpy(result.pixels.data()+offset,output.data<const uint8_t>(),size_t(s.count)*4);
         for(size_t n=0;n<s.count;++n){const auto value=coverage.data<const uint8_t>()[n];require(value<=1);result.covered_samples+=value;}
-        result.input_bytes+=uint64_t(s.sw)*s.sh*16+uint64_t(s.count)*4+76;result.output_bytes+=uint64_t(s.count)*5;++result.provider_requests;++result.tile_executions;
+        result.input_bytes+=uint64_t(s.sw)*s.sh*(s.pixel.opaque?12u:16u)+uint64_t(s.count)*4+76;result.output_bytes+=uint64_t(s.count)*5;++result.provider_requests;++result.tile_executions;
     }
     result.timings.merger_ms=elapsed(began);result.timings.total_ms=elapsed(start);result.used_rectangle=true;result.vertices=std::move(shaded.vertices);s.failed=false;return result;
 }

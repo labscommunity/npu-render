@@ -1,0 +1,81 @@
+{
+  "build": "present-umd-v123",
+  "clean_cpu_suites_passed": 18,
+  "source_hashes_verified": 101,
+  "binary_hashes_verified_on_delta": 24,
+  "captured_draw": "v85-dwm-4476",
+  "target": [
+    1280,
+    48
+  ],
+  "source_texture": [
+    1024,
+    768
+  ],
+  "covered_samples": 49152,
+  "cpu_scalar_and_npu_pixels_exact": true,
+  "cpu_npu_pixel_sha256": "d1ed09d75b633e4e4aa78d561d6b966bd970a4ae6f69957ec0d37a2c8c60c438",
+  "npu_replays_passed": 2,
+  "npu_draw_ms": [
+    263.302,
+    172.759
+  ],
+  "npu_driver_callback_components_checked": 212992,
+  "npu_sampler_components_per_suite": 20054016,
+  "npu_sampler_suites": [
+    "opaque point",
+    "modulated point",
+    "linear"
+  ],
+  "npu_sampler_passes_per_suite": 2,
+  "npu_sampler_total_components_checked": 120324096,
+  "npu_sampler_maximum_error_bytes": {
+    "opaque_point": 0.5,
+    "modulated_point": 0.5,
+    "linear": 0.518258361
+  },
+  "cache_diagnostic": {
+    "checks": [
+      {
+        "build": "v123",
+        "cache": "existing",
+        "mode": "point-opaque",
+        "exit_code": 0
+      },
+      {
+        "build": "v123",
+        "cache": "existing",
+        "mode": "point",
+        "exit_code": 0
+      },
+      {
+        "build": "v123",
+        "cache": "existing",
+        "mode": "linear",
+        "exit_code": 0
+      },
+      {
+        "build": "v121",
+        "cache": "cold",
+        "mode": "point-opaque",
+        "exit_code": 1
+      },
+      {
+        "build": "v121",
+        "cache": "warm",
+        "mode": "point-opaque",
+        "exit_code": 1
+      }
+    ],
+    "desktop_offload_tested": false
+  },
+  "desktop_offload_tested": false,
+  "performance_comparison_with_tahoma": false,
+  "findings": [
+    "The captured DWM target is wider than its texture. Crop admission previously rejected it. The renderer and offline replay now select affine point sampling when either source dimension is smaller. A DDI test checks a 4x4 texture rendered into a 64x64 target.",
+    "v121 reproduces the captured draw exactly, but broader NPU checks find a red/blue mismatch under explicit model caching. The mismatch recurs with a new cache and on its second use, while disabling the explicit cache passes all opaque-point checks. The underlying runtime cache/compiler cause remains unresolved.",
+    "v122 removes vector swizzling but still fails a color-modulation case. v123 separates source and color input ports per channel. All three broad NPU suites pass both first and repeated use of the existing cache, across formats, blending, fractional positions, clamping and dynamic colors. Host work deinterleaves storage; rendering arithmetic remains on NPU.",
+    "The CI run for the preceding alpha-mask change failed with Windows illegal-instruction exceptions. The failed-job rerun passes. Both results are retained; the initial runner failure is not explained by these rendering checks.",
+    "This qualification establishes bounded sampler correctness. It does not establish a usable desktop, full GPU replacement or Tahoma benefit."
+  ]
+}
