@@ -100,7 +100,12 @@ first cold replay took 9.76 seconds including compilation. A subsequent
 preserves the exact image and reduces repeated draw time to 42–49 ms in the
 diagnostic run. Its NPU pixel tests check 37.9 million components, including
 fractional edges and unchanged background pixels. This still does not establish
-interactive desktop performance or a Tahoma benefit.
+interactive desktop performance or a Tahoma benefit. A
+[native packet bridge](docs/validation/2026-10-10/indexed-stream-v65/report.json)
+now returns exact 1024×768 NPU output from the physical machine to the disposable
+VM. Warm roundtrips took 203 ms in the diagnostic run. The bridge uses a local
+named pipe and a bounded authenticated stream; it is laboratory infrastructure,
+and its successful packet tests do not establish desktop frame delivery.
 
 The [captured-window desktop experiment](native/windows/capture/README.md) now
 presents an NPU-composed 2880×1800 desktop with input passing through to the

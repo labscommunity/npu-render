@@ -1,0 +1,118 @@
+-- Building for: Visual Studio 17 2022
+-- Selecting Windows SDK version 10.0.26100.0 to target Windows 10.0.26200.
+-- The CXX compiler identification is MSVC 19.44.35229.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/cl.exe - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Failed
+-- Looking for pthread_create in pthreads
+-- Looking for pthread_create in pthreads - not found
+-- Looking for pthread_create in pthread
+-- Looking for pthread_create in pthread - not found
+-- Found Threads: TRUE
+-- Configuring done (2.6s)
+-- Generating done (0.1s)
+-- Build files have been written to: C:/Users/tatef/AppData/Local/npu-render/builds/present-umd-v64
+MSBuild version 17.14.60+43b635718 for .NET Framework
+
+MSBuild version 17.14.60+43b635718 for .NET Framework
+
+  1>Checking Build System
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/registered_lab/CMakeLists.txt
+  blend_executor.cpp
+  nr_registered_blend.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v64\Release\nr_registered_blend.lib
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/registered_lab/CMakeLists.txt
+  vertex_executor.cpp
+  raster_executor.cpp
+  projection_executor.cpp
+  output_merger.cpp
+  uniform_draw.cpp
+  solid_rectangle.cpp
+  Generating Code...
+  nr_registered_vertex.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v64\Release\nr_registered_vertex.lib
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/registered_lab/CMakeLists.txt
+  driver.cpp
+     Creating library C:/Users/tatef/AppData/Local/npu-render/builds/present-umd-v64/Release/nr_fill_umd.lib and object C:/Users/tatef/AppData/Local/npu-render/builds/present-umd-v64/Release/nr_fill_umd.exp
+  nr_fill_umd.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v64\Release\nr_fill_umd.dll
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/registered_lab/CMakeLists.txt
+  probe.cpp
+  nr_registered_clear_probe.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v64\Release\nr_registered_clear_probe.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/registered_lab/CMakeLists.txt
+  draw_replay_probe.cpp
+  nr_registered_draw_replay_probe.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v64\Release\nr_registered_draw_replay_probe.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/registered_lab/CMakeLists.txt
+  lab_exchange_test.cpp
+  nr_registered_exchange_test.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v64\Release\nr_registered_exchange_test.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/registered_lab/CMakeLists.txt
+  indexed_exchange_test.cpp
+  nr_registered_indexed_exchange_test.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v64\Release\nr_registered_indexed_exchange_test.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/registered_lab/CMakeLists.txt
+  indexed_stream_relay.cpp
+  nr_registered_indexed_stream_relay.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v64\Release\nr_registered_indexed_stream_relay.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/registered_lab/CMakeLists.txt
+  indexed_stream_worker.cpp
+  nr_registered_indexed_stream_worker.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v64\Release\nr_registered_indexed_stream_worker.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/registered_lab/CMakeLists.txt
+  indexed_exchange_worker.cpp
+  nr_registered_indexed_worker.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v64\Release\nr_registered_indexed_worker.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/registered_lab/CMakeLists.txt
+  tests.cpp
+     Creating library C:/Users/tatef/AppData/Local/npu-render/builds/present-umd-v64/Release/nr_registered_lab_test.lib and object C:/Users/tatef/AppData/Local/npu-render/builds/present-umd-v64/Release/nr_registered_lab_test.exp
+  nr_registered_lab_test.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v64\Release\nr_registered_lab_test.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/registered_lab/CMakeLists.txt
+  npu_exchange_worker.cpp
+  nr_registered_npu_worker.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v64\Release\nr_registered_npu_worker.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/registered_lab/CMakeLists.txt
+  output_merger_test.cpp
+  nr_registered_output_merger_test.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v64\Release\nr_registered_output_merger_test.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/registered_lab/CMakeLists.txt
+  projection_test.cpp
+  nr_registered_projection_test.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v64\Release\nr_registered_projection_test.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/registered_lab/CMakeLists.txt
+  raster_test.cpp
+  nr_registered_raster_test.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v64\Release\nr_registered_raster_test.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/registered_lab/CMakeLists.txt
+  solid_rectangle_test.cpp
+  nr_registered_solid_rectangle_test.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v64\Release\nr_registered_solid_rectangle_test.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/registered_lab/CMakeLists.txt
+  texture_test.cpp
+  nr_registered_texture_test.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v64\Release\nr_registered_texture_test.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/registered_lab/CMakeLists.txt
+  uniform_draw_test.cpp
+  nr_registered_uniform_draw_test.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v64\Release\nr_registered_uniform_draw_test.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/registered_lab/CMakeLists.txt
+  vertex_stream_probe.cpp
+  nr_registered_vertex_stream_probe.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v64\Release\nr_registered_vertex_stream_probe.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/registered_lab/CMakeLists.txt
+  vertex_test.cpp
+  nr_registered_vertex_test.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v64\Release\nr_registered_vertex_test.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/registered_lab/CMakeLists.txt
+Test project C:/Users/tatef/AppData/Local/npu-render/builds/present-umd-v64
+      Start  1: registered_lab_contract
+ 1/10 Test  #1: registered_lab_contract ................   Passed    0.71 sec
+      Start  2: registered_exchange_contract
+ 2/10 Test  #2: registered_exchange_contract ...........   Passed    0.30 sec
+      Start  3: registered_vertex_contract
+ 3/10 Test  #3: registered_vertex_contract .............   Passed    0.66 sec
+      Start  4: registered_texture_contract
+ 4/10 Test  #4: registered_texture_contract ............   Passed    0.79 sec
+      Start  5: registered_raster_contract
+ 5/10 Test  #5: registered_raster_contract .............   Passed    0.47 sec
+      Start  6: registered_projection_contract
+ 6/10 Test  #6: registered_projection_contract .........   Passed    0.34 sec
+      Start  7: registered_output_merger_contract
+ 7/10 Test  #7: registered_output_merger_contract ......   Passed    0.97 sec
+      Start  8: registered_uniform_draw_contract
+ 8/10 Test  #8: registered_uniform_draw_contract .......   Passed    0.75 sec
+      Start  9: registered_solid_rectangle_contract
+ 9/10 Test  #9: registered_solid_rectangle_contract ....   Passed    0.78 sec
+      Start 10: registered_indexed_exchange_contract
+10/10 Test #10: registered_indexed_exchange_contract ...   Passed    0.52 sec
+
+100% tests passed out of 10
+
+Total Test time (real) =   6.31 sec
+{"schema": 1, "kind": "registered-umd-build-only", "clean_build": true, "source_sha256": {"native/windows/blend_model.hpp": "1c55a46eeed27310085612dcdcfd28b4665a2f7e89ab05e267d4d7209d7844c8", "native/windows/ddi/contract.hpp": "e82cc949a2847eea1de8e5346bcef1dcaa23ea092126c57b56301bc48c07d919", "native/windows/ddi/unsupported.inc": "8ed01a87d6516139ce19725aa139d6b2de93f22d49307c6166825fa889300cdb", "native/windows/kmd/contract.hpp": "9c35ef2bd7ae8c900a461bcdf53c612f1aa0dd6be558422db083e37ecc7ed0a6", "native/windows/registered_lab/blend_executor.cpp": "911e40debb5f16ef13ebfdb2d0871256529703823c4c93e251ec936dfb4ae0d1", "native/windows/registered_lab/blend_executor.hpp": "54f175dd76d7c0a96210b5cf9d12d7be6ccf8e2c70e8f97aabf34bd837f2202c", "native/windows/registered_lab/buffer.hpp": "d2ef8368d67fcf1de9c850c01b41459323aea31502f62182599b263f36036a25", "native/windows/registered_lab/buffer_probe.hpp": "7765ae1e62d236bfc5e39c929520e35fd7ff71f9230c8b717aa731d4396e0442", "native/windows/registered_lab/buffer_test.hpp": "1e10f02c300cb9cda3b9fcef3f6855991f79ce4b827fe24817dd3c0baafbd02a", "native/windows/registered_lab/capture_reader.hpp": "45a7f2a6448ed794db51d2fc6d85be266e4f4cb01e494c27ecec8b8d21822c4f", "native/windows/registered_lab/CMakeLists.txt": "34cd3da7dec58210317fdb1b7c1245e22a92632c7605fb62f35eee1fa99d6a54", "native/windows/registered_lab/contract.hpp": "675e9ea5ee23282f6b6cf40a2b51d0e09a945e5b31214d01af52e29fd416386c", "native/windows/registered_lab/draw.hpp": "4ea47f826e81f16e311319c98ab8d5d9748f7ce82b648ef23d830680641d1ecb", "native/windows/registered_lab/draw_capture.hpp": "baae40d2c80cba606c179955a0bf5fc13b7d01893efbf3276f5797d59d39fcc5", "native/windows/registered_lab/draw_probe.hpp": "2d94ccb0b583a1435d5c027d09757b345e2fd195cc5fb4d4db0b366423515452", "native/windows/registered_lab/draw_replay_probe.cpp": "ba634a48ad5d613cf9f750e5a952b734d169c4e004c36fceb7ff590983201de6", "native/windows/registered_lab/draw_test.hpp": "834615bc4599290c31a0d46a07eff7018981d465faee8fb2f9ba24a360eacfe1", "native/windows/registered_lab/driver.cpp": "faf46cd44b702907d4f9a948f13d46830659d6b894f023216865742ebbdd0351", "native/windows/registered_lab/geometry_probe.hpp": "1b80c667c35cfccfb873d2b2fccbb4ca4b815fc11049a89f36de79202796b8f4", "native/windows/registered_lab/geometry_test.hpp": "a50b9b0ace882f24160904a7de549dc89c0edc05cdf944fd8817f4c5cdec604c", "native/windows/registered_lab/indexed_draw.hpp": "fd5b46c94d2762faca7cfaf8a8db2abefb82b3b67b085cb176ac267a9ce075ac", "native/windows/registered_lab/indexed_draw_test.hpp": "d67b55270733672cf7a0cbff261f75ddd8692a77647db78a0c3f4fa4413b0319", "native/windows/registered_lab/indexed_exchange.hpp": "0ebeb250972456cce0a460d26c91d0c7a635d2be1c6f1faa48a9798dd3fa7c61", "native/windows/registered_lab/indexed_exchange_protocol.hpp": "ff87bd4af8cf8f8883f81738132fe6ba8ff43c697fabfafb1fc534a519872934", "native/windows/registered_lab/indexed_exchange_test.cpp": "9e67e35bae35bf7ee03de858ce09a77bdd1a3c63fd9a63bee06500ad19cf7f8d", "native/windows/registered_lab/indexed_exchange_worker.cpp": "92812eecebbb83f7512d916abd8d8bd16234ead30c008506b37a7f7a50b1c24f", "native/windows/registered_lab/indexed_pipe.hpp": "7a91d6bdcb6b1945fde8a21f3a882de025a2ef296b9f2eabf1d092952fbec36e", "native/windows/registered_lab/indexed_pipeline.hpp": "c3e45d884c7aa880ba5f39aca35abd02222342ce05c3c706557588ff04f9773a", "native/windows/registered_lab/indexed_socket.hpp": "04fbe3b3288bc85c72458710dab8bb20b90e1c9dd4e6c308d8a69fd51f08a69a", "native/windows/registered_lab/indexed_stream_relay.cpp": "7685affe1f70b6169d4efecdafbf76b84cbaf3de7a232a0820a0e9f5d9dbafbe", "native/windows/registered_lab/indexed_stream_worker.cpp": "1d3609e39d47f5a5977e691b25b3b19dea764e5c2343985e2bfad26a68f9af7f", "native/windows/registered_lab/input_assembler.hpp": "ff1addee13c525f7dd72a9fd9a55a39bbf9411da4a7c3bc8852fd4472cd9c144", "native/windows/registered_lab/kernel_memory.hpp": "30a4cfd86c297c041e9abbaae0badc9295864d939231ac3f1b9d38bce74a144e", "native/windows/registered_lab/lab_exchange.hpp": "179df3e76074e01988f4750785ad80a6c7ac58e30fdf4da1a4ddc6d0e922a860", "native/windows/registered_lab/lab_exchange_io.hpp": "4fe8565367d05bfecb0f030816674627f3d09a364b558bd0cab34d043dccac4f", "native/windows/registered_lab/lab_exchange_protocol.hpp": "17ba6c81f3788d7536d54048e6238dc600667a27e30654404fbf3f114f1e355c", "native/windows/registered_lab/lab_exchange_test.cpp": "8cef69f1eddec439efe3d5abef653b21d21a273823925c74da8183a33ea94ed7", "native/windows/registered_lab/lab_trace.hpp": "3902d3762896ab2c2bc86fe8024b09f43523f1acdd7b7c72ce302a94d45f312f", "native/windows/registered_lab/npu_exchange_worker.cpp": "b61baa0b42c0a64fb6c86c5028c4c74118687f5024d7d3286298ce4ae274ba08", "native/windows/registered_lab/output_merger.cpp": "011ed7d927a3d1fdc346b2570e3652a56fd28e7f67c14302215044e568ae560a", "native/windows/registered_lab/output_merger.hpp": "608181b72d75f4c200a181c10c156029dd549f6c856eeaea63390f94f4948c36", "native/windows/registered_lab/output_merger_test.cpp": "75723330cbcb4c0386cf2a91595a7211186e6895b0f5cbb06a880b9fab72c0b6", "native/windows/registered_lab/present_draw_probe.hpp": "7cbacb1c787c61f9a652b6c63747e9b253be14f82d8732c9edfe7cce7502d8a4", "native/windows/registered_lab/present_probe.hpp": "2328b18a9dc8a45def57fe7db0bd9629e6301120acb9795c9521230724fd27ab", "native/windows/registered_lab/present_test.hpp": "2038f19b9a46ef3ced409dadcf75727e675f801d99f783e0c2dc348c7381a1b0", "native/windows/registered_lab/probe.cpp": "41afab98c7e3f42871d09130a41d6cc0fb28c01ab67aed44d46e2953220bf038", "native/windows/registered_lab/process_probe.hpp": "94f607597c882fe7c515b3ac7cac80d93d914c546e1bd73dfd36b4a73263d67c", "native/windows/registered_lab/projection_executor.cpp": "278e1970b6d9826f721de6756d0133d3e1f5861f6202ccd7afa4d6f99ebd9ce8", "native/windows/registered_lab/projection_executor.hpp": "f49c5db526f7a32139e82ff624b362ae95e379ca764182801382d46cf5b4041e", "native/windows/registered_lab/projection_test.cpp": "1fb6d5a778f5ce98477a8875d8873a5dea373168ecec1d8656fffe03b13d1aa7", "native/windows/registered_lab/raster_executor.cpp": "469d5ad0a7ab294e9ece995d9ed02b778d785d250e287d36e6f964287c83d9d4", "native/windows/registered_lab/raster_executor.hpp": "d42ad9b4983a71bf9e9f27d569015c630775cb1af923c33665f1b7db6b7d79c1", "native/windows/registered_lab/raster_test.cpp": "0f20c02a061ebb6bc9f80603dbaca8f90bf847e71dbba9b740d0bb13727b39d6", "native/windows/registered_lab/shader_contract.hpp": "131b486ce83d7d8c7f41b92a54b58ee869b6c8b7eadcf59220d5eb69b71e7e43", "native/windows/registered_lab/shader_ir.hpp": "19f999d335cc572e25d907ea4e0726b0c9b0cad32dbe64c7b9b6a24d57c3b5d4", "native/windows/registered_lab/shader_reference.hpp": "c22747385e2dc1d87bf552a587c32cb1b7ad9bb8f2a5b008740b6bc7e7732472", "native/windows/registered_lab/shader_texture.hpp": "d70fb970b2d6635daf0ee7c2cab0e171516853a81e581c75dc2bc461c7b21c96", "native/windows/registered_lab/solid_rectangle.cpp": "f5f1e7c361eff6d4e8f61bf2e18509cf0e277eb41a04bee8a619e533fe7acc96", "native/windows/registered_lab/solid_rectangle.hpp": "a35ed7854a0a4597968521a1cf57112ef0a2e751f50dd5f9a7447d453199a0e5", "native/windows/registered_lab/solid_rectangle_test.cpp": "6fb24544794e41c32f6b1b1fb997c9926a7a9125ea908a31de08b2f96a8db15c", "native/windows/registered_lab/tests.cpp": "58814b5f0554d644a014fd0e00e9737b7fc22cccbbe2a054dcde915595182892", "native/windows/registered_lab/texture_test.cpp": "cb717fb84f97749da5f1136710583294d00503e42106c5908c08e69f97449092", "native/windows/registered_lab/uniform_draw.cpp": "48a2c73d7a859f9176e33e81b7ad58e7a6b6e5d792470e54a92a2a7c6715b73a", "native/windows/registered_lab/uniform_draw.hpp": "2e000a6a22dd5cb6f3ea4c3b7dfc49bbeb73b71ea98fc9dfb6a024a24abe4da4", "native/windows/registered_lab/uniform_draw_test.cpp": "8363619dd24354bb63647288c56df5a926b068b4c68fe9f3e0ae3d987db094d1", "native/windows/registered_lab/upload_probe.hpp": "a5f0f4e10600842acf7240fd4cead24e5c05c6cad28dd2ebdf17ce6fa83b8341", "native/windows/registered_lab/upload_test.hpp": "8627b5c5e08b8a5ac15a0cbc14fc8314fac4109082f354f12b50f9de185e5413", "native/windows/registered_lab/vertex_executor.cpp": "1b9161e185b0240fc33a7f685143b8bd722dd55d91a343d6bbb564e485d5c05a", "native/windows/registered_lab/vertex_executor.hpp": "5573b0c3dedde61078389469d1e50bc64982f2db59405c19fc6b4ed4ed2088be", "native/windows/registered_lab/vertex_stream_probe.cpp": "dd5d996fec1a5418c7005da97ebb4355f76d9fb2e46d29139c6c24aacaa76e9a", "native/windows/registered_lab/vertex_test.cpp": "62db8fb2a03666963da2aacade310cf960b1ec36ec35313a31979004d35e529c"}, "binary_sha256": {"nr_fill_umd.dll": "46aae214e0e55f7219f8b662badf9068482092f41637f48676b4c880e626a11b", "nr_registered_clear_probe.exe": "b96a9bbd89f9b30f5effe5a06d25f40cc4a7e90fef83f45b721add83429ea5a9", "nr_registered_lab_test.exe": "3c758980498ffdde86d1221321eeee3542b4bdc97d53846716be9f694b5929ee", "nr_registered_npu_worker.exe": "b8b07afefd3b9ebd7029637bed28cd01db6e9a33fc2990409960a4709c25de6b", "nr_registered_exchange_test.exe": "d3ceb137bda3b9f0193d9892b92524a78c6eec189c181002bfb5fd17a2a1ec02", "nr_registered_vertex_test.exe": "e85187acdc7f54a1b6a2ea94612e172a61d34332fde5e721274ec7218def3142", "nr_registered_vertex_stream_probe.exe": "7239c963ad8e87a75018dec44e505ebb1bea11752aa1d0330998f3fce679b886", "nr_registered_texture_test.exe": "d6286fa14ae9f2627fb0bf67dbe6d7b64097bba1a25c2616564623ad6506c0e5", "nr_registered_raster_test.exe": "ac0203b372d6ac94ba6f2ebe8ed612f00c9954ca8b3c3f9f626876403579c040", "nr_registered_projection_test.exe": "aefb851f8f09419732a0cedfa1bf1d54306bb9b588662b6d5dbe63936c4769d0", "nr_registered_output_merger_test.exe": "306005c7816a86b26e41cebea67fede465cc192446e9b9f0cc9232a8fad29e4c", "nr_registered_draw_replay_probe.exe": "5b06ef61fef8b15b03522fc23efe0484b3e1f7651bbd8d763fdb661149901d33", "nr_registered_uniform_draw_test.exe": "d35cb1aeec160cfdf9a985f9748df4d0ce9d9f9116e4b3ec0da2fc127f1b4494", "nr_registered_solid_rectangle_test.exe": "c8d80c0e1de27e49204c746b4cb4fb37d1de7c99d20b8770625193786f2919e9", "nr_registered_indexed_exchange_test.exe": "bc66a6e0a1b19149f5b30210cf77f318c0423750c162881a871256134257d2c1", "nr_registered_indexed_worker.exe": "db02347f17a0e8bf8b9c76acc79026e4e6e3734905915a4d732c596815322b85", "nr_registered_indexed_stream_worker.exe": "37130434570e03f7152ff790e76b637106e04a75072432cc640d5be1afe296c9", "nr_registered_indexed_stream_relay.exe": "06cc9add8747a77002e4a7f75d31400197f445afe52e44ad60c44ea4eaff108f"}, "installation_performed": false, "signing_performed": false, "npu_execution_tested": false, "desktop_offload_tested": false}

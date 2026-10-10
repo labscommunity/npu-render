@@ -104,8 +104,8 @@ std::vector<uint8_t> read_pixels(Allocation &source) {
 #include "indexed_draw.hpp"
 void APIENTRY draw_indexed(D3D10DDI_HDEVICE h, UINT count, UINT first, INT base) {
     guard(h, __FUNCTION__, [&] {
-        lab_capture_indexed_draw(device(h), count, first, base);
-        execute_indexed_draw(device(h), count, first, base);
+        try { execute_indexed_draw(device(h), count, first, base); }
+        catch (...) { lab_capture_indexed_draw(device(h), count, first, base); throw; }
     });
 }
 void APIENTRY draw(D3D10DDI_HDEVICE h, UINT count, UINT first) {

@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "kind": "physical-npu-indexed-native-stream-qualification",
+  "cpu_contracts_passed": 10,
+  "python_tests_passed": 110,
+  "local_pipe_tests": [
+    "fragmented transfer through 512-byte pipe buffers",
+    "pending read cancellation after a silent peer",
+    "synthetic peer only; no device execution claim"
+  ],
+  "small_npu_roundtrips": 3,
+  "desktop_size": [
+    1024,
+    768
+  ],
+  "desktop_npu_roundtrips": 3,
+  "desktop_verified_components": 9437184,
+  "desktop_roundtrip_ms": [
+    6609,
+    203,
+    203
+  ],
+  "desktop_worker_draw_ms": [
+    83.74,
+    68.934,
+    69.785
+  ],
+  "compiler_diagnostic": "Constant pixel shader emitted outliner diagnostic; explicit NPU execution and exact output still passed.",
+  "setup_failures": [
+    "v62 staged source in wrong directory; missing binary prevented successful build report",
+    "Initial controller assumed a default route; isolated guest intentionally has none. Peer now comes from authenticated WinRM connection."
+  ],
+  "transport": "Guest local named pipe; finite native relay; per-job token; loopback SSH tunnel and isolated QEMU host forwarding; physical worker selects NPU only",
+  "cleanup": [
+    "Both smoke workers exited zero",
+    "Guest configurations and temporary firewall rules removed",
+    "Private tokens removed"
+  ],
+  "scope": "Roundtrip rendering packets only; no installed custom adapter, DWM frame acceptance or displayed frames in these smoke tests",
+  "full_desktop_offload": false,
+  "displayed_frames": 0,
+  "tahoma_performance_tested": false,
+  "sources": [
+    "https://learn.microsoft.com/en-us/windows/win32/ipc/named-pipe-server-using-overlapped-i-o",
+    "https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-getoverlappedresult",
+    "https://qemu-project.gitlab.io/qemu/system/monitor.html"
+  ]
+}

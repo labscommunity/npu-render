@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "kind": "indexed-npu-native-stream",
+  "job_id": "8b10d6e076eb4ce7b75073c3f837930e",
+  "started": "2026-10-10T08:27:45.5405898Z",
+  "completed": true,
+  "transport": "local named pipe and authenticated SSH-carried stream",
+  "smoke_test": true,
+  "desktop_offload_tested": false,
+  "displayed_frames": 0,
+  "error": "No matching MSFT_NetRoute objects found by CIM query for instances of the ROOT/StandardCimv2/MSFT_NetRoute class on the  CIM server: SELECT * FROM MSFT_NetRoute  WHERE ((DestinationPrefix LIKE '0.0.0.0/0')) AND ((AddressFamily = 2)). Verify query parameters and retry.",
+  "state": "failed",
+  "configuration_removed": true,
+  "copy_error_relay.stdout.jsonl": "Cannot find path 'C:\\npu-lab\\indexed-stream-8b10d6e076eb4ce7b75073c3f837930e\\relay.stdout.jsonl' because it does not exist.",
+  "copy_error_relay.stderr.log": "Cannot find path 'C:\\npu-lab\\indexed-stream-8b10d6e076eb4ce7b75073c3f837930e\\relay.stderr.log' because it does not exist.",
+  "finished": "2026-10-10T08:28:14.0945347Z"
+}

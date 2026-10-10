@@ -86,6 +86,8 @@ def main():
         "nr_registered_solid_rectangle_test.exe",
         "nr_registered_indexed_exchange_test.exe",
         "nr_registered_indexed_worker.exe",
+        "nr_registered_indexed_stream_worker.exe",
+        "nr_registered_indexed_stream_relay.exe",
     ):
         binaries[name] = hashlib.sha256(
             (args.build_dir / "Release" / name).read_bytes()

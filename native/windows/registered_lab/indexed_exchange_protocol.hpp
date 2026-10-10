@@ -1,6 +1,6 @@
 #pragma once
 // Bounded, versioned laboratory draw packets. Shader tokens are parsed SM4 data,
-// never native code or an imported OpenVINO model. No network listener is used.
+// never native code or an imported OpenVINO model. Transport is defined separately.
 #include "uniform_draw.hpp"
 #include <cstring>
 #include <limits>
