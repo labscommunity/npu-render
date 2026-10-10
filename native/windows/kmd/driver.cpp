@@ -519,6 +519,8 @@ NTSTATUS APIENTRY create_allocation(HANDLE adapter, DXGKARG_CREATEALLOCATION *ar
         args->NumAllocations > 16 || (args->Flags.Value & ~1u) || args->hResource)
         return STATUS_INVALID_PARAMETER;
     const bool resource_owned = args->Flags.Resource != 0;
+    NR_LAB_TRACE("nr_paging_lab: create_allocation count=%u flags=%08x resource_bytes=%u\n",
+                 args->NumAllocations, args->Flags.Value, args->PrivateDriverDataSize);
     // Windows creates its presentation staging surface as a resource even
     // when GetStandardAllocationDriverData returns zero resource-private bytes.
     // Its single allocation descriptor remains the complete pixel contract.
@@ -541,6 +543,8 @@ NTSTATUS APIENTRY create_allocation(HANDLE adapter, DXGKARG_CREATEALLOCATION *ar
         if (!in.pPrivateDriverData || in.PrivateDriverDataSize != sizeof(descriptions[i]))
             return STATUS_INVALID_PARAMETER;
         RtlCopyMemory(&descriptions[i], in.pPrivateDriverData, sizeof(descriptions[i]));
+        NR_LAB_TRACE("nr_paging_lab: allocation_input index=%u flags=%08x surface_flags=%u width=%u height=%u\n",
+                     i, in.Flags.Value, descriptions[i].flags, descriptions[i].width, descriptions[i].height);
         if (!nr::kernel_contract::valid(descriptions[i])) return STATUS_INVALID_PARAMETER;
         if (descriptions[i].flags && !a->segment.is_aperture())
             return STATUS_NOT_SUPPORTED;
@@ -609,6 +613,8 @@ NTSTATUS APIENTRY create_allocation(HANDLE adapter, DXGKARG_CREATEALLOCATION *ar
         out.pAllocationUsageHint = nullptr;
         out.AllocationPriority = D3DDDI_ALLOCATIONPRIORITY_NORMAL;
         out.hAllocation = created[i];
+        NR_LAB_TRACE("nr_paging_lab: allocation_output index=%u flags=%08x bytes=%Iu read_segments=%08x write_segments=%08x\n",
+                     i, out.Flags.Value, out.Size, out.SupportedReadSegmentSet, out.SupportedWriteSegmentSet);
     }
     args->hResource = resource;
     return STATUS_SUCCESS;
