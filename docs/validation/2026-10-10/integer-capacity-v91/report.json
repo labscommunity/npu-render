@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "kind": "integer-input-and-allocation-capacity-qualification",
+  "umd_build": "present-umd-v91",
+  "kernel_build": "allocation-capacity-v3",
+  "native_cpu_suites_passed": 15,
+  "kernel_host_suite_passed": true,
+  "integer_formats": 12,
+  "components_checked_per_geometry_binding": 1579008,
+  "geometry_binding_cases": 2,
+  "integer_decode_location": "host input preparation; shader arithmetic remains on selected provider",
+  "npu_ddi_draws_passed": 32,
+  "metadata_allocation_limit": 4096,
+  "metadata_resource_limit": 4096,
+  "resident_aperture_bytes": 268435456,
+  "capacity_checks": [
+    "real full-budget admission",
+    "one-over-budget rejection",
+    "atomic two-object rejection with one free slot",
+    "slot reuse",
+    "complete cleanup",
+    "resource-pool failure rollback",
+    "allocation-pool failure rollback"
+  ],
+  "kernel_live_validation_pending": true,
+  "full_desktop_offload": false,
+  "tahoma_performance_tested": false
+}

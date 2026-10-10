@@ -20,9 +20,9 @@ int resource_test(Adapter *a) {
         NR_CHECK(outstanding == baseline && !a->allocations && !a->resources && !create.hResource && !info.hAllocation);
     }
     fail_after = -1;
-    a->resources = 128;
+    a->resources = Adapter::resource_limit;
     NR_CHECK(registration.DxgkDdiCreateAllocation(a, &create) == STATUS_INSUFFICIENT_RESOURCES);
-    NR_CHECK(a->resources == 128 && !a->allocations && outstanding == baseline);
+    NR_CHECK(a->resources == Adapter::resource_limit && !a->allocations && outstanding == baseline);
     a->resources = 0;
     for (unsigned separate = 0; separate < 2; ++separate) {
         NR_CHECK(registration.DxgkDdiCreateAllocation(a, &create) == STATUS_SUCCESS);

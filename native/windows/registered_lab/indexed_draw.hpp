@@ -17,9 +17,7 @@ std::vector<nr::shader::VertexRegisters> fetch_vertices_at(Device &d, const std:
         for (size_t i = 0; i < indices.size(); ++i) {
             auto &v = result[i][e.InputRegister]; v = {0, 0, 0, format.integer ? 1u : 0x3f800000u};
             const auto *data = static_cast<const uint8_t *>(read.data) + b.offset + e.AlignedByteOffset + uint64_t(indices[i]) * b.stride;
-            if (format.normalized) for (UINT c = 0; c < 4; ++c) { const float f = float(data[c]) / 255; std::memcpy(&v[c], &f, 4); }
-            else if (format.half) for (UINT c = 0; c < format.lanes; ++c) { uint16_t f; std::memcpy(&f, data + c * 2, 2); v[c] = half_to_float_bits(f); }
-            else std::memcpy(v.data(), data, format.bytes);
+            decode_element(v, data, format);
         }
         read.finish();
     }

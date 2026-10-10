@@ -41,6 +41,62 @@ int test_half_input(D3D10DDI_HDEVICE h, const D3D10DDI_DEVICEFUNCS &f, D3D10DDI_
     std::puts("{\"half_input_decoder\":true,\"encodings_checked\":65536,\"formats_checked\":3,\"host_decode_only\":true}");
     return 0;
 }
+int test_integer_input(D3D10DDI_HDEVICE h, const D3D10DDI_DEVICEFUNCS &f, D3D10DDI_HRESOURCE buffer) {
+    const DXGI_FORMAT formats[]{DXGI_FORMAT_R8_UINT, DXGI_FORMAT_R8G8_UINT, DXGI_FORMAT_R8G8B8A8_UINT,
+        DXGI_FORMAT_R8_SINT, DXGI_FORMAT_R8G8_SINT, DXGI_FORMAT_R8G8B8A8_SINT,
+        DXGI_FORMAT_R16_UINT, DXGI_FORMAT_R16G16_UINT, DXGI_FORMAT_R16G16B16A16_UINT,
+        DXGI_FORMAT_R16_SINT, DXGI_FORMAT_R16G16_SINT, DXGI_FORMAT_R16G16B16A16_SINT};
+    uint64_t checked = 0;
+    for (const auto id : formats) {
+        const auto format = element_format(id);
+        const uint32_t range = 1u << (format.component_bytes * 8);
+        for (uint32_t raw = 0; raw < range; ++raw) {
+            uint8_t bytes[9]{};
+            for (UINT c = 0; c < format.lanes; ++c) {
+                const uint32_t x = (raw + c * 73) % range;
+                std::memcpy(bytes + 1 + c * format.component_bytes, &x, format.component_bytes);
+            }
+            nr::shader::VertexBits actual{}; decode_element(actual, bytes + 1, format);
+            for (UINT c = 0; c < 4; ++c) {
+                const int64_t x = (raw + c * 73) % range;
+                const auto signed_value = format.signed_integer && x >= range / 2 ? x - range : x;
+                const uint32_t expected = c < format.lanes ? uint32_t(signed_value) : UINT(c == 3);
+                TEST(actual[c] == expected); ++checked;
+            }
+        }
+        D3D10DDI_MAPPED_SUBRESOURCE mapped{};
+        f.pfnDynamicIABufferMapDiscard(h, buffer, 0, D3D10_DDI_MAP_WRITE_DISCARD, 0, &mapped);
+        TEST(last_error == S_OK && mapped.pData);
+        const UINT stride = 12, offset = format.component_bytes;
+        const uint32_t values[]{0, range / 2 - 1, range / 2, range - 1};
+        for (UINT i = 0; i < 3; ++i) for (UINT c = 0; c < format.lanes; ++c)
+            std::memcpy(static_cast<uint8_t *>(mapped.pData) + offset + i * stride + c * format.component_bytes,
+                &values[(i+c)%4], format.component_bytes);
+        f.pfnDynamicIABufferUnmap(h, buffer, 0);
+        f.pfnIaSetVertexBuffers(h, 3, 1, &buffer, &stride, &offset);
+        D3D10DDIARG_INPUT_ELEMENT_DESC element{3, 0, id, D3D10_DDI_INPUT_PER_VERTEX_DATA, 0, 1};
+        D3D10DDIARG_CREATEELEMENTLAYOUT args{&element, 1};
+        alignas(ElementLayout) unsigned char storage[sizeof(ElementLayout)]{};
+        D3D10DDI_HELEMENTLAYOUT layout{}; layout.pDrvPrivate = storage;
+        f.pfnCreateElementLayout(h, &args, layout, {}); f.pfnIaSetInputLayout(h, layout);
+        TEST(last_error == S_OK); f.pfnDestroyElementLayout(h, layout);
+        const auto consecutive = fetch_vertices(device(h), 3, 0);
+        const auto reordered = fetch_vertices_at(device(h), {2,0,1}, {9,8,7});
+        TEST(reordered[0] == consecutive[2] && reordered[1] == consecutive[0] && reordered[2] == consecutive[1]);
+        for (UINT i = 0; i < 3; ++i) for (UINT c = 0; c < 4; ++c) {
+            const int64_t x = values[(i+c)%4];
+            const auto signed_value = format.signed_integer && x >= range / 2 ? x - range : x;
+            TEST(consecutive[i][1][c] == (c < format.lanes ? uint32_t(signed_value) : UINT(c == 3)));
+        }
+        if (format.component_bytes == 2) {
+            element.AlignedByteOffset = 1; f.pfnCreateElementLayout(h, &args, layout, {});
+            TEST(last_error == E_INVALIDARG); f.pfnDestroyElementLayout(h, layout); last_error = S_OK;
+        }
+        f.pfnIaSetInputLayout(h, {});
+    }
+    std::printf("{\"integer_input_decoder\":true,\"formats_checked\":12,\"components_checked\":%llu,\"host_decode_only\":true}\n", static_cast<unsigned long long>(checked));
+    return 0;
+}
 int test_input_layout(D3D10DDI_HDEVICE h, const D3D10DDI_DEVICEFUNCS &f, D3D10DDI_HRESOURCE buffer) {
     D3D10DDI_MAPPED_SUBRESOURCE mapped{};
     f.pfnDynamicIABufferMapNoOverwrite(h, buffer, 0, D3D10_DDI_MAP_WRITE_NOOVERWRITE, 0, &mapped);
@@ -124,6 +180,7 @@ int test_geometry_buffers(D3D10DDI_HDEVICE h, const D3D10DDI_DEVICEFUNCS &f) {
             last_error = S_OK;
             TEST(test_input_layout(h, f, value) == 0);
             TEST(test_half_input(h, f, value) == 0);
+            TEST(test_integer_input(h, f, value) == 0);
         }
         if (bind & D3D10_DDI_BIND_INDEX_BUFFER) {
             f.pfnIaSetIndexBuffer(h, value, DXGI_FORMAT_R16_UINT, 2);

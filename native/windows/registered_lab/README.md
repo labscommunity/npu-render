@@ -563,3 +563,12 @@ can bind independently to all three shader stages, and a failed binding preserve
 the old state. Typed buffers cannot masquerade as textures in the current SAMPLE
 path. Buffer-load shader execution remains unsupported and is not counted as
 migrated work. Opaque-alpha linear filtering is also still explicitly rejected.
+
+The [v73 trial](../../../docs/validation/2026-10-10/sole-display-v73/report.json)
+passed all five NPU packet preflights but delivered black frames. Explorer and
+Start reached an `R16G16_UINT` input layout; DWM then reported allocation failure
+on a 16×16 texture. The next input decoder extends 8/16-bit signed and unsigned
+components to their 32-bit register representation and preserves integer defaults
+for absent channels, following
+[sections 3.2.3 and 19.1.3.3 of the Direct3D specification](https://microsoft.github.io/DirectX-Specs/d3d/archive/D3D11_3_FunctionalSpec.htm).
+This is host input preparation; it does not move shader work to the CPU.

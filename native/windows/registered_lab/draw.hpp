@@ -181,7 +181,7 @@ void APIENTRY set_scissors(D3D10DDI_HDEVICE h, UINT count, UINT, const D3D10_DDI
         require(count <= 16 && (!count || values));
         auto &scissors = device(h).scissors;
         if (count) scissors.assign(values, values + count); else scissors.clear();
-    }); // Enabled scissoring is still rejected before drawing.
+    });
 }
 void APIENTRY view_hazard(D3D10DDI_HDEVICE, D3D10DDI_HSHADERRESOURCEVIEW, D3D10DDI_HRESOURCE) {} // Blocking mappings/submissions order access.
 void bind_draw_functions(D3D10DDI_DEVICEFUNCS &f) {

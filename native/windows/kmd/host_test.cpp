@@ -261,6 +261,7 @@ NTSTATUS initialize(DRIVER_OBJECT *, UNICODE_STRING *, DRIVER_INITIALIZATION_DAT
 #include "recovery_test.hpp"
 #include "allocation_test.hpp"
 #include "resource_test.hpp"
+#include "allocation_capacity_test.hpp"
 #include "fill_test.hpp"
 #include "copy_test.hpp"
 #if NR_KMD_LAB_PAGING_ADAPTER

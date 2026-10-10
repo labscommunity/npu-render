@@ -49,6 +49,10 @@ constexpr bool runtime_ready = false;
 constexpr bool startup_enabled = runtime_ready || NR_KMD_LAB_PAGING_ADAPTER != 0;
 constexpr bool lab_fill_enabled = NR_KMD_LAB_PAGING_ADAPTER != 0;
 struct Adapter {
+    // Metadata count, independent of the unchanged 256 MiB residency aperture.
+    // The earlier 128-object bring-up budget is too small for desktop clients.
+    static constexpr LONG allocation_limit = 4096;
+    static constexpr LONG resource_limit = 4096;
     const DEVICE_OBJECT *physical;
     DXGKRNL_INTERFACE kernel;
     nr::kmd::Scheduler scheduler;
@@ -570,13 +574,16 @@ NTSTATUS APIENTRY create_allocation(HANDLE adapter, DXGKARG_CREATEALLOCATION *ar
     LONG previous;
     do {
         previous = InterlockedCompareExchange(&a->allocations, 0, 0);
-        if (previous < 0 || previous > 128 - LONG(args->NumAllocations))
+        if (previous < 0 || previous > Adapter::allocation_limit - LONG(args->NumAllocations)) {
+            NR_LAB_TRACE("nr_paging_lab: allocation_budget_rejected live=%ld requested=%u limit=%ld\n",
+                previous, args->NumAllocations, Adapter::allocation_limit);
             return STATUS_INSUFFICIENT_RESOURCES;
+        }
     } while (InterlockedCompareExchange(&a->allocations, previous + args->NumAllocations,
                                        previous) != previous);
     Resource *resource = nullptr;
     if (resource_owned) {
-        if (InterlockedIncrement(&a->resources) <= 128) resource = allocate<Resource>();
+        if (InterlockedIncrement(&a->resources) <= Adapter::resource_limit) resource = allocate<Resource>();
         if (!resource) {
             InterlockedDecrement(&a->resources);
             InterlockedExchangeAdd(&a->allocations, -LONG(args->NumAllocations));
@@ -626,6 +633,9 @@ NTSTATUS APIENTRY create_allocation(HANDLE adapter, DXGKARG_CREATEALLOCATION *ar
                      i, out.Flags.Value, out.Size, out.SupportedReadSegmentSet, out.SupportedWriteSegmentSet);
     }
     args->hResource = resource;
+    if (previous + LONG(args->NumAllocations) > 128)
+        NR_LAB_TRACE("nr_paging_lab: desktop_allocation_count=%ld resources=%ld limit=%ld\n",
+            previous + LONG(args->NumAllocations), InterlockedCompareExchange(&a->resources, 0, 0), Adapter::allocation_limit);
     return STATUS_SUCCESS;
 }
 DXGKDDI_DESTROYALLOCATION destroy_allocation;

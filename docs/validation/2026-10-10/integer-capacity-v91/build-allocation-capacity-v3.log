@@ -1,0 +1,33 @@
+-- Building for: Visual Studio 17 2022
+-- Selecting Windows SDK version 10.0.26100.0 to target Windows 10.0.26200.
+-- The CXX compiler identification is MSVC 19.44.35229.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/cl.exe - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Configuring done (1.3s)
+-- Generating done (0.0s)
+-- Build files have been written to: C:/Users/tatef/AppData/Local/npu-render/builds/allocation-capacity-v3
+MSBuild version 17.14.60+43b635718 for .NET Framework
+
+MSBuild version 17.14.60+43b635718 for .NET Framework
+
+  1>Checking Build System
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/kmd/CMakeLists.txt
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/kmd/CMakeLists.txt
+  host_test.cpp
+  driver.cpp
+  host_main.cpp
+  Generating Code...
+  nr_render_kmd.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\allocation-capacity-v3\Release\nr_render_kmd.sys
+  nr_kernel_host_test.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\allocation-capacity-v3\Release\nr_kernel_host_test.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/kmd/CMakeLists.txt
+Test project C:/Users/tatef/AppData/Local/npu-render/builds/allocation-capacity-v3
+    Start 1: kernel_ddi_host_contract
+1/1 Test #1: kernel_ddi_host_contract .........   Passed    0.30 sec
+
+100% tests passed out of 1
+
+Total Test time (real) =   0.31 sec
+{"schema": 1, "kind": "kernel-build-only", "sha256": "cfa5dbdcfa385d27db056e46a96e03184eabc7002e3183ec17b44ea4d33f7ab9", "pdb_sha256": "0a5dc485bb48fb963b7b55f3ac275782b06d7202d429d6c5bed2f25e1e690421", "source_sha256": {"native/windows/kmd/allocation_capacity_test.hpp": "6cf501c6f8fb9357beff304673f24cdc22bfeef9f0638f845364f0b436fbfd12", "native/windows/kmd/allocation_test.hpp": "abab49f86a65f40f228a848bc25d0f730230335c097e34bac8e26b443f41cb3e", "native/windows/kmd/aperture.hpp": "3b6211d8d06b620915f464537a0b460b2cb76de4666e23a8c89e085c07f37ab9", "native/windows/kmd/aperture_adapter_test.hpp": "64f6c6b56ab06c10380d3f868f2f6ec1dd294c9a4134d86c9174b7270b0c7cab", "native/windows/kmd/aperture_host.hpp": "5f1f875c0c3ca84d686302ec379e4c4361bb77640f92ae2049499a69476771f4", "native/windows/kmd/aperture_probe.hpp": "a9bc5c96d786a46437cda431c57ff4027895c1af48a78f36f036d015c1e9342f", "native/windows/kmd/aperture_test.hpp": "b565473b6b46f3af50a9df5839d0da552bc8ed69b7b37b3077ffec27595d64e8", "native/windows/kmd/CMakeLists.txt": "6fbf4daf73ff45e51c60665bc130d2fd559e92c8c77f3d7cb95fc768a3025ba2", "native/windows/kmd/contract.hpp": "9c35ef2bd7ae8c900a461bcdf53c612f1aa0dd6be558422db083e37ecc7ed0a6", "native/windows/kmd/copy.hpp": "5638b43b114cc37ce7f4046e0d10b6684fa0c75ab4bf5593a34b0220414d3af6", "native/windows/kmd/copy_test.hpp": "9532553bd1fe4e1a76057ad8e1adcb54b03eefb81823a259c252069ac8c33cb1", "native/windows/kmd/driver.cpp": "c1530fdc7114f81ff5782e55f2190f32ecd1d92928b9074c2a8ad2e848e1cdb5", "native/windows/kmd/engine.hpp": "1859300cd9d6b831ae65ba35c020d03a5e16ec29954808bb12cf31f27c01997f", "native/windows/kmd/engine_probe.hpp": "8387bc14ddd85a5d3492a0e75304e36fb90e8e5928f7ef655cecdfdbfcdcbd2c", "native/windows/kmd/engine_test.hpp": "1f48eecdec99e68bed546b83e837eba834c0f72bb9fba8673d09cc121580e2d7", "native/windows/kmd/fill.hpp": "79b9ba29ebb662072f829c6f6665d2e7e87c721e03565738eccde4a9863350b0", "native/windows/kmd/fill_test.hpp": "f8c1a9e02c2dc21efe69d8935923a290cc8391e86fa491330bcddbfc79b37d5d", "native/windows/kmd/host_main.cpp": "dc120fef2b80d80be5ef3f88efe3cc80db4f38e012a4cad1b40fe3a4d5a80f8e", "native/windows/kmd/host_test.cpp": "11f9910477194f15074198f73ff333c65bc7ec4882c67c81007d67ceb00e7f59", "native/windows/kmd/lab_start_test.hpp": "9d73bd1ee3aca4200b1359a65b5599550a44e984ad7c1a74098a38413727a47e", "native/windows/kmd/paging.hpp": "9d948dd915b89d7a5a9d82e012562a431c1639e3f07555bf0a26df6da4c47986", "native/windows/kmd/paging_test.hpp": "6cdb5f8a15ff29d14b7f8a0d6de438a703dc86137b64afdd94664f7e4e0fb6d0", "native/windows/kmd/present.hpp": "aa3546fa44e30ba5c441d54a980ef9523f50e82ba03f2fda64f83dfa2370c104", "native/windows/kmd/present_test.hpp": "3aff2954112cdb69fd04e7a7d9f4d2a4a01b4696f493d23d33ed679ba5115a64", "native/windows/kmd/recovery_test.hpp": "5ca3c7c0327d5b0d88f24c3a821d96e9dd53e82bec376ac25a52ad0f41f113ca", "native/windows/kmd/resource_test.hpp": "34d3bfe5e0ca3a3259bb6b9e0f91bccde26223577ffa9fca516c0fba990624e5", "native/windows/kmd/row_copy.hpp": "db5dd1929027769594e0c9ccd59894a144b97f61019d95a5dd8a03ffacdb3a37", "native/windows/kmd/scheduler.hpp": "0b3bde52958501c1a53a748c8a015d121b97f8b5d18b709fcd1834d3065b97b6", "native/windows/kmd/segment.hpp": "0597370c935cbc108fa0f36634baa5fcea0ab3810fb540997919e910e678c6d1", "native/windows/kmd/segment_capacity_test.hpp": "7c93a7c6e6318a31d520fc63d9b1ff5feed48b4840b7a286b3c0ddf83b5d1a16", "native/windows/kmd/shadow_surface_test.hpp": "69abceeb07067f75416dfef6f68842585fb9b4c40d656ce56f5113b34236ffe8", "native/windows/kmd/standard_allocation.hpp": "59b64e37f052979299ecb043c10d23ca47495b397065a2eeaf73a6fd9beab185", "native/windows/kmd/standard_allocation_test.hpp": "aa1ba27795633f68d48796b65c511f99a9fddc93fee3683f81e1791de1156ff4", "native/windows/kmd/submission.hpp": "b4733d83b04e62dc4c90bbb19239d7adc3b4d02608b86d1c0d9663a125cab596", "native/windows/kmd/submission_test.hpp": "6b1a8336fa05c68cbba4e7839434745b3a434f3c80dafde66ced403b9ba8f9d8", "native/windows/kmd/synchronization_probe.hpp": "542042777b2146a191e8247c42d5a91eaa15c095a2b2b8d89f47a4d43f1a9a86", "native/windows/kmd/worker_probe.hpp": "799c0ba33379a66b776264910a808470e327067c5142b55764baa853ebd8a63c", "native/windows/kmd/worker_probe_test.hpp": "4ea6cb4a8606e1bc014858ab95873ee823b304b961a772969e12e3fa98f939c2"}, "clean_build": true, "start_enabled": true, "rendering_ready": false, "lab_paging_adapter_enabled": true, "lab_fill_command_enabled": true, "lab_sync_probe_enabled": false, "lab_worker_probe_enabled": false, "lab_engine_probe_enabled": false, "lab_aperture_probe_enabled": false, "lab_aperture_adapter_enabled": true, "installation_performed": false, "signing_performed": false, "npu_execution_tested": false, "desktop_offload_tested": false}

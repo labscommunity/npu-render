@@ -20,6 +20,8 @@ int aperture_adapter_test() {
     NR_CHECK(!a->segment.ready() && outstanding == 1); thread_fail = false;
     NR_CHECK(registration.DxgkDdiStartDevice(a, &start, &kernel, &sources, &children) == STATUS_SUCCESS);
     NR_CHECK(!sources && !children && a->segment.is_aperture() && a->segment.capacity() == Aperture::bytes);
+    const auto allocation_capacity_result = allocation_capacity_test(a);
+    if (allocation_capacity_result) return allocation_capacity_result;
     const auto standard_result = standard_allocation_ddi_test(a);
     if (standard_result) return standard_result;
     const auto shadow_result = shadow_surface_test(a);

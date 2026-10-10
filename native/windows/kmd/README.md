@@ -441,3 +441,13 @@ Engine contracts: [interrupt notification](https://learn.microsoft.com/en-us/win
 [reset synchronization and zero-byte eviction](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/thread-synchronization-and-tdr).
 [Reset fence semantics](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/tdr-changes-in-windows-8)
 require distinguishing recovery baselines from successful execution.
+
+Desktop allocation metadata is now bounded at 4,096 allocations and 4,096
+resources per adapter. The 256 MiB residency aperture, page ownership and
+per-allocation byte limits remain unchanged. The former 128-object bring-up
+limit could reject tiny textures independently of available memory. Admission
+above 128 and rejection at the new limit have separate bounded diagnostics.
+The aperture-mode host test fills the real metadata budget, rejects excess and
+partial admission, frees/reuses a slot, and verifies complete cleanup and pool
+failure rollback. Live desktop memory exhaustion must still be diagnosed from
+runtime evidence; increasing a metadata budget does not establish that cause.
