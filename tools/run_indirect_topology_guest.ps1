@@ -9,6 +9,8 @@ if(!(Test-Path $Probe -PathType Leaf) -or !$Probe.StartsWith('C:\npu-lab\',[Stri
 $prefix="C:\npu-lab\$Name"
 if(@(Get-ChildItem "$prefix*").Count){throw 'Evidence path already exists'}
 $started=[DateTime]::UtcNow.ToString('o');$code=1
+$report=[ordered]@{started=$started;probe_sha256=$Sha256;completed=$false;exit_code=$null;desktop_offload_tested=$false}
+$report | ConvertTo-Json | Set-Content "$prefix-exit.json"
 try {
  $devices=@(Get-PnpDevice -Class Display -PresentOnly)
  foreach($id in 'ROOT\NPURENDER_KMD_LAB','ROOT\NPURENDER_INDIRECT_LAB'){
@@ -20,10 +22,16 @@ try {
  $process.StartInfo.FileName=$Probe;$process.StartInfo.UseShellExecute=$false
  $process.StartInfo.RedirectStandardOutput=$true;$process.StartInfo.RedirectStandardError=$true
  if(!$process.Start()){throw 'Probe did not start'}
- $stdout=$process.StandardOutput.ReadToEndAsync();$stderr=$process.StandardError.ReadToEndAsync()
- $process.WaitForExit();$code=$process.ExitCode
- $stdout.Result | Set-Content "$prefix.jsonl";$stderr.Result | Set-Content "$prefix.stderr.log"
- $process.Dispose()
+ # Preserve progress even if a display API stalls and the task deadline fires.
+ $output=[IO.FileStream]::new("$prefix.jsonl",[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::Read,1,[IO.FileOptions]::WriteThrough)
+ $errorOutput=[IO.FileStream]::new("$prefix.stderr.log",[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::Read,1,[IO.FileOptions]::WriteThrough)
+ try {
+  $stdout=$process.StandardOutput.BaseStream.CopyToAsync($output)
+  $stderr=$process.StandardError.BaseStream.CopyToAsync($errorOutput)
+  $process.WaitForExit();$code=$process.ExitCode
+  $stdout.GetAwaiter().GetResult();$stderr.GetAwaiter().GetResult()
+ } finally {$output.Dispose();$errorOutput.Dispose();$process.Dispose()}
 } catch {$_ | Out-String | Set-Content "$prefix.failure.log"}
-[ordered]@{started=$started;finished=[DateTime]::UtcNow.ToString('o');probe_sha256=$Sha256;exit_code=$code;desktop_offload_tested=$false} | ConvertTo-Json | Set-Content "$prefix-exit.json"
+$report.finished=[DateTime]::UtcNow.ToString('o');$report.completed=$true;$report.exit_code=$code
+$report | ConvertTo-Json | Set-Content "$prefix-exit.json"
 exit $code
