@@ -81,12 +81,42 @@ int main() {
             target = path; ++candidates;
         }
         if (candidates != 1 || contains(before, target)) throw std::runtime_error("one new inactive indirect monitor required");
-        // Extend only within the owned guest. Do not save a new topology to the database.
-        const auto status = SetDisplayConfig(0, nullptr, 0, nullptr, SDC_TOPOLOGY_EXTEND | SDC_APPLY);
+        // Supply the exact additional path: a remembered EXTEND topology may
+        // successfully return without including a newly arrived indirect target.
+        auto desired = before;
+        const auto original = before.paths[0].sourceInfo.modeInfoIdx;
+        if (original >= before.modes.size() || before.modes[original].infoType != DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE)
+            throw std::runtime_error("original source mode unavailable");
+        const auto &source = before.modes[original].sourceMode;
+        DISPLAYCONFIG_MODE_INFO mode{};
+        mode.infoType = DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE;
+        mode.id = target.sourceInfo.id; mode.adapterId = target.sourceInfo.adapterId;
+        mode.sourceMode.width = 1024; mode.sourceMode.height = 768;
+        mode.sourceMode.pixelFormat = DISPLAYCONFIG_PIXELFORMAT_32BPP;
+        mode.sourceMode.position = {source.position.x + LONG(source.width), source.position.y};
+        target.sourceInfo.modeInfoIdx = UINT(desired.modes.size());
+        target.targetInfo.modeInfoIdx = DISPLAYCONFIG_PATH_MODE_IDX_INVALID;
+        target.targetInfo.refreshRate = {60, 1};
+        target.targetInfo.rotation = DISPLAYCONFIG_ROTATION_IDENTITY;
+        target.targetInfo.scaling = DISPLAYCONFIG_SCALING_IDENTITY;
+        target.targetInfo.scanLineOrdering = DISPLAYCONFIG_SCANLINE_ORDERING_PROGRESSIVE;
+        target.flags = DISPLAYCONFIG_PATH_ACTIVE;
+        desired.modes.push_back(mode); desired.paths.push_back(target);
+        constexpr UINT flags = SDC_USE_SUPPLIED_DISPLAY_CONFIG | SDC_ALLOW_CHANGES;
+        const auto validation = SetDisplayConfig(UINT(desired.paths.size()), desired.paths.data(),
+            UINT(desired.modes.size()), desired.modes.data(), flags | SDC_VALIDATE);
+        std::printf("{\"operation\":\"validate\",\"win32_status\":%ld}\n", validation); std::fflush(stdout);
+        if (validation) throw std::runtime_error("supplied indirect display topology invalid");
+        const auto status = SetDisplayConfig(UINT(desired.paths.size()), desired.paths.data(),
+            UINT(desired.modes.size()), desired.modes.data(), flags | SDC_APPLY);
         std::printf("{\"operation\":\"extend\",\"win32_status\":%ld}\n", status); std::fflush(stdout);
         restore = true; // Restore even if Windows partially applied a failing request.
         if (status) throw std::runtime_error("display extension failed");
-        const auto active = query(QDC_ONLY_ACTIVE_PATHS); print("extended", active);
+        auto active = query(QDC_ONLY_ACTIVE_PATHS);
+        for (UINT attempt = 0; attempt < 20 && !contains(active, target); ++attempt) {
+            Sleep(1000); active = query(QDC_ONLY_ACTIVE_PATHS);
+        }
+        print("extended", active);
         if (!contains(active, target) || !position_preserved(before, active))
             throw std::runtime_error("indirect display activation or original-display preservation failed");
         std::puts("{\"indirect_display_active\":true,\"original_display_preserved\":true,\"observation_seconds\":45}");
