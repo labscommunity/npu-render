@@ -98,7 +98,7 @@ try {
 } catch { $failure=$_.Exception.Message; Write-Warning $failure }
 finally {
  $env:PATH=$originalPath
- foreach($name in 'probe.stdout.jsonl','probe.stderr.log','probe-exit.json'){
+ foreach($name in 'probe.stdout.jsonl','probe.stderr.log','probe-exit.json','runner.log'){
   try {Copy-Item "$guestDirectory\$name" -Destination $EvidenceDirectory -FromSession $Session -ErrorAction Stop} catch {Write-Warning "Could not collect $name"}
  }
  # Do not kill the probe during graphics cleanup; its own deadline and task bound remain active.
