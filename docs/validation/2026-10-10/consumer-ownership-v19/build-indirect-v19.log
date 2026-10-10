@@ -1,0 +1,38 @@
+-- Building for: Visual Studio 17 2022
+-- Selecting Windows SDK version 10.0.26100.0 to target Windows 10.0.26200.
+-- The CXX compiler identification is MSVC 19.44.35229.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/cl.exe - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Configuring done (1.4s)
+-- Generating done (0.0s)
+-- Build files have been written to: C:/Users/tatef/AppData/Local/npu-render/builds/indirect-lab-v19
+MSBuild version 17.14.60+43b635718 for .NET Framework
+
+MSBuild version 17.14.60+43b635718 for .NET Framework
+
+  1>Checking Build System
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/indirect_lab/CMakeLists.txt
+  consumer_slot_test.cpp
+  nr_indirect_consumer_test.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\indirect-lab-v19\Release\nr_indirect_consumer_test.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/indirect_lab/CMakeLists.txt
+  driver.cpp
+     Creating library C:/Users/tatef/AppData/Local/npu-render/builds/indirect-lab-v19/Release/nr_indirect_lab.lib and object C:/Users/tatef/AppData/Local/npu-render/builds/indirect-lab-v19/Release/nr_indirect_lab.exp
+  nr_indirect_lab.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\indirect-lab-v19\Release\nr_indirect_lab.dll
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/indirect_lab/CMakeLists.txt
+  topology_probe.cpp
+  nr_indirect_topology_gui.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\indirect-lab-v19\Release\nr_indirect_topology_gui.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/indirect_lab/CMakeLists.txt
+  topology_probe.cpp
+  nr_indirect_topology_probe.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\indirect-lab-v19\Release\nr_indirect_topology_probe.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/indirect_lab/CMakeLists.txt
+Test project C:/Users/tatef/AppData/Local/npu-render/builds/indirect-lab-v19
+    Start 1: indirect_consumer_ownership
+1/1 Test #1: indirect_consumer_ownership ......   Passed    0.40 sec
+
+100% tests passed out of 1
+
+Total Test time (real) =   0.41 sec
+{"schema": 1, "kind": "indirect-display-admission-build-only", "clean_build": true, "system_renderer_control": false, "source_sha256": {"native/windows/indirect_lab/CMakeLists.txt": "519b62ba0b9314cfe956eddadee742146038e1086a740ca4ea41b02286086906", "native/windows/indirect_lab/consumer_slot.hpp": "9045a6b2c9b75c6076fdf8ea5c1236c30555c441dd025cd92ecf8b754a6bebf8", "native/windows/indirect_lab/consumer_slot_test.cpp": "18737c813e47bc6fece50276724c206373030e1a8141a78a6e0ee155d861e6b1", "native/windows/indirect_lab/driver.cpp": "76af3dc4f79d06fd5a4888549fe1deeb65e18f60a6277b1b9549ed9a930f54db", "native/windows/indirect_lab/nr_indirect_lab.inf": "59b94e6b8ba19246c9c993941d092b9aee40c23017d678cd3358d76bb6caa375", "native/windows/indirect_lab/README.md": "d59deeae6f9b66386f38df4b84e5d6a71799655999d575d97d7f6c73a58ba903", "native/windows/indirect_lab/topology_probe.cpp": "ab7b31bc397aa94abfae9e3b7a039fa20c6ec73c0cbbeb2d45685889ec9640c9", "native/windows/registered_lab/contract.hpp": "675e9ea5ee23282f6b6cf40a2b51d0e09a945e5b31214d01af52e29fd416386c", "native/windows/kmd/contract.hpp": "9c35ef2bd7ae8c900a461bcdf53c612f1aa0dd6be558422db083e37ecc7ed0a6"}, "sha256": "08b6ae472719beaf5a0e75c4b58cbeef5ee16ce744049c11fb920e6384d23009", "binary_sha256": {"nr_indirect_lab.dll": "08b6ae472719beaf5a0e75c4b58cbeef5ee16ce744049c11fb920e6384d23009", "nr_indirect_topology_probe.exe": "ac13916ec1ffcd498c1f59325a5fd0329e1b6320ac068f25eb021b56977d005b", "nr_indirect_topology_gui.exe": "9bf80def1563bb50f685096674d199f93534ad1f56ccdc4f5d3bd9d3e66df99c", "nr_indirect_consumer_test.exe": "12405ca61567cd05421ee50080845bb6a3078578876fd2d7b1c05d31597e419a", "nr_indirect_lab.pdb": "275460f0daab31c38c95a0e93672f7c07d9a505f127775098185e338080349c0"}, "installation_performed": false, "desktop_offload_tested": false}

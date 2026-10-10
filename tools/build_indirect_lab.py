@@ -54,6 +54,10 @@ def main():
         ],
         check=True,
     )
+    subprocess.run(
+        ["ctest", "--test-dir", str(args.build_dir), "-C", "Release", "--output-on-failure"],
+        check=True,
+    )
     if source_hashes() != sources:
         raise RuntimeError("Sources changed during build")
     report = {
@@ -71,6 +75,8 @@ def main():
                 "nr_indirect_lab.dll",
                 "nr_indirect_topology_probe.exe",
                 "nr_indirect_topology_gui.exe",
+                "nr_indirect_consumer_test.exe",
+                "nr_indirect_lab.pdb",
             )
         },
         "installation_performed": False,

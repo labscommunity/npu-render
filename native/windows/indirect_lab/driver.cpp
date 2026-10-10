@@ -19,6 +19,7 @@
 #include <mutex>
 #include <memory>
 #include <vector>
+#include "consumer_slot.hpp"
 #include "../registered_lab/contract.hpp"
 #include "../kmd/contract.hpp"
 using Microsoft::WRL::ComPtr;
@@ -167,7 +168,7 @@ public:
         if (stop) CloseHandle(stop);
     }
 };
-struct MonitorState { Consumer *consumer = nullptr; LUID preferred{}; PreparedDevice *prepared = nullptr; };
+struct MonitorState { nr::indirect::ConsumerSlot<Consumer> consumers; LUID preferred{}; PreparedDevice *prepared = nullptr; };
 WDF_DECLARE_CONTEXT_TYPE(MonitorState);
 EVT_IDD_CX_MONITOR_GET_DEFAULT_DESCRIPTION_MODES modes;
 NTSTATUS modes(IDDCX_MONITOR, const IDARG_IN_GETDEFAULTDESCRIPTIONMODES *in, IDARG_OUT_GETDEFAULTDESCRIPTIONMODES *out) {
@@ -195,7 +196,9 @@ NTSTATUS commit_modes(IDDCX_ADAPTER, const IDARG_IN_COMMITMODES *in) {
 EVT_IDD_CX_MONITOR_ASSIGN_SWAPCHAIN assign;
 NTSTATUS assign(IDDCX_MONITOR monitor, const IDARG_IN_SETSWAPCHAIN *in) {
     auto state = WdfObjectGet_MonitorState(monitor);
-    delete state->consumer; state->consumer = nullptr;
+    auto update = state->consumers.begin();
+    update.previous.reset();
+    if (!update.allowed) return STATUS_DEVICE_REMOVED;
     const bool paired = (state->preferred.LowPart || state->preferred.HighPart) &&
                         in->RenderAdapterLuid.LowPart == state->preferred.LowPart &&
                         in->RenderAdapterLuid.HighPart == state->preferred.HighPart;
@@ -210,7 +213,10 @@ NTSTATUS assign(IDDCX_MONITOR monitor, const IDARG_IN_SETSWAPCHAIN *in) {
         auto consumer = std::make_unique<Consumer>(in->hSwapChain, in->hNextSurfaceAvailable);
         const auto status = consumer->start(*state->prepared);
         if (FAILED(status)) { WdfObjectDelete(in->hSwapChain); return STATUS_SUCCESS; }
-        state->consumer = consumer.release();
+        // An overlapping unassign/cleanup cancels this ticket. A started
+        // worker owns the chain and releases it when this candidate is retired.
+        if (!state->consumers.publish(update.generation, consumer))
+            trace("{\"event\":\"assignment_cancelled\"}\n");
         return STATUS_SUCCESS;
     } catch (...) { WdfObjectDelete(in->hSwapChain); return STATUS_SUCCESS; }
     // IddCx ownership is explicitly released on failure, following its retry contract.
@@ -218,7 +224,7 @@ NTSTATUS assign(IDDCX_MONITOR monitor, const IDARG_IN_SETSWAPCHAIN *in) {
 EVT_IDD_CX_MONITOR_UNASSIGN_SWAPCHAIN unassign;
 NTSTATUS unassign(IDDCX_MONITOR monitor) {
     auto state = WdfObjectGet_MonitorState(monitor);
-    delete state->consumer; state->consumer = nullptr;
+    auto update = state->consumers.begin(); update.previous.reset();
     trace("{\"event\":\"unassigned\"}\n"); return STATUS_SUCCESS;
 }
 struct PreparationContext { IDDCX_ADAPTER adapter = nullptr; };
@@ -245,7 +251,13 @@ void prepare_monitor(WDFWORKITEM item) {
     }
     WDF_OBJECT_ATTRIBUTES attributes; WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attributes, MonitorState);
     attributes.EvtCleanupCallback = [](WDFOBJECT object) {
-        auto monitor = WdfObjectGet_MonitorState(object); delete monitor->consumer; monitor->consumer = nullptr;
+        auto monitor = WdfObjectGet_MonitorState(object);
+        auto update = monitor->consumers.begin(true); update.previous.reset();
+    };
+    attributes.EvtDestroyCallback = [](WDFOBJECT object) {
+        // Cleanup can overlap callbacks. Destroy runs after object references
+        // drain, so immutable device ownership remains valid through assignment.
+        auto monitor = WdfObjectGet_MonitorState(object); delete monitor->prepared; monitor->prepared = nullptr;
     };
     IDDCX_MONITOR_INFO info{}; info.Size = sizeof(info); info.MonitorType = DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INDIRECT_WIRED;
     info.MonitorDescription.Size = sizeof(info.MonitorDescription); info.MonitorDescription.Type = IDDCX_MONITOR_DESCRIPTION_TYPE_EDID;
@@ -254,9 +266,14 @@ void prepare_monitor(WDFWORKITEM item) {
     IDARG_OUT_MONITORCREATE out{};
     auto status = IddCxMonitorCreate(adapter, &create, &out);
     if (NT_SUCCESS(status)) {
-        WdfObjectGet_MonitorState(out.MonitorObject)->preferred = state->preferred;
-        WdfObjectGet_MonitorState(out.MonitorObject)->prepared = state->prepared;
-        IDARG_OUT_MONITORARRIVAL arrival{}; status = IddCxMonitorArrival(out.MonitorObject, &arrival);
+        auto monitor = WdfObjectGet_MonitorState(out.MonitorObject);
+        monitor->preferred = state->preferred;
+        // The monitor owns its COM references independently of adapter cleanup.
+        try { monitor->prepared = new PreparedDevice(*state->prepared); }
+        catch (...) { WdfObjectDelete(out.MonitorObject); status = STATUS_INSUFFICIENT_RESOURCES; }
+        if (NT_SUCCESS(status)) {
+            IDARG_OUT_MONITORARRIVAL arrival{}; status = IddCxMonitorArrival(out.MonitorObject, &arrival);
+        }
     }
     trace("{\"event\":\"monitor_arrival\",\"status\":\"%08lx\"}\n", ULONG(status));
     if (SUCCEEDED(com)) CoUninitialize();

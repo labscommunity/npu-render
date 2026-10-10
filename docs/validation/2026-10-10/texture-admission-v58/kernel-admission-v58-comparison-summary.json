@@ -1,0 +1,77 @@
+{
+  "triage_counts": {
+    "Adapter AddDevice has completed with status %1": 2,
+    "Driver returned an invalid NTSTATUS code: 0x%I64x": 148,
+    "GPU virtualization initialization has completed with status %1": 2,
+    "The selected adapter is display only adapter": 2,
+    "Adapter StartDevice has completed with status %1": 2,
+    "Cannot find the file version resource in DxgkpGetFileVersion (ntStatus = %I64d).": 4,
+    "Failed to get preferred mode from monitor EDID or DisplayID on adapter 0x%I64x, target 0x%I64x (status = 0x%I64x)": 10,
+    "PermanentSysMem, Protected,                             ExistingSysMem, ExistingKernelSysMem,                             or Primary flags can't be                             specified with Shareable.\n": 16,
+    "Failed to create CDD primary allocations on Adapter 0x%I64x for VidPnSource 0x%I64x, (Status = 0x%I64x).": 16,
+    "Failed to find DXGPROCESS": 17
+  },
+  "gdi_context_events": 1,
+  "dwm_adapters": [
+    {
+      "displayAdapterLuid": "0x5C66",
+      "renderAdapterLuid": "0x5C66",
+      "vidPnSourceId": 0,
+      "vidPnTargetId": 0,
+      "uniqueId": 2,
+      "surfaceLuid": "0x12EA651",
+      "bindId": 1,
+      "presentCount": 0,
+      "flipRect": [
+        {
+          "left": 0,
+          "top": 35,
+          "right": 113,
+          "bottom": 49
+        }
+      ],
+      "meta": {
+        "provider": "Microsoft-Windows-Dwm-Core",
+        "event": "468v0",
+        "time": "2026-10-09T23:15:22.924",
+        "cpu": 2,
+        "pid": 7068,
+        "tid": 8064,
+        "channel": "Microsoft-Windows-Dwm-Core/Diagnostic",
+        "level": "Information ",
+        "task": "Dx_Flip_Consumed",
+        "keywords": "Composition"
+      }
+    },
+    {
+      "displayAdapterLuid": "0x5C66",
+      "renderAdapterLuid": "0x5C66",
+      "vidPnSourceId": 0,
+      "vidPnTargetId": 0,
+      "uniqueId": 2,
+      "surfaceLuid": "0x12EA726",
+      "bindId": 1,
+      "presentCount": 0,
+      "flipRect": [
+        {
+          "left": 0,
+          "top": 1,
+          "right": 96,
+          "bottom": 27
+        }
+      ],
+      "meta": {
+        "provider": "Microsoft-Windows-Dwm-Core",
+        "event": "468v0",
+        "time": "2026-10-09T23:15:22.929",
+        "cpu": 2,
+        "pid": 7068,
+        "tid": 8064,
+        "channel": "Microsoft-Windows-Dwm-Core/Diagnostic",
+        "level": "Information ",
+        "task": "Dx_Flip_Consumed",
+        "keywords": "Composition"
+      }
+    }
+  ]
+}

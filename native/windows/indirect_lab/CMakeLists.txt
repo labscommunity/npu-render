@@ -9,7 +9,7 @@ if(NR_IDD_SYSTEM_RENDERER_CONTROL)
   target_compile_definitions(nr_indirect_lab PRIVATE NR_IDD_SYSTEM_RENDERER_CONTROL)
 endif()
 target_compile_features(nr_indirect_lab PRIVATE cxx_std_17)
-target_compile_options(nr_indirect_lab PRIVATE /W4 /WX)
+target_compile_options(nr_indirect_lab PRIVATE /W4 /WX /Zi)
 target_include_directories(nr_indirect_lab PRIVATE
   "${NR_WDK_ROOT}/include/um" "${NR_WDK_ROOT}/include/shared"
   "${NR_WDK_ROOT}/umdf/include" "${NR_WDK_ROOT}/include/um/iddcx/1.4")
@@ -19,7 +19,7 @@ target_link_libraries(nr_indirect_lab PRIVATE
   "${NR_WDK_ROOT}/umdf/lib/WdfDriverStubUm.lib" "${NR_WDK_ROOT}/iddcx/lib/iddcxstub.lib"
   ntdll dxgi d3d11 gdi32 ole32)
 set_property(TARGET nr_indirect_lab PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-target_link_options(nr_indirect_lab PRIVATE /EXPORT:FxDriverEntryUm)
+target_link_options(nr_indirect_lab PRIVATE /EXPORT:FxDriverEntryUm /DEBUG /OPT:REF /OPT:ICF)
 add_executable(nr_indirect_topology_probe topology_probe.cpp)
 target_compile_features(nr_indirect_topology_probe PRIVATE cxx_std_17)
 target_compile_options(nr_indirect_topology_probe PRIVATE /W4 /WX)
@@ -31,3 +31,10 @@ target_compile_definitions(nr_indirect_topology_gui PRIVATE NR_TOPOLOGY_GUI UNIC
 target_compile_options(nr_indirect_topology_gui PRIVATE /W4 /WX)
 target_link_libraries(nr_indirect_topology_gui PRIVATE user32 shell32)
 set_property(TARGET nr_indirect_topology_gui PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+add_executable(nr_indirect_consumer_test consumer_slot_test.cpp)
+target_compile_features(nr_indirect_consumer_test PRIVATE cxx_std_17)
+target_compile_options(nr_indirect_consumer_test PRIVATE /W4 /WX)
+set_property(TARGET nr_indirect_consumer_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+include(CTest)
+add_test(NAME indirect_consumer_ownership COMMAND nr_indirect_consumer_test)
+set_tests_properties(indirect_consumer_ownership PROPERTIES TIMEOUT 30)
