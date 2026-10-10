@@ -6,7 +6,15 @@ extern "C" {
 #include <dispmprt.h>
 }
 #if NR_KMD_LAB_PAGING_ADAPTER
-#define NR_LAB_TRACE(...) DbgPrintEx(DPFLTR_IHVVIDEO_ID, DPFLTR_ERROR_LEVEL, __VA_ARGS__)
+// A compositor retry loop must not turn synchronous KD diagnostics into an
+// unbounded source of debugger traffic. Each call site has its own budget so
+// routine adapter queries cannot consume the shadow-allocation diagnostics.
+#define NR_LAB_TRACE(...) do { \
+    static volatile LONG nr_trace_count = 0; \
+    if (InterlockedCompareExchange(&nr_trace_count, 0, 0) < 256 && \
+        InterlockedIncrement(&nr_trace_count) <= 256) \
+        DbgPrintEx(DPFLTR_IHVVIDEO_ID, DPFLTR_ERROR_LEVEL, __VA_ARGS__); \
+} while (false)
 #else
 #define NR_LAB_TRACE(...) do {} while (false)
 #endif
