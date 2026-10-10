@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <vector>
 #include <map>
+#include <cmath>
 #define TEST(x) do { if (!(x)) { std::fprintf(stderr, "line %d: %s\n", __LINE__, #x); return 1; } } while (false)
 namespace {
 std::array<std::vector<unsigned char>, 8> memory;

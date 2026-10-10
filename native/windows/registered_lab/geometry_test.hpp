@@ -1,4 +1,46 @@
 // Resource/IA ownership checks with callback shims; no vertex shader execution.
+int test_half_input(D3D10DDI_HDEVICE h, const D3D10DDI_DEVICEFUNCS &f, D3D10DDI_HRESOURCE buffer) {
+    // Exhaustive conversion against an independent arithmetic oracle.
+    for (uint32_t raw = 0; raw < 65536; ++raw) {
+        const auto bits = half_to_float_bits(uint16_t(raw)); float actual; std::memcpy(&actual, &bits, 4);
+        const auto exponent = (raw >> 10) & 31, fraction = raw & 1023;
+        TEST(std::signbit(actual) == bool(raw & 0x8000));
+        if (exponent == 31) { TEST(fraction ? std::isnan(actual) : std::isinf(actual)); }
+        else {
+            float expected = std::ldexp(float(fraction + (exponent ? 1024 : 0)), exponent ? int(exponent) - 25 : -24);
+            if (raw & 0x8000) expected = -expected;
+            TEST(actual == expected);
+        }
+    }
+    const uint16_t patterns[]{0x0000, 0x8000, 0x0001, 0x03ff, 0x0400, 0x3c00, 0xbc00, 0x7bff, 0x7c00, 0xfc00, 0x7e01, 0xfe01};
+    D3D10DDI_MAPPED_SUBRESOURCE mapped{};
+    f.pfnDynamicIABufferMapNoOverwrite(h, buffer, 0, D3D10_DDI_MAP_WRITE_NOOVERWRITE, 0, &mapped);
+    TEST(last_error == S_OK && mapped.pData);
+    for (UINT i = 0; i < 12; ++i) {
+        const uint16_t data[]{patterns[i], patterns[(i + 1) % 12], patterns[(i + 2) % 12], patterns[(i + 3) % 12]};
+        std::memcpy(static_cast<uint8_t *>(mapped.pData) + 2 + i * 10, data, sizeof(data));
+    }
+    f.pfnDynamicIABufferUnmap(h, buffer, 0);
+    const UINT stride = 10, offset = 0; f.pfnIaSetVertexBuffers(h, 3, 1, &buffer, &stride, &offset);
+    for (const auto format : {DXGI_FORMAT_R16_FLOAT, DXGI_FORMAT_R16G16_FLOAT, DXGI_FORMAT_R16G16B16A16_FLOAT}) {
+        D3D10DDIARG_INPUT_ELEMENT_DESC element{3, 2, format, D3D10_DDI_INPUT_PER_VERTEX_DATA, 0, 3};
+        D3D10DDIARG_CREATEELEMENTLAYOUT args{&element, 1};
+        alignas(ElementLayout) unsigned char storage[sizeof(ElementLayout)]{};
+        D3D10DDI_HELEMENTLAYOUT layout{}; layout.pDrvPrivate = storage;
+        f.pfnCreateElementLayout(h, &args, layout, {}); f.pfnIaSetInputLayout(h, layout);
+        TEST(last_error == S_OK);
+        f.pfnDestroyElementLayout(h, layout);
+        const auto vertices = fetch_vertices(device(h), 12, 0);
+        const auto lanes = element_format(format).lanes;
+        for (UINT i = 0; i < 12; ++i) for (UINT c = 0; c < 4; ++c)
+            TEST(vertices[i][3][c] == (c < lanes ? half_to_float_bits(patterns[(i + c) % 12]) : (c == 3 ? 0x3f800000u : 0u)));
+        element.AlignedByteOffset = 3; f.pfnCreateElementLayout(h, &args, layout, {});
+        TEST(last_error == E_INVALIDARG); f.pfnDestroyElementLayout(h, layout); last_error = S_OK;
+        f.pfnIaSetInputLayout(h, {});
+    }
+    std::puts("{\"half_input_decoder\":true,\"encodings_checked\":65536,\"formats_checked\":3,\"host_decode_only\":true}");
+    return 0;
+}
 int test_input_layout(D3D10DDI_HDEVICE h, const D3D10DDI_DEVICEFUNCS &f, D3D10DDI_HRESOURCE buffer) {
     D3D10DDI_MAPPED_SUBRESOURCE mapped{};
     f.pfnDynamicIABufferMapNoOverwrite(h, buffer, 0, D3D10_DDI_MAP_WRITE_NOOVERWRITE, 0, &mapped);
@@ -81,6 +123,7 @@ int test_geometry_buffers(D3D10DDI_HDEVICE h, const D3D10DDI_DEVICEFUNCS &f) {
             TEST(last_error == E_INVALIDARG && device(h).vertex_buffers[3].offset == 4);
             last_error = S_OK;
             TEST(test_input_layout(h, f, value) == 0);
+            TEST(test_half_input(h, f, value) == 0);
         }
         if (bind & D3D10_DDI_BIND_INDEX_BUFFER) {
             f.pfnIaSetIndexBuffer(h, value, DXGI_FORMAT_R16_UINT, 2);

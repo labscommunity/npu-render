@@ -324,8 +324,12 @@ Negative addends become explicit Subtract nodes before precision annotation:
 the equivalent Add/negative-product graph loses precision after compilation.
 
 Input-layout objects retain their descriptors across runtime-wrapper destruction.
-The bounded host decoder handles per-vertex 32-bit float/integer formats and
-RGBA8 UNORM, including offsets, strides and missing-component defaults. Instancing
+The bounded host decoder handles per-vertex 32-bit float/integer formats,
+R16/R16G16/R16G16B16A16 float and RGBA8 UNORM, including offsets, strides and
+missing-component defaults. The [half-input qualification](../../../docs/validation/2026-10-10/half-input-v46/report.json)
+checks all 65,536 half encodings against an independent arithmetic oracle,
+including signed zero, subnormals, infinity and NaN. This is host format
+decoding; existing NPU vertex/pixel and composition regressions pass separately. Instancing
 and out-of-range vertex fetch remain unsupported. This prepares shader inputs;
 it does not perform rasterization.
 
