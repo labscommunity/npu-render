@@ -1,0 +1,61 @@
+{
+  "build": "present-umd-v107",
+  "clean_build": true,
+  "compiled_source_hashes_match": true,
+  "cpu_contract_suites_passed": 17,
+  "npu_callback_contracts_passed": true,
+  "nonblocking_map_contract": {
+    "contention_forced": true,
+    "kernel_status_translated_to_ddi_status": true,
+    "pending_copies_and_ownership_preserved": true,
+    "retry_passed": true,
+    "live_cause_not_yet_verified": true
+  },
+  "packed_scissor_contract": {
+    "npu_checked_components": 98304,
+    "maximum_byte_error": 1,
+    "coverage_exact": true,
+    "scissor_cases": 6,
+    "partial_batches": true,
+    "empty_regions": true,
+    "both_formats_and_sampler_filters": true,
+    "coverage_and_shading_on_npu": true
+  },
+  "actual_dwm_capture_replay": {
+    "capture": "v76-dwm-draw-1076.bin",
+    "target": [
+      1024,
+      768
+    ],
+    "scissor": [
+      429,
+      732,
+      453,
+      756
+    ],
+    "vertices": 81,
+    "covered_samples": 125,
+    "cpu_and_npu_byte_exact": true,
+    "baseline_build": "present-umd-v106",
+    "baseline_batch": 4096,
+    "baseline_tiles": 162,
+    "baseline_npu_repeated_ms": [
+      3004.413,
+      3018.704
+    ],
+    "packed_batch": 4096,
+    "packed_tiles": 27,
+    "packed_npu_repeated_ms": [
+      850.688,
+      854.649
+    ],
+    "smaller_batch_diagnostic": 1024,
+    "smaller_batch_npu_repeated_ms": [
+      331.487,
+      316.798
+    ],
+    "smaller_batch_is_live_default": false
+  },
+  "full_desktop_offload": false,
+  "tahoma_performance_tested": false
+}

@@ -364,7 +364,8 @@ void APIENTRY map(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE r, UINT sub, D3D10_DDI_
     if (out) *out = {};
     guard(h, __FUNCTION__, [&] {
         auto &v = resource(r);
-        require(out && !flags && v.allocation->context == device(h).context);
+        lab_trace("{\"event\":\"resource_map\",\"subresource\":%u,\"type\":%u,\"flags\":%u,\"usage\":%u,\"cpu_access\":%u}\n",sub,UINT(type),flags,v.usage,v.map_flags);
+        require(out && !(flags & ~D3D10_DDI_MAP_FLAG_DONOTWAIT) && v.allocation->context == device(h).context);
         const auto allocation = mip_allocation(v, sub);
         const bool wants_read=type==D3D10_DDI_MAP_READ || type==D3D10_DDI_MAP_READWRITE;
         const bool wants_write=type==D3D10_DDI_MAP_WRITE || type==D3D10_DDI_MAP_READWRITE;
@@ -375,8 +376,18 @@ void APIENTRY map(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE r, UINT sub, D3D10_DDI_
         const bool discard = v.buffer_bytes && (type == D3D10_DDI_MAP_WRITE_DISCARD ||
             (geometry && type == D3D10_DDI_MAP_WRITE_NOOVERWRITE)) &&
             v.usage == D3D10_DDI_USAGE_DYNAMIC && v.map_flags == D3D10_DDI_CPU_ACCESS_WRITE;
-        require(staging || discard);
-        out->pData = allocation->lock(staging && wants_read && !wants_write,staging && wants_read && wants_write);
+        const bool do_not_wait=(flags & D3D10_DDI_MAP_FLAG_DONOTWAIT)!=0;
+        require(staging || (discard && !do_not_wait));
+        try {
+            out->pData = allocation->lock(staging && wants_read && !wants_write,staging && wants_read && wants_write,do_not_wait);
+        } catch(const Error &e) {
+            if(do_not_wait && (e.status==D3DDDIERR_WASSTILLDRAWING || e.status==DXGI_DDI_ERR_WASSTILLDRAWING || e.status==DXGI_ERROR_WAS_STILL_DRAWING)) {
+                // Contention is retryable, not a device-fatal invalid argument.
+                lab_trace("{\"event\":\"map_busy\",\"retryable\":true}\n");
+                auto &d=device(h);d.callbacks.pfnSetErrorCb(d.core,DXGI_DDI_ERR_WASSTILLDRAWING);return;
+            }
+            throw;
+        }
         v.mapped_write = discard || (staging && wants_write);
         out->RowPitch = allocation->surface.row_pitch;
         out->DepthPitch = UINT(allocation->surface.allocation_bytes);

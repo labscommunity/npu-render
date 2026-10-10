@@ -1,0 +1,31 @@
+{
+  "trial": "v78",
+  "source_commit": "9e40276c9e0296183c4e49bee2de725da04180a0",
+  "umd_build": "present-umd-v106",
+  "kmd_build": "allocation-capacity-v3",
+  "package_version": "0.0.66.0",
+  "machine_scope": "disposable guest; physical NPU executes explicit remote draw packets",
+  "npu_preflight_packets_passed": 13,
+  "explorer_successful_npu_packets": 339,
+  "explorer_traced_completed_draws": 137,
+  "explorer_traced_present_callbacks": 1,
+  "explorer_traced_map_rejections": 67,
+  "dwm_npu_draws": 0,
+  "worker_request_limit": 512,
+  "successful_worker_requests": 352,
+  "received_frames": 0,
+  "viewer_window_submissions": 0,
+  "input_actions": [],
+  "input_visual_response_verified": false,
+  "full_desktop_offload": false,
+  "performance_tested": false,
+  "cleanup_passed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "findings": [
+    "The larger request budget is no longer exhausted. All 352 NPU requests pass: 13 preflights and 339 Explorer requests. Bounded UMD logging records 137 completed draws before its log cap; that count is not the worker total.",
+    "Staging read/write texture creation succeeds. Explorer next fails Map with E_INVALIDARG after a 222x34 staging copy, repeatedly recreating its device. The v106 trace does not record map type/flags; nonblocking flags are a hypothesis, not yet observed.",
+    "The topology helper reports a 90-second sole indirect display and successful restoration. The collector sole-display gate was observed true during live polling, but no frame arrived. The input report incorrectly gates its sole_gate_observed flag on frame existence; it remains false and no input was sent.",
+    "Both guest devices were removed successfully. Closing the relay during cleanup ends the waiting worker with socket-closed exit 1, after all recorded draw requests succeeded. No DWM draw, IDD swapchain assignment or desktop frame was observed."
+  ]
+}

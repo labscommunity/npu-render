@@ -120,9 +120,8 @@ inline bool triangle_work_valid(const Request &r){
     const auto clip=r.scissor.value_or(std::array<int32_t,4>{0,0,int32_t(h.width),int32_t(h.height)});
     if(!scissor_valid(clip,h))return false;
     uint32_t batch=4096;const uint64_t pixels=uint64_t(h.width)*h.height;while(pixels%batch)batch/=2;
-    const auto first=uint64_t(clip[1])*h.width/batch;
-    const auto end=(uint64_t(clip[3])*h.width+batch-1)/batch;
-    return uint64_t(h.vertices/3)*(end-first)<=4096;
+    const auto clipped_pixels=uint64_t(clip[2]-clip[0])*uint64_t(clip[3]-clip[1]);
+    return uint64_t(h.vertices/3)*((clipped_pixels+batch-1)/batch)<=4096;
 }
 inline std::vector<uint8_t> encode(Request &r) {
     auto &h = r.header;

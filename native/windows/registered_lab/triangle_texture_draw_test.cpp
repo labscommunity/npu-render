@@ -28,13 +28,16 @@ float4 main(float4 p:SV_Position,noperspective float4 c:COLOR,noperspective floa
     for(const auto filter:{TextureFilter::point,TextureFilter::linear})for(const uint32_t format:{28u,87u}){
         const uint8_t mask=format==87?13:15;
         PackedTexture texture{3,2,87,{{20,40,80,255},{40,80,120,192},{100,50,10,255},{0,70,90,128},{40,20,10,255},{30,90,120,240}}};
-        const Viewport viewport{0,0,32,32,0,1};const std::array<int32_t,4> clip{7,8,26,24};
+        const Viewport viewport{0,0,32,32,0,1};
         std::vector<PackedColor> bg(1024);for(size_t n=0;n<bg.size();++n)bg[n]={uint8_t(n),31,211,97};
-        TriangleTextureDrawExecutor executor(vs,ps,9,32,32,format,3,2,87,backend,true,mask,filter,CullMode::back,false,1024);
+        TriangleTextureDrawExecutor executor(vs,ps,9,32,32,format,3,2,87,backend,true,mask,filter,CullMode::back,false,256);
+        for(const std::array<int32_t,4> clip: {std::array<int32_t,4>{7,8,26,24}, {7,8,26,9}, {0,0,32,32}, {31,31,32,32}, {17,0,17,32}, {0,17,32,17}}){
         const auto result=executor.execute(inputs,{}, {},viewport,texture,bg,clip);
-        TEST(result.execution_device.rfind(backend,0)==0 && result.covered_samples==19*16 && result.tile_executions==3);
+        const auto area=unsigned(clip[2]-clip[0])*unsigned(clip[3]-clip[1]);
+        const auto covered=unsigned((std::max)(0,(std::min)(28,clip[2])-(std::max)(4,clip[0])))*unsigned((std::max)(0,(std::min)(28,clip[3])-(std::max)(4,clip[1])));
+        TEST(result.execution_device.rfind(backend,0)==0 && result.covered_samples==covered && result.tile_executions==3*((area+255)/256));
         for(unsigned y=0;y<32;++y)for(unsigned x=0;x<32;++x){const auto n=size_t(y)*32+x;auto expected=bg[n];
-            if(x>=7 && x<26 && y>=8 && y<24){
+            if(x>=unsigned(clip[0]) && x<unsigned(clip[2]) && y>=unsigned(clip[1]) && y<unsigned(clip[3]) && x>=4 && x<28 && y>=4 && y<28){
                 const double tx=(x+.5-4)/24*3-(filter==TextureFilter::linear?.5:0),ty=(y+.5-4)/24*2-(filter==TextureFilter::linear?.5:0);
                 const int ix=int(std::floor(tx)),iy=int(std::floor(ty));const double fx=filter==TextureFilter::linear?tx-ix:0,fy=filter==TextureFilter::linear?ty-iy:0;
                 double sampled[4]{};
@@ -47,6 +50,7 @@ float4 main(float4 p:SV_Position,noperspective float4 c:COLOR,noperspective floa
             }
             for(unsigned c=0;c<4;++c){const auto error=unsigned(std::abs(int(expected[c])-int(result.pixels[n][c])));maximum=(std::max)(maximum,error);if(error>1)std::fprintf(stderr,"x=%u y=%u lane=%u actual=%u expected=%u filter=%u format=%u\n",x,y,c,unsigned(result.pixels[n][c]),unsigned(expected[c]),unsigned(filter),format);TEST(error<=1);++checked;}
         }
+        }
     }
-    std::printf("{\"textured_triangle_components\":%llu,\"maximum_byte_error\":%u,\"execution_device\":\"%s\",\"coverage_exact\":true,\"desktop_offload_tested\":false}\n",static_cast<unsigned long long>(checked),maximum,backend.c_str());return 0;
+    std::printf("{\"textured_triangle_components\":%llu,\"maximum_byte_error\":%u,\"execution_device\":\"%s\",\"coverage_exact\":true,\"packed_scissor_cases\":6,\"partial_batch_and_empty_regions\":true,\"desktop_offload_tested\":false}\n",static_cast<unsigned long long>(checked),maximum,backend.c_str());return 0;
 }catch(const std::exception &e){std::fprintf(stderr,"%s\n",e.what());return 1;}

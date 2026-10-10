@@ -15,7 +15,7 @@ nr::kernel_contract::FillSurface commands[2]{};
 D3DDDI_ALLOCATIONLIST lists[2][2]{};
 UINT current_buffer = 0, renders = 0, destroys = 0, released = 0;
 bool contract_error = false, allocation_failure = false, render_failure = false;
-bool lock_failure = false, last_lock_read_only=false, last_lock_write_only=false;
+bool lock_failure = false, lock_busy=false, last_lock_read_only=false, last_lock_write_only=false, last_lock_do_not_wait=false;
 bool emulate_copies = false;
 std::vector<std::pair<UINT, UINT>> pending_copies;
 HRESULT last_error = S_OK;
@@ -81,7 +81,9 @@ HRESULT APIENTRY deallocate_cb(HANDLE rt, const D3DDDICB_DEALLOCATE *a) {
 HRESULT APIENTRY lock_cb(HANDLE rt, D3DDDICB_LOCK *a) {
     verify(rt == runtime_handle && a->Flags.LockEntire && a->Flags.DonotEvict && !a->Flags.Discard);
     last_lock_read_only=a->Flags.ReadOnly!=0;last_lock_write_only=a->Flags.WriteOnly!=0;
+    last_lock_do_not_wait=a->Flags.DonotWait!=0;
     verify(!(last_lock_read_only && last_lock_write_only));
+    if(lock_busy && a->Flags.DonotWait)return D3DDDIERR_WASSTILLDRAWING;
     if (lock_failure && !a->Flags.ReadOnly) return E_ACCESSDENIED;
     const auto i = a->hAllocation;
     for (const auto &resource : resource_handles) if (resource.second == i) return E_ACCESSDENIED;

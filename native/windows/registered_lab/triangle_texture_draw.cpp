@@ -73,11 +73,10 @@ UniformDrawExecutor::Result TriangleTextureDrawExecutor::execute(const std::vect
         viewport.width==float(s.width) && viewport.height==float(s.height));
     const auto clip=scissor.value_or(std::array<int32_t,4>{0,0,int32_t(s.width),int32_t(s.height)});
     require(clip[0]>=0 && clip[1]>=0 && clip[0]<=clip[2] && clip[1]<=clip[3] && clip[2]<=int32_t(s.width) && clip[3]<=int32_t(s.height));
-    const size_t first_tile=(size_t(clip[1])*s.width/s.batch)*s.batch;
-    const size_t end_tile=(std::min)(background.size(),((size_t(clip[3])*s.width+s.batch-1)/s.batch)*s.batch);
+    const size_t clip_width=size_t(clip[2]-clip[0]),clip_pixels=clip_width*size_t(clip[3]-clip[1]);
     // Bound the work actually requested by the scissor, not an unrelated
     // full-target estimate. Validate before executing any provider request.
-    require(uint64_t(s.count/3)*((end_tile-first_tile)/s.batch)<=4096);
+    require(uint64_t(s.count/3)*((clip_pixels+s.batch-1)/s.batch)<=4096);
     const std::array<int32_t,4> fixed_clip{clip[0]*256,clip[1]*256,clip[2]*256,clip[3]*256};
     UniformDrawExecutor::Result result{};auto began=Clock::now();auto shaded=s.vertex.execute(inputs,vc);
     result.execution_device=shaded.execution_device;result.timings.shader_ms=ms(began);
@@ -89,10 +88,16 @@ UniformDrawExecutor::Result TriangleTextureDrawExecutor::execute(const std::vect
     const auto textures=decode_resources(s.ps,resources);
     result.pixels=background;std::vector<Sample> samples(s.batch);std::vector<Point> points(s.batch);
     std::vector<PackedColor> tile(s.batch);std::vector<Color> colors(s.batch);std::vector<shader::VertexRegisters> fragments(s.batch);
-    for(size_t triangle=0;triangle<s.count;triangle+=3)for(size_t first=first_tile;first<end_tile;first+=s.batch){
+    for(size_t triangle=0;triangle<s.count;triangle+=3)for(size_t first=0;first<clip_pixels;first+=s.batch){
         const std::array<ProjectedVertex,3> vertices{projected.vertices[triangle],projected.vertices[triangle+1],projected.vertices[triangle+2]};
+        const auto valid=(std::min)(size_t(s.batch),clip_pixels-first);
+        // Host work is address generation, not triangle coverage. Pack only
+        // the requested scissor; padded lanes lie outside its nonnegative bounds.
+        // The NPU decides coverage for every lane before interpolation/shading.
+        const auto pixel_index=[&](size_t n){const auto i=first+n;return (size_t(clip[1])+i/clip_width)*s.width+size_t(clip[0])+i%clip_width;};
         for(size_t n=0;n<s.batch;++n){
-            const auto index=first+n;points[n]={int32_t(index%s.width)*256+128,int32_t(index/s.width)*256+128};
+            if(n<valid){const auto index=pixel_index(n);points[n]={int32_t(index%s.width)*256+128,int32_t(index/s.width)*256+128};}
+            else points[n]={-128,-128};
             samples[n]={{vertices[0].snapped,vertices[1].snapped,vertices[2].snapped},points[n]};
         }
         began=Clock::now();const auto covered=s.coverage.execute(samples,fixed_clip);require(covered.execution_device==result.execution_device);
@@ -114,10 +119,11 @@ UniformDrawExecutor::Result TriangleTextureDrawExecutor::execute(const std::vect
         began=Clock::now();const auto pixels=s.pixel->execute(fragments,pc,textures);require(pixels.execution_device==result.execution_device);
         result.timings.shader_ms+=ms(began);result.input_bytes+=pixels.input_bytes;result.output_bytes+=pixels.output_bytes;++result.provider_requests;
         for(size_t n=0;n<s.batch;++n)std::memcpy(colors[n].data(),pixels.vertices[n][0].data(),16);
-        std::copy_n(result.pixels.data()+first,s.batch,tile.data());
+        for(size_t n=0;n<s.batch;++n)tile[n]=n<valid?result.pixels[pixel_index(n)]:PackedColor{};
         began=Clock::now();const auto merged=s.merger.execute(colors,tile,covered.covered);require(merged.execution_device==result.execution_device);
         result.timings.merger_ms+=ms(began);result.input_bytes+=uint64_t(s.batch)*24;result.output_bytes+=uint64_t(s.batch)*4;++result.provider_requests;
-        std::copy(merged.pixels.begin(),merged.pixels.end(),result.pixels.begin()+first);++result.tile_executions;
+        for(size_t n=0;n<valid;++n)result.pixels[pixel_index(n)]=merged.pixels[n];
+        ++result.tile_executions;
     }
     result.vertices=std::move(shaded.vertices);result.timings.total_ms=ms(start);return result;
 }

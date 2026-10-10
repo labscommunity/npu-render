@@ -112,6 +112,12 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
     auto excessive=desktop_clipped_packet;const std::array<int32_t,4> full_clip{0,0,1024,768};
     std::memcpy(excessive.data()+sizeof(ex::Header)+sizeof(nr::raster::Viewport),full_clip.data(),sizeof(full_clip));rejects(excessive);
     desktop_clipped.scissor=full_clip;bool oversized_rejected=false;try{(void)ex::encode(desktop_clipped);}catch(const std::invalid_argument &){oversized_rejected=true;}test(oversized_rejected);
+    // A thin, full-height scissor is one packed batch, not 192 full rows.
+    desktop_clipped.header.vertices=4095;desktop_clipped.inputs.resize(4095);
+    for(const std::array<int32_t,4> clip: {std::array<int32_t,4>{429,0,430,768},{429,0,429,768},{0,768,1024,768}}){
+        desktop_clipped.scissor=clip;const auto packed=ex::encode(desktop_clipped);
+        test(ex::decode(packed).inputs.size()==4095);
+    }
     auto resources=r;resources.header.abi=8;resources.header.flags=0x2f42;
     const auto &lookup=nr::registered_lab::test_fixture::typed_lookup_pixel_words;
     resources.pixel=nr::shader::parse_pixel(lookup,std::size(lookup));

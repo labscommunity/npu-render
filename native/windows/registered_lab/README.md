@@ -635,3 +635,20 @@ denial and exact pixels; these are memory-contract tests, not NPU evidence.
 The stream controller defaults to 512 requests within ten minutes, with a strict
 4096-request protocol ceiling. The sole-display observation is separately bounded
 and always attempts topology restoration and removal.
+
+Nonblocking staging maps now pass `DonotWait` to VidMm and translate temporary
+contention to `DXGI_DDI_ERR_WASSTILLDRAWING` without counting it as a fatal
+rejection. Tests force contention, verify ownership remains intact, and retry.
+The [ResourceMap contract](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3d10umddi/nc-d3d10umddi-pfnd3d10ddi_resourcemap)
+and [LockCb flags](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dukmdt/ns-d3dukmdt-_d3dddicb_lockflags)
+define the runtime and memory-manager statuses separately. Live map arguments are
+traced so the next trial can test this explanation of v78's rejection.
+
+Textured triangles now pack the scissor rectangle into fixed-size batches.
+Padding lanes sit outside the scissor, and the NPU still computes their coverage.
+The CPU only generates addresses and gathers/scatters pixels; it does not test
+triangle coverage. This reduces the actual 24×24 DWM capture from 162 to 27
+triangle batches, with byte-exact CPU and NPU replay. Partial batches, full
+targets, empty regions, culling, both pixel formats and both sampler filters have
+independent pixel checks. This is an isolated rendering improvement, not desktop
+delivery or a Tahoma performance result.

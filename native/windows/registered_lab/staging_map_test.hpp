@@ -31,6 +31,18 @@ int test_staging_maps(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
         args.MapFlags = access; f.pfnCreateResource(h, &args, staging, {}); TEST(last_error == S_OK);
         args.MapFlags = read; f.pfnCreateResource(h, &args, readback, {}); TEST(last_error == S_OK);
         f.pfnResourceCopy(h, staging, source); TEST(last_error == S_OK);
+        // A nonblocking map reports transient contention with the D3D10 DDI
+        // status and preserves ownership. A later retry succeeds normally.
+        D3D10DDI_MAPPED_SUBRESOURCE probe{};const auto probe_mode=(access&read)?D3D10_DDI_MAP_READ:D3D10_DDI_MAP_WRITE;
+        const auto pending=pending_copies;lock_busy=true;
+        f.pfnStagingResourceMap(h,staging,0,probe_mode,D3D10_DDI_MAP_FLAG_DONOTWAIT,&probe);
+        TEST(last_error==DXGI_DDI_ERR_WASSTILLDRAWING && !probe.pData && !resource(staging).allocation->locked && pending_copies==pending);
+        lock_busy=false;last_error=S_OK;
+        f.pfnStagingResourceMap(h,staging,0,probe_mode,D3D10_DDI_MAP_FLAG_DONOTWAIT,&probe);
+        TEST(last_error==S_OK && probe.pData && last_lock_do_not_wait);
+        f.pfnStagingResourceUnmap(h,staging,0);TEST(last_error==S_OK);
+        f.pfnStagingResourceMap(h,staging,0,probe_mode,D3D10_DDI_MAP_FLAG_DONOTWAIT|1,&probe);
+        TEST(last_error==E_INVALIDARG && !probe.pData && !resource(staging).allocation->locked);last_error=S_OK;
         const auto before = counters.upload_bytes; UINT writes = 0;
         for (const auto mode : {D3D10_DDI_MAP_READ, D3D10_DDI_MAP_WRITE, D3D10_DDI_MAP_READWRITE}) {
             const bool reads = mode != D3D10_DDI_MAP_WRITE, modifies = mode != D3D10_DDI_MAP_READ;
@@ -42,7 +54,7 @@ int test_staging_maps(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
                 last_error = S_OK; continue;
             }
             TEST(last_error == S_OK && mapped.pData && last_lock_read_only == (reads && !modifies) &&
-                last_lock_write_only == (modifies && !reads));
+                last_lock_write_only == (modifies && !reads) && !last_lock_do_not_wait);
             for (UINT y = 0; y < height; ++y) {
                 auto row = static_cast<unsigned char *>(mapped.pData) + y * mapped.RowPitch;
                 if (reads) TEST(!std::memcmp(row, expected.data() + y * width, width * 4));
@@ -67,6 +79,6 @@ int test_staging_maps(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
     }
     f.pfnDestroyDevice(h); emulate_copies = false;
     TEST(!counters.live_contexts && !counters.cleanup_errors && !contract_error);
-    std::puts("{\"staging_texture_maps\":true,\"access_modes\":3,\"shared_and_private_roundtrip\":true,\"read_write_lock_flags\":true,\"denied_access_rejected\":true,\"npu_execution_tested\":false}");
+    std::puts("{\"staging_texture_maps\":true,\"access_modes\":3,\"shared_and_private_roundtrip\":true,\"read_write_lock_flags\":true,\"nonblocking_contention_and_retry\":true,\"denied_access_rejected\":true,\"npu_execution_tested\":false}");
     return 0;
 }

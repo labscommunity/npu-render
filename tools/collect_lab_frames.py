@@ -109,6 +109,7 @@ def run(args):
     command = "powershell.exe -NoProfile -NonInteractive -EncodedCommand "
     command += base64.b64encode(script.encode("utf-16-le")).decode("ascii")
     count = 0
+    last_state = None
     with (args.output / "ssh.stderr.log").open("wb") as stderr:
         child = subprocess.Popen(
             [
@@ -130,7 +131,10 @@ def run(args):
         deadline = threading.Timer(args.seconds + 90, child.terminate)
         deadline.start()
         try:
-            with (args.output / "frames.jsonl").open("x", encoding="utf-8") as log:
+            with (
+                (args.output / "frames.jsonl").open("x", encoding="utf-8") as log,
+                (args.output / "topology.jsonl").open("x", encoding="utf-8") as topology_log,
+            ):
                 while line := child.stdout.readline(4 * ((MAX_BYTES + 2) // 3) + 32):
                     if line.startswith(b"NRSTATE:"):
                         if len(line) > 4096:
@@ -141,6 +145,13 @@ def run(args):
                         temporary = args.output / "incoming-state.json"
                         temporary.write_text(json.dumps(state) + "\n", encoding="utf-8")
                         temporary.replace(args.output / "input-ready.json")
+                        if state != last_state:
+                            topology_log.write(
+                                json.dumps({"received_at": datetime.now(UTC).isoformat(), **state})
+                                + "\n"
+                            )
+                            topology_log.flush()
+                            last_state = state
                         continue
                     if not line.startswith(b"NRFRAME:"):
                         if len(line) > 4096:
