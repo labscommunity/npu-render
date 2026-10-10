@@ -1,0 +1,116 @@
+{
+  "schema": 1,
+  "kind": "registered-window-staging-open-rejection",
+  "date_utc": "2026-10-09",
+  "package": "v39-staging-owner",
+  "driver_version": "0.0.28.0",
+  "source_revisions": {
+    "kernel": "adc280f20bfe8fd989e572a0442b1125efef9895",
+    "umd": "a95a58c33ebc13c5cabf918d4b3772a0e5e7ba21"
+  },
+  "result": "staging-creation-accepted-open-rejected",
+  "cases": {
+    "window": {
+      "process": {
+        "started": "2026-10-09T23:55:52.3921680Z",
+        "finished": "2026-10-09T23:56:08.4251890Z",
+        "probe_sha256": "89E05ED87286B9653021955D425EC75ED3E5F820AAAD6CE56C0521648C7AD5E5",
+        "exit_code": 1,
+        "npu_execution_tested": false
+      },
+      "operations": {
+        "create_factory": "00000000",
+        "select_paired_adapter": "00000000",
+        "create_registered_device": "00000000",
+        "create_registered_hwnd_swapchain": "00000000",
+        "get_registered_backbuffer": "00000000",
+        "create_registered_backbuffer_view": "00000000",
+        "present_clear_status": "00000000",
+        "registered_hwnd_present": "087a0001"
+      },
+      "stats": {
+        "failed": true,
+        "rejected": 0,
+        "last_unsupported_offset": 18446744073709551615,
+        "cleanup_errors": 0,
+        "executions": 0,
+        "cpu_executions": 0,
+        "gpu_executions": 0,
+        "npu_executions": 0,
+        "live_allocations": 0,
+        "live_contexts": 0,
+        "present_requests": 1,
+        "accepted_present_callbacks": 1
+      },
+      "verified_presented_frames": 0
+    },
+    "window-trace": {
+      "process": {
+        "started": "2026-10-09T23:59:04.5626950Z",
+        "finished": "2026-10-09T23:59:10.2698910Z",
+        "probe_sha256": "89E05ED87286B9653021955D425EC75ED3E5F820AAAD6CE56C0521648C7AD5E5",
+        "exit_code": 1,
+        "npu_execution_tested": false
+      },
+      "operations": {
+        "create_factory": "00000000",
+        "select_paired_adapter": "00000000",
+        "create_registered_device": "00000000",
+        "create_registered_hwnd_swapchain": "00000000",
+        "get_registered_backbuffer": "00000000",
+        "create_registered_backbuffer_view": "00000000",
+        "present_clear_status": "00000000",
+        "registered_hwnd_present": "087a0001"
+      },
+      "stats": {
+        "failed": true,
+        "rejected": 0,
+        "last_unsupported_offset": 18446744073709551615,
+        "cleanup_errors": 0,
+        "executions": 0,
+        "cpu_executions": 0,
+        "gpu_executions": 0,
+        "npu_executions": 0,
+        "live_allocations": 0,
+        "live_contexts": 0,
+        "present_requests": 1,
+        "accepted_present_callbacks": 1
+      },
+      "verified_presented_frames": 0
+    }
+  },
+  "interactive_session": 1,
+  "requested_client_extent": [
+    320,
+    192
+  ],
+  "verified_presented_frames": 0,
+  "successful_cpu_clear_fences": 2,
+  "staging_request": {
+    "allocation_private_bytes": 40,
+    "resource_private_bytes": 0,
+    "resource_flag": true,
+    "description_status": "00000000",
+    "creation_status": "00000000",
+    "open_status": "c000000d",
+    "open_create_flag": true
+  },
+  "mapped_pages_after_tests": 0,
+  "kernel_module_unloaded": true,
+  "owned_device_removed": true,
+  "owned_inf_deleted": true,
+  "prior_display_status_preserved": true,
+  "registered_npu_execution_tested": false,
+  "desktop_offload_tested": false,
+  "tahoma_benefit_tested": false,
+  "notes": [
+    "Both attempts create the swap chain and clear its back buffer, then receive DXGI_STATUS_OCCLUDED. No pixel oracle succeeds.",
+    "The traced attempt observes successful ordinary allocation creation/open, a successful clear, successful staging description and creation, then a rejected staging open. The open has Create=1, one allocation with 40 bytes of private metadata and zero resource-private bytes.",
+    "The KMD still equates resource ownership with nonzero resource-private metadata in OpenAllocation. Revision 004bb7f permits the single staging allocation to open without this metadata and tests OS-handle resolution, close, and rejection of destruction while referenced.",
+    "Revision d17d6d7 separately corrects DescribeAllocation for format 88 to X8R8G8B8. That defect was found during inspection; this trace does not establish it as a cause of the failed present.",
+    "The two completed fences are CPU clears. There is no registered NPU execution, verified displayed frame, DWM migration or Tahoma measurement in this run."
+  ],
+  "references": [
+    "https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/ns-d3dkmddi-_dxgkarg_createallocation"
+  ]
+}
