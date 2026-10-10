@@ -107,12 +107,26 @@ struct PreparedDevice {
 };
 struct DeviceState {
     IDDCX_ADAPTER adapter = nullptr; LUID preferred{};
+    WDFDEVICE framework_device = nullptr;
     PreparedDevice *prepared = nullptr; WDFWORKITEM preparation = nullptr;
 };
 WDF_DECLARE_CONTEXT_TYPE(DeviceState);
+struct SwapchainRelease { IDDCX_SWAPCHAIN chain = nullptr; };
+WDF_DECLARE_CONTEXT_TYPE(SwapchainRelease);
+EVT_WDF_WORKITEM release_swapchain;
+void release_swapchain(WDFWORKITEM item) {
+    const auto chain = WdfObjectGet_SwapchainRelease(item)->chain;
+    // Never join this work item from an IddCx callback. Cleanup can need the
+    // framework lock held by an assign/unassign callback waiting for the frame
+    // thread. That thread only queues this independent release and then exits.
+    WdfObjectDelete(chain);
+    trace("{\"event\":\"swapchain_release_completed\"}\n");
+    WdfObjectDelete(item);
+}
 class Consumer {
     IDDCX_SWAPCHAIN chain;
     HANDLE available, stop = nullptr, thread = nullptr;
+    WDFWORKITEM release = nullptr;
     ComPtr<ID3D11Device> device;
     ComPtr<ID3D11DeviceContext> context;
     static DWORD WINAPI run_thread(void *self) { static_cast<Consumer *>(self)->run(); return 0; }
@@ -150,13 +164,22 @@ class Consumer {
             status = IddCxSwapChainFinishedProcessingFrame(chain);
         }
         trace("{\"event\":\"consumer_exit\",\"status\":\"%08lx\",\"received_frames\":%u,\"displayed_frames\":0}\n", ULONG(status), frames);
-        WdfObjectDelete(chain);
+        const auto item = std::exchange(release, nullptr);
+        WdfObjectGet_SwapchainRelease(item)->chain = chain;
+        trace("{\"event\":\"swapchain_release_queued\"}\n");
+        WdfWorkItemEnqueue(item);
     }
 public:
     Consumer(IDDCX_SWAPCHAIN value, HANDLE event) : chain(value), available(event) {}
-    HRESULT start(const PreparedDevice &prepared) {
+    HRESULT start(const PreparedDevice &prepared, WDFDEVICE parent) {
         device = prepared.device; context = prepared.context;
-        if (!device || !context) return E_UNEXPECTED;
+        if (!device || !context || !parent) return E_UNEXPECTED;
+        WDF_WORKITEM_CONFIG config; WDF_WORKITEM_CONFIG_INIT(&config, release_swapchain);
+        config.AutomaticSerialization = FALSE;
+        WDF_OBJECT_ATTRIBUTES attributes; WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attributes, SwapchainRelease);
+        attributes.ParentObject = parent;
+        const auto status = WdfWorkItemCreate(&config, &attributes, &release);
+        if (!NT_SUCCESS(status)) return HRESULT_FROM_NT(status);
         stop = CreateEventW(nullptr, TRUE, FALSE, nullptr);
         if (!stop) return HRESULT_FROM_WIN32(GetLastError());
         thread = CreateThread(nullptr, 0, run_thread, this, 0, nullptr);
@@ -165,10 +188,13 @@ public:
     ~Consumer() {
         if (stop) SetEvent(stop);
         if (thread) { WaitForSingleObject(thread, INFINITE); CloseHandle(thread); }
+        // Only startup failure leaves an unqueued work item here. A queued
+        // release owns its chain and deletes itself independently of the frame thread.
+        if (release) WdfObjectDelete(release);
         if (stop) CloseHandle(stop);
     }
 };
-struct MonitorState { nr::indirect::ConsumerSlot<Consumer> consumers; LUID preferred{}; PreparedDevice *prepared = nullptr; };
+struct MonitorState { nr::indirect::ConsumerSlot<Consumer> consumers; LUID preferred{}; PreparedDevice *prepared = nullptr; WDFDEVICE framework_device = nullptr; };
 WDF_DECLARE_CONTEXT_TYPE(MonitorState);
 EVT_IDD_CX_MONITOR_GET_DEFAULT_DESCRIPTION_MODES modes;
 NTSTATUS modes(IDDCX_MONITOR, const IDARG_IN_GETDEFAULTDESCRIPTIONMODES *in, IDARG_OUT_GETDEFAULTDESCRIPTIONMODES *out) {
@@ -198,7 +224,7 @@ NTSTATUS assign(IDDCX_MONITOR monitor, const IDARG_IN_SETSWAPCHAIN *in) {
     auto state = WdfObjectGet_MonitorState(monitor);
     auto update = state->consumers.begin();
     update.previous.reset();
-    if (!update.allowed) return STATUS_DEVICE_REMOVED;
+    if (!update.allowed) return STATUS_GRAPHICS_INDIRECT_DISPLAY_ABANDON_SWAPCHAIN;
     const bool paired = (state->preferred.LowPart || state->preferred.HighPart) &&
                         in->RenderAdapterLuid.LowPart == state->preferred.LowPart &&
                         in->RenderAdapterLuid.HighPart == state->preferred.HighPart;
@@ -211,15 +237,15 @@ NTSTATUS assign(IDDCX_MONITOR monitor, const IDARG_IN_SETSWAPCHAIN *in) {
     }
     try {
         auto consumer = std::make_unique<Consumer>(in->hSwapChain, in->hNextSurfaceAvailable);
-        const auto status = consumer->start(*state->prepared);
-        if (FAILED(status)) { WdfObjectDelete(in->hSwapChain); return STATUS_SUCCESS; }
+        const auto status = consumer->start(*state->prepared, state->framework_device);
+        if (FAILED(status)) return STATUS_GRAPHICS_INDIRECT_DISPLAY_ABANDON_SWAPCHAIN;
         // An overlapping unassign/cleanup cancels this ticket. A started
         // worker owns the chain and releases it when this candidate is retired.
         if (!state->consumers.publish(update.generation, consumer))
             trace("{\"event\":\"assignment_cancelled\"}\n");
         return STATUS_SUCCESS;
-    } catch (...) { WdfObjectDelete(in->hSwapChain); return STATUS_SUCCESS; }
-    // IddCx ownership is explicitly released on failure, following its retry contract.
+    } catch (...) { return STATUS_GRAPHICS_INDIRECT_DISPLAY_ABANDON_SWAPCHAIN; }
+    // Startup failure does not take ownership; IddCx receives its retry status.
 }
 EVT_IDD_CX_MONITOR_UNASSIGN_SWAPCHAIN unassign;
 NTSTATUS unassign(IDDCX_MONITOR monitor) {
@@ -268,6 +294,7 @@ void prepare_monitor(WDFWORKITEM item) {
     if (NT_SUCCESS(status)) {
         auto monitor = WdfObjectGet_MonitorState(out.MonitorObject);
         monitor->preferred = state->preferred;
+        monitor->framework_device = state->framework_device;
         // The monitor owns its COM references independently of adapter cleanup.
         try { monitor->prepared = new PreparedDevice(*state->prepared); }
         catch (...) { WdfObjectDelete(out.MonitorObject); status = STATUS_INSUFFICIENT_RESOURCES; }
@@ -330,6 +357,7 @@ NTSTATUS power_on(WDFDEVICE device, WDF_POWER_DEVICE_STATE) {
     if (NT_SUCCESS(status)) {
         state->adapter = out.AdapterObject;
         WdfObjectGet_DeviceState(out.AdapterObject)->preferred = state->preferred;
+        WdfObjectGet_DeviceState(out.AdapterObject)->framework_device = device;
     }
     return status;
 }

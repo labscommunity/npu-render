@@ -35,3 +35,18 @@ The lifecycle follows Microsoft's public
 The selection contract is
 [IddCxAdapterSetRenderAdapter](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/iddcx/nf-iddcx-iddcxadaptersetrenderadapter):
 it expresses a preference; the assign-swapchain callback reports the actual choice.
+
+A failed-draw test exposed a lock cycle during cancelled assignment: the callback
+joined its candidate frame thread while that thread called `WdfObjectDelete`
+and waited for an IddCx lock held by the callback. The frame thread now hands
+swapchain deletion to an independent framework work item before exiting. The
+callback can finish its join without waiting for framework deletion. Work-item
+creation failure returns the documented abandon-swapchain status before ownership
+is accepted. This addresses the captured deletion/join cycle; installed-guest
+teardown and successful frame delivery remain separate validation requirements.
+
+The work item uses `AutomaticSerialization = FALSE`, is parented to the framework
+device, owns only the swapchain handle after handoff, and deletes itself after
+releasing that handle. Lifecycle references:
+[framework work items](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdfworkitem/nc-wdfworkitem-evt_wdf_workitem),
+[assignment ownership and retry status](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/iddcx/nc-iddcx-evt_idd_cx_monitor_assign_swapchain).

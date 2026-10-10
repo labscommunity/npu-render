@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "kind": "desktop-harness-acknowledgement-failure-and-idd-deadlock",
+  "source_revision": "2cc810526f2cb17fd8f94b730cf71ab0efab6bd6",
+  "umd_build": "present-umd-v73",
+  "render_version": "0.0.52.0",
+  "idd_version": "0.0.7.0",
+  "npu_draws": {
+    "prewarm_passed": 3,
+    "live_dwm_completed": 0
+  },
+  "cause": "The added third warmup packet used sequence 3, but the PowerShell helper sent acknowledgement 1. The native relay rejected this and exited before live DWM requests. Native compiled packet tests already acknowledge the actual sequence correctly.",
+  "retry_correction": "Acknowledge the sequence read at header offset 56; require all three successful relay receipts before installing devices. Corrected helper is preserved but has not yet run in the installed test.",
+  "live_dwm_pid": 1064,
+  "captured_first_failed_draw_sha256": "a0525404fbdb34f4f16e496671ceab3bba8f4b827102d080b72829ba655210bf",
+  "local_draw_rejections": 43,
+  "idd_assignments": 83,
+  "idd_received_frames": 0,
+  "idd_assignment_cancelled": 1,
+  "stop_reason": "complete-dwm-failure-capture",
+  "observation_ms": 414,
+  "cleanup_deadlock": {
+    "detected_by": "UMDF reflector IPC timeout; debugger break",
+    "waiting_callback": "assign+0x21e -> Consumer destructor -> WaitForSingleObject(frame thread)",
+    "waiting_worker": "Consumer::run -> WdfObjectDelete -> IddSwapChain::Cleanup -> RtlEnterCriticalSection",
+    "read_only_debugger_commands": [
+      "!process 0xFFFF9D85520C9080 0x1f",
+      "!wdfkd.wdfumdevstack 0x0000019753D4D4F0",
+      "g"
+    ],
+    "framework_timeout_preserved": true,
+    "private_memory_modified": false
+  },
+  "cleanup": "Render device removal passed. Indirect device removal requested reboot. Only disposable VM restarted; saved INF hash verified and pending package deleted. Both owned devices absent.",
+  "displayed_frames": 0,
+  "full_desktop_offload": false,
+  "tahoma_performance_tested": false
+}
