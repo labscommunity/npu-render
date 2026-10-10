@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.24)
+project(mirror_diagnostic LANGUAGES CXX)
+find_package(OpenVINO REQUIRED COMPONENTS Runtime)
+add_executable(mirror_test mirror_test.cpp vertex_executor.cpp)
+target_compile_features(mirror_test PRIVATE cxx_std_17)
+target_compile_options(mirror_test PRIVATE /W4 /WX)
+set_property(TARGET mirror_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+target_link_libraries(mirror_test PRIVATE openvino::runtime)

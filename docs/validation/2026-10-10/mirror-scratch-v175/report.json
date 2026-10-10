@@ -1,0 +1,32 @@
+{
+  "kind": "isolated-mirror-largest-odd-coordinate-qualification",
+  "passed": true,
+  "checks": {
+    "CPU": {
+      "components": 196608,
+      "maximum_error": 0,
+      "nonfinite_rejection_checks": 24
+    },
+    "NPU": {
+      "components": 196608,
+      "maximum_error": 0,
+      "nonfinite_rejection_checks": 24
+    }
+  },
+  "texture_shapes": [
+    [
+      4,
+      8
+    ],
+    [
+      17,
+      13
+    ],
+    [
+      1,
+      1
+    ]
+  ],
+  "change": "Same implementation as v173. Diagnostic input replaces +/-3 with +/-16777215, the largest odd representable integers below the even-only FP32 range.",
+  "desktop_offload_tested": false
+}

@@ -1,0 +1,12 @@
+{
+  "kind": "isolated-mirror-coordinate-qualification",
+  "cpu_passed": true,
+  "npu_passed": true,
+  "components_per_backend": 65536,
+  "maximum_absolute_error": 0,
+  "finite_cases": "32 U x 32 V, two texture payloads, point/linear, all clamp/mirror U/V combinations, 4x8 texture",
+  "invalid_cases": "Active NaN and infinity in each address/filter combination rejected",
+  "change": "Scale the range comparison by 1/32768 before comparing with 512, keeping comparison constants inside FP16 range. This replaces the direct 2^24 comparison that failed native NPU validation.",
+  "desktop_offload_tested": false,
+  "captured_draw_replay_tested": false
+}

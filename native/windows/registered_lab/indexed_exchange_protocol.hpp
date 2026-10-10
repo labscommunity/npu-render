@@ -29,6 +29,13 @@ inline raster::BlendMode blend_mode(const Header &h) {
     return (h.flags & 0x8000) ? raster::BlendMode::destination_out : (h.flags & 0x4000) ? raster::BlendMode::destination_in : raster::source_blend((h.flags & 1) != 0);
 }
 inline bool shape_valid(const Header &h) {
+    // ABI 12 adds U/V address bits to each existing sampler word. Older
+    // ABIs remain clamp-only; all shape/blend rules are inherited unchanged.
+    if(h.abi==12){
+        if(!(h.flags&0x2000))return false;
+        auto legacy=h;legacy.abi=(h.flags&0x10000)?11u:(h.flags&0x8000)?10u:(h.flags&0x4000)?9u:8u;
+        return shape_valid(legacy);
+    }
     if(h.flags & 0x1f0000){
         if(!(h.flags&0x10000) || h.abi!=11 || !raster::extended_blend(blend_mode(h)) ||
             !(h.flags&1) || (h.flags&0xc000) || ((h.flags&2) && !(h.flags&0x3000)))return false;
@@ -178,7 +185,11 @@ inline std::vector<uint8_t> encode(Request &r) {
         (void)raster::resource_shapes(r.pixel,r.resources);
         for(const auto &t:r.resources){const TextureDescription description{t.width,t.height,t.format,0};
             require(t.pixels.size()==size_t(t.width)*t.height);w.value(description);w.append(t.pixels.data(),t.pixels.size()*sizeof(raster::PackedColor));}
-        for(const auto &sampler:r.samplers){const auto filter=uint32_t(sampler.filter);require(filter<=1);w.value(filter);}
+        for(const auto &sampler:r.samplers){
+            const auto filter=uint32_t(sampler.filter),u=uint32_t(sampler.u),v=uint32_t(sampler.v);
+            require(filter<=1 && u<=1 && v<=1 && (h.abi==12 || (!u && !v)));
+            w.value(filter|(u<<1)|(v<<2));
+        }
     } else if (h.flags & 2) {
         const auto &t = r.texture; const TextureDescription description{t.width,t.height,t.format,0};
         require(texture_valid(description,h) && t.pixels.size() == size_t(t.width)*t.height);
@@ -204,7 +215,10 @@ inline Request decode(const std::vector<uint8_t> &bytes) {
         for(auto &t:r.resources){const auto d=reader.value<TextureDescription>();require(!d.reserved);
             t={d.width,d.height,d.format,reader.vector<raster::PackedColor>(size_t(d.width)*d.height)};}
         (void)raster::resource_shapes(r.pixel,r.resources);
-        for(auto &sampler:r.samplers){const auto filter=reader.value<uint32_t>();require(filter<=1);sampler.filter=static_cast<shader::TextureFilter>(filter);}
+        for(auto &sampler:r.samplers){const auto encoded=reader.value<uint32_t>();require(encoded<=(h.abi==12?7u:1u));
+            sampler.filter=static_cast<shader::TextureFilter>(encoded&1);
+            sampler.u=static_cast<shader::TextureAddress>((encoded>>1)&1);sampler.v=static_cast<shader::TextureAddress>((encoded>>2)&1);
+        }
     } else if (h.flags & 2) {
         const auto t = reader.value<TextureDescription>(); require(texture_valid(t,h));
         r.texture = {t.width,t.height,t.format,reader.vector<raster::PackedColor>(size_t(t.width)*t.height)};

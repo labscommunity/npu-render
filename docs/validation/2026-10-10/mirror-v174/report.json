@@ -1,0 +1,36 @@
+{
+  "build": "present-umd-v174",
+  "all_checks_passed": true,
+  "mirror_packet_components": 4096,
+  "captured_dwm_pixels": 8192,
+  "native_npu_execution": true,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "cpu_suites_passed": 22,
+  "cpu_suite_elapsed_seconds": 106.26,
+  "source_hashes_verified": 109,
+  "binary_hashes_verified_on_delta": 28,
+  "mirror_sample_components": 196608,
+  "mirror_sample_maximum_error": 0,
+  "nonfinite_rejection_checks": 24,
+  "captured_draw_sha256": "a2383d2d3c75a211fc7b52b11842a3eb050bb3e340fa123061378dc79adf75a5",
+  "captured_cpu_npu_pixels_identical": true,
+  "captured_output_sha256": "0f9706270f768c4afaf639d4007b7f2f5491fa64f79a2504ba2fa6d3e97def7e",
+  "captured_covered_samples": 1265,
+  "captured_tile_executions": 10,
+  "ddi_draws_verified": 58,
+  "full_desktop_offload": false,
+  "findings": [
+    "MIRROR U/V addressing now traverses driver admission, sampler-aware compiled-model cache keys, ABI 12 packets, and provider-side integer texel addressing. Clamp-only older packet ABIs reject address bits rather than silently changing semantics.",
+    "The first native NPU implementation failed a large-coordinate case. Scaling the guard avoids a direct 2^24 comparison; isolated and production tests retain zero component error. A separate diagnostic checks +/-16777215, the largest odd representable coordinates below the even-only FP32 range.",
+    "Broader CPU tests exposed an out-of-range negative linear tap for a 1x1 mirrored texture. Adding two periods before reduction fixes the boundary. Production checks cover 4x8, 17x13, and 1x1 textures, including both sides of the two-unit seams.",
+    "The complete v93 DWM capture uses the 1850-word blur shader with nine active taps and MIRROR U/V sampling. CPU and NPU replay produce identical 8192-pixel targets with exact scalar coverage and byte-color agreement. The draw covers 1265 samples in ten tiles.",
+    "Point and linear scissored mirror draws verify 1024 pixels each. The ABI 12 native NPU worker returns all 4096 expected byte components; 58 DDI draws and the existing mask, loop, derivative, typed-load, triangle and sampler NPU regressions pass.",
+    "Build v168 failed a missing include. Build v169 passed the added DDI pixel test but retained the old aggregate count assertion; its NPU coordinate test failed. Build v171 exposed the negative seam issue. Failed attempts and isolated corrections are preserved beside this clean qualification.",
+    "Component and replay checks do not establish a stable interactive desktop or a Tahoma benefit. The next installed trial is v94."
+  ],
+  "sources": [
+    "https://learn.microsoft.com/en-us/windows/win32/api/d3d11/ne-d3d11-d3d11_texture_address_mode",
+    "https://learn.microsoft.com/en-us/windows/win32/direct3d10/d3d10-graphics-programming-guide-resources-coordinates"
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "kind": "isolated-mirror-seam-qualification",
+  "passed": true,
+  "checks": {
+    "CPU": {
+      "components": 196608,
+      "maximum_error": 0,
+      "nonfinite_rejection_checks": 24
+    },
+    "NPU": {
+      "components": 196608,
+      "maximum_error": 0,
+      "nonfinite_rejection_checks": 24
+    }
+  },
+  "texture_shapes": [
+    [
+      4,
+      8
+    ],
+    [
+      17,
+      13
+    ],
+    [
+      1,
+      1
+    ]
+  ],
+  "change": "Negative linear taps may be one texel below -period. Adding two periods and reducing once keeps all taps in range, including the 1x1 case and coordinates immediately inside +/-2.",
+  "desktop_offload_tested": false,
+  "captured_draw_replay_tested": false
+}

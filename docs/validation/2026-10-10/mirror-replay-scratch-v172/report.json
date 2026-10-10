@@ -1,0 +1,22 @@
+{
+  "kind": "isolated-captured-mirror-draw-replay",
+  "cpu_passed": true,
+  "npu_passed": true,
+  "captured_draw_sha256": "a2383d2d3c75a211fc7b52b11842a3eb050bb3e340fa123061378dc79adf75a5",
+  "width": 128,
+  "height": 64,
+  "verified_pixels": 8192,
+  "covered_samples": 1265,
+  "tile_executions": 10,
+  "maximum_oracle_byte_error": 0,
+  "cpu_npu_pixels_identical": true,
+  "pixel_sha256": "0f9706270f768c4afaf639d4007b7f2f5491fa64f79a2504ba2fa6d3e97def7e",
+  "source_composition": "Current mirror vertex_executor.cpp and draw_replay_probe.cpp, linked with the unchanged raster components from present-umd-v169. This is an isolated diagnostic, not a deployable clean build.",
+  "performance_comparison_valid": false,
+  "performance_note": "CPU compilation of the full build overlapped these component checks; timings are retained but are not an isolated benchmark.",
+  "desktop_offload_tested": false,
+  "sources": [
+    "https://learn.microsoft.com/en-us/windows/win32/api/d3d11/ne-d3d11-d3d11_texture_address_mode",
+    "https://learn.microsoft.com/en-us/windows/win32/direct3d10/d3d10-graphics-programming-guide-resources-coordinates"
+  ]
+}

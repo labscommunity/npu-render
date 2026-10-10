@@ -188,6 +188,16 @@ int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
         TEST(FAILED(last_error) && memory[target_index]==before && counters.draws==draws);last_error=S_OK;
         sampler.Filter=D3D10_DDI_FILTER_MIN_MAG_MIP_POINT;f.pfnPsSetSamplers(h,0,1,&hs);
     }
+    // Negative UVs exercise mirror addressing through the actual DDI route.
+    for(auto &vertex:textured_positions){vertex[4]=-vertex[4];vertex[5]=-vertex[5];}
+    f.pfnResourceUpdateSubresourceUP(h,resources[5],0,nullptr,textured_positions,0,0);
+    sampler.AddressU=sampler.AddressV=D3D10_DDI_TEXTURE_ADDRESS_MIRROR;f.pfnPsSetSamplers(h,0,1,&hs);
+    {const auto draws=counters.draws;f.pfnDrawIndexed(h,6,1,1);TEST(last_error==S_OK && counters.draws==draws+1);}
+    for(UINT y=0;y<height;++y)for(UINT x=0;x<width;++x)for(UINT c=0;c<4;++c)
+        TEST(memory[target_index][(size_t(y)*width+x)*4+c]==(c==3?uint8_t(255):source[(size_t(y+16)*sw+x+32)*4+c]));
+    sampler.AddressU=sampler.AddressV=D3D10_DDI_TEXTURE_ADDRESS_CLAMP;f.pfnPsSetSamplers(h,0,1,&hs);
+    for(auto &vertex:textured_positions){vertex[4]=-vertex[4];vertex[5]=-vertex[5];}
+    f.pfnResourceUpdateSubresourceUP(h,resources[5],0,nullptr,textured_positions,0,0);
     // Opaque point sampling may enlarge a smaller texture. A crop-only path
     // cannot admit this draw; compare every output against scalar texel lookup.
     f.pfnDestroyShaderResourceView(h,srv);f.pfnDestroyResource(h,resources[4]);
@@ -306,7 +316,7 @@ int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
     f.pfnDestroyRenderTargetView(h, view);
     for (const auto r : resources) f.pfnDestroyResource(h, r);
     f.pfnDestroyDevice(h);
-    TEST(counters.executions == executions_before + 57 && !counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
-    std::printf("{\"kind\":\"indexed-ddi-runtime-shim\",\"requested_backend\":\"%s\",\"execution_device\":\"%s\",\"verified_draws\":%llu,\"porter_duff_components\":540672,\"porter_duff_additional_modes\":11,\"derivative_ddi_components\":16384,\"loop_ddi_components\":65536,\"loop_overflow_preserved_target\":true,\"blended_scissored_draws\":6,\"textured_draws\":7,\"point_scaled_blended_draws\":2,\"linear_scaled_blended_draws\":2,\"base_vertex_and_start_index\":true,\"invalid_ranges_and_sampler_rejected\":true,\"registered_adapter_tested\":false,\"desktop_offload_tested\":false}\n", backend, counters.last_execution_device, static_cast<unsigned long long>(counters.draws-draws_before));
+    TEST(counters.executions == executions_before + 58 && !counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
+    std::printf("{\"kind\":\"indexed-ddi-runtime-shim\",\"requested_backend\":\"%s\",\"execution_device\":\"%s\",\"verified_draws\":%llu,\"porter_duff_components\":540672,\"porter_duff_additional_modes\":11,\"derivative_ddi_components\":16384,\"loop_ddi_components\":65536,\"loop_overflow_preserved_target\":true,\"blended_scissored_draws\":6,\"textured_draws\":8,\"mirrored_ddi_components\":16384,\"point_scaled_blended_draws\":2,\"linear_scaled_blended_draws\":2,\"base_vertex_and_start_index\":true,\"invalid_ranges_and_sampler_rejected\":true,\"registered_adapter_tested\":false,\"desktop_offload_tested\":false}\n", backend, counters.last_execution_device, static_cast<unsigned long long>(counters.draws-draws_before));
     return 0;
 }

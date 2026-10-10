@@ -27,7 +27,7 @@ public:
             const auto &h=request.header;require(shape_valid(h));
             const auto batch=triangle_batch(request);
             raster::PackedResources resources;shader::TextureSamplers samplers{};
-            if(h.flags&0x2000){require(h.abi==8 || h.abi==9 || h.abi==10 || h.abi==11);resources=request.resources;samplers=request.samplers;}
+            if(h.flags&0x2000){require(h.abi==8 || h.abi==9 || h.abi==10 || h.abi==11 || h.abi==12);resources=request.resources;samplers=request.samplers;}
             else {require(h.abi==7 || h.abi==9 || h.abi==10 || h.abi==11);resources[0]=request.texture;samplers[0].filter=(h.flags&16)?shader::TextureFilter::point:shader::TextureFilter::linear;}
             for(auto &entry:triangle_cache){const auto &old=entry.header;
                 if(entry.batch==batch && old.width==h.width && old.height==h.height && old.vertices==h.vertices && old.format==h.format &&

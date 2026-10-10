@@ -197,10 +197,13 @@ struct RegisterExecutor::State {
         auto sample_texture = [&](const Instruction &instruction) -> Node {
             const auto slot = instruction.sources[1].index;
             const auto shape = texture_shapes[slot];
-            const auto filter = samplers[instruction.sources[2].index].filter;
+            const auto sampler = samplers[instruction.sources[2].index];
+            const auto filter = sampler.filter;
             check(shape.width && shape.width <= 8192 && shape.height && shape.height <= 8192 &&
                   uint64_t(shape.width) * shape.height <= 4194304 &&
-                  (filter == TextureFilter::point || filter == TextureFilter::linear));
+                  (filter == TextureFilter::point || filter == TextureFilter::linear) &&
+                  (sampler.u==TextureAddress::clamp || sampler.u==TextureAddress::mirror) &&
+                  (sampler.v==TextureAddress::clamp || sampler.v==TextureAddress::mirror));
             if (!textures[slot]) {
                 auto parameter = std::make_shared<op::Parameter>(ov::element::f32, ov::Shape{size_t(shape.width) * shape.height, 4});
                 const auto name = "texture_" + std::to_string(slot);
@@ -217,7 +220,7 @@ struct RegisterExecutor::State {
                 parameter->set_friendly_name(name); parameter->output(0).get_tensor().set_names({name});
                 bindings.push_back({parameter, false, 0, name, false, true}); half_texel = parameter;
             }
-            auto coordinate = [&](unsigned axis, uint32_t extent) -> Node {
+            auto coordinate = [&](unsigned axis, uint32_t extent,TextureAddress address) -> Node {
                 Node value = values[axis].floating; check(bool(value));
                 const auto nan = std::make_shared<op::IsNaN>(value);
                 // A combined floating isfinite pattern misclassifies ordinary
@@ -233,6 +236,22 @@ struct RegisterExecutor::State {
                         std::make_shared<op::Convert>(batch(active), ov::element::i32));
                 }
                 invalid_coordinates.push_back(active_invalid);
+                if(address==TextureAddress::mirror){
+                    // All finite FP32 magnitudes >= 2^24 are even integers.
+                    // Reduce smaller magnitudes modulo two on the provider,
+                    // before multiplying by the extent, to bound integer taps.
+                    value=choose(std::make_shared<op::NotEqual>(invalid,integer(0)),number(0),value);
+                    Node magnitude=std::make_shared<op::Abs>(value);
+                    const auto small=std::make_shared<op::Less>(std::make_shared<op::Multiply>(magnitude,number(1.f/32768)),number(512));
+                    magnitude=choose(small,magnitude,number(0));
+                    const auto cycles=std::make_shared<op::BitwiseAnd>(std::make_shared<op::Convert>(
+                        std::make_shared<op::Multiply>(magnitude,number(.5f)),ov::element::i32),integer(0x7fffffff));
+                    Node reduced=std::make_shared<op::Subtract>(magnitude,std::make_shared<op::Multiply>(
+                        std::make_shared<op::Convert>(cycles,ov::element::f32),number(2)));
+                    reduced=choose(std::make_shared<op::Less>(value,number(0)),std::make_shared<op::Negative>(reduced),reduced);
+                    Node scaled=std::make_shared<op::Multiply>(reduced,number(float(extent)));
+                    return filter==TextureFilter::linear?Node(std::make_shared<op::Subtract>(scaled,half_texel)):scaled;
+                }
                 // Keep every speculative read in bounds. Nonfinite coordinates
                 // on an active path fail explicitly after inference.
                 value = choose(nan, number(0), value); // Infinities clamp at the comparisons below.
@@ -245,18 +264,36 @@ struct RegisterExecutor::State {
                 return choose(std::make_shared<op::Less>(value, number(0)), number(0),
                     choose(std::make_shared<op::Greater>(value, number(float(extent - 1))), number(float(extent - 1)), value));
             };
-            const auto x = coordinate(0, shape.width), y = coordinate(1, shape.height);
-            auto floor_index = [&](const Node &value) -> Node {
+            const auto x = coordinate(0, shape.width,sampler.u), y = coordinate(1, shape.height,sampler.v);
+            auto floor_index = [&](const Node &value,TextureAddress address) -> Node {
                 // Coordinates are nonnegative and bounded. Native NPU Floor
                 // miscomputes FP32; Convert gives truncation here. The AND is
                 // an identity on this range but prevents the compiler from
                 // incorrectly deleting the lossy float/int/float round trip.
-                return std::make_shared<op::BitwiseAnd>(std::make_shared<op::Convert>(value, ov::element::i32), integer(0x7fffffff));
+                Node truncated=std::make_shared<op::BitwiseAnd>(std::make_shared<op::Convert>(
+                    address==TextureAddress::mirror?Node(std::make_shared<op::Abs>(value)):value,ov::element::i32),integer(0x7fffffff));
+                if(address==TextureAddress::mirror){
+                    truncated=choose(std::make_shared<op::Less>(value,number(0)),std::make_shared<op::Negative>(truncated),truncated);
+                    // Convert truncates toward zero; correct negative fractions.
+                    return std::make_shared<op::Subtract>(truncated,std::make_shared<op::Convert>(
+                        std::make_shared<op::Less>(value,std::make_shared<op::Convert>(truncated,ov::element::f32)),ov::element::i32));
+                }
+                return truncated;
             };
-            const auto ix = floor_index(x), iy = floor_index(y);
+            const auto ix = floor_index(x,sampler.u), iy = floor_index(y,sampler.v);
+            auto tap = [&](const Node &base,int delta,uint32_t extent,TextureAddress address)->Node {
+                Node n=std::make_shared<op::Add>(base,integer(delta));
+                if(address==TextureAddress::clamp)return std::make_shared<op::Minimum>(n,integer(int32_t(extent-1)));
+                const auto period=integer(int32_t(extent*2));
+                // Linear filtering can place the first tap one texel below
+                // -period. Add two periods before the final single reduction.
+                n=choose(std::make_shared<op::Less>(n,integer(0)),std::make_shared<op::Add>(n,integer(int32_t(extent*4))),n);
+                n=choose(std::make_shared<op::GreaterEqual>(n,period),std::make_shared<op::Subtract>(n,period),n);
+                return choose(std::make_shared<op::Less>(n,integer(int32_t(extent))),n,
+                    std::make_shared<op::Subtract>(integer(int32_t(extent*2-1)),n));
+            };
             auto fetch = [&](int dx, int dy) -> Node {
-                const auto sx = std::make_shared<op::Minimum>(std::make_shared<op::Add>(ix, integer(dx)), integer(int32_t(shape.width - 1)));
-                const auto sy = std::make_shared<op::Minimum>(std::make_shared<op::Add>(iy, integer(dy)), integer(int32_t(shape.height - 1)));
+                const auto sx = tap(ix,dx,shape.width,sampler.u),sy=tap(iy,dy,shape.height,sampler.v);
                 const auto index = std::make_shared<op::Reshape>(std::make_shared<op::Add>(sx,
                     std::make_shared<op::Multiply>(sy, integer(int32_t(shape.width)))), indices({int64_t(count)}), false);
                 return std::make_shared<op::Gather>(textures[slot], index, integer(0));

@@ -1,4 +1,5 @@
 #pragma once
+#include <algorithm>
 // Test/reference evaluation only. Never a fallback for the NPU provider.
 #include "shader_ir.hpp"
 #include "shader_texture.hpp"
@@ -115,20 +116,29 @@ inline Registers reference_vertex(const Program &program, const Registers &input
             else if (instruction.opcode == Opcode::sample) {
                 const auto slot = instruction.sources[1].index;
                 const auto shape = shapes[slot];
-                const auto filter = samplers[instruction.sources[2].index].filter;
+                const auto sampler = samplers[instruction.sources[2].index];
+                const auto filter = sampler.filter;
                 check(shape.width && shape.height && textures[slot].size() == size_t(shape.width) * shape.height);
                 const auto u = as_float(values[0][0]), v = as_float(values[0][1]);
                 check(std::isfinite(u) && std::isfinite(v));
-                // Independent scalar oracle: clamp individual taps, with
-                // double-precision weights, rather than the graph's lowering.
-                const auto clamp_uv = [](float x) { return x < 0 ? 0.0 : (x > 1 ? 1.0 : double(x)); };
-                const double x = clamp_uv(u) * shape.width - (filter == TextureFilter::linear ? .5 : 0);
-                const double y = clamp_uv(v) * shape.height - (filter == TextureFilter::linear ? .5 : 0);
+                // Independent scalar oracle: reduce with double fmod, then
+                // address individual integer taps, including mirror seams.
+                const auto coordinate = [](float x, TextureAddress address) {
+                    if(address==TextureAddress::mirror)return std::fmod(double(x),2.0);
+                    check(address==TextureAddress::clamp);return std::clamp(double(x),0.,1.);
+                };
+                const double x = coordinate(u,sampler.u) * shape.width - (filter == TextureFilter::linear ? .5 : 0);
+                const double y = coordinate(v,sampler.v) * shape.height - (filter == TextureFilter::linear ? .5 : 0);
                 const auto ix = int(std::floor(x)), iy = int(std::floor(y));
                 const auto component = instruction.sources[1].lanes[i];
+                auto tap = [](int n,uint32_t extent,TextureAddress address) {
+                    if(address==TextureAddress::clamp)return uint32_t(std::clamp(n,0,int(extent)-1));
+                    const int period=int(extent)*2;int wrapped=n%period;if(wrapped<0)wrapped+=period;
+                    return uint32_t(wrapped<int(extent)?wrapped:period-1-wrapped);
+                };
                 auto fetch = [&](int dx, int dy) {
-                    const auto sx = ix + dx < 0 ? 0u : (uint32_t(ix + dx) >= shape.width ? shape.width - 1 : uint32_t(ix + dx));
-                    const auto sy = iy + dy < 0 ? 0u : (uint32_t(iy + dy) >= shape.height ? shape.height - 1 : uint32_t(iy + dy));
+                    const auto sx = tap(ix+dx,shape.width,sampler.u);
+                    const auto sy = tap(iy+dy,shape.height,sampler.v);
                     return double(textures[slot][size_t(sy) * shape.width + sx][component]);
                 };
                 double sampled = fetch(0, 0);

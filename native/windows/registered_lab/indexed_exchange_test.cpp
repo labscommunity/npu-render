@@ -188,6 +188,21 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
     const auto resource_packet=ex::encode(resources);const auto resource_decoded=ex::decode(resource_packet);
     test(resource_decoded.resources[0].pixels==resources.resources[0].pixels && resource_decoded.resources[1].pixels==resources.resources[1].pixels &&
         nr::raster::resource_layout_equal(resources.resources,resource_decoded.resources));
+    for(unsigned mode=0;mode<4;++mode){auto mirrored=resources;mirrored.header.abi=12;
+        mirrored.samplers[0].u=mode&1?nr::shader::TextureAddress::mirror:nr::shader::TextureAddress::clamp;
+        mirrored.samplers[0].v=mode&2?nr::shader::TextureAddress::mirror:nr::shader::TextureAddress::clamp;
+        for(const uint32_t flags:{0u,0x4001u,0x8001u,0x90001u}){
+            mirrored.header.flags=resources.header.flags|flags;const auto packet=ex::encode(mirrored);const auto roundtrip=ex::decode(packet);
+            test(nr::raster::sampler_layout_equal(mirrored.samplers,roundtrip.samplers) && ex::blend_mode(mirrored.header)==ex::blend_mode(roundtrip.header));
+            auto corrupt=packet;const uint32_t invalid=8;std::memcpy(corrupt.data()+corrupt.size()-16*4,&invalid,4);rejects(corrupt);
+            if(mode){auto legacy=mirrored;legacy.header.abi=flags==0?8:flags==0x4001?9:flags==0x8001?10:11;
+                bool rejected=false;try{(void)ex::encode(legacy);}catch(const std::invalid_argument &){rejected=true;}test(rejected);
+                auto old_packet=packet;auto h=legacy.header;std::memcpy(old_packet.data(),&h,sizeof(h));rejects(old_packet);
+            }
+        }
+        if(mode)test(!nr::raster::sampler_layout_equal(mirrored.samplers,resources.samplers));
+    }
+    {auto bad=r;bad.header.abi=12;test(!ex::shape_valid(bad.header));}
     for(uint32_t mode=4;mode<13;++mode){
         for(const auto &base : {triangles,resources}){auto candidate=base;candidate.header.abi=11;candidate.header.flags|=0x10001|(mode<<17);
             const auto roundtrip=ex::decode(ex::encode(candidate));

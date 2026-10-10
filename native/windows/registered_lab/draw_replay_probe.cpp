@@ -169,13 +169,19 @@ int main(int argc, char **argv) try {
     for(unsigned slot=0;slot<16;++slot)general_resources=general_resources ||
         (ps.textures[slot] && (slot || ps.texture_dimensions[slot]!=3 || ps.texture_uint[slot])) || (slot && ps.samplers[slot]);
     for(const auto &instruction:ps.instructions)general_resources=general_resources || instruction.opcode==Opcode::load;
+    for(unsigned slot=0;slot<16;++slot)if(ps.samplers[slot]){
+        const auto sampler=snapshot.values<uint32_t>("sampler-2-"+std::to_string(slot));nr::capture::check(sampler.size()==13);
+        general_resources=general_resources || sampler[1]!=3 || sampler[2]!=3;
+    }
     std::vector<PackedColor> texture_reference;
     if(general_resources){
         for(unsigned slot=0;slot<16;++slot){
             if(ps.samplers[slot]){
                 const auto sampler=snapshot.values<uint32_t>("sampler-2-"+std::to_string(slot));
-                nr::capture::check(sampler.size()==13 && (sampler[0]==0 || sampler[0]==21) && sampler[1]==3 && sampler[2]==3 && sampler[3]==3 && !sampler[4] && !sampler[11] && as_float(sampler[12])>=0);
+                nr::capture::check(sampler.size()==13 && (sampler[0]==0 || sampler[0]==21) && (sampler[1]==2 || sampler[1]==3) && (sampler[2]==2 || sampler[2]==3) && sampler[3]==3 && !sampler[4] && !sampler[11] && as_float(sampler[12])>=0);
                 texture_samplers[slot].filter=sampler[0]==0?TextureFilter::point:TextureFilter::linear;
+                texture_samplers[slot].u=sampler[1]==2?TextureAddress::mirror:TextureAddress::clamp;
+                texture_samplers[slot].v=sampler[2]==2?TextureAddress::mirror:TextureAddress::clamp;
             }
             if(!ps.textures[slot])continue;const auto name="resource-2-"+std::to_string(slot);if(!snapshot.has(name))continue;
             const auto description=snapshot.values<uint32_t>(name+"-description"),view_desc=snapshot.values<uint32_t>(name+"-view");

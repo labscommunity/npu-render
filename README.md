@@ -113,13 +113,21 @@ now has an exact NPU specialization for opaque, one-to-one point-sampled quads.
 Its captured 1024×768 replay passes, as do changing-image and driver callback
 tests. This is a checked subset, not general desktop rendering.
 
-The [latest installed trial](docs/validation/2026-10-10/sole-display-v92/report.json)
-completes 171 live desktop NPU draws plus 13 prewarm requests, all acknowledged.
-DWM creates the previously rejected masking shader and the finite observer
-records no in-window DWM rejection. Two frames arrive through the sole indirect
-display: one black and one incomplete desktop. The input gate never admits its
-Start-menu test. Both custom drivers unload cleanly and the normal VM desktop
-returns. Full desktop offload and a Tahoma benefit remain unproven.
+The [latest installed trial](docs/validation/2026-10-10/sole-display-v93/report.json)
+completes 323 live desktop NPU draws plus 13 prewarm requests, all acknowledged.
+Eleven frames arrive through the sole indirect display. Later frames show the
+wallpaper and full taskbar after DWM restarts, but the Start/Escape snapshots
+show no verified response. A complete failed draw identifies MIRROR texture
+addressing as the next missing operation in Windows' blur shader. Both custom
+drivers unload cleanly and the normal VM desktop returns. Stable interactive
+desktop offload and a Tahoma benefit remain unproven.
+
+[Mirrored-texture qualification](docs/validation/2026-10-10/mirror-v174/report.json)
+now replays that failed DWM blur draw on the NPU with all 8,192 output pixels
+matching the CPU and scalar reference. MIRROR addressing crosses the driver,
+versioned packet and NPU sampling paths. All 22 CPU suites, 196,608 native NPU
+sample components, 58 driver draws and the existing NPU regressions pass.
+The installed desktop trial is the next validation step.
 
 The [loop-shader qualification](docs/validation/2026-10-10/loops-v165/report.json)
 passes the captured 1,850-word mirrored filter on the NPU, including 33 scalar
@@ -128,8 +136,8 @@ admitted loops use a checked 16-iteration bound. The captured filter has an exac
 bytecode specialization with up to 128 sample pairs and a verified 256-pixel
 batch limit. A larger batch lost the NPU device during qualification; the failed
 experiment and subsequent recovery check are retained. Twenty CPU suites and
-57 NPU indexed DDI draws pass. The v91 installed trial does not exercise this
-1,850-word shader; its real desktop behavior remains unverified.
+57 NPU indexed DDI draws pass. The v93 installed trial reaches this
+1,850-word shader, then rejects its MIRROR sampler state before NPU execution.
 
 The [masking-shader qualification](docs/validation/2026-10-10/masks-v167/report.json)
 adds bitwise AND and floating inequality with conservative predicate tracking.

@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.24)
+project(mirror_replay_diagnostic LANGUAGES CXX)
+find_package(OpenVINO REQUIRED COMPONENTS Runtime)
+add_executable(replay_test draw_replay_probe.cpp vertex_executor.cpp)
+target_compile_features(replay_test PRIVATE cxx_std_17)
+target_compile_options(replay_test PRIVATE /W4 /WX)
+set_property(TARGET replay_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+target_link_libraries(replay_test PRIVATE "$ENV{LOCALAPPDATA}/npu-render/builds/present-umd-v169/Release/nr_registered_vertex.lib" openvino::runtime)

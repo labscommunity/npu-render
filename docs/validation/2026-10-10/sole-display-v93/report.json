@@ -1,0 +1,37 @@
+{
+  "trial": "v93",
+  "source_commit": "5bc630865c0fa9148bcfb9bf13c11bf1dcaed7c4",
+  "umd_build": "present-umd-v167",
+  "package_version": "0.0.81.0",
+  "worker_successes_by_client": {
+    "42": 13,
+    "4764": 82,
+    "1076": 73,
+    "5384": 58,
+    "4524": 110
+  },
+  "acknowledged_successes_by_client": {
+    "42": 13,
+    "4764": 82,
+    "1076": 73,
+    "5384": 58,
+    "4524": 110
+  },
+  "received_frames": 11,
+  "viewer_submissions": 11,
+  "full_desktop_offload": false,
+  "usable_interactive_desktop": false,
+  "tahoma_performance_tested": false,
+  "original_cleanup_passed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "guest_restart": false,
+  "findings": [
+    "336 successful NPU requests: 13 prewarm packets and 323 live draws. Clients: DWM PID 1076 (73), subsequent DWM PID 4524 (110), Explorer PID 4764 (82), StartMenuExperienceHost PID 5384 (58). Every successful reply has an acknowledged relay receipt.",
+    "The 300-second topology interval exposes a complete failed DWM draw after 65794 ms of observation. Its 1850-word pixel shader matches the earlier loop fixture, but sampler 0 uses MIRROR on U and V. The current driver accepts only CLAMP. The archived exact draw rejects at executor construction in CPU replay of build v167; no CPU rendering fallback is accepted.",
+    "Eleven 1024x768 frames arrive while the indirect display is the only active path. Later frames, after the DWM process changes, show wallpaper and a complete taskbar. This is frame receipt and SDL window submission evidence; physical scanout and stable interactive operation remain unverified.",
+    "The input harness sends Control, Start, then Escape. All three snapshots retain the same frame identity and pixel hash. No visual response is verified. Later frame changes cannot be attributed to these actions.",
+    "The observer waits for finite topology restoration after detecting the DWM rejection. Both custom driver removals pass, the stream configuration is removed, and the normal VM desktop is visually verified afterward. Device-gone DDI rows in later client logs are untimestamped and are not evidence of a second shader failure.",
+    "The next change adds MIRROR addressing through driver admission, versioned draw packets, provider sampling, and the independent scalar reference, followed by replay of the captured draw and another installed trial."
+  ]
+}

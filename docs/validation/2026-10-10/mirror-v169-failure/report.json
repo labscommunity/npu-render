@@ -1,0 +1,12 @@
+{
+  "build": "present-umd-v169",
+  "cpu_suites_passed": 21,
+  "cpu_suites_total": 22,
+  "cpu_mirror_contract_passed": true,
+  "ddi_failure": "The aggregate assertion still expected 57 draws after adding one mirror draw. The added draw pixel check passed before this assertion.",
+  "native_npu_passed": false,
+  "npu_failure": "Point sampling with MIRROR on U and CLAMP on V returned zero for U=-8388607.5 where the scalar reference expected 0.2890625 in lane 0. Failure at row 2. No desktop installation performed.",
+  "next_experiment": "Scale the coordinate range guard as already qualified for FRC, then run isolated CPU/NPU mirror tests.",
+  "raw_build_sha256": "d9a9a744b9ed0266d9f36b4003e272295da09a4f6566bfc0bfb70404e36e310d",
+  "installed": false
+}

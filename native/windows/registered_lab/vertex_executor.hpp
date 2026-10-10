@@ -11,7 +11,7 @@ using VertexConstants = std::array<std::vector<VertexBits>, 14>;
 // indexed constant reads execute on the explicitly selected compiled provider.
 // Shared vertex/pixel arithmetic. Inputs are already decoded/interpolated; this
 // does not implement rasterization or interpolation. Texture sampling accepts
-// only the explicit single-mip, edge-clamped contract in shader_texture.hpp.
+// only the explicit single-mip addressing contract in shader_texture.hpp.
 class RegisterExecutor {
     struct State;
     std::unique_ptr<State> state;

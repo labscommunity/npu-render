@@ -1,0 +1,11 @@
+{
+  "build": "present-umd-v171",
+  "cpu_suites_passed": 21,
+  "cpu_suites_total": 22,
+  "cpu_mirror_contract_passed": false,
+  "failure": "Linear MIRROR on both axes of a 1x1 texture returned 0.0637817383 instead of 0.07421875 at coordinate (-1.875,-1.875), row 231 lane 1.",
+  "cause": "The first linear tap can be -period-1. Adding one period to a negative tap leaves that boundary negative; the old implementation could send an out-of-range Gather index.",
+  "fix_under_test": "Add two periods for negative taps, then reduce once. Extended tests add coordinates immediately inside the negative and positive two-unit seams.",
+  "raw_build_sha256": "b3711c0ebc0f49ddec9a2d310c56a28fbb17b8bdc172f7865ff2274b909b1917",
+  "installed": false
+}
