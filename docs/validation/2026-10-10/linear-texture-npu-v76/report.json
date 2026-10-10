@@ -1,0 +1,66 @@
+{
+  "schema": 1,
+  "kind": "bounded-linear-texture-quad-npu-qualification",
+  "clean_build": "present-umd-v76",
+  "cpu_contract_tests_passed": 13,
+  "source_hashes_match_checkout": 82,
+  "npu_linear_draw": {
+    "binary_build": "present-umd-v75",
+    "runtime_sources_unchanged_in_v76": true,
+    "components_checked": 12845056,
+    "rounded_double_oracle_differences": 22740,
+    "maximum_error_in_byte_units": 0.516322696,
+    "limit_in_byte_units": 0.6,
+    "uncovered_pixels_exact": true,
+    "invalid_draws_rejected": 16,
+    "full_size_draw_ms": [
+      2255.545,
+      2185.057,
+      2180.782,
+      2269.284
+    ]
+  },
+  "captured_replay": {
+    "sha256": "768e20d93f659fb807ba2f60cc383cfeac81d8972360a1d778b3bf2fd939d031",
+    "repeats": 3,
+    "covered_samples": 779280,
+    "requests_per_draw": 194,
+    "tiling_requests": 192,
+    "draw_ms": [
+      2001.578,
+      1940.306,
+      1951.659
+    ],
+    "maximum_byte_error": 0,
+    "source_is_transparent": true,
+    "general_nonzero_sources_qualified_separately": true
+  },
+  "npu_ddi_shim": {
+    "binary_build": "present-umd-v76",
+    "indexed_draws": 9,
+    "checked_components": 147456,
+    "new_linear_scaled_blended_draws": 2,
+    "other_component_draws": 16
+  },
+  "preserved_failures": [
+    "Direct GridSample compiled on NPU but returned corrupted values at 64x64; discarded.",
+    "v74 compile failed on Windows max macro in test; corrected with parenthesized std::max.",
+    "v75 renderer tests passed; old DDI test expected E_INVALIDARG for a newly recognized linear sampler paired with unsupported opaque shader. It now checks failed HRESULT and unchanged output; no successful unsupported draw is permitted."
+  ],
+  "protocol": {
+    "abi": 4,
+    "flag_bit": 8,
+    "texture_flag_also_required": true,
+    "allows_blending_and_scissor": true,
+    "prior_versions_compatible": true
+  },
+  "limitations": [
+    "Axis-aligned unit-w quad and white-modulated two-instruction SAMPLE shader only.",
+    "Single mip, bilinear clamp, RGBA8/BGRA8, full write mask; no arbitrary shader or rotation.",
+    "About 2.2 seconds for one 1024x768 draw; not interactive performance.",
+    "No new installed desktop trial or frame delivery established by these component tests."
+  ],
+  "displayed_frames": 0,
+  "full_desktop_offload": false,
+  "tahoma_performance_tested": false
+}

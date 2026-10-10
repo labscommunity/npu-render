@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "kind": "live-dwm-npu-draws-and-deferred-swapchain-release",
+  "source_revision": "38d9a30e69bd8e2e1ce123a4185dcdab8bf2f713",
+  "umd_build": "present-umd-v73",
+  "render_version": "0.0.52.0",
+  "idd_build": "indirect-lab-v22",
+  "idd_version": "0.0.8.0",
+  "npu_draws": {"prewarm_passed": 3, "live_dwm_completed": 10, "live_dwm_textured_completed": 0},
+  "live_dwm_pid": 1076,
+  "captured_first_failed_draw_sha256": "768e20d93f659fb807ba2f60cc383cfeac81d8972360a1d778b3bf2fd939d031",
+  "next_unsupported_draw": "Fractional axis-aligned quad, linear clamp texture sampling, sampled alpha preserved, premultiplied source-over; captured source happens to be transparent but implementation must handle general images.",
+  "idd_assignments": 20,
+  "idd_release_queued": 20,
+  "idd_release_completed": 20,
+  "idd_received_frames": 0,
+  "cleanup": "Both owned devices removed with devcon and pnputil exit 0, without restarting the VM. No physical host restart or driver changes.",
+  "worker_exit_code": 1,
+  "worker_exit_detail": "Socket closed or timed out when the finite controller action ended; all 13 submitted requests have successful worker and relay receipts.",
+  "displayed_frames": 0,
+  "full_desktop_offload": false,
+  "tahoma_performance_tested": false
+}

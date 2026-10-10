@@ -412,10 +412,43 @@ under the tested NPU's floating-point lowering. Arbitrary fractional colors use
 the existing bounded merger only with full-target scissor; unsupported partial
 scissor draws fail without committing target bytes. Both checked quad index
 orders are admitted. Pixel scissor coordinates travel in packet version 3;
-versions 1 and 2 remain compatible, and partial texture scissor remains rejected.
+versions 1 and 2 remain compatible. The point-copy specialization still requires
+full coverage; the linear-texture path below also accepts partial scissor.
 The stream caches up to eight uniform programs, retaining compiled programs
 across alternating draw states. `-SmokeTest -ScissorSmokeTest` checks three
 1024×768 packets against independent byte arithmetic and preserved outside pixels.
 The [v73 qualification](../../../docs/validation/2026-10-10/scissor-blend-npu-v73/report.json)
 records the exact pixel checks, captured-draw replay, VM packet checks and failed
 arithmetic prototypes. It does not establish display frame delivery.
+
+
+`LinearTextureDrawExecutor` handles the next captured DWM shader: SAMPLE followed
+by white color modulation, retaining sampled alpha. A checked axis-aligned quad
+with unit clip w supports fractional bounds, scaling, edge-clamped bilinear
+sampling, RGBA/BGRA conversion, partial scissor and optional premultiplied
+source-over. Vertex shading, projection, coverage, UV interpolation, filtering,
+blending and byte conversion execute on the selected provider. Host code validates
+state, decodes texel formats, copies inputs/outputs and counts coverage diagnostics.
+It does not rasterize pixels or choose a fallback device.
+
+The sampler processes at most 4096 pixels per request, with the same compiled
+model reused for every row group. A direct GridSample prototype produced corrupt
+NPU output; the implementation uses the previously qualified bounded Gather and
+integer-predicate lowering. Packet version 4 adds a checked linear-filter bit;
+versions 1–3 remain compatible. Unsupported shaders, perspective/rotated geometry,
+non-white vertex color and unsupported filtering still fail without committing
+the target. This is an incremental operation, not full desktop offload.
+
+The [v63b installed trial](../../../docs/validation/2026-10-10/indexed-dwm-v63b/report.json)
+completed 10 live DWM solid draws on the NPU. With deferred swapchain deletion,
+all 20 swapchains released and both devices removed without restarting the VM.
+No indirect-display frame arrived. The next captured operation is the scaled,
+alpha-blended texture handled by the new path.
+
+The [v76 hardware qualification](../../../docs/validation/2026-10-10/linear-texture-npu-v76/report.json)
+checks 12,845,056 components against an independent double-precision sampler and
+blend oracle. Maximum error is 0.5164 byte units (the limit is 0.6); outside pixels
+remain exact. Three replays of the captured transparent-source draw are exact.
+The actual DDI shim also verifies changing nonzero scaled/blended textures. One
+1024×768 draw currently takes about 2.2 seconds: correctness evidence does not
+establish interactive rendering, frame delivery, or a Tahoma benefit.

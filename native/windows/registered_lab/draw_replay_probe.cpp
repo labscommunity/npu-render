@@ -4,6 +4,7 @@
 #include "shader_reference.hpp"
 #include "uniform_draw.hpp"
 #include "point_texture_draw.hpp"
+#include "linear_texture_draw.hpp"
 #include <cstdlib>
 #include <algorithm>
 #include <chrono>
@@ -103,15 +104,38 @@ int main(int argc, char **argv) try {
     const auto compile_start = std::chrono::steady_clock::now();
     std::unique_ptr<UniformDrawExecutor> executor;
     std::unique_ptr<PointTextureDrawExecutor> texture_executor;
+    std::unique_ptr<LinearTextureDrawExecutor> linear_executor;
+    std::vector<std::array<double,4>> linear_reference;
+    uint64_t linear_covered=0;
     PackedTexture texture;
     std::vector<PackedColor> texture_reference;
     if (textured) {
-        nr::capture::check(clip == std::array<int32_t,4>{0,0,int32_t(width),int32_t(height)});
         const auto source = snapshot.values<uint32_t>("source-description"), sampler = snapshot.values<uint32_t>("sampler-2-0");
-        nr::capture::check(args[0] == 6 && !blending && (blend[15] & 255) == 15 && source.size() == 10 && source[0] == 0x4e52574b && source[1] == 1 && source[2] == 40 && !source[7]);
-        nr::capture::check(sampler.size() == 13 && !sampler[0] && sampler[1] == 3 && sampler[2] == 3 && sampler[3] == 3 && !sampler[4] && !sampler[11]);
+        nr::capture::check(args[0] == 6 && (blend[15] & 255) == 15 && source.size() == 10 && source[0] == 0x4e52574b && source[1] == 1 && source[2] == 40 && !source[7]);
+        nr::capture::check(sampler.size() == 13 && (sampler[0]==0 || sampler[0]==21) && sampler[1] == 3 && sampler[2] == 3 && sampler[3] == 3 && !sampler[4] && !sampler[11]);
         nr::capture::check(as_float(sampler[12]) >= 0);
         texture = {source[3],source[4],source[5],snapshot.values<PackedColor>("source")};
+        if(sampler[0]==21){
+            linear_executor=std::make_unique<LinearTextureDrawExecutor>(vs,ps,width,height,format,texture.width,texture.height,texture.format,backend,blending);
+            const auto a=reference_vertex(vs,inputs[0],cb),b=reference_vertex(vs,inputs[2],cb);const auto pr=vs.position_output,ur=ps.instructions[0].sources[0].index;
+            const std::array<float,4> screen{(as_float(a[pr][0])+1)*(float(width)*.5f),(1-as_float(a[pr][1]))*(float(height)*.5f),
+                (as_float(b[pr][0])+1)*(float(width)*.5f),(1-as_float(b[pr][1]))*(float(height)*.5f)};
+            const std::array<double,4> uv{as_float(a[ur][0]),as_float(a[ur][1]),as_float(b[ur][0]),as_float(b[ur][1])};
+            std::array<int32_t,4> snapped{};for(unsigned c=0;c<4;++c)snapped[c]=int32_t(std::nearbyint(double(screen[c])*256));
+            linear_reference.resize(size_t(width)*height);
+            for(uint32_t y=0;y<height;++y)for(uint32_t x=0;x<width;++x){
+                const auto at=size_t(y)*width+x;const int32_t px=int32_t(x)*256+128,py=int32_t(y)*256+128;
+                const bool covered=px>=snapped[0]&&px<snapped[2]&&py>=snapped[1]&&py<snapped[3]&&int32_t(x)>=clip[0]&&int32_t(y)>=clip[1]&&int32_t(x)<clip[2]&&int32_t(y)<clip[3];
+                if(!covered){for(unsigned c=0;c<4;++c)linear_reference[at][c]=pixels[at][c];continue;}++linear_covered;
+                const double tx=(uv[0]+(x+.5-screen[0])/(double(screen[2])-screen[0])*(uv[2]-uv[0]))*texture.width-.5;
+                const double ty=(uv[1]+(y+.5-screen[1])/(double(screen[3])-screen[1])*(uv[3]-uv[1]))*texture.height-.5;
+                const auto ix=int64_t(std::floor(tx)),iy=int64_t(std::floor(ty));const double fx=tx-double(ix),fy=ty-double(iy);double sample[4]{};
+                for(int dy=0;dy<2;++dy)for(int dx=0;dx<2;++dx){const auto sx=std::clamp(ix+dx,int64_t(0),int64_t(texture.width)-1),sy=std::clamp(iy+dy,int64_t(0),int64_t(texture.height)-1);
+                    for(unsigned c=0;c<4;++c)sample[c]+=texture.pixels[size_t(sy)*texture.width+size_t(sx)][c]*(dx?fx:1-fx)*(dy?fy:1-fy);}
+                for(unsigned c=0;c<4;++c)linear_reference[at][c]=std::clamp(sample[format!=texture.format&&c<3?2-c:c]+(blending?pixels[at][c]*(1-sample[3]/255):0),0.,255.);
+            }
+        }else{
+            nr::capture::check(!blending && clip==std::array<int32_t,4>{0,0,int32_t(width),int32_t(height)});
         texture_executor = std::make_unique<PointTextureDrawExecutor>(vs,ps,width,height,format,texture.width,texture.height,texture.format,backend);
         // Independent scalar point-sampling oracle for this capture. The runtime
         // specialization validates the complete shader and affine-quad proof.
@@ -126,19 +150,27 @@ int main(int argc, char **argv) try {
             auto p = texture.pixels[size_t(sy)*texture.width+size_t(sx)];
             if(format!=texture.format) std::swap(p[0],p[2]); p[3]=255; texture_reference[size_t(y)*width+x]=p;
         }
+        }
     } else executor = std::make_unique<UniformDrawExecutor>(vs, ps, args[0], width, height, backend, blending, format == 87, uint8_t(blend[15] & 255), batch);
     const auto compile_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - compile_start).count();
     UniformDrawExecutor::Result result;
     std::vector<PackedColor> reference_pixels;
     for (uint32_t iteration = 0; iteration < repeats; ++iteration) {
         const Viewport viewport{view[0],view[1],view[2],view[3],view[4],view[5]};
-        result = textured ? texture_executor->execute(inputs,cb,viewport,texture) : executor->execute(inputs, cb, pixel_cb, viewport, pixels, clip);
+        result = linear_executor ? linear_executor->execute(inputs,cb,viewport,texture,pixels,clip) : textured ? texture_executor->execute(inputs,cb,viewport,texture) : executor->execute(inputs, cb, pixel_cb, viewport, pixels, clip);
         for (size_t i = 0; i < inputs.size(); ++i) {
             const auto expected = reference_vertex(vs, inputs[i], cb);
             for (unsigned r = 0; r < 16; ++r) for (unsigned c = 0; c < 4; ++c) if (vs.outputs[r] & (1u << c))
                 nr::capture::check(result.vertices[i][r][c] == expected[r][c]);
         }
-        if (textured) nr::capture::check(result.pixels == texture_reference);
+        if(linear_executor){
+            double maximum=0;uint64_t differing=0;
+            nr::capture::check(result.covered_samples==linear_covered);
+            for(size_t n=0;n<result.pixels.size();++n)for(unsigned c=0;c<4;++c){const auto wanted=linear_reference[n][c];
+                maximum=(std::max)(maximum,std::abs(result.pixels[n][c]-wanted));if(result.pixels[n][c]!=uint8_t(std::nearbyint(wanted)))++differing;}
+            nr::capture::check(maximum<=.6);
+            std::printf("{\"linear_oracle_max_byte_error\":%.9g,\"rounded_oracle_differences\":%llu}\n",maximum,static_cast<unsigned long long>(differing));
+        }else if (textured) nr::capture::check(result.pixels == texture_reference);
         else {
             VertexRegisters uniform{};
             for (unsigned r = 0; r < 16; ++r) if (ps.inputs[r] && r != ps.position_input) uniform[r] = result.vertices[0][r];

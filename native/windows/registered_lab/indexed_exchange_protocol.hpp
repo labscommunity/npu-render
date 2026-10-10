@@ -3,6 +3,7 @@
 // never native code or an imported OpenVINO model. Transport is defined separately.
 #include "uniform_draw.hpp"
 #include "point_texture_draw.hpp"
+#include "linear_texture_draw.hpp"
 #include <cstring>
 #include <limits>
 #include <stdexcept>
@@ -23,13 +24,14 @@ struct Receipt {
 static_assert(sizeof(Receipt) == 48);
 inline void require(bool value) { if (!value) throw std::invalid_argument("invalid indexed NPU exchange packet"); }
 inline bool shape_valid(const Header &h) {
-    const bool valid = h.signature == magic && h.abi == ((h.flags & 4) ? 3u : ((h.flags & 2) ? 2u : 1u)) && (h.nonce[0] || h.nonce[1]) && h.client_pid &&
+    const bool valid = h.signature == magic && h.abi == ((h.flags & 8) ? 4u : ((h.flags & 4) ? 3u : ((h.flags & 2) ? 2u : 1u))) && (h.nonce[0] || h.nonce[1]) && h.client_pid &&
         h.width && h.width <= 8192 && h.height && h.height <= 8192 && uint64_t(h.width) * h.height <= 4 * 1024 * 1024 &&
         h.vertices && h.vertices <= 4096 && !(h.vertices % 3) && (h.format == 28 || h.format == 87) &&
-        !(h.flags & ~0xf07u) && (h.flags & 0xf00u) && h.vs_words >= 3 && h.vs_words <= 16384 &&
+        !(h.flags & ~0xf0fu) && (h.flags & 0xf00u) && h.vs_words >= 3 && h.vs_words <= 16384 &&
         h.ps_words >= 3 && h.ps_words <= 16384 && h.sequence && h.sequence <= max_requests &&
         h.body_bytes <= max_packet_bytes - sizeof(Header) && !h.reserved;
     if (!valid) return false;
+    if (h.flags & 8) return h.vertices == 6 && h.width <= 4096 && (h.flags & ~5u) == 0xf0a;
     if (h.flags & 2) return h.vertices == 6 && h.flags == 0xf02;
     uint32_t batch = 4096; const uint64_t pixels = uint64_t(h.width) * h.height;
     while (pixels % batch) batch /= 2;
@@ -69,7 +71,7 @@ struct TextureDescription { uint32_t width, height, format, reserved; };
 static_assert(sizeof(TextureDescription) == 16);
 inline bool texture_valid(const TextureDescription &t, const Header &h) {
     return t.width && t.width <= 8192 && t.height && t.height <= 8192 &&
-        uint64_t(t.width)*t.height <= 4*1024*1024 && t.width >= h.width && t.height >= h.height &&
+        uint64_t(t.width)*t.height <= 4*1024*1024 && ((h.flags & 8) || (t.width >= h.width && t.height >= h.height)) &&
         (t.format == 28 || t.format == 87) && !t.reserved;
 }
 class Writer {

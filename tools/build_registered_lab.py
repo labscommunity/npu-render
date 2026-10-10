@@ -90,6 +90,7 @@ def main():
         "nr_registered_indexed_stream_relay.exe",
         "nr_registered_texture_crop_test.exe",
         "nr_registered_point_texture_draw_test.exe",
+        "nr_registered_linear_texture_draw_test.exe",
     ):
         binaries[name] = hashlib.sha256(
             (args.build_dir / "Release" / name).read_bytes()

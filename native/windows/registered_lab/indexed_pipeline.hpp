@@ -10,8 +10,23 @@ class Pipeline {
     std::vector<UniformEntry> uniform_cache;
     std::unique_ptr<raster::PointTextureDrawExecutor> texture_executor;
     Request previous_texture;
+    std::unique_ptr<raster::LinearTextureDrawExecutor> linear_executor;
+    Request previous_linear;
 public:
     raster::UniformDrawExecutor::Result execute(const Request &request) {
+        if (request.header.flags & 8) {
+            const auto &h=request.header,&old=previous_linear.header;
+            const auto &t=request.texture,&pt=previous_linear.texture;
+            require(shape_valid(h) && h.abi==4);
+            if(!linear_executor || old.width!=h.width || old.height!=h.height || old.format!=h.format ||
+                (old.flags & ~4u)!=(h.flags & ~4u) || pt.width!=t.width || pt.height!=t.height || pt.format!=t.format ||
+                previous_linear.vertex.bytecode!=request.vertex.bytecode || previous_linear.pixel.bytecode!=request.pixel.bytecode){
+                auto candidate=std::make_unique<raster::LinearTextureDrawExecutor>(request.vertex,request.pixel,h.width,h.height,h.format,t.width,t.height,t.format,"NPU",(h.flags&1)!=0);
+                linear_executor=std::move(candidate);previous_linear={};previous_linear.header=h;
+                previous_linear.vertex=request.vertex;previous_linear.pixel=request.pixel;previous_linear.texture={t.width,t.height,t.format,{}};
+            }
+            return linear_executor->execute(request.inputs,request.vertex_constants,request.viewport,t,request.background,request.scissor);
+        }
         if (request.header.flags & 2) {
             const auto &h = request.header, &old = previous_texture.header;
             const auto &t = request.texture, &pt = previous_texture.texture;

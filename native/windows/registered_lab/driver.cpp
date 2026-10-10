@@ -44,6 +44,9 @@ struct Device {
     std::unique_ptr<nr::raster::PointTextureDrawExecutor> point_texture_executor;
     std::shared_ptr<const nr::shader::Program> point_texture_vertex, point_texture_pixel;
     std::array<uint64_t, 6> point_texture_key{};
+    std::unique_ptr<nr::raster::LinearTextureDrawExecutor> linear_texture_executor;
+    std::shared_ptr<const nr::shader::Program> linear_texture_vertex, linear_texture_pixel;
+    std::array<uint64_t, 7> linear_texture_key{};
     std::unique_ptr<IndexedNpuExchange> indexed_exchange;
     std::shared_ptr<const nr::shader::Program> indexed_vertex, indexed_pixel;
     std::array<uint64_t, 5> indexed_key{};

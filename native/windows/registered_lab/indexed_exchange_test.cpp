@@ -2,6 +2,7 @@
 #include "shader_contract.hpp"
 #include "shader_reference.hpp"
 #include "point_texture_fixture.hpp"
+#include "linear_texture_fixture.hpp"
 #include <fstream>
 #include <cstdio>
 #include <thread>
@@ -82,6 +83,14 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
     const auto texture_bytes = ex::encode(textured); const auto texture_decoded = ex::decode(texture_bytes);
     test(texture_decoded.texture.pixels == textured.texture.pixels && texture_decoded.texture.width == textured.texture.width &&
          texture_decoded.texture.height == textured.texture.height && texture_decoded.texture.format == 87 && texture_decoded.inputs == textured.inputs);
+    auto linear=textured;linear.header.abi=4;linear.header.flags=0xf0f;linear.scissor=std::array<int32_t,4>{3,5,int32_t(r.header.width)-7,int32_t(r.header.height)-9};
+    linear.pixel=nr::shader::parse_pixel(nr::registered_lab::test_fixture::linear_texture_pixel_words,std::size(nr::registered_lab::test_fixture::linear_texture_pixel_words));
+    linear.texture={2,2,28,{{1,2,3,4},{5,6,7,8},{9,10,11,12},{13,14,15,16}}};
+    const auto linear_bytes=ex::encode(linear);const auto linear_decoded=ex::decode(linear_bytes);
+    test(linear_decoded.texture.pixels==linear.texture.pixels && linear_decoded.scissor==linear.scissor && linear_decoded.header.flags==0xf0f);
+    for(unsigned n=0;n<5;++n){auto bad=linear_bytes;auto h=linear.header;
+        if(n==0)h.abi=3;if(n==1)h.flags&=~2u;if(n==2)h.flags&=~8u;if(n==3)h.vertices=3;if(n==4)h.width=4097;
+        std::memcpy(bad.data(),&h,sizeof(h));rejects(bad);}
     const size_t description_offset = texture_bytes.size()-textured.texture.pixels.size()*4-sizeof(ex::TextureDescription);
     for(uint32_t bad=0;bad<5;++bad) {
         auto packet = texture_bytes; ex::TextureDescription desc{}; std::memcpy(&desc,packet.data()+description_offset,sizeof(desc));

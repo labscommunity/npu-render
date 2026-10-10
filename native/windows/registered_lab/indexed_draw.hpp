@@ -68,14 +68,15 @@ void execute_indexed_draw(Device &d, UINT count, UINT first, INT base) {
     const auto inputs = fetch_indexed_vertices(d, count, first, base);
     const auto vc = fetch_constants(d, 0, *d.vertex_program), pc = fetch_constants(d, 2, *d.pixel_program);
     const bool textured = std::any_of(d.pixel_program->textures.begin(),d.pixel_program->textures.end(),[](bool v){return v;});
-    nr::raster::PackedTexture texture;
+    nr::raster::PackedTexture texture; bool linear=false;
     if (textured) {
-        require(clip == full);
-        nr::raster::PointTextureDrawExecutor::validate_shader(*d.pixel_program);
         const auto source = d.bound_source; const auto &sampler = d.samplers[2][0];
-        require(count == 6 && !blend && d.blend.RenderTargetWriteMask[0] == 15 && source && source != target && source->handle != target->handle &&
+        linear=sampler.desc.Filter==D3D10_DDI_FILTER_MIN_MAG_MIP_LINEAR;
+        if(linear) nr::raster::LinearTextureDrawExecutor::validate_shader(*d.pixel_program);
+        else { require(clip==full && !blend); nr::raster::PointTextureDrawExecutor::validate_shader(*d.pixel_program); }
+        require(count == 6 && d.blend.RenderTargetWriteMask[0] == 15 && source && source != target && source->handle != target->handle &&
             source->context == d.context && !source->locked && sampler.bound &&
-            sampler.desc.Filter == D3D10_DDI_FILTER_MIN_MAG_MIP_POINT &&
+            (linear || sampler.desc.Filter == D3D10_DDI_FILTER_MIN_MAG_MIP_POINT) &&
             sampler.desc.AddressU == D3D10_DDI_TEXTURE_ADDRESS_CLAMP && sampler.desc.AddressV == D3D10_DDI_TEXTURE_ADDRESS_CLAMP &&
             sampler.desc.AddressW == D3D10_DDI_TEXTURE_ADDRESS_CLAMP && sampler.desc.MipLODBias == 0 && sampler.desc.MinLOD == 0 && sampler.desc.MaxLOD >= 0);
         const auto &ss = source->surface;
@@ -94,9 +95,19 @@ void execute_indexed_draw(Device &d, UINT count, UINT first, INT base) {
         request.header.format = s.format; request.header.flags = (UINT(d.blend.RenderTargetWriteMask[0]) << 8) | UINT(blend);
         if (textured) { request.header.abi = 2; request.header.flags |= 2; request.texture = std::move(texture); }
         if (clip != full) { request.header.abi = 3; request.header.flags |= 4; request.scissor = clip; }
+        if (linear) {request.header.abi=4;request.header.flags|=8;}
         request.viewport = viewport; request.vertex = *d.vertex_program; request.pixel = *d.pixel_program;
         request.inputs = inputs; request.vertex_constants = vc; request.pixel_constants = pc; request.background = std::move(background);
         result = d.indexed_exchange->execute(std::move(request));
+    } else if (linear) {
+        const std::array<uint64_t,7> key{s.width,s.height,s.format,texture.width,texture.height,texture.format,uint64_t(blend)};
+        if(!d.linear_texture_executor || d.linear_texture_vertex!=d.vertex_program || d.linear_texture_pixel!=d.pixel_program || d.linear_texture_key!=key){
+            auto candidate=std::make_unique<nr::raster::LinearTextureDrawExecutor>(*d.vertex_program,*d.pixel_program,s.width,s.height,s.format,
+                texture.width,texture.height,texture.format,d.backend,blend);
+            d.linear_texture_executor=std::move(candidate);d.linear_texture_key=key;
+            d.linear_texture_vertex=d.vertex_program;d.linear_texture_pixel=d.pixel_program;
+        }
+        result=d.linear_texture_executor->execute(inputs,vc,viewport,texture,background,clip);
     } else if (textured) {
         const std::array<uint64_t,6> key{s.width,s.height,s.format,texture.width,texture.height,texture.format};
         if (!d.point_texture_executor || d.point_texture_vertex != d.vertex_program || d.point_texture_pixel != d.pixel_program || d.point_texture_key != key) {

@@ -1,0 +1,15 @@
+{"stage": "compile", "width": 64, "height": 64}
+{"stage": "compiled", "ms": 196.69039998552762, "devices": "NPU"}
+{"stage": "result", "width": 64, "frame": 0, "ms": 3.565499995602295, "max_byte_error": 1.0059285377008978e+34, "over_2": 16347}
+python.exe : Traceback (most recent call last):
+At line:4 char:1
++ & "$src\venv\Scripts\python.exe" "$r\vm\probe-npu-grid-v1.py" *> "$r\ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], Remot 
+   eException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "C:\Users\tatef\AppData\Local\npu-render\vm\probe-npu-grid-v1.py", line 42, in <module>
+    if errors.max()>2:raise AssertionError('bilinear error exceeded 2 bytes')
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: bilinear error exceeded 2 bytes
