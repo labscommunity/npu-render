@@ -749,3 +749,30 @@ against the physical NPU. The
 [v87 desktop trial](../../../docs/validation/2026-10-10/sole-display-v87/report.json)
 records two background-only frames followed by black frames and the original
 shared-transport failure. Full desktop offload remains unproven.
+
+The desktop's captured `INV_DEST_ALPHA / ONE / ADD` operation extends the
+output merger to all thirteen canonical Porter-Duff/plus modes. A shared factor
+table defines the provider-independent contract. Color and alpha must use the
+same admitted factor pair; other combinations remain rejected. Full blend mode
+identity participates in executor caching, and general modes bypass the
+source-copy rectangle specialization.
+
+Packet ABI 11 carries the nine additional modes, preserving the earlier packet
+versions. Uniform, general textured-triangle and multi-resource packets use the
+new modes; rectangle texture specializations that only implement source-over
+remain excluded. The tests compare both byte formats, varying alpha, clipping,
+coverage and channel masks against a separate scalar oracle. A live desktop
+trial must still establish usable frame delivery and input response.
+
+NPU qualification exposed incorrect output when the graph included redundant
+zero contributions or multiplication by one. The merger now emits direct graph
+forms for these factors. The failing builds and isolated reproducer are retained;
+the workaround does not identify the compiler's internal cause.
+
+The [v133 qualification](../../../docs/validation/2026-10-10/porter-duff-v133/report.json)
+passes all 18 CPU suites, 638,976 NPU output-merger components, 582,656 uniform-draw
+components, 52 driver-callback draws and a 16,384-component ABI 11 worker response.
+The exact captured CPU/NPU replay has 396 covered samples and zero-valued output;
+the varied component fixtures establish the blend arithmetic beyond that capture.
+The worker emits a compiler diagnostic while still returning verified NPU pixels;
+its raw log is preserved.

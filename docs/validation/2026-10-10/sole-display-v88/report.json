@@ -1,0 +1,43 @@
+{
+  "trial": "v88",
+  "source_commit": "cd69d51509fa4114455d5a7d78d752d04e9b2a0a",
+  "umd_build": "present-umd-v128",
+  "package_version": "0.0.76.0",
+  "worker_successes_by_client": {
+    "42": 13,
+    "3640": 21,
+    "7412": 59,
+    "2812": 16,
+    "7588": 32,
+    "1140": 50
+  },
+  "acknowledged_successes_by_client": {
+    "42": 13,
+    "3640": 20,
+    "7412": 59,
+    "2812": 15,
+    "7588": 32,
+    "1140": 50
+  },
+  "isolated_client_departures": 2,
+  "received_frames": 8,
+  "received_nonblack_frames": 5,
+  "nonblack_frames_with_sole_gate_true": 5,
+  "viewer_submissions": 8,
+  "full_desktop_offload": false,
+  "usable_interactive_desktop": false,
+  "tahoma_performance_tested": false,
+  "collector_completed_without_error": true,
+  "original_cleanup_passed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "guest_restart": false,
+  "findings": [
+    "The relay isolates two broken client pipes after receiving successful NPU responses; remaining clients continue. It also delivers a failed provider response without terminating the service.",
+    "The last successful draw preceding the first complete DWM capture uses destination-out on 72 vertices with 76 covered samples, confirming the prior inverse-mask and wide-coordinate fix in the live compositor.",
+    "The first rejected DWM draw is a 24 by 24 BGRA texture operation with INV_DEST_ALPHA/ONE/ADD for color and alpha, i.e. destination-over. Its 783792-byte capture is preserved and the previous replay probe rejects this unsupported blend.",
+    "Later the worker reports an invalid texture-coordinate or indexable-temporary lookup on DWM sequence 10. Its cause is unresolved; this may be a separate blocker after destination-over support. A rejected pixel shader is also preserved for investigation.",
+    "Eight frames are received, including one background-only frame, a uniform dark-gray frame, and three identical frames showing wallpaper and desktop icons without a taskbar, while the sole-display gate is true. The corrected input harness checks a matching receipt before sending Start, then observes black frames before those later partial-desktop frames arrive. No usable desktop or visual input response is verified.",
+    "Both owned custom devices are removed successfully. After Control wakes the display, the normal desktop, taskbar and icons are visually restored. Physical Delta has no driver changes or restart."
+  ]
+}

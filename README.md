@@ -113,12 +113,13 @@ now has an exact NPU specialization for opaque, one-to-one point-sampled quads.
 Its captured 1024×768 replay passes, as do changing-image and driver callback
 tests. This is a checked subset, not general desktop rendering.
 
-The [latest installed trial](docs/validation/2026-10-10/sole-display-v83/report.json)
-completes five DWM, 18 Explorer and 18 Start menu NPU requests. DWM still delivers
-only black frames. The frame collector also fails while reading a growing log;
-the saved VM frame independently confirms that no later usable frame exists.
-Both guest drivers were removed successfully. Full desktop offload and a Tahoma
-benefit remain unproven.
+The [latest installed trial](docs/validation/2026-10-10/sole-display-v88/report.json)
+completes 178 live desktop NPU draws plus 13 prewarm requests. The transport now
+isolates departing Windows clients so other processes can keep rendering. Eight
+frames arrive, including wallpaper and desktop icons without a taskbar in sole-display mode, but the
+trial still fails on unsupported compositor operations and delivers no usable
+interactive desktop. Both guest drivers are removed successfully and the normal
+VM desktop is restored. Full desktop offload and a Tahoma benefit remain unproven.
 
 [NPU-computed triangle bounds](docs/validation/2026-10-10/triangle-bounds-v112/report.json)
 now restrict tile dispatch while preserving exact output in eight replays of four

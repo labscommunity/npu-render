@@ -94,20 +94,24 @@ int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
             TEST(memory[target_index][byte_offset]==expected);
         }
     }
-    blend.SrcBlend=blend.SrcBlendAlpha=D3D10_DDI_BLEND_ZERO;
-    for(const bool erase : {false,true}) {
-    blend.DestBlend=blend.DestBlendAlpha=erase?D3D10_DDI_BLEND_INV_SRC_ALPHA:D3D10_DDI_BLEND_SRC_ALPHA;
+    // Explicit D3D factor pairs independently exercise every remaining Porter-Duff operation.
+    constexpr UINT porter_duff[][2]{{1,5},{1,6},{8,2},{7,1},{8,1},{7,6},{8,5},{8,6},{2,2},{1,2},{1,1}};
+    for(UINT mode=2;mode<13;++mode) {
+    blend.SrcBlend=blend.SrcBlendAlpha=D3D10_DDI_BLEND(porter_duff[mode-2][0]);
+    blend.DestBlend=blend.DestBlendAlpha=D3D10_DDI_BLEND(porter_duff[mode-2][1]);
     f.pfnSetBlendState(h,bs,nullptr,~0u);
     for(const float alpha : {0.f,.5f,1.f}) {
-        std::fill(memory[target_index].begin(),memory[target_index].end(),uint8_t(103));
+        for(size_t i=0;i<memory[target_index].size();++i)memory[target_index][i]=uint8_t((i*37+i/4*13)&255);
         const auto before=memory[target_index];const auto draws=counters.draws;
         color[0]=.75f;color[1]=.25f;color[2]=1.f;color[3]=alpha;
         f.pfnDefaultConstantBufferUpdateSubresourceUP(h,resources[3],0,nullptr,color,0,0);
         f.pfnDrawIndexed(h,6,1,1);TEST(last_error==S_OK && counters.draws==draws+1);
         for(UINT y=0;y<height;++y)for(UINT x=0;x<width;++x)for(UINT c=0;c<4;++c) {
-            const auto at=(size_t(y)*width+x)*4+c;
+            const auto at=(size_t(y)*width+x)*4+c;const auto lane=c<3?2-c:c;
             const bool inside=x>=5 && x<width-3 && y>=7 && y<height-5;
-            TEST(memory[target_index][at]==(inside?uint8_t(std::nearbyint(double(before[at])*(erase?1-alpha:alpha))):before[at]));
+            const auto terms=nr::raster::reference_blend_terms(nr::raster::BlendMode(mode),double(color[lane]),double(alpha),double(before[at]),double(before[(at/4)*4+3]));
+            const auto expected=inside?uint8_t(std::nearbyint((std::clamp)(terms[0]+terms[1],0.,255.))):before[at];
+            TEST(memory[target_index][at]==expected);
         }
     }
     }
@@ -280,7 +284,7 @@ int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
     f.pfnDestroyRenderTargetView(h, view);
     for (const auto r : resources) f.pfnDestroyResource(h, r);
     f.pfnDestroyDevice(h);
-    TEST(counters.executions == executions_before + 25 && !counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
-    std::printf("{\"kind\":\"indexed-ddi-runtime-shim\",\"requested_backend\":\"%s\",\"execution_device\":\"%s\",\"verified_draws\":18,\"verified_components\":262144,\"blended_scissored_draws\":6,\"textured_draws\":7,\"point_scaled_blended_draws\":2,\"linear_scaled_blended_draws\":2,\"base_vertex_and_start_index\":true,\"invalid_ranges_and_sampler_rejected\":true,\"registered_adapter_tested\":false,\"desktop_offload_tested\":false}\n", backend, counters.last_execution_device);
+    TEST(counters.executions == executions_before + 52 && !counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
+    std::printf("{\"kind\":\"indexed-ddi-runtime-shim\",\"requested_backend\":\"%s\",\"execution_device\":\"%s\",\"verified_draws\":%llu,\"porter_duff_components\":540672,\"porter_duff_additional_modes\":11,\"blended_scissored_draws\":6,\"textured_draws\":7,\"point_scaled_blended_draws\":2,\"linear_scaled_blended_draws\":2,\"base_vertex_and_start_index\":true,\"invalid_ranges_and_sampler_rejected\":true,\"registered_adapter_tested\":false,\"desktop_offload_tested\":false}\n", backend, counters.last_execution_device, static_cast<unsigned long long>(counters.draws-draws_before));
     return 0;
 }

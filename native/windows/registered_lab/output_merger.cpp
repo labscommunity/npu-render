@@ -32,7 +32,7 @@ struct OutputMerger::State {
     std::string execution_device;
     bool failed = false;
     State(uint32_t size, const std::string &backend, BlendMode blending, bool bgra, uint8_t mask) : count(size), blend(blending) {
-        require(blend == BlendMode::source_copy || blend == BlendMode::source_over || destination_blend(blend));
+        require(valid_blend(blend));
         require(count && count <= 65536 && mask && mask <= 15 && (backend == "NPU" || backend == "CPU" || backend == "GPU"));
         auto colors = std::make_shared<op::Parameter>(ov::element::f32, ov::Shape{count, 4});
         auto background = std::make_shared<op::Parameter>(ov::element::u8, ov::Shape{count, 4});
@@ -57,6 +57,26 @@ struct OutputMerger::State {
                 choose(std::make_shared<op::Greater>(v,number(1)),number(1),v));
         };
         auto alpha = clamp_source(lane(colors, 3));
+        const auto factors=blend_factors[uint32_t(blend)];
+        const Node destination_alpha=std::make_shared<op::Convert>(lane(background,3),ov::element::f32);
+        const auto source_scale=[&]() -> Node {
+            switch(factors[0]){
+            case BlendFactor::zero:return number(0);
+            case BlendFactor::one:return number(255);
+            case BlendFactor::destination_alpha:return destination_alpha;
+            case BlendFactor::inverse_destination_alpha:return sub(number(255),destination_alpha);
+            default:throw std::invalid_argument("unsupported Porter-Duff source factor");
+            }
+        }();
+        const auto destination_scale=[&]() -> Node {
+            switch(factors[1]){
+            case BlendFactor::zero:return number(0);
+            case BlendFactor::one:return number(1);
+            case BlendFactor::source_alpha:return alpha;
+            case BlendFactor::inverse_source_alpha:return sub(number(1),alpha);
+            default:throw std::invalid_argument("unsupported Porter-Duff destination factor");
+            }
+        }();
         for (unsigned ch = 0; ch < 4; ++ch) {
             const auto source = bgra && ch < 3 ? 2 - ch : ch;
             auto bc = lane(background, ch);
@@ -64,9 +84,14 @@ struct OutputMerger::State {
             // Multi-index channel Gather corrupts this mixed-type NPU graph.
             // Separate lanes also prevent flattened clamp selection losing FP32.
             auto fg = clamp_source(lane(colors, source));
-            Node value = mul(fg, number(255));
-            if (blend == BlendMode::source_over) value = add(value, mul(std::make_shared<op::Convert>(bc, ov::element::f32), sub(number(1), alpha)));
-            else if (destination_blend(blend)) value = mul(std::make_shared<op::Convert>(bc, ov::element::f32), blend == BlendMode::destination_in ? alpha : sub(number(1), alpha));
+            // Preserve direct graph forms for zero/one factors. Redundant
+            // arithmetic changes NPU output in the blend qualification suite.
+            const Node destination=std::make_shared<op::Convert>(bc,ov::element::f32);
+            const Node contribution=factors[1]==BlendFactor::one?destination:mul(destination,destination_scale);
+            Node value;
+            if(factors[0]==BlendFactor::zero)value=contribution;
+            else if(factors[1]==BlendFactor::zero)value=mul(fg,source_scale);
+            else value=add(mul(fg,source_scale),contribution);
             value = choose(std::make_shared<op::Less>(value, number(0)), number(0),
                 choose(std::make_shared<op::Greater>(value, number(255)), number(255), value));
             auto base = both(pred(value), integer(255));

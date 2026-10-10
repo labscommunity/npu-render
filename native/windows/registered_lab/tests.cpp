@@ -1,5 +1,6 @@
 // Actual UMD callbacks with owned runtime shims. This is not a live adapter test.
 #include "driver.cpp"
+#include "blend_reference.hpp"
 #include <cstdio>
 #include <vector>
 #include <map>

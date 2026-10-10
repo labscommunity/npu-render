@@ -1,0 +1,115 @@
+{
+  "build": "present-umd-v133",
+  "cpu_suites_passed": 18,
+  "source_hashes_verified": 102,
+  "binary_hashes_verified_on_delta": 24,
+  "captured_draw": "v88-dwm-7412",
+  "target": [
+    24,
+    24
+  ],
+  "assembled_vertices": 12,
+  "triangles": 4,
+  "npu_replay": [
+    {
+      "kind": "draw_stage_timing",
+      "iteration": 0,
+      "batch": 64,
+      "compile_ms": 670.081,
+      "shader_ms": 29.997,
+      "projection_ms": 2.868,
+      "coverage_ms": 57.212,
+      "merger_ms": 21.589,
+      "draw_ms": 112.147,
+      "rectangle_path": false,
+      "execution_device": "NPU"
+    },
+    {
+      "kind": "draw_stage_timing",
+      "iteration": 1,
+      "batch": 64,
+      "compile_ms": 670.081,
+      "shader_ms": 21.478,
+      "projection_ms": 0.918,
+      "coverage_ms": 44.95,
+      "merger_ms": 16.826,
+      "draw_ms": 85.456,
+      "rectangle_path": false,
+      "execution_device": "NPU"
+    },
+    {
+      "kind": "offline_draw_replay",
+      "textured": true,
+      "width": 24,
+      "height": 24,
+      "vertices": 12,
+      "triangles": 4,
+      "covered_samples": 396,
+      "tile_executions": 14,
+      "execution_device": "NPU",
+      "elapsed_ms": 871,
+      "displayed_frames": 0,
+      "desktop_offload_tested": false
+    }
+  ],
+  "cpu_scalar_npu_pixels_exact": true,
+  "pixel_sha256": "6b2e09e1198af741fb9b8545b26c0398ea445d1fa4fea2c7e920189a1205ff44",
+  "npu_blend_modes": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12
+  ],
+  "npu_output_merger_summary": {
+    "checked_output_components": 638976,
+    "invalid_requests_rejected": 156,
+    "reusable_after_input_rejection": true
+  },
+  "npu_uniform_summary": {
+    "checked_components": 582656,
+    "gradient_max_byte_error": 0.5,
+    "dynamic_geometry_and_constants": true,
+    "unsupported_nonuniform_program_rejected": true,
+    "background_unchanged": true
+  },
+  "npu_ddi_summary": [
+    {
+      "kind": "indexed-ddi-runtime-shim",
+      "requested_backend": "NPU",
+      "execution_device": "NPU",
+      "verified_draws": 52,
+      "porter_duff_components": 540672,
+      "porter_duff_additional_modes": 11,
+      "blended_scissored_draws": 6,
+      "textured_draws": 7,
+      "point_scaled_blended_draws": 2,
+      "linear_scaled_blended_draws": 2,
+      "base_vertex_and_start_index": true,
+      "invalid_ranges_and_sampler_rejected": true,
+      "registered_adapter_tested": false,
+      "desktop_offload_tested": false
+    }
+  ],
+  "abi11_verified_components": 16384,
+  "full_desktop_offload": false,
+  "tahoma_performance_tested": false,
+  "findings": [
+    "All thirteen canonical Porter-Duff/plus modes use a provider-independent factor table and explicit D3D color/alpha factor matching. Noncanonical factor pairs remain rejected.",
+    "ABI 11 carries nine additional modes. Tests preserve ABI 1-10, roundtrip uniform/general texture/resource packets, and reject mismatched versions, unknown modes, missing marker/enable, overlapping older mask flags and unsupported texture specializations.",
+    "The captured destination-over draw now matches scalar, CPU and NPU output exactly. The three-output distinction is checked before a new live desktop trial.",
+    "The initial v129 clean build rejects a signed/unsigned comparison warning; the factor table now uses the native blend enum type.",
+    "The v130 CPU suites and captured CPU/NPU replay pass, but its generalized graph regresses destination-out on NPU. v131 omits zero terms, resolving that regression and passing modes 0-9, but additive mode returns zero instead of byte 224. v132 also removes the multiplication by one in the destination term; its isolated tests precede the final clean v133 build. These are observed graph workarounds, not a proven compiler root cause.",
+    "Broader desktop operations, usable input, physical scanout and Tahoma benefit remain unproven."
+  ],
+  "captured_output_all_zero": false,
+  "packet_worker_compiler_diagnostic": "function-outliner-vertical-fusion emitted an empty-function diagnostic; worker exit zero, explicit NPU execution and every response component verified"
+}

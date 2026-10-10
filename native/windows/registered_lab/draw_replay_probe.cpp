@@ -1,5 +1,6 @@
 // Offline replay of captured uniform-color triangle draws. No display control.
 #include "capture_reader.hpp"
+#include "blend_reference.hpp"
 #include "provider_compile_statistics.hpp"
 #include "vertex_executor.hpp"
 #include "shader_reference.hpp"
@@ -124,12 +125,16 @@ int main(int argc, char **argv) try {
     const auto blend = snapshot.values<uint32_t>("blend"), raster = snapshot.values<uint32_t>("raster"), depth = snapshot.values<uint32_t>("depth");
     nr::capture::check(blend.size() == 17 && !blend[0] && depth.size() == 15 && !depth[0] && !depth[3]);
     // Only target zero is bound in this captured draw; other blend slots are unused.
-    const bool blending = blend[1] != 0;
-    const bool destination_in = blending && blend[9] == 1 && blend[10] == 5 && blend[12] == 1 && blend[13] == 5;
-    const bool destination_out = blending && blend[9] == 1 && blend[10] == 6 && blend[12] == 1 && blend[13] == 6;
-    if (blending) nr::capture::check(blend[11] == 1 && blend[14] == 1 &&
-        (destination_in || destination_out || (blend[9] == 2 && blend[10] == 6 && blend[12] == 2 && blend[13] == 6)));
-    const auto blend_mode = destination_in ? BlendMode::destination_in : destination_out ? BlendMode::destination_out : source_blend(blending);
+    BlendMode blend_mode=BlendMode::source_copy;
+    if(blend[1]){
+        nr::capture::check(blend[11]==1 && blend[14]==1 && blend[9]==blend[12] && blend[10]==blend[13]);
+        constexpr std::array<uint32_t,6> ddi_factors{1,2,5,6,7,8};bool found=false;
+        for(uint32_t mode=0;mode<blend_factors.size();++mode){const auto pair=blend_factors[mode];
+            if(blend[9]==ddi_factors[uint32_t(pair[0])] && blend[10]==ddi_factors[uint32_t(pair[1])]){blend_mode=BlendMode(mode);found=true;break;}
+        }
+        nr::capture::check(found);
+    }
+    const bool blending=blend_mode!=BlendMode::source_copy;
     nr::capture::check(raster.size() == 10 && raster[0] == 3 && raster[1] >= 1 && raster[1] <= 3 && !raster[3] && !raster[4] && !raster[5] && !raster[8] && !raster[9]);
     std::array<int32_t,4> clip{0,0,int32_t(width),int32_t(height)};
     if (raster[7]) {
@@ -195,7 +200,7 @@ int main(int argc, char **argv) try {
             texture={source[3],source[4],28,{}};texture.pixels.resize(alpha.size());
             for(size_t i=0;i<alpha.size();++i)texture.pixels[i]={0,0,0,alpha[i]};
         } else texture = {source[3],source[4],source[5],snapshot.values<PackedColor>("source")};
-        bool general_texture=destination_in || destination_out || args[0]!=6 || raster[1]!=1 || (blend[15]&255)!=15;
+        bool general_texture=general_blend(blend_mode) || args[0]!=6 || raster[1]!=1 || (blend[15]&255)!=15;
         if(!general_texture)try{LinearTextureDrawExecutor::validate_shader(ps);}catch(const std::invalid_argument &){general_texture=true;}
         if(general_texture){
             while(uint64_t(width)*height%batch)batch/=2;
@@ -331,7 +336,8 @@ int main(int argc, char **argv) try {
                         const auto lane=format==87 && c<3 ? 2-c : c;
                         if(!((blend[15]&255)&(1u<<lane)))continue;
                         const double alpha=std::clamp(double(as_float(fragment[3])),0.,1.);
-                        const double value=destination_in ? double(pixel[c])*alpha : destination_out ? double(pixel[c])*(1-alpha) : std::clamp(double(as_float(fragment[lane])),0.,1.)*255+(blending?double(pixel[c])*(1-alpha):0);
+                        const auto terms=reference_blend_terms(blend_mode,std::clamp(double(as_float(fragment[lane])),0.,1.),alpha,double(pixel[c]),double(pixel[3]));
+                        const double value=terms[0]+terms[1];
                         pixel[c]=uint8_t(std::nearbyint((std::clamp)(value,0.,255.)));
                     }
                 }
