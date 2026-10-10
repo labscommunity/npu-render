@@ -108,6 +108,7 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
     auto desktop_clipped=triangles;desktop_clipped.header.width=1024;desktop_clipped.header.height=768;desktop_clipped.header.vertices=81;
     desktop_clipped.viewport={0,0,1024,768,0,1};desktop_clipped.inputs.resize(81);desktop_clipped.background.resize(1024*768);
     desktop_clipped.scissor=std::array<int32_t,4>{429,732,453,756};
+    test(ex::triangle_batch(desktop_clipped)==1024);
     const auto desktop_clipped_packet=ex::encode(desktop_clipped);test(ex::decode(desktop_clipped_packet).inputs.size()==81);
     auto excessive=desktop_clipped_packet;const std::array<int32_t,4> full_clip{0,0,1024,768};
     std::memcpy(excessive.data()+sizeof(ex::Header)+sizeof(nr::raster::Viewport),full_clip.data(),sizeof(full_clip));rejects(excessive);
@@ -117,7 +118,9 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
     for(const std::array<int32_t,4> clip: {std::array<int32_t,4>{429,0,430,768},{429,0,429,768},{0,768,1024,768}}){
         desktop_clipped.scissor=clip;const auto packed=ex::encode(desktop_clipped);
         test(ex::decode(packed).inputs.size()==4095);
+        test(ex::triangle_batch(desktop_clipped)==(clip[0]!=clip[2] && clip[1]!=clip[3]?1024u:256u));
     }
+    desktop_clipped.scissor=std::array<int32_t,4>{0,0,1024,5};test(ex::triangle_batch(desktop_clipped)==4096);
     auto resources=r;resources.header.abi=8;resources.header.flags=0x2f42;
     const auto &lookup=nr::registered_lab::test_fixture::typed_lookup_pixel_words;
     resources.pixel=nr::shader::parse_pixel(lookup,std::size(lookup));

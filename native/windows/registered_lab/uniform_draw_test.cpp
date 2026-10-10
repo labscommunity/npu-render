@@ -79,6 +79,15 @@ O main(float4 p:POSITION,float4 c:COLOR) {O o;o.p=p;o.c=c*color;return o;})", "v
     }
     // Arbitrary nonuniform pixel programs remain rejected until their complete
     // interpolation and shader path is implemented, with no target mutation.
+    for(const std::array<int32_t,4> test_clip: {std::array<int32_t,4>{0,0,0,64},{0,63,64,63},{63,63,64,64}}){
+        const auto result=executor.execute(gradient,white,{},viewport,background,test_clip);
+        const bool one=test_clip[0]==63;test(result.covered_samples==(one?1u:0u));
+        for(unsigned y=0;y<64;++y)for(unsigned x=0;x<64;++x)for(unsigned c=0;c<4;++c){
+            const double rgba[]{(x+.5)/128,(y+.5)/256,.125,.5};const auto lane=c<3?2-c:c;
+            const double expected=one && x==63 && y==63?rgba[lane]*255+old[c]*.5:old[c];
+            test(std::abs(result.pixels[size_t(y)*64+x][c]-expected)<=.51);++checked;
+        }
+    }
     const auto bad_words=nr::registered_lab::shader_tokens("float4 main(float4 c:COLOR):SV_Target{return c*c;}","ps_4_0");
     const auto bad_ps=parse_pixel(bad_words.data(),bad_words.size());
     UniformDrawExecutor unsupported(vs,bad_ps,6,64,64,backend,true,true,15,256);

@@ -113,14 +113,14 @@ now has an exact NPU specialization for opaque, one-to-one point-sampled quads.
 Its captured 1024×768 replay passes, as do changing-image and driver callback
 tests. This is a checked subset, not general desktop rendering.
 
-The [latest installed trial](docs/validation/2026-10-10/sole-display-v78/report.json)
-completed 339 Explorer NPU requests but received no desktop frames. Read/write
-staging texture creation now succeeds; Explorer next rejects a texture map and
-recreates its device. The expanded finite worker budget was not exhausted. Both
-guest drivers were removed successfully. Nonblocking maps and packed scissor
-batches are under qualification. Instanced input, immutable textures and typed
-lookups pass isolated NPU checks; full desktop offload and a Tahoma benefit
-remain unproven.
+The [latest installed trial](docs/validation/2026-10-10/sole-display-v79/report.json)
+resolves Explorer's staging-map rejection loop and completes 20 Explorer NPU
+requests, including additional text and image draws. DWM still completes no draw,
+and no desktop frame arrives during the sole-display observation. Both guest
+drivers were removed successfully. Packed scissor batches preserve exact DWM
+pixels and reduce isolated draw time; adaptive batches and a fresh VM session
+are prepared for the next trial. Full desktop offload and a Tahoma benefit remain
+unproven.
 
 The [captured-window desktop experiment](native/windows/capture/README.md) now
 presents an NPU-composed 2880×1800 desktop with input passing through to the

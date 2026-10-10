@@ -122,21 +122,24 @@ UniformDrawExecutor::Result UniformDrawExecutor::execute(const std::vector<shade
     // The caller's target is unchanged unless it explicitly commits this result.
     result.pixels = background;
     std::vector<Sample> samples(s.batch); std::vector<PackedColor> tile(s.batch);std::vector<Point> points(s.batch);
-    // Conservative tile scheduling from the explicit scissor. Exact coverage,
-    // clipping and culling are still evaluated on device for every submitted tile.
-    const size_t first_tile=(size_t(clip[1])*s.width/s.batch)*s.batch;
-    const size_t end_tile=(std::min)(result.pixels.size(),((size_t(clip[3])*s.width+s.batch-1)/s.batch)*s.batch);
-    for (size_t t = 0; t < clips.size(); t += 3) for (size_t first = first_tile; first < end_tile; first += s.batch) {
+    // Pack the explicit scissor. Exact coverage, clipping and culling remain
+    // device operations; padding lanes are outside every admitted scissor.
+    const size_t clip_width=size_t(clip[2]-clip[0]),clip_pixels=clip_width*size_t(clip[3]-clip[1]);
+    for (size_t t = 0; t < clips.size(); t += 3) for (size_t first = 0; first < clip_pixels; first += s.batch) {
+        const auto valid=(std::min)(size_t(s.batch),clip_pixels-first);
+        const auto pixel_index=[&](size_t n){const auto i=first+n;return (size_t(clip[1])+i/clip_width)*s.width+size_t(clip[0])+i%clip_width;};
         for (size_t i = 0; i < s.batch; ++i) {
             for (size_t v = 0; v < 3; ++v) samples[i].triangle[v] = projected.vertices[t + v].snapped;
-            const auto index = first + i; samples[i].point = {int32_t(index % s.width) * 256 + 128, int32_t(index / s.width) * 256 + 128};
+            if(i<valid){const auto index=pixel_index(i);samples[i].point={int32_t(index%s.width)*256+128,int32_t(index/s.width)*256+128};}
+            else samples[i].point={-128,-128};
             points[i]=samples[i].point;
         }
-        std::copy_n(result.pixels.data() + first, s.batch, tile.data());
         began = Clock::now(); const auto selected = s.coverage->execute(samples,fixed_clip);
         result.input_bytes += uint64_t(s.batch) * 32 + 16; result.output_bytes += uint64_t(s.batch) * 4; ++result.provider_requests;
         result.timings.coverage_ms += milliseconds(began); require(selected.execution_device == result.execution_device);
         for (const auto value : selected.covered) result.covered_samples += value;
+        if(std::none_of(selected.covered.begin(),selected.covered.end(),[](auto v){return v!=0;})){++result.tile_executions;continue;}
+        for(size_t i=0;i<s.batch;++i)tile[i]=i<valid?result.pixels[pixel_index(i)]:PackedColor{};
         if(!uniform_inputs) {
             std::array<Color,3> vertex_colors{};
             for(size_t v=0;v<3;++v)std::memcpy(vertex_colors[v].data(),shaded.vertices[t+v][s.color_input].data(),16);
@@ -148,7 +151,8 @@ UniformDrawExecutor::Result UniformDrawExecutor::execute(const std::vector<shade
         began = Clock::now(); const auto merged = s.merger->execute(colors, tile, selected.covered);
         result.input_bytes += uint64_t(s.batch) * 24; result.output_bytes += uint64_t(s.batch) * 4; ++result.provider_requests;
         result.timings.merger_ms += milliseconds(began); require(merged.execution_device == result.execution_device);
-        std::copy(merged.pixels.begin(), merged.pixels.end(), result.pixels.begin() + first); ++result.tile_executions;
+        for(size_t i=0;i<valid;++i)result.pixels[pixel_index(i)]=merged.pixels[i];
+        ++result.tile_executions;
     }
     result.vertices = std::move(shaded.vertices); result.timings.total_ms = milliseconds(start); return result;
 }

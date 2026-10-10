@@ -123,6 +123,17 @@ inline bool triangle_work_valid(const Request &r){
     const auto clipped_pixels=uint64_t(clip[2]-clip[0])*uint64_t(clip[3]-clip[1]);
     return uint64_t(h.vertices/3)*((clipped_pixels+batch-1)/batch)<=4096;
 }
+inline uint32_t triangle_batch(const Request &r){
+    const auto &h=r.header;require(shape_valid(h) && (h.flags&0x3000));
+    const auto clip=r.scissor.value_or(std::array<int32_t,4>{0,0,int32_t(h.width),int32_t(h.height)});
+    require(scissor_valid(clip,h));
+    uint32_t batch=4096;while(uint64_t(h.width)*h.height%batch)batch/=2;
+    const auto area=uint64_t(clip[2]-clip[0])*uint64_t(clip[3]-clip[1]);
+    // Shrink only while the complete region still fits in one batch. This
+    // avoids padding work without increasing the validated tile budget.
+    while(batch>256 && area<=batch/2)batch/=2;
+    return batch;
+}
 inline std::vector<uint8_t> encode(Request &r) {
     auto &h = r.header;
     require(r.vertex.bytecode.size() <= 16384 && r.pixel.bytecode.size() <= 16384);

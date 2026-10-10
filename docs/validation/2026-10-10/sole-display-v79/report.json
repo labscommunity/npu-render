@@ -1,0 +1,33 @@
+{
+  "trial": "v79",
+  "source_commit": "dcebcf4daa3bbcf1f38ed6c32a352f8208123a49",
+  "umd_build": "present-umd-v107",
+  "kmd_build": "allocation-capacity-v3",
+  "package_version": "0.0.67.0",
+  "npu_preflight_packets_passed": 13,
+  "explorer_successful_npu_packets": 20,
+  "explorer_traced_completed_draws": 19,
+  "explorer_traced_present_callbacks": 2,
+  "explorer_nonblocking_maps": 11,
+  "explorer_blocking_staging_maps": 10,
+  "explorer_traced_created_devices": 3,
+  "dwm_npu_draws": 0,
+  "received_frames": 0,
+  "viewer_window_submissions": 0,
+  "input_actions": [],
+  "sole_gate_observed": true,
+  "full_desktop_offload": false,
+  "performance_tested": false,
+  "cleanup_passed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "guest_reboot_after_trial": true,
+  "findings": [
+    "Explorer successfully maps staging textures with type WRITE and DONOTWAIT flag 1048576; the prior map-rejection loop is resolved. It proceeds through additional typed text and textured image draws.",
+    "Several real shell draws take 9-21 seconds. DWM creates devices but completes no draw; IDD never receives a swapchain or frame during the bounded observation.",
+    "The collector confirms the sole indirect topology from 15:55:56.885Z until 15:57:30.474Z. Input sends no keys because no frame arrives.",
+    "Two late Explorer failures occur during teardown: a draw fails and its capture is incomplete (1156 bytes), then resource creation reports device removed. All 33 worker requests succeeded. These errors do not establish a new unsupported shader.",
+    "DWM ETW decoding via tracerpt succeeds and preserves 40 event types, including device creation and occluded device-state checks. Get-WinEvent provider filtering found no matching records, so that failed query is not evidence that DWM emitted no events.",
+    "Both custom devices are removed and topology restored before a clean shutdown/restart of only the disposable VM. The fresh guest has the Basic Display Adapter and a normal signed-in desktop."
+  ]
+}

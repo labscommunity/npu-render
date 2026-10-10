@@ -1,0 +1,33 @@
+{
+  "build": "present-umd-v108",
+  "clean_build": true,
+  "compiled_source_hashes_match": true,
+  "cpu_contract_suites_passed": 17,
+  "npu_callback_contracts_passed": true,
+  "npu_uniform_draw_checked_components": 222208,
+  "uniform_gradient_max_byte_error": 0.5,
+  "uniform_scissor_packing_and_empty_tile_skip": true,
+  "adaptive_textured_batch": {
+    "shrink_only_when_region_fits_one_batch": true,
+    "minimum_preferred_batch": 256,
+    "cache_key_includes_batch": true,
+    "alternating_exact_npu_packets": 4,
+    "exact_pixels_per_packet": 786432,
+    "actual_81_vertex_capture_repeated_ms": 342.954,
+    "derived_24_vertex_fixture_repeated_ms": 116.287,
+    "triangle_tiles": [
+      27,
+      8
+    ]
+  },
+  "slow_packet_capture": {
+    "maximum_files": 4,
+    "threshold_ms": 5000,
+    "excludes_preflight_pid": 42,
+    "directory": "owned physical stream evidence directory",
+    "live_capture_not_yet_exercised": true
+  },
+  "full_desktop_offload": false,
+  "tahoma_performance_tested": false,
+  "preserved_harness_failure": "First adaptive-packet invocation used a nonexistent executable name. Requests remain in adaptive-packets-v108; corrected invocation and passing results use new directory adaptive-packets-v108b."
+}

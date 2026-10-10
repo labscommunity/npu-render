@@ -652,3 +652,11 @@ triangle batches, with byte-exact CPU and NPU replay. Partial batches, full
 targets, empty regions, culling, both pixel formats and both sampler filters have
 independent pixel checks. This is an isolated rendering improvement, not desktop
 delivery or a Tahoma performance result.
+
+The [v108 qualification](../../../docs/validation/2026-10-10/adaptive-batches-v108/report.json)
+adds scissor packing and device-confirmed empty-tile skipping to untextured
+draws. Textured batches shrink when the entire clipped region fits a smaller
+batch; cache identity includes that size. Four alternating real/derived DWM
+packets return exact NPU pixels. The physical worker also retains at most four
+slow non-preflight packets in its owned evidence directory for offline diagnosis;
+these captures do not include the transport authentication secret.
