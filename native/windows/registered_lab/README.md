@@ -251,32 +251,37 @@ three remote NPU executions, and zero live resources or cleanup errors. The
 earlier withheld-reply attempt times out without fallback or a successful present.
 
 
-`nr_registered_vertex_test --backend NPU` independently translates bounded SM4
-vertex arithmetic and dynamically indexed constants into an OpenVINO graph. The
-[v24 hardware test](../../../docs/validation/2026-10-10/vertex-npu-v24/report.json)
-checks 768 vertex results, including changed constants and 4,096-row buffer bounds,
-on Delta's physical NPU. Its inputs use exactly representable binary fractions;
-this does not establish general FP32 shader conformance. A qualified workaround
-reconstructs a 0/1 bounds mask before color selection to avoid an observed NPU
-compiler error while preserving integer address comparisons. No backend fallback
-is permitted. The standalone translator is not yet admitted by the registered
-UMD and supplies neither rasterization nor pixel shading or desktop migration.
+The registered UMD now creates and retains bounded SM4 vertex programs, including
+MOV, ADD, MUL, MAD, source negation/absolute value and indexed constant buffers.
+The [v53 desktop run](../../../docs/validation/2026-10-10/vertex-admission-v53/report.json)
+records DWM accepting its 90-word shader through this path. It then requests a
+116-word shader that the installed version rejects. Both streams have separately
+executed on the physical NPU; their creation by DWM is not draw execution.
 
-The [v26 precision follow-up](../../../docs/validation/2026-10-10/vertex-npu-v26/report.json)
-adds 4,096 screen-coordinate vertices and non-FP16 palette values. Default NPU
-lowering introduced subpixel errors. For OpenVINO 2026.1, serialized legacy
-precision metadata plus the accuracy hint preserves the tested FP32 arithmetic.
-Bounds reads now gather from an appended zero row, avoiding a floating mask that
-failed with precision preservation. The translator still runs independently of
-the registered driver; this establishes neither general shader conformance nor
-desktop migration.
+`nr_registered_vertex_test --backend NPU` checks the translator with explicit
+execution identity and no backend fallback. The
+[v32 qualification](../../../docs/validation/2026-10-10/modifiers-npu-v32/report.json)
+includes signed-zero source modifiers, indexed constants through 4,096 rows,
+4,096 screen-coordinate vertices, and 8,192 checked output components from the
+116-word desktop stream. `nr_registered_vertex_stream_probe --shader <token-stream>
+--backend NPU` runs captured-stage checks without embedding system shader binaries
+in the repository. These fixtures do not establish general shader conformance.
 
-The [v51 desktop admission test](../../../docs/validation/2026-10-10/desktop-active-v51/report.json)
-activates an indirect desktop and records DWM loading this UMD. Initialization
-then rejects a 90-word vertex program and kernel shadow-surface requests. The
-[v28 captured-stage test](../../../docs/validation/2026-10-10/dwm-vertex-npu-v28/report.json)
-executes that exact vertex token stream on the physical NPU and checks 8,192
-output components bit for bit against the reference, with a separate CPU control.
-`nr_registered_vertex_stream_probe --shader <token-stream> --backend NPU` runs
-this qualification without embedding captured system binaries in the repository.
-It does not establish driver admission, rasterization or desktop frame delivery.
+OpenVINO 2026.1 requires serialized legacy precision metadata plus the accuracy
+hint to preserve the tested FP32 arithmetic. Indexed reads gather from an appended
+zero row for out-of-range constants. Bit-preserving MOV/modifier outputs use NPU
+integer operations and integer tensors because the floating path canonicalizes
+negative zero. Host code decodes inputs and copies output bytes. Modified MOV
+from arithmetic temporaries without integer bit views remains rejected.
+
+Input-layout objects retain their descriptors across runtime-wrapper destruction.
+The bounded host decoder handles per-vertex 32-bit float/integer formats and
+RGBA8 UNORM, including offsets, strides and missing-component defaults. Instancing
+and out-of-range vertex fetch remain unsupported. This prepares shader inputs;
+it does not perform rasterization.
+
+Generic draw execution still requires rasterization, pixel shading and complete
+pipeline integration. The existing exact fullscreen composition path remains the
+only supported Draw path. The indirect desktop activates, but no DWM swapchain
+or desktop frames have been delivered. Windows also rejects a later CDD allocation;
+its relationship to the incomplete DWM initialization remains unresolved.
