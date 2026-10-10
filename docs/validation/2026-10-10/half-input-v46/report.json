@@ -1,0 +1,27 @@
+{
+  "scope": "Host input-format decoding and existing NPU stage regressions",
+  "formats": [
+    "R16_FLOAT",
+    "R16G16_FLOAT",
+    "R16G16B16A16_FLOAT"
+  ],
+  "half_encodings_checked": 65536,
+  "half_decode_backend": "CPU integer format conversion",
+  "oracle": "independent power-of-two scalar arithmetic; classification checks for infinity and NaN",
+  "signed_zero_and_subnormals": true,
+  "nan_policy": "quiet NaN; preserve sign and available payload",
+  "input_fetch_checks": [
+    "two-byte alignment",
+    "stride and offset",
+    "missing components zero and one",
+    "layout lifetime",
+    "reject misalignment"
+  ],
+  "cpu_contracts": "4/4 passed",
+  "existing_npu_vertex_samples": 16,
+  "existing_npu_pixel_samples": 16,
+  "existing_npu_composition_draws": 16,
+  "desktop_offload_tested": false,
+  "performance_tested": false,
+  "reference": "https://learn.microsoft.com/en-us/windows/win32/direct3d10/d3d10-graphics-programming-guide-resources-float-rules"
+}
