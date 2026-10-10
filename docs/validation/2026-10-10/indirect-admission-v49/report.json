@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "kind": "paired-desktop-admission-diagnostics",
+  "driver_version": "0.0.38.0",
+  "source_revision": "0d56dafc85db519a271638ac700de724fa6c5eb3",
+  "signed_umd_sha256": "db87dcb7c882529429d61b8a32995a657bc4505085dc503460672054961cccb53",
+  "paired_indirect_version": "0.0.6.0",
+  "prepared_custom_device": true,
+  "preparation_milliseconds": 579,
+  "feature_level": "10_0",
+  "custom_render_luid": 1122854,
+  "indirect_display_luid": 1399996,
+  "original_display_luid": 23654,
+  "topology_validate_status": 0,
+  "topology_apply_status": 0,
+  "indirect_path_became_active": false,
+  "swapchain_assigned": false,
+  "frames_received": 0,
+  "dwm_events": {
+    "event_count": 24550,
+    "lost_events": 0,
+    "duration_seconds_approx": 61,
+    "selected_level2_errors": 0,
+    "adapter_event468_records": 2,
+    "display_adapter_luid": 23654,
+    "render_adapter_luid": 23654
+  },
+  "clean_removal": true,
+  "npu_execution_tested": false,
+  "desktop_offload_tested": false,
+  "performance_tested": false,
+  "notes": [
+    "The custom device is prepared, but the supplied topology does not activate its indirect path. Observed DWM adapter events still identify the original adapter.",
+    "The selected DWM/DXGI trace contains no explicit rejection cause. This does not prove that no other graphics subsystem reported an error.",
+    "Explorer and Start Menu still reject the same indexed-palette vertex program seen in v48. These are not identified as DWM shaders.",
+    "Four virtual CPUs replace the prior two. A debugger module-load notification paused installation; timings cannot be compared as performance results. Only notification-break filters changed, not OS watchdog configuration.",
+    "Trace handles remain open until DLL unload. Snapshot2 copies rather than renames them; a subsequent source fix enables FILE_SHARE_DELETE.",
+    "All 28 raw snapshot files were hash-verified. Committed text normalizes CRLF to LF; UMD retry streams are limited to first 60 records and compiled captured shaders are excluded. Full raw ZIP, ETL, XML and original manifests remain in local results."
+  ]
+}
