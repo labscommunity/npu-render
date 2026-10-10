@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "kind": "bounded-indexed-draw-npu-relay-qualification",
+  "cpu_contract_tests_passed": 10,
+  "physical_npu_worker_passed": true,
+  "guest_roundtrip_verified_components": 16384,
+  "guest_roundtrip_device": "NPU",
+  "request_seen_to_reply_published_seconds": 11.603405,
+  "configuration_removed": true,
+  "driver_installed": false,
+  "received_desktop_frames": 0,
+  "displayed_frames": 0,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "limitations": [
+    "WinRM file transport is too slow for live DWM.",
+    "Constant pixel shader compilation emitted an outliner diagnostic; execution still returned NPU identity and exact pixels.",
+    "Only the bounded uniform indexed-draw contract is supported."
+  ],
+  "next": "Keep packet validation and move frame traffic to a persistent native stream before installed DWM testing."
+}

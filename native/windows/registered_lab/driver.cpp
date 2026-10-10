@@ -21,6 +21,7 @@
 #include "blend_executor.hpp"
 #include "vertex_executor.hpp"
 #include "uniform_draw.hpp"
+#include "indexed_exchange.hpp"
 #include "shader_contract.hpp"
 #include "lab_trace.hpp"
 namespace {
@@ -40,6 +41,7 @@ struct Device {
     std::shared_ptr<Allocation> bound_source;
     std::unique_ptr<BlendExecutor> executor;
     std::unique_ptr<nr::raster::UniformDrawExecutor> indexed_executor;
+    std::unique_ptr<IndexedNpuExchange> indexed_exchange;
     std::shared_ptr<const nr::shader::Program> indexed_vertex, indexed_pixel;
     std::array<uint64_t, 5> indexed_key{};
     std::shared_ptr<const nr::shader::Program> vertex_program;
@@ -455,6 +457,7 @@ HRESULT APIENTRY create_device(D3D10DDI_HADAPTER, D3D10DDIARG_CREATEDEVICE *a) {
         // table address, and read only the entry supported by this DDI version.
         d->dxgi_callbacks = a->DXGIBaseDDI.pDXGIBaseCallbacks;
         d->backend = selected_backend;
+        if (d->backend == "NPU" && indexed_exchange_configured()) d->backend = "NPU_LAB_INDEXED";
         d->vertex_code = shader_tokens(nr_ddi_vertex_shader, "vs_4_0");
         d->pixel_code = shader_tokens(nr_ddi_pixel_shader, "ps_4_0");
         auto &f = d->functions;
@@ -572,6 +575,6 @@ extern "C" __declspec(dllexport) BOOL nr_fill_configure(const char *backend) {
     std::lock_guard<std::recursive_mutex> lock(mutex);
     if (!backend || counters.live_contexts || counters.live_allocations ||
         (std::strcmp(backend, "CPU") && std::strcmp(backend, "GPU") && std::strcmp(backend, "NPU") &&
-         (std::strcmp(backend, "NPU_LAB_FILE") || !nr_fill_guest()))) return FALSE;
+         ((std::strcmp(backend, "NPU_LAB_FILE") && std::strcmp(backend, "NPU_LAB_INDEXED")) || !nr_fill_guest()))) return FALSE;
     try { selected_backend = backend; return TRUE; } catch (...) { return FALSE; }
 }

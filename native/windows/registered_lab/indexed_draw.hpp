@@ -62,19 +62,31 @@ void execute_indexed_draw(Device &d, UINT count, UINT first, INT base) {
         d.blend.DestBlendAlpha == D3D10_DDI_BLEND_INV_SRC_ALPHA && d.blend.BlendOpAlpha == D3D10_DDI_BLEND_OP_ADD);
     const auto inputs = fetch_indexed_vertices(d, count, first, base);
     const auto vc = fetch_constants(d, 0, *d.vertex_program), pc = fetch_constants(d, 2, *d.pixel_program);
-    const std::array<uint64_t, 5> key{s.width, s.height, s.format, count, uint64_t(d.blend.RenderTargetWriteMask[0]) | (uint64_t(blend) << 8)};
-    if (!d.indexed_executor || d.indexed_vertex != d.vertex_program || d.indexed_pixel != d.pixel_program || d.indexed_key != key) {
-        uint32_t batch = 4096; while (uint64_t(s.width) * s.height % batch) batch /= 2;
-        auto candidate = std::make_unique<nr::raster::UniformDrawExecutor>(*d.vertex_program, *d.pixel_program, count,
-            s.width, s.height, d.backend, blend, s.format == 87, d.blend.RenderTargetWriteMask[0], batch);
-        d.indexed_executor = std::move(candidate); d.indexed_key = key; d.indexed_vertex = d.vertex_program; d.indexed_pixel = d.pixel_program;
-    }
     const auto bytes = read_pixels(*target); std::vector<nr::raster::PackedColor> background(bytes.size() / 4);
     std::memcpy(background.data(), bytes.data(), bytes.size());
-    auto result = d.indexed_executor->execute(inputs, vc, pc,
-        {d.viewport.TopLeftX, d.viewport.TopLeftY, d.viewport.Width, d.viewport.Height, d.viewport.MinDepth, d.viewport.MaxDepth}, background);
+    const nr::raster::Viewport viewport{d.viewport.TopLeftX, d.viewport.TopLeftY, d.viewport.Width, d.viewport.Height, d.viewport.MinDepth, d.viewport.MaxDepth};
+    nr::raster::UniformDrawExecutor::Result result;
+    if (d.backend == "NPU_LAB_INDEXED") {
+        if (!d.indexed_exchange) d.indexed_exchange = std::make_unique<IndexedNpuExchange>();
+        indexed_exchange::Request request;
+        request.header.width = s.width; request.header.height = s.height; request.header.vertices = count;
+        request.header.format = s.format; request.header.flags = (UINT(d.blend.RenderTargetWriteMask[0]) << 8) | UINT(blend);
+        request.viewport = viewport; request.vertex = *d.vertex_program; request.pixel = *d.pixel_program;
+        request.inputs = inputs; request.vertex_constants = vc; request.pixel_constants = pc; request.background = std::move(background);
+        result = d.indexed_exchange->execute(std::move(request));
+    } else {
+        const std::array<uint64_t, 5> key{s.width, s.height, s.format, count, uint64_t(d.blend.RenderTargetWriteMask[0]) | (uint64_t(blend) << 8)};
+        if (!d.indexed_executor || d.indexed_vertex != d.vertex_program || d.indexed_pixel != d.pixel_program || d.indexed_key != key) {
+            uint32_t batch = 4096; while (uint64_t(s.width) * s.height % batch) batch /= 2;
+            auto candidate = std::make_unique<nr::raster::UniformDrawExecutor>(*d.vertex_program, *d.pixel_program, count,
+                s.width, s.height, d.backend, blend, s.format == 87, d.blend.RenderTargetWriteMask[0], batch);
+            d.indexed_executor = std::move(candidate); d.indexed_key = key; d.indexed_vertex = d.vertex_program; d.indexed_pixel = d.pixel_program;
+        }
+        result = d.indexed_executor->execute(inputs, vc, pc, viewport, background);
+    }
     ++counters.executions;
-    if (d.backend == "NPU") ++counters.npu_executions;
+    if (d.backend == "NPU_LAB_INDEXED") ++counters.remote_npu_executions;
+    else if (d.backend == "NPU") ++counters.npu_executions;
     else if (d.backend == "GPU") ++counters.gpu_executions;
     else if (d.backend == "CPU") ++counters.cpu_executions;
     else throw Error{DXGI_ERROR_UNSUPPORTED};
