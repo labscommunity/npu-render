@@ -61,3 +61,24 @@ device, owns only the swapchain handle after handoff, and deletes itself after
 releasing that handle. Lifecycle references:
 [framework work items](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdfworkitem/nc-wdfworkitem-evt_wdf_workitem),
 [assignment ownership and retry status](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/iddcx/nc-iddcx-evt_idd_cx_monitor_assign_swapchain).
+# Received desktop viewer
+
+`tools/collect_lab_frames.py --host <existing-ssh-host> --seconds 120 --output <new-directory>`
+uses the existing private lab-session helper on the test host to read complete
+NRFRAME1 files from the disposable guest. It opens each source with shared-delete
+access so publication is not blocked. It validates the bounded pixel format before
+atomically publishing `<new-directory>/latest.bin` locally. No new guest listener
+or display driver is installed by the collector.
+
+`uv run --extra live python tools/view_lab_desktop.py --frame <new-directory>/latest.bin --report <new-report.jsonl> --seconds 120`
+displays the received pixels in an SDL software window. Optional `--vm-pid` and
+`--qmp-port` enable keyboard and mouse input through the existing local QEMU monitor.
+The tool checks process identity and releases held inputs on loss of focus or exit.
+Use input only after verifying a sole-indirect topology; extended-display pointer
+coordinates would refer to a different desktop layout. The topology diagnostic
+accepts an automatically activated indirect monitor when making this switch and
+restores the exact prior paths after its finite observation.
+
+Window submissions, received frames and scanout verification remain separate
+measurements. The host compositor and display controller still present the viewer;
+this viewer does not establish that Delta's physical desktop has migrated.

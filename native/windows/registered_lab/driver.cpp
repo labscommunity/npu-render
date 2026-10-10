@@ -403,6 +403,7 @@ void APIENTRY targets(D3D10DDI_HDEVICE h, const D3D10DDI_HRENDERTARGETVIEW *view
     });
 }
 #include "draw.hpp"
+#include "copy_region.hpp"
 void APIENTRY flush(D3D10DDI_HDEVICE) {} // Clears submit immediately; draws complete synchronously.
 void APIENTRY hazard(D3D10DDI_HDEVICE, D3D10DDI_HRESOURCE) {} // Blocking locks order our staging copies.
 void APIENTRY format_support(D3D10DDI_HDEVICE, DXGI_FORMAT f, UINT *out) {
@@ -525,6 +526,7 @@ HRESULT APIENTRY create_device(D3D10DDI_HADAPTER, D3D10DDIARG_CREATEDEVICE *a) {
         f.pfnCalcPrivateResourceSize = resource_size; f.pfnCreateResource = create_resource;
         f.pfnCalcPrivateOpenedResourceSize = opened_resource_size; f.pfnOpenResource = open_resource;
         f.pfnDestroyResource = destroy_resource; f.pfnResourceCopy = copy_resource;
+        f.pfnResourceCopyRegion = copy_region;
         f.pfnResourceUpdateSubresourceUP = update_resource;
         f.pfnDefaultConstantBufferUpdateSubresourceUP = update_resource;
         f.pfnResourceMap = f.pfnStagingResourceMap = map;

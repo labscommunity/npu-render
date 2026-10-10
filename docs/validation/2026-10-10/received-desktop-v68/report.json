@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "kind": "live-dwm-buffer-rotation-and-received-frames",
+  "source_revision": "d4d9ba406052ab7d6de1f1616a94c771466a5411",
+  "render_package": "v68-fade-rotation",
+  "render_version": "0.0.57.0",
+  "idd_version": "0.0.9.0",
+  "live_dwm_npu_draws": 9,
+  "successful_present_callbacks": 4,
+  "successful_resource_rotations": 4,
+  "received_and_readback_frames": 4,
+  "full_desktop_offload": false,
+  "displayed_frames_verified": 0,
+  "remaining_failure": "One actual ResourceCopyRegion DDI (offset 304) is unsupported; no failed DrawIndexed capture occurred. This still causes device recovery, despite successful rotation.",
+  "scope": "The 90-second observer completed, and the topology helper independently verified two stable active paths. The four received frames alone are not proof of complete primary-desktop rendering.",
+  "cleanup": "Both devices and packages removed; relay configuration removed.",
+  "sources": [
+    "https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3d10umddi/nc-d3d10umddi-pfnd3d10ddi_resourcecopyregion"
+  ]
+}
