@@ -51,6 +51,13 @@ struct Device {
     };
     std::array<std::array<SamplerBinding, 16>, 3> samplers{};
     std::array<std::array<std::shared_ptr<Allocation>, 14>, 3> constant_buffers{};
+    struct GeometryBinding {
+        std::shared_ptr<Allocation> allocation;
+        UINT bytes = 0, stride = 0, offset = 0;
+        DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
+    };
+    std::array<GeometryBinding, 16> vertex_buffers{};
+    GeometryBinding index_buffer{};
 };
 struct Resource {
     std::shared_ptr<Allocation> allocation;
@@ -251,7 +258,8 @@ void APIENTRY copy_resource(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE dst, D3D10DDI
     guard(h, __FUNCTION__, [&] {
         auto &d = resource(dst); auto &s = resource(src);
         require(d.usage == D3D10_DDI_USAGE_STAGING && d.buffer_bytes == s.buffer_bytes &&
-            (s.usage == D3D10_DDI_USAGE_DEFAULT || (s.buffer_bytes && s.usage == D3D10_DDI_USAGE_DYNAMIC)));
+            (s.usage == D3D10_DDI_USAGE_DEFAULT || (s.buffer_bytes &&
+             (s.usage == D3D10_DDI_USAGE_DYNAMIC || s.usage == D3D10_DDI_USAGE_IMMUTABLE))));
         auto a = d.allocation, b = s.allocation;
         require(a != b && a->context == device(h).context && b->context == a->context &&
                 a->surface.width == b->surface.width && a->surface.height == b->surface.height &&
@@ -289,7 +297,9 @@ void APIENTRY map(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE r, UINT sub, D3D10_DDI_
         require(out && !sub && !flags && v.allocation->context == device(h).context);
         const bool read = type == D3D10_DDI_MAP_READ && v.usage == D3D10_DDI_USAGE_STAGING &&
             v.map_flags == D3D10_DDI_CPU_ACCESS_READ;
-        const bool discard = v.buffer_bytes && type == D3D10_DDI_MAP_WRITE_DISCARD &&
+        const bool geometry = (v.bind_flags & (D3D10_DDI_BIND_VERTEX_BUFFER | D3D10_DDI_BIND_INDEX_BUFFER)) != 0;
+        const bool discard = v.buffer_bytes && (type == D3D10_DDI_MAP_WRITE_DISCARD ||
+            (geometry && type == D3D10_DDI_MAP_WRITE_NOOVERWRITE)) &&
             v.usage == D3D10_DDI_USAGE_DYNAMIC && v.map_flags == D3D10_DDI_CPU_ACCESS_WRITE;
         require(read || discard);
         out->pData = v.allocation->lock(read); v.mapped_write = discard;
@@ -447,6 +457,8 @@ HRESULT APIENTRY create_device(D3D10DDI_HADAPTER, D3D10DDIARG_CREATEDEVICE *a) {
         f.pfnResourceUnmap = f.pfnStagingResourceUnmap = unmap;
         f.pfnDynamicConstantBufferMapDiscard = map;
         f.pfnDynamicConstantBufferUnmap = unmap;
+        f.pfnDynamicIABufferMapDiscard = f.pfnDynamicIABufferMapNoOverwrite = map;
+        f.pfnDynamicIABufferUnmap = unmap;
         f.pfnCalcPrivateRenderTargetViewSize = view_size; f.pfnCreateRenderTargetView = create_view;
         f.pfnDestroyRenderTargetView = destroy_view; f.pfnClearRenderTargetView = clear;
         f.pfnSetRenderTargets = targets;

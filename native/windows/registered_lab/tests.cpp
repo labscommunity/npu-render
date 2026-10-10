@@ -124,6 +124,7 @@ HRESULT APIENTRY render_cb(HANDLE rt, D3DDDICB_RENDER *a) {
 #include "upload_test.hpp"
 #include "draw_test.hpp"
 #include "present_test.hpp"
+#include "geometry_test.hpp"
 #include "buffer_test.hpp"
 int main(int argc, char **argv) {
     const char *backend = argc >= 2 ? argv[1] : "CPU";

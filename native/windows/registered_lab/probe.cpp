@@ -192,6 +192,7 @@ void exercise_shared(IDXGIAdapter *adapter, ID3D11Device *creator, ID3D11DeviceC
 #include "draw_probe.hpp"
 #include "present_probe.hpp"
 #include "buffer_probe.hpp"
+#include "geometry_probe.hpp"
 int main(int argc, char **argv) {
     const char *present_backend = argc == 2 && !std::strcmp(argv[1], "--present-draw-cpu") ? "CPU" :
                                   (argc == 2 && !std::strcmp(argv[1], "--present-draw-npu") ? "NPU" :
@@ -204,12 +205,13 @@ int main(int argc, char **argv) {
     const bool nt_handles = argc == 2 && std::strcmp(argv[1], "--shared-nt") == 0;
     const bool uploads = argc == 2 && std::strcmp(argv[1], "--upload") == 0;
     const bool buffers = argc == 2 && !std::strcmp(argv[1], "--buffers");
+    const bool geometry_buffers = argc == 2 && !std::strcmp(argv[1], "--geometry-buffers");
     const bool desktop_size = argc == 3 && !std::strcmp(argv[2], "--desktop-size");
     const bool draw_args = argc == 2 || desktop_size;
     const char *draw_backend = present_backend ? present_backend :
                                (draw_args && !std::strcmp(argv[1], "--draw-cpu") ? "CPU" :
                                (draw_args && !std::strcmp(argv[1], "--draw-npu") ? "NPU" : nullptr));
-    if (!presentation && !child && !processes && !nt_handles && !uploads && !buffers && !draw_backend && (argc != 2 || (std::strcmp(argv[1], "--exercise") && std::strcmp(argv[1], "--shared")))) return 2;
+    if (!presentation && !child && !processes && !nt_handles && !uploads && !buffers && !geometry_buffers && !draw_backend && (argc != 2 || (std::strcmp(argv[1], "--exercise") && std::strcmp(argv[1], "--shared")))) return 2;
     const bool shared = nt_handles || std::strcmp(argv[1], "--shared") == 0;
     if (!nr_fill_guest()) { std::puts("{\"passed\":false,\"error\":\"owned graphics guest required\"}"); return 2; }
     HMODULE retained = nullptr;
@@ -262,6 +264,7 @@ int main(int argc, char **argv) {
                 for (const auto &[width, height] : extents) for (UINT sharing = 0; sharing < 3; ++sharing)
                     exercise_draw(device.Get(), context.Get(), format, width, height, sharing);
         } else if (buffers) exercise_buffers(device.Get(), context.Get());
+        else if (geometry_buffers) exercise_geometry_buffers(device.Get(), context.Get());
         else if (uploads) {
             for (const auto format : {DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM})
                 for (UINT sharing = 0; sharing < 3; ++sharing) exercise_upload(device.Get(), context.Get(), format, sharing);
@@ -312,6 +315,8 @@ int main(int argc, char **argv) {
             require(result.allocations == 15 && !result.fills && !result.submitted_copies &&
                     result.upload_bytes == 525504 && result.staging_copy_bytes == 688128, "unexpected buffer traffic");
         }
+        else if (geometry_buffers) require(result.allocations == 72 && !result.fills && !result.submitted_copies &&
+                    result.upload_bytes == 1774584 && result.staging_copy_bytes == 3096576, "unexpected geometry traffic");
         else if (uploads) require(result.allocations == 24 && !result.fills && result.staging_copy_bytes == 819200 &&
                              result.submitted_copies == 32 && result.upload_bytes == 119496, "unexpected upload counters");
         else require(result.allocations == (child ? 1u : 4u) && result.fills == (child ? 1u : (processes ? 2u : 6u)) &&

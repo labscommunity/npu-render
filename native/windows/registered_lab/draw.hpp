@@ -36,7 +36,9 @@ void APIENTRY create_shader(D3D10DDI_HDEVICE h, const UINT *code, D3D10DDI_HSHAD
     new (out.pDrvPrivate) Shader();
     guard(h, __FUNCTION__, [&] {
         const auto &expected = Kind == 1 ? device(h).vertex_code : device(h).pixel_code;
-        require(code && expected.size() >= 2 && code[1] == expected.size() && std::equal(expected.begin(), expected.end(), code));
+        const bool supported = code && expected.size() >= 2 && code[1] == expected.size() && std::equal(expected.begin(), expected.end(), code);
+        if (!supported) lab_shader_capture(Kind, code);
+        require(supported);
         static_cast<Shader *>(out.pDrvPrivate)->kind = Kind;
     });
 }
@@ -126,13 +128,6 @@ void APIENTRY null_views(D3D10DDI_HDEVICE h, UINT start, UINT count, const D3D10
     guard(h, __FUNCTION__, [&] { require(start <= 128 && count <= 128 - start && (!count || values));
         for (UINT i = 0; i < count; ++i) require(!values[i].pDrvPrivate); });
 }
-void APIENTRY null_vertices(D3D10DDI_HDEVICE h, UINT start, UINT count, const D3D10DDI_HRESOURCE *values, const UINT *, const UINT *) {
-    guard(h, __FUNCTION__, [&] { require(start <= 16 && count <= 16 - start && (!count || values));
-        for (UINT i = 0; i < count; ++i) require(!values[i].pDrvPrivate); });
-}
-void APIENTRY null_index(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE value, DXGI_FORMAT, UINT) {
-    guard(h, __FUNCTION__, [&] { require(!value.pDrvPrivate); });
-}
 void APIENTRY null_stream(D3D10DDI_HDEVICE h, UINT count, UINT, const D3D10DDI_HRESOURCE *values, const UINT *) {
     guard(h, __FUNCTION__, [&] { require(count <= 4 && (!count || values)); for (UINT i = 0; i < count; ++i) require(!values[i].pDrvPrivate); });
 }
@@ -152,7 +147,7 @@ void bind_draw_functions(D3D10DDI_DEVICEFUNCS &f) {
     f.pfnGsSetConstantBuffers = set_constant_buffers<1>;
     f.pfnPsSetConstantBuffers = set_constant_buffers<2>;
     f.pfnVsSetShaderResources = f.pfnGsSetShaderResources = null_views;
-    f.pfnIaSetVertexBuffers = null_vertices; f.pfnIaSetIndexBuffer = null_index;
+    f.pfnIaSetVertexBuffers = set_vertex_buffers; f.pfnIaSetIndexBuffer = set_index_buffer;
     f.pfnSoSetTargets = null_stream; f.pfnSetPredication = null_predication;
     f.pfnSetScissorRects = set_scissors; f.pfnShaderResourceViewReadAfterWriteHazard = view_hazard;
 }

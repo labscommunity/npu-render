@@ -76,6 +76,7 @@ int test_buffers(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER_DEVI
         }
         last_error = S_OK;
     }
+    if (test_geometry_buffers(h, f)) return 1;
     f.pfnDestroyDevice(h);
     TEST(!counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
     return 0;

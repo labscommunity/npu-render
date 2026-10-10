@@ -50,4 +50,29 @@ inline void lab_trace(const char *format, ...) noexcept {
     }
     CloseHandle(file);
 }
+inline void lab_shader_capture(UINT kind, const UINT *code) noexcept {
+    if (!nr_fill_guest() || !code || code[1] < 2 || code[1] > 16384) return;
+    // Preserve at most eight rejected programs per process across DLL reloads.
+    // The filename hash deduplicates diagnostics; it is not an integrity check.
+    uint64_t hash = 14695981039346656037ull;
+    for (UINT i = 0; i < code[1]; ++i) { hash ^= code[i]; hash *= 1099511628211ull; }
+    WCHAR path[MAX_PATH]{}, pattern[MAX_PATH]{};
+    swprintf_s(path, L"C:\\npu-lab\\umd-trace\\shader-%lu-%u-%016llx.bin", GetCurrentProcessId(), kind, hash);
+    if (GetFileAttributesW(path) != INVALID_FILE_ATTRIBUTES) return;
+    swprintf_s(pattern, L"C:\\npu-lab\\umd-trace\\shader-%lu-*.bin", GetCurrentProcessId());
+    WIN32_FIND_DATAW entry{}; UINT count = 0;
+    const auto search = FindFirstFileW(pattern, &entry);
+    if (search != INVALID_HANDLE_VALUE) {
+        do { ++count; } while (count < 8 && FindNextFileW(search, &entry));
+        FindClose(search);
+    }
+    if (count >= 8) return;
+    const auto file = CreateFileW(path, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE) return;
+    DWORD written = 0; const DWORD bytes = code[1] * sizeof(UINT);
+    const bool saved = WriteFile(file, code, bytes, &written, nullptr) && written == bytes;
+    CloseHandle(file);
+    lab_trace("{\"event\":\"rejected_shader_capture\",\"kind\":%u,\"words\":%u,\"hash\":\"%016llx\",\"saved\":%s}\n",
+              kind, code[1], hash, saved ? "true" : "false");
+}
 }
