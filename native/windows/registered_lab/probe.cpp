@@ -193,7 +193,8 @@ void exercise_shared(IDXGIAdapter *adapter, ID3D11Device *creator, ID3D11DeviceC
 #include "present_probe.hpp"
 int main(int argc, char **argv) {
     const char *present_backend = argc == 2 && !std::strcmp(argv[1], "--present-draw-cpu") ? "CPU" :
-                                  (argc == 2 && !std::strcmp(argv[1], "--present-draw-npu") ? "NPU" : nullptr);
+                                  (argc == 2 && !std::strcmp(argv[1], "--present-draw-npu") ? "NPU" :
+                                  (argc == 2 && !std::strcmp(argv[1], "--present-draw-npu-remote") ? "NPU_LAB_FILE" : nullptr));
     const bool presentation = present_backend || (argc == 2 && !std::strcmp(argv[1], "--present"));
     const bool child_nt = argc == 5 && std::strcmp(argv[1], "--shared-child-nt") == 0;
     const bool child = child_nt || (argc == 5 && std::strcmp(argv[1], "--shared-child") == 0);
@@ -283,11 +284,13 @@ int main(int argc, char **argv) {
         std::printf("{\"draws\":%llu,\"executions\":%llu,\"cpu_executions\":%llu,\"gpu_executions\":%llu,\"npu_executions\":%llu,\"execution_device\":\"%s\",\"inference_input_bytes\":%llu,\"inference_output_bytes\":%llu}\n",
                     result.draws, result.executions, result.cpu_executions, result.gpu_executions, result.npu_executions,
                     result.last_execution_device, result.inference_input_bytes, result.inference_output_bytes);
+        std::printf("{\"remote_npu_executions\":%llu,\"local_npu_executions\":%llu}\n", result.remote_npu_executions, result.npu_executions);
         if (presentation) {
             require(result.fills == 3 && result.present_requests == 3 && result.accepted_present_callbacks == 3, "unexpected presentation counters");
             if (present_backend) require(result.draws == 3 && result.executions == 3 && !result.gpu_executions &&
                     result.cpu_executions == (!std::strcmp(present_backend, "CPU") ? 3u : 0u) &&
-                    result.npu_executions == (!std::strcmp(present_backend, "NPU") ? 3u : 0u), "unexpected presented draw backend");
+                    result.npu_executions == (!std::strcmp(present_backend, "NPU") ? 3u : 0u) &&
+                    result.remote_npu_executions == (!std::strcmp(present_backend, "NPU_LAB_FILE") ? 3u : 0u), "unexpected presented draw backend");
         }
         else if (draw_backend) {
             require(result.draws == 24 && result.executions == 24 && !result.gpu_executions &&
@@ -305,19 +308,24 @@ int main(int argc, char **argv) {
                 result.staging_copy_bytes == copies * 12288 && result.submitted_copies == (shared || child || processes ? copies : 0u) &&
                 !result.upload_bytes, "unexpected UMD counters");
         require(!result.live_allocations && !result.live_contexts && !result.cleanup_errors && !result.rejected, "unexpected cleanup counters");
+        if (!present_backend || std::strcmp(present_backend, "NPU_LAB_FILE"))
+            require(!result.remote_npu_executions, "unexpected external inference");
         if (!draw_backend) require(!result.executions && !result.draws, "unexpected rendering execution");
         FreeLibrary(retained);
-        std::printf("{\"passed\":true,\"npu_execution_tested\":%s,\"desktop_offload_tested\":false}\n", result.npu_executions ? "true" : "false");
+        std::printf("{\"passed\":true,\"npu_execution_tested\":%s,\"remote_npu_execution_tested\":%s,\"desktop_offload_tested\":false}\n",
+                    result.npu_executions ? "true" : "false", result.remote_npu_executions ? "true" : "false");
         return 0;
     } catch (const std::exception &e) {
         std::fprintf(stderr, "registered clear failed: %s\n", e.what());
         if (retained) {
             auto stats = reinterpret_cast<BOOL (*)(NrFillStats *)>(GetProcAddress(retained, "nr_fill_stats"));
             NrFillStats result{};
-            if (stats && stats(&result))
+            if (stats && stats(&result)) {
                 std::printf("{\"failed\":true,\"rejected\":%llu,\"last_unsupported_offset\":%llu,\"cleanup_errors\":%llu,\"executions\":%llu,\"cpu_executions\":%llu,\"gpu_executions\":%llu,\"npu_executions\":%llu,\"live_allocations\":%llu,\"live_contexts\":%llu,\"present_requests\":%llu,\"accepted_present_callbacks\":%llu}\n",
                             result.rejected, result.last_unsupported_offset, result.cleanup_errors, result.executions,
                             result.cpu_executions, result.gpu_executions, result.npu_executions, result.live_allocations, result.live_contexts, result.present_requests, result.accepted_present_callbacks);
+                std::printf("{\"remote_npu_executions\":%llu,\"local_npu_executions\":%llu}\n", result.remote_npu_executions, result.npu_executions);
+            }
             FreeLibrary(retained);
         }
         return 1;

@@ -107,7 +107,8 @@ void APIENTRY draw(D3D10DDI_HDEVICE h, UINT count, UINT first) {
         auto background = d.blend.BlendEnable[0] ? read_pixels(*target) : std::vector<uint8_t>(foreground.size());
         auto result = d.executor->compose(s.width, s.height, background, foreground);
         ++counters.executions;
-        if (d.backend == "NPU") ++counters.npu_executions;
+        if (d.backend == "NPU_LAB_FILE") ++counters.remote_npu_executions;
+        else if (d.backend == "NPU") ++counters.npu_executions;
         else if (d.backend == "GPU") ++counters.gpu_executions;
         else ++counters.cpu_executions;
         strncpy_s(counters.last_execution_device, result.execution_device.c_str(), _TRUNCATE);

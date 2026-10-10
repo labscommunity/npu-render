@@ -96,7 +96,8 @@ int test_present(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER_DEVI
     TEST(dxgi.pfnPresent(&args) == E_INVALIDARG && present_callback_calls == 3 && memory == pixels_before);
     NrFillStats stats{}; TEST(nr_fill_stats(&stats));
     TEST(stats.present_requests == 3 && stats.accepted_present_callbacks == 2);
-    stats.version = 4; TEST(!nr_fill_stats(&stats));
+    TEST(!stats.remote_npu_executions);
+    stats.version = 5; TEST(!nr_fill_stats(&stats));
     source.allocation.reset(); destination.allocation.reset(); f.pfnDestroyDevice(h);
     TEST(!counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
     std::puts("{\"kind\":\"registered-present-callback-shim\",\"callback_requests\":3,\"accepted_callbacks\":2,\"display_delivery_tested\":false}");

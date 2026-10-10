@@ -1,5 +1,6 @@
 #include "blend_executor.hpp"
 #include "../blend_model.hpp"
+#include "lab_exchange.hpp"
 #include <cstring>
 #include <map>
 #include <stdexcept>
@@ -7,6 +8,7 @@ namespace nr::registered_lab {
 struct BlendExecutor::State {
     ov::Core core;
     std::string backend;
+    std::unique_ptr<LabNpuExchange> external;
     struct Model {
         ov::CompiledModel compiled;
         ov::InferRequest request;
@@ -23,6 +25,7 @@ struct BlendExecutor::State {
     };
     std::map<uint64_t, std::unique_ptr<Model>> models;
     explicit State(const std::string &selected) : backend(selected) {
+        if (backend == "NPU_LAB_FILE") { external = std::make_unique<LabNpuExchange>(); return; }
         if (backend != "CPU" && backend != "GPU" && backend != "NPU")
             throw std::invalid_argument("explicit CPU, GPU or NPU required");
     }
@@ -35,6 +38,7 @@ BlendExecutor::Result BlendExecutor::compose(uint32_t width, uint32_t height,
         uint64_t(width) * height * 4 > 128ull * 1024 * 1024 ||
         background.size() != size_t(width) * height * 4 || foreground.size() != background.size())
         throw std::invalid_argument("invalid packed composition extents");
+    if (state->external) return {state->external->compose(width, height, background, foreground), "NPU (remote lab)"};
     const uint64_t key = (uint64_t(width) << 32) | height;
     if (!state->models.count(key)) {
         if (state->models.size() >= 8) throw std::runtime_error("composition shape cache is full");

@@ -75,7 +75,7 @@ The DXGI blit-present entrypoint now forwards the actual source/destination
 allocation handles, kernel context and opaque DXGI context to the runtime's
 `PresentCb`. It preserves callback status (including occlusion), rejects
 unsupported flags and mismatched resources, and invalidates the context after
-a failed callback. Statistics ABI 5 distinguishes requests from accepted
+a failed callback. Statistics ABI 6 distinguishes requests from accepted
 callbacks; neither counter means a frame reached a display. The component test
 uses explicit callback shims and verifies that forwarding does not secretly
 copy pixels. Live swap-chain presentation remains a separate test; flips,
@@ -215,3 +215,31 @@ matches, all runtime-owned objects are released, and no callback is rejected.
 The kernel debugger records the six actual render submissions and completions.
 This validates the registered CPU-worker path on the isolated guest. NPU execution,
 sharing, shaders, presentation, and DWM selection are separate remaining gates.
+
+### Finite physical-NPU exchange laboratory
+
+`--present-draw-npu-remote` is a separate, explicitly selected laboratory
+backend (`NPU_LAB_FILE`). The installed UMD in the owned disposable guest writes
+three bounded pixel requests; `tools/run_registered_npu_exchange.ps1` transfers
+them over an existing authenticated WinRM session to
+`nr_registered_npu_worker.exe` on a physical NPU host. That worker hardcodes the
+NPU provider and returns pixels only after verifying its execution device.
+No network listener or driver installation is performed by the controller.
+The returned pixels follow the existing registered presentation path and are
+checked independently against the displayed window.
+
+A fresh random job directory, exclusive client claim, per-request random nonce,
+sequence, dimensions, byte counts and device identity prevent accidental stale
+response acceptance. Messages are limited to 32 MiB per frame and three requests;
+a missing reply fails after 120 seconds. Errors latch without backend fallback.
+Malformed, oversized and wrong-device messages have explicit contract tests.
+Statistics ABI 6 counts `remote_npu_executions` separately from local NPU, CPU
+and GPU executions. `tools/validate_registered_npu_worker.py` checks physical
+NPU pixels and malformed requests without claiming adapter integration.
+
+This transport exists to validate the real hardware path while keeping the
+experimental kernel driver off the physical machine. It is not a production
+transport, performance benchmark, DWM migration, or full desktop offload. CPU
+uploads, kernel copies, management transfers and the original display adapter
+remain involved. Local NPU configuration continues to fail when no local NPU
+is available; remote operation requires the explicit laboratory mode.

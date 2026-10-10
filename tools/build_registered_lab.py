@@ -69,7 +69,13 @@ def main():
     if source_hashes() != sources:
         raise RuntimeError("Sources changed during the build; discard this result")
     binaries = {}
-    for name in ("nr_fill_umd.dll", "nr_registered_clear_probe.exe", "nr_registered_lab_test.exe"):
+    for name in (
+        "nr_fill_umd.dll",
+        "nr_registered_clear_probe.exe",
+        "nr_registered_lab_test.exe",
+        "nr_registered_npu_worker.exe",
+        "nr_registered_exchange_test.exe",
+    ):
         binaries[name] = hashlib.sha256(
             (args.build_dir / "Release" / name).read_bytes()
         ).hexdigest()

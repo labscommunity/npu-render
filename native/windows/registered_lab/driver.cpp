@@ -490,7 +490,7 @@ extern "C" __declspec(dllexport) HRESULT APIENTRY OpenAdapter10_2(D3D10DDIARG_OP
     return status;
 }
 extern "C" __declspec(dllexport) BOOL nr_fill_stats(NrFillStats *out) {
-    if (!out || out->bytes != sizeof(*out) || out->version != 5) return FALSE;
+    if (!out || out->bytes != sizeof(*out) || out->version != 6) return FALSE;
     std::lock_guard<std::recursive_mutex> lock(mutex);
     out->allocations = counters.allocations; out->fills = counters.fills; out->staging_copy_bytes = counters.copies;
     out->live_allocations = counters.live_allocations; out->live_contexts = counters.live_contexts;
@@ -503,12 +503,14 @@ extern "C" __declspec(dllexport) BOOL nr_fill_stats(NrFillStats *out) {
     out->cpu_executions = counters.cpu_executions; out->gpu_executions = counters.gpu_executions;
     out->npu_executions = counters.npu_executions;
     out->present_requests = counters.present_requests; out->accepted_present_callbacks = counters.accepted_present_callbacks;
+    out->remote_npu_executions = counters.remote_npu_executions;
     std::memcpy(out->last_execution_device, counters.last_execution_device, sizeof(out->last_execution_device));
     return TRUE;
 }
 extern "C" __declspec(dllexport) BOOL nr_fill_configure(const char *backend) {
     std::lock_guard<std::recursive_mutex> lock(mutex);
     if (!backend || counters.live_contexts || counters.live_allocations ||
-        (std::strcmp(backend, "CPU") && std::strcmp(backend, "GPU") && std::strcmp(backend, "NPU"))) return FALSE;
+        (std::strcmp(backend, "CPU") && std::strcmp(backend, "GPU") && std::strcmp(backend, "NPU") &&
+         (std::strcmp(backend, "NPU_LAB_FILE") || !nr_fill_guest()))) return FALSE;
     try { selected_backend = backend; return TRUE; } catch (...) { return FALSE; }
 }

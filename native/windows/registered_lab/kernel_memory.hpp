@@ -29,6 +29,7 @@ struct Counters {
     uint64_t cpu_executions = 0, gpu_executions = 0, npu_executions = 0;
     char last_execution_device[32]{};
     uint64_t present_requests = 0, accepted_present_callbacks = 0;
+    uint64_t remote_npu_executions = 0;
 };
 struct Context {
     HANDLE runtime = nullptr;
