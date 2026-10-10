@@ -1,0 +1,48 @@
+{
+  "scope": "Reusable uniform triangle rendering pipeline with explicit provider and per-stage timing",
+  "build": "present-umd-v56",
+  "cpu_contract_tests_passed": 8,
+  "npu_dynamic_test_components": 98304,
+  "npu_dynamic_tests": [
+    "updated constants",
+    "updated geometry",
+    "full and partial coverage",
+    "degenerate triangles",
+    "premultiplied source-over",
+    "reject nonuniform varyings without target modification",
+    "reuse after rejected input"
+  ],
+  "v54_capture_profile": {
+    "compile_ms": 1696.21,
+    "draw_ms": [
+      7532.401,
+      7662.73,
+      7773.158
+    ],
+    "coverage_ms": [
+      5482.708,
+      5515.866,
+      5567.402
+    ],
+    "merger_ms": [
+      2024.034,
+      2124.126,
+      2181.288
+    ]
+  },
+  "profiling_caveat": "Diagnostic run overlapped a Windows build. Not an isolated performance benchmark. Coverage dominates by seconds.",
+  "larger_batch_failure": {
+    "batch": 65536,
+    "status": "ZE_RESULT_ERROR_DEVICE_LOST",
+    "output_created": false,
+    "recovery": "Existing NPU output-merger test subsequently passed all 98304 components without reboot or driver changes."
+  },
+  "aligned_coverage_python_diagnostic": {
+    "checked_samples": 81920,
+    "exact": true,
+    "purpose": "Investigate shared triangle state and bounded exact i32 products; not integrated in production executor"
+  },
+  "full_desktop_offload": false,
+  "displayed_frames": 0,
+  "tahoma_performance_tested": false
+}

@@ -2,8 +2,8 @@
 #include "capture_reader.hpp"
 #include "vertex_executor.hpp"
 #include "shader_reference.hpp"
-#include "projection_executor.hpp"
-#include "output_merger.hpp"
+#include "uniform_draw.hpp"
+#include <cstdlib>
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
@@ -52,8 +52,16 @@ std::vector<nr::shader::VertexRegisters> fetch(const nr::capture::Snapshot &s, u
 int main(int argc, char **argv) try {
     using namespace nr::shader;
     using namespace nr::raster;
-    if (argc != 7 || std::strcmp(argv[1], "--capture") || std::strcmp(argv[3], "--backend") || std::strcmp(argv[5], "--output"))
+    if ((argc != 7 && argc != 11) || std::strcmp(argv[1], "--capture") || std::strcmp(argv[3], "--backend") || std::strcmp(argv[5], "--output"))
         throw std::invalid_argument("expected --capture <NPDRAW01 file> --backend <CPU|NPU> --output <new pixel file>");
+    uint32_t repeats = 1, batch = 4096;
+    if (argc == 11) {
+        nr::capture::check(!std::strcmp(argv[7], "--repeat") && !std::strcmp(argv[9], "--batch"));
+        char *end = nullptr; const auto r = std::strtoul(argv[8], &end, 10);
+        nr::capture::check(end != argv[8] && !*end && r && r <= 5); repeats = uint32_t(r);
+        const auto b = std::strtoul(argv[10], &end, 10);
+        nr::capture::check(end != argv[10] && !*end && b && b <= 65536); batch = uint32_t(b);
+    }
     const std::string backend = argv[4]; nr::capture::check(backend == "CPU" || backend == "NPU");
     std::ifstream existing(argv[6], std::ios::binary); nr::capture::check(!existing); existing.close();
     const auto start = std::chrono::steady_clock::now();
@@ -88,52 +96,33 @@ int main(int argc, char **argv) try {
     int32_t base; std::memcpy(&base, &args[2], 4);
     const auto inputs = fetch(snapshot, args[0], args[1], base);
     const auto cb = constants(snapshot, 0, vs);
-    VertexExecutor vertex(vs, args[0], backend); const auto shaded = vertex.execute(inputs, cb);
-    for (size_t i = 0; i < inputs.size(); ++i) {
-        const auto expected = reference_vertex(vs, inputs[i], cb);
-        for (unsigned r = 0; r < 16; ++r) for (unsigned c = 0; c < 4; ++c) if (vs.outputs[r] & (1u << c))
-            nr::capture::check(shaded.vertices[i][r][c] == expected[r][c]);
-    }
-    std::vector<ClipPosition> clips(args[0]);
-    for (size_t i = 0; i < clips.size(); ++i) std::memcpy(clips[i].data(), shaded.vertices[i][vs.position_output].data(), 16);
-    ProjectionExecutor projection(args[0], backend);
-    const auto projected = projection.execute(clips, {view[0], view[1], view[2], view[3], view[4], view[5]});
-    constexpr uint32_t batch = 4096;
-    nr::capture::check(pixels.size() % batch == 0); // No padded tail is silently written.
-    VertexRegisters uniform{};
-    for (unsigned r = 0; r < 16; ++r) if (ps.inputs[r] && r != ps.position_input) {
-        nr::capture::check((vs.outputs[r] & ps.inputs[r]) == ps.inputs[r]); uniform[r] = shaded.vertices[0][r];
-        for (const auto &v : shaded.vertices) for (unsigned c = 0; c < 4; ++c) if (ps.inputs[r] & (1u << c))
-            nr::capture::check(v[r][c] == uniform[r][c]);
-    }
-    // Reusing a pixel batch is exact for these verified uniform inputs.
-    PixelExecutor pixel(ps, batch, backend);
     const auto pixel_cb = constants(snapshot, 2, ps);
-    const auto fragment = pixel.execute(std::vector<VertexRegisters>(batch, uniform), pixel_cb);
-    const auto expected_color = reference_vertex(ps, uniform, pixel_cb)[0];
-    std::vector<Color> colors(batch);
-    for (size_t i = 0; i < batch; ++i) {
-        nr::capture::check(fragment.vertices[i][0] == expected_color); std::memcpy(colors[i].data(), fragment.vertices[i][0].data(), 16);
-    }
-    CoverageExecutor coverage(batch, backend); OutputMerger merger(batch, backend, blending, format == 87, uint8_t(blend[15] & 255));
-    std::vector<Sample> samples(batch); std::vector<PackedColor> background(batch);
-    uint64_t covered_samples = 0, tile_executions = 0;
-    for (size_t t = 0; t < clips.size(); t += 3) for (size_t first = 0; first < pixels.size(); first += batch) {
-        for (size_t i = 0; i < batch; ++i) {
-            for (size_t v = 0; v < 3; ++v) samples[i].triangle[v] = projected.vertices[t + v].snapped;
-            const auto index = first + i; samples[i].point = {int32_t(index % width) * 256 + 128, int32_t(index / width) * 256 + 128};
+    const auto compile_start = std::chrono::steady_clock::now();
+    UniformDrawExecutor executor(vs, ps, args[0], width, height, backend, blending, format == 87, uint8_t(blend[15] & 255), batch);
+    const auto compile_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - compile_start).count();
+    UniformDrawExecutor::Result result;
+    std::vector<PackedColor> reference_pixels;
+    for (uint32_t iteration = 0; iteration < repeats; ++iteration) {
+        result = executor.execute(inputs, cb, pixel_cb, {view[0], view[1], view[2], view[3], view[4], view[5]}, pixels);
+        for (size_t i = 0; i < inputs.size(); ++i) {
+            const auto expected = reference_vertex(vs, inputs[i], cb);
+            for (unsigned r = 0; r < 16; ++r) for (unsigned c = 0; c < 4; ++c) if (vs.outputs[r] & (1u << c))
+                nr::capture::check(result.vertices[i][r][c] == expected[r][c]);
         }
-        std::copy_n(pixels.data() + first, batch, background.data());
-        const auto selected = coverage.execute(samples);
-        for (const auto value : selected.covered) covered_samples += value;
-        const auto result = merger.execute(colors, background, selected.covered);
-        std::copy(result.pixels.begin(), result.pixels.end(), pixels.begin() + first); ++tile_executions;
+        VertexRegisters uniform{};
+        for (unsigned r = 0; r < 16; ++r) if (ps.inputs[r] && r != ps.position_input) uniform[r] = result.vertices[0][r];
+        nr::capture::check(result.fragment == reference_vertex(ps, uniform, pixel_cb)[0]);
+        if (!iteration) reference_pixels = result.pixels; else nr::capture::check(result.pixels == reference_pixels);
+        const auto &t = result.timings;
+        std::printf("{\"kind\":\"draw_stage_timing\",\"iteration\":%u,\"batch\":%u,\"compile_ms\":%.3f,\"shader_ms\":%.3f,\"projection_ms\":%.3f,\"coverage_ms\":%.3f,\"merger_ms\":%.3f,\"draw_ms\":%.3f,\"execution_device\":\"%s\"}\n",
+            iteration, batch, compile_ms, t.shader_ms, t.projection_ms, t.coverage_ms, t.merger_ms, t.total_ms, result.execution_device.c_str());
     }
+    pixels = std::move(result.pixels);
     std::ofstream output(argv[6], std::ios::binary); nr::capture::check(bool(output));
     output.write(reinterpret_cast<const char *>(pixels.data()), std::streamsize(pixels.size() * sizeof(PackedColor))); output.close(); nr::capture::check(bool(output));
     const auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
     std::printf("{\"kind\":\"offline_uniform_draw_replay\",\"width\":%u,\"height\":%u,\"vertices\":%u,\"triangles\":%u,\"covered_samples\":%llu,\"tile_executions\":%llu,\"execution_device\":\"%s\",\"elapsed_ms\":%lld,\"displayed_frames\":0,\"desktop_offload_tested\":false}\n",
-        width, height, args[0], args[0] / 3, static_cast<unsigned long long>(covered_samples), static_cast<unsigned long long>(tile_executions),
-        projected.execution_device.c_str(), static_cast<long long>(milliseconds));
+        width, height, args[0], args[0] / 3, static_cast<unsigned long long>(result.covered_samples), static_cast<unsigned long long>(result.tile_executions),
+        result.execution_device.c_str(), static_cast<long long>(milliseconds));
     return 0;
 } catch (const std::exception &e) { std::fprintf(stderr, "%s\n", e.what()); return 1; }

@@ -1,0 +1,13 @@
+nr_registered_draw_replay_probe.exe : Exception from src\inference\src\cpp\infer_request.cpp:224:
+At line:6 char:2
++  & $exe --capture "$r\vm\v60-draw-1048.bin" --backend NPU --output "$ ...
++  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Exception from ...equest.cpp:224::String) [], Remote 
+   Exception
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Exception from src\plugins\intel_npu\src\utils\src\zero\zero_wrappers.cpp:258:
+L0 zeFenceHostSynchronize result: ZE_RESULT_ERROR_DEVICE_LOST, code 0x70000001 - device hung, 
+reset, was removed, or driver update occurred
+
+

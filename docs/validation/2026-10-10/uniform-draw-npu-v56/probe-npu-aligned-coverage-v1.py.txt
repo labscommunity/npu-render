@@ -1,0 +1,47 @@
+import json,tempfile,time
+from pathlib import Path
+import numpy as np
+import openvino as ov
+from openvino import opset15 as o
+n=4096
+vertices=o.parameter([1,6],np.float32,name='vertices');points=o.parameter([n,2],np.float32,name='points')
+def ci(v):return o.constant(v,np.int32)
+def pred(x):return o.convert(x,np.int32)
+def both(a,b):return o.bitwise_and(a,b)
+def either(a,b):return o.bitwise_or(a,b)
+def lane(v,i):return o.convert(o.multiply(o.gather(v,[i],1),o.constant(1/128,np.float32)),np.int32)
+def sign(x):return pred(o.greater(x,ci(0))),pred(o.less(x,ci(0))),pred(o.equal(x,ci(0)))
+def det(ax,by,ay,bx):return sign(o.subtract(o.multiply(ax,by),o.multiply(ay,bx)))
+v=[lane(vertices,i) for i in range(6)];px=lane(points,0);py=lane(points,1)
+pos,neg,zero=det(o.subtract(v[2],v[0]),o.subtract(v[5],v[1]),o.subtract(v[3],v[1]),o.subtract(v[4],v[0]));coverage=either(pos,neg)
+for a,b in [(0,2),(2,4),(4,0)]:
+ dx=o.subtract(v[b],v[a]);dy=o.subtract(v[b+1],v[a+1]);ep,en,ez=det(dx,o.subtract(py,v[a+1]),dy,o.subtract(px,v[a]))
+ top=either(pred(o.less(dy,ci(0))),both(pred(o.equal(dy,ci(0))),pred(o.greater(dx,ci(0)))))
+ rev=either(pred(o.greater(dy,ci(0))),both(pred(o.equal(dy,ci(0))),pred(o.less(dx,ci(0)))))
+ coverage=both(coverage,either(both(pos,either(ep,both(ez,top))),both(neg,either(en,both(ez,rev)))))
+def oracle(t,points):
+ q=[tuple(map(int,t[j:j+2])) for j in (0,2,4)]
+ def edge(a,b,c):return (b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0])
+ area=edge(*q)
+ if not area:return np.zeros(n,np.int32)
+ if area<0:q[1],q[2]=q[2],q[1]
+ result=[]
+ for p in points:
+  p=tuple(map(int,p));result.append(all((e:=edge(a,b,p))>0 or(e==0 and(b[1]<a[1]or(b[1]==a[1]and b[0]>a[0]))) for a,b in zip(q,q[1:]+q[:1])))
+ return np.array(result,np.int32)
+with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
+ m=ov.Model([coverage],[vertices,points]);path=Path(d)/'m.xml'
+ for node in m.get_ops():node.set_rt_info('','precise_0')
+ ov.serialize(m,path);core=ov.Core();compiled=core.compile_model(core.read_model(path),'NPU',{'EXECUTION_MODE_HINT':'ACCURACY'})
+ rng=np.random.default_rng(390);total=0
+ for frame in range(20):
+  vv=rng.integers(-8191,8192,(1,6),dtype=np.int32)*256;pp=rng.integers(-8191,8192,(n,2),dtype=np.int32)*256+128
+  if frame<4:
+   vv=np.array([[0,0,1024*256,0,1024*256,768*256]] if frame%2==0 else [[1024*256,768*256,0,768*256,0,0]],np.int32)
+   pp=np.array([[(i%64)*256+128,(i//64)*256+128] for i in range(n)],np.int32)
+   if frame>=2:vv=vv.reshape(1,3,2)[:,[0,2,1]].reshape(1,6).copy()
+  if frame==4:vv[:,4:6]=vv[:,2:4]
+  expected=oracle(vv[0],pp);start=time.perf_counter();actual=compiled({'vertices':vv.astype(np.float32),'points':pp.astype(np.float32)})[0].ravel();elapsed=(time.perf_counter()-start)*1000
+  exact=np.array_equal(actual,expected);print(json.dumps({'frame':frame,'samples':n,'exact':bool(exact),'execution_devices':compiled.get_property('EXECUTION_DEVICES'),'elapsed_ms':elapsed,'mismatches':int(np.sum(actual!=expected))}),flush=True)
+  assert exact;total+=n
+ print(json.dumps({'checked_samples':total,'desktop_offload_tested':False}))
