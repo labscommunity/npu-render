@@ -1,0 +1,104 @@
+{
+  "schema": 1,
+  "kind": "indirect-display-startup-diagnostics",
+  "date_utc": "2026-10-10",
+  "result": "startup-progress-not-desktop-admission",
+  "cases": [
+    {
+      "version": 1,
+      "source_revision": "e790b4dd0a3f39dc5049861399237581457dcd96",
+      "install": {
+        "started": "2026-10-10T01:16:24.6112860Z",
+        "action": "install",
+        "completed": true,
+        "passed": false,
+        "error": "Indirect device is not ready",
+        "devcon_exit": 0,
+        "finished": "2026-10-10T01:17:03.1639870Z"
+      },
+      "remove": {
+        "started": "2026-10-10T01:21:39.7432920Z",
+        "action": "remove",
+        "completed": true,
+        "passed": true,
+        "error": null,
+        "devcon_exit": 0,
+        "pnputil_exit": 0,
+        "finished": "2026-10-10T01:21:48.8972580Z"
+      },
+      "problem_code": 31,
+      "problem_status": "c0000001",
+      "trace": [],
+      "prior_display_status_preserved": true,
+      "owned_inf_deleted": true
+    },
+    {
+      "version": 2,
+      "source_revision": "37720a9df0aa308f1a6233e625daaf5fd32799ee",
+      "install": {
+        "started": "2026-10-10T01:25:02.6637850Z",
+        "action": "install",
+        "completed": true,
+        "passed": false,
+        "error": "Indirect device is not ready",
+        "devcon_exit": 0,
+        "finished": "2026-10-10T01:25:55.6706570Z"
+      },
+      "remove": {
+        "started": "2026-10-10T01:28:13.5731730Z",
+        "action": "remove",
+        "completed": true,
+        "passed": true,
+        "error": null,
+        "devcon_exit": 0,
+        "pnputil_exit": 0,
+        "finished": "2026-10-10T01:28:24.3063370Z"
+      },
+      "problem_code": 10,
+      "problem_status": "c000009e",
+      "trace": [
+        {
+          "event": "driver_entry"
+        },
+        {
+          "event": "framework_driver",
+          "status": "00000000"
+        },
+        {
+          "event": "client_config",
+          "status": "00000000"
+        },
+        {
+          "event": "framework_device",
+          "status": "00000000"
+        },
+        {
+          "event": "device_added",
+          "status": "00000000"
+        },
+        {
+          "event": "paired_adapter",
+          "status": "80004005"
+        }
+      ],
+      "prior_display_status_preserved": true,
+      "owned_inf_deleted": true
+    }
+  ],
+  "render_adapter_selected": false,
+  "desktop_surface_received": false,
+  "npu_execution_tested": false,
+  "desktop_offload_tested": false,
+  "notes": [
+    "Both packages register successfully through devcon but the final PnP state is failed; devcon exit zero alone is not treated as successful startup. Both devices and their exact recorded OEM packages were removed, preserving the registered render adapter and original display status.",
+    "The first package records Code 31. A restart after enabling the UMDF Operational log reports driver-load HRESULT d000000d (invalid parameter). No driver file trace was created.",
+    "The second package explicitly supplies the monitor-description parser, rejects unsupported EDID parsing, and adds startup traces. Its entrypoint, framework creation, client configuration and device creation all succeed. It reaches adapter discovery, which returns E_FAIL; PnP reports Code 10 / c000009e.",
+    "The original enumeration helper bounds the first reported capacity at 32, while the already working registered probe permits 64. A subsequent revision admits 64 and records raw enumeration statuses/counts. That revision is not included in this report, so the capacity hypothesis is not marked proven here.",
+    "Only the disposable guest was changed. Its UMDF Operational event log was enabled and the dedicated diagnostic directory was granted write access to authenticated users and the UserModeDrivers SID. No host driver, reboot, timeout-disable setting or desktop-route change was used.",
+    "No indirect monitor reached render-adapter selection in these two cases. This evidence does not establish DWM migration, desktop frames or NPU execution."
+  ],
+  "references": [
+    "https://learn.microsoft.com/en-us/windows-hardware/drivers/wdf/determining-why-the-umdf-driver-fails-to-load-or-the-umdf-device-fails",
+    "https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmthk/nf-d3dkmthk-d3dkmtenumadapters2"
+  ]
+}
