@@ -91,8 +91,12 @@ executes its first indexed draw through vertex shading, projection, triangle
 coverage, pixel shading and BGRA output, matching all 786,432 output pixels.
 This draw is an opaque uniform-color quad. General textured desktop draws, live
 draw integration and indirect-display frame delivery remain unfinished. The
-single cold replay took 9.76 seconds including compilation; it does not establish
-interactive performance or a Tahoma benefit.
+first cold replay took 9.76 seconds including compilation. A subsequent
+[rectangle specialization](docs/validation/2026-10-10/solid-rectangle-npu-v58/report.json)
+preserves the exact image and reduces repeated draw time to 42–49 ms in the
+diagnostic run. Its NPU pixel tests check 37.9 million components, including
+fractional edges and unchanged background pixels. This still does not establish
+interactive desktop performance or a Tahoma benefit.
 
 The [captured-window desktop experiment](native/windows/capture/README.md) now
 presents an NPU-composed 2880×1800 desktop with input passing through to the

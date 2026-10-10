@@ -60,7 +60,7 @@ int main(int argc, char **argv) try {
         char *end = nullptr; const auto r = std::strtoul(argv[8], &end, 10);
         nr::capture::check(end != argv[8] && !*end && r && r <= 5); repeats = uint32_t(r);
         const auto b = std::strtoul(argv[10], &end, 10);
-        nr::capture::check(end != argv[10] && !*end && b && b <= 65536); batch = uint32_t(b);
+        nr::capture::check(end != argv[10] && !*end && b && b <= 4096); batch = uint32_t(b);
     }
     const std::string backend = argv[4]; nr::capture::check(backend == "CPU" || backend == "NPU");
     std::ifstream existing(argv[6], std::ios::binary); nr::capture::check(!existing); existing.close();
@@ -114,8 +114,8 @@ int main(int argc, char **argv) try {
         nr::capture::check(result.fragment == reference_vertex(ps, uniform, pixel_cb)[0]);
         if (!iteration) reference_pixels = result.pixels; else nr::capture::check(result.pixels == reference_pixels);
         const auto &t = result.timings;
-        std::printf("{\"kind\":\"draw_stage_timing\",\"iteration\":%u,\"batch\":%u,\"compile_ms\":%.3f,\"shader_ms\":%.3f,\"projection_ms\":%.3f,\"coverage_ms\":%.3f,\"merger_ms\":%.3f,\"draw_ms\":%.3f,\"execution_device\":\"%s\"}\n",
-            iteration, batch, compile_ms, t.shader_ms, t.projection_ms, t.coverage_ms, t.merger_ms, t.total_ms, result.execution_device.c_str());
+        std::printf("{\"kind\":\"draw_stage_timing\",\"iteration\":%u,\"batch\":%u,\"compile_ms\":%.3f,\"shader_ms\":%.3f,\"projection_ms\":%.3f,\"coverage_ms\":%.3f,\"merger_ms\":%.3f,\"draw_ms\":%.3f,\"rectangle_path\":%s,\"execution_device\":\"%s\"}\n",
+            iteration, batch, compile_ms, t.shader_ms, t.projection_ms, t.coverage_ms, t.merger_ms, t.total_ms, result.used_rectangle ? "true" : "false", result.execution_device.c_str());
     }
     pixels = std::move(result.pixels);
     std::ofstream output(argv[6], std::ios::binary); nr::capture::check(bool(output));

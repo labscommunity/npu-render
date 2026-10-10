@@ -1,0 +1,44 @@
+{
+  "scope": "NPU specialization for exact axis-aligned uniform unblended or opaque source-over rectangles",
+  "build": "present-umd-v58",
+  "cpu_contract_tests_passed": 9,
+  "npu_checked_components": 37945344,
+  "npu_invalid_colors_rejected": 12,
+  "cases": [
+    "RGBA and BGRA",
+    "64x64 and 1024x768",
+    "fractional fixed-point edges",
+    "top-left boundary ownership",
+    "offscreen bounds",
+    "empty rectangles",
+    "nearest-even color quantization",
+    "unchanged background outside coverage",
+    "request reuse after rejected color"
+  ],
+  "captured_dwm_replay": {
+    "pixels_exact": 786432,
+    "sha256": "d2cdb07798b599560e35abad5e4f87f4205ee60e72e14d850b9590f801080978",
+    "compile_ms": 1924.242,
+    "warm_draw_ms": [
+      49.22,
+      44.602,
+      42.575,
+      41.993
+    ],
+    "rectangle_path": true,
+    "covered_samples": 786432,
+    "tile_executions": 1
+  },
+  "optimization": "Validate the two-triangle rectangle shape; quantize color once on NPU; compute NPU coverage with comparisons; use exact integer-valued FP16 byte selection in groups of four pixels. Coverage-mask counting on the host is diagnostic only.",
+  "limitations": [
+    "No interpolated varying or texture shading",
+    "No transparent blend specialization; existing general NPU triangle path remains",
+    "No live installed-driver or desktop frame delivery in these tests",
+    "Timing is diagnostic, not a controlled frame-rate benchmark"
+  ],
+  "larger_batches": "Uniform pipeline now rejects batch >4096 after prior 65536-sample device-loss experiment",
+  "rejected_variant": "NPU compiler rejected integer ReduceSum over the entire coverage plane. Validated implementation returns a mask for host diagnostics instead.",
+  "full_desktop_offload": false,
+  "displayed_frames": 0,
+  "tahoma_performance_tested": false
+}

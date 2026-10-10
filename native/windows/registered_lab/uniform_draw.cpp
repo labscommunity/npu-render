@@ -1,4 +1,5 @@
 #include "uniform_draw.hpp"
+#include "solid_rectangle.hpp"
 #include <algorithm>
 #include <chrono>
 #include <cstring>
@@ -12,6 +13,8 @@ void require(bool value) { if (!value) throw std::invalid_argument("unsupported 
 struct UniformDrawExecutor::State {
     shader::Program vs, ps;
     uint32_t count, width, height, batch;
+    bool blending;
+    std::unique_ptr<SolidRectangleExecutor> rectangle;
     std::unique_ptr<shader::VertexExecutor> vertex;
     std::unique_ptr<shader::PixelExecutor> pixel;
     std::unique_ptr<ProjectionExecutor> projection;
@@ -19,10 +22,10 @@ struct UniformDrawExecutor::State {
     std::unique_ptr<OutputMerger> merger;
     State(const shader::Program &v, const shader::Program &p, uint32_t n, uint32_t w, uint32_t h,
           const std::string &backend, bool blend, bool bgra, uint8_t mask, uint32_t b)
-        : vs(v), ps(p), count(n), width(w), height(h), batch(b) {
+        : vs(v), ps(p), count(n), width(w), height(h), batch(b), blending(blend) {
         require(vs.stage == shader::Stage::vertex && ps.stage == shader::Stage::pixel && count && count <= 65536 && !(count % 3));
         require(width && width <= 8192 && height && height <= 8192 && uint64_t(width) * height <= 8 * 1024 * 1024);
-        require(batch && batch <= 65536 && !(uint64_t(width) * height % batch) && vs.position_output < 16 && ps.outputs[0] == 15);
+        require(batch && batch <= 4096 && !(uint64_t(width) * height % batch) && vs.position_output < 16 && ps.outputs[0] == 15);
         for (size_t i = 1; i < ps.outputs.size(); ++i) require(!ps.outputs[i]);
         for (const auto used : ps.textures) require(!used);
         for (const auto &instruction : ps.instructions) for (unsigned i = 0; i < instruction.source_count; ++i)
@@ -31,9 +34,11 @@ struct UniformDrawExecutor::State {
             require((vs.outputs[r] & ps.inputs[r]) == ps.inputs[r]);
         vertex = std::make_unique<shader::VertexExecutor>(vs, count, backend);
         projection = std::make_unique<ProjectionExecutor>(count, backend);
-        pixel = std::make_unique<shader::PixelExecutor>(ps, batch, backend);
+        pixel = std::make_unique<shader::PixelExecutor>(ps, 1, backend);
         coverage = std::make_unique<CoverageExecutor>(batch, backend);
         merger = std::make_unique<OutputMerger>(batch, backend, blend, bgra, mask);
+        if (count == 6 && mask == 15 && !(width % 4) && uint64_t(width) * height <= 4 * 1024 * 1024)
+            rectangle = std::make_unique<SolidRectangleExecutor>(width, height, backend, bgra);
     }
 };
 UniformDrawExecutor::UniformDrawExecutor(const shader::Program &vs, const shader::Program &ps, uint32_t count,
@@ -57,13 +62,27 @@ UniformDrawExecutor::Result UniformDrawExecutor::execute(const std::vector<shade
         uniform[r] = shaded.vertices[0][r];
         for (const auto &v : shaded.vertices) for (unsigned c = 0; c < 4; ++c) if (s.ps.inputs[r] & (1u << c)) require(v[r][c] == uniform[r][c]);
     }
-    began = Clock::now(); const auto fragment = s.pixel->execute(std::vector<shader::VertexRegisters>(s.batch, uniform), pc);
+    began = Clock::now(); const auto fragment = s.pixel->execute(std::vector<shader::VertexRegisters>(1, uniform), pc);
     result.timings.shader_ms += milliseconds(began); require(fragment.execution_device == result.execution_device);
     result.fragment = fragment.vertices[0][0];
-    std::vector<Color> colors(s.batch);
-    for (size_t i = 0; i < s.batch; ++i) {
-        require(fragment.vertices[i][0] == result.fragment); std::memcpy(colors[i].data(), fragment.vertices[i][0].data(), 16);
+    Color color{}; std::memcpy(color.data(), result.fragment.data(), 16);
+    const auto &p = projected.vertices;
+    // Admit precisely the two nonoverlapping triangles of an axis-aligned quad.
+    // This is a shape check. Pixel coverage and all color writes remain on device.
+    if (s.rectangle && (!s.blending || color[3] == 1) &&
+        std::all_of(color.begin(), color.end(), [](float c) { return c >= 0 && c <= 1; }) &&
+        p[0].snapped == p[5].snapped && p[2].snapped == p[3].snapped &&
+        p[0].snapped[1] == p[1].snapped[1] && p[1].snapped[0] == p[2].snapped[0] &&
+        p[2].snapped[1] == p[4].snapped[1] && p[4].snapped[0] == p[0].snapped[0] &&
+        p[0].snapped[0] < p[2].snapped[0] && p[0].snapped[1] < p[2].snapped[1]) {
+        began = Clock::now();
+        auto rect = s.rectangle->execute({p[0].snapped[0], p[0].snapped[1], p[2].snapped[0], p[2].snapped[1]}, color, background);
+        result.timings.merger_ms = milliseconds(began); require(rect.execution_device == result.execution_device);
+        result.pixels = std::move(rect.pixels); result.covered_samples = rect.covered_samples;
+        result.tile_executions = 1; result.used_rectangle = true; result.vertices = std::move(shaded.vertices);
+        result.timings.total_ms = milliseconds(start); return result;
     }
+    const std::vector<Color> colors(s.batch, color);
     // The caller's target is unchanged unless it explicitly commits this result.
     result.pixels = background;
     std::vector<Sample> samples(s.batch); std::vector<PackedColor> tile(s.batch);

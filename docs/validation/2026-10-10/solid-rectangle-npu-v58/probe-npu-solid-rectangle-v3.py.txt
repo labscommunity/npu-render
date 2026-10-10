@@ -1,0 +1,33 @@
+import json,tempfile,time
+from pathlib import Path
+import numpy as np
+import openvino as ov
+from openvino import opset15 as o
+w,h=1024,768
+rect=o.parameter([4],np.int32,name='rect');color=o.parameter([1,1,1,4],np.float32,name='color');bg=o.parameter([1,h,w,4],np.uint8,name='background')
+def ci(v):return o.constant(v,np.int32)
+def f(v):return o.constant(v,np.float32)
+def pred(x):return o.convert(x,np.int32)
+def lane(v,i):return o.gather(v,[i],0)
+x=o.constant((np.arange(w,dtype=np.int32)*256+128).reshape(1,1,w,1));y=o.constant((np.arange(h,dtype=np.int32)*256+128).reshape(1,h,1,1))
+covered=o.bitwise_and(o.bitwise_and(pred(o.greater_equal(x,lane(rect,0))),pred(o.less(x,lane(rect,2)))),o.bitwise_and(pred(o.greater_equal(y,lane(rect,1))),pred(o.less(y,lane(rect,3)))))
+value=o.multiply(color,f(255));base=o.bitwise_and(o.convert(value,np.int32),ci(255));fraction=o.subtract(value,o.convert(base,np.float32))
+inc=o.bitwise_or(pred(o.greater(fraction,f(.5))),o.bitwise_and(pred(o.equal(fraction,f(.5))),o.bitwise_and(base,ci(1))))
+q=o.convert(o.add(base,inc),np.float16);mask=o.convert(covered,np.float16);inverse=o.subtract(o.constant(1,np.float16),mask)
+def grouped(t):return o.transpose(o.reshape(t,[1,h,w//4,16],False),[0,3,1,2])
+mask=grouped(o.broadcast(mask,[1,h,w,4]));inverse=o.subtract(o.constant(1,np.float16),mask)
+q=o.transpose(o.concat([q,q,q,q],3),[0,3,1,2]);bg_value=grouped(o.convert(bg,np.float16))
+output=o.convert(o.reshape(o.transpose(o.add(o.multiply(mask,q),o.multiply(inverse,bg_value)),[0,2,3,1]),[1,h,w,4],False),np.uint8)
+with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
+ m=ov.Model([output],[rect,color,bg]);path=Path(d)/'m.xml'
+ for node in m.get_ops():node.set_rt_info('','precise_0')
+ ov.serialize(m,path);core=ov.Core();start=time.perf_counter();compiled=core.compile_model(core.read_model(path),'NPU',{'EXECUTION_MODE_HINT':'ACCURACY'});compile_ms=(time.perf_counter()-start)*1000
+ rng=np.random.default_rng(545);background=rng.integers(0,256,(1,h,w,4),dtype=np.uint8)
+ for frame in range(10):
+  rect_value=np.array([0,0,w*256,h*256] if frame<2 else [17*256+64,31*256+192,817*256+128,700*256+128],np.int32)
+  cc=np.array([0,0,0,1],np.float32) if frame==0 else rng.uniform(0,1,4).astype(np.float32)
+  inside=((np.arange(w)*256+128>=rect_value[0])&(np.arange(w)*256+128<rect_value[2]))[None,:,None]&((np.arange(h)*256+128>=rect_value[1])&(np.arange(h)*256+128<rect_value[3]))[:,None,None]
+  expected=np.where(inside,np.rint(cc*255).astype(np.uint8),background)
+  start=time.perf_counter();actual=compiled({'rect':rect_value,'color':cc.reshape(1,1,1,4),'background':background})[0];elapsed=(time.perf_counter()-start)*1000
+  exact=np.array_equal(actual,expected);print(json.dumps({'frame':frame,'execution_devices':compiled.get_property('EXECUTION_DEVICES'),'compile_ms':compile_ms,'elapsed_ms':elapsed,'exact':bool(exact),'mismatches':int(np.sum(actual!=expected))}),flush=True)
+  assert exact

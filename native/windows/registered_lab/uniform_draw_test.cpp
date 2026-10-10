@@ -38,6 +38,7 @@ O main(float4 p:POSITION,float4 c:COLOR) {O o;o.p=p;o.c=c*color;return o;})", "v
         VertexConstants cb; cb[0].resize(1); std::memcpy(cb[0][0].data(), color.data(), 16);
         const auto inputs = quad(partial ? 0.f : 1.f, empty);
         const auto result = executor.execute(inputs, cb, {}, viewport, background);
+        test(result.used_rectangle == (frame == 0 || frame == 4));
         test(result.covered_samples == (empty ? 0u : (partial ? 1024u : 4096u)));
         for (unsigned y = 0; y < 64; ++y) for (unsigned x = 0; x < 64; ++x) for (unsigned c = 0; c < 4; ++c) {
             const bool covered = !empty && (!partial || (x < 32 && y < 32)); const auto source = c < 3 ? 2 - c : c;
