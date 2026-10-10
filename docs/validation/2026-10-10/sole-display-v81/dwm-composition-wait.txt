@@ -1,0 +1,35 @@
+THREAD ffff808e3359c080  Cid 042c.0488  Teb: 000000b60e52d000 Win32Thread: ffff808e316fa420 WAIT: (Executive) KernelMode Alertable
+            ffff808e3a41d628  NotificationEvent
+        IRP List:
+            ffff808e34c6a330: (0006,03a0) Flags: 00060830  Mdl: 00000000
+        Not impersonating
+        DeviceMap                 ffffa38ef8e6cda0
+        Owning Process            ffff808e3349e080       Image:         dwm.exe
+        Attached Process          N/A            Image:         N/A
+        Wait Start TickCount      151883         Ticks: 341 (0:00:00:05.328)
+        Context Switch Count      6784           IdealProcessor: 1
+        UserTime                  00:00:11.109
+        KernelTime                00:00:08.000
+        Win32 Start Address dwmcore!CConnection::CompositionThreadEntryPoint (0x00007ff86f118ef0)
+        Stack Init fffff30e9f7e7c70 Current fffff30e9f7e7320
+        Base fffff30e9f7e8000 Limit fffff30e9f7e2000 Call 0000000000000000
+        Priority 15  BasePriority 15  IoPriority 2  PagePriority 5
+        Child-SP          RetAddr               Call Site
+        fffff30e`9f7e7360 fffff803`ae8cc438     nt!KiSwapContext+0x76
+        fffff30e`9f7e74a0 fffff803`ae817a05     nt!KiSwapThread+0x248
+        fffff30e`9f7e7510 fffff803`ae8186f6     nt!KiCommitThreadWait+0x225
+        fffff30e`9f7e75b0 fffff803`ae9aaa0f     nt!KeWaitForSingleObject+0x846
+        fffff30e`9f7e76a0 fffff803`aeeeb4c6     nt!IopWaitForSynchronousIo+0x7f
+        fffff30e`9f7e7700 fffff803`aeeea0ec     nt!IopSynchronousServiceTail+0x3e6
+        fffff30e`9f7e7790 fffff803`aeee8f3e     nt!IopXxxControlFile+0x99c
+        fffff30e`9f7e7a00 fffff803`aecc1d55     nt!NtFsControlFile+0x5e
+        fffff30e`9f7e7a70 00007ff8`757c14e4     nt!KiSystemServiceCopyEnd+0x25 (TrapFrame @ fffff30e`9f7e7ae0)
+        000000b6`0e77bc98 00007ff8`72e646a0     ntdll!NtFsControlFile+0x14
+        000000b6`0e77bca0 00007ff8`281550ec     KERNELBASE!WaitNamedPipeW+0x270
+        000000b6`0e77bda0 00000233`926c1800     nr_fill_umd+0x150ec
+        000000b6`0e77bda8 ffffffff`ffffffff     0x00000233`926c1800
+        000000b6`0e77bdb0 00000000`000005f0     0xffffffff`ffffffff
+        000000b6`0e77bdb8 00007ff8`28146040     0x5f0
+        000000b6`0e77bdc0 00000000`00000003     nr_fill_umd+0x6040
+        000000b6`0e77bdc8 00000000`40110000     0x3
+        000000b6`0e77bdd0 00000000`00000000     0x40110000

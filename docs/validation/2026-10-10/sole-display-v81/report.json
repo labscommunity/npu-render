@@ -1,0 +1,34 @@
+{
+  "trial": "v81",
+  "source_commit": "cc6b04a9fce56b25efe8ee71d1fdf524a71914a2",
+  "umd_build": "present-umd-v112",
+  "kmd_build": "allocation-capacity-v3",
+  "package_version": "0.0.69.0",
+  "npu_preflight_packets_passed": 13,
+  "successful_npu_packets_by_process": {
+    "dwm.exe": 17,
+    "Explorer.EXE": 12,
+    "StartMenuExperienceHost.exe": 10
+  },
+  "dwm_traced_completed_draws": 16,
+  "dwm_traced_present_callbacks": 5,
+  "received_frames": 3,
+  "received_frames_with_nonblack_pixels": 0,
+  "viewer_window_submissions": 3,
+  "input_actions": [],
+  "sole_gate_observed": true,
+  "full_desktop_offload": false,
+  "performance_tested": false,
+  "device_cleanup_passed": true,
+  "transport_configuration_removed": true,
+  "controller_completed_without_error": false,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "findings": [
+    "DWM resumes rendering with the v112 NPU triangle bounds optimization. All three received 1024x768 frames are opaque black; no usable desktop or input round trip is established.",
+    "A live DWM composition-thread stack waits in WaitNamedPipeW. The current single-instance relay cannot accept another client while it renders or waits for the previous receipt. This establishes contention at the sampled instant, not a complete explanation of earlier failures.",
+    "The Start menu preserves one complete 35-instance indexed draw capture. DWM and Explorer captures at teardown are incomplete and must not be replayed as complete draws.",
+    "A debugger pause from approximately 16:45 to 16:46:59 exceeds the stream request deadline. The resumed controller reports a WinRM XML writer error; worker stderr reports socket closure/timeout. Timings and late errors are diagnostic only.",
+    "Both custom devices are removed and stream configuration is removed. Full desktop offload and Tahoma benefit remain unproven."
+  ]
+}

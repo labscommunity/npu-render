@@ -17,12 +17,15 @@ inline DWORD remaining(ULONGLONG deadline) {
     if (now >= deadline) throw std::runtime_error("indexed stream deadline expired");
     return DWORD((std::min)(deadline - now, ULONGLONG(300000)));
 }
-inline DWORD completed(HANDLE handle, OVERLAPPED &operation, BOOL immediate, DWORD error, ULONGLONG deadline, DWORD immediate_bytes = 0) {
+inline DWORD completed(HANDLE handle, OVERLAPPED &operation, BOOL immediate, DWORD error, ULONGLONG deadline, DWORD immediate_bytes = 0, HANDLE cancel = nullptr) {
     if (immediate) return immediate_bytes;
     if (!immediate && error != ERROR_IO_PENDING) throw std::runtime_error("indexed pipe operation failed: " + std::to_string(error));
     // Drain cancellation before the stack-owned OVERLAPPED or its event is freed.
     DWORD wait = WAIT_FAILED;
-    try { wait = WaitForSingleObject(operation.hEvent, remaining(deadline)); } catch (...) {
+    try {
+        const HANDLE events[]{operation.hEvent,cancel};
+        wait = cancel ? WaitForMultipleObjects(2,events,FALSE,remaining(deadline)) : WaitForSingleObject(operation.hEvent, remaining(deadline));
+    } catch (...) {
         CancelIoEx(handle, &operation); DWORD ignored = 0; GetOverlappedResult(handle, &operation, &ignored, TRUE); throw;
     }
     if (wait != WAIT_OBJECT_0) {
@@ -33,27 +36,28 @@ inline DWORD completed(HANDLE handle, OVERLAPPED &operation, BOOL immediate, DWO
     if (!GetOverlappedResult(handle, &operation, &actual, FALSE)) throw std::runtime_error("indexed pipe completion failed");
     return actual;
 }
-inline void transfer(HANDLE pipe, void *data, DWORD bytes, bool write, ULONGLONG deadline) {
+inline void transfer(HANDLE pipe, void *data, DWORD bytes, bool write, ULONGLONG deadline, HANDLE cancel = nullptr) {
     auto p = static_cast<uint8_t *>(data); DWORD cursor = 0;
     while (cursor < bytes) {
+        if(cancel && WaitForSingleObject(cancel,0)==WAIT_OBJECT_0)throw std::runtime_error("indexed pipe cancelled");
         Handle event(CreateEventW(nullptr, TRUE, FALSE, nullptr)); OVERLAPPED operation{}; operation.hEvent = event.value;
         const DWORD count = (std::min)(bytes - cursor, DWORD(64 * 1024));
         DWORD immediate_bytes = 0;
         const BOOL ready = write ? WriteFile(pipe, p + cursor, count, &immediate_bytes, &operation) : ReadFile(pipe, p + cursor, count, &immediate_bytes, &operation);
         const auto error = ready ? ERROR_SUCCESS : GetLastError();
-        const auto actual = completed(pipe, operation, ready, error, deadline, immediate_bytes);
+        const auto actual = completed(pipe, operation, ready, error, deadline, immediate_bytes,cancel);
         if (!actual || actual > count) throw std::runtime_error("indexed pipe truncated transfer"); cursor += actual;
     }
 }
-inline std::vector<uint8_t> read_packet(HANDLE pipe, ULONGLONG deadline) {
-    uint32_t size = 0; transfer(pipe, &size, 4, false, deadline);
+inline std::vector<uint8_t> read_packet(HANDLE pipe, ULONGLONG deadline, HANDLE cancel = nullptr) {
+    uint32_t size = 0; transfer(pipe, &size, 4, false, deadline,cancel);
     indexed_exchange::require(size >= sizeof(indexed_exchange::Header) && size <= indexed_exchange::max_packet_bytes);
-    std::vector<uint8_t> bytes(size); transfer(pipe, bytes.data(), size, false, deadline); return bytes;
+    std::vector<uint8_t> bytes(size); transfer(pipe, bytes.data(), size, false, deadline,cancel); return bytes;
 }
-inline void write_packet(HANDLE pipe, const std::vector<uint8_t> &bytes, ULONGLONG deadline) {
+inline void write_packet(HANDLE pipe, const std::vector<uint8_t> &bytes, ULONGLONG deadline, HANDLE cancel = nullptr) {
     indexed_exchange::require(bytes.size() >= sizeof(indexed_exchange::Header) && bytes.size() <= indexed_exchange::max_packet_bytes);
-    auto size = uint32_t(bytes.size()); transfer(pipe, &size, 4, true, deadline);
-    transfer(pipe, const_cast<uint8_t *>(bytes.data()), size, true, deadline);
+    auto size = uint32_t(bytes.size()); transfer(pipe, &size, 4, true, deadline,cancel);
+    transfer(pipe, const_cast<uint8_t *>(bytes.data()), size, true, deadline,cancel);
 }
 inline bool pipe_name_valid(const std::wstring &name) {
     const std::wstring prefix = L"\\\\.\\pipe\\npu-render-indexed-";

@@ -113,13 +113,14 @@ now has an exact NPU specialization for opaque, one-to-one point-sampled quads.
 Its captured 1024×768 replay passes, as do changing-image and driver callback
 tests. This is a checked subset, not general desktop rendering.
 
-The [latest installed trial](docs/validation/2026-10-10/sole-display-v80/report.json)
-completes 20 Explorer NPU requests in a freshly booted VM. DWM still completes no
-draw, and no desktop frame arrives during the 120-second sole-display observation.
-Both guest drivers were removed successfully. Four captured slow shell draws
-separate compilation delays from rendering work; another draw visits 1,296 tiles
-for only 373 covered samples. Full desktop offload and a Tahoma benefit remain
-unproven.
+The [latest installed trial](docs/validation/2026-10-10/sole-display-v81/report.json)
+completes 17 DWM, 12 Explorer and 10 Start menu NPU requests. Three received
+1024×768 frames are still opaque black. A live stack catches DWM waiting for the
+single-client rendering pipe; a bounded four-client FIFO relay now passes a
+[real NPU transport check](docs/validation/2026-10-10/fair-relay-v113/guest.json).
+The debugger pause disrupted the trial's transport deadline, so its late errors
+and wall times are diagnostic only. Both guest drivers were removed successfully.
+Full desktop offload and a Tahoma benefit remain unproven.
 
 [NPU-computed triangle bounds](docs/validation/2026-10-10/triangle-bounds-v112/report.json)
 now restrict tile dispatch while preserving exact output in eight replays of four

@@ -124,6 +124,12 @@ foreach(kind worker relay)
 endforeach()
 target_link_libraries(nr_registered_indexed_stream_worker PRIVATE nr_registered_vertex)
 
+add_executable(nr_registered_fifo_dispatch_test fifo_dispatch_test.cpp)
+target_compile_features(nr_registered_fifo_dispatch_test PRIVATE cxx_std_17)
+target_compile_options(nr_registered_fifo_dispatch_test PRIVATE /W4 /WX)
+set_property(TARGET nr_registered_fifo_dispatch_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+add_test(NAME registered_fifo_dispatch_contract COMMAND nr_registered_fifo_dispatch_test)
+
 add_executable(nr_registered_texture_crop_test texture_crop_test.cpp)
 target_compile_features(nr_registered_texture_crop_test PRIVATE cxx_std_17)
 target_compile_options(nr_registered_texture_crop_test PRIVATE /W4 /WX)
