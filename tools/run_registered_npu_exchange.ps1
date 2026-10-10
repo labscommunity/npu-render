@@ -31,6 +31,7 @@ try {
  Invoke-Command -Session $Session -ArgumentList $guestDirectory -ScriptBlock {
   param($directory)
   if($env:COMPUTERNAME -ne 'NR-GFX-LAB' -or (Get-Volume -DriveLetter C).FileSystemLabel -ne 'NR_WINDOWS' -or (Get-CimInstance Win32_ComputerSystem).Manufacturer -notmatch 'QEMU'){throw 'Owned disposable guest required'}
+  if(Get-ScheduledTask -TaskName 'NpuRenderLabExchange-*' -ErrorAction SilentlyContinue | Where-Object State -eq 'Running'){throw 'Another exchange probe is still active'}
   if(Test-Path $directory){throw 'Exchange already exists'}
   New-Item -ItemType Directory $directory | Out-Null
  }
@@ -69,9 +70,21 @@ try {
   $frameStarted=[DateTime]::UtcNow.ToString('o')
   # Generated argument paths are quoted explicitly for Start-Process on Windows PowerShell.
   $arguments='"'+(Join-Path $EvidenceDirectory $requestName)+'" "'+(Join-Path $EvidenceDirectory $replyName)+'"'
-  $process=Start-Process -FilePath $worker -ArgumentList $arguments -PassThru -RedirectStandardOutput "$EvidenceDirectory\worker-$sequence.stdout.jsonl" -RedirectStandardError "$EvidenceDirectory\worker-$sequence.stderr.log"
-  if(!$process.WaitForExit(90000)){$process.Kill();throw 'Finite NPU worker timed out'}
-  $process.Refresh();$code=$process.ExitCode
+  $process=New-Object System.Diagnostics.Process
+  $process.StartInfo.FileName=$worker; $process.StartInfo.Arguments=$arguments
+  $process.StartInfo.UseShellExecute=$false; $process.StartInfo.CreateNoWindow=$true
+  $process.StartInfo.RedirectStandardOutput=$true; $process.StartInfo.RedirectStandardError=$true
+  $stdout=$null;$stderr=$null
+  try {
+   if(!$process.Start()){throw 'NPU worker did not start'}
+   $stdout=$process.StandardOutput.ReadToEndAsync();$stderr=$process.StandardError.ReadToEndAsync()
+   if(!$process.WaitForExit(90000)){$process.Kill();$process.WaitForExit();throw 'Finite NPU worker timed out'}
+   $code=$process.ExitCode
+  } finally {
+   if($stdout){[IO.File]::WriteAllText("$EvidenceDirectory\worker-$sequence.stdout.jsonl",$stdout.GetAwaiter().GetResult())}
+   if($stderr){[IO.File]::WriteAllText("$EvidenceDirectory\worker-$sequence.stderr.log",$stderr.GetAwaiter().GetResult())}
+   $process.Dispose()
+  }
   if($code -ne 0){throw "NPU worker failed with exit $code"}
   $result=Get-Content "$EvidenceDirectory\worker-$sequence.stdout.jsonl" -Raw | ConvertFrom-Json
   if(!$result.passed -or $result.sequence -ne $sequence -or $result.execution_device -notmatch '^NPU(?:\.|$)'){throw 'NPU worker identity mismatch'}
@@ -98,6 +111,14 @@ try {
 } catch { $failure=$_.Exception.Message; Write-Warning $failure }
 finally {
  $env:PATH=$originalPath
+ if(!$success){
+  $cleanupDeadline=[DateTime]::UtcNow.AddSeconds(145)
+  do {
+   try { $taskState=Invoke-Command -Session $Session -ArgumentList $task -ScriptBlock {param($name) [string](Get-ScheduledTask -TaskName $name).State} } catch {break}
+   if($taskState -ne 'Running' -or [DateTime]::UtcNow -gt $cleanupDeadline){break}
+   Start-Sleep -Milliseconds 500
+  } while($true)
+ }
  foreach($name in 'probe.stdout.jsonl','probe.stderr.log','probe-exit.json','runner.log'){
   try {Copy-Item "$guestDirectory\$name" -Destination $EvidenceDirectory -FromSession $Session -ErrorAction Stop} catch {Write-Warning "Could not collect $name"}
  }
