@@ -27,7 +27,7 @@ int test_buffers(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER_DEVI
         TEST(std::equal(input.begin(), input.end(), memory[index].begin()));
         std::fill(input.begin(), input.end(), static_cast<unsigned char>(0xa7));
         TEST(memory[index][0] != 0xa7); // Initial data is owned by VidMm, not the caller.
-        f.pfnResourceUpdateSubresourceUP(h, target, 0, nullptr, input.data(), 0, 0);
+        f.pfnDefaultConstantBufferUpdateSubresourceUP(h, target, 0, nullptr, input.data(), 0, 0);
         TEST(last_error == S_OK && std::equal(input.begin(), input.end(), memory[index].begin()));
         const auto expected = memory[index];
         const D3D10_DDI_BOX partial{0, 0, 0, 16, 1, 1};

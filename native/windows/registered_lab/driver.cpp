@@ -442,6 +442,7 @@ HRESULT APIENTRY create_device(D3D10DDI_HADAPTER, D3D10DDIARG_CREATEDEVICE *a) {
         f.pfnCalcPrivateOpenedResourceSize = opened_resource_size; f.pfnOpenResource = open_resource;
         f.pfnDestroyResource = destroy_resource; f.pfnResourceCopy = copy_resource;
         f.pfnResourceUpdateSubresourceUP = update_resource;
+        f.pfnDefaultConstantBufferUpdateSubresourceUP = update_resource;
         f.pfnResourceMap = f.pfnStagingResourceMap = map;
         f.pfnResourceUnmap = f.pfnStagingResourceUnmap = unmap;
         f.pfnDynamicConstantBufferMapDiscard = map;
