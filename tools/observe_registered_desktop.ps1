@@ -9,7 +9,7 @@ param(
  [Parameter(Mandatory=$true)][ValidatePattern('^idd-topology-[a-z0-9-]+$')][string]$TopologyName,
  [Parameter(Mandatory=$true)][string]$TopologyProbe,
  [Parameter(Mandatory=$true)][ValidatePattern('^[a-fA-F0-9]{64}$')][string]$TopologySha256,
- [ValidateRange(5,120)][int]$ObservationSeconds=90
+ [ValidateRange(5,300)][int]$ObservationSeconds=90
 )
 $ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue'
 . "$PSScriptRoot\lab_device_identity.ps1"
@@ -88,7 +88,7 @@ try {
 } catch {$report.error=$_.Exception.Message}
 finally {
  # Let the finite topology helper restore its original paths before removing
- # the monitor. It has its own bounded observation and five-minute task cap.
+ # the monitor. It has its own bounded observation and eight-minute task cap.
  $restoring=[Diagnostics.Stopwatch]::StartNew()
  while($restoring.ElapsedMilliseconds -lt (($ObservationSeconds+30)*1000)){
   $topology="C:\npu-lab\$TopologyName.jsonl"

@@ -1,0 +1,21 @@
+{
+  "scope": "Static SM4 inventory from preserved guest system module copies; parsing is not runtime execution or shader admission.",
+  "modules": [
+    {
+      "module": "guest-d2d1-v48.dll",
+      "sha256": "e528680681c7eb3f4e895b97891308657489154ca95c3980f8dafe87e2b7a163",
+      "bytes": 6592096,
+      "shaders": 321
+    },
+    {
+      "module": "guest-dwmcore-v86.dll",
+      "sha256": "40579ecfa394395677fec84014c32ba5495f334b6d96c5653fd5caa129dc1222",
+      "bytes": 4444160,
+      "shaders": 446
+    }
+  ],
+  "unique_sm4_shaders": 274,
+  "parsed": 86,
+  "rejected": 188,
+  "limitations": "Parse success does not establish type-view admission, NPU execution, complete API support or that the active desktop uses the shader."
+}

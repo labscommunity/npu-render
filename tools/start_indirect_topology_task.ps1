@@ -4,7 +4,7 @@ param(
  [Parameter(Mandatory=$true)][ValidatePattern('^idd-topology-[a-z0-9-]+$')][string]$Name,
  [switch]$SystemRendererControl,
  [switch]$SoleIndirect,
- [ValidateRange(5,120)][int]$ObservationSeconds=45
+ [ValidateRange(5,300)][int]$ObservationSeconds=45
 )
 $ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue'
 . "$PSScriptRoot\lab_device_identity.ps1"
@@ -29,7 +29,7 @@ $definition.RegistrationInfo.Description='Finite owned-guest display activation 
 $definition.Principal.UserId='NR-GFX-LAB\npu-lab'
 $definition.Principal.LogonType=3 # TASK_LOGON_INTERACTIVE_TOKEN
 $definition.Principal.RunLevel=1
-$definition.Settings.ExecutionTimeLimit='PT5M'
+$definition.Settings.ExecutionTimeLimit='PT8M'
 $definition.Settings.DisallowStartIfOnBatteries=$false
 $definition.Settings.StopIfGoingOnBatteries=$false
 $action=$definition.Actions.Create(0)
@@ -39,7 +39,7 @@ if($ObservationSeconds -ne 45){$action.Arguments+=" --seconds $ObservationSecond
 $taskName="NpuRender-$Name"
 # TASK_CREATE fails on an existing task; never replace another run's evidence.
 $task=$service.GetFolder('\').RegisterTaskDefinition($taskName,$definition,2,'NR-GFX-LAB\npu-lab',$null,3)
-$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');task=$taskName;probe_sha256=$Sha256;devices=$devices;system_renderer_control=[bool]$SystemRendererControl;sole_indirect_requested=[bool]$SoleIndirect;observation_seconds=$ObservationSeconds;maximum_seconds=300;desktop_offload_tested=$false}
+$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');task=$taskName;probe_sha256=$Sha256;devices=$devices;system_renderer_control=[bool]$SystemRendererControl;sole_indirect_requested=[bool]$SoleIndirect;observation_seconds=$ObservationSeconds;maximum_seconds=480;desktop_offload_tested=$false}
 $report | ConvertTo-Json -Depth 6 | Set-Content "C:\npu-lab\$Name-launch.json"
 $task.Run($null) | Out-Null
 Get-Content "C:\npu-lab\$Name-launch.json"

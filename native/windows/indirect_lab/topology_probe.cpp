@@ -227,7 +227,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     bool duration_valid = true;
     if (argc == next + 2 && !lstrcmpW(args[next], L"--seconds")) {
         wchar_t *end = nullptr; const auto seconds = wcstoul(args[next + 1], &end, 10);
-        duration_valid = end != args[next + 1] && !*end && seconds >= 5 && seconds <= 120;
+        duration_valid = end != args[next + 1] && !*end && seconds >= 5 && seconds <= 300;
         if (duration_valid) observation_seconds = UINT(seconds);
         next += 2;
     }

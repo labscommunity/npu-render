@@ -113,13 +113,13 @@ now has an exact NPU specialization for opaque, one-to-one point-sampled quads.
 Its captured 1024×768 replay passes, as do changing-image and driver callback
 tests. This is a checked subset, not general desktop rendering.
 
-The [latest installed trial](docs/validation/2026-10-10/sole-display-v91/report.json)
-completes 159 live desktop NPU draws plus 13 prewarm requests, all acknowledged.
-One incomplete desktop frame arrives through the sole indirect display. DWM
-rejects a newly encountered 223-word masking shader using AND and NE; the
-Start-menu interaction gate never admits its test. Both custom drivers unload
-cleanly and the normal VM desktop is restored. Full desktop offload and a Tahoma
-benefit remain unproven.
+The [latest installed trial](docs/validation/2026-10-10/sole-display-v92/report.json)
+completes 171 live desktop NPU draws plus 13 prewarm requests, all acknowledged.
+DWM creates the previously rejected masking shader and the finite observer
+records no in-window DWM rejection. Two frames arrive through the sole indirect
+display: one black and one incomplete desktop. The input gate never admits its
+Start-menu test. Both custom drivers unload cleanly and the normal VM desktop
+returns. Full desktop offload and a Tahoma benefit remain unproven.
 
 The [loop-shader qualification](docs/validation/2026-10-10/loops-v165/report.json)
 passes the captured 1,850-word mirrored filter on the NPU, including 33 scalar
@@ -135,8 +135,10 @@ The [masking-shader qualification](docs/validation/2026-10-10/masks-v167/report.
 adds bitwise AND and floating inequality with conservative predicate tracking.
 The captured 223-word shader matches the scalar reference exactly on the NPU for
 point and linear sampling. Its scissored raster and native draw packet also pass,
-alongside 21 CPU suites and the NPU regression checks. Installed desktop behavior
-with this additional support remains unverified.
+alongside 21 CPU suites and the NPU regression checks. The v92 installed trial
+accepts its creation but still fails to deliver a complete desktop. A
+[longer finite observation helper](docs/validation/2026-10-10/desktop-duration-v29/report.json)
+now builds and passes ownership/readback contracts for the next installed test.
 
 [NPU-computed triangle bounds](docs/validation/2026-10-10/triangle-bounds-v112/report.json)
 now restrict tile dispatch while preserving exact output in eight replays of four

@@ -1,0 +1,23 @@
+{
+  "build": "indirect-lab-v29",
+  "clean_build": true,
+  "source_files_verified": 12,
+  "cpu_contracts_passed": 2,
+  "ctest_seconds": 0.66,
+  "topology_gui_sha256": "0ad87c632a111145d56ef0f16da0dcf2d88006d0c65e264fbb5f5af8e8e46058",
+  "maximum_observation_seconds": 300,
+  "scheduled_task_maximum_seconds": 480,
+  "default_durations_unchanged": true,
+  "automatic_topology_restoration_retained": true,
+  "custom_idd_driver_package_unchanged": "v9",
+  "render_build_unchanged": "present-umd-v167",
+  "physical_driver_changed": false,
+  "graphics_watchdog_changed": false,
+  "installed_trial_completed": false,
+  "findings": [
+    "The v92 desktop trial completed its finite observation without a recorded in-window DWM rejection, while delivering only black and partial desktop frames. Extend the permitted observation from 120 to 300 seconds to distinguish slow initialization from an additional rendering failure.",
+    "The scheduled task remains finite, with its cap extended from 300 to 480 seconds to retain 180 seconds of startup/restoration margin. The existing automatic topology restoration and owned-device cleanup remain in use.",
+    "The first build invocation lacked the remote tools/build_indirect_lab.py entry point. Its failure log is preserved. After synchronizing the build helpers, v28 built and passed both tests, but source comparison found an outdated README on Delta. v29 was rebuilt after synchronizing that documentation and all 12 source hashes match the repository.",
+    "This qualification builds the topology helper and passes ownership/readback contracts; it does not establish longer installed observation, desktop offload or Tahoma benefit."
+  ]
+}

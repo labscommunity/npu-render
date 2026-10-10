@@ -1,0 +1,36 @@
+{
+  "trial": "v92",
+  "source_commit": "da32f547c28201546c44740a4a66445d3ee5f6bb",
+  "umd_build": "present-umd-v167",
+  "package_version": "0.0.80.0",
+  "worker_successes_by_client": {
+    "42": 13,
+    "4764": 44,
+    "1076": 71,
+    "5384": 56
+  },
+  "acknowledged_successes_by_client": {
+    "42": 13,
+    "4764": 44,
+    "1076": 71,
+    "5384": 56
+  },
+  "received_frames": 2,
+  "viewer_submissions": 2,
+  "full_desktop_offload": false,
+  "usable_interactive_desktop": false,
+  "tahoma_performance_tested": false,
+  "collector_completed_without_error": true,
+  "original_cleanup_passed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "guest_restart": false,
+  "findings": [
+    "184 successful NPU requests: 13 prewarm packets and 171 live desktop draws (71 DWM, 44 Explorer, 56 StartMenuExperienceHost). Every successful reply has an acknowledged relay receipt.",
+    "DWM creates the previously rejected 223-word masking shader. No new rejected shader capture is recorded. The finite observer reaches bounded-observation-complete at 150148 ms, with no DWM rejection detected during that interval. The final archive contains an incomplete draw capture and device-removed DDI rejection; those rows have no timestamps, so attribution to cleanup is an inference. No complete failed draw or provider failure is recorded.",
+    "Two 1024x768 frames arrive while the indirect display is the only active path. The first is black. The second shows scaled desktop icons over black with a clipped taskbar. The viewer submits both frames; physical scanout remains unmeasured.",
+    "The input test sends only a Control wake event. The mostly-filled-content gate never admits Start/Escape checks. The next test should accept nonuniform visible content and provide more response time; the existing experiment is preserved without claiming an interaction result.",
+    "The 120-second sole-display interval restores successfully. Both custom driver removals pass, the stream configuration is removed, and the complete normal VM desktop is visually verified after cleanup. The worker exits 1 with socket closed or timed out as the relay closes; it records no NPU draw rejection.",
+    "The result motivates a longer finite observation, not a claim that initialization time alone explains the incomplete desktop."
+  ]
+}
