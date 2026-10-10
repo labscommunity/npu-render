@@ -53,9 +53,11 @@ UniformDrawExecutor::Result UniformDrawExecutor::execute(const std::vector<shade
         viewport.x == 0 && viewport.y == 0 && viewport.width == float(s.width) && viewport.height == float(s.height));
     auto began = Clock::now(); auto shaded = s.vertex->execute(inputs, vc);
     result.timings.shader_ms = milliseconds(began); result.execution_device = shaded.execution_device;
+    result.input_bytes = shaded.input_bytes; result.output_bytes = shaded.output_bytes; ++result.provider_requests;
     std::vector<ClipPosition> clips(s.count);
     for (size_t i = 0; i < clips.size(); ++i) std::memcpy(clips[i].data(), shaded.vertices[i][s.vs.position_output].data(), 16);
     began = Clock::now(); const auto projected = s.projection->execute(clips, viewport);
+    result.input_bytes += uint64_t(s.count) * 16 + 24; result.output_bytes += uint64_t(s.count) * 24; ++result.provider_requests;
     result.timings.projection_ms = milliseconds(began); require(projected.execution_device == result.execution_device);
     shader::VertexRegisters uniform{};
     for (unsigned r = 0; r < 16; ++r) if (s.ps.inputs[r] && r != s.ps.position_input) {
@@ -64,6 +66,7 @@ UniformDrawExecutor::Result UniformDrawExecutor::execute(const std::vector<shade
     }
     began = Clock::now(); const auto fragment = s.pixel->execute(std::vector<shader::VertexRegisters>(1, uniform), pc);
     result.timings.shader_ms += milliseconds(began); require(fragment.execution_device == result.execution_device);
+    result.input_bytes += fragment.input_bytes; result.output_bytes += fragment.output_bytes; ++result.provider_requests;
     result.fragment = fragment.vertices[0][0];
     Color color{}; std::memcpy(color.data(), result.fragment.data(), 16);
     const auto &p = projected.vertices;
@@ -79,6 +82,7 @@ UniformDrawExecutor::Result UniformDrawExecutor::execute(const std::vector<shade
         auto rect = s.rectangle->execute({p[0].snapped[0], p[0].snapped[1], p[2].snapped[0], p[2].snapped[1]}, color, background);
         result.timings.merger_ms = milliseconds(began); require(rect.execution_device == result.execution_device);
         result.pixels = std::move(rect.pixels); result.covered_samples = rect.covered_samples;
+        result.input_bytes += uint64_t(background.size()) * 4 + 32; result.output_bytes += uint64_t(background.size()) * 5; ++result.provider_requests;
         result.tile_executions = 1; result.used_rectangle = true; result.vertices = std::move(shaded.vertices);
         result.timings.total_ms = milliseconds(start); return result;
     }
@@ -93,9 +97,11 @@ UniformDrawExecutor::Result UniformDrawExecutor::execute(const std::vector<shade
         }
         std::copy_n(result.pixels.data() + first, s.batch, tile.data());
         began = Clock::now(); const auto selected = s.coverage->execute(samples);
+        result.input_bytes += uint64_t(s.batch) * 32; result.output_bytes += uint64_t(s.batch) * 4; ++result.provider_requests;
         result.timings.coverage_ms += milliseconds(began); require(selected.execution_device == result.execution_device);
         for (const auto value : selected.covered) result.covered_samples += value;
         began = Clock::now(); const auto merged = s.merger->execute(colors, tile, selected.covered);
+        result.input_bytes += uint64_t(s.batch) * 24; result.output_bytes += uint64_t(s.batch) * 4; ++result.provider_requests;
         result.timings.merger_ms += milliseconds(began); require(merged.execution_device == result.execution_device);
         std::copy(merged.pixels.begin(), merged.pixels.end(), result.pixels.begin() + first); ++result.tile_executions;
     }

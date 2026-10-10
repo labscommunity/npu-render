@@ -20,6 +20,7 @@
 #include "kernel_memory.hpp"
 #include "blend_executor.hpp"
 #include "vertex_executor.hpp"
+#include "uniform_draw.hpp"
 #include "shader_contract.hpp"
 #include "lab_trace.hpp"
 namespace {
@@ -38,6 +39,9 @@ struct Device {
     std::shared_ptr<Allocation> bound_target;
     std::shared_ptr<Allocation> bound_source;
     std::unique_ptr<BlendExecutor> executor;
+    std::unique_ptr<nr::raster::UniformDrawExecutor> indexed_executor;
+    std::shared_ptr<const nr::shader::Program> indexed_vertex, indexed_pixel;
+    std::array<uint64_t, 5> indexed_key{};
     std::shared_ptr<const nr::shader::Program> vertex_program;
     std::shared_ptr<const nr::shader::Program> pixel_program;
     std::shared_ptr<const InputElements> input_elements;
@@ -58,6 +62,7 @@ struct Device {
     };
     std::array<std::array<SamplerBinding, 16>, 3> samplers{};
     std::array<std::array<std::shared_ptr<Allocation>, 14>, 3> constant_buffers{};
+    std::array<std::array<UINT, 14>, 3> constant_bytes{};
     struct GeometryBinding {
         std::shared_ptr<Allocation> allocation;
         UINT bytes = 0, stride = 0, offset = 0;

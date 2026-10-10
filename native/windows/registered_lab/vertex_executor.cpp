@@ -479,9 +479,11 @@ RegisterExecutor::Result RegisterExecutor::execute(const std::vector<VertexRegis
                                                    const TexturePixels &textures) {
     check(!state->failed && vertices.size() == state->count);
     for (unsigned i = 0; i < 14; ++i) check(constants[i].size() >= state->program.constants[i]);
+    Result result;
     try {
         for (size_t i = 0; i < state->bindings.size(); ++i) {
             const auto &binding = state->bindings[i]; auto tensor = state->request.get_tensor(binding.name);
+            result.input_bytes += tensor.get_byte_size();
             if (binding.half_texel) {
                 check(tensor.get_size() == 1 && tensor.get_element_type() == ov::element::f32);
                 *tensor.data<float>() = .5f;
@@ -503,12 +505,14 @@ RegisterExecutor::Result RegisterExecutor::execute(const std::vector<VertexRegis
         state->request.infer();
         if (state->checks_sample_coordinates) {
             const auto status = state->request.get_tensor("invalid_sample_coordinates");
+            result.output_bytes += status.get_byte_size();
             check(status.get_size() == 1 && status.get_element_type() == ov::element::i32);
             if (*status.data<const int32_t>()) throw std::runtime_error("nonfinite sample coordinate on active shader path");
         }
-        Result result; result.vertices.resize(vertices.size()); result.execution_device = state->execution_device;
+        result.vertices.resize(vertices.size()); result.execution_device = state->execution_device;
         for (size_t i = 0; i < state->outputs.size(); ++i) {
             const auto tensor = state->request.get_tensor("vs_output_" + std::to_string(state->outputs[i]));
+            result.output_bytes += tensor.get_byte_size();
             check(tensor.get_element_type() == ov::element::f32 && tensor.get_byte_size() == vertices.size() * sizeof(VertexBits));
             const auto *source = static_cast<const uint8_t *>(tensor.data());
             for (size_t v = 0; v < vertices.size(); ++v)
@@ -516,6 +520,7 @@ RegisterExecutor::Result RegisterExecutor::execute(const std::vector<VertexRegis
             const auto mask = state->output_bit_masks[state->outputs[i]];
             if (mask) {
                 const auto bits = state->request.get_tensor("vs_bits_" + std::to_string(state->outputs[i]));
+                result.output_bytes += bits.get_byte_size();
                 check(bits.get_element_type() == ov::element::i32 && bits.get_byte_size() == tensor.get_byte_size());
                 const auto *raw = static_cast<const uint8_t *>(bits.data());
                 for (size_t v = 0; v < vertices.size(); ++v) for (unsigned c = 0; c < 4; ++c) if (mask & (1u << c))

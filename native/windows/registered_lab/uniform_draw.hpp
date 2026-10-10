@@ -26,6 +26,7 @@ public:
         uint64_t covered_samples = 0, tile_executions = 0;
         Timings timings;
         bool used_rectangle = false;
+        uint64_t input_bytes = 0, output_bytes = 0, provider_requests = 0;
     };
     Result execute(const std::vector<shader::VertexRegisters> &vertices,
                    const shader::VertexConstants &vertex_constants,

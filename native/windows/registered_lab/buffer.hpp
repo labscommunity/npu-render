@@ -65,13 +65,16 @@ void APIENTRY set_constant_buffers(D3D10DDI_HDEVICE h, UINT start, UINT count, c
     guard(h, __FUNCTION__, [&] {
         require(start <= 14 && count <= 14 - start && (!count || values));
         auto next = device(h).constant_buffers[Stage];
+        auto sizes = device(h).constant_bytes[Stage];
         for (UINT i = 0; i < count; ++i) {
-            if (!values[i].pDrvPrivate) { next[start + i].reset(); continue; }
+            if (!values[i].pDrvPrivate) { next[start + i].reset(); sizes[start + i] = 0; continue; }
             auto &r = resource(values[i]);
             require(r.buffer_bytes && r.bind_flags == D3D10_DDI_BIND_CONSTANT_BUFFER &&
                 r.allocation->context == device(h).context && !r.allocation->locked);
             next[start + i] = r.allocation;
+            sizes[start + i] = r.buffer_bytes;
         }
         device(h).constant_buffers[Stage] = std::move(next);
+        device(h).constant_bytes[Stage] = sizes;
     });
 }

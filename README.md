@@ -89,8 +89,12 @@ The isolated desktop work now captures DWM's real shader and draw state. An
 [offline NPU replay](docs/validation/2026-10-10/dwm-draw-replay-npu-v53/report.json)
 executes its first indexed draw through vertex shading, projection, triangle
 coverage, pixel shading and BGRA output, matching all 786,432 output pixels.
-This draw is an opaque uniform-color quad. General textured desktop draws, live
-draw integration and indirect-display frame delivery remain unfinished. The
+This draw is an opaque uniform-color quad. The
+[indexed driver callback](docs/validation/2026-10-10/indexed-ddi-npu-v60/report.json)
+now passes two NPU draws through test allocation callbacks, including constant
+updates and checked index offsets. General textured desktop draws, installed
+adapter validation of indexed rendering and indirect-display frame delivery
+remain unfinished. The
 first cold replay took 9.76 seconds including compilation. A subsequent
 [rectangle specialization](docs/validation/2026-10-10/solid-rectangle-npu-v58/report.json)
 preserves the exact image and reduces repeated draw time to 42–49 ms in the

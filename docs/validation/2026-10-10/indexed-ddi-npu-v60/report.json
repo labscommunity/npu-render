@@ -1,0 +1,28 @@
+{
+  "scope": "Actual DrawIndexed UMD callback with explicit runtime allocation shims on physical NPU",
+  "build": "present-umd-v60",
+  "cpu_contract_tests_passed": 9,
+  "npu_indexed_draws_verified": 2,
+  "npu_indexed_components_verified": 32768,
+  "previous_npu_composition_draws_passed": 16,
+  "validated": [
+    "index-buffer byte offset plus StartIndexLocation plus signed BaseVertexLocation",
+    "bound shaders and layout outliving runtime wrappers",
+    "constant-buffer updates with reused compiled pipeline",
+    "NPU vertex shading, projection, pixel shading, rectangle coverage and quantization",
+    "commit successful output through ordinary upload path",
+    "invalid negative and out-of-range indices leave target unchanged",
+    "owned bindings and executors release without live allocation or context leaks"
+  ],
+  "counters": "Count all actual provider input/output tensors, including intermediate stages. Kernel uploads and copies remain separately counted.",
+  "limits": [
+    "Uniform-varying, nontextured single-sample triangle lists only",
+    "Whole-target viewport and scissor; no depth/stencil",
+    "No installed-adapter test in this evidence set",
+    "External indexed NPU transport is the next integration step"
+  ],
+  "registered_adapter_tested": false,
+  "full_desktop_offload": false,
+  "displayed_frames": 0,
+  "tahoma_performance_tested": false
+}

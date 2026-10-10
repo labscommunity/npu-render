@@ -24,7 +24,7 @@ public:
     ~RegisterExecutor();
     RegisterExecutor(const RegisterExecutor &) = delete;
     RegisterExecutor &operator=(const RegisterExecutor &) = delete;
-    struct Result { std::vector<VertexRegisters> vertices; std::string execution_device; };
+    struct Result { std::vector<VertexRegisters> vertices; std::string execution_device; uint64_t input_bytes = 0, output_bytes = 0; };
     Result execute(const std::vector<VertexRegisters> &vertices, const VertexConstants &constants,
                    const TexturePixels &textures = {});
 };

@@ -101,12 +101,11 @@ std::vector<uint8_t> read_pixels(Allocation &source) {
     return result;
 }
 #include "draw_capture.hpp"
+#include "indexed_draw.hpp"
 void APIENTRY draw_indexed(D3D10DDI_HDEVICE h, UINT count, UINT first, INT base) {
     guard(h, __FUNCTION__, [&] {
         lab_capture_indexed_draw(device(h), count, first, base);
-        // Capturing the request is diagnostic only. No target writes, shader
-        // execution, successful draw, or frame delivery are reported.
-        throw Error{DXGI_ERROR_UNSUPPORTED};
+        execute_indexed_draw(device(h), count, first, base);
     });
 }
 void APIENTRY draw(D3D10DDI_HDEVICE h, UINT count, UINT first) {

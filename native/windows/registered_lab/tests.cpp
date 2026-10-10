@@ -124,6 +124,7 @@ HRESULT APIENTRY render_cb(HANDLE rt, D3DDDICB_RENDER *a) {
 }
 #include "upload_test.hpp"
 #include "draw_test.hpp"
+#include "indexed_draw_test.hpp"
 #include "present_test.hpp"
 #include "geometry_test.hpp"
 #include "buffer_test.hpp"
@@ -292,6 +293,7 @@ int main(int argc, char **argv) {
     TEST(test_present(kt, um) == 0);
     TEST(test_buffers(kt, um) == 0);
     TEST(test_draws(kt, um, backend, desktop_size) == 0);
+    TEST(test_indexed_draw(kt, um, backend) == 0);
     std::puts("registered lab allocation and submission contracts passed");
     return 0;
 }
