@@ -27,6 +27,26 @@ int main(int argc, char **argv) {
         std::string backend = "CPU";
         if (argc == 3 && !std::strcmp(argv[1], "--backend")) backend = argv[2];
         else test(argc == 1);
+        const auto modifier_tokens = nr::registered_lab::shader_tokens(
+            "struct O {float4 p:SV_Position;float4 a:COLOR;};O main(float4 v:POSITION){O o;o.p=-v;o.a=-abs(v);return o;}", "vs_4_0");
+        const auto modifier_program = parse_vertex(modifier_tokens.data(), modifier_tokens.size());
+        std::vector<VertexRegisters> modifier_vertices(16);
+        for (unsigned i = 0; i < modifier_vertices.size(); ++i)
+            modifier_vertices[i][0] = {as_bits(0.0f), as_bits(-0.0f), as_bits(-float(i + 1) / 8), as_bits(float(i + 1) / 16)};
+        VertexExecutor modifier_executor(modifier_program, uint32_t(modifier_vertices.size()), backend);
+        const auto modified = modifier_executor.execute(modifier_vertices, {});
+        for (unsigned i = 0; i < modifier_vertices.size(); ++i) {
+            const auto expected = reference_vertex(modifier_program, modifier_vertices[i], {});
+            for (unsigned slot = 0; slot < 16; ++slot) if (modifier_program.outputs[slot]) {
+                if (modified.vertices[i][slot] != expected[slot]) {
+                    for (unsigned c = 0; c < 4; ++c) std::fprintf(stderr,
+                        "modifier mismatch vertex=%u output=%u lane=%u actual=%08x expected=%08x\n",
+                        i, slot, c, modified.vertices[i][slot][c], expected[slot][c]);
+                    test(false);
+                }
+            }
+        }
+        std::printf("{\"source_modifiers\":true,\"vertices\":16,\"execution_device\":\"%s\",\"signed_zero_verified\":true,\"desktop_offload_tested\":false}\n", modified.execution_device.c_str());
         const auto code = nr::registered_lab::shader_tokens(source, "vs_4_0");
         const auto program = parse_vertex(code.data(), code.size());
         for (const char *unsupported : {

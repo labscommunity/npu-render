@@ -27,7 +27,12 @@ inline Registers reference_vertex(const Program &program, const Registers &input
             if (index < program.constants[a.index]) raw = constants[a.index][index];
         } else check(false);
         Bits result{};
-        for (unsigned i = 0; i < 4; ++i) result[i] = raw[a.lanes[i]];
+        for (unsigned i = 0; i < 4; ++i) {
+            auto value = raw[a.lanes[i]];
+            if (a.modifier == Modifier::absolute || a.modifier == Modifier::absolute_negate) value &= 0x7fffffffu;
+            if (a.modifier == Modifier::negate || a.modifier == Modifier::absolute_negate) value ^= 0x80000000u;
+            result[i] = value;
+        }
         return result;
     };
     for (const auto &instruction : program.instructions) {

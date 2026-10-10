@@ -30,6 +30,7 @@ struct VertexExecutor::State {
     struct Binding { std::shared_ptr<op::Parameter> parameter; bool constant; unsigned index; std::string name; };
     std::vector<Binding> bindings;
     std::vector<unsigned> outputs;
+    std::array<uint32_t, 16> output_bit_masks{};
     ov::Core core;
     ov::CompiledModel compiled;
     ov::InferRequest request;
@@ -96,7 +97,21 @@ struct VertexExecutor::State {
                 for (unsigned c = 0; c < 4; ++c) raw[c] = {lane(f, c), lane(i, c)};
             } else check(false);
             Lanes result{};
-            for (unsigned c = 0; c < 4; ++c) result[c] = raw[a.lanes[c]];
+            for (unsigned c = 0; c < 4; ++c) {
+                result[c] = raw[a.lanes[c]];
+                if (a.modifier != Modifier::none && result[c].floating) {
+                    if (a.modifier == Modifier::absolute || a.modifier == Modifier::absolute_negate)
+                        result[c].floating = std::make_shared<op::Abs>(result[c].floating);
+                    if (a.modifier == Modifier::negate || a.modifier == Modifier::absolute_negate)
+                        result[c].floating = std::make_shared<op::Negative>(result[c].floating);
+                    if (result[c].integer) {
+                        if (a.modifier == Modifier::absolute || a.modifier == Modifier::absolute_negate)
+                            result[c].integer = std::make_shared<op::BitwiseAnd>(result[c].integer, integer(0x7fffffff));
+                        if (a.modifier == Modifier::negate || a.modifier == Modifier::absolute_negate)
+                            result[c].integer = std::make_shared<op::BitwiseXor>(result[c].integer, integer(INT32_MIN));
+                    }
+                }
+            }
             return result;
         };
         for (const auto &instruction : program.instructions) {
@@ -132,6 +147,21 @@ struct VertexExecutor::State {
             auto result = std::make_shared<op::Concat>(components, 1);
             result->output(0).get_tensor().set_names({"vs_output_" + std::to_string(i)});
             results.push_back(result); outputs.push_back(i);
+            // The NPU floating path canonicalizes negative zero. MOV and
+            // source modifiers have exact integer bit views, so emit those
+            // through an integer output and pack their bytes on the host.
+            // Sign-bit arithmetic itself remains part of the NPU graph.
+            ov::OutputVector bit_components;
+            for (unsigned c = 0; c < 4; ++c) {
+                const bool available = (program.outputs[i] & (1u << c)) && output[i][c].integer;
+                if (available) output_bit_masks[i] |= 1u << c;
+                bit_components.push_back(batch(available ? output[i][c].integer : integer(0)));
+            }
+            if (output_bit_masks[i]) {
+                auto bits = std::make_shared<op::Concat>(bit_components, 1);
+                bits->output(0).get_tensor().set_names({"vs_bits_" + std::to_string(i)});
+                results.push_back(bits);
+            }
         }
         check(!results.empty());
         // Drop unused bit/float views before creating the model's public inputs.
@@ -167,7 +197,7 @@ struct VertexExecutor::State {
             properties.emplace(ov::hint::execution_mode(ov::hint::ExecutionMode::ACCURACY));
         }
         compiled = core.compile_model(model, backend, properties);
-        check(compiled.inputs().size() == bindings.size() && compiled.outputs().size() == outputs.size());
+        check(compiled.inputs().size() == bindings.size() && compiled.outputs().size() == results.size());
         const auto devices = compiled.get_property(ov::execution_devices);
         if (devices.size() != 1 || !(devices[0] == backend || devices[0].rfind(backend + ".", 0) == 0))
             throw std::runtime_error("unexpected vertex execution device");
@@ -185,6 +215,11 @@ void VertexExecutor::validate(const Program &program) {
             const auto &source = instruction.sources[i];
             if (source.relative.enabled && source.relative.kind == Register::temporary)
                 check((integer_lanes[source.relative.index] & (1u << source.relative.component)) != 0);
+            if (instruction.opcode == Opcode::move && source.modifier != Modifier::none &&
+                source.kind == Register::temporary) {
+                for (unsigned c = 0; c < 4; ++c) if (instruction.destination.mask & (1u << c))
+                    check((integer_lanes[source.index] & (1u << source.lanes[c])) != 0);
+            }
         }
         const auto &destination = instruction.destination;
         if (destination.kind != Register::temporary) continue;
@@ -226,6 +261,14 @@ VertexExecutor::Result VertexExecutor::execute(const std::vector<VertexRegisters
             const auto *source = static_cast<const uint8_t *>(tensor.data());
             for (size_t v = 0; v < vertices.size(); ++v)
                 std::memcpy(result.vertices[v][state->outputs[i]].data(), source + v * sizeof(VertexBits), sizeof(VertexBits));
+            const auto mask = state->output_bit_masks[state->outputs[i]];
+            if (mask) {
+                const auto bits = state->request.get_tensor("vs_bits_" + std::to_string(state->outputs[i]));
+                check(bits.get_element_type() == ov::element::i32 && bits.get_byte_size() == tensor.get_byte_size());
+                const auto *raw = static_cast<const uint8_t *>(bits.data());
+                for (size_t v = 0; v < vertices.size(); ++v) for (unsigned c = 0; c < 4; ++c) if (mask & (1u << c))
+                    std::memcpy(&result.vertices[v][state->outputs[i]][c], raw + (v * 4 + c) * sizeof(uint32_t), sizeof(uint32_t));
+            }
         }
         return result;
     } catch (...) { state->failed = true; throw; }

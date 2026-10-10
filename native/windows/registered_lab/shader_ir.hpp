@@ -14,6 +14,7 @@ inline void check(bool value) {
 }
 enum class Register : uint32_t { temporary = 0, input = 1, output = 2, immediate = 4, constant = 8 };
 enum class Opcode : uint32_t { add = 0, mad = 50, move = 54, multiply = 56 };
+enum class Modifier : uint32_t { none = 0, negate = 1, absolute = 2, absolute_negate = 3 };
 struct RelativeIndex {
     bool enabled = false;
     Register kind = Register::temporary;
@@ -21,6 +22,7 @@ struct RelativeIndex {
 };
 struct Operand {
     Register kind{};
+    Modifier modifier = Modifier::none;
     uint32_t index = 0, element = 0, mask = 0;
     std::array<uint32_t, 4> lanes{0, 1, 2, 3}, literal{};
     RelativeIndex relative{};
@@ -49,10 +51,16 @@ public:
     Operand operand(bool destination, bool declaration = false, unsigned depth = 0) {
         check(depth <= 1);
         const auto token = read();
-        check(!(token & 0x80000000u)); // Extended modifiers are not lowered yet.
+        Modifier modifier = Modifier::none;
+        if (token & 0x80000000u) {
+            check(!destination && !declaration && !depth);
+            const auto extension = read();
+            check((extension & 0x3fu) == 1 && !(extension & ~0xffu));
+            modifier = Modifier((extension >> 6) & 3u);
+        }
         const auto components = token & 3u, selection = (token >> 2) & 3u;
         const auto dimensions = (token >> 20) & 3u;
-        Operand value; value.kind = Register((token >> 12) & 255u);
+        Operand value; value.kind = Register((token >> 12) & 255u); value.modifier = modifier;
         check(components == 1 || components == 2);
         if (components == 1) { value.mask = 1; value.lanes.fill(0); }
         else if (!selection) { value.mask = (token >> 4) & 15u; }
