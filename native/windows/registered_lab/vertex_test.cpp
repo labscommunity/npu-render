@@ -29,6 +29,16 @@ int main(int argc, char **argv) {
         else test(argc == 1);
         const auto code = nr::registered_lab::shader_tokens(source, "vs_4_0");
         const auto program = parse_vertex(code.data(), code.size());
+        for (const char *unsupported : {
+                 "float4 main(float4 p:POSITION):SV_Position{return saturate(p);}",
+                 "cbuffer C {float4 data[250];}; float4 main(float4 p:POSITION):SV_Position{return data[asuint(p.x*2)];}"}) {
+            const auto tokens = nr::registered_lab::shader_tokens(unsupported, "vs_4_0");
+            const auto parsed = parse_vertex(tokens.data(), tokens.size());
+            bool lowering_rejected = false;
+            try { VertexExecutor::validate(parsed); }
+            catch (const std::invalid_argument &) { lowering_rejected = true; }
+            test(lowering_rejected);
+        }
         test(program.constants[0] == 1 && program.constants[1] == 250 && program.dynamic_constants[1]);
         Constants constants; constants[0] = {{as_bits(0.25f), as_bits(-1.0f), as_bits(-0.5f), as_bits(1.0f)}};
         constants[1].resize(250);

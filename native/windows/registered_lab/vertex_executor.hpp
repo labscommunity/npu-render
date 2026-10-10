@@ -13,6 +13,9 @@ class VertexExecutor {
     struct State;
     std::unique_ptr<State> state;
 public:
+    // Validate lowering constraints after parse_vertex, without choosing a
+    // device or claiming that a complete graphics pipeline can execute.
+    static void validate(const Program &program);
     VertexExecutor(const Program &program, uint32_t vertices, const std::string &backend);
     ~VertexExecutor();
     VertexExecutor(const VertexExecutor &) = delete;

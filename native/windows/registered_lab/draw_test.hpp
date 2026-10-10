@@ -80,6 +80,36 @@ int test_draws(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER_DEVICE
             TEST(last_error == S_OK);
             const auto executions = counters.executions, allocations = counters.allocations;
             const auto before = memory[target_index];
+            if (!checks) {
+                // Runtime shader wrapper destruction must not invalidate a
+                // bound program. Exercise its real stage executor separately;
+                // generic rasterization is still rejected by the Draw DDI.
+                const auto code = shader_tokens("float4 main(float4 p:POSITION):SV_Position{return p*float4(2,3,4,1);}", "vs_4_0");
+                alignas(Shader) unsigned char generic_storage[sizeof(Shader)]{};
+                D3D10DDI_HSHADER generic{}; generic.pDrvPrivate = generic_storage;
+                f.pfnCreateVertexShader(h, code.data(), generic, {}, nullptr);
+                TEST(last_error == S_OK);
+                f.pfnVsSetShader(h, generic);
+                TEST(d.vertex_program);
+                const std::weak_ptr<const nr::shader::Program> retained = d.vertex_program;
+                f.pfnDestroyShader(h, generic);
+                TEST(last_error == S_OK && !retained.expired());
+                std::vector<nr::shader::VertexRegisters> vertices(16);
+                const std::array<float, 4> input{0.25f, -0.5f, 0.125f, 1.0f};
+                for (auto &v : vertices) std::memcpy(v[0].data(), input.data(), sizeof(input));
+                nr::shader::VertexExecutor executor(*d.vertex_program, UINT(vertices.size()), backend);
+                const auto output = executor.execute(vertices, {});
+                const std::array<float, 4> expected{0.5f, -1.5f, 0.5f, 1.0f};
+                for (const auto &v : output.vertices)
+                    TEST(!std::memcmp(v[d.vertex_program->position_output].data(), expected.data(), sizeof(expected)));
+                f.pfnSetBlendState(h, hb, nullptr, ~0u);
+                f.pfnDraw(h, 3, 0);
+                TEST(last_error == E_INVALIDARG && counters.executions == executions &&
+                     counters.allocations == allocations && memory[target_index] == before);
+                last_error = S_OK; f.pfnVsSetShader(h, hv);
+                TEST(last_error == S_OK && retained.expired());
+                std::printf("{\"bound_vertex_stage\":true,\"vertices\":16,\"execution_device\":\"%s\",\"exact_bits_verified\":true,\"desktop_offload_tested\":false}\n", output.execution_device.c_str());
+            }
             depth.DepthEnable = TRUE; f.pfnSetDepthStencilState(h, hd, 0);
             f.pfnDraw(h, 3, 0);
             TEST(last_error == E_INVALIDARG && counters.executions == executions && counters.allocations == allocations && memory[target_index] == before);

@@ -37,6 +37,7 @@ struct VertexExecutor::State {
     bool failed = false;
     State(const Program &p, uint32_t vertices, const std::string &backend) : program(p), count(vertices) {
         check(count && count <= 65536 && (backend == "CPU" || backend == "GPU" || backend == "NPU"));
+        VertexExecutor::validate(program);
         std::array<Lanes, 16> input{}, temporary{}, output{};
         std::array<Value, 14> constants{};
         auto parameter_pair = [&](bool constant, unsigned index, size_t rows) {
@@ -173,6 +174,31 @@ struct VertexExecutor::State {
         execution_device = devices[0]; request = compiled.create_infer_request();
     }
 };
+void VertexExecutor::validate(const Program &program) {
+    // parse_vertex has already checked declarations, operand bounds and lane
+    // initialization. Track the additional bit-view requirement of this graph
+    // lowering, using the old register state for simultaneous masked writes.
+    std::array<uint32_t, 16> integer_lanes{};
+    for (const auto &instruction : program.instructions) {
+        check(!instruction.saturate);
+        for (unsigned i = 0; i < instruction.source_count; ++i) {
+            const auto &source = instruction.sources[i];
+            if (source.relative.enabled && source.relative.kind == Register::temporary)
+                check((integer_lanes[source.relative.index] & (1u << source.relative.component)) != 0);
+        }
+        const auto &destination = instruction.destination;
+        if (destination.kind != Register::temporary) continue;
+        uint32_t bits = 0;
+        if (instruction.opcode == Opcode::move) {
+            const auto &source = instruction.sources[0];
+            const auto available = source.kind == Register::temporary ? integer_lanes[source.index] : 15u;
+            for (unsigned c = 0; c < 4; ++c)
+                if (available & (1u << source.lanes[c])) bits |= 1u << c;
+        }
+        integer_lanes[destination.index] = (integer_lanes[destination.index] & ~destination.mask) |
+                                          (bits & destination.mask);
+    }
+}
 VertexExecutor::VertexExecutor(const Program &p, uint32_t count, const std::string &backend)
     : state(std::make_unique<State>(p, count, backend)) {}
 VertexExecutor::~VertexExecutor() = default;

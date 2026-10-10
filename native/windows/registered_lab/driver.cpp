@@ -19,6 +19,7 @@
 #include "contract.hpp"
 #include "kernel_memory.hpp"
 #include "blend_executor.hpp"
+#include "vertex_executor.hpp"
 #include "shader_contract.hpp"
 #include "lab_trace.hpp"
 namespace {
@@ -35,6 +36,7 @@ struct Device {
     std::shared_ptr<Allocation> bound_target;
     std::shared_ptr<Allocation> bound_source;
     std::unique_ptr<BlendExecutor> executor;
+    std::shared_ptr<const nr::shader::Program> vertex_program;
     std::string backend;
     std::vector<UINT> vertex_code, pixel_code;
     UINT vertex_shader = 0, pixel_shader = 0, viewport_count = 0;
@@ -66,7 +68,7 @@ struct Resource {
     bool mapped_write = false;
 };
 struct View { std::shared_ptr<Allocation> allocation; };
-struct Shader { UINT kind = 0; };
+struct Shader { UINT kind = 0; std::shared_ptr<const nr::shader::Program> vertex_program; };
 Device &device(D3D10DDI_HDEVICE h) { return *static_cast<Device *>(h.pDrvPrivate); }
 void reject(D3D10DDI_HDEVICE h, HRESULT status, const char *operation) {
     lab_trace("{\"event\":\"reject\",\"operation\":\"%s\",\"status\":\"%08lx\"}\n", operation, ULONG(status));
