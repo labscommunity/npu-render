@@ -249,3 +249,15 @@ passes all three remote NPU draws and independently checks 552,960 screen RGB
 bytes within one byte. It records zero local CPU/GPU/NPU draw executions, exactly
 three remote NPU executions, and zero live resources or cleanup errors. The
 earlier withheld-reply attempt times out without fallback or a successful present.
+
+
+`nr_registered_vertex_test --backend NPU` independently translates bounded SM4
+vertex arithmetic and dynamically indexed constants into an OpenVINO graph. The
+[v24 hardware test](../../../docs/validation/2026-10-10/vertex-npu-v24/report.json)
+checks 768 vertex results, including changed constants and 4,096-row buffer bounds,
+on Delta's physical NPU. Its inputs use exactly representable binary fractions;
+this does not establish general FP32 shader conformance. A qualified workaround
+reconstructs a 0/1 bounds mask before color selection to avoid an observed NPU
+compiler error while preserving integer address comparisons. No backend fallback
+is permitted. The standalone translator is not yet admitted by the registered
+UMD and supplies neither rasterization nor pixel shading or desktop migration.
