@@ -94,6 +94,9 @@ provider or establish frame delivery. The component tests require this exact
 successful status and continue to exercise resource, draw and present callbacks.
 Earlier live packages through v41 returned `S_OK`; their measurements remain
 unchanged, and the new status needs a separate live presentation check.
+The [v7 physical NPU component run](../../../docs/validation/2026-10-10/registered-component-v7/report.json)
+passes all 16 native-size draws with this status change and test allocation
+callbacks. It establishes neither installed-adapter execution nor screen output.
 
 `--present` creates a visible 320×192 HWND and a discard-model DXGI swap chain
 on the selected laboratory adapter. It requires an interactive guest session,

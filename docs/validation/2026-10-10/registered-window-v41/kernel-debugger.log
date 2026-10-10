@@ -1,0 +1,344 @@
+Opened log file 'C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-present-v41-oct10.log'
+0: kd> .sympath srv*C:\Users\tatef\AppData\Local\npu-render\symbols*https://msdl.microsoft.com/download/symbols;C:\Users\tatef\AppData\Local\npu-render\builds\present-capacity-v1\Release
+Symbol search path is: srv*C:\Users\tatef\AppData\Local\npu-render\symbols*https://msdl.microsoft.com/download/symbols;C:\Users\tatef\AppData\Local\npu-render\builds\present-capacity-v1\Release
+Expanded Symbol search path is: srv*c:\users\tatef\appdata\local\npu-render\symbols*https://msdl.microsoft.com/download/symbols;c:\users\tatef\appdata\local\npu-render\builds\present-capacity-v1\release
+
+************* Path validation summary **************
+Response                         Time (ms)     Location
+Deferred                                       srv*C:\Users\tatef\AppData\Local\npu-render\symbols*https://msdl.microsoft.com/download/symbols
+OK                                             C:\Users\tatef\AppData\Local\npu-render\builds\present-capacity-v1\Release
+0: kd> g
+nr_paging_lab: memory=00000000 required_queue=32
+nr_paging_lab: engine_start=00000000 capacity=33; rendering_ready=0 sources=0 children=0
+nr_paging_lab: query type=1 input=0 output=552
+nr_paging_lab: query type=47 input=0 output=4
+nr_paging_lab: create_context node=0 affinity=1 flags=1 private=0
+nr_paging_lab: query type=5 input=24 output=32
+nr_paging_lab: query type=5 input=24 output=32
+nr_paging_lab: query type=10 input=4 output=4
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+Break instruction exception - code 80000003 (first chance)
+*******************************************************************************
+*                                                                             *
+*   You are seeing this message because you pressed either                    *
+*       CTRL+C (if you run console kernel debugger) or,                       *
+*       CTRL+BREAK (if you run GUI kernel debugger),                          *
+*   on your debugger machine's keyboard.                                      *
+*                                                                             *
+*                   THIS IS NOT A BUG OR A SYSTEM CRASH                       *
+*                                                                             *
+* If you did not intend to break into the debugger, press the "g" key, then   *
+* press the "Enter" key now.  This message might immediately reappear.  If it *
+* does, press "g" and "Enter" again.                                          *
+*                                                                             *
+*******************************************************************************
+nt!DbgBreakPointWithStatus:
+fffff807`784fdfb0 cc              int     3
+0: kd> .reload /f nr_render_kmd.sys; x nr_render_kmd!*present*; x nr_render_kmd!*patch*
+
+
+Press ctrl-c (cdb, kd, ntsd) or ctrl-break (windbg) to abort symbol loads that take too long.
+Run !sym noisy before .reload to track down problems loading symbols.
+
+fffff807`0ef844e0 nr_render_kmd!nr::kmd::Present::locate (class nr::kmd::Segment *, struct _DXGK_ALLOCATIONLIST *, struct nr::kmd::PresentRecord *, bool)
+fffff807`0ef858b0 nr_render_kmd!nr::kmd::Present::patch (class nr::kmd::Segment *, struct nr::kernel_contract::Surface *, struct nr::kernel_contract::Surface *, struct _DXGKARG_PATCH *)
+fffff807`0ef84880 nr_render_kmd!nr::kmd::Present::matches (struct nr::kmd::PresentRecord *, struct nr::kernel_contract::Surface *, struct nr::kernel_contract::Surface *)
+fffff807`0ef81a10 nr_render_kmd!nr::kmd::Present::build (class nr::kmd::Segment *, struct nr::kernel_contract::Surface *, struct nr::kernel_contract::Surface *, struct _DXGKARG_PRESENT *)
+fffff807`0ef862a0 nr_render_kmd!`anonymous namespace'::present (void *, struct _DXGKARG_PRESENT *)
+fffff807`0ef88550 nr_render_kmd!nr::kmd::Present::valid (struct nr::kmd::PresentRecord *)
+fffff807`0ef851e8 nr_render_kmd!?A0xe1342900::present_allocations =  (inline caller) nr_render_kmd!`anonymous namespace'::patch+348
+fffff807`0ef862ec nr_render_kmd!?A0xe1342900::present_allocations =  (inline caller) nr_render_kmd!`anonymous namespace'::present+4c
+fffff807`0ef881a9 nr_render_kmd!nr::kmd::Present::execute =  (inline caller) nr_render_kmd!nr::kmd::Engine::thread_main+1e9
+fffff807`0ef8a128 nr_render_kmd!__guard_xfg_dispatch_icall_fptr = 0xfffff807`0ef89180
+fffff807`0ef8a128 nr_render_kmd!__guard_xfg_dispatch_icall_fptr = 0xfffff807`0ef89180
+fffff807`0ef89160 nr_render_kmd!_guard_dispatch_icall_nop = 0xff ''
+fffff807`0ef8a118 nr_render_kmd!__guard_dispatch_icall_fptr = 0xfffff807`0ef89160
+fffff807`0ef8a118 nr_render_kmd!__guard_dispatch_icall_fptr = 0xfffff807`0ef89160
+fffff807`0ef8a130 nr_render_kmd!__guard_xfg_table_dispatch_icall_fptr = 0xfffff807`0ef89180
+fffff807`0ef8a130 nr_render_kmd!__guard_xfg_table_dispatch_icall_fptr = 0xfffff807`0ef89180
+fffff807`0ef89180 nr_render_kmd!_guard_xfg_dispatch_icall_nop = 0xff ''
+fffff807`0ef89160 nr_render_kmd!_guard_dispatch_icall_nop (void)
+fffff807`0ef89180 nr_render_kmd!_guard_xfg_dispatch_icall_nop (void)
+fffff807`0ef858b0 nr_render_kmd!nr::kmd::Present::patch (class nr::kmd::Segment *, struct nr::kernel_contract::Surface *, struct nr::kernel_contract::Surface *, struct _DXGKARG_PATCH *)
+fffff807`0ef84ea0 nr_render_kmd!`anonymous namespace'::patch (void *, struct _DXGKARG_PATCH *)
+fffff807`0ef85340 nr_render_kmd!nr::kmd::Copy::patch (class nr::kmd::Segment *, unsigned int64, struct _DXGKARG_PATCH *)
+fffff807`0ef89140 nr_render_kmd!_guard_dispatch_icall (void)
+fffff807`0ef85600 nr_render_kmd!nr::kmd::Fill::patch (class nr::kmd::Segment *, unsigned int64, struct _DXGKARG_PATCH *)
+fffff807`0ef8507c nr_render_kmd!nr::kmd::Submissions::patch =  (inline caller) nr_render_kmd!`anonymous namespace'::patch+1dc
+0: kd> bp fffff807`0ef862a0 "dt -r1 nr_render_kmd!_DXGKARG_PRESENT @rdx; g"; bp fffff807`0ef84ea0 "dt -r1 nr_render_kmd!_DXGKARG_PATCH @rdx; g"; bl; g
+     0 e Disable Clear  fffff807`0ef862a0     0001 (0001) nr_render_kmd!`anonymous namespace'::present "dt -r1 nr_render_kmd!_DXGKARG_PRESENT @rdx; g"
+     1 e Disable Clear  fffff807`0ef84ea0     0001 (0001) nr_render_kmd!`anonymous namespace'::patch "dt -r1 nr_render_kmd!_DXGKARG_PATCH @rdx; g"
+
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: create_context node=0 affinity=1 flags=0 private=0
+nr_paging_lab: render_fill=00000000
+nr_paging_lab: aperture operation=5 pages=60 status=00000000 live=60
+   +0x000 hDevice          : 0xffffd586`d04b7c10 Void
+   +0x000 hContext         : 0xffffd586`d04b7c10 Void
+   +0x008 DmaBufferSegmentId : 0
+   +0x010 DmaBufferPhysicalAddress : _LARGE_INTEGER 0x00000001`7ffd8000
+      +0x000 LowPart          : 0x7ffd8000
+      +0x004 HighPart         : 0n1
+      +0x000 u                : _LARGE_INTEGER::<unnamed-type-u>
+      +0x000 QuadPart         : 0n6442287104
+   +0x018 pDmaBuffer       : 0xffffba09`d2bb8000 Void
+   +0x020 DmaBufferSize    : 0x10000
+   +0x024 DmaBufferSubmissionStartOffset : 0
+   +0x028 DmaBufferSubmissionEndOffset : 0x10
+   +0x030 pDmaBufferPrivateData : 0xffffd586`d1cf8000 Void
+   +0x038 DmaBufferPrivateDataSize : 0x8000
+   +0x03c DmaBufferPrivateDataSubmissionStartOffset : 0
+   +0x040 DmaBufferPrivateDataSubmissionEndOffset : 0x20
+   +0x048 pAllocationList  : 0xffffd586`d0e72660 _DXGK_ALLOCATIONLIST
+      +0x000 hDeviceSpecificAllocation : 0xffffd586`d04b7cd0 Void
+      +0x008 WriteOperation   : 0y1
+      +0x008 SegmentId        : 0y00001 (0x1)
+      +0x008 Reserved         : 0y00000000000000000000000000 (0)
+      +0x010 PhysicalAddress  : _LARGE_INTEGER 0x0
+   +0x050 AllocationListSize : 1
+   +0x058 pPatchLocationList : 0xffffe78c`f84ca7e0 _D3DDDI_PATCHLOCATIONLIST
+      +0x000 AllocationIndex  : 0
+      +0x004 SlotId           : 0y000000000000000000000000 (0)
+      +0x004 Reserved         : 0y00000000 (0)
+      +0x004 Value            : 0
+      +0x008 DriverId         : 0
+      +0x00c AllocationOffset : 0
+      +0x010 PatchOffset      : 8
+      +0x014 SplitOffset      : 0
+   +0x060 PatchLocationListSize : 0x40
+   +0x064 PatchLocationListSubmissionStart : 0
+   +0x068 PatchLocationListSubmissionLength : 1
+   +0x06c SubmissionFenceId : 1
+   +0x070 Flags            : _DXGK_PATCHFLAGS
+      +0x000 Paging           : 0y0
+      +0x000 Present          : 0y0
+      +0x000 RedirectedPresent : 0y0
+      +0x000 NullRendering    : 0y0
+      +0x000 Reserved         : 0y0000000000000000000000000000 (0)
+      +0x000 Value            : 0
+   +0x074 EngineOrdinal    : 0
+nr_paging_lab: patch=00000000 flags=0 fence=1 dma=0..16 private=0..32
+nr_paging_lab: submit=00000000 flags=0 fence=1
+nr_paging_lab: standard_allocation type=3 status=00000000
+nr_paging_lab: standard_allocation type=3 status=00000000
+nr_paging_lab: execute fence=1 commands=1 status=00000000 irql=0
+   +0x000 pDmaBuffer       : 0xffffba09`d2ba8000 Void
+   +0x008 DmaSize          : 0x10000
+   +0x010 pDmaBufferPrivateData : 0xffffd586`d1983000 Void
+   +0x018 DmaBufferPrivateDataSize : 0x8000
+   +0x020 pAllocationList  : 0xffffd586`d0e72010 _DXGK_ALLOCATIONLIST
+      +0x000 hDeviceSpecificAllocation : (null) 
+      +0x008 WriteOperation   : 0y0
+      +0x008 SegmentId        : 0y00000 (0)
+      +0x008 Reserved         : 0y00000000000000000000000000 (0)
+      +0x010 PhysicalAddress  : _LARGE_INTEGER 0x0
+   +0x020 pAllocationInfo  : 0xffffd586`d0e72010 _DXGK_PRESENTALLOCATIONINFO
+      +0x000 hDeviceSpecificAllocation : (null) 
+      +0x008 AllocationVirtualAddress : 0
+      +0x010 PhysicalAddress  : _LARGE_INTEGER 0x0
+      +0x018 SegmentId        : 0x7cd0
+      +0x01a PhysicalAdapterIndex : 0xd04b
+   +0x020 pPresentMultiPlaneOverlayInfo : 0xffffd586`d0e72010 _DXGK_PRESENTMULTIPLANEOVERLAYINFO
+      +0x000 VidPnSourceId    : 0
+      +0x004 PlaneListCount   : 0
+      +0x008 pPlaneList       : (null) 
+   +0x028 pPatchLocationListOut : 0xffffe78c`f142d010 _D3DDDI_PATCHLOCATIONLIST
+      +0x000 AllocationIndex  : 0
+      +0x004 SlotId           : 0y000000000000000000000000 (0)
+      +0x004 Reserved         : 0y00000000 (0)
+      +0x004 Value            : 0
+      +0x008 DriverId         : 0
+      +0x00c AllocationOffset : 0
+      +0x010 PatchOffset      : 0
+      +0x014 SplitOffset      : 0
+   +0x030 PatchLocationListOutSize : 0x40
+   +0x034 MultipassOffset  : 0
+   +0x038 Color            : 0
+   +0x03c DstRect          : tagRECT
+      +0x000 left             : 0n0
+      +0x004 top              : 0n0
+      +0x008 right            : 0n320
+      +0x00c bottom           : 0n192
+   +0x04c SrcRect          : tagRECT
+      +0x000 left             : 0n0
+      +0x004 top              : 0n0
+      +0x008 right            : 0n320
+      +0x00c bottom           : 0n192
+   +0x05c SubRectCnt       : 1
+   +0x060 pDstSubRects     : 0xffffe78c`f7d4d350 tagRECT
+      +0x000 left             : 0n0
+      +0x004 top              : 0n0
+      +0x008 right            : 0n320
+      +0x00c bottom           : 0n192
+   +0x068 FlipInterval     : 0 ( D3DDDI_FLIPINTERVAL_IMMEDIATE )
+   +0x06c Flags            : _DXGK_PRESENTFLAGS
+      +0x000 Blt              : 0y1
+      +0x000 ColorFill        : 0y0
+      +0x000 Flip             : 0y0
+      +0x000 FlipWithNoWait   : 0y0
+      +0x000 SrcColorKey      : 0y0
+      +0x000 DstColorKey      : 0y0
+      +0x000 LinearToSrgb     : 0y0
+      +0x000 Rotate           : 0y0
+      +0x000 FlipStereo       : 0y0
+      +0x000 FlipStereoTemporaryMono : 0y0
+      +0x000 FlipStereoPreferRight : 0y0
+      +0x000 BltStereoUseRight : 0y0
+      +0x000 FlipWithMultiPlaneOverlay : 0y0
+      +0x000 RedirectedFlip   : 0y0
+      +0x000 Reserved         : 0y000000000000000000 (0)
+      +0x000 Value            : 1
+   +0x070 DmaBufferSegmentId : 0
+   +0x078 DmaBufferPhysicalAddress : _LARGE_INTEGER 0x00000001`7ffe8000
+      +0x000 LowPart          : 0x7ffe8000
+      +0x004 HighPart         : 0n1
+      +0x000 u                : _LARGE_INTEGER::<unnamed-type-u>
+      +0x000 QuadPart         : 0n6442352640
+   +0x080 Reserved         : 0
+   +0x088 DmaBufferGpuVirtualAddress : 0
+   +0x090 NumSrcAllocations : 0
+   +0x094 NumDstAllocations : 0
+   +0x098 PrivateDriverDataSize : 0
+   +0x0a0 pPrivateDriverData : (null) 
+nr_paging_lab: present flags=1 rectangles=1 progress=1 status=00000000
+nr_paging_lab: aperture operation=5 pages=60 status=00000000 live=120
+   +0x000 hDevice          : 0xffffd586`d04b7c10 Void
+   +0x000 hContext         : 0xffffd586`d04b7c10 Void
+   +0x008 DmaBufferSegmentId : 0
+   +0x010 DmaBufferPhysicalAddress : _LARGE_INTEGER 0x00000001`7ffe8000
+      +0x000 LowPart          : 0x7ffe8000
+      +0x004 HighPart         : 0n1
+      +0x000 u                : _LARGE_INTEGER::<unnamed-type-u>
+      +0x000 QuadPart         : 0n6442352640
+   +0x018 pDmaBuffer       : 0xffffba09`d2ba8000 Void
+   +0x020 DmaBufferSize    : 0x10000
+   +0x024 DmaBufferSubmissionStartOffset : 0
+   +0x028 DmaBufferSubmissionEndOffset : 0x20
+   +0x030 pDmaBufferPrivateData : 0xffffd586`d1983000 Void
+   +0x038 DmaBufferPrivateDataSize : 0x8000
+   +0x03c DmaBufferPrivateDataSubmissionStartOffset : 0
+   +0x040 DmaBufferPrivateDataSubmissionEndOffset : 0x40
+   +0x048 pAllocationList  : 0xffffd586`d0e72010 _DXGK_ALLOCATIONLIST
+      +0x000 hDeviceSpecificAllocation : (null) 
+      +0x008 WriteOperation   : 0y0
+      +0x008 SegmentId        : 0y00000 (0)
+      +0x008 Reserved         : 0y00000000000000000000000000 (0)
+      +0x010 PhysicalAddress  : _LARGE_INTEGER 0x0
+   +0x050 AllocationListSize : 3
+   +0x058 pPatchLocationList : 0xffffe78c`f142d010 _D3DDDI_PATCHLOCATIONLIST
+      +0x000 AllocationIndex  : 1
+      +0x004 SlotId           : 0y000000000000000000000000 (0)
+      +0x004 Reserved         : 0y00000000 (0)
+      +0x004 Value            : 0
+      +0x008 DriverId         : 0
+      +0x00c AllocationOffset : 0
+      +0x010 PatchOffset      : 8
+      +0x014 SplitOffset      : 0
+   +0x060 PatchLocationListSize : 0x40
+   +0x064 PatchLocationListSubmissionStart : 0
+   +0x068 PatchLocationListSubmissionLength : 2
+   +0x06c SubmissionFenceId : 2
+   +0x070 Flags            : _DXGK_PATCHFLAGS
+      +0x000 Paging           : 0y0
+      +0x000 Present          : 0y1
+      +0x000 RedirectedPresent : 0y0
+      +0x000 NullRendering    : 0y0
+      +0x000 Reserved         : 0y0000000000000000000000000000 (0)
+      +0x000 Value            : 2
+   +0x074 EngineOrdinal    : 0
+nr_paging_lab: patch=00000000 flags=2 fence=2 dma=0..32 private=0..64
+nr_paging_lab: submit=00000000 flags=2 fence=2
+nr_paging_lab: execute fence=2 commands=1 status=00000000 irql=0
+nr_paging_lab: aperture operation=6 pages=60 status=00000000 live=60
+nr_paging_lab: aperture operation=6 pages=60 status=00000000 live=0
+Break instruction exception - code 80000003 (first chance)
+*******************************************************************************
+*                                                                             *
+*   You are seeing this message because you pressed either                    *
+*       CTRL+C (if you run console kernel debugger) or,                       *
+*       CTRL+BREAK (if you run GUI kernel debugger),                          *
+*   on your debugger machine's keyboard.                                      *
+*                                                                             *
+*                   THIS IS NOT A BUG OR A SYSTEM CRASH                       *
+*                                                                             *
+* If you did not intend to break into the debugger, press the "g" key, then   *
+* press the "Enter" key now.  This message might immediately reappear.  If it *
+* does, press "g" and "Enter" again.                                          *
+*                                                                             *
+*******************************************************************************
+nt!DbgBreakPointWithStatus:
+fffff807`784fdfb0 cc              int     3
+0: kd> bc *; g
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+Unload module \SystemRoot\System32\DriverStore\FileRepository\nr_render_lab.inf_amd64_b74d47bb27f3b63e\nr_render_kmd.sys at fffff807`0ef80000
+Break instruction exception - code 80000003 (first chance)
+*******************************************************************************
+*                                                                             *
+*   You are seeing this message because you pressed either                    *
+*       CTRL+C (if you run console kernel debugger) or,                       *
+*       CTRL+BREAK (if you run GUI kernel debugger),                          *
+*   on your debugger machine's keyboard.                                      *
+*                                                                             *
+*                   THIS IS NOT A BUG OR A SYSTEM CRASH                       *
+*                                                                             *
+* If you did not intend to break into the debugger, press the "g" key, then   *
+* press the "Enter" key now.  This message might immediately reappear.  If it *
+* does, press "g" and "Enter" again.                                          *
+*                                                                             *
+*******************************************************************************
+nt!DbgBreakPointWithStatus:
+fffff807`784fdfb0 cc              int     3
+0: kd> .logclose; .logopen C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-present-v42-oct10.log; g
+Closing open log file C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-present-v41-oct10.log

@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "kind": "physical-npu-umd-component-validation",
+  "source_revision": "c3e3e8f9a2fd61d93506ea60f74c7ccee1ab06fa",
+  "result": "pass",
+  "requested_backend": "NPU",
+  "execution_device": "NPU",
+  "verified_draws": 16,
+  "maximum_byte_error": 1,
+  "verified_bytes": 232243200,
+  "resolutions": [
+    [
+      1920,
+      1080
+    ],
+    [
+      2880,
+      1800
+    ]
+  ],
+  "formats": [
+    28,
+    87
+  ],
+  "allocation_callbacks": "owned-test-shims",
+  "registered_adapter_tested": false,
+  "display_delivery_tested": false,
+  "desktop_offload_tested": false,
+  "tahoma_benefit_tested": false,
+  "notes": [
+    "Actual UMD entrypoints and the OpenVINO NPU provider execute on physical Delta; owned allocation/runtime callback shims supply the memory boundary. No custom kernel driver is installed on Delta.",
+    "The exact two supported shader/blend modes are checked in both formats and ordinary/shared component resources. Unsupported shader/state rejection and cleanup remain part of the executable contract.",
+    "The UMD returns DXGI_STATUS_NO_REDIRECTION during device creation, but the callback shims do not validate Windows runtime routing. The separate disposable guest test covers that boundary."
+  ]
+}

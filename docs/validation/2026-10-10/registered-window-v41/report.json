@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "kind": "registered-window-kernel-presentation-completed",
+  "date_utc": "2026-10-10",
+  "package": "v41-present-capacity",
+  "driver_version": "0.0.30.0",
+  "source_revisions": {
+    "kernel": "2e3eaf1c76680ea28b23ac8e61c6ca052fac4272",
+    "umd": "a95a58c33ebc13c5cabf918d4b3772a0e5e7ba21"
+  },
+  "result": "kernel-copy-completed-dxgi-still-occluded",
+  "probe_exit": {
+    "started": "2026-10-10T00:26:47.3809100Z",
+    "finished": "2026-10-10T00:26:54.2408390Z",
+    "probe_sha256": "89E05ED87286B9653021955D425EC75ED3E5F820AAAD6CE56C0521648C7AD5E5",
+    "exit_code": 1,
+    "npu_execution_tested": false
+  },
+  "interactive_session": 1,
+  "requested_client_extent": [
+    320,
+    192
+  ],
+  "verified_presented_frames": 0,
+  "successful_cpu_clear_fences": 1,
+  "successful_cpu_presentation_fences": 1,
+  "observed_private_buffer_capacity_bytes": 32768,
+  "present_dma_bytes": 32,
+  "present_private_bytes": 64,
+  "present_status": "00000000",
+  "patch_status": "00000000",
+  "submit_status": "00000000",
+  "worker_status": "00000000",
+  "dxgi_present_status": "087a0001",
+  "probe_stats": {
+    "failed": true,
+    "rejected": 0,
+    "last_unsupported_offset": 18446744073709551615,
+    "cleanup_errors": 0,
+    "executions": 0,
+    "cpu_executions": 0,
+    "gpu_executions": 0,
+    "npu_executions": 0,
+    "live_allocations": 0,
+    "live_contexts": 0,
+    "present_requests": 1,
+    "accepted_present_callbacks": 1
+  },
+  "mapped_pages_after_tests": 0,
+  "kernel_module_unloaded": true,
+  "owned_device_removed": true,
+  "owned_inf_deleted": true,
+  "prior_display_status_preserved": true,
+  "registered_npu_execution_tested": false,
+  "desktop_offload_tested": false,
+  "tahoma_benefit_tested": false,
+  "notes": [
+    "This run validates the context capacity fix against actual Windows calls. The debugger observes 32768 private bytes, a successful one-rectangle present, a nonempty 32-byte DMA/64-byte private packet, successful patch/submit and completed CPU copy fence.",
+    "DXGI still returns DXGI_STATUS_OCCLUDED and the probe fails before its pixel oracle. Kernel copy completion is not displayed-frame delivery. No bugcheck occurs and resources and driver are removed cleanly.",
+    "The runner launches the probe with WindowStyle Hidden, and the probe does not assert IsWindowVisible or hold ES_DISPLAY_REQUIRED. A later console snapshot shows the display asleep, but its state at the exact present is not captured. Window startup visibility and display idle state remain possible confounders; an awake/normal-launch control is required.",
+    "This package uses the previous UMD returning S_OK from CreateDevice. The separately built c3e3e8f UMD returns DXGI_STATUS_NO_REDIRECTION as required without shared D3D9 hardware; its effect needs its own live measurement.",
+    "Debugger breakpoints automatically dump Present/Patch arguments and continue. This is functional evidence, not a latency or performance benchmark."
+  ],
+  "references": [
+    "https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/nc-d3dkmddi-dxgkddi_present",
+    "https://learn.microsoft.com/en-us/windows-hardware/drivers/display/supporting-the-dxgi-ddi"
+  ]
+}

@@ -94,7 +94,11 @@ reaches `DxgkDdiPresent`, but its 64-byte records cannot fit the
 packet; rejecting its patch causes guest bugcheck `0x119/3`. The aperture context
 now advertises space for the bounded presentation record array. The presentation
 test creates its context through the actual DDI and checks those advertised
-budgets before exercising copies. This fix still requires live acceptance.
+budgets before exercising copies. The [v41 live trace](../../../docs/validation/2026-10-10/registered-window-v41/report.json)
+confirms the larger private buffer and successful Present, Patch, Submit and
+CPU-worker completion. DXGI still reports occlusion and no screen pixels are
+verified; hidden startup and display-idle state need separate controls. The
+driver unloads cleanly and mapped pages return to zero.
 
 The design follows the documented [linear aperture address-space contract](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/linear-aperture-space-segments)
 and [map/unmap requirements](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/nc-d3dkmddi-dxgkddi_buildpagingbuffer).
