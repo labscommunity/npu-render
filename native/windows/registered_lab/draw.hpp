@@ -5,6 +5,8 @@ void APIENTRY create_srv(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATESHADERRESOU
     new (out.pDrvPrivate) View();
     guard(h, __FUNCTION__, [&] {
         require(a != nullptr);
+        lab_trace("{\"event\":\"shader_resource_view\",\"dimension\":%u,\"format\":%u,\"first\":%u,\"count\":%u}\n",
+            UINT(a->ResourceDimension), UINT(a->Format), a->Buffer.FirstElement, a->Buffer.NumElements);
         auto &r = resource(a->hDrvResource);
         require(!r.buffer_bytes && r.usage == D3D10_DDI_USAGE_DEFAULT && r.allocation->context == device(h).context &&
                 a->ResourceDimension == D3D10DDIRESOURCE_TEXTURE2D && UINT(a->Format) == r.allocation->surface.format &&
@@ -83,7 +85,8 @@ void APIENTRY set_topology(D3D10DDI_HDEVICE h, D3D10_DDI_PRIMITIVE_TOPOLOGY valu
 std::vector<uint8_t> read_pixels(Allocation &source) {
     require(!source.locked && !source.context->poisoned);
     const auto &s = source.surface;
-    std::vector<uint8_t> result(size_t(s.width) * s.height * 4);
+    const UINT row_bytes = s.width * texel_bytes(s.format);
+    std::vector<uint8_t> result(size_t(row_bytes) * s.height);
     std::unique_ptr<Allocation> staging;
     Allocation *readable = &source;
     if (source.runtime_resource) {
@@ -95,8 +98,8 @@ std::vector<uint8_t> read_pixels(Allocation &source) {
     }
     Mapping read(*readable, true);
     for (UINT y = 0; y < s.height; ++y)
-        std::memcpy(result.data() + size_t(y) * s.width * 4,
-                    static_cast<const uint8_t *>(read.data) + size_t(y) * s.row_pitch, s.width * 4);
+        std::memcpy(result.data() + size_t(y) * row_bytes,
+                    static_cast<const uint8_t *>(read.data) + size_t(y) * s.row_pitch, row_bytes);
     read.finish();
     return result;
 }

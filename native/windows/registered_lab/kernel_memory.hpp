@@ -129,12 +129,19 @@ struct Allocation {
     }
     void create(UINT width, UINT height, UINT format, HANDLE resource = nullptr) {
         require(!handle && context && context->command.hContext && width && width <= 8192 && height && height <= 8192);
+        const bool alpha = format == 65; // A8_UNORM, packed bytes in private VidMm backing.
+        require(!alpha || !resource);
         surface.width = width; surface.height = height; surface.format = format;
-        surface.row_pitch = (width * 4 + 255) & ~255u;
+        surface.row_pitch = (width * (alpha ? 1 : 4) + 255) & ~255u;
         surface.allocation_bytes = (uint64_t(surface.row_pitch) * height + 4095) & ~uint64_t(4095);
-        require(kernel_contract::valid(surface));
+        // The kernel only owns/copies bytes. Pack four alpha texels into one
+        // private 32-bit storage unit, retaining the logical format in the UMD.
+        // Such backing is never shared, presented or opened as a color surface.
+        auto storage = surface;
+        if (alpha) { storage.width = (width + 3) / 4; storage.format = 28; }
+        require(kernel_contract::valid(storage));
         D3DDDI_ALLOCATIONINFO item{};
-        item.pPrivateDriverData = &surface; item.PrivateDriverDataSize = sizeof(surface);
+        item.pPrivateDriverData = &storage; item.PrivateDriverDataSize = sizeof(storage);
         D3DDDICB_ALLOCATE args{};
         args.hResource = resource;
         if (resource) { args.pPrivateDriverData = &surface; args.PrivateDriverDataSize = sizeof(surface); }

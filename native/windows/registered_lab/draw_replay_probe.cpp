@@ -134,7 +134,12 @@ int main(int argc, char **argv) try {
         nr::capture::check(args[0] == 6 && (blend[15] & 255) == 15 && source.size() == 10 && source[0] == 0x4e52574b && source[1] == 1 && source[2] == 40 && !source[7]);
         nr::capture::check(sampler.size() == 13 && (sampler[0]==0 || sampler[0]==21) && sampler[1] == 3 && sampler[2] == 3 && sampler[3] == 3 && !sampler[4] && !sampler[11]);
         nr::capture::check(as_float(sampler[12]) >= 0);
-        texture = {source[3],source[4],source[5],snapshot.values<PackedColor>("source")};
+        if(source[5] == 65) {
+            const auto alpha=snapshot.values<uint8_t>("source");
+            nr::capture::check(alpha.size()==uint64_t(source[3])*source[4]);
+            texture={source[3],source[4],28,{}};texture.pixels.resize(alpha.size());
+            for(size_t i=0;i<alpha.size();++i)texture.pixels[i]={0,0,0,alpha[i]};
+        } else texture = {source[3],source[4],source[5],snapshot.values<PackedColor>("source")};
         if(sampler[0]==21){
             linear_executor=std::make_unique<LinearTextureDrawExecutor>(vs,ps,width,height,format,texture.width,texture.height,texture.format,backend,blending);
             const auto a=reference_vertex(vs,inputs[0],cb),b=reference_vertex(vs,inputs[2],cb);const auto pr=vs.position_output,ur=ps.instructions[0].sources[0].index;

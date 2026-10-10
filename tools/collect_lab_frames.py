@@ -43,7 +43,11 @@ try {
       Where-Object {$_.Trim()} | ForEach-Object {$_|ConvertFrom-Json})
      $last=$rows|Where-Object {$null -ne $_.path_count}|Select-Object -Last 1
      $admitted=@($rows|Where-Object {$_.indirect_display_active -eq $true}).Count -gt 0
-     $state.sole_indirect=$admitted -and $last.phase -eq 'extended' -and $last.path_count -eq 1
+     $finished=@($rows|Where-Object {
+      $_.operation -eq 'restore' -or $null -ne $_.passed -or $null -ne $_.error
+     }).Count -gt 0
+     $state.sole_indirect=$admitted -and !$finished -and
+      $last.phase -eq 'extended' -and $last.path_count -eq 1
     }
     [pscustomobject]@{kind='topology';payload=($state|ConvertTo-Json -Compress)}
    }

@@ -109,9 +109,13 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
             sampler.desc.AddressU == D3D10_DDI_TEXTURE_ADDRESS_CLAMP && sampler.desc.AddressV == D3D10_DDI_TEXTURE_ADDRESS_CLAMP &&
             sampler.desc.AddressW == D3D10_DDI_TEXTURE_ADDRESS_CLAMP && sampler.desc.MipLODBias == 0 && sampler.desc.MinLOD == 0 && sampler.desc.MaxLOD >= 0);
         const auto &ss = source->surface;
-        require((ss.format == 28 || ss.format == 87) && ss.width <= 8192 && ss.height <= 8192 && uint64_t(ss.width)*ss.height <= 4*1024*1024);
-        const auto source_bytes = read_pixels(*source); texture = {ss.width,ss.height,ss.format,{}}; texture.pixels.resize(source_bytes.size()/4);
-        std::memcpy(texture.pixels.data(),source_bytes.data(),source_bytes.size());
+        require((ss.format == 28 || ss.format == 87 || ss.format == 65) && ss.width <= 8192 && ss.height <= 8192 && uint64_t(ss.width)*ss.height <= 4*1024*1024);
+        const auto source_bytes = read_pixels(*source); texture = {ss.width,ss.height,ss.format == 65 ? 28u : ss.format,{}};
+        texture.pixels.resize(size_t(ss.width)*ss.height);
+        // Format decoding only: sampling, shader math and blending remain on
+        // the selected provider. Missing A8 RGB channels are zero.
+        if(ss.format == 65) for(size_t i=0;i<source_bytes.size();++i) texture.pixels[i]={0,0,0,source_bytes[i]};
+        else std::memcpy(texture.pixels.data(),source_bytes.data(),source_bytes.size());
     }
     const auto bytes = read_pixels(*target); std::vector<nr::raster::PackedColor> background(bytes.size() / 4);
     std::memcpy(background.data(), bytes.data(), bytes.size());

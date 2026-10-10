@@ -527,3 +527,18 @@ model creation. A failed preparation leaves target pixels unchanged. This is a
 hardware-qualified runtime workaround, not evidence of a Tahoma speedup.
 The [v87 qualification](../../../docs/validation/2026-10-10/vertex-id-mips-v87/report.json)
 preserves both failures, the stage isolation, and two passing clean-build NPU runs.
+
+The [v71 sole-display trial](../../../docs/validation/2026-10-10/sole-display-v71/report.json)
+reached alpha-only texture creation in DWM, while Explorer and Start rejected
+shader-readable buffer storage. Its latest received frame is black. Both custom
+devices were removed and the normal desktop recovered; topology restoration itself
+returned Win32 status 31. The collector now disables input on any restoration
+attempt or terminal helper result, including that failure.
+
+[A8 texture qualification](../../../docs/validation/2026-10-10/alpha-texture-v88/report.json)
+adds unshared packed alpha storage, mip updates/copies/maps and single-level SRVs.
+It decodes missing RGB channels to zero, matching the independent WARP oracle;
+filtering, shader multiplication and blending still execute on the NPU. Two new
+filtered/blended draws pass 32,768 component checks within 0.6 byte units. A8
+render targets and shared resources remain rejected. Shader-readable buffers can
+own ordinary byte storage; typed buffer views are a separate unsupported operation.

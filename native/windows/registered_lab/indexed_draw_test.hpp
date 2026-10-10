@@ -160,6 +160,32 @@ int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
             for(UINT c=0;c<4;++c)TEST(std::abs(memory[target_index][at+c]-(sample[c]+before[at+c]*(1-sample[3]/255)))<=.6);
         }
     }
+    // Alpha-only coverage textures decode to (0,0,0,a), then the real selected
+    // provider filters and blends. Recreate the SRV to verify logical format
+    // and allocation ownership, and compare against independent bilinear math.
+    const D3D10DDI_HSHADERRESOURCEVIEW no_source{};f.pfnPsSetShaderResources(h,0,1,&no_source);
+    f.pfnDestroyShaderResourceView(h,srv);f.pfnDestroyResource(h,resources[4]);
+    std::vector<uint8_t> alpha(size_t(sw)*sh);
+    args.Format=DXGI_FORMAT_A8_UNORM;initial.pSysMem=alpha.data();initial.SysMemPitch=sw;
+    f.pfnCreateResource(h,&args,resources[4],{});sva.Format=args.Format;
+    f.pfnCreateShaderResourceView(h,&sva,srv,{});f.pfnPsSetShaderResources(h,0,1,&srv);
+    TEST(last_error==S_OK);
+    for(UINT frame=0;frame<2;++frame) {
+        for(size_t i=0;i<alpha.size();++i)alpha[i]=uint8_t(i*37+frame*73);
+        f.pfnResourceUpdateSubresourceUP(h,resources[4],0,nullptr,alpha.data(),sw,0);
+        const auto before=memory[target_index];const auto draws=counters.draws;
+        f.pfnDrawIndexed(h,6,1,1);TEST(last_error==S_OK && counters.draws==draws+1);
+        for(UINT y=0;y<height;++y)for(UINT x=0;x<width;++x) {
+            const auto at=(size_t(y)*width+x)*4;
+            if(x<7 || x>=60 || y<5 || y>=60){for(UINT c=0;c<4;++c)TEST(memory[target_index][at+c]==before[at+c]);continue;}
+            const double tx=(x+.5-4)/56*sw-.5,ty=(y+.5-3)/58*sh-.5;
+            const auto ix=int(std::floor(tx)),iy=int(std::floor(ty));const double fx=tx-ix,fy=ty-iy;double sample=0;
+            for(int dy=0;dy<2;++dy)for(int dx=0;dx<2;++dx)sample+=alpha[size_t((std::clamp)(iy+dy,0,int(sh)-1))*sw+
+                size_t((std::clamp)(ix+dx,0,int(sw)-1))]*(dx?fx:1-fx)*(dy?fy:1-fy);
+            for(UINT c=0;c<4;++c)TEST(std::abs(memory[target_index][at+c]-((c==3?sample:0)+before[at+c]*(1-sample/255)))<=.6);
+        }
+    }
+    std::printf("{\"alpha_texture_draw_ddi\":true,\"verified_draws\":2,\"verified_components\":32768,\"execution_device\":\"%s\"}\n",counters.last_execution_device);
     // Actual Draw DDI with no layout or vertex buffers: the captured desktop
     // shader synthesizes a quad from the generated IDs. Start/base offsets
     // affect IA addresses, not the system value. Invalid lookup stays atomic.
@@ -197,7 +223,7 @@ int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
     f.pfnDestroyRenderTargetView(h, view);
     for (const auto r : resources) f.pfnDestroyResource(h, r);
     f.pfnDestroyDevice(h);
-    TEST(counters.executions == executions_before + 12 && !counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
+    TEST(counters.executions == executions_before + 14 && !counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
     std::printf("{\"kind\":\"indexed-ddi-runtime-shim\",\"requested_backend\":\"%s\",\"execution_device\":\"%s\",\"verified_draws\":9,\"verified_components\":147456,\"blended_scissored_draws\":3,\"textured_draws\":4,\"linear_scaled_blended_draws\":2,\"base_vertex_and_start_index\":true,\"invalid_ranges_and_sampler_rejected\":true,\"registered_adapter_tested\":false,\"desktop_offload_tested\":false}\n", backend, counters.last_execution_device);
     return 0;
 }

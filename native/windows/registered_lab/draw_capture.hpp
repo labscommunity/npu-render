@@ -1,7 +1,7 @@
 // Included after read_pixels. One bounded, read-only snapshot per guest process.
 // NPDRAW01: repeated {char name[32], uint64 little-endian bytes, payload} records.
 // State payloads use the locked x64 WDK D3D10 DDI ABI. Buffer payloads are raw;
-// texture payloads are tightly packed RGBA/BGRA8 as described by their surface.
+// Texture payloads are tightly packed in their surface's logical format.
 // A final zero-length "complete" record is required for a replayable snapshot.
 class DrawCapture {
     HANDLE file = INVALID_HANDLE_VALUE;

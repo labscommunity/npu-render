@@ -77,6 +77,26 @@ int test_buffers(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER_DEVI
         last_error = S_OK;
     }
     if (test_geometry_buffers(h, f)) return 1;
+    // Shader-readable buffer storage has the same byte ownership and staging
+    // contract. Typed SRV interpretation is independently validated/rejected.
+    for(const auto usage:{D3D10_DDI_USAGE_DEFAULT,D3D10_DDI_USAGE_IMMUTABLE,D3D10_DDI_USAGE_DYNAMIC}) {
+        constexpr UINT bytes=32769;std::vector<uint8_t> input(bytes);
+        for(UINT i=0;i<bytes;++i)input[i]=uint8_t(i*37);
+        D3D10DDI_MIPINFO mip{};mip.TexelWidth=bytes;mip.TexelHeight=mip.TexelDepth=1;
+        D3D10_DDIARG_SUBRESOURCE_UP up{};up.pSysMem=input.data();
+        D3D10DDIARG_CREATERESOURCE a{};a.ResourceDimension=D3D10DDIRESOURCE_BUFFER;
+        a.MipLevels=a.ArraySize=a.SampleDesc.Count=1;a.pMipInfoList=&mip;
+        a.Usage=usage;a.BindFlags=D3D10_DDI_BIND_SHADER_RESOURCE;a.pInitialDataUP=&up;
+        a.MapFlags=usage==D3D10_DDI_USAGE_DYNAMIC ? D3D10_DDI_CPU_ACCESS_WRITE : 0;
+        alignas(Resource) unsigned char backing[2][sizeof(Resource)]{};
+        D3D10DDI_HRESOURCE source{},stage{};source.pDrvPrivate=backing[0];stage.pDrvPrivate=backing[1];
+        f.pfnCreateResource(h,&a,source,{});TEST(last_error==S_OK);
+        a.Usage=D3D10_DDI_USAGE_STAGING;a.BindFlags=0;a.MapFlags=D3D10_DDI_CPU_ACCESS_READ;a.pInitialDataUP=nullptr;
+        f.pfnCreateResource(h,&a,stage,{});f.pfnResourceCopy(h,stage,source);
+        D3D10DDI_MAPPED_SUBRESOURCE mapped{};f.pfnStagingResourceMap(h,stage,0,D3D10_DDI_MAP_READ,0,&mapped);
+        TEST(last_error==S_OK && mapped.pData && !std::memcmp(mapped.pData,input.data(),bytes));
+        f.pfnStagingResourceUnmap(h,stage,0);f.pfnDestroyResource(h,source);f.pfnDestroyResource(h,stage);
+    }
     f.pfnDestroyDevice(h);
     TEST(!counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
     return 0;

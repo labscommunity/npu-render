@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "kind": "alpha-texture-ddi-qualification",
+  "build": "present-umd-v88",
+  "source_files_verified": 87,
+  "native_cpu_tests_passed": 13,
+  "npu_ddi_runs_passed": 1,
+  "successful_npu_draws": 30,
+  "new_alpha_filtered_blended_draws": 2,
+  "alpha_draw_components_verified": 32768,
+  "alpha_pixel_tolerance_bytes": 0.6,
+  "alpha_storage": "packed one-byte texels in unshared private VidMm allocations; four logical texels per kernel 32-bit storage unit; no kernel contract change",
+  "alpha_mip_levels_verified": 11,
+  "warp_oracle": "All 256 A8 encodings have zero RGB; maximum normalized-alpha error 2.968545054e-08",
+  "shader_buffer_storage": "default, immutable and dynamic allocation/upload/staging-copy verified; typed buffer SRVs remain explicitly unsupported",
+  "collector_gate_cases_passed": 5,
+  "collector_gate_restore_failure_disables_input": true,
+  "full_desktop_offload": false,
+  "tahoma_performance_tested": false
+}

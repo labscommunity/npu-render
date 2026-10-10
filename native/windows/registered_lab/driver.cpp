@@ -126,6 +126,7 @@ template<class R, class... A, size_t Offset> struct UnsupportedDxgi<R(APIENTRY *
     }
 };
 bool format_ok(DXGI_FORMAT f) { return f == DXGI_FORMAT_R8G8B8A8_UNORM || f == DXGI_FORMAT_B8G8R8A8_UNORM; }
+UINT texel_bytes(UINT format) { require(format == 28 || format == 87 || format == 65); return format == 65 ? 1 : 4; }
 Resource &resource(D3D10DDI_HRESOURCE h) {
     require(h.pDrvPrivate != nullptr);
     auto &r = *static_cast<Resource *>(h.pDrvPrivate);
@@ -147,7 +148,8 @@ void upload(Allocation &target, const D3D10_DDI_BOX *box, const void *source, UI
             region.top >= 0 && region.top <= region.bottom && region.bottom <= LONG(s.height) &&
             region.front >= 0 && region.front <= region.back && region.back <= 1);
     if (region.left == region.right || region.top == region.bottom || region.front == region.back) return;
-    const UINT row_bytes = (region.right - region.left) * 4, rows = region.bottom - region.top;
+    const UINT bytes = texel_bytes(s.format);
+    const UINT row_bytes = (region.right - region.left) * bytes, rows = region.bottom - region.top;
     const uint64_t source_bytes = uint64_t(rows - 1) * pitch + row_bytes;
     require(source && pitch >= row_bytes && uintptr_t(source) <= UINTPTR_MAX - source_bytes);
     const bool entire = !region.left && !region.top && region.right == LONG(s.width) && region.bottom == LONG(s.height);
@@ -168,7 +170,7 @@ void upload(Allocation &target, const D3D10_DDI_BOX *box, const void *source, UI
         Mapping write(*writable, false);
         if (entire) std::memset(write.data, 0, size_t(s.allocation_bytes));
         for (UINT y = 0; y < rows; ++y) {
-            auto destination = static_cast<unsigned char *>(write.data) + size_t(y + region.top) * s.row_pitch + region.left * 4;
+            auto destination = static_cast<unsigned char *>(write.data) + size_t(y + region.top) * s.row_pitch + region.left * bytes;
             auto input = static_cast<const unsigned char *>(source) + size_t(y) * pitch;
             std::memcpy(destination, input, row_bytes);
         }
@@ -194,6 +196,9 @@ void APIENTRY create_resource(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATERESOUR
             UINT(a->ResourceDimension), UINT(a->Format), a->MipLevels, a->ArraySize, UINT(a->Usage),
             a->BindFlags, a->MapFlags, a->MiscFlags, a->SampleDesc.Count, a->SampleDesc.Quality,
             a->pPrimaryDesc ? "true" : "false");
+        if (a && a->pMipInfoList) lab_trace("{\"event\":\"resource_extent\",\"width\":%u,\"height\":%u,\"depth\":%u,\"initial_data\":%s}\n",
+            a->pMipInfoList[0].TexelWidth, a->pMipInfoList[0].TexelHeight, a->pMipInfoList[0].TexelDepth,
+            a->pInitialDataUP ? "true" : "false");
         if (a && a->ResourceDimension == D3D10DDIRESOURCE_BUFFER) {
             create_buffer(device(h), *a, *static_cast<Resource *>(out.pDrvPrivate)); return;
         }
@@ -207,10 +212,12 @@ void APIENTRY create_resource(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATERESOUR
         }
         constexpr UINT allowed_misc = D3D10_DDI_RESOURCE_MISC_SHARED | D3D10_DDI_RESOURCE_MISC_DISCARD_ON_PRESENT;
         require(a && a->ResourceDimension == D3D10DDIRESOURCE_TEXTURE2D && a->MipLevels && a->MipLevels <= 14 &&
-                a->ArraySize == 1 && a->pMipInfoList && format_ok(a->Format) && a->SampleDesc.Count == 1 &&
+                a->ArraySize == 1 && a->pMipInfoList && (format_ok(a->Format) || a->Format == DXGI_FORMAT_A8_UNORM) && a->SampleDesc.Count == 1 &&
                 !a->SampleDesc.Quality && !(a->MiscFlags & ~allowed_misc) && !a->pPrimaryDesc);
         const bool shared = (a->MiscFlags & D3D10_DDI_RESOURCE_MISC_SHARED) != 0;
         const bool presentation = (a->BindFlags & D3D10_DDI_BIND_PRESENT) != 0;
+        require(a->Format != DXGI_FORMAT_A8_UNORM || (!shared && !presentation &&
+                !(a->BindFlags & ~D3D10_DDI_BIND_SHADER_RESOURCE)));
         require(!(a->MiscFlags & D3D10_DDI_RESOURCE_MISC_DISCARD_ON_PRESENT) || presentation);
         require(!presentation || (a->BindFlags & D3D10_DDI_BIND_RENDER_TARGET));
         require(!shared || rt.handle);
@@ -230,7 +237,7 @@ void APIENTRY create_resource(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATERESOUR
             const auto &m = a->pMipInfoList[i];
             require(m.TexelDepth == 1 && m.TexelWidth == (std::max)(1u, base.TexelWidth >> i) &&
                     m.TexelHeight == (std::max)(1u, base.TexelHeight >> i));
-            if(a->pInitialDataUP) require(a->pInitialDataUP[i].pSysMem && a->pInitialDataUP[i].SysMemPitch >= m.TexelWidth * 4);
+            if(a->pInitialDataUP) require(a->pInitialDataUP[i].pSysMem && a->pInitialDataUP[i].SysMemPitch >= m.TexelWidth * texel_bytes(UINT(a->Format)));
         }
         std::vector<std::shared_ptr<Allocation>> levels;
         for (UINT i = 0; i < a->MipLevels; ++i) {
@@ -276,7 +283,7 @@ void APIENTRY create_view(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATERENDERTARG
     guard(h, __FUNCTION__, [&] {
         require(a != nullptr);
         auto &r = resource(a->hDrvResource);
-        require(!r.buffer_bytes && r.usage == D3D10_DDI_USAGE_DEFAULT && a->ResourceDimension == D3D10DDIRESOURCE_TEXTURE2D &&
+        require(!r.buffer_bytes && format_ok(a->Format) && r.usage == D3D10_DDI_USAGE_DEFAULT && a->ResourceDimension == D3D10DDIRESOURCE_TEXTURE2D &&
                 UINT(a->Format) == r.allocation->surface.format && a->Tex2D.MipSlice < mip_count(r) &&
                 !a->Tex2D.FirstArraySlice && a->Tex2D.ArraySize == 1);
         static_cast<View *>(v.pDrvPrivate)->allocation = mip_allocation(r, a->Tex2D.MipSlice);
@@ -436,7 +443,7 @@ void APIENTRY flush(D3D10DDI_HDEVICE) {} // Clears submit immediately; draws com
 void APIENTRY hazard(D3D10DDI_HDEVICE, D3D10DDI_HRESOURCE) {} // Blocking locks order our staging copies.
 void APIENTRY format_support(D3D10DDI_HDEVICE, DXGI_FORMAT f, UINT *out) {
     *out = format_ok(f) ? D3D10_DDI_FORMAT_SUPPORT_RENDERTARGET | D3D10_DDI_FORMAT_SUPPORT_SHADER_SAMPLE |
-                         D3D10_DDI_FORMAT_SUPPORT_BLENDABLE : 0;
+                         D3D10_DDI_FORMAT_SUPPORT_BLENDABLE : (f == DXGI_FORMAT_A8_UNORM ? D3D10_DDI_FORMAT_SUPPORT_SHADER_SAMPLE : 0);
 }
 void APIENTRY multisample(D3D10DDI_HDEVICE, DXGI_FORMAT f, UINT samples, UINT *out) { *out = format_ok(f) && samples == 1 ? 1 : 0; }
 void APIENTRY counter_info(D3D10DDI_HDEVICE, D3D10DDI_COUNTER_INFO *out) { *out = {}; }

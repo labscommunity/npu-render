@@ -31,9 +31,10 @@ void APIENTRY copy_region(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE destination, UI
         }else{
             const auto pixels=read_pixels(*sa);
             const UINT width=UINT(region.right-region.left),height=UINT(region.bottom-region.top);
+            const UINT bytes=texel_bytes(sa->surface.format);
             const D3D10_DDI_BOX target{LONG(x),LONG(y),0,LONG(x+width),LONG(y+height),1};
-            upload(*da,&target,pixels.data()+(size_t(region.top)*sw+region.left)*4,sw*4);
-            moved=uint64_t(width)*height*4;
+            upload(*da,&target,pixels.data()+(size_t(region.top)*sw+region.left)*bytes,sw*bytes);
+            moved=uint64_t(width)*height*bytes;
         }
         counters.copies+=moved;
         lab_trace("{\"event\":\"resource_region_copied\",\"bytes\":%llu,\"cpu_staging\":true,\"npu_execution\":false}\n",

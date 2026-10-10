@@ -12,7 +12,7 @@ void create_buffer(Device &d, const D3D10DDIARG_CREATERESOURCE &a, Resource &r) 
     const auto &m = a.pMipInfoList[0];
     require(m.TexelWidth && m.TexelWidth <= 16 * 1024 * 1024 && m.TexelHeight == 1 && m.TexelDepth == 1);
     const bool constant = a.BindFlags == D3D10_DDI_BIND_CONSTANT_BUFFER;
-    const UINT geometry_flags = D3D10_DDI_BIND_VERTEX_BUFFER | D3D10_DDI_BIND_INDEX_BUFFER;
+    const UINT geometry_flags = D3D10_DDI_BIND_VERTEX_BUFFER | D3D10_DDI_BIND_INDEX_BUFFER | D3D10_DDI_BIND_SHADER_RESOURCE;
     const bool geometry = a.BindFlags && !(a.BindFlags & ~geometry_flags);
     if (constant) require(m.TexelWidth <= 65536 && !(m.TexelWidth % 16));
     const bool staging = a.Usage == D3D10_DDI_USAGE_STAGING && !a.BindFlags && a.MapFlags == D3D10_DDI_CPU_ACCESS_READ;
