@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "kind": "dwm-source-modifier-admission",
+  "source_revision": "4c5bf47",
+  "driver_version": "0.0.43.0",
+  "active_indirect_path_observed": true,
+  "observation_seconds": 45,
+  "custom_render_luid": 12890481,
+  "indirect_display_luid": 12929901,
+  "dwm_vertex_words_accepted": [
+    90,
+    116,
+    144
+  ],
+  "accepted_shader_objects": 84,
+  "dwm_process_ids": [
+    5144,
+    408,
+    4640,
+    6776
+  ],
+  "next_rejected_vertex_words": 1053,
+  "next_vertex_sha256": "e3fc43d10913c6055e0fd72f4358a79ebd128e1d526af67004611e502479a0bc",
+  "swapchain_assigned": false,
+  "frames_received": 0,
+  "frames_displayed": 0,
+  "trace_events": 748831,
+  "trace_events_lost": 0,
+  "sharing_flag_rejections": 16,
+  "clean_removal": true,
+  "npu_execution_tested": false,
+  "desktop_offload_tested": false,
+  "performance_tested": false,
+  "notes": [
+    "All 76 raw snapshot files were hash-verified. Text evidence normalizes CRLF to LF.",
+    "Four DWM processes each create three supported vertex programs seven times during initialization retries. Shader object creation is not vertex execution.",
+    "The next captured vertex program has 126 executable/control instructions. It requires conditional selection, comparisons, integer sign conversion, dot products, division and reciprocal square root.",
+    "Input layouts are present in this build, but the initialization stops at the unsupported vertex program before this establishes DWM input-layout use.",
+    "The indirect driver prepares a D3D device in 438 ms and receives a mode commit. No swapchain or desktop frames arrive.",
+    "Sixteen later CDD allocation failures remain unresolved. Both owned devices are removed cleanly."
+  ]
+}
