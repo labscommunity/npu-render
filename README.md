@@ -113,12 +113,19 @@ now has an exact NPU specialization for opaque, one-to-one point-sampled quads.
 Its captured 1024×768 replay passes, as do changing-image and driver callback
 tests. This is a checked subset, not general desktop rendering.
 
-The [latest installed trial](docs/validation/2026-10-10/sole-display-v98/report.json)
-completes 314 live desktop NPU draws plus 13 prewarm requests with no rejected
-worker requests. Five frames arrive, including wallpaper, icons and the complete
-taskbar. Start-menu interaction still has no verified visible response. DWM twice
-binds a mapped vertex buffer and our driver rejects the binding; this is the next
-correctness issue under investigation. Both custom drivers unload cleanly.
+The [latest installed trial](docs/validation/2026-10-10/sole-display-v99/report.json)
+completes 329 live desktop NPU draws, 89 live NPU clears and 13 prewarm draws.
+All 431 worker requests receive successful acknowledgements. Nine frames arrive,
+including wallpaper, icons and taskbar at different stages, but Start-menu
+interaction still has no verified visible response. Mapped vertex-buffer binding
+now succeeds. DWM instead rejects depth-enabled draws without a depth buffer;
+the original captured operation fails before inference on both CPU and NPU.
+Both custom drivers unload cleanly.
+
+The [depth-state fix](docs/validation/2026-10-10/depthless-v194/report.json)
+now replays that unchanged capture exactly on the NPU, including 700 covered
+samples and the complete 512×512 target. All 24 CPU suites, 58 NPU driver draws
+and eight NPU clears pass. The next installed desktop trial will test interaction.
 
 The [snapped-boundary fix](docs/validation/2026-10-10/point-snap-v189/report.json)
 retains exact raster boundaries while allowing bounded FP32 endpoint rounding.
@@ -128,9 +135,9 @@ Its captured 642×660 draw matches all 423,720 pixels on the NPU. All 23 CPU sui
 151 million color components. Its
 [driver integration](docs/validation/2026-10-10/color-clear-v193/report.json) now
 passes 201.6 million NPU components, a real worker exchange, eight driver clears,
-and all 24 CPU suites. The next installed trial also accepts mapped vertex-buffer
-binding while still rejecting reads before unmap. Clears in installed v98 remain
-CPU-side; stable interactive desktop offload and a Tahoma benefit are unproven.
+and all 24 CPU suites. Installed v99 uses the NPU clear path and accepts mapped
+vertex-buffer binding while still rejecting reads before unmap. Stable interactive
+desktop offload and a Tahoma benefit are unproven.
 
 [Mirrored-texture qualification](docs/validation/2026-10-10/mirror-v174/report.json)
 now replays that failed DWM blur draw on the NPU with all 8,192 output pixels

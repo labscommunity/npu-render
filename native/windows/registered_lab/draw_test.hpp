@@ -137,10 +137,15 @@ int test_draws(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER_DEVICE
                 last_error = S_OK;
                 std::printf("{\"bound_pixel_stage\":true,\"samples\":16,\"execution_device\":\"%s\",\"exact_bits_verified\":true,\"desktop_offload_tested\":false}\n", pixel_output.execution_device.c_str());
             }
-            depth.DepthEnable = TRUE; f.pfnSetDepthStencilState(h, hd, 0);
-            f.pfnDraw(h, 3, 0);
-            TEST(last_error == E_INVALIDARG && counters.executions == executions && counters.allocations == allocations && memory[target_index] == before);
-            depth.DepthEnable = FALSE; f.pfnSetDepthStencilState(h, hd, 0); last_error = S_OK;
+            // State alone cannot enable depth/stencil tests without a DSV.
+            // An actual unsupported DSV binding is still rejected atomically.
+            depth.DepthEnable=depth.StencilEnable=TRUE;depth.DepthFunc=D3D10_DDI_COMPARISON_NEVER;
+            depth.FrontFace.StencilFunc=depth.BackFace.StencilFunc=D3D10_DDI_COMPARISON_NEVER;
+            f.pfnSetDepthStencilState(h,hd,1);
+            D3D10DDI_HDEPTHSTENCILVIEW unsupported{};unsupported.pDrvPrivate=&depth;
+            f.pfnSetRenderTargets(h,&ht,1,0,unsupported);
+            TEST(last_error==E_INVALIDARG && counters.executions==executions && counters.allocations==allocations && memory[target_index]==before && device(h).bound_target==resource(target).allocation);
+            last_error=S_OK;
             // UMD bindings retain backing storage after the runtime-owned
             // resource/view wrappers go away. The host shim tests that ownership.
             f.pfnDestroyRenderTargetView(h, ht); f.pfnDestroyShaderResourceView(h, hs);

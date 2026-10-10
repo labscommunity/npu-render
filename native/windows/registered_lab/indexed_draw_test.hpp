@@ -72,6 +72,10 @@ int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
         TEST(mapped.unlock()==S_OK);last_error=S_OK;
     }
     for (unsigned frame = 0; frame < 2; ++frame) {
+        D3D10_DDI_DEPTH_STENCIL_DESC enabled{};enabled.DepthEnable=enabled.StencilEnable=TRUE;
+        enabled.DepthFunc=enabled.FrontFace.StencilFunc=enabled.BackFace.StencilFunc=D3D10_DDI_COMPARISON_NEVER;
+        D3D10DDI_HDEPTHSTENCILSTATE state{};if(frame)state.pDrvPrivate=&enabled;
+        f.pfnSetDepthStencilState(h,state,1); // Default LESS, then NEVER; neither has a bound DSV.
         if (frame) {
             color[0] = .25f; color[1] = .125f; color[2] = .5f;
             f.pfnDefaultConstantBufferUpdateSubresourceUP(h, resources[3], 0, nullptr, color, 0, 0);

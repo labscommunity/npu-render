@@ -1,0 +1,45 @@
+{
+  "trial": "v99",
+  "source_commit": "8ecbc81588bb99f154af7976c33b6304b5b1304a",
+  "umd_build": "present-umd-v193",
+  "package_version": "0.0.87.0",
+  "worker_successes_by_client": {
+    "42": 13,
+    "7616": 75,
+    "6428": 179,
+    "7860": 56,
+    "6340": 108
+  },
+  "worker_successes_by_operation": {
+    "draw": 342,
+    "color_clear": 89
+  },
+  "acknowledged_successes_by_client": {
+    "42": 13,
+    "7616": 75,
+    "6428": 179,
+    "7860": 56,
+    "6340": 108
+  },
+  "acknowledged_failures": 0,
+  "received_frames": 9,
+  "full_desktop_offload": false,
+  "usable_interactive_desktop": false,
+  "tahoma_performance_tested": false,
+  "original_cleanup_passed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "guest_restart": false,
+  "findings": [
+    "431 successful NPU requests comprise 13 prewarm draws, 329 live draws and 89 live color clears. All have successful relay receipts. No worker request fails and no native NPU device loss is recorded. DWM executes 56 NPU clears and the GUI topology process executes 33.",
+    "Nine 1024x768 frames arrive under the sole indirect display gate. Wallpaper, icons and taskbar appear at different stages; later frames include a black transition and wallpaper without icons. The final received frame shows wallpaper and taskbar. No Start menu is visible. Start and Escape snapshots do not establish a working interactive desktop.",
+    "The mapped vertex-buffer binding rejection is absent. DWM now rejects seven draws before submission. Its first complete capture has DepthEnable TRUE, comparison LESS and no bound depth/stencil view. The shader emits zero color to a 512x512 target. Build v193 rejects the original capture in both CPU and NPU decode, before inference.",
+    "Microsoft specifies that depth and stencil tests pass when no depth buffer is bound. The bridge rejects every non-null depth/stencil target, so rejecting enabled state alone violates that no-buffer rule. The next change targets this captured failure and retains rejection of actual unsupported depth targets.",
+    "StartMenuExperienceHost records one draw failure with 0x88760870 after the last successful worker request, without a corresponding failed worker receipt. This is preserved as unresolved shutdown/transport evidence, not counted as native NPU device loss.",
+    "Worker draw time totals 146290.614 ms and compilation plus draw time totals 261449 ms. No source build overlaps this desktop trial, but these are aggregate worker diagnostics, not a frame-rate or Tahoma benchmark.",
+    "Both custom drivers unload cleanly; stream configuration is removed. A QMP screenshot verifies return to the ordinary VM desktop. No driver was installed on physical Delta and no physical restart occurred."
+  ],
+  "references": [
+    "https://learn.microsoft.com/en-us/windows/win32/direct3d11/d3d10-graphics-programming-guide-output-merger-stage"
+  ]
+}

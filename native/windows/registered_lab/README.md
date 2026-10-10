@@ -908,5 +908,17 @@ fills, explicitly labeled in the trace. Modern desktop experiments use
 `NPU_LAB_INDEXED`; their clears use the NPU with no provider fallback. Uploads,
 resource copies and display transport still use host/VidMm facilities. The clear
 cache holds at most four shapes and evicts before compiling a replacement. The
-installed v99 trial is required before claiming desktop integration or input
-response; no Tahoma performance benefit has been demonstrated.
+[installed v99 trial](../../../docs/validation/2026-10-10/sole-display-v99/report.json)
+records 89 live NPU clears and 329 live NPU draws. Nine frames arrive, but a
+usable interactive desktop and a Tahoma benefit remain unproven.
+
+The [v194 depth-state qualification](../../../docs/validation/2026-10-10/depthless-v194/report.json)
+replays the unchanged v99 DWM failure on CPU and NPU with identical complete
+512×512 output, 700 covered samples and zero scalar-oracle byte error. The bridge
+rejects every non-null depth/stencil target. With no such target bound, Direct3D
+requires depth and stencil tests to pass regardless of their enable/compare
+state; draw admission now follows that rule. Regression draws use default LESS
+and explicit NEVER states without a DSV, while a non-null DSV binding remains
+rejected atomically. New captures record the no-DSV invariant explicitly. The 24
+CPU suites, 58 native NPU indexed draws and eight NPU clears pass. Installed
+interaction is still pending.

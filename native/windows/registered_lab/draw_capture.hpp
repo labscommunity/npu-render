@@ -62,6 +62,8 @@ void lab_capture_indexed_draw(Device &d, UINT count, UINT first, INT base, bool 
         capture.value("arguments", args);
         const uint32_t call_kind = indexed ? 1u : 0u; capture.value("draw-indexed", call_kind);
         const uint32_t instance_args[]{instances,first_instance};capture.value("instances",instance_args);
+        // Non-null depth/stencil views are rejected by targets().
+        const uint32_t depth_target_bound=0;capture.value("depth-target-bound",depth_target_bound);
         capture.value("viewport", d.viewport); capture.value("blend", d.blend);
         capture.value("blend-factor", d.blend_factor); capture.value("depth", d.depth);
         capture.value("raster", d.raster);

@@ -156,7 +156,9 @@ void APIENTRY draw(D3D10DDI_HDEVICE h, UINT count, UINT first) {
         require(d.viewport_count == 1 && d.viewport.TopLeftX == 0 && d.viewport.TopLeftY == 0 &&
                 d.viewport.Width == FLOAT(s.width) && d.viewport.Height == FLOAT(s.height) &&
                 d.viewport.MinDepth == 0 && d.viewport.MaxDepth == 1);
-        require(!d.depth.DepthEnable && !d.depth.StencilEnable && d.raster.FillMode == D3D10_DDI_FILL_SOLID &&
+    // targets() rejects every non-null depth/stencil view. Without that
+    // buffer, Direct3D depth and stencil tests always pass, even when enabled.
+        require(d.raster.FillMode == D3D10_DDI_FILL_SOLID &&
                 d.raster.CullMode == D3D10_DDI_CULL_NONE && !d.raster.ScissorEnable && !d.raster.MultisampleEnable &&
                 !d.raster.AntialiasedLineEnable && !d.raster.DepthBias && d.raster.DepthBiasClamp == 0 &&
                 d.raster.SlopeScaledDepthBias == 0 && !d.blend.AlphaToCoverageEnable &&

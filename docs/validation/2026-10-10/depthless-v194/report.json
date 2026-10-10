@@ -1,0 +1,28 @@
+{
+  "build": "present-umd-v194",
+  "all_checks_passed": true,
+  "native_npu_execution": true,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "cpu_suites": 24,
+  "cpu_suite_seconds": 127.81,
+  "source_hashes_verified": 115,
+  "binary_hashes_verified": 30,
+  "captured_target_pixels": 262144,
+  "captured_covered_samples": 700,
+  "captured_max_byte_error": 0,
+  "native_ddi_draws": 58,
+  "native_ddi_clears": 8,
+  "full_desktop_offload": false,
+  "installed_desktop_validation_pending": true,
+  "findings": [
+    "The original complete v99 DWM capture is unchanged. Build v193 rejects it in capture decode before either CPU or NPU inference. Build v194 passes the same capture on both providers, with identical complete 512x512 outputs and independent scalar coverage/color checks: 700 covered samples, zero byte error.",
+    "Direct3D depth and stencil tests always pass when no depth buffer is bound. Both draw admission paths now honor this rule. Actual non-null depth/stencil targets remain unsupported and are rejected before binding or target modification.",
+    "The driver regressions draw with the default enabled LESS depth state and an explicit enabled NEVER state without a DSV; existing pixel checks pass. A non-null DSV binding remains rejected atomically. All 24 CPU suites, 58 native NPU indexed draws and eight native NPU clears pass.",
+    "New diagnostic captures explicitly record depth-target-bound=0. The replay tool rejects a contradictory bound-target record and accepts older captures from the same no-DSV bridge.",
+    "No NPU graph, rendering arithmetic or transport protocol changed. These tests do not establish installed desktop interaction or Tahoma performance."
+  ],
+  "references": [
+    "https://learn.microsoft.com/en-us/windows/win32/direct3d11/d3d10-graphics-programming-guide-output-merger-stage"
+  ]
+}

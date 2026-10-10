@@ -123,7 +123,12 @@ int main(int argc, char **argv) try {
     nr::capture::check(width && width <= 8192 && height && height <= 8192 && (format == 28 || format == 87) &&
           view[0] == 0 && view[1] == 0 && view[2] == float(width) && view[3] == float(height));
     const auto blend = snapshot.values<uint32_t>("blend"), raster = snapshot.values<uint32_t>("raster"), depth = snapshot.values<uint32_t>("depth");
-    nr::capture::check(blend.size() == 17 && !blend[0] && depth.size() == 15 && !depth[0] && !depth[3]);
+    nr::capture::check(blend.size() == 17 && !blend[0] && depth.size() == 15);
+    // NPDRAW01 has only been emitted by the bridge that rejects non-null DSVs.
+    // New captures state this invariant explicitly; old captures inherit it.
+    if(snapshot.has("depth-target-bound")){
+        const auto bound=snapshot.values<uint32_t>("depth-target-bound");nr::capture::check(bound.size()==1 && !bound[0]);
+    }
     // Only target zero is bound in this captured draw; other blend slots are unused.
     BlendMode blend_mode=BlendMode::source_copy;
     if(blend[1]){

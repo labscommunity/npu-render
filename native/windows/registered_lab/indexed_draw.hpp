@@ -85,10 +85,12 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
     const auto target = d.bound_target;
     require(target && target->context == d.context && !target->locked && !d.context->poisoned &&
         d.vertex_shader == 1 && d.pixel_shader == 2);
+    // targets() rejects every non-null depth/stencil view. Without that
+    // buffer, Direct3D depth and stencil tests always pass, even when enabled.
     const auto &s = target->surface;
     require((s.format == 28 || s.format == 87) && d.viewport_count == 1 && d.viewport.TopLeftX == 0 && d.viewport.TopLeftY == 0 &&
         d.viewport.Width == FLOAT(s.width) && d.viewport.Height == FLOAT(s.height) &&
-        !d.depth.DepthEnable && !d.depth.StencilEnable && d.raster.FillMode == D3D10_DDI_FILL_SOLID &&
+        d.raster.FillMode == D3D10_DDI_FILL_SOLID &&
         d.raster.CullMode >= D3D10_DDI_CULL_NONE && d.raster.CullMode <= D3D10_DDI_CULL_BACK && !d.raster.MultisampleEnable && !d.raster.AntialiasedLineEnable &&
         !d.raster.DepthBias && d.raster.DepthBiasClamp == 0 && d.raster.SlopeScaledDepthBias == 0 &&
         !d.blend.AlphaToCoverageEnable && d.sample_mask == ~0u && d.blend.RenderTargetWriteMask[0] && d.blend.RenderTargetWriteMask[0] <= 15);
