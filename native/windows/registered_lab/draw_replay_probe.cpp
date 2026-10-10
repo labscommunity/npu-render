@@ -127,8 +127,8 @@ int main(int argc, char **argv) try {
                 const auto at=size_t(y)*width+x;const int32_t px=int32_t(x)*256+128,py=int32_t(y)*256+128;
                 const bool covered=px>=snapped[0]&&px<snapped[2]&&py>=snapped[1]&&py<snapped[3]&&int32_t(x)>=clip[0]&&int32_t(y)>=clip[1]&&int32_t(x)<clip[2]&&int32_t(y)<clip[3];
                 if(!covered){for(unsigned c=0;c<4;++c)linear_reference[at][c]=pixels[at][c];continue;}++linear_covered;
-                const double tx=(uv[0]+(x+.5-screen[0])/(double(screen[2])-screen[0])*(uv[2]-uv[0]))*texture.width-.5;
-                const double ty=(uv[1]+(y+.5-screen[1])/(double(screen[3])-screen[1])*(uv[3]-uv[1]))*texture.height-.5;
+                const double tx=(uv[0]+(x+.5-double(snapped[0])/256)/(double(snapped[2]-snapped[0])/256)*(uv[2]-uv[0]))*texture.width-.5;
+                const double ty=(uv[1]+(y+.5-double(snapped[1])/256)/(double(snapped[3]-snapped[1])/256)*(uv[3]-uv[1]))*texture.height-.5;
                 const auto ix=int64_t(std::floor(tx)),iy=int64_t(std::floor(ty));const double fx=tx-double(ix),fy=ty-double(iy);double sample[4]{};
                 for(int dy=0;dy<2;++dy)for(int dx=0;dx<2;++dx){const auto sx=std::clamp(ix+dx,int64_t(0),int64_t(texture.width)-1),sy=std::clamp(iy+dy,int64_t(0),int64_t(texture.height)-1);
                     for(unsigned c=0;c<4;++c)sample[c]+=texture.pixels[size_t(sy)*texture.width+size_t(sx)][c]*(dx?fx:1-fx)*(dy?fy:1-fy);}

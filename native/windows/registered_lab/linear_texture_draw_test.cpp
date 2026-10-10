@@ -20,11 +20,13 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
         const Viewport view{0,0,float(w),float(h),0,1};
         PackedTexture source{sw,sh,87,std::vector<PackedColor>(size_t(sw)*sh)};std::vector<PackedColor> bg(size_t(w)*h);
         LinearTextureDrawExecutor executor(vs,ps,w,h,swap?28u:87u,sw,sh,87,backend,blend);
-        for(unsigned frame=0;frame<4;++frame){
+        for(unsigned frame=0;frame<(desktop?4u:5u);++frame){
             for(size_t n=0;n<source.pixels.size();++n){const auto alpha=frame==0?0u:frame==1?255u:unsigned((n*37+frame*17)%256);
                 for(unsigned c=0;c<4;++c)source.pixels[n][c]=uint8_t(c==3?alpha:(n*71+c*51+frame*19)%(alpha+1));}
             for(size_t n=0;n<bg.size();++n)for(unsigned c=0;c<4;++c)bg[n][c]=uint8_t((n*13+c*37+frame*31)%256);
-            const std::array<float,4> rectangle{2.07861328125f,1.5589599609375f,float(w)-2.07861328125f,float(h)-1.5589599609375f};
+            // A narrow fractional quad amplifies a pre-snap interpolation bug.
+            const std::array<float,4> rectangle=frame==4?std::array<float,4>{12.0009f,13.0011f,20.0482f,29.0519f}:
+                std::array<float,4>{2.07861328125f,1.5589599609375f,float(w)-2.07861328125f,float(h)-1.5589599609375f};
             const std::array<float,4> uv{frame==3?-.125f:4.912726581096649e-08f,0,1.0000001192092896f,frame==3?1.25f:1.0000001192092896f};
             const uint32_t orders[2][6]{{0,1,2,2,3,0},{0,1,2,0,2,3}};std::vector<VertexRegisters> inputs(6);
             for(size_t n=0;n<6;++n){const auto corner=orders[frame&1][n];const bool right=corner==1||corner==2,bottom=corner>=2;
@@ -44,8 +46,8 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
                 const auto at=size_t(y)*w+x;const int32_t px=int32_t(x)*256+128,py=int32_t(y)*256+128;
                 const bool inside=px>=snapped[0]&&px<snapped[2]&&py>=snapped[1]&&py<snapped[3]&&int32_t(x)>=clip[0]&&int32_t(y)>=clip[1]&&int32_t(x)<clip[2]&&int32_t(y)<clip[3];
                 if(!inside){TEST(result.pixels[at]==bg[at]);checked+=4;continue;}++covered;
-                const double u=double(uv[0])+(x+.5-screen[0])/(double(screen[2])-screen[0])*(double(uv[2])-uv[0]);
-                const double v=double(uv[1])+(y+.5-screen[1])/(double(screen[3])-screen[1])*(double(uv[3])-uv[1]);
+                const double u=double(uv[0])+(x+.5-double(snapped[0])/256)/(double(snapped[2]-snapped[0])/256)*(double(uv[2])-uv[0]);
+                const double v=double(uv[1])+(y+.5-double(snapped[1])/256)/(double(snapped[3]-snapped[1])/256)*(double(uv[3])-uv[1]);
                 const double tx=u*sw-.5,ty=v*sh-.5;const auto ix=int64_t(std::floor(tx)),iy=int64_t(std::floor(ty));const double fx=tx-double(ix),fy=ty-double(iy);
                 double sample[4]{};for(int dy=0;dy<2;++dy)for(int dx=0;dx<2;++dx){
                     const auto sx=std::clamp(ix+dx,int64_t(0),int64_t(sw)-1),sy=std::clamp(iy+dy,int64_t(0),int64_t(sh)-1);

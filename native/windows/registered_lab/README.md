@@ -452,3 +452,19 @@ remain exact. Three replays of the captured transparent-source draw are exact.
 The actual DDI shim also verifies changing nonzero scaled/blended textures. One
 1024×768 draw currently takes about 2.2 seconds: correctness evidence does not
 establish interactive rendering, frame delivery, or a Tahoma benefit.
+
+A subsequent specification review found that v76 interpolated UVs from unsnapped
+screen positions, while its oracle made the same assumption. Direct3D sections
+[3.4.1 and 15.16.2](https://microsoft.github.io/DirectX-Specs/d3d/archive/D3D11_3_FunctionalSpec.htm)
+require snapped positions for interpolation setup. The corrected renderer uses
+the provider-produced 1/256-pixel bounds for both interpolation and coverage.
+A narrow fractional-quad regression amplifies the old calculation's sampling
+error to 3.79 byte units. The v76 evidence remains intact as evidence of the
+initial implementation; its package was not installed. Texture sampling retains
+more than the minimum eight fractional bits required by section 7.18.16.1.
+
+The [v77 corrected qualification](../../../docs/validation/2026-10-10/linear-texture-npu-v77/report.json)
+passes 12,910,592 component checks on the NPU with maximum error 0.5183 byte units,
+including that regression, and three exact captured-draw replays. A separate
+separable-matrix sampling prototype is faster but is not integrated or qualified
+as a complete rendering path.

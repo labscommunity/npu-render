@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "kind": "snapped-vertex-interpolation-correction",
+  "clean_build": "present-umd-v77",
+  "cpu_contract_tests_passed": 13,
+  "source_hashes_match_checkout": 82,
+  "source_specification": "https://microsoft.github.io/DirectX-Specs/d3d/archive/D3D11_3_FunctionalSpec.htm",
+  "sections": [
+    "3.4.1 Coordinate Snapping",
+    "15.16.2 Attribute Interpolator Precision",
+    "7.18.16.1 Texture Addressing and LOD Precision"
+  ],
+  "correction": "Use provider-produced snapped vertex bounds for UV interpolation. v76 used unsnapped positions and its independent arithmetic oracle assumed the same semantics; corrected before installation.",
+  "regression": {
+    "kind": "narrow fractional quad",
+    "covered_pixels": 128,
+    "pre_snap_vs_correct_sampling_max_delta_bytes": 3.788818026980067,
+    "components_with_delta_over_0_point_6": 194
+  },
+  "npu_checks": {
+    "components": 12910592,
+    "rounded_double_oracle_differences": 22535,
+    "maximum_error_in_byte_units": 0.518258361,
+    "limit_in_byte_units": 0.6,
+    "outside_pixels_exact": true,
+    "invalid_draws_rejected": 16
+  },
+  "captured_replay": {
+    "capture_sha256": "768e20d93f659fb807ba2f60cc383cfeac81d8972360a1d778b3bf2fd939d031",
+    "exact_repeats": 3,
+    "covered_samples": 779280,
+    "draw_ms": [
+      2305.932,
+      2103.838,
+      2158.572
+    ]
+  },
+  "package_v64": "Signed v76 package preserved but never installed; superseded by v65 with this fix.",
+  "packaging_harness_failure": "First v64 invocation had an invalid-length placeholder revision; parameter validation rejected it before creating any package. Retried with the actual commit hash.",
+  "experimental_performance_path": {
+    "kind": "separable matrix bilinear sampler only",
+    "integrated_into_renderer": false,
+    "width": 1024,
+    "height": 768,
+    "warm_ms": [
+      59.39910002052784,
+      58.610100008081645
+    ],
+    "maximum_sample_error_in_byte_units": 0.2700663144199039,
+    "blend_coverage_and_display_tested": false
+  },
+  "displayed_frames": 0,
+  "full_desktop_offload": false,
+  "tahoma_performance_tested": false
+}

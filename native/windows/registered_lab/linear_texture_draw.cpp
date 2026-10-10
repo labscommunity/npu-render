@@ -72,7 +72,7 @@ struct LinearTextureDrawExecutor::State {
         };
         auto source=parameter(ov::element::f32,{size_t(sw)*sh,4},"source");
         auto bg=parameter(ov::element::u8,{count,4},"background");
-        auto rect=parameter(ov::element::f32,{1,4},"rect"),uv=parameter(ov::element::f32,{1,4},"uv");
+        auto uv=parameter(ov::element::f32,{1,4},"uv");
         auto bounds=parameter(ov::element::i32,{1,4},"bounds"),clip=parameter(ov::element::i32,{1,4},"scissor");
         auto origin=parameter(ov::element::f32,{1,1},"origin"),origin_i=parameter(ov::element::i32,{1,1},"origin_i");
         auto half=parameter(ov::element::f32,{1,1},"half");
@@ -87,7 +87,11 @@ struct LinearTextureDrawExecutor::State {
         };
         auto coordinate=[&](int c,uint32_t extent)->Node {
             Node x=op::Constant::create(ov::element::f32,ov::Shape{count,1},c ? yf : xf);if(c)x=add(x,origin);
-            auto t=std::make_shared<op::Divide>(sub(x,lane(rect,c)),sub(lane(rect,c+2),lane(rect,c)));
+            // Direct3D interpolation setup uses snapped vertex positions, just
+            // like coverage. Reconstruct them on the provider, not on the host.
+            auto low=mul(floating(lane(bounds,c)),number(1.f/256));
+            auto span=mul(floating(sub(lane(bounds,c+2),lane(bounds,c))),number(1.f/256));
+            auto t=std::make_shared<op::Divide>(sub(x,low),span);
             auto value=add(lane(uv,c),mul(t,sub(lane(uv,c+2),lane(uv,c))));
             value=choose(std::make_shared<op::Less>(value,number(0)),number(0),choose(std::make_shared<op::Greater>(value,number(1)),number(1),value));
             value=sub(mul(value,number(float(extent))),half);
@@ -120,7 +124,7 @@ struct LinearTextureDrawExecutor::State {
             channels.push_back(add(mul(add(base,inc),covered),mul(pred(bc),sub(integer(1),covered))));
         }
         auto output=std::make_shared<op::Convert>(std::make_shared<op::Concat>(channels,1),ov::element::u8);
-        auto model=std::make_shared<ov::Model>(ov::OutputVector{output,std::make_shared<op::Convert>(covered,ov::element::u8)},ov::ParameterVector{source,bg,rect,uv,bounds,clip,origin,origin_i,half});
+        auto model=std::make_shared<ov::Model>(ov::OutputVector{output,std::make_shared<op::Convert>(covered,ov::element::u8)},ov::ParameterVector{source,bg,uv,bounds,clip,origin,origin_i,half});
         ov::AnyMap properties{ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY)};
         if(backend=="NPU"){
             for(const auto &node:model->get_ops())node->get_rt_info()["precise_0"]=std::string{};
@@ -157,7 +161,7 @@ UniformDrawExecutor::Result LinearTextureDrawExecutor::execute(const std::vector
     const auto &a=projected.vertices[0],&b=projected.vertices[2];
     const std::array<float,4> rect{a.screen[0],a.screen[1],b.screen[0],b.screen[1]};
     const std::array<int32_t,4> bounds{a.snapped[0],a.snapped[1],b.snapped[0],b.snapped[1]};
-    require(rect[0]<rect[2] && rect[1]<rect[3]);
+    require(rect[0]<rect[2] && rect[1]<rect[3] && bounds[0]<bounds[2] && bounds[1]<bounds[3]);
     std::array<float,4> uv{};for(unsigned c=0;c<2;++c){std::memcpy(&uv[c],&shaded.vertices[0][s.pixel.uv][c],4);std::memcpy(&uv[c+2],&shaded.vertices[2][s.pixel.uv][c],4);}
     for(auto v:uv)require(std::isfinite(v) && std::abs(v)<=16);
     const uint32_t orders[2][6]{{0,1,2,2,3,0},{0,1,2,0,2,3}};bool accepted=false;
@@ -170,7 +174,7 @@ UniformDrawExecutor::Result LinearTextureDrawExecutor::execute(const std::vector
     s.failed=true;began=Clock::now();
     auto *texels=s.request.get_tensor("source").data<float>();
     for(size_t n=0;n<source.pixels.size();++n)for(size_t c=0;c<4;++c)texels[n*4+c]=float(source.pixels[n][c])/255;
-    std::memcpy(s.request.get_tensor("rect").data<float>(),rect.data(),16);std::memcpy(s.request.get_tensor("uv").data<float>(),uv.data(),16);
+    std::memcpy(s.request.get_tensor("uv").data<float>(),uv.data(),16);
     std::memcpy(s.request.get_tensor("bounds").data<int32_t>(),bounds.data(),16);std::memcpy(s.request.get_tensor("scissor").data<int32_t>(),clip.data(),16);
     s.request.get_tensor("half").data<float>()[0]=.5f;result.pixels.resize(background.size());
     for(uint32_t y=0;y<s.height;y+=s.rows){
@@ -180,7 +184,7 @@ UniformDrawExecutor::Result LinearTextureDrawExecutor::execute(const std::vector
         require(output.get_element_type()==ov::element::u8 && output.get_byte_size()==size_t(s.count)*4 && coverage.get_element_type()==ov::element::u8 && coverage.get_size()==s.count);
         std::memcpy(result.pixels.data()+offset,output.data<const uint8_t>(),size_t(s.count)*4);
         for(size_t n=0;n<s.count;++n){const auto value=coverage.data<const uint8_t>()[n];require(value<=1);result.covered_samples+=value;}
-        result.input_bytes+=uint64_t(s.sw)*s.sh*16+uint64_t(s.count)*4+76;result.output_bytes+=uint64_t(s.count)*5;++result.provider_requests;++result.tile_executions;
+        result.input_bytes+=uint64_t(s.sw)*s.sh*16+uint64_t(s.count)*4+60;result.output_bytes+=uint64_t(s.count)*5;++result.provider_requests;++result.tile_executions;
     }
     result.timings.merger_ms=elapsed(began);result.timings.total_ms=elapsed(start);result.used_rectangle=true;result.vertices=std::move(shaded.vertices);s.failed=false;return result;
 }
