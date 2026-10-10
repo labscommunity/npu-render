@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "kind": "registered-geometry-buffer-validation",
+  "source_revision": "c2fbe5b4176619292ca924f5bf5c1c1c45bd675e",
+  "driver_version": "0.0.37.0",
+  "signed_umd_sha256": "4454fe71595bcf5bec21b94d0f838f2569cbeabd624bb7c5c1cf9dd5b98de2c0",
+  "geometry": {
+    "passed": true,
+    "cases": 36,
+    "verified_readbacks": 72,
+    "allocations": 72,
+    "upload_bytes": 1774584,
+    "staging_copy_bytes": 3096576,
+    "live_allocations": 0,
+    "cleanup_errors": 0,
+    "rejected": 0
+  },
+  "constant_buffer_regression": {
+    "passed": true,
+    "verified_readbacks": 20,
+    "upload_bytes": 525504,
+    "staging_copy_bytes": 688128
+  },
+  "paired_desktop": {
+    "prepared_device_milliseconds": 2125,
+    "prepared_render_luid": 21232484,
+    "assigned": false,
+    "frames_received": 0,
+    "topology_task_result": 267014,
+    "topology_report_truncated": true,
+    "observed_shader_sha256": "a6eddb4654d3158d150a7409a0c0527141713266b41bd2a3a6386b8eea81f7a6",
+    "observed_shader_words": 58,
+    "requesting_processes": [
+      "Explorer.EXE",
+      "StartMenuExperienceHost.exe"
+    ],
+    "dwm_umd_observed": false
+  },
+  "npu_execution_tested": false,
+  "desktop_offload_tested": false,
+  "clean_removal": true,
+  "notes": [
+    "Default, dynamic, immutable and staging storage use real registered VidMm allocations; tests do not execute a shader.",
+    "Explorer and Start Menu pass the former dynamic vertex-buffer rejection, then reject the same vertex program. A bounded binary capture is retained locally and is not committed.",
+    "Activation did not finish before the task deadline; its file ends mid-record. A later debugger inspection paused the VM, so this run is not a timing comparison.",
+    "The debugger observed running threads in trace file CreateFile/WriteFile paths. Reducing trace handle operations is tested separately; this observation is not a complete attribution of the slowdown.",
+    "The raw archive/manifest were verified for 36 files. Committed process traces are explicitly limited to their first 60 records; raw retry traces remain preserved."
+  ]
+}
