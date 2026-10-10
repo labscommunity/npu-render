@@ -1,0 +1,31 @@
+from pathlib import Path
+import tempfile,json
+import numpy as np
+import openvino as ov
+from openvino import opset13 as o
+n=256
+x=o.parameter([n,1],np.float32,name='x');y=o.parameter([n,1],np.float32,name='y');pred=o.parameter([n,1],np.int32,name='pred')
+c=o.not_equal(pred,o.constant(0,np.int32));alt=o.convert(o.logical_not(c),np.int32)
+cat=o.concat([x,y],0);idx=o.add(o.constant(np.arange(n,dtype=np.int32)),o.multiply(o.reshape(alt,[n],False),o.constant(n,np.int32)))
+variants={
+'select':o.select(c,x,y),
+'gather':o.gather(cat,idx,0),
+'gather_nd':o.gather_nd(cat,o.reshape(idx,[n,1],False)),
+'gather_elements':o.gather_elements(cat,o.reshape(idx,[n,1],False),0),
+'select_flat':o.reshape(o.select(o.reshape(c,[n],False),o.reshape(x,[n],False),o.reshape(y,[n],False)),[n,1],False),
+'select_4d':o.reshape(o.select(o.reshape(c,[1,1,16,16],False),o.reshape(x,[1,1,16,16],False),o.reshape(y,[1,1,16,16],False)),[n,1],False),
+}
+a=(np.arange(n,dtype=np.float32).reshape(n,1)*31.13+9285.84375);b=-a-.071
+records=[]
+with tempfile.TemporaryDirectory() as d:
+ for name,node in variants.items():
+  record={'operation':name}
+  try:
+   model=ov.Model([node],[x,y,pred]);path=Path(d)/'m.xml'
+   for nd in model.get_ops():nd.set_rt_info('','precise_0')
+   ov.serialize(model,path);core=ov.Core();compiled=core.compile_model(core.read_model(path),'NPU',{'EXECUTION_MODE_HINT':'ACCURACY'});record['devices']=compiled.get_property('EXECUTION_DEVICES');record['runs']=[]
+   for selector in [np.zeros((n,1),np.int32),np.ones((n,1),np.int32),(np.arange(n)%2).astype(np.int32).reshape(n,1)]:
+    actual=compiled({'x':a,'y':b,'pred':selector})[0];expected=np.where(selector!=0,a,b)
+    record['runs'].append({'mismatches':int(np.count_nonzero(actual.view(np.uint32)!=expected.view(np.uint32))),'max_error':float(np.max(np.abs(actual-expected))),'actual':actual[:4].ravel().tolist(),'expected':expected[:4].ravel().tolist()})
+  except Exception as e:record['error']=str(e)
+  records.append(record);print(json.dumps(record),flush=True)

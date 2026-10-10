@@ -13,7 +13,12 @@ inline void check(bool value) {
     if (!value) throw std::invalid_argument("unsupported or malformed SM4 vertex program");
 }
 enum class Register : uint32_t { temporary = 0, input = 1, output = 2, immediate = 4, constant = 8 };
-enum class Opcode : uint32_t { add = 0, mad = 50, move = 54, multiply = 56 };
+enum class Opcode : uint32_t {
+    add = 0, divide = 14, dot3 = 16, dot4 = 17, otherwise = 18, end_if = 21,
+    integer_add = 30, begin_if = 31, integer_to_float = 43, less = 49,
+    mad = 50, minimum = 51, maximum = 52, move = 54, select = 55,
+    multiply = 56, reciprocal_sqrt = 68
+};
 enum class Modifier : uint32_t { none = 0, negate = 1, absolute = 2, absolute_negate = 3 };
 struct RelativeIndex {
     bool enabled = false;
@@ -33,6 +38,7 @@ struct Instruction {
     std::array<Operand, 3> sources{};
     uint32_t source_count = 0;
     bool saturate = false;
+    bool test_nonzero = true;
 };
 struct Program {
     std::array<uint32_t, 16> inputs{}, outputs{};
@@ -108,6 +114,11 @@ inline Program parse_vertex(const uint32_t *words, size_t count) {
     Program result;
     bool body = false, returned = false, temps_declared = false, flags_declared = false;
     std::array<uint32_t, 16> written_temps{}, written_outputs{};
+    struct Branch {
+        std::array<uint32_t, 16> before_temps, before_outputs, then_temps{}, then_outputs{};
+        bool has_else = false;
+    };
+    std::vector<Branch> branches;
     auto source_valid = [&](const Operand &source, uint32_t used_mask) {
         auto initialized = [&](Register kind, uint32_t index, uint32_t lanes) {
             check(index < 16);
@@ -155,10 +166,35 @@ inline Program parse_vertex(const uint32_t *words, size_t count) {
                     result.position_output = a.index;
                 }
             }
+        } else if (opcode == 31) {
+            check(!(controls & ~0x40000u) && branches.size() < 8 && result.instructions.size() < 1024);
+            body = true; Instruction instruction; instruction.opcode = Opcode::begin_if;
+            instruction.test_nonzero = controls != 0; instruction.source_count = 1;
+            instruction.sources[0] = in.operand(false); source_valid(instruction.sources[0], 1);
+            const auto &condition = instruction.sources[0];
+            check(condition.modifier == Modifier::none && condition.lanes[0] == condition.lanes[1] &&
+                  condition.lanes[0] == condition.lanes[2] && condition.lanes[0] == condition.lanes[3]);
+            branches.push_back({written_temps, written_outputs}); result.instructions.push_back(instruction);
+        } else if (opcode == 18 || opcode == 21) {
+            check(!controls && !branches.empty() && result.instructions.size() < 1024);
+            auto &branch = branches.back();
+            if (opcode == 18) {
+                check(!branch.has_else); branch.has_else = true;
+                branch.then_temps = written_temps; branch.then_outputs = written_outputs;
+                written_temps = branch.before_temps; written_outputs = branch.before_outputs;
+            } else {
+                const auto &other_temps = branch.has_else ? branch.then_temps : branch.before_temps;
+                const auto &other_outputs = branch.has_else ? branch.then_outputs : branch.before_outputs;
+                for (unsigned i = 0; i < 16; ++i) { written_temps[i] &= other_temps[i]; written_outputs[i] &= other_outputs[i]; }
+                branches.pop_back();
+            }
+            Instruction instruction; instruction.opcode = Opcode(opcode); result.instructions.push_back(instruction);
         } else if (opcode == 62) {
-            check(!controls && body); returned = true;
+            check(!controls && body && branches.empty()); returned = true;
         } else {
-            check(opcode == 0 || opcode == 50 || opcode == 54 || opcode == 56);
+            check(opcode == 0 || opcode == 14 || opcode == 16 || opcode == 17 || opcode == 30 ||
+                  opcode == 43 || opcode == 49 || opcode == 50 || opcode == 51 || opcode == 52 ||
+                  opcode == 54 || opcode == 55 || opcode == 56 || opcode == 68);
             check(!(controls & ~0x2000u) && result.instructions.size() < 1024);
             body = true;
             Instruction instruction; instruction.opcode = Opcode(opcode); instruction.saturate = controls != 0;
@@ -166,9 +202,14 @@ inline Program parse_vertex(const uint32_t *words, size_t count) {
             const auto &d = instruction.destination;
             check((d.kind == Register::temporary && d.index < result.temporaries) ||
                   (d.kind == Register::output && !(d.mask & ~result.outputs[d.index])));
-            instruction.source_count = opcode == 54 ? 1u : (opcode == 50 ? 3u : 2u);
+            instruction.source_count = (opcode == 43 || opcode == 54 || opcode == 68) ? 1u :
+                                       ((opcode == 50 || opcode == 55) ? 3u : 2u);
             for (unsigned i = 0; i < instruction.source_count; ++i) {
-                instruction.sources[i] = in.operand(false); source_valid(instruction.sources[i], d.mask);
+                instruction.sources[i] = in.operand(false);
+                source_valid(instruction.sources[i], opcode == 16 ? 7u : (opcode == 17 ? 15u : d.mask));
+                if (opcode == 30) check(instruction.sources[i].modifier == Modifier::none ||
+                                        instruction.sources[i].modifier == Modifier::negate);
+                if (opcode == 43 || (opcode == 55 && !i)) check(instruction.sources[i].modifier == Modifier::none);
             }
             (d.kind == Register::temporary ? written_temps : written_outputs)[d.index] |= d.mask;
             result.instructions.push_back(instruction);

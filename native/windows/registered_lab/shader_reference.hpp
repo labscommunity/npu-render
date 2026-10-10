@@ -12,7 +12,7 @@ inline uint32_t as_bits(float value) { uint32_t result; std::memcpy(&result, &va
 inline Registers reference_vertex(const Program &program, const Registers &inputs, const Constants &constants) {
     Registers temporary{}, output{};
     for (unsigned i = 0; i < 14; ++i) check(constants[i].size() >= program.constants[i]);
-    auto load = [&](const Operand &a) {
+    auto load = [&](const Operand &a, bool integer_modifier = false) {
         Bits raw{};
         if (a.kind == Register::temporary) raw = temporary[a.index];
         else if (a.kind == Register::input) raw = inputs[a.index];
@@ -30,24 +30,54 @@ inline Registers reference_vertex(const Program &program, const Registers &input
         for (unsigned i = 0; i < 4; ++i) {
             auto value = raw[a.lanes[i]];
             if (a.modifier == Modifier::absolute || a.modifier == Modifier::absolute_negate) value &= 0x7fffffffu;
-            if (a.modifier == Modifier::negate || a.modifier == Modifier::absolute_negate) value ^= 0x80000000u;
+            if (a.modifier == Modifier::negate || a.modifier == Modifier::absolute_negate)
+                value = integer_modifier ? 0u - value : value ^ 0x80000000u;
             result[i] = value;
         }
         return result;
     };
+    struct Branch { bool parent, condition; };
+    std::vector<Branch> branches;
+    bool active = true;
     for (const auto &instruction : program.instructions) {
+        if (instruction.opcode == Opcode::begin_if) {
+            const bool condition = active && ((load(instruction.sources[0])[0] != 0) == instruction.test_nonzero);
+            branches.push_back({active, condition}); active = active && condition; continue;
+        }
+        if (instruction.opcode == Opcode::otherwise) {
+            const auto &b = branches.back(); active = b.parent && !b.condition; continue;
+        }
+        if (instruction.opcode == Opcode::end_if) { active = branches.back().parent; branches.pop_back(); continue; }
+        if (!active) continue;
         std::array<Bits, 3> values{};
-        for (unsigned i = 0; i < instruction.source_count; ++i) values[i] = load(instruction.sources[i]);
+        for (unsigned i = 0; i < instruction.source_count; ++i)
+            values[i] = load(instruction.sources[i], instruction.opcode == Opcode::integer_add);
         Bits value{};
         for (unsigned i = 0; i < 4; ++i) {
             if (!(instruction.destination.mask & (1u << i))) continue;
             if (instruction.opcode == Opcode::move) value[i] = values[0][i];
+            else if (instruction.opcode == Opcode::select) value[i] = values[0][i] ? values[1][i] : values[2][i];
+            else if (instruction.opcode == Opcode::integer_add) value[i] = values[0][i] + values[1][i];
+            else if (instruction.opcode == Opcode::less)
+                value[i] = as_float(values[0][i]) < as_float(values[1][i]) ? 0xffffffffu : 0;
+            else if (instruction.opcode == Opcode::integer_to_float) {
+                int32_t source; std::memcpy(&source, &values[0][i], sizeof(source)); value[i] = as_bits(float(source));
+            }
             else {
                 const auto a = as_float(values[0][i]), b = as_float(values[1][i]);
                 float v = 0;
                 if (instruction.opcode == Opcode::add) v = a + b;
                 else if (instruction.opcode == Opcode::multiply) v = a * b;
                 else if (instruction.opcode == Opcode::mad) v = a * b + as_float(values[2][i]);
+                else if (instruction.opcode == Opcode::divide) v = a / b;
+                else if (instruction.opcode == Opcode::reciprocal_sqrt) v = 1.0f / std::sqrt(a);
+                else if (instruction.opcode == Opcode::minimum) v = std::fmin(a, b);
+                else if (instruction.opcode == Opcode::maximum) v = std::fmax(a, b);
+                else if (instruction.opcode == Opcode::dot3 || instruction.opcode == Opcode::dot4) {
+                    v = as_float(values[0][0]) * as_float(values[1][0]);
+                    for (unsigned c = 1; c < (instruction.opcode == Opcode::dot3 ? 3u : 4u); ++c)
+                        v += as_float(values[0][c]) * as_float(values[1][c]);
+                }
                 else check(false);
                 value[i] = as_bits(v);
             }

@@ -253,6 +253,9 @@ earlier withheld-reply attempt times out without fallback or a successful presen
 
 The registered UMD now creates and retains bounded SM4 vertex programs, including
 MOV, ADD, MUL, MAD, source negation/absolute value and indexed constant buffers.
+The translator also handles bounded IF/ELSE/ENDIF, MOVC, comparisons, signed
+integer addition/conversion, dot products, division, reciprocal square root,
+and min/max. Branch joins retain values initialized on every path.
 The [v53 desktop run](../../../docs/validation/2026-10-10/vertex-admission-v53/report.json)
 records DWM accepting its 90-word shader through this path. It then requests a
 116-word shader that the installed version rejects. Both streams have separately
@@ -267,12 +270,25 @@ includes signed-zero source modifiers, indexed constants through 4,096 rows,
 --backend NPU` runs captured-stage checks without embedding system shader binaries
 in the repository. These fixtures do not establish general shader conformance.
 
+The [v38 conditional-stage qualification](../../../docs/validation/2026-10-10/conditional-vertex-npu-v38/report.json)
+executes the captured 1,053-word desktop lighting shader on the NPU. Four passes
+exercise both lighting paths and match all 32,768 scalar-reference components
+bit for bit. Authored tests cover nested branches and the precision failures
+found while implementing this shader. The failure logs and smaller reproductions
+are preserved alongside the passing run. A CPU graph's lighting result differs
+from the sequential reference; it is not used as an NPU fallback.
+
 OpenVINO 2026.1 requires serialized legacy precision metadata plus the accuracy
 hint to preserve the tested FP32 arithmetic. Indexed reads gather from an appended
 zero row for out-of-range constants. Bit-preserving MOV/modifier outputs use NPU
 integer operations and integer tensors because the floating path canonicalizes
 negative zero. Host code decodes inputs and copies output bytes. Modified MOV
 from arithmetic temporaries without integer bit views remains rejected.
+On the tested NPU compiler, floating Select misselects elements and min/max
+returns incorrect values. Conditional values use integer-indexed Gather;
+min/max uses comparison and the same selection path, with NaN handling.
+Negative addends become explicit Subtract nodes before precision annotation:
+the equivalent Add/negative-product graph loses precision after compilation.
 
 Input-layout objects retain their descriptors across runtime-wrapper destruction.
 The bounded host decoder handles per-vertex 32-bit float/integer formats and

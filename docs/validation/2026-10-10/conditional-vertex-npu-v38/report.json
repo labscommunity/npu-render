@@ -1,0 +1,74 @@
+{
+  "scope": "Explicit NPU vertex-stage qualification; no installed-driver or desktop-frame execution",
+  "shader_sha256": "e3fc43d10913c6055e0fd72f4358a79ebd128e1d526af67004611e502479a0bc",
+  "shader_words": 1053,
+  "instructions": 126,
+  "source_module": "dwmcore.dll",
+  "module_sha256": "40579ecfa394395677fec84014c32ba5495f334b6d96c5653fd5caa129dc1222",
+  "captured_in": "modifier-admission-v54",
+  "admitted_in_driver_yet": false,
+  "qualified_backend": "NPU",
+  "vertices_per_pass": 256,
+  "passes": 4,
+  "components_per_pass": 8192,
+  "checked_components": 32768,
+  "exact_bits_verified": true,
+  "lighting_branch": {
+    "passes_0_1": "else",
+    "passes_2_3": "then",
+    "cb2_16_x": [
+      0.078125,
+      0.09375,
+      1.09375,
+      1.109375
+    ]
+  },
+  "authored_checks": {
+    "nested_branches": 2,
+    "branch_vertices": 64,
+    "branch_maximum_absolute_error": 0,
+    "precision_vertices": 256,
+    "precision_exact_bits": true,
+    "modifier_vertices": 16,
+    "signed_zero_verified": true,
+    "constant_buffer_rows": 4096,
+    "screen_vertices": 4096
+  },
+  "failures_preserved": {
+    "v33": "Floating Select misselected branches; authored test and captured stream failed.",
+    "v34": "Integer-indexed Gather fixed authored branching; captured shader arithmetic still lost precision.",
+    "v36": "Explicit floating multiplication for NEG and compare/gather min/max passed authored tests; fused subtraction still lost precision.",
+    "v37": "Prefix diagnostic isolates first material arithmetic mismatch at instruction 11. Diagnostic exit 0 means it completed, not that mismatches passed. Its report lists mismatch counts.",
+    "cpu_v36": "Captured lighting path differs from sequential scalar reference by several ULP; strict comparison fails. CPU is not substituted for NPU."
+  },
+  "lowering_changes": [
+    "SSA joins for bounded IF/ELSE/ENDIF with definite initialization on both paths",
+    "Integer-indexed Gather for conditional values",
+    "Explicit Subtract for ADD/MAD negative addends before precision annotation",
+    "Compare/Gather min/max with NaN preference",
+    "DOT3/DOT4, LT, IADD, ITOF, MOVC, DIV and reciprocal square root"
+  ],
+  "microbenchmarks": {
+    "select": "incorrect elements",
+    "gather": "exact across uniform and alternating conditions",
+    "negative": "FP16-like rounding",
+    "multiply_by_negative_one": "exact finite fixture",
+    "minimum_maximum": "incorrect zeros",
+    "direct_subtract": "exact",
+    "add_negative": "rounding errors",
+    "minmax_lowering": "512 cases with NaN, infinity, signed zero and ordinary values; zero sign order not enforced"
+  },
+  "cpu_build_tests": {
+    "passed": 3,
+    "total": 3
+  },
+  "limitations": [
+    "Finite authored and captured fixtures are not full Direct3D conformance.",
+    "Integer/float dual views cannot reinterpret arbitrary arithmetic temporaries.",
+    "No loops, saturation, pixel shader or generic rasterization.",
+    "No DWM draw, swapchain, delivered desktop frame or Tahoma improvement established."
+  ],
+  "desktop_offload_tested": false,
+  "full_desktop_offload": false,
+  "reference_spec": "https://microsoft.github.io/DirectX-Specs/d3d/archive/D3D11_3_FunctionalSpec.htm#3.1.3"
+}

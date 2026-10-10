@@ -4,11 +4,47 @@
 #include <cstdio>
 #include <fstream>
 #include <cstring>
+namespace {
+void trace_prefixes(const nr::shader::Program &program, const std::vector<nr::shader::VertexRegisters> &vertices,
+                    const nr::shader::VertexConstants &constants, const char *backend) {
+    using namespace nr::shader;
+    Program prefix = program; prefix.instructions.clear(); prefix.outputs.fill(0); prefix.position_output = 0; prefix.temporaries = 16;
+    for (size_t i = 0; i < program.instructions.size(); ++i) {
+        auto instruction = program.instructions[i];
+        if (instruction.opcode == Opcode::begin_if) break;
+        if (instruction.destination.kind == Register::output) {
+            instruction.destination.kind = Register::temporary; instruction.destination.index = 15;
+        }
+        prefix.instructions.push_back(instruction);
+        Instruction copy; copy.opcode = Opcode::move; copy.source_count = 1;
+        copy.destination = instruction.destination; copy.destination.kind = Register::output; copy.destination.index = 0;
+        copy.sources[0] = instruction.destination; copy.sources[0].lanes = {0, 1, 2, 3};
+        prefix.instructions.push_back(copy); prefix.outputs[0] = copy.destination.mask;
+        VertexExecutor executor(prefix, uint32_t(vertices.size()), backend);
+        const auto result = executor.execute(vertices, constants);
+        size_t mismatches = 0;
+        for (unsigned v = 0; v < vertices.size(); ++v) {
+            const auto expected = reference_vertex(prefix, vertices[v], constants);
+            for (unsigned c = 0; c < 4; ++c) if (prefix.outputs[0] & (1u << c)) {
+                if (result.vertices[v][0][c] != expected[0][c]) {
+                    if (!mismatches) std::fprintf(stderr, "prefix=%zu vertex=%u lane=%u actual=%08x expected=%08x\n",
+                        i, v, c, result.vertices[v][0][c], expected[0][c]);
+                    ++mismatches;
+                }
+            }
+        }
+        std::printf("{\"prefix_instruction\":%zu,\"opcode\":%u,\"mismatches\":%zu,\"execution_device\":\"%s\"}\n",
+            i, unsigned(instruction.opcode), mismatches, result.execution_device.c_str());
+        prefix.instructions.pop_back();
+    }
+}
+}
 int main(int argc, char **argv) {
     using namespace nr::shader;
     try {
-        if (argc != 5 || std::strcmp(argv[1], "--shader") || std::strcmp(argv[3], "--backend"))
-            throw std::invalid_argument("expected --shader <token-stream> --backend <CPU|GPU|NPU>");
+        if ((argc != 5 && argc != 6) || std::strcmp(argv[1], "--shader") || std::strcmp(argv[3], "--backend") ||
+            (argc == 6 && std::strcmp(argv[5], "--prefixes")))
+            throw std::invalid_argument("expected --shader <token-stream> --backend <CPU|GPU|NPU> [--prefixes]");
         std::ifstream file(argv[2], std::ios::binary | std::ios::ate);
         if (!file) throw std::runtime_error("shader stream unavailable");
         const auto bytes = file.tellg();
@@ -29,10 +65,11 @@ int main(int argc, char **argv) {
             for (unsigned r = 0; r < 16; ++r)
                 for (unsigned c = 0; c < 4; ++c)
                     vertices[v][r][c] = as_bits(float(int((v * 13 + r * 29 + c * 7) % 1024) - 512) / 8);
+        if (argc == 6) { trace_prefixes(program, vertices, constants, argv[4]); return 0; }
         VertexExecutor executor(program, uint32_t(vertices.size()), argv[4]);
-        for (unsigned pass = 0; pass < 2; ++pass) {
+        for (unsigned pass = 0; pass < 4; ++pass) {
             if (pass) for (auto &buffer : constants) for (auto &row : buffer) for (auto &value : row)
-                value = as_bits(as_float(value) + 1.0f / 64);
+                value = as_bits(as_float(value) + (pass == 2 ? 1.0f : 1.0f / 64));
             const auto result = executor.execute(vertices, constants);
             size_t checked = 0;
             for (unsigned v = 0; v < vertices.size(); ++v) {

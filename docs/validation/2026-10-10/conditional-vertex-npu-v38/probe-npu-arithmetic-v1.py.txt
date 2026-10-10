@@ -1,0 +1,25 @@
+from pathlib import Path
+import tempfile,json
+import numpy as np
+import openvino as ov
+from openvino import opset13 as o
+n=256
+x=o.parameter([n,1],np.float32,name='x');y=o.parameter([n,1],np.float32,name='y')
+a=(np.arange(n,dtype=np.float32).reshape(n,1)*31.13+9285.84375);b=np.full((n,1),.17323,np.float32)
+variants={
+'negative':(o.negative(x),-a),'multiply_negative':(o.multiply(x,o.constant(-1,np.float32)),-a),
+'add':(o.add(x,y),a+b),'multiply':(o.multiply(x,y),a*b),'mad':(o.add(o.multiply(x,y),y),a*b+b),
+'divide':(o.divide(x,y),a/b),'sqrt':(o.sqrt(x),np.sqrt(a)),'reciprocal_sqrt':(o.divide(o.constant(1,np.float32),o.sqrt(x)),1/np.sqrt(a)),
+'absolute':(o.absolute(x),np.abs(a)),'minimum':(o.minimum(x,y),np.minimum(a,b)),
+'maximum':(o.maximum(x,y),np.maximum(a,b)),
+}
+with tempfile.TemporaryDirectory() as d:
+ for name,(node,expected) in variants.items():
+  rec={'operation':name}
+  try:
+   model=ov.Model([node],[x,y]);path=Path(d)/'m.xml'
+   for nd in model.get_ops():nd.set_rt_info('','precise_0')
+   ov.serialize(model,path);core=ov.Core();c=core.compile_model(core.read_model(path),'NPU',{'EXECUTION_MODE_HINT':'ACCURACY'})
+   actual=c({'x':a,'y':b})[0];rec.update(devices=c.get_property('EXECUTION_DEVICES'),mismatches=int(np.count_nonzero(actual.view(np.uint32)!=expected.view(np.uint32))),max_error=float(np.max(np.abs(actual-expected))),actual=actual[:4].ravel().tolist(),expected=expected[:4].ravel().tolist())
+  except Exception as e:rec['error']=str(e)
+  print(json.dumps(rec),flush=True)

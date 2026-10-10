@@ -1,0 +1,17 @@
+import json,tempfile
+from pathlib import Path
+import numpy as np
+import openvino as ov
+from openvino import opset13 as o
+n=256;x=o.parameter([n,1],np.float32,name='x');y=o.parameter([n,1],np.float32,name='y')
+def choose(c,a,b):
+ idx=o.add(o.constant(np.arange(n,dtype=np.int32)),o.multiply(o.reshape(o.convert(o.logical_not(c),np.int32),[n],False),o.constant(n,np.int32)))
+ return o.gather(o.concat([a,b],0),idx,0)
+lt=o.less(x,y);small=choose(o.is_nan(x),y,choose(o.is_nan(y),x,choose(lt,x,y)));large=choose(o.is_nan(x),y,choose(o.is_nan(y),x,choose(lt,y,x)))
+a=np.resize(np.array([np.nan,1,np.nan,np.inf,-np.inf,-0.,0.,9285.84375],np.float32),n).reshape(n,1);b=np.resize(np.array([2,np.nan,np.nan,-np.inf,np.inf,0.,-0.,.07123],np.float32),n).reshape(n,1)
+with tempfile.TemporaryDirectory() as d:
+ m=ov.Model([small,large],[x,y]);p=Path(d)/'m.xml'
+ for nd in m.get_ops():nd.set_rt_info('','precise_0')
+ ov.serialize(m,p);core=ov.Core();c=core.compile_model(core.read_model(p),'NPU',{'EXECUTION_MODE_HINT':'ACCURACY'});result=c({'x':a,'y':b})
+ for i,expected in enumerate([np.fmin(a,b),np.fmax(a,b)]):
+  actual=result[i];same=(actual==expected)|(np.isnan(actual)&np.isnan(expected));print(json.dumps({'op':'min' if i==0 else 'max','devices':c.get_property('EXECUTION_DEVICES'),'cases':n,'mismatches':int(np.count_nonzero(~same)),'zeros_sign_not_enforced':True}),flush=True)

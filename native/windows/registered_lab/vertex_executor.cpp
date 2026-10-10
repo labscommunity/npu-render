@@ -63,7 +63,19 @@ struct VertexExecutor::State {
         auto batch = [&](const Node &value) -> Node {
             check(bool(value)); return std::make_shared<op::Broadcast>(value, batch_shape);
         };
-        auto load = [&](const Operand &a) {
+        std::vector<int32_t> row_numbers(count);
+        for (uint32_t i = 0; i < count; ++i) row_numbers[i] = int32_t(i);
+        const auto rows = op::Constant::create(ov::element::i32, ov::Shape{count}, row_numbers);
+        auto choose = [&](const Node &condition, const Node &yes, const Node &no) -> Node {
+            // NPU Select produced wrong elements for batched control flow.
+            // Select rows by integer index instead, as for bounded CB reads.
+            const auto alternate = std::make_shared<op::Reshape>(
+                std::make_shared<op::Convert>(std::make_shared<op::LogicalNot>(batch(condition)), ov::element::i32),
+                indices({int64_t(count)}), false);
+            const auto index = std::make_shared<op::Add>(rows, std::make_shared<op::Multiply>(alternate, integer(int32_t(count))));
+            return std::make_shared<op::Gather>(std::make_shared<op::Concat>(ov::OutputVector{batch(yes), batch(no)}, 0), index, integer(0));
+        };
+        auto load = [&](const Operand &a, bool integer_modifier = false) {
             Lanes raw{};
             if (a.kind == Register::input) raw = input[a.index];
             else if (a.kind == Register::temporary) raw = temporary[a.index];
@@ -99,11 +111,15 @@ struct VertexExecutor::State {
             Lanes result{};
             for (unsigned c = 0; c < 4; ++c) {
                 result[c] = raw[a.lanes[c]];
-                if (a.modifier != Modifier::none && result[c].floating) {
-                    if (a.modifier == Modifier::absolute || a.modifier == Modifier::absolute_negate)
+                if (a.modifier != Modifier::none) {
+                    if (integer_modifier) {
+                        if (result[c].integer) result[c].integer = std::make_shared<op::Negative>(result[c].integer);
+                        result[c].floating.reset(); continue;
+                    }
+                    if (result[c].floating && (a.modifier == Modifier::absolute || a.modifier == Modifier::absolute_negate))
                         result[c].floating = std::make_shared<op::Abs>(result[c].floating);
-                    if (a.modifier == Modifier::negate || a.modifier == Modifier::absolute_negate)
-                        result[c].floating = std::make_shared<op::Negative>(result[c].floating);
+                    if (result[c].floating && (a.modifier == Modifier::negate || a.modifier == Modifier::absolute_negate))
+                        result[c].floating = std::make_shared<op::Multiply>(result[c].floating, floating(0xbf800000));
                     if (result[c].integer) {
                         if (a.modifier == Modifier::absolute || a.modifier == Modifier::absolute_negate)
                             result[c].integer = std::make_shared<op::BitwiseAnd>(result[c].integer, integer(0x7fffffff));
@@ -114,23 +130,106 @@ struct VertexExecutor::State {
             }
             return result;
         };
+        using Registers = std::array<Lanes, 16>;
+        struct Branch { Node condition; Registers before_temps, before_outputs, then_temps{}, then_outputs{}; bool has_else = false; };
+        std::vector<Branch> branches;
         for (const auto &instruction : program.instructions) {
             check(!instruction.saturate); // NaN/denormal saturation is not qualified on NPU yet.
+            if (instruction.opcode == Opcode::begin_if) {
+                const auto value = load(instruction.sources[0])[0].integer; check(bool(value));
+                Node condition = std::make_shared<op::NotEqual>(value, integer(0));
+                if (!instruction.test_nonzero) condition = std::make_shared<op::LogicalNot>(condition);
+                branches.push_back({condition, temporary, output}); continue;
+            }
+            if (instruction.opcode == Opcode::otherwise) {
+                auto &b = branches.back(); b.then_temps = temporary; b.then_outputs = output;
+                b.has_else = true; temporary = b.before_temps; output = b.before_outputs; continue;
+            }
+            if (instruction.opcode == Opcode::end_if) {
+                const auto &b = branches.back();
+                auto merge = [&](Registers &values, const Registers &other) {
+                    for (unsigned i = 0; i < 16; ++i) for (unsigned c = 0; c < 4; ++c) {
+                        auto &current = values[i][c]; const auto &alternative = other[i][c];
+                        auto join = [&](const Node &a, const Node &other_value) -> Node {
+                            if (!a || !other_value) return {};
+                            if (a == other_value) return a;
+                            return choose(b.condition, b.has_else ? other_value : a, b.has_else ? a : other_value);
+                        };
+                        current = {join(current.floating, alternative.floating), join(current.integer, alternative.integer)};
+                    }
+                };
+                merge(temporary, b.has_else ? b.then_temps : b.before_temps);
+                merge(output, b.has_else ? b.then_outputs : b.before_outputs);
+                branches.pop_back(); continue;
+            }
             std::array<Lanes, 3> sources{};
-            for (unsigned i = 0; i < instruction.source_count; ++i) sources[i] = load(instruction.sources[i]);
+            int subtract_source = -1;
+            auto negative = [](Modifier modifier) { return modifier == Modifier::negate || modifier == Modifier::absolute_negate; };
+            if (instruction.opcode == Opcode::mad && negative(instruction.sources[2].modifier)) subtract_source = 2;
+            else if (instruction.opcode == Opcode::add) {
+                if (negative(instruction.sources[1].modifier)) subtract_source = 1;
+                else if (negative(instruction.sources[0].modifier)) subtract_source = 0;
+            }
+            for (unsigned i = 0; i < instruction.source_count; ++i) {
+                auto source = instruction.sources[i];
+                if (int(i) == subtract_source)
+                    source.modifier = source.modifier == Modifier::negate ? Modifier::none : Modifier::absolute;
+                sources[i] = load(source, instruction.opcode == Opcode::integer_add);
+            }
             Lanes result{};
             for (unsigned c = 0; c < 4; ++c) if (instruction.destination.mask & (1u << c)) {
                 if (instruction.opcode == Opcode::move) result[c] = sources[0][c];
+                else if (instruction.opcode == Opcode::integer_add) {
+                    check(bool(sources[0][c].integer) && bool(sources[1][c].integer));
+                    result[c].integer = std::make_shared<op::Add>(sources[0][c].integer, sources[1][c].integer);
+                } else if (instruction.opcode == Opcode::integer_to_float) {
+                    check(bool(sources[0][c].integer));
+                    result[c].floating = std::make_shared<op::Convert>(sources[0][c].integer, ov::element::f32);
+                } else if (instruction.opcode == Opcode::select) {
+                    check(bool(sources[0][c].integer));
+                    const auto condition = std::make_shared<op::NotEqual>(sources[0][c].integer, integer(0));
+                    if (sources[1][c].floating && sources[2][c].floating)
+                        result[c].floating = choose(condition, sources[1][c].floating, sources[2][c].floating);
+                    if (sources[1][c].integer && sources[2][c].integer)
+                        result[c].integer = choose(condition, sources[1][c].integer, sources[2][c].integer);
+                }
                 else {
                     const auto a = sources[0][c].floating, b = sources[1][c].floating;
-                    check(bool(a) && bool(b)); Node value;
-                    if (instruction.opcode == Opcode::add) value = std::make_shared<op::Add>(a, b);
+                    if (instruction.opcode != Opcode::dot3 && instruction.opcode != Opcode::dot4)
+                        check(bool(a) && (instruction.source_count == 1 || bool(b)));
+                    Node value;
+                    if (instruction.opcode == Opcode::add) {
+                        // Form subtraction before marking precision. Rewriting
+                        // Add(Multiply(x,-1),y) inside the NPU compiler loses
+                        // the precision marker on the replacement operation.
+                        if (subtract_source == 0) value = std::make_shared<op::Subtract>(b, a);
+                        else if (subtract_source == 1) value = std::make_shared<op::Subtract>(a, b);
+                        else value = std::make_shared<op::Add>(a, b);
+                    }
                     else if (instruction.opcode == Opcode::multiply || instruction.opcode == Opcode::mad) {
                         value = std::make_shared<op::Multiply>(a, b);
                         if (instruction.opcode == Opcode::mad) {
                             check(bool(sources[2][c].floating));
-                            value = std::make_shared<op::Add>(value, sources[2][c].floating);
+                            value = subtract_source == 2 ? Node(std::make_shared<op::Subtract>(value, sources[2][c].floating)) :
+                                                           Node(std::make_shared<op::Add>(value, sources[2][c].floating));
                         }
+                    } else if (instruction.opcode == Opcode::divide) value = std::make_shared<op::Divide>(a, b);
+                    else if (instruction.opcode == Opcode::reciprocal_sqrt)
+                        value = std::make_shared<op::Divide>(floating(0x3f800000), std::make_shared<op::Sqrt>(a));
+                    else if (instruction.opcode == Opcode::less) {
+                        result[c].integer = std::make_shared<op::Multiply>(
+                            std::make_shared<op::Convert>(std::make_shared<op::Less>(a, b), ov::element::i32), integer(-1));
+                    } else if (instruction.opcode == Opcode::minimum || instruction.opcode == Opcode::maximum) {
+                        // Native NPU floating min/max returned zero in the
+                        // precision-marked graph. Compare and gather instead.
+                        const auto less = std::make_shared<op::Less>(a, b);
+                        Node numeric = instruction.opcode == Opcode::minimum ? choose(less, a, b) : choose(less, b, a);
+                        value = choose(std::make_shared<op::IsNaN>(a), b, choose(std::make_shared<op::IsNaN>(b), a, numeric));
+                    } else if (instruction.opcode == Opcode::dot3 || instruction.opcode == Opcode::dot4) {
+                        value = std::make_shared<op::Multiply>(sources[0][0].floating, sources[1][0].floating);
+                        for (unsigned i = 1; i < (instruction.opcode == Opcode::dot3 ? 3u : 4u); ++i)
+                            value = std::make_shared<op::Add>(value,
+                                std::make_shared<op::Multiply>(sources[0][i].floating, sources[1][i].floating));
                     } else check(false);
                     result[c].floating = value;
                 }
@@ -142,8 +241,10 @@ struct VertexExecutor::State {
         ov::OutputVector results;
         for (unsigned i = 0; i < 16; ++i) if (program.outputs[i]) {
             ov::OutputVector components;
-            for (unsigned c = 0; c < 4; ++c)
-                components.push_back(batch((program.outputs[i] & (1u << c)) ? output[i][c].floating : floating(0)));
+            for (unsigned c = 0; c < 4; ++c) {
+                if (program.outputs[i] & (1u << c)) check(bool(output[i][c].floating) || bool(output[i][c].integer));
+                components.push_back(batch((program.outputs[i] & (1u << c)) && output[i][c].floating ? output[i][c].floating : floating(0)));
+            }
             auto result = std::make_shared<op::Concat>(components, 1);
             result->output(0).get_tensor().set_names({"vs_output_" + std::to_string(i)});
             results.push_back(result); outputs.push_back(i);
@@ -205,34 +306,69 @@ struct VertexExecutor::State {
     }
 };
 void VertexExecutor::validate(const Program &program) {
-    // parse_vertex has already checked declarations, operand bounds and lane
-    // initialization. Track the additional bit-view requirement of this graph
-    // lowering, using the old register state for simultaneous masked writes.
-    std::array<uint32_t, 16> integer_lanes{};
+    // Type views are properties of each SSA value, not permanent register
+    // types. Branch joins retain only the views available on both paths.
+    using Masks = std::array<uint32_t, 16>;
+    struct Views { Masks temporary_float{}, temporary_bits{}, output_float{}, output_bits{}; };
+    struct Branch { Views before, then_values{}; bool has_else = false; };
+    Views views;
+    std::vector<Branch> branches;
+    auto available = [&](const Operand &source, bool bits) {
+        uint32_t raw = 15;
+        if (source.kind == Register::temporary)
+            raw = (bits ? views.temporary_bits : views.temporary_float)[source.index];
+        else if (source.kind == Register::input) raw = program.inputs[source.index];
+        uint32_t result = 0;
+        for (unsigned c = 0; c < 4; ++c) if (raw & (1u << source.lanes[c])) result |= 1u << c;
+        return result;
+    };
     for (const auto &instruction : program.instructions) {
         check(!instruction.saturate);
         for (unsigned i = 0; i < instruction.source_count; ++i) {
             const auto &source = instruction.sources[i];
             if (source.relative.enabled && source.relative.kind == Register::temporary)
-                check((integer_lanes[source.relative.index] & (1u << source.relative.component)) != 0);
-            if (instruction.opcode == Opcode::move && source.modifier != Modifier::none &&
-                source.kind == Register::temporary) {
-                for (unsigned c = 0; c < 4; ++c) if (instruction.destination.mask & (1u << c))
-                    check((integer_lanes[source.index] & (1u << source.lanes[c])) != 0);
+                check((views.temporary_bits[source.relative.index] & (1u << source.relative.component)) != 0);
+        }
+        if (instruction.opcode == Opcode::begin_if) {
+            check((available(instruction.sources[0], true) & 1u) != 0);
+            branches.push_back({views}); continue;
+        }
+        if (instruction.opcode == Opcode::otherwise) {
+            auto &b = branches.back(); b.then_values = views; b.has_else = true; views = b.before; continue;
+        }
+        if (instruction.opcode == Opcode::end_if) {
+            const auto &b = branches.back(); const auto &other = b.has_else ? b.then_values : b.before;
+            for (unsigned i = 0; i < 16; ++i) {
+                views.temporary_float[i] &= other.temporary_float[i]; views.temporary_bits[i] &= other.temporary_bits[i];
+                views.output_float[i] &= other.output_float[i]; views.output_bits[i] &= other.output_bits[i];
             }
+            branches.pop_back(); continue;
         }
         const auto &destination = instruction.destination;
-        if (destination.kind != Register::temporary) continue;
-        uint32_t bits = 0;
+        const auto mask = destination.mask;
+        uint32_t floating_views = 0, bit_views = 0;
         if (instruction.opcode == Opcode::move) {
-            const auto &source = instruction.sources[0];
-            const auto available = source.kind == Register::temporary ? integer_lanes[source.index] : 15u;
-            for (unsigned c = 0; c < 4; ++c)
-                if (available & (1u << source.lanes[c])) bits |= 1u << c;
+            floating_views = available(instruction.sources[0], false); bit_views = available(instruction.sources[0], true);
+            if (instruction.sources[0].modifier != Modifier::none) check(!(mask & ~bit_views));
+        } else if (instruction.opcode == Opcode::select) {
+            check(!(mask & ~available(instruction.sources[0], true)));
+            floating_views = available(instruction.sources[1], false) & available(instruction.sources[2], false);
+            bit_views = available(instruction.sources[1], true) & available(instruction.sources[2], true);
+        } else if (instruction.opcode == Opcode::integer_add || instruction.opcode == Opcode::integer_to_float) {
+            for (unsigned i = 0; i < instruction.source_count; ++i) check(!(mask & ~available(instruction.sources[i], true)));
+            if (instruction.opcode == Opcode::integer_add) bit_views = mask; else floating_views = mask;
+        } else {
+            const auto used = instruction.opcode == Opcode::dot3 ? 7u : (instruction.opcode == Opcode::dot4 ? 15u : mask);
+            for (unsigned i = 0; i < instruction.source_count; ++i) check(!(used & ~available(instruction.sources[i], false)));
+            if (instruction.opcode == Opcode::less) bit_views = mask; else floating_views = mask;
         }
-        integer_lanes[destination.index] = (integer_lanes[destination.index] & ~destination.mask) |
-                                          (bits & destination.mask);
+        check(!(mask & ~(floating_views | bit_views)));
+        auto &floats = destination.kind == Register::temporary ? views.temporary_float : views.output_float;
+        auto &bits = destination.kind == Register::temporary ? views.temporary_bits : views.output_bits;
+        floats[destination.index] = (floats[destination.index] & ~mask) | (floating_views & mask);
+        bits[destination.index] = (bits[destination.index] & ~mask) | (bit_views & mask);
     }
+    for (unsigned i = 0; i < 16; ++i) check(!(program.outputs[i] & ~(views.output_float[i] | views.output_bits[i])));
 }
 VertexExecutor::VertexExecutor(const Program &p, uint32_t count, const std::string &backend)
     : state(std::make_unique<State>(p, count, backend)) {}

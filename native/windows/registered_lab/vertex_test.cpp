@@ -21,12 +21,80 @@ void rejects(const std::vector<uint32_t> &code) {
     catch (const std::invalid_argument &) { rejected = true; }
     test(rejected);
 }
+void test_branches(const std::string &backend) {
+    const char *text = R"(
+cbuffer Mode {float4 mode;};
+struct O {float4 p:SV_Position;float4 n:NORMAL;};
+O main(float4 v:POSITION) {
+    O o; float3 q;
+    [branch] if(mode.w>0.5) {
+        q=float3(dot(v.xyz,mode.xyz),dot(v,float4(1,2,3,4)),min(max(sign(v.w),-0.5),0.5));
+        [branch] if(v.x<0) q=q/2; else q=q*2;
+    } else {q=v.xyz/float3(2,4,8);}
+    o.p=float4(q,1);o.n=float4(normalize(v.xyz),sign(v.w));return o;
+})";
+    const auto words = nr::registered_lab::shader_tokens(text, "vs_4_0");
+    const auto program = parse_vertex(words.data(), words.size());
+    unsigned branches = 0;
+    for (const auto &instruction : program.instructions) if (instruction.opcode == Opcode::begin_if) ++branches;
+    test(branches >= 2);
+    for (size_t i = 0; i < words.size(); ++i) {
+        std::vector<uint32_t> prefix(words.begin(), words.begin() + i);
+        if (i > 1) prefix[1] = uint32_t(i); rejects(prefix);
+    }
+    std::vector<VertexRegisters> input(32);
+    for (unsigned i = 0; i < input.size(); ++i)
+        input[i][0] = {as_bits(i % 2 ? -3.0f : 3.0f), as_bits(4.0f), as_bits(0.0f), as_bits(float(int(i % 3) - 1))};
+    VertexExecutor executor(program, uint32_t(input.size()), backend);
+    VertexConstants constants; constants[0] = {{as_bits(0.25f), as_bits(0.5f), as_bits(0.125f), 0}};
+    float maximum_error = 0;
+    for (unsigned pass = 0; pass < 2; ++pass) {
+        constants[0][0][3] = as_bits(float(pass));
+        const auto result = executor.execute(input, constants);
+        for (unsigned i = 0; i < input.size(); ++i) {
+            const auto expected = reference_vertex(program, input[i], constants);
+            for (unsigned r = 0; r < 16; ++r) for (unsigned c = 0; c < 4; ++c) if (program.outputs[r] & (1u << c)) {
+                const auto actual = as_float(result.vertices[i][r][c]), wanted = as_float(expected[r][c]);
+                const auto error = std::abs(actual - wanted); maximum_error = (std::max)(maximum_error, error);
+                if (!std::isfinite(actual) || error > 1e-6f * (1 + std::abs(wanted))) {
+                    std::fprintf(stderr, "branch mismatch pass=%u vertex=%u output=%u lane=%u actual=%.9g expected=%.9g\n",
+                        pass, i, r, c, double(actual), double(wanted)); test(false);
+                }
+            }
+            if (!pass) test(as_float(result.vertices[i][program.position_output][0]) == (i % 2 ? -1.5f : 1.5f));
+        }
+    }
+    std::printf("{\"conditional_vertex_program\":true,\"vertices\":64,\"branches\":%u,\"maximum_absolute_error\":%.9g,\"execution_device\":\"%s\",\"desktop_offload_tested\":false}\n",
+        branches, double(maximum_error), backend.c_str());
+}
+void test_math_precision(const std::string &backend) {
+    const auto words = nr::registered_lab::shader_tokens(
+        "float4 main(float4 v:POSITION):SV_Position {float q=v.z*v.w;return float4(v.x*v.y-q,min(v.x,v.z),max(v.x,v.z),v.w);}", "vs_4_0");
+    const auto program = parse_vertex(words.data(), words.size());
+    std::vector<VertexRegisters> input(256);
+    for (unsigned i = 0; i < input.size(); ++i) {
+        const float value = 9285.84375f + float(i) * 31.125f;
+        input[i][0] = {as_bits(i % 2 ? -value : value), as_bits(0.125f), as_bits(0.07123f), as_bits(1.0f)};
+    }
+    VertexExecutor executor(program, uint32_t(input.size()), backend);
+    const auto result = executor.execute(input, {});
+    for (unsigned i = 0; i < input.size(); ++i) {
+        const auto expected = reference_vertex(program, input[i], {});
+        for (unsigned c = 0; c < 4; ++c) if (result.vertices[i][program.position_output][c] != expected[program.position_output][c]) {
+            std::fprintf(stderr, "math precision mismatch vertex=%u lane=%u actual=%08x expected=%08x\n",
+                i, c, result.vertices[i][program.position_output][c], expected[program.position_output][c]); test(false);
+        }
+    }
+    std::printf("{\"math_precision\":true,\"vertices\":256,\"exact_bits_verified\":true,\"execution_device\":\"%s\",\"desktop_offload_tested\":false}\n", backend.c_str());
+}
 }
 int main(int argc, char **argv) {
     try {
         std::string backend = "CPU";
         if (argc == 3 && !std::strcmp(argv[1], "--backend")) backend = argv[2];
         else test(argc == 1);
+        test_branches(backend);
+        test_math_precision(backend);
         const auto modifier_tokens = nr::registered_lab::shader_tokens(
             "struct O {float4 p:SV_Position;float4 a:COLOR;};O main(float4 v:POSITION){O o;o.p=-v;o.a=-abs(v);return o;}", "vs_4_0");
         const auto modifier_program = parse_vertex(modifier_tokens.data(), modifier_tokens.size());
