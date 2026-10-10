@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "C:\Users\tatef\AppData\Local\npu-render\vm\clear-graph-v190.py", line 31, in <module>
+    devices=compiled.get_property('EXECUTION_DEVICES');print(json.dumps({'kind':'compiled_devices','backend':a.backend,'devices':str(devices),'type':str(type(devices)),'width':width,'height':height}),flush=True);assert devices and all(str(d).startswith(a.backend) for d in devices)
+                                                                                                                                                                                                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

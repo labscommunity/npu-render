@@ -870,3 +870,17 @@ draws. Both captured draws replay with exact scalar pixels and coverage. The fad
 draw takes 4.5 seconds on the NPU; these fixes require installed trial v97 and do
 not establish interactive desktop offload. Runtime device loss in v96 remains
 unexplained; a fresh NPU regression process recovered without a driver change.
+
+The [v97 installed trial](../../../docs/validation/2026-10-10/sole-display-v97/report.json)
+completes 298 live NPU draws and receives four desktop frames with a complete
+taskbar. Start input exposes a 642×660 crop whose projected coordinates differ
+from integer screen coordinates by a few FP32 ulps. Exact floating equality
+incorrectly rejects its otherwise exact snapped raster boundary.
+
+[Clean build v189](../../../docs/validation/2026-10-10/point-snap-v189/report.json)
+retains exact snapped boundaries and bounds floating displacement to 1/512 pixel.
+The crop's existing unit-scale UV proof stays far from half-texel selection
+boundaries. All 423,720 captured pixels match the CPU and NPU oracle, and the NPU
+passes 3,520,832 point-draw components, 14 rejection cases and 58 driver draws.
+The 23 CPU suites pass. Installed trial v98 is still required; clear integration
+and interactive latency remain unresolved.

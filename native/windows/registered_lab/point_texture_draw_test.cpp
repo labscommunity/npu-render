@@ -4,6 +4,7 @@
 #include "shader_reference.hpp"
 #include <cstdio>
 #include <cstring>
+#include <cmath>
 using namespace nr::raster;
 using namespace nr::shader;
 namespace {
@@ -50,6 +51,31 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
                 test(out.pixels[size_t(y)*64+x][c] == expected); ++checked;
             }
             std::printf("{\"point_texture_draw\":true,\"frame\":%u,\"swap\":%s,\"draw_ms\":%.3f,\"execution_device\":\"%s\"}\n",frame,swap ? "true" : "false",out.timings.total_ms,out.execution_device.c_str());
+        }
+    }
+    // Captured Start-menu backdrop: the transformed +1/-1 endpoints are
+    // 0.9999998808/-0.9999998808, but snap to the exact 642x660 rectangle.
+    {
+        constexpr uint32_t w=642,h=660,sw=1024,sh=768,ox=191,oy=48;
+        PackedTexture source{sw,sh,87,{}};source.pixels.resize(size_t(sw)*sh);
+        for(size_t i=0;i<source.pixels.size();++i)for(unsigned c=0;c<4;++c)source.pixels[i][c]=uint8_t((i*17+c*71)&255);
+        PointTextureDrawExecutor executor(vs,ps,w,h,87,sw,sh,87,backend);
+        const Viewport view{0,0,float(w),float(h),0,1};
+        const uint32_t corners[6][2]{{0,0},{w,0},{w,h},{w,h},{0,h},{0,0}};
+        for(const float edge:{0.99999988079071044921875f,1.00000011920928955078125f}){
+            std::vector<VertexRegisters> inputs(6);
+            for(unsigned n=0;n<6;++n){
+                inputs[n][0]={as_bits(corners[n][0]?edge:-1.f),as_bits(corners[n][1]?-edge:1.f),as_bits(0.f),as_bits(1.f)};
+                inputs[n][1]={as_bits(1.f),as_bits(1.f),as_bits(1.f),as_bits(1.f)};
+                inputs[n][2]={as_bits(float(ox+corners[n][0])/sw),as_bits(float(oy+corners[n][1])/sh),0,0};
+            }
+            auto invalid=inputs;invalid[1][0][0]=as_bits(1.f-1.f/256.f);
+            bool failed=false;try{(void)executor.execute(invalid,{},view,source);}catch(const std::invalid_argument&){failed=true;}test(failed);++rejected;
+            const auto result=executor.execute(inputs,{},view,source);
+            test(result.covered_samples==uint64_t(w)*h && result.execution_device.rfind(backend,0)==0);
+            for(unsigned y=0;y<h;++y)for(unsigned x=0;x<w;++x)for(unsigned c=0;c<4;++c){
+                test(result.pixels[size_t(y)*w+x][c]==(c==3?255:source.pixels[size_t(y+oy)*sw+x+ox][c]));++checked;
+            }
         }
     }
     for (uint32_t bad = 0; bad < 4; ++bad) {

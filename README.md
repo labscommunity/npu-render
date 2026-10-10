@@ -113,20 +113,21 @@ now has an exact NPU specialization for opaque, one-to-one point-sampled quads.
 Its captured 1024×768 replay passes, as do changing-image and driver callback
 tests. This is a checked subset, not general desktop rendering.
 
-The [latest installed trial](docs/validation/2026-10-10/sole-display-v96/report.json)
-completes 276 live desktop NPU draws plus 13 prewarm requests. Seven frames arrive
-through the sole indirect display, but the Start-menu input test does not produce
-a verified response. A valid sparse draw is rejected before transport; an opacity
-shader fails NPU compilation, followed by runtime device loss. Both custom drivers
-unload cleanly and the normal VM desktop returns.
+The [latest installed trial](docs/validation/2026-10-10/sole-display-v97/report.json)
+completes 298 live desktop NPU draws plus 13 prewarm requests and delivers four
+frames, including wallpaper, icons and a complete taskbar. Start-menu interaction
+exposes a valid textured rectangle rejected by an overly strict floating-point
+boundary check. Both CPU and NPU replay reproduce the failure. Both custom
+drivers unload cleanly and the normal VM desktop returns.
 
-The [next clean build](docs/validation/2026-10-10/desktop-blockers-v188/report.json)
-uses actual projected bounds to admit sparse draws and a qualified 512-pixel batch
-for the captured opacity shader. Both failed desktop draws now replay on the NPU
-with exact scalar coverage and pixel bytes. All 23 CPU suites, 71,680 NPU shader
-components and 58 driver draws pass. The taskbar draw still takes 4.5 seconds;
-installed desktop/input validation is next. Stable interactive desktop offload
-and a Tahoma benefit remain unproven; pixel clears also still use the CPU.
+The [next clean build](docs/validation/2026-10-10/point-snap-v189/report.json)
+retains exact snapped raster boundaries while allowing bounded FP32 endpoint
+rounding. The captured 642×660 draw now matches all 423,720 pixels on the NPU.
+All 23 CPU suites, 3,520,832 NPU point-draw components and 58 driver draws pass.
+Installed desktop/input validation is next. A separate
+[NPU clear graph](docs/validation/2026-10-10/clear-graph-v192/report.json) passes
+151 million color components but is not yet integrated; driver clears still use
+the CPU. Stable interactive desktop offload and a Tahoma benefit remain unproven.
 
 [Mirrored-texture qualification](docs/validation/2026-10-10/mirror-v174/report.json)
 now replays that failed DWM blur draw on the NPU with all 8,192 output pixels

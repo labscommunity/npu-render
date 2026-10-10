@@ -1,0 +1,43 @@
+"""Diagnostic only: device quantization and full-image clear, no driver install."""
+import argparse,json,time
+from pathlib import Path
+import numpy as np
+import openvino as ov
+from openvino import opset13 as op
+p=argparse.ArgumentParser();p.add_argument('--backend',choices=['CPU','NPU'],required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
+a.output.mkdir(exist_ok=False);core=ov.Core();rows=[]
+def record(row):
+ rows.append(row);print(json.dumps(row),flush=True);(a.output/'runs.json').write_text(json.dumps(rows,indent=2)+'\n')
+# Include clamp endpoints, exactly representable midpoints and the adjacent floats.
+colors=[[-2,0,1,3],[0.5,0.25,0.75,1],[1/255,127/255,128/255,254/255]]
+for k in (0,1,2,63,126,127,128,253,254):
+ x=np.float32((k+.5)/255);colors.append([float(np.nextafter(x,np.float32(-np.inf))),float(x),float(np.nextafter(x,np.float32(np.inf))),1])
+colors=np.asarray(colors,dtype=np.float32)
+for width,height in ((1,1),(65,7),(1024,768),(1025,769)):
+ for bgra in (False,True):
+  color=op.parameter([1,1,1,4],np.float32,name='color')
+  value=op.multiply(op.clamp(color,0.,1.),np.float32(255))
+  base=op.bitwise_and(op.convert(value,'i32'),np.int32(255));fraction=op.subtract(value,op.convert(base,'f32'))
+  increment=op.bitwise_or(op.convert(op.greater(fraction,np.float32(.5)),'i32'),op.bitwise_and(op.convert(op.equal(fraction,np.float32(.5)),'i32'),op.bitwise_and(base,np.int32(1))))
+  q=op.add(base,increment)
+  if bgra:q=op.gather(q,np.asarray([2,1,0,3],dtype=np.int64),np.int32(3))
+  result=op.convert(op.broadcast(q,np.asarray([1,height,width,4],dtype=np.int64)),'u8')
+  model=ov.Model([result],[color])
+  for node in model.get_ops():node.set_rt_info('', 'precise_0')
+  xml=a.output/f'{width}x{height}-{bgra}.xml';weights=xml.with_suffix('.bin');ov.serialize(model,xml,weights)
+  model=core.read_model(xml,weights)
+  assert all('precise_0' in node.get_rt_info() for node in model.get_ops())
+  started=time.perf_counter();compiled=core.compile_model(model,a.backend,{'PERFORMANCE_HINT':'LATENCY','EXECUTION_MODE_HINT':'ACCURACY'});compile_ms=(time.perf_counter()-started)*1000
+  devices=compiled.get_property('EXECUTION_DEVICES');print(json.dumps({'kind':'compiled_devices','backend':a.backend,'devices':str(devices),'type':str(type(devices)),'width':width,'height':height}),flush=True);devices=[devices] if isinstance(devices,str) else list(devices);assert devices and all(d==a.backend or d.startswith(a.backend+'.') for d in devices)
+  request=compiled.create_infer_request();elapsed=[];components=0
+  for rgba in colors:
+   started=time.perf_counter();request.infer({0:rgba.reshape(1,1,1,4)});elapsed.append((time.perf_counter()-started)*1000)
+   pixels=request.get_output_tensor().data
+   expected=np.rint(np.clip(rgba,0,1)*np.float32(255)).astype(np.uint8)
+   if bgra:expected=expected[[2,1,0,3]]
+   if not np.all(pixels==expected):
+    differing=np.argwhere(pixels!=expected);record({'passed':False,'shape':[width,height],'bgra':bgra,'rgba':rgba.tolist(),'expected':expected.tolist(),'first':pixels[0,0,0].tolist(),'differences':len(differing)});raise RuntimeError('Device clear differs')
+   components+=pixels.size
+  record({'passed':True,'width':width,'height':height,'bgra':bgra,'colors':len(colors),'verified_components':components,'execution_devices':list(devices),'compile_ms':compile_ms,'median_inference_ms':float(np.median(elapsed)),'inference_ms':elapsed})
+  del request,compiled,model
+(a.output/'report.json').write_text(json.dumps({'passed':True,'backend':a.backend,'components':sum(r['verified_components'] for r in rows),'driver_installed':False,'desktop_offload_tested':False},indent=2)+'\n')

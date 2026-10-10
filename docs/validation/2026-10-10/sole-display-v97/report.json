@@ -1,0 +1,36 @@
+{
+  "trial": "v97",
+  "source_commit": "9ee3d2603269879d0dfc8c95b161f29825445af1",
+  "umd_build": "present-umd-v188",
+  "package_version": "0.0.85.0",
+  "worker_successes_by_client": {
+    "42": 13,
+    "7616": 50,
+    "6428": 192,
+    "7860": 56
+  },
+  "acknowledged_successes_by_client": {
+    "42": 13,
+    "7616": 50,
+    "6428": 192,
+    "7860": 56
+  },
+  "acknowledged_failures": 1,
+  "received_frames": 4,
+  "full_desktop_offload": false,
+  "usable_interactive_desktop": false,
+  "tahoma_performance_tested": false,
+  "original_cleanup_passed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "guest_restart": false,
+  "findings": [
+    "311 successful native NPU requests include 13 prewarm and 298 live draws. All have relay acknowledgements. One DWM draw rejects with unsupported point-textured triangle draw. No NPU device-loss error is recorded.",
+    "Four frames arrive under the sole indirect display gate. Later frames contain wallpaper, icons and a complete taskbar. Start and Escape are sent, but before-Start and after-Start snapshots are identical; the later desktop frame is not a verified menu response.",
+    "The failed six-vertex draw renders a 642x660 crop of a 1024x768 texture with the already supported 42-word pixel shader. The complete 8179720-byte capture has SHA256 9bac3968fcf0f246da8830ffe7bf93d3f75047b8c3fa260ed7f27980515b5377. Original CPU and NPU replays both reproduce rejection.",
+    "The independent scalar vertex inspection yields right/bottom clip endpoints 0.9999998808/-0.9999998808. They snap to the intended raster boundary, but the fast crop implementation also demands exact floating screen coordinates. The proposed fix retains exact snapped boundaries and bounds the float deviation to 1/512 pixel, safely below the half-texel selection margin for its unit-scale crop proof.",
+    "A separate DWM vertex-buffer bind while locked is rejected; later draws and presentation continue. The role of this event in desktop behavior has not been independently established.",
+    "Both drivers unload cleanly, the stream configuration is removed and the original 1280x800 VM desktop is visually verified. The worker exits on socket closure during normal shutdown.",
+    "Next: qualify the snapped-boundary fix and repeat installed input testing. Pixel clears still use the CPU, and rendering remains too slow for a usable desktop."
+  ]
+}

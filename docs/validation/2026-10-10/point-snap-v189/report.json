@@ -1,0 +1,24 @@
+{
+  "build": "present-umd-v189",
+  "all_checks_passed": true,
+  "point_components": 3520832,
+  "captured_pixels": 423720,
+  "native_npu_execution": true,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "cpu_suites_passed": 23,
+  "cpu_suite_elapsed_seconds": 128.67,
+  "source_hashes_verified": 111,
+  "binary_hashes_verified": 29,
+  "invalid_point_draws_rejected": 14,
+  "ddi_draws_verified": 58,
+  "full_desktop_offload": false,
+  "physical_driver_changed": false,
+  "findings": [
+    "The original captured draw fails on both CPU and NPU because a transformed edge differs from its integer screen coordinate by a few FP32 ulps. The rectangle fast path now admits only exact snapped corners with floating displacement at most 1/512 pixel. The unit-scale texture endpoint proof remains bounded to 1/1024 texel. This preserves point selection at pixel centers.",
+    "The 642x660 fixture checks both inward and outward FP32 rounding, all color bytes, genuinely displaced-corner rejection and reuse after rejection. The full point test checks 3520832 components and 14 rejected draws on the NPU.",
+    "The original 8179720-byte capture now replays on both CPU and NPU. All 423720 pixels match the independent point oracle exactly. Native NPU draw time is 70.050 ms after 59.075 ms compilation/cache load in this diagnostic; CPU draw time is 20.922 ms. Neither establishes interactive desktop performance.",
+    "All 23 CPU suites and 58 native NPU driver draws pass. The build also includes explicit CPU FP32 packed-blend properties; its GPU/NPU properties are unchanged.",
+    "Next: signed installed v98 desktop/input trial. NPU clears have a separately qualified graph but are not integrated into this build."
+  ]
+}

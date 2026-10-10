@@ -1,0 +1,6 @@
+slot 0 input=0 texture=1 sampler=1
+slot 1 input=15 texture=0 sampler=0
+slot 2 input=3 texture=0 sampler=0
+op 69 dest r0 mask=15 sat=0 src0 (1,2,0,0100,mod=0) src1 (7,0,0,0123,mod=0) src2 (6,0,0,0123,mod=0)
+op 54 dest r0 mask=8 sat=0 src0 (4,0,0,0123,mod=0) 1 1 1 1
+op 56 dest r0 mask=15 sat=0 src0 (0,0,0,0123,mod=0) src1 (1,1,0,0123,mod=0)

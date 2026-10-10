@@ -1,0 +1,36 @@
+{
+  "diagnostic": "clear-graph-v192",
+  "native_npu_execution": true,
+  "verified_components": 151210848,
+  "shapes": [
+    [
+      1,
+      1
+    ],
+    [
+      65,
+      7
+    ],
+    [
+      1024,
+      768
+    ],
+    [
+      1025,
+      769
+    ]
+  ],
+  "formats": [
+    "RGBA",
+    "BGRA"
+  ],
+  "colors_per_shape": 12,
+  "driver_integration_tested": false,
+  "full_desktop_offload": false,
+  "findings": [
+    "The original graph passes CPU checks for 151210848 components. The first two NPU attempts fail in the harness because the NPU execution-device property is a string, while CPU returns a list. Both are normalized without weakening explicit-device validation.",
+    "The first actual NPU inference fails UNORM rounding: color [0.5,0.25,0.75,1] becomes [127,63,191,255] rather than [128,64,191,255]. Applying an integer byte mask before deriving the fractional remainder preserves the rounding increment. This follows the existing qualified solid-rectangle graph structure.",
+    "The corrected NPU graph passes all eight image/format cases and every output component, including adjacent floats around selected half-byte rounding boundaries. Failed graph variants are retained.",
+    "Registered-driver CPU build work overlaps these calls, so timing is diagnostic and not an isolated performance comparison. No driver clear callback or live desktop clear has used this graph yet."
+  ]
+}

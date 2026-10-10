@@ -82,12 +82,16 @@ UniformDrawExecutor::Result PointTextureDrawExecutor::execute(const std::vector<
     for (size_t i = 0; i < 6; ++i) {
         const auto &p = projected.vertices[i];
         for (size_t c = 0; c < 2; ++c) {
-            require(p.screen[c] == float(corners[i][c]) && p.snapped[c] == int32_t(corners[i][c]*256));
+            // Raster coverage uses the snapped grid. DWM's viewport transform
+            // can leave an edge a few FP32 ulps from its integer pixel boundary.
+            require(p.snapped[c] == int32_t(corners[i][c]*256) &&
+                std::abs(double(p.screen[c])-double(corners[i][c])) <= 1.0/512.0);
             float uv = 0; std::memcpy(&uv, &shaded.vertices[i][s.pixel.uv][c], 4); require(std::isfinite(uv));
             const double texel = double(uv) * (c ? source.height : source.width);
             if (!i) origin[c] = std::round(texel);
             // The affine quad has unit clip w. Endpoint error <= 1/1024 texel
-            // and bounded FP32 interpolation stay far from half-texel cell
+            // plus <= 1/512-pixel endpoint displacement and bounded FP32
+            // interpolation stay far from half-texel cell
             // boundaries, so point selection equals this integer crop.
             require(std::abs(texel - (origin[c]+corners[i][c])) <= 1.0/1024.0);
         }

@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "C:\Users\tatef\AppData\Local\npu-render\vm\clear-graph-v191.py", line 39, in <module>
+    differing=np.argwhere(pixels!=expected);record({'passed':False,'shape':[width,height],'bgra':bgra,'rgba':rgba.tolist(),'expected':expected.tolist(),'first':pixels[0,0,0].tolist(),'differences':len(differing)});raise RuntimeError('Device clear differs')
+                                                                                                                                                                                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: Device clear differs
