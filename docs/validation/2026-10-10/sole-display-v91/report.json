@@ -1,0 +1,36 @@
+{
+  "trial": "v91",
+  "source_commit": "ed52a218afd6348126c66290c9333499942be59a",
+  "umd_build": "present-umd-v165",
+  "package_version": "0.0.79.0",
+  "worker_successes_by_client": {
+    "42": 13,
+    "4764": 35,
+    "1076": 68,
+    "5384": 56
+  },
+  "acknowledged_successes_by_client": {
+    "42": 13,
+    "4764": 35,
+    "1076": 68,
+    "5384": 56
+  },
+  "received_frames": 1,
+  "viewer_submissions": 1,
+  "full_desktop_offload": false,
+  "usable_interactive_desktop": false,
+  "tahoma_performance_tested": false,
+  "collector_completed_without_error": true,
+  "original_cleanup_passed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "guest_restart": false,
+  "findings": [
+    "172 successful NPU requests: 13 prewarm packets and 159 live desktop draws (68 DWM, 35 Explorer, 56 StartMenuExperienceHost). Every successful reply has an acknowledged relay receipt.",
+    "DWM rejects a 223-word pixel shader using AND and NE. Its raw token stream, SHA256 and fixture are preserved. No 1850-word loop shader creation is observed in this trial; the earlier loop fix remains separately qualified, not proven exercised by this installed trial.",
+    "One 1024x768 frame arrives while the indirect display is the only active path. It shows desktop icons over black with a clipped taskbar. The viewer submits this frame, but no physical scanout is measured.",
+    "The input test sends only a Control wake event. The visible-content gate never admits the Start/Escape checks; no visual input response is verified.",
+    "The observer records a DWM DDI rejection at 96363 ms, then waits 31545 ms for the finite topology helper. Display paths restore successfully; both custom device removals pass. The normal VM wallpaper, icons and complete taskbar are visually verified after cleanup.",
+    "The stream configuration is removed. The worker reports socket closed or timed out (exit 1) as the finite relay closes; no NPU draw rejection is logged. The VM stays running for the next experiment."
+  ]
+}

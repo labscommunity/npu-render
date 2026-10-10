@@ -1,0 +1,36 @@
+{
+  "build": "present-umd-v167",
+  "clean_build": true,
+  "verified_source_files": 108,
+  "verified_binaries": 27,
+  "cpu_suites_passed": 21,
+  "cpu_ctest_seconds": 102.22,
+  "native_npu_qualification_passed": true,
+  "new_arithmetic_exact_components": 512,
+  "predicate_flow_exact_components": 256,
+  "captured_mask_shader_words": 223,
+  "captured_mask_shader_sha256": "b7f4e6d0abea95bb235098b7e357eacd906679d4626ba4abf4b3c5e3ca31ecf7",
+  "captured_shader_components": 512,
+  "captured_shader_maximum_error": 0,
+  "raster_exact_pixels": 1024,
+  "scissor_covered_pixels": 572,
+  "captured_packet_exact_components": 4096,
+  "captured_packet_provider_requests": 14,
+  "captured_packet_draw_ms": 83.08,
+  "uniform_loop_packet_exact_components": 16384,
+  "npu_indexed_ddi_draws": 57,
+  "full_desktop_offload": false,
+  "installed_driver_tested": false,
+  "tahoma_performance_tested": false,
+  "physical_driver_changed": false,
+  "findings": [
+    "AND and float NE execute on the provider. Raw AND output bits and comparison masks match the scalar oracle on 512 components, including signed zero, subnormals, adjacent normal values, infinities and NaNs.",
+    "Predicate proof propagates through MOV/swizzles, SELECT and branch joins. Mask-and-float arithmetic matches 256 components; negative tests reject modified or unproven predicate paths instead of assuming an arbitrary bitcast.",
+    "The exact 223-word DWM masking shader matches 512 scalar components with zero error across point and linear filtering, two textures, bounds clipping and non-unit coordinate divisors. Its scissored raster and ABI8 worker packet pass exact pixel checks.",
+    "Loop, derivative, typed-load, textured-triangle, texture and DDI regressions pass. These are component and packet tests, not an installed desktop result.",
+    "The NPU compiler logs an empty-function diagnostic during qualification; the process exits successfully and exact shader/raster results still pass. The original diagnostic is retained; no CPU fallback is requested or accepted."
+  ],
+  "compiler_diagnostic_files": [
+    "raster-NPU.stdout.jsonl"
+  ]
+}

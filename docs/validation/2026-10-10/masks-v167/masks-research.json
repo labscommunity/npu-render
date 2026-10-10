@@ -1,0 +1,14 @@
+{
+  "sources": [
+    {
+      "url": "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/and--sm4---asm-",
+      "contract": "Component-wise bitwise AND of the two 32-bit source values."
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/ne--sm4---asm-",
+      "contract": "Float inequality returns all-one or zero masks, flushes denormals, equates signed zero and returns true when either operand is NaN."
+    }
+  ],
+  "implementation_boundary": "Arbitrary AND values retain an integer bit view. A floating view is admitted only when one operand is proven to be zero or all ones, allowing device selection of the other operand or positive zero. Predicate proof propagates through unmodified MOV/swizzles, SELECT and conservative branch joins. Unproven arbitrary bitcasts still reject.",
+  "captured_shader_sha256": "b7f4e6d0abea95bb235098b7e357eacd906679d4626ba4abf4b3c5e3ca31ecf7"
+}

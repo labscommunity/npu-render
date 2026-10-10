@@ -96,6 +96,7 @@ def main():
         "nr_registered_typed_load_test.exe",
         "nr_registered_derivative_test.exe",
         "nr_registered_loop_test.exe",
+        "nr_registered_mask_test.exe",
     ):
         binaries[name] = hashlib.sha256(
             (args.build_dir / "Release" / name).read_bytes()

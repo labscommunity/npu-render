@@ -113,21 +113,30 @@ now has an exact NPU specialization for opaque, one-to-one point-sampled quads.
 Its captured 1024×768 replay passes, as do changing-image and driver callback
 tests. This is a checked subset, not general desktop rendering.
 
-The [latest installed trial](docs/validation/2026-10-10/sole-display-v90/report.json)
-completes 184 live desktop NPU draws plus 13 prewarm requests. Eleven frames arrive,
-including a partial desktop, but a newly encountered compositor shader with loops
-is rejected. Start-menu input has no verified visual response. Driver cleanup
-requires a separate verified recovery, after which the normal VM desktop is
-restored. Full desktop offload and a Tahoma benefit remain unproven.
+The [latest installed trial](docs/validation/2026-10-10/sole-display-v91/report.json)
+completes 159 live desktop NPU draws plus 13 prewarm requests, all acknowledged.
+One incomplete desktop frame arrives through the sole indirect display. DWM
+rejects a newly encountered 223-word masking shader using AND and NE; the
+Start-menu interaction gate never admits its test. Both custom drivers unload
+cleanly and the normal VM desktop is restored. Full desktop offload and a Tahoma
+benefit remain unproven.
 
-The [next loop-shader qualification](docs/validation/2026-10-10/loops-v165/report.json)
+The [loop-shader qualification](docs/validation/2026-10-10/loops-v165/report.json)
 passes the captured 1,850-word mirrored filter on the NPU, including 33 scalar
 comparisons, a scissored raster draw and native draw-packet delivery. General
 admitted loops use a checked 16-iteration bound. The captured filter has an exact
 bytecode specialization with up to 128 sample pairs and a verified 256-pixel
 batch limit. A larger batch lost the NPU device during qualification; the failed
 experiment and subsequent recovery check are retained. Twenty CPU suites and
-57 NPU indexed DDI draws pass. Installed desktop behavior remains the next test.
+57 NPU indexed DDI draws pass. The v91 installed trial does not exercise this
+1,850-word shader; its real desktop behavior remains unverified.
+
+The [masking-shader qualification](docs/validation/2026-10-10/masks-v167/report.json)
+adds bitwise AND and floating inequality with conservative predicate tracking.
+The captured 223-word shader matches the scalar reference exactly on the NPU for
+point and linear sampling. Its scissored raster and native draw packet also pass,
+alongside 21 CPU suites and the NPU regression checks. Installed desktop behavior
+with this additional support remains unverified.
 
 [NPU-computed triangle bounds](docs/validation/2026-10-10/triangle-bounds-v112/report.json)
 now restrict tile dispatch while preserving exact output in eight replays of four

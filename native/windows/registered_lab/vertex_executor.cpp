@@ -13,7 +13,7 @@ namespace nr::shader {
 namespace {
 namespace op = ov::opset13;
 using Node = std::shared_ptr<ov::Node>;
-struct Value { Node floating, integer; };
+struct Value { Node floating, integer; bool predicate = false; };
 using Lanes = std::array<Value, 4>;
 Node integer(int32_t value) { return op::Constant::create(ov::element::i32, ov::Shape{}, {value}); }
 Node indices(std::initializer_list<int64_t> values) {
@@ -137,7 +137,7 @@ struct RegisterExecutor::State {
             if (a.kind == Register::input) raw = input[a.index];
             else if (a.kind == Register::temporary) raw = temporary[a.index];
             else if (a.kind == Register::immediate) {
-                for (unsigned c = 0; c < 4; ++c) raw[c] = {floating(a.literal[c]), integer(int32_t(a.literal[c]))};
+                for (unsigned c = 0; c < 4; ++c) raw[c] = {floating(a.literal[c]), integer(int32_t(a.literal[c])),a.literal[c]==0 || a.literal[c]==UINT32_MAX};
             } else if (a.kind == Register::constant || a.kind == Register::indexable) {
                 const auto size=a.kind==Register::constant?program.constants[a.index]:uint32_t(program.literal_tables[a.index].size());
                 Node index = integer(int32_t(a.element));
@@ -172,6 +172,7 @@ struct RegisterExecutor::State {
             for (unsigned c = 0; c < 4; ++c) {
                 result[c] = raw[a.lanes[c]];
                 if (a.modifier != Modifier::none) {
+                    result[c].predicate=false;
                     if (integer_modifier) {
                         if (result[c].integer) result[c].integer = std::make_shared<op::Negative>(result[c].integer);
                         result[c].floating.reset(); continue;
@@ -366,7 +367,7 @@ struct RegisterExecutor::State {
                             if (a == other_value) return a;
                             return choose(b.condition, b.has_else ? other_value : a, b.has_else ? a : other_value);
                         };
-                        current = {join(current.floating, alternative.floating), join(current.integer, alternative.integer)};
+                        current = {join(current.floating, alternative.floating), join(current.integer, alternative.integer),current.predicate && alternative.predicate};
                     }
                 };
                 merge(temporary, b.has_else ? b.then_temps : b.before_temps);
@@ -403,6 +404,16 @@ struct RegisterExecutor::State {
             Lanes result{};
             for (unsigned c = 0; c < 4; ++c) if (instruction.destination.mask & (1u << c)) {
                 if (instruction.opcode == Opcode::move) result[c] = sources[0][c];
+                else if(instruction.opcode==Opcode::bitwise_and){
+                    const auto &a=sources[0][c],&b=sources[1][c];check(bool(a.integer) && bool(b.integer));
+                    result[c].integer=std::make_shared<op::BitwiseAnd>(a.integer,b.integer);
+                    result[c].predicate=a.predicate && b.predicate;
+                    // A proven 0/all-ones mask preserves the other operand's
+                    // float bits or returns +0. This is not numeric int-to-float
+                    // conversion, and makes no assumption about arbitrary bits.
+                    if(a.predicate && b.floating)result[c].floating=choose(std::make_shared<op::NotEqual>(a.integer,integer(0)),b.floating,number(0));
+                    else if(b.predicate && a.floating)result[c].floating=choose(std::make_shared<op::NotEqual>(b.integer,integer(0)),a.floating,number(0));
+                }
                 else if (instruction.opcode == Opcode::integer_add) {
                     check(bool(sources[0][c].integer) && bool(sources[1][c].integer));
                     result[c].integer = std::make_shared<op::Add>(sources[0][c].integer, sources[1][c].integer);
@@ -421,6 +432,7 @@ struct RegisterExecutor::State {
                     const auto low=bit(std::make_shared<op::GreaterEqual>(al,bl));
                     result[c].integer=std::make_shared<op::Multiply>(std::make_shared<op::BitwiseOr>(high,
                         std::make_shared<op::BitwiseAnd>(same,low)),integer(-1));
+                    result[c].predicate=true;
                 } else if(instruction.opcode==Opcode::integer_mad){
                     check(bool(sources[0][c].integer) && bool(sources[1][c].integer) && bool(sources[2][c].integer));
                     result[c].integer=std::make_shared<op::Add>(std::make_shared<op::Multiply>(sources[0][c].integer,sources[1][c].integer),sources[2][c].integer);
@@ -468,6 +480,7 @@ struct RegisterExecutor::State {
                         result[c].floating = choose(condition, sources[1][c].floating, sources[2][c].floating);
                     if (sources[1][c].integer && sources[2][c].integer)
                         result[c].integer = choose(condition, sources[1][c].integer, sources[2][c].integer);
+                    result[c].predicate=sources[1][c].predicate && sources[2][c].predicate;
                 }
                 else {
                     const auto a = sources[0][c].floating, b = sources[1][c].floating;
@@ -518,11 +531,13 @@ struct RegisterExecutor::State {
                         Node finite=choose(std::make_shared<op::Less>(a,number(0)),negative_fraction,fraction);
                         finite=choose(std::make_shared<op::Less>(magnitude,number(1.1754943508222875e-38f)),number(0),finite);
                         value=choose(std::make_shared<op::IsNaN>(a),a,choose(std::make_shared<op::IsInf>(a),std::make_shared<op::Subtract>(a,a),finite));
-                    } else if (instruction.opcode == Opcode::less || instruction.opcode==Opcode::greater_equal) {
+                    } else if (instruction.opcode == Opcode::less || instruction.opcode==Opcode::greater_equal || instruction.opcode==Opcode::not_equal) {
                         auto flush=[&](const Node &v)->Node{return choose(std::make_shared<op::Less>(std::make_shared<op::Abs>(v),number(1.1754943508222875e-38f)),number(0),v);};
-                        const Node comparison=instruction.opcode==Opcode::less?Node(std::make_shared<op::Less>(a,b)):Node(std::make_shared<op::GreaterEqual>(flush(a),flush(b)));
+                        const Node comparison=instruction.opcode==Opcode::less?Node(std::make_shared<op::Less>(a,b)):
+                            instruction.opcode==Opcode::not_equal?Node(std::make_shared<op::NotEqual>(flush(a),flush(b))):Node(std::make_shared<op::GreaterEqual>(flush(a),flush(b)));
                         result[c].integer = std::make_shared<op::Multiply>(
                             std::make_shared<op::Convert>(comparison, ov::element::i32), integer(-1));
+                        result[c].predicate=true;
                     } else if (instruction.opcode == Opcode::minimum || instruction.opcode == Opcode::maximum) {
                         // Native NPU floating min/max returned zero in the
                         // precision-marked graph. Compare and gather instead.
@@ -635,7 +650,7 @@ void RegisterExecutor::validate(const Program &original) {
     // Type views are properties of each SSA value, not permanent register
     // types. Branch joins retain only the views available on both paths.
     using Masks = std::array<uint32_t, 16>;
-    struct Views { Masks temporary_float{}, temporary_bits{}, output_float{}, output_bits{}; };
+    struct Views { Masks temporary_float{}, temporary_bits{}, output_float{}, output_bits{},temporary_predicate{},output_predicate{}; };
     struct Branch { Views before, then_values{}; bool has_else = false; };
     Views views;
     std::vector<Branch> branches;
@@ -646,6 +661,14 @@ void RegisterExecutor::validate(const Program &original) {
         else if (source.kind == Register::input) raw = program.inputs[source.index];
         uint32_t result = 0;
         for (unsigned c = 0; c < 4; ++c) if (raw & (1u << source.lanes[c])) result |= 1u << c;
+        return result;
+    };
+    auto predicates=[&](const Operand &source){
+        uint32_t result=0;if(source.modifier!=Modifier::none)return result;
+        for(unsigned c=0;c<4;++c){const auto lane=source.lanes[c];
+            if(source.kind==Register::temporary && (views.temporary_predicate[source.index]&(1u<<lane)))result|=1u<<c;
+            if(source.kind==Register::immediate && (source.literal[lane]==0 || source.literal[lane]==UINT32_MAX))result|=1u<<c;
+        }
         return result;
     };
     for (const auto &instruction : program.instructions) {
@@ -669,22 +692,31 @@ void RegisterExecutor::validate(const Program &original) {
             for (unsigned i = 0; i < 16; ++i) {
                 views.temporary_float[i] &= other.temporary_float[i]; views.temporary_bits[i] &= other.temporary_bits[i];
                 views.output_float[i] &= other.output_float[i]; views.output_bits[i] &= other.output_bits[i];
+                views.temporary_predicate[i]&=other.temporary_predicate[i];views.output_predicate[i]&=other.output_predicate[i];
             }
             branches.pop_back(); continue;
         }
         const auto &destination = instruction.destination;
         const auto mask = destination.mask;
-        uint32_t floating_views = 0, bit_views = 0;
+        uint32_t floating_views = 0, bit_views = 0,predicate_views=0;
         if (instruction.opcode == Opcode::move) {
             floating_views = available(instruction.sources[0], false); bit_views = available(instruction.sources[0], true);
+            predicate_views=predicates(instruction.sources[0]);
             if (instruction.sources[0].modifier != Modifier::none) check(!(mask & ~bit_views));
         } else if (instruction.opcode == Opcode::select) {
             check(!(mask & ~available(instruction.sources[0], true)));
             floating_views = available(instruction.sources[1], false) & available(instruction.sources[2], false);
             bit_views = available(instruction.sources[1], true) & available(instruction.sources[2], true);
+            predicate_views=predicates(instruction.sources[1])&predicates(instruction.sources[2]);
+        } else if(instruction.opcode==Opcode::bitwise_and){
+            for(unsigned i=0;i<2;++i)check(!(mask&~available(instruction.sources[i],true)));
+            const auto a=predicates(instruction.sources[0]),b=predicates(instruction.sources[1]);
+            bit_views=mask;predicate_views=a&b;
+            floating_views=(a&available(instruction.sources[1],false))|(b&available(instruction.sources[0],false));
         } else if (instruction.opcode == Opcode::integer_add || instruction.opcode == Opcode::integer_greater_equal || instruction.opcode == Opcode::integer_mad || instruction.opcode==Opcode::shift_right || instruction.opcode == Opcode::shift_left || instruction.opcode == Opcode::integer_to_float) {
             for (unsigned i = 0; i < instruction.source_count; ++i) check(!(mask & ~available(instruction.sources[i], true)));
             if (instruction.opcode != Opcode::integer_to_float) bit_views = mask; else floating_views = mask;
+            if(instruction.opcode==Opcode::integer_greater_equal)predicate_views=mask;
         } else if(instruction.opcode==Opcode::float_to_integer){
             check(!(mask&~available(instruction.sources[0],true)));bit_views=mask;
         } else if(instruction.opcode==Opcode::load){
@@ -697,13 +729,15 @@ void RegisterExecutor::validate(const Program &original) {
         } else {
             const auto used = instruction.opcode == Opcode::dot2 ? 3u : (instruction.opcode == Opcode::dot3 ? 7u : (instruction.opcode == Opcode::dot4 ? 15u : mask));
             for (unsigned i = 0; i < instruction.source_count; ++i) check(!(used & ~available(instruction.sources[i], false)));
-            if (instruction.opcode == Opcode::less || instruction.opcode==Opcode::greater_equal) bit_views = mask; else floating_views = mask;
+            if (instruction.opcode == Opcode::less || instruction.opcode==Opcode::greater_equal || instruction.opcode==Opcode::not_equal)bit_views=predicate_views=mask; else floating_views = mask;
         }
         check(!(mask & ~(floating_views | bit_views)));
         auto &floats = destination.kind == Register::temporary ? views.temporary_float : views.output_float;
         auto &bits = destination.kind == Register::temporary ? views.temporary_bits : views.output_bits;
         floats[destination.index] = (floats[destination.index] & ~mask) | (floating_views & mask);
         bits[destination.index] = (bits[destination.index] & ~mask) | (bit_views & mask);
+        auto &known=destination.kind==Register::temporary?views.temporary_predicate:views.output_predicate;
+        known[destination.index]=(known[destination.index]&~mask)|(predicate_views&mask);
     }
     for (unsigned i = 0; i < 16; ++i) check(!(program.outputs[i] & ~(views.output_float[i] | views.output_bits[i])));
 }

@@ -82,6 +82,7 @@ inline Registers reference_vertex(const Program &program, const Registers &input
             else if (instruction.opcode == Opcode::move) value[i] = values[0][i];
             else if (instruction.opcode == Opcode::select) value[i] = values[0][i] ? values[1][i] : values[2][i];
             else if (instruction.opcode == Opcode::integer_add) value[i] = values[0][i] + values[1][i];
+            else if(instruction.opcode==Opcode::bitwise_and)value[i]=values[0][i]&values[1][i];
             else if(instruction.opcode==Opcode::integer_mad)value[i]=values[0][i]*values[1][i]+values[2][i];
             else if(instruction.opcode==Opcode::shift_right){
                 const auto amount=values[1][0]&31,raw=values[0][i];
@@ -106,6 +107,7 @@ inline Registers reference_vertex(const Program &program, const Registers &input
             else if (instruction.opcode == Opcode::less)
                 value[i] = as_float(values[0][i]) < as_float(values[1][i]) ? 0xffffffffu : 0;
             else if(instruction.opcode==Opcode::greater_equal){auto flush=[](float v){return std::fpclassify(v)==FP_SUBNORMAL?0.f:v;};value[i]=flush(as_float(values[0][i]))>=flush(as_float(values[1][i]))?0xffffffffu:0;}
+            else if(instruction.opcode==Opcode::not_equal){auto flush=[](float v){return std::fpclassify(v)==FP_SUBNORMAL?0.f:v;};value[i]=flush(as_float(values[0][i]))!=flush(as_float(values[1][i]))?0xffffffffu:0;}
             else if(instruction.opcode==Opcode::integer_greater_equal){int32_t a,b;std::memcpy(&a,&values[0][i],4);std::memcpy(&b,&values[1][i],4);value[i]=a>=b?0xffffffffu:0;}
             else if (instruction.opcode == Opcode::integer_to_float) {
                 int32_t source; std::memcpy(&source, &values[0][i], sizeof(source)); value[i] = as_bits(float(source));
