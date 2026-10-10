@@ -136,7 +136,7 @@ int test_input_layout(D3D10DDI_HDEVICE h, const D3D10DDI_DEVICEFUNCS &f, D3D10DD
         const unsigned char color[]{255, 0, 127, static_cast<unsigned char>(i * 255)};
         std::memcpy(data + 12, color, sizeof(color));
     }
-    f.pfnDynamicIABufferUnmap(h, buffer, 0);
+
     D3D10DDIARG_INPUT_ELEMENT_DESC elements[]{
         {3, 0, DXGI_FORMAT_R32G32B32_FLOAT, D3D10_DDI_INPUT_PER_VERTEX_DATA, 0, 2},
         {3, 12, DXGI_FORMAT_R8G8B8A8_UNORM, D3D10_DDI_INPUT_PER_VERTEX_DATA, 0, 4}};
@@ -155,6 +155,12 @@ int test_input_layout(D3D10DDI_HDEVICE h, const D3D10DDI_DEVICEFUNCS &f, D3D10DD
     f.pfnIaSetInputLayout(h, invalid);
     TEST(last_error == E_INVALIDARG && device(h).input_elements == retained.lock());
     f.pfnDestroyElementLayout(h, invalid); last_error = S_OK;
+    const UINT mapped_stride=20,mapped_offset=4;
+    f.pfnIaSetVertexBuffers(h,3,1,&buffer,&mapped_stride,&mapped_offset);
+    TEST(last_error==S_OK && resource(buffer).allocation->locked && device(h).vertex_buffers[3].allocation==resource(buffer).allocation);
+    bool mapped_rejected=false;try{(void)fetch_vertices(device(h),2,0);}catch(const Error &e){mapped_rejected=e.status==E_INVALIDARG;}
+    TEST(mapped_rejected && resource(buffer).allocation->locked);
+    f.pfnDynamicIABufferUnmap(h,buffer,0);TEST(last_error==S_OK);
     const auto fetched = fetch_vertices(device(h), 2, 0);
     for (UINT i = 0; i < 2; ++i) {
         const float position[]{float(i) + 0.25f, -0.5f, 0.125f, 1.0f};

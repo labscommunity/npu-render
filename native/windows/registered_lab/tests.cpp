@@ -138,11 +138,13 @@ HRESULT APIENTRY render_cb(HANDLE rt, D3DDDICB_RENDER *a) {
 #include "mip_test.hpp"
 #include "geometry_test.hpp"
 #include "buffer_test.hpp"
+#include "clear_ddi_test.hpp"
 int main(int argc, char **argv) {
     std::setvbuf(stdout, nullptr, _IONBF, 0); // Preserve the last completed check if a callback crashes.
     const char *backend = argc >= 2 ? argv[1] : "CPU";
     const bool desktop_size = argc == 3 && !std::strcmp(argv[2], "--desktop-size");
     TEST(argc <= 2 || desktop_size);
+    TEST(nr_fill_configure("CPU")); // Allocation/submission shims explicitly exercise the CPU fill path.
     TEST(OpenAdapter10_2(nullptr) == E_INVALIDARG);
     if (!nr_fill_guest()) {
         D3DDDI_ADAPTERCALLBACKS callbacks{};
@@ -309,6 +311,7 @@ int main(int argc, char **argv) {
     TEST(test_buffers(kt, um) == 0);
     TEST(test_draws(kt, um, backend, desktop_size) == 0);
     TEST(test_indexed_draw(kt, um, backend) == 0);
+    TEST(test_provider_clears(kt, um, backend) == 0);
     std::puts("registered lab allocation and submission contracts passed");
     return 0;
 }

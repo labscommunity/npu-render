@@ -19,6 +19,7 @@
 #include "contract.hpp"
 #include "kernel_memory.hpp"
 #include "blend_executor.hpp"
+#include "clear_executor.hpp"
 #include "vertex_executor.hpp"
 #include "uniform_draw.hpp"
 #include "indexed_exchange.hpp"
@@ -46,6 +47,8 @@ struct Device {
     std::shared_ptr<Allocation> bound_source;
     std::array<std::array<View, 128>, 3> shader_sources{};
     std::unique_ptr<BlendExecutor> executor;
+    std::unique_ptr<nr::raster::ClearExecutor> clear_executor;
+    std::array<uint32_t,3> clear_key{};
     std::unique_ptr<nr::raster::UniformDrawExecutor> indexed_executor;
     std::unique_ptr<nr::raster::PointTextureDrawExecutor> point_texture_executor;
     std::shared_ptr<const nr::shader::Program> point_texture_vertex, point_texture_pixel;
@@ -310,7 +313,36 @@ void APIENTRY clear(D3D10DDI_HDEVICE h, D3D10DDI_HRENDERTARGETVIEW v, FLOAT colo
     guard(h, __FUNCTION__, [&] {
         require(v.pDrvPrivate && color);
         auto a = static_cast<View *>(v.pDrvPrivate)->allocation;
-        require(a && !a->locked && a->context == device(h).context);
+        auto &d=device(h);require(a && !a->locked && a->context==d.context && !d.context->poisoned);
+        for(unsigned n=0;n<4;++n)require(std::isfinite(color[n]));
+        // The historical blend-only file bridge retains its documented CPU
+        // clears. Full desktop experiments use the indexed ABI 13 path.
+        if(d.backend!="CPU" && d.backend!="NPU_LAB_FILE"){
+            const auto &surface=a->surface;nr::raster::Color input{};std::copy_n(color,4,input.begin());
+            std::vector<nr::raster::PackedColor> pixels;std::string execution_device;
+            if(d.backend=="NPU_LAB_INDEXED"){
+                if(!d.indexed_exchange)d.indexed_exchange=std::make_unique<IndexedNpuExchange>();
+                indexed_exchange::Request request;auto &header=request.header;header.abi=13;header.flags=0x200000;
+                header.width=surface.width;header.height=surface.height;header.format=surface.format;request.clear_color=input;
+                auto result=d.indexed_exchange->execute(std::move(request));pixels=std::move(result.pixels);execution_device=std::move(result.execution_device);
+            }else{
+                require(d.backend=="NPU" || d.backend=="GPU");
+                const std::array<uint32_t,3> key{surface.width,surface.height,surface.format};
+                if(!d.clear_executor || d.clear_key!=key){
+                    d.clear_executor.reset();d.clear_executor=std::make_unique<nr::raster::ClearExecutor>(key[0],key[1],key[2],d.backend);d.clear_key=key;
+                }
+                auto result=d.clear_executor->execute(input);pixels=std::move(result.pixels);execution_device=std::move(result.execution_device);
+            }
+            // VidMm upload/copy remains transport; every returned color byte was
+            // generated and quantized on the explicitly selected provider.
+            upload(*a,nullptr,pixels.data(),surface.width*4);++counters.fills;++counters.executions;
+            if(d.backend=="NPU_LAB_INDEXED")++counters.remote_npu_executions;
+            else if(d.backend=="NPU")++counters.npu_executions;else ++counters.gpu_executions;
+            counters.inference_input_bytes+=16;counters.inference_output_bytes+=uint64_t(surface.width)*surface.height*4;
+            strncpy_s(counters.last_execution_device,execution_device.c_str(),_TRUNCATE);
+            lab_trace("{\"event\":\"color_clear_executed\",\"width\":%u,\"height\":%u,\"execution_device\":\"%s\"}\n",surface.width,surface.height,execution_device.c_str());
+            return;
+        }
         std::array<unsigned char, 4> bytes{};
         for (size_t i = 0; i < 4; ++i) {
             require(std::isfinite(color[i]));
@@ -320,6 +352,7 @@ void APIENTRY clear(D3D10DDI_HDEVICE h, D3D10DDI_HRENDERTARGETVIEW v, FLOAT colo
         ULONG pattern = 0;
         std::memcpy(&pattern, bytes.data(), sizeof(pattern));
         a->context->fill(a->handle, pattern);
+        lab_trace("{\"event\":\"color_clear_executed\",\"width\":%u,\"height\":%u,\"execution_device\":\"CPU (kernel fill)\"}\n",a->surface.width,a->surface.height);
     });
 }
 void APIENTRY copy_resource(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE dst, D3D10DDI_HRESOURCE src) {

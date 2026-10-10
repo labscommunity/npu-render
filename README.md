@@ -125,9 +125,12 @@ retains exact raster boundaries while allowing bounded FP32 endpoint rounding.
 Its captured 642×660 draw matches all 423,720 pixels on the NPU. All 23 CPU suites,
 3,520,832 NPU point-draw components and 58 driver draws pass. A separate
 [NPU clear graph](docs/validation/2026-10-10/clear-graph-v192/report.json) passes
-151 million color components; its driver integration is under validation. Clears
-in the installed v98 build still use the CPU. Stable interactive desktop offload
-and a Tahoma benefit remain unproven.
+151 million color components. Its
+[driver integration](docs/validation/2026-10-10/color-clear-v193/report.json) now
+passes 201.6 million NPU components, a real worker exchange, eight driver clears,
+and all 24 CPU suites. The next installed trial also accepts mapped vertex-buffer
+binding while still rejecting reads before unmap. Clears in installed v98 remain
+CPU-side; stable interactive desktop offload and a Tahoma benefit are unproven.
 
 [Mirrored-texture qualification](docs/validation/2026-10-10/mirror-v174/report.json)
 now replays that failed DWM blur draw on the NPU with all 8,192 output pixels

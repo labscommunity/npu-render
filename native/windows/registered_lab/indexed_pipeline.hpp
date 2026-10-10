@@ -1,7 +1,10 @@
 #pragma once
 #include "indexed_exchange_protocol.hpp"
+#include "clear_executor.hpp"
 namespace nr::registered_lab::indexed_exchange {
 class Pipeline {
+    struct ClearEntry {uint32_t width,height,format;std::unique_ptr<raster::ClearExecutor> executor;};
+    std::vector<ClearEntry> clear_cache;
     struct UniformEntry {
         Header header;
         std::vector<uint32_t> vertex, pixel;
@@ -23,6 +26,20 @@ class Pipeline {
     std::vector<TriangleEntry> triangle_cache;
 public:
     raster::UniformDrawExecutor::Result execute(const Request &request) {
+        if(color_clear(request.header)){
+            const auto &h=request.header;require(shape_valid(h));
+            raster::ClearExecutor *executor=nullptr;
+            for(auto &entry:clear_cache)if(entry.width==h.width && entry.height==h.height && entry.format==h.format){executor=entry.executor.get();break;}
+            if(!executor){
+                if(clear_cache.size()==4)clear_cache.erase(clear_cache.begin());
+                auto candidate=std::make_unique<raster::ClearExecutor>(h.width,h.height,h.format,"NPU");
+                clear_cache.push_back({h.width,h.height,h.format,std::move(candidate)});executor=clear_cache.back().executor.get();
+            }
+            auto clear=executor->execute(request.clear_color);raster::UniformDrawExecutor::Result result{};
+            result.pixels=std::move(clear.pixels);result.execution_device=std::move(clear.execution_device);
+            result.input_bytes=16;result.output_bytes=uint64_t(h.width)*h.height*4;result.covered_samples=uint64_t(h.width)*h.height;
+            result.provider_requests=result.tile_executions=1;result.timings.total_ms=clear.milliseconds;return result;
+        }
         if(request.header.flags & 0x3000){
             const auto &h=request.header;require(shape_valid(h));
             const auto batch=triangle_batch(request);

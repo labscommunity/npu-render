@@ -238,9 +238,9 @@ int main(int argc, char **argv) {
         retained = LoadLibraryExW(umd, nullptr, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32 | LOAD_LIBRARY_SEARCH_USER_DIRS);
         require(retained != nullptr, "retain registered UMD diagnostics");
         require(!GetProcAddress(retained, "D3DKMTCreateDevice"), "unexpected KMT replacement export");
-        if (draw_backend) {
+        {
             const auto configure = reinterpret_cast<BOOL (*)(const char *)>(GetProcAddress(retained, "nr_fill_configure"));
-            require(configure && configure(draw_backend), "explicit draw backend configuration failed");
+            require(configure && configure(draw_backend ? draw_backend : "CPU"), "explicit probe backend configuration failed");
         }
         ComPtr<IDXGIFactory4> factory;
         check(CreateDXGIFactory1(IID_PPV_ARGS(&factory)), "create_factory");
@@ -293,9 +293,9 @@ int main(int argc, char **argv) {
         std::printf("{\"remote_npu_executions\":%llu,\"local_npu_executions\":%llu}\n", result.remote_npu_executions, result.npu_executions);
         if (presentation) {
             require(result.fills == 3 && result.present_requests == 3 && result.accepted_present_callbacks == 3, "unexpected presentation counters");
-            if (present_backend) require(result.draws == 3 && result.executions == 3 && !result.gpu_executions &&
+            if (present_backend) require(result.draws == 3 && result.executions == (!std::strcmp(present_backend,"NPU") ? 6u : 3u) && !result.gpu_executions &&
                     result.cpu_executions == (!std::strcmp(present_backend, "CPU") ? 3u : 0u) &&
-                    result.npu_executions == (!std::strcmp(present_backend, "NPU") ? 3u : 0u) &&
+                    result.npu_executions == (!std::strcmp(present_backend, "NPU") ? 6u : 0u) &&
                     result.remote_npu_executions == (!std::strcmp(present_backend, "NPU_LAB_FILE") ? 3u : 0u), "unexpected presented draw backend");
         }
         else if (draw_backend) {

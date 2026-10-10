@@ -35,13 +35,16 @@ void APIENTRY set_vertex_buffers(D3D10DDI_HDEVICE h, UINT start, UINT count,
     const D3D10DDI_HRESOURCE *values, const UINT *strides, const UINT *offsets) {
     guard(h, __FUNCTION__, [&] {
         require(start <= 16 && count <= 16 - start && (!count || (values && strides && offsets)));
+        // This callback records state and reads no vertex memory. DWM binds
+        // dynamic buffers before unmapping them. Fetch/draw still rejects a
+        // mapped allocation before any provider work or target modification.
         auto next = device(h).vertex_buffers;
         for (UINT i = 0; i < count; ++i) {
             auto &binding = next[start + i]; binding = {};
             if (!values[i].pDrvPrivate) continue;
             auto &r = resource(values[i]);
             const bool valid=r.buffer_bytes && (r.bind_flags & D3D10_DDI_BIND_VERTEX_BUFFER) &&
-                r.allocation->context == device(h).context && !r.allocation->locked &&
+                r.allocation->context == device(h).context &&
                 strides[i] <= 2048 && offsets[i] <= r.buffer_bytes;
             if(!valid)lab_trace("{\"event\":\"vertex_binding_rejected\",\"start\":%u,\"count\":%u,\"slot\":%u,\"bytes\":%u,\"bind_flags\":%u,\"stride\":%u,\"offset\":%u,\"locked\":%s,\"same_context\":%s}\n",
                 start,count,start+i,r.buffer_bytes,r.bind_flags,strides[i],offsets[i],r.allocation->locked?"true":"false",r.allocation->context==device(h).context?"true":"false");

@@ -72,6 +72,7 @@ def main():
     for name in (
         "nr_fill_umd.dll",
         "nr_registered_clear_probe.exe",
+        "nr_registered_color_clear_test.exe",
         "nr_registered_lab_test.exe",
         "nr_registered_npu_worker.exe",
         "nr_registered_exchange_test.exe",

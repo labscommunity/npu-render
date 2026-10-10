@@ -25,7 +25,7 @@ int wmain(int argc, wchar_t **argv) try {
         try {
             const auto request = ex::decode(bytes); const auto start = GetTickCount64();
             const auto result = pipeline.execute(request); reply = ex::response(h, result);
-            std::printf("{\"sequence\":%u,\"client_pid\":%u,\"execution_device\":\"%s\",\"width\":%u,\"height\":%u,\"textured\":%s,\"vertices\":%u,\"triangle_batch\":%u,\"provider_requests\":%llu,\"covered_samples\":%llu,\"tile_executions\":%llu,\"draw_ms\":%.3f,\"compile_and_draw_ms\":%llu,\"displayed_frames\":0,\"passed\":true}\n", h.sequence, h.client_pid, result.execution_device.c_str(), h.width, h.height, (h.flags & 2) ? "true" : "false",h.vertices,(h.flags&0x3000)?ex::triangle_batch(request):0u,
+            std::printf("{\"sequence\":%u,\"client_pid\":%u,\"execution_device\":\"%s\",\"operation\":\"%s\",\"width\":%u,\"height\":%u,\"textured\":%s,\"vertices\":%u,\"triangle_batch\":%u,\"provider_requests\":%llu,\"covered_samples\":%llu,\"tile_executions\":%llu,\"draw_ms\":%.3f,\"compile_and_draw_ms\":%llu,\"displayed_frames\":0,\"passed\":true}\n", h.sequence, h.client_pid, result.execution_device.c_str(), ex::color_clear(h)?"color_clear":"draw", h.width, h.height, (h.flags & 2) ? "true" : "false",h.vertices,(h.flags&0x3000)?ex::triangle_batch(request):0u,
                 static_cast<unsigned long long>(result.provider_requests),static_cast<unsigned long long>(result.covered_samples),static_cast<unsigned long long>(result.tile_executions), result.timings.total_ms, static_cast<unsigned long long>(GetTickCount64() - start));
         } catch (const std::exception &e) {
             std::fprintf(stderr, "indexed stream draw rejected: %.32000s\n", e.what());

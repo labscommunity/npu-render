@@ -50,6 +50,30 @@ void pipe_contract(const std::vector<uint8_t> &request, const std::vector<uint8_
 }
 int main(int argc, char **argv) try {
     test(argc == 1 || argc == 3);
+    ex::Request clear;clear.header.abi=13;clear.header.flags=0x200000;clear.header.nonce[0]=7;
+    clear.header.client_pid=42;clear.header.sequence=1;clear.header.width=65;clear.header.height=7;clear.header.format=87;
+    clear.clear_color={.5f,.25f,.75f,1};const auto clear_packet=ex::encode(clear);const auto clear_decoded=ex::decode(clear_packet);
+    test(clear_packet.size()==96 && clear_decoded.clear_color==clear.clear_color && clear_decoded.inputs.empty());
+    for(unsigned n=0;n<10;++n){auto bad=clear_packet;auto h=clear.header;
+        if(n==0)h.flags|=1;if(n==1)h.vertices=3;if(n==2)h.vs_words=3;if(n==3)h.ps_words=3;
+        if(n==4)h.abi=12;if(n==5)h.reserved=1;if(n==6)h.body_bytes=12;if(n==7)h.device=3;
+        if(n==8)h.width=0;if(n==9)h.nonce[0]=0;std::memcpy(bad.data(),&h,sizeof(h));rejects(bad);
+    }
+    for(const auto value:{std::numeric_limits<float>::quiet_NaN(),std::numeric_limits<float>::infinity(),-std::numeric_limits<float>::infinity()}){
+        auto bad=clear_packet;std::memcpy(bad.data()+sizeof(ex::Header),&value,4);rejects(bad);
+        auto candidate=clear;candidate.clear_color[0]=value;bool failed=false;try{ex::encode(candidate);}catch(const std::invalid_argument&){failed=true;}test(failed);
+    }
+    auto short_clear=clear_packet;short_clear.pop_back();rejects(short_clear);auto long_clear=clear_packet;long_clear.push_back(0);rejects(long_clear);
+    nr::raster::UniformDrawExecutor::Result clear_result{};clear_result.pixels.assign(455,{191,64,128,255});
+    clear_result.execution_device="NPU";clear_result.input_bytes=16;clear_result.output_bytes=1820;
+    clear_result.covered_samples=455;clear_result.provider_requests=clear_result.tile_executions=1;
+    const auto clear_reply=ex::response(clear.header,clear_result);test(ex::decode_response(clear_reply,clear.header).pixels==clear_result.pixels);
+    for(unsigned n=0;n<5;++n){auto bad=clear_reply;ex::Receipt receipt{};std::memcpy(&receipt,bad.data()+sizeof(ex::Header),sizeof(receipt));
+        if(n==0)receipt.covered_samples=0;if(n==1)receipt.input_bytes=0;if(n==2)receipt.output_bytes=0;
+        if(n==3)receipt.provider_requests=2;if(n==4)receipt.tile_executions=0;
+        std::memcpy(bad.data()+sizeof(ex::Header),&receipt,sizeof(receipt));bool failed=false;
+        try{ex::decode_response(bad,clear.header);}catch(const std::invalid_argument&){failed=true;}test(failed);
+    }
     const auto vw = nr::registered_lab::shader_tokens("float4 main(float4 v:POSITION):SV_Position{return v;}", "vs_4_0");
     const auto pw = nr::registered_lab::shader_tokens("float4 main():SV_Target{return float4(0,0,0,1);}", "ps_4_0");
     ex::Request r; r.header.nonce[0] = 0x12345678; r.header.nonce[1] = 0xabcdef; r.header.client_pid = 42;
@@ -286,8 +310,8 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
     result.execution_device = "CPU"; rejected = false;
     try { (void)ex::response(r.header, result); } catch (const std::invalid_argument &) { rejected = true; } test(rejected);
     if (argc == 3) {
-        if (!std::strcmp(argv[1], "--emit-request") || !std::strcmp(argv[1], "--emit-destination-in") || !std::strcmp(argv[1], "--emit-destination-out") || !std::strcmp(argv[1], "--emit-destination-over") || !std::strcmp(argv[1], "--emit-derivatives") || !std::strcmp(argv[1], "--emit-loops")) {
-            const auto &emitted = !std::strcmp(argv[1], "--emit-loops") ? loop_packet : !std::strcmp(argv[1], "--emit-derivatives") ? derivative_packet : !std::strcmp(argv[1], "--emit-destination-over") ? behind_packet : !std::strcmp(argv[1], "--emit-destination-out") ? erase_packet : !std::strcmp(argv[1], "--emit-destination-in") ? destination_packet : bytes;
+        if (!std::strcmp(argv[1], "--emit-clear") || !std::strcmp(argv[1], "--emit-request") || !std::strcmp(argv[1], "--emit-destination-in") || !std::strcmp(argv[1], "--emit-destination-out") || !std::strcmp(argv[1], "--emit-destination-over") || !std::strcmp(argv[1], "--emit-derivatives") || !std::strcmp(argv[1], "--emit-loops")) {
+            const auto &emitted = !std::strcmp(argv[1], "--emit-clear") ? clear_packet : !std::strcmp(argv[1], "--emit-loops") ? loop_packet : !std::strcmp(argv[1], "--emit-derivatives") ? derivative_packet : !std::strcmp(argv[1], "--emit-destination-over") ? behind_packet : !std::strcmp(argv[1], "--emit-destination-out") ? erase_packet : !std::strcmp(argv[1], "--emit-destination-in") ? destination_packet : bytes;
             std::ifstream old(argv[2], std::ios::binary); test(!old); old.close();
             std::ofstream out(argv[2], std::ios::binary); test(bool(out));
             out.write(reinterpret_cast<const char *>(emitted.data()), std::streamsize(emitted.size())); out.close(); test(bool(out));
@@ -337,10 +361,14 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
                 test(output.covered_samples == pixel_count); for (const auto &p : output.pixels) test(p == nr::raster::PackedColor{0,0,0,255});
                 std::printf("{\"indexed_pipe_npu_packet\":true,\"sequence\":%u,\"verified_components\":%zu,\"roundtrip_ms\":%llu,\"displayed_frames\":0}\n", i, pixel_count * 4, static_cast<unsigned long long>(GetTickCount64() - started));
             }
-        } else if (!std::strcmp(argv[1], "--verify-reply")) {
+        } else if (!std::strcmp(argv[1], "--verify-clear") || !std::strcmp(argv[1], "--verify-reply")) {
             std::ifstream in(argv[2], std::ios::binary | std::ios::ate); test(bool(in)); const auto size = in.tellg();
             test(size >= std::streamoff(sizeof(ex::Header)) && size <= ex::max_packet_bytes); in.seekg(0);
             std::vector<uint8_t> contents(size_t(size), 0); in.read(reinterpret_cast<char *>(contents.data()), std::streamsize(contents.size())); test(bool(in));
+            if(!std::strcmp(argv[1], "--verify-clear")){
+                const auto output=ex::decode_response(contents,clear.header);test(output.pixels==clear_result.pixels && output.covered_samples==455);
+                std::puts("{\"clear_exchange\":true,\"verified_components\":1820,\"execution_device\":\"NPU (remote lab indexed)\",\"displayed_frames\":0}");return 0;
+            }
             const auto output = ex::decode_response(contents, r.header); test(output.covered_samples == 4096);
             for (const auto &p : output.pixels) test(p == nr::raster::PackedColor{0,0,0,255});
             std::printf("{\"indexed_npu_packet\":true,\"verified_components\":16384,\"execution_device\":\"%s\",\"displayed_frames\":0}\n", output.execution_device.c_str());

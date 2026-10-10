@@ -1,0 +1,27 @@
+{
+  "build": "present-umd-v193",
+  "all_checks_passed": true,
+  "native_npu_execution": true,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "cpu_suites": 24,
+  "clear_components": 201616408,
+  "invalid_clear_requests_rejected": 28,
+  "native_ddi_clears": 8,
+  "clear_exchange_verified_components": 1820,
+  "full_desktop_offload": false,
+  "installed_desktop_validation_pending": true,
+  "findings": [
+    "ABI 13 sends a finite FP32 color to the explicit NPU. The NPU clamps, quantizes with nearest-even rounding, swizzles RGBA/BGRA and produces every target pixel. Host upload and VidMm copies remain transport.",
+    "Quantization uses an integer bit mask between float conversion and fractional rounding; the previously preserved graph experiments show that removing this identity mask changes results on driver 5540.",
+    "The native test checks all 255 UNORM half-byte transitions and their adjacent FP32 values, clamping endpoints, finite extremes and subnormals. Eight size/format cases include odd extents and 1024x768/1025x769 targets. Nonfinite inputs reject before inference and the executor remains reusable.",
+    "A real file-exchange worker verifies 455 clear pixels. Driver callbacks check eight native NPU clears, shared targets, three independent mip levels, padded rows and invalid requests without target modification.",
+    "Mapped vertex-buffer binding now records state without reading memory. The regression uses a real dynamic map/bind/unmap sequence and exact input fetch. A draw issued before unmap still rejects without provider execution or target mutation.",
+    "CPU mode and the historical blend-only NPU_LAB_FILE bridge retain their explicit CPU kernel fills. Modern desktop offload uses NPU_LAB_INDEXED; its clears use ABI 13. CPU fills are labeled in the driver trace. No hidden provider fallback is added.",
+    "Build v190 fails to compile a missing test-only stdexcept include. Build v191 compiles and passes 23 suites but exposes the allocation harness implicit use of the default NPU backend; its standalone NPU clear diagnostic passes. Build v192 explicitly selects CPU for the preliminary allocation tests and passes all 24 suites. Final v193 additionally preserves historical probe behavior and updates NPU clear-plus-draw presentation counters.",
+    "No custom driver was installed on physical Delta and no physical restart occurred. End-to-end desktop/input validation and Tahoma benefit remain unproven."
+  ],
+  "references": [
+    "https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3d10umddi/nc-d3d10umddi-pfnd3d10ddi_ia_setvertexbuffers"
+  ]
+}

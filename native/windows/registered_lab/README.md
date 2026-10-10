@@ -882,5 +882,31 @@ retains exact snapped boundaries and bounds floating displacement to 1/512 pixel
 The crop's existing unit-scale UV proof stays far from half-texel selection
 boundaries. All 423,720 captured pixels match the CPU and NPU oracle, and the NPU
 passes 3,520,832 point-draw components, 14 rejection cases and 58 driver draws.
-The 23 CPU suites pass. Installed trial v98 is still required; clear integration
-and interactive latency remain unresolved.
+The 23 CPU suites pass. The subsequent
+[v98 trial](../../../docs/validation/2026-10-10/sole-display-v98/report.json)
+completes 314 live NPU draws with zero worker rejections and receives five desktop
+frames. Start interaction remains unverified. DWM twice binds a mapped vertex
+buffer; the UMD rejects that state-only callback with `E_INVALIDARG` and DWM then
+opens another adapter. Microsoft documents unexpected errors from
+[IaSetVertexBuffers](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3d10umddi/nc-d3d10umddi-pfnd3d10ddi_ia_setvertexbuffers)
+as critical to the runtime. The next build accepts binding without reading mapped
+memory; fetch and draw continue rejecting mapped data before target changes.
+
+
+[Clean build v193](../../../docs/validation/2026-10-10/color-clear-v193/report.json)
+adds NPU render-target clears through indexed exchange ABI 13. The 96-byte request
+carries four finite FP32 components; clamping, nearest-even UNORM quantization,
+RGBA/BGRA swizzle and full image generation execute on the explicitly selected
+provider. The integer boundary mask preserves the qualified NPU rounding behavior.
+All 201,616,408 native NPU components match, including every half-byte transition
+and adjacent FP32 values. Eight driver clears check shared surfaces, three mip
+levels, padded rows and invalid-input atomicity. A real worker roundtrip verifies
+1,820 components. The 24 CPU suites and 58 existing NPU driver draws also pass.
+
+The CPU mode and historical blend-only `NPU_LAB_FILE` bridge retain CPU kernel
+fills, explicitly labeled in the trace. Modern desktop experiments use
+`NPU_LAB_INDEXED`; their clears use the NPU with no provider fallback. Uploads,
+resource copies and display transport still use host/VidMm facilities. The clear
+cache holds at most four shapes and evicts before compiling a replacement. The
+installed v99 trial is required before claiming desktop integration or input
+response; no Tahoma performance benefit has been demonstrated.

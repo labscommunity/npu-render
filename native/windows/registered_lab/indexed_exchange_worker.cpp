@@ -55,8 +55,8 @@ int wmain(int argc, wchar_t **argv) try {
                 const auto request = ex::decode(bytes); const auto &h = request.header;
                 const auto result=pipeline->execute(request);
                 publish(directory + L"\\" + packet_name(h, true), ex::response(h, result)); ++succeeded;
-                std::printf("{\"client_pid\":%u,\"sequence\":%u,\"execution_device\":\"%s\",\"width\":%u,\"height\":%u,\"provider_requests\":%llu,\"draw_ms\":%.3f,\"passed\":true,\"displayed_frames\":0}\n",
-                    h.client_pid, h.sequence, result.execution_device.c_str(), h.width, h.height,
+                std::printf("{\"client_pid\":%u,\"sequence\":%u,\"execution_device\":\"%s\",\"operation\":\"%s\",\"width\":%u,\"height\":%u,\"provider_requests\":%llu,\"draw_ms\":%.3f,\"passed\":true,\"displayed_frames\":0}\n",
+                    h.client_pid, h.sequence, result.execution_device.c_str(), ex::color_clear(h)?"color_clear":"draw", h.width, h.height,
                     static_cast<unsigned long long>(result.provider_requests), result.timings.total_ms); std::fflush(stdout);
             } catch (const std::exception &error) {
                 ++failed; pipeline=std::make_unique<ex::Pipeline>(); std::fprintf(stderr, "indexed NPU request failed: %.32000s\n", error.what()); std::fflush(stderr);

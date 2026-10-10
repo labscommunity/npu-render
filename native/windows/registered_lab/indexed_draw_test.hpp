@@ -64,6 +64,13 @@ int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
     D3D10_DDI_RECT scissor{0,0,width,height}; f.pfnSetScissorRects(h, 1, 0, &scissor);
     D3D10_DDI_BLEND_DESC blend{}; blend.RenderTargetWriteMask[0] = 15; D3D10DDI_HBLENDSTATE bs{}; bs.pDrvPrivate = &blend;
     f.pfnSetBlendState(h, bs, nullptr, ~0u); TEST(last_error == S_OK);
+    {
+        auto &mapped=*resource(resources[1]).allocation;(void)mapped.lock(false);
+        const auto before=memory[target_index];const auto executions=counters.executions;
+        f.pfnIaSetVertexBuffers(h,0,1,&resources[1],&stride,&offset);TEST(last_error==S_OK && mapped.locked);
+        f.pfnDrawIndexed(h,6,1,1);TEST(last_error==E_INVALIDARG && memory[target_index]==before && counters.executions==executions);
+        TEST(mapped.unlock()==S_OK);last_error=S_OK;
+    }
     for (unsigned frame = 0; frame < 2; ++frame) {
         if (frame) {
             color[0] = .25f; color[1] = .125f; color[2] = .5f;

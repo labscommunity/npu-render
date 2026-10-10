@@ -6,6 +6,7 @@
 #include "linear_texture_draw.hpp"
 #include "triangle_texture_draw.hpp"
 #include <cstring>
+#include <cmath>
 #include <limits>
 #include <stdexcept>
 namespace nr::registered_lab::indexed_exchange {
@@ -28,7 +29,13 @@ inline raster::BlendMode blend_mode(const Header &h) {
     if(h.flags & 0x10000)return raster::BlendMode((h.flags>>17)&15);
     return (h.flags & 0x8000) ? raster::BlendMode::destination_out : (h.flags & 0x4000) ? raster::BlendMode::destination_in : raster::source_blend((h.flags & 1) != 0);
 }
+inline bool color_clear(const Header &h){return h.abi==13 && h.flags==0x200000;}
 inline bool shape_valid(const Header &h) {
+    if(h.abi==13)return color_clear(h) && h.signature==magic && (h.nonce[0] || h.nonce[1]) && h.client_pid &&
+        h.width && h.width<=8192 && h.height && h.height<=8192 && uint64_t(h.width)*h.height<=4194304 &&
+        (h.format==28 || h.format==87) && !h.vertices && !h.vs_words && !h.ps_words &&
+        h.sequence && h.sequence<=max_requests && h.body_bytes<=max_packet_bytes-sizeof(Header) && !h.reserved;
+
     // ABI 12 adds U/V address bits to each existing sampler word. Older
     // ABIs remain clamp-only; all shape/blend rules are inherited unchanged.
     if(h.abi==12){
@@ -79,7 +86,7 @@ inline bool shape_valid(const Header &h) {
     return true;
 }
 inline bool request_valid(const Header &h, uint64_t bytes) {
-    return shape_valid(h) && h.kind == 1 && !h.device && bytes == sizeof(Header) + uint64_t(h.body_bytes);
+    return shape_valid(h) && h.kind == 1 && !h.device && (!color_clear(h) || h.body_bytes==16) && bytes == sizeof(Header) + uint64_t(h.body_bytes);
 }
 inline bool same_request(const Header &a, const Header &b) {
     return a.abi == b.abi && a.nonce[0] == b.nonce[0] && a.nonce[1] == b.nonce[1] && a.client_pid == b.client_pid && a.sequence == b.sequence &&
@@ -97,6 +104,7 @@ inline bool failure_valid(const Header &h, const Header &request, uint64_t bytes
 }
 struct Request {
     Header header;
+    raster::Color clear_color{};
     raster::Viewport viewport{};
     std::optional<std::array<int32_t,4>> scissor;
     shader::Program vertex, pixel;
@@ -168,6 +176,12 @@ inline uint32_t triangle_batch(const Request &r){
 }
 inline std::vector<uint8_t> encode(Request &r) {
     auto &h = r.header;
+    if(color_clear(h)){
+        require(shape_valid(h) && h.kind==1 && !h.device && r.inputs.empty() && r.background.empty() &&
+            r.vertex.bytecode.empty() && r.pixel.bytecode.empty() && !r.scissor);
+        for(const auto value:r.clear_color)require(std::isfinite(value));
+        h.body_bytes=sizeof(r.clear_color);Writer w;w.value(h);w.value(r.clear_color);return w.finish();
+    }
     require(r.vertex.bytecode.size() <= 16384 && r.pixel.bytecode.size() <= 16384);
     h.vs_words = uint32_t(r.vertex.bytecode.size()); h.ps_words = uint32_t(r.pixel.bytecode.size());
     require(shape_valid(h) && h.kind == 1 && !h.device && r.inputs.size() == h.vertices && r.background.size() == size_t(h.width) * h.height);
@@ -201,7 +215,12 @@ inline std::vector<uint8_t> encode(Request &r) {
 }
 inline Request decode(const std::vector<uint8_t> &bytes) {
     Reader reader(bytes); Request r; r.header = reader.value<Header>(); const auto &h = r.header;
-    require(request_valid(h, bytes.size())); r.viewport = reader.value<raster::Viewport>();
+    require(request_valid(h, bytes.size()));
+    if(color_clear(h)){
+        require(h.body_bytes==sizeof(r.clear_color));r.clear_color=reader.value<raster::Color>();
+        for(const auto value:r.clear_color)require(std::isfinite(value));require(reader.done());return r;
+    }
+    r.viewport = reader.value<raster::Viewport>();
     if (h.flags & 4) { r.scissor = reader.value<std::array<int32_t,4>>(); require(scissor_valid(*r.scissor,h)); }
     require(triangle_scissor_valid(r));
     require(r.viewport.x == 0 && r.viewport.y == 0 && r.viewport.width == float(h.width) && r.viewport.height == float(h.height) &&
@@ -238,7 +257,9 @@ inline raster::UniformDrawExecutor::Result decode_response(const std::vector<uin
     if (failure_valid(h, request, bytes.size())) throw std::runtime_error("physical NPU worker rejected indexed draw");
     require(response_valid(h, request, bytes.size())); const auto receipt = reader.value<Receipt>();
     require(!receipt.reserved && receipt.used_rectangle <= 1 && receipt.provider_requests && receipt.provider_requests <= 4 * 1024 * 1024 &&
-        receipt.covered_samples <= uint64_t(h.width) * h.height * (h.vertices / 3));
+        receipt.covered_samples <= uint64_t(h.width) * h.height * (color_clear(h)?1u:h.vertices/3));
+    if(color_clear(h))require(receipt.input_bytes==16 && receipt.output_bytes==uint64_t(h.width)*h.height*4 &&
+        receipt.provider_requests==1 && receipt.tile_executions==1 && receipt.covered_samples==uint64_t(h.width)*h.height && !receipt.used_rectangle);
     raster::UniformDrawExecutor::Result r{};
     r.pixels = reader.vector<raster::PackedColor>(size_t(h.width) * h.height); require(reader.done());
     r.execution_device = "NPU (remote lab indexed)"; r.input_bytes = receipt.input_bytes; r.output_bytes = receipt.output_bytes;
