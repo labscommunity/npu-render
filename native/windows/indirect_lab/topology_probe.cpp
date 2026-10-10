@@ -79,6 +79,21 @@ int run_probe() {
     Topology before; bool restore = false, passed = false;
     try {
         before = query(QDC_ONLY_ACTIVE_PATHS); print("before", before);
+        if (before.paths.size() == 2) {
+            UINT indirect = 0;
+            for (const auto &path : before.paths)
+                if (path.targetInfo.targetAvailable && path.targetInfo.outputTechnology == DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INDIRECT_WIRED)
+                    ++indirect;
+            if (indirect != 1) throw std::runtime_error("one original and one active indirect display required");
+            std::fputs("{\"automatic_activation_observed\":true,\"topology_changed_by_probe\":false,\"observation_seconds\":45}\n", output);
+            std::fflush(output);
+            for (UINT i = 0; i < 45; ++i) Sleep(1000);
+            const auto current = query(QDC_ONLY_ACTIVE_PATHS); print("observed", current);
+            if (current.paths.size() != before.paths.size() || !position_preserved(before, current))
+                throw std::runtime_error("automatically activated topology changed during observation");
+            std::fputs("{\"passed\":true,\"desktop_offload_tested\":false,\"render_device_verified\":false}\n", output);
+            return 0;
+        }
         const auto all = query(QDC_ALL_PATHS); print("available", all);
         if (before.paths.size() != 1) throw std::runtime_error("exactly one original active display required");
         DISPLAYCONFIG_PATH_INFO target{}; UINT candidates = 0;

@@ -80,7 +80,34 @@ void signal(DISPLAYCONFIG_VIDEO_SIGNAL_INFO &mode, bool monitor) {
     mode.scanLineOrdering = DISPLAYCONFIG_SCANLINE_ORDERING_PROGRESSIVE;
     mode.pixelRate = uint64_t(60) * width * height;
 }
-struct DeviceState { IDDCX_ADAPTER adapter = nullptr; LUID preferred{}; };
+struct PreparedDevice {
+    LUID luid{};
+    ComPtr<ID3D11Device> device;
+    ComPtr<ID3D11DeviceContext> context;
+    HRESULT initialize(LUID preferred) {
+        ComPtr<IDXGIFactory4> factory; ComPtr<IDXGIAdapter1> adapter;
+        auto status = CreateDXGIFactory1(IID_PPV_ARGS(&factory));
+#ifdef NR_IDD_SYSTEM_RENDERER_CONTROL
+        (void)preferred;
+        if (SUCCEEDED(status)) status = factory->EnumWarpAdapter(IID_PPV_ARGS(&adapter));
+#else
+        if (SUCCEEDED(status)) status = factory->EnumAdapterByLuid(preferred, IID_PPV_ARGS(&adapter));
+#endif
+        DXGI_ADAPTER_DESC1 desc{};
+        if (SUCCEEDED(status)) status = adapter->GetDesc1(&desc);
+        if (SUCCEEDED(status)) luid = desc.AdapterLuid;
+        D3D_FEATURE_LEVEL level{};
+        if (SUCCEEDED(status)) status = D3D11CreateDevice(adapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr,
+            D3D11_CREATE_DEVICE_BGRA_SUPPORT, nullptr, 0, D3D11_SDK_VERSION, &device, &level, &context);
+        trace("{\"event\":\"prepared_device\",\"status\":\"%08lx\",\"feature_level\":%u,\"low\":%lu,\"high\":%ld}\n",
+              ULONG(status), UINT(level), luid.LowPart, luid.HighPart);
+        return status;
+    }
+};
+struct DeviceState {
+    IDDCX_ADAPTER adapter = nullptr; LUID preferred{};
+    PreparedDevice *prepared = nullptr; WDFWORKITEM preparation = nullptr;
+};
 WDF_DECLARE_CONTEXT_TYPE(DeviceState);
 class Consumer {
     IDDCX_SWAPCHAIN chain;
@@ -126,15 +153,9 @@ class Consumer {
     }
 public:
     Consumer(IDDCX_SWAPCHAIN value, HANDLE event) : chain(value), available(event) {}
-    HRESULT start(LUID luid) {
-        ComPtr<IDXGIFactory4> factory; ComPtr<IDXGIAdapter1> adapter;
-        auto status = CreateDXGIFactory1(IID_PPV_ARGS(&factory));
-        if (SUCCEEDED(status)) status = factory->EnumAdapterByLuid(luid, IID_PPV_ARGS(&adapter));
-        D3D_FEATURE_LEVEL level{};
-        if (SUCCEEDED(status)) status = D3D11CreateDevice(adapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr,
-            D3D11_CREATE_DEVICE_BGRA_SUPPORT, nullptr, 0, D3D11_SDK_VERSION, &device, &level, &context);
-        trace("{\"event\":\"consumer_device\",\"status\":\"%08lx\",\"feature_level\":%u}\n", ULONG(status), UINT(level));
-        if (FAILED(status)) return status;
+    HRESULT start(const PreparedDevice &prepared) {
+        device = prepared.device; context = prepared.context;
+        if (!device || !context) return E_UNEXPECTED;
         stop = CreateEventW(nullptr, TRUE, FALSE, nullptr);
         if (!stop) return HRESULT_FROM_WIN32(GetLastError());
         thread = CreateThread(nullptr, 0, run_thread, this, 0, nullptr);
@@ -146,7 +167,7 @@ public:
         if (stop) CloseHandle(stop);
     }
 };
-struct MonitorState { Consumer *consumer = nullptr; LUID preferred{}; };
+struct MonitorState { Consumer *consumer = nullptr; LUID preferred{}; PreparedDevice *prepared = nullptr; };
 WDF_DECLARE_CONTEXT_TYPE(MonitorState);
 EVT_IDD_CX_MONITOR_GET_DEFAULT_DESCRIPTION_MODES modes;
 NTSTATUS modes(IDDCX_MONITOR, const IDARG_IN_GETDEFAULTDESCRIPTIONMODES *in, IDARG_OUT_GETDEFAULTDESCRIPTIONMODES *out) {
@@ -180,9 +201,14 @@ NTSTATUS assign(IDDCX_MONITOR monitor, const IDARG_IN_SETSWAPCHAIN *in) {
                         in->RenderAdapterLuid.HighPart == state->preferred.HighPart;
     trace("{\"event\":\"assigned\",\"actual_low\":%lu,\"actual_high\":%ld,\"preferred_selected\":%s}\n",
           in->RenderAdapterLuid.LowPart, in->RenderAdapterLuid.HighPart, paired ? "true" : "false");
+    if (!state->prepared || state->prepared->luid.LowPart != in->RenderAdapterLuid.LowPart ||
+        state->prepared->luid.HighPart != in->RenderAdapterLuid.HighPart) {
+        trace("{\"event\":\"prepared_adapter_mismatch\"}\n");
+        return STATUS_NOT_SUPPORTED;
+    }
     try {
         auto consumer = std::make_unique<Consumer>(in->hSwapChain, in->hNextSurfaceAvailable);
-        const auto status = consumer->start(in->RenderAdapterLuid);
+        const auto status = consumer->start(*state->prepared);
         if (FAILED(status)) { WdfObjectDelete(in->hSwapChain); return STATUS_SUCCESS; }
         state->consumer = consumer.release();
         return STATUS_SUCCESS;
@@ -194,6 +220,46 @@ NTSTATUS unassign(IDDCX_MONITOR monitor) {
     auto state = WdfObjectGet_MonitorState(monitor);
     delete state->consumer; state->consumer = nullptr;
     trace("{\"event\":\"unassigned\"}\n"); return STATUS_SUCCESS;
+}
+struct PreparationContext { IDDCX_ADAPTER adapter = nullptr; };
+WDF_DECLARE_CONTEXT_TYPE(PreparationContext);
+EVT_WDF_WORKITEM prepare_monitor;
+void prepare_monitor(WDFWORKITEM item) {
+    const auto adapter = WdfObjectGet_PreparationContext(item)->adapter;
+    auto state = WdfObjectGet_DeviceState(adapter);
+    // Prepare before monitor arrival, outside the timed assign-swapchain callback.
+    // Both the DDI and frame watchdogs remain enabled.
+    const auto com = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    try {
+        auto prepared = std::make_unique<PreparedDevice>();
+        const auto start = GetTickCount64();
+        const auto status = prepared->initialize(state->preferred);
+        trace("{\"event\":\"device_preparation\",\"milliseconds\":%llu,\"status\":\"%08lx\"}\n",
+              GetTickCount64() - start, ULONG(status));
+        if (FAILED(status)) { if (SUCCEEDED(com)) CoUninitialize(); return; }
+        state->prepared = prepared.release();
+    } catch (...) {
+        trace("{\"event\":\"device_preparation_failed\"}\n");
+        if (SUCCEEDED(com)) CoUninitialize();
+        return;
+    }
+    WDF_OBJECT_ATTRIBUTES attributes; WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attributes, MonitorState);
+    attributes.EvtCleanupCallback = [](WDFOBJECT object) {
+        auto monitor = WdfObjectGet_MonitorState(object); delete monitor->consumer; monitor->consumer = nullptr;
+    };
+    IDDCX_MONITOR_INFO info{}; info.Size = sizeof(info); info.MonitorType = DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INDIRECT_WIRED;
+    info.MonitorDescription.Size = sizeof(info.MonitorDescription); info.MonitorDescription.Type = IDDCX_MONITOR_DESCRIPTION_TYPE_EDID;
+    info.MonitorContainerId = {0x60f0a813,0xc8ad,0x4421,{0x91,0x38,0x2b,0x18,0x4a,0x5e,0x33,0x90}};
+    IDARG_IN_MONITORCREATE create{}; create.ObjectAttributes = &attributes; create.pMonitorInfo = &info;
+    IDARG_OUT_MONITORCREATE out{};
+    auto status = IddCxMonitorCreate(adapter, &create, &out);
+    if (NT_SUCCESS(status)) {
+        WdfObjectGet_MonitorState(out.MonitorObject)->preferred = state->preferred;
+        WdfObjectGet_MonitorState(out.MonitorObject)->prepared = state->prepared;
+        IDARG_OUT_MONITORARRIVAL arrival{}; status = IddCxMonitorArrival(out.MonitorObject, &arrival);
+    }
+    trace("{\"event\":\"monitor_arrival\",\"status\":\"%08lx\"}\n", ULONG(status));
+    if (SUCCEEDED(com)) CoUninitialize();
 }
 EVT_IDD_CX_ADAPTER_INIT_FINISHED initialized;
 NTSTATUS initialized(IDDCX_ADAPTER adapter, const IDARG_IN_ADAPTER_INIT_FINISHED *in) {
@@ -207,21 +273,15 @@ NTSTATUS initialized(IDDCX_ADAPTER adapter, const IDARG_IN_ADAPTER_INIT_FINISHED
 #else
     trace("{\"event\":\"system_renderer_control\",\"experimental_adapter_requested\":false}\n");
 #endif
-    WDF_OBJECT_ATTRIBUTES attributes; WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attributes, MonitorState);
-    attributes.EvtCleanupCallback = [](WDFOBJECT object) {
-        auto monitor = WdfObjectGet_MonitorState(object); delete monitor->consumer; monitor->consumer = nullptr;
-    };
-    IDDCX_MONITOR_INFO info{}; info.Size = sizeof(info); info.MonitorType = DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INDIRECT_WIRED;
-    info.MonitorDescription.Size = sizeof(info.MonitorDescription); info.MonitorDescription.Type = IDDCX_MONITOR_DESCRIPTION_TYPE_EDID;
-    info.MonitorContainerId = {0x60f0a813,0xc8ad,0x4421,{0x91,0x38,0x2b,0x18,0x4a,0x5e,0x33,0x90}};
-    IDARG_IN_MONITORCREATE create{}; create.ObjectAttributes = &attributes; create.pMonitorInfo = &info;
-    IDARG_OUT_MONITORCREATE out{};
-    auto status = IddCxMonitorCreate(adapter, &create, &out);
+    WDF_WORKITEM_CONFIG config; WDF_WORKITEM_CONFIG_INIT(&config, prepare_monitor);
+    config.AutomaticSerialization = FALSE;
+    WDF_OBJECT_ATTRIBUTES attributes; WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attributes, PreparationContext);
+    attributes.ParentObject = adapter;
+    const auto status = WdfWorkItemCreate(&config, &attributes, &state->preparation);
     if (NT_SUCCESS(status)) {
-        WdfObjectGet_MonitorState(out.MonitorObject)->preferred = state->preferred;
-        IDARG_OUT_MONITORARRIVAL arrival{}; status = IddCxMonitorArrival(out.MonitorObject, &arrival);
+        WdfObjectGet_PreparationContext(state->preparation)->adapter = adapter;
+        WdfWorkItemEnqueue(state->preparation);
     }
-    trace("{\"event\":\"monitor_arrival\",\"status\":\"%08lx\"}\n", ULONG(status));
     return status;
 }
 EVT_WDF_DEVICE_D0_ENTRY power_on;
@@ -243,6 +303,11 @@ NTSTATUS power_on(WDFDEVICE device, WDF_POWER_DEVICE_STATE) {
     IDDCX_ENDPOINT_VERSION version{}; version.Size = sizeof(version); version.MajorVer = 1;
     caps.EndPointDiagnostics.pFirmwareVersion = caps.EndPointDiagnostics.pHardwareVersion = &version;
     WDF_OBJECT_ATTRIBUTES attributes; WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attributes, DeviceState);
+    attributes.EvtCleanupCallback = [](WDFOBJECT object) {
+        auto state = WdfObjectGet_DeviceState(object);
+        if (state->preparation) WdfWorkItemFlush(state->preparation);
+        delete state->prepared; state->prepared = nullptr;
+    };
     IDARG_IN_ADAPTER_INIT init{}; init.WdfDevice = device; init.pCaps = &caps; init.ObjectAttributes = &attributes;
     IDARG_OUT_ADAPTER_INIT out{}; const auto status = IddCxAdapterInitAsync(&init, &out);
     if (NT_SUCCESS(status)) {
