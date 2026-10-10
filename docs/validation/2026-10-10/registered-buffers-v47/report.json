@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "kind": "registered-constant-buffer-live-validation",
+  "passed": true,
+  "verified_readbacks": 20,
+  "verified_logical_bytes": 525504,
+  "stats": {
+    "pid": 7388,
+    "allocations": 15,
+    "fills": 0,
+    "staging_copy_bytes": 688128,
+    "live_allocations": 0,
+    "live_contexts": 0,
+    "cleanup_errors": 0,
+    "rejected": 0,
+    "submitted_copies": 0,
+    "upload_bytes": 525504
+  },
+  "npu_execution_tested": false,
+  "desktop_offload_tested": false,
+  "probe_source_revision": "809d1cef3eab83c0480600458880f1d0597794f6",
+  "notes": [
+    "The registered Windows adapter now supports default and dynamic constant-buffer allocation, initial uploads, full updates, write-discard mapping, bindings and staging readback. Sizes 16, 272, 32768, 32784 and 65536 bytes each pass four exact readbacks. All cleanup/rejection counters are zero.",
+    "v46 first passes initialization/readback and then rejects the dedicated default-constant-buffer update callback. v47 connects that callback. Its first run verifies all 20 readbacks, then fails an incorrectly calculated test expectation for padded storage. The corrected v17 probe on the same installed v47 driver passes, including the exact 688128-byte staging-copy total. No failed evidence was overwritten.",
+    "Uploads, copies and mappings execute on the CPU through actual Windows VidMm allocations. This test performs no draw and no NPU execution.",
+    "The v6 indirect-monitor driver separately prepares a device on the custom render adapter in 657 ms and announces the monitor. Its v6a activation probe still observes only the original display after extension and successfully restores it. That failure is independent of the passing buffer test.",
+    "Both custom drivers are removed cleanly after capture. Explorer and Start Menu subsequently request a dynamic vertex buffer (bind 1), which this version still rejects; geometry-buffer work is validated separately."
+  ],
+  "references": [
+    "https://learn.microsoft.com/en-us/windows/win32/api/d3d11/nf-d3d11-id3d11device-createbuffer",
+    "https://learn.microsoft.com/en-us/windows/win32/api/d3d11/nf-d3d11-id3d11devicecontext-updatesubresource"
+  ]
+}
