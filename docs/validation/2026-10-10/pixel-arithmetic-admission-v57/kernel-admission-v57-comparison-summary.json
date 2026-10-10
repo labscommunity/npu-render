@@ -1,0 +1,47 @@
+{
+  "triage_counts": {
+    "Adapter AddDevice has completed with status %1": 2,
+    "Driver returned an invalid NTSTATUS code: 0x%I64x": 162,
+    "GPU virtualization initialization has completed with status %1": 2,
+    "The selected adapter is display only adapter": 2,
+    "Adapter StartDevice has completed with status %1": 2,
+    "Cannot find the file version resource in DxgkpGetFileVersion (ntStatus = %I64d).": 4,
+    "Failed to get preferred mode from monitor EDID or DisplayID on adapter 0x%I64x, target 0x%I64x (status = 0x%I64x)": 12,
+    "PermanentSysMem, Protected,                             ExistingSysMem, ExistingKernelSysMem,                             or Primary flags can't be                             specified with Shareable.\n": 18,
+    "Failed to create CDD primary allocations on Adapter 0x%I64x for VidPnSource 0x%I64x, (Status = 0x%I64x).": 18,
+    "Failed to find DXGPROCESS": 20
+  },
+  "gdi_context_events": 1,
+  "dwm_adapters": [
+    {
+      "displayAdapterLuid": "0x5C66",
+      "renderAdapterLuid": "0x5C66",
+      "vidPnSourceId": 0,
+      "vidPnTargetId": 0,
+      "uniqueId": 2,
+      "surfaceLuid": "0x11661F3",
+      "bindId": 1,
+      "presentCount": 0,
+      "flipRect": [
+        {
+          "left": 704,
+          "top": 6,
+          "right": 818,
+          "bottom": 20
+        }
+      ],
+      "meta": {
+        "provider": "Microsoft-Windows-Dwm-Core",
+        "event": "468v0",
+        "time": "2026-10-09T22:47:45.414",
+        "cpu": 2,
+        "pid": 7384,
+        "tid": 7996,
+        "channel": "Microsoft-Windows-Dwm-Core/Diagnostic",
+        "level": "Information ",
+        "task": "Dx_Flip_Consumed",
+        "keywords": "Composition"
+      }
+    }
+  ]
+}
