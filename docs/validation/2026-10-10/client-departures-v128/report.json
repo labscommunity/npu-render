@@ -1,0 +1,26 @@
+{
+  "build": "present-umd-v128",
+  "clean_cpu_suites_passed": 18,
+  "source_hashes_verified": 101,
+  "binary_hashes_verified_by_controller": 24,
+  "baseline_build": "present-umd-v127",
+  "baseline_corrected_fixture_reproduces_global_failure": true,
+  "client_cases_passed": 6,
+  "healthy_npu_components_checked": 98304,
+  "worker_successful_npu_packets": 9,
+  "acknowledged_replies": 6,
+  "isolated_departures": 6,
+  "departures_after_provider_response": 3,
+  "worker_exit_code": 0,
+  "transport_cleanup_passed": true,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "findings": [
+    "The previous relay loses every client when one closes its empty connection. Both the original and corrected fixture reproduce that failure before the first healthy request completes.",
+    "The initial v128 fixture accidentally assigns sequence numbers above the protocol limit of 4096. The new relay correctly isolates both the departing client and the invalid fixture request; the fixture then fails on a truncated reply. Raw reports and the original fixture are retained.",
+    "The corrected fixture separates process identifiers from bounded sequences. All six lifecycle cases pass with real guest named pipes, the physical NPU worker, nine computed requests and every byte of six healthy replies checked. Three departures consume provider requests without acknowledged delivery.",
+    "A client that has received a complete reply leaves its acknowledgement pending while a second client completes an NPU request. It then disconnects, and subsequent clients still succeed.",
+    "Only local connection/request/delivery/acknowledgement failures are isolated. Malformed worker responses and provider-stream failures remain fatal; a complete worker response is drained before the FIFO turn is released.",
+    "These are transport and NPU execution checks. The next live VM trial must establish full visible and interactive desktop delivery."
+  ]
+}

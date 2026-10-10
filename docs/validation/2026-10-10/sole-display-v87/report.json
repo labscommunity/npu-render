@@ -1,0 +1,40 @@
+{
+  "trial": "v87",
+  "source_commit": "23bcc2fcd64f94a68efbf330bb45af99b8ef4083",
+  "umd_build": "present-umd-v127",
+  "package_version": "0.0.75.0",
+  "worker_successes_by_client": {
+    "42": 13,
+    "6660": 18,
+    "5404": 12,
+    "5100": 13
+  },
+  "acknowledged_successes_by_client": {
+    "42": 13,
+    "6660": 17,
+    "5404": 11,
+    "5100": 13
+  },
+  "received_frames": 4,
+  "received_nonblack_frames": 2,
+  "nonblack_frames_with_sole_gate_true": 1,
+  "viewer_submissions": 4,
+  "full_desktop_offload": false,
+  "usable_interactive_desktop": false,
+  "tahoma_performance_tested": false,
+  "collector_completed_without_error": true,
+  "original_cleanup_passed": false,
+  "subsequent_cleanup_verified": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "guest_restart": false,
+  "findings": [
+    "Two background-only frames were received, one while the sole-display gate was true. Both have the same pixels; the following two frames are opaque black. These observations do not establish fresh full-desktop rendering or usable interaction.",
+    "The harness sent Control, Start and Escape. It selected a nonblack image received immediately before the sole gate; the next harness requires a matching frame receipt during sole mode. No visual input response is verified.",
+    "The relay terminates with indexed pipe operation failed: 232. The worker completes its last NPU draw successfully and then reports the socket closed or timed out. Two completed worker responses have no matching acknowledged client receipt.",
+    "The first DWM draw rejection is E_FAIL after the transport failure, with an incomplete capture. Later replacement processes produce three complete captures. No rejected shader or vertex-binding diagnostic was captured in this trial.",
+    "The relay currently treats a departing local client as a global failure, shutting down the provider stream and causing subsequent graphics requests to fail. Client lifecycle isolation is the next change, with a real-pipe reproduction before the next live trial.",
+    "The original indirect-device removal returned exit 1. The device was subsequently confirmed absent, its exact owned INF verified and deleted, and both custom device classes independently confirmed absent. The first recovery invocation had an execution-policy import error; a separate successful verification is preserved. No reboot was performed.",
+    "The collector, viewer and input harness finish normally. The original desktop is visually restored. This trial does not establish physical scanout offload or Tahoma benefit."
+  ]
+}

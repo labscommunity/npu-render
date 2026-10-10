@@ -1,0 +1,51 @@
+{
+    "cases":  [
+                  {
+                      "case":  "before-header",
+                      "healthy_client_pid":  9101,
+                      "execution_device":  "NPU",
+                      "verified_components":  16384,
+                      "passed":  true
+                  },
+                  {
+                      "case":  "partial-request",
+                      "healthy_client_pid":  9102,
+                      "execution_device":  "NPU",
+                      "verified_components":  16384,
+                      "passed":  true
+                  },
+                  {
+                      "case":  "invalid-request",
+                      "healthy_client_pid":  9103,
+                      "execution_device":  "NPU",
+                      "verified_components":  16384,
+                      "passed":  true
+                  },
+                  {
+                      "case":  "after-reply-header",
+                      "healthy_client_pid":  9104,
+                      "execution_device":  "NPU",
+                      "verified_components":  16384,
+                      "passed":  true
+                  },
+                  {
+                      "case":  "missing-ack",
+                      "healthy_client_pid":  9105,
+                      "execution_device":  "NPU",
+                      "verified_components":  16384,
+                      "passed":  true
+                  },
+                  {
+                      "case":  "wrong-ack",
+                      "healthy_client_pid":  9106,
+                      "execution_device":  "NPU",
+                      "verified_components":  16384,
+                      "passed":  true
+                  }
+              ],
+    "expected_provider_requests":  9,
+    "expected_acknowledged_replies":  6,
+    "expected_client_departures":  6,
+    "desktop_offload_tested":  false,
+    "passed":  true
+}

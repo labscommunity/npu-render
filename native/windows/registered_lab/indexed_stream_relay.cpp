@@ -38,7 +38,7 @@ int wmain(int argc, wchar_t **argv) try {
     LocalFree(descriptor);
     stream::Handle stop_event(CreateEventW(nullptr,TRUE,FALSE,nullptr));
     nr::registered_lab::FifoDispatch dispatch{uint32_t(limit)};
-    std::atomic<bool> stopping{false};std::atomic<uint32_t> acknowledged_count{0};
+    std::atomic<bool> stopping{false};std::atomic<uint32_t> settled_count{0};
     std::mutex error_mutex;std::exception_ptr failure;
     const auto stop=[&]{
         stopping.store(true);SetEvent(stop_event.value);dispatch.cancel();shutdown(socket.value,SD_BOTH);
@@ -50,32 +50,54 @@ int wmain(int argc, wchar_t **argv) try {
     const auto serve=[&](HANDLE pipe){
         try {
             while(!stopping.load() && GetTickCount64()<deadline){
-                stream::Handle event(CreateEventW(nullptr,TRUE,FALSE,nullptr));OVERLAPPED operation{};operation.hEvent=event.value;
-                const BOOL ready=ConnectNamedPipe(pipe,&operation);const auto error=ready?ERROR_SUCCESS:GetLastError();
-                if(error!=ERROR_PIPE_CONNECTED)(void)stream::completed(pipe,operation,ready,error,deadline,0,stop_event.value);
-                const auto started=GetTickCount64();const auto request_deadline=(std::min)(deadline,started+90000);
-                const auto bytes=stream::read_packet(pipe,request_deadline,stop_event.value);
-                const auto h=ex::Reader(bytes).value<ex::Header>();ex::require(ex::request_valid(h,bytes.size()));
-                uint32_t ticket=0;
-                try{ticket=dispatch.reserve();}catch(const nr::registered_lab::FifoDispatch::Exhausted &){DisconnectNamedPipe(pipe);return;}
-                const auto queued=GetTickCount64();ULONGLONG entered=0,finished=0;
-                const auto turn_deadline=nr::registered_lab::FifoDispatch::Clock::now()+std::chrono::milliseconds(stream::remaining(request_deadline));
-                const auto reply=dispatch.execute(ticket,turn_deadline,[&]{
-                    entered=GetTickCount64();
-                    stream::socket_write(socket.value,bytes,request_deadline);auto result=stream::socket_read(socket.value,request_deadline);
-                    const auto response=ex::Reader(result).value<ex::Header>();
-                    ex::require(ex::response_valid(response,h,result.size()) || ex::failure_valid(response,h,result.size()));
-                    finished=GetTickCount64();return result;
-                });
-                const auto response=ex::Reader(reply).value<ex::Header>();
-                // Release the provider turn before delivering this client's reply.
-                stream::write_packet(pipe,reply,request_deadline,stop_event.value);
-                uint32_t acknowledged=0;stream::transfer(pipe,&acknowledged,4,false,request_deadline,stop_event.value);ex::require(acknowledged==h.sequence);
-                std::printf("{\"sequence\":%u,\"client_pid\":%u,\"dispatch_ticket\":%u,\"request_bytes\":%zu,\"reply_bytes\":%zu,\"queue_wait_ms\":%llu,\"worker_ms\":%llu,\"roundtrip_ms\":%llu,\"worker_success\":%s,\"displayed_frames\":0}\n",
-                    h.sequence,h.client_pid,ticket,bytes.size(),reply.size(),static_cast<unsigned long long>(entered-queued),static_cast<unsigned long long>(finished-entered),
-                    static_cast<unsigned long long>(GetTickCount64()-started),response.kind==2?"true":"false");std::fflush(stdout);
-                if(!DisconnectNamedPipe(pipe))throw std::runtime_error("relay pipe disconnect failed");
-                if(acknowledged_count.fetch_add(1)+1==limit){stop();return;}
+                const char *phase="connect";ex::Header h{};uint32_t ticket=UINT32_MAX;bool dispatched=false;
+                const auto departure=[&](DWORD code){
+                    std::printf("{\"kind\":\"client_departure\",\"phase\":\"%s\",\"win32_error\":%lu,\"client_pid\":%u,\"sequence\":%u,\"dispatch_ticket\":%u,\"provider_response_received\":%s,\"delivery_acknowledged\":false}\n",
+                        phase,code,h.client_pid,h.sequence,ticket,dispatched?"true":"false");std::fflush(stdout);
+                };
+                try {
+                    stream::Handle event(CreateEventW(nullptr,TRUE,FALSE,nullptr));OVERLAPPED operation{};operation.hEvent=event.value;
+                    const BOOL ready=ConnectNamedPipe(pipe,&operation);const auto error=ready?ERROR_SUCCESS:GetLastError();
+                    if(error!=ERROR_PIPE_CONNECTED)(void)stream::completed(pipe,operation,ready,error,deadline,0,stop_event.value);
+                    const auto started=GetTickCount64();const auto request_deadline=(std::min)(deadline,started+90000);
+                    phase="request";const auto bytes=stream::read_packet(pipe,request_deadline,stop_event.value);
+                    h=ex::Reader(bytes).value<ex::Header>();ex::require(ex::request_valid(h,bytes.size()));
+                    try{ticket=dispatch.reserve();}catch(const nr::registered_lab::FifoDispatch::Exhausted &){DisconnectNamedPipe(pipe);return;}
+                    const auto queued=GetTickCount64();ULONGLONG entered=0,finished=0;
+                    const auto turn_deadline=nr::registered_lab::FifoDispatch::Clock::now()+std::chrono::milliseconds(stream::remaining(request_deadline));
+                    phase="provider";
+                    const auto reply=dispatch.execute(ticket,turn_deadline,[&]{
+                        entered=GetTickCount64();
+                        stream::socket_write(socket.value,bytes,request_deadline);auto result=stream::socket_read(socket.value,request_deadline);
+                        const auto response=ex::Reader(result).value<ex::Header>();
+                        ex::require(ex::response_valid(response,h,result.size()) || ex::failure_valid(response,h,result.size()));
+                        finished=GetTickCount64();return result;
+                    });
+                    dispatched=true;const auto response=ex::Reader(reply).value<ex::Header>();
+                    // The complete worker reply has been drained and the FIFO turn
+                    // released. A departing application cannot desynchronize or
+                    // cancel the provider stream used by the remaining clients.
+                    phase="reply";stream::write_packet(pipe,reply,request_deadline,stop_event.value);
+                    phase="ack";uint32_t acknowledged=0;
+                    stream::transfer(pipe,&acknowledged,4,false,request_deadline,stop_event.value);ex::require(acknowledged==h.sequence);
+                    std::printf("{\"sequence\":%u,\"client_pid\":%u,\"dispatch_ticket\":%u,\"request_bytes\":%zu,\"reply_bytes\":%zu,\"queue_wait_ms\":%llu,\"worker_ms\":%llu,\"roundtrip_ms\":%llu,\"worker_success\":%s,\"displayed_frames\":0}\n",
+                        h.sequence,h.client_pid,ticket,bytes.size(),reply.size(),static_cast<unsigned long long>(entered-queued),static_cast<unsigned long long>(finished-entered),
+                        static_cast<unsigned long long>(GetTickCount64()-started),response.kind==2?"true":"false");std::fflush(stdout);
+                } catch(const stream::PipeError &error){
+                    if(stopping.load())return;
+                    if(!error.client_departure())throw;
+                    departure(error.code);
+                } catch(const std::invalid_argument &){
+                    // Bad local packet/ACK affects this client only. An invalid
+                    // worker reply remains fatal because stream integrity is lost.
+                    if(std::strcmp(phase,"request") && std::strcmp(phase,"ack"))throw;
+                    departure(ERROR_INVALID_DATA);
+                }
+                if(!DisconnectNamedPipe(pipe) && GetLastError()!=ERROR_PIPE_NOT_CONNECTED)
+                    throw std::runtime_error("relay pipe disconnect failed");
+                // Count consumed provider turns, including undeliverable replies,
+                // so abandoned clients cannot keep an exhausted relay alive.
+                if(dispatched && settled_count.fetch_add(1)+1==limit){stop();return;}
             }
         }catch(...){if(!stopping.load())fail(std::current_exception());DisconnectNamedPipe(pipe);}
     };

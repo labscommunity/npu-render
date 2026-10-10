@@ -5,6 +5,15 @@
 #include <windows.h>
 #include "indexed_exchange_protocol.hpp"
 namespace nr::registered_lab::indexed_stream {
+struct PipeError : std::runtime_error {
+    DWORD code;
+    PipeError(const char *operation, DWORD value)
+        : std::runtime_error(std::string(operation) + ": " + std::to_string(value)), code(value) {}
+    bool client_departure() const {
+        return code == ERROR_BROKEN_PIPE || code == ERROR_NO_DATA || code == ERROR_PIPE_NOT_CONNECTED ||
+               code == ERROR_HANDLE_EOF || code == ERROR_TIMEOUT;
+    }
+};
 struct Handle {
     HANDLE value = INVALID_HANDLE_VALUE;
     explicit Handle(HANDLE h) : value(h) { if (!h || h == INVALID_HANDLE_VALUE) throw std::runtime_error("indexed pipe handle unavailable"); }
@@ -19,21 +28,24 @@ inline DWORD remaining(ULONGLONG deadline) {
 }
 inline DWORD completed(HANDLE handle, OVERLAPPED &operation, BOOL immediate, DWORD error, ULONGLONG deadline, DWORD immediate_bytes = 0, HANDLE cancel = nullptr) {
     if (immediate) return immediate_bytes;
-    if (!immediate && error != ERROR_IO_PENDING) throw std::runtime_error("indexed pipe operation failed: " + std::to_string(error));
+    if (!immediate && error != ERROR_IO_PENDING) throw PipeError("indexed pipe operation failed", error);
     // Drain cancellation before the stack-owned OVERLAPPED or its event is freed.
     DWORD wait = WAIT_FAILED;
     try {
         const HANDLE events[]{operation.hEvent,cancel};
         wait = cancel ? WaitForMultipleObjects(2,events,FALSE,remaining(deadline)) : WaitForSingleObject(operation.hEvent, remaining(deadline));
     } catch (...) {
-        CancelIoEx(handle, &operation); DWORD ignored = 0; GetOverlappedResult(handle, &operation, &ignored, TRUE); throw;
+        CancelIoEx(handle, &operation); DWORD ignored = 0; GetOverlappedResult(handle, &operation, &ignored, TRUE);
+        if(GetTickCount64() >= deadline) throw PipeError("indexed pipe wait expired", ERROR_TIMEOUT);
+        throw;
     }
     if (wait != WAIT_OBJECT_0) {
         CancelIoEx(handle, &operation); DWORD ignored = 0; GetOverlappedResult(handle, &operation, &ignored, TRUE);
-        throw std::runtime_error("indexed pipe wait expired");
+        if(wait == WAIT_TIMEOUT) throw PipeError("indexed pipe wait expired", ERROR_TIMEOUT);
+        throw std::runtime_error("indexed pipe wait cancelled or failed");
     }
     DWORD actual = 0;
-    if (!GetOverlappedResult(handle, &operation, &actual, FALSE)) throw std::runtime_error("indexed pipe completion failed");
+    if (!GetOverlappedResult(handle, &operation, &actual, FALSE)) throw PipeError("indexed pipe completion failed", GetLastError());
     return actual;
 }
 inline void transfer(HANDLE pipe, void *data, DWORD bytes, bool write, ULONGLONG deadline, HANDLE cancel = nullptr) {
@@ -46,7 +58,8 @@ inline void transfer(HANDLE pipe, void *data, DWORD bytes, bool write, ULONGLONG
         const BOOL ready = write ? WriteFile(pipe, p + cursor, count, &immediate_bytes, &operation) : ReadFile(pipe, p + cursor, count, &immediate_bytes, &operation);
         const auto error = ready ? ERROR_SUCCESS : GetLastError();
         const auto actual = completed(pipe, operation, ready, error, deadline, immediate_bytes,cancel);
-        if (!actual || actual > count) throw std::runtime_error("indexed pipe truncated transfer"); cursor += actual;
+        if (!actual) throw PipeError("indexed pipe truncated transfer", ERROR_HANDLE_EOF);
+        if (actual > count) throw std::runtime_error("indexed pipe invalid transfer size"); cursor += actual;
     }
 }
 inline std::vector<uint8_t> read_packet(HANDLE pipe, ULONGLONG deadline, HANDLE cancel = nullptr) {

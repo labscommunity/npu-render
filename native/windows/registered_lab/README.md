@@ -728,3 +728,24 @@ NPU coverage checks and the ABI 10 worker response. The
 [v86 live trial](../../../docs/validation/2026-10-10/sole-display-v86/report.json)
 preserves the failing draw and black received frames; a usable desktop remains
 unproven.
+
+The native relay isolates local client departures from the shared NPU worker
+connection. It drains a complete worker response before releasing each FIFO
+turn; a closed client pipe, malformed local packet or bad acknowledgement then
+affects that client only. Invalid worker responses and provider-stream failures
+remain fatal. Consumed provider turns count toward the bounded request budget
+even when the client leaves before acknowledging its reply. Departure records
+include the transfer phase and explicitly mark the reply unacknowledged.
+
+`tools/check_indexed_client_departures.ps1` exercises six real guest-pipe
+lifecycle cases, checking every output byte from a healthy NPU client after
+each case. It also keeps one reply unacknowledged while another client completes,
+checking that acknowledgement does not retain provider ownership. This test
+installs no display drivers and does not establish desktop delivery.
+
+The [v128 qualification](../../../docs/validation/2026-10-10/client-departures-v128/report.json)
+preserves the old relay's failure and all six corrected-fixture cases passing
+against the physical NPU. The
+[v87 desktop trial](../../../docs/validation/2026-10-10/sole-display-v87/report.json)
+records two background-only frames followed by black frames and the original
+shared-transport failure. Full desktop offload remains unproven.
