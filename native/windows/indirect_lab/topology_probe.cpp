@@ -67,7 +67,7 @@ void print(const char *phase, const Topology &value) {
     std::fflush(output);
 }
 }
-int run_probe() {
+int run_probe(bool sole_indirect = false) {
     if (!nr_fill_guest()) return 2;
     DWORD session = 0;
     if (!ProcessIdToSessionId(GetCurrentProcessId(), &session) || !session) return 2;
@@ -79,7 +79,7 @@ int run_probe() {
     Topology before; bool restore = false, passed = false;
     try {
         before = query(QDC_ONLY_ACTIVE_PATHS); print("before", before);
-        if (before.paths.size() == 2) {
+        if (before.paths.size() == 2 && !sole_indirect) {
             UINT indirect = 0;
             for (const auto &path : before.paths)
                 if (path.targetInfo.targetAvailable && path.targetInfo.outputTechnology == DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INDIRECT_WIRED)
@@ -109,12 +109,13 @@ int run_probe() {
         if (original >= before.modes.size() || before.modes[original].infoType != DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE)
             throw std::runtime_error("original source mode unavailable");
         const auto &source = before.modes[original].sourceMode;
+        if (sole_indirect) { desired.paths.clear(); desired.modes.clear(); }
         DISPLAYCONFIG_MODE_INFO mode{};
         mode.infoType = DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE;
         mode.id = target.sourceInfo.id; mode.adapterId = target.sourceInfo.adapterId;
         mode.sourceMode.width = 1024; mode.sourceMode.height = 768;
         mode.sourceMode.pixelFormat = DISPLAYCONFIG_PIXELFORMAT_32BPP;
-        mode.sourceMode.position = {source.position.x + LONG(source.width), source.position.y};
+        mode.sourceMode.position = sole_indirect ? POINTL{0, 0} : POINTL{source.position.x + LONG(source.width), source.position.y};
         target.sourceInfo.modeInfoIdx = UINT(desired.modes.size());
         target.targetInfo.modeInfoIdx = DISPLAYCONFIG_PATH_MODE_IDX_INVALID;
         target.targetInfo.refreshRate = {60, 1};
@@ -123,6 +124,7 @@ int run_probe() {
         target.targetInfo.scanLineOrdering = DISPLAYCONFIG_SCANLINE_ORDERING_PROGRESSIVE;
         target.flags = DISPLAYCONFIG_PATH_ACTIVE;
         desired.modes.push_back(mode); desired.paths.push_back(target);
+        std::fprintf(output, "{\"sole_indirect_requested\":%s,\"automatic_restoration\":true}\n", sole_indirect ? "true" : "false");
         constexpr UINT flags = SDC_USE_SUPPLIED_DISPLAY_CONFIG | SDC_ALLOW_CHANGES;
         const auto validation = SetDisplayConfig(UINT(desired.paths.size()), desired.paths.data(),
             UINT(desired.modes.size()), desired.modes.data(), flags | SDC_VALIDATE);
@@ -138,9 +140,9 @@ int run_probe() {
             Sleep(1000); active = query(QDC_ONLY_ACTIVE_PATHS);
         }
         print("extended", active);
-        if (!contains(active, target) || !position_preserved(before, active))
+        if (!contains(active, target) || (sole_indirect ? active.paths.size() != 1 : !position_preserved(before, active)))
             throw std::runtime_error("indirect display activation or original-display preservation failed");
-        std::fputs("{\"indirect_display_active\":true,\"original_display_preserved\":true,\"observation_seconds\":45}\n", output);
+        std::fprintf(output, "{\"indirect_display_active\":true,\"original_display_preserved\":%s,\"observation_seconds\":45}\n", sole_indirect ? "false" : "true");
         std::fflush(output);
         for (UINT i = 0; i < 45; ++i) Sleep(1000);
         passed = true;
@@ -168,7 +170,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     int argc = 0;
     auto args = CommandLineToArgvW(GetCommandLineW(), &argc);
     if (!args) return 2;
-    bool valid = argc == 3 && !lstrcmpW(args[1], L"--report") &&
+    const bool sole_indirect = argc == 4 && !lstrcmpW(args[3], L"--sole-indirect");
+    bool valid = (argc == 3 || sole_indirect) && !lstrcmpW(args[1], L"--report") &&
         !wcsncmp(args[2], L"idd-topology-", 13) && wcslen(args[2]) < 100;
     if (valid) for (const WCHAR *p = args[2]; *p; ++p)
         if (!((*p >= L'a' && *p <= L'z') || (*p >= L'0' && *p <= L'9') || *p == L'-')) valid = false;
@@ -185,7 +188,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     if (!output) { _close(fd); return 2; }
     setvbuf(output, nullptr, _IONBF, 0);
     std::fprintf(output, "{\"event\":\"probe_started\",\"pid\":%lu,\"console_required\":false}\n", GetCurrentProcessId());
-    const auto result = run_probe();
+    const auto result = run_probe(sole_indirect);
     fclose(output); return result;
 }
 #endif
