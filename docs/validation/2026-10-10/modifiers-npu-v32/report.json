@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "kind": "npu-vertex-source-modifier-validation",
+  "source_revision": "4c5bf47",
+  "passed": true,
+  "backend": "NPU",
+  "authored_modifier_vertices": 16,
+  "signed_zero_verified": true,
+  "captured_vertex_words": 116,
+  "captured_shader_sha256": "5206f958ed82db3692b2a0f34e08300091ddde34e86d1b2ef94a418d7434ceed",
+  "captured_vertex_results": 512,
+  "captured_output_components": 8192,
+  "captured_output_bits_exact": true,
+  "desktop_offload_tested": false,
+  "performance_tested": false,
+  "notes": [
+    "v31 passes the captured desktop vertex stream but fails the independent signed-zero source-modifier fixture. A standalone graph probe confirms the NPU floating path canonicalizes negative zero.",
+    "v32 performs negation and absolute-value bit changes with NPU integer BitwiseXor/BitwiseAnd and emits available bit views as integer outputs. The host only copies output bytes; it does not fix signs with CPU arithmetic.",
+    "All previous vertex tests still pass on the real NPU, including 4096-row indexed constants and 4096 FP32 screen vertices. Three CPU build-contract tests pass.",
+    "Modified MOV from an arithmetic temporary without an integer bit view remains explicitly rejected. Out-of-range input-assembler fetch and instancing are also not yet admitted.",
+    "This establishes bounded stage execution. It does not establish generic rasterization, pixel shading, desktop frames, or Tahoma benefit."
+  ]
+}
