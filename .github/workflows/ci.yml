@@ -109,6 +109,12 @@ jobs:
           cmake --build build/windows-paging-probe --config Release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           ctest --test-dir build/windows-paging-probe -C Release --output-on-failure
+      - name: Build registered graphics bridge and test CPU and exchange contracts
+        if: runner.os == 'Windows'
+        run: uv run --frozen python tools/build_registered_lab.py --wdk-include-root build/dependencies/wdk-10.0.26100.6584/include
+      - name: Build disposable-guest indirect display diagnostic
+        if: runner.os == 'Windows'
+        run: uv run --frozen python tools/build_indirect_lab.py
       - name: Package private Windows prototype
         if: runner.os == 'Windows'
         run: uv run --frozen python tools/package_windows.py --ddi --source-revision ${{ github.sha }}
