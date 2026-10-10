@@ -86,6 +86,15 @@ take effect, as required by the
 The component test replaces `PresentCb` after the first call and verifies that
 the next invocation reaches its replacement.
 
+Device creation now returns `DXGI_STATUS_NO_REDIRECTION`, as the same DXGI
+contract requires for adapters without a shared Direct3D 9 hardware
+implementation. This selects CPU-accessible presentation rather than D3D9/DWM
+shared-resource redirection; it does not change the explicitly selected draw
+provider or establish frame delivery. The component tests require this exact
+successful status and continue to exercise resource, draw and present callbacks.
+Earlier live packages through v41 returned `S_OK`; their measurements remain
+unchanged, and the new status needs a separate live presentation check.
+
 `--present` creates a visible 320×192 HWND and a discard-model DXGI swap chain
 on the selected laboratory adapter. It requires an interactive guest session,
 clears the back buffer red/green/blue, submits each present, and checks every RGB

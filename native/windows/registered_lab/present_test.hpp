@@ -23,7 +23,7 @@ int test_present(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER_DEVI
     create.pDeviceFuncs = &f; create.pUMCallbacks = &um; create.pKTCallbacks = &kt;
     create.DXGIBaseDDI.pDXGIDDIBaseFunctions = &dxgi; create.DXGIBaseDDI.pDXGIBaseCallbacks = &cb;
     create.Interface = D3D10_0_DDI_INTERFACE_VERSION;
-    TEST(create_device({}, &create) == S_OK);
+    TEST(create_device({}, &create) == DXGI_STATUS_NO_REDIRECTION);
     const auto h = create.hDrvDevice;
     // The live DXGI discard swap chain requests PRESENT|RENDER_TARGET with
     // DISCARD_ON_PRESENT and no primary description. It remains a real VidMm

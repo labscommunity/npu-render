@@ -8,7 +8,7 @@ int test_draws(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER_DEVICE
     create.hDrvDevice.pDrvPrivate = storage; create.hRTDevice.handle = runtime_handle;
     create.pDeviceFuncs = &f; create.pUMCallbacks = &um; create.pKTCallbacks = &kt;
     create.DXGIBaseDDI.pDXGIDDIBaseFunctions = &dxgi; create.Interface = D3D10_0_DDI_INTERFACE_VERSION;
-    TEST(create_device({}, &create) == S_OK);
+    TEST(create_device({}, &create) == DXGI_STATUS_NO_REDIRECTION);
     TEST(!nr_fill_configure(backend)); // Configuration cannot change beneath a live device.
     const auto h = create.hDrvDevice;
     auto &d = device(h);

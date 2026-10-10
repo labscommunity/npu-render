@@ -8,7 +8,7 @@ int test_uploads(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER_DEVI
     create.hDrvDevice.pDrvPrivate = storage; create.hRTDevice.handle = runtime_handle;
     create.pDeviceFuncs = &f; create.pUMCallbacks = &um; create.pKTCallbacks = &kt;
     create.DXGIBaseDDI.pDXGIDDIBaseFunctions = &dxgi; create.Interface = D3D10_0_DDI_INTERFACE_VERSION;
-    TEST(create_device({}, &create) == S_OK);
+    TEST(create_device({}, &create) == DXGI_STATUS_NO_REDIRECTION);
     const auto h = create.hDrvDevice;
     for (const auto format : {DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_B8G8R8A8_UNORM}) {
         for (bool shared : {false, true}) {

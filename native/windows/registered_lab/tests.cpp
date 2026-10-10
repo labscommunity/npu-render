@@ -151,7 +151,7 @@ int main(int argc, char **argv) {
     create.pDeviceFuncs = &functions; create.pUMCallbacks = &um; create.pKTCallbacks = &kt;
     create.DXGIBaseDDI.pDXGIDDIBaseFunctions = &dxgi;
     create.Interface = D3D10_0_DDI_INTERFACE_VERSION;
-    TEST(create_device({}, &create) == S_OK);
+    TEST(create_device({}, &create) == DXGI_STATUS_NO_REDIRECTION);
     const auto h = create.hDrvDevice;
     TEST(counters.live_contexts == 1);
     D3D10_DDI_BLEND_DESC blend_desc{};

@@ -439,7 +439,10 @@ HRESULT APIENTRY create_device(D3D10DDI_HADAPTER, D3D10DDIARG_CREATEDEVICE *a) {
         NR_DXGI(pfnRotateResourceIdentities); NR_DXGI(pfnBlt);
 #undef NR_DXGI
         *a->pDeviceFuncs = f;
-        return S_OK;
+        // This adapter has no shared D3D9 hardware implementation. The DXGI
+        // contract requires CPU-accessible presentation instead of D3D9/DWM
+        // resource redirection, even when the selected draw provider is NPU.
+        return DXGI_STATUS_NO_REDIRECTION;
     } catch (const Error &e) { status = e.status; }
     catch (const std::bad_alloc &) { status = E_OUTOFMEMORY; }
     catch (...) {}
