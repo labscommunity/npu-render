@@ -1,5 +1,6 @@
 // Offline replay of captured uniform-color triangle draws. No display control.
 #include "capture_reader.hpp"
+#include "provider_compile_statistics.hpp"
 #include "vertex_executor.hpp"
 #include "shader_reference.hpp"
 #include "uniform_draw.hpp"
@@ -245,6 +246,9 @@ int main(int argc, char **argv) try {
         executor = std::make_unique<UniformDrawExecutor>(vs, ps, args[0], width, height, backend, blending, format == 87, uint8_t(blend[15] & 255), batch,static_cast<CullMode>(raster[1]-1),raster[2]!=0);
     }
     const auto compile_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - compile_start).count();
+    const auto cache=nr::provider::compile_statistics();
+    std::printf("{\"kind\":\"model_compile_cache\",\"compile_calls\":%llu,\"cache_requests\":%llu,\"cache_hits\":%llu,\"cache_status_unavailable\":%llu}\n",
+        static_cast<unsigned long long>(cache.calls),static_cast<unsigned long long>(cache.cache_requests),static_cast<unsigned long long>(cache.cache_hits),static_cast<unsigned long long>(cache.cache_status_unavailable));
     UniformDrawExecutor::Result result;
     std::vector<PackedColor> reference_pixels;
     for (uint32_t iteration = 0; iteration < repeats; ++iteration) {

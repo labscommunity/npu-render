@@ -1,3 +1,4 @@
+#include "provider_compile.hpp"
 #include "linear_texture_draw.hpp"
 #include <openvino/openvino.hpp>
 #include <openvino/opsets/opset13.hpp>
@@ -148,7 +149,7 @@ struct LinearTextureDrawExecutor::State {
             model=core.read_model(xml.str(),data);for(const auto &node:model->get_ops())require(node->get_rt_info().count("precise_0")!=0);
             properties.emplace(ov::hint::execution_mode(ov::hint::ExecutionMode::ACCURACY));
         }
-        compiled=core.compile_model(model,backend,properties);const auto devices=compiled.get_property(ov::execution_devices);
+        compiled=nr::provider::compile_model(core,model,backend,properties);const auto devices=compiled.get_property(ov::execution_devices);
         require(devices.size()==1 && (devices[0]==backend || devices[0].rfind(backend+".",0)==0));device=devices[0];request=compiled.create_infer_request();
     }
 };

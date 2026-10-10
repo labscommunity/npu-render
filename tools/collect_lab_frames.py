@@ -35,7 +35,20 @@ try {
     $state=[ordered]@{topology_name='NR_TOPOLOGY';sole_indirect=$false}
     $path='C:\npu-lab\NR_TOPOLOGY.jsonl'
     if(Test-Path $path){
-     $text=Get-Content $path -Raw
+     # Get-Content -Raw can emit several strings when a file grows during the
+     # read. Snapshot a bounded byte count with explicit writer sharing instead.
+     $topologyStream=[IO.File]::Open($path,[IO.FileMode]::Open,[IO.FileAccess]::Read,
+      ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+     try {
+      $topologyLength=$topologyStream.Length
+      if($topologyLength -gt 65536){throw 'Topology log exceeds snapshot limit'}
+      $topologyBytes=New-Object byte[] ([int]$topologyLength);$topologyOffset=0
+      while($topologyOffset -lt $topologyBytes.Length){
+       $copied=$topologyStream.Read($topologyBytes,$topologyOffset,$topologyBytes.Length-$topologyOffset)
+       if(!$copied){throw 'Topology snapshot truncated'};$topologyOffset+=$copied
+      }
+      $text=[Text.Encoding]::UTF8.GetString($topologyBytes)
+     } finally {$topologyStream.Dispose()}
      # The native writer appends complete JSON lines. Ignore a concurrently
      # written final fragment rather than parsing a partial record.
      $end=$text.LastIndexOf("`n")

@@ -1,0 +1,34 @@
+{
+  "trial": "v83",
+  "source_commit": "0aa44ffa844bb7311e60c3ba687d8d89a2610c5c",
+  "umd_build": "present-umd-v116",
+  "kmd_build": "allocation-capacity-v3",
+  "package_version": "0.0.71.0",
+  "fresh_guest_boot": true,
+  "npu_preflight_packets_passed": 13,
+  "successful_npu_packets_by_process": {
+    "dwm.exe": 5,
+    "Explorer.EXE": 18,
+    "StartMenuExperienceHost.exe": 18
+  },
+  "dwm_traced_completed_draws": 5,
+  "dwm_traced_present_callbacks": 2,
+  "received_frames": 1,
+  "received_frames_with_nonblack_pixels": 0,
+  "saved_latest_frame_sequence": 2,
+  "viewer_window_submissions": 1,
+  "collector_completed_without_error": false,
+  "full_desktop_offload": false,
+  "performance_tested": false,
+  "device_cleanup_passed": true,
+  "transport_configuration_removed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "findings": [
+    "The sole-indirect display topology activates, but DWM completes only five NPU draws and two Present callbacks. The saved latest frame is sequence 2 and opaque black.",
+    "The collector crashes on Substring after Get-Content -Raw observes a growing topology log. It receives one earlier black frame and never opens its input gate. Saved IDD evidence independently confirms that no later usable frame exists.",
+    "The FIFO relay serves interleaved DWM and shell processes with explicit wait times. Both shell processes trace 17 completed draws; each has one additional successful NPU receipt around teardown. Their final failed captures are incomplete.",
+    "The fresh VM trace preflight and observation trace start/stop succeed. Both custom drivers are removed and transport configuration is removed.",
+    "No debugger pause occurs in this trial. The next run will use a corrected collector and verified model cache to reduce repeated compilation."
+  ]
+}

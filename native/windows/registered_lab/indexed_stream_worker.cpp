@@ -1,5 +1,6 @@
 #include "indexed_socket.hpp"
 #include "indexed_pipeline.hpp"
+#include "provider_compile_statistics.hpp"
 #include <cstdio>
 namespace stream = nr::registered_lab::indexed_stream;
 namespace ex = nr::registered_lab::indexed_exchange;
@@ -20,7 +21,7 @@ int wmain(int argc, wchar_t **argv) try {
     for (uint32_t count = 0; count < limit && GetTickCount64() < deadline; ++count) {
         const auto bytes = stream::socket_read(socket.value, deadline); ex::Header h{};
         std::memcpy(&h, bytes.data(), sizeof(h)); ex::require(ex::request_valid(h, bytes.size()));
-        std::vector<uint8_t> reply;const auto draw_started=GetTickCount64();
+        std::vector<uint8_t> reply;const auto draw_started=GetTickCount64();const auto cache_before=nr::provider::compile_statistics();
         try {
             const auto request = ex::decode(bytes); const auto start = GetTickCount64();
             const auto result = pipeline.execute(request); reply = ex::response(h, result);
@@ -45,6 +46,10 @@ int wmain(int argc, wchar_t **argv) try {
             } catch(const std::exception &) {}
             std::printf("{\"kind\":\"slow_draw_packet\",\"file\":\"slow-request-%u.bin\",\"client_pid\":%u,\"bytes\":%zu,\"saved\":%s}\n",ordinal,h.client_pid,bytes.size(),saved?"true":"false");
         }
+        const auto cache_after=nr::provider::compile_statistics();
+        if(cache_after.calls!=cache_before.calls)std::printf("{\"kind\":\"model_compile_cache\",\"client_pid\":%u,\"sequence\":%u,\"compile_calls\":%llu,\"cache_requests\":%llu,\"cache_hits\":%llu,\"cache_status_unavailable\":%llu}\n",
+            h.client_pid,h.sequence,static_cast<unsigned long long>(cache_after.calls-cache_before.calls),static_cast<unsigned long long>(cache_after.cache_requests-cache_before.cache_requests),
+            static_cast<unsigned long long>(cache_after.cache_hits-cache_before.cache_hits),static_cast<unsigned long long>(cache_after.cache_status_unavailable-cache_before.cache_status_unavailable));
         std::fflush(stdout); std::fflush(stderr); stream::socket_write(socket.value, reply, (std::min)(deadline, GetTickCount64() + 90000));
     }
     return 0;

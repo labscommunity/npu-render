@@ -1,3 +1,4 @@
+#include "provider_compile.hpp"
 #include "vertex_executor.hpp"
 #include <openvino/openvino.hpp>
 #include <openvino/opsets/opset13.hpp>
@@ -519,7 +520,7 @@ struct RegisterExecutor::State {
                 if (!node->get_rt_info().count("precise_0")) throw std::runtime_error("vertex precision marker was lost");
             properties.emplace(ov::hint::execution_mode(ov::hint::ExecutionMode::ACCURACY));
         }
-        compiled = core.compile_model(model, backend, properties);
+        compiled = nr::provider::compile_model(core, model, backend, properties);
         check(compiled.inputs().size() == bindings.size() && compiled.outputs().size() == results.size());
         const auto devices = compiled.get_property(ov::execution_devices);
         if (devices.size() != 1 || !(devices[0] == backend || devices[0].rfind(backend + ".", 0) == 0))

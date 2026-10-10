@@ -1,3 +1,4 @@
+#include "provider_compile.hpp"
 #include "solid_rectangle.hpp"
 #include <openvino/openvino.hpp>
 #include <openvino/opsets/opset13.hpp>
@@ -95,7 +96,7 @@ struct SolidRectangleExecutor::State {
             for (const auto &node : model->get_ops()) require(node->get_rt_info().count("precise_0") != 0);
             properties.emplace(ov::hint::execution_mode(ov::hint::ExecutionMode::ACCURACY));
         }
-        compiled = core.compile_model(model, backend, properties);
+        compiled = nr::provider::compile_model(core, model, backend, properties);
         const auto devices = compiled.get_property(ov::execution_devices);
         require(devices.size() == 1 && (devices[0] == backend || devices[0].rfind(backend + ".", 0) == 0));
         execution_device = devices[0]; request = compiled.create_infer_request();

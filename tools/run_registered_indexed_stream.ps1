@@ -6,6 +6,7 @@ param(
  [Parameter(Mandatory=$true)][string]$RuntimeDirectory,
  [Parameter(Mandatory=$true)][string]$EvidenceDirectory,
  [string]$GuestActionScript='',
+ [string]$ModelCacheDirectory='',
  [switch]$SmokeTest,
  [switch]$DesktopSmokeTest,
  [switch]$TextureSmokeTest,
@@ -15,6 +16,7 @@ param(
 $ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue'
 if($Session.State -ne 'Opened' -or (Test-Path $EvidenceDirectory)){throw 'Opened guest session and new evidence directory required'}
 if(!$SmokeTest -and !$GuestActionScript){throw 'An explicit finite guest action or smoke test is required'}
+if($ModelCacheDirectory -and (![IO.Path]::IsPathRooted($ModelCacheDirectory) -or !(Test-Path -LiteralPath $ModelCacheDirectory -PathType Container))){throw 'Model cache must be an existing absolute directory'}
 $build=Get-Content "$BuildDirectory\registered-build-report.json" -Raw|ConvertFrom-Json
 if(!$build.clean_build){throw 'Clean build required'}
 foreach($item in $build.binary_sha256.psobject.Properties){
@@ -37,6 +39,7 @@ $token="$EvidenceDirectory\private-token.bin";$worker=$null;$stdout=$null;$stder
 $report=[ordered]@{schema=1;kind='indexed-npu-native-stream';job_id=$job;started=[DateTime]::UtcNow.ToString('o');completed=$false;transport='local named pipe and authenticated SSH-carried stream';smoke_test=[bool]$SmokeTest;desktop_offload_tested=$false;displayed_frames=0}
 $report.physical_runtime=$runtimeManifest
 $report.maximum_requests=$limit;$report.worker_maximum_seconds=600
+$report.model_cache_enabled=[bool]$ModelCacheDirectory
 function Save-Report {$report|ConvertTo-Json -Depth 8|Set-Content "$EvidenceDirectory\report.json"}
 Save-Report
 try {
@@ -74,6 +77,8 @@ try {
  $worker=New-Object System.Diagnostics.Process
  $worker.StartInfo.FileName="$BuildDirectory\Release\nr_registered_indexed_stream_worker.exe";$worker.StartInfo.Arguments='"'+$token+'" '+$limit
  $worker.StartInfo.UseShellExecute=$false;$worker.StartInfo.CreateNoWindow=$true;$worker.StartInfo.RedirectStandardOutput=$true;$worker.StartInfo.RedirectStandardError=$true
+ if($ModelCacheDirectory){$worker.StartInfo.EnvironmentVariables['NR_RENDER_NPU_CACHE']=$ModelCacheDirectory}
+ else{$worker.StartInfo.EnvironmentVariables.Remove('NR_RENDER_NPU_CACHE')}
  if(!$worker.Start()){throw 'Native NPU worker did not start'}
  $stdout=$worker.StandardOutput.ReadToEndAsync();$stderr=$worker.StandardError.ReadToEndAsync();$report.worker_pid=$worker.Id
  Invoke-Command -Session $Session -ArgumentList $guest,$pipe,$active -ScriptBlock {

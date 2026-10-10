@@ -1,3 +1,4 @@
+#include "provider_compile.hpp"
 #include "color_interpolator.hpp"
 #include <openvino/openvino.hpp>
 #include <openvino/opsets/opset13.hpp>
@@ -62,7 +63,7 @@ struct ColorInterpolator::State {
             for(const auto &node:model->get_ops())if(!node->get_rt_info().count("precise_0"))throw std::runtime_error("interpolation precision marker lost");
             properties.emplace(ov::hint::execution_mode(ov::hint::ExecutionMode::ACCURACY));
         }
-        compiled=core.compile_model(model,backend,properties);
+        compiled=nr::provider::compile_model(core,model,backend,properties);
         const auto devices=compiled.get_property(ov::execution_devices);
         require(devices.size()==1 && (devices[0]==backend || devices[0].rfind(backend+".",0)==0));
         device=devices[0];request=compiled.create_infer_request();

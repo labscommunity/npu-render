@@ -113,14 +113,12 @@ now has an exact NPU specialization for opaque, one-to-one point-sampled quads.
 Its captured 1024×768 replay passes, as do changing-image and driver callback
 tests. This is a checked subset, not general desktop rendering.
 
-The [latest installed trial](docs/validation/2026-10-10/sole-display-v81/report.json)
-completes 17 DWM, 12 Explorer and 10 Start menu NPU requests. Three received
-1024×768 frames are still opaque black. A live stack catches DWM waiting for the
-single-client rendering pipe; a bounded four-client FIFO relay now passes a
-[real NPU transport check](docs/validation/2026-10-10/fair-relay-v113/guest.json).
-The debugger pause disrupted the trial's transport deadline, so its late errors
-and wall times are diagnostic only. Both guest drivers were removed successfully.
-Full desktop offload and a Tahoma benefit remain unproven.
+The [latest installed trial](docs/validation/2026-10-10/sole-display-v83/report.json)
+completes five DWM, 18 Explorer and 18 Start menu NPU requests. DWM still delivers
+only black frames. The frame collector also fails while reading a growing log;
+the saved VM frame independently confirms that no later usable frame exists.
+Both guest drivers were removed successfully. Full desktop offload and a Tahoma
+benefit remain unproven.
 
 [NPU-computed triangle bounds](docs/validation/2026-10-10/triangle-bounds-v112/report.json)
 now restrict tile dispatch while preserving exact output in eight replays of four
@@ -134,6 +132,12 @@ raster tiles; the old estimate rejected it as 7,560 tiles. Admission now uses
 device-computed bounds and retains the 4,096-tile maximum. The v82 desktop
 attempt failed to start tracing before installing any drivers; the disposable
 VM was restarted and the [failure preserved](docs/validation/2026-10-10/sole-display-v82-preinstall/report.json).
+
+An explicit [NPU model cache](docs/validation/2026-10-10/model-cache-v118/report.json)
+now loads all six models in a captured draw from cache in a fresh process,
+reducing compilation from 4.47 seconds to 0.16 seconds with exact pixels.
+Rendering itself still takes seconds. The corrected collector also passes 100
+snapshots during concurrent writes; both changes await desktop validation.
 
 The [captured-window desktop experiment](native/windows/capture/README.md) now
 presents an NPU-composed 2880×1800 desktop with input passing through to the

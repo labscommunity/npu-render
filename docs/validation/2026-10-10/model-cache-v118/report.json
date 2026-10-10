@@ -1,0 +1,38 @@
+{
+  "build": "present-umd-v118",
+  "clean_cpu_suites_passed": 18,
+  "frame_contract_tests_passed": 17,
+  "concurrent_topology_snapshot_checks": 100,
+  "cache_enabled_by_default": false,
+  "cache_configuration": "NR_RENDER_NPU_CACHE: existing absolute private directory; native stream controller accepts ModelCacheDirectory",
+  "real_npu_cold_cache_hits": 0,
+  "real_npu_warm_cache_hits": 6,
+  "models_per_replay": 6,
+  "cold_compile_ms": 4468.083,
+  "warm_compile_ms": 161.175,
+  "cold_draw_ms": 3592.072,
+  "warm_draw_ms": 3643.836,
+  "pixel_sha256": "967048bdec4affa842185c9e1ffb715aafd9741fa989a592e5f590de1313be87",
+  "cpu_scalar_and_npu_pixels_match": true,
+  "cached_driver_callback_contracts_passed": true,
+  "invalid_cache_directory_rejected": true,
+  "cache_files_after_tests": 29,
+  "cache_bytes_after_tests": 19615744,
+  "desktop_offload_tested": false,
+  "findings": [
+    "One cold and one warm replay in separate processes establish actual NPU cache import, not in-process executor reuse. Both outputs match the existing CPU/scalar-verified capture exactly.",
+    "The cache is opt-in and NPU-specific. CPU execution is unchanged; cache telemetry records compilation calls, requested caching, verified hits and unavailable status. Cache configuration errors reject instead of selecting another device.",
+    "The first v117 build failed on a property-map argument and an unnecessary public OpenVINO include dependency. v118 separates telemetry from provider compilation and passes a clean build.",
+    "The v83 frame collector failed while Get-Content -Raw read a growing topology log. Its bounded file snapshot replacement passes 100 concurrent-write checks with complete JSON rows.",
+    "Model compilation improves in this isolated pair; draw execution still takes seconds. These results establish neither usable desktop delivery nor a Tahoma benefit."
+  ],
+  "sources": [
+    "https://docs.openvino.ai/2026/openvino-workflow/running-inference/inference-devices-and-modes/npu-device.html",
+    "https://docs.openvino.ai/2026/openvino-workflow/running-inference/optimize-inference/optimizing-latency/model-caching-overview.html"
+  ],
+  "cached_four_client_stream_passed": true,
+  "stream_worker_exit_code": 0,
+  "stream_cache_requests": 5,
+  "stream_cache_hits": 2,
+  "stream_configuration_removed": true
+}

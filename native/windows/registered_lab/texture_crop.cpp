@@ -1,3 +1,4 @@
+#include "provider_compile.hpp"
 #include "texture_crop.hpp"
 #include <openvino/openvino.hpp>
 #include <openvino/opsets/opset13.hpp>
@@ -42,7 +43,7 @@ struct TextureCropExecutor::State {
                 for (const auto &node : model->get_ops()) require(node->get_rt_info().count("precise_0") != 0);
                 properties.emplace(ov::hint::execution_mode(ov::hint::ExecutionMode::ACCURACY));
             }
-            compiled = s.core.compile_model(model, s.backend, properties); const auto devices = compiled.get_property(ov::execution_devices);
+            compiled = nr::provider::compile_model(s.core, model, s.backend, properties); const auto devices = compiled.get_property(ov::execution_devices);
             require(devices.size() == 1 && (devices[0] == s.backend || devices[0].rfind(s.backend + ".",0) == 0));
             device = devices[0]; request = compiled.create_infer_request();
         }
