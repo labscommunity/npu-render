@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "kind": "awake-live-desktop-npu-rendering-present-failure",
+  "source_revision": "1c1fe246dc8e1ac724cf7422791ace5039f3fe83",
+  "umd_build": "present-umd-v77",
+  "render_version": "0.0.54.0",
+  "idd_version": "0.0.8.0",
+  "control": "Same signed packages and finite observation as v65. Desktop visually confirmed awake before installation; 12 QEMU Control press/release events kept the VM awake.",
+  "prewarms_passed": 4,
+  "live_dwm_npu_draws": 114,
+  "live_linear_texture_draws": 1,
+  "npu_request_failures": 0,
+  "idd_assignments": 117,
+  "idd_received_frames": 0,
+  "idd_releases_completed": 117,
+  "displayed_frames": 0,
+  "full_desktop_offload": false,
+  "findings": [
+    "Keeping the desktop awake restores real DWM draws on the NPU; topology alone did not establish visible display activity.",
+    "DWM created its rendering device 58 times. No UMD D3D rejection was recorded for DWM; the existing HRESULT-returning Present path does not log its own failures.",
+    "DXGI Present reported device removed (0x887a0005) 56 times. This is not proof of a hardware reset: the underlying failure still requires attribution.",
+    "Real desktop source-over scaled linear sampling completed on the NPU. Complete frames still did not reach IddCx."
+  ],
+  "cleanup": "Both devices removed successfully without restarting the VM; physical host drivers unchanged.",
+  "next_step": "Trace the Present DDI request, validation rejection and runtime callback HRESULT before changing presentation semantics.",
+  "tahoma_performance_tested": false
+}

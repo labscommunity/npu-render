@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "kind": "awake-state-investigation-before-live-linear-desktop-draw",
+  "source_revision": "1c1fe246dc8e1ac724cf7422791ace5039f3fe83",
+  "umd_build": "present-umd-v77",
+  "render_version": "0.0.54.0",
+  "idd_version": "0.0.8.0",
+  "physical_runtime": "Complete OpenVINO 2026.1 native NPU runtime, including IR frontend and NPU plugin; manifest in stream-report.json.",
+  "prewarms_passed": 4,
+  "live_dwm_npu_draws": 0,
+  "idd_assignments": 0,
+  "idd_received_frames": 0,
+  "displayed_frames": 0,
+  "full_desktop_offload": false,
+  "observations": [
+    "DWM created the device, shaders and textures without a recorded UMD rejection, but no draw reached the NPU.",
+    "DXGI Present(TEST) returned DXGI_STATUS_OCCLUDED (0x087a0001) 31 times. Both indirect swapchains were created and immediately abandoned without a consumer.",
+    "The topology probe saw Default input desktop, no screen saver and two active paths; these checks did not establish visible display content.",
+    "A subsequent QEMU screenshot was blank; a keyboard Control press restored the desktop. This motivates an awake-state controlled retry, not a proven cause for all missing frames.",
+    "Explorer separately retried an unsupported shader-resource buffer allocation 498 times; this remains a real unsupported path."
+  ],
+  "cleanup": "Both custom devices and packages removed successfully without guest restart; physical host drivers unchanged.",
+  "next_trial": "Same signed renderer and IDD packages, with visible awake VM before installation and bounded periodic QEMU keyboard Control press/release recorded separately.",
+  "tahoma_performance_tested": false,
+  "sources": [
+    "https://learn.microsoft.com/en-us/windows/win32/direct3ddxgi/dxgi-status",
+    "https://learn.microsoft.com/en-us/windows/win32/direct3ddxgi/dxgi-present",
+    "https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-setthreadexecutionstate"
+  ]
+}

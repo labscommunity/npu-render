@@ -418,6 +418,11 @@ HRESULT APIENTRY present(DXGI_DDI_ARG_PRESENT *a) {
     if (!a || !a->hDevice) return E_INVALIDARG;
     std::lock_guard<std::recursive_mutex> lock(mutex);
     auto &d = *reinterpret_cast<Device *>(a->hDevice);
+    lab_trace("{\"event\":\"present_begin\",\"flags\":%u,\"source_subresource\":%u,\"destination_subresource\":%u,"
+              "\"destination_bound\":%s,\"flip_interval\":%u,\"context_poisoned\":%s}\n",
+              a->Flags.Value, a->SrcSubResourceIndex, a->DstSubResourceIndex,
+              a->hDstResource ? "true" : "false", UINT(a->FlipInterval),
+              d.context && d.context->poisoned ? "true" : "false");
     try {
         require(a->Flags.Value == 1 && !a->SrcSubResourceIndex && !a->DstSubResourceIndex &&
                 d.context && !d.context->poisoned && d.dxgi_callbacks &&
@@ -439,11 +444,17 @@ HRESULT APIENTRY present(DXGI_DDI_ARG_PRESENT *a) {
         }
         ++counters.present_requests;
         const auto status = d.dxgi_callbacks->pfnPresentCb(d.context->runtime, &callback);
+        lab_trace("{\"event\":\"present_callback_result\",\"status\":\"%08lx\",\"display_delivery_verified\":false}\n", ULONG(status));
         if (FAILED(status)) { d.context->poisoned = true; ++counters.rejected; }
         else ++counters.accepted_present_callbacks;
         return status;
-    } catch (const Error &e) { ++counters.rejected; return e.status; }
-    catch (...) { ++counters.rejected; return E_FAIL; }
+    } catch (const Error &e) {
+        lab_trace("{\"event\":\"present_rejected\",\"status\":\"%08lx\"}\n", ULONG(e.status));
+        ++counters.rejected; return e.status;
+    } catch (...) {
+        lab_trace("{\"event\":\"present_rejected\",\"status\":\"%08lx\"}\n", ULONG(E_FAIL));
+        ++counters.rejected; return E_FAIL;
+    }
 }
 SIZE_T APIENTRY device_size(D3D10DDI_HADAPTER, const D3D10DDIARG_CALCPRIVATEDEVICESIZE *) { return sizeof(Device); }
 HRESULT APIENTRY create_device(D3D10DDI_HADAPTER, D3D10DDIARG_CREATEDEVICE *a) {
