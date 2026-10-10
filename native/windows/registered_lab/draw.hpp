@@ -138,7 +138,6 @@ void APIENTRY draw(D3D10DDI_HDEVICE h, UINT count, UINT first) {
     });
 }
 void APIENTRY null_shader(D3D10DDI_HDEVICE h, D3D10DDI_HSHADER value) { guard(h, __FUNCTION__, [&] { require(!value.pDrvPrivate); }); }
-void APIENTRY null_layout(D3D10DDI_HDEVICE h, D3D10DDI_HELEMENTLAYOUT value) { guard(h, __FUNCTION__, [&] { require(!value.pDrvPrivate); }); }
 void APIENTRY null_views(D3D10DDI_HDEVICE h, UINT start, UINT count, const D3D10DDI_HSHADERRESOURCEVIEW *values) {
     guard(h, __FUNCTION__, [&] { require(start <= 128 && count <= 128 - start && (!count || values));
         for (UINT i = 0; i < count; ++i) require(!values[i].pDrvPrivate); });
@@ -157,7 +156,9 @@ void bind_draw_functions(D3D10DDI_DEVICEFUNCS &f) {
     f.pfnCalcPrivateShaderSize = shader_size; f.pfnCreateVertexShader = create_shader<1>; f.pfnCreatePixelShader = create_shader<2>;
     f.pfnDestroyShader = destroy_shader; f.pfnVsSetShader = set_shader<1>; f.pfnPsSetShader = set_shader<2>;
     f.pfnSetViewports = set_viewports; f.pfnIaSetTopology = set_topology; f.pfnDraw = draw;
-    f.pfnGsSetShader = null_shader; f.pfnIaSetInputLayout = null_layout;
+    f.pfnGsSetShader = null_shader; f.pfnIaSetInputLayout = set_layout;
+    f.pfnCalcPrivateElementLayoutSize = layout_size; f.pfnCreateElementLayout = create_layout;
+    f.pfnDestroyElementLayout = destroy_layout;
     f.pfnVsSetConstantBuffers = set_constant_buffers<0>;
     f.pfnGsSetConstantBuffers = set_constant_buffers<1>;
     f.pfnPsSetConstantBuffers = set_constant_buffers<2>;

@@ -27,6 +27,8 @@ using namespace nr::registered_lab;
 std::recursive_mutex mutex;
 Counters counters;
 std::string selected_backend = "NPU";
+using InputElements = std::vector<D3D10DDIARG_INPUT_ELEMENT_DESC>;
+struct ElementLayout { std::shared_ptr<const InputElements> elements; };
 struct Device {
     D3D10DDI_HRTCORELAYER core{};
     D3D10DDI_CORELAYER_DEVICECALLBACKS callbacks{};
@@ -37,6 +39,7 @@ struct Device {
     std::shared_ptr<Allocation> bound_source;
     std::unique_ptr<BlendExecutor> executor;
     std::shared_ptr<const nr::shader::Program> vertex_program;
+    std::shared_ptr<const InputElements> input_elements;
     std::string backend;
     std::vector<UINT> vertex_code, pixel_code;
     UINT vertex_shader = 0, pixel_shader = 0, viewport_count = 0;
@@ -114,6 +117,7 @@ Resource &resource(D3D10DDI_HRESOURCE h) {
     return r;
 }
 #include "buffer.hpp"
+#include "input_assembler.hpp"
 void upload(Allocation &target, const D3D10_DDI_BOX *box, const void *source, UINT pitch) {
     require(!target.locked && !target.context->poisoned);
     const auto &s = target.surface;
