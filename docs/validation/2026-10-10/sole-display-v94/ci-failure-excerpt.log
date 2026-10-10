@@ -1,0 +1,6 @@
+Tests (windows-latest)	Run uv run --frozen --group native python tools/build_native.py --ddi	2026-10-10T21:46:20.8868716Z       Start 37: registered_loop_contract
+Tests (windows-latest)	Run uv run --frozen --group native python tools/build_native.py --ddi	2026-10-10T21:46:21.4567481Z 37/39 Test #37: registered_loop_contract ......................***Failed    0.58 sec
+Tests (windows-latest)	Run uv run --frozen --group native python tools/build_native.py --ddi	2026-10-10T21:46:21.4569862Z arithmetic opcode=29 sample=12 component=3 actual=ffffffff expected=00000000
+Tests (windows-latest)	Run uv run --frozen --group native python tools/build_native.py --ddi	2026-10-10T21:46:21.4570259Z loop test: equal
+Tests (windows-latest)	Run uv run --frozen --group native python tools/build_native.py --ddi	2026-10-10T21:46:27.5289200Z 97% tests passed, 1 tests failed out of 39
+Tests (windows-latest)	Run uv run --frozen --group native python tools/build_native.py --ddi	2026-10-10T21:46:27.5290905Z 	 37 - registered_loop_contract (Failed)

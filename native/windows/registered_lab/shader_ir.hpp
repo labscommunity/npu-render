@@ -15,9 +15,9 @@ inline void check(bool value) {
 enum class Register : uint32_t { temporary = 0, input = 1, output = 2, indexable = 3, immediate = 4, sampler = 6, texture = 7, constant = 8 };
 enum class Opcode : uint32_t {
     add = 0, bitwise_and = 1, break_if = 3, derivative_x = 11, derivative_y = 12, divide = 14, dot2 = 15, dot3 = 16, dot4 = 17, otherwise = 18, end_if = 21, end_loop = 22,
-    fraction = 26, float_to_integer = 27, greater_equal = 29, integer_add = 30, begin_if = 31, integer_greater_equal = 33, integer_mad = 35, shift_left = 41, shift_right = 42, integer_to_float = 43, load = 45, begin_loop = 48, less = 49,
+    equal = 24, fraction = 26, float_to_integer = 27, greater_equal = 29, integer_add = 30, begin_if = 31, integer_greater_equal = 33, integer_mad = 35, shift_left = 41, shift_right = 42, integer_to_float = 43, load = 45, begin_loop = 48, less = 49,
     mad = 50, minimum = 51, maximum = 52, move = 54, select = 55,
-    multiply = 56, not_equal = 57, reciprocal_sqrt = 68, sample = 69,
+    multiply = 56, not_equal = 57, floor = 65, reciprocal_sqrt = 68, sample = 69,
     loop_overflow = 0x10000 // Internal checked lowering only; never a bytecode opcode.
 };
 enum class Modifier : uint32_t { none = 0, negate = 1, absolute = 2, absolute_negate = 3 };
@@ -266,9 +266,9 @@ inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
         } else if (opcode == 62) {
             check(!controls && body && branches.empty() && !in_loop); returned = true;
         } else {
-            check(opcode == 0 || opcode == 1 || opcode == 11 || opcode == 12 || opcode == 14 || opcode == 15 || opcode == 16 || opcode == 17 || opcode == 26 || opcode == 27 || opcode == 29 || opcode == 30 || opcode == 33 || opcode == 35 || opcode == 41 || opcode == 42 || opcode == 45 ||
+            check(opcode == 0 || opcode == 1 || opcode == 11 || opcode == 12 || opcode == 14 || opcode == 15 || opcode == 16 || opcode == 17 || opcode == 24 || opcode == 26 || opcode == 27 || opcode == 29 || opcode == 30 || opcode == 33 || opcode == 35 || opcode == 41 || opcode == 42 || opcode == 45 ||
                   opcode == 43 || opcode == 49 || opcode == 50 || opcode == 51 || opcode == 52 ||
-                  opcode == 54 || opcode == 55 || opcode == 56 || opcode == 57 || opcode == 68 || opcode == 69);
+                  opcode == 54 || opcode == 55 || opcode == 56 || opcode == 57 || opcode == 65 || opcode == 68 || opcode == 69);
             check(!(controls & ~0x2000u) && result.instructions.size() < 1024);
             body = true;
             if(opcode==11 || opcode==12)check(stage==Stage::pixel && branches.empty() && !in_loop);
@@ -288,7 +288,7 @@ inline Program parse_program(const uint32_t *words, size_t count, Stage stage) {
             }
             check((d.kind == Register::temporary && d.index < result.temporaries) ||
                   (d.kind == Register::output && !(d.mask & ~result.outputs[d.index])));
-            instruction.source_count = (opcode == 11 || opcode == 12 || opcode == 26 || opcode == 27 || opcode == 43 || opcode == 54 || opcode == 68) ? 1u :
+            instruction.source_count = (opcode == 11 || opcode == 12 || opcode == 26 || opcode == 27 || opcode == 43 || opcode == 54 || opcode == 65 || opcode == 68) ? 1u :
                                        ((opcode == 35 || opcode == 50 || opcode == 55 || opcode == 69) ? 3u : 2u);
             for (unsigned i = 0; i < instruction.source_count; ++i) {
                 instruction.sources[i] = in.operand(false);

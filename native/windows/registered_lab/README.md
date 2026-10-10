@@ -802,3 +802,31 @@ partial batches, scissor and channel masks. The formerly rejected dual-texture
 capture now matches scalar, CPU and NPU pixels exactly. Valid nonfinite-coordinate
 rejection remains tested. This qualifies the renderer for another VM trial;
 it does not establish a usable desktop or improved Tahoma throughput.
+
+The [v94 installed trial](../../../docs/validation/2026-10-10/sole-display-v94/report.json)
+executes the earlier MIRROR blur draw on the NPU and then reaches a new 988-word
+DWM pixel shader. Equality, rounding down, and saturated arithmetic are its next
+missing operations. The trial records 339 successful NPU requests, including
+13 prewarm packets; 338 have an acknowledged relay receipt. Eight frames arrive
+under the collector's sole-indirect-display gate. Desktop icons, partial taskbar,
+and wallpaper are visible at different times, but Start/Escape snapshots remain
+identical. Both drivers are removed successfully and the normal VM desktop is
+restored. This is still partial desktop rendering, with no verified usable input
+response or Tahoma improvement.
+
+The [v183 component checks](../../../docs/validation/2026-10-10/compositor-scratch-v183/report.json)
+cover the captured shader after adding floating EQ, ROUND_NI, and saturated
+floating results. CPU and native NPU each check 22,528 components, including
+signed zero, NaN, infinity, subnormals, large integral values, source modifiers,
+and zero-alpha color cases. The captured shader's maximum absolute NPU error is
+3.94e-6 against a 1e-5 test bound; this is not full shader-model conformance.
+Comparisons explicitly correct unordered operands, floor keeps negation in the
+integer graph before converting back to float, and saturation deliberately
+flushes subnormals as permitted by SM4 min/max. Failed compiler and admission
+experiments remain in the [v176–v182 evidence](../../../docs/validation/2026-10-10/compositor-experiments-v176-v182/report.json).
+
+[Clean build v184](../../../docs/validation/2026-10-10/compositor-v184/report.json)
+passes all 23 CPU suites and the native NPU regressions, including 58 DDI draws.
+The later v94 solid desktop draw replays with exact coverage and zero pixel byte
+error on both providers. This build is ready for installed trial v95; full
+desktop operation remains unverified.

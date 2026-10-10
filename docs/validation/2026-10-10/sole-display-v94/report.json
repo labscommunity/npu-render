@@ -1,0 +1,42 @@
+{
+  "trial": "v94",
+  "source_commit": "4ee6fba60c16e889ad8f4f766c7097fb0bcb9925",
+  "umd_build": "present-umd-v174",
+  "package_version": "0.0.82.0",
+  "worker_successes_by_client": {
+    "42": 13,
+    "4764": 62,
+    "4524": 90,
+    "392": 76,
+    "5384": 23,
+    "388": 37,
+    "4876": 38
+  },
+  "acknowledged_successes_by_client": {
+    "42": 13,
+    "4764": 62,
+    "4524": 90,
+    "392": 76,
+    "5384": 22,
+    "388": 37,
+    "4876": 38
+  },
+  "received_frames": 8,
+  "viewer_submissions": 8,
+  "full_desktop_offload": false,
+  "usable_interactive_desktop": false,
+  "tahoma_performance_tested": false,
+  "original_cleanup_passed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "guest_restart": false,
+  "findings": [
+    "339 successful native NPU requests: 13 prewarm packets and 326 live draws. Relay logs acknowledge 338 successes; one StartMenuExperienceHost reply has no acknowledged receipt. A worker success alone is not display delivery.",
+    "Initial DWM PID 4524 reaches and successfully executes the previously rejected MIRROR blur draw, then rejects a new 988-word pixel shader at creation. Its SHA256 is c71638aa9df382391c81ce814b60b92cff815bf2b31547a5569cfe785beaf341. It requires EQ, ROUND_NI, and saturated floating arithmetic. The current driver lacks those admitted operations.",
+    "Eight 1024x768 frames arrive while the collector observes the indirect display as the sole active path. Early frames show desktop icons and a partial taskbar. Subsequent DWM PID 392 produces wallpaper and taskbar frames; the final received image has wallpaper but no taskbar or icons. This is partial frame receipt and SDL submission evidence, not a usable desktop or physical scanout proof.",
+    "The input harness sends Control, Start, and Escape. All three snapshots retain identical frame identity and pixel hash, so no visual response is verified. The v94 readiness heuristic accepted colored wallpaper as a taskbar; the next input trial requires the light neutral taskbar band and timestamps each action/snapshot.",
+    "The observer detects the DWM rejection after 89200 ms and waits for finite topology restoration. Both custom driver removals pass, stream configuration is removed, and the normal VM desktop is visually verified afterward. Worker exits with socket-closed status during shutdown.",
+    "A later DWM PID 392 complete 3338720-byte draw capture is preserved with SHA256 3d95e7dcbfe98370bb2a42d551d1adc35c2107b31fbb1e732061490128438578. Its generic draw failure occurs among shutdown activity without a failed NPU result; causal attribution remains unverified. Build v174 CPU replay passes every covered output component with zero byte error and exact coverage (99328 covered samples); this does not establish native NPU replay or prove the live failure cause.",
+    "Next: qualify equality, floor, and saturation on CPU and native NPU, exercise the captured shader against an independent scalar oracle, then repeat the installed desktop trial."
+  ]
+}

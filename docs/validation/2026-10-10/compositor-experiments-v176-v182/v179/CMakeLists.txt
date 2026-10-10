@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.24)
+project(compositor_diagnostic LANGUAGES CXX)
+find_package(OpenVINO REQUIRED COMPONENTS Runtime)
+add_executable(compositor_test compositor_test.cpp vertex_executor.cpp)
+target_compile_features(compositor_test PRIVATE cxx_std_17)
+target_compile_options(compositor_test PRIVATE /W4 /WX)
+set_property(TARGET compositor_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+target_link_libraries(compositor_test PRIVATE openvino::runtime)

@@ -1,0 +1,29 @@
+{
+  "passed": true,
+  "native_npu_execution": true,
+  "full_desktop_offload": false,
+  "cpu_components": 22528,
+  "npu_components": 22528,
+  "comparison_floor_components_per_backend": 16384,
+  "saturation_components_per_backend": 3072,
+  "captured_shader_components_per_backend": 3072,
+  "captured_shader_words": 988,
+  "captured_shader_maximum_absolute_error_cpu": 1.1920929e-07,
+  "captured_shader_maximum_absolute_error_npu": 3.93390656e-06,
+  "captured_shader_absolute_tolerance": 1e-05,
+  "source_sha256": {
+    "vertex_executor.cpp": "63738db99ff02ac9e60f5b20822ff2d842e2db23b186028b7768d15642daa35b",
+    "compositor_test.cpp": "c50b99c9d306b7ab0940d450aaf67294bd9e4cf26a889f0a33cc786e270ce644",
+    "shader_ir.hpp": "447c1c84fcd3a486c86ebd22ec18a1cc2a46603021bd15ff33f7d4b7259dded1",
+    "shader_reference.hpp": "90b327097f72bcb4dcde0d245839e457d467fda3cbcc05078edd1cee7fad1f6d",
+    "compositor_fixture.hpp": "8fae094ea19bd73521a7fc996b4332ca8c6c86c373dc57d8ff1d70cfaf2eae23"
+  },
+  "scope": "Isolated register/shader arithmetic only; no raster, display, or Tahoma proof. Clean CPU build overlaps part of the NPU run, so elapsed times are not performance evidence. Saturation explicitly chooses the denorm-flushed result permitted by SM4 min/max.",
+  "references": [
+    "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/eq--sm4---asm-",
+    "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/round-ni--sm4---asm-",
+    "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/saturate",
+    "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/min--sm4---asm-",
+    "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/max--sm4---asm-"
+  ]
+}

@@ -108,6 +108,7 @@ inline Registers reference_vertex(const Program &program, const Registers &input
             else if (instruction.opcode == Opcode::less)
                 value[i] = as_float(values[0][i]) < as_float(values[1][i]) ? 0xffffffffu : 0;
             else if(instruction.opcode==Opcode::greater_equal){auto flush=[](float v){return std::fpclassify(v)==FP_SUBNORMAL?0.f:v;};value[i]=flush(as_float(values[0][i]))>=flush(as_float(values[1][i]))?0xffffffffu:0;}
+            else if(instruction.opcode==Opcode::equal){auto flush=[](float v){return std::fpclassify(v)==FP_SUBNORMAL?0.f:v;};value[i]=flush(as_float(values[0][i]))==flush(as_float(values[1][i]))?0xffffffffu:0;}
             else if(instruction.opcode==Opcode::not_equal){auto flush=[](float v){return std::fpclassify(v)==FP_SUBNORMAL?0.f:v;};value[i]=flush(as_float(values[0][i]))!=flush(as_float(values[1][i]))?0xffffffffu:0;}
             else if(instruction.opcode==Opcode::integer_greater_equal){int32_t a,b;std::memcpy(&a,&values[0][i],4);std::memcpy(&b,&values[1][i],4);value[i]=a>=b?0xffffffffu:0;}
             else if (instruction.opcode == Opcode::integer_to_float) {
@@ -161,6 +162,7 @@ inline Registers reference_vertex(const Program &program, const Registers &input
                     else {volatile float product=a*b;v=product+as_float(values[2][i]);}
                 }
                 else if (instruction.opcode == Opcode::divide) v = a / b;
+                else if(instruction.opcode==Opcode::floor)v=std::fpclassify(a)==FP_SUBNORMAL?std::copysign(0.f,a):std::floor(a);
                 else if(instruction.opcode==Opcode::fraction)v=std::fpclassify(a)==FP_SUBNORMAL?0.f:a-std::floor(a);
                 else if (instruction.opcode == Opcode::reciprocal_sqrt) v = 1.0f / std::sqrt(a);
                 else if (instruction.opcode == Opcode::minimum) v = std::fmin(a, b);
@@ -179,7 +181,7 @@ inline Registers reference_vertex(const Program &program, const Registers &input
             }
             if (instruction.saturate) {
                 const auto v = as_float(value[i]);
-                value[i] = as_bits(std::isnan(v) || v < 0 ? 0.0f : (v > 1 ? 1.0f : v));
+                value[i] = as_bits(std::isnan(v) || std::fpclassify(v)==FP_SUBNORMAL || v < 0 ? 0.0f : (v > 1 ? 1.0f : v));
             }
         }
         auto &destination = (instruction.destination.kind == Register::temporary ? temporary : output)[instruction.destination.index];

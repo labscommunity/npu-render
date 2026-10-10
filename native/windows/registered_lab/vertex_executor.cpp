@@ -375,7 +375,6 @@ struct RegisterExecutor::State {
             return value;
         };
         for (const auto &instruction : program.instructions) {
-            check(!instruction.saturate); // NaN/denormal saturation is not qualified on NPU yet.
             if(instruction.opcode==Opcode::loop_overflow){
                 Node invalid=batch(integer(1));
                 for(const auto &branch:branches){
@@ -552,6 +551,23 @@ struct RegisterExecutor::State {
                     } else if (instruction.opcode == Opcode::divide) value = std::make_shared<op::Divide>(a, b);
                     else if (instruction.opcode == Opcode::reciprocal_sqrt)
                         value = std::make_shared<op::Divide>(floating(0x3f800000), std::make_shared<op::Sqrt>(a));
+                    else if(instruction.opcode==Opcode::floor){
+                        // Avoid native NPU Floor and out-of-range integer casts.
+                        // Every finite f32 at or above 2^24 is already integral.
+                        // Keep the range constant representable in FP16.
+                        const auto magnitude=std::make_shared<op::Abs>(a);
+                        const auto small=std::make_shared<op::Less>(std::make_shared<op::Multiply>(magnitude,number(1.f/32768)),number(512));
+                        const auto safe=choose(small,magnitude,number(0));
+                        const auto integral=std::make_shared<op::BitwiseAnd>(std::make_shared<op::Convert>(safe,ov::element::i32),integer(0x7fffffff));
+                        const auto whole=std::make_shared<op::Convert>(integral,ov::element::f32);
+                        const auto negative_floor=std::make_shared<op::Subtract>(std::make_shared<op::Convert>(std::make_shared<op::Subtract>(integer(0),integral),ov::element::f32),
+                            choose(std::make_shared<op::Greater>(safe,whole),number(1),number(0)));
+                        const auto rounded=choose(std::make_shared<op::Less>(a,number(0)),negative_floor,whole);
+                        const auto finite=choose(small,rounded,a);
+                        // ROUND_NI flushes subnormals and preserves signed zero.
+                        value=choose(std::make_shared<op::Less>(magnitude,number(1.1754943508222875e-38f)),
+                            std::make_shared<op::Multiply>(a,number(0)),finite);
+                    }
                     else if(instruction.opcode==Opcode::fraction){
                         // Finite f32 values with magnitude >= 2^23 are integral.
                         // Scale the range test to keep comparison constants within
@@ -568,12 +584,23 @@ struct RegisterExecutor::State {
                         Node finite=choose(std::make_shared<op::Less>(a,number(0)),negative_fraction,fraction);
                         finite=choose(std::make_shared<op::Less>(magnitude,number(1.1754943508222875e-38f)),number(0),finite);
                         value=choose(std::make_shared<op::IsNaN>(a),a,choose(std::make_shared<op::IsInf>(a),std::make_shared<op::Subtract>(a,a),finite));
-                    } else if (instruction.opcode == Opcode::less || instruction.opcode==Opcode::greater_equal || instruction.opcode==Opcode::not_equal) {
+                    } else if (instruction.opcode == Opcode::less || instruction.opcode==Opcode::greater_equal || instruction.opcode==Opcode::equal || instruction.opcode==Opcode::not_equal) {
                         auto flush=[&](const Node &v)->Node{return choose(std::make_shared<op::Less>(std::make_shared<op::Abs>(v),number(1.1754943508222875e-38f)),number(0),v);};
                         const Node comparison=instruction.opcode==Opcode::less?Node(std::make_shared<op::Less>(a,b)):
+                            instruction.opcode==Opcode::equal?Node(std::make_shared<op::Equal>(flush(a),flush(b))):
                             instruction.opcode==Opcode::not_equal?Node(std::make_shared<op::NotEqual>(flush(a),flush(b))):Node(std::make_shared<op::GreaterEqual>(flush(a),flush(b)));
-                        result[c].integer = std::make_shared<op::Multiply>(
-                            std::make_shared<op::Convert>(comparison, ov::element::i32), integer(-1));
+                        const auto compared=std::make_shared<op::Convert>(comparison,ov::element::i32);
+                        // Some CPU kernels lower GE to !LT, which is true for
+                        // unordered NaN operands. Keep the unordered bits as
+                        // separate integer operations, also avoiding NPU boolean
+                        // fusion that changed the result for equal zero inputs.
+                        const auto unordered=std::make_shared<op::BitwiseOr>(
+                            std::make_shared<op::Convert>(std::make_shared<op::IsNaN>(a),ov::element::i32),
+                            std::make_shared<op::Convert>(std::make_shared<op::IsNaN>(b),ov::element::i32));
+                        const Node corrected=instruction.opcode==Opcode::not_equal?
+                            Node(std::make_shared<op::BitwiseOr>(compared,unordered)):
+                            Node(std::make_shared<op::BitwiseAnd>(compared,std::make_shared<op::BitwiseXor>(unordered,integer(1))));
+                        result[c].integer=std::make_shared<op::Multiply>(corrected,integer(-1));
                         result[c].predicate=true;
                     } else if (instruction.opcode == Opcode::minimum || instruction.opcode == Opcode::maximum) {
                         // Native NPU floating min/max returned zero in the
@@ -588,6 +615,15 @@ struct RegisterExecutor::State {
                                 std::make_shared<op::Multiply>(sources[0][i].floating, sources[1][i].floating));
                     } else check(false);
                     result[c].floating = value;
+                }
+                if(instruction.saturate){
+                    check(bool(result[c].floating));const auto original_value=result[c].floating;
+                    // SM4 min/max flush before comparison and permit a flushed
+                    // result. Choose that result explicitly for saturation.
+                    const auto value=choose(std::make_shared<op::Less>(std::make_shared<op::Abs>(original_value),number(1.1754943508222875e-38f)),number(0),original_value);
+                    const auto bounded=choose(std::make_shared<op::Less>(value,number(0)),number(0),
+                        choose(std::make_shared<op::Greater>(value,number(1)),number(1),value));
+                    result[c]={choose(std::make_shared<op::IsNaN>(value),number(0),bounded),{}};
                 }
             }
             auto &destination = (instruction.destination.kind == Register::temporary ? temporary : output)[instruction.destination.index];
@@ -709,7 +745,6 @@ void RegisterExecutor::validate(const Program &original) {
         return result;
     };
     for (const auto &instruction : program.instructions) {
-        check(!instruction.saturate);
         if(instruction.opcode==Opcode::loop_overflow)continue;
         if(instruction.opcode==Opcode::derivative_x || instruction.opcode==Opcode::derivative_y)check(program.stage==Stage::pixel && branches.empty());
         for (unsigned i = 0; i < instruction.source_count; ++i) {
@@ -766,8 +801,9 @@ void RegisterExecutor::validate(const Program &original) {
         } else {
             const auto used = instruction.opcode == Opcode::dot2 ? 3u : (instruction.opcode == Opcode::dot3 ? 7u : (instruction.opcode == Opcode::dot4 ? 15u : mask));
             for (unsigned i = 0; i < instruction.source_count; ++i) check(!(used & ~available(instruction.sources[i], false)));
-            if (instruction.opcode == Opcode::less || instruction.opcode==Opcode::greater_equal || instruction.opcode==Opcode::not_equal)bit_views=predicate_views=mask; else floating_views = mask;
+            if (instruction.opcode == Opcode::less || instruction.opcode==Opcode::greater_equal || instruction.opcode==Opcode::equal || instruction.opcode==Opcode::not_equal)bit_views=predicate_views=mask; else floating_views = mask;
         }
+        if(instruction.saturate){check(!(mask&~floating_views));bit_views=predicate_views=0;}
         check(!(mask & ~(floating_views | bit_views)));
         auto &floats = destination.kind == Register::temporary ? views.temporary_float : views.output_float;
         auto &bits = destination.kind == Register::temporary ? views.temporary_bits : views.output_bits;

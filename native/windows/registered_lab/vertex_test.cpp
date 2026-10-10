@@ -192,7 +192,6 @@ int main(int argc, char **argv) {
         const auto code = nr::registered_lab::shader_tokens(source, "vs_4_0");
         const auto program = parse_vertex(code.data(), code.size());
         for (const char *unsupported : {
-                 "float4 main(float4 p:POSITION):SV_Position{return saturate(p);}",
                  "cbuffer C {float4 data[250];}; float4 main(float4 p:POSITION):SV_Position{return data[asuint(p.x*2)];}"}) {
             const auto tokens = nr::registered_lab::shader_tokens(unsupported, "vs_4_0");
             const auto parsed = parse_vertex(tokens.data(), tokens.size());

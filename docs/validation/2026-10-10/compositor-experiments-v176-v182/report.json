@@ -1,0 +1,20 @@
+{
+  "installed": false,
+  "full_desktop_offload": false,
+  "experiments": {
+    "v176": "Build failed: unused shader_contract include lacked adjacent DDI headers, and local name shadowed an earlier variable. No execution.",
+    "v177": "CPU arithmetic passed, captured shader failed validation because saturation was not implemented. NPU not launched.",
+    "v178": "CPU arithmetic passed with unordered-comparison guard; captured shader still hit a second saturation admission gate. NPU not launched.",
+    "v179": "CPU captured shader passed. Native NPU equality returned false for zero equals zero with the boolean/Gather unordered guard.",
+    "v180": "Integer unordered bits fix native NPU comparison cases. Floor of -8388607.5 returned -65505 because floating negation demoted the integral magnitude.",
+    "v181": "Integer negation before float conversion fixes floor. Saturation fails its strict reference check; diagnostic added next.",
+    "v182": "Detailed diagnostic shows saturated MOV of negative subnormal returned the unflushed negative subnormal. SM4 min/max permits denorm flushing; next version explicitly flushes saturation input and oracle to zero."
+  },
+  "sources": [
+    "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/eq--sm4---asm-",
+    "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/round-ni--sm4---asm-",
+    "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/saturate",
+    "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/min--sm4---asm-",
+    "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/max--sm4---asm-"
+  ]
+}

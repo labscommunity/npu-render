@@ -1,0 +1,20 @@
+{
+  "build": "present-umd-v184",
+  "clean_cpu_suites_passed": 23,
+  "clean_cpu_test_seconds": 110.8,
+  "local_source_hashes_verified": 111,
+  "physical_binary_hashes_verified": 29,
+  "unsigned_umd_sha256": "1c397b9bc87c1fef3114142e239e626415bfc23116f37ce3d2cfc84d47b333a5",
+  "native_npu_checks_passed": true,
+  "full_desktop_offload": false,
+  "usable_interactive_desktop": false,
+  "tahoma_performance_tested": false,
+  "findings": [
+    "New compositor suite passes on CPU and NPU: 16384 comparison/floor components, 3072 saturation components, and 3072 components through the captured 988-word shader. Native maximum absolute shader error is 3.93390656e-6 against the independent scalar reference and 1e-5 bound.",
+    "Later v94 DWM draw (PID 392, 66 vertices, 1024x768) replays on CPU and native NPU with zero byte error and exact coverage: 99328 covered samples, 66 tile executions. This isolates it from the captured shader-creation rejection; it does not prove the live shutdown failure cause.",
+    "Native NPU DDI shim passes 58 draws. Vertex arithmetic, MIRROR sampling/raster, mask, loop, derivatives, typed loads, triangle textures, and basic texture tests pass. No provider fallback is permitted.",
+    "Initial qualification invoked vertex_test as NPU; that program requires --backend NPU and rejected its arguments before constructing a provider. The original failure is retained; the followup uses the correct arguments and completes all remaining suites. Production sources and binaries are unchanged between runs.",
+    "CI run 38088513473 of the previous mirror commit found GE(NaN,0.75) returning true on its CPU. The new explicit unordered comparison path covers this case and passes the clean local CPU/NPU suites. A new CI run remains required.",
+    "Next installed trial v95 will test this exact build. Component/replay correctness alone does not establish frame delivery, usable desktop input, physical deployment, or Tahoma performance."
+  ]
+}
