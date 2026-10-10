@@ -19,6 +19,7 @@
     "The unmodified executor failed on the NPU: a valid indexed palette color became zero after a broadcast Select.",
     "An isolated reproduction returned correct indices, bounds decisions and unmasked Gather values on the NPU. Direct integer-derived and explicitly broadcast masks failed; reconstructing the 0/1 mask through F32 passed.",
     "The fix preserves integer addressing and bounds checks, including indices 2049, 4095, 4096 and high-bit-set values. No CPU/GPU fallback is allowed.",
-    "Host byte packing and input/output transfer remain CPU work. Rasterization, pixel shading and generic Windows draw integration remain separate work."
+    "Host byte packing and input/output transfer remain CPU work. Rasterization, pixel shading and generic Windows draw integration remain separate work.",
+    "Committed text copies normalize CRLF to LF; original bytes remain in the local results archive."
   ]
 }
