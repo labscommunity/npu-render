@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "kind": "indirect-display-system-renderer-control",
+  "source_revision": "aa631faf146d8a21b1e0ef2ff1c8a5c1b419379b",
+  "driver_version": "0.0.5.0",
+  "system_renderer_control": true,
+  "custom_render_adapter_installed": false,
+  "device_preparation_milliseconds": 422,
+  "assigned_render_luid": {
+    "low": 24589,
+    "high": 0
+  },
+  "received_desktop_frames": 5,
+  "displayed_frames": 0,
+  "npu_execution_tested": false,
+  "desktop_offload_tested": false,
+  "clean_removal": true,
+  "observations": [
+    "Device created before monitor arrival on the work-item thread. Assignment uses the retained device.",
+    "Both finite 45-second topology checks observe the original and indirect display active and unchanged.",
+    "Display sleep initially suppresses swapchain delivery despite the active path. Recorded finite wake input precedes frame delivery.",
+    "No debugger watchdog break was observed during this run; this is not a long-duration reliability test."
+  ]
+}
