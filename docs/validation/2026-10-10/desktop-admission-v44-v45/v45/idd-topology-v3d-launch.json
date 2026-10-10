@@ -1,0 +1,35 @@
+{
+    "started":  "2026-10-10T02:16:06.4883520Z",
+    "task":  "NpuRender-idd-topology-v3d",
+    "probe_sha256":  "c78cea3e9f63b12d73bfd1bd0abf785109787ed2adc90079e826b19d0d12c31b",
+    "devices":  [
+                    {
+                        "instance":  "ROOT\\DISPLAY\\0000",
+                        "hardware_id":  "ROOT\\NPURENDER_KMD_LAB",
+                        "inf":  "oem2.inf",
+                        "version":  "0.0.34.0",
+                        "status":  25174027,
+                        "problem":  0,
+                        "started":  true,
+                        "user_mode_driver":  [
+                                                 "C:\\Windows\\System32\\DriverStore\\FileRepository\\nr_render_lab.inf_amd64_ded85328b8bba476\\nr_fill_umd.dll",
+                                                 "C:\\Windows\\System32\\DriverStore\\FileRepository\\nr_render_lab.inf_amd64_ded85328b8bba476\\nr_fill_umd.dll",
+                                                 "C:\\Windows\\System32\\DriverStore\\FileRepository\\nr_render_lab.inf_amd64_ded85328b8bba476\\nr_fill_umd.dll"
+                                             ],
+                        "driver_key":  "{4d36e968-e325-11ce-bfc1-08002be10318}\\0001"
+                    },
+                    {
+                        "instance":  "ROOT\\DISPLAY\\0001",
+                        "hardware_id":  "ROOT\\NPURENDER_INDIRECT_LAB",
+                        "inf":  "oem3.inf",
+                        "version":  "0.0.3.0",
+                        "status":  25174027,
+                        "problem":  0,
+                        "started":  true,
+                        "user_mode_driver":  null,
+                        "driver_key":  "{4d36e968-e325-11ce-bfc1-08002be10318}\\0002"
+                    }
+                ],
+    "maximum_seconds":  180,
+    "desktop_offload_tested":  false
+}

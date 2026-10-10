@@ -1,0 +1,53 @@
+﻿[0]0C98.1DD4::10/10/2026-01:56:37.136 [cx][IddCx]DriverEntry: Enter
+[0]0C98.1DD4::10/10/2026-01:56:37.139 [cx][IddCx]DriverEntry: Feature_EnableIddCx111 Enabled
+[0]0C98.1DD4::10/10/2026-01:56:37.139 [cx][IddCx]DriverEntry: Querying OS feature support overrides
+[0]0C98.1DD4::10/10/2026-01:56:37.139 [cx][IddCx]DriverEntry: Query complete, Status = 0x0
+[0]0C98.1DD4::10/10/2026-01:56:37.139 [cx][IddCx]DriverEntry: OS feature support override: 0xffffffff
+[0]0C98.1DD4::10/10/2026-01:56:37.140 [cx][IddCx]DriverEntry: Feature_IddCx_1_11_D3d12 Enabled
+[0]0C98.1DD4::10/10/2026-01:56:37.140 [cx][IddCx]DriverEntry: Feature_IdSwapChainUserModeSync Enabled
+[0]0C98.1DD4::10/10/2026-01:56:37.140 [cx][IddCx]DriverEntry: Feature_IdAcceptDisplayIdOnly Enabled
+[0]0C98.1DD4::10/10/2026-01:56:37.141 [cx][IddCx]DriverEntry: Feature_IdAtomicI2C Disabled
+[0]0C98.1DD4::10/10/2026-01:56:37.141 [cx][IddCx]DriverEntry: Feature_IdUpdateReencodeCount Enabled
+[0]0C98.1DD4::10/10/2026-01:56:37.161 [cx][IddCx]?IddCxLibraryInitialize@@YAJXZ: Enter
+[0]0C98.1DD4::10/10/2026-01:56:37.161 [cx][IddCx]?IddCxLibraryInitialize@@YAJXZ: Exit
+[0]0C98.1DD4::10/10/2026-01:56:37.162 [cx][IddCx]DriverEntry: Exit, status=STATUS_SUCCESS
+[0]0C98.1DD4::10/10/2026-01:56:37.188 [cx][IddCx]?IddCxLibraryBindClient@@YAJPEAU_WDF_CLASS_BIND_INFO@@PEAPEAX@Z: Enter
+[0]0C98.1DD4::10/10/2026-01:56:37.188 [cx][IddCx]?IddCxLibraryBindClient@@YAJPEAU_WDF_CLASS_BIND_INFO@@PEAPEAX@Z: Exit, status=STATUS_SUCCESS
+[0]0C98.1DD4::10/10/2026-01:56:37.256 [cx][IddCx]IddCxImplDeviceInitConfig: Enter
+[0]0C98.1DD4::10/10/2026-01:56:37.257 [cx][IddCx]IddCxImplDeviceInitConfig: Exit, status=STATUS_SUCCESS
+[1]0C98.1DD4::10/10/2026-01:56:37.273 [cx][IddCx]IddCxImplDeviceInitialize: Enter
+[1]0C98.1DD4::10/10/2026-01:56:37.277 [cx][IddCx]IddCxImplDeviceInitialize: New IddDevice 0x000001DAB4F5F690 created
+[1]0C98.1DD4::10/10/2026-01:56:37.278 [cx][IddCx]IddCxImplDeviceInitialize: Exit, status=STATUS_SUCCESS
+[1]0C98.1ED8::10/10/2026-01:56:37.337 [cx][IddCx]IddCxImplAdapterInitAsync: Enter
+[1]0C98.1ED8::10/10/2026-01:56:37.338 [cx][IddCx]?Init@IddAdapter@@QEAAXPEAUIDD_DRIVER_GLOBALS@@PEAUIDDCX_ADAPTER__@@PEAVIddDevice@@PEAUIDDCX_ADAPTER_CAPS@@@Z: New IddAdapter 0x000001DAB4F60620 created, API object 0xFFFFFE254B0ED1F8, IddDevice 0x000001DAB4F5F690
+[1]0C98.1ED8::10/10/2026-01:56:37.340 [cx][IddCx]?SendUserModeMessage@IddAdapter@@QEAAJIPEAXI0W4DXGK_IDD_ESCAPE_CODE@@PEAI@Z: Sending escape 0x0 to kernel
+Unknown( 89): GUID=ba36b5ad-f12e-3f3f-d76a-b5e2fd92783e (No Format Information found).
+[1]0C98.1ED8::10/10/2026-01:56:37.342 [cx][IddCx]IddCxImplAdapterInitAsync: Exit, status=STATUS_SUCCESS
+[1]0C98.04A4::10/10/2026-01:56:37.482 [cx][IddCx]?HandleKernelModeMessage@IddAdapter@@QEAAXIPEAXI0PEAI@Z: IddAdapter 0x000001DAB4F60620, processing command START_ADAPTER_COMPLETE from KMD
+[1]0C98.04A4::10/10/2026-01:56:37.482 [cx][IddCx]?HandleKernelModeMessage@IddAdapter@@QEAAXIPEAXI0PEAI@Z: IddAdapter 0x000001DAB4F60620, Successful adapter start, Wddm Luid = 0xaae5e5, Adapter caps 0x0, Session Id 0, Terminal Luid 0x0
+[1]0C98.04A4::10/10/2026-01:56:37.485 [cx][IddCx]?HandleKernelModeMessage@IddAdapter@@QEAAXIPEAXI0PEAI@Z: Exit
+[1]0C98.14C0::10/10/2026-01:56:37.489 [cx][IddCx]<lambda_68bc81eb2706b7c3c3670c0b4082c65a>::operator(): DDI: Calling EvtIddCxAdapterInitFinished DDI, IddAdapter 0xFFFFFE254B0ED1F8
+[0]0C98.14C0::10/10/2026-01:56:37.493 [cx][IddCx]IddCxImplAdapterSetRenderAdapter: Enter
+[0]0C98.14C0::10/10/2026-01:56:37.493 [cx][IddCx]IddCxImplAdapterSetRenderAdapter: Processing set render for adapter 0x000001DAB4F60620, new render Luid 0xa67736
+[0]0C98.14C0::10/10/2026-01:56:37.493 [cx][IddCx]?SendUserModeMessage@IddAdapter@@QEAAJIPEAXI0W4DXGK_IDD_ESCAPE_CODE@@PEAI@Z: Sending escape 0x3 to kernel
+Unknown( 89): GUID=ba36b5ad-f12e-3f3f-d76a-b5e2fd92783e (No Format Information found).
+[0]0C98.14C0::10/10/2026-01:56:37.494 [cx][IddCx]IddCxImplAdapterSetRenderAdapter: Exit
+[0]0C98.14C0::10/10/2026-01:56:37.501 [cx][IddCx]IddCxImplMonitorCreate: Enter
+[0]0C98.14C0::10/10/2026-01:56:37.501 [cx][IddCx]?Init@IddMonitor@@QEAAXPEAUIDDCX_MONITOR__@@PEAVIddAdapter@@PEBUIDARG_IN_MONITORCREATE@@@Z: New IddMonitor 0x000001DAB4F679C0 created, API object 0xFFFFFE254B0B4818, IddAdapter 0x000001DAB4F60620
+[0]0C98.14C0::10/10/2026-01:56:37.501 [cx][IddCx]IddCxImplMonitorCreate: Exit, status=STATUS_SUCCESS
+[0]0C98.14C0::10/10/2026-01:56:37.501 [cx][IddCx]IddCxImplMonitorArrival: Enter
+[0]0C98.14C0::10/10/2026-01:56:37.502 [cx][IddCx]?GetDefaultModesV1@IddMonitor@@AEAAXAEAV?$vector@UIDDCX_MONITOR_MODE@@V?$allocator@UIDDCX_MONITOR_MODE@@@std@@@std@@AEAI@Z: DDI: Calling EvtIddCxMonitorGetDefaultDescriptionModes DDI for mode count, IddMonitor 0x000001DAB4F679C0
+[0]0C98.14C0::10/10/2026-01:56:37.502 [cx][IddCx]?GetDefaultModesV1@IddMonitor@@AEAAXAEAV?$vector@UIDDCX_MONITOR_MODE@@V?$allocator@UIDDCX_MONITOR_MODE@@@std@@@std@@AEAI@Z: DDI: Return successfully from EvtIddCxMonitorGetDefaultDescriptionModes DDI, mode count = 0x1
+[0]0C98.14C0::10/10/2026-01:56:37.502 [cx][IddCx]?GetDefaultModesV1@IddMonitor@@AEAAXAEAV?$vector@UIDDCX_MONITOR_MODE@@V?$allocator@UIDDCX_MONITOR_MODE@@@std@@@std@@AEAI@Z: DDI: Calling EvtIddCxMonitorGetDefaultDescriptionModes DDI to get modes, IddMonitor 0x000001DAB4F679C0
+[0]0C98.14C0::10/10/2026-01:56:37.502 [cx][IddCx]?GetDefaultModesV1@IddMonitor@@AEAAXAEAV?$vector@UIDDCX_MONITOR_MODE@@V?$allocator@UIDDCX_MONITOR_MODE@@@std@@@std@@AEAI@Z: DDI: Return successfully from EvtIddCxMonitorGetDefaultDescriptionModes DDI
+[0]0C98.14C0::10/10/2026-01:56:37.502 [cx][IddCx]?AddMonitorModes@IddMonitor@@AEAAXAEAV?$vector@UTARGET_MONITOR_MODE@@V?$allocator@UTARGET_MONITOR_MODE@@@std@@@std@@@Z: IddMonitor 0x000001DAB4F679C0, GetDefaultDescriptionModes returned 1 modes.
+[0]0C98.14C0::10/10/2026-01:56:37.503 [cx][IddCx]?QueryModesV1@IddMonitor@@AEAAXAEAV?$vector@UIDDCX_TARGET_MODE@@V?$allocator@UIDDCX_TARGET_MODE@@@std@@@std@@@Z: DDI: Calling EvtIddCxMonitorQueryTargetModes DDI for mode count, IddMonitor 0x000001DAB4F679C0
+[0]0C98.14C0::10/10/2026-01:56:37.503 [cx][IddCx]?QueryModesV1@IddMonitor@@AEAAXAEAV?$vector@UIDDCX_TARGET_MODE@@V?$allocator@UIDDCX_TARGET_MODE@@@std@@@std@@@Z: DDI: Return successfully from EvtIddCxMonitorQueryTargetModes DDI, mode count = 0x1
+[0]0C98.14C0::10/10/2026-01:56:37.503 [cx][IddCx]?QueryModesV1@IddMonitor@@AEAAXAEAV?$vector@UIDDCX_TARGET_MODE@@V?$allocator@UIDDCX_TARGET_MODE@@@std@@@std@@@Z: DDI: Calling EvtIddCxMonitorQueryTargetModes DDI to get modes, IddMonitor 0x000001DAB4F679C0
+[0]0C98.14C0::10/10/2026-01:56:37.503 [cx][IddCx]?QueryModesV1@IddMonitor@@AEAAXAEAV?$vector@UIDDCX_TARGET_MODE@@V?$allocator@UIDDCX_TARGET_MODE@@@std@@@std@@@Z: DDI: Return successfully from EvtIddCxMonitorQueryTargetModes DDI
+[0]0C98.14C0::10/10/2026-01:56:37.504 [cx][IddCx]?AddTargetModes@IddMonitor@@AEAAXAEAV?$vector@UTARGET_MONITOR_MODE@@V?$allocator@UTARGET_MONITOR_MODE@@@std@@@std@@@Z: IddMonitor 0x000001DAB4F679C0, queryTargetModes returned 1 modes.
+[0]0C98.14C0::10/10/2026-01:56:37.504 [cx][IddCx]?SendUserModeMessage@IddAdapter@@QEAAJIPEAXI0W4DXGK_IDD_ESCAPE_CODE@@PEAI@Z: Sending escape 0x1 to kernel
+Unknown( 89): GUID=ba36b5ad-f12e-3f3f-d76a-b5e2fd92783e (No Format Information found).
+[0]0C98.14C0::10/10/2026-01:56:37.505 [cx][IddCx]IddCxImplMonitorArrival: IddMonitor 0x000001DAB4F679C0 monitor connected, OsAdapter LUID 0xaae5e5, OsTargetId 0x100
+[0]0C98.14C0::10/10/2026-01:56:37.505 [cx][IddCx]IddCxImplMonitorArrival: Exit, status=STATUS_SUCCESS
+[0]0C98.14C0::10/10/2026-01:56:37.508 [cx][IddCx]<lambda_68bc81eb2706b7c3c3670c0b4082c65a>::operator(): DDI: Return successfully from EvtIddCxAdapterInitFinished DDI

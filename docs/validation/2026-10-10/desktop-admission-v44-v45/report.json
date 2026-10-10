@@ -1,0 +1,144 @@
+{
+  "schema": 1,
+  "kind": "desktop-admission-operation-diagnostics",
+  "runs": [
+    {
+      "version": 44,
+      "source_revision": "f4d0d1c8682af42946ecc15e4f1e7f51a8857351",
+      "processes": [
+        {
+          "file": "paging-v44-umd-process-5008.jsonl",
+          "sha256": "2abc7bc16210aa665b650b41218fe8c9dbee342fe61e8d33f75cee8003e860f0",
+          "events": {
+            "open_adapter": 1068,
+            "caps": 534,
+            "versions": 2136,
+            "create_device": 534,
+            "device_created": 534,
+            "reject": 533
+          },
+          "image": null,
+          "rejections": {
+            "unattributed": 533
+          }
+        },
+        {
+          "file": "paging-v44-umd-process-3616.jsonl",
+          "sha256": "fb9a57f325200610a32bfac59c9e7f8ccb988f5e9751bac78b01b0f987734374",
+          "events": {
+            "open_adapter": 6768,
+            "caps": 3384,
+            "versions": 13536,
+            "create_device": 3384,
+            "device_created": 3384,
+            "reject": 3383
+          },
+          "image": null,
+          "rejections": {
+            "unattributed": 3383
+          }
+        },
+        {
+          "file": "paging-v44-umd-process-7892.jsonl",
+          "sha256": "0c081d991bfbfe67261d379daff6324a1ce875c2b62df4debd1cb7b01158e6ab",
+          "events": {
+            "open_adapter": 2,
+            "caps": 1,
+            "versions": 4
+          },
+          "image": null,
+          "rejections": {}
+        },
+        {
+          "file": "paging-v44-umd-process-5004.jsonl",
+          "sha256": "0c081d991bfbfe67261d379daff6324a1ce875c2b62df4debd1cb7b01158e6ab",
+          "events": {
+            "open_adapter": 2,
+            "caps": 1,
+            "versions": 4
+          },
+          "image": null,
+          "rejections": {}
+        }
+      ]
+    },
+    {
+      "version": 45,
+      "source_revision": "3b34f30f284e025909491f6c175a143f30561556",
+      "processes": [
+        {
+          "file": "paging-v45-umd-process-5008.jsonl",
+          "sha256": "c5783a0bd71988e80e8cfca5e530cb51a5eea4413f1dc3a8d21cd2a7c367530e",
+          "events": {
+            "process": 978,
+            "open_adapter": 1956,
+            "caps": 978,
+            "versions": 3912,
+            "create_device": 978,
+            "device_created": 978,
+            "resource": 977,
+            "reject": 977
+          },
+          "image": "StartMenuExperienceHost.exe",
+          "rejections": {
+            "`anonymous-namespace'::create_resource": 977
+          }
+        },
+        {
+          "file": "paging-v45-umd-process-4872.jsonl",
+          "sha256": "8da5b7227566992839d89ef713839ea0cf988e045cf59529dd3183657b89c890",
+          "events": {
+            "process": 1,
+            "open_adapter": 2,
+            "caps": 1,
+            "versions": 4
+          },
+          "image": "dxgiadaptercache.exe",
+          "rejections": {}
+        },
+        {
+          "file": "paging-v45-umd-process-3616.jsonl",
+          "sha256": "4728ff96d08c84484458ab0c20863621039c7824e4377c4ab7e925cee524806b",
+          "events": {
+            "process": 3593,
+            "open_adapter": 7186,
+            "caps": 3593,
+            "versions": 14372,
+            "create_device": 3593,
+            "device_created": 3593,
+            "resource": 3591,
+            "reject": 3591
+          },
+          "image": "Explorer.EXE",
+          "rejections": {
+            "`anonymous-namespace'::create_resource": 3591
+          }
+        },
+        {
+          "file": "paging-v45-umd-process-7504.jsonl",
+          "sha256": "610c8105d622edc94a6eaa34d9480a441f795bcc4d23e8b1255c489e8a2984b0",
+          "events": {
+            "process": 1,
+            "open_adapter": 2,
+            "caps": 1,
+            "versions": 4
+          },
+          "image": "dxgiadaptercache.exe",
+          "rejections": {}
+        }
+      ]
+    }
+  ],
+  "installed_normal_dependency_loading_passed": true,
+  "npu_execution_tested": false,
+  "desktop_offload_tested": false,
+  "dwm_custom_renderer_observed": false,
+  "notes": [
+    "Colocating the verified runtime DLLs fixes fresh-process loading of the installed v44 UMD without explicit runtime-directory setup. This is a loader prerequisite test, not DWM execution.",
+    "The v45 process records identify Explorer.EXE and StartMenuExperienceHost.exe rejecting a BUFFER resource with CONSTANT_BUFFER bind flags. Neither caller is DWM. This motivates constant-buffer implementation; it does not establish the complete desktop requirement set.",
+    "v3d supplies a concrete extended display layout, receives successful API statuses, but sees only the original active display and restores that path. v3e logs its initial active-path query and then reaches the task deadline (267014); it has no completed activation result.",
+    "The v44 WPP decode records successful monitor mode queries and arrival. It contains no assign-swapchain or commit-modes evidence.",
+    "The old removal task stalled before producing driver-action evidence. It was cancelled and its process confirmed gone before the exact owned devices were removed through native configuration-manager identity checks. This does not prove the internal cause of the management stall.",
+    "Both versions and their indirect monitors were removed cleanly. No physical-host driver was installed and the original VM display was retained."
+  ]
+}
