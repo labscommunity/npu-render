@@ -830,3 +830,27 @@ passes all 23 CPU suites and the native NPU regressions, including 58 DDI draws.
 The later v94 solid desktop draw replays with exact coverage and zero pixel byte
 error on both providers. This build is ready for installed trial v95; full
 desktop operation remains unverified.
+
+The [v95 installed trial](../../../docs/validation/2026-10-10/sole-display-v95/report.json)
+admits the 988-word shader but exposes a native compiler layout failure when
+its actual taskbar draw uses 4096-pixel batches and 128×64/512×384 textures.
+There are 269 successful live NPU draws, four received desktop frames and seven
+acknowledged draw failures. The final frame contains wallpaper, icons and
+transparent taskbar controls. The input harness incorrectly waited for an opaque
+taskbar and never sent Start or Escape; the next trial removes that assumption.
+Both drivers unload and the original VM desktop returns.
+
+Offline replay reproduces the compiler failure at batches 4096 and 1024.
+Batches 256 and 512 execute on the NPU with exact coverage of 49,152 samples and
+at most one color-byte error against the scalar reference. The 512-pixel draw
+still takes 4.7 seconds after compilation. The new exact-bytecode batch limit
+keeps this shader at 512, with synthetic sampling checks using the real desktop
+texture dimensions. It does not establish a usable desktop or a Tahoma benefit.
+
+[Clean build v185](../../../docs/validation/2026-10-10/compositor-batch-v185/report.json)
+passes 23 CPU suites and 47,104 NPU arithmetic/shader components, including the
+real texture dimensions at 512 lanes. The actual taskbar capture now passes at
+the normal requested batch because the executor applies the bound internally.
+The 58 NPU DDI draws and loop regressions also pass. Installed trial v96 will
+check desktop progression and input; these component results do not establish
+that outcome.

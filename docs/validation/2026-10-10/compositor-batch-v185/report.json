@@ -1,0 +1,30 @@
+{
+  "build": "present-umd-v185",
+  "all_checks_passed": true,
+  "arithmetic_components": 19456,
+  "captured_shader_components": 27648,
+  "captured_dwm_pixels": 786432,
+  "captured_dwm_covered_samples": 49152,
+  "compositor_batch_limit": 512,
+  "native_npu_execution": true,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "cpu_suites_passed": 23,
+  "cpu_suite_elapsed_seconds": 118.56,
+  "source_hashes_verified": 111,
+  "binary_hashes_verified": 29,
+  "compositor_verified_components": 47104,
+  "compositor_maximum_error": 3.93390656e-06,
+  "ddi_draws_verified": 58,
+  "full_desktop_offload": false,
+  "installed_driver_tested": false,
+  "physical_driver_changed": false,
+  "findings": [
+    "Exact 988-word shader is limited to 512 pixel lanes. This is a verified workaround for the captured Intel NPU compiler layout failure, not an assertion about every shader or compiler version.",
+    "Compositor tests cover both 4x4 textures at 64 lanes and actual desktop texture dimensions 128x64/512x384 at 512 lanes, for both point and linear filtering and six constant/color scenarios. Oversized direct execution rejects before compilation. All 47104 arithmetic and shader components pass on the NPU.",
+    "The original 4195144-byte taskbar draw replays on CPU and NPU at the normal requested batch 4096, internally bounded to 512. Both cover 49152 samples in 204 tiles and match scalar coverage exactly. CPU has four differing color components and NPU has 73, each at most one byte from scalar. Existing log batch labels report the requested batch, not the internal effective batch.",
+    "NPU captured draw time is 4680.526 ms after 335.607 ms compilation/cache load; total replay time includes the scalar oracle and is 5529 ms. This remains too slow for a usable desktop. No Tahoma measurement was made.",
+    "All 23 CPU suites and NPU compositor, 58 DDI draw and loop regressions pass. Runtime/source hashes are verified before qualification. Prior v184 full NPU regressions are retained separately; this report does not claim they were all rerun.",
+    "Next: signed installed v96 trial with input eligibility based on sole display, nonblack receipt and settling time, rather than taskbar opacity."
+  ]
+}

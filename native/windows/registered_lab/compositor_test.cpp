@@ -55,14 +55,18 @@ VertexConstants constants(unsigned scenario){
  if(scenario==5)c[0][0]=c[0][1]=f(1,1,1,1);
  return c;
 }
-void captured(const std::string &backend){
+void captured(const std::string &backend,bool desktop_shapes=false){
  const auto &words=nr::registered_lab::test_fixture::compositor_pixel_words;const auto p=parse_pixel(words,std::size(words));TEST(p.constants[0]==6 && p.instructions.size()==111);
+ TEST(RegisterExecutor::maximum_batch(p)==512);
+ bool rejected=false;try{PixelExecutor oversized(p,1024,backend);}catch(const std::invalid_argument &){rejected=true;}TEST(rejected);
  TextureShapes shapes{};TextureSamplers samplers{};TexturePixels textures{};
- for(unsigned slot=0;slot<2;++slot){shapes[slot]={4,4,15};textures[slot].resize(16);for(unsigned n=0;n<16;++n)textures[slot][n]={float(n%4)/8,float(n/4)/8,float(n)/32,float((n+slot*3)%16)/16};}
- const float coordinates[]{-2.f,-.125f,0.f,.125f,.375f,.75f,1.f,2.f};std::vector<VertexRegisters> inputs(64);
+ for(unsigned slot=0;slot<2;++slot){shapes[slot]=desktop_shapes?(slot?TextureShape{512,384,15}:TextureShape{128,64,15}):TextureShape{4,4,15};
+  textures[slot].resize(size_t(shapes[slot].width)*shapes[slot].height);for(size_t n=0;n<textures[slot].size();++n)
+   textures[slot][n]={float(n%4)/8,float((n/4)%4)/8,float(n%16)/32,float((n+slot*3)%16)/16};}
+ const float coordinates[]{-2.f,-.125f,0.f,.125f,.375f,.75f,1.f,2.f};std::vector<VertexRegisters> inputs(desktop_shapes?512:64);
  for(unsigned n=0;n<inputs.size();++n){inputs[n][1]={as_bits(1),as_bits(1),as_bits(1),as_bits(float(n%4)/4)};
-  inputs[n][2]={as_bits(coordinates[n%8]*.5f),as_bits(coordinates[n/8]*.5f),as_bits(.5f),as_bits(1)};
-  inputs[n][3]={as_bits(coordinates[7-n%8]*2),as_bits(coordinates[7-n/8]*2),as_bits(2),as_bits(1)};}
+  inputs[n][2]={as_bits(coordinates[n%8]*.5f),as_bits(coordinates[(n/8)%8]*.5f),as_bits(.5f),as_bits(1)};
+  inputs[n][3]={as_bits(coordinates[7-n%8]*2),as_bits(coordinates[7-(n/8)%8]*2),as_bits(2),as_bits(1)};}
  for(const auto filter:{TextureFilter::point,TextureFilter::linear}){
   samplers[0].filter=samplers[1].filter=filter;PixelExecutor executor(p,uint32_t(inputs.size()),backend,shapes,samplers);
   for(unsigned scenario=0;scenario<6;++scenario){const auto cb=constants(scenario);const auto result=executor.execute(inputs,cb,textures);TEST(result.execution_device.rfind(backend,0)==0);float error=0;
@@ -70,11 +74,12 @@ void captured(const std::string &backend){
     const auto a=as_float(result.vertices[n][0][c]),b=as_float(expected[0][c]);const auto d=std::abs(a-b);error=(std::max)(error,d);
     if(!(std::isfinite(a) && std::isfinite(b) && d<=1e-5f))std::fprintf(stderr,"captured filter=%u scenario=%u row=%u lane=%u actual=%.9g expected=%.9g\n",unsigned(filter),scenario,n,c,double(a),double(b));
     TEST(std::isfinite(a) && std::isfinite(b) && d<=1e-5f);}}
-   std::printf("{\"captured_shader_words\":988,\"filter\":%u,\"scenario\":%u,\"verified_components\":256,\"maximum_error\":%.9g,\"execution_device\":\"%s\"}\n",unsigned(filter),scenario,double(error),backend.c_str());std::fflush(stdout);
+   std::printf("{\"captured_shader_words\":988,\"desktop_texture_shapes\":%s,\"batch\":%u,\"filter\":%u,\"scenario\":%u,\"verified_components\":%u,\"maximum_error\":%.9g,\"execution_device\":\"%s\"}\n",desktop_shapes?"true":"false",unsigned(inputs.size()),unsigned(filter),scenario,unsigned(inputs.size()*4),double(error),backend.c_str());std::fflush(stdout);
   }
  }
 }
 }
 int main(int argc,char **argv)try{TEST(argc<=3);const std::string backend=argc>=2?argv[1]:"CPU";const std::string section=argc>=3?argv[2]:"all";
- if(section=="all" || section=="arithmetic")arithmetic(backend);if(section=="all" || section=="captured")captured(backend);return 0;
+ if(section=="all" || section=="arithmetic")arithmetic(backend);if(section=="all" || section=="captured")captured(backend);
+ if(section=="all" || section=="desktop")captured(backend,true);return 0;
 }catch(const std::exception&e){std::fprintf(stderr,"compositor test: %s\n",e.what());return 1;}

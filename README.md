@@ -113,14 +113,16 @@ now has an exact NPU specialization for opaque, one-to-one point-sampled quads.
 Its captured 1024×768 replay passes, as do changing-image and driver callback
 tests. This is a checked subset, not general desktop rendering.
 
-The [latest installed trial](docs/validation/2026-10-10/sole-display-v93/report.json)
-completes 323 live desktop NPU draws plus 13 prewarm requests, all acknowledged.
-Eleven frames arrive through the sole indirect display. Later frames show the
-wallpaper and full taskbar after DWM restarts, but the Start/Escape snapshots
-show no verified response. A complete failed draw identifies MIRROR texture
-addressing as the next missing operation in Windows' blur shader. Both custom
-drivers unload cleanly and the normal VM desktop returns. Stable interactive
-desktop offload and a Tahoma benefit remain unproven.
+The [latest installed trial](docs/validation/2026-10-10/sole-display-v95/report.json)
+completes 269 live desktop NPU draws plus 13 prewarm requests. Four frames arrive
+through the sole indirect display, including wallpaper, icons and taskbar
+controls. A complete taskbar draw then exposes an NPU compiler layout failure.
+Offline replay reproduces the failure at 4096 and 1024 pixels per batch; 512 and
+256 pixels pass with exact coverage and at most one color-byte error against the
+scalar reference. The input test incorrectly required an opaque taskbar and
+never sent Start or Escape. Both custom drivers unload cleanly and the normal VM
+desktop returns. Stable interactive desktop offload and a Tahoma benefit remain
+unproven; pixel clears also still use the CPU.
 
 [Mirrored-texture qualification](docs/validation/2026-10-10/mirror-v174/report.json)
 now replays that failed DWM blur draw on the NPU with all 8,192 output pixels

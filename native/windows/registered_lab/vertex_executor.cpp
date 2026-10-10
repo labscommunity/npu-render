@@ -1,5 +1,6 @@
 #include "provider_compile.hpp"
 #include "loop_fixture.hpp"
+#include "compositor_fixture.hpp"
 #include "vertex_executor.hpp"
 #include <openvino/openvino.hpp>
 #include <openvino/opsets/opset13.hpp>
@@ -816,7 +817,17 @@ void RegisterExecutor::validate(const Program &original) {
 }
 // The 65,536-tap raster graph lost the NPU device during qualification.
 // Bound this specialization to the verified 32,768-tap graph shape.
-uint32_t RegisterExecutor::maximum_batch(const Program &p){return mirrored_loop_shader(p)?256u:65536u;}
+uint32_t RegisterExecutor::maximum_batch(const Program &p){
+    if(mirrored_loop_shader(p))return 256u;
+    // The qualified Intel NPU compiler rejects this compositor's real two-
+    // texture graph at 1024 and 4096 lanes with a layout legalization error.
+    // Both 256 and 512 lanes execute the complete captured draw correctly.
+    // Keep the workaround tied to exact bytecode, not a word-count heuristic.
+    const auto &words=nr::registered_lab::test_fixture::compositor_pixel_words;
+    if(p.stage==Stage::pixel && p.bytecode.size()==std::size(words) &&
+        std::equal(p.bytecode.begin(),p.bytecode.end(),std::begin(words)))return 512u;
+    return 65536u;
+}
 RegisterExecutor::RegisterExecutor(const Program &p, uint32_t count, const std::string &backend,
                                    const TextureShapes &textures, const TextureSamplers &samplers)
     : state(std::make_unique<State>(p, count, backend, textures, samplers)) {}

@@ -1,0 +1,46 @@
+{
+  "trial": "v95",
+  "source_commit": "48fb3d56e9516efc060929bb504973171a9ea28b",
+  "umd_build": "present-umd-v184",
+  "package_version": "0.0.83.0",
+  "worker_successes_by_client": {
+    "42": 13,
+    "4876": 63,
+    "392": 152,
+    "388": 54
+  },
+  "acknowledged_successes_by_client": {
+    "42": 13,
+    "4876": 63,
+    "392": 151,
+    "388": 54
+  },
+  "acknowledged_failures": 7,
+  "received_frames": 4,
+  "full_desktop_offload": false,
+  "usable_interactive_desktop": false,
+  "tahoma_performance_tested": false,
+  "original_cleanup_passed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "guest_restart": false,
+  "findings": [
+    "282 successful native NPU requests: 13 prewarm packets and 269 live draws. Relay logs acknowledge 281 successes and seven failures. One successful DWM reply lacks a relay acknowledgement during shutdown.",
+    "The previously rejected 988-word pixel shader is admitted, but its complete 30-vertex taskbar draw fails native NPU compilation. Repeated layout legalization errors refer to 1x4096x1x1 float tensors. Complete draw capture is 4195144 bytes; its two textures are 128x64 and 512x384, with a 1024x768 target and 1024x48 scissor.",
+    "Four 1024x768 frames arrive while the indirect display is the sole observed active path. The final received image shows wallpaper, icons and taskbar controls over a transparent taskbar. This is not a usable interactive desktop or proof that the acrylic compositor draw succeeded.",
+    "The input harness sends only Control. Its opaque-light-taskbar heuristic does not recognize the transparent taskbar, so it never sends Start or Escape. The next harness uses sole-display state, received nonblack content and a finite settling interval rather than taskbar color.",
+    "Offline CPU replays pass at batch sizes 4096, 1024 and 256 with exact scalar coverage and maximum color-byte error one. NPU reproduces the compiler error at 4096 and 1024. NPU batches 256 and 512 complete with exact coverage of 49152 samples and maximum scalar byte error one; each has 73 differing components against the scalar reference. The 512 draw takes 4698.956 ms after 18840.715 ms compilation, which is still too slow for an interactive desktop.",
+    "The observer detects the complete DWM capture after 200421 ms and waits for finite topology restoration. Both custom driver removals pass, stream configuration is removed, no NPU worker remains, and the normal VM desktop is visually verified afterward. Worker exits with socket-closed status during shutdown.",
+    "Next: bound this exact shader to the qualified 512-lane graph, add realistic texture-shape regression checks, qualify a clean build and repeat desktop/input testing. Remaining CPU clear operations and severe latency still preclude claiming full desktop offload."
+  ],
+  "previous_source_ci": {
+    "run_id": 38089922884,
+    "conclusion": "success",
+    "jobs": [
+      "Conventional commits",
+      "Tests (windows-latest)",
+      "Tests (ubuntu-latest)",
+      "Weston integration (CPU, headless)"
+    ]
+  }
+}
