@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "kind": "active-indirect-desktop-dwm-admission",
+  "source_revision": "0afe35f",
+  "driver_version": "0.0.40.0",
+  "gdi_context_failures": 0,
+  "active_indirect_path_observed": true,
+  "observation_seconds": 45,
+  "custom_render_luid": 8156135,
+  "indirect_display_luid": 8193426,
+  "original_display_luid": 23654,
+  "dwm_loaded_custom_umd": true,
+  "dwm_vertex_shader_words": 90,
+  "dwm_vertex_shader_sha256": "26bba297ecd8dd974198912272d887a232815dd5e4ebfc2a4843294a8e1f7856",
+  "swapchain_assigned": false,
+  "frames_received": 0,
+  "frames_displayed": 0,
+  "trace_events": 558297,
+  "trace_events_lost": 0,
+  "clean_removal": true,
+  "npu_execution_tested": false,
+  "desktop_offload_tested": false,
+  "performance_tested": false,
+  "notes": [
+    "One GDI context is created without the six earlier CreateContext failures. The indirect path automatically activates and survives the finite topology observation.",
+    "DWM loads the UMD, creates its device and several buffers, then its vertex shader is rejected by the exact-shader-only admission policy. Its 90-word stream uses declarations, MUL, ADD, MOV and RET. Captured binaries remain local only.",
+    "Three DWM process IDs appear across initialization retries; this is not stable desktop rendering.",
+    "The kernel also rejects three SHADOWSURFACE metadata requests. ETW reports failures creating CDD primary allocations.",
+    "The indirect driver commits one display path, but receives no swapchain. The original desktop remains and no NPU rendering or Tahoma improvement is demonstrated.",
+    "All 44 raw snapshot files were hash-verified. Committed text normalizes CRLF to LF."
+  ]
+}
