@@ -1,0 +1,113 @@
+{
+  "schema": 1,
+  "kind": "indirect-monitor-startup-and-loader-diagnostics",
+  "source_revision": "de8178da431e379fcc7ae29eaef2d3e85c783847",
+  "install": {
+    "started": "2026-10-10T01:35:40.9701640Z",
+    "action": "install",
+    "completed": true,
+    "passed": true,
+    "error": null,
+    "devcon_exit": 0,
+    "finished": "2026-10-10T01:36:50.5295250Z"
+  },
+  "remove": {
+    "started": "2026-10-10T01:51:16.2591510Z",
+    "action": "remove",
+    "completed": true,
+    "passed": true,
+    "error": null,
+    "devcon_exit": 0,
+    "pnputil_exit": 0,
+    "finished": "2026-10-10T01:51:27.9294890Z"
+  },
+  "monitor_announced": true,
+  "render_adapter_assigned": false,
+  "desktop_frames_received": 0,
+  "topology_probes": [
+    {
+      "name": "a",
+      "build": "v8",
+      "source_revision": "66958b227a2234830c040d2ff329a4fd9be4708b",
+      "exit": {
+        "started": "2026-10-10T01:45:38.7629500Z",
+        "finished": "2026-10-10T01:46:02.1840570Z",
+        "probe_sha256": "36d2c5dfe03456aa45d4b444579fe54bb171b7782cbb977d21b8dec457c9da76",
+        "exit_code": 1,
+        "desktop_offload_tested": false
+      },
+      "activated": false,
+      "restored_original_path": true
+    },
+    {
+      "name": "b",
+      "build": "v9",
+      "source_revision": "3a07f9c9244cf67d350d3e18b490296d5416afb2",
+      "exit": {
+        "started": "2026-10-10T01:49:13.5425480Z",
+        "finished": "2026-10-10T01:49:56.9888740Z",
+        "probe_sha256": "040682743a234d838996008e3679664701f5c86ceea56a84c35883b0be7ce0f4",
+        "exit_code": 1,
+        "desktop_offload_tested": false
+      },
+      "activated": false,
+      "restored_original_path": true
+    }
+  ],
+  "loader_original": {
+    "finished": "2026-10-10T01:38:31.8649980Z",
+    "module_sha256": "1ECF5AF826E35586BB32A6D867944E2229C0BDF22E1FFE2686B936C8C6CF5D00",
+    "cases": [
+      {
+        "mode": "driver-directory-and-system",
+        "loaded": false,
+        "win32_error": 126,
+        "released": false
+      },
+      {
+        "mode": "explicit-probe-runtime",
+        "loaded": true,
+        "win32_error": 0,
+        "released": true
+      }
+    ],
+    "dwm_execution_tested": false,
+    "graphics_device_created": false,
+    "npu_execution_tested": false
+  },
+  "loader_colocated_candidate": {
+    "finished": "2026-10-10T01:48:31.5888240Z",
+    "module_sha256": "1ECF5AF826E35586BB32A6D867944E2229C0BDF22E1FFE2686B936C8C6CF5D00",
+    "cases": [
+      {
+        "mode": "driver-directory-and-system",
+        "loaded": true,
+        "win32_error": 0,
+        "released": true
+      },
+      {
+        "mode": "explicit-probe-runtime",
+        "loaded": true,
+        "win32_error": 0,
+        "released": true
+      }
+    ],
+    "dwm_execution_tested": false,
+    "graphics_device_created": false,
+    "npu_execution_tested": false
+  },
+  "npu_execution_tested": false,
+  "desktop_offload_tested": false,
+  "notes": [
+    "Enumeration reported capacity 34 and actual count 3. Raising the capacity bound to 64 admits discovery, initialization and monitor arrival.",
+    "Both finite topology requests return success but leave only the original display active. Neither produces a commit-modes callback or assigned swapchain. The test rejects both and successfully restores the original path. This does not identify the cause of activation failure.",
+    "A fresh process cannot load the installed v43 UMD with DLL-directory/system search (Win32 126); explicit runtime setup succeeds. Copying the exact UMD and all 16 verified runtime DLLs into one uninstalled candidate directory makes the first load case succeed. This is a loader prerequisite test, not a DWM execution trace.",
+    "The earlier loader-v43 control omitted SetDefaultDllDirectories and both cases failed; it is preserved but not used as a successful control. A preliminary candidate preparation stopped because its test script had not been staged; no candidate load occurred in that attempt.",
+    "The v3 monitor and its exact OEM package were removed, preserving the original display and paired render adapter. No physical-host driver or reboot was used."
+  ],
+  "references": [
+    "https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmthk/nf-d3dkmthk-d3dkmtenumadapters2",
+    "https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setdisplayconfig",
+    "https://learn.microsoft.com/en-us/windows/win32/dlls/dynamic-link-library-search-order"
+  ]
+}
