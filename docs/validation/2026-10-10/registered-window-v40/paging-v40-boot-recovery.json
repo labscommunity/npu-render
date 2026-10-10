@@ -1,0 +1,32 @@
+{
+    "captured_utc":  "2026-10-10T00:20:53.2910340Z",
+    "last_boot":  "2026-10-10T00:07:49.5000000Z",
+    "dump_files":  [
+                       {
+                           "Name":  "MEMORY.DMP",
+                           "Length":  399304515,
+                           "LastWriteTimeUtc":  "\/Date(1791590904568)\/"
+                       },
+                       {
+                           "Name":  "101026-69843-01.dmp",
+                           "Length":  1235196,
+                           "LastWriteTimeUtc":  "\/Date(1791590982679)\/"
+                       }
+                   ],
+    "events":  [
+                   {
+                       "Id":  1001,
+                       "ProviderName":  "Microsoft-Windows-WER-SystemErrorReporting",
+                       "TimeCreated":  "\/Date(1791590982784)\/",
+                       "Message":  "The computer has rebooted from a bugcheck.  The bugcheck was: 0x00000119 (0x0000000000000003, 0xffffca89ca003000, 0xffffca89c47a6050, 0xffffca89cba4e660). A dump was saved in: C:\\Windows\\MEMORY.DMP. Report Id: cda44493-7ba4-4583-9ead-df64e918e323."
+                   },
+                   {
+                       "Id":  41,
+                       "ProviderName":  "Microsoft-Windows-Kernel-Power",
+                       "TimeCreated":  "\/Date(1791590879320)\/",
+                       "Message":  "The system has rebooted without cleanly shutting down first. This error could be caused if the system stopped responding, crashed, or lost power unexpectedly."
+                   }
+               ],
+    "management_service":  "Running",
+    "management_listener_listening":  true
+}

@@ -1,0 +1,348 @@
+Opened log file 'C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-present-v40-oct10.log'
+0: kd> .sympath srv*C:\Users\tatef\AppData\Local\npu-render\vm\symbols*https://msdl.microsoft.com/download/symbols;C:\Users\tatef\AppData\Local\npu-render\builds\present-staging-v4\Release
+Symbol search path is: srv*C:\Users\tatef\AppData\Local\npu-render\vm\symbols*https://msdl.microsoft.com/download/symbols;C:\Users\tatef\AppData\Local\npu-render\builds\present-staging-v4\Release
+Expanded Symbol search path is: srv*c:\users\tatef\appdata\local\npu-render\vm\symbols*https://msdl.microsoft.com/download/symbols;c:\users\tatef\appdata\local\npu-render\builds\present-staging-v4\release
+
+************* Path validation summary **************
+Response                         Time (ms)     Location
+Deferred                                       srv*C:\Users\tatef\AppData\Local\npu-render\vm\symbols*https://msdl.microsoft.com/download/symbols
+OK                                             C:\Users\tatef\AppData\Local\npu-render\builds\present-staging-v4\Release
+0: kd> g
+nr_paging_lab: memory=00000000 required_queue=32
+nr_paging_lab: engine_start=00000000 capacity=33; rendering_ready=0 sources=0 children=0
+nr_paging_lab: query type=1 input=0 output=552
+nr_paging_lab: query type=47 input=0 output=4
+nr_paging_lab: create_context node=0 affinity=1 flags=1 private=0
+nr_paging_lab: query type=5 input=24 output=32
+nr_paging_lab: query type=5 input=24 output=32
+nr_paging_lab: query type=10 input=4 output=4
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=24 input=4 output=44
+nr_paging_lab: query type=25 input=4 output=53
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: query type=0 input=0 output=16
+nr_paging_lab: create_context node=0 affinity=1 flags=0 private=0
+nr_paging_lab: render_fill=00000000
+nr_paging_lab: aperture operation=5 pages=60 status=00000000 live=60
+nr_paging_lab: patch=00000000 flags=0 fence=1 dma=0..16 private=0..32
+nr_paging_lab: submit=00000000 flags=0 fence=1
+nr_paging_lab: standard_allocation type=3 status=00000000
+nr_paging_lab: standard_allocation type=3 status=00000000
+nr_paging_lab: present flags=1 rectangles=1 progress=0 status=c01e0001
+nr_paging_lab: present flags=1 rectangles=1 progress=0 status=c01e0001
+nr_paging_lab: patch=c000000d flags=2 fence=2 dma=0..0 private=0..0
+nr_paging_lab: present flags=1 rectangles=1 progress=0 status=c01e0001
+nr_paging_lab: present flags=1 rectangles=1 progress=0 status=c01e0001
+KDTARGET: Refreshing KD connection
+
+*** Fatal System Error: 0x00000119
+                       (0x0000000000000003,0xFFFFCA89CA003000,0xFFFFCA89C47A6050,0xFFFFCA89CBA4E660)
+
+Break instruction exception - code 80000003 (first chance)
+
+A fatal system error has occurred.
+Debugger entered on first try; Bugcheck callbacks have not been invoked.
+
+A fatal system error has occurred.
+
+For analysis of this file, run !analyze -v
+nt!DbgBreakPointWithStatus:
+fffff804`a52fdfb0 cc              int     3
+0: kd> !analyze -v; kv; lm m nr_render_kmd; x nr_render_kmd!*present*
+Connected to Windows 10 26100 x64 target at (Fri Oct  9 17:04:18.306 2026 (UTC - 7:00)), ptr64 TRUE
+Loading Kernel Symbols
+...............................................................
+.................................
+
+Press ctrl-c (cdb, kd, ntsd) or ctrl-break (windbg) to abort symbol loads that take too long.
+Run !sym noisy before .reload to track down problems loading symbols.
+
+...............................
+..................................
+Loading User Symbols
+
+Loading unloaded module list
+..................
+*******************************************************************************
+*                                                                             *
+*                        Bugcheck Analysis                                    *
+*                                                                             *
+*******************************************************************************
+
+VIDEO_SCHEDULER_INTERNAL_ERROR (119)
+The video scheduler has detected that fatal violation has occurred. This resulted
+in a condition that video scheduler can no longer progress. Any other values after
+parameter 1 must be individually examined according to the subtype.
+Arguments:
+Arg1: 0000000000000003, The driver failed upon the patching command buffer.
+Arg2: ffffca89ca003000
+Arg3: ffffca89c47a6050
+Arg4: ffffca89cba4e660
+
+Debugging Details:
+------------------
+
+
+KEY_VALUES_STRING: 1
+
+    Key  : Analysis.CPU.mSec
+    Value: 10936
+
+    Key  : Analysis.Elapsed.mSec
+    Value: 103914
+
+    Key  : Analysis.IO.Other.Mb
+    Value: 26
+
+    Key  : Analysis.IO.Read.Mb
+    Value: 0
+
+    Key  : Analysis.IO.Write.Mb
+    Value: 0
+
+    Key  : Analysis.Init.CPU.mSec
+    Value: 6734
+
+    Key  : Analysis.Init.Elapsed.mSec
+    Value: 7045869
+
+    Key  : Analysis.Memory.CommitPeak.Mb
+    Value: 77
+
+    Key  : Bugcheck.Code.KiBugCheckData
+    Value: 0x119
+
+    Key  : Bugcheck.Code.LegacyAPI
+    Value: 0x119
+
+    Key  : Failure.Bucket
+    Value: 0x119_3_DRIVER_FAILED_PATCH_COMMAND_dxgmms1!VidSchiSubmitRenderCommand
+
+    Key  : Failure.Hash
+    Value: {390320db-49b9-cc42-7f0b-d19f81b19876}
+
+    Key  : Hypervisor.Enlightenments.Value
+    Value: 0
+
+    Key  : Hypervisor.Enlightenments.ValueHex
+    Value: 0
+
+    Key  : Hypervisor.Flags.AnyHypervisorPresent
+    Value: 1
+
+    Key  : Hypervisor.Flags.ApicEnlightened
+    Value: 0
+
+    Key  : Hypervisor.Flags.ApicVirtualizationAvailable
+    Value: 0
+
+    Key  : Hypervisor.Flags.AsyncMemoryHint
+    Value: 0
+
+    Key  : Hypervisor.Flags.CoreSchedulerRequested
+    Value: 0
+
+    Key  : Hypervisor.Flags.CpuManager
+    Value: 0
+
+    Key  : Hypervisor.Flags.DeprecateAutoEoi
+    Value: 0
+
+    Key  : Hypervisor.Flags.DynamicCpuDisabled
+    Value: 0
+
+    Key  : Hypervisor.Flags.Epf
+    Value: 0
+
+    Key  : Hypervisor.Flags.ExtendedProcessorMasks
+    Value: 0
+
+    Key  : Hypervisor.Flags.HardwareMbecAvailable
+    Value: 0
+
+    Key  : Hypervisor.Flags.MaxBankNumber
+    Value: 0
+
+    Key  : Hypervisor.Flags.MemoryZeroingControl
+    Value: 0
+
+    Key  : Hypervisor.Flags.NoExtendedRangeFlush
+    Value: 0
+
+    Key  : Hypervisor.Flags.NoNonArchCoreSharing
+    Value: 0
+
+    Key  : Hypervisor.Flags.Phase0InitDone
+    Value: 0
+
+    Key  : Hypervisor.Flags.PowerSchedulerQos
+    Value: 0
+
+    Key  : Hypervisor.Flags.RootScheduler
+    Value: 0
+
+    Key  : Hypervisor.Flags.SynicAvailable
+    Value: 0
+
+    Key  : Hypervisor.Flags.UseQpcBias
+    Value: 0
+
+    Key  : Hypervisor.Flags.Value
+    Value: 4096
+
+    Key  : Hypervisor.Flags.ValueHex
+    Value: 1000
+
+    Key  : Hypervisor.Flags.VpAssistPage
+    Value: 0
+
+    Key  : Hypervisor.Flags.VsmAvailable
+    Value: 0
+
+    Key  : Hypervisor.RootFlags.AccessStats
+    Value: 0
+
+    Key  : Hypervisor.RootFlags.CrashdumpEnlightened
+    Value: 0
+
+    Key  : Hypervisor.RootFlags.CreateVirtualProcessor
+    Value: 0
+
+    Key  : Hypervisor.RootFlags.DisableHyperthreading
+    Value: 0
+
+    Key  : Hypervisor.RootFlags.HostTimelineSync
+    Value: 0
+
+    Key  : Hypervisor.RootFlags.HypervisorDebuggingEnabled
+    Value: 0
+
+    Key  : Hypervisor.RootFlags.IsHyperV
+    Value: 0
+
+    Key  : Hypervisor.RootFlags.LivedumpEnlightened
+    Value: 0
+
+    Key  : Hypervisor.RootFlags.MapDeviceInterrupt
+    Value: 0
+
+    Key  : Hypervisor.RootFlags.MceEnlightened
+    Value: 0
+
+    Key  : Hypervisor.RootFlags.Nested
+    Value: 0
+
+    Key  : Hypervisor.RootFlags.StartLogicalProcessor
+    Value: 0
+
+    Key  : Hypervisor.RootFlags.Value
+    Value: 0
+
+    Key  : Hypervisor.RootFlags.ValueHex
+    Value: 0
+
+    Key  : SecureKernel.HalpHvciEnabled
+    Value: 0
+
+    Key  : WER.OS.Branch
+    Value: ge_release
+
+    Key  : WER.OS.Version
+    Value: 10.0.26100.1
+
+
+BUGCHECK_CODE:  119
+
+BUGCHECK_P1: 3
+
+BUGCHECK_P2: ffffca89ca003000
+
+BUGCHECK_P3: ffffca89c47a6050
+
+BUGCHECK_P4: ffffca89cba4e660
+
+PROCESS_NAME:  System
+
+STACK_TEXT:  
+fffffa83`1d56b128 fffff804`a53b3622     : fffffa83`1d56b1a8 00000000`00000101 00000000`00000100 fffff804`a54c8201 : nt!DbgBreakPointWithStatus
+fffffa83`1d56b130 fffff804`a53b2b4e     : 00000000`00000003 fffffa83`1d56b290 fffff804`a54c84b0 00000000`00000119 : nt!KiBugCheckDebugBreak+0x12
+fffffa83`1d56b190 fffff804`a52fd237     : 00000000`c47a6000 ffffca89`00000000 ffffca89`cb4abdd0 ffffca89`ca003000 : nt!KeBugCheck2+0xb2e
+fffffa83`1d56b920 fffff804`36c41316     : 00000000`00000119 00000000`00000003 ffffca89`ca003000 ffffca89`c47a6050 : nt!KeBugCheckEx+0x107
+fffffa83`1d56b960 fffff804`3c389d4b     : ffffca89`cbfcb000 ffffca89`cba4e660 00000000`c000000d ffffca89`cbfcb320 : watchdog!WdLogSingleEntry5+0x156
+fffffa83`1d56b9f0 fffff804`3c388cbb     : ffffca89`cba4e010 ffffca89`cba4e660 ffffca89`ca003000 ffffca89`ca003000 : dxgmms1!VidSchiSubmitRenderCommand+0x99b
+fffffa83`1d56bb70 fffff804`3c37ff9f     : ffffca89`ca003000 00000000`00000080 fffff804`3c37ff00 ffffda80`ad9c0180 : dxgmms1!VidSchiRun_PriorityTable+0x10b
+fffffa83`1d56bbb0 fffff804`a52944ca     : ffffca89`cad9e040 fffff804`3c37ff00 79732565`78652e61 746f6f72`6d657473 : dxgmms1!VidSchiWorkerThread+0x9f
+fffffa83`1d56bbf0 fffff804`a54af7f4     : ffffda80`ad9c0180 ffffca89`cad9e040 fffff804`a5294470 53232100`906c6c64 : nt!PspSystemThreadStartup+0x5a
+fffffa83`1d56bc40 00000000`00000000     : fffffa83`1d56c000 fffffa83`1d566000 00000000`00000000 00000000`00000000 : nt!KiStartSystemThread+0x34
+
+
+SYMBOL_NAME:  dxgmms1!VidSchiSubmitRenderCommand+99b
+
+MODULE_NAME: dxgmms1
+
+IMAGE_NAME:  dxgmms1.sys
+
+IMAGE_VERSION:  10.0.26100.9444
+
+STACK_COMMAND:  .cxr; .ecxr ; kb
+
+BUCKET_ID_FUNC_OFFSET:  99b
+
+FAILURE_BUCKET_ID:  0x119_3_DRIVER_FAILED_PATCH_COMMAND_dxgmms1!VidSchiSubmitRenderCommand
+
+OS_VERSION:  10.0.26100.1
+
+BUILDLAB_STR:  ge_release
+
+OSPLATFORM_TYPE:  x64
+
+OSNAME:  Windows 10
+
+FAILURE_ID_HASH:  {390320db-49b9-cc42-7f0b-d19f81b19876}
+
+Followup:     MachineOwner
+---------
+
+ # Child-SP          RetAddr               : Args to Child                                                           : Call Site
+00 fffffa83`1d56b128 fffff804`a53b3622     : fffffa83`1d56b1a8 00000000`00000101 00000000`00000100 fffff804`a54c8201 : nt!DbgBreakPointWithStatus
+01 fffffa83`1d56b130 fffff804`a53b2b4e     : 00000000`00000003 fffffa83`1d56b290 fffff804`a54c84b0 00000000`00000119 : nt!KiBugCheckDebugBreak+0x12
+02 fffffa83`1d56b190 fffff804`a52fd237     : 00000000`c47a6000 ffffca89`00000000 ffffca89`cb4abdd0 ffffca89`ca003000 : nt!KeBugCheck2+0xb2e
+03 fffffa83`1d56b920 fffff804`36c41316     : 00000000`00000119 00000000`00000003 ffffca89`ca003000 ffffca89`c47a6050 : nt!KeBugCheckEx+0x107
+04 fffffa83`1d56b960 fffff804`3c389d4b     : ffffca89`cbfcb000 ffffca89`cba4e660 00000000`c000000d ffffca89`cbfcb320 : watchdog!WdLogSingleEntry5+0x156
+05 fffffa83`1d56b9f0 fffff804`3c388cbb     : ffffca89`cba4e010 ffffca89`cba4e660 ffffca89`ca003000 ffffca89`ca003000 : dxgmms1!VidSchiSubmitRenderCommand+0x99b
+06 fffffa83`1d56bb70 fffff804`3c37ff9f     : ffffca89`ca003000 00000000`00000080 fffff804`3c37ff00 ffffda80`ad9c0180 : dxgmms1!VidSchiRun_PriorityTable+0x10b
+07 fffffa83`1d56bbb0 fffff804`a52944ca     : ffffca89`cad9e040 fffff804`3c37ff00 79732565`78652e61 746f6f72`6d657473 : dxgmms1!VidSchiWorkerThread+0x9f
+08 fffffa83`1d56bbf0 fffff804`a54af7f4     : ffffda80`ad9c0180 ffffca89`cad9e040 fffff804`a5294470 53232100`906c6c64 : nt!PspSystemThreadStartup+0x5a
+09 fffffa83`1d56bc40 00000000`00000000     : fffffa83`1d56c000 fffffa83`1d566000 00000000`00000000 00000000`00000000 : nt!KiStartSystemThread+0x34
+Browse full module list
+start             end                 module name
+fffff804`3bec0000 fffff804`3bed1000   nr_render_kmd   (deferred)             
+fffff804`3bec44e0 nr_render_kmd!nr::kmd::Present::locate (class nr::kmd::Segment *, struct _DXGK_ALLOCATIONLIST *, struct nr::kmd::PresentRecord *, bool)
+fffff804`3bec58b0 nr_render_kmd!nr::kmd::Present::patch (class nr::kmd::Segment *, struct nr::kernel_contract::Surface *, struct nr::kernel_contract::Surface *, struct _DXGKARG_PATCH *)
+fffff804`3bec4880 nr_render_kmd!nr::kmd::Present::matches (struct nr::kmd::PresentRecord *, struct nr::kernel_contract::Surface *, struct nr::kernel_contract::Surface *)
+fffff804`3bec1a10 nr_render_kmd!nr::kmd::Present::build (class nr::kmd::Segment *, struct nr::kernel_contract::Surface *, struct nr::kernel_contract::Surface *, struct _DXGKARG_PRESENT *)
+fffff804`3bec62a0 nr_render_kmd!`anonymous namespace'::present (void *, struct _DXGKARG_PRESENT *)
+fffff804`3bec8550 nr_render_kmd!nr::kmd::Present::valid (struct nr::kmd::PresentRecord *)
+fffff804`3bec51e8 nr_render_kmd!?A0xe1342900::present_allocations =  (inline caller) nr_render_kmd!`anonymous namespace'::patch+348
+fffff804`3bec62ec nr_render_kmd!?A0xe1342900::present_allocations =  (inline caller) nr_render_kmd!`anonymous namespace'::present+4c
+fffff804`3bec81a9 nr_render_kmd!nr::kmd::Present::execute =  (inline caller) nr_render_kmd!nr::kmd::Engine::thread_main+1e9
+0: kd> .logclose; .logopen C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-present-v40-recovery-oct10.log; g
+Closing open log file C:\Users\tatef\AppData\Local\npu-render\vm\guest-kd-present-v40-oct10.log

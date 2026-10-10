@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "kind": "registered-window-presentation-capacity-crash",
+  "date_utc": "2026-10-10",
+  "package": "v40-staging-open",
+  "driver_version": "0.0.29.0",
+  "source_revisions": {
+    "kernel": "004bb7f35450792afb245c984eb18528d99ce250",
+    "umd": "a95a58c33ebc13c5cabf918d4b3772a0e5e7ba21"
+  },
+  "result": "guest-bugcheck-during-presentation-patch",
+  "verified_presented_frames": 0,
+  "boot_recovery_report": "paging-v40-boot-recovery.json",
+  "accepted_cpu_clear_submissions": 1,
+  "cpu_clear_completion_observed": false,
+  "present_attempts": 4,
+  "present_status": "c01e0001",
+  "multipass_progress": 0,
+  "patch_status": "c000000d",
+  "patch_dma_range": [
+    0,
+    0
+  ],
+  "patch_private_range": [
+    0,
+    0
+  ],
+  "bugcheck": "0x119",
+  "bugcheck_parameter_1": 3,
+  "probe_exit_report_exists": false,
+  "clean_driver_unload_before_crash": false,
+  "owned_device_removed_after_reboot": true,
+  "owned_inf_deleted_after_reboot": true,
+  "prior_display_status_preserved_after_removal": true,
+  "registered_npu_execution_tested": false,
+  "desktop_offload_tested": false,
+  "tahoma_benefit_tested": false,
+  "notes": [
+    "This attempt reaches the actual DxgkDdiPresent entrypoint after staging allocation creation/open succeeds. Four calls report insufficient DMA buffer with no progress. One earlier clear is accepted for submission. This log has no worker-completion trace, so it does not establish completion of that clear.",
+    "The kernel then rejects patching an empty presentation packet. Windows bugchecks 0x119 with parameter 1=3 (DRIVER_FAILED_PATCH_COMMAND). The probe never writes a completion/exit report and no displayed frame is verified.",
+    "Source inspection identifies a concrete size mismatch: CreateContext advertises sizeof(CopyRecord)=40 private bytes, while Present requires at least sizeof(PresentRecord)=64. Thus even a fresh context buffer cannot hold one rectangle. The captured trace has no direct buffer-size dump; this diagnosis follows the exact package source and returned progress/status.",
+    "Revision 2e3eaf1 advertises storage for the bounded presentation record array. Tests now create the context through the actual DDI and require its advertised DMA/private/patch budgets to fit the emitted rectangles. Live acceptance remains a separate gate.",
+    "Only the disposable VM crashed. Its Windows crash handler saved a dump and rebooted. The registered driver is removed after reboot; this does not retroactively establish clean teardown of the crashed attempt. No driver was installed on the physical Delta host."
+  ],
+  "references": [
+    "https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/nc-d3dkmddi-dxgkddi_patch",
+    "https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/nc-d3dkmddi-dxgkddi_present",
+    "https://learn.microsoft.com/en-us/windows-hardware/drivers/debugger/bug-check-0x119---video-scheduler-internal-error"
+  ]
+}

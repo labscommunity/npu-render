@@ -87,7 +87,8 @@ validated presentation staging surface, returns a real resource owner, and
 tracks its allocation through destruction. Other resource kinds still require
 their matching resource metadata. Host tests reproduce the observed request
 and reject ordinary/cross-adapter surfaces and malformed metadata in this path.
-The v40 guest reaches `DxgkDdiPresent`, but its 64-byte records cannot fit the
+The [v40 guest crash](../../../docs/validation/2026-10-10/registered-window-v40/report.json)
+reaches `DxgkDdiPresent`, but its 64-byte records cannot fit the
 40-byte private-buffer size advertised by context creation. Repeated
 `STATUS_GRAPHICS_INSUFFICIENT_DMA_BUFFER` responses leave an empty presentation
 packet; rejecting its patch causes guest bugcheck `0x119/3`. The aperture context
