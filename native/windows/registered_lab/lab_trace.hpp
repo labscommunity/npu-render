@@ -17,6 +17,10 @@ inline void lab_trace(const char *format, ...) noexcept {
     HANDLE file = CreateFileW(path, FILE_APPEND_DATA | FILE_READ_ATTRIBUTES, FILE_SHARE_READ,
                              nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (file == INVALID_HANDLE_VALUE) return;
+    LARGE_INTEGER size{};
+    if (!GetFileSizeEx(file, &size) || size.QuadPart > 4 * 1024 * 1024 - 2048) {
+        CloseHandle(file); return;
+    }
     if (!lines) {
         WCHAR module[MAX_PATH]{};
         const auto count = GetModuleFileNameW(nullptr, module, MAX_PATH);
@@ -36,8 +40,7 @@ inline void lab_trace(const char *format, ...) noexcept {
         if (length > 0) WriteFile(file, header, DWORD(length), &written, nullptr);
     }
     ++lines;
-    LARGE_INTEGER size{};
-    if (GetFileSizeEx(file, &size) && size.QuadPart < 4 * 1024 * 1024) {
+    {
         char line[1024]{};
         va_list args; va_start(args, format);
         const auto length = _vsnprintf_s(line, sizeof(line), _TRUNCATE, format, args);
