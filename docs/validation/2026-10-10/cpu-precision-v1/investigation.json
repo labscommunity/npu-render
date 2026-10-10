@@ -1,0 +1,46 @@
+{
+  "source_ci_run": 38090989948,
+  "attempt": 2,
+  "original_ci_conclusion": "failure",
+  "cpu": "Intel Xeon Platinum 8573C",
+  "failed_tests": [
+    "native_span_blend_cpu",
+    "windows_ddi_cpu",
+    "windows_ddi_shared_cpu_control",
+    "native_packed_blend_cpu",
+    "registered_lab_contract"
+  ],
+  "diagnostic": {
+    "unrestricted_ctest_exit": 8,
+    "avx2_ctest_exit": 0,
+    "test": "native_span_blend_cpu",
+    "unrestricted_dispatch": "AMX/BF16 reported before illegal instruction"
+  },
+  "upstream_issue": "https://github.com/uxlfoundation/oneDNN/issues/5689",
+  "precision_documentation": "https://docs.openvino.ai/2026/openvino-workflow/running-inference/inference-devices-and-modes/cpu-device.html",
+  "hypothesis": "Default CPU precision selects a BF16/AMX path unavailable to the hosted Windows process. Matching upstream report is supporting context; the exception instruction has not been captured.",
+  "proposed_change": "Explicit CPU FP32 inference precision for packed byte blending; normal ISA dispatch and every test remain enabled. GPU and NPU settings unchanged.",
+  "fix_validated": true,
+  "raw_log": {
+    "path": "results/render-driver/ci-38090989948-attempt2-full.log",
+    "sha256": "b197d603ed41e3250b2b42b0538371c12596c96d232736ac1ca0110e1a1b80ec"
+  },
+  "validation": {
+    "delta_cpu_span_blend": {
+      "passed": true,
+      "maximum_byte_error": 0,
+      "dispatches": 2
+    },
+    "delta_cpu_packed_blend": {
+      "passed": true,
+      "cases": 48,
+      "maximum_byte_error": 0,
+      "compiled_precision_assertion": "f32"
+    },
+    "registered_cpu_suites_passed": 23,
+    "clean_registered_build": "present-umd-v189",
+    "hosted_xeon_fix_verified": false,
+    "first_build_launch": "Failed before compilation because the physical source tree lacks tools/build_native.py; raw log preserved. The two native checks then built in an isolated CMake project against the same source."
+  },
+  "fix_validation_scope": "Delta CPU numerical checks; hosted Xeon crash resolution is pending."
+}

@@ -2,6 +2,15 @@
 #include <openvino/openvino.hpp>
 #include <openvino/opsets/opset13.hpp>
 
+// Packed byte-color contracts require the CPU's FP32 arithmetic path. Default
+// CPU precision can select BF16/AMX convolution on Xeon Windows hosts, where
+// the qualified runtime has produced illegal-instruction exceptions.
+inline ov::AnyMap blend_compile_properties(const std::string &backend) {
+    ov::AnyMap properties{ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY)};
+    if (backend == "CPU") properties.emplace(ov::hint::inference_precision(ov::element::f32));
+    return properties;
+}
+
 inline size_t blend_pixel_group(size_t width, bool packed_u8, size_t requested = 4) {
     if (requested != 1 && requested != 4 && requested != 16 && requested != 32)
         throw std::invalid_argument("pixel group must be 1, 4, 16 or 32");

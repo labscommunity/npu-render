@@ -29,7 +29,7 @@ class PackedBlendProvider {
             throw std::invalid_argument("explicit CPU, GPU or NPU backend required");
         compiled =
             core.compile_model(blend_model(width, height, true, 4, "convolution"), backend,
-                               ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY));
+                               blend_compile_properties(backend));
         const auto devices = compiled.get_property(ov::execution_devices);
         if (devices.size() != 1 ||
             (devices[0] != backend && devices[0].rfind(backend + ".", 0) != 0))

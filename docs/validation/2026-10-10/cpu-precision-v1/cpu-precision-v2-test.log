@@ -1,0 +1,28 @@
+UpdateCTestConfiguration  from :C:/Users/tatef/AppData/Local/npu-render/builds/cpu-precision-v2/DartConfiguration.tcl
+Test project C:/Users/tatef/AppData/Local/npu-render/builds/cpu-precision-v2
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 1
+    Start 1: span_blend_cpu
+
+1: Test command: C:\Users\tatef\AppData\Local\npu-render\builds\cpu-precision-v2\Release\nr_span_blend_test.exe "CPU"
+1: Working Directory: C:/Users/tatef/AppData/Local/npu-render/builds/cpu-precision-v2
+1: Test timeout computed to be: 10000000
+1: {"passed":true,"execution_device":"CPU","maximum_error":0,"dispatches":2}
+1/2 Test #1: span_blend_cpu ...................   Passed    0.38 sec
+test 2
+    Start 2: packed_blend_cpu
+
+2: Test command: C:\Users\tatef\AppData\Local\npu-render\builds\cpu-precision-v2\Release\nr_packed_blend_test.exe
+2: Working Directory: C:/Users/tatef/AppData/Local/npu-render/builds/cpu-precision-v2
+2: Test timeout computed to be: 10000000
+2: {"packed_blend_cpu":true,"cases":48,"max_byte_error":0}
+2/2 Test #2: packed_blend_cpu .................   Passed    0.80 sec
+
+100% tests passed out of 2
+
+Total Test time (real) =   1.18 sec

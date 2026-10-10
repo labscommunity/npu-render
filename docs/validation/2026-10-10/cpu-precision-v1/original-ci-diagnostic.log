@@ -1,0 +1,126 @@
+﻿2026-10-10T22:43:14.3810642Z ##[group]Run Get-CimInstance Win32_Processor | Select-Object Manufacturer,Name,NumberOfCores,NumberOfLogicalProcessors | ConvertTo-Json
+2026-10-10T22:43:14.3811867Z [36;1mGet-CimInstance Win32_Processor | Select-Object Manufacturer,Name,NumberOfCores,NumberOfLogicalProcessors | ConvertTo-Json[0m
+2026-10-10T22:43:14.3812463Z [36;1m[ordered]@{[0m
+2026-10-10T22:43:14.3812803Z [36;1m  avx = [System.Runtime.Intrinsics.X86.Avx]::IsSupported[0m
+2026-10-10T22:43:14.3813255Z [36;1m  avx2 = [System.Runtime.Intrinsics.X86.Avx2]::IsSupported[0m
+2026-10-10T22:43:14.3813718Z [36;1m  avx512f = [System.Runtime.Intrinsics.X86.Avx512F]::IsSupported[0m
+2026-10-10T22:43:14.3814244Z [36;1m  avx512bw = [System.Runtime.Intrinsics.X86.Avx512BW]::IsSupported[0m
+2026-10-10T22:43:14.3814641Z [36;1m} | ConvertTo-Json[0m
+2026-10-10T22:43:14.3815344Z [36;1muv run --frozen python -c "import openvino as ov; c=ov.Core(); print(ov.__version__); print(c.get_property('CPU','FULL_DEVICE_NAME')); print(c.get_property('CPU','OPTIMIZATION_CAPABILITIES'))"[0m
+2026-10-10T22:43:14.3816395Z [36;1m$runtime = uv run --frozen python -c "import openvino,pathlib; print(pathlib.Path(openvino.__file__).parent/'libs')"[0m
+2026-10-10T22:43:14.3816967Z [36;1mif ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }[0m
+2026-10-10T22:43:14.3817338Z [36;1m$env:PATH = "$runtime;$env:PATH"[0m
+2026-10-10T22:43:14.3817774Z [36;1m# Diagnostic comparison only: the original failing step still fails CI.[0m
+2026-10-10T22:43:14.3818293Z [36;1m# No ISA restriction is applied to the normal build or shipped runtime.[0m
+2026-10-10T22:43:14.3818764Z [36;1m$env:ONEDNN_VERBOSE = '1'[0m
+2026-10-10T22:43:14.3819164Z [36;1mctest --test-dir build/native -C Release -R '^native_span_blend_cpu$' --verbose[0m
+2026-10-10T22:43:14.3819574Z [36;1m$nativeStatus = $LASTEXITCODE[0m
+2026-10-10T22:43:14.3819879Z [36;1m$env:ONEDNN_MAX_CPU_ISA = 'AVX2'[0m
+2026-10-10T22:43:14.3820276Z [36;1mctest --test-dir build/native -C Release -R '^native_span_blend_cpu$' --verbose[0m
+2026-10-10T22:43:14.3820937Z [36;1m[ordered]@{unrestricted_ctest_exit=$nativeStatus;avx2_ctest_exit=$LASTEXITCODE;diagnostic_only=$true} | ConvertTo-Json[0m
+2026-10-10T22:43:14.3821768Z [36;1mexit 0[0m
+2026-10-10T22:43:14.3896195Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-10-10T22:43:14.3896586Z env:
+2026-10-10T22:43:14.3896911Z   pythonLocation: C:\hostedtoolcache\windows\Python\3.12.10\x64
+2026-10-10T22:43:14.3897379Z   PKG_CONFIG_PATH: C:\hostedtoolcache\windows\Python\3.12.10\x64/lib/pkgconfig
+2026-10-10T22:43:14.3897844Z   Python_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.12.10\x64
+2026-10-10T22:43:14.3898296Z   Python2_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.12.10\x64
+2026-10-10T22:43:14.3898713Z   Python3_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.12.10\x64
+2026-10-10T22:43:14.3899059Z ##[endgroup]
+2026-10-10T22:43:16.0863562Z {
+2026-10-10T22:43:16.0865142Z   "Manufacturer": "GenuineIntel",
+2026-10-10T22:43:16.0866428Z   "Name": "INTEL(R) XEON(R) PLATINUM 8573C",
+2026-10-10T22:43:16.0867079Z   "NumberOfCores": 1,
+2026-10-10T22:43:16.0867676Z   "NumberOfLogicalProcessors": 2
+2026-10-10T22:43:16.0868370Z }
+2026-10-10T22:43:16.0926912Z {
+2026-10-10T22:43:16.0927382Z   "avx": true,
+2026-10-10T22:43:16.0927775Z   "avx2": true,
+2026-10-10T22:43:16.0928122Z   "avx512f": true,
+2026-10-10T22:43:16.0928470Z   "avx512bw": true
+2026-10-10T22:43:16.0928714Z }
+2026-10-10T22:43:16.4793307Z 2026.1.0-21367-63e31528c62-releases/2026/1
+2026-10-10T22:43:16.4883916Z INTEL(R) XEON(R) PLATINUM 8573C
+2026-10-10T22:43:16.4906964Z ['BF16', 'WINOGRAD', 'FP32', 'FP16', 'INT8', 'BIN', 'EXPORT_IMPORT']
+2026-10-10T22:43:17.3190883Z UpdateCTestConfiguration  from :D:/a/npu-render/npu-render/build/native/DartConfiguration.tcl
+2026-10-10T22:43:17.3191804Z Parse Config file:D:/a/npu-render/npu-render/build/native/DartConfiguration.tcl
+2026-10-10T22:43:17.4221150Z Test project D:/a/npu-render/npu-render/build/native
+2026-10-10T22:43:17.4275952Z Constructing a list of tests
+2026-10-10T22:43:17.4507881Z Done constructing a list of tests
+2026-10-10T22:43:17.4508643Z Updating test list for fixtures
+2026-10-10T22:43:17.4509242Z Added 0 tests to meet fixture requirements
+2026-10-10T22:43:17.4518235Z Checking test dependency graph...
+2026-10-10T22:43:17.4518760Z Checking test dependency graph end
+2026-10-10T22:43:17.4520590Z test 3
+2026-10-10T22:43:17.4568043Z     Start 3: native_span_blend_cpu
+2026-10-10T22:43:17.4569047Z
+2026-10-10T22:43:17.4569575Z 3: Test command: D:\a\npu-render\npu-render\build\native\Release\nr_span_blend_test.exe "CPU"
+2026-10-10T22:43:17.4570489Z 3: Working Directory: D:/a/npu-render/npu-render/build/native
+2026-10-10T22:43:17.4571167Z 3: Test timeout computed to be: 1500
+2026-10-10T22:43:17.5164890Z 3: onednn_verbose,v1,info,oneDNN v3.10.2 (commit 6b6492b1ea9ef5ca9ff3c5c59ed71dcca683a446)
+2026-10-10T22:43:17.5166082Z 3: onednn_verbose,v1,info,cpu,runtime:threadpool,nthr:1
+2026-10-10T22:43:17.5167333Z 3: onednn_verbose,v1,info,cpu,isa:Intel AVX-512 with float16, Intel DL Boost and bfloat16 support and Intel AMX with bfloat16 and 8-bit integer support
+2026-10-10T22:43:17.5168487Z 3: onednn_verbose,v1,info,gpu,runtime:none
+2026-10-10T22:43:17.5169760Z 3: onednn_verbose,v1,primitive,info,template:operation,engine,primitive,implementation,prop_kind,memory_descriptors,attributes,auxiliary,problem_desc,exec_time
+2026-10-10T22:43:17.5171451Z 3: onednn_verbose,v1,primitive,exec,cpu,reorder,jit:uni,undef,src:f32::blocked:abcd::f0 dst:bf16:p:blocked:ABcd16b16a2b::f0,,,16x16x1x1,0.0103
+2026-10-10T22:43:17.5309103Z 3: onednn_verbose,v1,primitive,exec,cpu,reorder,brgemm_matmul_copy_reorder_t,undef,src:f32::blocked:acdb::f0 dst:f32::blocked:abcd::f0,,,1x16x512x256,3.4791
+2026-10-10T22:43:17.5379075Z 3: onednn_verbose,v1,primitive,exec,cpu,reorder,brgemm_matmul_copy_reorder_t,undef,src:f32::blocked:acdb::f0 dst:f32::blocked:abcd::f0,,,1x16x512x256,3.4492
+2026-10-10T22:43:17.5446891Z 3: onednn_verbose,v1,primitive,exec,cpu,reorder,jit:uni,undef,src:f32::blocked:abcd::f0 dst:bf16::blocked:acdb::f0,,,1x16x512x256,2.4339
+2026-10-10T22:43:17.8560622Z 1/1 Test #3: native_span_blend_cpu ............***Exception: Illegal  0.39 sec
+2026-10-10T22:43:17.8575923Z
+2026-10-10T22:43:17.8576668Z 0% tests passed, 1 tests failed out of 1
+2026-10-10T22:43:17.8577279Z
+2026-10-10T22:43:17.8577575Z Total Test time (real) =   0.43 sec
+2026-10-10T22:43:17.8578024Z
+2026-10-10T22:43:17.8578330Z The following tests FAILED:
+2026-10-10T22:43:17.8578945Z 	  3 - native_span_blend_cpu (ILLEGAL)
+2026-10-10T22:43:17.8582789Z Errors while running CTest
+2026-10-10T22:43:17.8583627Z Output from these tests are in: D:/a/npu-render/npu-render/build/native/Testing/Temporary/LastTest.log
+2026-10-10T22:43:17.8584776Z Use "--rerun-failed --output-on-failure" to re-run the failed cases verbosely.
+2026-10-10T22:43:17.9159366Z UpdateCTestConfiguration  from :D:/a/npu-render/npu-render/build/native/DartConfiguration.tcl
+2026-10-10T22:43:17.9184779Z Parse Config file:D:/a/npu-render/npu-render/build/native/DartConfiguration.tcl
+2026-10-10T22:43:17.9187356Z Test project D:/a/npu-render/npu-render/build/native
+2026-10-10T22:43:17.9200379Z Constructing a list of tests
+2026-10-10T22:43:17.9203289Z Done constructing a list of tests
+2026-10-10T22:43:17.9204893Z Updating test list for fixtures
+2026-10-10T22:43:17.9206064Z Added 0 tests to meet fixture requirements
+2026-10-10T22:43:17.9206808Z Checking test dependency graph...
+2026-10-10T22:43:17.9207926Z Checking test dependency graph end
+2026-10-10T22:43:17.9208926Z test 3
+2026-10-10T22:43:17.9209466Z     Start 3: native_span_blend_cpu
+2026-10-10T22:43:17.9210047Z
+2026-10-10T22:43:17.9210577Z 3: Test command: D:\a\npu-render\npu-render\build\native\Release\nr_span_blend_test.exe "CPU"
+2026-10-10T22:43:17.9211384Z 3: Working Directory: D:/a/npu-render/npu-render/build/native
+2026-10-10T22:43:17.9212019Z 3: Test timeout computed to be: 1500
+2026-10-10T22:43:17.9675446Z 3: onednn_verbose,v1,info,oneDNN v3.10.2 (commit 6b6492b1ea9ef5ca9ff3c5c59ed71dcca683a446)
+2026-10-10T22:43:17.9677132Z 3: onednn_verbose,v1,info,cpu,runtime:threadpool,nthr:1
+2026-10-10T22:43:17.9677672Z 3: onednn_verbose,v1,info,cpu,isa:Intel AVX2
+2026-10-10T22:43:17.9678141Z 3: onednn_verbose,v1,info,gpu,runtime:none
+2026-10-10T22:43:17.9679161Z 3: onednn_verbose,v1,primitive,info,template:operation,engine,primitive,implementation,prop_kind,memory_descriptors,attributes,auxiliary,problem_desc,exec_time
+2026-10-10T22:43:17.9680546Z 3: onednn_verbose,v1,primitive,exec,cpu,reorder,jit:blk,undef,src:f32::blocked:abcd::f0 dst:f32::blocked:Acdb16a::f0,,,16x16x1x1,0.0127
+2026-10-10T22:43:18.1101658Z 3: onednn_verbose,v1,primitive,exec,cpu,reorder,jit:blk,undef,src:f32::blocked:acdb::f0 dst:f32::blocked:abcd::f0,,,1x16x512x256,3.309
+2026-10-10T22:43:18.1105450Z 3: onednn_verbose,v1,primitive,exec,cpu,reorder,jit:blk,undef,src:f32::blocked:acdb::f0 dst:f32::blocked:abcd::f0,,,1x16x512x256,3.2145
+2026-10-10T22:43:18.1106766Z 3: onednn_verbose,v1,primitive,exec,cpu,reorder,jit:blk,undef,src:f32::blocked:abcd::f0 dst:f32::blocked:acdb::f0,,,1x16x512x256,0.9133
+2026-10-10T22:43:18.1109075Z 3: onednn_verbose,v1,primitive,exec,cpu,convolution,brgconv_1x1:avx2,forward_inference,src:f32::blocked:acdb::f0 wei:f32:a:blocked:Acdb16a::f0 bia:undef::undef::: dst:f32::blocked:acdb::f0,attr-scratchpad:user attr-post-ops:eltwise_linear:1:1,alg:convolution_direct,mb1_ic16oc16_ih512oh512kh1sh1dh0ph0_iw256ow256kw1sw1dw0pw0,2.6511
+2026-10-10T22:43:18.1111328Z 3: onednn_verbose,v1,primitive,exec,cpu,reorder,jit:blk,undef,src:f32::blocked:acdb::f0 dst:f32::blocked:abcd::f0,,,1x16x512x256,1.1226
+2026-10-10T22:43:18.1112545Z 3: onednn_verbose,v1,primitive,exec,cpu,reorder,jit:blk,undef,src:f32::blocked:acdb::f0 dst:f32::blocked:abcd::f0,,,1x16x512x256,1.1617
+2026-10-10T22:43:18.1113708Z 3: onednn_verbose,v1,primitive,exec,cpu,reorder,jit:blk,undef,src:f32::blocked:abcd::f0 dst:f32::blocked:acdb::f0,,,1x16x512x256,0.718
+2026-10-10T22:43:18.1115737Z 3: onednn_verbose,v1,primitive,exec,cpu,convolution,brgconv_1x1:avx2,forward_inference,src:f32::blocked:acdb::f0 wei:f32:a:blocked:Acdb16a::f0 bia:undef::undef::: dst:f32::blocked:acdb::f0,attr-scratchpad:user attr-post-ops:eltwise_linear:1:1,alg:convolution_direct,mb1_ic16oc16_ih512oh512kh1sh1dh0ph0_iw256ow256kw1sw1dw0pw0,0.9803
+2026-10-10T22:43:18.1117744Z 3: onednn_verbose,v1,primitive,exec,cpu,reorder,jit:blk,undef,src:f32::blocked:acdb::f0 dst:f32::blocked:abcd::f0,,,1x16x512x256,1.0613
+2026-10-10T22:43:18.1118927Z 3: onednn_verbose,v1,primitive,exec,cpu,reorder,jit:blk,undef,src:f32::blocked:acdb::f0 dst:f32::blocked:abcd::f0,,,1x16x512x256,1.0942
+2026-10-10T22:43:18.1120075Z 3: onednn_verbose,v1,primitive,exec,cpu,reorder,jit:blk,undef,src:f32::blocked:abcd::f0 dst:f32::blocked:acdb::f0,,,1x16x512x256,0.6568
+2026-10-10T22:43:18.1122050Z 3: onednn_verbose,v1,primitive,exec,cpu,convolution,brgconv_1x1:avx2,forward_inference,src:f32::blocked:acdb::f0 wei:f32:a:blocked:Acdb16a::f0 bia:undef::undef::: dst:f32::blocked:acdb::f0,attr-scratchpad:user attr-post-ops:eltwise_linear:1:1,alg:convolution_direct,mb1_ic16oc16_ih512oh512kh1sh1dh0ph0_iw256ow256kw1sw1dw0pw0,0.9845
+2026-10-10T22:43:18.1124303Z 3: {"passed":true,"execution_device":"CPU","maximum_error":0,"dispatches":2}
+2026-10-10T22:43:18.1125017Z 1/1 Test #3: native_span_blend_cpu ............   Passed    0.15 sec
+2026-10-10T22:43:18.1125464Z
+2026-10-10T22:43:18.1125672Z The following tests passed:
+2026-10-10T22:43:18.1126125Z 	native_span_blend_cpu
+2026-10-10T22:43:18.1126393Z
+2026-10-10T22:43:18.1126600Z 100% tests passed out of 1
+2026-10-10T22:43:18.1126836Z
+2026-10-10T22:43:18.1127062Z Total Test time (real) =   0.16 sec
+2026-10-10T22:43:18.1127507Z {
+2026-10-10T22:43:18.1127878Z   "unrestricted_ctest_exit": 8,
+2026-10-10T22:43:18.1128316Z   "avx2_ctest_exit": 0,
+2026-10-10T22:43:18.1128734Z   "diagnostic_only": true
+2026-10-10T22:43:18.1129155Z }

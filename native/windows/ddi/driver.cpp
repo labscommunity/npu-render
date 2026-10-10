@@ -83,7 +83,7 @@ struct Blend {
     Blend(ov::Core &core, const std::string &device, UINT w, UINT h) {
         compiled =
             core.compile_model(blend_model(w, h, true, 4, "convolution"), device,
-                               ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY));
+                               blend_compile_properties(device));
         const auto executions = compiled.get_property(ov::execution_devices);
         require(executions.size() == 1 &&
                     (executions[0] == device || executions[0].rfind(device + ".", 0) == 0),

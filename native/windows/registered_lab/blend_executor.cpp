@@ -16,7 +16,7 @@ struct BlendExecutor::State {
         std::string execution_device;
         Model(ov::Core &core, const std::string &backend, uint32_t width, uint32_t height) {
             compiled = nr::provider::compile_model(core, blend_model(width, height, true, 4, "convolution"), backend,
-                {ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY)});
+                blend_compile_properties(backend));
             const auto devices = compiled.get_property(ov::execution_devices);
             if (devices.size() != 1 || !(devices[0] == backend || devices[0].rfind(backend + ".", 0) == 0))
                 throw std::runtime_error("unexpected composition execution device");
