@@ -1,0 +1,37 @@
+{
+  "trial": "v98",
+  "source_commit": "092487bc9f1aec0caab1e9908958b99753910294",
+  "umd_build": "present-umd-v189",
+  "package_version": "0.0.86.0",
+  "worker_successes_by_client": {
+    "42": 13,
+    "7616": 52,
+    "6428": 206,
+    "7860": 56
+  },
+  "acknowledged_successes_by_client": {
+    "42": 13,
+    "7616": 52,
+    "6428": 206,
+    "7860": 56
+  },
+  "acknowledged_failures": 0,
+  "received_frames": 5,
+  "full_desktop_offload": false,
+  "usable_interactive_desktop": false,
+  "tahoma_performance_tested": false,
+  "original_cleanup_passed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "guest_restart": false,
+  "findings": [
+    "327 successful NPU requests include 13 prewarm and 314 live desktop draws. All have relay acknowledgements; no worker draw rejection or device-loss error is recorded. The previous snapped-crop blocker is no longer observed.",
+    "Five 1024x768 frames arrive under the sole indirect display gate. Later frames show wallpaper, icons and the taskbar. Before-Start and after-Start snapshots are identical. No Start-menu appearance is verified, including later frames.",
+    "DWM twice binds a 102400-byte vertex buffer while mapped (stride 48, offset zero, valid context). The UMD rejects binding with E_INVALIDARG. Its observer stops on this event; later NPU draws still complete. Microsoft documents unexpected errors from this state-binding callback as critical, so moving mapped-memory validation to the existing draw-time checks is the next correctness investigation.",
+    "Live worker draw time totals 139174.960 ms; compilation plus draw time totals 277808 ms. This includes source-build CPU contention during part of the trial and is not an isolated performance or Tahoma comparison.",
+    "Both owned drivers unload cleanly and stream configuration is removed. Worker socket closure is normal shutdown. The VM returns to its normal display. Clears remain CPU-side in this installed build."
+  ],
+  "references": [
+    "https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3d10umddi/nc-d3d10umddi-pfnd3d10ddi_ia_setvertexbuffers"
+  ]
+}

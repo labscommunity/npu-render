@@ -113,21 +113,21 @@ now has an exact NPU specialization for opaque, one-to-one point-sampled quads.
 Its captured 1024×768 replay passes, as do changing-image and driver callback
 tests. This is a checked subset, not general desktop rendering.
 
-The [latest installed trial](docs/validation/2026-10-10/sole-display-v97/report.json)
-completes 298 live desktop NPU draws plus 13 prewarm requests and delivers four
-frames, including wallpaper, icons and a complete taskbar. Start-menu interaction
-exposes a valid textured rectangle rejected by an overly strict floating-point
-boundary check. Both CPU and NPU replay reproduce the failure. Both custom
-drivers unload cleanly and the normal VM desktop returns.
+The [latest installed trial](docs/validation/2026-10-10/sole-display-v98/report.json)
+completes 314 live desktop NPU draws plus 13 prewarm requests with no rejected
+worker requests. Five frames arrive, including wallpaper, icons and the complete
+taskbar. Start-menu interaction still has no verified visible response. DWM twice
+binds a mapped vertex buffer and our driver rejects the binding; this is the next
+correctness issue under investigation. Both custom drivers unload cleanly.
 
-The [next clean build](docs/validation/2026-10-10/point-snap-v189/report.json)
-retains exact snapped raster boundaries while allowing bounded FP32 endpoint
-rounding. The captured 642×660 draw now matches all 423,720 pixels on the NPU.
-All 23 CPU suites, 3,520,832 NPU point-draw components and 58 driver draws pass.
-Installed desktop/input validation is next. A separate
+The [snapped-boundary fix](docs/validation/2026-10-10/point-snap-v189/report.json)
+retains exact raster boundaries while allowing bounded FP32 endpoint rounding.
+Its captured 642×660 draw matches all 423,720 pixels on the NPU. All 23 CPU suites,
+3,520,832 NPU point-draw components and 58 driver draws pass. A separate
 [NPU clear graph](docs/validation/2026-10-10/clear-graph-v192/report.json) passes
-151 million color components but is not yet integrated; driver clears still use
-the CPU. Stable interactive desktop offload and a Tahoma benefit remain unproven.
+151 million color components; its driver integration is under validation. Clears
+in the installed v98 build still use the CPU. Stable interactive desktop offload
+and a Tahoma benefit remain unproven.
 
 [Mirrored-texture qualification](docs/validation/2026-10-10/mirror-v174/report.json)
 now replays that failed DWM blur draw on the NPU with all 8,192 output pixels
