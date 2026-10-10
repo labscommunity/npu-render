@@ -1,0 +1,143 @@
+{
+  "schema": 1,
+  "kind": "registered-graphics-physical-npu-window-delivery",
+  "date_utc": "2026-10-10",
+  "package": "v43-npu-exchange",
+  "driver_version": "0.0.32.0",
+  "source_revisions": {
+    "kernel": "2e3eaf1c76680ea28b23ac8e61c6ca052fac4272",
+    "registered_driver_and_worker": "bcda269d242bb71b7ff798311d2db891db219c0b",
+    "guest_launcher_fix": "21c456941a271466807ac701a533d5f0f8bd8ec1",
+    "controller_process_fix": "25d321b3543994d49e600adb1094f6c30bd11cd8"
+  },
+  "result": "three-remote-npu-draws-delivered-and-screen-verified",
+  "install": {
+    "action": "install",
+    "pid": 2176,
+    "started": "2026-10-10T00:59:50.4776330Z",
+    "identity": "NT AUTHORITY\\SYSTEM",
+    "completed": true,
+    "script_succeeded": true,
+    "child_exit": 0,
+    "finished": "2026-10-10T01:00:52.1324290Z"
+  },
+  "controller": {
+    "schema": 1,
+    "started": "2026-10-10T01:08:45.9523383Z",
+    "finished": "2026-10-10T01:10:35.6900604Z",
+    "job_id": "22f08dc25c554f8a963fe36e452e8bab",
+    "passed": true,
+    "failure": null,
+    "frames": [
+      {
+        "sequence": 1,
+        "worker_started": "2026-10-10T01:09:55.3378344Z",
+        "reply_published": "2026-10-10T01:09:56.9315398Z",
+        "exit_code": 0,
+        "execution_device": "NPU",
+        "request_sha256": "4EDF39CA2D6EED5970506759CB51B3460BF7075B9B83CEB1FC884A4E4A90E4DF",
+        "reply_sha256": "7965074BAF566A3E9238B076B12C1F1906E1AC1C2B3BA4A5683AD56B9C41C4AD"
+      },
+      {
+        "sequence": 2,
+        "worker_started": "2026-10-10T01:10:12.3551681Z",
+        "reply_published": "2026-10-10T01:10:13.6466116Z",
+        "exit_code": 0,
+        "execution_device": "NPU",
+        "request_sha256": "5BB43312279949EA836473899D50400BB7C59A7FF966C71DDCE6FFE949EDD062",
+        "reply_sha256": "14DDAE19363FEDA9B416D87DA9216B4C3F9C08DBD2044F4D5035D109345D576A"
+      },
+      {
+        "sequence": 3,
+        "worker_started": "2026-10-10T01:10:28.8497156Z",
+        "reply_published": "2026-10-10T01:10:30.1546249Z",
+        "exit_code": 0,
+        "execution_device": "NPU",
+        "request_sha256": "4B484A8018052EB9F66BD98FB28506A9571AEBAD91CE49806AE67164A8FE8B8A",
+        "reply_sha256": "52F4C57EA7D4413D9F16714BAC257CFCAC99C8016BE965C155927A0CAA24102F"
+      }
+    ],
+    "worker_sha256": "D8DD4F7C745704BF4E81EA3CD21952CDD48E41F40871D3E1FEDFE5370DCADCAD",
+    "remote_npu_execution_tested": true,
+    "local_npu_execution_tested": false,
+    "desktop_offload_tested": false,
+    "performance_tested": false,
+    "transport": "authenticated WinRM file copies"
+  },
+  "probe_exit": {
+    "started": "2026-10-10T01:09:26.5951090Z",
+    "finished": "2026-10-10T01:10:32.4037740Z",
+    "probe_sha256": "1FA04E83B1ACFBECFFB1D5ABB3EB5DE4100A73E60C7D0C3EA2C1735E3BC660A5",
+    "exit_code": 0,
+    "local_npu_execution_tested": false,
+    "desktop_offload_tested": false
+  },
+  "frames": [
+    {
+      "presented_pass": 0,
+      "verified_rgb_bytes": 184320,
+      "screen_delivery_verified": true,
+      "shader_draw": true,
+      "byte_tolerance": 1,
+      "dwm_migrated": false
+    },
+    {
+      "presented_pass": 1,
+      "verified_rgb_bytes": 184320,
+      "screen_delivery_verified": true,
+      "shader_draw": true,
+      "byte_tolerance": 1,
+      "dwm_migrated": false
+    },
+    {
+      "presented_pass": 2,
+      "verified_rgb_bytes": 184320,
+      "screen_delivery_verified": true,
+      "shader_draw": true,
+      "byte_tolerance": 1,
+      "dwm_migrated": false
+    }
+  ],
+  "execution": {
+    "draws": 3,
+    "executions": 3,
+    "cpu_executions": 0,
+    "gpu_executions": 0,
+    "npu_executions": 0,
+    "execution_device": "NPU (remote lab)",
+    "inference_input_bytes": 1474560,
+    "inference_output_bytes": 737280
+  },
+  "resources": {
+    "pid": 5748,
+    "allocations": 2,
+    "fills": 3,
+    "staging_copy_bytes": 0,
+    "live_allocations": 0,
+    "live_contexts": 0,
+    "cleanup_errors": 0,
+    "rejected": 0,
+    "submitted_copies": 0,
+    "upload_bytes": 1474560
+  },
+  "verified_rgb_bytes": 552960,
+  "local_cpu_draw_executions": 0,
+  "local_gpu_draw_executions": 0,
+  "local_npu_draw_executions": 0,
+  "remote_npu_draw_executions": 3,
+  "successful_kernel_cpu_clear_fences": 4,
+  "successful_kernel_cpu_present_fences": 3,
+  "mapped_pages_after_tests": 0,
+  "adapter_removed_at_capture": false,
+  "desktop_offload_tested": false,
+  "tahoma_benefit_tested": false,
+  "performance_tested": false,
+  "notes": [
+    "The normal Windows-registered adapter and actual UMD draw callback supplied the physical NPU request inputs. The VM has no local NPU. A finite controller copied the request and reply through an existing authenticated WinRM session; there is no new network listener.",
+    "Each request/reply header carries matching dimensions, sequence and random identity. Local/remote transfer hashes match. The physical worker hardcodes OpenVINO NPU, verifies execution_devices and reports success; the guest independently verifies pixels captured from the presented screen rectangle.",
+    "CPU resource uploads, kernel clear/present copies, management transport and original-adapter display/DWM work remain. Zero CPU/GPU draw-provider executions does not mean zero CPU/GPU system activity. This deliberately slow finite transport is not a benchmark or production display mode.",
+    "Two earlier attempts are preserved. The first launcher used the hardware ID as an instance-ID prefix and never launched the probe: Windows names the actual instance ROOT\\DISPLAY\\0000. The second reached physical NPU execution, but Start-Process/WaitForExit yielded a null exit code in the controller, so no response was published. The guest timed out with no accepted draws, no presents, no fallback and no leaks. System.Diagnostics.Process now retains the process handle and reads the exit code before disposal.",
+    "The seven completed kernel CPU-worker fences comprise one clear preceding the timeout and six operations for the successful three-frame run. The successful probe released all contexts and allocations. The adapter intentionally remains installed for the next isolated DWM selection test; this capture does not claim driver removal.",
+    "Full Windows desktop migration, general shader support, native local NPU adapter integration and Tahoma benefit remain outstanding."
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "started": "2026-10-10T00:57:23.532491+00:00",
+  "finished": "2026-10-10T00:57:24.136526+00:00",
+  "passed": true,
+  "worker_sha256": "d8dd4f7c745704bf4e81ea3cd21952cdd48e41f40871d3e1fedfe5370dcadcad",
+  "cases": [
+    {
+      "case": "valid",
+      "exit_code": 0,
+      "reply_exists": true,
+      "verified_bytes": 245760,
+      "max_error": 1,
+      "execution_device": "NPU"
+    },
+    {
+      "case": "truncated",
+      "exit_code": 1,
+      "reply_exists": false
+    },
+    {
+      "case": "trailing",
+      "exit_code": 1,
+      "reply_exists": false
+    },
+    {
+      "case": "cpu-device",
+      "exit_code": 1,
+      "reply_exists": false
+    },
+    {
+      "case": "oversized",
+      "exit_code": 1,
+      "reply_exists": false
+    }
+  ],
+  "npu_execution_tested": true,
+  "registered_adapter_tested": false,
+  "desktop_offload_tested": false
+}
