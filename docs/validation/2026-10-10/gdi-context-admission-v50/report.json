@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "kind": "gdi-context-desktop-admission-followup",
+  "desktop_offload_tested": false,
+  "npu_execution_tested": false,
+  "performance_tested": false,
+  "v50_context_failures": 6,
+  "v49b_context_failures": 6,
+  "v50_trace_events": 327074,
+  "v50_trace_events_lost": 0,
+  "v50_extend_status": 0,
+  "v50_indirect_active": false,
+  "v50c_sole_display_apply_status": 31,
+  "v50c_restore_status": 0,
+  "clean_removal": true,
+  "next_implementation": "gdi-context-v1",
+  "notes": [
+    "Leaving RenderKm null removes an unsupported capability advertisement but did not stop CDD requesting GDI contexts. The six CreateContext failures remain; this disproves the callback-presence-only admission hypothesis.",
+    "The sole-display attempt validates but applying returns ERROR_GEN_FAILURE. Original paths are verified after restoration.",
+    "The subsequent context implementation allocates and owns GDI state, advertises the documented allocation-list capacity, and shares validated presentation copies. It rejects the private UMD render format for GDI contexts and still does not advertise RenderKm.",
+    "Aperture tests check normal and GDI context copies through patch, submission, completion and every destination byte. Default tests also verify allocation failure, mixed flags, lifetime and command rejection. Both configurations pass.",
+    "The context implementation has not yet completed a live desktop admission test in this evidence set.",
+    "Text copies normalize CRLF to LF. Raw captures, ETL and full decoded traces are retained in local results."
+  ],
+  "references": [
+    "https://learn.microsoft.com/en-us/windows-hardware/drivers/display/initialization-and-dma-buffer-creation",
+    "https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/nc-d3dkmddi-dxgkddi_createcontext",
+    "https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmddi/ns-d3dkmddi-_dxgk_createcontextflags"
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "triage_counts": {
+    "Adapter AddDevice has completed with status %1": 2,
+    "Driver returned an invalid NTSTATUS code: 0x%I64x": 64,
+    "GPU virtualization initialization has completed with status %1": 2,
+    "The selected adapter is display only adapter": 2,
+    "Adapter StartDevice has completed with status %1": 2,
+    "Cannot find the file version resource in DxgkpGetFileVersion (ntStatus = %I64d).": 4,
+    "DdiCreateContext() failed with status 0x%I64x": 6,
+    "Failed to get preferred mode from monitor EDID or DisplayID on adapter 0x%I64x, target 0x%I64x (status = 0x%I64x)": 4,
+    "Failed to reference adapter by LUID (0x%I64x%08I64x) in DxgkIsAdapterVirtualTopologyEnabled function.": 30
+  },
+  "gdi_context_events": 12,
+  "dwm_adapters": [
+    {
+      "displayAdapterLuid": "0x5C66",
+      "renderAdapterLuid": "0x5C66",
+      "vidPnSourceId": 0,
+      "vidPnTargetId": 0,
+      "uniqueId": 1,
+      "surfaceLuid": "0x38E652",
+      "bindId": 1,
+      "presentCount": 0,
+      "flipRect": [
+        {
+          "left": 753,
+          "top": 1,
+          "right": 866,
+          "bottom": 15
+        }
+      ],
+      "meta": {
+        "provider": "Microsoft-Windows-Dwm-Core",
+        "event": "468v0",
+        "time": "2026-10-09T21:01:19.324",
+        "cpu": 2,
+        "pid": 1068,
+        "tid": 1168,
+        "channel": "Microsoft-Windows-Dwm-Core/Diagnostic",
+        "level": "Information ",
+        "task": "Dx_Flip_Consumed",
+        "keywords": "Composition"
+      }
+    }
+  ]
+}
