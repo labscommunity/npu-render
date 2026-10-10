@@ -278,6 +278,20 @@ found while implementing this shader. The failure logs and smaller reproductions
 are preserved alongside the passing run. A CPU graph's lighting result differs
 from the sequential reference; it is not used as an NPU fallback.
 
+Adding DP2 completes the tested set of nine vertex streams embedded in this
+`dwmcore.dll`: [36 NPU runs check 223,232 components exactly](../../../docs/validation/2026-10-10/compositor-vertex-inventory-v39/qualification.json).
+This static inventory is not an exhaustive desktop/application shader list.
+In the [v56 live run](../../../docs/validation/2026-10-10/vertex-inventory-admission-v56/report.json),
+DWM creates eight vertex variants and reaches its first pixel shader.
+
+Vertex and pixel arithmetic share `RegisterExecutor`, with stage-specific
+declarations and retained pixel interpolation metadata. The
+[v40 NPU check](../../../docs/validation/2026-10-10/pixel-stage-npu-v40/report.json)
+executes that captured 18-word pixel program and checks 4,096 output components
+exactly. Authored pixel arithmetic and bound shader lifetime also pass. Input
+values are supplied to the pixel stage; interpolation and rasterization are
+not performed by these tests. Texture declarations/sampling remain unsupported.
+
 OpenVINO 2026.1 requires serialized legacy precision metadata plus the accuracy
 hint to preserve the tested FP32 arithmetic. Indexed reads gather from an appended
 zero row for out-of-range constants. Bit-preserving MOV/modifier outputs use NPU
@@ -296,7 +310,7 @@ RGBA8 UNORM, including offsets, strides and missing-component defaults. Instanci
 and out-of-range vertex fetch remain unsupported. This prepares shader inputs;
 it does not perform rasterization.
 
-Generic draw execution still requires rasterization, pixel shading and complete
+Generic draw execution still requires rasterization, texture sampling and complete
 pipeline integration. The existing exact fullscreen composition path remains the
 only supported Draw path. The indirect desktop activates, but no DWM swapchain
 or desktop frames have been delivered. Windows also rejects a later CDD allocation;
