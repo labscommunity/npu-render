@@ -113,13 +113,13 @@ now has an exact NPU specialization for opaque, one-to-one point-sampled quads.
 Its captured 1024×768 replay passes, as do changing-image and driver callback
 tests. This is a checked subset, not general desktop rendering.
 
-The [latest installed trial](docs/validation/2026-10-11/sole-display-v104/report.json)
-completes 375 live desktop NPU draws, 77 live NPU clears and 13 prewarm draws.
-Three frames arrive while the indirect display is the sole active path, showing
-wallpaper, icons and taskbar. Start still has no verified visible response, and
-Windows records an Explorer hang during the attempt. After both custom drivers
-unload, the same input visibly opens Start on the ordinary VM display. No CPU
-build overlaps this trial.
+The [latest installed trial](docs/validation/2026-10-11/sole-display-v105/report.json)
+completes 303 live desktop NPU draws, 54 live NPU clears and 17 prewarm draws.
+Four frames arrive while the indirect display is the sole active path. The last
+visibly contains Start, but arrives 225 seconds after the Windows key and after
+Escape was already sent. Closing Start and usable interaction remain unverified.
+A new three-texture shader fails Intel compilation and triggers cleanup; both
+custom drivers unload successfully. No CPU build overlaps this trial.
 
 The [three-texture fix](docs/validation/2026-10-11/three-texture-v199/report.json)
 selects a qualified batch size for that exact captured shader. The unchanged

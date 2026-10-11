@@ -1,0 +1,47 @@
+{
+  "trial": "v105",
+  "source_commit": "aca204c842fbda0b440236366df66b21c6dd788c",
+  "umd_build": "present-umd-v203",
+  "package_version": "0.0.93.0",
+  "worker_successes_by_client": {
+    "42": 17,
+    "2932": 47,
+    "5112": 254,
+    "3012": 56
+  },
+  "worker_successes_by_operation": {
+    "draw": 320,
+    "color_clear": 54
+  },
+  "acknowledged_successes_by_client": {
+    "42": 17,
+    "2932": 47,
+    "5112": 254,
+    "3012": 56
+  },
+  "acknowledged_failures": 1,
+  "received_frames": 4,
+  "sole_indirect_received_frames": 4,
+  "live_draw_ms": 188693.298,
+  "live_compile_and_draw_ms": 276395,
+  "full_desktop_offload": false,
+  "usable_interactive_desktop": false,
+  "tahoma_performance_tested": false,
+  "original_cleanup_passed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "concurrent_cpu_build": false,
+  "archive_entries_verified": 35,
+  "visually_verified_start_visible": true,
+  "visually_verified_escape_response": false,
+  "findings": [
+    "374 successful NPU requests comprise 17 prewarm draws, 303 live draws and 54 live clears. All successful completions have relay acknowledgements. One additional request fails compilation and receives a failure acknowledgement.",
+    "Four 1024x768 frames arrive while the indirect display is the sole active path. The fourth visibly contains the Start menu. It arrives at 01:59:37.269067 UTC, 225.432 seconds after the Windows key and 25.211 seconds after Escape. This verifies a received Start image, not responsive input or a completed open/close interaction. The automated input report deliberately does not infer visual success from changed bytes.",
+    "The earlier third frame shows wallpaper and desktop icons. The fourth also shows a correctly repositioned taskbar. The ordinary display had been 1280x800 before switching to 1024x768, so resizing remains a confounding source of work.",
+    "DWM sequence 163 performs 11,533 NPU requests over 1,679 raster batches and takes 55.477 seconds of draw time. Its total including construction is 56.672 seconds. Small device submissions remain a major performance target.",
+    "DWM sequence 227 fails Intel NPU compilation with an unresolved NHWC materialization at 4096 lanes. The preserved original capture contains a new exact 1041-word three-texture shader, SHA256 39799859d6531970077cbe235484fb7164778b325f8f58e3b8d6774351baf0b3. It is not the previously capped 1061-word variant.",
+    "The observer stops on the recorded DWM rejection after 296663 ms. Topology restoration takes 10893 ms; both custom drivers and stream configuration are removed successfully. Worker exit 1 follows stream socket closure. Explorer also records later driver rejection status 88760870; successful frame receipt does not establish complete application health.",
+    "Live draw_ms sums to 188693.298 and compile_and_draw_ms to 276395. These sums use a different request mix than v104 and cannot establish an overall performance comparison.",
+    "Windows processes run in the disposable VM; the physical Panther Lake NPU performs accepted rendering operations. Frame presentation uses the Mac SDL viewer. Physical Delta scanout, general application coverage, full desktop offload and Tahoma benefit remain unverified."
+  ]
+}
