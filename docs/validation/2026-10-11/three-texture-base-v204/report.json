@@ -1,0 +1,29 @@
+{
+  "build": "present-umd-v204",
+  "source_base": "46e260fc77af6f49ec89f7e63c55ccf896de194f",
+  "clean_cpu_suites": 24,
+  "cpu_test_seconds": 183.99,
+  "source_files_verified": 116,
+  "binary_files_verified": 30,
+  "original_capture_sha256": "2bd0001ec19439a2ba859d28429ca68fdc020e0751ad91a1e7953881911f3a07",
+  "shader_sha256": "39799859d6531970077cbe235484fb7164778b325f8f58e3b8d6774351baf0b3",
+  "captured_shader_words": 1041,
+  "capture_covered_samples": 425023,
+  "capture_raster_batches": 1679,
+  "native_npu_execution": true,
+  "native_npu_driver_draws": 58,
+  "native_npu_driver_clears": 8,
+  "cpu_npu_pixels_exact": false,
+  "maximum_cpu_npu_byte_difference": 1,
+  "differing_components": 684,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "findings": [
+    "The complete exact captured 1041-word three-texture program now selects a 512-lane internal capacity. It is the six-constant-row variant without the fade calculation, distinct from the previously qualified eight-row 1061-word shader. No broad word-count heuristic is used.",
+    "Twelve scalar-oracle sampling scenarios cover point and linear filters, out-of-range clamp coordinates and varying constants. All pass on CPU and NPU with a 1e-5 float tolerance. The existing 1061-word tests remain intact.",
+    "The unchanged failed capture passes the independent full coverage and color oracles on CPU and NPU. Coverage is425023 samples; the complete786432-pixel outputs differ in684 components, all by at most one byte.",
+    "The NPU replay takes54.076seconds of draw time, including39.595seconds in shading and interpolation,10.079seconds in coverage and4.112seconds in blending. Resolving compilation does not establish usable desktop speed.",
+    "All24 clean CPU suites, seven NPU regression executables,58 native driver draws and8 clears pass. The installed desktop experiment remains pending.",
+    "The priorv105 trial restores the ordinary1280x800 desktop, visually checked after a Control-key wake. The first screenshot was black while idle and is retained in ignored evidence. The VM ordinary display enumerates only1280x800, so1024x768 matching-mode preparation fails. No registry mode is changed; the corrected helper restores the original mode successfully. Future resolution matching requires a compatible display mode, not pretending the failed preparation succeeded."
+  ]
+}

@@ -84,10 +84,11 @@ void captured(const std::string &backend,bool desktop_shapes=false,bool fade=fal
   }
  }
 }
-void three_textures(const std::string &backend){
- const auto &words=nr::registered_lab::test_fixture::compositor_three_texture_pixel_words;
- const auto program=parse_pixel(words,std::size(words));
- TEST(program.constants[0]==8 && program.inputs[4]==15 && program.textures[2] && RegisterExecutor::maximum_batch(program)==512);
+void three_textures(const std::string &backend,bool fade=true){
+ using namespace nr::registered_lab::test_fixture;
+ const auto program=fade?parse_pixel(compositor_three_texture_pixel_words,std::size(compositor_three_texture_pixel_words)):
+  parse_pixel(compositor_three_texture_base_pixel_words,std::size(compositor_three_texture_base_pixel_words));
+ TEST(program.constants[0]==(fade?8u:6u) && program.inputs[4]==15 && program.textures[2] && RegisterExecutor::maximum_batch(program)==512);
  bool rejected=false;try{PixelExecutor oversized(program,1024,backend);}catch(const std::invalid_argument &){rejected=true;}TEST(rejected);
  TextureShapes shapes{};TextureSamplers samplers{};TexturePixels textures{};
  for(unsigned slot=0;slot<3;++slot){
@@ -111,14 +112,17 @@ void three_textures(const std::string &backend){
   for(unsigned slot=0;slot<3;++slot)samplers[slot].filter=filter;
   PixelExecutor executor(program,uint32_t(inputs.size()),backend,shapes,samplers);
   for(unsigned scenario=0;scenario<6;++scenario){
-   VertexConstants cb;cb[0].resize(8);std::memcpy(cb[0].data(),captured_constants,sizeof(captured_constants));
+   VertexConstants cb;cb[0].resize(fade?8:6);
+   if(fade)std::memcpy(cb[0].data(),captured_constants,sizeof(captured_constants));
+   else{cb[0][0]=std::array<uint32_t,4>{1062996279,1062996279,1062996279,1063708391};
+    cb[0][1]={0,0,0,0};for(unsigned n=2;n<6;++n)std::memcpy(cb[0][n].data(),captured_constants[n+2],16);}
    if(scenario)for(unsigned c=0;c<4;++c){cb[0][0][c]=as_bits(float(scenario-1)/4);cb[0][1][c]=as_bits(float(5-scenario)/4);}
    const auto result=executor.execute(inputs,cb,textures);TEST(result.execution_device.rfind(backend,0)==0);float maximum=0;
    for(unsigned n=0;n<inputs.size();++n){const auto expected=reference_vertex(program,inputs[n],cb,shapes,samplers,textures);
     for(unsigned c=0;c<4;++c){const auto actual=as_float(result.vertices[n][0][c]),want=as_float(expected[0][c]);
      maximum=(std::max)(maximum,std::abs(actual-want));TEST(std::isfinite(actual) && std::isfinite(want) && std::abs(actual-want)<=1e-5f);}}
-   std::printf("{\"captured_shader_words\":1061,\"textures\":3,\"batch\":512,\"filter\":%u,\"scenario\":%u,\"verified_components\":2048,\"maximum_error\":%.9g,\"execution_device\":\"%s\"}\n",
-    unsigned(filter),scenario,double(maximum),backend.c_str());std::fflush(stdout);
+   std::printf("{\"captured_shader_words\":%u,\"textures\":3,\"batch\":512,\"filter\":%u,\"scenario\":%u,\"verified_components\":2048,\"maximum_error\":%.9g,\"execution_device\":\"%s\"}\n",
+    unsigned(program.bytecode.size()),unsigned(filter),scenario,double(maximum),backend.c_str());std::fflush(stdout);
   }
  }
 }
@@ -127,5 +131,6 @@ int main(int argc,char **argv)try{TEST(argc<=3);const std::string backend=argc>=
  if(section=="all" || section=="arithmetic")arithmetic(backend);if(section=="all" || section=="captured")captured(backend);
  if(section=="all" || section=="desktop")captured(backend,true);
  if(section=="all" || section=="fade")captured(backend,true,true);
- if(section=="all" || section=="three")three_textures(backend);return 0;
+ if(section=="all" || section=="three")three_textures(backend);
+ if(section=="all" || section=="three-base")three_textures(backend,false);return 0;
 }catch(const std::exception&e){std::fprintf(stderr,"compositor test: %s\n",e.what());return 1;}

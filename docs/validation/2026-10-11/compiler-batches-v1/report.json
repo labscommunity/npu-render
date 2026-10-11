@@ -1,0 +1,28 @@
+{
+  "source_base": "aca204c842fbda0b440236366df66b21c6dd788c",
+  "old_runtime": "2026.1.0.21367",
+  "candidate_runtime": "2026.4.1.22982",
+  "driver": "32.0.100.5540",
+  "cpu_passed": 24,
+  "old_runtime_npu_passed": 3,
+  "old_runtime_npu_compiler_rejections": 9,
+  "candidate_precompilation_precision_rejections": 12,
+  "production_policy_changed": false,
+  "desktop_offload_tested": false,
+  "findings": [
+    "The standalone probe preserves parsed shader operations while clearing only the bytecode identity that selects the shipping 512-lane cap. It tests 988-, 1008- and 1061-word captured shaders at 512, 1024, 2048 and 4096 lanes, with both point and linear sampling and six constant/coordinate scenarios. Every output component is compared to an independent scalar shader interpreter.",
+    "Both runtimes pass all 12 CPU cases. The old runtime passes all three 512-lane NPU cases, but rejects every larger NPU batch during Intel compiler layout legalization. These are actual compilation attempts, not policy rejections.",
+    "The candidate runtime rejects all 12 NPU attempts before compilation because precise_0 does not survive the existing round-trip assertion. Therefore no candidate NPU batch compilation or arithmetic result is established. A compatibility investigation is required; removing the assertion alone would not qualify precision.",
+    "The candidate is isolated under toolchains/openvino-2026.4.1. The baseline environment and physical driver are unchanged. No live desktop stream or CPU build overlaps the comparison."
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/openvinotoolkit/openvino/blob/2026.4.1/src/common/transformations/src/transformations/fp16_compression/convert_legacy_precision_attribute.cpp",
+      "finding": "Subsequent source inspection shows IR normalization migrates the legacy marker to DisablePrecisionConversion; the original key-presence assertion does not recognize this migration."
+    },
+    {
+      "url": "https://github.com/openvinotoolkit/openvino/blob/2026.4.1/src/common/transformations/src/transformations/rt_info/disable_precision_conversion.cpp",
+      "finding": "The replacement attribute visits a value string representing its source-to-target map, allowing independent inspection through public runtime attribute visitors."
+    }
+  ]
+}

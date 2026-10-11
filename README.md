@@ -128,6 +128,12 @@ differ in 684 components by at most one byte. All 24 CPU suites and native NPU
 regressions pass. The draw still takes about 55 seconds, so resolving compilation
 does not establish usable interaction.
 
+The [unfaded three-texture fix](docs/validation/2026-10-11/three-texture-base-v204/report.json)
+handles the newly captured 1041-word variant with the same exact-bytecode batch
+policy. Its full failed draw now passes CPU and NPU coverage and color oracles,
+with at most one byte of output difference. All CPU suites and NPU regressions
+pass; the NPU draw still takes 54 seconds.
+
 The [blur capacity change](docs/validation/2026-10-11/tap-capacity-v201/report.json)
 reduces two captured requests from 22.8 to 3.7 seconds and from 11.5 to 1.9 seconds
 in repeated NPU execution, preserving every output pixel. It sizes the exact
