@@ -1,0 +1,54 @@
+{
+  "trial": "v106",
+  "source_commit": "e2fa69e59bafba7ebf257806d62d5eeb1329e999",
+  "host_worker_build": "present-umd-v209",
+  "guest_umd_build": "present-umd-v209-legacy",
+  "package_version": "0.0.94.0",
+  "worker_successes_by_client": {
+    "42": 17,
+    "5548": 70,
+    "1072": 204,
+    "5632": 58
+  },
+  "worker_successes_by_operation": {
+    "draw": 301,
+    "color_clear": 48
+  },
+  "acknowledged_successes_by_client": {
+    "42": 17,
+    "5548": 70,
+    "1072": 204,
+    "5632": 58
+  },
+  "acknowledged_failures": 0,
+  "received_frames": 2,
+  "sole_indirect_received_frames": 2,
+  "live_draw_ms": 103821.428,
+  "live_compile_and_draw_ms": 449749,
+  "live_compile_calls": 1002,
+  "live_cache_hits": 861,
+  "live_cache_misses": 141,
+  "requests_with_cache_misses": 89,
+  "requests_with_cache_misses_total_ms": 358754,
+  "full_desktop_offload": false,
+  "usable_interactive_desktop": false,
+  "tahoma_performance_tested": false,
+  "original_cleanup_passed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "concurrent_cpu_build": false,
+  "archive_entries_verified": 34,
+  "visually_verified_start_visible": false,
+  "visually_verified_escape_response": false,
+  "findings": [
+    "349 successful NPU requests comprise 17 prewarm draws, 284 live draws and 48 live clears. The worker records no rendering failure. All successful completions have relay acknowledgements.",
+    "Two 1024x768 frames arrive while the indirect display is the sole active path. Both show the desktop, without Start. The Windows key is sent at 04:53:30.556482 UTC, after the first frame. No subsequent test action is sent because the visual Start gate is never satisfied.",
+    "The second frame arrives at 04:56:21.779643 UTC. It shows the correctly sized wallpaper, icons and taskbar but no Start panel. The first frame contains a mode-transition layout. The ordinary display was 1280x800 before switching to 1024x768.",
+    "The observer completes its bounded 450146 ms observation. Both custom drivers and the stream configuration are removed successfully. Worker exit 1 reports stream socket closure. DWM and Explorer record final driver rejection status 88760870 with incomplete captures; their position at the ends of the traces is consistent with teardown, but the traces do not establish exact rejection times. No complete failed-draw capture is recorded.",
+    "Live compile_and_draw_ms sums to 449749, while draw_ms sums to 103821.428. Approximately 345928 ms lies outside the inner draw timer. This includes graph construction and model loading/compilation; it is not a direct isolated compiler measurement. Deferred blur compilation can also occur inside draw_ms.",
+    "The live stream makes 1002 model compile calls, with 861 cache hits and 141 misses. The 89 requests having any miss account for 358754 ms of total processing. That sum includes their drawing and cache hits too, so it cannot be attributed entirely to cache misses. A repeat using the populated cache is the next controlled observation.",
+    "DWM sequence 185 takes 29000 ms total and 1195.623 ms within drawing, with five of six model calls hitting cache. Sequence 165 completes the larger three-texture draw in 9293.917 ms of drawing and 10875 ms total. This does not establish an overall performance improvement against earlier trials, whose request mixes differ.",
+    "After restoring the ordinary display and waking it with Control, Start is visually present. This confirms that the key reached Windows but does not establish that the NPU path displayed its response. Escape closes Start before the next trial.",
+    "Windows processes run in the disposable VM; the physical Panther Lake NPU performs accepted rendering operations. Frame presentation uses the Mac SDL viewer. Physical Delta scanout, general application coverage, full desktop offload and Tahoma benefit remain unverified."
+  ]
+}

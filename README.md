@@ -113,13 +113,16 @@ now has an exact NPU specialization for opaque, one-to-one point-sampled quads.
 Its captured 1024×768 replay passes, as do changing-image and driver callback
 tests. This is a checked subset, not general desktop rendering.
 
-The [latest installed trial](docs/validation/2026-10-11/sole-display-v105/report.json)
-completes 303 live desktop NPU draws, 54 live NPU clears and 17 prewarm draws.
-Four frames arrive while the indirect display is the sole active path. The last
-visibly contains Start, but arrives 225 seconds after the Windows key and after
-Escape was already sent. Closing Start and usable interaction remain unverified.
-A new three-texture shader fails Intel compilation and triggers cleanup; both
-custom drivers unload successfully. No CPU build overlaps this trial.
+The [latest installed trial](docs/validation/2026-10-11/sole-display-v106/report.json)
+completes 284 live desktop NPU draws, 48 live NPU clears and 17 prewarm draws.
+Two frames arrive while the indirect display is the sole active path, but neither
+shows Start after the Windows key. The bounded observation ends and both custom
+drivers unload successfully. The 332 live requests take about 450 seconds in
+aggregate; 346 seconds lies outside the inner draw timer. Of 1002 model compile
+calls, 141 miss the cache. Requests containing those misses account for 359
+seconds including their drawing time. A repeat with the populated cache is needed
+to separate first-use overhead from steady-state costs. No CPU build overlaps
+this trial. Full desktop offload and usable interaction remain unverified.
 
 The [three-texture fix](docs/validation/2026-10-11/three-texture-v199/report.json)
 selects a qualified batch size for that exact captured shader. The unchanged
