@@ -113,16 +113,18 @@ now has an exact NPU specialization for opaque, one-to-one point-sampled quads.
 Its captured 1024×768 replay passes, as do changing-image and driver callback
 tests. This is a checked subset, not general desktop rendering.
 
-The [latest installed trial](docs/validation/2026-10-11/sole-display-v106/report.json)
-completes 284 live desktop NPU draws, 48 live NPU clears and 17 prewarm draws.
-Two frames arrive while the indirect display is the sole active path, but neither
-shows Start after the Windows key. The bounded observation ends and both custom
-drivers unload successfully. The 332 live requests take about 450 seconds in
-aggregate; 346 seconds lies outside the inner draw timer. Of 1002 model compile
-calls, 141 miss the cache. Requests containing those misses account for 359
-seconds including their drawing time. A repeat with the populated cache is needed
-to separate first-use overhead from steady-state costs. No CPU build overlaps
-this trial. Full desktop offload and usable interaction remain unverified.
+The [latest installed trial](docs/validation/2026-10-11/sole-display-v107/report.json)
+repeats the qualified renderer with the cache populated by
+[v106](docs/validation/2026-10-11/sole-display-v106/report.json). It completes 387
+live desktop NPU draws, 82 live NPU clears and 17 prewarm draws. Nine frames
+arrive, six while the indirect display is the sole active path, but none of those
+six shows Start. Windows closes an unresponsive Explorer process during the
+trial. Both custom drivers unload successfully when the bounded observation ends.
+Of 1371 model compile calls, 1349 hit the cache; even the 452 requests without a
+miss take 192 seconds in aggregate, including 62 seconds of drawing. Warm disk
+caching alone does not establish usable interaction. Reuse of already-loaded
+models is the next experiment. No CPU build overlaps this trial. Full desktop
+offload remains unverified.
 
 The [three-texture fix](docs/validation/2026-10-11/three-texture-v199/report.json)
 selects a qualified batch size for that exact captured shader. The unchanged

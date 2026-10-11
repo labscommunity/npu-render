@@ -1,0 +1,59 @@
+{
+  "trial": "v107",
+  "source_commit": "e2fa69e59bafba7ebf257806d62d5eeb1329e999",
+  "host_worker_build": "present-umd-v209",
+  "guest_umd_build": "present-umd-v209-legacy",
+  "package_version": "0.0.95.0",
+  "worker_successes_by_client": {
+    "42": 17,
+    "1072": 323,
+    "5548": 26,
+    "5632": 1,
+    "3316": 55,
+    "4452": 64
+  },
+  "worker_successes_by_operation": {
+    "draw": 404,
+    "color_clear": 82
+  },
+  "acknowledged_successes_by_client": {
+    "42": 17,
+    "1072": 323,
+    "5548": 25,
+    "3316": 55,
+    "4452": 64
+  },
+  "acknowledged_failures": 0,
+  "client_departures_without_acknowledgement": 2,
+  "received_frames": 9,
+  "sole_indirect_received_frames": 6,
+  "live_draw_ms": 83364.005,
+  "live_compile_and_draw_ms": 384156,
+  "live_compile_calls": 1371,
+  "live_cache_hits": 1349,
+  "live_cache_misses": 22,
+  "requests_without_cache_misses": 452,
+  "requests_without_cache_misses_total_ms": 192314,
+  "requests_without_cache_misses_draw_ms": 61814.122,
+  "full_desktop_offload": false,
+  "usable_interactive_desktop": false,
+  "tahoma_performance_tested": false,
+  "original_cleanup_passed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "concurrent_cpu_build": false,
+  "archive_entries_verified": 36,
+  "visually_verified_start_visible": false,
+  "visually_verified_escape_response": false,
+  "findings": [
+    "This repeats the v106 renderer and populated model cache with a newly versioned package. The signed UMD and KMD bytes are identical to v106. The ordinary desktop is restored, awakened and visually checked; Escape closes the previously open Start panel before the trial.",
+    "486 successful NPU requests comprise 17 prewarm draws, 387 live draws and 82 live clears. No worker rendering failure is recorded. The relay acknowledges 484 successful requests; the old Explorer and Start-menu clients disconnect after provider responses, before acknowledging their last requests.",
+    "Nine frames arrive, with six received while the indirect display is the sole active path. All six sole-display images were visually inspected: they show the desktop without Start. The Windows key is sent at 05:12:10.693652 UTC. Explorer stops responding and Windows closes it at 05:12:33.1610669 UTC (Application event 1002). Explorer and Start-menu processes subsequently have new PIDs.",
+    "The input controller stops at 05:13:00 after its 15-second freshness gate expires. The topology history does not record a display restoration at that point; collection resumes with sole-display confirmation. No Escape is sent by this controller. After inspecting the restarted shell, a second Windows-key action is sent at 05:16:16.932710 UTC with a fresh sole-display gate. Later frames still show no Start panel.",
+    "The finite observer finishes after 450407 ms. Topology restoration takes 12 ms; both custom drivers and stream configuration are removed successfully. DWM and the new Explorer record final driver rejections near the ends of their traces; exact rejection timestamps are not present. The complete-failure capture watcher records no complete draw failure.",
+    "469 live requests take 384156 ms in aggregate, with 83364.005 ms inside draw timers. Of 1371 compile calls, 1349 hit the disk cache and 22 miss. The 452 requests with no cache miss still consume 192314 ms total, including 61814.122 ms of drawing. Graph construction and cached model import remain substantial; the outer-minus-inner difference does not isolate individual stages.",
+    "Several small 30-vertex compositor draws take 27 to 34 seconds including compilation but only 90 to 1180 ms of drawing. Their slow packets are preserved for replay. The 126-vertex three-texture draw completes in 9112.756 ms of drawing and 10609 ms total, with all six model calls hitting cache.",
+    "The request mix and shell lifetimes differ from v106, so frame counts and aggregate timings are not a controlled frame-rate benchmark. The repeat demonstrates that populating the disk cache does not by itself make the desktop usable.",
+    "Windows processes run in the disposable VM; the physical Panther Lake NPU performs accepted rendering operations. Frame presentation uses the Mac SDL viewer. Physical Delta scanout, general application coverage, full desktop offload and Tahoma benefit remain unverified."
+  ]
+}
