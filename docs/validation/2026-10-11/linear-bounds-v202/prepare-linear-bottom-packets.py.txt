@@ -1,0 +1,15 @@
+import hashlib,json,os,struct,sys
+from pathlib import Path
+root=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm'
+out=Path(sys.argv[1]);out.mkdir(exist_ok=False);records=[]
+fixtures=[('linear','v65-linear-warm-packet.bin','2d119277d53811dc52a6054d4b8db84569208e9b20901a5a5c11d53bd195a059'),('point','v73-modulated-point-warm-packet.bin','4d192ed55a6f565fdc0c0ae9a2745a6917739c00a0841defa4d66977302c3b9d')]
+for index,(filter_name,filename,digest) in enumerate(fixtures):
+ original=(root/filename).read_bytes();assert hashlib.sha256(original).hexdigest()==digest
+ h=struct.unpack_from('<3Q14I',original);assert len(original)==80+h[12] and h[14]==1 and h[15]==0 and not h[8]&4 and h[4:6]==(1024,768)
+ for kind,clip in enumerate(((7,754,39,765),(5,7,5,7))):
+  case=index*2+kind+1
+  for repeat in range(3):
+   sequence=case*10+repeat;data=bytearray(original[:104]+struct.pack('<4i',*clip)+original[104:]);struct.pack_into('<I',data,44,h[8]|4);struct.pack_into('<I',data,56,sequence);struct.pack_into('<I',data,60,h[12]+16)
+   name=f'request-{h[13]}-{h[1]:016x}{h[2]:016x}-{sequence}.bin';(out/name).write_bytes(data)
+   records.append({'case':case,'filter':filter_name,'clip':clip,'repeat':repeat,'client_pid':h[13],'sequence':sequence,'file':name,'source_sha256':digest,'derived_sha256':hashlib.sha256(data).hexdigest(),'modified_fields':['sequence','scissor-present flag','body length','inserted scissor'],'captured_small_draw':False})
+(out/'requests.json').write_text(json.dumps(records,indent=2)+'\n');print(json.dumps({'prepared_requests':len(records),'captured_base_packets':2,'synthetic_clipping_variants':4,'vertex_texture_and_background_bytes_unchanged':True}))

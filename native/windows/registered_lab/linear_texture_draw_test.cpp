@@ -25,7 +25,7 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
         const uint32_t format=swap?(sf==87?28u:87u):sf;
         PackedTexture source{sw,sh,sf,std::vector<PackedColor>(size_t(sw)*sh)};std::vector<PackedColor> bg(size_t(w)*h);
         LinearTextureDrawExecutor executor(vs,ps,w,h,format,sw,sh,sf,backend,blend,point?TextureFilter::point:TextureFilter::linear);
-        for(unsigned frame=0;frame<(desktop?6u:9u);++frame){
+        for(unsigned frame=0;frame<9;++frame){
             for(size_t n=0;n<source.pixels.size();++n){const auto alpha=frame==0?0u:frame==1?255u:unsigned((n*37+frame*17)%256);
                 for(unsigned c=0;c<4;++c)source.pixels[n][c]=uint8_t(c==3?alpha:(n*71+c*51+frame*19)%(alpha+1));}
             for(size_t n=0;n<bg.size();++n)for(unsigned c=0;c<4;++c)bg[n][c]=uint8_t((n*13+c*37+frame*31)%256);
@@ -40,7 +40,10 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
             for(size_t n=0;n<6;++n){const auto corner=orders[frame&1][n];const bool right=corner==1||corner==2,bottom=corner>=2;
                 inputs[n][0]={as_bits(rectangle[right?2:0]/(float(w)*.5f)-1),as_bits(1-rectangle[bottom?3:1]/(float(h)*.5f)),as_bits(.5f),as_bits(1.f)};
                 for(unsigned c=0;c<4;++c)inputs[n][1][c]=as_bits(color[c]);inputs[n][2]={as_bits(uv[right?2:0]),as_bits(uv[bottom?3:1]),0,0};}
-            const std::array<int32_t,4> clip=frame==2?std::array<int32_t,4>{5,7,int32_t(w)-9,int32_t(h)-11}:std::array<int32_t,4>{0,0,int32_t(w),int32_t(h)};
+            const std::array<int32_t,4> clip=desktop && frame==6?std::array<int32_t,4>{5,7,5,7}:
+                desktop && frame==7?std::array<int32_t,4>{0,int32_t(h)-3,int32_t(w),int32_t(h)}:
+                desktop && frame==8?std::array<int32_t,4>{0,9,int32_t(w),10}:
+                frame==2?std::array<int32_t,4>{5,7,int32_t(w)-9,int32_t(h)-11}:std::array<int32_t,4>{0,0,int32_t(w),int32_t(h)};
             if(!frame && !desktop)for(unsigned bad=0;bad<8;++bad){auto invalid=inputs;
                 if(bad==0)invalid[1][1][0]=as_bits(.5f);if(bad==1)invalid[2][2][0]=as_bits(.5f);if(bad==2)invalid[1][0][0]=as_bits(.5f);if(bad==3)invalid[3][0][3]=as_bits(2.f);
                 if(bad>=4){const float value=bad==4?-.01f:bad==5?1.01f:bad==6?std::numeric_limits<float>::quiet_NaN():std::numeric_limits<float>::infinity();
@@ -69,6 +72,9 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
                     if(actual!=uint8_t(std::nearbyint(ideal)))++different;++checked;}
             }
             TEST(result.covered_samples==covered);
+            if(desktop && frame==4)TEST(result.tile_executions<=5);
+            if(desktop && frame==6)TEST(!result.tile_executions && result.provider_requests==2 && result.pixels==bg);
+            if(desktop && frame>=7)TEST(result.tile_executions==1);
             std::printf("{\"modulated_texture_draw\":true,\"point_filter\":%s,\"width\":%u,\"height\":%u,\"source_format\":%u,\"blend\":%s,\"swap\":%s,\"frame\":%u,\"draw_ms\":%.3f,\"covered_samples\":%llu,\"execution_device\":\"%s\"}\n",point?"true":"false",w,h,sf,blend?"true":"false",swap?"true":"false",frame,result.timings.total_ms,static_cast<unsigned long long>(covered),result.execution_device.c_str());std::fflush(stdout);
         }
     }

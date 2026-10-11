@@ -1,0 +1,15 @@
+import hashlib,json,statistics,struct,sys
+from pathlib import Path
+root=Path(sys.argv[1]);base=root/'baseline';candidate=root/'candidate';requests=json.loads((base/'requests.json').read_text());checks=[]
+for r in requests:
+ name=r['file'].replace('request-','reply-',1);old=(base/name).read_bytes();new=(candidate/name).read_bytes()
+ a=struct.unpack_from('<3Q14I',old);b=struct.unpack_from('<3Q14I',new);assert a==b and a[14]==2 and a[15]==3 and len(old)==len(new)==128+a[4]*a[5]*4
+ ar=struct.unpack_from('<5Q2I',old,80);br=struct.unpack_from('<5Q2I',new,80)
+ assert old[128:]==new[128:] and ar[3]==br[3] and br[4]<=ar[4]
+ checks.append({'baseline_response_sha256':hashlib.sha256(old).hexdigest(),'candidate_response_sha256':hashlib.sha256(new).hexdigest(),'response_bytes':len(new),'case':r['case'],'repeat':r['repeat'],'pixels':a[4]*a[5],'sha256':hashlib.sha256(new[128:]).hexdigest(),'covered_samples':br[3],'baseline_provider_requests':ar[2],'candidate_provider_requests':br[2],'baseline_tiles':ar[4],'candidate_tiles':br[4],'exact_pixels':True})
+def rows(name):return [json.loads(x) for x in (root/(name+'.stdout.jsonl')).read_text().splitlines() if x.startswith('{') and 'draw_ms' in x]
+timings=[]
+for case in (1,2,3,4):
+ keys={(x['client_pid'],x['sequence']) for x in requests if x['case']==case};a=[x['draw_ms'] for x in rows('baseline-worker') if (x['client_pid'],x['sequence']) in keys];b=[x['draw_ms'] for x in rows('candidate-worker') if (x['client_pid'],x['sequence']) in keys];assert len(a)==len(b)==3
+ timings.append({'case':case,'baseline_draw_ms':a,'candidate_draw_ms':b,'baseline_warm_median_ms':statistics.median(a[1:]),'candidate_warm_median_ms':statistics.median(b[1:]),'warm_draw_speedup':statistics.median(a[1:])/statistics.median(b[1:])})
+report={'pixel_checks':checks,'timings':timings,'execution_device':'NPU','all_pixels_exact':True,'desktop_offload_tested':False,'tahoma_performance_tested':False};(root/'packet-comparison.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report))

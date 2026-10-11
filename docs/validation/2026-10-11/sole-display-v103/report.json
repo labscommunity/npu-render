@@ -1,0 +1,48 @@
+{
+  "trial": "v103",
+  "source_commit": "a70195f078d17dc0602ad51f627803d0b8633d60",
+  "umd_build": "present-umd-v201",
+  "package_version": "0.0.91.0",
+  "worker_successes_by_client": {
+    "42": 13,
+    "5192": 36,
+    "5112": 255,
+    "5812": 23,
+    "6764": 45,
+    "4836": 60
+  },
+  "worker_successes_by_operation": {
+    "draw": 360,
+    "color_clear": 72
+  },
+  "acknowledged_successes_by_client": {
+    "42": 13,
+    "5192": 36,
+    "5112": 255,
+    "5812": 22,
+    "6764": 44,
+    "4836": 60
+  },
+  "acknowledged_failures": 0,
+  "received_frames": 6,
+  "live_draw_ms": 138865.808,
+  "live_compile_and_draw_ms": 271830,
+  "full_desktop_offload": false,
+  "usable_interactive_desktop": false,
+  "tahoma_performance_tested": false,
+  "original_cleanup_passed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "concurrent_cpu_build": false,
+  "archive_entries_verified": 37,
+  "findings": [
+    "432 successful NPU requests comprise 13 prewarm draws, 347 live draws and 72 live clears. The relay acknowledges 430 successes and no failures. One unacknowledged request has an explicit client-departure record; the other has no matching receipt in the archived relay log. Successful execution without an acknowledgement is not counted as delivered.",
+    "Six 1024x768 frames arrive while the indirect display is the sole active path. The last three show wallpaper, icons and the full taskbar. Start and Escape are sent, but no received frame visibly shows the Start menu. Full desktop offload and responsive interaction remain unproven.",
+    "The observer reaches its bounded-observation-complete condition after 330149ms rather than stopping on a DWM rejection. The archived process traces nevertheless contain two reject events; their log rows have no timestamps, so this report does not assign their timing solely from archive order.",
+    "Both custom drivers and the stream configuration are removed. Topology restoration takes 575ms. A separate post-cleanup QMP image confirms the ordinary 1280x800 desktop is restored.",
+    "Live draw_ms sums to 138865.808ms and compile_and_draw_ms to 271830ms. These are serial request timings, not frame latency or a Tahoma benchmark. Model diagnostics record 1227 compile/load calls, 1220 satisfied from disk cache.",
+    "Two new 128x128 nine-tap blur requests still spend about 23 seconds each including graph construction. Another 1024x768 draw first takes 32.125seconds and later 5.750seconds. Model setup and repeated graph loading remain substantial.",
+    "Linear and point-modulated rectangle requests process all 192 row blocks even for tiny covered areas. Several spend roughly two seconds inside draw execution. Later short draws wait over thirty seconds in the serial queue. Bounding rectangle row dispatch is the next separately qualified change.",
+    "The native renderer uses the physical Panther Lake NPU, while application and DWM processes run in the disposable Windows VM. Received frames are presented by the Mac SDL viewer; this does not demonstrate physical Delta display scanout or reduced iGPU use."
+  ]
+}

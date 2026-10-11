@@ -113,12 +113,13 @@ now has an exact NPU specialization for opaque, one-to-one point-sampled quads.
 Its captured 1024×768 replay passes, as do changing-image and driver callback
 tests. This is a checked subset, not general desktop rendering.
 
-The [latest installed trial](docs/validation/2026-10-11/sole-display-v102/report.json)
-completes 284 live desktop NPU draws, 58 live NPU clears and 13 prewarm draws.
-Four frames arrive while the indirect display is the sole active path, including
-wallpaper, icons and taskbar. Start-menu interaction still has no verified visible
-response. A three-texture shader fails NPU compilation; both custom drivers
-subsequently unload cleanly. No CPU build overlaps this trial.
+The [latest installed trial](docs/validation/2026-10-11/sole-display-v103/report.json)
+completes 347 live desktop NPU draws, 72 live NPU clears and 13 prewarm draws.
+Six frames arrive while the indirect display is the sole active path, including
+wallpaper, icons and taskbar. The observer completes its bounded interval without
+stopping on a DWM rejection. Start-menu interaction still has no verified visible
+response. Both custom drivers unload cleanly, and the ordinary VM display is
+visually verified afterward. No CPU build overlaps this trial.
 
 The [three-texture fix](docs/validation/2026-10-11/three-texture-v199/report.json)
 selects a qualified batch size for that exact captured shader. The unchanged
@@ -133,7 +134,14 @@ in repeated NPU execution, preserving every output pixel. It sizes the exact
 shader's tap axis from its uniform loop bound; all sampling and arithmetic stay
 on the NPU. All 24 CPU suites and native NPU regressions pass, including changing
 bounds on the same executor. Cold capacity compilation adds roughly 12 seconds
-in this experiment. Installed desktop validation is next.
+in this experiment. The installed trial above includes this change.
+
+[Rectangle row bounds](docs/validation/2026-10-11/linear-bounds-v202/report.json)
+reduce a synthetically clipped linear update from 2.42 seconds to 131 milliseconds,
+and a bottom point-sampled update from 2.01 seconds to 61 milliseconds, with all
+output pixels unchanged. Empty intersections skip pixel inference entirely.
+All 24 CPU suites and native NPU regressions pass. These packet measurements do
+not establish desktop frame rate; installed interaction remains the next check.
 
 [Triangle batching](docs/validation/2026-10-11/triangle-collation-v196/report.json)
 reduces one captured request from 132 to 47 batches, preserving every pixel and

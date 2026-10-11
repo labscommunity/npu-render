@@ -1,0 +1,150 @@
+{
+  "build": "present-umd-v202",
+  "source_base": "a70195f078d17dc0602ad51f627803d0b8633d60",
+  "clean_cpu_suites": 24,
+  "cpu_test_seconds": 170.4,
+  "native_npu_qualification_passed": true,
+  "source_files_verified": 116,
+  "binary_files_verified": 30,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "upper_clip_timings": [
+    {
+      "case": 1,
+      "baseline_draw_ms": [
+        2524.475,
+        2443.994,
+        2391.892
+      ],
+      "candidate_draw_ms": [
+        190.154,
+        136.237,
+        126.16
+      ],
+      "baseline_warm_median_ms": 2417.943,
+      "candidate_warm_median_ms": 131.1985,
+      "warm_draw_speedup": 18.429654302450107
+    },
+    {
+      "case": 2,
+      "baseline_draw_ms": [
+        2419.945,
+        2364.808,
+        2440.55
+      ],
+      "candidate_draw_ms": [
+        2.434,
+        2.57,
+        2.542
+      ],
+      "baseline_warm_median_ms": 2402.679,
+      "candidate_warm_median_ms": 2.556,
+      "warm_draw_speedup": 940.0152582159625
+    },
+    {
+      "case": 3,
+      "baseline_draw_ms": [
+        2140.959,
+        2031.79,
+        1991.467
+      ],
+      "candidate_draw_ms": [
+        16.239,
+        2.776,
+        2.037
+      ],
+      "baseline_warm_median_ms": 2011.6285,
+      "candidate_warm_median_ms": 2.4065,
+      "warm_draw_speedup": 835.9146062746728
+    },
+    {
+      "case": 4,
+      "baseline_draw_ms": [
+        1991.086,
+        1998.665,
+        1983.736
+      ],
+      "candidate_draw_ms": [
+        2.357,
+        2.951,
+        2.659
+      ],
+      "baseline_warm_median_ms": 1991.2005,
+      "candidate_warm_median_ms": 2.8049999999999997,
+      "warm_draw_speedup": 709.8754010695187
+    }
+  ],
+  "bottom_clip_timings": [
+    {
+      "case": 1,
+      "baseline_draw_ms": [
+        2436.749,
+        2352.849,
+        2369.225
+      ],
+      "candidate_draw_ms": [
+        98.957,
+        76.313,
+        66.526
+      ],
+      "baseline_warm_median_ms": 2361.0370000000003,
+      "candidate_warm_median_ms": 71.4195,
+      "warm_draw_speedup": 33.05871645699004
+    },
+    {
+      "case": 2,
+      "baseline_draw_ms": [
+        2364.82,
+        2365.26,
+        2338.744
+      ],
+      "candidate_draw_ms": [
+        2.128,
+        2.062,
+        2.15
+      ],
+      "baseline_warm_median_ms": 2352.0020000000004,
+      "candidate_warm_median_ms": 2.106,
+      "warm_draw_speedup": 1116.8100664767335
+    },
+    {
+      "case": 3,
+      "baseline_draw_ms": [
+        2012.781,
+        2018.597,
+        1998.733
+      ],
+      "candidate_draw_ms": [
+        91.056,
+        64.82,
+        56.602
+      ],
+      "baseline_warm_median_ms": 2008.665,
+      "candidate_warm_median_ms": 60.711,
+      "warm_draw_speedup": 33.085684637050946
+    },
+    {
+      "case": 4,
+      "baseline_draw_ms": [
+        2011.863,
+        2020.337,
+        2019.373
+      ],
+      "candidate_draw_ms": [
+        2.189,
+        2.42,
+        2.414
+      ],
+      "baseline_warm_median_ms": 2019.855,
+      "candidate_warm_median_ms": 2.417,
+      "warm_draw_speedup": 835.6868018204386
+    }
+  ],
+  "findings": [
+    "Linear and point-modulated rectangle execution schedules only row blocks intersecting device-projected triangle bounds and the scissor. Exact coverage, filtering and blending remain NPU graph operations. Pixels in untouched row blocks retain the original background.",
+    "Empty intersections return the unchanged background after the vertex and projection requests, with zero pixel tiles. Invalid rectangle inputs still reject before output. Independent scalar tests cover fractional geometry, both triangle orders, empty/scissored/single-row/bottom-edge updates, source formats and blend/filter variants.",
+    "Two captured base packets are given synthetic scissors and unique sequence numbers. Their vertices, constants, textures and backgrounds are unchanged. Both the upper and bottom clipping experiments use three repetitions for each case, serial baseline-build201 and candidate-build202 workers, and compare all786432 output pixels exactly.",
+    "The upper point clip misses its original rectangle and is an empty-intersection test, not evidence for a visible point update. The supplemental bottom clip intersects the point rectangle and separately verifies nonzero coverage. These derived requests are not claimed as captured live small draws.",
+    "All24 CPU suites, three rectangle NPU modes, seven NPU rendering regressions,58 driver draws and8 clears pass. Both original single-mip captures retain exact CPU/NPU output. Native timing improvements do not establish installed desktop interaction or a Tahoma performance benefit."
+  ]
+}

@@ -1,5 +1,6 @@
 #include "provider_compile.hpp"
 #include "linear_texture_draw.hpp"
+#include "triangle_regions.hpp"
 #include <openvino/openvino.hpp>
 #include <openvino/opsets/opset13.hpp>
 #include <openvino/pass/serialize.hpp>
@@ -201,7 +202,21 @@ UniformDrawExecutor::Result LinearTextureDrawExecutor::execute(const std::vector
         matches &= projected.vertices[n].screen==expected && projected.vertices[n].snapped==snapped;
         float u=0,v=0;std::memcpy(&u,&shaded.vertices[n][s.pixel.uv][0],4);std::memcpy(&v,&shaded.vertices[n][s.pixel.uv][1],4);
         matches &= u==uv[right?2:0] && v==uv[bottom?3:1];}accepted |= matches;}
-    require(accepted);for(auto &v:clip)v*=256;
+    require(accepted);
+    // The provider has already projected and bounded both triangles. Schedule
+    // only row blocks intersecting those bounds and the scissor; the graph
+    // still decides exact sample coverage, sampling and blending.
+    const auto regions=bounded_triangle_regions(projected.triangle_bounds,clip,s.count);
+    uint32_t first_row=s.height,end_row=0;
+    for(const auto &region:regions)if(region[0]<region[2] && region[1]<region[3]){
+        first_row=(std::min)(first_row,uint32_t(region[1]));end_row=(std::max)(end_row,uint32_t(region[3]));
+    }
+    result.pixels=background;
+    if(first_row>=end_row){
+        result.timings.total_ms=elapsed(start);result.used_rectangle=true;result.vertices=std::move(shaded.vertices);return result;
+    }
+    first_row-=first_row%s.rows;
+    for(auto &v:clip)v*=256;
     s.failed=true;began=Clock::now();
     for(unsigned c=0;c<(s.pixel.opaque?3u:4u);++c) {
         auto *texels=s.request.get_tensor("source"+std::to_string(c)).data<float>();
@@ -210,8 +225,8 @@ UniformDrawExecutor::Result LinearTextureDrawExecutor::execute(const std::vector
     for(unsigned c=0;c<4;++c)s.request.get_tensor("color"+std::to_string(c)).data<float>()[0]=color[c];
     std::memcpy(s.request.get_tensor("uv").data<float>(),uv.data(),16);
     std::memcpy(s.request.get_tensor("bounds").data<int32_t>(),bounds.data(),16);std::memcpy(s.request.get_tensor("scissor").data<int32_t>(),clip.data(),16);
-    s.request.get_tensor("half").data<float>()[0]=s.point?0.f:.5f;result.pixels.resize(background.size());
-    for(uint32_t y=0;y<s.height;y+=s.rows){
+    s.request.get_tensor("half").data<float>()[0]=s.point?0.f:.5f;
+    for(uint32_t y=first_row;y<end_row;y+=s.rows){
         const auto offset=size_t(y)*s.width;s.request.get_tensor("origin").data<float>()[0]=float(y);s.request.get_tensor("origin_i").data<int32_t>()[0]=int32_t(y);
         std::memcpy(s.request.get_tensor("background").data<uint8_t>(),background.data()+offset,size_t(s.count)*4);s.request.infer();
         const auto output=s.request.get_output_tensor(0),coverage=s.request.get_output_tensor(1);
