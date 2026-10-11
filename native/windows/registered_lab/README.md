@@ -920,5 +920,16 @@ requires depth and stencil tests to pass regardless of their enable/compare
 state; draw admission now follows that rule. Regression draws use default LESS
 and explicit NEVER states without a DSV, while a non-null DSV binding remains
 rejected atomically. New captures record the no-DSV invariant explicitly. The 24
-CPU suites, 58 native NPU indexed draws and eight NPU clears pass. Installed
-interaction is still pending.
+CPU suites, 58 native NPU indexed draws and eight NPU clears pass.
+[Installed v100](../../../docs/validation/2026-10-10/sole-display-v100/report.json)
+completes the formerly rejected 700-sample draw and encounters a different
+single-mip filter rejection. Interactive desktop operation is still unproven.
+
+The [v195 single-mip qualification](../../../docs/validation/2026-10-11/single-mip-v195/report.json)
+admits equivalent mip-filter settings for views exposing exactly one mip:
+0/1 select point minification and magnification; 0x14/0x15 select linear.
+The two original v100 captures pass on CPU and NPU with identical complete
+512×512 output and zero scalar-oracle error for 10,200 covered samples each.
+Mixed minification/magnification filters still fail atomically. All 24 CPU suites,
+58 native NPU driver draws and eight clears pass; installed interaction remains
+unproven.

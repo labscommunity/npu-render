@@ -191,11 +191,14 @@ int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
     D3D10DDI_HSAMPLER hs{};hs.pDrvPrivate=&sampler;f.pfnPsSetSamplers(h,0,1,&hs);TEST(last_error==S_OK);
     for(unsigned frame=0;frame<2;++frame){
         if(frame){for(auto &c:source)c=uint8_t(c+43);f.pfnResourceUpdateSubresourceUP(h,resources[4],0,nullptr,source.data(),sw*4,0);}
+        sampler.Filter=frame?D3D10_DDI_FILTER_MIN_MAG_POINT_MIP_LINEAR:D3D10_DDI_FILTER_MIN_MAG_MIP_POINT;f.pfnPsSetSamplers(h,0,1,&hs);
         const auto executed=counters.draws;f.pfnDrawIndexed(h,6,1,1);TEST(last_error==S_OK && counters.draws==executed+1);
         for(UINT y=0;y<height;++y)for(UINT x=0;x<width;++x)for(UINT c=0;c<4;++c)
             TEST(memory[target_index][(size_t(y)*width+x)*4+c]==(c==3?uint8_t(255):source[(size_t(y+16)*sw+x+32)*4+c]));
         const auto before=memory[target_index];const auto draws=counters.draws;
         sampler.Filter=D3D10_DDI_FILTER_MIN_MAG_MIP_LINEAR;f.pfnPsSetSamplers(h,0,1,&hs);f.pfnDrawIndexed(h,6,1,1);
+        TEST(FAILED(last_error) && memory[target_index]==before && counters.draws==draws);last_error=S_OK;
+        sampler.Filter=D3D10_DDI_FILTER_MIN_POINT_MAG_LINEAR_MIP_POINT;f.pfnPsSetSamplers(h,0,1,&hs);f.pfnDrawIndexed(h,6,1,1);
         TEST(FAILED(last_error) && memory[target_index]==before && counters.draws==draws);last_error=S_OK;
         sampler.Filter=D3D10_DDI_FILTER_MIN_MAG_MIP_POINT;f.pfnPsSetSamplers(h,0,1,&hs);
     }
@@ -236,7 +239,8 @@ int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
     for(unsigned frame=0;frame<4;++frame){
         if(frame==3){f.pfnCreatePixelShader(h,nr::registered_lab::test_fixture::point_texture_pixel_words,shaders[1],{},nullptr);
             f.pfnPsSetShader(h,shaders[1]);f.pfnDestroyShader(h,shaders[1]);}
-        sampler.Filter=frame>=2?D3D10_DDI_FILTER_MIN_MAG_MIP_POINT:D3D10_DDI_FILTER_MIN_MAG_MIP_LINEAR;f.pfnPsSetSamplers(h,0,1,&hs);
+        sampler.Filter=frame>=2?(frame==3?D3D10_DDI_FILTER_MIN_MAG_POINT_MIP_LINEAR:D3D10_DDI_FILTER_MIN_MAG_MIP_POINT):
+            (frame==1?D3D10_DDI_FILTER_MIN_MAG_LINEAR_MIP_POINT:D3D10_DDI_FILTER_MIN_MAG_MIP_LINEAR);f.pfnPsSetSamplers(h,0,1,&hs);
         for(size_t n=0;n<size_t(sw)*sh;++n)for(unsigned c=0;c<4;++c)source[n*4+c]=uint8_t(c==3?128:(n*13+c*29+frame*41)%129);
         f.pfnResourceUpdateSubresourceUP(h,resources[4],0,nullptr,source.data(),sw*4,0);
         const auto before=memory[target_index];const auto executed=counters.draws;f.pfnDrawIndexed(h,6,1,1);TEST(last_error==S_OK && counters.draws==executed+1);

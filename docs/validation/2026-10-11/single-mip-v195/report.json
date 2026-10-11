@@ -1,0 +1,28 @@
+{
+  "build": "present-umd-v195",
+  "all_checks_passed": true,
+  "native_npu_execution": true,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "cpu_suites": 24,
+  "cpu_suite_seconds": 128.86,
+  "source_hashes_verified": 116,
+  "binary_hashes_verified": 30,
+  "captured_draws": 2,
+  "verified_target_pixels_per_draw": 262144,
+  "covered_samples_per_draw": 10200,
+  "maximum_scalar_byte_error": 0,
+  "native_ddi_draws": 58,
+  "native_ddi_clears": 8,
+  "full_desktop_offload": false,
+  "installed_desktop_validation_pending": true,
+  "findings": [
+    "Build v194 rejects the original v100 capture during executor construction before CPU or NPU inference. Build v195 replays both unchanged captures successfully. Each has 10200 covered samples and a complete 512x512 output identical between CPU and NPU, with zero error against the independent scalar oracle.",
+    "The bridge admits SRVs exposing exactly one mip. Filter 0x14 therefore has the same result as 0x15 (linear minification/magnification), and filter 1 the same result as 0 (point minification/magnification). A shared classifier normalizes these equivalent cases for the driver and capture replay tool.",
+    "Existing driver pixel tests now exercise both mip-filter bits with linear and point sampling. Mixed minification/magnification filter 4 remains rejected before target modification. The existing 24 CPU suites, 58 native NPU indexed draws and eight native NPU clears pass.",
+    "No provider graph or packet ABI changed. The separately prepared triangle batching experiment has not been applied to this qualified build. Native replay is not proof of desktop interaction or Tahoma performance."
+  ],
+  "references": [
+    "https://learn.microsoft.com/en-us/windows/win32/api/d3d11/ne-d3d11-d3d11_filter"
+  ]
+}

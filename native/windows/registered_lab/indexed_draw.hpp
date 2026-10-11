@@ -140,11 +140,11 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
         for(unsigned slot=0;slot<16;++slot){
             if(d.pixel_program->samplers[slot]){
                 const auto &samp=d.samplers[2][slot];require(samp.bound &&
-                    (samp.desc.Filter==D3D10_DDI_FILTER_MIN_MAG_MIP_LINEAR || samp.desc.Filter==D3D10_DDI_FILTER_MIN_MAG_MIP_POINT) &&
+                    single_mip_filter_supported(UINT(samp.desc.Filter)) &&
                     (samp.desc.AddressU==D3D10_DDI_TEXTURE_ADDRESS_CLAMP || samp.desc.AddressU==D3D10_DDI_TEXTURE_ADDRESS_MIRROR) &&
                     (samp.desc.AddressV==D3D10_DDI_TEXTURE_ADDRESS_CLAMP || samp.desc.AddressV==D3D10_DDI_TEXTURE_ADDRESS_MIRROR) &&
                     samp.desc.AddressW==D3D10_DDI_TEXTURE_ADDRESS_CLAMP && samp.desc.MipLODBias==0 && samp.desc.MinLOD==0 && samp.desc.MaxLOD>=0);
-                resource_samplers[slot].filter=samp.desc.Filter==D3D10_DDI_FILTER_MIN_MAG_MIP_LINEAR?nr::shader::TextureFilter::linear:nr::shader::TextureFilter::point;
+                resource_samplers[slot].filter=single_mip_linear_filter(UINT(samp.desc.Filter))?nr::shader::TextureFilter::linear:nr::shader::TextureFilter::point;
                 resource_samplers[slot].u=samp.desc.AddressU==D3D10_DDI_TEXTURE_ADDRESS_MIRROR?nr::shader::TextureAddress::mirror:nr::shader::TextureAddress::clamp;
                 resource_samplers[slot].v=samp.desc.AddressV==D3D10_DDI_TEXTURE_ADDRESS_MIRROR?nr::shader::TextureAddress::mirror:nr::shader::TextureAddress::clamp;
             }
@@ -167,7 +167,7 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
         }
     }else if (textured) {
         const auto source = d.bound_source; const auto &sampler = d.samplers[2][0];
-        linear=sampler.desc.Filter==D3D10_DDI_FILTER_MIN_MAG_MIP_LINEAR;
+        linear=single_mip_linear_filter(UINT(sampler.desc.Filter));
         // A target larger than its source cannot be a one-to-one crop. The
         // affine point sampler handles scaling/clamping on the selected device.
         const bool source_smaller=source && (source->surface.width<s.width || source->surface.height<s.height);
@@ -182,7 +182,7 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
         if(general_texture) nr::raster::TriangleTextureDrawExecutor::validate_shader(*d.pixel_program);
         require(source && source != target && source->handle != target->handle &&
             source->context == d.context && !source->locked && sampler.bound &&
-            (linear || sampler.desc.Filter == D3D10_DDI_FILTER_MIN_MAG_MIP_POINT) &&
+            single_mip_filter_supported(UINT(sampler.desc.Filter)) &&
             sampler.desc.AddressU == D3D10_DDI_TEXTURE_ADDRESS_CLAMP && sampler.desc.AddressV == D3D10_DDI_TEXTURE_ADDRESS_CLAMP &&
             sampler.desc.AddressW == D3D10_DDI_TEXTURE_ADDRESS_CLAMP && sampler.desc.MipLODBias == 0 && sampler.desc.MinLOD == 0 && sampler.desc.MaxLOD >= 0);
         const auto &ss = source->surface;

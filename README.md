@@ -113,19 +113,23 @@ now has an exact NPU specialization for opaque, one-to-one point-sampled quads.
 Its captured 1024×768 replay passes, as do changing-image and driver callback
 tests. This is a checked subset, not general desktop rendering.
 
-The [latest installed trial](docs/validation/2026-10-10/sole-display-v99/report.json)
-completes 329 live desktop NPU draws, 89 live NPU clears and 13 prewarm draws.
-All 431 worker requests receive successful acknowledgements. Nine frames arrive,
-including wallpaper, icons and taskbar at different stages, but Start-menu
-interaction still has no verified visible response. Mapped vertex-buffer binding
-now succeeds. DWM instead rejects depth-enabled draws without a depth buffer;
-the original captured operation fails before inference on both CPU and NPU.
-Both custom drivers unload cleanly.
+The [latest installed trial](docs/validation/2026-10-10/sole-display-v100/report.json)
+completes 354 live desktop NPU draws, 88 live NPU clears and 13 prewarm draws.
+All 455 worker requests receive successful acknowledgements. Thirteen frames
+arrive, including wallpaper, icons and taskbar at different stages. Start-menu
+interaction still has no verified visible response. The previously rejected
+depth-enabled draw now succeeds; DWM next encounters an unsupported texture
+filter setting on a single-mip view. Both custom drivers unload cleanly.
 
 The [depth-state fix](docs/validation/2026-10-10/depthless-v194/report.json)
-now replays that unchanged capture exactly on the NPU, including 700 covered
+replays the earlier unchanged capture exactly on the NPU, including 700 covered
 samples and the complete 512×512 target. All 24 CPU suites, 58 NPU driver draws
-and eight NPU clears pass. The next installed desktop trial will test interaction.
+and eight NPU clears pass. Installed v100 also completes that draw on the NPU.
+
+The [single-mip filter fix](docs/validation/2026-10-11/single-mip-v195/report.json)
+now replays both new captures exactly on the NPU: 10,200 affected pixels in each
+512×512 target. All 24 CPU suites and the native NPU driver checks pass. The next
+installed trial will test this correction in the desktop.
 
 The [snapped-boundary fix](docs/validation/2026-10-10/point-snap-v189/report.json)
 retains exact raster boundaries while allowing bounded FP32 endpoint rounding.

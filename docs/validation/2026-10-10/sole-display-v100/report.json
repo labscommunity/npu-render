@@ -1,0 +1,48 @@
+{
+  "trial": "v100",
+  "source_commit": "da4bd37287fe5265967d636ef1685a9a7d1f9673",
+  "umd_build": "present-umd-v194",
+  "package_version": "0.0.88.0",
+  "worker_successes_by_client": {
+    "42": 13,
+    "1092": 160,
+    "5192": 77,
+    "5812": 56,
+    "5112": 149
+  },
+  "worker_successes_by_operation": {
+    "draw": 367,
+    "color_clear": 88
+  },
+  "acknowledged_successes_by_client": {
+    "42": 13,
+    "1092": 160,
+    "5192": 77,
+    "5812": 56,
+    "5112": 149
+  },
+  "acknowledged_failures": 0,
+  "received_frames": 13,
+  "live_draw_ms": 156058.742,
+  "live_compile_and_draw_ms": 229354,
+  "full_desktop_offload": false,
+  "usable_interactive_desktop": false,
+  "tahoma_performance_tested": false,
+  "original_cleanup_passed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "guest_clean_boot_before_trial": true,
+  "findings": [
+    "455 successful NPU requests comprise 13 prewarm draws, 354 live desktop draws and 88 live clears. Every request has a successful relay acknowledgement. No failed native NPU request or device-loss error is recorded.",
+    "Thirteen 1024x768 frames arrive under the sole indirect display gate. Wallpaper, icons and taskbar appear, with black/partial transitions and later wallpaper without icons. The Start snapshot shows wallpaper and taskbar, not a menu. Different Start/Escape hashes alone do not establish input response.",
+    "The previously rejected depth-enabled 700-sample draw completes on the NPU. DWM then rejects a different draw with sampler filter 0x14 (MIN_MAG_LINEAR_MIP_POINT). Two complete captures from processes 1092 and 5112 preserve this same sampler state, six vertices, a 512x512 target and a single 128x128 source mip.",
+    "Both CPU and NPU replay of the first unchanged capture fail during executor construction in build v194, before inference. The bridge currently admits only filter 0 and 0x15. Since its SRVs expose exactly one mip, the mip interpolation bit cannot change the sample result when minification and magnification filters match. Extending this equivalence is the next correction.",
+    "The UMD records seven invalid-argument draw rejections in PID 1092 and one in PID 5112. PID 5112 and the shell process 5192 also each record a later 0x88760870 draw failure without a failed worker receipt; this remains separate transport/shutdown evidence.",
+    "The VM was shut down gracefully after v99 driver removal and cold-booted before this trial. The initial login input was rejected; shorter QMP key holds succeeded. The console session and normal desktop were verified. No physical-machine restart occurred.",
+    "Both custom drivers unload cleanly and stream configuration is removed. A QMP screenshot verifies the ordinary VM desktop after cleanup. No source build overlaps the live NPU trial; aggregate worker timings remain diagnostics, not a Tahoma or frame-rate benchmark."
+  ],
+  "references": [
+    "https://learn.microsoft.com/en-us/windows/win32/api/d3d11/ne-d3d11-d3d11_filter",
+    "https://learn.microsoft.com/en-us/windows/win32/direct3d11/d3d10-graphics-programming-guide-output-merger-stage"
+  ]
+}

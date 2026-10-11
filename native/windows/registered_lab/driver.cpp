@@ -25,6 +25,7 @@
 #include "indexed_exchange.hpp"
 #include "shader_contract.hpp"
 #include "lab_trace.hpp"
+#include "single_mip_filter.hpp"
 namespace {
 using namespace nr::registered_lab;
 std::recursive_mutex mutex;

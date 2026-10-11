@@ -8,6 +8,7 @@
 #include "point_texture_draw.hpp"
 #include "linear_texture_draw.hpp"
 #include "triangle_texture_draw.hpp"
+#include "single_mip_filter.hpp"
 #include <cstdlib>
 #include <algorithm>
 #include <chrono>
@@ -98,6 +99,7 @@ std::vector<nr::shader::VertexRegisters> fetch(const nr::capture::Snapshot &s, u
 int main(int argc, char **argv) try {
     using namespace nr::shader;
     using namespace nr::raster;
+    using namespace nr::registered_lab;
     if ((argc != 7 && argc != 11) || std::strcmp(argv[1], "--capture") || std::strcmp(argv[3], "--backend") || std::strcmp(argv[5], "--output"))
         throw std::invalid_argument("expected --capture <NPDRAW01 file> --backend <CPU|NPU> --output <new pixel file>");
     uint32_t repeats = 1, batch = 4096;
@@ -183,8 +185,8 @@ int main(int argc, char **argv) try {
         for(unsigned slot=0;slot<16;++slot){
             if(ps.samplers[slot]){
                 const auto sampler=snapshot.values<uint32_t>("sampler-2-"+std::to_string(slot));
-                nr::capture::check(sampler.size()==13 && (sampler[0]==0 || sampler[0]==21) && (sampler[1]==2 || sampler[1]==3) && (sampler[2]==2 || sampler[2]==3) && sampler[3]==3 && !sampler[4] && !sampler[11] && as_float(sampler[12])>=0);
-                texture_samplers[slot].filter=sampler[0]==0?TextureFilter::point:TextureFilter::linear;
+                nr::capture::check(sampler.size()==13 && single_mip_filter_supported(sampler[0]) && (sampler[1]==2 || sampler[1]==3) && (sampler[2]==2 || sampler[2]==3) && sampler[3]==3 && !sampler[4] && !sampler[11] && as_float(sampler[12])>=0);
+                texture_samplers[slot].filter=single_mip_point_filter(sampler[0])?TextureFilter::point:TextureFilter::linear;
                 texture_samplers[slot].u=sampler[1]==2?TextureAddress::mirror:TextureAddress::clamp;
                 texture_samplers[slot].v=sampler[2]==2?TextureAddress::mirror:TextureAddress::clamp;
             }
@@ -207,7 +209,7 @@ int main(int argc, char **argv) try {
     }else if (textured) {
         const auto source = snapshot.values<uint32_t>("source-description"), sampler = snapshot.values<uint32_t>("sampler-2-0");
         nr::capture::check(source.size() == 10 && source[0] == 0x4e52574b && source[1] == 1 && source[2] == 40 && !source[7]);
-        nr::capture::check(sampler.size() == 13 && (sampler[0]==0 || sampler[0]==21) && sampler[1] == 3 && sampler[2] == 3 && sampler[3] == 3 && !sampler[4] && !sampler[11]);
+        nr::capture::check(sampler.size() == 13 && single_mip_filter_supported(sampler[0]) && sampler[1] == 3 && sampler[2] == 3 && sampler[3] == 3 && !sampler[4] && !sampler[11]);
         nr::capture::check(as_float(sampler[12]) >= 0);
         if(source[5] == 65) {
             const auto alpha=snapshot.values<uint8_t>("source");
@@ -221,13 +223,13 @@ int main(int argc, char **argv) try {
             if(quad_derivatives(ps)){while(batch>4 && uint64_t(clip[2]-clip[0])*uint64_t(clip[3]-clip[1])<=batch/2)batch/=2;batch=(std::max)(4u,batch);}
         else while(uint64_t(width)*height%batch)batch/=2;
             triangle_executor=std::make_unique<TriangleTextureDrawExecutor>(vs,ps,args[0],width,height,format,texture.width,texture.height,texture.format,
-                backend,blend_mode,uint8_t(blend[15]&255),sampler[0]==0?TextureFilter::point:TextureFilter::linear,static_cast<CullMode>(raster[1]-1),raster[2]!=0,batch);
-            texture_shapes[0]={texture.width,texture.height};texture_samplers[0].filter=sampler[0]==0?TextureFilter::point:TextureFilter::linear;
+                backend,blend_mode,uint8_t(blend[15]&255),single_mip_point_filter(sampler[0])?TextureFilter::point:TextureFilter::linear,static_cast<CullMode>(raster[1]-1),raster[2]!=0,batch);
+            texture_shapes[0]={texture.width,texture.height};texture_samplers[0].filter=single_mip_point_filter(sampler[0])?TextureFilter::point:TextureFilter::linear;
             texture_pixels[0].resize(texture.pixels.size());
             for(size_t n=0;n<texture.pixels.size();++n)for(unsigned c=0;c<4;++c)
                 texture_pixels[0][n][c]=float(texture.pixels[n][texture.format==87 && c<3?2-c:c])/255;
-        }else if(sampler[0]==21 || ps.instructions.size()==2 || blending || texture.width<width || texture.height<height || clip!=std::array<int32_t,4>{0,0,int32_t(width),int32_t(height)}){
-            const bool point=sampler[0]==0;
+        }else if(single_mip_linear_filter(sampler[0]) || ps.instructions.size()==2 || blending || texture.width<width || texture.height<height || clip!=std::array<int32_t,4>{0,0,int32_t(width),int32_t(height)}){
+            const bool point=single_mip_point_filter(sampler[0]);
             linear_executor=std::make_unique<LinearTextureDrawExecutor>(vs,ps,width,height,format,texture.width,texture.height,texture.format,backend,blending,point?TextureFilter::point:TextureFilter::linear);
             const auto a=reference_vertex(vs,inputs[0],cb),b=reference_vertex(vs,inputs[2],cb);const auto pr=vs.position_output,ur=ps.instructions[0].sources[0].index;
             const std::array<float,4> screen{(as_float(a[pr][0])+1)*(float(width)*.5f),(1-as_float(a[pr][1]))*(float(height)*.5f),
