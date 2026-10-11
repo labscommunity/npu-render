@@ -1,0 +1,13 @@
+{
+  "sources": [
+    {
+      "url": "https://github.com/openvinotoolkit/openvino/issues/38403",
+      "finding": "An upstream user reports multi-model hangs on driver 5540 on Lunar Lake. Later controlled updates retract the initial claim that turbo or keeping the NPU busy prevents the problem: failures continue with turbo, disabled idle pruning, and continuous submissions. Different processor and workload; this does not establish our root cause."
+    },
+    {
+      "url": "https://raw.githubusercontent.com/openvinotoolkit/openvino/2026.4.1/src/plugins/intel_npu/README.md",
+      "finding": "The NPU plugin documents multiple infer requests per compiled model and a turbo property. API support alone does not validate this renderer workload."
+    }
+  ],
+  "action": "Preserve the failed experiment and confirm recovery with the qualified baseline. Do not ship an untested power-state workaround."
+}

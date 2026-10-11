@@ -1,0 +1,15 @@
+from pathlib import Path
+import json,hashlib,os,struct
+root=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm/model-reuse-diagnostic-v2-results';rows=json.loads((root/'baseline/requests.json').read_text());out=[]
+for r in rows:
+ name=r['file'].replace('request-','reply-',1);a=(root/'baseline'/name).read_bytes();b=(root/'enabled'/name).read_bytes();h=struct.unpack_from('<3Q14I',b)
+ failed=h[14]==3;assert failed or h[14]==2
+ exact=None if failed else a[80:]==b[80:]
+ out.append({'sequence':r['sequence'],'source':r['source'],'failed':failed,'successful_receipt_and_pixels_exact':exact,'reply_sha256':hashlib.sha256(b).hexdigest()})
+report={'total':len(out),'failures':sum(x['failed'] for x in out),'successful_outputs_exact':all(x['successful_receipt_and_pixels_exact'] for x in out if not x['failed']),'results':out}
+(root/'partial-comparison.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps({k:v for k,v in report.items() if k!='results'}))
+for group in ['model-reuse-diagnostic-v2-results','model-reuse-recovery-v1']:
+ p=root.parent/group;files=[]
+ for f in p.rglob('*'):
+  if f.is_file() and f.name!='raw-files-sha256.json':files.append({'name':f.relative_to(p).as_posix(),'bytes':f.stat().st_size,'sha256':hashlib.sha256(f.read_bytes()).hexdigest()})
+ (p/'raw-files-sha256.json').write_text(json.dumps(files,indent=2)+'\n')

@@ -1,0 +1,9 @@
+{
+  "kind": "unqualified-diagnostic",
+  "source_commit": "9ae76ad550a82667b7e0e7603eb07c5288539547",
+  "purpose": "Reuse identical currently-live NPU compiled models across pipeline objects without retaining models after their owners disappear. Independent InferRequests preserve per-pipeline buffers. No production source changed.",
+  "enabled_by": "NR_RENDER_REUSE_COMPILED=1",
+  "qualified": false,
+  "installed": false,
+  "predecessor": "v1 failed to compile because diagnostic worker headers require OpenVINO include propagation; no CPU tests, NPU execution or installation ran v1."
+}

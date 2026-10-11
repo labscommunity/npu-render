@@ -1,0 +1,16 @@
+from pathlib import Path
+import hashlib,json,struct,sys
+out=Path(sys.argv[1]);a=out/'baseline';b=out/sys.argv[2];records=json.loads((a/'requests.json').read_text());results=[]
+assert records==json.loads((b/'requests.json').read_text())
+for r in records:
+ name=r['file'].replace('request-','reply-',1);request=(a/r['file']).read_bytes();assert hashlib.sha256(request).hexdigest()==r['derived_sha256'];header=struct.unpack_from('<3Q14I',request)
+ replies=[(f/name).read_bytes() for f in [a,b]]
+ for data in replies:
+  h=struct.unpack_from('<3Q14I',data)
+  assert all(h[i]==header[i] for i in range(17) if i not in [12,14,15]);assert h[14]==2 and h[15]==3 and len(data)==80+h[12] and h[12]==48+h[4]*h[5]*4
+ assert replies[0][80:]==replies[1][80:],r['file']
+ pixels=replies[1][128:];sha=hashlib.sha256(pixels).hexdigest()
+ if r['expected_pixel_sha256']:assert sha==r['expected_pixel_sha256']
+ results.append({'sequence':r['sequence'],'source':r['source'],'pixels':len(pixels)//4,'pixel_sha256':sha,'receipt_and_pixels_exact':True})
+assert len(results)==42
+(out/(sys.argv[2]+'-comparison.json')).write_text(json.dumps({'all_exact':True,'results':results},indent=2)+'\n');print(json.dumps({'compared':42,'all_receipts_and_pixels_exact':True}))

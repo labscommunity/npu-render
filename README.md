@@ -123,8 +123,16 @@ trial. Both custom drivers unload successfully when the bounded observation ends
 Of 1371 model compile calls, 1349 hit the cache; even the 452 requests without a
 miss take 192 seconds in aggregate, including 62 seconds of drawing. Warm disk
 caching alone does not establish usable interaction. Reuse of already-loaded
-models is the next experiment. No CPU build overlaps this trial. Full desktop
+models was tested separately. No CPU build overlaps this trial. Full desktop
 offload remains unverified.
+
+The [model-sharing experiment](docs/validation/2026-10-11/model-reuse-v2/report.json)
+passes 26 CPU suites and a small NPU lifetime/buffer test, but fails two of 42
+captured NPU requests with device loss and an unavailable graph. The same
+build with sharing disabled matches all baseline pixels and receipts. The
+qualified renderer then recovers all 42 requests exactly without restarting
+Delta. Model sharing remains outside the installed renderer; its failure cause
+is not established.
 
 The [three-texture fix](docs/validation/2026-10-11/three-texture-v199/report.json)
 selects a qualified batch size for that exact captured shader. The unchanged

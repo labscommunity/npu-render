@@ -1,0 +1,20 @@
+{
+  "passed": false,
+  "installed": false,
+  "production_source_changed": false,
+  "cpu_contracts": 26,
+  "cpu_seconds": 191.5,
+  "native_unit_passed": true,
+  "baseline_42_passed": true,
+  "sharing_disabled_42_exact": true,
+  "sharing_enabled_successes": 40,
+  "sharing_enabled_failures": 2,
+  "sharing_enabled_hits": 41,
+  "failed_sequences": [
+    2001,
+    2022
+  ],
+  "failure": "ZE_RESULT_ERROR_DEVICE_LOST followed by unavailable compiled graph",
+  "disabled_repeat_run": false,
+  "conclusion": "Model sharing is not qualified for installation. One enabled run fails after baseline and disabled runs pass. Cause and reproducibility remain to be established; do not attribute the failure exclusively to model lifetime or power state."
+}
