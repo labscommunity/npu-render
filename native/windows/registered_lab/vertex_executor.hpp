@@ -14,7 +14,9 @@ using VertexConstants = std::array<std::vector<VertexBits>, 14>;
 // only the explicit single-mip addressing contract in shader_texture.hpp.
 class RegisterExecutor {
     struct State;
+    struct Configuration;
     std::unique_ptr<State> state;
+    std::unique_ptr<Configuration> configuration;
 public:
     // Validate lowering constraints after parse_vertex/parse_pixel, without choosing a
     // device or claiming that a complete graphics pipeline can execute.

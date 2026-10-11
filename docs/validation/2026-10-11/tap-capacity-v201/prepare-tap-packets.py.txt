@@ -1,0 +1,12 @@
+import hashlib,json,os,struct,sys
+from pathlib import Path
+root=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm'
+out=Path(sys.argv[1]);out.mkdir(exist_ok=False);records=[]
+for case,digest in ((3,'6f5a037d12529d97d467e5a0dda7cc9ad12b2f3d2e13f1f12a8214ad8192f68a'),(4,'f6972738566c08bddf48e73d328ee5f360e9b6518c505020bea6c487efa3dd9c')):
+ source=root/'indexed-dwm-stream-v102'/f'slow-request-{case}.bin';original=source.read_bytes();assert hashlib.sha256(original).hexdigest()==digest
+ h=struct.unpack_from('<3Q14I',original);assert len(original)==80+h[12] and h[14]==1 and h[15]==0
+ for repeat in range(3):
+  data=bytearray(original);sequence=case*10+repeat;struct.pack_into('<I',data,56,sequence)
+  name=f'request-{h[13]}-{h[1]:016x}{h[2]:016x}-{sequence}.bin';(out/name).write_bytes(data)
+  records.append({'case':case,'repeat':repeat,'client_pid':h[13],'sequence':sequence,'file':name,'source_sha256':digest,'derived_sha256':hashlib.sha256(data).hexdigest(),'modified_field':'sequence only'})
+(out/'requests.json').write_text(json.dumps(records,indent=2)+'\n');print(json.dumps({'prepared_requests':len(records),'original_packets':2,'identical_geometry_and_pixels':True}))

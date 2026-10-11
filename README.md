@@ -125,8 +125,15 @@ selects a qualified batch size for that exact captured shader. The unchanged
 failed draw now completes on the NPU with exact coverage; CPU and NPU images
 differ in 684 components by at most one byte. All 24 CPU suites and native NPU
 regressions pass. The draw still takes about 55 seconds, so resolving compilation
-does not establish usable interaction. Two captured blur requests also take
-about 23 and 11 seconds; their excess graph capacity is the next optimization.
+does not establish usable interaction.
+
+The [blur capacity change](docs/validation/2026-10-11/tap-capacity-v201/report.json)
+reduces two captured requests from 22.8 to 3.7 seconds and from 11.5 to 1.9 seconds
+in repeated NPU execution, preserving every output pixel. It sizes the exact
+shader's tap axis from its uniform loop bound; all sampling and arithmetic stay
+on the NPU. All 24 CPU suites and native NPU regressions pass, including changing
+bounds on the same executor. Cold capacity compilation adds roughly 12 seconds
+in this experiment. Installed desktop validation is next.
 
 [Triangle batching](docs/validation/2026-10-11/triangle-collation-v196/report.json)
 reduces one captured request from 132 to 47 batches, preserving every pixel and

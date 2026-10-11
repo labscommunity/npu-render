@@ -1,0 +1,53 @@
+{
+  "build": "present-umd-v201",
+  "source_base": "55451bcf474d96ade956d47fe47ccb1324c73490",
+  "clean_cpu_suites": 24,
+  "cpu_test_seconds": 176.21,
+  "native_npu_qualification_passed": true,
+  "source_files_verified": 116,
+  "binary_files_verified": 30,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "timings": [
+    {
+      "case": 3,
+      "baseline_draw_ms": [
+        23021.755,
+        22762.436,
+        22855.691
+      ],
+      "candidate_draw_ms": [
+        15437.553,
+        3741.933,
+        3705.24
+      ],
+      "baseline_warm_median_ms": 22809.0635,
+      "candidate_warm_median_ms": 3723.5865,
+      "warm_draw_speedup": 6.125562948517511
+    },
+    {
+      "case": 4,
+      "baseline_draw_ms": [
+        11526.044,
+        11408.728,
+        11509.285
+      ],
+      "candidate_draw_ms": [
+        13745.993,
+        1854.196,
+        1864.244
+      ],
+      "baseline_warm_median_ms": 11459.0065,
+      "candidate_warm_median_ms": 1859.2199999999998,
+      "warm_draw_speedup": 6.163340809586816
+    }
+  ],
+  "findings": [
+    "The exact captured mirrored blur shader now sizes its tap axis to the smallest power of two containing the uniform tap count. Nine taps use sixteen lanes instead of 128. Coordinates, sampling, weights and pairwise reduction remain NPU arithmetic.",
+    "The bound is checked before graph replacement. Capacity changes release the old graph before compiling the new one; a failed replacement leaves the executor unusable. Negative and zero bounds retain zero-iteration semantics. Bounds above 128 fail before target modification.",
+    "The scalar reference checks 69 scenarios spanning negative/zero counts, power-of-two boundaries, 128 taps and repeated large/small transitions on the same executor. Invalid 129 followed by valid 9 is exercised within each coordinate scenario.",
+    "Two unchanged captured v102 blur requests are compared through serial qualified baseline and candidate NPU workers, three repetitions each. Derived packets change only unique sequence numbers. Complete output pixels are compared; measured timings appear above. The first candidate draw includes any capacity-specific compilation.",
+    "The first clean attempt, build 200, failed the new invalid-bound test because its catch expected runtime_error while the contract throws invalid_argument. Correcting the assertion retains the required rejection; the failed log is preserved.",
+    "All 24 CPU suites, seven NPU rendering regression executables, 58 driver draws and 8 clears pass. Both original single-mip captures retain exact CPU/NPU output. This qualification does not establish installed desktop interaction or a Tahoma performance benefit."
+  ]
+}

@@ -57,7 +57,7 @@ static Program mirrored_tap_program(const Program &p){
 }
 struct RegisterExecutor::State {
     Program program;
-    uint32_t count, logical_count;
+    uint32_t count, logical_count, tap_capacity;
     bool mirrored_taps;
     TextureShapes texture_shapes;
     bool checks_sample_coordinates = false;
@@ -71,9 +71,11 @@ struct RegisterExecutor::State {
     std::string execution_device;
     bool failed = false;
     State(const Program &p, uint32_t vertices, const std::string &backend,
-          const TextureShapes &shapes, const TextureSamplers &samplers) : program(mirrored_loop_shader(p)?mirrored_tap_program(p):lower_bounded_loops(p)), count(vertices), logical_count(vertices), mirrored_taps(mirrored_loop_shader(p)), texture_shapes(shapes) {
+          const TextureShapes &shapes, const TextureSamplers &samplers, uint32_t tap_limit=128) : program(mirrored_loop_shader(p)?mirrored_tap_program(p):lower_bounded_loops(p)), count(vertices), logical_count(vertices), tap_capacity(tap_limit), mirrored_taps(mirrored_loop_shader(p)), texture_shapes(shapes) {
         check(count && count <= 65536 && (backend == "CPU" || backend == "GPU" || backend == "NPU"));
-        check(count<=RegisterExecutor::maximum_batch(p));if(mirrored_taps)count*=128;
+        check(count<=RegisterExecutor::maximum_batch(p));
+        check(tap_capacity && tap_capacity<=128 && !(tap_capacity&(tap_capacity-1)));
+        if(mirrored_taps)count*=tap_capacity;
         RegisterExecutor::validate(program);
         check(!quad_derivatives(program) || !(count%4));
         std::array<Lanes, 16> input{}, temporary{}, output{};
@@ -96,11 +98,11 @@ struct RegisterExecutor::State {
         };
         for (unsigned i = 0; i < 16; ++i) if (program.inputs[i]) {
             if(mirrored_taps && i==15){
-                std::vector<int32_t> taps(count);for(unsigned n=0;n<count;++n)taps[n]=int32_t(n%128);
+                std::vector<int32_t> taps(count);for(unsigned n=0;n<count;++n)taps[n]=int32_t(n%tap_capacity);
                 input[i][0]={number(0),op::Constant::create(ov::element::i32,ov::Shape{count,1},taps)};continue;
             }
             auto value = parameter_pair(false, i, logical_count);
-            if(mirrored_taps){std::vector<int32_t> repeated(count);for(unsigned n=0;n<count;++n)repeated[n]=int32_t(n/128);
+            if(mirrored_taps){std::vector<int32_t> repeated(count);for(unsigned n=0;n<count;++n)repeated[n]=int32_t(n/tap_capacity);
                 const auto index=op::Constant::create(ov::element::i32,ov::Shape{count},repeated);
                 value={std::make_shared<op::Gather>(value.floating,index,integer(0)),std::make_shared<op::Gather>(value.integer,index,integer(0))};
             }
@@ -643,7 +645,7 @@ struct RegisterExecutor::State {
                 // Native ReduceSum demotes these values; axis-1 Gather in a
                 // rank-3 reduction produced zeros. Flat row Gather + Add
                 // preserves the qualified FP32 path for this tap reduction.
-                for(unsigned remaining=128;remaining>1;remaining/=2){
+                for(unsigned remaining=tap_capacity;remaining>1;remaining/=2){
                     std::vector<int32_t> evens(logical_count*remaining/2),odds(evens.size());
                     for(unsigned row=0;row<logical_count;++row)for(unsigned n=0;n<remaining/2;++n){
                         const auto at=row*(remaining/2)+n;evens[at]=int32_t(row*remaining+n*2);odds[at]=evens[at]+1;}
@@ -834,16 +836,37 @@ uint32_t RegisterExecutor::maximum_batch(const Program &p){
         std::equal(p.bytecode.begin(),p.bytecode.end(),std::begin(three)))return 512u;
     return 65536u;
 }
+struct RegisterExecutor::Configuration {
+    Program program;
+    uint32_t count;
+    std::string backend;
+    TextureShapes textures;
+    TextureSamplers samplers;
+};
 RegisterExecutor::RegisterExecutor(const Program &p, uint32_t count, const std::string &backend,
                                    const TextureShapes &textures, const TextureSamplers &samplers)
-    : state(std::make_unique<State>(p, count, backend, textures, samplers)) {}
+    : state(std::make_unique<State>(p, count, backend, textures, samplers,mirrored_loop_shader(p)?1u:128u)) {
+    if(mirrored_loop_shader(p))configuration=std::make_unique<Configuration>(Configuration{p,count,backend,textures,samplers});
+}
 RegisterExecutor::~RegisterExecutor() = default;
 RegisterExecutor::Result RegisterExecutor::execute(const std::vector<VertexRegisters> &vertices, const VertexConstants &constants,
                                                    const TexturePixels &textures) {
-    check(!state->failed && vertices.size() == state->logical_count);
+    check(state && !state->failed && vertices.size() == state->logical_count);
     for (unsigned i = 0; i < 14; ++i) check(constants[i].size() >= state->program.constants[i]);
     Result result;
-    if(state->mirrored_taps){int32_t taps;std::memcpy(&taps,&constants[0][0][3],4);check(taps<=128);}
+    if(state->mirrored_taps){
+        int32_t taps;std::memcpy(&taps,&constants[0][0][3],4);check(taps<=128);
+        uint32_t capacity=1;while(taps>int32_t(capacity))capacity*=2;
+        if(capacity!=state->tap_capacity){
+            check(bool(configuration));const auto &c=*configuration;
+            // The exact captured shader's uniform loop bound controls only
+            // graph capacity. Coordinates, samples, weights and reduction
+            // still execute on the provider. Release before recompiling for
+            // the qualified NPU driver's model-lifetime constraint.
+            state.reset();
+            state=std::make_unique<State>(c.program,c.count,c.backend,c.textures,c.samplers,capacity);
+        }
+    }
     try {
         for (size_t i = 0; i < state->bindings.size(); ++i) {
             const auto &binding = state->bindings[i]; auto tensor = state->request.get_tensor(binding.name);

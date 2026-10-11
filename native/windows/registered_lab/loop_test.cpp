@@ -55,19 +55,24 @@ void captured(const std::string &backend){
  for(unsigned n=0;n<16;++n)textures[0][n]={float(n%4)/4,float(n/4)/4,float(n)/16,1};
  std::vector<VertexRegisters> input(4);for(unsigned n=0;n<4;++n){input[n][1]={as_bits(1),as_bits(1),as_bits(1),as_bits(1)};input[n][2]={as_bits((float(n)+.5f)/4),as_bits(.375f),as_bits(1),as_bits(1)};}
  PixelExecutor executor(p,uint32_t(input.size()),backend,shapes,samplers);
- for(unsigned scenario=0;scenario<3;++scenario)for(unsigned taps:{0u,1u,7u,8u,9u,16u,17u,31u,64u,127u,128u}){
+ for(unsigned scenario=0;scenario<3;++scenario)for(int32_t taps:{-1,0,1,2,3,4,5,7,8,9,16,17,31,32,33,64,65,127,128,9,1,128,0}){
   VertexConstants constants;constants[0].resize(130);
-  for(unsigned n=0;n<128;++n)constants[0][n]={as_bits(float(n)/16),as_bits(float(n)/32),as_bits(taps?1.f/(2*taps):0.f),0};
+  for(unsigned n=0;n<128;++n)constants[0][n]={as_bits(float(n)/16),as_bits(float(n)/32),as_bits(taps>0?1.f/(2*taps):0.f),0};
   if(scenario){
    for(unsigned n=0;n<128;++n)constants[0][n]={as_bits(float(int(n%13)-6)*.37f),as_bits(float(int(n%17)-8)*.21f),as_bits(float(int(n%7)-3)*.0078125f),0};
    for(unsigned n=0;n<input.size();++n)input[n][2]={as_bits((float(n)-2.25f)*17),as_bits((float(n)-1.5f)*9),as_bits(scenario==1?1.f:.375f),as_bits(1)};
   }else for(unsigned n=0;n<input.size();++n)input[n][2]={as_bits((float(n)+.5f)/4),as_bits(.375f),as_bits(1),as_bits(1)};
   constants[0][0][3]=taps;constants[0][128]={as_bits(0),as_bits(0),as_bits(1),as_bits(1)};constants[0][129]={0,0,as_bits(.25f),as_bits(.25f)};
+  if(taps==9){
+   constants[0][0][3]=129;bool rejected=false;
+   try{(void)executor.execute(input,constants,textures);}catch(const std::invalid_argument &){rejected=true;}
+   TEST(rejected);constants[0][0][3]=uint32_t(taps);
+  }
   const auto result=executor.execute(input,constants,textures);TEST(result.execution_device.rfind(backend,0)==0);float max_error=0;
   for(unsigned n=0;n<input.size();++n){const auto expected=reference_vertex(p,input[n],constants,shapes,samplers,textures);
    for(unsigned c=0;c<4;++c){const auto error=std::abs(as_float(result.vertices[n][0][c])-as_float(expected[0][c]));max_error=(std::max)(max_error,error);TEST(error<=1e-5f);}
   }
-  std::printf("{\"captured_shader_words\":1850,\"scenario\":%u,\"taps\":%u,\"verified_components\":16,\"maximum_error\":%.9g,\"execution_device\":\"%s\"}\n",scenario,taps,double(max_error),backend.c_str());std::fflush(stdout);
+  std::printf("{\"captured_shader_words\":1850,\"scenario\":%u,\"taps\":%d,\"verified_components\":16,\"maximum_error\":%.9g,\"execution_device\":\"%s\"}\n",scenario,taps,double(max_error),backend.c_str());std::fflush(stdout);
  }
 }
 void raster(const std::string &backend,const std::string &packet_path){
