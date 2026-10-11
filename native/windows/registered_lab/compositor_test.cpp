@@ -84,9 +84,48 @@ void captured(const std::string &backend,bool desktop_shapes=false,bool fade=fal
   }
  }
 }
+void three_textures(const std::string &backend){
+ const auto &words=nr::registered_lab::test_fixture::compositor_three_texture_pixel_words;
+ const auto program=parse_pixel(words,std::size(words));
+ TEST(program.constants[0]==8 && program.inputs[4]==15 && program.textures[2] && RegisterExecutor::maximum_batch(program)==512);
+ bool rejected=false;try{PixelExecutor oversized(program,1024,backend);}catch(const std::invalid_argument &){rejected=true;}TEST(rejected);
+ TextureShapes shapes{};TextureSamplers samplers{};TexturePixels textures{};
+ for(unsigned slot=0;slot<3;++slot){
+  shapes[slot]=slot?TextureShape{768,576,15}:TextureShape{128,128,15};
+  textures[slot].resize(size_t(shapes[slot].width)*shapes[slot].height);
+  for(size_t n=0;n<textures[slot].size();++n)textures[slot][n]={float((n+slot)%7)/8,float((n/7+slot)%7)/8,float(n%11)/16,float((n+slot*3)%16)/16};
+ }
+ const float coordinates[]{-2.f,-.125f,0.f,.125f,.375f,.75f,1.f,2.f};
+ std::vector<VertexRegisters> inputs(512);
+ for(unsigned n=0;n<inputs.size();++n){
+  inputs[n][1]={as_bits(1),as_bits(1),as_bits(1),as_bits(float(n%4)/4)};
+  for(unsigned reg_index=2;reg_index<=4;++reg_index)
+   inputs[n][reg_index]={as_bits(coordinates[(n+reg_index)%8]),as_bits(coordinates[(n/8+reg_index)%8]),as_bits(float(reg_index)*.5f),as_bits(1)};
+ }
+ const uint32_t captured_constants[8][4]{
+  {1064234735,1064234735,1064234735,1065353216},{1062996279,1062996279,1062996279,1063708391},
+  {0,0,0,0},{1065353216,0,0,0},{998244352,998244352,1057947648,1058209792},
+  {1124073472,1124073472,1006632960,1006632960},{984263339,996380217,1051415894,1055216981},
+  {1145044992,1141899264,984263339,987991609}};
+ for(const auto filter:{TextureFilter::point,TextureFilter::linear}){
+  for(unsigned slot=0;slot<3;++slot)samplers[slot].filter=filter;
+  PixelExecutor executor(program,uint32_t(inputs.size()),backend,shapes,samplers);
+  for(unsigned scenario=0;scenario<6;++scenario){
+   VertexConstants cb;cb[0].resize(8);std::memcpy(cb[0].data(),captured_constants,sizeof(captured_constants));
+   if(scenario)for(unsigned c=0;c<4;++c){cb[0][0][c]=as_bits(float(scenario-1)/4);cb[0][1][c]=as_bits(float(5-scenario)/4);}
+   const auto result=executor.execute(inputs,cb,textures);TEST(result.execution_device.rfind(backend,0)==0);float maximum=0;
+   for(unsigned n=0;n<inputs.size();++n){const auto expected=reference_vertex(program,inputs[n],cb,shapes,samplers,textures);
+    for(unsigned c=0;c<4;++c){const auto actual=as_float(result.vertices[n][0][c]),want=as_float(expected[0][c]);
+     maximum=(std::max)(maximum,std::abs(actual-want));TEST(std::isfinite(actual) && std::isfinite(want) && std::abs(actual-want)<=1e-5f);}}
+   std::printf("{\"captured_shader_words\":1061,\"textures\":3,\"batch\":512,\"filter\":%u,\"scenario\":%u,\"verified_components\":2048,\"maximum_error\":%.9g,\"execution_device\":\"%s\"}\n",
+    unsigned(filter),scenario,double(maximum),backend.c_str());std::fflush(stdout);
+  }
+ }
+}
 }
 int main(int argc,char **argv)try{TEST(argc<=3);const std::string backend=argc>=2?argv[1]:"CPU";const std::string section=argc>=3?argv[2]:"all";
  if(section=="all" || section=="arithmetic")arithmetic(backend);if(section=="all" || section=="captured")captured(backend);
  if(section=="all" || section=="desktop")captured(backend,true);
- if(section=="all" || section=="fade")captured(backend,true,true);return 0;
+ if(section=="all" || section=="fade")captured(backend,true,true);
+ if(section=="all" || section=="three")three_textures(backend);return 0;
 }catch(const std::exception&e){std::fprintf(stderr,"compositor test: %s\n",e.what());return 1;}

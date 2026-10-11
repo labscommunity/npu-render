@@ -1,0 +1,5 @@
+import hashlib,json,sys
+from pathlib import Path
+r=Path(sys.argv[1]);a=(r/'CPU.pixels').read_bytes();b=(r/'NPU.pixels').read_bytes();assert len(a)==len(b)==1024*768*4
+errors=[abs(x-y) for x,y in zip(a,b)];report={'components':len(a),'differing_components':sum(x!=0 for x in errors),'maximum_byte_difference':max(errors),'cpu_sha256':hashlib.sha256(a).hexdigest(),'npu_sha256':hashlib.sha256(b).hexdigest(),'exact_pixels':a==b,'allowed_byte_difference':1}
+(r/'pixel-comparison.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report));assert report['maximum_byte_difference']<=1

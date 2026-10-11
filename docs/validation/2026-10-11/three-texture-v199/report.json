@@ -1,0 +1,28 @@
+{
+  "build": "present-umd-v199",
+  "source_base": "99aa49d3ce039ab1f73e96439bc21d8d3389c75c",
+  "clean_cpu_suites": 24,
+  "cpu_test_seconds": 139.66,
+  "source_files_verified": 116,
+  "binary_files_verified": 30,
+  "native_npu_execution": true,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "original_capture_sha256": "8e634f6ea14a33f0204d2aff4c1f1b1033db814c1959d04a1c5717d4bd63e44c",
+  "capture_covered_samples": 425023,
+  "capture_raster_batches": 1679,
+  "capture_target_pixels": 786432,
+  "scalar_oracle_max_byte_error": 1,
+  "cpu_npu_pixels_exact": false,
+  "maximum_cpu_npu_byte_difference": 1,
+  "differing_components": 684,
+  "native_npu_driver_draws": 58,
+  "native_npu_driver_clears": 8,
+  "findings": [
+    "The exact captured 1061-word DWM shader selects an internal batch capacity of512. The rule matches all original bytecode words; it does not infer semantics from shader size. Other programs retain their existing limits.",
+    "Twelve point/linear sampling and color scenarios check the shader against the independent scalar interpreter on CPU and NPU, including out-of-range clamp coordinates and changed constants. Oversized1024 construction is rejected by policy; this is not a claim that an Intel1024 compilation was tested.",
+    "The unchanged failed desktop capture now succeeds with the ordinary default4096 request, automatically capped internally. Coverage matches exactly. CPU and NPU images differ in684 components by at most one byte and reproduce the prior explicit512 outputs. Both scalar oracles pass.",
+    "Warm NPU draw execution is54.589seconds, including40.054seconds in shading and interpolation,10.176seconds in coverage and4.065seconds in blending. This resolves the compiler failure but is far from interactive performance.",
+    "All24 clean CPU suites, seven native NPU rendering regression executables,58 driver draws and8 clears pass. Installed desktop validation remains necessary. The previous trial restored the normal VM desktop at1280x800; the physical machine was not restarted or modified."
+  ]
+}

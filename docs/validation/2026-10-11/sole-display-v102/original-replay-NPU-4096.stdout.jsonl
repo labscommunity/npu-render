@@ -1,0 +1,2 @@
+[ERROR] 17:35:45.481 [vpux-compiler] Got Diagnostic at loc(fused<{name = "Add_11856", type = "Add"}>["Add_11856", "add_0"]) : failed to legalize unresolved materialization from ('tensor<1x4096x1x1xf32>') to ('tensor<1x4096x1x1xf32, {order = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3, d1)>}>') that remained live after conversion
+[ERROR] 17:35:45.481 [vpux-compiler] Failed Pass ConvertLayers2VPU on Operation loc(fused<{name = "main", type = "Func"}>["main"])

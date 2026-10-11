@@ -1,0 +1,42 @@
+{
+  "trial": "v102",
+  "source_commit": "99aa49d3ce039ab1f73e96439bc21d8d3389c75c",
+  "umd_build": "present-umd-v198",
+  "package_version": "0.0.90.0",
+  "worker_successes_by_client": {
+    "42": 13,
+    "5192": 52,
+    "5112": 234,
+    "5812": 56
+  },
+  "worker_successes_by_operation": {
+    "draw": 297,
+    "color_clear": 58
+  },
+  "acknowledged_successes_by_client": {
+    "42": 13,
+    "5192": 52,
+    "5112": 233,
+    "5812": 56
+  },
+  "acknowledged_failures": 2,
+  "received_frames": 4,
+  "live_draw_ms": 177102.032,
+  "live_compile_and_draw_ms": 286963,
+  "full_desktop_offload": false,
+  "usable_interactive_desktop": false,
+  "tahoma_performance_tested": false,
+  "original_cleanup_passed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "concurrent_cpu_build": false,
+  "archive_entries_verified": 35,
+  "findings": [
+    "355 successful NPU requests comprise 13 prewarm draws, 284 live draws and 58 live clears. The relay acknowledges 354 successes and two failures; one completed request lacks an acknowledgement during cleanup.",
+    "Four 1024x768 frames arrive while the indirect display is the sole active path. The fourth shows wallpaper, icons and the full taskbar. Start and Escape are sent, but a visible interaction response is not verified.",
+    "The previous 144-vertex window draw now executes on the NPU. A later 1061-word pixel shader with three textures fails compilation at batch4096 with unresolved tensor-layout materialization and vclAllocatedExecutableCreate2 code0x78000004. No NPU device-loss error is recorded.",
+    "The unchanged original capture contains 42 triangles and targets 1024x768. Serial replay on the qualified installed build reproduces the NPU compilation failure at4096; both CPU and NPU pass at512 with425023 covered samples and1679 batches. CPU/NPU images differ in684 components by at most one byte; they are not byte-identical. Both independent scalar coverage/color checks pass. NPU draw execution takes55.162seconds, CPU25.502seconds.",
+    "The observer stops on DWM rejection after230397ms and waits85012ms for topology restoration. Both custom drivers are removed successfully and the native stream configuration is removed. This trial does not overlap a CPU build.",
+    "Two preserved blur packets request nine taps but the existing NPU graph reserves128. Their repeated draw times are approximately23seconds and11seconds. Reducing unused graph capacity is the next separate performance experiment; no Tahoma performance result is established."
+  ]
+}

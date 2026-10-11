@@ -113,27 +113,28 @@ now has an exact NPU specialization for opaque, one-to-one point-sampled quads.
 Its captured 1024×768 replay passes, as do changing-image and driver callback
 tests. This is a checked subset, not general desktop rendering.
 
-The [latest installed trial](docs/validation/2026-10-11/sole-display-v101/report.json)
-completes 293 live desktop NPU draws, 55 live NPU clears and 13 prewarm draws.
-All 361 successful requests receive acknowledgements; two further DWM requests
-exceed the renderer's raster batch limit. Four frames arrive, including wallpaper,
-icons and taskbar. Start-menu interaction still has no verified visible response.
-The captured failure reproduces on CPU and NPU: a 642×660 target forces an
-eight-pixel batch through an obsolete divisibility rule. Both custom drivers
-unload cleanly. A concurrent CPU build prevents isolated performance conclusions.
+The [latest installed trial](docs/validation/2026-10-11/sole-display-v102/report.json)
+completes 284 live desktop NPU draws, 58 live NPU clears and 13 prewarm draws.
+Four frames arrive while the indirect display is the sole active path, including
+wallpaper, icons and taskbar. Start-menu interaction still has no verified visible
+response. A three-texture shader fails NPU compilation; both custom drivers
+subsequently unload cleanly. No CPU build overlaps this trial.
+
+The [three-texture fix](docs/validation/2026-10-11/three-texture-v199/report.json)
+selects a qualified batch size for that exact captured shader. The unchanged
+failed draw now completes on the NPU with exact coverage; CPU and NPU images
+differ in 684 components by at most one byte. All 24 CPU suites and native NPU
+regressions pass. The draw still takes about 55 seconds, so resolving compilation
+does not establish usable interaction. Two captured blur requests also take
+about 23 and 11 seconds; their excess graph capacity is the next optimization.
 
 [Triangle batching](docs/validation/2026-10-11/triangle-collation-v196/report.json)
-preserves complete captured output images while reducing one desktop request
-from 132 to 47 batches. Its warm draw time improves from about 6.0 to 2.65 seconds;
-another request remains at 204 batches and slows by 6.6%. These are request-level
-diagnostics. All 24 CPU suites and native NPU regressions pass; this change has
-not yet been tested in an installed desktop trial.
-
-The [window batch fix](docs/validation/2026-10-11/packed-window-v198/report.json)
-removes that divisibility rule. The unchanged failed draw now completes in 17
-batches on the NPU, with all 423,720 pixels identical to the CPU result and the
-independent reference. Odd-target, clipping and partial-batch tests pass, along
-with all 24 CPU suites and the NPU regressions. Desktop validation is next.
+reduces one captured request from 132 to 47 batches, preserving every pixel and
+improving its warm draw time from about 6.0 to 2.65 seconds. Another request slows
+by 6.6%. The [window batch fix](docs/validation/2026-10-11/packed-window-v198/report.json)
+removes an obsolete target-area divisibility rule. Its previously failed draw
+matches all 423,720 pixels on CPU and NPU and now executes in the installed trial.
+These results establish neither full desktop offload nor a Tahoma benefit.
 
 The [depth-state fix](docs/validation/2026-10-10/depthless-v194/report.json)
 replays the earlier unchanged capture exactly on the NPU, including 700 covered
