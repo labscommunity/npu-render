@@ -9,7 +9,7 @@ param(
  [Parameter(Mandatory=$true)][ValidatePattern('^idd-topology-[a-z0-9-]+$')][string]$TopologyName,
  [Parameter(Mandatory=$true)][string]$TopologyProbe,
  [Parameter(Mandatory=$true)][ValidatePattern('^[a-fA-F0-9]{64}$')][string]$TopologySha256,
- [ValidateRange(5,300)][int]$ObservationSeconds=90
+ [ValidateRange(5,420)][int]$ObservationSeconds=90
 )
 $ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue'
 . "$PSScriptRoot\lab_device_identity.ps1"

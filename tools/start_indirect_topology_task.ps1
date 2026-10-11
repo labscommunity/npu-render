@@ -4,7 +4,7 @@ param(
  [Parameter(Mandatory=$true)][ValidatePattern('^idd-topology-[a-z0-9-]+$')][string]$Name,
  [switch]$SystemRendererControl,
  [switch]$SoleIndirect,
- [ValidateRange(5,300)][int]$ObservationSeconds=45
+ [ValidateRange(5,420)][int]$ObservationSeconds=45
 )
 $ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue'
 . "$PSScriptRoot\lab_device_identity.ps1"
