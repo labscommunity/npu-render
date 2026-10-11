@@ -113,13 +113,21 @@ now has an exact NPU specialization for opaque, one-to-one point-sampled quads.
 Its captured 1024×768 replay passes, as do changing-image and driver callback
 tests. This is a checked subset, not general desktop rendering.
 
-The [latest installed trial](docs/validation/2026-10-10/sole-display-v100/report.json)
-completes 354 live desktop NPU draws, 88 live NPU clears and 13 prewarm draws.
-All 455 worker requests receive successful acknowledgements. Thirteen frames
-arrive, including wallpaper, icons and taskbar at different stages. Start-menu
-interaction still has no verified visible response. The previously rejected
-depth-enabled draw now succeeds; DWM next encounters an unsupported texture
-filter setting on a single-mip view. Both custom drivers unload cleanly.
+The [latest installed trial](docs/validation/2026-10-11/sole-display-v101/report.json)
+completes 293 live desktop NPU draws, 55 live NPU clears and 13 prewarm draws.
+All 361 successful requests receive acknowledgements; two further DWM requests
+exceed the renderer's raster batch limit. Four frames arrive, including wallpaper,
+icons and taskbar. Start-menu interaction still has no verified visible response.
+The captured failure reproduces on CPU and NPU: a 642×660 target forces an
+eight-pixel batch through an obsolete divisibility rule. Both custom drivers
+unload cleanly. A concurrent CPU build prevents isolated performance conclusions.
+
+[Triangle batching](docs/validation/2026-10-11/triangle-collation-v196/report.json)
+preserves complete captured output images while reducing one desktop request
+from 132 to 47 batches. Its warm draw time improves from about 6.0 to 2.65 seconds;
+another request remains at 204 batches and slows by 6.6%. These are request-level
+diagnostics. All 24 CPU suites and native NPU regressions pass; this change has
+not yet been tested in an installed desktop trial.
 
 The [depth-state fix](docs/validation/2026-10-10/depthless-v194/report.json)
 replays the earlier unchanged capture exactly on the NPU, including 700 covered
@@ -128,8 +136,8 @@ and eight NPU clears pass. Installed v100 also completes that draw on the NPU.
 
 The [single-mip filter fix](docs/validation/2026-10-11/single-mip-v195/report.json)
 now replays both new captures exactly on the NPU: 10,200 affected pixels in each
-512×512 target. All 24 CPU suites and the native NPU driver checks pass. The next
-installed trial will test this correction in the desktop.
+512×512 target. All 24 CPU suites and the native NPU driver checks pass. Installed
+v101 progresses to a different failure in raster batch sizing.
 
 The [snapped-boundary fix](docs/validation/2026-10-10/point-snap-v189/report.json)
 retains exact raster boundaries while allowing bounded FP32 endpoint rounding.

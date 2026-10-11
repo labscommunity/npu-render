@@ -23,4 +23,21 @@ inline std::vector<std::array<int32_t,4>> bounded_triangle_regions(
     }
     return regions;
 }
+// A later overlapping region must execute after every earlier one. Regions
+// in the same layer are disjoint, so their fragments can share an NPU batch
+// without changing blend order. Bounds include any derivative helper quads.
+inline std::vector<std::vector<size_t>> triangle_region_layers(const std::vector<std::array<int32_t,4>> &regions){
+    if(regions.size()>4096/3)throw std::invalid_argument("too many triangle regions");
+    std::vector<size_t> depth(regions.size());std::vector<std::vector<size_t>> layers;
+    for(size_t i=0;i<regions.size();++i){
+        const auto &a=regions[i];if(a[0]>=a[2] || a[1]>=a[3])continue;
+        for(size_t j=0;j<i;++j){const auto &b=regions[j];
+            if(b[0]<b[2] && b[1]<b[3] && a[0]<b[2] && b[0]<a[2] && a[1]<b[3] && b[1]<a[3])
+                depth[i]=(std::max)(depth[i],depth[j]+1);
+        }
+        if(layers.size()<=depth[i])layers.resize(depth[i]+1);
+        layers[depth[i]].push_back(i);
+    }
+    return layers;
+}
 }

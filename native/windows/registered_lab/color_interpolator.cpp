@@ -23,15 +23,16 @@ Node safe_denominator(const Node &a) { return add(a,floating(std::make_shared<op
 }
 struct ColorInterpolator::State {
     uint32_t count;
+    bool per_sample;
     ov::Core core;
     ov::CompiledModel compiled;
     ov::InferRequest request;
     std::string device;
     bool failed=false;
-    State(uint32_t n,const std::string &backend,bool perspective):count(n) {
+    State(uint32_t n,const std::string &backend,bool perspective,bool varied):count(n),per_sample(varied) {
         require(n && n<=65536 && (backend=="NPU" || backend=="CPU" || backend=="GPU"));
-        auto vertices=std::make_shared<op::Parameter>(ov::element::f32,ov::Shape{1,9});
-        auto colors=std::make_shared<op::Parameter>(ov::element::f32,ov::Shape{1,12});
+        auto vertices=std::make_shared<op::Parameter>(ov::element::f32,ov::Shape{varied?n:1,9});
+        auto colors=std::make_shared<op::Parameter>(ov::element::f32,ov::Shape{varied?n:1,12});
         auto points=std::make_shared<op::Parameter>(ov::element::i32,ov::Shape{n,2});
         auto coverage=std::make_shared<op::Parameter>(ov::element::i32,ov::Shape{n,1});
         vertices->output(0).get_tensor().set_names({"vertices"});colors->output(0).get_tensor().set_names({"colors"});
@@ -68,26 +69,39 @@ struct ColorInterpolator::State {
         require(devices.size()==1 && (devices[0]==backend || devices[0].rfind(backend+".",0)==0));
         device=devices[0];request=compiled.create_infer_request();
     }
+    Result run(const std::array<ProjectedVertex,3> *triangles,const std::array<Color,3> *colors,bool varied,
+               const std::vector<Point> &points,const std::vector<uint8_t> &coverage);
 };
-ColorInterpolator::ColorInterpolator(uint32_t n,const std::string &backend,bool perspective):state(std::make_unique<State>(n,backend,perspective)) {}
+ColorInterpolator::ColorInterpolator(uint32_t n,const std::string &backend,bool perspective,bool per_sample_triangle):state(std::make_unique<State>(n,backend,perspective,per_sample_triangle)) {}
 ColorInterpolator::~ColorInterpolator()=default;
 ColorInterpolator::Result ColorInterpolator::execute(const std::array<ProjectedVertex,3> &triangle,const std::array<Color,3> &colors,
     const std::vector<Point> &points,const std::vector<uint8_t> &coverage) {
-    auto &s=*state;require(!s.failed && points.size()==s.count && coverage.size()==s.count);
-    std::array<float,9> vertices{};
-    for(unsigned v=0;v<3;++v) {
+    return state->run(&triangle,&colors,false,points,coverage);
+}
+ColorInterpolator::Result ColorInterpolator::execute(const std::vector<std::array<ProjectedVertex,3>> &triangles,
+    const std::vector<std::array<Color,3>> &colors,const std::vector<Point> &points,const std::vector<uint8_t> &coverage){
+    require(triangles.size()==state->count && colors.size()==state->count);
+    return state->run(triangles.data(),colors.data(),true,points,coverage);
+}
+ColorInterpolator::Result ColorInterpolator::State::run(const std::array<ProjectedVertex,3> *triangles,
+    const std::array<Color,3> *colors,bool varied,const std::vector<Point> &points,const std::vector<uint8_t> &coverage){
+    auto &s=*this;require(!s.failed && (!varied || s.per_sample) && points.size()==s.count && coverage.size()==s.count);
+    const size_t rows=s.per_sample?s.count:1;std::vector<float> vertices(rows*9);std::vector<Color> values(rows*3);
+    for(size_t n=0;n<rows;++n)for(unsigned v=0;v<3;++v) {
+        const auto &triangle=triangles[varied?n:0];const auto &color=colors[varied?n:0];
         for(const auto f:triangle[v].screen)require(std::isfinite(f) && std::abs(f)<=double(coordinate_limit)/256);
         require(std::isfinite(triangle[v].inverse_w) && triangle[v].inverse_w>0 && triangle[v].inverse_w<=65536);
-        for(const auto f:colors[v])require(std::isfinite(f) && std::abs(f)<=16384);
-        vertices[v*3]=triangle[v].screen[0];vertices[v*3+1]=triangle[v].screen[1];vertices[v*3+2]=triangle[v].inverse_w;
+        for(const auto f:color[v])require(std::isfinite(f) && std::abs(f)<=16384);
+        vertices[n*9+v*3]=triangle[v].screen[0];vertices[n*9+v*3+1]=triangle[v].screen[1];vertices[n*9+v*3+2]=triangle[v].inverse_w;
+        values[n*3+v]=color[v];
     }
     for(size_t i=0;i<points.size();++i) {
         require(coverage[i]<=1);
         for(const auto p:points[i])require(p>=-coordinate_limit && p<=coordinate_limit);
     }
     s.failed=true;
-    std::memcpy(s.request.get_tensor("vertices").data<float>(),vertices.data(),sizeof(vertices));
-    std::memcpy(s.request.get_tensor("colors").data<float>(),colors.data(),sizeof(colors));
+    std::memcpy(s.request.get_tensor("vertices").data<float>(),vertices.data(),vertices.size()*sizeof(float));
+    std::memcpy(s.request.get_tensor("colors").data<float>(),values.data(),values.size()*sizeof(Color));
     std::memcpy(s.request.get_tensor("points").data<int32_t>(),points.data(),points.size()*sizeof(Point));
     auto c=s.request.get_tensor("coverage");for(size_t i=0;i<coverage.size();++i)c.data<int32_t>()[i]=coverage[i];
     s.request.infer();const auto output=s.request.get_output_tensor();

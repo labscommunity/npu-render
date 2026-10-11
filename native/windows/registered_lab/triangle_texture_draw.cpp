@@ -46,8 +46,8 @@ struct TriangleTextureDrawExecutor::State {
         pixel=std::make_unique<shader::PixelExecutor>(ps,batch,backend,shapes,samplers);
         for(unsigned r=0;r<16;++r)if(ps.inputs[r] && r!=ps.position_input){
             require((vs.outputs[r]&ps.inputs[r])==ps.inputs[r]);
-            if(ps.interpolation[r]==2 && !perspective)perspective=std::make_unique<ColorInterpolator>(batch,backend,true);
-            if(ps.interpolation[r]==4 && !affine)affine=std::make_unique<ColorInterpolator>(batch,backend,false);
+            if(ps.interpolation[r]==2 && !perspective)perspective=std::make_unique<ColorInterpolator>(batch,backend,true,true);
+            if(ps.interpolation[r]==4 && !affine)affine=std::make_unique<ColorInterpolator>(batch,backend,false,true);
         }
     }
 };
@@ -97,51 +97,41 @@ UniformDrawExecutor::Result TriangleTextureDrawExecutor::execute(const std::vect
     // device establishes geometry bounds, admit at most 4096 raster tiles.
     // Reject the whole draw before coverage or destination modification.
     const auto regions=bounded_triangle_regions(projected.triangle_bounds,clip,s.batch,s.quads);
+    const auto layers=triangle_region_layers(regions);
     const auto textures=decode_resources(s.ps,resources);
     result.pixels=background;std::vector<Sample> samples(s.batch);std::vector<Point> points(s.batch);
     std::vector<PackedColor> tile(s.batch);std::vector<Color> colors(s.batch);std::vector<shader::VertexRegisters> fragments(s.batch);
-    for(size_t triangle=0;triangle<s.count;triangle+=3){
-      const auto &region=regions[triangle/3];
-      if(region[0]>=region[2] || region[1]>=region[3])continue;
-      const size_t region_width=size_t(region[2]-region[0]),region_pixels=region_width*size_t(region[3]-region[1]);
-      for(size_t first=0;first<region_pixels;first+=s.batch){
-        const std::array<ProjectedVertex,3> vertices{projected.vertices[triangle],projected.vertices[triangle+1],projected.vertices[triangle+2]};
-        const auto valid=(std::min)(size_t(s.batch),region_pixels-first);
-        // Host work is address generation, not triangle coverage. Pack only
-        // the device-computed bounds intersected with the requested scissor;
-        // padded lanes lie outside its nonnegative bounds.
-        // The NPU decides coverage for every lane before interpolation/shading.
-        const auto pixel_xy=[&](size_t n){const auto i=first+n;
-            if(!s.quads)return std::array<size_t,2>{size_t(region[0])+i%region_width,size_t(region[1])+i/region_width};
-            const auto quad=i/4,columns=region_width/2;
-            return std::array<size_t,2>{size_t(region[0])+2*(quad%columns)+(i&1),size_t(region[1])+2*(quad/columns)+((i>>1)&1)};
-        };
-        const auto pixel_index=[&](size_t n){const auto p=pixel_xy(n);return p[1]*s.width+p[0];};
-        const auto stored_pixel=[&](size_t n){if(n>=valid)return false;const auto p=pixel_xy(n);return p[0]<s.width && p[1]<s.height;};
+    std::vector<std::array<ProjectedVertex,3>> vertices(s.batch);
+    std::vector<std::array<Color,3>> values(s.batch);
+    std::vector<size_t> triangle_base(s.batch),pixel_index(s.batch);
+    std::vector<uint8_t> stored_pixel(s.batch);
+    const auto submit=[&](size_t valid){
+        require(valid && valid<=s.batch && (!s.quads || !(valid%4)));
         for(size_t n=0;n<s.batch;++n){
-            if(n<valid){const auto p=pixel_xy(n);points[n]={int32_t(p[0])*256+128,int32_t(p[1])*256+128};}
-            else points[n]={-128,-128};
-            samples[n]={{vertices[0].snapped,vertices[1].snapped,vertices[2].snapped},points[n]};
+            if(n>=valid){points[n]={-128,-128};vertices[n]=vertices[0];triangle_base[n]=triangle_base[0];stored_pixel[n]=0;}
+            samples[n]={{vertices[n][0].snapped,vertices[n][1].snapped,vertices[n][2].snapped},points[n]};
         }
         began=Clock::now();const auto covered=s.coverage.execute(samples,fixed_clip);require(covered.execution_device==result.execution_device);
         result.timings.coverage_ms+=ms(began);result.input_bytes+=uint64_t(s.batch)*32+16;result.output_bytes+=uint64_t(s.batch)*4;++result.provider_requests;
         for(const auto v:covered.covered)result.covered_samples+=v;
         // The NPU has established that no samples survive. Skipping later
         // stages is control flow only; no host coverage/shader calculation.
-        if(std::none_of(covered.covered.begin(),covered.covered.end(),[](auto v){return v!=0;})){++result.tile_executions;continue;}
+        if(std::none_of(covered.covered.begin(),covered.covered.end(),[](auto v){return v!=0;})){++result.tile_executions;return;}
         auto interpolation_coverage=covered.covered;
         if(s.quads)for(size_t q=0;q<s.batch;q+=4){
             const bool active=covered.covered[q] || covered.covered[q+1] || covered.covered[q+2] || covered.covered[q+3];
             if(active)for(size_t lane=0;lane<4;++lane)interpolation_coverage[q+lane]=1;
         }
         for(unsigned r=0;r<16;++r)if(s.ps.inputs[r] && r!=s.ps.position_input){
-            if(s.ps.interpolation[r]==1){for(auto &f:fragments)f[r]=shaded.vertices[triangle][r];continue;}
-            std::array<Color,3> values{};
-            for(unsigned v=0;v<3;++v)for(unsigned c=0;c<4;++c)if(s.ps.inputs[r]&(1u<<c))
-                std::memcpy(&values[v][c],&shaded.vertices[triangle+v][r][c],4);
+            if(s.ps.interpolation[r]==1){for(size_t n=0;n<s.batch;++n)fragments[n][r]=shaded.vertices[triangle_base[n]][r];continue;}
+            for(size_t n=0;n<s.batch;++n)for(unsigned v=0;v<3;++v){
+                values[n][v]={};
+                for(unsigned c=0;c<4;++c)if(s.ps.inputs[r]&(1u<<c))
+                    std::memcpy(&values[n][v][c],&shaded.vertices[triangle_base[n]+v][r][c],4);
+            }
             began=Clock::now();const auto interpolated=(s.ps.interpolation[r]==2?s.perspective:s.affine)->execute(vertices,values,points,interpolation_coverage);
             require(interpolated.execution_device==result.execution_device);result.timings.shader_ms+=ms(began);
-            result.input_bytes+=uint64_t(s.batch)*12+84;result.output_bytes+=uint64_t(s.batch)*16;++result.provider_requests;
+            result.input_bytes+=uint64_t(s.batch)*96;result.output_bytes+=uint64_t(s.batch)*16;++result.provider_requests;
             for(size_t n=0;n<s.batch;++n)std::memcpy(fragments[n][r].data(),interpolated.colors[n].data(),16);
         }
         // The device supplied the execution mask. Inactive fragments cannot
@@ -155,12 +145,33 @@ UniformDrawExecutor::Result TriangleTextureDrawExecutor::execute(const std::vect
         began=Clock::now();const auto pixels=s.pixel->execute(fragments,pc,textures);require(pixels.execution_device==result.execution_device);
         result.timings.shader_ms+=ms(began);result.input_bytes+=pixels.input_bytes;result.output_bytes+=pixels.output_bytes;++result.provider_requests;
         for(size_t n=0;n<s.batch;++n)std::memcpy(colors[n].data(),pixels.vertices[n][0].data(),16);
-        for(size_t n=0;n<s.batch;++n)tile[n]=stored_pixel(n)?result.pixels[pixel_index(n)]:PackedColor{};
+        for(size_t n=0;n<s.batch;++n)tile[n]=stored_pixel[n]?result.pixels[pixel_index[n]]:PackedColor{};
         began=Clock::now();const auto merged=s.merger.execute(colors,tile,covered.covered);require(merged.execution_device==result.execution_device);
         result.timings.merger_ms+=ms(began);result.input_bytes+=uint64_t(s.batch)*24;result.output_bytes+=uint64_t(s.batch)*4;++result.provider_requests;
-        for(size_t n=0;n<valid;++n)if(stored_pixel(n))result.pixels[pixel_index(n)]=merged.pixels[n];
+        for(size_t n=0;n<valid;++n)if(stored_pixel[n])result.pixels[pixel_index[n]]=merged.pixels[n];
         ++result.tile_executions;
-      }
+    };
+    for(const auto &layer:layers){
+        size_t filled=0;
+        for(const auto triangle:layer){
+            const auto &region=regions[triangle];const auto base=triangle*3;
+            const size_t width=size_t(region[2]-region[0]),pixels=width*size_t(region[3]-region[1]);
+            for(size_t first=0;first<pixels;){
+                const auto count=(std::min)(size_t(s.batch)-filled,pixels-first);
+                for(size_t k=0;k<count;++k){const auto i=first+k,n=filled+k;
+                    // Bounds and scissor define addresses only; coverage and
+                    // every color operation still run on the selected device.
+                    const size_t x=s.quads?size_t(region[0])+2*((i/4)%(width/2))+(i&1):size_t(region[0])+i%width;
+                    const size_t y=s.quads?size_t(region[1])+2*((i/4)/(width/2))+((i>>1)&1):size_t(region[1])+i/width;
+                    points[n]={int32_t(x)*256+128,int32_t(y)*256+128};triangle_base[n]=base;
+                    vertices[n]={projected.vertices[base],projected.vertices[base+1],projected.vertices[base+2]};
+                    stored_pixel[n]=uint8_t(x<s.width && y<s.height);pixel_index[n]=y*s.width+x;
+                }
+                filled+=count;first+=count;
+                if(filled==s.batch){submit(filled);filled=0;}
+            }
+        }
+        if(filled)submit(filled);
     }
     result.vertices=std::move(shaded.vertices);result.timings.total_ms=ms(start);return result;
 }

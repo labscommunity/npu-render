@@ -1,0 +1,19 @@
+{
+  "build": "present-umd-v196",
+  "source_base": "8406bdef2b9355c1c06ce2364509e25195ac6043",
+  "clean_cpu_suites": 24,
+  "cpu_test_seconds": 129.47,
+  "native_npu_qualification_passed": true,
+  "source_files_verified": 116,
+  "binary_files_verified": 30,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "findings": [
+    "Disjoint device-computed triangle bounds share a batch. Every overlapping pair retains submission order through dependency layers. Coverage, interpolation, shading and blending execute on the selected provider; the host schedules addresses and copies results.",
+    "On NPU, 150 small blended triangles execute in three raster batches and 17 provider requests, with exact ordered-blend pixels. Quad derivative helpers remain grouped within each primitive. Existing overlap, scissor, sparse geometry, typed-load, loop, mask, mirror and captured-compositor regressions pass.",
+    "All 58 NPU DDI draws and eight NPU clear operations pass. Both original single-mip captures retain exact CPU/NPU output and zero scalar-oracle byte error.",
+    "Two saved v99 desktop requests are replayed three times each by qualified v195 and candidate v196 workers, serially on the physical NPU. Original packet hashes are verified; derived requests change only sequence numbers. All six complete 1024x768 output images match byte for byte.",
+    "The 330-vertex request drops from 132 to 47 raster batches and 599 to 264 provider calls. Median of the two warm draw times falls from 5999.560 ms to 2653.455 ms (2.261x). The overlapping 30-vertex request stays at 204 batches and 926 calls; its warm median increases from 4498.696 ms to 4795.539 ms (6.6 percent). These are diagnostic request timings, not a frame-rate or Tahoma benchmark.",
+    "The CPU build overlapped installed v101; qualification and captured-request comparison began after v101 worker shutdown and configuration removal. Native NPU workers ran serially. The installed desktop has not yet exercised this batching implementation."
+  ]
+}

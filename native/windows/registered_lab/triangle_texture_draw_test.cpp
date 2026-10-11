@@ -74,5 +74,40 @@ float4 main(float4 p:SV_Position,noperspective float4 c:COLOR,noperspective floa
     TEST(sparse_result.execution_device.rfind(backend,0)==0 && sparse_result.tile_executions==70 && sparse_result.covered_samples==210);
     for(unsigned y=0;y<128;++y)for(unsigned x=0;x<128;++x)
         TEST(sparse_result.pixels[y*128+x]==(x>=4 && x<6 && y>=4 && y<=x?tiny.pixels[0]:bg[0]));
+    // Fifty disjoint glyph-sized quads, each followed by a blended overwrite
+    // of its first half. Collating disjoint regions should need three batches
+    // while preserving every overlapping primitive's submission order.
+    uint64_t collated_components=0;
+    {
+        constexpr unsigned quads=50,width=128,height=64;
+        const unsigned corner[9]{0,1,2,0,2,3,0,1,2};
+        const unsigned xy[4][2]{{0,0},{2,0},{2,2},{0,2}};
+        std::vector<VertexRegisters> glyphs(quads*9);
+        for(unsigned q=0;q<quads;++q)for(unsigned v=0;v<9;++v){
+            const float x=float(4+(q%10)*10+xy[corner[v]][0]),y=float(4+(q/10)*10+xy[corner[v]][1]);
+            const float tint=float(1+(q%3))*.25f,red=v>=6?.75f:tint;
+            glyphs[q*9+v][0]={as_bits(x/64-1),as_bits(1-y/32),as_bits(.5f),as_bits(1)};
+            glyphs[q*9+v][1]={as_bits(red),as_bits(.25f),as_bits(.5f),as_bits(.5f)};
+            glyphs[q*9+v][2]={as_bits(.5f),as_bits(.5f),0,0};
+        }
+        const PackedColor old{16,32,48,64};const PackedTexture source{1,1,28,{{64,128,192,255}}};
+        const std::vector<PackedColor> background(width*height,old);
+        TriangleTextureDrawExecutor executor(vs,ps,quads*9,width,height,28,1,1,28,backend,true,15,TextureFilter::point,CullMode::none,false,256);
+        const auto result=executor.execute(glyphs,{}, {},{0,0,width,height,0,1},source,background);
+        TEST(result.execution_device.rfind(backend,0)==0 && result.covered_samples==quads*7 && result.tile_executions==3);
+        for(unsigned y=0;y<height;++y)for(unsigned x=0;x<width;++x){auto expected=old;
+            if(x>=4 && y>=4 && (x-4)/10<10 && (y-4)/10<5 && (x-4)%10<2 && (y-4)%10<2){
+                const auto q=((y-4)/10)*10+(x-4)/10;
+                const double tint[4]{double(1+(q%3))*.25,.25,.5,.5};
+                for(unsigned c=0;c<4;++c)expected[c]=uint8_t(std::nearbyint(source.pixels[0][c]*tint[c]+old[c]*.5));
+                if((y-4)%10<=(x-4)%10){const double over[4]{.75,.25,.5,.5};
+                    for(unsigned c=0;c<4;++c)expected[c]=uint8_t(std::nearbyint(source.pixels[0][c]*over[c]+expected[c]*.5));}
+            }
+            TEST(result.pixels[y*width+x]==expected);collated_components+=4;
+        }
+        std::printf("{\"collated_triangles\":150,\"raster_batches\":%llu,\"provider_requests\":%llu,\"ordered_blending_exact\":true,\"execution_device\":\"%s\"}\n",
+            static_cast<unsigned long long>(result.tile_executions),static_cast<unsigned long long>(result.provider_requests),result.execution_device.c_str());
+    }
+    TEST(collated_components==32768);
     std::printf("{\"textured_triangle_components\":%llu,\"maximum_byte_error\":%u,\"execution_device\":\"%s\",\"coverage_exact\":true,\"packed_scissor_cases\":6,\"partial_batch_and_empty_regions\":true,\"sparse_triangle_tiles\":70,\"raster_tile_budget\":4096,\"desktop_offload_tested\":false}\n",static_cast<unsigned long long>(checked),maximum,backend.c_str());return 0;
 }catch(const std::exception &e){std::fprintf(stderr,"%s\n",e.what());return 1;}

@@ -1,0 +1,41 @@
+{
+  "trial": "v101",
+  "source_commit": "8406bdef2b9355c1c06ce2364509e25195ac6043",
+  "umd_build": "present-umd-v195",
+  "package_version": "0.0.89.0",
+  "worker_successes_by_client": {
+    "42": 13,
+    "5192": 68,
+    "5112": 224,
+    "5812": 56
+  },
+  "worker_successes_by_operation": {
+    "draw": 306,
+    "color_clear": 55
+  },
+  "acknowledged_successes_by_client": {
+    "42": 13,
+    "5192": 68,
+    "5112": 224,
+    "5812": 56
+  },
+  "acknowledged_failures": 2,
+  "received_frames": 4,
+  "live_draw_ms": 141304.139,
+  "live_compile_and_draw_ms": 282954,
+  "full_desktop_offload": false,
+  "usable_interactive_desktop": false,
+  "tahoma_performance_tested": false,
+  "original_cleanup_passed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "concurrent_cpu_build": true,
+  "archive_entries_verified": 35,
+  "findings": [
+    "361 successful NPU requests comprise 13 prewarm draws, 293 live draws and 55 live clears. Every successful request has a relay acknowledgement. Two further DWM requests fail with triangle raster budget exceeded; no NPU device-loss error is recorded.",
+    "Four 1024x768 frames arrive while the indirect display is the sole active path. The Start snapshot shows wallpaper, icons and taskbar without a visible menu. Input is sent, but a visual response is not verified.",
+    "A complete unchanged DWM capture preserves an indexed 144-vertex draw into a 642x660 target, with a 100x100 linear-filtered texture. Both CPU and NPU replay on build195 reproduce the triangle raster budget failure after provider projection. Its dimensions force the current batch selection down to eight pixels; the executor still requires area divisibility despite already padding partial regions. Removing that obsolete requirement is the next correction.",
+    "The observer stops on DWM DDI rejection after 284998 ms and waits 22813 ms for topology restoration. Both custom drivers are removed successfully and native stream configuration is removed. Later device-gone draw/map errors remain in the cleanup trace.",
+    "The v196 CPU build ran concurrently with this installed trial, so these timings cannot isolate renderer performance. The batching change was not installed in this trial."
+  ]
+}

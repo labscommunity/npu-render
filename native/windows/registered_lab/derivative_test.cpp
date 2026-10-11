@@ -93,6 +93,27 @@ O main(float4 p:POSITION,float4 uv:TEXCOORD){O o;o.p=p;o.uv=uv;return o;})","vs_
             TEST(result.covered_samples==covered);
         }
     }
+    // Two separated primitives share a batch, with different UV origins.
+    // Each keeps a complete helper quad; derivatives cannot cross primitives.
+    {
+        std::vector<VertexRegisters> input(6);
+        const float offsets[3][2]{{0,0},{1,0},{0,1}};
+        for(unsigned t=0;t<2;++t)for(unsigned v=0;v<3;++v){
+            const float x=3.25f+float(t)*6+offsets[v][0],y=5.25f+offsets[v][1];
+            input[t*3+v][0]={as_bits(x*2/width-1),as_bits(1-y*2/height),as_bits(.5f),as_bits(1)};
+            input[t*3+v][1]={as_bits((x+float(t)*8)/32),as_bits(y/32),as_bits(1),as_bits(1)};
+        }
+        const PackedColor old{4,19,53,211};const std::vector<PackedColor> background(width*height,old);
+        TriangleTextureDrawExecutor executor(vs,ps,6,width,height,28,PackedResources{},TextureSamplers{},backend,BlendMode::source_copy,15,CullMode::none,false,64);
+        const auto result=executor.execute(input,{}, {},{0,0,width,height,0,1},PackedResources{},background);
+        TEST(result.execution_device.rfind(backend,0)==0 && result.covered_samples==2 && result.tile_executions==1);
+        for(unsigned y=0;y<height;++y)for(unsigned x=0;x<width;++x)for(unsigned c=0;c<4;++c){
+            const bool inside=y==5 && (x==3 || x==9);
+            const double color[4]{(y+.5)/32,(x+.5+(x==9?8:0))/32,1,1};
+            const double expected=inside?color[c]*255:old[c];
+            TEST(std::abs(result.pixels[y*width+x][c]-expected)<=.501);++draw_components;
+        }
+    }
     // Inactive raster lanes have no pixel shader invocation. A zero-filled
     // UV/w payload would create 0/0 and reject the whole otherwise valid draw.
     {
