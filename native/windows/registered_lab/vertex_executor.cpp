@@ -69,9 +69,9 @@ struct RegisterExecutor::State {
     ov::CompiledModel compiled;
     ov::InferRequest request;
     std::string execution_device;
-    bool failed = false;
+    bool failed = false, ready = false;
     State(const Program &p, uint32_t vertices, const std::string &backend,
-          const TextureShapes &shapes, const TextureSamplers &samplers, uint32_t tap_limit=128) : program(mirrored_loop_shader(p)?mirrored_tap_program(p):lower_bounded_loops(p)), count(vertices), logical_count(vertices), tap_capacity(tap_limit), mirrored_taps(mirrored_loop_shader(p)), texture_shapes(shapes) {
+          const TextureShapes &shapes, const TextureSamplers &samplers, uint32_t tap_limit=128, bool defer_compile=false) : program(mirrored_loop_shader(p)?mirrored_tap_program(p):lower_bounded_loops(p)), count(vertices), logical_count(vertices), tap_capacity(tap_limit), mirrored_taps(mirrored_loop_shader(p)), texture_shapes(shapes) {
         check(count && count <= 65536 && (backend == "CPU" || backend == "GPU" || backend == "NPU"));
         check(count<=RegisterExecutor::maximum_batch(p));
         check(tap_capacity && tap_capacity<=128 && !(tap_capacity&(tap_capacity-1)));
@@ -713,12 +713,13 @@ struct RegisterExecutor::State {
                 if (!node->get_rt_info().count("precise_0")) throw std::runtime_error("vertex precision marker was lost");
             properties.emplace(ov::hint::execution_mode(ov::hint::ExecutionMode::ACCURACY));
         }
+        if(defer_compile)return;
         compiled = nr::provider::compile_model(core, model, backend, properties);
         check(compiled.inputs().size() == bindings.size() && compiled.outputs().size() == results.size());
         const auto devices = compiled.get_property(ov::execution_devices);
         if (devices.size() != 1 || !(devices[0] == backend || devices[0].rfind(backend + ".", 0) == 0))
             throw std::runtime_error("unexpected vertex execution device");
-        execution_device = devices[0]; request = compiled.create_infer_request();
+        execution_device = devices[0]; request = compiled.create_infer_request();ready=true;
     }
 };
 void RegisterExecutor::validate(const Program &original) {
@@ -845,7 +846,7 @@ struct RegisterExecutor::Configuration {
 };
 RegisterExecutor::RegisterExecutor(const Program &p, uint32_t count, const std::string &backend,
                                    const TextureShapes &textures, const TextureSamplers &samplers)
-    : state(std::make_unique<State>(p, count, backend, textures, samplers,mirrored_loop_shader(p)?1u:128u)) {
+    : state(std::make_unique<State>(p, count, backend, textures, samplers,mirrored_loop_shader(p)?1u:128u,mirrored_loop_shader(p))) {
     if(mirrored_loop_shader(p))configuration=std::make_unique<Configuration>(Configuration{p,count,backend,textures,samplers});
 }
 RegisterExecutor::~RegisterExecutor() = default;
@@ -857,8 +858,10 @@ RegisterExecutor::Result RegisterExecutor::execute(const std::vector<VertexRegis
     if(state->mirrored_taps){
         int32_t taps;std::memcpy(&taps,&constants[0][0][3],4);check(taps<=128);
         uint32_t capacity=1;while(taps>int32_t(capacity))capacity*=2;
-        if(capacity!=state->tap_capacity){
+        if(!state->ready || capacity!=state->tap_capacity){
             check(bool(configuration));const auto &c=*configuration;
+            // Defer compilation until the first constants establish capacity.
+            // Constructor graph validation remains eager.
             // The exact captured shader's uniform loop bound controls only
             // graph capacity. Coordinates, samples, weights and reduction
             // still execute on the provider. Release before recompiling for

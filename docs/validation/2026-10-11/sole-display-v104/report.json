@@ -1,0 +1,51 @@
+{
+  "trial": "v104",
+  "source_commit": "5822d7f2719e5176e29306f98fb6bf8dc47da498",
+  "umd_build": "present-umd-v202",
+  "package_version": "0.0.92.0",
+  "worker_successes_by_client": {
+    "42": 13,
+    "6764": 38,
+    "5112": 269,
+    "4836": 38,
+    "2932": 45,
+    "3012": 62
+  },
+  "worker_successes_by_operation": {
+    "draw": 388,
+    "color_clear": 77
+  },
+  "acknowledged_successes_by_client": {
+    "42": 13,
+    "6764": 38,
+    "5112": 269,
+    "4836": 37,
+    "2932": 45,
+    "3012": 62
+  },
+  "acknowledged_failures": 0,
+  "received_frames": 4,
+  "sole_indirect_received_frames": 3,
+  "live_draw_ms": 127697.26,
+  "live_compile_and_draw_ms": 296348,
+  "full_desktop_offload": false,
+  "usable_interactive_desktop": false,
+  "tahoma_performance_tested": false,
+  "original_cleanup_passed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "concurrent_cpu_build": false,
+  "archive_entries_verified": 37,
+  "findings": [
+    "465 successful NPU requests comprise13 prewarm draws,375 live draws and77 live clears. The relay acknowledges464 successes and no failures. The unmatched completion belongs to StartMenuExperienceHost4836 sequence38, whose pipe closes before delivery acknowledgement.",
+    "Four1024x768 frames arrive. Only the first three arrive while the indirect display is the sole active path. The fourth arrives after topology restoration and is excluded from sole-display success counts. The third shows wallpaper, icons and taskbar; no received frame visibly verifies Start opening.",
+    "The observer completes its bounded interval after330041ms. Both custom drivers and stream configuration are removed; topology restoration takes14ms. Native worker exit1 follows socket closure during controller cleanup, not a claimed graceful worker completion.",
+    "Windows logs an Explorer application hang at01:34:37.8016849UTC. Explorer6764 and StartMenuExperienceHost4836 are replaced during the trial by Explorer2932 and StartMenuExperienceHost3012. DWM5112 retains its original23:52:16.9139319UTC start time. Rendering request success alone does not establish application health.",
+    "After cleanup, the same QMP Windows-key input visibly opens Start on the ordinary1280x800 VM display, and Escape closes it. This separates input-path validation from the failed NPU interaction. The ordinary display images are not NPU output.",
+    "Live draw_ms sums to127697.26ms and compile_and_draw_ms to296348ms. Diagnostics record1390 compile/load calls with1383 disk-cache hits. Request mixes differ fromv103, so these totals do not establish an overall speedup or regression.",
+    "Two192x64 nine-tap blur requests take23.203 and23.422seconds including graph construction. Each draw_ms includes roughly12seconds spent replacing the initial one-tap graph. Deferring compilation until the first loop bound is available is the next isolated experiment.",
+    "Two other1024x768 shaders first take33.672 and32.157seconds; a later matching988-word request takes5.859seconds. Their captured packets are preserved for further compilation and dispatch analysis.",
+    "The native renderer reports execution on the physical Panther Lake NPU; Windows processes run in the disposable VM. Frame presentation uses the Mac SDL viewer. No physical Delta scanout, full desktop offload, or Tahoma performance benefit is established.",
+    "Supplementary v103 application logs are preserved. The Explorer1002 event identifies PID5192 and its WER event time01:10:18.605703UTC, during the prior Start attempt. Repeated Windows Error Reporting1001 records are not counted as new crashes solely from report-publication times."
+  ]
+}

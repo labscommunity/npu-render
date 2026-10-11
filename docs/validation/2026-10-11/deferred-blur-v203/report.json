@@ -1,0 +1,58 @@
+{
+  "build": "present-umd-v203",
+  "source_base": "5822d7f2719e5176e29306f98fb6bf8dc47da498",
+  "clean_cpu_suites": 24,
+  "cpu_test_seconds": 174.13,
+  "native_npu_qualification_passed": true,
+  "source_files_verified": 116,
+  "binary_files_verified": 30,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "cold_worker_elapsed_ms": {
+    "baseline-worker": 64035,
+    "candidate-worker": 43225
+  },
+  "cold_worker_ratio": 1.4814343551185656,
+  "timings": [
+    {
+      "case": 3,
+      "baseline_draw_ms": [
+        16125.664,
+        3769.251,
+        3779.316
+      ],
+      "candidate_draw_ms": [
+        15361.025,
+        3736.881,
+        3727.745
+      ],
+      "baseline_warm_median_ms": 3774.2835,
+      "candidate_warm_median_ms": 3732.313,
+      "warm_draw_speedup": 1.0112451715598343
+    },
+    {
+      "case": 4,
+      "baseline_draw_ms": [
+        13527.385,
+        1878.629,
+        1874.865
+      ],
+      "candidate_draw_ms": [
+        12953.514,
+        1819.665,
+        1851.369
+      ],
+      "baseline_warm_median_ms": 1876.7469999999998,
+      "candidate_warm_median_ms": 1835.5169999999998,
+      "warm_draw_speedup": 1.0224623362246168
+    }
+  ],
+  "findings": [
+    "The exact mirrored blur shader validates its graph at construction but defers device compilation until the first uniform tap bound is known. Previously the constructor compiled a one-tap graph, then immediately replaced it with a sixteen-tap graph for common nine-tap requests.",
+    "The test checks that constructing this exact shader performs zero provider compilations and that the first valid nine-tap execution performs exactly one. A129-tap request is rejected before that first compilation. The scalar reference checks72 scenarios including negative and zero bounds, power-of-two transitions and128 taps.",
+    "Graph validation remains eager; provider compilation occurs at first execution for this specialization. Capacity replacement destroys the previous state before creating the next. Compilation failure leaves the executor unusable; no CPU fallback is introduced.",
+    "Baselinebuild202 and candidatebuild203 workers process the same two capturedv102 blur packets, three repetitions each. They use separate initially empty model-cache directories. Complete output images and coverage are unchanged. Worker elapsed time includes graph setup and execution; draw_ms excludes constructor work and is not a fair standalone measure of this compilation change.",
+    "An additional serial comparison replays four capturedv104 slow requests, changing only client ID and sequence for use in the prewarm harness. Every output pixel matches the qualified baseline. Their verified output hashes permit compilation before a later display switch; no displayed frame is claimed for these packets.",
+    "All24 CPU suites, seven NPU rendering regression executables,58 driver draws and8 clears pass. Both original single-mip captures retain exact CPU/NPU output. Installed desktop interaction and a Tahoma benefit remain unverified."
+  ]
+}

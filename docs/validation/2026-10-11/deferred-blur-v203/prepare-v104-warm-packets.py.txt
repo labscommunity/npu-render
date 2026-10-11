@@ -1,0 +1,11 @@
+import hashlib,json,os,struct,sys
+from pathlib import Path
+root=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm';out=Path(sys.argv[1]);out.mkdir(exist_ok=False);records=[]
+digests=['6aa26a48cbc6f9ce6001de41763597e62984cb70bb9cfdfede4ce388c90173a1','747dbc0a5030837b51e544326e3cf2360293d6bf651011efff9c97df98a83c95','7de551d5a606e0256e27ce893f0e2f1361a7ddfe44e7a2a147af13b93a0c7347','bd39d8a5e5ddacd102c14d7400930190a9ac8551a8650ab932879de83e9ac8a4']
+for case,digest in enumerate(digests,1):
+ original=(root/'indexed-dwm-stream-v104'/f'slow-request-{case}.bin').read_bytes();assert hashlib.sha256(original).hexdigest()==digest
+ h=struct.unpack_from('<3Q14I',original);assert len(original)==80+h[12] and h[14]==1 and h[15]==0
+ data=bytearray(original);sequence=1000+case;struct.pack_into('<I',data,56,sequence);struct.pack_into('<I',data,64,42)
+ name=f'request-42-{h[1]:016x}{h[2]:016x}-{sequence}.bin';(out/name).write_bytes(data)
+ records.append({'case':case,'repeat':0,'client_pid':42,'sequence':sequence,'file':name,'source_sha256':digest,'derived_sha256':hashlib.sha256(data).hexdigest(),'modified_fields':['client_pid','sequence'],'captured_geometry_texture_and_background_unchanged':True})
+(out/'requests.json').write_text(json.dumps(records,indent=2)+'\n');print(json.dumps({'prepared_requests':len(records),'original_packets':4}))

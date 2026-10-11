@@ -1,4 +1,5 @@
 #include "vertex_executor.hpp"
+#include "provider_compile_statistics.hpp"
 #include "shader_reference.hpp"
 #include "loop_fixture.hpp"
 #include "triangle_texture_draw.hpp"
@@ -54,8 +55,10 @@ void captured(const std::string &backend){
  TextureShapes shapes{};shapes[0]={4,4,15};TextureSamplers samplers{};samplers[0].filter=TextureFilter::linear;TexturePixels textures{};textures[0].resize(16);
  for(unsigned n=0;n<16;++n)textures[0][n]={float(n%4)/4,float(n/4)/4,float(n)/16,1};
  std::vector<VertexRegisters> input(4);for(unsigned n=0;n<4;++n){input[n][1]={as_bits(1),as_bits(1),as_bits(1),as_bits(1)};input[n][2]={as_bits((float(n)+.5f)/4),as_bits(.375f),as_bits(1),as_bits(1)};}
+ const auto before=nr::provider::compile_statistics();
  PixelExecutor executor(p,uint32_t(input.size()),backend,shapes,samplers);
- for(unsigned scenario=0;scenario<3;++scenario)for(int32_t taps:{-1,0,1,2,3,4,5,7,8,9,16,17,31,32,33,64,65,127,128,9,1,128,0}){
+ TEST(nr::provider::compile_statistics().calls==before.calls);bool first_result=true;
+ for(unsigned scenario=0;scenario<3;++scenario)for(int32_t taps:{9,-1,0,1,2,3,4,5,7,8,9,16,17,31,32,33,64,65,127,128,9,1,128,0}){
   VertexConstants constants;constants[0].resize(130);
   for(unsigned n=0;n<128;++n)constants[0][n]={as_bits(float(n)/16),as_bits(float(n)/32),as_bits(taps>0?1.f/(2*taps):0.f),0};
   if(scenario){
@@ -68,7 +71,9 @@ void captured(const std::string &backend){
    try{(void)executor.execute(input,constants,textures);}catch(const std::invalid_argument &){rejected=true;}
    TEST(rejected);constants[0][0][3]=uint32_t(taps);
   }
-  const auto result=executor.execute(input,constants,textures);TEST(result.execution_device.rfind(backend,0)==0);float max_error=0;
+  const auto result=executor.execute(input,constants,textures);
+  if(first_result){TEST(nr::provider::compile_statistics().calls==before.calls+1);first_result=false;}
+  TEST(result.execution_device.rfind(backend,0)==0);float max_error=0;
   for(unsigned n=0;n<input.size();++n){const auto expected=reference_vertex(p,input[n],constants,shapes,samplers,textures);
    for(unsigned c=0;c<4;++c){const auto error=std::abs(as_float(result.vertices[n][0][c])-as_float(expected[0][c]));max_error=(std::max)(max_error,error);TEST(error<=1e-5f);}
   }

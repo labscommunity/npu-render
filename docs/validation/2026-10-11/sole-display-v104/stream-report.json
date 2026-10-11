@@ -1,0 +1,43 @@
+{
+    "schema":  1,
+    "kind":  "indexed-npu-native-stream",
+    "job_id":  "866c534efa2f48b68a5b9a1ae63f61f7",
+    "started":  "2026-10-11T01:32:16.1820704Z",
+    "completed":  true,
+    "transport":  "local named pipe and authenticated SSH-carried stream",
+    "smoke_test":  false,
+    "desktop_offload_tested":  false,
+    "displayed_frames":  0,
+    "physical_runtime":  [
+                             {
+                                 "name":  "openvino.dll",
+                                 "sha256":  "8F942EA62FEA186F8D1C67714A8DBB959A19DAF62BE7E279681BD7AF0F3DB4BC",
+                                 "file_version":  "2026.1.0.21367"
+                             },
+                             {
+                                 "name":  "openvino_ir_frontend.dll",
+                                 "sha256":  "3E558751F4FFCA0FC190BF68F1D3E96E0A8C7E8FD1CFE217D15A07A69CA2CA0A",
+                                 "file_version":  "2026.1.0.21367"
+                             },
+                             {
+                                 "name":  "openvino_intel_npu_plugin.dll",
+                                 "sha256":  "D224638D4F3460C8C37943D6A67493A2C03DB1AD5398DFFF0FFF8D1B69DD4629",
+                                 "file_version":  "2026.1.0.21367"
+                             }
+                         ],
+    "maximum_requests":  4096,
+    "worker_maximum_seconds":  600,
+    "model_cache_enabled":  true,
+    "relay_pid":  {
+                      "value":  4816,
+                      "PSComputerName":  "127.0.0.1",
+                      "RunspaceId":  "fcdce985-bd42-4525-81dc-5aac4b506a54",
+                      "PSShowComputerName":  true
+                  },
+    "worker_pid":  22876,
+    "state":  "action_finished",
+    "guest_action_finished":  true,
+    "configuration_removed":  true,
+    "worker_exit_code":  1,
+    "finished":  "2026-10-11T01:39:26.6311785Z"
+}
