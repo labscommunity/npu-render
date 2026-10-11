@@ -1,0 +1,27 @@
+{
+  "build": "present-umd-v198",
+  "source_base": "762010a2c7b4ff3383528fb012b27cb4a3dd35a4",
+  "clean_cpu_suites": 24,
+  "cpu_test_seconds": 131.12,
+  "source_files_verified": 116,
+  "binary_files_verified": 30,
+  "native_npu_execution": true,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "original_capture_sha256": "e9a18804040c80e51b615893580ce79cf48fca146fd6affbbde0e01aa561bbea",
+  "capture_covered_samples": 24378,
+  "capture_raster_batches": 17,
+  "capture_target_pixels": 423720,
+  "scalar_oracle_max_byte_error": 0,
+  "cpu_npu_pixels_exact": true,
+  "native_npu_driver_draws": 58,
+  "native_npu_driver_clears": 8,
+  "findings": [
+    "Removes the target-area divisibility requirement from textured triangle batches. Regions already pad inactive lanes and only store valid pixels. Direct DDI, remote request selection and replay now retain useful batch sizes for odd or non-power-of-two window dimensions.",
+    "New contracts cover full, edge-clipped and empty draws into 31x29 and 1x1 targets, and remote packet sizing for 642x660, 31x29 and 1x1 windows. The independent pixel oracle checks that padded lanes cannot modify the target. Existing overlap, scissor and derivative-helper behavior is retained.",
+    "The first clean build, v197, fails because a new test local shadows an earlier variable under warnings-as-errors. Its log is preserved. The already-built replay executable is used only for an explicitly unqualified CPU diagnosis, concurrent with the subsequent build; no performance conclusion is drawn from it.",
+    "The unchanged v101 capture now passes on CPU and NPU with 24,378 covered samples, 17 batches, and all 423,720 target pixels identical. Both match the independent scalar coverage and color oracle with zero byte error. NPU draw execution is 907.984 ms versus CPU 120.607 ms; these diagnostic timings establish no desktop or Tahoma performance benefit.",
+    "All seven native NPU rendering regression executables, 58 NPU driver draws and eight NPU clears pass. The new odd-target tests verify 10,800 components on the NPU. Installed desktop validation remains the next step.",
+    "After the installed v101 trial removed both custom drivers, the restored VM display was black while idle. A Control wake and Escape restored wallpaper, icons and taskbar at 1280x800. The VM remained signed in and unlocked; no physical restart or driver change occurred."
+  ]
+}

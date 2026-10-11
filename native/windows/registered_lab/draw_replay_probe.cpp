@@ -203,7 +203,6 @@ int main(int argc, char **argv) try {
         }
         texture_shapes=resource_shapes(ps,resources);texture_pixels=decode_resources(ps,resources);
         if(quad_derivatives(ps)){while(batch>4 && uint64_t(clip[2]-clip[0])*uint64_t(clip[3]-clip[1])<=batch/2)batch/=2;batch=(std::max)(4u,batch);}
-        else while(uint64_t(width)*height%batch)batch/=2;
         triangle_executor=std::make_unique<TriangleTextureDrawExecutor>(vs,ps,args[0],width,height,format,resources,texture_samplers,backend,
             blend_mode,uint8_t(blend[15]&255),static_cast<CullMode>(raster[1]-1),raster[2]!=0,batch);
     }else if (textured) {
@@ -221,7 +220,6 @@ int main(int argc, char **argv) try {
         if(!general_texture)try{LinearTextureDrawExecutor::validate_shader(ps);}catch(const std::invalid_argument &){general_texture=true;}
         if(general_texture){
             if(quad_derivatives(ps)){while(batch>4 && uint64_t(clip[2]-clip[0])*uint64_t(clip[3]-clip[1])<=batch/2)batch/=2;batch=(std::max)(4u,batch);}
-        else while(uint64_t(width)*height%batch)batch/=2;
             triangle_executor=std::make_unique<TriangleTextureDrawExecutor>(vs,ps,args[0],width,height,format,texture.width,texture.height,texture.format,
                 backend,blend_mode,uint8_t(blend[15]&255),single_mip_point_filter(sampler[0])?TextureFilter::point:TextureFilter::linear,static_cast<CullMode>(raster[1]-1),raster[2]!=0,batch);
             texture_shapes[0]={texture.width,texture.height};texture_samplers[0].filter=single_mip_point_filter(sampler[0])?TextureFilter::point:TextureFilter::linear;

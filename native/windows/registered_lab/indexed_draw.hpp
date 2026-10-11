@@ -221,7 +221,7 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
         const std::array<uint64_t,5> key{s.width,s.height,s.format,count,options};
         if(!d.resources_executor || d.resources_vertex!=d.vertex_program || d.resources_pixel!=d.pixel_program || d.resources_key!=key ||
             !nr::raster::resource_layout_equal(resources,d.resources_layout) || !nr::raster::sampler_layout_equal(resource_samplers,d.resources_samplers)){
-            if(d.backend=="NPU")d.resources_executor.reset();uint32_t batch=4096;while(uint64_t(s.width)*s.height%batch)batch/=2;
+            if(d.backend=="NPU")d.resources_executor.reset();constexpr uint32_t batch=4096;
             auto candidate=std::make_unique<nr::raster::TriangleTextureDrawExecutor>(*d.vertex_program,*d.pixel_program,count,s.width,s.height,s.format,
                 resources,resource_samplers,d.backend,blend_mode,d.blend.RenderTargetWriteMask[0],cull,front_ccw,batch);
             d.resources_executor=std::move(candidate);d.resources_key=key;d.resources_layout=nr::raster::resource_layout(resources);d.resources_samplers=resource_samplers;
@@ -233,7 +233,7 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
         const std::array<uint64_t,8> key{s.width,s.height,s.format,texture.width,texture.height,texture.format,count,options};
         if(!d.triangle_texture_executor || d.triangle_texture_vertex!=d.vertex_program || d.triangle_texture_pixel!=d.pixel_program || d.triangle_texture_key!=key){
             if(d.backend=="NPU")d.triangle_texture_executor.reset();
-            uint32_t batch=4096;while(uint64_t(s.width)*s.height%batch)batch/=2;
+            constexpr uint32_t batch=4096;
             auto candidate=std::make_unique<nr::raster::TriangleTextureDrawExecutor>(*d.vertex_program,*d.pixel_program,count,s.width,s.height,s.format,
                 texture.width,texture.height,texture.format,d.backend,blend_mode,d.blend.RenderTargetWriteMask[0],
                 linear?nr::shader::TextureFilter::linear:nr::shader::TextureFilter::point,cull,front_ccw,batch);

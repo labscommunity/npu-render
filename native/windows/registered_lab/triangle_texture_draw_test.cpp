@@ -109,5 +109,31 @@ float4 main(float4 p:SV_Position,noperspective float4 c:COLOR,noperspective floa
             static_cast<unsigned long long>(result.tile_executions),static_cast<unsigned long long>(result.provider_requests),result.execution_device.c_str());
     }
     TEST(collated_components==32768);
+    uint64_t odd_components=0;
+    for(const auto extent:{std::array<uint32_t,2>{31,29},{1,1}}){
+        const auto w=extent[0],h=extent[1];const unsigned corner[6]{0,1,2,0,2,3};
+        const float xy[4][2]{{-1,1},{1,1},{1,-1},{-1,-1}};
+        std::vector<VertexRegisters> quad(6);
+        for(unsigned v=0;v<6;++v){
+            quad[v][0]={as_bits(xy[corner[v]][0]),as_bits(xy[corner[v]][1]),as_bits(.5f),as_bits(1)};
+            quad[v][1]={as_bits(1),as_bits(1),as_bits(1),as_bits(1)};
+            quad[v][2]={as_bits(.5f),as_bits(.5f),0,0};
+        }
+        const PackedColor old{1,2,3,4};const std::vector<PackedColor> background(size_t(w)*h,old);
+        TriangleTextureDrawExecutor executor(vs,ps,6,w,h,28,1,1,28,backend,false,15,TextureFilter::point,CullMode::none,false,256);
+        for(const auto clip:{std::array<int32_t,4>{0,0,int32_t(w),int32_t(h)},
+            {int32_t(w>3?w-3:0),int32_t(h>3?h-3:0),int32_t(w),int32_t(h)},
+            {int32_t(w),int32_t(h),int32_t(w),int32_t(h)}}){
+            const auto result=executor.execute(quad,{}, {},{0,0,float(w),float(h),0,1},tiny,background,clip);
+            const auto area=uint64_t(clip[2]-clip[0])*uint64_t(clip[3]-clip[1]);
+            TEST(result.execution_device.rfind(backend,0)==0 && result.covered_samples==area && result.tile_executions==2*((area+255)/256));
+            for(uint32_t y=0;y<h;++y)for(uint32_t x=0;x<w;++x){
+                const bool covered=int32_t(x)>=clip[0] && int32_t(y)>=clip[1] && int32_t(x)<clip[2] && int32_t(y)<clip[3];
+                TEST(result.pixels[size_t(y)*w+x]==(covered?tiny.pixels[0]:old));odd_components+=4;
+            }
+        }
+    }
+    std::printf("{\"odd_target_components\":%llu,\"partial_batch_padding\":true,\"one_pixel_target\":true,\"execution_device\":\"%s\"}\n",
+        static_cast<unsigned long long>(odd_components),backend.c_str());
     std::printf("{\"textured_triangle_components\":%llu,\"maximum_byte_error\":%u,\"execution_device\":\"%s\",\"coverage_exact\":true,\"packed_scissor_cases\":6,\"partial_batch_and_empty_regions\":true,\"sparse_triangle_tiles\":70,\"raster_tile_budget\":4096,\"desktop_offload_tested\":false}\n",static_cast<unsigned long long>(checked),maximum,backend.c_str());return 0;
 }catch(const std::exception &e){std::fprintf(stderr,"%s\n",e.what());return 1;}

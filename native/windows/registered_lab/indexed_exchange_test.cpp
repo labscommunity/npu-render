@@ -210,6 +210,14 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
         test(ex::triangle_batch(desktop_clipped)==(clip[0]!=clip[2] && clip[1]!=clip[3]?1024u:256u));
     }
     desktop_clipped.scissor=std::array<int32_t,4>{0,0,1024,5};test(ex::triangle_batch(desktop_clipped)==4096);
+    // A window's odd extent must not reduce packed batches to one/eight pixels.
+    for(const auto extent:{std::array<uint32_t,3>{642,660,4096},{31,29,1024},{1,1,256}}){
+        auto window=desktop_clipped;window.header.width=extent[0];window.header.height=extent[1];
+        window.viewport={0,0,float(extent[0]),float(extent[1]),0,1};
+        window.background.resize(size_t(extent[0])*extent[1]);
+        window.scissor=std::array<int32_t,4>{0,0,int32_t(extent[0]),int32_t(extent[1])};
+        const auto decoded_window=ex::decode(ex::encode(window));test(ex::triangle_batch(decoded_window)==extent[2]);
+    }
     auto resources=r;resources.header.abi=8;resources.header.flags=0x2f42;
     const auto &lookup=nr::registered_lab::test_fixture::typed_lookup_pixel_words;
     resources.pixel=nr::shader::parse_pixel(lookup,std::size(lookup));

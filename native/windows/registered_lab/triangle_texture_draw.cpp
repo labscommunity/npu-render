@@ -40,7 +40,7 @@ struct TriangleTextureDrawExecutor::State {
          vertex(v,n,backend),projection(n,backend),coverage(batch,backend,cull,ccw),merger(batch,backend,blend,f==87,mask){
         validate_shader(ps);
         require(n && n<=4096 && !(n%3) && w && w<=8192 && h && h<=8192 && uint64_t(w)*h<=4*1024*1024 &&
-            b && b<=4096 && (quads?!(b%4):!(uint64_t(w)*h%b)) &&
+            b && b<=4096 && (!quads || !(b%4)) &&
             (f==28 || f==87) && vs.stage==shader::Stage::vertex && vs.position_output<16);
         const auto shapes=resource_shapes(ps,resources);
         pixel=std::make_unique<shader::PixelExecutor>(ps,batch,backend,shapes,samplers);

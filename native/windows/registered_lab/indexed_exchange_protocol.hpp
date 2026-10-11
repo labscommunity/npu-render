@@ -167,7 +167,8 @@ inline uint32_t triangle_batch(const Request &r){
         const auto area=uint64_t(clip[2]-clip[0])*uint64_t(clip[3]-clip[1]);
         uint32_t batch=4096;while(batch>4 && area<=batch/2)batch/=2;return batch;
     }
-    uint32_t batch=4096;while(uint64_t(h.width)*h.height%batch)batch/=2;
+    // Packed regions pad their last batch; target area need not divide it.
+    uint32_t batch=4096;
     const auto area=uint64_t(clip[2]-clip[0])*uint64_t(clip[3]-clip[1]);
     // Shrink only while the complete region still fits in one batch. This
     // avoids padding work without increasing the validated tile budget.

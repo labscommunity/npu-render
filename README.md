@@ -129,6 +129,12 @@ another request remains at 204 batches and slows by 6.6%. These are request-leve
 diagnostics. All 24 CPU suites and native NPU regressions pass; this change has
 not yet been tested in an installed desktop trial.
 
+The [window batch fix](docs/validation/2026-10-11/packed-window-v198/report.json)
+removes that divisibility rule. The unchanged failed draw now completes in 17
+batches on the NPU, with all 423,720 pixels identical to the CPU result and the
+independent reference. Odd-target, clipping and partial-batch tests pass, along
+with all 24 CPU suites and the NPU regressions. Desktop validation is next.
+
 The [depth-state fix](docs/validation/2026-10-10/depthless-v194/report.json)
 replays the earlier unchanged capture exactly on the NPU, including 700 covered
 samples and the complete 512×512 target. All 24 CPU suites, 58 NPU driver draws
