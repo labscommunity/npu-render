@@ -1,0 +1,42 @@
+{
+  "build": "present-umd-v210",
+  "legacy_build": "present-umd-v210-legacy",
+  "clean_cpu_suites_per_runtime": 25,
+  "cpu_seconds": {
+    "candidate": 196.94,
+    "legacy": 189.13
+  },
+  "source_files_verified": 120,
+  "binary_files_per_build_verified": 31,
+  "native_npu_checks": [
+    "triangles-NPU",
+    "derivatives-NPU",
+    "compositor-NPU",
+    "typed-load-NPU",
+    "loops-NPU",
+    "masks-NPU",
+    "mirror-NPU",
+    "capture-CPU",
+    "capture-NPU",
+    "capture1061-CPU",
+    "capture1061-NPU",
+    "lab-NPU",
+    "legacy-compositor-NPU",
+    "legacy-triangles-NPU",
+    "baseline-worker",
+    "candidate-worker"
+  ],
+  "prewarm_packets_verified": 17,
+  "prewarm_pixels_all_exact": true,
+  "maximum_prewarm_byte_difference": 0,
+  "native_npu_execution": true,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "findings": [
+    "Affine attributes share one interpolation request per tile; perspective attributes share another. Flat attributes retain their original values. Arithmetic remains on the selected provider.",
+    "Independent mixed-interpolation tests cover two affine, two perspective and one flat varying, nonuniform homogeneous W, both 256- and 4096-pixel batches, and the existing edge, odd-size, derivative and sparse-tile cases.",
+    "Both original full desktop draw captures pass their scalar oracle and CPU/NPU comparison. All seventeen prewarm images remain byte-exact against the qualified baseline.",
+    "Both runtimes pass their clean CPU suites. Native NPU qualification covers triangle rendering, derivatives, compositor shaders, typed loads, loops, masks, mirror sampling, driver draws/clears and legacy compatibility.",
+    "This qualifies a candidate for an installed desktop trial. Full desktop offload and Tahoma performance remain unverified. No compiled-model sharing is included."
+  ]
+}

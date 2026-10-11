@@ -109,6 +109,52 @@ float4 main(float4 p:SV_Position,noperspective float4 c:COLOR,noperspective floa
             static_cast<unsigned long long>(result.tile_executions),static_cast<unsigned long long>(result.provider_requests),result.execution_device.c_str());
     }
     TEST(collated_components==32768);
+    // Multiple affine and perspective attributes plus a flat attribute must
+    // retain their own values and interpolation modes when sharing a request.
+    for(const auto attribute_batch : {256u,4096u}){
+        const auto mixed_vw=nr::registered_lab::shader_tokens(R"(
+struct O{float4 p:SV_Position;noperspective float4 a:TEXCOORD0;noperspective float4 b:TEXCOORD1;float4 c:TEXCOORD2;float4 d:TEXCOORD3;nointerpolation float4 e:TEXCOORD4;};
+O main(float4 p:POSITION,float4 a:TEXCOORD0,float4 b:TEXCOORD1,float4 c:TEXCOORD2,float4 d:TEXCOORD3,float4 e:TEXCOORD4){O o;o.p=p;o.a=a;o.b=b;o.c=c;o.d=d;o.e=e;return o;})","vs_4_0");
+        const auto mixed_pw=nr::registered_lab::shader_tokens(R"(
+Texture2D t:register(t0);SamplerState s:register(s0);
+float4 main(float4 p:SV_Position,noperspective float4 a:TEXCOORD0,noperspective float4 b:TEXCOORD1,float4 c:TEXCOORD2,float4 d:TEXCOORD3,nointerpolation float4 e:TEXCOORD4):SV_Target{return t.Sample(s,float2(.5,.5))*(a*.25+b*.125+c*.25+d*.125+e*.125);})","ps_4_0");
+        const auto mixed_vs=parse_vertex(mixed_vw.data(),mixed_vw.size()),mixed_ps=parse_pixel(mixed_pw.data(),mixed_pw.size());
+        const float xy[3][2]{{2,2},{30,2},{2,30}},w[3]{1,2,4};
+        std::vector<VertexRegisters> input(3);
+        for(unsigned v=0;v<3;++v){
+            input[v][0]={as_bits((xy[v][0]/16-1)*w[v]),as_bits((1-xy[v][1]/16)*w[v]),as_bits(.5f*w[v]),as_bits(w[v])};
+            for(unsigned r=1;r<=5;++r)for(unsigned c=0;c<4;++c)
+                input[v][r][c]=as_bits(float(1+((v*3+r*5+c*7)%13))/16);
+        }
+        const PackedTexture white{1,1,28,{{255,255,255,255}}};const PackedColor old{13,29,47,63};
+        const std::vector<PackedColor> background(1024,old);
+        TriangleTextureDrawExecutor executor(mixed_vs,mixed_ps,3,32,32,28,1,1,28,backend,false,15,TextureFilter::point,CullMode::none,false,attribute_batch);
+        const auto result=executor.execute(input,{}, {},{0,0,32,32,0,1},white,background);
+        TEST(result.execution_device.rfind(backend,0)==0);
+        unsigned samples=0;
+        for(unsigned y=0;y<32;++y)for(unsigned x=0;x<32;++x){
+            auto expected=old;
+            // The descending diagonal is not a top-left edge: centers on it
+            // are excluded. Horizontal and vertical minimum edges are included.
+            if(x>=2 && y>=2 && x+y<31){
+                ++samples;const double b=(double(x)+.5-2)/28,c=(double(y)+.5-2)/28;
+                const double bary[3]{1-b-c,b,c},weights[5]{.25,.125,.25,.125,.125};
+                const double denominator=bary[0]+bary[1]/2+bary[2]/4;
+                for(unsigned channel=0;channel<4;++channel){double value=0;
+                    for(unsigned r=1;r<=5;++r){double attribute=0;
+                        if(r==5)attribute=as_float(input[0][r][channel]);
+                        else for(unsigned v=0;v<3;++v)
+                            attribute+=as_float(input[v][r][channel])*bary[v]*(r>=3?1/double(w[v])/denominator:1);
+                        value+=attribute*weights[r-1];
+                    }
+                    expected[channel]=uint8_t(std::nearbyint(value*255));
+                }
+            }
+            for(unsigned channel=0;channel<4;++channel)TEST(std::abs(int(result.pixels[y*32+x][channel])-int(expected[channel]))<=1);
+        }
+        TEST(result.covered_samples==samples);
+        std::printf("{\"mixed_interpolation_components\":4096,\"batch\":%u,\"affine_attributes\":2,\"perspective_attributes\":2,\"flat_attributes\":1,\"execution_device\":\"%s\"}\n",attribute_batch,backend.c_str());
+    }
     uint64_t odd_components=0;
     for(const auto extent:{std::array<uint32_t,2>{31,29},{1,1}}){
         const auto w=extent[0],h=extent[1];const unsigned corner[6]{0,1,2,0,2,3};

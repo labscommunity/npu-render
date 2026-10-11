@@ -32,7 +32,8 @@ struct TriangleTextureDrawExecutor::State {
     std::unique_ptr<shader::PixelExecutor> pixel;
     CoverageExecutor coverage;
     OutputMerger merger;
-    std::unique_ptr<ColorInterpolator> perspective,affine;
+    std::array<std::vector<unsigned>,2> varying_registers;
+    std::array<std::unique_ptr<ColorInterpolator>,2> interpolators;
     State(const shader::Program &v,const shader::Program &p,uint32_t n,uint32_t w,uint32_t h,uint32_t f,
         const PackedResources &resources,const shader::TextureSamplers &samplers,const std::string &backend,
         BlendMode blend,uint8_t mask,CullMode cull,bool ccw,uint32_t b)
@@ -46,9 +47,11 @@ struct TriangleTextureDrawExecutor::State {
         pixel=std::make_unique<shader::PixelExecutor>(ps,batch,backend,shapes,samplers);
         for(unsigned r=0;r<16;++r)if(ps.inputs[r] && r!=ps.position_input){
             require((vs.outputs[r]&ps.inputs[r])==ps.inputs[r]);
-            if(ps.interpolation[r]==2 && !perspective)perspective=std::make_unique<ColorInterpolator>(batch,backend,true,true);
-            if(ps.interpolation[r]==4 && !affine)affine=std::make_unique<ColorInterpolator>(batch,backend,false,true);
+            if(ps.interpolation[r]==2)varying_registers[0].push_back(r);
+            if(ps.interpolation[r]==4)varying_registers[1].push_back(r);
         }
+        for(unsigned group=0;group<2;++group)if(!varying_registers[group].empty())
+            interpolators[group]=std::make_unique<ColorInterpolator>(batch*uint32_t(varying_registers[group].size()),backend,group==0,true);
     }
 };
 TriangleTextureDrawExecutor::TriangleTextureDrawExecutor(const shader::Program &v,const shader::Program &p,uint32_t n,uint32_t w,uint32_t h,uint32_t f,
@@ -102,7 +105,15 @@ UniformDrawExecutor::Result TriangleTextureDrawExecutor::execute(const std::vect
     result.pixels=background;std::vector<Sample> samples(s.batch);std::vector<Point> points(s.batch);
     std::vector<PackedColor> tile(s.batch);std::vector<Color> colors(s.batch);std::vector<shader::VertexRegisters> fragments(s.batch);
     std::vector<std::array<ProjectedVertex,3>> vertices(s.batch);
-    std::vector<std::array<Color,3>> values(s.batch);
+    std::array<std::vector<std::array<ProjectedVertex,3>>,2> attribute_vertices;
+    std::array<std::vector<std::array<Color,3>>,2> attribute_values;
+    std::array<std::vector<Point>,2> attribute_points;
+    std::array<std::vector<uint8_t>,2> attribute_coverage;
+    for(unsigned group=0;group<2;++group){
+        const auto n=size_t(s.batch)*s.varying_registers[group].size();
+        attribute_vertices[group].resize(n);attribute_values[group].resize(n);
+        attribute_points[group].resize(n);attribute_coverage[group].resize(n);
+    }
     std::vector<size_t> triangle_base(s.batch),pixel_index(s.batch);
     std::vector<uint8_t> stored_pixel(s.batch);
     const auto submit=[&](size_t valid){
@@ -122,17 +133,29 @@ UniformDrawExecutor::Result TriangleTextureDrawExecutor::execute(const std::vect
             const bool active=covered.covered[q] || covered.covered[q+1] || covered.covered[q+2] || covered.covered[q+3];
             if(active)for(size_t lane=0;lane<4;++lane)interpolation_coverage[q+lane]=1;
         }
-        for(unsigned r=0;r<16;++r)if(s.ps.inputs[r] && r!=s.ps.position_input){
-            if(s.ps.interpolation[r]==1){for(size_t n=0;n<s.batch;++n)fragments[n][r]=shaded.vertices[triangle_base[n]][r];continue;}
-            for(size_t n=0;n<s.batch;++n)for(unsigned v=0;v<3;++v){
-                values[n][v]={};
-                for(unsigned c=0;c<4;++c)if(s.ps.inputs[r]&(1u<<c))
-                    std::memcpy(&values[n][v][c],&shaded.vertices[triangle_base[n]+v][r][c],4);
+        for(unsigned r=0;r<16;++r)if(s.ps.inputs[r] && r!=s.ps.position_input && s.ps.interpolation[r]==1)
+            for(size_t n=0;n<s.batch;++n)fragments[n][r]=shaded.vertices[triangle_base[n]][r];
+        // Pack attributes with the same interpolation mode into one provider
+        // request. The host only duplicates unchanged geometry and bits;
+        // barycentric weights and all interpolation remain device arithmetic.
+        for(unsigned group=0;group<2;++group){
+            const auto &registers=s.varying_registers[group];if(registers.empty())continue;
+            const auto count=registers.size();
+            for(size_t n=0;n<s.batch;++n)for(size_t attribute=0;attribute<count;++attribute){
+                const auto at=n*count+attribute;const auto r=registers[attribute];
+                attribute_vertices[group][at]=vertices[n];attribute_points[group][at]=points[n];
+                attribute_coverage[group][at]=interpolation_coverage[n];
+                for(unsigned v=0;v<3;++v){
+                    auto &value=attribute_values[group][at][v];value={};
+                    for(unsigned c=0;c<4;++c)if(s.ps.inputs[r]&(1u<<c))
+                        std::memcpy(&value[c],&shaded.vertices[triangle_base[n]+v][r][c],4);
+                }
             }
-            began=Clock::now();const auto interpolated=(s.ps.interpolation[r]==2?s.perspective:s.affine)->execute(vertices,values,points,interpolation_coverage);
+            began=Clock::now();const auto interpolated=s.interpolators[group]->execute(attribute_vertices[group],attribute_values[group],attribute_points[group],attribute_coverage[group]);
             require(interpolated.execution_device==result.execution_device);result.timings.shader_ms+=ms(began);
-            result.input_bytes+=uint64_t(s.batch)*96;result.output_bytes+=uint64_t(s.batch)*16;++result.provider_requests;
-            for(size_t n=0;n<s.batch;++n)std::memcpy(fragments[n][r].data(),interpolated.colors[n].data(),16);
+            result.input_bytes+=uint64_t(s.batch)*count*96;result.output_bytes+=uint64_t(s.batch)*count*16;++result.provider_requests;
+            for(size_t n=0;n<s.batch;++n)for(size_t attribute=0;attribute<count;++attribute)
+                std::memcpy(fragments[n][registers[attribute]].data(),interpolated.colors[n*count+attribute].data(),16);
         }
         // The device supplied the execution mask. Inactive fragments cannot
         // contribute pixels or derivatives; use a live fragment/quad for their

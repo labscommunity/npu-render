@@ -1,0 +1,27 @@
+{
+  "all_checks_passed": true,
+  "source_hashes_verified": 3,
+  "full_image_baseline_comparisons_exact": 4,
+  "mixed_interpolation": {
+    "affine_attributes": 2,
+    "perspective_attributes": 2,
+    "flat_attributes": 1,
+    "batches": [
+      256,
+      4096
+    ]
+  },
+  "single_sample_npu_draw_ms": {
+    "1041": {
+      "baseline": 8032.337,
+      "batched": 7363.977
+    },
+    "1061": {
+      "baseline": 9159.755,
+      "batched": 8483.209
+    }
+  },
+  "interpretation": "Single diagnostic samples qualify pixel behavior, not a general performance improvement. Arithmetic remains on the selected provider. Grouping attributes reduces request count but does not reduce attribute bytes. CPU single samples were slower.",
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false
+}

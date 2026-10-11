@@ -1,0 +1,5 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$src='C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25';$b="$r\builds\attribute-diagnostic-v2";$sdk="$r\toolchains\openvino-2026.4.1\Lib\site-packages\openvino"
+if(Test-Path $b){throw 'Diagnostic build exists'}
+$ErrorActionPreference='Continue';& cmake -S "$r\vm\attribute-diagnostic-v2" -B $b -A x64 "-DOpenVINO_DIR=$sdk\cmake" "-DNR_RENDER_SOURCE=$src\native\windows\registered_lab" "-DNR_RENDER_LIBRARY=$r\builds\present-umd-v209\Release\nr_registered_vertex.lib" "-DNR_CACHE_LIBRARY=$r\builds\present-umd-v209\Release\nr_registered_provider_cache.lib" *> "$r\vm\build-attribute-diagnostic-v2.log";$code=$LASTEXITCODE
+if(!$code){& cmake --build $b --config Release --clean-first *>> "$r\vm\build-attribute-diagnostic-v2.log";$code=$LASTEXITCODE}
+$ErrorActionPreference='Stop';Get-Content "$r\vm\build-attribute-diagnostic-v2.log" -Tail 7;if($code){throw 'Diagnostic build failed'}
