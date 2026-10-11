@@ -1,0 +1,127 @@
+-- Building for: Visual Studio 17 2022
+-- Selecting Windows SDK version 10.0.26100.0 to target Windows 10.0.26200.
+-- The CXX compiler identification is MSVC 19.44.35229.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/cl.exe - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Failed
+-- Looking for pthread_create in pthreads
+-- Looking for pthread_create in pthreads - not found
+-- Looking for pthread_create in pthread
+-- Looking for pthread_create in pthread - not found
+-- Found Threads: TRUE
+-- Configuring done (2.8s)
+-- Generating done (0.2s)
+-- Build files have been written to: C:/Users/tatef/AppData/Local/npu-render/builds/present-umd-v208
+MSBuild version 17.14.60+43b635718 for .NET Framework
+
+MSBuild version 17.14.60+43b635718 for .NET Framework
+
+  1>Checking Build System
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/registered_lab/CMakeLists.txt
+  blend_executor.cpp
+  nr_registered_blend.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\Release\nr_registered_blend.lib
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/registered_lab/CMakeLists.txt
+  clear_executor.cpp
+  vertex_executor.cpp
+C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(252,32): error C3530: 'auto' cannot be combined with any other type-specifier [C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\nr_registered_vertex.vcxproj]
+C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(252,37): error C2513: 'const char': no variable declared before '=' [C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\nr_registered_vertex.vcxproj]
+C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(253,38): error C2144: syntax error: 'char' should be preceded by ')' [C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\nr_registered_vertex.vcxproj]
+C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(253,31): error C2064: term does not evaluate to a function taking 0 arguments [C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\nr_registered_vertex.vcxproj]
+      C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(253,31):
+      class does not define an 'operator()' or a user defined conversion operator to a pointer-to-function or reference-to-function that takes appropriate number of arguments
+      C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(253,31):
+      while trying to match the argument list '()'
+
+C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(253,38): error C2144: syntax error: 'char' should be preceded by ';' [C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\nr_registered_vertex.vcxproj]
+C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(253,43): error C2059: syntax error: ',' [C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\nr_registered_vertex.vcxproj]
+C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(253,63): error C2059: syntax error: ')' [C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\nr_registered_vertex.vcxproj]
+C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(566,36): error C3530: 'auto' cannot be combined with any other type-specifier [C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\nr_registered_vertex.vcxproj]
+C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(566,41): error C2513: 'const char': no variable declared before '=' [C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\nr_registered_vertex.vcxproj]
+C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(567,48): error C2144: syntax error: 'char' should be preceded by ')' [C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\nr_registered_vertex.vcxproj]
+C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(567,41): error C2064: term does not evaluate to a function taking 0 arguments [C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\nr_registered_vertex.vcxproj]
+      C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(567,41):
+      class does not define an 'operator()' or a user defined conversion operator to a pointer-to-function or reference-to-function that takes appropriate number of arguments
+      C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(567,41):
+      while trying to match the argument list '()'
+
+C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(567,48): error C2144: syntax error: 'char' should be preceded by ';' [C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\nr_registered_vertex.vcxproj]
+C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(567,53): error C2059: syntax error: ',' [C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\nr_registered_vertex.vcxproj]
+C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(567,73): error C2059: syntax error: ')' [C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\nr_registered_vertex.vcxproj]
+C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(573,50): error C2144: syntax error: 'char' should be preceded by ')' [C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\nr_registered_vertex.vcxproj]
+C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(573,43): error C2064: term does not evaluate to a function taking 0 arguments [C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\nr_registered_vertex.vcxproj]
+      C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(573,43):
+      class does not define an 'operator()' or a user defined conversion operator to a pointer-to-function or reference-to-function that takes appropriate number of arguments
+      C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(573,43):
+      while trying to match the argument list '()'
+
+C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(573,50): error C2144: syntax error: 'char' should be preceded by ';' [C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\nr_registered_vertex.vcxproj]
+C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(573,55): error C2059: syntax error: ',' [C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\nr_registered_vertex.vcxproj]
+C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(573,65): error C2059: syntax error: ')' [C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\nr_registered_vertex.vcxproj]
+C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(586,36): error C3530: 'auto' cannot be combined with any other type-specifier [C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\nr_registered_vertex.vcxproj]
+C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(586,41): error C2513: 'const char': no variable declared before '=' [C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\nr_registered_vertex.vcxproj]
+C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(587,48): error C2144: syntax error: 'char' should be preceded by ')' [C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\nr_registered_vertex.vcxproj]
+C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(587,41): error C2064: term does not evaluate to a function taking 0 arguments [C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\nr_registered_vertex.vcxproj]
+      C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(587,41):
+      class does not define an 'operator()' or a user defined conversion operator to a pointer-to-function or reference-to-function that takes appropriate number of arguments
+      C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(587,41):
+      while trying to match the argument list '()'
+
+C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(587,48): error C2144: syntax error: 'char' should be preceded by ';' [C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\nr_registered_vertex.vcxproj]
+C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(587,53): error C2059: syntax error: ',' [C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\nr_registered_vertex.vcxproj]
+C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\native\windows\registered_lab\vertex_executor.cpp(587,73): error C2059: syntax error: ')' [C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\nr_registered_vertex.vcxproj]
+  raster_executor.cpp
+  projection_executor.cpp
+  output_merger.cpp
+  color_interpolator.cpp
+  uniform_draw.cpp
+  solid_rectangle.cpp
+  texture_crop.cpp
+  point_texture_draw.cpp
+  linear_texture_draw.cpp
+  triangle_texture_draw.cpp
+  Generating Code...
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/registered_lab/CMakeLists.txt
+  probe.cpp
+  nr_registered_clear_probe.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\Release\nr_registered_clear_probe.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/registered_lab/CMakeLists.txt
+  lab_exchange_test.cpp
+  nr_registered_exchange_test.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\Release\nr_registered_exchange_test.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/registered_lab/CMakeLists.txt
+  fifo_dispatch_test.cpp
+  nr_registered_fifo_dispatch_test.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\Release\nr_registered_fifo_dispatch_test.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/registered_lab/CMakeLists.txt
+  indexed_exchange_test.cpp
+  nr_registered_indexed_exchange_test.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\Release\nr_registered_indexed_exchange_test.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/registered_lab/CMakeLists.txt
+  indexed_stream_relay.cpp
+  nr_registered_indexed_stream_relay.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\Release\nr_registered_indexed_stream_relay.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/registered_lab/CMakeLists.txt
+  npu_exchange_worker.cpp
+  nr_registered_npu_worker.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\Release\nr_registered_npu_worker.exe
+  Building Custom Rule C:/Users/tatef/AppData/Local/Temp/npu-graphics-probe-0146a2388f25/native/windows/registered_lab/CMakeLists.txt
+  provider_cache_test.cpp
+  nr_registered_provider_cache_test.vcxproj -> C:\Users\tatef\AppData\Local\npu-render\builds\present-umd-v208\Release\nr_registered_provider_cache_test.exe
+python.exe : Traceback (most recent call last):
+At line:10 char:2
++  & $python tools\build_registered_lab.py --build-dir $b --wdk-include ...
++  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], Remot
+   eException
+    + FullyQualifiedErrorId : NativeCommandError
+
+  File "C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\tools\build_registered_l
+ab.py", line 126, in <module>
+    main()
+  File "C:\Users\tatef\AppData\Local\Temp\npu-graphics-probe-0146a2388f25\tools\build_registered_l
+ab.py", line 59, in main
+    subprocess.run(
+  File "C:\Users\tatef\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 571, in
+run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['cmake', '--build',
+'C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\present-umd-v208', '--config', 'Release',
+'--clean-first']' returned non-zero exit status 1.

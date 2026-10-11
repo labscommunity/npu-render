@@ -1,0 +1,39 @@
+{
+  "kind": "cache-key-collision-and-isolation-diagnostic",
+  "runtime": "2026.4.1-22982-e213a147257-releases/2026/4",
+  "uncached_solid_rectangle_suite_passed": true,
+  "unpartitioned_fresh_cache_passed": false,
+  "unpartitioned_reused_cache_passed": false,
+  "isolated_fresh_cache_passed": true,
+  "isolated_fresh_cache_hits": 0,
+  "isolated_reused_cache_passed": true,
+  "isolated_reused_cache_hits": 8,
+  "graphs": 8,
+  "checked_components_per_full_pass": 84082688,
+  "distinct_builtin_keys_for_eight_graphs": 4,
+  "original_uncached_vertex_and_loop_failures_reproduced": true,
+  "desktop_offload_tested": false,
+  "physical_machine_restarted": false,
+  "findings": [
+    "All four RGBA/BGRA graph pairs receive identical built-in cache filenames despite producing different pixels; separate SHA-256 namespaces contain distinct compiled blobs for those pairs. Clearing the cache does not prevent the collision.",
+    "The original graph is unchanged. An independent SHA-256 over normalized serialized graph structure, constants and runtime build identifies its cache directory. The provider still includes its own compilation-property key inside that directory.",
+    "The first expanded diagnostic continued after incorrect pixels and ended with process access violation 0xc0000005. The following uncached native suite passes without a physical restart; no device-loss error was reported.",
+    "Original v205 vertex-ID and blur failures persist with the OpenVINO cache disabled. The general bounds-mask correction is independently necessary.",
+    "The cache identity unit diagnostic checks known SHA-256 answers, constant permutation, stable generated names, input shape and binding-name changes, model immutability and IR round trips. The full integration qualification remains pending."
+  ],
+  "primary_sources": [
+    {
+      "url": "https://github.com/openvinotoolkit/openvino/blob/2026.4.1/src/inference/src/dev/compilation_context.cpp",
+      "finding": "ModelCache computes a model hash and adds compile configuration and runtime attributes."
+    },
+    {
+      "url": "https://github.com/openvinotoolkit/openvino/blob/2026.4.1/src/core/src/pass/serialize.cpp",
+      "finding": "The hash pass uses deterministic serialization and the constant writer data hash."
+    },
+    {
+      "url": "https://github.com/openvinotoolkit/openvino/blob/2026.4.1/src/plugins/intel_npu/README.md",
+      "finding": "Documents separate driver and OpenVINO model caches. An explicit OpenVINO cache bypasses the driver cache."
+    }
+  ],
+  "integration_build_v208": "Compile failure from Windows SDK macro leakage; no hardware checks or installation. The CNG implementation was subsequently isolated in a .cpp file for v209."
+}

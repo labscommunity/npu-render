@@ -1,0 +1,9 @@
+{
+  "build": "present-umd-v208",
+  "compiled": false,
+  "tests_run": false,
+  "installed": false,
+  "cause": "Including Windows SDK types through provider_cache.hpp exposed the SDK small macro to pre-existing shader local variables. Isolate the CNG implementation in provider_cache.cpp; renderer arithmetic does not change.",
+  "raw_log_bytes": 28364,
+  "raw_log_sha256": "b8e96577c1f9d4ed7e08a0fd089ce28054b5531123ced5d71c102af7939e9167"
+}

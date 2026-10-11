@@ -1,0 +1,49 @@
+{
+  "build": "present-umd-v205",
+  "source_base": "4b5671b60a755f47101cb26027a5b5eb41cc0da7",
+  "qualified": false,
+  "desktop_deployment_allowed": false,
+  "new_and_legacy_clean_cpu_suites_passed": 24,
+  "native_npu_regressions_passed": [
+    "triangles",
+    "derivatives",
+    "compositor",
+    "typed-load"
+  ],
+  "native_npu_regressions_failed": [
+    "loops"
+  ],
+  "not_run": [
+    "masks",
+    "mirror",
+    "lab",
+    "legacy NPU compatibility",
+    "17 prewarm comparison"
+  ],
+  "blur_maximum_error": 0.666666627,
+  "capture_pixel_tolerance_passed": true,
+  "capture_coverage_exact": true,
+  "captures": [
+    {
+      "shader_words": 1041,
+      "previous_npu_draw_ms": 54076.038,
+      "candidate_npu_draw_ms": 8775.9,
+      "tiles_before": 1679,
+      "tiles_after": 214
+    },
+    {
+      "shader_words": 1061,
+      "previous_npu_draw_ms": 54589.0,
+      "candidate_npu_draw_ms": 8766.341,
+      "tiles_before": 1679,
+      "tiles_after": 214
+    }
+  ],
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "findings": [
+    "The new runtime and larger batches reproduce both complete captured images within the existing one-byte tolerance and preserve exact coverage. This is offline draw evidence, not interactive desktop performance.",
+    "Blur loses sample contributions before reduction. Diagnostic alpha outputs for nine active taps are zero for multiple active taps; the final gather/add reduction correctly sums the already incorrect contributions. This is a numerical correctness failure, not a tolerance adjustment opportunity.",
+    "The candidate is rejected for desktop deployment pending a fix and complete requalification. Physical GPU/NPU drivers and baseline runtime are unchanged."
+  ]
+}

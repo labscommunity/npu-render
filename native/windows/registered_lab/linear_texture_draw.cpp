@@ -159,7 +159,7 @@ struct LinearTextureDrawExecutor::State {
             for(const auto &node:model->get_ops())node->get_rt_info()["precise_0"]=std::string{};
             std::ostringstream xml,weights;ov::pass::Serialize serializer(xml,weights);serializer.run_on_model(model);
             const auto bytes=weights.str();ov::Tensor data(ov::element::u8,ov::Shape{bytes.size()});if(!bytes.empty())std::memcpy(data.data(),bytes.data(),bytes.size());
-            model=core.read_model(xml.str(),data);for(const auto &node:model->get_ops())require(node->get_rt_info().count("precise_0")!=0);
+            model=core.read_model(xml.str(),data);for(const auto &node:model->get_ops())require(nr::provider::precision_preserved(node));
             properties.emplace(ov::hint::execution_mode(ov::hint::ExecutionMode::ACCURACY));
         }
         compiled=nr::provider::compile_model(core,model,backend,properties);const auto devices=compiled.get_property(ov::execution_devices);

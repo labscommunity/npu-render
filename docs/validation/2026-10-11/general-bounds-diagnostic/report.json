@@ -1,0 +1,32 @@
+{
+  "full_runtime_qualified": false,
+  "cpu_and_npu_diagnostic_suites_passed": [
+    "vertex",
+    "texture",
+    "captured blur"
+  ],
+  "blur_cases": 72,
+  "blur_maximum_error": 2.38418579e-07,
+  "existing_blur_tolerance": 1e-05,
+  "vertex_id_batch_sizes": [
+    1,
+    2,
+    3,
+    4,
+    6,
+    8,
+    16,
+    32,
+    64
+  ],
+  "invalid_vertex_ids_rejected": true,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "findings": [
+    "The rejected v206 driver test fails on the vertex-ID quad. An isolated probe reproduces rejection for all nine batch sizes. Instrumentation shows correct integer indices0..7 but incorrect converted validity masks, including values other than0/1.",
+    "Replacing LogicalAnd in the integer-index bounds expression with BitwiseAnd of two converted0/1 comparisons fixes the vertex-ID test while retaining device-side lower/upper bounds and invalid-index rejection. Typed texture loads already use this representation.",
+    "The same general correction, applied to the v205 source without the shader-specific130-row coefficient bypass, passes full vertex and texture suites and all72 original blur scenarios on CPU and NPU. This supersedes the narrower v206 blur workaround. No bounds checking, padded zero row, accuracy tolerance or failure handling is removed.",
+    "The first general-probe controller passed CPU vertex and texture tests but supplied an incorrect argument list to the loop binary. Qualification v2 reuses identical binaries with explicit backend arguments and passes all six runs. That controller failure is not renderer evidence.",
+    "A fresh full build and broader native hardware qualification are required before desktop deployment."
+  ]
+}

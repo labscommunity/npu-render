@@ -1,0 +1,24 @@
+sample=0 lane=0 actual=-1.20849609 expected=0.03125 error=1.23974609
+sample=0 lane=1 actual=3.36460018 expected=0.25 error=3.11460018
+sample=0 lane=2 actual=1.87499154 expected=0.2578125 error=1.61717904
+sample=0 lane=3 actual=5.65945101 expected=1 error=4.65945101
+sample=1 lane=0 actual=-1.5 expected=0.25 error=1.75
+sample=1 lane=1 actual=3.01041675 expected=0.25 error=2.76041675
+sample=1 lane=2 actual=-0.895833313 expected=0.3125 error=1.20833325
+sample=1 lane=3 actual=3.48611116 expected=1 error=2.48611116
+sample=2 lane=0 actual=-2.75 expected=0.5 error=3.25
+sample=2 lane=1 actual=6.40625 expected=0.25 error=6.15625
+sample=2 lane=2 actual=-1.71875 expected=0.37499997 error=2.09375
+sample=2 lane=3 actual=6.1875 expected=1 error=5.1875
+sample=3 lane=0 actual=-2.75 expected=0.71874994 error=3.46875
+sample=3 lane=1 actual=6.40625 expected=0.25 error=6.15625
+sample=3 lane=2 actual=-1.71875 expected=0.42968753 error=2.1484375
+sample=3 lane=3 actual=6.1875 expected=1 error=5.1875
+{"captured_shader_words":1850,"scenario":0,"taps":9,"verified_components":16,"maximum_error":6.15625,"execution_device":"NPU"}
+nr_loop_diagnostic.exe : loop diagnostic: max_error<=1e-5f
+At line:7 char:1
++ & "$b\Release\nr_loop_diagnostic.exe" NPU *> "$r\vm\loop-diagnostic-v ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (loop diagnostic: max_error<=1e-5f:String) [], Remote
+   Exception
+    + FullyQualifiedErrorId : NativeCommandError

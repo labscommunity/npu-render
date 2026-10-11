@@ -27,19 +27,23 @@ void test_vertex_id_tables(const std::string &backend){
     const auto &words=nr::registered_lab::test_fixture::vertex_id_quad_words;
     const auto program=parse_vertex(words,std::size(words));
     test(program.vertex_id_input==0 && program.literal_tables[0].size()==8 && program.instructions.size()==4);
-    std::vector<VertexRegisters> input(32);VertexExecutor executor(program,32,backend);
     const float xy[4][2]{{-1,-1},{-1,1},{1,-1},{1,1}};
-    for(unsigned pass=0;pass<3;++pass){
-        for(unsigned n=0;n<input.size();++n)input[n][0][0]=(n+pass)%4;
-        const auto result=executor.execute(input,{});test(result.execution_device.rfind(backend,0)==0);
-        for(unsigned n=0;n<input.size();++n){const auto id=input[n][0][0];
-            const VertexBits expected{as_bits(xy[id][0]),as_bits(xy[id][1]),0,as_bits(1.f)};
-            test(result.vertices[n][program.position_output]==expected);
-            test(result.vertices[n]==reference_vertex(program,input[n],{}));
+    unsigned verified_vertices=0;
+    for(unsigned count:{1u,2u,3u,4u,6u,8u,16u,32u,64u}){
+        std::vector<VertexRegisters> input(count);VertexExecutor executor(program,count,backend);
+        for(unsigned pass=0;pass<3;++pass){
+            for(unsigned n=0;n<input.size();++n)input[n][0][0]=(n+pass)%4;
+            const auto result=executor.execute(input,{});test(result.execution_device.rfind(backend,0)==0);
+            for(unsigned n=0;n<input.size();++n){const auto id=input[n][0][0];
+                const VertexBits expected{as_bits(xy[id][0]),as_bits(xy[id][1]),0,as_bits(1.f)};
+                test(result.vertices[n][program.position_output]==expected);
+                test(result.vertices[n]==reference_vertex(program,input[n],{}));
+            }
         }
+        input[0][0][0]=4;bool failed=false;
+        try{(void)executor.execute(input,{});}catch(const std::runtime_error &){failed=true;}test(failed);
+        verified_vertices+=3*count;
     }
-    input[0][0][0]=4;bool failed=false;
-    try{(void)executor.execute(input,{});}catch(const std::runtime_error &){failed=true;}test(failed);
     // Reject malformed tables, undeclared system values and truncated streams.
     for(size_t n=0;n<std::size(words);++n){std::vector<uint32_t> bad(words,words+n);if(n>1)bad[1]=uint32_t(n);rejects(bad);}
     for(unsigned kind=0;kind<4;++kind){std::vector<uint32_t> bad(words,words+std::size(words));
@@ -51,7 +55,7 @@ void test_vertex_id_tables(const std::string &backend){
         if(kind==3){bad.erase(bad.begin()+16,bad.begin()+22);bad[1]=uint32_t(bad.size());}
         rejects(bad);
     }
-    std::printf("{\"vertex_id_literal_table\":true,\"vertices\":96,\"exact_bits_verified\":true,\"invalid_lookup_rejected\":true,\"execution_device\":\"%s\",\"desktop_offload_tested\":false}\n",backend.c_str());
+    std::printf("{\"vertex_id_literal_table\":true,\"vertices\":%u,\"batch_sizes\":9,\"exact_bits_verified\":true,\"invalid_lookup_rejected\":true,\"execution_device\":\"%s\",\"desktop_offload_tested\":false}\n",verified_vertices,backend.c_str());
 }
 void test_integer_shift(const std::string &backend){
     const auto words=nr::registered_lab::shader_tokens(R"(

@@ -103,7 +103,7 @@ struct CoverageExecutor::State {
             if (!bytes.empty()) std::memcpy(data.data(), bytes.data(), bytes.size());
             model = core.read_model(xml.str(), data);
             for (const auto &node : model->get_ops())
-                if (!node->get_rt_info().count("precise_0")) throw std::runtime_error("coverage precision marker lost");
+                if (!nr::provider::precision_preserved(node)) throw std::runtime_error("coverage precision marker lost");
             properties.emplace(ov::hint::execution_mode(ov::hint::ExecutionMode::ACCURACY));
         }
         compiled = nr::provider::compile_model(core, model, backend, properties);

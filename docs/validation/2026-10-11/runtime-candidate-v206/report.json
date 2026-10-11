@@ -1,0 +1,17 @@
+{
+  "build": "present-umd-v206",
+  "qualified": false,
+  "desktop_deployment_allowed": false,
+  "clean_cpu_suites_per_runtime": 24,
+  "seven_rendering_npu_suites_passed": true,
+  "two_full_capture_pairs_passed": true,
+  "failed_check": "lab-NPU",
+  "failure": "The vertex-ID quad draw rejects valid inputs as an invalid indexable lookup. Separate full vertex suite also rejects it. The earlier direct invocation without --backend had invalid command-line syntax and is not renderer evidence.",
+  "blur_fix_passed": true,
+  "not_run": [
+    "legacy NPU compatibility",
+    "17 prewarm packet comparisons"
+  ],
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false
+}

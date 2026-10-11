@@ -1,0 +1,40 @@
+taps=16 sample=0 alpha: 0.111111112 0 0 0 0 0 0.111111112 0.111111112 0 0 0 0 0 0 0 0
+taps=16 sample=1 alpha: 0 0 0.111111112 0.111111112 0 0 0.111111112 0.111111112 0 0 0 0 0 0 0 0
+taps=16 sample=2 alpha: 0 0 0.111111112 0.111111112 0 0 0.111111112 0.111111112 0 0 0 0 0 0 0 0
+taps=16 sample=3 alpha: 0 0 0.111111112 0.111111112 0 0 0.111111112 0.111111112 0 0 0 0 0 0 0 0
+taps=8 sample=0 alpha: 0.111111112 0 0 0.222222224 0 0 0 0
+taps=8 sample=1 alpha: 0 0.222222224 0 0.222222224 0 0 0 0
+taps=8 sample=2 alpha: 0 0.222222224 0 0.222222224 0 0 0 0
+taps=8 sample=3 alpha: 0 0.222222224 0 0.222222224 0 0 0 0
+taps=4 sample=0 alpha: 0.111111112 0.222222224 0 0
+taps=4 sample=1 alpha: 0.222222224 0.222222224 0 0
+taps=4 sample=2 alpha: 0.222222224 0.222222224 0 0
+taps=4 sample=3 alpha: 0.222222224 0.222222224 0 0
+taps=2 sample=0 alpha: 0.333333343 0
+taps=2 sample=1 alpha: 0.444444448 0
+taps=2 sample=2 alpha: 0.444444448 0
+taps=2 sample=3 alpha: 0.444444448 0
+sample=0 lane=0 actual=0.011284722 expected=0.03125 error=0.019965278
+sample=0 lane=1 actual=0.0833333358 expected=0.25 error=0.166666657
+sample=0 lane=2 actual=0.0861545131 expected=0.2578125 error=0.171657979
+sample=0 lane=3 actual=0.333333343 expected=1 error=0.666666627
+sample=1 lane=0 actual=0.111111112 expected=0.25 error=0.138888896
+sample=1 lane=1 actual=0.111111112 expected=0.25 error=0.138888896
+sample=1 lane=2 actual=0.138888896 expected=0.3125 error=0.173611104
+sample=1 lane=3 actual=0.444444448 expected=1 error=0.555555582
+sample=2 lane=0 actual=0.222222224 expected=0.5 error=0.277777791
+sample=2 lane=1 actual=0.111111112 expected=0.25 error=0.138888896
+sample=2 lane=2 actual=0.166666672 expected=0.37499997 error=0.208333299
+sample=2 lane=3 actual=0.444444448 expected=1 error=0.555555582
+sample=3 lane=0 actual=0.317708343 expected=0.71874994 error=0.401041597
+sample=3 lane=1 actual=0.111111112 expected=0.25 error=0.138888896
+sample=3 lane=2 actual=0.190538198 expected=0.42968753 error=0.239149332
+sample=3 lane=3 actual=0.444444448 expected=1 error=0.555555582
+{"captured_shader_words":1850,"scenario":0,"taps":9,"verified_components":16,"maximum_error":0.666666627,"execution_device":"NPU"}
+nr_loop_diagnostic.exe : loop diagnostic: max_error<=1e-5f
+At line:7 char:1
++ & "$b\Release\nr_loop_diagnostic.exe" NPU *> "$r\vm\loop-diagnostic-v ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (loop diagnostic: max_error<=1e-5f:String) [], Remote
+   Exception
+    + FullyQualifiedErrorId : NativeCommandError

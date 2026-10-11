@@ -1,0 +1,12 @@
+nr_loop_diagnostic.exe : loop diagnostic: Exception from
+src\inference\src\cpp\infer_request.cpp:224:
+At line:7 char:1
++ & "$b\Release\nr_loop_diagnostic.exe" NPU *> "$r\vm\loop-diagnostic-v ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (loop diagnostic...equest.cpp:224::String) [], Remote
+   Exception
+    + FullyQualifiedErrorId : NativeCommandError
+
+Exception from src\plugins\intel_npu\src\utils\src\zero\zero_wrappers.cpp:382:
+L0 zeFenceHostSynchronize result: ZE_RESULT_ERROR_DEVICE_LOST, code 0x70000001 - device hung,
+reset, was removed, or driver update occurred

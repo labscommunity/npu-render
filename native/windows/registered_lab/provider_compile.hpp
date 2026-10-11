@@ -1,6 +1,8 @@
 #pragma once
 #include <openvino/openvino.hpp>
 #include "provider_compile_statistics.hpp"
+#include "provider_precision.hpp"
+#include "provider_cache.hpp"
 #include <cstdlib>
 #include <filesystem>
 #include <memory>
@@ -25,7 +27,7 @@ inline ov::CompiledModel compile_model(ov::Core &core,const std::shared_ptr<ov::
         if(!path.is_absolute() || !std::filesystem::is_directory(path))throw std::invalid_argument("NPU cache must be an existing absolute directory");
         // Explicit controller-owned cache only. OpenVINO keys entries by graph
         // and compilation properties; frame pixels remain runtime inputs.
-        core.set_property(ov::cache_dir(directory));++cache_requests;
+        core.set_property(ov::cache_dir(isolated_cache_directory(path,model).string()));++cache_requests;
     }
     auto compiled=core.compile_model(model,backend,properties);
     if(!directory.empty()){

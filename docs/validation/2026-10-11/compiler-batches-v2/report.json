@@ -1,0 +1,33 @@
+{
+  "runtime": "2026.4.1-22982-e213a147257-releases/2026/4",
+  "driver": "32.0.100.5540",
+  "cpu_cases_passed": 12,
+  "npu_cases_passed": 12,
+  "verified_components": {
+    "CPU": 1105920,
+    "NPU": 1105920
+  },
+  "maximum_float_error": {
+    "CPU": 7.4505806e-08,
+    "NPU": 8.94069672e-07
+  },
+  "shipping_renderer_changed_by_probe": false,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "findings": [
+    "The isolated probe recognizes the normalized DisablePrecisionConversion_0 runtime attribute and visits its contents through the public RuntimeAttribute API. It requires exactly one value field equal to dynamic:f16; the old key-presence check is not simply removed.",
+    "All988-,1008- and1061-word captured shaders pass at512,1024,2048 and4096 pixels per inference. Every run covers point and linear sampling and six constant/coordinate scenarios, compared to the independent scalar shader interpreter. Every NPU result reports NPU execution.",
+    "This removes the compiler limitation observed in v1 for these shader shapes and this pinned runtime. It does not establish a desktop speedup, successful deployment of the whole renderer, or coverage of the1041-word variant added after the probe was built.",
+    "Full renderer integration must additionally check all raster stages, complete captured image oracles, all existing prewarm packets and installed interaction before the runtime is adopted. The physical driver and baseline environment remain unchanged."
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/openvinotoolkit/openvino/blob/2026.4.1/src/common/transformations/src/transformations/fp16_compression/convert_legacy_precision_attribute.cpp",
+      "finding": "Legacy precision attributes migrate during IR normalization."
+    },
+    {
+      "url": "https://github.com/openvinotoolkit/openvino/blob/2026.4.1/src/common/transformations/src/transformations/rt_info/disable_precision_conversion.cpp",
+      "finding": "The new typed attribute exposes its conversion map to attribute visitors."
+    }
+  ]
+}

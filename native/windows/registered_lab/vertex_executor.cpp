@@ -152,9 +152,13 @@ struct RegisterExecutor::State {
                     check(bool(relative)); index = std::make_shared<op::Add>(index, relative);
                 }
                 index = std::make_shared<op::Reshape>(batch(index), indices({int64_t(count)}), false);
-                const auto valid = std::make_shared<op::LogicalAnd>(
-                    std::make_shared<op::GreaterEqual>(index, integer(0)),
-                    std::make_shared<op::Less>(index, integer(int32_t(size))));
+                // The 2026.4 NPU compiler miscomputes LogicalAnd for these
+                // integer-index comparisons. Combine exact 0/1 integer masks,
+                // as in typed texture loads, and keep both bounds on device.
+                const auto valid_bits=std::make_shared<op::BitwiseAnd>(
+                    std::make_shared<op::Convert>(std::make_shared<op::GreaterEqual>(index,integer(0)),ov::element::i32),
+                    std::make_shared<op::Convert>(std::make_shared<op::Less>(index,integer(int32_t(size))),ov::element::i32));
+                const auto valid=std::make_shared<op::NotEqual>(valid_bits,integer(0));
                 if(a.kind==Register::indexable)invalid_coordinates.push_back(std::make_shared<op::Reshape>(
                     std::make_shared<op::Convert>(std::make_shared<op::LogicalNot>(valid),ov::element::i32),batch_shape,false));
                 // Route out-of-range reads to an appended zero row. The Intel
@@ -710,7 +714,7 @@ struct RegisterExecutor::State {
             if (!bytes.empty()) std::memcpy(data.data(), bytes.data(), bytes.size());
             model = core.read_model(xml.str(), data);
             for (const auto &node : model->get_ops())
-                if (!node->get_rt_info().count("precise_0")) throw std::runtime_error("vertex precision marker was lost");
+                if (!nr::provider::precision_preserved(node)) throw std::runtime_error("vertex precision marker was lost");
             properties.emplace(ov::hint::execution_mode(ov::hint::ExecutionMode::ACCURACY));
         }
         if(defer_compile)return;
@@ -822,22 +826,21 @@ void RegisterExecutor::validate(const Program &original) {
 // Bound this specialization to the verified 32,768-tap graph shape.
 uint32_t RegisterExecutor::maximum_batch(const Program &p){
     if(mirrored_loop_shader(p))return 256u;
-    // The qualified Intel NPU compiler rejects this compositor's real two-
-    // texture graph at 1024 and 4096 lanes with a layout legalization error.
-    // Both 256 and 512 lanes execute the complete captured draw correctly.
-    // Keep the workaround tied to exact bytecode, not a word-count heuristic.
+    // The legacy Intel compiler rejects larger compositor batches. Enable
+    // the larger shape only for the exact separately qualified runtime and
+    // exact shader bytecode; keep other runtime versions conservative.
     const auto &words=nr::registered_lab::test_fixture::compositor_pixel_words;
     if(p.stage==Stage::pixel && p.bytecode.size()==std::size(words) &&
-        std::equal(p.bytecode.begin(),p.bytecode.end(),std::begin(words)))return 512u;
+        std::equal(p.bytecode.begin(),p.bytecode.end(),std::begin(words)))return nr::provider::compositor_batch_capacity();
     const auto &fade=nr::registered_lab::test_fixture::compositor_fade_pixel_words;
     if(p.stage==Stage::pixel && p.bytecode.size()==std::size(fade) &&
-        std::equal(p.bytecode.begin(),p.bytecode.end(),std::begin(fade)))return 512u;
+        std::equal(p.bytecode.begin(),p.bytecode.end(),std::begin(fade)))return nr::provider::compositor_batch_capacity();
     const auto &three=nr::registered_lab::test_fixture::compositor_three_texture_pixel_words;
     if(p.stage==Stage::pixel && p.bytecode.size()==std::size(three) &&
-        std::equal(p.bytecode.begin(),p.bytecode.end(),std::begin(three)))return 512u;
+        std::equal(p.bytecode.begin(),p.bytecode.end(),std::begin(three)))return nr::provider::compositor_batch_capacity();
     const auto &three_base=nr::registered_lab::test_fixture::compositor_three_texture_base_pixel_words;
     if(p.stage==Stage::pixel && p.bytecode.size()==std::size(three_base) &&
-        std::equal(p.bytecode.begin(),p.bytecode.end(),std::begin(three_base)))return 512u;
+        std::equal(p.bytecode.begin(),p.bytecode.end(),std::begin(three_base)))return nr::provider::compositor_batch_capacity();
     return 65536u;
 }
 struct RegisterExecutor::Configuration {

@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.25)
+project(cache_identity LANGUAGES CXX)
+find_package(OpenVINO 2026.1 REQUIRED COMPONENTS Runtime)
+add_executable(cache_identity_test provider_cache_test.cpp)
+target_link_libraries(cache_identity_test PRIVATE openvino::runtime)
+target_compile_features(cache_identity_test PRIVATE cxx_std_17)
+target_compile_options(cache_identity_test PRIVATE /W4 /WX)
+set_property(TARGET cache_identity_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")

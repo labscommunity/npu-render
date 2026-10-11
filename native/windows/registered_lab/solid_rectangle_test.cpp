@@ -1,4 +1,5 @@
 #include "solid_rectangle.hpp"
+#include "provider_compile_statistics.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -83,5 +84,9 @@ int main(int argc, char **argv) try {
     }
     std::printf("{\"blend_checked_components\":%llu,\"scissor_and_premultiplied_byte_color_admission_checked\":true}\n",static_cast<unsigned long long>(blend_checked));
     std::printf("{\"checked_components\":%llu,\"invalid_colors_rejected\":12,\"reusable_after_input_rejection\":true}\n", static_cast<unsigned long long>(checked));
+    const auto stats=nr::provider::compile_statistics();
+    std::printf("{\"compile_calls\":%llu,\"cache_requests\":%llu,\"cache_hits\":%llu,\"cache_status_unavailable\":%llu}\n",
+        static_cast<unsigned long long>(stats.calls),static_cast<unsigned long long>(stats.cache_requests),
+        static_cast<unsigned long long>(stats.cache_hits),static_cast<unsigned long long>(stats.cache_status_unavailable));
     return 0;
 } catch (const std::exception &e) { std::fprintf(stderr, "%s\n", e.what()); return 1; }

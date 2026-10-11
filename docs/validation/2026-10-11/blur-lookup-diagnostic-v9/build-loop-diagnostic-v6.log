@@ -1,0 +1,39 @@
+-- Building for: Visual Studio 17 2022
+-- Selecting Windows SDK version 10.0.26100.0 to target Windows 10.0.26200.
+-- The CXX compiler identification is MSVC 19.44.35229.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/cl.exe - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Failed
+-- Looking for pthread_create in pthreads
+-- Looking for pthread_create in pthreads - not found
+-- Looking for pthread_create in pthread
+-- Looking for pthread_create in pthread - not found
+-- Found Threads: TRUE
+-- Configuring done (2.8s)
+-- Generating done (0.0s)
+-- Build files have been written to: C:/Users/tatef/AppData/Local/npu-render/builds/loop-diagnostic-v6
+MSBuild version 17.14.60+43b635718 for .NET Framework
+
+MSBuild version 17.14.60+43b635718 for .NET Framework
+
+  1>Checking Build System
+  Building Custom Rule C:/Users/tatef/AppData/Local/npu-render/vm/loop-diagnostic-v6/CMakeLists.txt
+  loop_diagnostic.cpp
+  vertex_executor.cpp
+C:\Users\tatef\AppData\Local\npu-render\vm\loop-diagnostic-v6\vertex_executor.cpp(910,624): error C2220: the following warning is treated as an error [C:\Users\tatef\AppData\Local\npu-render\builds\loop-diagnostic-v6\nr_loop_diagnostic.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\loop-diagnostic-v6\vertex_executor.cpp(910,624): warning C4840: non-portable use of class 'std::basic_string<char,std::char_traits<char>,std::allocator<char>>' as an argument to a variadic function [C:\Users\tatef\AppData\Local\npu-render\builds\loop-diagnostic-v6\nr_loop_diagnostic.vcxproj]
+      C:\Users\tatef\AppData\Local\npu-render\vm\loop-diagnostic-v6\vertex_executor.cpp(910,624):
+      'std::basic_string<char,std::char_traits<char>,std::allocator<char>>::basic_string' is non-trivial
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\xstring(1027,5):
+      see declaration of 'std::basic_string<char,std::char_traits<char>,std::allocator<char>>::basic_string'
+      C:\Users\tatef\AppData\Local\npu-render\vm\loop-diagnostic-v6\vertex_executor.cpp(910,624):
+      the constructor and destructor will not be called; a bitwise copy of the class will be passed as the argument
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\xstring(541,7):
+      see declaration of 'std::basic_string<char,std::char_traits<char>,std::allocator<char>>'
+
+C:\Users\tatef\AppData\Local\npu-render\vm\loop-diagnostic-v6\vertex_executor.cpp(910,555): warning C4477: 'printf' : format string '%s' requires an argument of type 'char *', but variadic argument 1 has type 'std::string' [C:\Users\tatef\AppData\Local\npu-render\builds\loop-diagnostic-v6\nr_loop_diagnostic.vcxproj]
+  Generating Code...

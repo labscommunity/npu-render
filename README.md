@@ -134,6 +134,23 @@ policy. Its full failed draw now passes CPU and NPU coverage and color oracles,
 with at most one byte of output difference. All CPU suites and NPU regressions
 pass; the NPU draw still takes 54 seconds.
 
+The [new-runtime qualification](docs/validation/2026-10-11/runtime-qualified-v209/report.json)
+enables 4096-pixel batches for the four captured compositor shaders on the pinned
+OpenVINO 2026.4.1 build. Both complete three-texture draws now take about **8.87
+seconds** on the NPU, with exact coverage and at most one byte of CPU/NPU color
+difference. Both clean builds pass 25 CPU suites; 20 native NPU rendering checks,
+58 driver draws, eight clears, cache reuse, legacy compatibility, and 17 exact
+captured-packet comparisons also pass. These results qualify the next installed
+experiment; they do not establish responsive full desktop rendering.
+
+The runtime update required two independent corrections: integer bounds masks
+for shader table lookups, and [cache isolation](docs/validation/2026-10-11/cache-isolation-v3/report.json).
+Distinct RGBA and BGRA graphs receive the same built-in cache key in the tested
+runtime, producing swapped colors even with a fresh cache. SHA-256 graph identities
+separate those entries; all eight rectangle variants pass exact pixel checks both
+when compiled and when reused from cache. Original blur and vertex-ID failures
+also reproduce without caching, confirming the separate bounds correction.
+
 The [blur capacity change](docs/validation/2026-10-11/tap-capacity-v201/report.json)
 reduces two captured requests from 22.8 to 3.7 seconds and from 11.5 to 1.9 seconds
 in repeated NPU execution, preserving every output pixel. It sizes the exact

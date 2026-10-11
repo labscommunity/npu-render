@@ -1,0 +1,20 @@
+{
+  "build": "present-umd-v207",
+  "legacy_build": "present-umd-v207-legacy",
+  "cpu_checks_per_runtime": 24,
+  "cpu_seconds": {
+    "candidate": 192.8,
+    "legacy": 184.77
+  },
+  "npu_rendering_checks_passed": 19,
+  "npu_rendering_checks_failed": [
+    "solid-NPU"
+  ],
+  "deployable": false,
+  "desktop_offload_tested": false,
+  "findings": [
+    "General integer-mask bounds fix passes vertex-ID, texture, loop and captured compositor checks.",
+    "Solid rectangles fail exact pixel comparison in the shared OpenVINO cache. The independent cache-isolation investigation reproduces cache-key collisions between RGBA and BGRA variants and is preserved separately.",
+    "Neither v207 nor its legacy build was installed. Full capture, driver-callback and prewarm comparison stages did not run after this qualification failure."
+  ]
+}

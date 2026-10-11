@@ -1,0 +1,102 @@
+{
+  "build": "present-umd-v209",
+  "legacy_build": "present-umd-v209-legacy",
+  "clean_cpu_suites_per_runtime": 25,
+  "cpu_seconds": {
+    "candidate": 191.97,
+    "legacy": 185.8
+  },
+  "source_files_verified": 120,
+  "binary_files_per_build_verified": 31,
+  "native_npu_checks": [
+    "vertex-NPU",
+    "texture-NPU",
+    "raster-NPU",
+    "projection-NPU",
+    "merger-NPU",
+    "uniform-NPU",
+    "solid-NPU",
+    "crop-NPU",
+    "point-NPU",
+    "linear-NPU",
+    "color-clear-NPU",
+    "modulated-point-NPU",
+    "opaque-point-NPU",
+    "triangles-NPU",
+    "derivatives-NPU",
+    "compositor-NPU",
+    "typed-load-NPU",
+    "loops-NPU",
+    "masks-NPU",
+    "mirror-NPU",
+    "solid-reused-cache-NPU",
+    "capture-CPU",
+    "capture-NPU",
+    "capture1061-CPU",
+    "capture1061-NPU",
+    "lab-NPU",
+    "legacy-vertex-NPU",
+    "legacy-compositor-NPU",
+    "legacy-loops-NPU",
+    "legacy-triangles-NPU",
+    "baseline-worker",
+    "candidate-worker"
+  ],
+  "prewarm_packets_verified": 17,
+  "prewarm_pixels_all_exact": true,
+  "maximum_prewarm_byte_difference": 0,
+  "native_npu_execution": true,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "findings": [
+    "The pinned 2026.4.1 runtime supports4096-pixel batches for all four captured compositor variants. Other runtime versions retain512.",
+    "Precision markers are checked after IR normalization through the public attribute visitor. The migrated value must prohibit conversion to f16; the check is not removed.",
+    "Integer-index bounds combine exact0/1 integer masks on the NPU instead of the miscompiled LogicalAnd graph. Lower/upper bounds, invalid-index rejection and zero-row fallback remain enabled for every shader. The earlier shader-specific coefficient bypass is removed; original scalar tolerances are unchanged.",
+    "All20 new-runtime rendering checks, the repeated eight-model cache hit/pixel check, both complete captured desktop draw oracles, the driver draw/clear test, four legacy NPU compatibility tests and all17 prewarm packet comparisons pass. These qualify the renderer for an installed experiment, not full desktop offload or a Tahoma speedup.",
+    "Cache entries are isolated with SHA-256 of canonical graph structure, constants and runtime build. All eight solid rectangle models pass exact pixel checks on both first compilation and cache reuse.",
+    "The guest UMD uses the legacy runtime closure; the host rendering worker uses2026.4.1. Both builds have identical source hashes and retain the same IPC contract. There is no CPU or GPU rendering fallback.",
+    "Intel emits internal function-outliner-vertical-fusion diagnostics in some passing shader suites. Those suites exit successfully, report NPU execution, and pass unchanged scalar oracles. Their complete logs are retained; diagnostics are not suppressed."
+  ],
+  "nonfatal_compiler_diagnostics": [
+    {
+      "file": "loops-NPU.stdout.jsonl",
+      "message": "[ERROR] 21:30:59.900 [function-outliner-vertical-fusion] At least one instance has no outputs values, which results in an empty function"
+    },
+    {
+      "file": "masks-NPU.stdout.jsonl",
+      "message": "[ERROR] 21:31:14.891 [function-outliner-vertical-fusion] At least one instance has no outputs values, which results in an empty function"
+    },
+    {
+      "file": "legacy-loops-NPU.stdout.jsonl",
+      "message": "[ERROR] 21:40:11.305 [function-outliner-vertical-fusion] At least one instance has no outputs values, which results in an empty function"
+    },
+    {
+      "file": "typed-load-NPU.stdout.jsonl",
+      "message": "[ERROR] 21:29:45.162 [function-outliner-vertical-fusion] At least one instance has no outputs values, which results in an empty function"
+    }
+  ],
+  "captured_draws": {
+    "1041": {
+      "npu_draw_ms": 8867.912,
+      "cpu_draw_ms": 9562.648,
+      "covered_samples": 425023,
+      "tiles": 214,
+      "cpu_npu_differing_components": 684,
+      "maximum_byte_difference": 1
+    },
+    "1061": {
+      "npu_draw_ms": 8866.017,
+      "cpu_draw_ms": 8595.215,
+      "covered_samples": 425023,
+      "tiles": 214,
+      "cpu_npu_differing_components": 684,
+      "maximum_byte_difference": 1
+    }
+  },
+  "packet_worker_elapsed_ms": {
+    "baseline": 23681,
+    "candidate_first_run": 113522,
+    "candidate_warm_repeat": 13866
+  },
+  "warm_repeat": "Passed all17 packets exactly; see ../runtime-warm-repeat-v209/summary.json"
+}

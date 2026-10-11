@@ -40,7 +40,7 @@ struct TextureCropExecutor::State {
                 const auto bytes = weights.str(); ov::Tensor data(ov::element::u8, ov::Shape{bytes.size()});
                 if (!bytes.empty()) std::memcpy(data.data(), bytes.data(), bytes.size());
                 model = s.core.read_model(xml.str(), data);
-                for (const auto &node : model->get_ops()) require(node->get_rt_info().count("precise_0") != 0);
+                for (const auto &node : model->get_ops()) require(nr::provider::precision_preserved(node));
                 properties.emplace(ov::hint::execution_mode(ov::hint::ExecutionMode::ACCURACY));
             }
             compiled = nr::provider::compile_model(s.core, model, s.backend, properties); const auto devices = compiled.get_property(ov::execution_devices);

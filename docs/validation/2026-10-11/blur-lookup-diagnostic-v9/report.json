@@ -1,0 +1,16 @@
+{
+  "diagnostic": "v9",
+  "native_npu_cases": 72,
+  "verified_components": 1152,
+  "maximum_error": 2.38418579e-07,
+  "existing_tolerance": 1e-05,
+  "full_runtime_qualified": false,
+  "desktop_offload_tested": false,
+  "findings": [
+    "The original 2026.4 renderer produced an error of 0.666666627 for the first nine-tap blur. Intermediate outputs locate missing contributions before reduction.",
+    "Replacing selection with Select fails numerically; GatherElements causes a device-lost error. A subsequent fresh process running the qualified v204 mask suite succeeds on NPU without restarting the physical host. Neither alternative is used in the fix.",
+    "Comparing CPU and NPU intermediate outputs finds wrong offset/weight values before selection. v9 removes the unused appended zero row and bounds selection from coefficient-table reads in the exact recognized mirrored-tap shader. Its tap IDs are bounded below128 and fixed reads are below130. General shader lookups remain checked.",
+    "All72 original scalar-oracle scenarios pass with the original tolerance, including negative/zero counts,1..128 boundary counts, changing capacities, mirrored coordinates, weights of both signs and rejection of129 followed by valid9. Full renderer build and replay qualification remains necessary.",
+    "v5 diagnostics stopped because the tensor reader did not accept a converted boolean output type. v6 did not compile because its printf diagnostic passed std::string. v7/v8 repair only the diagnostic reader, not renderer behavior."
+  ]
+}
