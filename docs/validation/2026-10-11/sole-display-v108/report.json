@@ -1,0 +1,46 @@
+{
+  "trial": "v108",
+  "source_commit": "72360dd1c468a40ebd5f10f62fbc9865996950e3",
+  "host_worker_build": "present-umd-v210",
+  "guest_umd_build": "present-umd-v210-legacy",
+  "package_version": "0.0.96.0",
+  "successful_requests": 588,
+  "live_requests": 571,
+  "worker_successes_by_client": {
+    "42": 17,
+    "1072": 449,
+    "3316": 66,
+    "4452": 56
+  },
+  "worker_successes_by_operation": {
+    "draw": 494,
+    "color_clear": 94
+  },
+  "acknowledged_successes": 588,
+  "failed_responses": 1,
+  "client_departures": 0,
+  "received_frames": 11,
+  "sole_indirect_received_frames": 10,
+  "start_first_visible_seconds": 190.090593,
+  "visually_verified_start_visible": true,
+  "visually_verified_escape_response": false,
+  "live_compile_and_draw_ms": 371922,
+  "live_draw_ms": 117424.278,
+  "full_desktop_offload": false,
+  "usable_interactive_desktop": false,
+  "tahoma_performance_tested": false,
+  "original_cleanup_passed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "concurrent_cpu_build": false,
+  "findings": [
+    "Windows processes run in the disposable VM; accepted draw and clear requests run on the physical Panther Lake NPU. The indirect display is the sole active guest display during ten received frames. A Mac SDL viewer presents the received images.",
+    "588 successful NPU requests comprise 17 prewarm draws, 477 live draws and 94 live clears. All 588 have successful acknowledgements. One additional DWM request is rejected by the point-texture specialization.",
+    "The desktop and Start menu become visible. Start first appears 190.090593 seconds after the Windows-key action. Escape is sent later, but the last sole-display frame still shows Start. No responsive interactive desktop has been established.",
+    "The first Start-visible frame arrives after the DWM rejection. Sole-display topology and accepted NPU receipts do not prove that Windows performed no internal recovery or fallback after the rejected draw.",
+    "The rejected capture has a 642x661 target, but its geometry covers only the top 440 rows, sampling a 642x440 region from origin (191,328) of a 1024x768 source. The crop specialization requires full-target coverage. Its capture replay also fails during executor construction because the old crop-only oracle assumes all 661 rows are sampled.",
+    "A diagnostic replay routes the same capture to the existing general triangle renderer. Both CPU and NPU pass the independent full-image scalar oracle with exact coverage of 282480 samples and zero pixel error. The two resulting 1697448-byte images are byte-identical. This establishes a routing defect, not an inability of the NPU to render this draw.",
+    "The observer stops for a recorded DWM rejection. Both custom drivers and stream configuration are removed. The input controller later saves a stale frame after sole-display topology has ended; that snapshot is not evidence of an Escape response.",
+    "The general-renderer diagnostic is separate from the installed trial. Physical Delta scanout, broad application coverage, a usable full desktop and improved Tahoma performance remain unverified."
+  ]
+}
