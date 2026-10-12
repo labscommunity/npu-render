@@ -967,3 +967,12 @@ Native NPU checks cover 64 driver draws, five worker requests changing filters
 and texture contents, all four rectangle shader/filter combinations, seventeen
 prewarm requests and 63 historical desktop packets. This verifies the captured
 operation; full desktop offload and interactive performance remain unproven.
+
+The [v113 installed trial](../../../docs/validation/2026-10-12/sole-display-v113/report.json)
+acknowledges 440 NPU results and receives nine frames, eight on the sole indirect
+path. A complete desktop is visible, but Run never appears there. Two Level Zero
+command-queue creation errors precede device loss. All four failed captures pass
+CPU replay and subsequently pass NPU replay with byte-identical output after an
+exact-instance NPU device restart. Both guest drivers are removed; no physical
+reboot, GPU device change or driver-package change occurs. Resource accumulation
+is a hypothesis for controlled follow-up, not an established hardware queue limit.

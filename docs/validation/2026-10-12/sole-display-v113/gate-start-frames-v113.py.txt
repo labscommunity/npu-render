@@ -1,0 +1,57 @@
+"""Gate reversible VM input using archived pixel templates; retain manual verification."""
+from pathlib import Path
+from datetime import UTC,datetime
+import hashlib,json,time
+import numpy as np
+from npu_render.indirect_frame import parse_frame,confirmed_sole_display
+root=Path('results/render-driver');source=root/'collector-v113-live';out=root/'input-v113'
+def load(path):
+ data=path.read_bytes();frame=parse_frame(data)
+ if (frame.width,frame.height,frame.format)!=(1024,768,87):raise ValueError('Template requires the validated lab display shape')
+ return frame,np.frombuffer(frame.pixels,np.uint8).reshape(768,1024,4)[:,:,:3].astype(np.int16),data
+_,start,_=load(root/'collector-v109-live/frame-005.bin')
+_,desktop,_=load(root/'collector-v109-live/frame-004.bin')
+icons=[(272,205),(368,205),(464,205),(560,205),(656,205),(752,205)]
+wallpaper=[(320,160),(512,160),(700,300),(300,400),(512,512),(700,600)]
+def scores(im):
+ best=(1e9,0,0)
+ for dy in range(-48,49):
+  for dx in range(-6,7):
+   errors=[float(np.abs(im[y+dy-8:y+dy+8,x+dx-8:x+dx+8]-start[y-8:y+8,x-8:x+8]).mean()) for x,y in icons]
+   score=sum(sorted(errors)[:5])/5
+   if score<best[0]:best=(score,dx,dy)
+ wall=float(np.mean([np.abs(im[y-12:y+12,x-12:x+12]-desktop[y-12:y+12,x-12:x+12]).mean() for x,y in wallpaper]))
+ return {'start_icon_error':best[0],'start_offset':[best[1],best[2]],'wallpaper_error':wall,'start_candidate':best[0]<8,'desktop_candidate':wall<3 and best[0]>40}
+def calibrate():
+ rows=[]
+ for p in sorted((root/'collector-v109-live').glob('frame-*.bin')):
+  f,im,_=load(p);s=scores(im);expected=f.identity[1]>=5
+  assert s['start_candidate']==expected and s['desktop_candidate']==(2<=f.identity[1]<=4),(p,s)
+  rows.append({'file':p.name,'identity':f.identity,**s})
+ return rows
+calibration=calibrate()
+if '--calibrate' in __import__('sys').argv:
+ (root/'gate-start-v113-calibration.json').write_text(json.dumps(calibration,indent=2)+'\n');print(json.dumps(calibration));raise SystemExit
+end=time.monotonic()+650;seen=None
+while time.monotonic()<end:
+ try:
+  if not confirmed_sole_display(source/'input-ready.json') or not (source/'latest.bin').exists() or not out.exists():time.sleep(.25);continue
+  frame,im,data=load(source/'latest.bin')
+  if frame.identity==seen:time.sleep(.25);continue
+  receipts=[json.loads(x) for x in (source/'frames.jsonl').read_text().splitlines()]
+  receipt=next(x for x in reversed(receipts) if tuple(x['identity'])==frame.identity)
+  if not receipt['sole_indirect_at_receive']:time.sleep(.25);continue
+  s=scores(im);actions=json.loads((out/'report.json').read_text()).get('actions',[]) if (out/'report.json').exists() else []
+  last=actions[-1] if actions else None
+  name=None
+  if s['desktop_candidate'] and not any(a['action']=='open-start' for a in actions):name='desktop-ready'
+  if last and receipt['received_at']>last['at']:
+   if s['start_candidate'] and last['action']=='open-start':name='start-visible'
+   if s['desktop_candidate'] and last['action']=='escape':name='escape-visible'
+  event={'identity':frame.identity,'received_at':receipt['received_at'],'sole_indirect_at_receive':True,'classified_at':datetime.now(UTC).isoformat(),'automatic_template_gate':True,'manual_visual_verification_required':True,'scores':s,'pixel_sha256':hashlib.sha256(frame.pixels).hexdigest(),'marker':name}
+  with (out/'template-gates.jsonl').open('a') as log:log.write(json.dumps(event)+'\n')
+  if name and not (out/(name+'.json')).exists() and confirmed_sole_display(source/'input-ready.json'):
+   (out/(name+'-template.bin')).write_bytes(data);(out/(name+'.json')).write_text(json.dumps(event,indent=2)+'\n');print(json.dumps(event),flush=True)
+  if not name or (out/(name+'.json')).exists():seen=frame.identity
+ except (FileNotFoundError,json.JSONDecodeError,StopIteration):pass
+ time.sleep(.25)

@@ -1,0 +1,71 @@
+{
+  "trial": "v113",
+  "source_commit": "af89adea11817fb5be9eb9bc2c23863efbb13213",
+  "host_worker_build": "present-umd-v222",
+  "guest_umd_build": "present-umd-v222-legacy",
+  "package_version": "0.0.101.0",
+  "successful_worker_requests": 440,
+  "live_worker_requests": 423,
+  "acknowledged_successes": 440,
+  "failed_relay_responses": [
+    {
+      "sequence": 13,
+      "client_pid": 1076,
+      "dispatch_ticket": 247,
+      "request_bytes": 2820332,
+      "reply_bytes": 80,
+      "queue_wait_ms": 0,
+      "worker_ms": 3781,
+      "roundtrip_ms": 3796,
+      "worker_success": false,
+      "displayed_frames": 0
+    },
+    {
+      "sequence": 260,
+      "client_pid": 1076,
+      "dispatch_ticket": 343,
+      "request_bytes": 110272,
+      "reply_bytes": 80,
+      "queue_wait_ms": 0,
+      "worker_ms": 6906,
+      "roundtrip_ms": 6906,
+      "worker_success": false,
+      "displayed_frames": 0
+    }
+  ],
+  "worker_successes_by_client": {
+    "42": 17,
+    "5336": 35,
+    "1076": 388
+  },
+  "received_frames": 9,
+  "sole_indirect_received_frames": 8,
+  "sampled_process_memory": {
+    "private_bytes": 759955456,
+    "working_bytes": 1661374464,
+    "peak_working_bytes": 1662709760,
+    "samples": 1322,
+    "device_driver_memory_included": false
+  },
+  "visually_verified_complete_desktop": true,
+  "visually_verified_run_on_npu_path": false,
+  "notepad_action_sent": false,
+  "full_desktop_offload": false,
+  "usable_interactive_desktop": false,
+  "tahoma_performance_tested": false,
+  "guest_cleanup_passed": true,
+  "physical_driver_package_changed": false,
+  "physical_npu_device_restarted": true,
+  "physical_machine_restarted": false,
+  "gpu_device_touched": false,
+  "concurrent_cpu_build_during_trial": false,
+  "findings": [
+    "Nine frames arrive; eight have a sole-indirect topology receipt. Frame 6 is the first complete desktop. No received frame shows Run; Run appears only on the restored ordinary display. Notepad input is never sent.",
+    "Two failures creating Level Zero command queues return ZE_RESULT_ERROR_UNKNOWN; a later fence synchronization reports ZE_RESULT_ERROR_DEVICE_LOST. There are 440 successful NPU results and exactly matching positive acknowledgements, plus two negative responses. The final device-loss request has no completed response.",
+    "The four complete captured draws all pass CPU replay. After NPU recovery they all pass on the physical NPU, with complete output byte-identical to CPU; the first capture differs from the independent mathematical oracle in one component by one byte, on both devices.",
+    "The observer stops on a DWM DDI rejection, waits its bounded 450 seconds for the topology helper, and removes both custom drivers. The helper never records a final restoration result. The ordinary desktop is visually verified after device removal.",
+    "The NPU worker is terminated by the stream controller but remains retained and output collection blocks. A first NPU replay times out. An exact-instance NPU restart using Windows PnPUtil succeeds and releases the blocked controllers; two replays during recovery fail platform auto-detection before the fourth succeeds. A subsequent fresh four-capture NPU replay passes completely.",
+    "The device restart preserves driver 32.0.100.5540 and does not request a system reboot or touch the GPU. This is a runtime/device-state failure, not evidence of a newly unsupported shader. Resource accumulation is a hypothesis requiring controlled tests; no command-queue capacity limit has been established.",
+    "Full desktop offload, usable interaction, physical scanout migration and Tahoma improvement remain unverified."
+  ]
+}

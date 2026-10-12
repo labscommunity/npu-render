@@ -1,0 +1,27 @@
+{
+    "started":  "2026-10-12T21:30:20.2821788Z",
+    "instance_id":  "PCI\\VEN_8086\u0026DEV_B03E\u0026SUBSYS_20BF1043\u0026REV_04\\3\u002611583659\u00260\u002658",
+    "name":  "Intel(R) NPU",
+    "class":  "ComputeAccelerator",
+    "before_status":  "OK",
+    "driver_properties":  [
+                              {
+                                  "KeyName":  "DEVPKEY_Device_DriverVersion",
+                                  "Data":  "32.0.100.5540"
+                              },
+                              {
+                                  "KeyName":  "DEVPKEY_Device_DriverInfPath",
+                                  "Data":  "oem13.inf"
+                              }
+                          ],
+    "action":  "pnputil /restart-device exact NPU instance",
+    "reboot_requested":  false,
+    "driver_package_changed":  false,
+    "gpu_device_touched":  false,
+    "reason":  "NPU replay timed out; terminated test processes remain present and controller output does not close.",
+    "documentation":  "https://learn.microsoft.com/en-us/windows-hardware/drivers/devtest/pnputil-command-syntax#restart-device",
+    "command_pid":  6036,
+    "command_finished":  true,
+    "exit_code":  0,
+    "finished":  "2026-10-12T21:31:13.7270705Z"
+}

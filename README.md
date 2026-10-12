@@ -113,7 +113,16 @@ now has an exact NPU specialization for opaque, one-to-one point-sampled quads.
 Its captured 1024×768 replay passes, as do changing-image and driver callback
 tests. This is a checked subset, not general desktop rendering.
 
-The latest [v112 installed trial](docs/validation/2026-10-12/sole-display-v112/report.json)
+The latest [v113 installed trial](docs/validation/2026-10-12/sole-display-v113/report.json)
+returns 440 acknowledged NPU results and nine frames, eight received while the
+indirect display is the sole guest path. The complete desktop is visible, but
+Run never appears on that path. Command-queue creation failures are followed by
+NPU device loss. All four captured draws pass on CPU and, after restarting only
+the NPU device, pass on NPU with identical output. Both custom guest drivers are
+removed; Delta is not rebooted and its GPU is untouched. Runtime stability and
+usable interaction remain unfinished. This trial does not establish a Tahoma gain.
+
+The preceding [v112 installed trial](docs/validation/2026-10-12/sole-display-v112/report.json)
 returns 565 acknowledged NPU results and fourteen frames, thirteen received while
 the indirect display is the sole guest path. The complete desktop and Run dialog
 are visually verified, but Run takes 269 seconds to appear. Notepad becomes visible
@@ -130,8 +139,8 @@ above uses this qualified implementation and reaches the next unsupported draw.
 
 The [v222 alpha-replacement fix](docs/validation/2026-10-12/linear-opaque-v222/report.json)
 then reproduces that exact draw on CPU and NPU with identical output. Both clean
-builds pass 27 CPU suites; thirteen hardware qualification stages pass. Its next
-installed trial will check application interaction. A separate
+builds pass 27 CPU suites; thirteen hardware qualification stages pass. The v113
+installed trial above encounters a runtime failure during application interaction. A separate
 [clamp optimization experiment](docs/validation/2026-10-12/clamp-diagnostic-v1-rejected/report.json)
 failed NPU accuracy checks and was not adopted.
 
