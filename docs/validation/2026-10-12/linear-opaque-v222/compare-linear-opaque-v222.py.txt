@@ -1,0 +1,11 @@
+from pathlib import Path
+import hashlib,json,sys
+r=Path(sys.argv[1]);cpu=(r/'capture-CPU.pixels').read_bytes();npu=(r/'capture-NPU.pixels').read_bytes();assert len(cpu)==len(npu)==397*174*4
+report={'bytes':len(cpu),'cpu_sha256':hashlib.sha256(cpu).hexdigest(),'npu_sha256':hashlib.sha256(npu).hexdigest(),'cpu_npu_exact':cpu==npu,'maximum_byte_difference':max(abs(a-b) for a,b in zip(cpu,npu)),'differing_components':sum(a!=b for a,b in zip(cpu,npu))};assert report['maximum_byte_difference']<=1
+for name in ['capture-CPU','capture-NPU']:
+ rows=[json.loads(s) for s in (r/(name+'.stdout.jsonl')).read_text().splitlines() if s.startswith('{')];assert len([x for x in rows if x.get('kind')=='draw_stage_timing'])==2
+ final=next(x for x in rows if x.get('kind')=='offline_draw_replay');assert final['width']==397 and final['height']==174 and final['covered_samples']==397*174
+legacy=r/'legacy-capture-NPU.pixels';dest=r/'capture-comparison.json'
+if legacy.exists():
+ b=legacy.read_bytes();report['legacy_sha256']=hashlib.sha256(b).hexdigest();report['legacy_npu_exact']=b==npu;assert b==npu;dest=r/'legacy-capture-comparison.json'
+assert not dest.exists();dest.write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report))

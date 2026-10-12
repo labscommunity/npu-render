@@ -72,7 +72,9 @@ struct LinearTextureDrawExecutor::State {
         uint32_t source_width,uint32_t source_height,uint32_t source_format,const std::string &backend,bool blend,shader::TextureFilter filter)
         : vs(v),pixel(pattern(p)),width(w),height(h),sw(source_width),sh(source_height),sf(source_format),
           rows(1),count(w),point(filter==shader::TextureFilter::point),vertex(v,6,backend),projection(6,backend) {
-        require((filter==shader::TextureFilter::point || filter==shader::TextureFilter::linear) && (!pixel.opaque || point));
+        // Alpha replacement happens after sampling. The RGB taps remain valid
+        // for both point and bilinear filtering; source alpha is unused.
+        require(filter==shader::TextureFilter::point || filter==shader::TextureFilter::linear);
         require(w && w<=4096 && h && h<=8192 && uint64_t(w)*h<=4*1024*1024 && sw && sw<=8192 && sh && sh<=8192 && uint64_t(sw)*sh<=4*1024*1024);
         require((format==28 || format==87) && (sf==28 || sf==87) && vs.stage==shader::Stage::vertex && vs.position_output<16 &&
             (vs.outputs[pixel.color]&15)==15 && (vs.outputs[pixel.uv]&3)==3);

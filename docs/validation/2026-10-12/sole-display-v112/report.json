@@ -1,0 +1,63 @@
+{
+  "trial": "v112",
+  "source_commit": "e423e6188355e865887dd242a4a614205ef21e4c",
+  "host_worker_build": "present-umd-v221",
+  "guest_umd_build": "present-umd-v221-legacy",
+  "package_version": "0.0.100.0",
+  "successful_worker_requests": 565,
+  "live_worker_requests": 548,
+  "acknowledged_successes": 565,
+  "failed_relay_responses": [
+    {
+      "sequence": 389,
+      "client_pid": 1076,
+      "dispatch_ticket": 475,
+      "request_bytes": 630388,
+      "reply_bytes": 80,
+      "queue_wait_ms": 0,
+      "worker_ms": 125,
+      "roundtrip_ms": 125,
+      "worker_success": false,
+      "displayed_frames": 0
+    }
+  ],
+  "worker_successes_by_client": {
+    "42": 17,
+    "1076": 496,
+    "5336": 50,
+    "1956": 2
+  },
+  "received_frames": 14,
+  "sole_indirect_received_frames": 13,
+  "interaction_latencies": {
+    "run_dialog_seconds": 268.836856,
+    "last_sole_frame_after_notepad_action_seconds": 3.693437
+  },
+  "sampled_process_memory": {
+    "private_bytes": 969297920,
+    "working_bytes": 2251968512,
+    "peak_working_bytes": 2268053504,
+    "samples": 1002,
+    "device_driver_memory_included": false
+  },
+  "visually_verified_run_dialog": true,
+  "notepad_action_sent": true,
+  "visually_verified_notepad_on_npu_path": false,
+  "full_desktop_offload": false,
+  "usable_interactive_desktop": false,
+  "tahoma_performance_tested": false,
+  "cleanup_passed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "concurrent_cpu_build": false,
+  "findings": [
+    "Fourteen frames arrive; thirteen have a sole-indirect topology receipt, and one precedes sole-display confirmation. The complete desktop and Run dialog are visually verified; preceding frames 9 through 13 show no Run dialog. The first Run dialog arrives 268.836856 seconds after Win+R.",
+    "The input controller types notepad and presses Enter only after manual Run verification. The last received sole-display frame shows the partially updated Run input. Notepad appears only after the ordinary display is restored; that is not NPU display evidence.",
+    "One complete DWM capture records a 397x174 BGRA target, 413x213 BGRA source, six vertices and bilinear clamp sampler. The pixel shader samples RGB, replaces alpha with 1, then multiplies by a vertex color. Unchanged v221 CPU replay rejects this combination during linear executor construction; the rectangle executor deliberately limited alpha replacement to point filtering.",
+    "The stream records 565 successful requests and matching positive acknowledgements, including seventeen prewarm requests. One negative relay response matches the opaque-linear failure. Later device-lost DDI rejections are retained separately. Worker shutdown reports socket closed or timed out.",
+    "The observer stops on a DWM DDI rejection, removes both custom drivers, restores the ordinary display and clears the stream configuration. No physical driver or power setting is changed.",
+    "Compile metadata is associated in stream order; PID/sequence pairs repeat. A metadata event for the failed request has no successful result and is retained separately, verified against the negative relay receipt.",
+    "Successful triangle draws spend 68995.252 ms inside draw timers and 231656.748 ms outside them. Of 564 model operations, 534 hit the persistent cache. Outside-draw time includes model setup and graph construction, and is not solely compiler time. These totals do not establish a controlled comparison to v111.",
+    "Full desktop offload, usable interaction, physical scanout migration and Tahoma improvement remain unverified."
+  ]
+}

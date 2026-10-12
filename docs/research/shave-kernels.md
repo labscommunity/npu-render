@@ -45,6 +45,17 @@ Its [porting plan](https://github.com/hsfzxjy/npunlock/blob/c23eded3d1d9eec88924
 treats newer generations as unverified. We inspected its source and documentation;
 we have not installed it, patched a graph, or executed its kernels on Delta.
 
+The newer public compiler at commit
+[`20e7912`](https://github.com/openvinotoolkit/npu_compiler/tree/20e7912fbc230725e1ca7394762348d4f480aa65)
+also exposes a disabled-by-default `enable-shave-code-gen` option. Its
+[NPU50XX pipeline](https://github.com/openvinotoolkit/npu_compiler/blob/20e7912fbc230725e1ca7394762348d4f480aa65/src/vpux_compiler/src/NPU50XX/dialect/VPU/transforms/pipelines.cpp)
+includes kernel fusion and code generation. This is a concrete route to investigate,
+but its [binary-generation implementation](https://github.com/openvinotoolkit/npu_compiler/blob/20e7912fbc230725e1ca7394762348d4f480aa65/src/vpux_compiler/src/utils/llvm_to_binary.cpp)
+requires `MV_TOOLS_DIR` and `MV_TOOLS_VERSION`, invoking external Linux MoviTools
+compiler, assembler and linker paths with 5000-specific libraries. The source does
+not establish a self-contained Windows compiler switch. Availability in Delta's
+pinned compiler and execution of generated kernels remain untested.
+
 ## Next experiment and acceptance gates
 
 A fused sampler could read four BGRA texels, interpolate, apply opacity and blend

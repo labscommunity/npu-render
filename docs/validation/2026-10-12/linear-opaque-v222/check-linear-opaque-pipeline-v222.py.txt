@@ -1,0 +1,42 @@
+import hashlib,json,struct,subprocess,sys,time
+from pathlib import Path
+build=Path(sys.argv[1]);out=Path(sys.argv[2]);out.mkdir(exist_ok=False)
+base=out/'base.bin'
+with (out/'fixture.stdout.log').open('wb') as log:
+ subprocess.run([str(build/'nr_registered_indexed_exchange_test.exe'),'--emit-point-texture',str(base)],stdout=log,stderr=subprocess.STDOUT,check=True,timeout=30)
+original=base.read_bytes();h=struct.unpack_from('<3Q14I',original)
+assert h[3:9]==(2,64,64,6,87,0xf02) and len(original)==80+h[12]
+inputs=104+4*(h[9]+h[10]);background=inputs+6*256;texture=background+64*64*4
+assert struct.unpack_from('<4I',original,texture)==(96,80,87,0) and texture+16+96*80*4==len(original)
+packets=out/'packets';packets.mkdir();checks=[]
+with (out/'worker.stdout.jsonl').open('wb') as stdout,(out/'worker.stderr.log').open('wb') as stderr:
+ process=subprocess.Popen([str(build/'nr_registered_indexed_worker.exe'),str(packets),'5'],stdout=stdout,stderr=stderr)
+ try:
+  for case in range(1,6):
+   point=case in (1,5);data=bytearray(original);sequence=3300+case
+   struct.pack_into('<I',data,24,5 if point else 4);struct.pack_into('<I',data,44,0xf12 if point else 0xf0a);struct.pack_into('<I',data,56,sequence)
+   if case in (3,4):
+    for i in range(96*80):
+     for c in range(3):data[texture+16+i*4+c]=(data[texture+16+i*4+c]+37)%256
+   for i in range(96*80):data[texture+16+i*4+3]=0 if case in (2,3) else 255
+   request=struct.unpack_from('<3Q14I',data);name=f'request-42-{h[1]:016x}{h[2]:016x}-{sequence}.bin';temp=packets/'pending';temp.write_bytes(data);temp.replace(packets/name)
+   reply=packets/name.replace('request-','reply-',1);began=time.monotonic()
+   while not reply.exists():
+    assert process.poll() is None,'worker exited before reply'
+    if time.monotonic()-began>120:raise TimeoutError('Opaque linear packet timed out')
+    time.sleep(.025)
+   response=reply.read_bytes();rh=struct.unpack_from('<3Q14I',response);receipt=struct.unpack_from('<5Q2I',response,80)
+   assert rh[:12]==request[:12] and rh[13]==request[13] and rh[14:17]==(2,3,0) and len(response)==128+64*64*4
+   expected=bytearray()
+   for y in range(64):
+    for x in range(64):
+     at=texture+16+((y+16)*96+x+32)*4;expected.extend(data[at:at+3]+b'\xff')
+   assert response[128:]==expected and receipt[3]==4096 and receipt[5]==1
+   checks.append({'case':case,'filter':'point' if point else 'linear','source_alpha':0 if case in (2,3) else 255,'changed_rgb':case in (3,4),'sequence':sequence,'packet_sha256':hashlib.sha256(data).hexdigest(),'pixel_sha256':hashlib.sha256(response[128:]).hexdigest(),'covered_samples':receipt[3],'all_pixels_exact':True,'execution_device':'NPU'})
+   (out/'checks.json').write_text(json.dumps(checks,indent=2)+'\n')
+  assert checks[0]['pixel_sha256']==checks[1]['pixel_sha256']==checks[4]['pixel_sha256']
+  assert checks[2]['pixel_sha256']==checks[3]['pixel_sha256']!=checks[0]['pixel_sha256']
+  assert process.wait(timeout=15)==0
+ finally:
+  if process.poll() is None:process.kill();process.wait()
+report={'all_passed':len(checks)==5,'checks':checks,'desktop_offload_tested':False};(out/'report.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report))

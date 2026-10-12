@@ -11,8 +11,9 @@ using namespace nr::shader;
 #define TEST(v) do {if(!(v))throw std::runtime_error(#v);}while(false)
 int main(int argc,char **argv)try{
     const std::string backend=argc>1?argv[1]:"CPU";
-    TEST(argc<=3 && (argc<3 || !std::strcmp(argv[2],"--point") || !std::strcmp(argv[2],"--point-opaque")));
-    const bool point=argc==3,opaque=argc==3 && !std::strcmp(argv[2],"--point-opaque");
+    TEST(argc<=3 && (argc<3 || !std::strcmp(argv[2],"--point") || !std::strcmp(argv[2],"--point-opaque") || !std::strcmp(argv[2],"--linear-opaque")));
+    const bool point=argc==3 && std::strcmp(argv[2],"--linear-opaque"),
+        opaque=argc==3 && (!std::strcmp(argv[2],"--point-opaque") || !std::strcmp(argv[2],"--linear-opaque"));
     const auto words=nr::registered_lab::shader_tokens(R"(
 struct O{float4 p:SV_Position;float4 c:COLOR0;float2 uv:TEXCOORD0;};
 O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.uv=uv;return o;})","vs_4_0");

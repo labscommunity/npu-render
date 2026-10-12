@@ -1,0 +1,57 @@
+{
+  "method": "Attach compile metadata in stream order to its preceding successful result, allowing slow-packet records between them and checking PID/sequence. Retain metadata without a successful result separately; verify it against a negative relay receipt. Keys alone are not unique.",
+  "metadata_without_success": [
+    {
+      "kind": "model_compile_cache",
+      "client_pid": 1076,
+      "sequence": 389,
+      "compile_calls": 2,
+      "cache_requests": 2,
+      "cache_hits": 2,
+      "cache_status_unavailable": 0
+    }
+  ],
+  "duplicate_pid_sequence_keys": 63,
+  "categories": {
+    "uniform": {
+      "requests": 99,
+      "requests_compiling_models": 46,
+      "compile_calls": 267,
+      "persistent_cache_hits": 263,
+      "draw_ms": 15164.874,
+      "compile_and_draw_ms": 38049,
+      "outside_draw_with_compile_ms": 22729.628,
+      "outside_draw_without_compile_ms": 154.498
+    },
+    "triangle": {
+      "requests": 323,
+      "requests_compiling_models": 94,
+      "compile_calls": 564,
+      "persistent_cache_hits": 534,
+      "draw_ms": 68995.252,
+      "compile_and_draw_ms": 300652,
+      "outside_draw_with_compile_ms": 230936.793,
+      "outside_draw_without_compile_ms": 719.955
+    },
+    "point_or_linear": {
+      "requests": 46,
+      "requests_compiling_models": 42,
+      "compile_calls": 124,
+      "persistent_cache_hits": 121,
+      "draw_ms": 5764.912,
+      "compile_and_draw_ms": 25564,
+      "outside_draw_with_compile_ms": 19803.724,
+      "outside_draw_without_compile_ms": -4.636
+    },
+    "clear": {
+      "requests": 80,
+      "requests_compiling_models": 19,
+      "compile_calls": 19,
+      "persistent_cache_hits": 16,
+      "draw_ms": 263.278,
+      "compile_and_draw_ms": 2064,
+      "outside_draw_with_compile_ms": 1742.626,
+      "outside_draw_without_compile_ms": 58.096
+    }
+  }
+}

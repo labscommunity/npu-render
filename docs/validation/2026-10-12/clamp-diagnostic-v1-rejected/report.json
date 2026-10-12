@@ -1,0 +1,17 @@
+{
+  "accepted": false,
+  "baseline_source": "shader-profile-diagnostic-v2",
+  "change": "Replace conditional row-Gather clamp bounds with Minimum/Maximum operators.",
+  "cpu_tests_passed": 6,
+  "failed_stage": "texture-NPU linear samples",
+  "actual": 8.85608188e-06,
+  "expected": 1.35133085e-10,
+  "allowed_absolute_error": 1e-06,
+  "npu_point_checks_passed": true,
+  "baseline_v221_recovery_passed": true,
+  "production_source_changed": false,
+  "timing_comparison_reached": false,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "finding": "The algebraically equivalent bound rewrite changes NPU floating-point output beyond the existing tolerance. It is rejected before the planned timing comparisons. The unchanged v221 texture suite succeeds after the failure."
+}

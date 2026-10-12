@@ -1,0 +1,37 @@
+{
+  "build": "present-umd-v222",
+  "all_checks_passed": true,
+  "native_npu_execution": true,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "clean_host_build": "present-umd-v222",
+  "clean_guest_build": "present-umd-v222-legacy",
+  "cpu_suites_passed_each": 27,
+  "qualification_stages_passed": 13,
+  "source_files_matching_local_host_guest": 121,
+  "new_combination": "Bilinear clamp sampling with shader alpha replacement before color modulation.",
+  "changing_filter_worker_requests": 5,
+  "changing_filter_and_source_requests_exact": true,
+  "driver_indexed_draws_passed": 64,
+  "opaque_linear_driver_draws_passed": 2,
+  "historical_captured_packets_exact": 63,
+  "prewarm_packets_exact": 17,
+  "captured_draw": {
+    "bytes": 276312,
+    "cpu_sha256": "d4ca381f628a91b668c19d24f79c372bfa28bafa1383e252ece033e89bfab3b3",
+    "npu_sha256": "d4ca381f628a91b668c19d24f79c372bfa28bafa1383e252ece033e89bfab3b3",
+    "cpu_npu_exact": true,
+    "maximum_byte_difference": 0,
+    "differing_components": 0,
+    "legacy_sha256": "d4ca381f628a91b668c19d24f79c372bfa28bafa1383e252ece033e89bfab3b3",
+    "legacy_npu_exact": true
+  },
+  "npu_linear_opaque_checked_components": 29491200,
+  "npu_linear_opaque_maximum_byte_error": 0.522349805,
+  "npu_linear_opaque_allowed_byte_error": 0.6,
+  "limitations": [
+    "No installed desktop trial in this qualification",
+    "Existing rectangle geometry and sampling limits remain enforced",
+    "No physical display change or Tahoma performance test"
+  ]
+}

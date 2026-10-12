@@ -158,6 +158,7 @@ add_test(NAME registered_linear_texture_draw_contract COMMAND nr_registered_line
 
 add_test(NAME registered_modulated_point_texture_contract COMMAND nr_registered_linear_texture_draw_test CPU --point)
 add_test(NAME registered_opaque_point_texture_contract COMMAND nr_registered_linear_texture_draw_test CPU --point-opaque)
+add_test(NAME registered_opaque_linear_texture_contract COMMAND nr_registered_linear_texture_draw_test CPU --linear-opaque)
 
 add_executable(nr_registered_triangle_texture_draw_test triangle_texture_draw_test.cpp)
 target_compile_features(nr_registered_triangle_texture_draw_test PRIVATE cxx_std_17)

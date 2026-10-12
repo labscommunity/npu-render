@@ -1,0 +1,15 @@
+{
+  "baseline_source_commit": "d91aac36d37f1f5b6145f169f06d7c931c358246",
+  "source": "shader-profile-diagnostic-v2",
+  "change": "Replace four conditional row-gather selections per clamped coordinate with exact min/max bounds. Retain nonfinite-coordinate validation and NaN sanitization.",
+  "production_changed": false,
+  "built": false,
+  "npu_tested": false,
+  "required_validation": [
+    "CPU and NPU texture and mixed mirror/clamp suites",
+    "compositor variants",
+    "historical 1041/1061 exact images at 4096 and 8192",
+    "serial baseline/candidate/baseline replay before timing claim"
+  ],
+  "must_follow_completed_desktop_trial": "v112"
+}

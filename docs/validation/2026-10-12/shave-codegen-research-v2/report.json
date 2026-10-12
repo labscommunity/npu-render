@@ -1,0 +1,22 @@
+{
+  "repository": "https://github.com/openvinotoolkit/npu_compiler",
+  "commit": "20e7912fbc230725e1ca7394762348d4f480aa65",
+  "option": "enable-shave-code-gen=true",
+  "default_enabled": false,
+  "architecture_pipeline_includes_npu50xx": true,
+  "kernel_codegen_requires_external_tools": true,
+  "required_environment": [
+    "MV_TOOLS_DIR",
+    "MV_TOOLS_VERSION"
+  ],
+  "external_programs": [
+    "linux64/bin/moviCompile",
+    "linux64/bin/moviAsm",
+    "linux64/sparc-myriad-rtems-6.3.0/bin/sparc-myriad-rtems-ld"
+  ],
+  "arch_argument": "5000xx",
+  "arch_library_directory": "50xxxx",
+  "tested_installed_compiler_support": false,
+  "executed_custom_kernel": false,
+  "conclusion": "Public JIT fusion path exists for NPU50XX but the pinned source invokes external MoviTools binaries and libraries. It is not a self-contained installed Windows compiler switch. Investigate tooling separately; ordinary graph optimizations remain independently testable."
+}

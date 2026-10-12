@@ -952,3 +952,18 @@ checks exact arithmetic alternatives from Direct3D 11.3 section 3.1.3, without
 applying a general ULP tolerance to vertex outputs or integer/MOV values. The
 preceding [v220 qualification rejection](../../../docs/validation/2026-10-12/border-v220-replay-rejected/report.json)
 is retained. Offline replay does not establish installed desktop operation.
+
+The [v112 installed trial](../../../docs/validation/2026-10-12/sole-display-v112/report.json)
+visibly reaches the Run dialog, but a subsequent DWM draw combines bilinear clamp
+sampling with shader alpha replacement. The rectangle specialization previously
+admitted this shader only with point filtering. RGB filtering now also supports
+bilinear taps while source alpha remains unused; color modulation and blending
+still execute on the selected device.
+
+The [v222 qualification](../../../docs/validation/2026-10-12/linear-opaque-v222/report.json)
+replays the exact 397×174 capture with identical CPU, modern-NPU and legacy-NPU
+output, covering all 69,078 samples. Two clean builds pass 27 CPU suites each.
+Native NPU checks cover 64 driver draws, five worker requests changing filters
+and texture contents, all four rectangle shader/filter combinations, seventeen
+prewarm requests and 63 historical desktop packets. This verifies the captured
+operation; full desktop offload and interactive performance remain unproven.
