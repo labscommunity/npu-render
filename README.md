@@ -113,7 +113,7 @@ now has an exact NPU specialization for opaque, one-to-one point-sampled quads.
 Its captured 1024×768 replay passes, as do changing-image and driver callback
 tests. This is a checked subset, not general desktop rendering.
 
-The latest [v113 installed trial](docs/validation/2026-10-12/sole-display-v113/report.json)
+The [v113 installed trial](docs/validation/2026-10-12/sole-display-v113/report.json)
 returns 440 acknowledged NPU results and nine frames, eight received while the
 indirect display is the sole guest path. The complete desktop is visible, but
 Run never appears on that path. Command-queue creation failures are followed by
@@ -131,9 +131,17 @@ warmed baseline (41 versus 21 seconds), because the smaller cache evicts models.
 This does not establish desktop stability or a general performance gain.
 The [v223 implementation](docs/validation/2026-10-12/surface-capacity-v223/report.json)
 passes both clean 28-suite CPU builds and twelve NPU qualification stages,
-including the four v113 captures and changing-target pixel checks. The next
-installed desktop trial will test stability and interaction. The stream harness
-now writes worker logs during execution and records incomplete shutdown explicitly.
+including the four v113 captures and changing-target pixel checks. Its
+[v114 installed trial](docs/validation/2026-10-12/sole-display-v114/report.json)
+fails after 62 acknowledged NPU requests (17 prewarm, 45 live), with zero received
+frames. An untextured 24×24 draw hits NPU device loss, followed by a worker access
+violation. All three captured draws subsequently pass CPU and both NPU runtimes
+with identical pixels after restarting the NPU device. The cache change has not
+established desktop stability. Guest cleanup also requires restarting the owned
+VM; both custom devices are then absent. Physical Delta is not rebooted. The
+stream harness preserves live logs and completes output collection after the
+worker crash. Ordered request capture is the next diagnostic step; full desktop
+offload, usable interaction, and a Tahoma improvement remain unverified.
 
 The preceding [v112 installed trial](docs/validation/2026-10-12/sole-display-v112/report.json)
 returns 565 acknowledged NPU results and fourteen frames, thirteen received while

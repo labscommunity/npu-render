@@ -1,0 +1,66 @@
+{
+  "trial": "v114",
+  "source_commit": "63b5b083b8db3a3d6835f15f668bcc8874a7e1ca",
+  "host_worker_build": "present-umd-v223",
+  "guest_umd_build": "present-umd-v223-legacy",
+  "package_version": "0.0.102.0",
+  "successful_worker_requests": 62,
+  "live_worker_requests": 45,
+  "acknowledged_successes": 62,
+  "failed_relay_responses": [
+    {
+      "sequence": 19,
+      "client_pid": 4216,
+      "dispatch_ticket": 62,
+      "request_bytes": 9804,
+      "reply_bytes": 80,
+      "queue_wait_ms": 484,
+      "worker_ms": 61360,
+      "roundtrip_ms": 61844,
+      "worker_success": false,
+      "displayed_frames": 0
+    }
+  ],
+  "worker_successes_by_client": {
+    "42": 17,
+    "5336": 27,
+    "4216": 18
+  },
+  "cumulative_compile_calls": 194,
+  "hardware_queue_count_measured": false,
+  "received_frames": 0,
+  "sampled_process_memory": {
+    "private_bytes": 318132224,
+    "working_bytes": 881975296,
+    "peak_working_bytes": 883027968,
+    "samples": 287,
+    "device_driver_memory_included": false
+  },
+  "visually_verified_complete_desktop": false,
+  "run_action_sent": false,
+  "notepad_action_sent": false,
+  "full_desktop_offload": false,
+  "usable_interactive_desktop": false,
+  "tahoma_performance_tested": false,
+  "original_guest_cleanup_passed": false,
+  "guest_recovery_verified": true,
+  "owned_guest_restarted": true,
+  "physical_driver_package_changed": false,
+  "physical_npu_device_restarted": true,
+  "physical_machine_restarted": false,
+  "gpu_device_touched": false,
+  "worker_exit_code": -1073741819,
+  "worker_output_complete": true,
+  "concurrent_cpu_build_during_trial": false,
+  "findings": [
+    "The capacity/cache policy passes offline qualification but fails installed desktop use: 17 prewarm and 45 live successful requests, one failed response, and zero received frames.",
+    "The first failure is an untextured 24-by-24 destination-in draw on the unchanged UniformDrawExecutor path. A bound texture is unused by its shader. Level Zero fence synchronization reports ZE_RESULT_ERROR_DEVICE_LOST; the worker subsequently exits with access violation 0xC0000005. No command-queue creation error appears in this trial.",
+    "All three complete captured draws pass the CPU oracle. After an exact-instance NPU restart, all three pass two repetitions in both modern and legacy NPU runtimes, with output bytes identical to CPU. This does not reproduce their preceding desktop process state.",
+    "Live log capture works and final output is complete. The first early-stop script finds the worker already exited but fails loading the guest helper because of execution policy. Its retry requests disabling only the owned guest indirect device, which returns 3010 and requires a guest reboot. No render-device disable is attempted by that failed retry.",
+    "The observer removes the render adapter but cannot remove the pending-reboot indirect device. After preserving evidence, an owned-VM-only restart and deletion of the unused test INF restore zero custom devices. Original cleanup failure is preserved. Neither the physical Delta machine nor its GPU is restarted.",
+    "The NPU restart keeps driver 32.0.100.5540 and completes successfully. A deterministic ordered capture is still needed to isolate accumulation, eviction, or runtime-state faults; individual replay success does not establish a fix.",
+    "The local stop note names a planned ordering, but the guest early-disable attempt had already started before local input/viewer/collector termination. No frame was received at any point, and no Run or Notepad action was issued.",
+    "Full desktop offload, usable interaction, physical scanout migration and Tahoma improvement remain unverified."
+  ],
+  "interrupted_viewer_report_empty": true
+}

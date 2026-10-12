@@ -1,0 +1,27 @@
+{
+    "started":  "2026-10-12T22:22:06.1638681Z",
+    "instance_id":  "PCI\\VEN_8086\u0026DEV_B03E\u0026SUBSYS_20BF1043\u0026REV_04\\3\u002611583659\u00260\u002658",
+    "name":  "Intel(R) NPU",
+    "class":  "ComputeAccelerator",
+    "before_status":  "OK",
+    "driver_properties":  [
+                              {
+                                  "KeyName":  "DEVPKEY_Device_DriverVersion",
+                                  "Data":  "32.0.100.5540"
+                              },
+                              {
+                                  "KeyName":  "DEVPKEY_Device_DriverInfPath",
+                                  "Data":  "oem13.inf"
+                              }
+                          ],
+    "action":  "pnputil /restart-device exact NPU instance",
+    "reboot_requested":  false,
+    "driver_package_changed":  false,
+    "gpu_device_touched":  false,
+    "reason":  "Recorded NPU fence device loss during v114; owned stream worker has exited. Reinitialize the exact NPU before isolated comparison; do not resume the failed desktop trial.",
+    "documentation":  "https://learn.microsoft.com/en-us/windows-hardware/drivers/devtest/pnputil-command-syntax#restart-device",
+    "command_pid":  3764,
+    "command_finished":  true,
+    "exit_code":  0,
+    "finished":  "2026-10-12T22:22:06.5651322Z"
+}
