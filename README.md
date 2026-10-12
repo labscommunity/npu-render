@@ -161,7 +161,23 @@ keeps an efficient batch for arbitrary surface sizes and retains the existing
 stages pass. The Notepad capture now executes 426 tiles with exact oracle pixels
 and coverage on CPU and both NPU runtimes. Its original driver packet also passes
 with output identical to CPU. Odd surfaces, clipped tails, prior captures and
-native draw callbacks pass; installed desktop interaction still requires a trial.
+native draw callbacks pass. Its [v116 installed trial](docs/validation/2026-10-12/sole-display-v116/report.json)
+then returns 792 acknowledged NPU results and thirteen sole-display frames. The
+previous Notepad draw rejection does not recur. Its window border and blank
+interior appear about 155 seconds after launch, but its complete UI and typing
+remain unverified on the NPU path. Run appears after about 125 seconds. All 792
+requests are preserved in order for replay; both guest drivers are removed
+cleanly, with no NPU restart. Four untimestamped UMD rejection rows remain in the
+archive alongside normal bounded cleanup. Full desktop offload is unfinished.
+The Windows VM runs on the Mac; Delta provides the physical NPU. Delta's own
+Windows desktop continues using its ordinary graphics path.
+
+The v116 live draws expand into 26,995 provider calls. Their reported execution
+intervals total 138 seconds, versus 329 seconds including pipeline setup and
+other wrapper work. Of 1,921 model setup calls, 1,915 are disk-cache hits.
+Retaining loaded pipelines and reducing provider-call count are optimization
+targets; these sums do not measure pure hardware or compiler time. No Tahoma
+performance gain is established by this desktop trial.
 
 The preceding [v112 installed trial](docs/validation/2026-10-12/sole-display-v112/report.json)
 returns 565 acknowledged NPU results and fourteen frames, thirteen received while

@@ -1,0 +1,17 @@
+{
+  "baseline_commit": "4f2ad4b14618da27d099795144c48d01c2446484",
+  "production_source_changed": false,
+  "renderer_math_changed": false,
+  "cache_policy_changed": false,
+  "changes": [
+    "Extend trace storage to 8 GiB on physical Delta only, with at most 4096 requests.",
+    "Log every request start, including after capture stops. Latch capture closed after first quota or write failure so retained files are always a prefix.",
+    "Add original ordinal to successful result logs.",
+    "Explicit diagnostic worker duration via NR_RENDER_STREAM_SECONDS, range 60 to 1800 seconds, default 600."
+  ],
+  "reason": "v115 outlives the initial 512 MiB trace budget. Longer interaction experiments require more recorded state and an explicit finite worker duration.",
+  "npu_execution_tested": false,
+  "desktop_offload_tested": false,
+  "additional_renderer_changes": "Includes pending v224 partial uniform batch fix; desktop use requires full v224 CPU and NPU qualification.",
+  "prepared_from_v224_source": true
+}

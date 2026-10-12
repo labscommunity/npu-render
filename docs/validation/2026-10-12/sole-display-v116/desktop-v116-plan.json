@@ -1,0 +1,32 @@
+{
+  "trial": "v116",
+  "status": "completed_partial_notepad_window",
+  "host_worker_build": "trace-worker-v2",
+  "renderer_build": "present-umd-v224",
+  "guest_umd_build": "present-umd-v224-legacy",
+  "guest_package_version": "0.0.103.0",
+  "batch_change": "Capacity selection with exact partial-tile writes; 4096 raster tile maximum unchanged.",
+  "diagnostic_capture": "8 GiB prefix; record metadata after quota; no stream secret in request files.",
+  "worker_seconds": 600,
+  "observer_seconds": 420,
+  "vm_pid": 33237,
+  "topology": "idd-topology-v9ax",
+  "gates": "Full hardware qualification plus manual sole-display desktop, Run, Notepad, typing, maximize and close receipts.",
+  "full_desktop_offload": false,
+  "tahoma_performance_tested": false,
+  "started_at": "2026-10-12T23:21:16.475303+00:00",
+  "ordinary_desktop_before_trial": "visually confirmed from v116-before-trial.png",
+  "sessions": {
+    "controller": 23052,
+    "collector": 36728,
+    "viewer": 54214,
+    "input": 72752,
+    "failure_watch": 93274,
+    "memory_watch": 79478
+  },
+  "received_frames": 13,
+  "successful_requests": 792,
+  "guest_cleanup_passed": true,
+  "worker_exit_code": 1,
+  "worker_exit_message": "indexed socket closed or timed out during controller cleanup"
+}
