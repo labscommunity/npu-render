@@ -1,0 +1,36 @@
+{
+  "diagnostic": "shader-profile-v2",
+  "baseline_source_commit": "d91aac36d37f1f5b6145f169f06d7c931c358246",
+  "shipping_source_changed": false,
+  "native_npu_execution": true,
+  "full_capture_runs": 8,
+  "full_capture_historical_images_exact": 8,
+  "mixed_packets_exact": 63,
+  "profiled_shader_stages": [
+    "vertex",
+    "pixel",
+    "interpolation"
+  ],
+  "mixed_packet_totals": {
+    "execute_ms": 35522.429,
+    "core_constructions": 120,
+    "core_construct_ms": 121.689,
+    "model_compile_ms": 5484.876,
+    "cache_config_ms": 2713.277,
+    "compile_calls": 117,
+    "cache_hits": 117,
+    "draw_ms": 21502.007,
+    "elapsed_ms": 38127
+  },
+  "all_checks_passed": true,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "findings": [
+    "All eight complete CPU/NPU capture outputs retain their historical hashes. All sixty-three captured packet replies retain pixels and coverage. Instrumentation does not change the graph arithmetic or execution properties.",
+    "For both full-screen captures, the 8192-lane NPU pixel stage spends approximately 4.2 seconds per warm draw in infer calls; complete warm draws remain about seven seconds. Host input packing and copying are measurable but do not dominate these two full draws.",
+    "The mixed replay creates 120 Core objects and performs 117 model compile/load operations, all persistent-cache hits. Core construction totals 121.689 ms, compile_model calls 5484.876 ms, and cache directory/key configuration 2713.277 ms. These timings do not include every graph-building and model-loading step.",
+    "Low Core constructor time does not isolate lazy plugin initialization within later API calls. Shared-Core benefits are not established or ruled out by these counters. CompiledModel sharing remains disabled after the earlier device-loss experiment.",
+    "Host-side infer timers include runtime and submission overhead; they do not identify the NPU hardware engine or per-operation bottleneck. Official compiler profiling is a possible further diagnostic, not a result of this experiment.",
+    "No installed desktop trial or CPU build overlaps these serial replay measurements. The next cache-capacity candidate requires separate qualification and installed testing."
+  ]
+}

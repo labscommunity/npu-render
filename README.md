@@ -130,6 +130,20 @@ custom drivers are removed afterward. Three untimestamped UMD rejection rows
 and one unacknowledged final worker result remain in the evidence; successful
 worker computation alone is not proof of delivery. No Tahoma gain is established.
 
+[Shader timing probes](docs/validation/2026-10-12/shader-profile-v2/report.json)
+preserve all eight historical full-draw images and all 63 captured packet
+outputs. In two warm full-screen draws, pixel-shader inference takes roughly
+4.2 seconds and the whole draw about seven seconds. Setup and shader execution
+both need work. These host timers do not identify the NPU engine or individual
+hardware operations; separate hardware profiling is prepared for that question.
+
+The next [qualified cache candidate](docs/validation/2026-10-12/performance-qualified-v217/report.json)
+retains 64 complete triangle pipelines, up from 16, while keeping independent
+model ownership and eviction before replacement. Both runtime builds pass all
+25 CPU suites, and all 19 native qualification stages pass. The captured replay
+preserves exact output, but does not establish the memory cost of filling the
+larger cache or improved desktop interaction; the next installed trial measures those.
+
 A [controlled pipeline cache experiment](docs/validation/2026-10-12/pipeline-cache-v3/report.json)
 retains sixteen independently owned triangle pipelines instead of four. Its
 63-packet replay takes 34.676 seconds, compared with 63.085 and 63.382 seconds

@@ -1,0 +1,293 @@
+--- native/windows/registered_lab/blend_executor.cpp
++++ diagnostic/blend_executor.cpp
+@@ -7,7 +7,7 @@
+ #include <stdexcept>
+ namespace nr::registered_lab {
+ struct BlendExecutor::State {
+-    ov::Core core;
++    ov::Core core=nr::diagnostic::profiled_core();
+     std::string backend;
+     std::unique_ptr<LabNpuExchange> external;
+     struct Model {
+--- native/windows/registered_lab/clear_executor.cpp
++++ diagnostic/clear_executor.cpp
+@@ -14,7 +14,7 @@
+ }
+ struct ClearExecutor::State {
+     uint32_t width,height;
+-    ov::Core core;ov::CompiledModel compiled;ov::InferRequest request;
++    ov::Core core=nr::diagnostic::profiled_core();ov::CompiledModel compiled;ov::InferRequest request;
+     std::string execution_device;bool failed=false;
+     State(uint32_t w,uint32_t h,uint32_t format,const std::string &backend):width(w),height(h){
+         require(w && w<=8192 && h && h<=8192 && uint64_t(w)*h<=4194304 && (format==28 || format==87));
+--- native/windows/registered_lab/color_interpolator.cpp
++++ diagnostic/color_interpolator.cpp
+@@ -24,7 +24,7 @@
+ struct ColorInterpolator::State {
+     uint32_t count;
+     bool per_sample;
+-    ov::Core core;
++    ov::Core core=nr::diagnostic::profiled_core();
+     ov::CompiledModel compiled;
+     ov::InferRequest request;
+     std::string device;
+@@ -85,6 +85,7 @@
+ }
+ ColorInterpolator::Result ColorInterpolator::State::run(const std::array<ProjectedVertex,3> *triangles,
+     const std::array<Color,3> *colors,bool varied,const std::vector<Point> &points,const std::vector<uint8_t> &coverage){
++    auto &profile=nr::diagnostic::shader_profile[2];auto profile_start=nr::diagnostic::ProfileClock::now();
+     auto &s=*this;require(!s.failed && (!varied || s.per_sample) && points.size()==s.count && coverage.size()==s.count);
+     const size_t rows=s.per_sample?s.count:1;std::vector<float> vertices(rows*9);std::vector<Color> values(rows*3);
+     for(size_t n=0;n<rows;++n)for(unsigned v=0;v<3;++v) {
+@@ -104,11 +105,17 @@
+     std::memcpy(s.request.get_tensor("colors").data<float>(),values.data(),values.size()*sizeof(Color));
+     std::memcpy(s.request.get_tensor("points").data<int32_t>(),points.data(),points.size()*sizeof(Point));
+     auto c=s.request.get_tensor("coverage");for(size_t i=0;i<coverage.size();++i)c.data<int32_t>()[i]=coverage[i];
+-    s.request.infer();const auto output=s.request.get_output_tensor();
++    profile.binding_ms+=nr::diagnostic::profile_ms(profile_start);
++    profile_start=nr::diagnostic::ProfileClock::now();s.request.infer();
++    profile.infer_ms+=nr::diagnostic::profile_ms(profile_start);profile_start=nr::diagnostic::ProfileClock::now();
++    const auto output=s.request.get_output_tensor();
+     require(output.get_element_type()==ov::element::f32 && output.get_size()==size_t(s.count)*4);
+     Result result{{},s.device};result.colors.resize(s.count);
+     std::memcpy(result.colors.data(),output.data<const float>(),result.colors.size()*sizeof(Color));
+     for(const auto &color:result.colors)for(const auto f:color)require(std::isfinite(f));
++    profile.input_bytes+=vertices.size()*sizeof(float)+values.size()*sizeof(Color)+points.size()*sizeof(Point)+coverage.size()*sizeof(int32_t);
++    profile.output_bytes+=result.colors.size()*sizeof(Color);
++    profile.output_ms+=nr::diagnostic::profile_ms(profile_start);++profile.calls;
+     s.failed=false;return result;
+ }
+ }
+--- native/windows/registered_lab/draw_replay_probe.cpp
++++ diagnostic/draw_replay_probe.cpp
+@@ -1,3 +1,4 @@
++#include "shader_profile.hpp"
+ // Offline replay of captured uniform-color triangle draws. No display control.
+ #include "capture_reader.hpp"
+ #include "blend_reference.hpp"
+@@ -267,11 +268,17 @@
+     const auto cache=nr::provider::compile_statistics();
+     std::printf("{\"kind\":\"model_compile_cache\",\"compile_calls\":%llu,\"cache_requests\":%llu,\"cache_hits\":%llu,\"cache_status_unavailable\":%llu}\n",
+         static_cast<unsigned long long>(cache.calls),static_cast<unsigned long long>(cache.cache_requests),static_cast<unsigned long long>(cache.cache_hits),static_cast<unsigned long long>(cache.cache_status_unavailable));
++    std::printf("{\"kind\":\"provider_setup_profile\",\"core_constructions\":%llu,\"core_construct_ms\":%.3f,\"model_compile_ms\":%.3f,\"cache_config_ms\":%.3f}\n",static_cast<unsigned long long>(nr::diagnostic::core_constructions),nr::diagnostic::core_construct_ms,nr::diagnostic::model_compile_ms,nr::diagnostic::cache_config_ms);
+     UniformDrawExecutor::Result result;
+     std::vector<PackedColor> reference_pixels;
+     for (uint32_t iteration = 0; iteration < repeats; ++iteration) {
+         const Viewport viewport{view[0],view[1],view[2],view[3],view[4],view[5]};
++        nr::diagnostic::shader_profile={};
+         phase="provider execute";result = general_resources ? triangle_executor->execute(inputs,cb,pixel_cb,viewport,resources,pixels,clip) : triangle_executor ? triangle_executor->execute(inputs,cb,pixel_cb,viewport,texture,pixels,clip) : linear_executor ? linear_executor->execute(inputs,cb,viewport,texture,pixels,clip) : textured ? texture_executor->execute_adaptive(inputs,cb,viewport,texture,pixels) : executor->execute(inputs, cb, pixel_cb, viewport, pixels, clip);
++        for(unsigned stage=0;stage<3;++stage){const auto &p=nr::diagnostic::shader_profile[stage];
++            std::printf("{\"kind\":\"shader_provider_profile\",\"iteration\":%u,\"stage\":%u,\"calls\":%llu,\"input_bytes\":%llu,\"output_bytes\":%llu,\"binding_ms\":%.3f,\"infer_ms\":%.3f,\"output_ms\":%.3f}\n",
++                iteration,stage,static_cast<unsigned long long>(p.calls),static_cast<unsigned long long>(p.input_bytes),static_cast<unsigned long long>(p.output_bytes),p.binding_ms,p.infer_ms,p.output_ms);
++        }
+         uint64_t fused_matches=0;
+         phase="vertex oracle";for (size_t i = 0; i < inputs.size(); ++i) {
+             const auto expected = reference_vertex(vs, inputs[i], cb);
+--- native/windows/registered_lab/indexed_exchange_worker.cpp
++++ diagnostic/indexed_exchange_worker.cpp
+@@ -1,6 +1,9 @@
+ // Finite physical-NPU filesystem worker. Its controller uses authenticated WinRM.
+ #define NOMINMAX
+ #include "indexed_pipeline.hpp"
++#include "shader_profile.hpp"
++#include "provider_compile_statistics.hpp"
++#include <algorithm>
+ #include "lab_exchange_io.hpp"
+ #include <cstdio>
+ #include <set>
+@@ -43,6 +46,7 @@
+         } while (FindNextFileW(search, &found));
+         const auto search_error = GetLastError(); FindClose(search);
+         if (search_error != ERROR_NO_MORE_FILES) throw std::runtime_error("worker directory enumeration failed");
++        std::sort(names.begin(),names.end());
+         for (const auto &name : names) {
+             if (handled.size() >= limit) break;
+             handled.insert(name); ex::Header header{}; bool identified = false;
+@@ -53,7 +57,18 @@
+                 std::memcpy(&header, bytes.data(), sizeof(header));
+                 ex::require(ex::request_valid(header, bytes.size()) && packet_name(header, false) == name); identified = true;
+                 const auto request = ex::decode(bytes); const auto &h = request.header;
++                nr::diagnostic::shader_profile={};nr::diagnostic::core_constructions=0;
++                nr::diagnostic::core_construct_ms=0;nr::diagnostic::model_compile_ms=0;nr::diagnostic::cache_config_ms=0;
++                const auto cache_before=nr::provider::compile_statistics();const auto execute_start=nr::diagnostic::ProfileClock::now();
+                 const auto result=pipeline->execute(request);
++                const auto execute_ms=nr::diagnostic::profile_ms(execute_start);const auto cache_after=nr::provider::compile_statistics();
++                std::printf("{\"kind\":\"packet_setup_profile\",\"sequence\":%u,\"execute_ms\":%.3f,\"core_constructions\":%llu,\"core_construct_ms\":%.3f,\"model_compile_ms\":%.3f,\"cache_config_ms\":%.3f,\"compile_calls\":%llu,\"cache_hits\":%llu}\n",
++                    h.sequence,execute_ms,static_cast<unsigned long long>(nr::diagnostic::core_constructions),nr::diagnostic::core_construct_ms,nr::diagnostic::model_compile_ms,nr::diagnostic::cache_config_ms,
++                    static_cast<unsigned long long>(cache_after.calls-cache_before.calls),static_cast<unsigned long long>(cache_after.cache_hits-cache_before.cache_hits));
++                for(unsigned stage=0;stage<3;++stage){const auto &p=nr::diagnostic::shader_profile[stage];
++                    std::printf("{\"kind\":\"packet_shader_profile\",\"sequence\":%u,\"stage\":%u,\"calls\":%llu,\"input_bytes\":%llu,\"output_bytes\":%llu,\"binding_ms\":%.3f,\"infer_ms\":%.3f,\"output_ms\":%.3f}\n",
++                        h.sequence,stage,static_cast<unsigned long long>(p.calls),static_cast<unsigned long long>(p.input_bytes),static_cast<unsigned long long>(p.output_bytes),p.binding_ms,p.infer_ms,p.output_ms);
++                }
+                 publish(directory + L"\\" + packet_name(h, true), ex::response(h, result)); ++succeeded;
+                 std::printf("{\"client_pid\":%u,\"sequence\":%u,\"execution_device\":\"%s\",\"operation\":\"%s\",\"width\":%u,\"height\":%u,\"provider_requests\":%llu,\"draw_ms\":%.3f,\"passed\":true,\"displayed_frames\":0}\n",
+                     h.client_pid, h.sequence, result.execution_device.c_str(), ex::color_clear(h)?"color_clear":"draw", h.width, h.height,
+--- native/windows/registered_lab/linear_texture_draw.cpp
++++ diagnostic/linear_texture_draw.cpp
+@@ -67,7 +67,7 @@
+     shader::Program vs; Pattern pixel;
+     uint32_t width,height,sw,sh,sf,rows,count; bool failed=false, point=false;
+     shader::VertexExecutor vertex; ProjectionExecutor projection;
+-    ov::Core core; ov::CompiledModel compiled; ov::InferRequest request; std::string device;
++    ov::Core core=nr::diagnostic::profiled_core(); ov::CompiledModel compiled; ov::InferRequest request; std::string device;
+     State(const shader::Program &v,const shader::Program &p,uint32_t w,uint32_t h,uint32_t format,
+         uint32_t source_width,uint32_t source_height,uint32_t source_format,const std::string &backend,bool blend,shader::TextureFilter filter)
+         : vs(v),pixel(pattern(p)),width(w),height(h),sw(source_width),sh(source_height),sf(source_format),
+--- native/windows/registered_lab/output_merger.cpp
++++ diagnostic/output_merger.cpp
+@@ -26,7 +26,7 @@
+ struct OutputMerger::State {
+     uint32_t count;
+     BlendMode blend;
+-    ov::Core core;
++    ov::Core core=nr::diagnostic::profiled_core();
+     ov::CompiledModel compiled;
+     ov::InferRequest request;
+     std::string execution_device;
+--- native/windows/registered_lab/projection_executor.cpp
++++ diagnostic/projection_executor.cpp
+@@ -44,7 +44,7 @@
+ }
+ struct ProjectionExecutor::State {
+     uint32_t count;
+-    ov::Core core;
++    ov::Core core=nr::diagnostic::profiled_core();
+     ov::CompiledModel compiled;
+     ov::InferRequest request;
+     std::string execution_device;
+--- native/windows/registered_lab/provider_compile.hpp
++++ diagnostic/provider_compile.hpp
+@@ -1,3 +1,4 @@
++#include "shader_profile.hpp"
+ #pragma once
+ #include <openvino/openvino.hpp>
+ #include "provider_compile_statistics.hpp"
+@@ -7,6 +8,9 @@
+ #include <filesystem>
+ #include <memory>
+ #include <stdexcept>
++namespace nr::diagnostic {
++inline ov::Core profiled_core(){auto started=ProfileClock::now();ov::Core core;core_construct_ms+=profile_ms(started);++core_constructions;return core;}
++}
+ namespace nr::provider {
+ inline std::string model_cache_directory(){
+ #ifdef _MSC_VER
+@@ -23,13 +27,16 @@
+     ++compile_calls;
+     const auto directory=backend=="NPU"?model_cache_directory():std::string{};
+     if(!directory.empty()){
++        const auto cache_started=nr::diagnostic::ProfileClock::now();
+         const std::filesystem::path path(directory);
+         if(!path.is_absolute() || !std::filesystem::is_directory(path))throw std::invalid_argument("NPU cache must be an existing absolute directory");
+         // Explicit controller-owned cache only. OpenVINO keys entries by graph
+         // and compilation properties; frame pixels remain runtime inputs.
+-        core.set_property(ov::cache_dir(isolated_cache_directory(path,model).string()));++cache_requests;
++        core.set_property(ov::cache_dir(isolated_cache_directory(path,model).string()));++cache_requests;nr::diagnostic::cache_config_ms+=nr::diagnostic::profile_ms(cache_started);
+     }
++    const auto profile_start=nr::diagnostic::ProfileClock::now();
+     auto compiled=core.compile_model(model,backend,properties);
++    nr::diagnostic::model_compile_ms+=nr::diagnostic::profile_ms(profile_start);
+     if(!directory.empty()){
+         try{if(compiled.get_property(ov::loaded_from_cache))++cache_hits;}
+         catch(const ov::Exception &){++cache_status_unavailable;}
+--- native/windows/registered_lab/raster_executor.cpp
++++ diagnostic/raster_executor.cpp
+@@ -59,7 +59,7 @@
+ }
+ struct CoverageExecutor::State {
+     uint32_t count;
+-    ov::Core core;
++    ov::Core core=nr::diagnostic::profiled_core();
+     ov::CompiledModel compiled;
+     ov::InferRequest request;
+     std::string execution_device;
+--- native/windows/registered_lab/shader_contract.hpp
++++ diagnostic/shader_contract.hpp
+@@ -1,5 +1,5 @@
+ #pragma once
+-#include "../ddi/contract.hpp"
++#include "ddi_contract.hpp"
+ #include <d3dcompiler.h>
+ #include <wrl/client.h>
+ #include <cstring>
+--- native/windows/registered_lab/shader_profile.hpp
++++ diagnostic/shader_profile.hpp
+@@ -0,0 +1,12 @@
++#pragma once
++#include <chrono>
++#include <array>
++#include <cstdint>
++namespace nr::diagnostic {
++struct ShaderProfile { uint64_t calls=0,input_bytes=0,output_bytes=0;double binding_ms=0,infer_ms=0,output_ms=0; };
++inline thread_local std::array<ShaderProfile,3> shader_profile;
++using ProfileClock=std::chrono::steady_clock;
++inline double profile_ms(ProfileClock::time_point start){return std::chrono::duration<double,std::milli>(ProfileClock::now()-start).count();}
++inline thread_local uint64_t core_constructions=0;
++inline thread_local double core_construct_ms=0,model_compile_ms=0,cache_config_ms=0;
++}
+--- native/windows/registered_lab/solid_rectangle.cpp
++++ diagnostic/solid_rectangle.cpp
+@@ -45,7 +45,7 @@
+ }
+ struct SolidRectangleExecutor::State {
+     uint32_t width, height;
+-    ov::Core core; ov::CompiledModel compiled; ov::InferRequest request;
++    ov::Core core=nr::diagnostic::profiled_core(); ov::CompiledModel compiled; ov::InferRequest request;
+     std::string execution_device; bool failed = false, blending;
+     State(uint32_t w, uint32_t h, const std::string &backend, bool bgra, bool blend) : width(w), height(h), blending(blend) {
+         require(width && width <= 8192 && !(width % 4) && height && height <= 8192 && uint64_t(width) * height <= 4 * 1024 * 1024);
+--- native/windows/registered_lab/texture_crop.cpp
++++ diagnostic/texture_crop.cpp
+@@ -19,7 +19,7 @@
+ }
+ struct TextureCropExecutor::State {
+     uint32_t sw, sh, width, height; std::string backend; bool swap;
+-    ov::Core core; bool failed = false;
++    ov::Core core=nr::diagnostic::profiled_core(); bool failed = false;
+     struct Model {
+         ov::CompiledModel compiled; ov::InferRequest request; std::string device;
+         Model(State &s, uint32_t x, uint32_t y) {
+--- native/windows/registered_lab/vertex_executor.cpp
++++ diagnostic/vertex_executor.cpp
+@@ -1,3 +1,4 @@
++#include "shader_profile.hpp"
+ #include "provider_compile.hpp"
+ #include "loop_fixture.hpp"
+ #include "compositor_fixture.hpp"
+@@ -65,7 +66,7 @@
+     std::vector<Binding> bindings;
+     std::vector<unsigned> outputs;
+     std::array<uint32_t, 16> output_bit_masks{};
+-    ov::Core core;
++    ov::Core core=nr::diagnostic::profiled_core();
+     ov::CompiledModel compiled;
+     ov::InferRequest request;
+     std::string execution_device;
+@@ -879,6 +880,8 @@
+             state=std::make_unique<State>(c.program,c.count,c.backend,c.textures,c.samplers,capacity);
+         }
+     }
++    auto &profile=nr::diagnostic::shader_profile[state->program.stage==Stage::pixel?1:0];
++    auto phase_start=nr::diagnostic::ProfileClock::now();
+     try {
+         for (size_t i = 0; i < state->bindings.size(); ++i) {
+             const auto &binding = state->bindings[i]; auto tensor = state->request.get_tensor(binding.name);
+@@ -901,7 +904,9 @@
+                     std::memcpy(destination + v * sizeof(VertexBits), vertices[v][binding.index].data(), sizeof(VertexBits));
+             }
+         }
+-        state->request.infer();
++        profile.binding_ms+=nr::diagnostic::profile_ms(phase_start);profile.input_bytes+=result.input_bytes;
++        phase_start=nr::diagnostic::ProfileClock::now();state->request.infer();
++        profile.infer_ms+=nr::diagnostic::profile_ms(phase_start);phase_start=nr::diagnostic::ProfileClock::now();
+         if (state->checks_sample_coordinates) {
+             const auto status = state->request.get_tensor("invalid_sample_coordinates");
+             result.output_bytes += status.get_byte_size();
+@@ -926,6 +931,7 @@
+                     std::memcpy(&result.vertices[v][state->outputs[i]][c], raw + (v * 4 + c) * sizeof(uint32_t), sizeof(uint32_t));
+             }
+         }
++        profile.output_ms+=nr::diagnostic::profile_ms(phase_start);profile.output_bytes+=result.output_bytes;++profile.calls;
+         return result;
+     } catch (...) { state->failed = true; throw; }
+ }

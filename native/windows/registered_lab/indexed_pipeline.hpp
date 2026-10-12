@@ -52,11 +52,10 @@ public:
                     raster::sampler_layout_equal(samplers,entry.samplers) && entry.vertex==request.vertex.bytecode && entry.pixel==request.pixel.bytecode)
                     return entry.executor->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,resources,request.background,request.scissor);
             }
-            // Retain the desktop's alternating programs and shapes as complete,
-            // independently owned pipelines. The 4/16/4 captured NPU replay
-            // qualifies this bound without sharing compiled model lifetimes.
+            // Retain a bounded set of complete, independently owned pipelines
+            // across the desktop's alternating programs and geometry sizes.
             // Evict before constructing a successor for the qualified NPU driver.
-            if(triangle_cache.size()==16)triangle_cache.erase(triangle_cache.begin());
+            if(triangle_cache.size()==64)triangle_cache.erase(triangle_cache.begin());
             auto candidate=std::make_unique<raster::TriangleTextureDrawExecutor>(request.vertex,request.pixel,h.vertices,h.width,h.height,h.format,
                 resources,samplers,"NPU",blend_mode(h),uint8_t((h.flags>>8)&15),static_cast<raster::CullMode>((h.flags>>5)&3),(h.flags&128)!=0,batch);
             auto result=candidate->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,resources,request.background,request.scissor);

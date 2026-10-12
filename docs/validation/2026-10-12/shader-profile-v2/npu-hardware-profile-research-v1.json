@@ -1,0 +1,15 @@
+{
+  "retrieved_at": "2026-10-12",
+  "sources": [
+    {
+      "url": "https://github.com/openvinotoolkit/npu_compiler/blob/develop/guides/how_to_use_profiling.md",
+      "relevance": "Official compiler guide describes PERF_COUNT model instrumentation, DPU and SHAVE profiling, and per-engine reports. It notes architecture-specific timestamp limitations. This is a possible follow-up experiment, not evidence identifying the engine used by these shaders."
+    },
+    {
+      "url": "https://docs.openvino.ai/2026/openvino-workflow/running-inference/optimize-inference/precision-control.html",
+      "relevance": "Official precision guide distinguishes stored model precision from inference precision and describes execution accuracy mode. It does not establish which hardware engine executed this renderer."
+    }
+  ],
+  "hardware_profiling_run": false,
+  "production_properties_changed": false
+}

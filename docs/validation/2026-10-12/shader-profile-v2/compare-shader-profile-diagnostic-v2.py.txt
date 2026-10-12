@@ -1,0 +1,8 @@
+from pathlib import Path
+import hashlib,json,sys
+r=Path(sys.argv[1]);checks=[]
+expected={'1041':{'CPU':'b317c756f2df5a811f41469ade35c7680b194343a8af678491adceb35a4d6596','NPU':'0d09161f1c325ab05d678a601564ab6255432b44f8a5604ff17ac303a6b67080'},'1061':{'CPU':'324ef9862ccdf49df74174e8ced901b9983afdc7e987e8baad52d09a1e8bb2b8','NPU':'680e2630e9fa89f74788318a1fe7320017ba7410f78643d22e776d01f8091295'}}
+for p in sorted(r.glob('*.pixels')):
+ capture,backend,*_=p.stem.split('-');b=p.read_bytes();h=hashlib.sha256(b).hexdigest();checks.append({'name':p.name,'bytes':len(b),'sha256':h,'expected_sha256':expected[capture][backend],'exact_historical_pixels':h==expected[capture][backend]})
+report={'checks':checks,'all_exact':len(checks)==8 and all(x['exact_historical_pixels'] for x in checks)}
+(r/'pixel-comparison.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report));assert report['all_exact']

@@ -1,0 +1,898 @@
+{
+  "1041-CPU-8192-1": {
+    "setup": {
+      "kind": "provider_setup_profile",
+      "core_constructions": 6,
+      "core_construct_ms": 2.801,
+      "model_compile_ms": 1437.033,
+      "cache_config_ms": 0.0
+    },
+    "compile_cache": {
+      "kind": "model_compile_cache",
+      "compile_calls": 6,
+      "cache_requests": 0,
+      "cache_hits": 0,
+      "cache_status_unavailable": 0
+    },
+    "warm_draws": [
+      {
+        "kind": "draw_stage_timing",
+        "iteration": 1,
+        "batch": 8192,
+        "compile_ms": 1468.85,
+        "shader_ms": 6085.602,
+        "projection_ms": 0.742,
+        "coverage_ms": 1745.727,
+        "merger_ms": 505.447,
+        "draw_ms": 8611.267,
+        "rectangle_path": false,
+        "execution_device": "CPU"
+      },
+      {
+        "kind": "draw_stage_timing",
+        "iteration": 2,
+        "batch": 8192,
+        "compile_ms": 1468.85,
+        "shader_ms": 6071.7,
+        "projection_ms": 0.599,
+        "coverage_ms": 1737.658,
+        "merger_ms": 503.535,
+        "draw_ms": 8584.012,
+        "rectangle_path": false,
+        "execution_device": "CPU"
+      }
+    ],
+    "warm_shader_stages": [
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 1,
+        "stage": 0,
+        "calls": 1,
+        "input_bytes": 16176,
+        "output_bytes": 14112,
+        "binding_ms": 0.066,
+        "infer_ms": 0.591,
+        "output_ms": 0.047
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 1,
+        "stage": 1,
+        "calls": 109,
+        "input_bytes": 1628711572,
+        "output_bytes": 14287284,
+        "binding_ms": 405.747,
+        "infer_ms": 4279.596,
+        "output_ms": 174.173
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 1,
+        "stage": 2,
+        "calls": 109,
+        "input_bytes": 342884352,
+        "output_bytes": 57147392,
+        "binding_ms": 741.077,
+        "infer_ms": 349.931,
+        "output_ms": 97.823
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 2,
+        "stage": 0,
+        "calls": 1,
+        "input_bytes": 16176,
+        "output_bytes": 14112,
+        "binding_ms": 0.088,
+        "infer_ms": 0.715,
+        "output_ms": 0.043
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 2,
+        "stage": 1,
+        "calls": 109,
+        "input_bytes": 1628711572,
+        "output_bytes": 14287284,
+        "binding_ms": 402.262,
+        "infer_ms": 4269.211,
+        "output_ms": 172.011
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 2,
+        "stage": 2,
+        "calls": 109,
+        "input_bytes": 342884352,
+        "output_bytes": 57147392,
+        "binding_ms": 740.556,
+        "infer_ms": 352.378,
+        "output_ms": 97.904
+      }
+    ]
+  },
+  "1041-NPU-4096-1": {
+    "setup": {
+      "kind": "provider_setup_profile",
+      "core_constructions": 6,
+      "core_construct_ms": 2.306,
+      "model_compile_ms": 199.153,
+      "cache_config_ms": 93.703
+    },
+    "compile_cache": {
+      "kind": "model_compile_cache",
+      "compile_calls": 6,
+      "cache_requests": 6,
+      "cache_hits": 6,
+      "cache_status_unavailable": 0
+    },
+    "warm_draws": [
+      {
+        "kind": "draw_stage_timing",
+        "iteration": 1,
+        "batch": 4096,
+        "compile_ms": 509.143,
+        "shader_ms": 6840.802,
+        "projection_ms": 1.673,
+        "coverage_ms": 921.126,
+        "merger_ms": 739.452,
+        "draw_ms": 8797.902,
+        "rectangle_path": false,
+        "execution_device": "NPU"
+      },
+      {
+        "kind": "draw_stage_timing",
+        "iteration": 2,
+        "batch": 4096,
+        "compile_ms": 509.143,
+        "shader_ms": 6683.046,
+        "projection_ms": 1.049,
+        "coverage_ms": 930.145,
+        "merger_ms": 711.61,
+        "draw_ms": 8621.162,
+        "rectangle_path": false,
+        "execution_device": "NPU"
+      }
+    ],
+    "warm_shader_stages": [
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 1,
+        "stage": 0,
+        "calls": 1,
+        "input_bytes": 16176,
+        "output_bytes": 14112,
+        "binding_ms": 0.085,
+        "infer_ms": 2.112,
+        "output_ms": 0.082
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 1,
+        "stage": 1,
+        "calls": 214,
+        "input_bytes": 3141555096,
+        "output_bytes": 14025560,
+        "binding_ms": 381.715,
+        "infer_ms": 4911.62,
+        "output_ms": 127.891
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 1,
+        "stage": 2,
+        "calls": 214,
+        "input_bytes": 336592896,
+        "output_bytes": 56098816,
+        "binding_ms": 712.427,
+        "infer_ms": 607.583,
+        "output_ms": 94.95
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 2,
+        "stage": 0,
+        "calls": 1,
+        "input_bytes": 16176,
+        "output_bytes": 14112,
+        "binding_ms": 0.071,
+        "infer_ms": 1.493,
+        "output_ms": 0.044
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 2,
+        "stage": 1,
+        "calls": 214,
+        "input_bytes": 3141555096,
+        "output_bytes": 14025560,
+        "binding_ms": 381.332,
+        "infer_ms": 4765.743,
+        "output_ms": 121.892
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 2,
+        "stage": 2,
+        "calls": 214,
+        "input_bytes": 336592896,
+        "output_bytes": 56098816,
+        "binding_ms": 709.262,
+        "infer_ms": 607.926,
+        "output_ms": 92.983
+      }
+    ]
+  },
+  "1041-NPU-8192-2": {
+    "setup": {
+      "kind": "provider_setup_profile",
+      "core_constructions": 6,
+      "core_construct_ms": 2.24,
+      "model_compile_ms": 187.839,
+      "cache_config_ms": 93.423
+    },
+    "compile_cache": {
+      "kind": "model_compile_cache",
+      "compile_calls": 6,
+      "cache_requests": 6,
+      "cache_hits": 6,
+      "cache_status_unavailable": 0
+    },
+    "warm_draws": [
+      {
+        "kind": "draw_stage_timing",
+        "iteration": 1,
+        "batch": 8192,
+        "compile_ms": 496.345,
+        "shader_ms": 6054.686,
+        "projection_ms": 1.907,
+        "coverage_ms": 528.349,
+        "merger_ms": 542.838,
+        "draw_ms": 7413.132,
+        "rectangle_path": false,
+        "execution_device": "NPU"
+      },
+      {
+        "kind": "draw_stage_timing",
+        "iteration": 2,
+        "batch": 8192,
+        "compile_ms": 496.345,
+        "shader_ms": 5838.85,
+        "projection_ms": 0.987,
+        "coverage_ms": 507.164,
+        "merger_ms": 508.159,
+        "draw_ms": 7135.842,
+        "rectangle_path": false,
+        "execution_device": "NPU"
+      }
+    ],
+    "warm_shader_stages": [
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 1,
+        "stage": 0,
+        "calls": 1,
+        "input_bytes": 16176,
+        "output_bytes": 14112,
+        "binding_ms": 0.059,
+        "infer_ms": 1.988,
+        "output_ms": 0.099
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 1,
+        "stage": 1,
+        "calls": 109,
+        "input_bytes": 1628711572,
+        "output_bytes": 14287284,
+        "binding_ms": 200.925,
+        "infer_ms": 4411.536,
+        "output_ms": 114.844
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 1,
+        "stage": 2,
+        "calls": 109,
+        "input_bytes": 342884352,
+        "output_bytes": 57147392,
+        "binding_ms": 714.877,
+        "infer_ms": 505.846,
+        "output_ms": 77.56
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 2,
+        "stage": 0,
+        "calls": 1,
+        "input_bytes": 16176,
+        "output_bytes": 14112,
+        "binding_ms": 0.089,
+        "infer_ms": 1.678,
+        "output_ms": 0.04
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 2,
+        "stage": 1,
+        "calls": 109,
+        "input_bytes": 1628711572,
+        "output_bytes": 14287284,
+        "binding_ms": 195.026,
+        "infer_ms": 4216.989,
+        "output_ms": 112.418
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 2,
+        "stage": 2,
+        "calls": 109,
+        "input_bytes": 342884352,
+        "output_bytes": 57147392,
+        "binding_ms": 713.255,
+        "infer_ms": 495.965,
+        "output_ms": 75.436
+      }
+    ]
+  },
+  "1041-NPU-4096-3": {
+    "setup": {
+      "kind": "provider_setup_profile",
+      "core_constructions": 6,
+      "core_construct_ms": 2.255,
+      "model_compile_ms": 171.25,
+      "cache_config_ms": 93.716
+    },
+    "compile_cache": {
+      "kind": "model_compile_cache",
+      "compile_calls": 6,
+      "cache_requests": 6,
+      "cache_hits": 6,
+      "cache_status_unavailable": 0
+    },
+    "warm_draws": [
+      {
+        "kind": "draw_stage_timing",
+        "iteration": 1,
+        "batch": 4096,
+        "compile_ms": 481.77,
+        "shader_ms": 6769.353,
+        "projection_ms": 1.673,
+        "coverage_ms": 921.81,
+        "merger_ms": 732.058,
+        "draw_ms": 8727.44,
+        "rectangle_path": false,
+        "execution_device": "NPU"
+      },
+      {
+        "kind": "draw_stage_timing",
+        "iteration": 2,
+        "batch": 4096,
+        "compile_ms": 481.77,
+        "shader_ms": 6755.139,
+        "projection_ms": 1.208,
+        "coverage_ms": 917.951,
+        "merger_ms": 707.832,
+        "draw_ms": 8668.464,
+        "rectangle_path": false,
+        "execution_device": "NPU"
+      }
+    ],
+    "warm_shader_stages": [
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 1,
+        "stage": 0,
+        "calls": 1,
+        "input_bytes": 16176,
+        "output_bytes": 14112,
+        "binding_ms": 0.072,
+        "infer_ms": 1.964,
+        "output_ms": 0.081
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 1,
+        "stage": 1,
+        "calls": 214,
+        "input_bytes": 3141555096,
+        "output_bytes": 14025560,
+        "binding_ms": 381.042,
+        "infer_ms": 4817.921,
+        "output_ms": 133.913
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 1,
+        "stage": 2,
+        "calls": 214,
+        "input_bytes": 336592896,
+        "output_bytes": 56098816,
+        "binding_ms": 724.893,
+        "infer_ms": 608.083,
+        "output_ms": 98.445
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 2,
+        "stage": 0,
+        "calls": 1,
+        "input_bytes": 16176,
+        "output_bytes": 14112,
+        "binding_ms": 0.087,
+        "infer_ms": 1.734,
+        "output_ms": 0.048
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 2,
+        "stage": 1,
+        "calls": 214,
+        "input_bytes": 3141555096,
+        "output_bytes": 14025560,
+        "binding_ms": 381.887,
+        "infer_ms": 4852.521,
+        "output_ms": 133.89
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 2,
+        "stage": 2,
+        "calls": 214,
+        "input_bytes": 336592896,
+        "output_bytes": 56098816,
+        "binding_ms": 693.74,
+        "infer_ms": 599.478,
+        "output_ms": 88.833
+      }
+    ]
+  },
+  "1061-CPU-8192-1": {
+    "setup": {
+      "kind": "provider_setup_profile",
+      "core_constructions": 6,
+      "core_construct_ms": 2.558,
+      "model_compile_ms": 1398.307,
+      "cache_config_ms": 0.0
+    },
+    "compile_cache": {
+      "kind": "model_compile_cache",
+      "compile_calls": 6,
+      "cache_requests": 0,
+      "cache_hits": 0,
+      "cache_status_unavailable": 0
+    },
+    "warm_draws": [
+      {
+        "kind": "draw_stage_timing",
+        "iteration": 1,
+        "batch": 8192,
+        "compile_ms": 1427.244,
+        "shader_ms": 6043.481,
+        "projection_ms": 0.558,
+        "coverage_ms": 1717.819,
+        "merger_ms": 493.239,
+        "draw_ms": 8536.332,
+        "rectangle_path": false,
+        "execution_device": "CPU"
+      },
+      {
+        "kind": "draw_stage_timing",
+        "iteration": 2,
+        "batch": 8192,
+        "compile_ms": 1427.244,
+        "shader_ms": 6041.22,
+        "projection_ms": 0.606,
+        "coverage_ms": 1728.236,
+        "merger_ms": 491.599,
+        "draw_ms": 8539.696,
+        "rectangle_path": false,
+        "execution_device": "CPU"
+      }
+    ],
+    "warm_shader_stages": [
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 1,
+        "stage": 0,
+        "calls": 1,
+        "input_bytes": 16176,
+        "output_bytes": 14112,
+        "binding_ms": 0.051,
+        "infer_ms": 0.568,
+        "output_ms": 0.043
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 1,
+        "stage": 1,
+        "calls": 109,
+        "input_bytes": 1628715060,
+        "output_bytes": 14287284,
+        "binding_ms": 406.571,
+        "infer_ms": 4259.028,
+        "output_ms": 169.421
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 1,
+        "stage": 2,
+        "calls": 109,
+        "input_bytes": 342884352,
+        "output_bytes": 57147392,
+        "binding_ms": 725.897,
+        "infer_ms": 354.462,
+        "output_ms": 95.132
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 2,
+        "stage": 0,
+        "calls": 1,
+        "input_bytes": 16176,
+        "output_bytes": 14112,
+        "binding_ms": 0.068,
+        "infer_ms": 0.634,
+        "output_ms": 0.049
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 2,
+        "stage": 1,
+        "calls": 109,
+        "input_bytes": 1628715060,
+        "output_bytes": 14287284,
+        "binding_ms": 389.325,
+        "infer_ms": 4259.704,
+        "output_ms": 170.459
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 2,
+        "stage": 2,
+        "calls": 109,
+        "input_bytes": 342884352,
+        "output_bytes": 57147392,
+        "binding_ms": 730.869,
+        "infer_ms": 357.137,
+        "output_ms": 97.173
+      }
+    ]
+  },
+  "1061-NPU-4096-1": {
+    "setup": {
+      "kind": "provider_setup_profile",
+      "core_constructions": 6,
+      "core_construct_ms": 2.333,
+      "model_compile_ms": 202.724,
+      "cache_config_ms": 95.193
+    },
+    "compile_cache": {
+      "kind": "model_compile_cache",
+      "compile_calls": 6,
+      "cache_requests": 6,
+      "cache_hits": 6,
+      "cache_status_unavailable": 0
+    },
+    "warm_draws": [
+      {
+        "kind": "draw_stage_timing",
+        "iteration": 1,
+        "batch": 4096,
+        "compile_ms": 518.12,
+        "shader_ms": 6821.231,
+        "projection_ms": 1.484,
+        "coverage_ms": 917.812,
+        "merger_ms": 751.128,
+        "draw_ms": 8765.3,
+        "rectangle_path": false,
+        "execution_device": "NPU"
+      },
+      {
+        "kind": "draw_stage_timing",
+        "iteration": 2,
+        "batch": 4096,
+        "compile_ms": 518.12,
+        "shader_ms": 6817.638,
+        "projection_ms": 1.223,
+        "coverage_ms": 912.474,
+        "merger_ms": 737.264,
+        "draw_ms": 8745.69,
+        "rectangle_path": false,
+        "execution_device": "NPU"
+      }
+    ],
+    "warm_shader_stages": [
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 1,
+        "stage": 0,
+        "calls": 1,
+        "input_bytes": 16176,
+        "output_bytes": 14112,
+        "binding_ms": 0.087,
+        "infer_ms": 2.137,
+        "output_ms": 0.062
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 1,
+        "stage": 1,
+        "calls": 214,
+        "input_bytes": 3141561944,
+        "output_bytes": 14025560,
+        "binding_ms": 382.633,
+        "infer_ms": 4926.174,
+        "output_ms": 138.479
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 1,
+        "stage": 2,
+        "calls": 214,
+        "input_bytes": 336592896,
+        "output_bytes": 56098816,
+        "binding_ms": 676.909,
+        "infer_ms": 607.19,
+        "output_ms": 84.389
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 2,
+        "stage": 0,
+        "calls": 1,
+        "input_bytes": 16176,
+        "output_bytes": 14112,
+        "binding_ms": 0.063,
+        "infer_ms": 1.731,
+        "output_ms": 0.048
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 2,
+        "stage": 1,
+        "calls": 214,
+        "input_bytes": 3141561944,
+        "output_bytes": 14025560,
+        "binding_ms": 384.292,
+        "infer_ms": 4913.267,
+        "output_ms": 139.223
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 2,
+        "stage": 2,
+        "calls": 214,
+        "input_bytes": 336592896,
+        "output_bytes": 56098816,
+        "binding_ms": 674.896,
+        "infer_ms": 615.998,
+        "output_ms": 84.923
+      }
+    ]
+  },
+  "1061-NPU-8192-2": {
+    "setup": {
+      "kind": "provider_setup_profile",
+      "core_constructions": 6,
+      "core_construct_ms": 2.247,
+      "model_compile_ms": 185.524,
+      "cache_config_ms": 94.071
+    },
+    "compile_cache": {
+      "kind": "model_compile_cache",
+      "compile_calls": 6,
+      "cache_requests": 6,
+      "cache_hits": 6,
+      "cache_status_unavailable": 0
+    },
+    "warm_draws": [
+      {
+        "kind": "draw_stage_timing",
+        "iteration": 1,
+        "batch": 8192,
+        "compile_ms": 498.55,
+        "shader_ms": 5549.105,
+        "projection_ms": 1.846,
+        "coverage_ms": 504.904,
+        "merger_ms": 469.517,
+        "draw_ms": 6802.278,
+        "rectangle_path": false,
+        "execution_device": "NPU"
+      },
+      {
+        "kind": "draw_stage_timing",
+        "iteration": 2,
+        "batch": 8192,
+        "compile_ms": 498.55,
+        "shader_ms": 5876.595,
+        "projection_ms": 1.251,
+        "coverage_ms": 499.331,
+        "merger_ms": 485.457,
+        "draw_ms": 7143.389,
+        "rectangle_path": false,
+        "execution_device": "NPU"
+      }
+    ],
+    "warm_shader_stages": [
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 1,
+        "stage": 0,
+        "calls": 1,
+        "input_bytes": 16176,
+        "output_bytes": 14112,
+        "binding_ms": 0.068,
+        "infer_ms": 1.766,
+        "output_ms": 0.058
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 1,
+        "stage": 1,
+        "calls": 109,
+        "input_bytes": 1628715060,
+        "output_bytes": 14287284,
+        "binding_ms": 187.057,
+        "infer_ms": 3985.586,
+        "output_ms": 107.175
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 1,
+        "stage": 2,
+        "calls": 109,
+        "input_bytes": 342884352,
+        "output_bytes": 57147392,
+        "binding_ms": 673.51,
+        "infer_ms": 497.828,
+        "output_ms": 71.924
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 2,
+        "stage": 0,
+        "calls": 1,
+        "input_bytes": 16176,
+        "output_bytes": 14112,
+        "binding_ms": 0.061,
+        "infer_ms": 1.713,
+        "output_ms": 0.059
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 2,
+        "stage": 1,
+        "calls": 109,
+        "input_bytes": 1628715060,
+        "output_bytes": 14287284,
+        "binding_ms": 190.865,
+        "infer_ms": 4264.439,
+        "output_ms": 108.766
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 2,
+        "stage": 2,
+        "calls": 109,
+        "input_bytes": 342884352,
+        "output_bytes": 57147392,
+        "binding_ms": 712.33,
+        "infer_ms": 495.345,
+        "output_ms": 75.866
+      }
+    ]
+  },
+  "1061-NPU-4096-3": {
+    "setup": {
+      "kind": "provider_setup_profile",
+      "core_constructions": 6,
+      "core_construct_ms": 2.255,
+      "model_compile_ms": 171.109,
+      "cache_config_ms": 93.711
+    },
+    "compile_cache": {
+      "kind": "model_compile_cache",
+      "compile_calls": 6,
+      "cache_requests": 6,
+      "cache_hits": 6,
+      "cache_status_unavailable": 0
+    },
+    "warm_draws": [
+      {
+        "kind": "draw_stage_timing",
+        "iteration": 1,
+        "batch": 4096,
+        "compile_ms": 484.726,
+        "shader_ms": 6929.312,
+        "projection_ms": 1.011,
+        "coverage_ms": 908.756,
+        "merger_ms": 725.696,
+        "draw_ms": 8890.826,
+        "rectangle_path": false,
+        "execution_device": "NPU"
+      },
+      {
+        "kind": "draw_stage_timing",
+        "iteration": 2,
+        "batch": 4096,
+        "compile_ms": 484.726,
+        "shader_ms": 6623.208,
+        "projection_ms": 1.197,
+        "coverage_ms": 896.08,
+        "merger_ms": 692.861,
+        "draw_ms": 8503.627,
+        "rectangle_path": false,
+        "execution_device": "NPU"
+      }
+    ],
+    "warm_shader_stages": [
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 1,
+        "stage": 0,
+        "calls": 1,
+        "input_bytes": 16176,
+        "output_bytes": 14112,
+        "binding_ms": 0.059,
+        "infer_ms": 1.568,
+        "output_ms": 0.063
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 1,
+        "stage": 1,
+        "calls": 214,
+        "input_bytes": 3141561944,
+        "output_bytes": 14025560,
+        "binding_ms": 385.169,
+        "infer_ms": 4971.178,
+        "output_ms": 132.891
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 1,
+        "stage": 2,
+        "calls": 214,
+        "input_bytes": 336592896,
+        "output_bytes": 56098816,
+        "binding_ms": 733.268,
+        "infer_ms": 602.208,
+        "output_ms": 100.022
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 2,
+        "stage": 0,
+        "calls": 1,
+        "input_bytes": 16176,
+        "output_bytes": 14112,
+        "binding_ms": 0.061,
+        "infer_ms": 1.663,
+        "output_ms": 0.06
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 2,
+        "stage": 1,
+        "calls": 214,
+        "input_bytes": 3141561944,
+        "output_bytes": 14025560,
+        "binding_ms": 381.015,
+        "infer_ms": 4744.13,
+        "output_ms": 124.963
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 2,
+        "stage": 2,
+        "calls": 214,
+        "input_bytes": 336592896,
+        "output_bytes": 56098816,
+        "binding_ms": 684.28,
+        "infer_ms": 596.001,
+        "output_ms": 88.204
+      }
+    ]
+  }
+}
