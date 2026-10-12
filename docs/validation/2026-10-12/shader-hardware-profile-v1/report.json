@@ -1,0 +1,21 @@
+{
+  "diagnostic": "shader-hardware-profile-v1",
+  "baseline_source_commit": "d91aac36d37f1f5b6145f169f06d7c931c358246",
+  "native_npu_execution": true,
+  "historical_images_exact": 2,
+  "first_pixel_inference_profiled": true,
+  "profiling_enabled_for_pixel_models_only": true,
+  "shipping_source_changed": false,
+  "all_checks_passed": true,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "findings": [
+    "Profiling is enabled only for NPU pixel models in an isolated diagnostic source copy. The first pixel inference in each captured full draw calls get_profiling_info and emits the compiler task trace. Both complete pixel files retain exact historical NPU hashes.",
+    "The 1041 pixel graph reports 2011 Shave operations, 199 DMA operations and one DPU operation. The 1061 graph reports 2031 Shave, 199 DMA and one DPU operation. These are actual runtime profiles, rather than an inference from input precision or theoretical TOPS.",
+    "Compiler task traces contain 11907 and 12039 Shave task events respectively, plus 12 DPU task events each. Per-cluster tiling produces multiple task events for a single operation. Task spans are about 73.385 and 74.348 milliseconds for the first profiled pixel inference.",
+    "Task durations overlap across engines and clusters, and logical layer spans include scheduling and overlap. Their sums are not wall-clock inference time, percentages of a critical path, or per-frame costs.",
+    "With profiling enabled, warm full-draw pixel-stage infer totals are 4838.496 and 4614.540 ms across 109 calls. These instrumented timings must not be compared directly with unprofiled runs as a regression or improvement.",
+    "The profile supports investigating graph size, programmable-engine arithmetic and data movement. It does not establish that FP32 alone causes the slow path, that a particular fusion preserves correctness, or that an alternative compiler would be faster.",
+    "The completed desktop trial and all CPU builds are outside this serial profiling interval. The diagnostic changes do not alter the installed driver or physical display configuration."
+  ]
+}

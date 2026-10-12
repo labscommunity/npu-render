@@ -1,0 +1,190 @@
+{
+  "1041-NPU-8192-1": {
+    "operation_counts_by_engine": {
+      "Shave": 2011,
+      "DMA": 199,
+      "DPU": 1
+    },
+    "operation_counts_by_type": {
+      "BitwiseAnd": 47,
+      "Concat": 181,
+      "Gather": 245,
+      "NotEqual": 29,
+      "Select": 5,
+      "Divide": 34,
+      "Multiply": 393,
+      "Add": 309,
+      "Less": 88,
+      "LogicalNot": 190,
+      "Convert": 314,
+      "IsNaN": 98,
+      "IsInf": 12,
+      "BitwiseOr": 47,
+      "Subtract": 84,
+      "Abs": 36,
+      "BitwiseXor": 28,
+      "Greater": 24,
+      "Equal": 8,
+      "GreaterEqual": 20,
+      "ReduceMax": 1,
+      "Minimum": 16,
+      "Broadcast": 2
+    },
+    "hardware_task_counts": {
+      "DMA": 3851,
+      "DPU": 12,
+      "Shave": 11907
+    },
+    "summed_task_durations_us": {
+      "DMA": 56239.929,
+      "Shave": 115173.471,
+      "DPU": 21.401
+    },
+    "task_span_us": 73384.999,
+    "task_duration_sums_are_not_wall_time": true,
+    "warm_draws": [
+      {
+        "kind": "draw_stage_timing",
+        "iteration": 1,
+        "batch": 8192,
+        "compile_ms": 26610.744,
+        "shader_ms": 6471.576,
+        "projection_ms": 0.964,
+        "coverage_ms": 538.683,
+        "merger_ms": 585.773,
+        "draw_ms": 7883.958,
+        "rectangle_path": false,
+        "execution_device": "NPU"
+      }
+    ],
+    "warm_shader_stages": [
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 1,
+        "stage": 0,
+        "calls": 1,
+        "input_bytes": 16176,
+        "output_bytes": 14112,
+        "binding_ms": 0.059,
+        "infer_ms": 1.407,
+        "output_ms": 0.063
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 1,
+        "stage": 1,
+        "calls": 109,
+        "input_bytes": 1628711572,
+        "output_bytes": 14287284,
+        "binding_ms": 190.449,
+        "infer_ms": 4838.496,
+        "output_ms": 120.709
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 1,
+        "stage": 2,
+        "calls": 109,
+        "input_bytes": 342884352,
+        "output_bytes": 57147392,
+        "binding_ms": 720.276,
+        "infer_ms": 492.625,
+        "output_ms": 80.755
+      }
+    ]
+  },
+  "1061-NPU-8192-1": {
+    "operation_counts_by_engine": {
+      "Shave": 2031,
+      "DMA": 199,
+      "DPU": 1
+    },
+    "operation_counts_by_type": {
+      "BitwiseAnd": 49,
+      "Concat": 182,
+      "Gather": 246,
+      "NotEqual": 31,
+      "Multiply": 397,
+      "Select": 7,
+      "Divide": 34,
+      "Add": 313,
+      "Less": 88,
+      "LogicalNot": 190,
+      "Convert": 314,
+      "IsNaN": 98,
+      "Subtract": 88,
+      "Abs": 36,
+      "BitwiseXor": 28,
+      "Greater": 24,
+      "Equal": 8,
+      "BitwiseOr": 47,
+      "IsInf": 12,
+      "GreaterEqual": 20,
+      "Minimum": 16,
+      "Broadcast": 2,
+      "ReduceMax": 1
+    },
+    "hardware_task_counts": {
+      "DMA": 4056,
+      "DPU": 12,
+      "Shave": 12039
+    },
+    "summed_task_durations_us": {
+      "DMA": 57757.331,
+      "Shave": 115994.069,
+      "DPU": 21.246
+    },
+    "task_span_us": 74348.124,
+    "task_duration_sums_are_not_wall_time": true,
+    "warm_draws": [
+      {
+        "kind": "draw_stage_timing",
+        "iteration": 1,
+        "batch": 8192,
+        "compile_ms": 28971.714,
+        "shader_ms": 6245.2,
+        "projection_ms": 1.204,
+        "coverage_ms": 543.381,
+        "merger_ms": 548.093,
+        "draw_ms": 7626.77,
+        "rectangle_path": false,
+        "execution_device": "NPU"
+      }
+    ],
+    "warm_shader_stages": [
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 1,
+        "stage": 0,
+        "calls": 1,
+        "input_bytes": 16176,
+        "output_bytes": 14112,
+        "binding_ms": 0.063,
+        "infer_ms": 1.728,
+        "output_ms": 0.094
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 1,
+        "stage": 1,
+        "calls": 109,
+        "input_bytes": 1628715060,
+        "output_bytes": 14287284,
+        "binding_ms": 190.823,
+        "infer_ms": 4614.54,
+        "output_ms": 111.83
+      },
+      {
+        "kind": "shader_provider_profile",
+        "iteration": 1,
+        "stage": 2,
+        "calls": 109,
+        "input_bytes": 342884352,
+        "output_bytes": 57147392,
+        "binding_ms": 716.353,
+        "infer_ms": 499.045,
+        "output_ms": 82.853
+      }
+    ]
+  }
+}

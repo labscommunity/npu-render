@@ -1,0 +1,46 @@
+{
+  "method": "Attach each compile event to the immediately preceding successful result, verifying PID and sequence. Keys are reused and do not identify unique events.",
+  "duplicate_pid_sequence_keys": 6,
+  "categories": {
+    "uniform": {
+      "requests": 120,
+      "requests_compiling_models": 44,
+      "compile_calls": 257,
+      "persistent_cache_hits": 255,
+      "draw_ms": 11383.782,
+      "compile_and_draw_ms": 32079,
+      "outside_draw_with_compile_ms": 20712.35,
+      "outside_draw_without_compile_ms": -17.132
+    },
+    "triangle": {
+      "requests": 334,
+      "requests_compiling_models": 228,
+      "compile_calls": 1368,
+      "persistent_cache_hits": 1353,
+      "draw_ms": 100008.152,
+      "compile_and_draw_ms": 333565,
+      "outside_draw_with_compile_ms": 233468.377,
+      "outside_draw_without_compile_ms": 88.471
+    },
+    "point_or_linear": {
+      "requests": 39,
+      "requests_compiling_models": 30,
+      "compile_calls": 93,
+      "persistent_cache_hits": 92,
+      "draw_ms": 4431.727,
+      "compile_and_draw_ms": 10749,
+      "outside_draw_with_compile_ms": 6343.611,
+      "outside_draw_without_compile_ms": -26.338
+    },
+    "clear": {
+      "requests": 68,
+      "requests_compiling_models": 12,
+      "compile_calls": 12,
+      "persistent_cache_hits": 9,
+      "draw_ms": 94.585,
+      "compile_and_draw_ms": 1486,
+      "outside_draw_with_compile_ms": 1366.713,
+      "outside_draw_without_compile_ms": 24.702
+    }
+  }
+}

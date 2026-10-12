@@ -1,0 +1,53 @@
+{
+  "trial": "v111",
+  "source_commit": "b0784b7071360f2765ac61c7e93f4cbb3ecab389",
+  "host_worker_build": "present-umd-v217",
+  "guest_umd_build": "present-umd-v217-legacy",
+  "package_version": "0.0.99.0",
+  "successful_worker_requests": 966,
+  "live_worker_requests": 949,
+  "acknowledged_successes": 966,
+  "failed_relay_responses": 0,
+  "worker_successes_by_client": {
+    "42": 17,
+    "5336": 70,
+    "1076": 821,
+    "6016": 58
+  },
+  "received_frames": 15,
+  "sole_indirect_received_frames": 15,
+  "interaction_latencies": {
+    "start_seconds": 127.862194,
+    "escape_seconds": 95.270328,
+    "last_sole_frame_after_run_seconds": 148.276298
+  },
+  "sampled_process_memory": {
+    "private_bytes": 820146176,
+    "working_bytes": 2325028864,
+    "peak_working_bytes": 2325028864,
+    "samples": 999,
+    "device_driver_memory_included": false
+  },
+  "visually_verified_start_visible": true,
+  "visually_verified_escape_response": true,
+  "visually_verified_run_dialog": false,
+  "notepad_reached": false,
+  "full_desktop_offload": false,
+  "usable_interactive_desktop": false,
+  "tahoma_performance_tested": false,
+  "cleanup_passed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "concurrent_cpu_build": false,
+  "findings": [
+    "Fifteen desktop frames arrive while the indirect display is the sole guest path. Start appears after 127.862194 seconds and closes 95.270328 seconds after Escape. Run gains a taskbar icon, but no dialog is visible before cleanup. No Notepad action is sent.",
+    "The observed Start response is quicker than v110 but remains unusably slow. These installed runs do not hold guest state or request mix constant, so they are not a controlled cache-capacity performance comparison.",
+    "The bounded observer stops on a complete DWM failure capture. The captured six-vertex 512x512 draw samples a 192x192 BGRA texture with linear border addressing. The unchanged v217 CPU replay rejects it during executor construction; current driver and replay validation admit only clamp and mirror addressing.",
+    "Thirty DWM draw rejection rows have status 80070057. Explorer also records an incomplete capture and a draw_indexed_instanced rejection. Those are separate observations; the complete DWM capture does not explain every rejection.",
+    "The worker computes 966 successful requests including seventeen prewarm requests, and the relay acknowledges all 966. The cleanup closes the relay and the worker exits 1 with socket closed or timed out. Successful requests do not make the unsupported draws successful.",
+    "Both custom drivers are removed and the stream configuration is cleared. The ordinary restored desktop visibly shows the Run dialog. Its appearance after restoration is not NPU display evidence.",
+    "Worker process samples peak at 820146176 private bytes and 2325028864 working-set bytes. These process counters exclude device and driver allocations and do not prove the full memory cost of the NPU path.",
+    "Compile-event audit attaches metadata to the immediately preceding result. PID/sequence identifiers repeat. Earlier dictionary-based analysis overcounted v110 triangle model operations: corrected values are 179 requests, 1074 model calls, 1057 disk hits and 296903.503 ms outside draw timers. Earlier reports are retained; corrected audits are included here.",
+    "The v111 triangle category contains 390 requests; 106 perform 636 model operations with 627 disk hits and 76385.151 ms outside draw timers. Pipeline preparation and shader execution both remain targets. General application coverage, physical scanout offload and Tahoma gains remain unverified."
+  ]
+}

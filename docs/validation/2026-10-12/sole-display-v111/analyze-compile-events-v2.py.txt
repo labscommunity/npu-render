@@ -1,0 +1,15 @@
+from pathlib import Path
+import json,collections
+root=Path('results/render-driver')
+for trial in ['v109','v110','v111']:
+ rows=[json.loads(x) for x in (root/f'indexed-dwm-stream-{trial}/worker.stdout.jsonl').read_text().splitlines() if x.startswith('{')];success=[]
+ for row in rows:
+  if row.get('passed'):success.append({**row,'cache':None})
+  elif row.get('kind')=='model_compile_cache':
+   last=success[-1];assert (last['client_pid'],last['sequence'])==(row['client_pid'],row['sequence']) and last['cache'] is None;last['cache']=row
+ live=[x for x in success if x['client_pid']!=42];out={}
+ for name,pred in [('uniform',lambda x:x['operation']=='draw' and not x['textured']),('triangle',lambda x:x['triangle_batch']>0),('point_or_linear',lambda x:x['operation']=='draw' and x['textured'] and not x['triangle_batch']),('clear',lambda x:x['operation']=='color_clear')]:
+  a=[x for x in live if pred(x)];comp=[x for x in a if x['cache'] is not None];plain=[x for x in a if x['cache'] is None];m=[x['cache'] for x in comp];out[name]={'requests':len(a),'requests_compiling_models':len(comp),'compile_calls':sum(x['compile_calls'] for x in m),'persistent_cache_hits':sum(x['cache_hits'] for x in m),'draw_ms':round(sum(x['draw_ms'] for x in a),3),'compile_and_draw_ms':sum(x['compile_and_draw_ms'] for x in a),'outside_draw_with_compile_ms':round(sum(x['compile_and_draw_ms']-x['draw_ms'] for x in comp),3),'outside_draw_without_compile_ms':round(sum(x['compile_and_draw_ms']-x['draw_ms'] for x in plain),3)}
+ assert sum(x['requests'] for x in out.values())==len(live)
+ report={'method':'Attach each compile event to the immediately preceding successful result, verifying PID and sequence. Keys are reused and do not identify unique events.','duplicate_pid_sequence_keys':sum(v>1 for v in collections.Counter((x['client_pid'],x['sequence']) for x in live).values()),'categories':out}
+ (root/f'{trial}-compile-event-audit.json').write_text(json.dumps(report,indent=2)+'\n');print(trial,out['triangle'])

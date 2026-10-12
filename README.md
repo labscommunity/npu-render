@@ -113,7 +113,15 @@ now has an exact NPU specialization for opaque, one-to-one point-sampled quads.
 Its captured 1024×768 replay passes, as do changing-image and driver callback
 tests. This is a checked subset, not general desktop rendering.
 
-The [v110 installed trial](docs/validation/2026-10-12/sole-display-v110/report.json)
+The latest [v111 installed trial](docs/validation/2026-10-12/sole-display-v111/report.json)
+returns 966 acknowledged NPU results and fifteen sole-display frames. Start opens
+after 128 seconds and closes 95 seconds after Escape. Run gains a taskbar icon,
+but its dialog never appears through the experimental renderer. A complete DWM
+capture exposes missing border texture sampling; the unchanged CPU replay also
+rejects it before execution. The ordinary restored desktop shows the Run dialog.
+Both custom drivers are removed afterward. Full desktop offload remains unfinished.
+
+The preceding [v110 installed trial](docs/validation/2026-10-12/sole-display-v110/report.json)
 returns 474 successful NPU worker results, with 473 acknowledged by the guest.
 Nine frames arrive; eight arrive while the indirect display is the sole active
 guest path. Desktop and Start pixels are visible, but Start takes 249 seconds,
@@ -122,9 +130,11 @@ than the prior trial's 88 seconds; the two live runs do not isolate the cause.
 The automatic Start gate misses a 25-pixel displacement and adds 35 seconds
 before manually verified Escape. Full desktop offload remains unfinished.
 
-The trace identifies setup as the next performance target: 183 of 260 live
+The corrected trace analysis identifies setup as a performance target: 179 of 260 live
 triangle requests load or compile models, accounting for 297 seconds outside
-draw timers. Of 1,098 model operations, 1,081 report disk-cache hits. Retaining
+draw timers. Of 1,074 model operations, 1,057 report disk-cache hits. The
+[event-order audit](docs/validation/2026-10-12/sole-display-v111/v110-compile-event-audit.json)
+corrects earlier counts that joined reused request identifiers. Retaining
 ready executors and loading disk-cached models have different costs. Both
 custom drivers are removed afterward. Three untimestamped UMD rejection rows
 and one unacknowledged final worker result remain in the evidence; successful
@@ -134,15 +144,21 @@ worker computation alone is not proof of delivery. No Tahoma gain is established
 preserve all eight historical full-draw images and all 63 captured packet
 outputs. In two warm full-screen draws, pixel-shader inference takes roughly
 4.2 seconds and the whole draw about seven seconds. Setup and shader execution
-both need work. These host timers do not identify the NPU engine or individual
-hardware operations; separate hardware profiling is prepared for that question.
+both need work. A subsequent
+[hardware profile](docs/validation/2026-10-12/shader-hardware-profile-v1/report.json)
+preserves both historical images and reports roughly 2,000 Shave operations,
+199 DMA operations and one DPU operation per captured pixel graph. Task durations
+overlap and profiling adds overhead; these counts identify the execution path,
+without establishing a faster implementation or Tahoma benefit.
 
-The next [qualified cache candidate](docs/validation/2026-10-12/performance-qualified-v217/report.json)
+The [qualified v217 cache candidate](docs/validation/2026-10-12/performance-qualified-v217/report.json)
 retains 64 complete triangle pipelines, up from 16, while keeping independent
 model ownership and eviction before replacement. Both runtime builds pass all
 25 CPU suites, and all 19 native qualification stages pass. The captured replay
-preserves exact output, but does not establish the memory cost of filling the
-larger cache or improved desktop interaction; the next installed trial measures those.
+preserves exact output. The v111 installed trial above samples a peak process
+private allocation of 782 MiB and working set of 2,217 MiB; device and driver
+allocations are outside those counters. Start responds sooner than in v110,
+but the live trials do not isolate the cache change from guest-state differences.
 
 A [controlled pipeline cache experiment](docs/validation/2026-10-12/pipeline-cache-v3/report.json)
 retains sixteen independently owned triangle pipelines instead of four. Its
