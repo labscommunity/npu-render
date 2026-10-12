@@ -1,0 +1,37 @@
+-- Building for: Visual Studio 17 2022
+-- Selecting Windows SDK version 10.0.26100.0 to target Windows 10.0.26200.
+-- The CXX compiler identification is MSVC 19.44.35229.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/cl.exe - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Failed
+-- Looking for pthread_create in pthreads
+-- Looking for pthread_create in pthreads - not found
+-- Looking for pthread_create in pthread
+-- Looking for pthread_create in pthread - not found
+-- Found Threads: TRUE
+-- Configuring done (2.7s)
+-- Generating done (0.0s)
+-- Build files have been written to: C:/Users/tatef/AppData/Local/npu-render/builds/pipeline-cache-diagnostic-v2
+MSBuild version 17.14.60+43b635718 for .NET Framework
+
+MSBuild version 17.14.60+43b635718 for .NET Framework
+
+  1>Checking Build System
+  Building Custom Rule C:/Users/tatef/AppData/Local/npu-render/vm/pipeline-cache-diagnostic-v2/CMakeLists.txt
+  indexed_exchange_worker.cpp
+C:\Users\tatef\AppData\Local\npu-render\vm\pipeline-cache-diagnostic-v2\indexed_exchange_worker.cpp(46,14): error C2039: 'sort': is not a member of 'std' [C:\Users\tatef\AppData\Local\npu-render\builds\pipeline-cache-diagnostic-v2\pipeline_cache_16.vcxproj]
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\set(22,1):
+      see declaration of 'std'
+
+C:\Users\tatef\AppData\Local\npu-render\vm\pipeline-cache-diagnostic-v2\indexed_exchange_worker.cpp(46,14): error C3861: 'sort': identifier not found [C:\Users\tatef\AppData\Local\npu-render\builds\pipeline-cache-diagnostic-v2\pipeline_cache_16.vcxproj]
+  Building Custom Rule C:/Users/tatef/AppData/Local/npu-render/vm/pipeline-cache-diagnostic-v2/CMakeLists.txt
+  indexed_exchange_worker.cpp
+C:\Users\tatef\AppData\Local\npu-render\vm\pipeline-cache-diagnostic-v2\indexed_exchange_worker.cpp(46,14): error C2039: 'sort': is not a member of 'std' [C:\Users\tatef\AppData\Local\npu-render\builds\pipeline-cache-diagnostic-v2\pipeline_cache_4.vcxproj]
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\set(22,1):
+      see declaration of 'std'
+
+C:\Users\tatef\AppData\Local\npu-render\vm\pipeline-cache-diagnostic-v2\indexed_exchange_worker.cpp(46,14): error C3861: 'sort': identifier not found [C:\Users\tatef\AppData\Local\npu-render\builds\pipeline-cache-diagnostic-v2\pipeline_cache_4.vcxproj]

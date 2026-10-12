@@ -1,0 +1,52 @@
+{
+  "diagnostic": "pipeline-cache-v3",
+  "whole_triangle_pipeline_capacity": [
+    4,
+    16,
+    4
+  ],
+  "runs": [
+    {
+      "name": "baseline-worker",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 63085,
+      "passed": true,
+      "peak_private_bytes": 192765952,
+      "peak_working_bytes": 474587136
+    },
+    {
+      "name": "expanded-worker",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 34676,
+      "passed": true,
+      "peak_private_bytes": 267857920,
+      "peak_working_bytes": 687923200
+    },
+    {
+      "name": "baseline-repeat-worker",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 63382,
+      "passed": true,
+      "peak_private_bytes": 195911680,
+      "peak_working_bytes": 476012544
+    }
+  ],
+  "packets_per_run": 63,
+  "exact_receipt_and_pixel_comparisons": 126,
+  "elapsed_reduction_percent_vs_mean_baseline": 45.16197901428831,
+  "private_memory_increase_vs_first_baseline_mib": 71.61328125,
+  "working_memory_increase_vs_first_baseline_mib": 203.453125,
+  "all_checks_passed": true,
+  "production_source_changed": false,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "findings": [
+    "A deterministic sequence of seventeen prewarm packets and four captured slow desktop packets runs three times per worker. Baseline, expanded cache and baseline repeat run serially on the physical NPU with no installed desktop trial or CPU build overlap.",
+    "Retaining sixteen independently owned whole triangle executors reduces elapsed time from 63.085 and 63.382 seconds to 34.676 seconds. Every receipt and output pixel matches across variants; historical prewarm image hashes also match.",
+    "Eviction still happens before successor construction. This experiment does not share compiled models or infer requests. The earlier failed compiled-model sharing experiment is not enabled.",
+    "The controlled workload establishes a useful cache-capacity improvement. An installed desktop trial is still required to measure its effect on interaction."
+  ]
+}

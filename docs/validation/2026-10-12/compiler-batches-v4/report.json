@@ -1,0 +1,27 @@
+{
+  "diagnostic": "compiler-batches-v4",
+  "all_checks_passed": true,
+  "stages": 16,
+  "shader_word_counts": [
+    988,
+    1008,
+    1041,
+    1061
+  ],
+  "batches": [
+    8192,
+    16384
+  ],
+  "runtime": "2026.4.1-22982-e213a147257-releases/2026/4",
+  "maximum_error": 8.94069672e-07,
+  "verified_components": 9437184,
+  "shipping_batch_policy_changed": false,
+  "complete_draws_tested": false,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "findings": [
+    "All four captured compositor shaders pass CPU and native NPU evaluation at 8192 and 16384 lanes, with both texture filters and six constant scenarios checked against the scalar oracle.",
+    "Only the diagnostic copy clears bytecode after validating the current shipping limit, allowing the general executor limit for this experiment. Production caps remain unchanged.",
+    "Shader correctness alone does not establish complete-draw correctness, throughput, memory bounds or desktop interaction. Separate full capture replays are required before changing production policy."
+  ]
+}

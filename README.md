@@ -113,18 +113,35 @@ now has an exact NPU specialization for opaque, one-to-one point-sampled quads.
 Its captured 1024×768 replay passes, as do changing-image and driver callback
 tests. This is a checked subset, not general desktop rendering.
 
-The [latest installed trial](docs/validation/2026-10-11/sole-display-v107/report.json)
-repeats the qualified renderer with the cache populated by
-[v106](docs/validation/2026-10-11/sole-display-v106/report.json). It completes 387
-live desktop NPU draws, 82 live NPU clears and 17 prewarm draws. Nine frames
-arrive, six while the indirect display is the sole active path, but none of those
-six shows Start. Windows closes an unresponsive Explorer process during the
-trial. Both custom drivers unload successfully when the bounded observation ends.
-Of 1371 model compile calls, 1349 hit the cache; even the 452 requests without a
-miss take 192 seconds in aggregate, including 62 seconds of drawing. Warm disk
-caching alone does not establish usable interaction. Reuse of already-loaded
-models was tested separately. No CPU build overlaps this trial. Full desktop
-offload remains unverified.
+The [v109 installed trial](docs/validation/2026-10-12/sole-display-v109/report.json)
+returns 493 live NPU draws, 68 live clears and 17 prewarm draws successfully,
+with all 578 responses acknowledged. Eight frames arrive while the indirect
+display is the sole active guest path. The desktop and Start menu are visible,
+but Start takes 88 seconds to appear, and Escape does not visibly close it.
+The bounded trial completes and removes both custom drivers. Final UMD traces
+contain three rejection rows without timestamps; their relationship to cleanup
+is unresolved. Accepted live requests spend 378 seconds in aggregate, including
+116 seconds inside draw timers. Full desktop offload, usable interaction and a
+Tahoma benefit remain unverified.
+
+A [controlled pipeline cache experiment](docs/validation/2026-10-12/pipeline-cache-v3/report.json)
+retains sixteen independently owned triangle pipelines instead of four. Its
+63-packet replay takes 34.676 seconds, compared with 63.085 and 63.382 seconds
+for the surrounding baseline runs. Every receipt and pixel remains exact; peak
+private memory increases by about 72 MiB. This improvement awaits production
+integration and installed desktop measurement. Separately, all four captured
+compositor shaders [pass larger batch checks](docs/validation/2026-10-12/compiler-batches-v4/report.json)
+at 8,192 and 16,384 lanes on CPU and native NPU. Complete-draw correctness and
+performance still need qualification before changing the shipping batch policy.
+
+The [partial-coverage correction](docs/validation/2026-10-12/crop-qualified-v212/report.json)
+keeps valid point-sampled draws on the selected provider when they do not fit the
+full-target crop optimization. The rejected 642×661 capture covers only 440 rows;
+it now passes repeated NPU execution with exact coverage and zero pixel error.
+The general path preserves the untouched background. Both clean runtime builds
+pass 25 CPU suites. Native NPU qualification also passes 60 driver draws, eight
+clears, a full–partial–full worker sequence and all 17 historical desktop packet
+images. The subsequent v109 trial exercises this correction but does not establish a Tahoma gain.
 
 The [model-sharing experiment](docs/validation/2026-10-11/model-reuse-v2/report.json)
 passes 26 CPU suites and a small NPU lifetime/buffer test, but fails two of 42

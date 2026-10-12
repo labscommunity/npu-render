@@ -1,0 +1,46 @@
+{
+  "trial": "v109",
+  "source_commit": "81a4fa873c47caec68dff35885a69bcf4e146e89",
+  "host_worker_build": "present-umd-v212",
+  "guest_umd_build": "present-umd-v212-legacy",
+  "package_version": "0.0.97.0",
+  "successful_requests": 578,
+  "live_requests": 561,
+  "worker_successes_by_client": {
+    "42": 17,
+    "5336": 62,
+    "1076": 441,
+    "6016": 58
+  },
+  "worker_successes_by_operation": {
+    "draw": 510,
+    "color_clear": 68
+  },
+  "acknowledged_successes": 578,
+  "failed_relay_responses": 0,
+  "client_departures": 0,
+  "received_frames": 8,
+  "sole_indirect_received_frames": 8,
+  "start_first_visible_seconds": 87.710619,
+  "visually_verified_start_visible": true,
+  "visually_verified_escape_response": false,
+  "live_compile_and_draw_ms": 377879,
+  "live_draw_ms": 115918.246,
+  "full_desktop_offload": false,
+  "usable_interactive_desktop": false,
+  "tahoma_performance_tested": false,
+  "cleanup_passed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "concurrent_cpu_build": false,
+  "findings": [
+    "Windows processes run in the disposable VM; accepted draws and clears execute on physical Panther Lake NPU. All eight frames arrive while the guest indirect display is the sole active display; a Mac SDL viewer presents the images.",
+    "The previous partial point-draw failure does not recur in captured requests. All 578 requests receive successful replies, comprising 17 prewarm draws, 493 live draws and 68 live clears.",
+    "Start first appears 87.710619 seconds after the Windows-key action. Manual inspection happens approximately 83 seconds after that frame arrives and delays the next input. A frame received 74.454437 seconds after Escape still shows Start. No usable interactive desktop or successful Escape response is established.",
+    "Final UMD traces contain two draw rejections and one map rejection. Their rows have no timestamps; cleanup involvement is plausible but unproven. No complete failed draw capture is recovered. Zero relay failures must not be interpreted as zero DDI rejections.",
+    "The bounded observer completes and removes both custom drivers. The stream removes its configuration and forcibly terminates the remaining worker during cleanup (exit -1). A later input snapshot is stale and no longer has sole-display topology.",
+    "The previous test certificate reports an inaccessible stored private key. A new nonexportable machine-store lab signing key signs the isolated package; only its public certificate is imported into the VM trust stores. The physical machine receives no custom driver or root trust installation.",
+    "Queued application reports include historical desktop failures. The same DWM, Explorer and Start processes survive the trial. A contemporaneous Defender engine fault is recorded; its cause remains undetermined.",
+    "Physical Delta scanout, general application coverage, responsive desktop use and improved Tahoma performance remain unverified."
+  ]
+}

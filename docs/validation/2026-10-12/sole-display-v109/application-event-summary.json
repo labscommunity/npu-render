@@ -1,0 +1,100 @@
+{
+  "counts": {
+    "1001": 133,
+    "1000": 1
+  },
+  "fault_and_hang_events": [
+    {
+      "id": 1000,
+      "at": "2026-10-12T17:32:21.4055509Z",
+      "message": "Faulting application name: MsMpEng.exe, version: 4.18.26080.4, time stamp: 0x348553e0\r\nFaulting module name: mpengine.dll, version: 1.1.26080.3, time stamp: 0x01b1f900\r\nException code: 0xc0000005\r\nFault offset: 0x00000000002c10f0\r\nFaulting process id: 0xD7C\r\nFaulting application start time: 0x1DD5A6B91A31C63\r\nFaulting application path: C:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\4.18.26080.4-0\\MsMpEng.exe\r\nFaulting module path: C:\\ProgramData\\Microsoft\\Windows Defender\\Definition Updates\\{84443114-A882-405E-ADB2-4D3C9BD5353F}\\mpengine.dll\r\nReport Id: 4df96cbc-bc30-4532-ba87-5defb41189a6\r\nFaulting package full name: \r\nFaulting package-relative application ID: "
+    }
+  ],
+  "queued_report_context": {
+    "captured_at": "2026-10-12T17:46:05.8693990Z",
+    "processes": [
+      {
+        "Id": 1076,
+        "ProcessName": "dwm",
+        "started_at": "2026-10-12T17:03:00.5888239Z"
+      },
+      {
+        "Id": 5336,
+        "ProcessName": "explorer",
+        "started_at": "2026-10-12T17:09:06.5120169Z"
+      },
+      {
+        "Id": 6016,
+        "ProcessName": "StartMenuExperienceHost",
+        "started_at": "2026-10-12T17:09:16.6926789Z"
+      }
+    ],
+    "queued_reports": [
+      {
+        "original_event_at": "2026-10-11T05:12:13.3751790Z",
+        "EventTime": "134361691333751790",
+        "ReportIdentifier": "d6879915-acdf-4942-a6c6-e16ea4e34247",
+        "IntegratorReportIdentifier": "855a0553-aeac-4b4c-bd06-74891096e448",
+        "directory": "AppHang_explorer.exe_3661c3696f3479197b16ee80543321bf3ad0a7_f32e9b07_d6879915-acdf-4942-a6c6-e16ea4e34247",
+        "EventType": "AppHangB1"
+      },
+      {
+        "original_event_at": "2026-10-11T01:34:20.6480920Z",
+        "EventTime": "134361560606480920",
+        "ReportIdentifier": "2a7dc27b-caae-48ab-91c1-3177dbc5b0f9",
+        "IntegratorReportIdentifier": "e5b1593f-f1c5-4c65-a60c-a0c7a599895b",
+        "directory": "AppHang_explorer.exe_e85ffc79d337c70ce10c72ee5f16991f1ab94ac_f32e9b07_2a7dc27b-caae-48ab-91c1-3177dbc5b0f9",
+        "EventType": "AppHangB1"
+      },
+      {
+        "original_event_at": "2026-10-11T01:10:18.6057030Z",
+        "EventTime": "134361546186057030",
+        "ReportIdentifier": "f83154d5-560f-4d6e-8b2c-d073b606d424",
+        "IntegratorReportIdentifier": "ef145df5-6bbf-479c-a2db-3228563a91ac",
+        "directory": "AppHang_explorer.exe_e85ffc79d337c70ce10c72ee5f16991f1ab94ac_f32e9b07_f83154d5-560f-4d6e-8b2c-d073b606d424",
+        "EventType": "AppHangB1"
+      },
+      {
+        "original_event_at": "2026-10-10T23:52:04.0646150Z",
+        "EventTime": "134361499240646150",
+        "ReportIdentifier": "5e313bf8-e678-4354-afe8-5cf4bc00aaf3",
+        "IntegratorReportIdentifier": "8d5d323f-32c4-4c07-b661-9793d65e4ec2",
+        "directory": "AppCrash_dwm.exe_6ab8dc8161145da5a19115f474a9d96a3f58920_b2389584_5e313bf8-e678-4354-afe8-5cf4bc00aaf3",
+        "EventType": "APPCRASH"
+      },
+      {
+        "original_event_at": "2026-10-10T23:29:02.8765420Z",
+        "EventTime": "134361485428765420",
+        "ReportIdentifier": "32e88e40-93ad-4346-b63e-30666656dc38",
+        "IntegratorReportIdentifier": "23dfa8b1-dbb9-4cb9-94e2-d89cc6102836",
+        "directory": "AppCrash_dwm.exe_6ab8dc8161145da5a19115f474a9d96a3f58920_b2389584_32e88e40-93ad-4346-b63e-30666656dc38",
+        "EventType": "APPCRASH"
+      },
+      {
+        "original_event_at": "2026-10-10T22:23:39.1337590Z",
+        "EventTime": "134361446191337590",
+        "ReportIdentifier": "8d65ff9d-4d8b-4f89-b23e-528048d93274",
+        "IntegratorReportIdentifier": "55984863-1d3e-48f4-9a8b-2140fc84ddb6",
+        "directory": "AppHang_explorer.exe_e85ffc79d337c70ce10c72ee5f16991f1ab94ac_f32e9b07_8d65ff9d-4d8b-4f89-b23e-528048d93274",
+        "EventType": "AppHangB1"
+      },
+      {
+        "original_event_at": "2026-10-10T22:10:39.4153150Z",
+        "EventTime": "134361438394153150",
+        "ReportIdentifier": "e1187de2-c839-41dc-be8f-185ca78f5595",
+        "IntegratorReportIdentifier": "c30be3b0-d014-4210-85d6-5b83c85efdd6",
+        "directory": "AppCrash_dwm.exe_6a4cd3bd7bb04e44639c31bfd219efe0ee89bfd3_b2389584_e1187de2-c839-41dc-be8f-185ca78f5595",
+        "EventType": "APPCRASH"
+      },
+      {
+        "original_event_at": "2026-10-10T21:46:16.0351480Z",
+        "EventTime": "134361423760351480",
+        "ReportIdentifier": "9b3addb5-4c5c-4d82-b249-7a48910f24d2",
+        "IntegratorReportIdentifier": "c9a86f9c-fa92-4c8c-b72f-e1258a7bfda0",
+        "directory": "AppHang_explorer.exe_e85ffc79d337c70ce10c72ee5f16991f1ab94ac_f32e9b07_9b3addb5-4c5c-4d82-b249-7a48910f24d2",
+        "EventType": "AppHangB1"
+      }
+    ]
+  },
+  "interpretation": "Event 1001 includes queued historical reports. All eight sampled desktop report EventTimes predate this trial. Desktop processes retain the same IDs and start times after cleanup. One event 1000 records MsMpEng.exe/mpengine.dll c0000005; its cause is not established."
+}
