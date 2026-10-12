@@ -108,7 +108,7 @@ int main(int argc, char **argv) try {
         char *end = nullptr; const auto r = std::strtoul(argv[8], &end, 10);
         nr::capture::check(end != argv[8] && !*end && r && r <= 5); repeats = uint32_t(r);
         const auto b = std::strtoul(argv[10], &end, 10);
-        nr::capture::check(end != argv[10] && !*end && b && b <= 4096); batch = uint32_t(b);
+        nr::capture::check(end != argv[10] && !*end && b && b <= 8192); batch = uint32_t(b);
     }
     const std::string backend = argv[4]; nr::capture::check(backend == "CPU" || backend == "NPU");
     std::ifstream existing(argv[6], std::ios::binary); nr::capture::check(!existing); existing.close();

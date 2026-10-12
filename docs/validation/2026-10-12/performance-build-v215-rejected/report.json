@@ -1,0 +1,11 @@
+{
+  "build": "present-umd-v215",
+  "clean_build_passed": false,
+  "cpu_tests_performed": false,
+  "npu_tests_performed": false,
+  "legacy_build_performed": false,
+  "installation_performed": false,
+  "log_sha256": "5df3417b7a899b198dfdfd0434ab3c396e4f9c1be11b713fb64bed9780c2adcd",
+  "failure": "The stream worker is in the global namespace; its new logging expression omitted the nr namespace qualifier. Errors C2653/C3861 prevent compilation.",
+  "correction": "Fully qualify nr::shader::RegisterExecutor in the stream worker and build into a fresh v216 directory."
+}

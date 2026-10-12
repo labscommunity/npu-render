@@ -12,6 +12,9 @@ int main(int argc,char **argv)try{
     const std::array<int32_t,4> full{0,0,1024,1024};
     TEST(bounded_triangle_regions(std::vector<std::array<int32_t,4>>(16,full),full,4096).size()==16);
     bool rejected=false;try{bounded_triangle_regions(std::vector<std::array<int32_t,4>>(17,full),full,4096);}catch(const std::invalid_argument &){rejected=true;}TEST(rejected);
+    TEST(bounded_triangle_regions(std::vector<std::array<int32_t,4>>(32,full),full,8192).size()==32);
+    rejected=false;try{bounded_triangle_regions(std::vector<std::array<int32_t,4>>(33,full),full,8192);}catch(const std::invalid_argument &){rejected=true;}TEST(rejected);
+    rejected=false;try{bounded_triangle_regions({full},full,16384);}catch(const std::invalid_argument &){rejected=true;}TEST(rejected);
     TEST(bounded_triangle_regions(std::vector<std::array<int32_t,4>>(70,{4,4,6,6}),full,256).size()==70);
     TEST(bounded_triangle_regions(std::vector<std::array<int32_t,4>>(70,full),{0,0,0,0},1).size()==70);
     for(const std::array<int32_t,4> bad:{std::array<int32_t,4>{-1,0,2,2},{0,0,8193,2},{2,2,1,1}}){

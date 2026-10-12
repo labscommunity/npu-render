@@ -1,0 +1,43 @@
+{
+  "all_checks_passed": true,
+  "runs": [
+    {
+      "name": "baseline-worker",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 39429,
+      "passed": true,
+      "peak_private_bytes": 266313728,
+      "peak_working_bytes": 685076480
+    },
+    {
+      "name": "candidate-worker",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 36940,
+      "passed": true,
+      "peak_private_bytes": 268857344,
+      "peak_working_bytes": 703340544
+    },
+    {
+      "name": "baseline-repeat-worker",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 39743,
+      "passed": true,
+      "peak_private_bytes": 270888960,
+      "peak_working_bytes": 687415296
+    }
+  ],
+  "sequence": "old-16-pipeline-4096-batch / candidate-16-pipeline-8192-batch / old-repeat",
+  "packets_per_run": 63,
+  "candidate_pixels_and_coverage_exact": true,
+  "candidate_elapsed_reduction_percent": 6.684181276208756,
+  "native_npu_execution": true,
+  "installed_desktop_tested": false,
+  "tahoma_performance_tested": false,
+  "limitations": [
+    "Single serial A/B/A sequence with warm persistent model cache. This is a captured workload, not an interactive desktop or Tahoma measurement.",
+    "Prior first-use candidate replay took 95.257 seconds; this experiment does not remove first-use compilation and initialization cost."
+  ]
+}

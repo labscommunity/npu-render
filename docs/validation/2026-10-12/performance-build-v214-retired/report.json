@@ -1,0 +1,13 @@
+{
+  "build": "present-umd-v214",
+  "qualification_completed": false,
+  "deliberately_stopped": true,
+  "npu_tests_performed": false,
+  "installation_performed": false,
+  "reason": "Code review found that linking the packet contract helper to the renderer would add an OpenVINO runtime dependency to a helper copied into a guest with a separately pinned runtime. Stop this owned build before qualification and keep transport scheduling provider-independent.",
+  "correction": "Make the bounded raster batch preference an explicit optional argument supplied by the renderer. Keep packet helper linking unchanged.",
+  "build_log": "Preserved under results/render-driver/build-present-v214.log and on Delta.",
+  "log_sha256": "4151785200081e73077cd09f13882c290362e16d216cd040d3a926d6178a58e7",
+  "cpu_suites_passed_before_stop": 16,
+  "legacy_build_performed": false
+}

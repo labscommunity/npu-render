@@ -1,0 +1,41 @@
+{
+  "diagnostic": "triangle-batches-v1",
+  "source_baseline": "81a4fa873c47caec68dff35885a69bcf4e146e89",
+  "complete_draws": 2,
+  "replays": 14,
+  "draw_iterations_per_replay": 3,
+  "all_checks_passed": true,
+  "historical_pixel_hashes_exact": 14,
+  "pixel_bytes_per_image": 3145728,
+  "covered_samples_per_draw": 425023,
+  "raster_batches": {
+    "4096": 214,
+    "8192": 109,
+    "16384": 57
+  },
+  "source_files_verified": 118,
+  "comparisons": [
+    {
+      "shader_words": 1041,
+      "baseline_warm_mean_ms": 7456.7355,
+      "candidate_warm_mean_ms": 6204.757,
+      "warm_draw_reduction_percent": 16.78990088893457
+    },
+    {
+      "shader_words": 1061,
+      "baseline_warm_mean_ms": 7609.66575,
+      "candidate_warm_mean_ms": 6177.2165,
+      "warm_draw_reduction_percent": 18.824075814368058
+    }
+  ],
+  "production_source_changed_by_diagnostic": false,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "findings": [
+    "All complete CPU and NPU captures preserve the corresponding historical backend image exactly at all three batch sizes. Every replay also passes its independent scalar reference with exact coverage and at most one byte of channel error.",
+    "The NPU sequence is 4096, 8192, 16384, 4096 for each capture, with three draws per executor. The warm comparison uses iterations one and two, omitting the first draw, and averages the two baseline runs.",
+    "8192 lanes reduce warm complete-draw time by about 17% and 19% on the two captures. 16384 lanes offer no consistent additional benefit. The candidate policy selects 8192 only for the four exact qualified compositor shaders and pinned runtime.",
+    "First-time compilation of the new shapes takes about 26\u201333 seconds. These costs are recorded separately from warm drawing; total first-run time regresses until models are cached.",
+    "This isolated diagnostic changes no registered source or installed driver. Installed desktop qualification is still required."
+  ]
+}

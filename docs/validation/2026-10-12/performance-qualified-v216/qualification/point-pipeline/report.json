@@ -1,0 +1,45 @@
+{
+  "checks": [
+    {
+      "case": 1,
+      "height": 64,
+      "sequence": 3101,
+      "roundtrip_ms": 94.0,
+      "provider_requests": 3,
+      "covered_samples": 4096,
+      "used_rectangle": true,
+      "packet_sha256": "30d9cf0f3d7911507e5cd3432035699af7dea619cb2980556b65a6fb4c77738d",
+      "pixel_sha256": "e8f69362bf6d5852a94a0f15eb4dc197169beb758385c67e0ba7514b6685a2ab",
+      "all_pixels_exact": true,
+      "execution_device": "NPU"
+    },
+    {
+      "case": 2,
+      "height": 32,
+      "sequence": 3102,
+      "roundtrip_ms": 313.0,
+      "provider_requests": 12,
+      "covered_samples": 2048,
+      "used_rectangle": false,
+      "packet_sha256": "6814aa08f57940999f07634de7a5067d9d3ba519218c71d20c759c9667a22aee",
+      "pixel_sha256": "ef78fff2e33c66610adb6355b0b5c6907ceb4c05069b4d08325fddd8475241ad",
+      "all_pixels_exact": true,
+      "execution_device": "NPU"
+    },
+    {
+      "case": 3,
+      "height": 64,
+      "sequence": 3103,
+      "roundtrip_ms": 78.0,
+      "provider_requests": 10,
+      "covered_samples": 4096,
+      "used_rectangle": false,
+      "packet_sha256": "197c6bdebd9e19fb90f6a631159ef86a6e6304e9ce040e0767545c8e001b627e",
+      "pixel_sha256": "e8f69362bf6d5852a94a0f15eb4dc197169beb758385c67e0ba7514b6685a2ab",
+      "all_pixels_exact": true,
+      "execution_device": "NPU"
+    }
+  ],
+  "all_passed": true,
+  "desktop_offload_tested": false
+}

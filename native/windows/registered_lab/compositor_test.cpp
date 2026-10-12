@@ -63,7 +63,9 @@ void captured(const std::string &backend,bool desktop_shapes=false,bool fade=fal
  const auto p=fade?parse_pixel(compositor_fade_pixel_words,std::size(compositor_fade_pixel_words)):
   parse_pixel(compositor_pixel_words,std::size(compositor_pixel_words));
  TEST(p.constants[0]==(fade?8u:6u) && p.instructions.size()==(fade?113u:111u));
- const auto batch=RegisterExecutor::maximum_batch(p);TEST(batch==512 || batch==4096);
+ const auto batch=RegisterExecutor::maximum_batch(p);TEST(batch==512 || batch==8192);
+ TEST(RegisterExecutor::preferred_raster_batch(p)==(batch==8192?8192u:4096u));
+ auto unmatched=p;unmatched.bytecode.clear();TEST(RegisterExecutor::preferred_raster_batch(unmatched)==4096);
  bool rejected=false;try{PixelExecutor oversized(p,batch*2,backend);}catch(const std::invalid_argument &){rejected=true;}TEST(rejected);
  TextureShapes shapes{};TextureSamplers samplers{};TexturePixels textures{};
  for(unsigned slot=0;slot<2;++slot){shapes[slot]=desktop_shapes?(slot?TextureShape{fade?768u:512u,fade?576u:384u,15}:TextureShape{fade?192u:128u,64,15}):TextureShape{4,4,15};
@@ -89,7 +91,8 @@ void three_textures(const std::string &backend,bool fade=true){
  const auto program=fade?parse_pixel(compositor_three_texture_pixel_words,std::size(compositor_three_texture_pixel_words)):
   parse_pixel(compositor_three_texture_base_pixel_words,std::size(compositor_three_texture_base_pixel_words));
  TEST(program.constants[0]==(fade?8u:6u) && program.inputs[4]==15 && program.textures[2]);
- const auto batch=RegisterExecutor::maximum_batch(program);TEST(batch==512 || batch==4096);
+ const auto batch=RegisterExecutor::maximum_batch(program);TEST(batch==512 || batch==8192);
+ TEST(RegisterExecutor::preferred_raster_batch(program)==(batch==8192?8192u:4096u));
  bool rejected=false;try{PixelExecutor oversized(program,batch*2,backend);}catch(const std::invalid_argument &){rejected=true;}TEST(rejected);
  TextureShapes shapes{};TextureSamplers samplers{};TexturePixels textures{};
  for(unsigned slot=0;slot<3;++slot){

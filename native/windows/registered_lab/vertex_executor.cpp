@@ -822,26 +822,29 @@ void RegisterExecutor::validate(const Program &original) {
     }
     for (unsigned i = 0; i < 16; ++i) check(!(program.outputs[i] & ~(views.output_float[i] | views.output_bits[i])));
 }
-// The 65,536-tap raster graph lost the NPU device during qualification.
-// Bound this specialization to the verified 32,768-tap graph shape.
+namespace {
+bool captured_compositor_program(const Program &p){
+    if(p.stage!=Stage::pixel)return false;
+    using namespace nr::registered_lab::test_fixture;
+    const auto matches=[&](const auto &words){return p.bytecode.size()==std::size(words) &&
+        std::equal(p.bytecode.begin(),p.bytecode.end(),std::begin(words));};
+    return matches(compositor_pixel_words) || matches(compositor_fade_pixel_words) ||
+        matches(compositor_three_texture_pixel_words) || matches(compositor_three_texture_base_pixel_words);
+}
+}
 uint32_t RegisterExecutor::maximum_batch(const Program &p){
+    // The 65,536-tap raster graph lost the NPU device during qualification.
+    // Bound this specialization to the verified 32,768-tap graph shape.
     if(mirrored_loop_shader(p))return 256u;
-    // The legacy Intel compiler rejects larger compositor batches. Enable
-    // the larger shape only for the exact separately qualified runtime and
-    // exact shader bytecode; keep other runtime versions conservative.
-    const auto &words=nr::registered_lab::test_fixture::compositor_pixel_words;
-    if(p.stage==Stage::pixel && p.bytecode.size()==std::size(words) &&
-        std::equal(p.bytecode.begin(),p.bytecode.end(),std::begin(words)))return nr::provider::compositor_batch_capacity();
-    const auto &fade=nr::registered_lab::test_fixture::compositor_fade_pixel_words;
-    if(p.stage==Stage::pixel && p.bytecode.size()==std::size(fade) &&
-        std::equal(p.bytecode.begin(),p.bytecode.end(),std::begin(fade)))return nr::provider::compositor_batch_capacity();
-    const auto &three=nr::registered_lab::test_fixture::compositor_three_texture_pixel_words;
-    if(p.stage==Stage::pixel && p.bytecode.size()==std::size(three) &&
-        std::equal(p.bytecode.begin(),p.bytecode.end(),std::begin(three)))return nr::provider::compositor_batch_capacity();
-    const auto &three_base=nr::registered_lab::test_fixture::compositor_three_texture_base_pixel_words;
-    if(p.stage==Stage::pixel && p.bytecode.size()==std::size(three_base) &&
-        std::equal(p.bytecode.begin(),p.bytecode.end(),std::begin(three_base)))return nr::provider::compositor_batch_capacity();
+    // Only exact captured bytecode and the separately qualified runtime use
+    // larger compositor graphs; the legacy compiler retains its old bound.
+    if(captured_compositor_program(p))return nr::provider::compositor_batch_capacity();
     return 65536u;
+}
+uint32_t RegisterExecutor::preferred_raster_batch(const Program &p){
+    // Preserve existing scheduling for all other programs and older runtimes.
+    // The executor still applies maximum_batch to the selected raster shape.
+    return captured_compositor_program(p)?(std::max)(4096u,nr::provider::compositor_batch_capacity()):4096u;
 }
 struct RegisterExecutor::Configuration {
     Program program;

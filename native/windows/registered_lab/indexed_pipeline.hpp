@@ -42,7 +42,7 @@ public:
         }
         if(request.header.flags & 0x3000){
             const auto &h=request.header;require(shape_valid(h));
-            const auto batch=triangle_batch(request);
+            const auto batch=triangle_batch(request,shader::RegisterExecutor::preferred_raster_batch(request.pixel));
             raster::PackedResources resources;shader::TextureSamplers samplers{};
             if(h.flags&0x2000){require(h.abi==8 || h.abi==9 || h.abi==10 || h.abi==11 || h.abi==12);resources=request.resources;samplers=request.samplers;}
             else {require(h.abi==7 || h.abi==9 || h.abi==10 || h.abi==11);resources[0]=request.texture;samplers[0].filter=(h.flags&16)?shader::TextureFilter::point:shader::TextureFilter::linear;}
@@ -52,9 +52,11 @@ public:
                     raster::sampler_layout_equal(samplers,entry.samplers) && entry.vertex==request.vertex.bytecode && entry.pixel==request.pixel.bytecode)
                     return entry.executor->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,resources,request.background,request.scissor);
             }
-            // Alternating desktop draw sizes must not recompile each frame.
+            // Retain the desktop's alternating programs and shapes as complete,
+            // independently owned pipelines. The 4/16/4 captured NPU replay
+            // qualifies this bound without sharing compiled model lifetimes.
             // Evict before constructing a successor for the qualified NPU driver.
-            if(triangle_cache.size()==4)triangle_cache.erase(triangle_cache.begin());
+            if(triangle_cache.size()==16)triangle_cache.erase(triangle_cache.begin());
             auto candidate=std::make_unique<raster::TriangleTextureDrawExecutor>(request.vertex,request.pixel,h.vertices,h.width,h.height,h.format,
                 resources,samplers,"NPU",blend_mode(h),uint8_t((h.flags>>8)&15),static_cast<raster::CullMode>((h.flags>>5)&3),(h.flags&128)!=0,batch);
             auto result=candidate->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,resources,request.background,request.scissor);

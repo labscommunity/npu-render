@@ -218,6 +218,17 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
         window.scissor=std::array<int32_t,4>{0,0,int32_t(extent[0]),int32_t(extent[1])};
         const auto decoded_window=ex::decode(ex::encode(window));test(ex::triangle_batch(decoded_window)==extent[2]);
     }
+    // Scheduling accepts the renderer's bounded preference without importing
+    // provider APIs into the standalone packet helper.
+    for(const auto capacity:{4096u,8192u}){
+        auto sized=desktop_clipped;sized.scissor=full_clip;
+        test(ex::triangle_batch(sized,capacity)==capacity);
+        sized.scissor=std::array<int32_t,4>{429,0,430,768};
+        test(ex::triangle_batch(sized,capacity)==1024);
+    }
+    for(const auto invalid:{0u,512u,8193u,16384u}){
+        bool rejected=false;try{(void)ex::triangle_batch(desktop_clipped,invalid);}catch(const std::invalid_argument &){rejected=true;}test(rejected);
+    }
     auto resources=r;resources.header.abi=8;resources.header.flags=0x2f42;
     const auto &lookup=nr::registered_lab::test_fixture::typed_lookup_pixel_words;
     resources.pixel=nr::shader::parse_pixel(lookup,std::size(lookup));

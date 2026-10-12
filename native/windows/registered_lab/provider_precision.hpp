@@ -26,7 +26,7 @@ inline uint32_t compositor_batch_capacity(){
     // Only this isolated, qualified runtime enables the larger graph shape.
     // Other versions retain the older compiler's verified 512-lane limit.
     static const auto capacity=std::strcmp(ov::get_openvino_version().buildNumber,
-        "2026.4.1-22982-e213a147257-releases/2026/4")==0?4096u:512u;
+        "2026.4.1-22982-e213a147257-releases/2026/4")==0?8192u:512u;
     return capacity;
 }
 }

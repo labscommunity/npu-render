@@ -1,0 +1,11 @@
+{
+  "build": "present-umd-v213",
+  "clean_build_passed": false,
+  "cpu_tests_performed": false,
+  "npu_tests_performed": false,
+  "legacy_build_performed": false,
+  "installation_performed": false,
+  "log_sha256": "fa519c16c9b46f89382449b96e4feba76537c5958b5dcd7a61fb61e0f24bfc69",
+  "failure": "The indexed exchange contract test references runtime-qualified raster batch selection but does not link nr_registered_vertex. Linker errors LNK2019/LNK1120 stop the build before CTest.",
+  "correction": "Link that test to the renderer library, then clean-build into a new v214 directory."
+}

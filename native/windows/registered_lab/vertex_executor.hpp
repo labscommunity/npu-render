@@ -23,6 +23,8 @@ public:
     static void validate(const Program &program);
     // Bounded internal expansion for qualified shader specializations.
     static uint32_t maximum_batch(const Program &program);
+    // Preferred packed raster shape, independently of the arithmetic ceiling.
+    static uint32_t preferred_raster_batch(const Program &program);
     RegisterExecutor(const Program &program, uint32_t vertices, const std::string &backend,
                      const TextureShapes &textures = {}, const TextureSamplers &samplers = {});
     ~RegisterExecutor();

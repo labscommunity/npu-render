@@ -128,11 +128,20 @@ A [controlled pipeline cache experiment](docs/validation/2026-10-12/pipeline-cac
 retains sixteen independently owned triangle pipelines instead of four. Its
 63-packet replay takes 34.676 seconds, compared with 63.085 and 63.382 seconds
 for the surrounding baseline runs. Every receipt and pixel remains exact; peak
-private memory increases by about 72 MiB. This improvement awaits production
-integration and installed desktop measurement. Separately, all four captured
-compositor shaders [pass larger batch checks](docs/validation/2026-10-12/compiler-batches-v4/report.json)
-at 8,192 and 16,384 lanes on CPU and native NPU. Complete-draw correctness and
-performance still need qualification before changing the shipping batch policy.
+private memory increases by about 72 MiB. The cache change is now integrated
+with 8,192-lane batches for four exact captured compositor shaders on the pinned
+OpenVINO runtime. [Complete draw qualification](docs/validation/2026-10-12/triangle-batches-v1/report.json)
+preserves historical pixels and reduces warm full-draw time by 17–19% for two
+captured shaders. Other programs and runtimes retain their previous scheduling.
+
+The [integrated v216 renderer](docs/validation/2026-10-12/performance-qualified-v216/report.json)
+passes both clean builds, 25 CPU suites per runtime, and 19 native qualification
+stages. All 63 mixed captured packets retain exact pixels and coverage. A
+[controlled warm comparison](docs/validation/2026-10-12/performance-ab-v1/report.json)
+takes 36.940 seconds versus 39.429 and 39.743 seconds for the older sixteen-pipeline
+build, a 6.7% reduction. The initial candidate replay took 95.257 seconds before
+an identical repeat dropped to 37.730 seconds; first-use setup remains costly.
+Installed desktop responsiveness and a Tahoma benefit still need measurement.
 
 The [partial-coverage correction](docs/validation/2026-10-12/crop-qualified-v212/report.json)
 keeps valid point-sampled draws on the selected provider when they do not fit the

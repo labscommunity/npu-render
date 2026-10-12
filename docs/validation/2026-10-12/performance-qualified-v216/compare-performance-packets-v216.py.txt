@@ -1,0 +1,15 @@
+from pathlib import Path
+import hashlib,json,struct,sys
+baseline=Path(sys.argv[1]);candidate=Path(sys.argv[2]);results=[]
+records=json.loads((baseline/'requests.json').read_text());assert records==json.loads((candidate/'requests.json').read_text())
+for r in records:
+ name=r['file'].replace('request-','reply-',1);request=(candidate/r['file']).read_bytes();assert hashlib.sha256(request).hexdigest()==r['derived_sha256']
+ h=struct.unpack_from('<3Q14I',request);a=(baseline/name).read_bytes();b=(candidate/name).read_bytes()
+ for data in (a,b):
+  got=struct.unpack_from('<3Q14I',data);assert all(got[i]==h[i] for i in range(17) if i not in (12,14,15));assert got[14:16]==(2,3) and len(data)==128+h[4]*h[5]*4
+ ar=struct.unpack_from('<5Q2I',a,80);br=struct.unpack_from('<5Q2I',b,80);assert ar[3]==br[3] and ar[5:]==br[5:] and a[128:]==b[128:]
+ digest=hashlib.sha256(b[128:]).hexdigest()
+ if r['expected_pixel_sha256']:assert digest==r['expected_pixel_sha256']
+ results.append({'sequence':r['sequence'],'source':r['source'],'pixels':h[4]*h[5],'pixel_sha256':digest,'exact_pixels_and_coverage':True,'baseline_provider_requests':ar[2],'candidate_provider_requests':br[2],'baseline_tiles':ar[4],'candidate_tiles':br[4]})
+assert len(results)==63
+(candidate.parent/'captured-packet-comparison.json').write_text(json.dumps({'all_exact':True,'checks':results},indent=2)+'\n');print(json.dumps({'compared':63,'exact_pixels_and_coverage':True}))

@@ -1,0 +1,181 @@
+{
+  "build": "present-umd-v216",
+  "legacy_build": "present-umd-v216-legacy",
+  "runtime_checks": {
+    "v216": {
+      "cpu_suites": 25,
+      "cpu_elapsed_seconds": 196.71,
+      "source_files_verified": 120,
+      "recorded_binaries": 31
+    },
+    "v216-legacy": {
+      "cpu_suites": 25,
+      "cpu_elapsed_seconds": 184.22,
+      "source_files_verified": 120,
+      "recorded_binaries": 31
+    }
+  },
+  "native_qualification_stages": [
+    {
+      "name": "compositor-desktop-NPU",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 48873,
+      "passed": true
+    },
+    {
+      "name": "compositor-fade-NPU",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 53049,
+      "passed": true
+    },
+    {
+      "name": "compositor-three-NPU",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 25504,
+      "passed": true
+    },
+    {
+      "name": "compositor-three-base-NPU",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 22628,
+      "passed": true
+    },
+    {
+      "name": "1041-CPU",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 33996,
+      "passed": true
+    },
+    {
+      "name": "1041-NPU",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 22901,
+      "passed": true
+    },
+    {
+      "name": "1061-CPU",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 25035,
+      "passed": true
+    },
+    {
+      "name": "1061-NPU",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 23196,
+      "passed": true
+    },
+    {
+      "name": "point-NPU",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 1277,
+      "passed": true
+    },
+    {
+      "name": "triangles-NPU",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 3757,
+      "passed": true
+    },
+    {
+      "name": "capture-CPU",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 2599,
+      "passed": true
+    },
+    {
+      "name": "capture-NPU",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 3571,
+      "passed": true
+    },
+    {
+      "name": "lab-NPU",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 10277,
+      "passed": true
+    },
+    {
+      "name": "point-pipeline-NPU",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 1278,
+      "passed": true
+    },
+    {
+      "name": "legacy-point-NPU",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 1627,
+      "passed": true
+    },
+    {
+      "name": "legacy-triangles-NPU",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 3944,
+      "passed": true
+    },
+    {
+      "name": "baseline-worker",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 23127,
+      "passed": true
+    },
+    {
+      "name": "candidate-worker",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 69962,
+      "passed": true
+    },
+    {
+      "name": "captured-packets-worker",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 95257,
+      "passed": true
+    }
+  ],
+  "all_checks_passed": true,
+  "whole_triangle_pipeline_capacity": 16,
+  "preferred_compositor_batch": 8192,
+  "qualified_runtime": "2026.4.1-22982-e213a147257-releases/2026/4",
+  "unqualified_program_preferred_batch": 4096,
+  "legacy_compositor_arithmetic_limit": 512,
+  "complete_capture_images_exact": 4,
+  "historical_prewarm_images_exact": 17,
+  "mixed_captured_packets_exact": 63,
+  "point_pipeline_transitions_exact": 3,
+  "partial_point_capture_pixel_error": 0,
+  "protocol_abi_changed": false,
+  "native_npu_execution": true,
+  "installed_desktop_tested": false,
+  "full_desktop_offload": false,
+  "tahoma_performance_tested": false,
+  "findings": [
+    "Sixteen independently owned whole triangle executors replace the four-entry cache. Eviction still precedes successor construction; compiled models and infer requests are not shared.",
+    "Only four exact captured compositor shaders use 8192-lane pixel graphs on the pinned runtime. Other programs retain a 4096 preferred raster size; legacy arithmetic remains bounded to 512 for those compositor shaders. Existing arithmetic ceilings still apply.",
+    "The renderer passes its preferred capacity explicitly to the provider-independent transport scheduler. The standalone packet helper retains its original library dependencies. Protocol ABI and bytes are unchanged.",
+    "Two historical full draws pass repeated CPU and NPU execution with exact historical output hashes and scalar-checked coverage. The partial point capture, full-partial-full worker transition, sixty DDI draws and eight clears remain valid.",
+    "The actual candidate worker preserves all seventeen prewarm images and all sixty-three mixed captured packet images and coverage. Provider request and tile counts may decrease with the larger batches; those differences are recorded explicitly.",
+    "Both runtimes pass fresh builds and all twenty-five CPU suites. Native NPU qualification supports an installed VM experiment; it does not establish a usable full desktop, physical scanout offload or Tahoma improvement.",
+    "The first mixed-packet run takes 95.257 seconds; an identical-order repeat takes 37.73 seconds, with exact pixels and coverage again. The first-run setup penalty is consistent with warming newly shaped models, but this worker does not record per-request compilation counters, so compilation is not isolated as its sole cause. This qualification is not a controlled desktop-performance comparison."
+  ],
+  "mixed_packet_first_elapsed_ms": 95257,
+  "mixed_packet_repeat_elapsed_ms": 37730,
+  "repeat_captured_packets_exact": 63
+}

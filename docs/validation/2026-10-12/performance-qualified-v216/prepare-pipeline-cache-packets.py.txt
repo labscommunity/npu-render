@@ -1,0 +1,13 @@
+import hashlib,json,os,struct,sys
+from pathlib import Path
+root=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm';out=Path(sys.argv[1]);out.mkdir(exist_ok=False);records=[]
+originals=[]
+for row in json.loads((root/'prewarm-v105-contract.json').read_text()):
+ p=root/row['packet'];assert p.stat().st_size==row['bytes'];originals.append((p,row['pixel_sha256']))
+for n in range(1,5):originals.append((root/'indexed-dwm-stream-v107'/f'slow-request-{n}.bin',None))
+for case,(p,expected) in enumerate(originals*3,1):
+ original=p.read_bytes();h=struct.unpack_from('<3Q14I',original);assert len(original)==80+h[12] and h[14]==1 and h[15]==0
+ data=bytearray(original);seq=3000+case;struct.pack_into('<QQ',data,8,0x4e52504950454c49,case);struct.pack_into('<I',data,56,seq);struct.pack_into('<I',data,64,42)
+ name=f'request-42-{0x4e52504950454c49:016x}{case:016x}-{seq}.bin';(out/name).write_bytes(data)
+ records.append({'source':str(p.relative_to(root)),'sequence':seq,'file':name,'source_sha256':hashlib.sha256(original).hexdigest(),'derived_sha256':hashlib.sha256(data).hexdigest(),'expected_pixel_sha256':expected,'modified_fields':['nonce','client_pid','sequence']})
+(out/'requests.json').write_text(json.dumps(records,indent=2)+'\n');print(json.dumps({'prepared_requests':len(records)}))

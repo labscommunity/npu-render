@@ -9,7 +9,7 @@ namespace nr::raster {
 // This does not evaluate vertex shaders, triangle edges or sample coverage.
 inline std::vector<std::array<int32_t,4>> bounded_triangle_regions(
     const std::vector<std::array<int32_t,4>> &bounds,const std::array<int32_t,4> &clip,uint32_t batch,bool quads=false){
-    if(!batch || batch>4096 || (quads && batch%4) || clip[0]<0 || clip[1]<0 || clip[0]>clip[2] || clip[1]>clip[3] || clip[2]>8192 || clip[3]>8192)
+    if(!batch || batch>8192 || (quads && batch%4) || clip[0]<0 || clip[1]<0 || clip[0]>clip[2] || clip[1]>clip[3] || clip[2]>8192 || clip[3]>8192)
         throw std::invalid_argument("invalid triangle region parameters");
     std::vector<std::array<int32_t,4>> regions;regions.reserve(bounds.size());uint64_t tiles=0;
     for(const auto &b:bounds){
