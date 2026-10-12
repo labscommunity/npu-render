@@ -2,6 +2,8 @@
 #include "packed_resources.hpp"
 namespace nr::raster {
 // General triangle-list coverage with a bounded, single-mip texture shader.
+// Vertex count is a capacity; execution accepts complete triangle lists up to
+// that capacity and validated target dimensions supplied in the viewport.
 // Vertex arithmetic, projection, interpolation, sampling and merging run on
 // the selected provider. Flat attributes are transported as unchanged bits.
 class TriangleTextureDrawExecutor {

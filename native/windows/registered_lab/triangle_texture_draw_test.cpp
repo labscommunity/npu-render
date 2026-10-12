@@ -4,11 +4,13 @@
 #include "shader_reference.hpp"
 #include <algorithm>
 #include <cstdio>
+#include <limits>
 using namespace nr::raster;
 using namespace nr::shader;
 #define TEST(v) do{if(!(v))throw std::runtime_error(#v);}while(false)
 int main(int argc,char **argv)try{
-    TEST(argc<=2);const std::string backend=argc==2?argv[1]:"CPU";
+    TEST(argc<=3 && (argc<3 || !std::strcmp(argv[2],"--capacity")));const std::string backend=argc>=2?argv[1]:"CPU";
+    const auto capacity=[&](uint32_t n){return argc==3?n*2:n;};
     const std::array<int32_t,4> full{0,0,1024,1024};
     TEST(bounded_triangle_regions(std::vector<std::array<int32_t,4>>(16,full),full,4096).size()==16);
     bool rejected=false;try{bounded_triangle_regions(std::vector<std::array<int32_t,4>>(17,full),full,4096);}catch(const std::invalid_argument &){rejected=true;}TEST(rejected);
@@ -42,9 +44,23 @@ float4 main(float4 p:SV_Position,noperspective float4 c:COLOR,noperspective floa
         PackedTexture texture{3,2,87,{{20,40,80,255},{40,80,120,192},{100,50,10,255},{0,70,90,128},{40,20,10,255},{30,90,120,240}}};
         const Viewport viewport{0,0,32,32,0,1};
         std::vector<PackedColor> bg(1024);for(size_t n=0;n<bg.size();++n)bg[n]={uint8_t(n),31,211,97};
-        TriangleTextureDrawExecutor executor(vs,ps,9,32,32,format,3,2,87,backend,true,mask,filter,CullMode::back,false,256);
+        TriangleTextureDrawExecutor executor(vs,ps,capacity(9),32,32,format,3,2,87,backend,true,mask,filter,CullMode::back,false,256);
+        for(const float width:{0.f,-1.f,32.5f,8193.f,std::numeric_limits<float>::infinity(),std::numeric_limits<float>::quiet_NaN()}){
+            auto invalid=viewport;invalid.width=width;bool failed=false;
+            try{(void)executor.execute(inputs,{}, {},invalid,texture,bg);}catch(const std::invalid_argument &){failed=true;}
+            TEST(failed);
+        }
+        // Invalid logical counts fail before changing provider state. The invalid
+        // attempts are followed by independently checked valid draws.
+        for(const size_t size:{size_t(0),size_t(8),size_t(capacity(9)+3)}){
+            auto invalid=inputs;invalid.resize(size,inputs.back());bool failed=false;
+            try{(void)executor.execute(invalid,{}, {},viewport,texture,bg);}
+            catch(const std::invalid_argument &){failed=true;}
+            TEST(failed);
+        }
         for(const std::array<int32_t,4> clip: {std::array<int32_t,4>{7,8,26,24}, {7,8,26,9}, {0,0,32,32}, {31,31,32,32}, {17,0,17,32}, {0,17,32,17}}){
         const auto result=executor.execute(inputs,{}, {},viewport,texture,bg,clip);
+        TEST(result.vertices.size()==inputs.size());
         const auto covered=unsigned((std::max)(0,(std::min)(28,clip[2])-(std::max)(4,clip[0])))*unsigned((std::max)(0,(std::min)(28,clip[3])-(std::max)(4,clip[1])));
         TEST(result.execution_device.rfind(backend,0)==0 && result.covered_samples==covered && result.tile_executions==3*((covered+255)/256));
         for(unsigned y=0;y<32;++y)for(unsigned x=0;x<32;++x){const auto n=size_t(y)*32+x;auto expected=bg[n];
@@ -72,7 +88,7 @@ float4 main(float4 p:SV_Position,noperspective float4 c:COLOR,noperspective floa
         sparse[i][2]={as_bits(.5f),as_bits(.5f),0,0};
     }
     const PackedTexture tiny{1,1,28,{{23,51,79,255}}};const std::vector<PackedColor> bg(128*128,{1,2,3,4});
-    TriangleTextureDrawExecutor sparse_executor(vs,ps,210,128,128,28,1,1,28,backend,false,15,TextureFilter::point,CullMode::none,false,256);
+    TriangleTextureDrawExecutor sparse_executor(vs,ps,capacity(210),128,128,28,1,1,28,backend,false,15,TextureFilter::point,CullMode::none,false,256);
     const auto sparse_result=sparse_executor.execute(sparse,{}, {},{0,0,128,128,0,1},tiny,bg);
     TEST(sparse_result.execution_device.rfind(backend,0)==0 && sparse_result.tile_executions==70 && sparse_result.covered_samples==210);
     for(unsigned y=0;y<128;++y)for(unsigned x=0;x<128;++x)
@@ -95,7 +111,7 @@ float4 main(float4 p:SV_Position,noperspective float4 c:COLOR,noperspective floa
         }
         const PackedColor old{16,32,48,64};const PackedTexture source{1,1,28,{{64,128,192,255}}};
         const std::vector<PackedColor> background(width*height,old);
-        TriangleTextureDrawExecutor executor(vs,ps,quads*9,width,height,28,1,1,28,backend,true,15,TextureFilter::point,CullMode::none,false,256);
+        TriangleTextureDrawExecutor executor(vs,ps,capacity(quads*9),width,height,28,1,1,28,backend,true,15,TextureFilter::point,CullMode::none,false,256);
         const auto result=executor.execute(glyphs,{}, {},{0,0,width,height,0,1},source,background);
         TEST(result.execution_device.rfind(backend,0)==0 && result.covered_samples==quads*7 && result.tile_executions==3);
         for(unsigned y=0;y<height;++y)for(unsigned x=0;x<width;++x){auto expected=old;
@@ -131,7 +147,7 @@ float4 main(float4 p:SV_Position,noperspective float4 a:TEXCOORD0,noperspective 
         }
         const PackedTexture white{1,1,28,{{255,255,255,255}}};const PackedColor old{13,29,47,63};
         const std::vector<PackedColor> background(1024,old);
-        TriangleTextureDrawExecutor executor(mixed_vs,mixed_ps,3,32,32,28,1,1,28,backend,false,15,TextureFilter::point,CullMode::none,false,attribute_batch);
+        TriangleTextureDrawExecutor executor(mixed_vs,mixed_ps,capacity(3),32,32,28,1,1,28,backend,false,15,TextureFilter::point,CullMode::none,false,attribute_batch);
         const auto result=executor.execute(input,{}, {},{0,0,32,32,0,1},white,background);
         TEST(result.execution_device.rfind(backend,0)==0);
         unsigned samples=0;
@@ -159,7 +175,8 @@ float4 main(float4 p:SV_Position,noperspective float4 a:TEXCOORD0,noperspective 
         std::printf("{\"mixed_interpolation_components\":4096,\"batch\":%u,\"affine_attributes\":2,\"perspective_attributes\":2,\"flat_attributes\":1,\"execution_device\":\"%s\"}\n",attribute_batch,backend.c_str());
     }
     uint64_t odd_components=0;
-    for(const auto extent:{std::array<uint32_t,2>{31,29},{1,1}}){
+    TriangleTextureDrawExecutor resizable(vs,ps,capacity(6),32,32,28,1,1,28,backend,false,15,TextureFilter::point,CullMode::none,false,256);
+    for(const auto extent:{std::array<uint32_t,2>{31,29},{1,1},{64,17},{31,29}}){
         const auto w=extent[0],h=extent[1];const unsigned corner[6]{0,1,2,0,2,3};
         const float xy[4][2]{{-1,1},{1,1},{1,-1},{-1,-1}};
         std::vector<VertexRegisters> quad(6);
@@ -169,7 +186,7 @@ float4 main(float4 p:SV_Position,noperspective float4 a:TEXCOORD0,noperspective 
             quad[v][2]={as_bits(.5f),as_bits(.5f),0,0};
         }
         const PackedColor old{1,2,3,4};const std::vector<PackedColor> background(size_t(w)*h,old);
-        TriangleTextureDrawExecutor executor(vs,ps,6,w,h,28,1,1,28,backend,false,15,TextureFilter::point,CullMode::none,false,256);
+        auto &executor=resizable;
         for(const auto clip:{std::array<int32_t,4>{0,0,int32_t(w),int32_t(h)},
             {int32_t(w>3?w-3:0),int32_t(h>3?h-3:0),int32_t(w),int32_t(h)},
             {int32_t(w),int32_t(h),int32_t(w),int32_t(h)}}){

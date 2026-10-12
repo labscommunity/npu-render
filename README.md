@@ -122,6 +122,19 @@ the NPU device, pass on NPU with identical output. Both custom guest drivers are
 removed; Delta is not rebooted and its GPU is untouched. Runtime stability and
 usable interaction remain unfinished. This trial does not establish a Tahoma gain.
 
+A controlled [cache experiment](docs/validation/2026-10-12/capacity-experiments-v1/report.json)
+reuses triangle models across render-target sizes and retains 24 complete
+pipelines instead of 64. All 384 synthetic requests and 71 captured requests
+preserve their expected pixels and coverage. The changing-target test improves
+from about 25 seconds to 9 seconds; the changing-texture test is slower than its
+warmed baseline (41 versus 21 seconds), because the smaller cache evicts models.
+This does not establish desktop stability or a general performance gain.
+The [v223 implementation](docs/validation/2026-10-12/surface-capacity-v223/report.json)
+passes both clean 28-suite CPU builds and twelve NPU qualification stages,
+including the four v113 captures and changing-target pixel checks. The next
+installed desktop trial will test stability and interaction. The stream harness
+now writes worker logs during execution and records incomplete shutdown explicitly.
+
 The preceding [v112 installed trial](docs/validation/2026-10-12/sole-display-v112/report.json)
 returns 565 acknowledged NPU results and fourteen frames, thirteen received while
 the indirect display is the sole guest path. The complete desktop and Run dialog

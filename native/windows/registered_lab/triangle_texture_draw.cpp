@@ -3,6 +3,7 @@
 #include "color_interpolator.hpp"
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstring>
 #include <stdexcept>
 #include <numeric>
@@ -83,19 +84,32 @@ UniformDrawExecutor::Result TriangleTextureDrawExecutor::execute(const std::vect
     const shader::VertexConstants &vc,const shader::VertexConstants &pc,const Viewport &viewport,const PackedResources &resources,
     const std::vector<PackedColor> &background,const std::optional<std::array<int32_t,4>> &scissor){
     auto &s=*state;const auto start=Clock::now();
-    require(inputs.size()==s.count && background.size()==size_t(s.width)*s.height && resource_layout_equal(resources,s.layout) && viewport.x==0 && viewport.y==0 &&
-        viewport.width==float(s.width) && viewport.height==float(s.height));
-    const auto clip=scissor.value_or(std::array<int32_t,4>{0,0,int32_t(s.width),int32_t(s.height)});
-    require(clip[0]>=0 && clip[1]>=0 && clip[0]<=clip[2] && clip[1]<=clip[3] && clip[2]<=int32_t(s.width) && clip[3]<=int32_t(s.height));
+    // Projection accepts viewport dimensions as provider inputs; coverage and
+    // merger models operate on bounded batches, independent of target shape.
+    require(viewport.x==0 && viewport.y==0 && std::isfinite(viewport.width) && std::isfinite(viewport.height) &&
+        viewport.width>=1 && viewport.width<=8192 && viewport.height>=1 && viewport.height<=8192);
+    const auto target_width=uint32_t(viewport.width),target_height=uint32_t(viewport.height);
+    require(viewport.width==float(target_width) && viewport.height==float(target_height) &&
+        uint64_t(target_width)*target_height<=4*1024*1024 && !inputs.empty() && inputs.size()<=s.count && !(inputs.size()%3) &&
+        background.size()==size_t(target_width)*target_height && resource_layout_equal(resources,s.layout));
+    const auto clip=scissor.value_or(std::array<int32_t,4>{0,0,int32_t(target_width),int32_t(target_height)});
+    require(clip[0]>=0 && clip[1]>=0 && clip[0]<=clip[2] && clip[1]<=clip[3] && clip[2]<=int32_t(target_width) && clip[3]<=int32_t(target_height));
     const std::array<int32_t,4> fixed_clip{clip[0]*256,clip[1]*256,clip[2]*256,clip[3]*256};
-    UniformDrawExecutor::Result result{};auto began=Clock::now();auto shaded=s.vertex.execute(inputs,vc);
+    UniformDrawExecutor::Result result{};auto began=Clock::now();
+    // Duplicate valid input bits only; shader and projection arithmetic remain
+    // provider operations. Padding never enters raster scheduling or budgets.
+    auto padded=inputs;padded.resize(s.count,inputs.back());
+    auto shaded=s.vertex.execute(padded,vc);
     result.execution_device=shaded.execution_device;result.timings.shader_ms=ms(began);
     result.input_bytes=shaded.input_bytes;result.output_bytes=shaded.output_bytes;++result.provider_requests;
     std::vector<ClipPosition> clips(s.count);
     for(size_t v=0;v<s.count;++v)std::memcpy(clips[v].data(),shaded.vertices[v][s.vs.position_output].data(),16);
-    began=Clock::now();const auto projected=s.projection.execute(clips,viewport);require(projected.execution_device==result.execution_device);
+    began=Clock::now();auto projected=s.projection.execute(clips,viewport);require(projected.execution_device==result.execution_device);
     result.timings.projection_ms=ms(began);result.input_bytes+=uint64_t(s.count)*16+24;result.output_bytes+=uint64_t(s.count)*24+uint64_t(s.count/3)*16;++result.provider_requests;
     require(projected.triangle_bounds.size()==s.count/3);
+    projected.vertices.resize(inputs.size());
+    projected.triangle_bounds.resize(inputs.size()/3);
+    shaded.vertices.resize(inputs.size());
     // Vertex count and shader graphs are bounded before compilation. Once the
     // device establishes geometry bounds, admit at most 4096 raster tiles.
     // Reject the whole draw before coverage or destination modification.
@@ -188,7 +202,7 @@ UniformDrawExecutor::Result TriangleTextureDrawExecutor::execute(const std::vect
                     const size_t y=s.quads?size_t(region[1])+2*((i/4)/(width/2))+((i>>1)&1):size_t(region[1])+i/width;
                     points[n]={int32_t(x)*256+128,int32_t(y)*256+128};triangle_base[n]=base;
                     vertices[n]={projected.vertices[base],projected.vertices[base+1],projected.vertices[base+2]};
-                    stored_pixel[n]=uint8_t(x<s.width && y<s.height);pixel_index[n]=y*s.width+x;
+                    stored_pixel[n]=uint8_t(x<target_width && y<target_height);pixel_index[n]=y*target_width+x;
                 }
                 filled+=count;first+=count;
                 if(filled==s.batch){submit(filled);filled=0;}

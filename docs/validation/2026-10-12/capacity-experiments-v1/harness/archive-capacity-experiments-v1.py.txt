@@ -1,0 +1,21 @@
+from pathlib import Path
+import os,hashlib,json,zipfile
+root=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=root/'vm';dest=vm/'capacity-experiments-v1-evidence.zip';assert not dest.exists();manifest=[]
+folders=['vertex-capacity-v1','surface-capacity-v2b-results','surface-capacity-v2b-retry']
+with zipfile.ZipFile(dest,'x',zipfile.ZIP_DEFLATED) as z:
+ for name in folders:
+  for p in sorted((vm/name).rglob('*')):
+   if not p.is_file():continue
+   digest=hashlib.sha256()
+   with p.open('rb') as f:
+    while b:=f.read(1024*1024):digest.update(b)
+   rel=p.relative_to(vm).as_posix();manifest.append({'name':rel,'bytes':p.stat().st_size,'sha256':digest.hexdigest()})
+   if p.suffix in ('.json','.jsonl','.log'):z.write(p,rel)
+ for name in ['vertex-capacity-baseline-v1','vertex-capacity-candidate-v1','surface-capacity-v2b']:
+  p=root/'builds'/name/'probe-build-report.json';z.write(p,'builds/'+name+'/probe-build-report.json')
+  for suffix in ('-CPU-exact.log','-CPU-capacity.log'):
+   p=vm/(name+suffix)
+   if p.exists():z.write(p,'builds/'+name+'/'+p.name)
+  p=vm/('build-'+name+'.log');z.write(p,'builds/'+name+'/'+p.name)
+ z.writestr('raw-file-sha256.json',json.dumps(manifest,indent=2)+'\n')
+print(json.dumps({'archive':dest.name,'bytes':dest.stat().st_size,'sha256':hashlib.sha256(dest.read_bytes()).hexdigest(),'raw_files':len(manifest)}))

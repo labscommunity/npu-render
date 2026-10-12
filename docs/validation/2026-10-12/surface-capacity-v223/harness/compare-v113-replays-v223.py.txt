@@ -1,0 +1,9 @@
+from pathlib import Path
+import os,json,hashlib,sys
+root=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm';out=Path(sys.argv[1]);checks=[]
+def read(p):
+ b=p.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+for row in read(root/'v113-post-recovery-comparison.json')['checks']:
+ stem=Path(row['capture']).stem;p=out/(stem+'.pixels');data=p.read_bytes();digest=hashlib.sha256(data).hexdigest();assert len(data)==row['bytes'] and digest==row['cpu_sha256'].lower()
+ checks.append({'capture':row['capture'],'bytes':len(data),'pixel_sha256':digest,'exact_previous_cpu_npu':True})
+(out/'v113-comparison.json').write_text(json.dumps({'all_exact':True,'checks':checks,'desktop_offload_tested':False},indent=2)+'\n');print(json.dumps({'compared':len(checks),'all_exact':True}))

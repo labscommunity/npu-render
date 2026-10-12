@@ -35,7 +35,7 @@ $job=[Guid]::NewGuid().ToString('N');$guest="C:\npu-lab\indexed-stream-$job";$pi
 $active='C:\npu-lab\indexed-pipe-active.txt';$rule="NpuRenderIndexed-$job";$limit=$MaximumRequests;if($SmokeTest){$limit=3}
 New-Item -ItemType Directory $EvidenceDirectory|Out-Null
 Copy-Item "$BuildDirectory\registered-build-report.json" $EvidenceDirectory
-$token="$EvidenceDirectory\private-token.bin";$worker=$null;$stdout=$null;$stderr=$null;$prepared=$false;$oldPath=$env:PATH
+$token="$EvidenceDirectory\private-token.bin";$worker=$null;$stdout=$null;$stderr=$null;$stdoutFile=$null;$stderrFile=$null;$prepared=$false;$oldPath=$env:PATH
 $report=[ordered]@{schema=1;kind='indexed-npu-native-stream';job_id=$job;started=[DateTime]::UtcNow.ToString('o');completed=$false;transport='local named pipe and authenticated SSH-carried stream';smoke_test=[bool]$SmokeTest;desktop_offload_tested=$false;displayed_frames=0}
 $report.physical_runtime=$runtimeManifest
 $report.maximum_requests=$limit;$report.worker_maximum_seconds=600
@@ -79,8 +79,11 @@ try {
  $worker.StartInfo.UseShellExecute=$false;$worker.StartInfo.CreateNoWindow=$true;$worker.StartInfo.RedirectStandardOutput=$true;$worker.StartInfo.RedirectStandardError=$true
  if($ModelCacheDirectory){$worker.StartInfo.EnvironmentVariables['NR_RENDER_NPU_CACHE']=$ModelCacheDirectory}
  else{$worker.StartInfo.EnvironmentVariables.Remove('NR_RENDER_NPU_CACHE')}
+ $stdoutFile=[IO.FileStream]::new("$EvidenceDirectory\worker.stdout.jsonl",[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::ReadWrite,1,$true)
+ $stderrFile=[IO.FileStream]::new("$EvidenceDirectory\worker.stderr.log",[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::ReadWrite,1,$true)
  if(!$worker.Start()){throw 'Native NPU worker did not start'}
- $stdout=$worker.StandardOutput.ReadToEndAsync();$stderr=$worker.StandardError.ReadToEndAsync();$report.worker_pid=$worker.Id
+ $stdout=$worker.StandardOutput.BaseStream.CopyToAsync($stdoutFile,4096);$stderr=$worker.StandardError.BaseStream.CopyToAsync($stderrFile,4096);$report.worker_pid=$worker.Id
+ $report.worker_logs_streamed=$true
  Invoke-Command -Session $Session -ArgumentList $guest,$pipe,$active -ScriptBlock {
   param($directory,$name,$config)
   $deadline=[DateTime]::UtcNow.AddSeconds(30)
@@ -135,13 +138,22 @@ finally {
   }
  }
  if($worker -and $stdout){
-  if(!$worker.HasExited -and !$worker.WaitForExit(3000)){$worker.Kill();$worker.WaitForExit();$report.worker_terminated=$true}
-  $report.worker_exit_code=$worker.ExitCode
-  [IO.File]::WriteAllText("$EvidenceDirectory\worker.stdout.jsonl",$stdout.GetAwaiter().GetResult());[IO.File]::WriteAllText("$EvidenceDirectory\worker.stderr.log",$stderr.GetAwaiter().GetResult())
+  try {
+   if(!$worker.HasExited -and !$worker.WaitForExit(3000)){
+    $worker.Kill();$report.worker_terminated=$true
+    $report.worker_exit_wait_completed=$worker.WaitForExit(5000)
+   }
+   if($worker.HasExited){$report.worker_exit_code=$worker.ExitCode}
+   else{$report.worker_termination_pending=$true}
+   $outDone=$stdout.Wait(2000);$errDone=$stderr.Wait(2000)
+   $report.worker_output_complete=$outDone -and $errDone
+   if(!$report.worker_output_complete){$report.worker_output_incomplete=$true}
+  } catch {$report.worker_cleanup_error=$_.Exception.Message}
  }
+ if($stdoutFile){$stdoutFile.Dispose()};if($stderrFile){$stderrFile.Dispose()}
  if($worker){$worker.Dispose()}
  if(Test-Path $token){Remove-Item $token}
  $env:PATH=$oldPath;$report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');Save-Report
  Get-ChildItem $EvidenceDirectory -File|ForEach-Object {[ordered]@{name=$_.Name;sha256=(Get-FileHash $_.FullName).Hash}}|ConvertTo-Json|Set-Content "$EvidenceDirectory\sha256.json"
 }
-if($report.error -or $report.cleanup_error){throw 'Indexed NPU native stream failed; inspect preserved report'}
+if($report.error -or $report.cleanup_error -or $report.worker_cleanup_error -or $report.worker_termination_pending -or $report.worker_output_incomplete){throw 'Indexed NPU native stream failed; inspect preserved report'}

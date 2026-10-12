@@ -3,6 +3,12 @@
 #include "clear_executor.hpp"
 namespace nr::registered_lab::indexed_exchange {
 class Pipeline {
+    static uint32_t vertex_capacity(uint32_t count) {
+        require(count && count<=4095 && !(count%3));
+        uint32_t capacity=3;
+        while(capacity<count)capacity=(std::min)(4095u,capacity*2);
+        return capacity;
+    }
     struct ClearEntry {uint32_t width,height,format;std::unique_ptr<raster::ClearExecutor> executor;};
     std::vector<ClearEntry> clear_cache;
     struct UniformEntry {
@@ -43,23 +49,27 @@ public:
         if(request.header.flags & 0x3000){
             const auto &h=request.header;require(shape_valid(h));
             const auto batch=triangle_batch(request,shader::RegisterExecutor::preferred_raster_batch(request.pixel));
+            const auto capacity=vertex_capacity(h.vertices);
             raster::PackedResources resources;shader::TextureSamplers samplers{};
             if(h.flags&0x2000){require(h.abi==8 || h.abi==9 || h.abi==10 || h.abi==11 || h.abi==12 || h.abi==14);resources=request.resources;samplers=request.samplers;}
             else {require(h.abi==7 || h.abi==9 || h.abi==10 || h.abi==11);resources[0]=request.texture;samplers[0].filter=(h.flags&16)?shader::TextureFilter::point:shader::TextureFilter::linear;}
             for(auto &entry:triangle_cache){const auto &old=entry.header;
-                if(entry.batch==batch && old.width==h.width && old.height==h.height && old.vertices==h.vertices && old.format==h.format &&
+                if(entry.batch==batch && old.vertices==capacity && old.format==h.format &&
                     (old.flags&~4u)==(h.flags&~4u) && raster::resource_layout_equal(resources,entry.layout) &&
                     raster::sampler_layout_equal(samplers,entry.samplers) && entry.vertex==request.vertex.bytecode && entry.pixel==request.pixel.bytecode)
                     return entry.executor->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,resources,request.background,request.scissor);
             }
-            // Retain a bounded set of complete, independently owned pipelines
-            // across the desktop's alternating programs and geometry sizes.
+            // Target shape is a runtime projection input, not a model shape.
+            // Retain fewer complete pipelines after the 64-entry desktop trial
+            // encountered command-queue creation failures. This is a bounded
+            // policy, not a claim about the driver's hardware queue limit.
             // Evict before constructing a successor for the qualified NPU driver.
-            if(triangle_cache.size()==64)triangle_cache.erase(triangle_cache.begin());
-            auto candidate=std::make_unique<raster::TriangleTextureDrawExecutor>(request.vertex,request.pixel,h.vertices,h.width,h.height,h.format,
+            if(triangle_cache.size()==24)triangle_cache.erase(triangle_cache.begin());
+            auto candidate=std::make_unique<raster::TriangleTextureDrawExecutor>(request.vertex,request.pixel,capacity,h.width,h.height,h.format,
                 resources,samplers,"NPU",blend_mode(h),uint8_t((h.flags>>8)&15),static_cast<raster::CullMode>((h.flags>>5)&3),(h.flags&128)!=0,batch);
             auto result=candidate->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,resources,request.background,request.scissor);
-            triangle_cache.push_back({h,batch,request.vertex.bytecode,request.pixel.bytecode,raster::resource_layout(resources),samplers,std::move(candidate)});
+            auto key=h;key.vertices=capacity;
+            triangle_cache.push_back({key,batch,request.vertex.bytecode,request.pixel.bytecode,raster::resource_layout(resources),samplers,std::move(candidate)});
             return result;
         }
         if (request.header.flags & 24) {

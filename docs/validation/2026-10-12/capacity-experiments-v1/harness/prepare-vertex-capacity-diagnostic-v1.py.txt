@@ -1,0 +1,46 @@
+from pathlib import Path
+import hashlib,json,shutil,subprocess
+r=Path('results/render-driver');revision=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip();assert revision=='af89adea11817fb5be9eb9bc2c23863efbb13213'
+for variant in ('baseline','candidate'):
+ dest=r/f'vertex-capacity-{variant}-v1';assert not dest.exists()
+ lab=dest/'native/windows/registered_lab';shutil.copytree('native/windows/registered_lab',lab)
+ for name in ['native/windows/ddi/contract.hpp','native/windows/ddi/unsupported.inc','native/windows/kmd/contract.hpp','native/windows/blend_model.hpp']:
+  p=dest/name;p.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(name,p)
+ p=lab/'indexed_exchange_worker.cpp';s=p.read_text();s=s.replace('#include "indexed_pipeline.hpp"','#include "indexed_pipeline.hpp"\n#include "provider_compile_statistics.hpp"');old='                const auto result=pipeline->execute(request);';assert old in s
+ new=r'''                const auto began=GetTickCount64();const auto before=nr::provider::compile_statistics();
+                const auto result=pipeline->execute(request);
+                const auto elapsed=GetTickCount64()-began;const auto after=nr::provider::compile_statistics();
+                std::printf("{\"kind\":\"pipeline_setup_diagnostic\",\"sequence\":%u,\"vertices\":%u,\"width\":%u,\"height\":%u,\"pipeline_ms\":%llu,\"compile_calls\":%llu,\"disk_hits\":%llu}\n",h.sequence,h.vertices,h.width,h.height,static_cast<unsigned long long>(elapsed),static_cast<unsigned long long>(after.calls-before.calls),static_cast<unsigned long long>(after.cache_hits-before.cache_hits));'''
+ s=s.replace(old,new);p.write_text(s)
+ if variant=='candidate':
+  p=lab/'indexed_pipeline.hpp';s=p.read_text();s=s.replace('class Pipeline {','''class Pipeline {
+    static uint32_t vertex_capacity(uint32_t count) {
+        require(count && count<=4095 && !(count%3));
+        uint32_t capacity=3;
+        while(capacity<count)capacity=(std::min)(4095u,capacity*2);
+        return capacity;
+    }''')
+  old='            const auto batch=triangle_batch(request,shader::RegisterExecutor::preferred_raster_batch(request.pixel));';assert old in s;s=s.replace(old,old+'\n            const auto capacity=vertex_capacity(h.vertices);')
+  old='old.vertices==h.vertices &&';assert s.count(old)==2;s=s.replace(old,'old.vertices==capacity &&',1)
+  old='request.vertex,request.pixel,h.vertices,h.width,h.height,h.format,';assert old in s;s=s.replace(old,'request.vertex,request.pixel,capacity,h.width,h.height,h.format,',1)
+  old='triangle_cache.push_back({h,batch,';assert old in s;s=s.replace(old,'auto key=h;key.vertices=capacity;\n            triangle_cache.push_back({key,batch,',1);p.write_text(s)
+  p=lab/'triangle_texture_draw.cpp';s=p.read_text();old='require(inputs.size()==s.count && background.size()';assert old in s;s=s.replace(old,'require(!inputs.empty() && inputs.size()<=s.count && !(inputs.size()%3) && background.size()',1)
+  old='auto began=Clock::now();auto shaded=s.vertex.execute(inputs,vc);';assert old in s;new='''auto began=Clock::now();
+    // Duplicate valid input bits only; shader and projection arithmetic remain
+    // provider operations. Padding never enters raster scheduling or budgets.
+    auto padded=inputs;padded.resize(s.count,inputs.back());
+    auto shaded=s.vertex.execute(padded,vc);''';s=s.replace(old,new,1)
+  old='const auto projected=s.projection.execute(clips,viewport);';assert old in s;s=s.replace(old,'auto projected=s.projection.execute(clips,viewport);',1)
+  old='require(projected.triangle_bounds.size()==s.count/3);';assert old in s;s=s.replace(old,old+'''\n    projected.vertices.resize(inputs.size());
+    projected.triangle_bounds.resize(inputs.size()/3);
+    shaded.vertices.resize(inputs.size());''',1);p.write_text(s)
+  p=lab/'triangle_texture_draw_test.cpp';s=p.read_text();old='TEST(argc<=2);const std::string backend=argc==2?argv[1]:"CPU";';assert old in s;s=s.replace(old,'''TEST(argc<=3 && (argc<3 || !std::strcmp(argv[2],"--capacity")));const std::string backend=argc>=2?argv[1]:"CPU";
+    const auto capacity=[&](uint32_t n){return argc==3?n*2:n;};''')
+  for a,b in [('executor(vs,ps,9,','executor(vs,ps,capacity(9),'),('sparse_executor(vs,ps,210,','sparse_executor(vs,ps,capacity(210),'),('executor(vs,ps,quads*9,','executor(vs,ps,capacity(quads*9),'),('executor(mixed_vs,mixed_ps,3,','executor(mixed_vs,mixed_ps,capacity(3),'),('executor(vs,ps,6,w,','executor(vs,ps,capacity(6),w,')]:
+   assert a in s;s=s.replace(a,b)
+  old='const auto result=executor.execute(inputs,{}, {},viewport,texture,bg,clip);';assert old in s;s=s.replace(old,old+'\n        TEST(result.vertices.size()==inputs.size());',1)
+  old='        for(const std::array<int32_t,4> clip:';assert old in s;s=s.replace(old,'        // Invalid logical counts fail before changing provider state. Each\n        // attempt is followed by the same independently checked valid draw.\n        for(const size_t size:{size_t(0),size_t(8),size_t(capacity(9)+3)}){\n            auto invalid=inputs;invalid.resize(size,inputs.back());bool failed=false;\n            try{(void)executor.execute(invalid,{}, {},viewport,texture,bg);}\n            catch(const std::invalid_argument &){failed=true;}\n            TEST(failed);\n        }\n'+old,1)
+  p.write_text(s)
+ sources={p.relative_to(dest).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(dest.rglob('*')) if p.is_file()}
+ (r/f'vertex-capacity-{variant}-v1-source.json').write_text(json.dumps(sources,indent=2)+'\n')
+(r/'vertex-capacity-diagnostic-v1-plan.json').write_text(json.dumps({'baseline_revision':revision,'status':'prepared_not_built_or_run','production_source_changed':False,'required_before_run':'v113 completed and configuration removed; no concurrent hardware workload or build','candidate_change':['Bucket only triangle-pipeline vertex capacity in units of three, capped at 4095.','Pad with duplicated real input bits for provider vertex/projection stages.','Truncate padded shader/projection outputs before raster scheduling and tile-budget validation.','Preserve all shader, sampler, resource, blend and raster cache identities.','Return only real vertices; retain independently owned complete pipelines.'],'validation_required':['Clean isolated baseline/candidate builds with identical diagnostic timing instrumentation.','CPU and NPU existing triangle oracle suite with exact-size and padded-capacity modes.','Reject empty, non-triangle and over-capacity input without poisoning valid reuse.','Captured packet outputs and coverage exactly match baseline, including current border and opaque-linear packets.','Serial baseline/candidate/baseline timing with process memory and cache statistics.'],'no_claims':['No speed improvement measured.','No new compiled-model sharing.','No desktop or Tahoma improvement measured.']},indent=2)+'\n')

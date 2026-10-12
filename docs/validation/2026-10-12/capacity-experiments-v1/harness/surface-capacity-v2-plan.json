@@ -1,0 +1,18 @@
+{
+  "base": "vertex-capacity-candidate-v1",
+  "changes": [
+    "Reuse target-independent triangle graphs across validated viewport sizes.",
+    "Retain vertex capacity buckets from the accurate v1 candidate.",
+    "Reduce triangle retention bound from 64 to 24."
+  ],
+  "proof_basis": "Triangle vertex/projection/coverage/pixel/interpolation/merger model construction does not use target width or height. Viewport is already a projection input. Target shape controls only bounded host indexing and output layout.",
+  "required_checks": [
+    "Exact prior CPU/NPU triangle tests and invalid shapes.",
+    "All 71 historical packets exact.",
+    "Independent solid-source/scissor oracle across 32 target shapes, changing source contents, repeated vertices and 32 texture shapes requiring eviction.",
+    "Serial baseline/candidate comparisons."
+  ],
+  "production_source_changed": false,
+  "desktop_offload_tested": false,
+  "hardware_queue_limit_known": false
+}

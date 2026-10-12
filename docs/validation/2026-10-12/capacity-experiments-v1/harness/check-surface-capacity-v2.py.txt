@@ -1,0 +1,32 @@
+import hashlib,json,struct,subprocess,sys
+from pathlib import Path
+mode=sys.argv[1];out=Path(sys.argv[2])
+def digest(b):return hashlib.sha256(b).hexdigest()
+if mode=='prepare':
+ build=Path(sys.argv[3]);group=sys.argv[4];assert group in ('targets','textures');out.mkdir(exist_ok=False);base=out/'base.bin'
+ with (out/'fixture.log').open('wb') as f:subprocess.run([str(build/'nr_registered_indexed_exchange_test.exe'),'--emit-point-texture',str(base)],stdout=f,stderr=subprocess.STDOUT,check=True,timeout=30)
+ original=base.read_bytes();header=struct.unpack_from('<3Q14I',original);assert header[3:9]==(2,64,64,6,87,0xf02)
+ inputs=104+4*(header[9]+header[10]);background=inputs+6*256;texture=background+64*64*4
+ assert struct.unpack_from('<4I',original,texture)==(96,80,87,0) and texture+16+96*80*4==len(original)
+ records=[]
+ for case in range(64):
+  shape=case%32;quads=1+shape%4;w=64+2*shape if group=='targets' else 64;h=64+2*(shape%4) if group=='targets' else 64;sw=96 if group=='targets' else 96+shape;sh=80
+  clip=(3,5,w-7,h-9);color=bytes((17+(case%3)*31,71+(case%5)*17,129-(case%7)*11,case%256));old=bytes((3,19,91,137))
+  body=struct.pack('<6f',0,0,w,h,0,1)+struct.pack('<4i',*clip)+original[104:inputs]+original[inputs:background]*quads+old*(w*h)+struct.pack('<4I',sw,sh,87,0)+color*(sw*sh)
+  hd=list(header);hd[1]=0x4e52535552464332;hd[2]=case+1;hd[3:7]=(7,w,h,6*quads);hd[8]=0x1f16;hd[11]=4101+case;hd[12]=len(body);data=struct.pack('<3Q14I',*hd)+body
+  name=f'request-42-{hd[1]:016x}{hd[2]:016x}-{hd[11]}.bin';(out/name).write_bytes(data)
+  records.append({'file':name,'sequence':hd[11],'case':case,'group':group,'width':w,'height':h,'vertices':6*quads,'texture_width':sw,'clip':clip,'background':list(old),'expected_color':list(color[:3]+b'\xff'),'covered_samples':(clip[2]-clip[0])*(clip[3]-clip[1])*quads,'request_sha256':digest(data)})
+ (out/'requests.json').write_text(json.dumps(records,indent=2)+'\n');print(json.dumps({'prepared':len(records),'group':group}))
+elif mode=='compare':
+ records=json.loads((out/'requests.json').read_text());checks=[]
+ for r in records:
+  request=(out/r['file']).read_bytes();assert digest(request)==r['request_sha256'];h=struct.unpack_from('<3Q14I',request)
+  response=(out/r['file'].replace('request-','reply-',1)).read_bytes();rh=struct.unpack_from('<3Q14I',response);assert all(h[i]==rh[i] for i in range(17) if i not in (12,14,15)) and rh[14:16]==(2,3)
+  receipt=struct.unpack_from('<5Q2I',response,80);assert receipt[3]==r['covered_samples'] and receipt[5:]==(0,0)
+  expected=bytearray();x0,y0,x1,y1=r['clip'];old=bytes(r['background']);color=bytes(r['expected_color'])
+  for y in range(r['height']):expected.extend(old*x0+color*(x1-x0)+old*(r['width']-x1) if y0<=y<y1 else old*r['width'])
+  assert response[128:]==expected,(r['case'],sum(a!=b for a,b in zip(response[128:],expected)))
+  checks.append({'case':r['case'],'sequence':r['sequence'],'all_pixels_exact':True,'covered_samples':receipt[3],'pixel_sha256':digest(response[128:])})
+ assert len(checks)==64
+ (out/'oracle-comparison.json').write_text(json.dumps({'all_passed':True,'checks':checks,'execution_device':'NPU','desktop_offload_tested':False},indent=2)+'\n');print(json.dumps({'compared':len(checks),'exact_independent_pixels_and_coverage':True}))
+else:raise ValueError(mode)

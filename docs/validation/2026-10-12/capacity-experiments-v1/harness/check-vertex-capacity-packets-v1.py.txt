@@ -1,0 +1,33 @@
+import hashlib,json,os,struct,sys
+from pathlib import Path
+root=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm';out=Path(sys.argv[2]);action=sys.argv[1]
+def digest(b):return hashlib.sha256(b).hexdigest()
+if action=='prepare':
+ out.mkdir(exist_ok=False);cases=[]
+ base=root/'pipeline-cache-diagnostic-v3-results/baseline'
+ for row in json.loads((base/'requests.json').read_text()):
+  cases.append((base/row['file'],base/row['file'].replace('request-','reply-',1)))
+ for folder in ('border-v221/border-pipeline/packets','linear-opaque-v222/pipeline/packets'):
+  for p in sorted((root/folder).glob('request-*.bin')):cases.append((p,p.with_name(p.name.replace('request-','reply-',1))))
+ assert len(cases)==71,len(cases)
+ records=[]
+ for n,(source,reference) in enumerate(cases,1):
+  original=source.read_bytes();data=bytearray(original);h=struct.unpack_from('<3Q14I',data);assert len(data)==80+h[12] and h[14:16]==(1,0)
+  seq=3000+n;struct.pack_into('<QQ',data,8,0x4e52504950454c49,n);struct.pack_into('<I',data,56,seq);struct.pack_into('<I',data,64,42)
+  name=f'request-42-{0x4e52504950454c49:016x}{n:016x}-{seq}.bin';(out/name).write_bytes(data)
+  expected=reference.read_bytes();eh=struct.unpack_from('<3Q14I',expected);assert eh[14:16]==(2,3) and len(expected)==128+h[4]*h[5]*4
+  receipt=struct.unpack_from('<5Q2I',expected,80)
+  records.append({'sequence':seq,'file':name,'source':str(source.relative_to(root)),'source_sha256':digest(original),'request_sha256':digest(data),'reference':str(reference.relative_to(root)),'reference_sha256':digest(expected),'pixel_sha256':digest(expected[128:]),'covered_samples':receipt[3],'receipt_flags':list(receipt[5:])})
+ (out/'requests.json').write_text(json.dumps(records,indent=2)+'\n');print(json.dumps({'prepared':len(records)}))
+elif action=='compare':
+ records=json.loads((out/'requests.json').read_text());checks=[]
+ for r in records:
+  request=(out/r['file']).read_bytes();assert digest(request)==r['request_sha256'];h=struct.unpack_from('<3Q14I',request)
+  response=(out/r['file'].replace('request-','reply-',1)).read_bytes();rh=struct.unpack_from('<3Q14I',response)
+  assert all(rh[i]==h[i] for i in range(17) if i not in (12,14,15)) and rh[14:16]==(2,3) and len(response)==128+h[4]*h[5]*4
+  reference=(root/r['reference']).read_bytes();assert digest(reference)==r['reference_sha256']
+  receipt=struct.unpack_from('<5Q2I',response,80);assert response[128:]==reference[128:] and receipt[3]==r['covered_samples'] and list(receipt[5:])==r['receipt_flags']
+  checks.append({'sequence':r['sequence'],'pixel_sha256':digest(response[128:]),'covered_samples':receipt[3],'execution_device':'NPU','exact':True})
+ assert len(checks)==71
+ (out/'comparison.json').write_text(json.dumps({'all_exact':True,'checks':checks},indent=2)+'\n');print(json.dumps({'compared':len(checks),'all_exact':True}))
+else:raise ValueError(action)

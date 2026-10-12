@@ -976,3 +976,16 @@ CPU replay and subsequently pass NPU replay with byte-identical output after an
 exact-instance NPU device restart. Both guest drivers are removed; no physical
 reboot, GPU device change or driver-package change occurs. Resource accumulation
 is a hypothesis for controlled follow-up, not an established hardware queue limit.
+
+The [v223 surface-capacity implementation](../../../docs/validation/2026-10-12/surface-capacity-v223/report.json)
+reuses independently owned triangle pipelines across validated target dimensions
+and vertex-capacity buckets, with a 24-entry retention bound. Padding is removed
+before raster scheduling. Both runtime builds pass 28 CPU suites; twelve NPU
+qualification stages preserve changing-target pixels, historical captures and
+all four failed v113 draws. The [controlled cache comparison](../../../docs/validation/2026-10-12/capacity-experiments-v1/report.json)
+shows a changing-target improvement and a changing-texture eviction penalty;
+neither desktop stability nor a general speedup follows from these packet tests.
+The [stream log check](../../../docs/validation/2026-10-12/stream-capture-v119/report.json)
+verifies output is visible before normal and forced child termination. Shutdown
+waits are bounded and incomplete output is reported; a driver device-loss hang
+was not simulated in that check.

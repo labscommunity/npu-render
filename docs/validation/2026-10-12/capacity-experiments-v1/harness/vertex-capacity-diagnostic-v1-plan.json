@@ -1,0 +1,25 @@
+{
+  "baseline_revision": "af89adea11817fb5be9eb9bc2c23863efbb13213",
+  "status": "prepared_not_built_or_run",
+  "production_source_changed": false,
+  "required_before_run": "v113 completed and configuration removed; no concurrent hardware workload or build",
+  "candidate_change": [
+    "Bucket only triangle-pipeline vertex capacity in units of three, capped at 4095.",
+    "Pad with duplicated real input bits for provider vertex/projection stages.",
+    "Truncate padded shader/projection outputs before raster scheduling and tile-budget validation.",
+    "Preserve all shader, sampler, resource, blend and raster cache identities.",
+    "Return only real vertices; retain independently owned complete pipelines."
+  ],
+  "validation_required": [
+    "Clean isolated baseline/candidate builds with identical diagnostic timing instrumentation.",
+    "CPU and NPU existing triangle oracle suite with exact-size and padded-capacity modes.",
+    "Reject empty, non-triangle and over-capacity input without poisoning valid reuse.",
+    "Captured packet outputs and coverage exactly match baseline, including current border and opaque-linear packets.",
+    "Serial baseline/candidate/baseline timing with process memory and cache statistics."
+  ],
+  "no_claims": [
+    "No speed improvement measured.",
+    "No new compiled-model sharing.",
+    "No desktop or Tahoma improvement measured."
+  ]
+}

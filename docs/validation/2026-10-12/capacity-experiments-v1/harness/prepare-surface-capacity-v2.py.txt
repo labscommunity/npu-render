@@ -1,0 +1,27 @@
+from pathlib import Path
+import shutil,hashlib,json
+r=Path('results/render-driver');base=r/'vertex-capacity-candidate-v1';dest=r/'surface-capacity-v2';assert not dest.exists();shutil.copytree(base,dest);lab=dest/'native/windows/registered_lab'
+p=lab/'indexed_pipeline.hpp';s=p.read_text();old='entry.batch==batch && old.width==h.width && old.height==h.height && old.vertices==capacity';assert old in s;s=s.replace(old,'entry.batch==batch && old.vertices==capacity',1).replace('triangle_cache.size()==64','triangle_cache.size()==24');p.write_text(s)
+p=lab/'triangle_texture_draw.cpp';s=p.read_text();old='''require(!inputs.empty() && inputs.size()<=s.count && !(inputs.size()%3) && background.size()==size_t(s.width)*s.height && resource_layout_equal(resources,s.layout) && viewport.x==0 && viewport.y==0 &&
+        viewport.width==float(s.width) && viewport.height==float(s.height));''';assert old in s
+s=s.replace(old,'''// Projection accepts viewport dimensions as provider inputs; coverage and
+    // merger models operate on bounded batches, independent of target shape.
+    require(viewport.x==0 && viewport.y==0 && std::isfinite(viewport.width) && std::isfinite(viewport.height) &&
+        viewport.width>=1 && viewport.width<=8192 && viewport.height>=1 && viewport.height<=8192);
+    const auto target_width=uint32_t(viewport.width),target_height=uint32_t(viewport.height);
+    require(viewport.width==float(target_width) && viewport.height==float(target_height) &&
+        uint64_t(target_width)*target_height<=4*1024*1024 && !inputs.empty() && inputs.size()<=s.count && !(inputs.size()%3) &&
+        background.size()==size_t(target_width)*target_height && resource_layout_equal(resources,s.layout));''',1)
+start=s.index('UniformDrawExecutor::Result TriangleTextureDrawExecutor::execute(const std::vector<shader::VertexRegisters> &inputs,\n    const shader::VertexConstants &vc,const shader::VertexConstants &pc,const Viewport &viewport,const PackedResources')
+s=s[:start]+s[start:].replace('s.width','target_width').replace('s.height','target_height');p.write_text(s)
+p=lab/'triangle_texture_draw_test.cpp';s=p.read_text();anchor='        // Invalid logical counts fail';assert anchor in s
+s=s.replace(anchor,'''        for(const float width:{0.f,-1.f,32.5f,8193.f,std::numeric_limits<float>::infinity(),std::numeric_limits<float>::quiet_NaN()}){
+            auto invalid=viewport;invalid.width=width;bool failed=false;
+            try{(void)executor.execute(inputs,{}, {},invalid,texture,bg);}catch(const std::invalid_argument &){failed=true;}
+            TEST(failed);
+        }
+'''+anchor,1)
+if '#include <limits>' not in s:s=s.replace('#include <cmath>','#include <cmath>\n#include <limits>')
+p.write_text(s)
+sources={p.relative_to(dest).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(dest.rglob('*')) if p.is_file()};(r/'surface-capacity-v2-source.json').write_text(json.dumps(sources,indent=2)+'\n')
+(r/'surface-capacity-v2-plan.json').write_text(json.dumps({'base':'vertex-capacity-candidate-v1','changes':['Reuse target-independent triangle graphs across validated viewport sizes.','Retain vertex capacity buckets from the accurate v1 candidate.','Reduce triangle retention bound from 64 to 24.'],'proof_basis':'Triangle vertex/projection/coverage/pixel/interpolation/merger model construction does not use target width or height. Viewport is already a projection input. Target shape controls only bounded host indexing and output layout.','required_checks':['Exact prior CPU/NPU triangle tests and invalid shapes.','All 71 historical packets exact.','Independent solid-source/scissor oracle across 32 target shapes, changing source contents, repeated vertices and 32 texture shapes requiring eviction.','Serial baseline/candidate comparisons.'],'production_source_changed':False,'desktop_offload_tested':False,'hardware_queue_limit_known':False},indent=2)+'\n')

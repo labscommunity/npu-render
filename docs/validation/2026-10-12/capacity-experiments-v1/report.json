@@ -1,0 +1,142 @@
+{
+  "all_checks_passed": true,
+  "baseline_source_commit": "af89adea11817fb5be9eb9bc2c23863efbb13213",
+  "vertex_only_runs": [
+    {
+      "name": "baseline-triangle-NPU",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 3989,
+      "passed": true,
+      "peak_private_bytes": 29876224,
+      "peak_working_bytes": 79495168
+    },
+    {
+      "name": "candidate-triangle-NPU",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 3829,
+      "passed": true,
+      "peak_private_bytes": 30216192,
+      "peak_working_bytes": 79908864
+    },
+    {
+      "name": "candidate-capacity-NPU",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 6311,
+      "passed": true,
+      "peak_private_bytes": 61726720,
+      "peak_working_bytes": 133697536
+    },
+    {
+      "name": "baseline-worker",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 40006,
+      "passed": true,
+      "peak_private_bytes": 269348864,
+      "peak_working_bytes": 705179648
+    },
+    {
+      "name": "candidate-worker",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 41707,
+      "passed": true,
+      "peak_private_bytes": 283295744,
+      "peak_working_bytes": 751157248
+    },
+    {
+      "name": "baseline-repeat-worker",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 40374,
+      "passed": true,
+      "peak_private_bytes": 273670144,
+      "peak_working_bytes": 709337088
+    }
+  ],
+  "surface_reuse_runs": [
+    {
+      "name": "baseline-targets-worker",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 24621,
+      "passed": true,
+      "peak_private_bytes": 276328448,
+      "peak_working_bytes": 677974016
+    },
+    {
+      "name": "baseline-textures-worker",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 50029,
+      "passed": true,
+      "peak_private_bytes": 352641024,
+      "peak_working_bytes": 734208000
+    },
+    {
+      "name": "candidate-targets-worker",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 8869,
+      "passed": true,
+      "peak_private_bytes": 40857600,
+      "peak_working_bytes": 104890368
+    },
+    {
+      "name": "candidate-textures-worker",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 40524,
+      "passed": true,
+      "peak_private_bytes": 211632128,
+      "peak_working_bytes": 498978816
+    },
+    {
+      "name": "baseline-repeat-targets-worker",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 24882,
+      "passed": true,
+      "peak_private_bytes": 268017664,
+      "peak_working_bytes": 640348160
+    },
+    {
+      "name": "baseline-repeat-textures-worker",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 20692,
+      "passed": true,
+      "peak_private_bytes": 266526720,
+      "peak_working_bytes": 639574016
+    },
+    {
+      "name": "historical-worker",
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_ms": 39634,
+      "passed": true,
+      "peak_private_bytes": 270348288,
+      "peak_working_bytes": 704786432
+    }
+  ],
+  "historical_packets": 71,
+  "synthetic_packets_per_worker": 64,
+  "synthetic_workers": 6,
+  "cache_entries_before": 64,
+  "cache_entries_candidate": 24,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "process_memory_excludes_driver_device": true,
+  "findings": [
+    "Vertex capacity alone preserves historical pixels and coverage, but is about 3.8% slower than the average bracketing baseline and uses more process memory on the captured workload. It was not installed alone.",
+    "Triangle compiled graphs accept viewport dimensions as runtime inputs. The combined candidate reuses independent complete pipelines across target sizes and buckets vertex capacity, with a 24-entry retention policy.",
+    "Across 32 target sizes repeated twice, candidate takes 8869 ms; bracketing baselines take 24621 and 24882 ms. Sampled peak private memory is 40.9 MB versus 276.3 and 268.0 MB. This is a controlled packet workload, not desktop throughput.",
+    "Across 32 texture layouts repeated twice, candidate takes 40524 ms; baselines take 50029 then 20692 ms. Disk-cache warmup changes the baseline substantially. The candidate is 96% slower than the warm baseline as its smaller cache evicts pipelines. No general speedup is established.",
+    "All 384 synthetic packets pass independent full-pixel and coverage expectations. All 71 historical candidate outputs preserve exact pixels, coverage, device and protocol flags.",
+    "Initial v2 build fails because an explicit cmath include is missing. v2b corrects that include. Initial synthetic packets use invalid sequence 4101, exceeding protocol maximum 4096; v3 changes only sequence assignment to 3501 through 3564. Both failures and baseline recovery are preserved.",
+    "The 24-entry policy tests a resource-retention hypothesis after v113 queue creation failures; no hardware queue limit or prevention of desktop device loss is established."
+  ]
+}

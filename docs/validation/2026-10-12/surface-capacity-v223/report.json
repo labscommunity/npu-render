@@ -1,0 +1,23 @@
+{
+  "build": "present-umd-v223",
+  "all_checks_passed": true,
+  "native_npu_execution": true,
+  "historical_packets": 71,
+  "synthetic_packets": 128,
+  "failed_desktop_captures": 4,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "clean_cpu_suites_per_runtime": 28,
+  "qualification_stages": 12,
+  "runtime_variants": [
+    "OpenVINO 2026.4.1",
+    "OpenVINO 2026.1.0"
+  ],
+  "behavior": [
+    "Triangle models use validated runtime viewport dimensions and bounded vertex capacity. Padding is removed before raster scheduling and coverage budgets.",
+    "Triangle pipeline retention is bounded to 24 complete independent entries. No compiled-model sharing or CPU shader fallback is introduced.",
+    "One executor is checked across 31x29, 1x1, 64x17 and back to 31x29 targets, with full and empty scissors and an independent pixel oracle. Invalid finite/infinite dimensions and invalid vertex counts are rejected.",
+    "All four captured v113 failures produce complete output exactly matching the previously verified CPU and NPU output.",
+    "Cache policy is a resource-retention experiment; desktop stability, usable interaction and Tahoma performance remain unverified."
+  ]
+}
