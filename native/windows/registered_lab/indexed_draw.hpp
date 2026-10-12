@@ -128,10 +128,11 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
         (d.pixel_program->textures[slot] && (slot || d.pixel_program->texture_dimensions[slot]!=3 || d.pixel_program->texture_uint[slot])) ||
         (slot && d.pixel_program->samplers[slot]);
     for(const auto &instruction:d.pixel_program->instructions)general_resources=general_resources || instruction.opcode==nr::shader::Opcode::load;
-    bool addressed=false;
+    bool addressed=false,bordered=false;
     for(unsigned slot=0;slot<16;++slot)if(d.pixel_program->samplers[slot]){
         const auto &sampler=d.samplers[2][slot];require(sampler.bound);
         addressed=addressed || sampler.desc.AddressU!=D3D10_DDI_TEXTURE_ADDRESS_CLAMP || sampler.desc.AddressV!=D3D10_DDI_TEXTURE_ADDRESS_CLAMP;
+        bordered=bordered || sampler.desc.AddressU==D3D10_DDI_TEXTURE_ADDRESS_BORDER || sampler.desc.AddressV==D3D10_DDI_TEXTURE_ADDRESS_BORDER;
     }
     general_resources=general_resources || addressed;
     nr::raster::PackedResources resources{};nr::shader::TextureSamplers resource_samplers{};
@@ -141,12 +142,15 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
             if(d.pixel_program->samplers[slot]){
                 const auto &samp=d.samplers[2][slot];require(samp.bound &&
                     single_mip_filter_supported(UINT(samp.desc.Filter)) &&
-                    (samp.desc.AddressU==D3D10_DDI_TEXTURE_ADDRESS_CLAMP || samp.desc.AddressU==D3D10_DDI_TEXTURE_ADDRESS_MIRROR) &&
-                    (samp.desc.AddressV==D3D10_DDI_TEXTURE_ADDRESS_CLAMP || samp.desc.AddressV==D3D10_DDI_TEXTURE_ADDRESS_MIRROR) &&
+                    (samp.desc.AddressU==D3D10_DDI_TEXTURE_ADDRESS_CLAMP || samp.desc.AddressU==D3D10_DDI_TEXTURE_ADDRESS_MIRROR || samp.desc.AddressU==D3D10_DDI_TEXTURE_ADDRESS_BORDER) &&
+                    (samp.desc.AddressV==D3D10_DDI_TEXTURE_ADDRESS_CLAMP || samp.desc.AddressV==D3D10_DDI_TEXTURE_ADDRESS_MIRROR || samp.desc.AddressV==D3D10_DDI_TEXTURE_ADDRESS_BORDER) &&
                     samp.desc.AddressW==D3D10_DDI_TEXTURE_ADDRESS_CLAMP && samp.desc.MipLODBias==0 && samp.desc.MinLOD==0 && samp.desc.MaxLOD>=0);
                 resource_samplers[slot].filter=single_mip_linear_filter(UINT(samp.desc.Filter))?nr::shader::TextureFilter::linear:nr::shader::TextureFilter::point;
-                resource_samplers[slot].u=samp.desc.AddressU==D3D10_DDI_TEXTURE_ADDRESS_MIRROR?nr::shader::TextureAddress::mirror:nr::shader::TextureAddress::clamp;
-                resource_samplers[slot].v=samp.desc.AddressV==D3D10_DDI_TEXTURE_ADDRESS_MIRROR?nr::shader::TextureAddress::mirror:nr::shader::TextureAddress::clamp;
+                auto address=[](UINT mode){return mode==D3D10_DDI_TEXTURE_ADDRESS_BORDER?nr::shader::TextureAddress::border:
+                    mode==D3D10_DDI_TEXTURE_ADDRESS_MIRROR?nr::shader::TextureAddress::mirror:nr::shader::TextureAddress::clamp;};
+                auto &sampler=resource_samplers[slot];sampler.u=address(UINT(samp.desc.AddressU));sampler.v=address(UINT(samp.desc.AddressV));
+                if(sampler.u==nr::shader::TextureAddress::border || sampler.v==nr::shader::TextureAddress::border)
+                    for(unsigned c=0;c<4;++c){require(std::isfinite(samp.desc.BorderColor[c]));sampler.border[c]=std::clamp(samp.desc.BorderColor[c],0.f,1.f);}
             }
             if(!d.pixel_program->textures[slot])continue;
             const auto &view=d.shader_sources[2][slot];const auto source=view.allocation;if(!source)continue;
@@ -161,6 +165,13 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
             }else{
                 const auto &ss=source->surface;require(d.pixel_program->texture_dimensions[slot]==3 && !d.pixel_program->texture_uint[slot] &&
                     (ss.format==28 || ss.format==87 || ss.format==65) && ss.width<=8192 && ss.height<=8192 && uint64_t(ss.width)*ss.height<=4194304);
+                // A8 is expanded to RGBA transport. Its format-specific border
+                // defaults need separate metadata before border sampling is admitted.
+                if(ss.format==65)for(const auto &instruction:d.pixel_program->instructions)
+                    if(instruction.opcode==nr::shader::Opcode::sample && instruction.sources[1].index==slot){
+                        const auto &sampler=d.samplers[2][instruction.sources[2].index].desc;
+                        require(sampler.AddressU!=D3D10_DDI_TEXTURE_ADDRESS_BORDER && sampler.AddressV!=D3D10_DDI_TEXTURE_ADDRESS_BORDER);
+                    }
                 const auto data=read_pixels(*source);t={ss.width,ss.height,ss.format==65?28u:ss.format,{}};t.pixels.resize(size_t(ss.width)*ss.height);
                 if(ss.format==65)for(size_t n=0;n<data.size();++n)t.pixels[n]={0,0,0,data[n]};else std::memcpy(t.pixels.data(),data.data(),data.size());
             }
@@ -213,6 +224,7 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
         if(destination_out){request.header.abi=10;request.header.flags|=0x8000;}
         if(nr::raster::extended_blend(blend_mode)){request.header.abi=11;request.header.flags|=0x10000|(uint32_t(blend_mode)<<17);}
         if(addressed)request.header.abi=12;
+        if(bordered)request.header.abi=14;
         request.viewport = viewport; request.vertex = *d.vertex_program; request.pixel = *d.pixel_program;
         request.inputs = inputs; request.vertex_constants = vc; request.pixel_constants = pc; request.background = std::move(background);
         result = d.indexed_exchange->execute(std::move(request));

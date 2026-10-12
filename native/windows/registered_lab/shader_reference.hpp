@@ -14,7 +14,7 @@ inline uint32_t as_bits(float value) { uint32_t result; std::memcpy(&result, &va
 inline Registers reference_vertex(const Program &program, const Registers &inputs, const Constants &constants,
                                  const TextureShapes &shapes = {}, const TextureSamplers &samplers = {},
                                  const TexturePixels &textures = {}, unsigned fused_arithmetic = 0,
-                                 const std::vector<Bits> *derivatives = nullptr) {
+                                 const std::vector<Bits> *derivatives = nullptr, bool reciprocal_division = false) {
     Registers temporary{}, output{};
     for (unsigned i = 0; i < 14; ++i) check(constants[i].size() >= program.constants[i]);
     auto load = [&](const Operand &a, bool integer_modifier = false) {
@@ -126,6 +126,7 @@ inline Registers reference_vertex(const Program &program, const Registers &input
                 // address individual integer taps, including mirror seams.
                 const auto coordinate = [](float x, TextureAddress address) {
                     if(address==TextureAddress::mirror)return std::fmod(double(x),2.0);
+                    if(address==TextureAddress::border)return std::clamp(double(x),-2.,3.);
                     check(address==TextureAddress::clamp);return std::clamp(double(x),0.,1.);
                 };
                 const double x = coordinate(u,sampler.u) * shape.width - (filter == TextureFilter::linear ? .5 : 0);
@@ -138,6 +139,9 @@ inline Registers reference_vertex(const Program &program, const Registers &input
                     return uint32_t(wrapped<int(extent)?wrapped:period-1-wrapped);
                 };
                 auto fetch = [&](int dx, int dy) {
+                    if((sampler.u==TextureAddress::border && (ix+dx<0 || ix+dx>=int(shape.width))) ||
+                       (sampler.v==TextureAddress::border && (iy+dy<0 || iy+dy>=int(shape.height))))
+                        return double(sampler.border[component]);
                     const auto sx = tap(ix+dx,shape.width,sampler.u);
                     const auto sy = tap(iy+dy,shape.height,sampler.v);
                     return double(textures[slot][size_t(sy) * shape.width + sx][component]);
@@ -161,7 +165,14 @@ inline Registers reference_vertex(const Program &program, const Registers &input
                     if(fused_arithmetic)v=std::fma(a,b,as_float(values[2][i]));
                     else {volatile float product=a*b;v=product+as_float(values[2][i]);}
                 }
-                else if (instruction.opcode == Opcode::divide) v = a / b;
+                else if (instruction.opcode == Opcode::divide) {
+                    // D3D11.3 section 3.1.3 also permits x*(1/y), with
+                    // independently rounded reciprocal and multiplication.
+                    // This exact alternative is opt-in for replay validation;
+                    // it does not introduce a tolerance for MOV/integer bits.
+                    if(reciprocal_division){volatile float reciprocal=1.f/b;v=a*reciprocal;}
+                    else v=a/b;
+                }
                 else if(instruction.opcode==Opcode::floor)v=std::fpclassify(a)==FP_SUBNORMAL?std::copysign(0.f,a):std::floor(a);
                 else if(instruction.opcode==Opcode::fraction)v=std::fpclassify(a)==FP_SUBNORMAL?0.f:a-std::floor(a);
                 else if (instruction.opcode == Opcode::reciprocal_sqrt) v = 1.0f / std::sqrt(a);

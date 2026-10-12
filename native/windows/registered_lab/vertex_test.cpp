@@ -8,6 +8,26 @@
 namespace {
 using namespace nr::shader;
 void test(bool value) { if (!value) throw std::runtime_error("vertex program test failed"); }
+void test_division_reference(){
+    Program program;program.inputs[0]=program.inputs[1]=program.outputs[0]=15;
+    Instruction instruction;instruction.opcode=Opcode::divide;instruction.source_count=2;
+    instruction.destination.kind=Register::output;instruction.destination.mask=15;
+    instruction.sources[0].kind=instruction.sources[1].kind=Register::input;instruction.sources[1].index=1;
+    program.instructions.push_back(instruction);
+    Registers input{};input[0]={as_bits(7.f),as_bits(-7.f),as_bits(0.f),as_bits(7.f)};
+    input[1]={as_bits(3.f),as_bits(3.f),as_bits(3.f),as_bits(1.f)};
+    const Bits direct{0x40155555u,0xc0155555u,0,0x40e00000u};
+    const Bits reciprocal{0x40155556u,0xc0155556u,0,0x40e00000u};
+    for(unsigned mode=0;mode<3;++mode){
+        test(reference_vertex(program,input,{},{},{},{},mode)[0]==direct);
+        test(reference_vertex(program,input,{},{},{},{},mode,nullptr,true)[0]==reciprocal);
+    }
+    // A division allowance must not change unrelated raw-bit moves.
+    program.instructions[0].opcode=Opcode::move;program.instructions[0].source_count=1;
+    input[0]={0x7fc12345u,0x80000000u,0xffffffffu,0x00000001u};
+    for(unsigned mode=0;mode<3;++mode)
+        test(reference_vertex(program,input,{},{},{},{},mode,nullptr,true)[0]==input[0]);
+}
 constexpr const char *source = R"(
 cbuffer Screen : register(b0) { float4 transform; };
 cbuffer Palette : register(b1) { float4 colors[250]; };
@@ -165,6 +185,7 @@ void test_pixel_arithmetic(const std::string &backend) {
 }
 int main(int argc, char **argv) {
     try {
+        test_division_reference();
         std::string backend = "CPU";
         if (argc == 3 && !std::strcmp(argv[1], "--backend")) backend = argv[2];
         else test(argc == 1);

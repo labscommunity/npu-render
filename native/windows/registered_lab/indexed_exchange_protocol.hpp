@@ -38,7 +38,8 @@ inline bool shape_valid(const Header &h) {
 
     // ABI 12 adds U/V address bits to each existing sampler word. Older
     // ABIs remain clamp-only; all shape/blend rules are inherited unchanged.
-    if(h.abi==12){
+    // ABI 14 carries two-bit address modes and four finite border components.
+    if(h.abi==12 || h.abi==14){
         if(!(h.flags&0x2000))return false;
         auto legacy=h;legacy.abi=(h.flags&0x10000)?11u:(h.flags&0x8000)?10u:(h.flags&0x4000)?9u:8u;
         return shape_valid(legacy);
@@ -205,8 +206,12 @@ inline std::vector<uint8_t> encode(Request &r) {
             require(t.pixels.size()==size_t(t.width)*t.height);w.value(description);w.append(t.pixels.data(),t.pixels.size()*sizeof(raster::PackedColor));}
         for(const auto &sampler:r.samplers){
             const auto filter=uint32_t(sampler.filter),u=uint32_t(sampler.u),v=uint32_t(sampler.v);
-            require(filter<=1 && u<=1 && v<=1 && (h.abi==12 || (!u && !v)));
-            w.value(filter|(u<<1)|(v<<2));
+            for(const auto value:sampler.border)require(std::isfinite(value));
+            if(h.abi==14){require(filter<=1 && u<=2 && v<=2);w.value(filter|(u<<1)|(v<<3));w.value(sampler.border);}
+            else {
+                require(filter<=1 && u<=1 && v<=1 && (h.abi==12 || (!u && !v)) && sampler.border==std::array<float,4>{});
+                w.value(filter|(u<<1)|(v<<2));
+            }
         }
     } else if (h.flags & 2) {
         const auto &t = r.texture; const TextureDescription description{t.width,t.height,t.format,0};
@@ -238,9 +243,16 @@ inline Request decode(const std::vector<uint8_t> &bytes) {
         for(auto &t:r.resources){const auto d=reader.value<TextureDescription>();require(!d.reserved);
             t={d.width,d.height,d.format,reader.vector<raster::PackedColor>(size_t(d.width)*d.height)};}
         (void)raster::resource_shapes(r.pixel,r.resources);
-        for(auto &sampler:r.samplers){const auto encoded=reader.value<uint32_t>();require(encoded<=(h.abi==12?7u:1u));
+        for(auto &sampler:r.samplers){const auto encoded=reader.value<uint32_t>();
             sampler.filter=static_cast<shader::TextureFilter>(encoded&1);
-            sampler.u=static_cast<shader::TextureAddress>((encoded>>1)&1);sampler.v=static_cast<shader::TextureAddress>((encoded>>2)&1);
+            if(h.abi==14){
+                require(!(encoded>>5) && ((encoded>>1)&3)<=2 && ((encoded>>3)&3)<=2);
+                sampler.u=static_cast<shader::TextureAddress>((encoded>>1)&3);sampler.v=static_cast<shader::TextureAddress>((encoded>>3)&3);
+                sampler.border=reader.value<std::array<float,4>>();for(const auto value:sampler.border)require(std::isfinite(value));
+            }else {
+                require(encoded<=(h.abi==12?7u:1u));
+                sampler.u=static_cast<shader::TextureAddress>((encoded>>1)&1);sampler.v=static_cast<shader::TextureAddress>((encoded>>2)&1);
+            }
         }
     } else if (h.flags & 2) {
         const auto t = reader.value<TextureDescription>(); require(texture_valid(t,h));

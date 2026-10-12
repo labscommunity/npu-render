@@ -1,0 +1,11 @@
+{
+  "build": "present-umd-v219",
+  "compilation_passed": true,
+  "cpu_suites": 26,
+  "cpu_suites_passed": 25,
+  "npu_tests_ran": false,
+  "installed": false,
+  "failure": "DDI test retained its previous total of 60 executions after adding two successful border draws. All intervening pixel assertions passed; the final accounting assertion failed.",
+  "correction": "Change expected total to 62 and report the two additional border draws.",
+  "prior_outputs_preserved": true
+}

@@ -1,0 +1,55 @@
+{
+  "bytes": 1048576,
+  "cpu_sha256": "104e83eced3fcf76f9956b6a492c13acc621f8ecb4d11f4e905d4bfc20fae9fb",
+  "npu_sha256": "104e83eced3fcf76f9956b6a492c13acc621f8ecb4d11f4e905d4bfc20fae9fb",
+  "maximum_byte_difference": 0,
+  "different_components": 0,
+  "oracle": [
+    {
+      "backend": "CPU",
+      "oracle_checks": [
+        {
+          "uniform_inputs": false,
+          "oracle_max_byte_error": 0,
+          "differing_components": 0,
+          "coverage_exact": true
+        },
+        {
+          "uniform_inputs": false,
+          "oracle_max_byte_error": 0,
+          "differing_components": 0,
+          "coverage_exact": true
+        }
+      ]
+    },
+    {
+      "backend": "NPU",
+      "oracle_checks": [
+        {
+          "uniform_inputs": false,
+          "oracle_max_byte_error": 0,
+          "differing_components": 0,
+          "coverage_exact": true
+        },
+        {
+          "uniform_inputs": false,
+          "oracle_max_byte_error": 0,
+          "differing_components": 0,
+          "coverage_exact": true
+        }
+      ]
+    }
+  ],
+  "passed": true,
+  "capture_sha256": "5094971fc10e251f66da89631740a4c5b932ae5bb891d842776597e4e35bb246",
+  "cpu_vertex_fused_matches_per_repeat": 6,
+  "cpu_vertex_reciprocal_matches_per_repeat": 18,
+  "npu_vertices_match_direct_reference": true,
+  "covered_samples": 3364,
+  "repeat_count_per_backend": 2,
+  "qualification_scope": "Isolated replay build with exact reciprocal-division oracle alternative; no driver installation.",
+  "primary_reference": "https://microsoft.github.io/DirectX-Specs/d3d/archive/D3D11_3_FunctionalSpec.htm",
+  "section": "3.1.3",
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false
+}

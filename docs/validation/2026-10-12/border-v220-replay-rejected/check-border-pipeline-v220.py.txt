@@ -1,0 +1,32 @@
+from pathlib import Path
+import hashlib,json,struct,subprocess,sys,time
+build=Path(sys.argv[1]);fixture=Path(sys.argv[2]);out=Path(sys.argv[3]);out.mkdir(exist_ok=False)
+original=fixture.read_bytes();h=struct.unpack_from('<3Q14I',original)
+assert h[3:9]==(14,32,32,6,87,0x2f06) and len(original)==80+h[12]
+base_pixels=Path(str(fixture)+'.pixels').read_bytes();assert len(base_pixels)==4096
+samplers=len(original)-320;assert struct.unpack_from('<I4f',original,samplers)==(20,0.,1.,0.,1.)
+packets=out/'packets';packets.mkdir();checks=[]
+with (out/'worker.stdout.jsonl').open('wb') as stdout,(out/'worker.stderr.log').open('wb') as stderr:
+ process=subprocess.Popen([str(build/'nr_registered_indexed_worker.exe'),str(packets),'3'],stdout=stdout,stderr=stderr)
+ try:
+  for case,color in enumerate([(0.,1.,0.,1.),(1.,0.,1.,1.),(0.,1.,0.,1.)],1):
+   data=bytearray(original);sequence=3200+case;struct.pack_into('<I',data,56,sequence);struct.pack_into('<4f',data,samplers+4,*color)
+   name=f'request-42-{h[1]:016x}{h[2]:016x}-{sequence}.bin';temporary=packets/'pending';temporary.write_bytes(data);temporary.replace(packets/name)
+   reply=packets/name.replace('request-','reply-',1);start=time.monotonic()
+   while not reply.exists():
+    assert process.poll() is None,'worker exited before reply'
+    if time.monotonic()-start>120:raise TimeoutError('NPU border reply timed out')
+    time.sleep(.025)
+   response=reply.read_bytes();rh=struct.unpack_from('<3Q14I',response);receipt=struct.unpack_from('<5Q2I',response,80)
+   assert rh[:11]==h[:11] and rh[11]==sequence and rh[13]==h[13] and rh[14:17]==(2,3,0) and len(response)==4224
+   expected=bytearray(base_pixels);bgra=bytes(round(color[c]*255) for c in [2,1,0,3])
+   for y in range(5,27):
+    for x in range(3,29):
+     if not (16<=x<24 and 16<=y<24):expected[(y*32+x)*4:(y*32+x+1)*4]=bgra
+   assert response[128:]==expected and receipt[3]==572
+   checks.append({'case':case,'border_rgba':color,'sequence':sequence,'covered_samples':receipt[3],'packet_sha256':hashlib.sha256(data).hexdigest(),'pixel_sha256':hashlib.sha256(response[128:]).hexdigest(),'all_pixels_exact':True,'execution_device':'NPU'})
+   (out/'checks.json').write_text(json.dumps(checks,indent=2)+'\n')
+  assert process.wait(timeout=15)==0
+ finally:
+  if process.poll() is None:process.kill();process.wait()
+report={'all_passed':len(checks)==3,'checks':checks,'desktop_offload_tested':False};(out/'report.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report))

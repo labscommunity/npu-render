@@ -209,8 +209,9 @@ struct RegisterExecutor::State {
             check(shape.width && shape.width <= 8192 && shape.height && shape.height <= 8192 &&
                   uint64_t(shape.width) * shape.height <= 4194304 &&
                   (filter == TextureFilter::point || filter == TextureFilter::linear) &&
-                  (sampler.u==TextureAddress::clamp || sampler.u==TextureAddress::mirror) &&
-                  (sampler.v==TextureAddress::clamp || sampler.v==TextureAddress::mirror));
+                  (sampler.u==TextureAddress::clamp || sampler.u==TextureAddress::mirror || sampler.u==TextureAddress::border) &&
+                  (sampler.v==TextureAddress::clamp || sampler.v==TextureAddress::mirror || sampler.v==TextureAddress::border));
+            for(const auto value:sampler.border)check(std::isfinite(value));
             if (!textures[slot]) {
                 auto parameter = std::make_shared<op::Parameter>(ov::element::f32, ov::Shape{size_t(shape.width) * shape.height, 4});
                 const auto name = "texture_" + std::to_string(slot);
@@ -243,6 +244,16 @@ struct RegisterExecutor::State {
                         std::make_shared<op::Convert>(batch(active), ov::element::i32));
                 }
                 invalid_coordinates.push_back(active_invalid);
+                if(address==TextureAddress::border){
+                    // Preserve the half-texel transition across each edge.
+                    // Wider finite coordinates remain wholly in the border;
+                    // bound them before conversion, never clamp them to [0,1].
+                    value=choose(nan,number(0),value);
+                    value=choose(std::make_shared<op::Less>(value,number(-1)),number(-1),
+                        choose(std::make_shared<op::Greater>(value,number(2)),number(2),value));
+                    Node scaled=std::make_shared<op::Multiply>(value,number(float(extent)));
+                    return filter==TextureFilter::linear?Node(std::make_shared<op::Subtract>(scaled,half_texel)):scaled;
+                }
                 if(address==TextureAddress::mirror){
                     // All finite FP32 magnitudes >= 2^24 are even integers.
                     // Reduce smaller magnitudes modulo two on the provider,
@@ -278,8 +289,8 @@ struct RegisterExecutor::State {
                 // an identity on this range but prevents the compiler from
                 // incorrectly deleting the lossy float/int/float round trip.
                 Node truncated=std::make_shared<op::BitwiseAnd>(std::make_shared<op::Convert>(
-                    address==TextureAddress::mirror?Node(std::make_shared<op::Abs>(value)):value,ov::element::i32),integer(0x7fffffff));
-                if(address==TextureAddress::mirror){
+                    address!=TextureAddress::clamp?Node(std::make_shared<op::Abs>(value)):value,ov::element::i32),integer(0x7fffffff));
+                if(address!=TextureAddress::clamp){
                     truncated=choose(std::make_shared<op::Less>(value,number(0)),std::make_shared<op::Negative>(truncated),truncated);
                     // Convert truncates toward zero; correct negative fractions.
                     return std::make_shared<op::Subtract>(truncated,std::make_shared<op::Convert>(
@@ -290,6 +301,8 @@ struct RegisterExecutor::State {
             const auto ix = floor_index(x,sampler.u), iy = floor_index(y,sampler.v);
             auto tap = [&](const Node &base,int delta,uint32_t extent,TextureAddress address)->Node {
                 Node n=std::make_shared<op::Add>(base,integer(delta));
+                if(address==TextureAddress::border)return std::make_shared<op::Maximum>(integer(0),
+                    std::make_shared<op::Minimum>(n,integer(int32_t(extent-1))));
                 if(address==TextureAddress::clamp)return std::make_shared<op::Minimum>(n,integer(int32_t(extent-1)));
                 const auto period=integer(int32_t(extent*2));
                 // Linear filtering can place the first tap one texel below
@@ -299,11 +312,30 @@ struct RegisterExecutor::State {
                 return choose(std::make_shared<op::Less>(n,integer(int32_t(extent))),n,
                     std::make_shared<op::Subtract>(integer(int32_t(extent*2-1)),n));
             };
+            const bool bordered=sampler.u==TextureAddress::border || sampler.v==TextureAddress::border;
+            Node texels=textures[slot];
+            if(bordered)texels=std::make_shared<op::Concat>(ov::OutputVector{texels,
+                op::Constant::create(ov::element::f32,ov::Shape{1,4},std::vector<float>(sampler.border.begin(),sampler.border.end()))},0);
             auto fetch = [&](int dx, int dy) -> Node {
                 const auto sx = tap(ix,dx,shape.width,sampler.u),sy=tap(iy,dy,shape.height,sampler.v);
-                const auto index = std::make_shared<op::Reshape>(std::make_shared<op::Add>(sx,
-                    std::make_shared<op::Multiply>(sy, integer(int32_t(shape.width)))), indices({int64_t(count)}), false);
-                return std::make_shared<op::Gather>(textures[slot], index, integer(0));
+                Node address=std::make_shared<op::Add>(sx,std::make_shared<op::Multiply>(sy,integer(int32_t(shape.width))));
+                if(bordered){
+                    Node valid=integer(1);
+                    auto bound=[&](const Node &base,int delta,uint32_t extent,TextureAddress mode){
+                        if(mode!=TextureAddress::border)return;
+                        const auto n=std::make_shared<op::Add>(base,integer(delta));
+                        const auto bits=std::make_shared<op::BitwiseAnd>(
+                            std::make_shared<op::Convert>(std::make_shared<op::GreaterEqual>(n,integer(0)),ov::element::i32),
+                            std::make_shared<op::Convert>(std::make_shared<op::Less>(n,integer(int32_t(extent))),ov::element::i32));
+                        valid=std::make_shared<op::BitwiseAnd>(valid,bits);
+                    };
+                    bound(ix,dx,shape.width,sampler.u);bound(iy,dy,shape.height,sampler.v);
+                    // Select an integer address and Gather the border row.
+                    // Avoid the NPU's previously rejected floating Select path.
+                    address=std::make_shared<op::Select>(std::make_shared<op::NotEqual>(valid,integer(0)),address,integer(int32_t(shape.width*shape.height)));
+                }
+                const auto index=std::make_shared<op::Reshape>(address,indices({int64_t(count)}),false);
+                return std::make_shared<op::Gather>(texels,index,integer(0));
             };
             if (filter == TextureFilter::point) return fetch(0, 0);
             const auto tx = std::make_shared<op::Subtract>(x, std::make_shared<op::Convert>(ix, ov::element::f32));

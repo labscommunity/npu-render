@@ -252,6 +252,21 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
         if(mode)test(!nr::raster::sampler_layout_equal(mirrored.samplers,resources.samplers));
     }
     {auto bad=r;bad.header.abi=12;test(!ex::shape_valid(bad.header));}
+    for(unsigned u=0;u<3;++u)for(unsigned v=0;v<3;++v){
+        auto bordered=resources;bordered.header.abi=14;
+        bordered.samplers[0]={nr::shader::TextureFilter::linear,static_cast<nr::shader::TextureAddress>(u),
+            static_cast<nr::shader::TextureAddress>(v),{.25f,.5f,.75f,1.f}};
+        const auto packet=ex::encode(bordered);const auto border_decoded=ex::decode(packet);
+        test(nr::raster::sampler_layout_equal(bordered.samplers,border_decoded.samplers));
+        auto changed=border_decoded.samplers;changed[0].border[0]=.5f;test(!nr::raster::sampler_layout_equal(changed,border_decoded.samplers));
+        auto corrupt=packet;const uint32_t invalid=6;const auto begin=packet.size()-16*20;
+        std::memcpy(corrupt.data()+begin,&invalid,4);rejects(corrupt);
+        corrupt=packet;const uint32_t nan=0x7fc00000;std::memcpy(corrupt.data()+begin+4,&nan,4);rejects(corrupt);
+        corrupt=packet;corrupt.pop_back();rejects(corrupt);
+        auto legacy=bordered;legacy.header.abi=12;bool rejected=false;
+        try{(void)ex::encode(legacy);}catch(const std::invalid_argument &){rejected=true;}test(rejected);
+    }
+    {auto bad=r;bad.header.abi=14;test(!ex::shape_valid(bad.header));}
     for(uint32_t mode=4;mode<13;++mode){
         for(const auto &base : {triangles,resources}){auto candidate=base;candidate.header.abi=11;candidate.header.flags|=0x10001|(mode<<17);
             const auto roundtrip=ex::decode(ex::encode(candidate));

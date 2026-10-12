@@ -36,6 +36,6 @@ inline PackedResources resource_layout(const PackedResources &a){
     PackedResources result{};for(unsigned i=0;i<16;++i)result[i]={a[i].width,a[i].height,a[i].format,{}};return result;
 }
 inline bool sampler_layout_equal(const shader::TextureSamplers &a,const shader::TextureSamplers &b){
-    for(unsigned i=0;i<16;++i)if(a[i].filter!=b[i].filter || a[i].u!=b[i].u || a[i].v!=b[i].v)return false;return true;
+    for(unsigned i=0;i<16;++i)if(a[i].filter!=b[i].filter || a[i].u!=b[i].u || a[i].v!=b[i].v || a[i].border!=b[i].border)return false;return true;
 }
 }

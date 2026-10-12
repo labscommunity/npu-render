@@ -1,0 +1,10 @@
+from pathlib import Path
+import sys,json,hashlib
+r=Path(sys.argv[1]);a=(r/'border-CPU.pixels').read_bytes();b=(r/'border-NPU.pixels').read_bytes();assert len(a)==len(b)==512*512*4
+rows=[]
+for backend in ['CPU','NPU']:
+ data=[json.loads(x) for x in (r/('border-capture-'+backend+'.stdout.jsonl')).read_text().splitlines() if x.startswith('{')]
+ oracle=[x for x in data if 'oracle_max_byte_error' in x];assert len(oracle)==2 and all(x['coverage_exact'] and x['oracle_max_byte_error']<=1 for x in oracle)
+ rows.append({'backend':backend,'oracle_checks':oracle})
+report={'bytes':len(a),'cpu_sha256':hashlib.sha256(a).hexdigest(),'npu_sha256':hashlib.sha256(b).hexdigest(),'maximum_byte_difference':max(abs(x-y) for x,y in zip(a,b)),'different_components':sum(x!=y for x,y in zip(a,b)),'oracle':rows};report['passed']=report['maximum_byte_difference']<=1
+(r/'border-capture-comparison.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report));assert report['passed']

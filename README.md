@@ -121,6 +121,13 @@ capture exposes missing border texture sampling; the unchanged CPU replay also
 rejects it before execution. The ordinary restored desktop shows the Run dialog.
 Both custom drivers are removed afterward. Full desktop offload remains unfinished.
 
+The subsequent [v221 border-sampling qualification](docs/validation/2026-10-12/border-v221/report.json)
+replays that rejected DWM draw on CPU and physical NPU with identical complete
+output and zero independent-oracle pixel error. Both clean builds pass 26 CPU
+suites, and all 25 qualification stages pass, including 62 native NPU driver
+draws, changing border colors and 63 historical desktop requests. This fixes the
+captured operation; installed desktop interaction still needs the next trial.
+
 The preceding [v110 installed trial](docs/validation/2026-10-12/sole-display-v110/report.json)
 returns 474 successful NPU worker results, with 473 acknowledged by the guest.
 Nine frames arrive; eight arrive while the indirect display is the sole active

@@ -933,3 +933,22 @@ The two original v100 captures pass on CPU and NPU with identical complete
 Mixed minification/magnification filters still fail atomically. All 24 CPU suites,
 58 native NPU driver draws and eight clears pass; installed interaction remains
 unproven.
+
+Border addressing uses indexed exchange ABI 14, with two-bit U/V modes and four
+finite FP32 border components for each sampler. Point and linear filtering admit
+independent clamp, mirror and border axes. Linear sampling selects the border
+per tap, preserving interpolation across half-texel edges. Integer address
+selection and a padded border row keep all fetches bounded on the provider.
+Sampler cache identity includes the border color. Older packet ABIs retain their
+previous layout; ABI 13 remains the render-target clear protocol. A8 border
+sampling remains rejected until its missing-component defaults are transported.
+
+The [isolated captured-draw replay](../../../docs/validation/2026-10-12/border-oracle-diagnostic-v1/report.json)
+now reproduces the v111 DWM border draw on CPU and physical NPU with identical
+512×512 output and 3,364 covered samples. Both repeats match every scalar-oracle
+pixel. The CPU shader uses a permitted reciprocal-then-multiply division result
+for eighteen vertex components; the NPU matches direct scalar division. Replay
+checks exact arithmetic alternatives from Direct3D 11.3 section 3.1.3, without
+applying a general ULP tolerance to vertex outputs or integer/MOV values. The
+preceding [v220 qualification rejection](../../../docs/validation/2026-10-12/border-v220-replay-rejected/report.json)
+is retained. Offline replay does not establish installed desktop operation.

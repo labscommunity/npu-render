@@ -99,6 +99,7 @@ def main():
         "nr_registered_loop_test.exe",
         "nr_registered_mask_test.exe",
         "nr_registered_mirror_test.exe",
+        "nr_registered_border_test.exe",
         "nr_registered_compositor_test.exe",
         "nr_registered_provider_cache_test.exe",
     ):

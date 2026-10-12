@@ -1,0 +1,15 @@
+{
+  "build": "present-umd-v220",
+  "modern_cpu_suites_passed": 26,
+  "legacy_cpu_suites_passed": 26,
+  "border_samples_npu_passed": true,
+  "border_raster_npu_passed": true,
+  "border_worker_three_changing_color_requests_exact": true,
+  "real_captured_draw_cpu_replay_passed": false,
+  "failure": "vertex v=0 register=1 lane=0 actual=3f82b000 expected=3f82b001",
+  "remaining_qualification_stages_run": false,
+  "installed": false,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "diagnosis_pending": "Exact reciprocal multiplication alternative reproduces the first mismatch in a separate scalar diagnostic. Full captured draw verification remains pending."
+}

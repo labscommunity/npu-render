@@ -1,0 +1,44 @@
+{
+  "bytes": 1048576,
+  "cpu_sha256": "104e83eced3fcf76f9956b6a492c13acc621f8ecb4d11f4e905d4bfc20fae9fb",
+  "npu_sha256": "104e83eced3fcf76f9956b6a492c13acc621f8ecb4d11f4e905d4bfc20fae9fb",
+  "maximum_byte_difference": 0,
+  "different_components": 0,
+  "oracle": [
+    {
+      "backend": "CPU",
+      "oracle_checks": [
+        {
+          "uniform_inputs": false,
+          "oracle_max_byte_error": 0,
+          "differing_components": 0,
+          "coverage_exact": true
+        },
+        {
+          "uniform_inputs": false,
+          "oracle_max_byte_error": 0,
+          "differing_components": 0,
+          "coverage_exact": true
+        }
+      ]
+    },
+    {
+      "backend": "NPU",
+      "oracle_checks": [
+        {
+          "uniform_inputs": false,
+          "oracle_max_byte_error": 0,
+          "differing_components": 0,
+          "coverage_exact": true
+        },
+        {
+          "uniform_inputs": false,
+          "oracle_max_byte_error": 0,
+          "differing_components": 0,
+          "coverage_exact": true
+        }
+      ]
+    }
+  ],
+  "passed": true
+}

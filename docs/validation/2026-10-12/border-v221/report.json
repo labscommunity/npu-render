@@ -1,0 +1,68 @@
+{
+  "build": "present-umd-v221",
+  "all_checks_passed": true,
+  "native_npu_execution": true,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "clean_host_build": "present-umd-v221",
+  "clean_guest_build": "present-umd-v221-legacy",
+  "cpu_suites_passed_each": 26,
+  "qualification_stages_passed": 25,
+  "source_files_matching_local_host_guest": 121,
+  "border_packet_abi": 14,
+  "changing_border_worker_requests": 3,
+  "changing_border_requests_exact": true,
+  "driver_indexed_draws_passed": 62,
+  "historical_captured_packets_exact": 63,
+  "prewarm_packets_exact": 17,
+  "captured_border_draw": {
+    "bytes": 1048576,
+    "cpu_sha256": "104e83eced3fcf76f9956b6a492c13acc621f8ecb4d11f4e905d4bfc20fae9fb",
+    "npu_sha256": "104e83eced3fcf76f9956b6a492c13acc621f8ecb4d11f4e905d4bfc20fae9fb",
+    "maximum_byte_difference": 0,
+    "different_components": 0,
+    "oracle": [
+      {
+        "backend": "CPU",
+        "oracle_checks": [
+          {
+            "uniform_inputs": false,
+            "oracle_max_byte_error": 0,
+            "differing_components": 0,
+            "coverage_exact": true
+          },
+          {
+            "uniform_inputs": false,
+            "oracle_max_byte_error": 0,
+            "differing_components": 0,
+            "coverage_exact": true
+          }
+        ]
+      },
+      {
+        "backend": "NPU",
+        "oracle_checks": [
+          {
+            "uniform_inputs": false,
+            "oracle_max_byte_error": 0,
+            "differing_components": 0,
+            "coverage_exact": true
+          },
+          {
+            "uniform_inputs": false,
+            "oracle_max_byte_error": 0,
+            "differing_components": 0,
+            "coverage_exact": true
+          }
+        ]
+      }
+    ],
+    "passed": true
+  },
+  "limitations": [
+    "No installed desktop trial in this qualification",
+    "A8 texture border sampling remains rejected pending format-default metadata",
+    "No physical display change or Tahoma performance test"
+  ],
+  "primary_arithmetic_reference": "https://microsoft.github.io/DirectX-Specs/d3d/archive/D3D11_3_FunctionalSpec.htm"
+}

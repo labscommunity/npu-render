@@ -184,10 +184,12 @@ int main(int argc, char **argv) try {
         for(unsigned slot=0;slot<16;++slot){
             if(ps.samplers[slot]){
                 const auto sampler=snapshot.values<uint32_t>("sampler-2-"+std::to_string(slot));
-                nr::capture::check(sampler.size()==13 && single_mip_filter_supported(sampler[0]) && (sampler[1]==2 || sampler[1]==3) && (sampler[2]==2 || sampler[2]==3) && sampler[3]==3 && !sampler[4] && !sampler[11] && as_float(sampler[12])>=0);
+                nr::capture::check(sampler.size()==13 && single_mip_filter_supported(sampler[0]) && (sampler[1]>=2 && sampler[1]<=4) && (sampler[2]>=2 && sampler[2]<=4) && sampler[3]==3 && !sampler[4] && !sampler[11] && as_float(sampler[12])>=0);
                 texture_samplers[slot].filter=single_mip_point_filter(sampler[0])?TextureFilter::point:TextureFilter::linear;
-                texture_samplers[slot].u=sampler[1]==2?TextureAddress::mirror:TextureAddress::clamp;
-                texture_samplers[slot].v=sampler[2]==2?TextureAddress::mirror:TextureAddress::clamp;
+                auto address=[](uint32_t mode){return mode==4?TextureAddress::border:mode==2?TextureAddress::mirror:TextureAddress::clamp;};
+                auto &s=texture_samplers[slot];s.u=address(sampler[1]);s.v=address(sampler[2]);
+                if(s.u==TextureAddress::border || s.v==TextureAddress::border)
+                    for(unsigned c=0;c<4;++c){const auto value=as_float(sampler[7+c]);nr::capture::check(std::isfinite(value));s.border[c]=std::clamp(value,0.f,1.f);}
             }
             if(!ps.textures[slot])continue;const auto name="resource-2-"+std::to_string(slot);if(!snapshot.has(name))continue;
             const auto description=snapshot.values<uint32_t>(name+"-description"),view_desc=snapshot.values<uint32_t>(name+"-view");
@@ -196,7 +198,11 @@ int main(int argc, char **argv) try {
                 const auto &data=snapshot.bytes(name);nr::capture::check(view_desc[0]==62 && uint64_t(view_desc[1])+view_desc[2]<=data.size());
                 t={view_desc[2],1,42,{}};t.pixels.resize(view_desc[2]);
                 for(size_t n=0;n<t.pixels.size();++n){const uint32_t v=data[size_t(view_desc[1])+n];std::memcpy(t.pixels[n].data(),&v,4);}
-            }else if(description[5]==65){const auto &data=snapshot.bytes(name);t={description[3],description[4],28,{}};
+            }else if(description[5]==65){
+                for(const auto &instruction:ps.instructions)if(instruction.opcode==Opcode::sample && instruction.sources[1].index==slot){
+                    const auto &s=texture_samplers[instruction.sources[2].index];nr::capture::check(s.u!=TextureAddress::border && s.v!=TextureAddress::border);
+                }
+                const auto &data=snapshot.bytes(name);t={description[3],description[4],28,{}};
                 nr::capture::check(data.size()==size_t(t.width)*t.height);t.pixels.resize(data.size());for(size_t n=0;n<data.size();++n)t.pixels[n]={0,0,0,data[n]};
             }else t={description[3],description[4],description[5],snapshot.values<PackedColor>(name)};
         }
@@ -272,19 +278,24 @@ int main(int argc, char **argv) try {
     for (uint32_t iteration = 0; iteration < repeats; ++iteration) {
         const Viewport viewport{view[0],view[1],view[2],view[3],view[4],view[5]};
         phase="provider execute";result = general_resources ? triangle_executor->execute(inputs,cb,pixel_cb,viewport,resources,pixels,clip) : triangle_executor ? triangle_executor->execute(inputs,cb,pixel_cb,viewport,texture,pixels,clip) : linear_executor ? linear_executor->execute(inputs,cb,viewport,texture,pixels,clip) : textured ? texture_executor->execute_adaptive(inputs,cb,viewport,texture,pixels) : executor->execute(inputs, cb, pixel_cb, viewport, pixels, clip);
-        uint64_t fused_matches=0;
+        uint64_t fused_matches=0,reciprocal_matches=0;
         phase="vertex oracle";for (size_t i = 0; i < inputs.size(); ++i) {
             const auto expected = reference_vertex(vs, inputs[i], cb);
             const auto fused = reference_vertex(vs, inputs[i], cb, {}, {}, {}, 1);
             const auto reverse_fused = reference_vertex(vs, inputs[i], cb, {}, {}, {}, 2);
+            std::array<Registers,3> reciprocal;
+            for(unsigned mode=0;mode<3;++mode)
+                reciprocal[mode]=reference_vertex(vs,inputs[i],cb,{},{},{},mode,nullptr,true);
             for (unsigned r = 0; r < 16; ++r) for (unsigned c = 0; c < 4; ++c) if (vs.outputs[r] & (1u << c))
                 if(result.vertices[i][r][c]!=expected[r][c]){
                     if(result.vertices[i][r][c]==fused[r][c] || result.vertices[i][r][c]==reverse_fused[r][c]){++fused_matches;continue;}
+                    if(result.vertices[i][r][c]==reciprocal[0][r][c] || result.vertices[i][r][c]==reciprocal[1][r][c] || result.vertices[i][r][c]==reciprocal[2][r][c]){++reciprocal_matches;continue;}
                     std::fprintf(stderr,"vertex mismatch v=%zu register=%u lane=%u actual=%08x expected=%08x\n",i,r,c,result.vertices[i][r][c],expected[r][c]);
                     nr::capture::check(false);
                 }
         }
         std::printf("{\"vertex_oracle_fused_arithmetic_matches\":%llu}\n",static_cast<unsigned long long>(fused_matches));
+        std::printf("{\"vertex_oracle_reciprocal_division_matches\":%llu}\n",static_cast<unsigned long long>(reciprocal_matches));
         phase="pixel oracle";if(linear_executor){
             double maximum=0;uint64_t differing=0;
             nr::capture::check(result.covered_samples==linear_covered);
@@ -305,7 +316,7 @@ int main(int argc, char **argv) try {
             std::vector<Point> points(inputs.size());
             std::vector<std::array<double,3>> screen(inputs.size());
             for(size_t i=0;i<inputs.size();++i) {
-                const auto v=result.vertices[i][vs.position_output]; // Verified against scalar fused/unfused shader evaluations above.
+                const auto v=result.vertices[i][vs.position_output]; // Verified against exact permitted arithmetic alternatives above.
                 volatile float nx=as_float(v[0])/as_float(v[3]),ny=as_float(v[1])/as_float(v[3]);
                 volatile float sx=nx+1,sy=1-ny;sx=sx*(float(width)*.5f);sy=sy*(float(height)*.5f);
                 points[i]={int32_t(std::nearbyint(float(sx)*256)),int32_t(std::nearbyint(float(sy)*256))};
