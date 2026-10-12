@@ -1,0 +1,10 @@
+import hashlib,json,os,struct,sys
+from pathlib import Path
+root=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm';out=Path(sys.argv[1]);out.mkdir(exist_ok=False);records=[]
+entries=json.loads((root/'prewarm-v105-contract.json').read_text())
+for case,entry in enumerate(entries,1):
+ original=(root/entry['packet']).read_bytes();assert len(original)==entry['bytes'];h=struct.unpack_from('<3Q14I',original);assert len(original)==80+h[12] and h[14]==1 and h[15]==0
+ data=bytearray(original);sequence=2000+case;struct.pack_into('<I',data,56,sequence);struct.pack_into('<I',data,64,42)
+ name=f'request-42-{h[1]:016x}{h[2]:016x}-{sequence}.bin';(out/name).write_bytes(data)
+ records.append({**entry,'case':case,'client_pid':42,'sequence':sequence,'file':name,'source_sha256':hashlib.sha256(original).hexdigest(),'derived_sha256':hashlib.sha256(data).hexdigest(),'modified_fields':['client_pid','sequence']})
+(out/'requests.json').write_text(json.dumps(records,indent=2)+'\n');print(json.dumps({'prepared_requests':len(records)}))

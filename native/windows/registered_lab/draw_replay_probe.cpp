@@ -180,7 +180,6 @@ int main(int argc, char **argv) try {
         const auto sampler=snapshot.values<uint32_t>("sampler-2-"+std::to_string(slot));nr::capture::check(sampler.size()==13);
         general_resources=general_resources || sampler[1]!=3 || sampler[2]!=3;
     }
-    std::vector<PackedColor> texture_reference;
     if(general_resources){
         for(unsigned slot=0;slot<16;++slot){
             if(ps.samplers[slot]){
@@ -252,19 +251,12 @@ int main(int argc, char **argv) try {
         }else{
             nr::capture::check(!blending && clip==std::array<int32_t,4>{0,0,int32_t(width),int32_t(height)});
         texture_executor = std::make_unique<PointTextureDrawExecutor>(vs,ps,width,height,format,texture.width,texture.height,texture.format,backend);
-        // Independent scalar point-sampling oracle for this capture. The runtime
-        // specialization validates the complete shader and affine-quad proof.
-        const auto first_vertex = reference_vertex(vs,inputs[0],cb);
-        const auto uv_register = ps.instructions[0].sources[0].index;
-        const double ox = double(as_float(first_vertex[uv_register][0]))*texture.width;
-        const double oy = double(as_float(first_vertex[uv_register][1]))*texture.height;
-        texture_reference.resize(size_t(width)*height);
-        for (uint32_t y=0;y<height;++y) for(uint32_t x=0;x<width;++x) {
-            const auto sx = int64_t(std::floor(ox+x+.5)), sy = int64_t(std::floor(oy+y+.5));
-            nr::capture::check(sx>=0 && sy>=0 && sx<texture.width && sy<texture.height);
-            auto p = texture.pixels[size_t(sy)*texture.width+size_t(sx)];
-            if(format!=texture.format) std::swap(p[0],p[2]); p[3]=255; texture_reference[size_t(y)*width+x]=p;
-        }
+        // Use the independent triangle oracle for both optimized crops and
+        // partial/scaled geometry admitted by the general provider path.
+        texture_shapes[0]={texture.width,texture.height};texture_samplers[0].filter=TextureFilter::point;
+        texture_pixels[0].resize(texture.pixels.size());
+        for(size_t n=0;n<texture.pixels.size();++n)for(unsigned c=0;c<4;++c)
+            texture_pixels[0][n][c]=float(texture.pixels[n][texture.format==87 && c<3?2-c:c])/255;
         }
     } else {
         if(quad_derivatives(ps)){while(batch>4 && uint64_t(clip[2]-clip[0])*uint64_t(clip[3]-clip[1])<=batch/2)batch/=2;batch=(std::max)(4u,batch);}
@@ -279,7 +271,7 @@ int main(int argc, char **argv) try {
     std::vector<PackedColor> reference_pixels;
     for (uint32_t iteration = 0; iteration < repeats; ++iteration) {
         const Viewport viewport{view[0],view[1],view[2],view[3],view[4],view[5]};
-        phase="provider execute";result = general_resources ? triangle_executor->execute(inputs,cb,pixel_cb,viewport,resources,pixels,clip) : triangle_executor ? triangle_executor->execute(inputs,cb,pixel_cb,viewport,texture,pixels,clip) : linear_executor ? linear_executor->execute(inputs,cb,viewport,texture,pixels,clip) : textured ? texture_executor->execute(inputs,cb,viewport,texture) : executor->execute(inputs, cb, pixel_cb, viewport, pixels, clip);
+        phase="provider execute";result = general_resources ? triangle_executor->execute(inputs,cb,pixel_cb,viewport,resources,pixels,clip) : triangle_executor ? triangle_executor->execute(inputs,cb,pixel_cb,viewport,texture,pixels,clip) : linear_executor ? linear_executor->execute(inputs,cb,viewport,texture,pixels,clip) : textured ? texture_executor->execute_adaptive(inputs,cb,viewport,texture,pixels) : executor->execute(inputs, cb, pixel_cb, viewport, pixels, clip);
         uint64_t fused_matches=0;
         phase="vertex oracle";for (size_t i = 0; i < inputs.size(); ++i) {
             const auto expected = reference_vertex(vs, inputs[i], cb);
@@ -300,11 +292,10 @@ int main(int argc, char **argv) try {
                 maximum=(std::max)(maximum,std::abs(result.pixels[n][c]-wanted));if(result.pixels[n][c]!=uint8_t(std::nearbyint(wanted)))++differing;}
             nr::capture::check(maximum<=.6);
             std::printf("{\"linear_oracle_max_byte_error\":%.9g,\"rounded_oracle_differences\":%llu}\n",maximum,static_cast<unsigned long long>(differing));
-        }else if (textured && !triangle_executor) nr::capture::check(result.pixels == texture_reference);
-        else {
+        }else {
             VertexRegisters uniform{};
             for (unsigned r = 0; r < 16; ++r) if (ps.inputs[r] && r != ps.position_input) uniform[r] = result.vertices[0][r];
-            bool is_uniform=!triangle_executor;
+            bool is_uniform=!triangle_executor && !texture_executor;
             for(const auto &v:result.vertices)for(unsigned r=0;r<16;++r)if(ps.inputs[r] && r!=ps.position_input)
                 for(unsigned c=0;c<4;++c)if(ps.inputs[r]&(1u<<c))is_uniform=is_uniform && v[r][c]==uniform[r][c];
             if(is_uniform)nr::capture::check(result.fragment == reference_vertex(ps, uniform, pixel_cb)[0]);

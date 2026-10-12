@@ -260,7 +260,7 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
             d.point_texture_executor = std::move(candidate); d.point_texture_key = key;
             d.point_texture_vertex = d.vertex_program; d.point_texture_pixel = d.pixel_program;
         }
-        result = d.point_texture_executor->execute(inputs,vc,viewport,texture);
+        result = d.point_texture_executor->execute_adaptive(inputs,vc,viewport,texture,background);
     } else {
         const std::array<uint64_t, 5> key{s.width, s.height, s.format, count, uint64_t(d.blend.RenderTargetWriteMask[0]) | (uint64_t(blend) << 8) | (uint64_t(cull)<<9) | (uint64_t(front_ccw)<<11) | (uint64_t(blend_mode)<<12)};
         if (!d.indexed_executor || d.indexed_vertex != d.vertex_program || d.indexed_pixel != d.pixel_program || d.indexed_key != key) {

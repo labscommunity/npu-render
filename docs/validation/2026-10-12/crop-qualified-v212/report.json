@@ -1,0 +1,43 @@
+{
+  "build": "present-umd-v212",
+  "legacy_build": "present-umd-v212-legacy",
+  "cpu_tests_per_runtime": 25,
+  "cpu_seconds": {
+    "v212": 200.79,
+    "v212-legacy": 196.67
+  },
+  "source_files_verified": 120,
+  "binaries_verified_per_build": 31,
+  "native_qualification_stages": [
+    "point-NPU",
+    "triangles-NPU",
+    "capture-CPU",
+    "capture-NPU",
+    "lab-NPU",
+    "point-pipeline-NPU",
+    "legacy-point-NPU",
+    "legacy-triangles-NPU",
+    "baseline-worker",
+    "candidate-worker"
+  ],
+  "point_fixture_verified_components": 3545408,
+  "capture_width": 642,
+  "capture_height": 661,
+  "capture_covered_samples": 282480,
+  "capture_repeats_per_backend": 2,
+  "capture_maximum_pixel_difference": 0,
+  "capture_pixel_sha256": "39d5a40efa5af924ee5f44320f23ffec1c4f02941dfecb91c200588461183362",
+  "prewarm_packets_exact": 17,
+  "worker_pipeline_transitions_exact": 3,
+  "native_npu_execution": true,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "findings": [
+    "A failed crop geometry proof retires the specialized executor before constructing a general triangle executor on the same selected provider. Only this typed proof failure permits the transition. Malformed input, shader validation errors and provider errors still propagate.",
+    "The executor retains the general path for subsequent calls with the same configuration. It preserves untouched background pixels. Result accounting includes the attempted provider work, and elapsed draw time includes deferred model construction.",
+    "New scalar pixel tests cover full-to-partial-to-full transitions, scaling, nonuniform background, both byte channel orders and invalid background rejection. DDI tests add two successful draws and verify untouched target bytes; the complete driver test now expects 60 draw executions.",
+    "The original v108 rejected draw passes two replays on each backend with exact scalar coverage and zero pixel error. CPU and NPU outputs are byte-identical to the independently qualified general-renderer diagnostic.",
+    "A single physical NPU worker accepts full, partial and full ABI-2 packets in sequence, retains the general path after the partial draw, and returns exact scalar-reference pixels in all three cases. All seventeen existing desktop prewarm packet outputs remain exact against the qualified baseline.",
+    "Both OpenVINO runtime versions pass clean builds and all CPU suites; native NPU checks cover the adaptive renderer, general triangles, full capture replay, actual DDI, worker transport and legacy runtime compatibility. These checks qualify the correction for a new installed VM desktop trial; they do not establish a usable full desktop or a Tahoma speedup."
+  ]
+}

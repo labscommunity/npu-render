@@ -1,0 +1,46 @@
+import hashlib,json,struct,subprocess,sys,time
+from pathlib import Path
+build=Path(sys.argv[1]);out=Path(sys.argv[2]);out.mkdir(exist_ok=False)
+base=out/'base.bin'
+with (out/'fixture.stdout.log').open('wb') as log:
+ subprocess.run([str(build/'nr_registered_indexed_exchange_test.exe'),'--emit-point-texture',str(base)],stdout=log,stderr=subprocess.STDOUT,check=True,timeout=30)
+original=base.read_bytes();header=struct.unpack_from('<3Q14I',original)
+assert header[3:9]==(2,64,64,6,87,0xf02) and len(original)==80+header[12]
+inputs=104+4*(header[9]+header[10]);background=inputs+6*256;texture=background+64*64*4
+assert struct.unpack_from('<4I',original,texture)==(96,80,87,0) and texture+16+96*80*4==len(original)
+assert original[background:texture]==bytes([1,2,3,4])*4096
+results=[];packets=out/'packets';packets.mkdir()
+with (out/'worker.stdout.jsonl').open('wb') as stdout,(out/'worker.stderr.log').open('wb') as stderr:
+ process=subprocess.Popen([str(build/'nr_registered_indexed_worker.exe'),str(packets),'3'],stdout=stdout,stderr=stderr)
+ try:
+  for case,height in enumerate([64,32,64],1):
+   data=bytearray(original);sequence=3100+case;struct.pack_into('<I',data,56,sequence)
+   # The fixture VS passes POSITION and UV through unchanged.
+   if height==32:
+    for vertex in [2,3,4]:
+     struct.pack_into('<f',data,inputs+vertex*256+4,0.)
+     struct.pack_into('<f',data,inputs+vertex*256+36,48/80)
+   name=f'request-42-{header[1]:016x}{header[2]:016x}-{sequence}.bin'
+   temp=packets/'pending';temp.write_bytes(data);temp.replace(packets/name)
+   reply=packets/name.replace('request-','reply-',1);start=time.monotonic()
+   while not reply.exists():
+    assert process.poll() is None,'worker exited before reply'
+    if time.monotonic()-start>90:raise TimeoutError('NPU point reply timed out')
+    time.sleep(.025)
+   response=reply.read_bytes();h=struct.unpack_from('<3Q14I',response);receipt=struct.unpack_from('<5Q2I',response,80)
+   assert h[11]==sequence and h[14:17]==(2,3,0) and len(response)==128+64*64*4
+   expected=bytearray(original[background:texture])
+   for y in range(height):
+    for x in range(64):
+     at=texture+16+((y+16)*96+x+32)*4
+     expected[(y*64+x)*4:(y*64+x+1)*4]=original[at:at+3]+b'\xff'
+   pixels=response[128:];assert pixels==expected,'scalar pixel oracle mismatch'
+   assert receipt[3]==64*height
+   assert bool(receipt[5])==(case==1),'pipeline must retain general renderer after partial coverage'
+   results.append({'case':case,'height':height,'sequence':sequence,'roundtrip_ms':round((time.monotonic()-start)*1000,3),'provider_requests':receipt[2],'covered_samples':receipt[3],'used_rectangle':bool(receipt[5]),'packet_sha256':hashlib.sha256(data).hexdigest(),'pixel_sha256':hashlib.sha256(pixels).hexdigest(),'all_pixels_exact':True,'execution_device':'NPU'})
+   (out/'checks.json').write_text(json.dumps(results,indent=2)+'\n')
+  code=process.wait(timeout=15);assert code==0
+ finally:
+  if process.poll() is None:process.kill();process.wait()
+report={'checks':results,'all_passed':len(results)==3,'desktop_offload_tested':False}
+(out/'report.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report))

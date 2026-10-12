@@ -202,6 +202,25 @@ int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
         TEST(FAILED(last_error) && memory[target_index]==before && counters.draws==draws);last_error=S_OK;
         sampler.Filter=D3D10_DDI_FILTER_MIN_MAG_MIP_POINT;f.pfnPsSetSamplers(h,0,1,&hs);
     }
+    // A valid point draw can cover only half of its render target. Keep the
+    // same bindings/cache, then return to a full quad on the following draw.
+    {
+        const auto before=memory[target_index];
+        for(const unsigned i:{3u,4u}){textured_positions[i][1]=0; textured_positions[i][5]=48.f/sh;}
+        f.pfnResourceUpdateSubresourceUP(h,resources[5],0,nullptr,textured_positions,0,0);
+        for(auto &c:source)c=uint8_t(c+29);
+        f.pfnResourceUpdateSubresourceUP(h,resources[4],0,nullptr,source.data(),sw*4,0);
+        const auto prior=counters.draws;f.pfnDrawIndexed(h,6,1,1);TEST(last_error==S_OK && counters.draws==prior+1);
+        for(UINT y=0;y<height;++y)for(UINT x=0;x<width;++x)for(UINT c=0;c<4;++c){
+            const auto at=(size_t(y)*width+x)*4+c;
+            TEST(memory[target_index][at]==(y>=32?before[at]:c==3?uint8_t(255):source[(size_t(y+16)*sw+x+32)*4+c]));
+        }
+        for(const unsigned i:{3u,4u}){textured_positions[i][1]=-1; textured_positions[i][5]=1;}
+        f.pfnResourceUpdateSubresourceUP(h,resources[5],0,nullptr,textured_positions,0,0);
+        f.pfnDrawIndexed(h,6,1,1);TEST(last_error==S_OK && counters.draws==prior+2);
+        for(UINT y=0;y<height;++y)for(UINT x=0;x<width;++x)for(UINT c=0;c<4;++c)
+            TEST(memory[target_index][(size_t(y)*width+x)*4+c]==(c==3?uint8_t(255):source[(size_t(y+16)*sw+x+32)*4+c]));
+    }
     // Negative UVs exercise mirror addressing through the actual DDI route.
     for(auto &vertex:textured_positions){vertex[4]=-vertex[4];vertex[5]=-vertex[5];}
     f.pfnResourceUpdateSubresourceUP(h,resources[5],0,nullptr,textured_positions,0,0);
@@ -331,7 +350,7 @@ int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
     f.pfnDestroyRenderTargetView(h, view);
     for (const auto r : resources) f.pfnDestroyResource(h, r);
     f.pfnDestroyDevice(h);
-    TEST(counters.executions == executions_before + 58 && !counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
-    std::printf("{\"kind\":\"indexed-ddi-runtime-shim\",\"requested_backend\":\"%s\",\"execution_device\":\"%s\",\"verified_draws\":%llu,\"porter_duff_components\":540672,\"porter_duff_additional_modes\":11,\"derivative_ddi_components\":16384,\"loop_ddi_components\":65536,\"loop_overflow_preserved_target\":true,\"blended_scissored_draws\":6,\"textured_draws\":8,\"mirrored_ddi_components\":16384,\"point_scaled_blended_draws\":2,\"linear_scaled_blended_draws\":2,\"base_vertex_and_start_index\":true,\"invalid_ranges_and_sampler_rejected\":true,\"registered_adapter_tested\":false,\"desktop_offload_tested\":false}\n", backend, counters.last_execution_device, static_cast<unsigned long long>(counters.draws-draws_before));
+    TEST(counters.executions == executions_before + 60 && !counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
+    std::printf("{\"kind\":\"indexed-ddi-runtime-shim\",\"requested_backend\":\"%s\",\"execution_device\":\"%s\",\"verified_draws\":%llu,\"porter_duff_components\":540672,\"porter_duff_additional_modes\":11,\"derivative_ddi_components\":16384,\"loop_ddi_components\":65536,\"loop_overflow_preserved_target\":true,\"blended_scissored_draws\":6,\"textured_draws\":10,\"partial_point_preserved_target\":true,\"mirrored_ddi_components\":16384,\"point_scaled_blended_draws\":2,\"linear_scaled_blended_draws\":2,\"base_vertex_and_start_index\":true,\"invalid_ranges_and_sampler_rejected\":true,\"registered_adapter_tested\":false,\"desktop_offload_tested\":false}\n", backend, counters.last_execution_device, static_cast<unsigned long long>(counters.draws-draws_before));
     return 0;
 }

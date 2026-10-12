@@ -1,0 +1,11 @@
+import hashlib,json,struct,sys
+from pathlib import Path
+root=Path(sys.argv[1]);base=root/'baseline';candidate=root/'candidate';requests=json.loads((base/'requests.json').read_text());checks=[]
+for r in requests:
+ name=r['file'].replace('request-','reply-',1);old=(base/name).read_bytes();new=(candidate/name).read_bytes()
+ a=struct.unpack_from('<3Q14I',old);b=struct.unpack_from('<3Q14I',new);assert a==b and a[14]==2 and a[15]==3 and len(old)==len(new)==128+a[4]*a[5]*4
+ ar=struct.unpack_from('<5Q2I',old,80);br=struct.unpack_from('<5Q2I',new,80);assert ar[3]==br[3]
+ old_sha=hashlib.sha256(old[128:]).hexdigest();assert old_sha==r['pixel_sha256']
+ maximum=max(abs(x-y) for x,y in zip(old[128:],new[128:]));different=sum(x!=y for x,y in zip(old[128:],new[128:]));assert maximum<=1
+ checks.append({'case':r['case'],'packet':r['packet'],'source_sha256':r['source_sha256'],'pixels':a[4]*a[5],'baseline_sha256':old_sha,'candidate_sha256':hashlib.sha256(new[128:]).hexdigest(),'covered_samples':br[3],'baseline_provider_requests':ar[2],'candidate_provider_requests':br[2],'baseline_tiles':ar[4],'candidate_tiles':br[4],'maximum_byte_difference':maximum,'different_components':different,'exact_pixels':old[128:]==new[128:]})
+report={'pixel_checks':checks,'execution_device':'NPU','all_pixels_exact':all(x['exact_pixels'] for x in checks),'desktop_offload_tested':False,'tahoma_performance_tested':False};(root/'packet-comparison.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report))

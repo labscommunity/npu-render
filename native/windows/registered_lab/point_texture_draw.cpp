@@ -1,4 +1,5 @@
 #include "point_texture_draw.hpp"
+#include "triangle_texture_draw.hpp"
 #include <cmath>
 #include <cstring>
 #include <chrono>
@@ -41,7 +42,20 @@ Pattern pattern(const shader::Program &p) {
 }
 using Clock = std::chrono::steady_clock;
 double elapsed(Clock::time_point start) { return std::chrono::duration<double,std::milli>(Clock::now()-start).count(); }
+// Only a failed crop proof may select the general renderer. Malformed inputs,
+// shader validation errors and provider failures must still propagate.
+struct CropNotApplicable : std::invalid_argument {
+    UniformDrawExecutor::Result attempted;
+    explicit CropNotApplicable(const UniformDrawExecutor::Result &result)
+        : std::invalid_argument("point-textured draw requires general triangle rendering"), attempted(result) {}
+};
+void require_crop(bool value,const UniformDrawExecutor::Result &result) { if(!value)throw CropNotApplicable(result); }
 }
+struct PointTextureDrawExecutor::Configuration {
+    shader::Program vertex,pixel;
+    uint32_t width,height,format,source_width,source_height,source_format;
+    std::string backend;
+};
 struct PointTextureDrawExecutor::State {
     shader::Program vs; Pattern pixel;
     uint32_t width,height,source_width,source_height,source_format;
@@ -58,11 +72,13 @@ struct PointTextureDrawExecutor::State {
 };
 void PointTextureDrawExecutor::validate_shader(const shader::Program &p) { (void)pattern(p); }
 PointTextureDrawExecutor::PointTextureDrawExecutor(const shader::Program &v,const shader::Program &p,uint32_t w,uint32_t h,uint32_t format,
-    uint32_t sw,uint32_t sh,uint32_t sf,const std::string &backend) : state(std::make_unique<State>(v,p,w,h,format,sw,sh,sf,backend)) {}
+    uint32_t sw,uint32_t sh,uint32_t sf,const std::string &backend)
+    : configuration(std::make_unique<const Configuration>(Configuration{v,p,w,h,format,sw,sh,sf,backend})),
+      state(std::make_unique<State>(v,p,w,h,format,sw,sh,sf,backend)) {}
 PointTextureDrawExecutor::~PointTextureDrawExecutor() = default;
 UniformDrawExecutor::Result PointTextureDrawExecutor::execute(const std::vector<shader::VertexRegisters> &inputs,
     const shader::VertexConstants &constants, const Viewport &viewport, const PackedTexture &source) {
-    auto &s = *state; const auto start = Clock::now();
+    require(bool(state)); auto &s = *state; const auto start = Clock::now();
     require(inputs.size() == 6 && source.width == s.source_width && source.height == s.source_height && source.format == s.source_format &&
         source.pixels.size() == size_t(source.width)*source.height && viewport.x == 0 && viewport.y == 0 &&
         viewport.width == float(s.width) && viewport.height == float(s.height));
@@ -71,8 +87,8 @@ UniformDrawExecutor::Result PointTextureDrawExecutor::execute(const std::vector<
     result.input_bytes = shaded.input_bytes; result.output_bytes = shaded.output_bytes; ++result.provider_requests;
     std::vector<ClipPosition> clips(6);
     for (size_t i = 0; i < 6; ++i) {
-        require(shaded.vertices[i][s.pixel.color] == shader::VertexBits{0x3f800000,0x3f800000,0x3f800000,0x3f800000});
-        std::memcpy(clips[i].data(), shaded.vertices[i][s.vs.position_output].data(), 16); require(clips[i][3] == 1.f);
+        require_crop(shaded.vertices[i][s.pixel.color] == shader::VertexBits{0x3f800000,0x3f800000,0x3f800000,0x3f800000},result);
+        std::memcpy(clips[i].data(), shaded.vertices[i][s.vs.position_output].data(), 16); require_crop(clips[i][3] == 1.f,result);
     }
     began = Clock::now(); const auto projected = s.projection.execute(clips, viewport); result.timings.projection_ms = elapsed(began);
     require(projected.execution_device == result.execution_device);
@@ -84,8 +100,8 @@ UniformDrawExecutor::Result PointTextureDrawExecutor::execute(const std::vector<
         for (size_t c = 0; c < 2; ++c) {
             // Raster coverage uses the snapped grid. DWM's viewport transform
             // can leave an edge a few FP32 ulps from its integer pixel boundary.
-            require(p.snapped[c] == int32_t(corners[i][c]*256) &&
-                std::abs(double(p.screen[c])-double(corners[i][c])) <= 1.0/512.0);
+            require_crop(p.snapped[c] == int32_t(corners[i][c]*256) &&
+                std::abs(double(p.screen[c])-double(corners[i][c])) <= 1.0/512.0,result);
             float uv = 0; std::memcpy(&uv, &shaded.vertices[i][s.pixel.uv][c], 4); require(std::isfinite(uv));
             const double texel = double(uv) * (c ? source.height : source.width);
             if (!i) origin[c] = std::round(texel);
@@ -93,14 +109,38 @@ UniformDrawExecutor::Result PointTextureDrawExecutor::execute(const std::vector<
             // plus <= 1/512-pixel endpoint displacement and bounded FP32
             // interpolation stay far from half-texel cell
             // boundaries, so point selection equals this integer crop.
-            require(std::abs(texel - (origin[c]+corners[i][c])) <= 1.0/1024.0);
+            require_crop(std::abs(texel - (origin[c]+corners[i][c])) <= 1.0/1024.0,result);
         }
     }
-    require(origin[0] >= 0 && origin[1] >= 0 && origin[0]+s.width <= source.width && origin[1]+s.height <= source.height);
+    require_crop(origin[0] >= 0 && origin[1] >= 0 && origin[0]+s.width <= source.width && origin[1]+s.height <= source.height,result);
     began = Clock::now(); auto cropped = s.crop.execute(uint32_t(origin[0]),uint32_t(origin[1]),source.pixels);
     result.timings.merger_ms = elapsed(began); require(cropped.execution_device == result.execution_device);
     result.input_bytes += uint64_t(source.pixels.size())*4; result.output_bytes += uint64_t(cropped.pixels.size())*4; ++result.provider_requests;
     result.pixels = std::move(cropped.pixels); result.vertices = std::move(shaded.vertices);
     result.covered_samples = uint64_t(s.width)*s.height; result.tile_executions = 1; result.used_rectangle = true; result.timings.total_ms = elapsed(start); return result;
+}
+UniformDrawExecutor::Result PointTextureDrawExecutor::execute_adaptive(const std::vector<shader::VertexRegisters> &inputs,
+    const shader::VertexConstants &constants,const Viewport &viewport,const PackedTexture &source,
+    const std::vector<PackedColor> &background) {
+    const auto &c=*configuration;const auto start=Clock::now();
+    require(inputs.size()==6 && source.width==c.source_width && source.height==c.source_height && source.format==c.source_format &&
+        source.pixels.size()==size_t(source.width)*source.height && background.size()==size_t(c.width)*c.height &&
+        viewport.x==0 && viewport.y==0 && viewport.width==float(c.width) && viewport.height==float(c.height));
+    UniformDrawExecutor::Result attempted{};
+    if(state){
+        try{return execute(inputs,constants,viewport,source);}
+        catch(const CropNotApplicable &mismatch){attempted=mismatch.attempted;}
+        // Retire old NPU requests before creating successors (driver 5540).
+        // Stay general thereafter, including if construction must be retried.
+        state.reset();
+    }
+    if(!general)general=std::make_unique<TriangleTextureDrawExecutor>(c.vertex,c.pixel,6,c.width,c.height,c.format,
+        c.source_width,c.source_height,c.source_format,c.backend,false,15,shader::TextureFilter::point,CullMode::none,false);
+    auto result=general->execute(inputs,constants,{},viewport,source,background);
+    require(attempted.execution_device.empty() || attempted.execution_device==result.execution_device);
+    result.input_bytes+=attempted.input_bytes;result.output_bytes+=attempted.output_bytes;result.provider_requests+=attempted.provider_requests;
+    result.timings.shader_ms+=attempted.timings.shader_ms;result.timings.projection_ms+=attempted.timings.projection_ms;
+    // Includes the admission attempt and any deferred model construction.
+    result.timings.total_ms=elapsed(start);return result;
 }
 }

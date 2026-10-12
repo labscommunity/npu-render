@@ -88,7 +88,7 @@ public:
                 previous_texture = {}; previous_texture.header = h; previous_texture.vertex = request.vertex; previous_texture.pixel = request.pixel;
                 previous_texture.texture = {t.width,t.height,t.format,{}};
             }
-            return texture_executor->execute(request.inputs,request.vertex_constants,request.viewport,t);
+            return texture_executor->execute_adaptive(request.inputs,request.vertex_constants,request.viewport,t,request.background);
         }
         const auto &h = request.header;
         // Constants and scissor are graph inputs. Keep a bounded set of compiled
