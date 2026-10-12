@@ -1,0 +1,48 @@
+{
+  "trial": "v110",
+  "source_commit": "d91aac36d37f1f5b6145f169f06d7c931c358246",
+  "host_worker_build": "present-umd-v216",
+  "guest_umd_build": "present-umd-v216-legacy",
+  "package_version": "0.0.98.0",
+  "successful_worker_requests": 474,
+  "live_worker_requests": 457,
+  "worker_successes_by_client": {
+    "42": 17,
+    "5336": 64,
+    "1076": 335,
+    "6016": 58
+  },
+  "worker_successes_by_operation": {
+    "draw": 418,
+    "color_clear": 56
+  },
+  "acknowledged_successes": 473,
+  "unacknowledged_worker_results": 1,
+  "failed_relay_responses": 0,
+  "client_departures": 0,
+  "received_frames": 9,
+  "sole_indirect_received_frames": 8,
+  "start_first_visible_seconds": 249.171009,
+  "start_frame_to_escape_action_seconds": 34.542346,
+  "last_sole_frame_after_escape_seconds": 31.613744,
+  "visually_verified_start_visible": true,
+  "visually_verified_escape_response": false,
+  "live_compile_and_draw_ms": 412108,
+  "live_draw_ms": 90011.281,
+  "full_desktop_offload": false,
+  "usable_interactive_desktop": false,
+  "tahoma_performance_tested": false,
+  "cleanup_passed": true,
+  "physical_driver_changed": false,
+  "physical_restart": false,
+  "concurrent_cpu_build": false,
+  "findings": [
+    "The installed candidate returns nine frames, eight while the indirect display is the only active guest display. Desktop and Start pixels are manually verified. The ninth frame arrives after sole-display topology ends and cannot establish offload.",
+    "Start appears 249.171009 seconds after input, compared with 87.710619 in v109. This is a worse observed interaction, but the two live trials are not a controlled identical-state performance comparison. The faster captured packet experiment does not establish desktop improvement.",
+    "The calibrated automatic gate misses the first Start frame because its icon displacement exceeds the search range by one pixel. Manual verification authorizes Escape 34.542346 seconds after the first Start receipt. The last sole-display frame still shows Start 31.613744 seconds after Escape. Run and Notepad are not reached.",
+    "The worker reports 474 successful requests; the relay acknowledges 473. The unmatched final DWM result must not be counted as delivered. No failed relay response or client departure is recorded. Cleanup closes the relay; the worker exits 1 with socket closed or timed out.",
+    "Final UMD logs contain two draw rejections and one resource-creation rejection, without timestamps. The bounded observer records no rejection stop and no complete failure capture is recovered. Cleanup involvement is possible but not established.",
+    "Of 260 live triangle requests, 183 invoke model compilation or loading. Their 1098 model operations report 1081 persistent-cache hits. These requests account for 296914.044 ms outside draw timers; requests without model operations account for 385.701 ms. The association identifies renderer setup as the primary timing target but does not isolate its individual costs.",
+    "Both custom drivers are removed and the stream configuration is cleared. No physical custom driver, physical reboot, parallel NPU experiment or CPU build occurs during the trial. General application coverage, physical scanout offload and Tahoma gains remain unverified."
+  ]
+}

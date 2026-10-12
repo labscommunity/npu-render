@@ -1,0 +1,8 @@
+{
+  "diagnostic": "shader-profile-v1",
+  "build_passed": false,
+  "native_npu_execution": false,
+  "shipping_source_changed": false,
+  "error": "Diagnostic counter header included OpenVINO Core; the standalone replay target intentionally lacks that private provider include path. The renderer library built, then the probe failed C1083.",
+  "successor": "v2 moves the Core factory into the provider-only compile header and keeps the shared counters provider-independent."
+}

@@ -113,16 +113,22 @@ now has an exact NPU specialization for opaque, one-to-one point-sampled quads.
 Its captured 1024×768 replay passes, as do changing-image and driver callback
 tests. This is a checked subset, not general desktop rendering.
 
-The [v109 installed trial](docs/validation/2026-10-12/sole-display-v109/report.json)
-returns 493 live NPU draws, 68 live clears and 17 prewarm draws successfully,
-with all 578 responses acknowledged. Eight frames arrive while the indirect
-display is the sole active guest path. The desktop and Start menu are visible,
-but Start takes 88 seconds to appear, and Escape does not visibly close it.
-The bounded trial completes and removes both custom drivers. Final UMD traces
-contain three rejection rows without timestamps; their relationship to cleanup
-is unresolved. Accepted live requests spend 378 seconds in aggregate, including
-116 seconds inside draw timers. Full desktop offload, usable interaction and a
-Tahoma benefit remain unverified.
+The [v110 installed trial](docs/validation/2026-10-12/sole-display-v110/report.json)
+returns 474 successful NPU worker results, with 473 acknowledged by the guest.
+Nine frames arrive; eight arrive while the indirect display is the sole active
+guest path. Desktop and Start pixels are visible, but Start takes 249 seconds,
+and the last sole-display frame still shows Start after Escape. This is worse
+than the prior trial's 88 seconds; the two live runs do not isolate the cause.
+The automatic Start gate misses a 25-pixel displacement and adds 35 seconds
+before manually verified Escape. Full desktop offload remains unfinished.
+
+The trace identifies setup as the next performance target: 183 of 260 live
+triangle requests load or compile models, accounting for 297 seconds outside
+draw timers. Of 1,098 model operations, 1,081 report disk-cache hits. Retaining
+ready executors and loading disk-cached models have different costs. Both
+custom drivers are removed afterward. Three untimestamped UMD rejection rows
+and one unacknowledged final worker result remain in the evidence; successful
+worker computation alone is not proof of delivery. No Tahoma gain is established.
 
 A [controlled pipeline cache experiment](docs/validation/2026-10-12/pipeline-cache-v3/report.json)
 retains sixteen independently owned triangle pipelines instead of four. Its
@@ -141,7 +147,7 @@ stages. All 63 mixed captured packets retain exact pixels and coverage. A
 takes 36.940 seconds versus 39.429 and 39.743 seconds for the older sixteen-pipeline
 build, a 6.7% reduction. The initial candidate replay took 95.257 seconds before
 an identical repeat dropped to 37.730 seconds; first-use setup remains costly.
-Installed desktop responsiveness and a Tahoma benefit still need measurement.
+The subsequent v110 desktop trial above remains too slow for normal use.
 
 The [partial-coverage correction](docs/validation/2026-10-12/crop-qualified-v212/report.json)
 keeps valid point-sampled draws on the selected provider when they do not fit the
