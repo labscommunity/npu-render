@@ -266,7 +266,7 @@ int main(int argc, char **argv) try {
         }
     } else {
         if(quad_derivatives(ps)){while(batch>4 && uint64_t(clip[2]-clip[0])*uint64_t(clip[3]-clip[1])<=batch/2)batch/=2;batch=(std::max)(4u,batch);}
-        else while(uint64_t(width)*height%batch)batch/=2;
+        else batch=UniformDrawExecutor::raster_batch(width,height,batch);
         executor = std::make_unique<UniformDrawExecutor>(vs, ps, args[0], width, height, backend, blend_mode, format == 87, uint8_t(blend[15] & 255), batch,static_cast<CullMode>(raster[1]-1),raster[2]!=0);
     }
     const auto compile_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - compile_start).count();

@@ -33,7 +33,7 @@ struct UniformDrawExecutor::State {
         : vs(v), ps(p), count(n), width(w), height(h), batch(b), blending(blend), bgra(swizzle), cull(c), front_ccw(ccw), backend(device) {
         require(vs.stage == shader::Stage::vertex && ps.stage == shader::Stage::pixel && count && count <= 65536 && !(count % 3));
         require(width && width <= 8192 && height && height <= 8192 && uint64_t(width) * height <= 8 * 1024 * 1024);
-        require(batch && batch <= 4096 && !(uint64_t(width) * height % batch) && vs.position_output < 16 && ps.outputs[0] == 15);
+        require(batch && batch <= 4096 && vs.position_output < 16 && ps.outputs[0] == 15);
         for (size_t i = 1; i < ps.outputs.size(); ++i) require(!ps.outputs[i]);
         for (const auto used : ps.textures) require(!used);
         for (const auto &instruction : ps.instructions) for (unsigned i = 0; i < instruction.source_count; ++i)
@@ -57,6 +57,11 @@ struct UniformDrawExecutor::State {
             rectangle = std::make_unique<SolidRectangleExecutor>(width, height, backend, bgra);
     }
 };
+uint32_t UniformDrawExecutor::raster_batch(uint32_t width, uint32_t height, uint32_t maximum) {
+    require(width && width<=8192 && height && height<=8192 && uint64_t(width)*height<=8*1024*1024 && maximum && maximum<=4096);
+    while(maximum>1 && uint64_t(width)*height<=maximum/2)maximum/=2;
+    return maximum;
+}
 UniformDrawExecutor::UniformDrawExecutor(const shader::Program &vs, const shader::Program &ps, uint32_t count,
     uint32_t width, uint32_t height, const std::string &backend, bool blend, bool bgra, uint8_t mask, uint32_t batch, CullMode cull, bool front_ccw)
     : UniformDrawExecutor(vs, ps, count, width, height, backend, source_blend(blend), bgra, mask, batch, cull, front_ccw) {}

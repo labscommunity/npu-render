@@ -1,0 +1,20 @@
+from pathlib import Path
+import os,json,hashlib,zipfile
+root=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=root/'vm';out=vm/'uniform-partial-v224';dest=vm/'uniform-v224-evidence.zip';assert not dest.exists()
+def read(p):
+ b=p.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+assert read(out/'report.json')['all_checks_passed'];manifest=[]
+with zipfile.ZipFile(dest,'x',zipfile.ZIP_DEFLATED) as z:
+ for p in sorted(out.rglob('*')):
+  if not p.is_file():continue
+  h=hashlib.sha256()
+  with p.open('rb') as f:
+   while b:=f.read(1024*1024):h.update(b)
+  name=p.relative_to(out).as_posix();manifest.append({'name':name,'bytes':p.stat().st_size,'sha256':h.hexdigest()})
+  if p.suffix in ('.json','.jsonl','.log'):z.write(p,'qualification/'+name)
+ for tag in ['v224','v224-legacy']:
+  b=root/'builds'/('present-umd-'+tag)
+  for n in ['registered-build-report.json','runtime-build-provenance.json','Testing/Temporary/LastTest.log']:z.write(b/n,'builds/'+tag+'/'+n)
+  z.write(vm/('build-present-'+tag+'.log'),'builds/'+tag+'/build.log')
+ z.writestr('raw-file-sha256.json',json.dumps(manifest,indent=2)+'\n')
+print(json.dumps({'archive':dest.name,'bytes':dest.stat().st_size,'sha256':hashlib.sha256(dest.read_bytes()).hexdigest(),'raw_files':len(manifest)}))

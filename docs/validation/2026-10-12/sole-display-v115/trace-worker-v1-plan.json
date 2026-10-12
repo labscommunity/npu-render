@@ -1,0 +1,12 @@
+{
+  "baseline_commit": "63b5b083b8db3a3d6835f15f668bcc8874a7e1ca",
+  "production_source_changed": false,
+  "renderer_cache_policy_changed": false,
+  "changes": [
+    "Opt-in trace of each complete request before provider execution, bounded to 512 requests and 512 MiB; no stream token is recorded.",
+    "Log retained whole-pipeline counts before every traced request; these are not hardware queue counts.",
+    "After a provider runtime error return its failed response and stop before accepting another NPU request. Invalid input still preserves the current pipeline."
+  ],
+  "reason": "All v114 failures pass isolated CPU and both NPU runtimes. Preserve full ordering and resident pipeline context for a reproducible stateful replay.",
+  "desktop_offload_tested": false
+}

@@ -1,0 +1,18 @@
+from pathlib import Path
+from datetime import UTC,datetime
+import argparse,json,hashlib
+from npu_render.indirect_frame import parse_frame,confirmed_sole_display
+p=argparse.ArgumentParser();p.add_argument('marker',choices=['desktop-ready','run-visible','notepad-visible','text-visible','maximized-visible','closed-visible']);p.add_argument('frame',type=int);p.add_argument('note');a=p.parse_args()
+r=Path('results/render-driver');collector=r/'collector-v115-live';out=r/'input-v115';assert confirmed_sole_display(collector/'input-ready.json')
+# File sequence counts receipts; producer frame identities may skip values.
+for path in [collector/'latest.bin',*sorted(collector.glob('inspect-*.bin'),reverse=True),*sorted(collector.glob('frame-*.bin'),reverse=True)]:
+ b=path.read_bytes();f=parse_frame(b)
+ if f.identity[1]==a.frame:break
+else:raise RuntimeError('Requested producer frame is no longer retained')
+receipts=[json.loads(x) for x in (collector/'frames.jsonl').read_text().splitlines()];receipt=next(x for x in receipts if tuple(x['identity'])==f.identity);assert receipt['sole_indirect_at_receive']
+inspection=json.loads((collector/f'inspect-{f.identity[0]}-{f.identity[1]}.json').read_text());assert inspection['pixel_sha256']==hashlib.sha256(f.pixels).hexdigest()
+expected={'desktop-ready':'wake-control','run-visible':'open-run','notepad-visible':'launch-notepad','text-visible':'type-test-text','maximized-visible':'maximize-notepad','closed-visible':'close-notepad'}
+report=json.loads((out/'report.json').read_text());action=report['actions'][-1];assert action['action']==expected[a.marker] and receipt['received_at']>action['at']
+record={**inspection,'manual_visual_verification':True,'visual_verification':a.note,'verified_at':datetime.now(UTC).isoformat()}
+with (out/(a.marker+'.json')).open('x') as target:target.write(json.dumps(record,indent=2)+'\n')
+(out/(a.marker+'-manual.bin')).write_bytes(b);print(json.dumps(record))

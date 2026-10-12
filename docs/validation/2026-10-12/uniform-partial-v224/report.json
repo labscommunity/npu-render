@@ -1,0 +1,33 @@
+{
+  "build": "present-umd-v224",
+  "all_checks_passed": true,
+  "native_npu_execution": true,
+  "historical_packets": 71,
+  "failed_desktop_captures": 4,
+  "notepad_cpu_modern_legacy_exact": true,
+  "uniform_suites_both_npu_runtimes": true,
+  "desktop_offload_tested": false,
+  "tahoma_performance_tested": false,
+  "clean_cpu_suites_per_runtime": 28,
+  "qualification_stages": 11,
+  "runtime_variants": [
+    "OpenVINO 2026.4.1",
+    "OpenVINO 2026.1.0"
+  ],
+  "notepad_original_packet_sha256": "8994c10f18744f068cff2e35eb92006b17a341e5dd2fd58828c645a35e634b1f",
+  "behavior": [
+    "Uniform raster batches need not divide render-target area. Existing provider clipping handles padded tails; host writes remain restricted to valid addresses.",
+    "The exact 756-by-406 Notepad capture previously selects a batch of 8 and fails the 4096-tile work budget on CPU and NPU. It now selects 4096, executes 426 tiles, and matches the independent pixel/coverage oracle exactly on CPU and both NPU runtimes.",
+    "The unchanged original Notepad driver packet passes the physical NPU filesystem worker and its complete output is byte-identical to independently checked CPU replay.",
+    "All pixels of 31-by-29, 756-by-406, 1-by-1 and 64-by-17 targets are checked with full and clipped scissors, destination-in blending, masked channels, exact coverage and unchanged source buffers. Padding never extends output writes.",
+    "The existing dense-work rejection remains. The 4096 raster-tile work limit is unchanged.",
+    "The 71 historical packets and three v114 failed draw captures preserve their expected pixels. Native DDI draw and clear checks also pass.",
+    "No live desktop interaction or Tahoma performance claim follows from these qualifications. Those require a new installed trial."
+  ],
+  "raw_archive": {
+    "name": "uniform-v224-evidence.zip",
+    "bytes": 99654,
+    "sha256": "3d35f5b1be8139b404f28fd4174ecd987cfcb0ac29fca1f7f34921f96c95b67a",
+    "raw_files": 183
+  }
+}

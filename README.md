@@ -143,6 +143,26 @@ stream harness preserves live logs and completes output collection after the
 worker crash. Ordered request capture is the next diagnostic step; full desktop
 offload, usable interaction, and a Tahoma improvement remain unverified.
 
+The [v115 diagnostic trial](docs/validation/2026-10-12/sole-display-v115/report.json)
+returns 728 acknowledged NPU results and fifteen frames, eleven received while
+the indirect display is the sole guest path. The desktop and Run are visible;
+Run takes about 114 seconds to appear. Notepad starts but two of its draws exceed
+our raster-work budget, and its window appears only after ordinary display
+restoration. Its captured 756×406 draw reproduces the rejection on CPU: the
+uniform batch selector unnecessarily shrinks 4,096 pixels to 8 to divide the
+surface area exactly. This trial records no NPU device loss and removes both
+guest drivers cleanly. Its recorder preserves
+only 219 consecutive initial requests before reaching its storage cap, so the
+earlier device-loss cause remains unresolved.
+
+The [v224 partial-batch fix](docs/validation/2026-10-12/uniform-partial-v224/report.json)
+keeps an efficient batch for arbitrary surface sizes and retains the existing
+4,096-tile work limit. Both clean 28-suite CPU builds and all eleven qualification
+stages pass. The Notepad capture now executes 426 tiles with exact oracle pixels
+and coverage on CPU and both NPU runtimes. Its original driver packet also passes
+with output identical to CPU. Odd surfaces, clipped tails, prior captures and
+native draw callbacks pass; installed desktop interaction still requires a trial.
+
 The preceding [v112 installed trial](docs/validation/2026-10-12/sole-display-v112/report.json)
 returns 565 acknowledged NPU results and fourteen frames, thirteen received while
 the indirect display is the sole guest path. The complete desktop and Run dialog

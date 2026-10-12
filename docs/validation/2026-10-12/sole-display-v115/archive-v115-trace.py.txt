@@ -1,0 +1,10 @@
+from pathlib import Path
+import hashlib,json,struct,os
+r=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm';d=r/'indexed-dwm-stream-v115';report=json.loads((d/'report.json').read_text(encoding='utf-8-sig'));assert report['completed'] and report['configuration_removed']
+rows=[json.loads(s) for s in (d/'worker.stdout.jsonl').read_text(encoding='utf-8-sig').splitlines() if s.startswith('{')];starts={x['ordinal']:x for x in rows if x.get('kind')=='request_started'};files=sorted(d.glob('trace-request-*.bin'));result=[]
+assert len(starts)==len(files)==244
+for p in files:
+ ordinal=int(p.stem.rsplit('-',1)[1]);data=p.read_bytes();h=struct.unpack_from('<3Q14I',data);row=starts[ordinal];assert len(data)==row['bytes'] and h[13]==row['client_pid'] and h[11]==row['sequence'] and row['saved']
+ result.append({'name':p.name,'ordinal':ordinal,'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest(),'client_pid':h[13],'sequence':h[11]})
+p=r/'v115-trace-sha256.json';assert not p.exists();p.write_text(json.dumps(result,indent=2)+'\n')
+print(json.dumps({'verified_trace_files':len(result),'total_bytes':sum(x['bytes'] for x in result),'raw_requests_kept_on_physical_host':True}))

@@ -29,6 +29,31 @@ struct O {float4 p:SV_Position; float4 c:COLOR;};
 O main(float4 p:POSITION,float4 c:COLOR) {O o;o.p=p;o.c=c*color;return o;})", "vs_4_0");
     const auto pw = nr::registered_lab::shader_tokens("float4 main(float4 p:SV_Position,float4 c:COLOR):SV_Target{return c;}", "ps_4_0");
     const auto vs = parse_vertex(vw.data(), vw.size()), ps = parse_pixel(pw.data(), pw.size());
+    // Odd areas used to reduce a 4096-pixel batch to 1 or 8 pixels, rejecting
+    // ordinary window draws. Check every output byte, clipping and padded tails.
+    uint64_t partial_components=0;
+    for(const auto extent:{std::array<uint32_t,2>{31,29},{756,406},{1,1},{64,17}}) {
+        const auto w=extent[0],h=extent[1],batch=UniformDrawExecutor::raster_batch(w,h);
+        test(batch>=uint64_t(w)*h || batch==4096);
+        test(w!=756 || batch==4096);
+        const PackedColor old{8,20,80,100};const std::vector<PackedColor> background(size_t(w)*h,old);
+        UniformDrawExecutor partial(vs,ps,6,w,h,backend,BlendMode::destination_in,true,5,batch);
+        VertexConstants constants;constants[0].push_back({as_bits(.25f),as_bits(.125f),as_bits(.0625f),as_bits(.5f)});
+        const Viewport viewport{0,0,float(w),float(h),0,1};
+        for(const bool clipped:{false,true}) {
+            const std::array<int32_t,4> clip{clipped?1:0,clipped?1:0,int32_t(w),int32_t(h)};
+            const auto result=partial.execute(quad(1,false),constants,{},viewport,background,clip);
+            test(result.execution_device.rfind(backend,0)==0 && !result.used_rectangle);
+            test(result.covered_samples==uint64_t(w-uint32_t(clipped))*uint64_t(h-uint32_t(clipped)));
+            test(result.tile_executions<=2*((uint64_t(w)*h+batch-1)/batch));
+            for(uint32_t y=0;y<h;++y)for(uint32_t x=0;x<w;++x)for(unsigned c=0;c<4;++c) {
+                const bool changed=x>=uint32_t(clip[0]) && y>=uint32_t(clip[1]) && (c==0 || c==2);
+                test(result.pixels[size_t(y)*w+x][c]==(changed?old[c]/2:old[c]));++partial_components;
+            }
+            test(background==std::vector<PackedColor>(size_t(w)*h,old));
+        }
+    }
+    std::printf("{\"uniform_partial_batch_components\":%llu,\"execution_device\":\"%s\",\"passed\":true}\n",static_cast<unsigned long long>(partial_components),backend.c_str());
     {
         const std::vector<PackedColor> old_pixels(1024*768,PackedColor{7,11,13,17});
         UniformDrawExecutor sparse(vs,ps,66,1024,768,backend,false,true,15,4096);

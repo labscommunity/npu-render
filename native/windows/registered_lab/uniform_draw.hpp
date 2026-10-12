@@ -12,6 +12,9 @@ class UniformDrawExecutor {
     struct State;
     std::unique_ptr<State> state;
 public:
+    // Region tails are padded and clipped on device. Surface area need not be
+    // divisible by the raster batch; tiny surfaces only reduce unused capacity.
+    static uint32_t raster_batch(uint32_t width, uint32_t height, uint32_t maximum = 4096);
     UniformDrawExecutor(const shader::Program &vertex, const shader::Program &pixel,
                         uint32_t vertices, uint32_t width, uint32_t height,
                         const std::string &backend, bool blend, bool bgra, uint8_t write_mask,

@@ -1,0 +1,19 @@
+from pathlib import Path
+import argparse,hashlib,json,struct
+p=argparse.ArgumentParser();p.add_argument('action',choices=['prepare','compare']);p.add_argument('output',type=Path);a=p.parse_args()
+r=Path.home()/'AppData/Local/npu-render/vm';source=r/'indexed-dwm-stream-v115/slow-request-3.bin';data=source.read_bytes();h=struct.unpack_from('<3Q14I',data)
+assert hashlib.sha256(data).hexdigest()=='8994c10f18744f068cff2e35eb92006b17a341e5dd2fd58828c645a35e634b1f'
+assert h[3:9]==(6,756,406,30,87,1856) and h[14:]==(1,0,0) and h[12]+80==len(data)
+suffix=f'-{h[13]}-{h[1]:016x}{h[2]:016x}-{h[11]}.bin';request=a.output/('request'+suffix);reply=a.output/('reply'+suffix)
+if a.action=='prepare':
+ a.output.mkdir(exist_ok=False);request.write_bytes(data)
+ (a.output/'request-provenance.json').write_text(json.dumps({'source':'indexed-dwm-stream-v115/slow-request-3.bin','sha256':hashlib.sha256(data).hexdigest(),'bytes':len(data),'original_packet_unchanged':True,'source_dispatch_ticket':581},indent=2)+'\n')
+ print('Prepared original Notepad packet without changing rendering or delivery fields')
+else:
+ assert request.read_bytes()==data
+ b=reply.read_bytes();rh=struct.unpack_from('<3Q14I',b)
+ assert all(rh[i]==h[i] for i in range(17) if i not in (12,14,15)) and rh[14:16]==(2,3) and rh[12]+80==len(b) and len(b)==128+756*406*4
+ rec=struct.unpack_from('<5Q2I',b,80);assert rec[6]==0 and 0<rec[2]<=4*1024*1024 and rec[3]<=756*406*10
+ cpu=(a.output.parent/'notepad-CPU.pixels').read_bytes();assert b[128:]==cpu
+ result={'original_packet_unchanged':True,'execution_device':'NPU','all_pixels_exact_cpu':True,'verified_components':len(cpu),'pixels_sha256':hashlib.sha256(cpu).hexdigest(),'provider_requests':rec[2],'covered_samples':rec[3],'tile_executions':rec[4],'passed':True,'desktop_offload_tested':False}
+ (a.output/'comparison.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result))

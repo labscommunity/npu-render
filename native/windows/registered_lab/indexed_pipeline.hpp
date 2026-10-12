@@ -114,7 +114,7 @@ public:
         // old entry after creating its successor triggers a device-loss failure
         // with the qualified 5540 runtime during mixed desktop draws.
         if(uniform_cache.size()==8)uniform_cache.erase(uniform_cache.begin());
-        uint32_t batch=4096;while(uint64_t(h.width)*h.height%batch)batch/=2;
+        const auto batch=raster::UniformDrawExecutor::raster_batch(h.width,h.height);
         auto candidate=std::make_unique<raster::UniformDrawExecutor>(request.vertex,request.pixel,h.vertices,h.width,h.height,
             "NPU",blend_mode(h),h.format==87,uint8_t((h.flags>>8)&15),batch,static_cast<raster::CullMode>((h.flags>>5)&3),(h.flags&128)!=0);
         auto result=candidate->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,request.background,request.scissor);
