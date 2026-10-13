@@ -235,3 +235,13 @@ target_compile_features(nr_registered_provider_cache_test PRIVATE cxx_std_17)
 target_compile_options(nr_registered_provider_cache_test PRIVATE /W4 /WX)
 set_property(TARGET nr_registered_provider_cache_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 add_test(NAME registered_provider_cache_contract COMMAND nr_registered_provider_cache_test)
+
+# Explicit local transport components; existing guest driver admission is unchanged.
+foreach(kind probe test)
+  add_executable(nr_registered_local_indexed_client_${kind} local_indexed_client_${kind}.cpp)
+  target_compile_features(nr_registered_local_indexed_client_${kind} PRIVATE cxx_std_17)
+  target_compile_options(nr_registered_local_indexed_client_${kind} PRIVATE /W4 /WX)
+  set_property(TARGET nr_registered_local_indexed_client_${kind} PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endforeach()
+add_test(NAME registered_local_client_contract COMMAND nr_registered_local_indexed_client_test)
+set_tests_properties(registered_local_client_contract PROPERTIES TIMEOUT 30)

@@ -1,0 +1,4 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render"
+if(@(Get-Process nr_registered_local_indexed_worker,nr_registered_indexed_worker,nr_registered_indexed_stream_worker -ErrorAction SilentlyContinue).Count){throw 'Another renderer active'}
+& "$r\toolchains\openvino-2026.4.1\Scripts\python.exe" "$r\vm\qualify-native-client-v1.py" --worker "$r\builds\native-pipe-worker-v1\Release\nr_registered_local_indexed_worker.exe" --client "$r\builds\native-client-promoted-v1\Release\nr_registered_local_indexed_client_probe.exe" --runtime "$r\toolchains\openvino-2026.4.1\Lib\site-packages\openvino\libs" --cache "$r\vm\model-cache-2026-4-v209" --trace "$r\vm\indexed-dwm-stream-v120" --reference "$r\vm\ordered-point-reentry-v1-expanded\report.json" --output "$r\vm\native-client-promoted-v1-qualification"
+if($LASTEXITCODE){throw 'Promoted C++ client qualification failed'}

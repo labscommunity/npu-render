@@ -989,3 +989,24 @@ The [stream log check](../../../docs/validation/2026-10-12/stream-capture-v119/r
 verifies output is visible before normal and forced child termination. Shutdown
 waits are bounded and incomplete output is reported; a driver device-loss hang
 was not simulated in that check.
+
+
+`LocalIndexedClient` provides an explicit local named-pipe boundary for a future
+native controller. The caller supplies a handle to its known worker; the client
+retains that process object, verifies the pipe server's process ID and requires
+the worker to remain alive. Requests must identify the calling process. Replies
+must pass the complete existing NPU protocol decoder before delivery is
+acknowledged. Every exchange has a finite deadline and optional cancellation;
+failure permanently invalidates that client. Pending overlapped I/O is cancelled
+and drained before operation storage is released. The controller remains
+responsible for establishing the worker's identity and lifetime.
+
+`nr_registered_local_indexed_client_probe` takes an explicit pipe name, owned
+worker PID, request file, new reply file, timeout and diagnostic mode. It installs
+no driver and changes no desktop routing. The normal build includes a 15-case
+synthetic-peer contract covering malformed replies, timeout, cancellation,
+receipt validation, acknowledgment and permanent rejection after failure.
+Synthetic replies are not NPU execution evidence. Separate physical validation
+connects this same client source to Delta's NPU worker. Existing guest-only UMD
+and exchange admission remain unchanged; cross-account DWM access, integrity
+levels and physical adapter admission require their own qualification.
