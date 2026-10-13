@@ -1,0 +1,9 @@
+from pathlib import Path
+from datetime import datetime,timezone
+import json,openvino as ov,numpy as np
+from openvino import opset13 as op
+core=ov.Core();p=op.parameter([1,16],np.float32);model=ov.Model([op.add(p,op.constant(np.ones((1,16),np.float32)))],[p]);compiled=core.compile_model(model,'NPU');devices=compiled.get_property('EXECUTION_DEVICES');assert len(devices)==1 and devices[0].startswith('NPU')
+req=compiled.create_infer_request()
+for offset in (0,7,-11):
+ data=np.arange(16,dtype=np.float32).reshape(1,16)+offset;result=req.infer({0:data})[compiled.output(0)];np.testing.assert_array_equal(result,data+1)
+print(json.dumps(dict(at=datetime.now(timezone.utc).isoformat(),passed=True,execution_devices=devices,verified_values=48,physical_device_restart=False,health_probe_only=True)))

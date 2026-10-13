@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "C:\Users\tatef\AppData\Local\npu-render\vm\npu-health-after-profile-v1.py", line 5, in <module>
+    core=ov.Core();p=op.parameter([1,16],np.float32);model=ov.Model([op.add(p,op.constant(np.ones((1,16),np.float32)))],[p]);compiled=core.compile_model(model,'NPU');devices=compiled.get_property('EXECUTION_DEVICES');assert len(devices)==1 and devices[0].startswith('NPU')
+                                                                                                                                                                                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

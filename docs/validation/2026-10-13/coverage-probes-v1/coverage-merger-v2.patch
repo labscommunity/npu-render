@@ -1,0 +1,10 @@
+--- a/native/windows/registered_lab/CMakeLists.txt
++++ b/native/windows/registered_lab/CMakeLists.txt
+@@ -242,6 +242,6 @@
+ add_executable(nr_registered_fused_coverage_merger_test fused_coverage_merger_test.cpp)
+ target_compile_features(nr_registered_fused_coverage_merger_test PRIVATE cxx_std_17)
+ target_compile_options(nr_registered_fused_coverage_merger_test PRIVATE /W4 /WX)
+-target_link_libraries(nr_registered_fused_coverage_merger_test PRIVATE nr_registered_vertex)
++target_link_libraries(nr_registered_fused_coverage_merger_test PRIVATE nr_registered_vertex openvino::runtime)
+ set_property(TARGET nr_registered_fused_coverage_merger_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+ add_test(NAME registered_fused_coverage_merger_contract COMMAND nr_registered_fused_coverage_merger_test)

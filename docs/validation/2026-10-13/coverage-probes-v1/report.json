@@ -1,0 +1,95 @@
+{
+  "recorded_at": "2026-10-13T05:44:19.407377+00:00",
+  "experiments": {
+    "coverage-merger-v2": {
+      "npu_verified_values": 281600,
+      "cpu_contract_passed": true,
+      "gpu_qualified": false,
+      "gpu_stderr": "fused coverage/merger oracle failed",
+      "all_backend_qualification_completed": false,
+      "warm_rounds_excluding_first": 11,
+      "warm_fast_median_ms": 8.951,
+      "warm_baseline_median_ms": 9.179,
+      "warm_sum_reduction": 0.048358525079426284,
+      "single_short_trial": true,
+      "host_io_and_admission_included": true,
+      "desktop_performance_tested": false
+    },
+    "compact-coverage-v1": {
+      "npu_verified_values": 348160,
+      "cpu_contract_passed": true,
+      "gpu_qualified": false,
+      "gpu_stderr": "coverage mismatch sample=1 actual=0 expected=1\r\ncompact coverage oracle failed",
+      "all_backend_qualification_completed": false,
+      "warm_rounds_excluding_first": 11,
+      "warm_fast_median_ms": 3.083,
+      "warm_baseline_median_ms": 6.201,
+      "warm_sum_reduction": 0.48917843877043676,
+      "single_short_trial": true,
+      "host_io_and_admission_included": true,
+      "desktop_performance_tested": false
+    },
+    "compact-coverage-v2": {
+      "npu_verified_values": 348160,
+      "cpu_contract_passed": true,
+      "gpu_qualified": false,
+      "gpu_stderr": "coverage mismatch sample=1 actual=0 expected=1\r\ncompact coverage oracle failed",
+      "all_backend_qualification_completed": false,
+      "warm_rounds_excluding_first": 11,
+      "warm_fast_median_ms": 2.894,
+      "warm_baseline_median_ms": 6.415,
+      "warm_sum_reduction": 0.5467627949390175,
+      "single_short_trial": true,
+      "host_io_and_admission_included": true,
+      "desktop_performance_tested": false
+    },
+    "coverage-profile-v1": {
+      "npu_4096_verified_values": 245760,
+      "layer_entries": 753,
+      "recorded_execution_types": {
+        "DMA": 32,
+        "Shave": 721
+      },
+      "task_statistics_microseconds": {
+        "total duration": 8940.78,
+        "DMA duration": 2367.395,
+        "DPU duration": 0.0,
+        "SW duration": 5401.411,
+        "DMA-DPU overlap": 0.0,
+        "DMA-SW overlap": 270.777,
+        "SW-DPU overlap": 0.0,
+        "all tasks union": 7498.029,
+        "total idle": 1442.751,
+        "SW duration without DPU overlap": 5401.411,
+        "DMA duration without overlaps": 2096.618,
+        "Sum of DMA task durations": 2891.557,
+        "Sum of DPU task durations": 0.0,
+        "Sum of SW task durations": 26175.507
+      },
+      "workpoint_metadata": {
+        "freq": 1300.0,
+        "status": "INVALID"
+      },
+      "workpoint_frequency_not_verified": true,
+      "profile_overhead_present": true,
+      "layer_times_not_additive_elapsed": true,
+      "larger_65536_profile_failed": true,
+      "larger_case_stderr": "Exception from src\\inference\\src\\cpp\\infer_request.cpp:224:\r\nException from src\\plugins\\intel_npu\\src\\utils\\src\\zero\\zero_wrappers.cpp:382:\r\nL0 zeFenceHostSynchronize result: ZE_RESULT_ERROR_DEVICE_LOST, code 0x70000001 - device hung, reset, was removed, or driver update occurred",
+      "small_recovery_probe": {
+        "at": "2026-10-13T05:10:15.871671+00:00",
+        "passed": true,
+        "execution_devices": [
+          "NPU"
+        ],
+        "verified_values": 48,
+        "physical_device_restart": false,
+        "health_probe_only": true
+      },
+      "first_health_probe_failed_at_python_property_type_assertion": true,
+      "all_sizes_qualified": false
+    }
+  },
+  "raw_files_verified_against_remote_manifest": 37,
+  "production_renderer_changed": false,
+  "physical_desktop_offloaded": false
+}

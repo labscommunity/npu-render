@@ -1,0 +1,160 @@
+--- a/native/windows/registered_lab/CMakeLists.txt
++++ b/native/windows/registered_lab/CMakeLists.txt
+@@ -245,3 +245,10 @@
+ target_link_libraries(nr_registered_fused_coverage_merger_test PRIVATE nr_registered_vertex openvino::runtime)
+ set_property(TARGET nr_registered_fused_coverage_merger_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+ add_test(NAME registered_fused_coverage_merger_contract COMMAND nr_registered_fused_coverage_merger_test)
++
++add_executable(nr_registered_compact_coverage_test compact_coverage_test.cpp)
++target_compile_features(nr_registered_compact_coverage_test PRIVATE cxx_std_17)
++target_compile_options(nr_registered_compact_coverage_test PRIVATE /W4 /WX)
++target_link_libraries(nr_registered_compact_coverage_test PRIVATE nr_registered_vertex openvino::runtime)
++set_property(TARGET nr_registered_compact_coverage_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
++add_test(NAME registered_compact_coverage_contract COMMAND nr_registered_compact_coverage_test)
+--- /dev/null
++++ b/native/windows/registered_lab/compact_coverage.hpp
+@@ -0,0 +1,80 @@
++#pragma once
++#include "raster_executor.hpp"
++#include "provider_compile.hpp"
++#include <openvino/opsets/opset13.hpp>
++#include <openvino/pass/serialize.hpp>
++#include <algorithm>
++#include <cstring>
++#include <sstream>
++namespace nr::raster::compact {
++struct NotApplicable : std::runtime_error {NotApplicable():std::runtime_error("compact coverage domain not applicable") {}};
++inline void require(bool v){if(!v)throw std::invalid_argument("invalid compact coverage request");}
++// Positive, exact per-axis power-of-two scaling and translation preserve all
++// edge signs, winding, top-left ownership and degeneracy. Scissor comparisons
++// still use the original integer point coordinates on the execution device.
++inline bool normalize(const Sample &s,std::array<float,6> &v,std::array<float,2> &p){
++    for(unsigned axis=0;axis<2;++axis){
++        const int64_t origin=s.triangle[0][axis];std::array<int64_t,4> d{0,int64_t(s.triangle[1][axis])-origin,int64_t(s.triangle[2][axis])-origin,int64_t(s.point[axis])-origin};
++        uint32_t bits=0;for(auto value:d)bits|=uint32_t(value);unsigned shift=0;
++        if(bits)while(!(bits&1)){bits>>=1;++shift;}
++        const int64_t divisor=int64_t(1)<<shift;for(auto &value:d)value/=divisor;
++        const auto bounds=std::minmax_element(d.begin(),d.end());if(*bounds.second-*bounds.first>4095)return false;
++        for(unsigned n=0;n<3;++n)v[n*2+axis]=float(d[n]);p[axis]=float(d[3]);
++    }
++    return true;
++}
++namespace graph {
++namespace op=ov::opset13;using Node=std::shared_ptr<ov::Node>;
++inline Node integer(int32_t x){return op::Constant::create(ov::element::i32,ov::Shape{}, {x});}
++inline Node lane(const Node &v,int64_t i){return std::make_shared<op::Gather>(v,op::Constant::create(ov::element::i64,ov::Shape{1},{i}),integer(1));}
++inline Node sub(const Node&a,const Node&b){return std::make_shared<op::Subtract>(a,b);}
++inline Node mul(const Node&a,const Node&b){return std::make_shared<op::Multiply>(a,b);}
++inline Node pred(const Node &v){return std::make_shared<op::Convert>(v,ov::element::i32);}
++inline Node both(const Node&a,const Node&b){return std::make_shared<op::BitwiseAnd>(a,b);}
++inline Node either(const Node&a,const Node&b){return std::make_shared<op::BitwiseOr>(a,b);}
++inline Node positive(const Node &v){return pred(std::make_shared<op::Greater>(pred(v),integer(0)));}
++inline Node negative(const Node &v){return pred(std::make_shared<op::Less>(pred(v),integer(0)));}
++inline Node zero(const Node &v){return pred(std::make_shared<op::Equal>(pred(v),integer(0)));}
++struct Sign {Node positive,negative,zero;};
++inline Sign determinant(const Node &ax,const Node &by,const Node &ay,const Node &bx){
++    // Each product is an exactly representable integer smaller than 2^24.
++    // Their difference may round above 2^24, but its sign and zero status remain
++    // exact. Conversion is safe because the magnitude is below 2^25.
++    const auto value=sub(mul(ax,by),mul(ay,bx));return {positive(value),negative(value),zero(value)};
++}
++inline std::shared_ptr<ov::Model> model(uint32_t count,CullMode cull,bool ccw){
++    require(count && count<=65536 && (cull==CullMode::none || cull==CullMode::front || cull==CullMode::back));
++    auto vertices=std::make_shared<op::Parameter>(ov::element::f32,ov::Shape{count,6});auto points=std::make_shared<op::Parameter>(ov::element::f32,ov::Shape{count,2});auto original=std::make_shared<op::Parameter>(ov::element::i32,ov::Shape{count,2});auto clip=std::make_shared<op::Parameter>(ov::element::i32,ov::Shape{1,4});
++    vertices->output(0).set_names({"vertices"});points->output(0).set_names({"points"});original->output(0).set_names({"original_points"});clip->output(0).set_names({"scissor"});
++    std::array<Node,6> v;for(int64_t i=0;i<6;++i)v[size_t(i)]=lane(vertices,i);const auto px=lane(points,0),py=lane(points,1);
++    const auto area=determinant(sub(v[2],v[0]),sub(v[5],v[1]),sub(v[3],v[1]),sub(v[4],v[0]));auto covered=either(area.positive,area.negative);
++    if(cull!=CullMode::none)covered=((cull==CullMode::back)!=ccw)?area.positive:area.negative;
++    covered=both(covered,pred(std::make_shared<op::GreaterEqual>(lane(original,0),lane(clip,0))));covered=both(covered,pred(std::make_shared<op::GreaterEqual>(lane(original,1),lane(clip,1))));
++    covered=both(covered,pred(std::make_shared<op::Less>(lane(original,0),lane(clip,2))));covered=both(covered,pred(std::make_shared<op::Less>(lane(original,1),lane(clip,3))));
++    for(size_t a=0;a<6;a+=2){const auto b=(a+2)%6;const auto dx=sub(v[b],v[a]),dy=sub(v[b+1],v[a+1]);const auto e=determinant(dx,sub(py,v[a+1]),dy,sub(px,v[a]));const auto top=either(negative(dy),both(zero(dy),positive(dx))),reverse=either(positive(dy),both(zero(dy),negative(dx)));
++        covered=both(covered,either(both(area.positive,either(e.positive,both(e.zero,top))),both(area.negative,either(e.negative,both(e.zero,reverse)))));
++    }
++    return std::make_shared<ov::Model>(ov::OutputVector{covered},ov::ParameterVector{vertices,points,original,clip});
++}
++}
++class Executor {
++    uint32_t count;ov::Core core;ov::CompiledModel compiled;ov::InferRequest request;std::string device;bool failed=false;
++public:
++    Executor(uint32_t n,const std::string &backend,CullMode cull=CullMode::none,bool ccw=false):count(n){
++        require(backend=="CPU" || backend=="NPU" || backend=="GPU");auto model=graph::model(count,cull,ccw);ov::AnyMap properties{ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY)};
++        if(backend=="NPU"){
++            for(const auto &node:model->get_ops())node->get_rt_info()["precise_0"]=std::string{};
++            std::ostringstream xml,weights;ov::pass::Serialize serializer(xml,weights);serializer.run_on_model(model);const auto bytes=weights.str();ov::Tensor data(ov::element::u8,ov::Shape{bytes.size()});if(!bytes.empty())std::memcpy(data.data(),bytes.data(),bytes.size());model=core.read_model(xml.str(),data);
++            for(const auto &node:model->get_ops())require(nr::provider::precision_preserved(node));properties.emplace(ov::hint::execution_mode(ov::hint::ExecutionMode::ACCURACY));
++        }
++        compiled=nr::provider::compile_model(core,model,backend,properties);const auto devices=compiled.get_property(ov::execution_devices);require(devices.size()==1 && (devices[0]==backend || devices[0].rfind(backend+".",0)==0));device=devices[0];request=compiled.create_infer_request();
++    }
++    CoverageExecutor::Result execute(const std::vector<Sample> &samples,const std::array<int32_t,4> &clip){
++        require(!failed && samples.size()==count && clip[0]<=clip[2] && clip[1]<=clip[3]);for(auto x:clip)require(x>=-coordinate_limit && x<=coordinate_limit+1);
++        std::vector<std::array<float,6>> v(count);std::vector<std::array<float,2>> p(count);std::vector<Point> original(count);
++        for(size_t i=0;i<count;++i){const auto &s=samples[i];for(const auto &point:s.triangle)for(auto x:point)require(x>=-coordinate_limit && x<=coordinate_limit);for(auto x:s.point)require(x>=-coordinate_limit && x<=coordinate_limit);if(!normalize(s,v[i],p[i]))throw NotApplicable();original[i]=s.point;}
++        failed=true;std::memcpy(request.get_tensor("vertices").data<float>(),v.data(),size_t(count)*24);std::memcpy(request.get_tensor("points").data<float>(),p.data(),size_t(count)*8);std::memcpy(request.get_tensor("original_points").data<int32_t>(),original.data(),size_t(count)*8);std::memcpy(request.get_tensor("scissor").data<int32_t>(),clip.data(),16);
++        request.infer();const auto output=request.get_output_tensor();require(output.get_element_type()==ov::element::i32 && output.get_size()==count);CoverageExecutor::Result result{{},device};result.covered.resize(count);for(size_t i=0;i<count;++i){const auto x=output.data<const int32_t>()[i];require(x==0 || x==1);result.covered[i]=uint8_t(x);}failed=false;return result;
++    }
++};
++}
+--- /dev/null
++++ b/native/windows/registered_lab/compact_coverage_test.cpp
+@@ -0,0 +1,61 @@
++#include "compact_coverage.hpp"
++#include <algorithm>
++#include <chrono>
++#include <cstdio>
++using namespace nr::raster;
++namespace {
++void test(bool v){if(!v)throw std::runtime_error("compact coverage oracle failed");}
++int64_t edge(Point a,Point b,Point p){return (int64_t(b[0])-a[0])*(int64_t(p[1])-a[1])-(int64_t(b[1])-a[1])*(int64_t(p[0])-a[0]);}
++bool reference(Sample s,const std::array<int32_t,4> &clip,CullMode cull,bool ccw){
++    auto &v=s.triangle;const auto area=edge(v[0],v[1],v[2]);if(!area)return false;const bool front=(area<0)==ccw;
++    if((cull==CullMode::back && !front) || (cull==CullMode::front && front))return false;
++    if(s.point[0]<clip[0] || s.point[1]<clip[1] || s.point[0]>=clip[2] || s.point[1]>=clip[3])return false;
++    if(area<0)std::swap(v[1],v[2]);for(unsigned i=0;i<3;++i){const auto a=v[i],b=v[(i+1)%3];const auto e=edge(a,b,s.point);const bool top=b[1]<a[1] || (b[1]==a[1] && b[0]>a[0]);if(e<0 || (!e && !top))return false;}return true;
++}
++uint32_t random32(){static uint32_t x=0x145791ad;x^=x<<13;x^=x>>17;x^=x<<5;return x;}
++void fill(std::vector<Sample> &samples,unsigned frame){
++    for(size_t i=0;i<samples.size();++i){auto &s=samples[i];for(auto &p:s.triangle)p={int32_t(random32()%4096),int32_t(random32()%4096)};s.point={int32_t(random32()%4096),int32_t(random32()%4096)};
++        if(frame==0){s.triangle={{{0,0},{4095,0},{0,4095}}};s.point={int32_t(i%64)*64+32,int32_t((i/64)%64)*64+32};}
++        if(frame==2){s.triangle={{{0,0},{4095,4094},{4094,4093}}};s.point={2048,2048-int32_t(i%3)};test(edge(s.triangle[0],s.triangle[1],s.triangle[2])==-1);}
++        if(frame==3)s.point=s.triangle[i%3];if(frame==4)s.triangle[2]=s.triangle[1];
++        if(frame==8){for(auto &p:s.triangle)p[1]=317;s.point[1]=317;}
++        if(frame==9){s.triangle={{{0,0},{4095,0},{4095,4095}}};s.point={0,4095};}
++        if(i&1)std::swap(s.triangle[0],s.triangle[1]);
++        int64_t sx=1,sy=1,ox=0,oy=0;
++        if(frame==5){sx=sy=65536;ox=oy=coordinate_limit-4095*sx;}
++        if(frame==6){sx=sy=65536;ox=oy=-coordinate_limit;}
++        if(frame==7){sx=128;sy=1024;ox=-17;oy=31;}
++        if(frame==10){ox=-2048;oy=-2048;}
++        if(frame==11){sx=256;sy=128;ox=100000;oy=-100000;}
++        for(auto &p:s.triangle){p[0]=int32_t(int64_t(p[0])*sx+ox);p[1]=int32_t(int64_t(p[1])*sy+oy);}s.point[0]=int32_t(int64_t(s.point[0])*sx+ox);s.point[1]=int32_t(int64_t(s.point[1])*sy+oy);
++    }
++}
++uint64_t verify(const CoverageExecutor::Result &r,const std::vector<Sample> &samples,const std::array<int32_t,4> &clip,CullMode cull,bool ccw,const std::string &backend){
++    test(r.covered.size()==samples.size() && r.execution_device.rfind(backend,0)==0);
++    for(size_t i=0;i<samples.size();++i){const auto want=reference(samples[i],clip,cull,ccw);if(bool(r.covered[i])!=want){std::fprintf(stderr,"coverage mismatch sample=%zu actual=%u expected=%u\n",i,r.covered[i],unsigned(want));test(false);}}return samples.size();
++}
++using Clock=std::chrono::steady_clock;double elapsed(Clock::time_point s){return std::chrono::duration<double,std::milli>(Clock::now()-s).count();}
++}
++int main(int argc,char **argv)try{
++    test(argc<=2);const std::string backend=argc==2?argv[1]:"CPU";test(backend=="CPU" || backend=="NPU" || backend=="GPU");constexpr uint32_t count=4096;uint64_t checked=0;std::vector<Sample> samples(count);const std::array<int32_t,4> full{-coordinate_limit,-coordinate_limit,coordinate_limit+1,coordinate_limit+1};
++    for(const auto cull:{CullMode::none,CullMode::front,CullMode::back})for(const bool ccw:{false,true}){
++        compact::Executor fast(count,backend,cull,ccw);
++        for(unsigned frame=0;frame<12;++frame){fill(samples,frame);auto clip=full;if(frame==0)clip={5,7,3001,2999};if(frame==5)clip={coordinate_limit-100000,coordinate_limit-200000,coordinate_limit,coordinate_limit};if(frame==6)clip={-coordinate_limit+1,-coordinate_limit+1,-coordinate_limit+200000,-coordinate_limit+100000};if(frame==11)clip={100001,-99999,200003,100005};
++            checked+=verify(fast.execute(samples,clip),samples,clip,cull,ccw,backend);
++        }
++    }
++    std::printf("{\"compact_oracle\":true,\"verified_values\":%llu,\"cull_winding_modes\":6,\"geometry_frames_per_mode\":12,\"execution_device\":\"%s\"}\n",static_cast<unsigned long long>(checked),backend.c_str());std::fflush(stdout);
++    {
++        compact::Executor fast(count,backend);fill(samples,0);const auto good=samples[0];
++        samples[0]={{{{0,0},{4096,0},{0,4096}}},{1,1}};bool denied=false;try{fast.execute(samples,full);}catch(const compact::NotApplicable &){denied=true;}test(denied);
++        samples[0]=good;samples[0].point[0]=INT32_MAX;denied=false;try{fast.execute(samples,full);}catch(const std::invalid_argument &){denied=true;}test(denied);
++        samples[0]=good;checked+=verify(fast.execute(samples,full),samples,full,CullMode::none,false,backend);
++        CoverageExecutor general(count,backend);
++        for(unsigned round=0;round<12;++round){fill(samples,round%2);CoverageExecutor::Result a,b;double fast_ms=0,wide_ms=0;
++            const auto run_fast=[&]{auto start=Clock::now();a=fast.execute(samples,full);fast_ms=elapsed(start);};const auto run_wide=[&]{auto start=Clock::now();b=general.execute(samples,full);wide_ms=elapsed(start);};if(round&1){run_fast();run_wide();}else{run_wide();run_fast();}
++            test(a.covered==b.covered && b.execution_device.rfind(backend,0)==0);checked+=verify(a,samples,full,CullMode::none,false,backend);
++            std::printf("{\"profile\":true,\"round\":%u,\"compact_first\":%s,\"compact_ms\":%.3f,\"wide_ms\":%.3f,\"execution_device\":\"%s\",\"coverage_exact\":true}\n",round,round&1?"true":"false",fast_ms,wide_ms,backend.c_str());std::fflush(stdout);
++        }
++    }
++    std::printf("{\"passed\":true,\"total_verified_values\":%llu,\"domain_and_invalid_rejections\":2,\"renderer_integrated\":false}\n",static_cast<unsigned long long>(checked));return 0;
++}catch(const std::exception &e){std::fprintf(stderr,"%s\n",e.what());return 1;}

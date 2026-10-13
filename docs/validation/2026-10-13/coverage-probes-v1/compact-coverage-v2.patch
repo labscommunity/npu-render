@@ -1,0 +1,31 @@
+--- a/native/windows/registered_lab/compact_coverage.hpp
++++ b/native/windows/registered_lab/compact_coverage.hpp
+@@ -26,7 +26,7 @@
+ namespace graph {
+ namespace op=ov::opset13;using Node=std::shared_ptr<ov::Node>;
+ inline Node integer(int32_t x){return op::Constant::create(ov::element::i32,ov::Shape{}, {x});}
+-inline Node lane(const Node &v,int64_t i){return std::make_shared<op::Gather>(v,op::Constant::create(ov::element::i64,ov::Shape{1},{i}),integer(1));}
++inline Node lane(const Node &v,int64_t i){return std::make_shared<op::Gather>(v,op::Constant::create(ov::element::i64,ov::Shape{1},{i}),integer(0));}
+ inline Node sub(const Node&a,const Node&b){return std::make_shared<op::Subtract>(a,b);}
+ inline Node mul(const Node&a,const Node&b){return std::make_shared<op::Multiply>(a,b);}
+ inline Node pred(const Node &v){return std::make_shared<op::Convert>(v,ov::element::i32);}
+@@ -44,7 +44,7 @@
+ }
+ inline std::shared_ptr<ov::Model> model(uint32_t count,CullMode cull,bool ccw){
+     require(count && count<=65536 && (cull==CullMode::none || cull==CullMode::front || cull==CullMode::back));
+-    auto vertices=std::make_shared<op::Parameter>(ov::element::f32,ov::Shape{count,6});auto points=std::make_shared<op::Parameter>(ov::element::f32,ov::Shape{count,2});auto original=std::make_shared<op::Parameter>(ov::element::i32,ov::Shape{count,2});auto clip=std::make_shared<op::Parameter>(ov::element::i32,ov::Shape{1,4});
++    auto vertices=std::make_shared<op::Parameter>(ov::element::f32,ov::Shape{6,count});auto points=std::make_shared<op::Parameter>(ov::element::f32,ov::Shape{2,count});auto original=std::make_shared<op::Parameter>(ov::element::i32,ov::Shape{2,count});auto clip=std::make_shared<op::Parameter>(ov::element::i32,ov::Shape{4,1});
+     vertices->output(0).set_names({"vertices"});points->output(0).set_names({"points"});original->output(0).set_names({"original_points"});clip->output(0).set_names({"scissor"});
+     std::array<Node,6> v;for(int64_t i=0;i<6;++i)v[size_t(i)]=lane(vertices,i);const auto px=lane(points,0),py=lane(points,1);
+     const auto area=determinant(sub(v[2],v[0]),sub(v[5],v[1]),sub(v[3],v[1]),sub(v[4],v[0]));auto covered=either(area.positive,area.negative);
+@@ -71,8 +71,8 @@
+     }
+     CoverageExecutor::Result execute(const std::vector<Sample> &samples,const std::array<int32_t,4> &clip){
+         require(!failed && samples.size()==count && clip[0]<=clip[2] && clip[1]<=clip[3]);for(auto x:clip)require(x>=-coordinate_limit && x<=coordinate_limit+1);
+-        std::vector<std::array<float,6>> v(count);std::vector<std::array<float,2>> p(count);std::vector<Point> original(count);
+-        for(size_t i=0;i<count;++i){const auto &s=samples[i];for(const auto &point:s.triangle)for(auto x:point)require(x>=-coordinate_limit && x<=coordinate_limit);for(auto x:s.point)require(x>=-coordinate_limit && x<=coordinate_limit);if(!normalize(s,v[i],p[i]))throw NotApplicable();original[i]=s.point;}
++        std::vector<float> v(size_t(count)*6),p(size_t(count)*2);std::vector<int32_t> original(size_t(count)*2);
++        for(size_t i=0;i<count;++i){const auto &s=samples[i];for(const auto &point:s.triangle)for(auto x:point)require(x>=-coordinate_limit && x<=coordinate_limit);for(auto x:s.point)require(x>=-coordinate_limit && x<=coordinate_limit);std::array<float,6> compact_v;std::array<float,2> compact_p;if(!normalize(s,compact_v,compact_p))throw NotApplicable();for(size_t c=0;c<6;++c)v[c*count+i]=compact_v[c];for(size_t c=0;c<2;++c){p[c*count+i]=compact_p[c];original[c*count+i]=s.point[c];}}
+         failed=true;std::memcpy(request.get_tensor("vertices").data<float>(),v.data(),size_t(count)*24);std::memcpy(request.get_tensor("points").data<float>(),p.data(),size_t(count)*8);std::memcpy(request.get_tensor("original_points").data<int32_t>(),original.data(),size_t(count)*8);std::memcpy(request.get_tensor("scissor").data<int32_t>(),clip.data(),16);
+         request.infer();const auto output=request.get_output_tensor();require(output.get_element_type()==ov::element::i32 && output.get_size()==count);CoverageExecutor::Result result{{},device};result.covered.resize(count);for(size_t i=0;i<count;++i){const auto x=output.data<const int32_t>()[i];require(x==0 || x==1);result.covered[i]=uint8_t(x);}failed=false;return result;
+     }
