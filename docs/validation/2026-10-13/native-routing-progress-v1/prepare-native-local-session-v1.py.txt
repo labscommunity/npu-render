@@ -1,0 +1,24 @@
+from pathlib import Path
+import shutil,json,hashlib,tarfile
+r=Path('results/render-driver');d=r/'native-local-session-v1';d.mkdir(exist_ok=False);shutil.copy2(r/'native-session-admission-v3/lease.hpp',d/'lease.hpp')
+(d/'probe.cpp').write_text(r'''#include "lease.hpp"
+#include <cstdio>
+int wmain(int argc,wchar_t **argv)try{
+    if(argc!=2)return 2;const auto sid=nr::native_probe::user_sid(GetCurrentProcess());nr::native_probe::require(IsWellKnownSid(const_cast<uint8_t*>(sid.data()),WinLocalServiceSid)!=FALSE);
+    DWORD own=UINT32_MAX;nr::native_probe::require(ProcessIdToSessionId(GetCurrentProcessId(),&own) && own==0);FILE *file=nullptr;if(_wfreopen_s(&file,argv[1],L"wb",stdout))return 3;
+    const auto session=WTSGetActiveConsoleSessionId();LPWSTR name=nullptr;DWORD size=0;const bool user_query=WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE,session,WTSUserName,&name,&size)!=FALSE;const auto user_error=user_query?0:GetLastError();const bool has_user=user_query && name && size>=sizeof(wchar_t) && *name;WTSFreeMemory(name);
+    LPWSTR raw=nullptr;const bool state_query=WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE,session,WTSSessionInfoEx,&raw,&size)!=FALSE;const auto state_error=state_query?0:GetLastError();const auto info=reinterpret_cast<const WTSINFOEXW*>(raw);const bool valid=state_query && raw && size>=sizeof(WTSINFOEXW) && info->Level==1;const auto state=valid?DWORD(info->Data.WTSInfoExLevel1.SessionState):UINT32_MAX;const auto flags=valid?DWORD(info->Data.WTSInfoExLevel1.SessionFlags):UINT32_MAX;WTSFreeMemory(raw);
+    std::printf("{\"local_service_session_inspection\":true,\"pid\":%lu,\"process_session\":%lu,\"console_session\":%lu,\"user_query_succeeded\":%s,\"user_query_error\":%lu,\"has_signed_in_user\":%s,\"state_query_succeeded\":%s,\"state_query_error\":%lu,\"state_record_valid\":%s,\"console_state\":%lu,\"console_flags\":%lu,\"interactive_session_unlocked\":%s,\"desktop_changed\":false,\"npu_tested\":false}\n",GetCurrentProcessId(),own,session,user_query?"true":"false",user_error,has_user?"true":"false",state_query?"true":"false",state_error,valid?"true":"false",state,flags,nr::native_probe::session_unlocked(session)?"true":"false");return 0;
+}catch(...){return 1;}
+''')
+(d/'CMakeLists.txt').write_text('''cmake_minimum_required(VERSION 3.25)
+project(nr_native_local_session LANGUAGES CXX)
+add_executable(nr_native_local_session probe.cpp)
+target_compile_features(nr_native_local_session PRIVATE cxx_std_17)
+target_compile_options(nr_native_local_session PRIVATE /W4 /WX)
+target_link_libraries(nr_native_local_session PRIVATE advapi32 user32 wtsapi32)
+set_property(TARGET nr_native_local_session PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+''')
+(r/'native-local-session-v1-source.json').write_text(json.dumps({p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir()},indent=2)+'\n')
+with tarfile.open(r/'native-local-session-v1.tar.gz','w:gz') as f:f.add(d,arcname=d.name)
+s=(r/'build-native-dwm-access-v1.ps1').read_text();s=s[:s.index('$dwm=@')];s=s.replace('native-dwm-access-v1','native-local-session-v1').replace('nr_native_dwm_access','nr_native_local_session');(r/'build-native-local-session-v1.ps1').write_text(s)

@@ -1,0 +1,93 @@
+from pathlib import Path
+import shutil,hashlib,json,tarfile
+r=Path('results/render-driver');d=r/'native-idd-v1';shutil.copytree(Path('native'),d/'native');lab=d/'native/windows/indirect_lab';reg=d/'native/windows/registered_lab';shutil.copy2(r/'native-session-admission-v3/lease.hpp',reg/'native_probe_lease.hpp')
+(lab/'native_admission.hpp').write_text(r'''#pragma once
+#include "../registered_lab/native_probe_lease.hpp"
+#include <memory>
+namespace nr::indirect {
+inline bool current_host_identity(){
+    DWORD session=UINT32_MAX;if(!ProcessIdToSessionId(GetCurrentProcessId(),&session) || session || !nr::native_probe::current_image_is(L"WUDFHost.exe"))return false;
+    try{const auto sid=nr::native_probe::user_sid(GetCurrentProcess());return IsWellKnownSid(const_cast<uint8_t*>(sid.data()),WinLocalServiceSid)!=FALSE;}catch(...){return false;}
+}
+inline std::unique_ptr<nr::native_probe::Admission> await_native_admission(DWORD milliseconds=10000){
+    nr::native_probe::require(milliseconds && milliseconds<=10000 && current_host_identity());
+    const auto deadline=GetTickCount64()+milliseconds;const auto name=nr::native_probe::mapping_name(GetCurrentProcessId());
+    while(GetTickCount64()<deadline){
+        HANDLE mapping=OpenFileMappingW(FILE_MAP_READ,FALSE,name.c_str());
+        if(mapping){CloseHandle(mapping);const auto record=nr::native_probe::read_mapping();nr::native_probe::require(record.scope==2);return std::make_unique<nr::native_probe::Admission>(record);}
+        nr::native_probe::require(GetLastError()==ERROR_FILE_NOT_FOUND);Sleep(20);
+    }
+    throw std::runtime_error("Native indirect host admission deadline expired");
+}
+}
+''')
+(lab/'native_admission_test.cpp').write_text(r'''#include "native_admission.hpp"
+#include <cstdio>
+int main()try{
+    if(nr::indirect::current_host_identity())return 1;
+    unsigned cases=0;
+    for(const DWORD limit:{0ul,1ul,10000ul,10001ul}){
+        const auto before=GetTickCount64();bool rejected=false;try{auto admission=nr::indirect::await_native_admission(limit);(void)admission;}catch(const std::exception&){rejected=true;}
+        if(!rejected || GetTickCount64()-before>1000)return 1;++cases;
+    }
+    std::printf("{\"native_indirect_guard_contract\":true,\"passed\":true,\"non_host_rejection_cases\":%u,\"actual_umdf_execution\":false,\"driver_installed\":false}\n",cases);return 0;
+}catch(...){return 1;}
+''')
+p=lab/'driver.cpp';s=p.read_text();needle='using Microsoft::WRL::ComPtr;';s=s.replace(needle,'''#ifdef NR_IDD_NATIVE_PROBE
+#include "native_admission.hpp"
+#define NR_IDD_TRACE_ROOT L"C:\\\\ProgramData\\\\T8-NpuRender-NativeIddV1"
+#else
+#define NR_IDD_TRACE_ROOT L"C:\\\\npu-lab\\\\idd-trace"
+#endif
+'''+needle)
+s=s.replace('namespace {\nconstexpr', '''namespace {
+#ifdef NR_IDD_NATIVE_PROBE
+std::unique_ptr<nr::native_probe::Admission> native_admission;
+bool native_ready(){try{if(!native_admission)return false;native_admission->verify();return true;}catch(...){return false;}}
+#endif
+constexpr''')
+s=s.replace('L"C:'+chr(92)*2+'npu-lab'+chr(92)*2+'idd-trace'+chr(92)*2,'NR_IDD_TRACE_ROOT L"'+chr(92)*2)
+s=s.replace('    if (!nr_fill_guest()) return STATUS_NOT_SUPPORTED;', '''#ifdef NR_IDD_NATIVE_PROBE
+    if (!native_ready()) return STATUS_NOT_SUPPORTED;
+#else
+    if (!nr_fill_guest()) return STATUS_NOT_SUPPORTED;
+#endif''',1)
+needle='extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT object, PUNICODE_STRING path) {\n    if (!nr_fill_guest()) return STATUS_NOT_SUPPORTED;'
+assert needle in s;s=s.replace(needle,'''extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT object, PUNICODE_STRING path) {
+#ifdef NR_IDD_NATIVE_PROBE
+    try{native_admission=nr::indirect::await_native_admission();}catch(...){return STATUS_NOT_SUPPORTED;}
+#else
+    if (!nr_fill_guest()) return STATUS_NOT_SUPPORTED;
+#endif''')
+s=s.replace('NTSTATUS power_on(WDFDEVICE device, WDF_POWER_DEVICE_STATE) {','''NTSTATUS power_on(WDFDEVICE device, WDF_POWER_DEVICE_STATE) {
+#ifdef NR_IDD_NATIVE_PROBE
+    if (!native_ready()) return STATUS_NOT_SUPPORTED;
+#endif''')
+s=s.replace('void prepare_monitor(WDFWORKITEM item) {','''void prepare_monitor(WDFWORKITEM item) {
+#ifdef NR_IDD_NATIVE_PROBE
+    if (!native_ready()) return;
+#endif''')
+s=s.replace('        while (SUCCEEDED(status) && WaitForSingleObject(stop, 0) == WAIT_TIMEOUT) {','''        while (SUCCEEDED(status) && WaitForSingleObject(stop, 0) == WAIT_TIMEOUT) {
+#ifdef NR_IDD_NATIVE_PROBE
+            if (!native_ready()) {status=E_ACCESSDENIED;break;}
+#endif''')
+p.write_text(s)
+p=lab/'CMakeLists.txt';s=p.read_text();s=s.replace('add_library(nr_indirect_lab SHARED driver.cpp)', '''add_library(nr_indirect_lab SHARED driver.cpp)
+option(NR_IDD_NATIVE_PROBE "Bounded native indirect-host admission experiment" OFF)
+if(NR_IDD_NATIVE_PROBE)
+ target_compile_definitions(nr_indirect_lab PRIVATE NR_IDD_NATIVE_PROBE=1)
+ target_link_libraries(nr_indirect_lab PRIVATE advapi32 user32 wtsapi32)
+ set_target_properties(nr_indirect_lab PROPERTIES OUTPUT_NAME nr_native_indirect_probe)
+endif()''')
+s+='''
+add_executable(nr_native_indirect_admission_test native_admission_test.cpp)
+target_compile_features(nr_native_indirect_admission_test PRIVATE cxx_std_17)
+target_compile_options(nr_native_indirect_admission_test PRIVATE /W4 /WX)
+target_link_libraries(nr_native_indirect_admission_test PRIVATE advapi32 user32 wtsapi32)
+set_property(TARGET nr_native_indirect_admission_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+add_test(NAME native_indirect_admission_contract COMMAND nr_native_indirect_admission_test)
+set_tests_properties(native_indirect_admission_contract PROPERTIES TIMEOUT 10)
+''';p.write_text(s)
+s=(lab/'nr_indirect_lab.inf').read_text().replace('nr_indirect_lab','nr_native_indirect_probe').replace('ROOT\\NPURENDER_INDIRECT_LAB','ROOT\\NPURENDER_NATIVE_INDIRECT_V1').replace('NpuRenderDisposableIndirectLab','T8NativeIddV1').replace('10/10/2026,0.0.3.0','10/13/2026,0.0.1301.0').replace('NPU Render Indirect Admission Lab (VM only)','NPU Render Bounded Native Indirect Probe').replace('NPU Render Disposable Guest Laboratory','NPU Render Native Indirect Diagnostic');(lab/'nr_native_indirect_probe.inf').write_text(s)
+(r/'native-idd-v1-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-idd-v1.tar.gz','w:gz') as f:f.add(d,arcname=d.name)

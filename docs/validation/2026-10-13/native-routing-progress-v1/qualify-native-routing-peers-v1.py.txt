@@ -1,0 +1,70 @@
+"""Qualify a native C++ client against the previously qualified local NPU worker."""
+import argparse,os,subprocess,time,json,secrets,struct,hashlib,ctypes as C,re
+from ctypes import wintypes as W
+from pathlib import Path
+from datetime import UTC,datetime
+HEADER=struct.Struct('<3Q14I');RECEIPT=struct.Struct('<5Q2I')
+def obj(p):
+ b=p.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+def rows(p):return [json.loads(x) for x in p.read_text(encoding='utf-8-sig').splitlines() if x.startswith('{')]
+a=argparse.ArgumentParser()
+for x in ('worker','client','runtime','cache','trace','reference','output'):a.add_argument('--'+x,type=Path,required=True)
+a.add_argument('--dwm-pid',type=int,required=True);a.add_argument('--dwm-created',type=int,required=True);a.add_argument('--dwm-session',type=int,required=True)
+a.add_argument('--umdf-pid',type=int,required=True);a.add_argument('--umdf-created',type=int,required=True)
+v=a.parse_args();v.output.mkdir(exist_ok=False);out=v.output
+for path in (v.worker,v.client):
+ b=obj(path.parent.parent/'registered-build-report.json');assert b['clean_build'] and hashlib.sha256(path.read_bytes()).hexdigest()==b['binary_sha256'][path.name].lower()
+env=os.environ.copy();env['PATH']=str(v.runtime)+os.pathsep+env.get('PATH','');env.update(NR_RENDER_NPU_CACHE=str(v.cache),NR_RENDER_SHARED_QUEUE='1',NR_RENDER_PIPELINE_CACHE='expanded',NR_RENDER_MEMORY_CACHE='1',NR_RENDER_COMPACT_COVERAGE='0')
+report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,negative_cases=[],negative_worker_cases=[],valid_requests=[],dwm_execution_tested=False,umdf_execution_tested=False,physical_driver_installed=False,desktop_offloaded=False)
+def save():(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+save();name=r'\\.\pipe\npu-render-indexed-'+secrets.token_hex(16);source=v.trace/'trace-request-0001.bin';baseline=obj(v.reference)['requests'][0];assert hashlib.sha256(source.read_bytes()).hexdigest()==baseline['source_sha256']
+for label,extra in [('zero-pid',['0',str(v.dwm_created)]),('stale-creation',[str(v.dwm_pid),str(v.dwm_created+1)]),('wrong-process',[str(os.getpid()),str(v.dwm_created)]),('incomplete-peer',[str(v.dwm_pid)]),('overflow-creation',[str(v.dwm_pid),'18446744073709551616']),('umdf-zero-pid',[str(v.dwm_pid),str(v.dwm_created),'0',str(v.umdf_created)]),('umdf-stale-creation',[str(v.dwm_pid),str(v.dwm_created),str(v.umdf_pid),str(v.umdf_created+1)]),('umdf-wrong-image',[str(v.dwm_pid),str(v.dwm_created),str(os.getpid()),str(v.umdf_created)]),('umdf-overflow-creation',[str(v.dwm_pid),str(v.dwm_created),str(v.umdf_pid),'18446744073709551616'])]:
+ bad=subprocess.run([str(v.worker),name,'3','120',*extra],env=env,capture_output=True,timeout=20);(out/(label+'.stdout.jsonl')).write_bytes(bad.stdout);(out/(label+'.stderr.log')).write_bytes(bad.stderr)
+ logs=rows(out/(label+'.stdout.jsonl'));assert bad.returncode!=0 and not any(x.get('local_worker_ready') or x.get('passed') for x in logs);report['negative_worker_cases'].append(dict(case=label,exit_code=bad.returncode,provider_executions=0));save()
+def inspect_pipe_acl():
+ k=C.WinDLL('kernel32',use_last_error=True);adv=C.WinDLL('advapi32',use_last_error=True)
+ k.CreateFileW.argtypes=[W.LPCWSTR,W.DWORD,W.DWORD,W.LPVOID,W.DWORD,W.DWORD,W.HANDLE];k.CreateFileW.restype=W.HANDLE;k.CloseHandle.argtypes=[W.HANDLE];k.LocalFree.argtypes=[W.LPVOID]
+ adv.GetSecurityInfo.argtypes=[W.HANDLE,C.c_int,W.DWORD,W.LPVOID,W.LPVOID,C.POINTER(W.LPVOID),W.LPVOID,C.POINTER(W.LPVOID)];adv.GetSecurityInfo.restype=W.DWORD
+ adv.ConvertSecurityDescriptorToStringSecurityDescriptorW.argtypes=[W.LPVOID,W.DWORD,W.DWORD,C.POINTER(W.LPWSTR),W.LPVOID];adv.ConvertSecurityDescriptorToStringSecurityDescriptorW.restype=W.BOOL
+ handle=k.CreateFileW(name,0xc0020000,0,None,3,0x40000000,None);assert handle!=C.c_void_p(-1).value
+ sd=W.LPVOID();acl=W.LPVOID();text=W.LPWSTR()
+ try:
+  assert adv.GetSecurityInfo(handle,1,4,None,None,C.byref(acl),None,C.byref(sd))==0
+  assert adv.ConvertSecurityDescriptorToStringSecurityDescriptorW(sd,1,4,C.byref(text),None)
+  sddl=text.value;sid=f'S-1-5-90-0-{v.dwm_session}'
+  assert re.search(r'\(A;;(?:GA|FA|0x1f01ff);;;'+re.escape(sid)+r'\)',sddl,re.IGNORECASE),sddl
+  assert re.search(r'\(A;;(?:GA|FA|0x1f01ff);;;(?:LS|S-1-5-19)\)',sddl,re.IGNORECASE),sddl
+  report.update(worker_pipe_local_service_ace_present=True,umdf_pid=v.umdf_pid,worker_pipe_compositor_ace_present=True,worker_pipe_dacl_sha256=hashlib.sha256(sddl.encode()).hexdigest(),compositor_pid=v.dwm_pid,compositor_session=v.dwm_session);save()
+ finally:
+  if text:k.LocalFree(text)
+  if sd:k.LocalFree(sd)
+  k.CloseHandle(handle)
+with (out/'worker.stdout.jsonl').open('xb') as stdout,(out/'worker.stderr.log').open('xb') as stderr:
+ p=subprocess.Popen([str(v.worker),name,'3','120',str(v.dwm_pid),str(v.dwm_created),str(v.umdf_pid),str(v.umdf_created)],env=env,stdout=stdout,stderr=stderr);report['worker_pid']=p.pid
+ try:
+  until=time.perf_counter()+15
+  while not any(x.get('local_worker_ready') for x in rows(out/'worker.stdout.jsonl')):
+   assert time.perf_counter()<until and p.poll() is None;time.sleep(.02)
+  peers=[x for x in rows(out/'worker.stdout.jsonl') if x.get('compositor_peer_prepared')];assert len(peers)==1 and peers[0]['pid']==v.dwm_pid and peers[0]['creation_filetime']==v.dwm_created and peers[0]['session']==v.dwm_session and peers[0]['request_identity_pinned'] and not peers[0]['desktop_admission_performed']
+  hosts=[x for x in rows(out/'worker.stdout.jsonl') if x.get('indirect_peer_prepared')];assert len(hosts)==1 and hosts[0]['pid']==v.umdf_pid and hosts[0]['creation_filetime']==v.umdf_created and hosts[0]['session']==0 and hosts[0]['request_identity_pinned'] and not hosts[0]['actual_host_execution']
+  inspect_pipe_acl()
+  for label,pid,pipe,timeout,mode in [('wrong-server-identity',os.getpid(),name,'1000','failure'),('cancel-before-connect',p.pid,name,'1000','cancel'),('unavailable-endpoint',p.pid,r'\\.\pipe\npu-render-indexed-'+secrets.token_hex(16),'50','failure')]:
+   target=out/(label+'.bin');s=subprocess.run([str(v.client),pipe,str(pid),str(source),str(target),timeout,mode],capture_output=True,timeout=10);(out/(label+'.stdout.jsonl')).write_bytes(s.stdout);(out/(label+'.stderr.log')).write_bytes(s.stderr)
+   q=json.loads(s.stdout);assert s.returncode==0 and not s.stderr and q['expected_failure'] and q['client_poisoned'] and not target.exists();report['negative_cases'].append(dict(case=label,exit_code=s.returncode,**q));save()
+  for sequence in range(1,4):
+   request=bytearray(source.read_bytes());h=list(HEADER.unpack_from(request));h[1]=0x7472616365763031;h[2]=sequence;h[11]=sequence;request[:80]=HEADER.pack(*h);input_path=out/f'request-{sequence}.bin';input_path.write_bytes(request);target=out/f'reply-{sequence}.bin'
+   s=subprocess.run([str(v.client),name,str(p.pid),str(input_path),str(target),'30000','success'],capture_output=True,timeout=40);(out/f'client-{sequence}.stdout.jsonl').write_bytes(s.stdout);(out/f'client-{sequence}.stderr.log').write_bytes(s.stderr)
+   q=json.loads(s.stdout);assert s.returncode==0 and not s.stderr and q['native_client_success'];reply=target.read_bytes();rh=list(HEADER.unpack_from(reply));h[13]=q['client_pid'];assert all(h[i]==rh[i] for i in range(17) if i not in (12,14,15)) and rh[14:16]==[2,3] and len(reply)==128+h[4]*h[5]*4
+   receipt=dict(zip(['input_bytes','output_bytes','provider_requests','covered_samples','tile_executions','used_rectangle','reserved'],RECEIPT.unpack_from(reply,80)));digest=hashlib.sha256(reply[128:]).hexdigest();assert receipt==baseline['receipt'] and digest==baseline['pixels_sha256'];report['valid_requests'].append(dict(sequence=sequence,client_pid=q['client_pid'],pixels_sha256=digest,receipt=receipt,reply_sha256=hashlib.sha256(reply).hexdigest(),passed=True));save()
+   # These are owned temporary transport files; original trace is retained.
+   input_path.unlink();target.unlink()
+  p.wait(timeout=10);evidence=rows(out/'worker.stdout.jsonl');good=[x for x in evidence if x.get('passed')];acks=[x for x in evidence if x.get('worker_success')];done=[x for x in evidence if x.get('local_worker_finished')]
+  assert p.returncode==0 and len(good)==3 and len(acks)==3 and len(done)==1 and done[0]['succeeded']==done[0]['settled']==3 and not (out/'worker.stderr.log').read_bytes()
+  assert all(x['execution_device']=='NPU' for x in good) and {x['client_pid'] for x in good}=={x['client_pid'] for x in report['valid_requests']}
+  report.update(passed=True,execution_device='NPU',delivery_acknowledgments=3,distinct_client_processes=len({x['client_pid'] for x in good}))
+ except Exception as e:report['error']=repr(e)
+ finally:
+  if p.poll() is None:p.kill();p.wait(timeout=5);report['owned_worker_terminated']=True
+  report.update(completed=True,worker_exit_code=p.returncode,finished=datetime.now(UTC).isoformat());save()
+print(json.dumps(report))
+if not report['passed']:raise SystemExit(1)

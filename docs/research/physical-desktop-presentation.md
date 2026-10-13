@@ -78,6 +78,15 @@ and worker. Exact original DACLs and temporary tasks/files are restored. This
 qualifies an owned diagnostic under the driver host's account; actual WUDFHost
 bootstrap and DWM execution remain separate work.
 
+The [native routing candidate](../validation/2026-10-13/native-routing-progress-v1/)
+now builds separate compositor/indirect-host admission and a native indirect
+variant with a bounded ready-event wait. Both host identities can be pinned in
+the worker, and Local Service can query the console session state. Both signed
+packages [stage and remove cleanly](../validation/2026-10-13/native-pair-stage-v1/).
+Actual native driver-host entry, lease publication during installation and DWM
+adapter selection remain untested. The physical probe's console checks reject
+before showing a window when no signed-in unlocked desktop is available.
+
 The hybrid-GPU model does not solve DWM migration by itself. Microsoft's documented
 redirected and direct-flip paths use the integrated GPU for DWM composition, even
 when another adapter renders applications.

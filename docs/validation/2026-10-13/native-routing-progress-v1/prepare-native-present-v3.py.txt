@@ -1,0 +1,27 @@
+from pathlib import Path
+import shutil,hashlib,json,tarfile
+r=Path('results/render-driver');d=r/'native-present-v3';shutil.copytree(r/'native-present-v2',d)
+s=(r/'native-session-admission-v2/lease.hpp').read_text();a=s.index('inline bool session_unlocked');b=s.index('inline bool current_image_is_compositor')
+(d/'session_gate.hpp').write_text('#pragma once\n#include <windows.h>\n#include <wtsapi32.h>\n#include <cwchar>\nnamespace nr::present {\n'+s[a:b]+r'''
+inline bool console_identity_matches(DWORD session){
+    wchar_t own[256]{};DWORD own_bytes=256;if(!GetUserNameW(own,&own_bytes))return false;
+    LPWSTR name=nullptr;DWORD bytes=0;if(!WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE,session,WTSUserName,&name,&bytes))return false;
+    const bool matches=name && bytes>=sizeof(wchar_t) && !_wcsicmp(name,own);WTSFreeMemory(name);return matches;
+}
+inline bool current_console_default(){DWORD session=0;return ProcessIdToSessionId(GetCurrentProcessId(),&session) && session && session==WTSGetActiveConsoleSessionId() && session_unlocked(session) && current_input_is_default();}
+}
+''')
+p=d/'frame_present_probe.cpp';s=p.read_text().replace('#include <string>','#include <string>\n#include "session_gate.hpp"')
+s=s.replace('    require(argc==3,',r'''    if(argc==2 && !std::wcscmp(argv[1],L"--inspect-session")){
+        const auto session=WTSGetActiveConsoleSessionId();const bool unlocked=nr::present::session_unlocked(session),matches=nr::present::console_identity_matches(session);
+        std::printf("{\"session_inspection\":true,\"console_session\":%lu,\"signed_in_and_unlocked\":%s,\"controller_matches_console_user\":%s,\"ready_for_interactive_task\":%s,\"desktop_changed\":false}\n",session,unlocked?"true":"false",matches?"true":"false",(unlocked&&matches)?"true":"false");return 0;
+    }
+    require(argc==3,''')
+s=s.replace('    require(SetThreadDpiAwarenessContext','    require(nr::present::current_console_default(),"signed-in unlocked Default console desktop required");\n    require(SetThreadDpiAwarenessContext')
+s=s.replace('    ShowWindow(window.handle,SW_SHOWNOACTIVATE);','    require(nr::present::current_console_default(),"interactive desktop changed before presentation");\n    ShowWindow(window.handle,SW_SHOWNOACTIVATE);')
+s=s.replace('window.messages();if(window.stopped)break;', 'window.messages();if(window.stopped || !nr::present::current_console_default())break;')
+p.write_text(s)
+p=d/'CMakeLists.txt';s=p.read_text();s=s.replace('d3d11 dxgi user32','d3d11 dxgi user32 wtsapi32 advapi32');p.write_text(s)
+(r/'native-present-v3-source.json').write_text(json.dumps({p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir()},indent=2)+'\n')
+with tarfile.open(r/'native-present-v3.tar.gz','w:gz') as f:f.add(d,arcname=d.name)
+print((d/'CMakeLists.txt').read_text())

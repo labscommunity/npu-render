@@ -1,0 +1,308 @@
+--- a/native/windows/registered_lab/CMakeLists.txt
++++ b/native/windows/registered_lab/CMakeLists.txt
+@@ -270,3 +270,29 @@
+ set_property(TARGET nr_native_service_probe PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+ target_compile_options(nr_registered_vertex PRIVATE /Gy)
+ target_link_options(nr_native_service_probe PRIVATE /OPT:REF)
++
++# Separate, uninstalled native-probe artifacts. The ordinary guest targets keep their guard.
++add_library(nr_native_probe_umd SHARED driver.cpp)
++add_executable(nr_native_probe_ddi_test native_probe_ddi_test.cpp)
++foreach(target nr_native_probe_umd nr_native_probe_ddi_test)
++ target_compile_definitions(${target} PRIVATE NR_NATIVE_PROBE=1)
++ target_compile_features(${target} PRIVATE cxx_std_17)
++ target_compile_options(${target} PRIVATE /W4 /WX)
++ target_include_directories(${target} PRIVATE "${NR_WDK_INCLUDE_ROOT}/um" "${NR_WDK_INCLUDE_ROOT}/shared" "${NR_WDK_INCLUDE_ROOT}/km")
++ target_link_libraries(${target} PRIVATE nr_registered_blend nr_registered_vertex d3dcompiler advapi32 user32 wtsapi32)
++ set_property(TARGET ${target} PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
++endforeach()
++
++# Permit the native consumer to retain validation functions without graph code.
++target_compile_options(nr_registered_vertex PRIVATE /Gy)
++target_link_options(nr_native_probe_umd PRIVATE /OPT:REF)
++
++add_executable(nr_native_probe_lease_test native_probe_lease_test.cpp)
++target_compile_features(nr_native_probe_lease_test PRIVATE cxx_std_17)
++target_compile_options(nr_native_probe_lease_test PRIVATE /W4 /WX)
++target_link_libraries(nr_native_probe_lease_test PRIVATE advapi32 user32 wtsapi32)
++set_property(TARGET nr_native_probe_lease_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
++add_test(NAME registered_native_lease_contract COMMAND nr_native_probe_lease_test)
++add_test(NAME registered_native_unleased_contract COMMAND nr_native_probe_ddi_test --reject-unleased)
++set_tests_properties(registered_native_lease_contract registered_native_unleased_contract PROPERTIES TIMEOUT 30)
++
+--- a/native/windows/registered_lab/local_indexed_worker.cpp
++++ b/native/windows/registered_lab/local_indexed_worker.cpp
+@@ -22,20 +22,22 @@
+ }
+ }
+ int wmain(int argc, wchar_t **argv) try {
+-    if(argc!=4 && argc!=6 && argc!=7)throw std::invalid_argument("expected <private pipe> <requests> <seconds> [compositor-pid creation-filetime]");
++    if(argc!=4 && argc!=6 && argc!=7 && argc!=8)throw std::invalid_argument("expected <private pipe> <requests> <seconds> [compositor-pid creation-filetime]");
+     wchar_t *end = nullptr; const auto limit = std::wcstoul(argv[2], &end, 10);
+     ex::require(end != argv[2] && !*end && limit && limit <= ex::max_requests);
+     const std::wstring name = argv[1]; ex::require(stream::pipe_name_valid(name));
+     end=nullptr;const auto seconds=std::wcstoul(argv[3],&end,10);ex::require(end!=argv[3] && !*end && seconds>=60 && seconds<=1800);
+     const auto deadline=GetTickCount64()+uint64_t(seconds)*1000;
+     std::unique_ptr<nr::registered_lab::NativeCompositorPeer> compositor;
+-    if(argc>=6)compositor=std::make_unique<nr::registered_lab::NativeCompositorPeer>(DWORD(nr::registered_lab::NativeCompositorPeer::number(argv[4],UINT32_MAX)),nr::registered_lab::NativeCompositorPeer::number(argv[5],UINT64_MAX),argc==7);
++    if(argc>=6)compositor=std::make_unique<nr::registered_lab::NativeCompositorPeer>(DWORD(nr::registered_lab::NativeCompositorPeer::number(argv[4],UINT32_MAX)),nr::registered_lab::NativeCompositorPeer::number(argv[5],UINT64_MAX),argc==7?1u:0u);
++    std::unique_ptr<nr::registered_lab::NativeCompositorPeer> indirect;
++    if(argc==8)indirect=std::make_unique<nr::registered_lab::NativeCompositorPeer>(DWORD(nr::registered_lab::NativeCompositorPeer::number(argv[6],UINT32_MAX)),nr::registered_lab::NativeCompositorPeer::number(argv[7],UINT64_MAX),2u);
+     ex::require(argc!=7 || !std::wcscmp(argv[6],L"local-service-probe"));
+     ex::Pipeline pipeline;std::atomic<uint32_t> succeeded{0};
+     PSECURITY_DESCRIPTOR descriptor = nullptr;
+     // Private per-job endpoint: only this user and SYSTEM, local clients only.
+     const auto worker_user=current_user_sid();
+-    const auto acl=L"D:P(A;;GA;;;SY)(A;;GA;;;"+worker_user+L")"+(compositor?L"(A;;GA;;;"+compositor->sid()+L")":L"");
++    const auto acl=L"D:P(A;;GA;;;SY)(A;;GA;;;"+worker_user+L")"+(compositor?L"(A;;GA;;;"+compositor->sid()+L")":L"")+(indirect?L"(A;;GA;;;"+indirect->sid()+L")":L"");
+     if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(acl.c_str(), SDDL_REVISION_1, &descriptor, nullptr)) throw std::runtime_error("relay pipe ACL failed");
+     SECURITY_ATTRIBUTES attributes{sizeof(SECURITY_ATTRIBUTES), descriptor, FALSE};
+     constexpr DWORD clients=4;
+@@ -75,7 +77,7 @@
+                     phase="request";const auto bytes=stream::read_packet(pipe,request_deadline,stop_event.value);
+                     h=ex::Reader(bytes).value<ex::Header>();ex::require(ex::request_valid(h,bytes.size()));
+                     ULONG actual_client=0;ex::require(GetNamedPipeClientProcessId(pipe,&actual_client)!=0 && actual_client==h.client_pid);
+-                    if(compositor)compositor->authorize(actual_client,worker_user);
++                    if(indirect && actual_client==indirect->pid())indirect->verify();else if(compositor)compositor->authorize(actual_client,worker_user);
+                     try{ticket=dispatch.reserve();}catch(const nr::registered_lab::FifoDispatch::Exhausted &){DisconnectNamedPipe(pipe);return;}
+                     const auto queued=GetTickCount64();ULONGLONG entered=0,finished=0;
+                     const auto turn_deadline=nr::registered_lab::FifoDispatch::Clock::now()+std::chrono::milliseconds(stream::remaining(request_deadline));
+@@ -119,6 +121,7 @@
+         }catch(...){if(!stopping.load())fail(std::current_exception());DisconnectNamedPipe(pipe);}
+     };
+     if(compositor){std::printf("{\"compositor_peer_prepared\":true,\"pid\":%lu,\"session\":%lu,\"creation_filetime\":%llu,\"request_identity_pinned\":true,\"desktop_admission_performed\":false}\n",compositor->pid(),compositor->session_id(),static_cast<unsigned long long>(compositor->creation_time()));std::fflush(stdout);}
++    if(indirect){std::printf("{\"indirect_peer_prepared\":true,\"pid\":%lu,\"session\":%lu,\"creation_filetime\":%llu,\"request_identity_pinned\":true,\"actual_host_execution\":false}\n",indirect->pid(),indirect->session_id(),static_cast<unsigned long long>(indirect->creation_time()));std::fflush(stdout);}
+     std::vector<std::thread> threads;
+     try{for(const auto &pipe:pipes)threads.emplace_back(serve,pipe->value);}
+     catch(...){fail(std::current_exception());}
+--- a/native/windows/registered_lab/native_compositor_peer.hpp
++++ b/native/windows/registered_lab/native_compositor_peer.hpp
+@@ -13,13 +13,14 @@
+ public:
+     static uint64_t number(const wchar_t *text,uint64_t maximum){indexed_exchange::require(text && *text>=L'0' && *text<=L'9');wchar_t *end=nullptr;errno=0;const auto n=std::wcstoull(text,&end,10);indexed_exchange::require(!errno && end!=text && !*end && n && n<=maximum);return n;}
+     static std::wstring user(HANDLE h){HANDLE raw=nullptr;indexed_exchange::require(OpenProcessToken(h,TOKEN_QUERY,&raw)!=FALSE);indexed_stream::Handle token(raw);DWORD size=0;GetTokenInformation(token.value,TokenUser,nullptr,0,&size);indexed_exchange::require(GetLastError()==ERROR_INSUFFICIENT_BUFFER && size && size<=65536);std::vector<uint8_t> bytes(size);indexed_exchange::require(GetTokenInformation(token.value,TokenUser,bytes.data(),size,&size)!=FALSE);LPWSTR s=nullptr;indexed_exchange::require(ConvertSidToStringSidW(reinterpret_cast<TOKEN_USER*>(bytes.data())->User.Sid,&s)!=FALSE);try{std::wstring result(s);LocalFree(s);return result;}catch(...){LocalFree(s);throw;}}
+-    NativeCompositorPeer(DWORD pid,uint64_t timestamp,bool service_probe=false):process(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION|SYNCHRONIZE,FALSE,pid)),process_id(pid),created(timestamp){
+-        indexed_exchange::require(pid && timestamp && ProcessIdToSessionId(pid,&session) && (service_probe?session==0:session!=0));
++    NativeCompositorPeer(DWORD pid,uint64_t timestamp,unsigned kind=0):process(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION|SYNCHRONIZE,FALSE,pid)),process_id(pid),created(timestamp){
++        indexed_exchange::require(kind<=2);
++        indexed_exchange::require(pid && timestamp && ProcessIdToSessionId(pid,&session) && (kind?session==0:session!=0));
+         wchar_t path[32768]{},system[MAX_PATH]{};DWORD length=32768;indexed_exchange::require(QueryFullProcessImageNameW(process.value,0,path,&length)!=FALSE && GetSystemDirectoryW(system,MAX_PATH)!=0);
+         std::wstring expected;
+-        if(service_probe){wchar_t own[32768]{};const auto n=GetModuleFileNameW(nullptr,own,32768);indexed_exchange::require(n && n<32768);expected=own;const auto slash=expected.find_last_of(L"\\/");indexed_exchange::require(slash!=std::wstring::npos);expected.resize(slash+1);expected+=L"nr_native_service_probe.exe";}else expected=std::wstring(system)+LR"(\dwm.exe)";
++        if(kind==1){wchar_t own[32768]{};const auto n=GetModuleFileNameW(nullptr,own,32768);indexed_exchange::require(n && n<32768);expected=own;const auto slash=expected.find_last_of(L"\\/");indexed_exchange::require(slash!=std::wstring::npos);expected.resize(slash+1);expected+=L"nr_native_service_probe.exe";}else expected=std::wstring(system)+(kind==2?LR"(\WUDFHost.exe)":LR"(\dwm.exe)");
+         indexed_exchange::require(!_wcsicmp(path,expected.c_str()));
+-        identity=user(process.value);indexed_exchange::require(identity==(service_probe?std::wstring(L"S-1-5-19"):L"S-1-5-90-0-"+std::to_wstring(session)));verify();
++        identity=user(process.value);indexed_exchange::require(identity==(kind?std::wstring(L"S-1-5-19"):L"S-1-5-90-0-"+std::to_wstring(session)));verify();
+     }
+     void verify()const{DWORD current=0;indexed_exchange::require(WaitForSingleObject(process.value,0)==WAIT_TIMEOUT && GetProcessId(process.value)==process_id && creation(process.value)==created && ProcessIdToSessionId(process_id,&current) && current==session && user(process.value)==identity);}
+     const std::wstring &sid()const{return identity;}
+--- a/native/windows/registered_lab/native_probe_lease.hpp
++++ b/native/windows/registered_lab/native_probe_lease.hpp
+@@ -12,19 +12,19 @@
+ #include <string>
+ #include <vector>
+ namespace nr::native_probe {
+-inline std::wstring mapping_name(DWORD pid) { return L"Global\\T8.NpuRender.NativeSession.v1."+std::to_wstring(pid); }
+-constexpr uint64_t signature = 0x32564250524e3854ull;
++inline std::wstring mapping_name(DWORD pid) { return L"Global\\T8.NpuRender.NativeSession.v3."+std::to_wstring(pid); }
++constexpr uint64_t signature = 0x33564250524e3854ull;
+ struct ProcessIdentity { uint32_t pid = 0, session = 0; uint64_t created = 0; };
+ struct Lease {
+     uint64_t magic = signature;
+-    uint32_t version = 2, bytes = sizeof(Lease);
++    uint32_t version = 3, bytes = sizeof(Lease);
+     uint64_t issued_tick = 0, deadline_tick = 0;
+     ProcessIdentity controller, worker, consumer;
+-    uint32_t scope = 0, sid_bytes = 0; // 0 owned same-session probe; 1 interactive compositor.
++    uint32_t scope = 0, sid_bytes = 0; // 0 owned same-session probe; 1 compositor; 2 indirect driver host.
+     uint64_t nonce[2]{};
+     char pipe_suffix[32]{};
+     uint8_t consumer_sid[SECURITY_MAX_SID_SIZE]{};
+-    uint32_t reserved[5]{};
++    uint32_t desktop_session = 0, reserved[4]{};
+ };
+ static_assert(sizeof(Lease) == 224);
+ inline void require(bool ok) { if (!ok) throw std::runtime_error("native probe lease rejected"); }
+@@ -51,13 +51,17 @@
+     return !std::memcmp(GetSidIdentifierAuthority(sid),&nt,sizeof(nt)) && *GetSidSubAuthority(sid,0)==90 && *GetSidSubAuthority(sid,1)==0 && *GetSidSubAuthority(sid,2)==r.consumer.session;
+ }
+ inline bool shape_valid(const Lease &r, uint64_t now, DWORD pid, uint64_t created, DWORD session) {
+-    const auto maximum=r.scope==1?900000u:120000u;
+-    if(r.magic!=signature || r.version!=2 || r.bytes!=sizeof(Lease) || r.scope>1 || !sid_valid(r) ||
++    const auto maximum=r.scope?900000u:120000u;
++    if(r.magic!=signature || r.version!=3 || r.bytes!=sizeof(Lease) || r.scope>2 || !sid_valid(r) ||
+        !r.issued_tick || r.issued_tick>now || r.deadline_tick<=now || r.deadline_tick<=r.issued_tick || r.deadline_tick-r.issued_tick>maximum ||
+        r.consumer.pid!=pid || r.consumer.created!=created || r.consumer.session!=session || !(r.nonce[0] || r.nonce[1]))return false;
+     for(const auto &p:{r.controller,r.worker,r.consumer})if(!p.pid || !p.created || p.session==UINT32_MAX)return false;
+-    if(r.scope==0){if(r.controller.session!=session || r.worker.session!=session || compositor_sid(r))return false;}
+-    else if(r.controller.session || r.worker.session || !session || !compositor_sid(r))return false;
++    if(r.scope==0){if(r.desktop_session || r.controller.session!=session || r.worker.session!=session || compositor_sid(r))return false;}
++    else {
++        if(r.controller.session || r.worker.session || !r.desktop_session || r.desktop_session==UINT32_MAX)return false;
++        if(r.scope==1 && (!session || r.desktop_session!=session || !compositor_sid(r)))return false;
++        if(r.scope==2 && (session || !IsWellKnownSid(const_cast<uint8_t*>(r.consumer_sid),WinLocalServiceSid)))return false;
++    }
+     if(r.controller.pid==r.worker.pid || r.controller.pid==pid || r.worker.pid==pid)return false;
+     for(const auto c:r.pipe_suffix)if(!(c>='0' && c<='9') && !(c>='a' && c<='f'))return false;
+     for(const auto v:r.reserved)if(v)return false;
+@@ -86,9 +90,9 @@
+     const auto desktop=OpenInputDesktop(0,FALSE,DESKTOP_READOBJECTS);if(!desktop)return false;
+     wchar_t name[128]{};DWORD bytes=0;const bool ready=GetUserObjectInformationW(desktop,UOI_NAME,name,sizeof(name),&bytes) && bytes<=sizeof(name) && !std::wcscmp(name,L"Default");CloseDesktop(desktop);return ready;
+ }
+-inline bool current_image_is_compositor() {
++inline bool current_image_is(const wchar_t *name) {
+     wchar_t path[32768]{},root[MAX_PATH]{};DWORD bytes=32768;
+-    return QueryFullProcessImageNameW(GetCurrentProcess(),0,path,&bytes) && GetSystemDirectoryW(root,MAX_PATH) && !_wcsicmp(path,(std::wstring(root)+L"\\dwm.exe").c_str());
++    return QueryFullProcessImageNameW(GetCurrentProcess(),0,path,&bytes) && GetSystemDirectoryW(root,MAX_PATH) && !_wcsicmp(path,(std::wstring(root)+L"\\"+name).c_str());
+ }
+ inline bool administrator_or_system(PSID sid) {
+     return sid && (IsWellKnownSid(sid, WinBuiltinAdministratorsSid) || IsWellKnownSid(sid, WinLocalSystemSid));
+@@ -138,7 +142,9 @@
+         require(sid.size()==lease.sid_bytes && EqualSid(const_cast<uint8_t*>(lease.consumer_sid),const_cast<uint8_t*>(sid.data())));
+         verify_process(controller.value, lease.controller);
+         verify_process(worker.value, lease.worker);
+-        if(lease.scope==1)require(session_unlocked(session) && current_image_is_compositor() && current_input_is_default());
++        if(lease.scope)require(session_unlocked(lease.desktop_session));
++        if(lease.scope==1)require(current_image_is(L"dwm.exe") && current_input_is_default());
++        if(lease.scope==2)require(current_image_is(L"WUDFHost.exe"));
+     }
+     HANDLE worker_handle() const { verify(); return worker.value; }
+     std::wstring pipe_name() const {
+--- /dev/null
++++ b/native/windows/registered_lab/native_probe_lease_test.cpp
+@@ -0,0 +1,135 @@
++#include "native_probe_lease.hpp"
++#include <sddl.h>
++#include <cstdio>
++#include <cwchar>
++#include <utility>
++#include <iterator>
++namespace n = nr::native_probe;
++void check(bool value) { if (!value) throw std::runtime_error("native admission contract failed"); }
++struct Descriptor {
++    PSECURITY_DESCRIPTOR value = nullptr;
++    explicit Descriptor(const wchar_t *sddl) { check(ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl, SDDL_REVISION_1, &value, nullptr) != 0); }
++    ~Descriptor() { LocalFree(value); }
++};
++struct Child {
++    PROCESS_INFORMATION info{};
++    Child(const std::wstring &arguments, bool suspended) {
++        wchar_t module[32768]{}; const DWORD length = GetModuleFileNameW(nullptr, module, DWORD(std::size(module)));
++        check(length && length < std::size(module));
++        std::wstring command = L"\"" + std::wstring(module) + L"\" " + arguments;
++        STARTUPINFOW startup{}; startup.cb = sizeof(startup);
++        check(CreateProcessW(module, command.data(), nullptr, nullptr, FALSE,
++                             CREATE_NO_WINDOW | (suspended ? CREATE_SUSPENDED : 0), nullptr, nullptr, &startup, &info) != 0);
++    }
++    ~Child() {
++        if (WaitForSingleObject(info.hProcess, 0) == WAIT_TIMEOUT) { TerminateProcess(info.hProcess, 1); WaitForSingleObject(info.hProcess, 3000); }
++        CloseHandle(info.hThread); CloseHandle(info.hProcess);
++    }
++    Child(const Child &) = delete;
++};
++int wmain(int argc, wchar_t **argv) try {
++    if (argc == 2 && !std::wcscmp(argv[1], L"--hold")) { Sleep(10000); return 0; }
++    if (argc == 4 && !std::wcscmp(argv[1], L"--consume")) {
++        bool admitted = false;
++        try {
++            const auto record = n::read_mapping(argv[2]); n::Admission admission(record);
++            admission.verify(); check(GetProcessId(admission.worker_handle()) == record.worker.pid);
++            check(admission.pipe_name() == L"\\\\.\\pipe\\npu-render-indexed-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"); admitted = true;
++        } catch (const std::exception &) {}
++        return admitted == (!std::wcscmp(argv[3], L"accept")) ? 0 : 1;
++    }
++    check(argc == 1);
++    unsigned shape_cases = 0, acl_cases = 0, process_cases = 0;
++    n::Lease base; base.issued_tick = 9000; base.deadline_tick = 11000; base.scope = 0; n::set_consumer_sid(base,GetCurrentProcess());
++    base.controller = {1,4,17}; base.worker = {2,4,18}; base.consumer = {3,4,19}; base.nonce[0] = 7;
++    std::memset(base.pipe_suffix, 'a', sizeof(base.pipe_suffix));
++    check(n::shape_valid(base,10000,3,19,4)); ++shape_cases;
++    for (unsigned kind = 0; kind < 24; ++kind) {
++        auto r = base;
++        switch (kind) {
++        case 0: r.magic = 0; break;
++        case 1: ++r.version; break;
++        case 2: --r.bytes; break;
++        case 3: r.scope = 3; break;
++        case 4: r.issued_tick = 0; break;
++        case 5: r.issued_tick = 10001; break;
++        case 6: r.deadline_tick = 10000; break;
++        case 7: r.deadline_tick = r.issued_tick + 120001; break;
++        case 8: r.controller.pid = 0; break;
++        case 9: r.worker.pid = 0; break;
++        case 10: r.consumer.pid = 0; break;
++        case 11: ++r.consumer.created; break;
++        case 12: ++r.consumer.session; break;
++        case 13: r.controller.session = 5; break;
++        case 14: r.worker.session = 5; break;
++        case 15: r.consumer.session = 5; break;
++        case 16: r.controller.created = 0; break;
++        case 17: r.worker.created = 0; break;
++        case 18: r.controller.pid = r.worker.pid; break;
++        case 19: r.controller.pid = r.consumer.pid; break;
++        case 20: r.worker.pid = r.consumer.pid; break;
++        case 21: r.nonce[0] = 0; break;
++        case 22: r.pipe_suffix[0] = 'G'; break;
++        case 23: r.reserved[3] = 1; break;
++        }
++        check(!n::shape_valid(r,10000,3,19,4)); ++shape_cases;
++    }
++    for(unsigned kind=0;kind<6;++kind){auto value=base;switch(kind){case 0:value.sid_bytes=0;break;case 1:value.sid_bytes=69;break;case 2:value.consumer_sid[0]=0;break;case 3:value.consumer_sid[1]=16;break;case 4:value.consumer_sid[67]=1;break;case 5:value.desktop_session=1;break;}check(!n::shape_valid(value,10000,3,19,4));++shape_cases;}
++    auto desktop=base;desktop.scope=1;desktop.desktop_session=4;desktop.controller.session=desktop.worker.session=0;desktop.consumer.session=4;
++    PSID dwm_sid=nullptr;check(ConvertStringSidToSidW(L"S-1-5-90-0-4",&dwm_sid)!=FALSE);desktop.sid_bytes=GetLengthSid(dwm_sid);std::memset(desktop.consumer_sid,0,sizeof(desktop.consumer_sid));check(CopySid(sizeof(desktop.consumer_sid),desktop.consumer_sid,dwm_sid)!=FALSE);LocalFree(dwm_sid);
++    check(n::shape_valid(desktop,10000,3,19,4));++shape_cases;desktop.deadline_tick=desktop.issued_tick+900000;check(n::shape_valid(desktop,10000,3,19,4));++shape_cases;++desktop.deadline_tick;check(!n::shape_valid(desktop,10000,3,19,4));++shape_cases;desktop.deadline_tick=11000;desktop.scope=0;check(!n::shape_valid(desktop,10000,3,19,4));++shape_cases;
++    auto host=base;host.scope=2;host.desktop_session=4;host.controller.session=host.worker.session=host.consumer.session=0;host.deadline_tick=host.issued_tick+900000;
++    PSID host_sid=nullptr;check(ConvertStringSidToSidW(L"S-1-5-19",&host_sid)!=FALSE);host.sid_bytes=GetLengthSid(host_sid);std::memset(host.consumer_sid,0,sizeof(host.consumer_sid));check(CopySid(sizeof(host.consumer_sid),host.consumer_sid,host_sid)!=FALSE);LocalFree(host_sid);
++    check(n::shape_valid(host,10000,3,19,0));++shape_cases;
++    for(unsigned kind=0;kind<7;++kind){auto value=host;switch(kind){case 0:value.desktop_session=0;break;case 1:value.desktop_session=UINT32_MAX;break;case 2:value.consumer.session=1;break;case 3:value.controller.session=1;break;case 4:value.worker.session=1;break;case 5:value.scope=1;break;case 6:++value.deadline_tick;break;}check(!n::shape_valid(value,10000,3,19,0));++shape_cases;}
++    check(!n::current_image_is(L"dwm.exe") && !n::current_image_is(L"WUDFHost.exe"));++shape_cases;
++    const auto console=WTSGetActiveConsoleSessionId();std::printf("{\"console_session\":%lu,\"interactive_session_unlocked\":%s,\"compositor_execution_tested\":false}\n",console,n::session_unlocked(console)?"true":"false");
++    const std::pair<const wchar_t *, bool> descriptors[]{
++        {L"O:BAG:BAD:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;0x00020004;;;AU)",true},
++        {L"O:SYG:SYD:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;0x00020004;;;AU)",true},
++        {L"O:AUG:BAD:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;0x00020004;;;AU)",false},
++        {L"O:BAG:BAD:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;0x00020006;;;AU)",false},
++        {L"O:BAG:BAD:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;WD;;;AU)",false},
++        {L"O:BAG:BAD:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;WO;;;AU)",false},
++        {L"O:BAG:BAD:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GA;;;AU)",false},
++        {L"O:BAG:BAD:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GW;;;AU)",false},
++        {L"O:BAG:BAD:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;0x00020014;;;AU)",false}
++    };
++    for (const auto &entry : descriptors) { Descriptor descriptor(entry.first); check(n::readonly_to_unprivileged(descriptor.value) == entry.second); ++acl_cases; }
++    Descriptor null_acl(L"O:BAG:BAD:P(A;;GA;;;SY)(A;;GA;;;BA)");
++    // Build an absolute descriptor explicitly to exercise absent and null DACLs.
++    SECURITY_DESCRIPTOR absolute{}; check(InitializeSecurityDescriptor(&absolute, SECURITY_DESCRIPTOR_REVISION) != 0);
++    PSID owner = nullptr; BOOL ignored = FALSE; check(GetSecurityDescriptorOwner(null_acl.value,&owner,&ignored) != 0);
++    check(SetSecurityDescriptorOwner(&absolute,owner,FALSE) != 0);
++    check(!n::readonly_to_unprivileged(&absolute)); ++acl_cases;
++    check(SetSecurityDescriptorDacl(&absolute,TRUE,nullptr,FALSE) != 0);
++    check(!n::readonly_to_unprivileged(&absolute)); ++acl_cases;
++    DWORD session = 0; check(ProcessIdToSessionId(GetCurrentProcessId(), &session) != 0);
++    Child worker(L"--hold",false);
++    for (unsigned kind = 0; kind < 6; ++kind) {
++        wchar_t name[160]{}; swprintf_s(name,L"Global\\T8.NpuRender.NativeSession.TestV3.%lu.%llu.%u",GetCurrentProcessId(),static_cast<unsigned long long>(GetTickCount64()),kind);
++        Descriptor descriptor(L"O:BAG:BAD:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;0x00020004;;;AU)");
++        SECURITY_ATTRIBUTES attributes{sizeof(attributes),descriptor.value,FALSE};
++        HANDLE raw = CreateFileMappingW(INVALID_HANDLE_VALUE,&attributes,PAGE_READWRITE,0,sizeof(n::Lease),name);
++        const DWORD error = GetLastError(); n::Handle mapping(raw); check(error != ERROR_ALREADY_EXISTS);
++        Child consumer(L"--consume \""+std::wstring(name)+L"\" "+(kind==0?L"accept":L"reject"),true);
++        n::Lease record; n::set_consumer_sid(record,consumer.info.hProcess);record.issued_tick=GetTickCount64();record.deadline_tick=record.issued_tick+10000;
++        record.controller={GetCurrentProcessId(),session,n::creation_time(GetCurrentProcess())};
++        record.worker={worker.info.dwProcessId,session,n::creation_time(worker.info.hProcess)};
++        record.consumer={consumer.info.dwProcessId,session,n::creation_time(consumer.info.hProcess)};
++        record.nonce[0]=1;std::memset(record.pipe_suffix,'a',sizeof(record.pipe_suffix));
++        if(kind==1)++record.worker.created;
++        if(kind==2)++record.controller.created;
++        if(kind==3){record.issued_tick-=100;record.deadline_tick=record.issued_tick+1;}
++        if(kind==4)record.consumer.pid=GetCurrentProcessId();
++        if(kind==5){PSID other=nullptr;check(ConvertStringSidToSidW(L"S-1-5-11",&other)!=FALSE);record.sid_bytes=GetLengthSid(other);std::memset(record.consumer_sid,0,sizeof(record.consumer_sid));check(CopySid(sizeof(record.consumer_sid),record.consumer_sid,other)!=FALSE);LocalFree(other);}
++
++        auto view=MapViewOfFile(mapping.value,FILE_MAP_WRITE,0,0,sizeof(record));check(view!=nullptr);
++        std::memcpy(view,&record,sizeof(record));check(UnmapViewOfFile(view)!=0);
++        check(ResumeThread(consumer.info.hThread)!=DWORD(-1));check(WaitForSingleObject(consumer.info.hProcess,10000)==WAIT_OBJECT_0);
++        DWORD code=1;check(GetExitCodeProcess(consumer.info.hProcess,&code)!=0);
++        std::printf("{\"process_case\":%u,\"child_exit_code\":%lu}\n",kind,code);check(code==0);++process_cases;
++    }
++    std::printf("{\"native_session_admission_contract\":true,\"passed\":true,\"shape_cases\":%u,\"acl_cases\":%u,\"separate_process_cases\":%u,\"driver_installed\":false,\"npu_execution_tested\":false}\n",shape_cases,acl_cases,process_cases);
++    return 0;
++} catch (const std::exception &e) { std::fprintf(stderr,"%s (last Win32 error %lu)\n",e.what(),GetLastError());return 1; }

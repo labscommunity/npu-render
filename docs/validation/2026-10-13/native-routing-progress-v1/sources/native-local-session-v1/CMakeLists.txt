@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.25)
+project(nr_native_local_session LANGUAGES CXX)
+add_executable(nr_native_local_session probe.cpp)
+target_compile_features(nr_native_local_session PRIVATE cxx_std_17)
+target_compile_options(nr_native_local_session PRIVATE /W4 /WX)
+target_link_libraries(nr_native_local_session PRIVATE advapi32 user32 wtsapi32)
+set_property(TARGET nr_native_local_session PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")

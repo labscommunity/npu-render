@@ -18,6 +18,14 @@ adapter, package and certificate trust were removed after verification. This
 establishes native integration for the tested operations, not physical desktop
 offload or a Tahoma speedup.
 
+The [native account-boundary trial](docs/validation/2026-10-13/native-service-progress-v1/README.md)
+passes ten NPU operations from a Local Service process after adding bounded
+query/synchronization access to the owned controller and worker. The
+[native routing candidate](docs/validation/2026-10-13/native-routing-progress-v1/README.md)
+adds separate compositor/indirect-host admission and builds both driver packages;
+both packages stage and remove cleanly. Actual native DWM routing and physical
+frame delivery are still unverified.
+
 The latest [scripted desktop trial](docs/validation/2026-10-13/sole-display-v121/README.md)
 renders the VM's desktop on Delta's physical NPU and passes desktop, Run,
 Notepad, typing, maximize and close checks through the guest's sole indirect

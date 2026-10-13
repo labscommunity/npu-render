@@ -1,0 +1,29 @@
+from pathlib import Path
+import shutil,json,hashlib,tarfile
+r=Path('results/render-driver');d=r/'native-routing-v1';shutil.copytree(r/'native-service-peer-v2',d);lab=d/'native/windows/registered_lab'
+shutil.copy2(r/'native-session-admission-v3/lease.hpp',lab/'native_probe_lease.hpp')
+(lab/'native_probe_lease_test.cpp').write_text((r/'native-session-admission-v3/test.cpp').read_text().replace('#include "lease.hpp"','#include "native_probe_lease.hpp"'))
+p=lab/'native_compositor_peer.hpp';s=p.read_text().replace('bool service_probe=false','unsigned kind=0').replace('service_probe?session==0:session!=0','kind?session==0:session!=0').replace('if(service_probe){','if(kind==1){').replace('else expected=std::wstring(system)+LR"('+chr(92)+'dwm.exe)"','else expected=std::wstring(system)+(kind==2?LR"('+chr(92)+'WUDFHost.exe)":LR"('+chr(92)+'dwm.exe)")').replace('identity==(service_probe?','identity==(kind?')
+s=s.replace('        indexed_exchange::require(pid && timestamp', '        indexed_exchange::require(kind<=2);\n        indexed_exchange::require(pid && timestamp')
+assert 'bool service_probe' not in s and 'WUDFHost.exe' in s;p.write_text(s)
+p=lab/'local_indexed_worker.cpp';s=p.read_text().replace('argc!=4 && argc!=6 && argc!=7','argc!=4 && argc!=6 && argc!=7 && argc!=8').replace('::number(argv[5],UINT64_MAX),argc==7);','::number(argv[5],UINT64_MAX),argc==7?1u:0u);')
+s=s.replace('    ex::require(argc!=7', '''    std::unique_ptr<nr::registered_lab::NativeCompositorPeer> indirect;
+    if(argc==8)indirect=std::make_unique<nr::registered_lab::NativeCompositorPeer>(DWORD(nr::registered_lab::NativeCompositorPeer::number(argv[6],UINT32_MAX)),nr::registered_lab::NativeCompositorPeer::number(argv[7],UINT64_MAX),2u);
+    ex::require(argc!=7''')
+s=s.replace('(compositor?L"(A;;GA;;;"+compositor->sid()+L")":L"");','(compositor?L"(A;;GA;;;"+compositor->sid()+L")":L"")+(indirect?L"(A;;GA;;;"+indirect->sid()+L")":L"");')
+s=s.replace('if(compositor)compositor->authorize(actual_client,worker_user);','if(indirect && actual_client==indirect->pid())indirect->verify();else if(compositor)compositor->authorize(actual_client,worker_user);')
+needle='    std::vector<std::thread> threads;';assert needle in s;s=s.replace(needle,'''    if(indirect){std::printf("{\\"indirect_peer_prepared\\":true,\\"pid\\":%lu,\\"session\\":%lu,\\"creation_filetime\\":%llu,\\"request_identity_pinned\\":true,\\"actual_host_execution\\":false}\\n",indirect->pid(),indirect->session_id(),static_cast<unsigned long long>(indirect->creation_time()));std::fflush(stdout);}
+'''+needle);p.write_text(s)
+p=lab/'CMakeLists.txt';s=p.read_text();base=(r/'native-session-driver-v1/native/windows/registered_lab/CMakeLists.txt').read_text();a=base.index('# Separate, uninstalled native-probe artifacts.');b=base.index('add_executable(nr_native_registered_probe',a);s+='\n'+base[a:b];p.write_text(s)
+(r/'native-routing-v1-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-routing-v1.tar.gz','w:gz') as f:f.add(d,arcname=d.name)
+s=(r/'build-native-service-peer-v2.ps1').read_text().replace('native-service-peer-v2','native-routing-v1').replace('--target nr_registered_local_indexed_worker nr_native_service_probe','--target nr_registered_local_indexed_worker nr_native_probe_umd nr_native_probe_ddi_test nr_native_probe_lease_test')
+a=s.index('[ordered]@{clean_build=');s=s[:a]+'''$env:PATH="$sdk\\libs;"+$env:PATH
+& "$b\\Release\\nr_native_probe_lease_test.exe" 1> "$r\\vm\\native-routing-v1-admission.stdout.jsonl" 2> "$r\\vm\\native-routing-v1-admission.stderr.log"
+if($LASTEXITCODE){throw 'Native routing admission contract failed'}
+$hashes=@{};foreach($n in @('nr_registered_local_indexed_worker.exe','nr_native_probe_umd.dll','nr_native_probe_ddi_test.exe','nr_native_probe_lease_test.exe')){$hashes[$n]=(Get-FileHash "$b\\Release\\$n").Hash}
+[ordered]@{clean_build=$true;source_sha256=$expected;binary_sha256=$hashes;admission_contract_passed=$true;desktop_admission_performed=$false}|ConvertTo-Json -Depth 6|Set-Content "$b\\registered-build-report.json"
+''';(r/'build-native-routing-v1.ps1').write_text(s)
+s=(r/'qualify-native-session-driver-v1.py').read_text().replace("('reserved',C.c_uint32*5)","('desktop_session',C.c_uint32),('reserved',C.c_uint32*4)").replace('0x32564250524e3854','0x33564250524e3854').replace('record.version=2','record.version=3').replace('admission_protocol=2','admission_protocol=3').replace('NativeSession.v1.','NativeSession.v3.')
+(r/'qualify-native-routing-v1.py').write_text(s)
+s=(r/'qualify-native-session-driver-v1.ps1').read_text().replace('native-session-driver-v1','native-routing-v1').replace('native-pipe-worker-v1','native-routing-v1');(r/'qualify-native-routing-v1.ps1').write_text(s)

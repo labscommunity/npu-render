@@ -1,0 +1,28 @@
+from pathlib import Path
+import json,hashlib,tarfile,shutil
+r=Path('results/render-driver');d=r/'native-session-admission-v3';shutil.copytree(r/'native-session-admission-v2',d)
+p=d/'lease.hpp';s=p.read_text().replace('NativeSession.v1.','NativeSession.v3.').replace('0x32564250524e3854ull','0x33564250524e3854ull').replace('uint32_t version = 2','uint32_t version = 3').replace('// 0 owned same-session probe; 1 interactive compositor.','// 0 owned same-session probe; 1 compositor; 2 indirect driver host.').replace('uint32_t reserved[5]{};','uint32_t desktop_session = 0, reserved[4]{};')
+s=s.replace('const auto maximum=r.scope==1?900000u:120000u;', 'const auto maximum=r.scope?900000u:120000u;').replace('r.version!=2','r.version!=3').replace('r.scope>1','r.scope>2')
+s=s.replace('if(r.controller.session!=session || r.worker.session!=session || compositor_sid(r))', 'if(r.desktop_session || r.controller.session!=session || r.worker.session!=session || compositor_sid(r))')
+s=s.replace('else if(r.controller.session || r.worker.session || !session || !compositor_sid(r))return false;', '''else {
+        if(r.controller.session || r.worker.session || !r.desktop_session || r.desktop_session==UINT32_MAX)return false;
+        if(r.scope==1 && (!session || r.desktop_session!=session || !compositor_sid(r)))return false;
+        if(r.scope==2 && (session || !IsWellKnownSid(const_cast<uint8_t*>(r.consumer_sid),WinLocalServiceSid)))return false;
+    }''')
+s=s.replace('inline bool current_image_is_compositor() {','inline bool current_image_is(const wchar_t *name) {').replace('std::wstring(root)+L"'+chr(92)*2+'dwm.exe"','std::wstring(root)+L"'+chr(92)*2+'"+name')
+s=s.replace('if(lease.scope==1)require(session_unlocked(session) && current_image_is_compositor() && current_input_is_default());', '''if(lease.scope)require(session_unlocked(lease.desktop_session));
+        if(lease.scope==1)require(current_image_is(L"dwm.exe") && current_input_is_default());
+        if(lease.scope==2)require(current_image_is(L"WUDFHost.exe"));''')
+assert 'current_image_is_compositor' not in s;p.write_text(s)
+p=d/'test.cpp';s=p.read_text().replace('NativeSession.Test.','NativeSession.TestV3.').replace('case 3: r.scope = 2;', 'case 3: r.scope = 3;').replace('value.reserved[4]=1','value.desktop_session=1').replace('desktop.scope=1;','desktop.scope=1;desktop.desktop_session=4;')
+needle='    const auto console=WTSGetActiveConsoleSessionId();';assert needle in s
+s=s.replace(needle,r'''    auto host=base;host.scope=2;host.desktop_session=4;host.controller.session=host.worker.session=host.consumer.session=0;host.deadline_tick=host.issued_tick+900000;
+    PSID host_sid=nullptr;check(ConvertStringSidToSidW(L"S-1-5-19",&host_sid)!=FALSE);host.sid_bytes=GetLengthSid(host_sid);std::memset(host.consumer_sid,0,sizeof(host.consumer_sid));check(CopySid(sizeof(host.consumer_sid),host.consumer_sid,host_sid)!=FALSE);LocalFree(host_sid);
+    check(n::shape_valid(host,10000,3,19,0));++shape_cases;
+    for(unsigned kind=0;kind<7;++kind){auto value=host;switch(kind){case 0:value.desktop_session=0;break;case 1:value.desktop_session=UINT32_MAX;break;case 2:value.consumer.session=1;break;case 3:value.controller.session=1;break;case 4:value.worker.session=1;break;case 5:value.scope=1;break;case 6:++value.deadline_tick;break;}check(!n::shape_valid(value,10000,3,19,0));++shape_cases;}
+    check(!n::current_image_is(L"dwm.exe") && !n::current_image_is(L"WUDFHost.exe"));++shape_cases;
+'''+needle)
+p.write_text(s)
+(r/'native-session-admission-v3-source.json').write_text(json.dumps({p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir()},indent=2)+'\n')
+with tarfile.open(r/'native-session-admission-v3.tar.gz','w:gz') as f:f.add(d,arcname=d.name)
+(r/'build-native-session-admission-v3.ps1').write_text((r/'build-native-session-admission-v2.ps1').read_text().replace('native-session-admission-v2','native-session-admission-v3'))
