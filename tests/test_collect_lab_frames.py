@@ -19,11 +19,16 @@ def test_collection_end_revokes_published_input_permission(tmp_path, monkeypatch
     output = tmp_path / "frames"
     gate = output / "input-ready.json"
 
+    def input_allowed():
+        # Exercise revocation independently of filesystem/wall-clock precision.
+        # Freshness boundaries have their own deterministic contract tests.
+        return confirmed_sole_display(gate, gate.stat().st_mtime)
+
     class Output(io.BytesIO):
         def readline(self, size=-1):
             if self.tell():
                 # The collector really admitted input before the exit condition.
-                assert confirmed_sole_display(gate)
+                assert input_allowed()
                 if ending == "interrupt":
                     raise KeyboardInterrupt
                 if ending == "invalid-frame":
@@ -43,7 +48,7 @@ def test_collection_end_revokes_published_input_permission(tmp_path, monkeypatch
 
         def terminate(self):
             # Revocation must happen before a potentially slow process shutdown.
-            assert not confirmed_sole_display(gate)
+            assert not input_allowed()
             self.running = False
 
     process = Process()
@@ -65,5 +70,5 @@ def test_collection_end_revokes_published_input_permission(tmp_path, monkeypatch
         }[ending]
         with pytest.raises(error):
             collector.run(args)
-    assert not confirmed_sole_display(gate)
+    assert not input_allowed()
     assert not process.running
