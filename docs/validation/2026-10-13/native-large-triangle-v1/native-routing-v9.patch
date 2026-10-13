@@ -1,0 +1,270 @@
+--- a/native/windows/registered_lab/CMakeLists.txt
++++ b/native/windows/registered_lab/CMakeLists.txt
+@@ -310,3 +310,10 @@
+ target_link_libraries(nr_large_texture_capture_probe PRIVATE nr_registered_vertex)
+ set_property(TARGET nr_large_texture_capture_probe PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+ add_test(NAME large_texture_contract COMMAND nr_large_texture_capture_probe --contract)
++
++add_executable(nr_large_triangle_texture_capture_probe large_triangle_texture_capture_probe.cpp)
++target_compile_features(nr_large_triangle_texture_capture_probe PRIVATE cxx_std_17)
++target_compile_options(nr_large_triangle_texture_capture_probe PRIVATE /W4 /WX)
++target_link_libraries(nr_large_triangle_texture_capture_probe PRIVATE nr_registered_vertex)
++set_property(TARGET nr_large_triangle_texture_capture_probe PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
++add_test(NAME large_triangle_texture_contract COMMAND nr_large_triangle_texture_capture_probe --contract)
+--- a/native/windows/registered_lab/indexed_draw.hpp
++++ b/native/windows/registered_lab/indexed_draw.hpp
+@@ -204,7 +204,7 @@
+             sampler.desc.AddressU == D3D10_DDI_TEXTURE_ADDRESS_CLAMP && sampler.desc.AddressV == D3D10_DDI_TEXTURE_ADDRESS_CLAMP &&
+             sampler.desc.AddressW == D3D10_DDI_TEXTURE_ADDRESS_CLAMP && sampler.desc.MipLODBias == 0 && sampler.desc.MinLOD == 0 && sampler.desc.MaxLOD >= 0);
+         const auto &ss = source->surface;
+-        require((ss.format == 28 || ss.format == 87 || ss.format == 65) && ss.width <= 8192 && ss.height <= 8192 && uint64_t(ss.width)*ss.height <= uint64_t(modulated && !general_texture?8:4)*1024*1024);
++        require((ss.format == 28 || ss.format == 87 || ss.format == 65) && ss.width <= 8192 && ss.height <= 8192 && uint64_t(ss.width)*ss.height <= uint64_t(modulated || general_texture?8:4)*1024*1024);
+         const auto source_bytes = read_pixels(*source); texture = {ss.width,ss.height,ss.format == 65 ? 28u : ss.format,{}};
+         texture.pixels.resize(size_t(ss.width)*ss.height);
+         // Format decoding only: sampling, shader math and blending remain on
+--- a/native/windows/registered_lab/indexed_exchange_protocol.hpp
++++ b/native/windows/registered_lab/indexed_exchange_protocol.hpp
+@@ -34,10 +34,19 @@
+ // existing reply packet budget. The reserved word carries the legacy ABI.
+ // Textured draws and clears retain their previous limits.
+ constexpr uint32_t large_uniform_pixels=(max_packet_bytes-sizeof(Header)-sizeof(Receipt))/4;
+-inline uint32_t payload_abi(const Header &h){return (h.abi==16 || h.abi==17)?h.reserved:h.abi;}
++inline uint32_t payload_abi(const Header &h){return (h.abi==16 || h.abi==17 || h.abi==18)?h.reserved:h.abi;}
+ inline bool shape_valid(const Header &h,bool component_payload=false,bool large_uniform=false) {
+     // ABI 17 admits larger source textures for the bounded six-vertex affine
+     // sampler only. Target, total packet, shader and operation limits are retained.
++    // ABI 18 extends a single normalized source for general triangle draws.
++    // Multi-resource packets, typed loads, target and packet limits remain
++    // unchanged; the reserved word identifies the inherited blend payload.
++    if(h.abi==18){
++        if(large_uniform || (h.flags&0x3002)!=0x1002 ||
++           (h.reserved!=7 && h.reserved!=9 && h.reserved!=10 && h.reserved!=11 && h.reserved!=15))return false;
++        auto legacy=h;legacy.abi=h.reserved;legacy.reserved=0;
++        return shape_valid(legacy,component_payload,false);
++    }
+     if(h.abi==17){
+         if(large_uniform || (h.reserved!=4 && h.reserved!=5))return false;
+         auto legacy=h;legacy.abi=h.reserved;legacy.reserved=0;
+@@ -151,7 +160,7 @@
+ static_assert(sizeof(TextureDescription) == 16);
+ inline bool texture_valid(const TextureDescription &t, const Header &h) {
+     return t.width && t.width <= 8192 && t.height && t.height <= 8192 &&
+-        uint64_t(t.width)*t.height <= (h.abi==17?8u:4u)*1024*1024 && ((h.flags & 24) || (t.width >= h.width && t.height >= h.height)) &&
++        uint64_t(t.width)*t.height <= ((h.abi==17 || h.abi==18)?8u:4u)*1024*1024 && ((h.flags & 24) || (t.width >= h.width && t.height >= h.height)) &&
+         (t.format == 28 || t.format == 87) && !t.reserved;
+ }
+ class Writer {
+@@ -208,8 +217,11 @@
+ }
+ inline std::vector<uint8_t> encode(Request &r) {
+     auto &h = r.header;
+-    if(h.abi!=17 && (h.flags&2) && uint64_t(r.texture.width)*r.texture.height>4194304){
+-        require(!h.reserved && (h.abi==4 || h.abi==5));h.reserved=h.abi;h.abi=17;
++    if(h.abi!=17 && h.abi!=18 && (h.flags&2) && uint64_t(r.texture.width)*r.texture.height>4194304){
++        require(!h.reserved && !(h.flags&0x2000));
++        const bool triangle=(h.flags&0x1000)!=0;
++        require(triangle?(h.abi==7 || h.abi==9 || h.abi==10 || h.abi==11 || h.abi==15):(h.abi==4 || h.abi==5));
++        h.reserved=h.abi;h.abi=triangle?18u:17u;
+     }
+     if(h.abi!=16 && !color_clear(h) && uint64_t(h.width)*h.height>4194304){
+         require(!h.reserved && h.abi && h.abi<=15 && !(h.flags&2));
+@@ -240,7 +252,7 @@
+     if(h.flags & 0x2000){
+         (void)raster::resource_shapes(r.pixel,r.resources);
+         for(const auto &t:r.resources){const TextureDescription description{t.width,t.height,t.format,0};
+-            require(t.pixels.size()==size_t(t.width)*t.height);w.value(description);w.append(t.pixels.data(),t.pixels.size()*sizeof(raster::PackedColor));}
++            require(uint64_t(t.width)*t.height<=4194304 && t.pixels.size()==size_t(t.width)*t.height);w.value(description);w.append(t.pixels.data(),t.pixels.size()*sizeof(raster::PackedColor));}
+         for(const auto &sampler:r.samplers){
+             const auto filter=uint32_t(sampler.filter),u=uint32_t(sampler.u),v=uint32_t(sampler.v);
+             for(const auto value:sampler.border)require(std::isfinite(value));
+@@ -278,7 +290,7 @@
+     for (size_t i = 0; i < r.pixel_constants.size(); ++i) r.pixel_constants[i] = reader.vector<shader::VertexBits>(r.pixel.constants[i]);
+     r.background = reader.vector<raster::PackedColor>(size_t(h.width) * h.height);
+     if(h.flags & 0x2000){
+-        for(auto &t:r.resources){const auto d=reader.value<TextureDescription>();require(!d.reserved);
++        for(auto &t:r.resources){const auto d=reader.value<TextureDescription>();require(!d.reserved && uint64_t(d.width)*d.height<=4194304);
+             t={d.width,d.height,d.format,reader.vector<raster::PackedColor>(size_t(d.width)*d.height)};}
+         (void)raster::resource_shapes(r.pixel,r.resources);
+         for(auto &sampler:r.samplers){const auto encoded=reader.value<uint32_t>();
+--- a/native/windows/registered_lab/indexed_pipeline.hpp
++++ b/native/windows/registered_lab/indexed_pipeline.hpp
+@@ -68,7 +68,7 @@
+             const auto capacity=vertex_capacity(h.vertices);
+             raster::PackedResources resources;shader::TextureSamplers samplers{};
+             if(h.flags&0x2000){require(h.abi==8 || h.abi==9 || h.abi==10 || h.abi==11 || h.abi==12 || h.abi==14 || h.abi==15);resources=request.resources;samplers=request.samplers;}
+-            else {require(h.abi==7 || h.abi==9 || h.abi==10 || h.abi==11 || h.abi==15);resources[0]=request.texture;samplers[0].filter=(h.flags&16)?shader::TextureFilter::point:shader::TextureFilter::linear;}
++            else {const auto abi=payload_abi(h);require(abi==7 || abi==9 || abi==10 || abi==11 || abi==15);resources[0]=request.texture;samplers[0].filter=(h.flags&16)?shader::TextureFilter::point:shader::TextureFilter::linear;}
+             for(auto &entry:triangle_cache){const auto &old=entry.header;
+                 if(entry.batch==batch && old.vertices==capacity && old.format==h.format &&
+                     (old.flags&~4u)==(h.flags&~4u) && raster::resource_layout_equal(resources,entry.layout) &&
+--- /dev/null
++++ b/native/windows/registered_lab/large_triangle_texture_capture_probe.cpp
+@@ -0,0 +1,47 @@
++#define main original_draw_replay_main
++#include "draw_replay_probe.cpp"
++#undef main
++#include "indexed_exchange_protocol.hpp"
++#include <windows.h>
++namespace ex=nr::registered_lab::indexed_exchange;
++int main(int argc,char **argv)try{
++    ex::Header h;h.abi=18;h.reserved=7;h.nonce[0]=1;h.client_pid=1;h.sequence=1;
++    h.width=91;h.height=64;h.vertices=24;h.flags=0x1f0b;h.format=87;h.vs_words=h.ps_words=3;
++    nr::capture::check(ex::shape_valid(h));unsigned negatives=0;
++    ex::TextureDescription t{2912,1824,87,0};nr::capture::check(ex::texture_valid(t,h));
++    auto legacy=h;legacy.abi=7;legacy.reserved=0;nr::capture::check(!ex::texture_valid(t,legacy));++negatives;
++    for(unsigned i=0;i<8;++i){auto bad=h;
++        switch(i){case 0:bad.reserved=1;break;case 1:bad.reserved=18;break;case 2:bad.flags=0xf02;bad.reserved=2;break;
++        case 3:bad.flags|=0x2000;break;case 4:bad.vertices=25;break;case 5:bad.width=8193;break;
++        case 6:bad.width=4096;bad.height=2048;break;case 7:bad.flags=0xf00;break;}
++        nr::capture::check(!ex::shape_valid(bad));++negatives;
++    }
++    auto point=h;point.flags=0x1f13;nr::capture::check(ex::shape_valid(point));
++    auto too_big=t;too_big.width=8192;too_big.height=1025;nr::capture::check(!ex::texture_valid(too_big,h));++negatives;
++    auto changed=h;changed.reserved=5;nr::capture::check(!ex::same_request(h,changed));++negatives;
++    if(argc==2 && !std::strcmp(argv[1],"--contract")){
++        std::printf("{\"large_triangle_texture_contract\":true,\"negative_cases\":%u,\"legacy_large_source_rejected\":true,\"max_packet_bytes\":%u}\n",negatives,ex::max_packet_bytes);return 0;
++    }
++    nr::capture::check(argc==3);const nr::capture::Snapshot s(argv[1]);
++    const auto args=s.values<uint32_t>("arguments"),surface=s.values<uint32_t>("target-description"),source=s.values<uint32_t>("source-description"),sampler=s.values<uint32_t>("sampler-2-0");
++    const auto view=s.values<float>("viewport");const auto blend=s.values<uint32_t>("blend"),raster=s.values<uint32_t>("raster");
++    nr::capture::check(args.size()==9 && surface.size()==10 && source.size()==10 && sampler.size()==13 && view.size()==6 && blend.size()==17 && raster.size()==10);
++    nr::capture::check(args[0]==24 && args[3]==4 && args[4]==1 && args[7]==UINT32_MAX && !blend[0] && blend[1] && blend[9]==2 && blend[10]==6 && blend[11]==1 && blend[12]==2 && blend[13]==6 && blend[14]==1 && (blend[15]&255)==15);
++    nr::capture::check(raster[0]==3 && raster[1]==1 && !raster[2] && !raster[3] && !raster[4] && !raster[5] && !raster[8] && !raster[9]);
++    nr::capture::check(s.values<uint32_t>("draw-indexed")==std::vector<uint32_t>{1} && s.values<uint32_t>("depth-target-bound")==std::vector<uint32_t>{0});
++    nr::capture::check(nr::registered_lab::single_mip_linear_filter(sampler[0]) && sampler[1]==3 && sampler[2]==3 && sampler[3]==3 && !sampler[4] && !sampler[11]);
++    ex::Request r;auto &header=r.header;header.abi=7;header.nonce[0]=1;header.sequence=1;header.client_pid=GetCurrentProcessId();header.width=surface[3];header.height=surface[4];header.format=surface[5];header.flags=0x1f0b;
++    const auto vs=s.values<uint32_t>("vertex-shader"),ps=s.values<uint32_t>("pixel-shader");r.vertex=nr::shader::parse_vertex(vs.data(),vs.size());r.pixel=nr::shader::parse_pixel(ps.data(),ps.size());
++    nr::raster::TriangleTextureDrawExecutor::validate_shader(r.pixel);
++    int32_t base;std::memcpy(&base,&args[2],4);r.inputs=fetch(s,args[0],args[1],base,r.vertex,true,args[3]);header.vertices=uint32_t(r.inputs.size());
++    r.viewport={view[0],view[1],view[2],view[3],view[4],view[5]};r.vertex_constants=constants(s,0,r.vertex);r.pixel_constants=constants(s,2,r.pixel);r.background=s.values<nr::raster::PackedColor>("target");
++    r.texture={source[3],source[4],source[5],s.values<nr::raster::PackedColor>("source")};
++    if(raster[7]){const auto scissor=s.values<int32_t>("scissors");nr::capture::check(scissor.size()==4);const std::array<int32_t,4> clip{scissor[0],scissor[1],scissor[2],scissor[3]};
++        if(clip!=std::array<int32_t,4>{0,0,int32_t(header.width),int32_t(header.height)}){r.scissor=clip;header.flags|=4;}}
++    const auto bytes=ex::encode(r);nr::capture::check(header.abi==18 && header.reserved==7 && ex::request_valid(header,bytes.size()));
++    const auto decoded=ex::decode(bytes);nr::capture::check(decoded.background==r.background && decoded.texture.pixels==r.texture.pixels && decoded.inputs==r.inputs && decoded.pixel.bytecode==r.pixel.bytecode);
++    auto corrupt=bytes;auto malformed=header;malformed.abi=7;malformed.reserved=0;std::memcpy(corrupt.data(),&malformed,sizeof(malformed));bool rejected=false;
++    try{(void)ex::decode(corrupt);}catch(const std::invalid_argument&){rejected=true;}nr::capture::check(rejected);++negatives;
++    std::ifstream existing(argv[2],std::ios::binary);nr::capture::check(!existing);existing.close();std::ofstream output(argv[2],std::ios::binary);nr::capture::check(bool(output));output.write(reinterpret_cast<const char*>(bytes.data()),std::streamsize(bytes.size()));output.close();nr::capture::check(bool(output));
++    std::printf("{\"large_triangle_texture_capture_packet\":true,\"abi\":%u,\"legacy_abi\":%u,\"width\":%u,\"height\":%u,\"source_width\":%u,\"source_height\":%u,\"bytes\":%zu,\"negative_cases\":%u,\"rendering_performed\":false}\n",header.abi,header.reserved,header.width,header.height,r.texture.width,r.texture.height,bytes.size(),negatives);return 0;
++}catch(const std::exception &e){std::fprintf(stderr,"%s\n",e.what());return 1;}
+--- a/native/windows/registered_lab/packed_resources.hpp
++++ b/native/windows/registered_lab/packed_resources.hpp
+@@ -9,8 +9,14 @@
+     shader::TextureShapes shapes{};
+     for(unsigned slot=0;slot<16;++slot){const auto &r=resources[slot];
+         if(!r.width && !r.height && !r.format){shader::check(r.pixels.empty());continue;}
+-        shader::check(program.textures[slot] && r.width && r.height && uint64_t(r.width)*r.height<=4194304);
+         const bool buffer=program.texture_dimensions[slot]==1;
++        const auto area=uint64_t(r.width)*r.height;
++        shader::check(program.textures[slot] && r.width && r.height && area<=(buffer?4194304u:8388608u));
++        // Larger inputs are qualified for normalized sampling only. Typed
++        // loads retain their previous explicit capacity rather than silently
++        // sharing an unqualified large Gather graph.
++        if(area>4194304)for(const auto &instruction:program.instructions)
++            shader::check(instruction.opcode!=shader::Opcode::load || instruction.sources[1].index!=slot);
+         shader::check(buffer?(program.texture_uint[slot] && r.format==42 && r.height==1):
+             (!program.texture_uint[slot] && (r.format==28 || r.format==87) && r.width<=8192 && r.height<=8192));
+         shapes[slot]={r.width,r.height,buffer?1u:15u};
+--- a/native/windows/registered_lab/vertex_executor.cpp
++++ b/native/windows/registered_lab/vertex_executor.cpp
+@@ -61,7 +61,7 @@
+     bool mirrored_taps;
+     TextureShapes texture_shapes;
+     bool checks_sample_coordinates = false;
+-    struct Binding { std::shared_ptr<op::Parameter> parameter; bool constant; unsigned index; std::string name; bool texture = false, half_texel = false; };
++    struct Binding { std::shared_ptr<op::Parameter> parameter; bool constant; unsigned index; std::string name; bool texture = false, half_texel = false; uint32_t texture_offset=0, texture_rows=0; };
+     std::vector<Binding> bindings;
+     std::vector<unsigned> outputs;
+     std::array<uint32_t, 16> output_bit_masks{};
+@@ -82,6 +82,7 @@
+         std::array<Value, 14> constants{};
+         std::array<Value,16> literal_tables{};
+         std::array<Node, 16> textures{}, texture_bits{};
++        std::array<std::vector<Node>,16> texture_chunks{};
+         Node half_texel;
+         std::vector<Node> invalid_coordinates;
+         auto parameter_pair = [&](bool constant, unsigned index, size_t rows) {
+@@ -207,12 +208,28 @@
+             const auto sampler = samplers[instruction.sources[2].index];
+             const auto filter = sampler.filter;
+             check(shape.width && shape.width <= 8192 && shape.height && shape.height <= 8192 &&
+-                  uint64_t(shape.width) * shape.height <= 4194304 &&
++                  uint64_t(shape.width) * shape.height <= 8388608 &&
+                   (filter == TextureFilter::point || filter == TextureFilter::linear) &&
+                   (sampler.u==TextureAddress::clamp || sampler.u==TextureAddress::mirror || sampler.u==TextureAddress::border) &&
+                   (sampler.v==TextureAddress::clamp || sampler.v==TextureAddress::mirror || sampler.v==TextureAddress::border));
+             for(const auto value:sampler.border)check(std::isfinite(value));
+-            if (!textures[slot]) {
++            const auto source_size=shape.width*shape.height;
++            // The qualified NPU compiler wraps Gather indices at 2^21 for
++            // both scalar and RGBA FP32 inputs. Separate bounded ports keep
++            // all reads, filtering and selection on the requested provider.
++            const bool segmented=backend=="NPU" && source_size>2097152u;
++            constexpr uint32_t chunk_rows=1048576;
++            if(segmented && texture_chunks[slot].empty()){
++                for(uint32_t base=0;base<source_size;base+=chunk_rows){
++                    const auto length=(std::min)(chunk_rows,source_size-base);
++                    auto parameter=std::make_shared<op::Parameter>(ov::element::f32,ov::Shape{length,4});
++                    const auto name="texture_"+std::to_string(slot)+"_"+std::to_string(base);
++                    parameter->set_friendly_name(name);parameter->output(0).get_tensor().set_names({name});
++                    bindings.push_back({parameter,false,slot,name,true,false,base,length});
++                    texture_chunks[slot].push_back(parameter);
++                }
++            }
++            if (!segmented && !textures[slot]) {
+                 auto parameter = std::make_shared<op::Parameter>(ov::element::f32, ov::Shape{size_t(shape.width) * shape.height, 4});
+                 const auto name = "texture_" + std::to_string(slot);
+                 parameter->set_friendly_name(name); parameter->output(0).get_tensor().set_names({name});
+@@ -314,7 +331,7 @@
+             };
+             const bool bordered=sampler.u==TextureAddress::border || sampler.v==TextureAddress::border;
+             Node texels=textures[slot];
+-            if(bordered)texels=std::make_shared<op::Concat>(ov::OutputVector{texels,
++            if(bordered && !segmented)texels=std::make_shared<op::Concat>(ov::OutputVector{texels,
+                 op::Constant::create(ov::element::f32,ov::Shape{1,4},std::vector<float>(sampler.border.begin(),sampler.border.end()))},0);
+             auto fetch = [&](int dx, int dy) -> Node {
+                 const auto sx = tap(ix,dx,shape.width,sampler.u),sy=tap(iy,dy,shape.height,sampler.v);
+@@ -335,7 +352,27 @@
+                     address=std::make_shared<op::Select>(std::make_shared<op::NotEqual>(valid,integer(0)),address,integer(int32_t(shape.width*shape.height)));
+                 }
+                 const auto index=std::make_shared<op::Reshape>(address,indices({int64_t(count)}),false);
+-                return std::make_shared<op::Gather>(texels,index,integer(0));
++                if(!segmented)return std::make_shared<op::Gather>(texels,index,integer(0));
++                Node selected;
++                for(uint32_t base=0,port=0;base<source_size;base+=chunk_rows,++port){
++                    const auto length=(std::min)(chunk_rows,source_size-base);
++                    const auto safe=std::make_shared<op::Minimum>(std::make_shared<op::Maximum>(
++                        std::make_shared<op::Subtract>(index,integer(int32_t(base))),integer(0)),integer(int32_t(length-1)));
++                    const auto value=std::make_shared<op::Gather>(texture_chunks[slot][port],safe,integer(0));
++                    const auto bits=std::make_shared<op::BitwiseAnd>(
++                        std::make_shared<op::Convert>(std::make_shared<op::GreaterEqual>(index,integer(int32_t(base))),ov::element::i32),
++                        std::make_shared<op::Convert>(std::make_shared<op::Less>(index,integer(int32_t(base+length))),ov::element::i32));
++                    const auto mask=std::make_shared<op::Convert>(std::make_shared<op::Reshape>(bits,batch_shape,false),ov::element::f32);
++                    const auto term=std::make_shared<op::Multiply>(value,mask);
++                    selected=selected?Node(std::make_shared<op::Add>(selected,term)):term;
++                }
++                if(bordered){
++                    const auto bits=std::make_shared<op::Convert>(std::make_shared<op::Equal>(index,integer(int32_t(source_size))),ov::element::i32);
++                    const auto mask=std::make_shared<op::Convert>(std::make_shared<op::Reshape>(bits,batch_shape,false),ov::element::f32);
++                    const auto border=op::Constant::create(ov::element::f32,ov::Shape{1,4},std::vector<float>(sampler.border.begin(),sampler.border.end()));
++                    selected=std::make_shared<op::Add>(selected,std::make_shared<op::Multiply>(border,mask));
++                }
++                return selected;
+             };
+             if (filter == TextureFilter::point) return fetch(0, 0);
+             const auto tx = std::make_shared<op::Subtract>(x, std::make_shared<op::Convert>(ix, ov::element::f32));
+@@ -937,9 +974,11 @@
+                 *tensor.data<float>() = .5f;
+             } else if (binding.texture) {
+                 const auto shape = state->texture_shapes[binding.index];
+-                check(textures[binding.index].size() == size_t(shape.width) * shape.height &&
+-                      tensor.get_byte_size() == textures[binding.index].size() * sizeof(std::array<float, 4>));
+-                std::memcpy(tensor.data(), textures[binding.index].data(), tensor.get_byte_size());
++                const auto total=size_t(shape.width)*shape.height;
++                const auto length=binding.texture_rows?size_t(binding.texture_rows):total;
++                check(textures[binding.index].size()==total && binding.texture_offset<=total && length<=total-binding.texture_offset &&
++                      tensor.get_byte_size()==length*sizeof(std::array<float,4>));
++                std::memcpy(tensor.data(),textures[binding.index].data()+binding.texture_offset,tensor.get_byte_size());
+             } else if (binding.constant) {
+                 check(tensor.get_byte_size() == size_t(state->program.constants[binding.index]) * sizeof(VertexBits));
+                 std::memcpy(tensor.data(), constants[binding.index].data(), tensor.get_byte_size());

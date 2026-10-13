@@ -1,0 +1,63 @@
+from pathlib import Path
+import json,hashlib,tarfile
+r=Path('results/render-driver');d=r/'large-sampler-v1';d.mkdir(exist_ok=False)
+(d/'CMakeLists.txt').write_text('''cmake_minimum_required(VERSION 3.25)
+project(npu_large_sampler_contract LANGUAGES CXX)
+find_package(OpenVINO 2026.1 REQUIRED COMPONENTS Runtime)
+add_executable(nr_large_sampler_test large_sampler_test.cpp)
+target_include_directories(nr_large_sampler_test PRIVATE "${NR_QUALIFIED_SOURCE}")
+target_compile_features(nr_large_sampler_test PRIVATE cxx_std_17)
+target_compile_options(nr_large_sampler_test PRIVATE /W4 /WX)
+target_link_libraries(nr_large_sampler_test PRIVATE "${NR_QUALIFIED_BUILD}/Release/nr_registered_vertex.lib" "${NR_QUALIFIED_BUILD}/Release/nr_registered_provider_cache.lib" openvino::runtime bcrypt d3dcompiler)
+set_property(TARGET nr_large_sampler_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+''')
+(d/'large_sampler_test.cpp').write_text(r'''#include "vertex_executor.hpp"
+#include "shader_reference.hpp"
+#include "shader_contract.hpp"
+#include <cstdio>
+#include <cmath>
+using namespace nr::shader;
+#define TEST(v) do{if(!(v))throw std::runtime_error(#v);}while(false)
+int main(int argc,char **argv)try{
+ TEST(argc==2);const std::string backend=argv[1];TEST(backend=="CPU" || backend=="NPU");
+ const auto words=nr::registered_lab::shader_tokens("Texture2D image:register(t0);SamplerState filter:register(s0);float4 main(float2 uv:TEXCOORD):SV_Target{return image.Sample(filter,uv);}","ps_4_0");
+ const auto p=parse_pixel(words.data(),words.size());TEST(p.inputs[0]==3);
+ constexpr uint32_t width=2048,height=4096,count=32;
+ TextureShapes shapes{};shapes[0]={width,height,15};TexturePixels textures{};textures[0].resize(size_t(width)*height);
+ std::vector<VertexRegisters> inputs(count);
+ // Exact binary coordinates include both sides of chunk/wrap boundaries,
+ // the last texel, and outside each border. Every pixel has a distinct
+ // non-power-of-two period so wrapped addresses cannot hide in the fixture.
+ const float x[8]{-.25f/width,0,.5f/width,1.5f/width,.5f,1-.25f/width,1+.25f/width,1.25f};
+ const float y[8]{.5f/height,1024.f/height,1024.5f/height,2048.f/height,2048.5f/height,1-.25f/height,1+.25f/height,-.25f/height};
+ for(unsigned n=0;n<count;++n)inputs[n][0]={as_bits(x[n%8]),as_bits(y[(n/8+n)%8]),0,0};
+ for(const auto filter:{TextureFilter::point,TextureFilter::linear})for(const auto mode:{TextureAddress::clamp,TextureAddress::mirror,TextureAddress::border}){
+  TextureSamplers samplers{};samplers[0]={filter,mode,mode,{.25f,.5f,.75f,1.f}};
+  PixelExecutor executor(p,count,backend,shapes,samplers);
+  for(unsigned pass=0;pass<2;++pass){
+   for(unsigned n=0;n<textures[0].size();++n)for(unsigned c=0;c<4;++c)textures[0][n][c]=float((n*17+c*29+pass*53)%251)/256;
+   const auto result=executor.execute(inputs,{},textures);TEST(result.execution_device.rfind(backend,0)==0);float maximum=0;
+   for(unsigned n=0;n<count;++n){const auto expected=reference_vertex(p,inputs[n],{},shapes,samplers,textures);for(unsigned c=0;c<4;++c){
+    const auto actual=as_float(result.vertices[n][0][c]),wanted=as_float(expected[0][c]);const auto error=std::abs(actual-wanted);maximum=(std::max)(maximum,error);
+    if(!std::isfinite(actual) || error>1e-6f || (filter==TextureFilter::point && actual!=wanted)){
+     std::fprintf(stderr,"filter=%u mode=%u pass=%u row=%u lane=%u actual=%.9g expected=%.9g\n",unsigned(filter),unsigned(mode),pass,n,c,double(actual),double(wanted));TEST(false);
+    }
+   }}
+   std::printf("{\"source_pixels\":%u,\"filter\":%u,\"mode\":%u,\"pass\":%u,\"verified_components\":%u,\"maximum_error\":%.9g,\"input_bytes\":%llu,\"execution_device\":\"%s\"}\n",width*height,unsigned(filter),unsigned(mode),pass,count*4,double(maximum),static_cast<unsigned long long>(result.input_bytes),result.execution_device.c_str());std::fflush(stdout);
+  }
+ }
+ return 0;
+}catch(const std::exception &e){std::fprintf(stderr,"large sampler: %s\n",e.what());return 1;}
+''')
+(r/'large-sampler-v1-source.json').write_text(json.dumps({p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir()},indent=2)+'\n')
+with tarfile.open(r/'large-sampler-v1.tar.gz','w:gz') as f:f.add(d,arcname=d.name)
+s=(r/'build-texture-oracle-v3.ps1').read_text().replace('native-texture-oracle-v3','large-sampler-v1').replace('native-routing-v7','native-routing-v9').replace('nr_texture_oracle_diagnostic','nr_large_sampler_test').replace('native-routing-v9 with native-routing-v8 segmented sampler','native-routing-v9 general segmented sampler')
+a=s.index(' -ArgumentList @(');b=s.index(' -PassThru',a);s=s[:a]+' -ArgumentList @($backend)'+s[b:]
+s=s.replace("};$results|ConvertTo-Json|Set-Content", "};if(@($results|Where-Object exit_code -ne 0).Count){$results|ConvertTo-Json|Set-Content \"$s\\report.json\";throw 'Large sampler regression failed'};$results|ConvertTo-Json|Set-Content")
+(r/'qualify-large-sampler-v1.ps1').write_text(s)
+for before,after in [('qualify-native-routing-v8.ps1','qualify-native-routing-v9.ps1'),('package-native-driver-v6.ps1','package-native-driver-v7.ps1'),('run-native-registration-v6.ps1','run-native-registration-v7.ps1'),('recover-native-registration-v6.ps1','recover-native-registration-v7.ps1'),('qualify-native-registered-v6.py','qualify-native-registered-v7.py')]:
+ s=(r/before).read_text().replace('native-routing-v8','native-routing-v9').replace('native-driver-package-v6','native-driver-package-v7').replace('registration-v6','registration-v7').replace('registered-v6','registered-v7').replace('stage-v6','stage-v7').replace('NativeRecovery-v6','NativeRecovery-v7').replace('0.0.1306.0','0.0.1307.0')
+ if before.startswith('package-'):
+  s=s.replace("'large-texture-v2-qualification\\report.json'", "'large-texture-v2-qualification\\report.json','large-triangle-texture-v1-replay\\report.json','large-triangle-texture-v1-qualification\\report.json'")
+  s=s.replace("$build=Get-Content", "$sampler=Get-Content \"$r\\vm\\large-sampler-v1\\report.json\" -Raw|ConvertFrom-Json;if($sampler.Count -ne 2 -or @($sampler|Where-Object exit_code -ne 0).Count){throw 'Large sampler qualification missing'}\n$build=Get-Content")
+ (r/after).write_text(s)

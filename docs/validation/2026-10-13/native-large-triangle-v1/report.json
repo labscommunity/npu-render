@@ -1,0 +1,42 @@
+{
+  "recorded_at": "2026-10-13T15:35:44.560705+00:00",
+  "evidence_checks_passed": true,
+  "raw_files_remotely_hash_verified": 217,
+  "prior_native_trial": {
+    "npu_operations": 20,
+    "native_frame_produced": false,
+    "cleanup_passed": true
+  },
+  "latest_native_trial": {
+    "passed": false,
+    "npu_operations": 69,
+    "delivery_acknowledgments": 69,
+    "native_frame_produced": false,
+    "cleanup_passed": true
+  },
+  "capture_sha256": "fbade8e95e2574056f740dac08c7a313bfab23bbde2df0d78992256caa8c1c4a",
+  "source_shape": [
+    2912,
+    1824
+  ],
+  "target_shape": [
+    91,
+    64
+  ],
+  "direct_rgba_fp32_gather_wrap_boundary": 2097152,
+  "segmented_rows_per_port": 1048576,
+  "segmented_gather_probes_passed": true,
+  "captured_cpu_npu_pixels_exact": true,
+  "captured_draw_covered_samples": 0,
+  "captured_draw_limits": "vertex/projection and packet acceptance only; no visible samples",
+  "transport_npu_receipts": 1,
+  "transport_acknowledgments": 1,
+  "verified_pixel_bytes": 23296,
+  "independent_sampler_cpu_npu_cases": 24,
+  "independent_sampler_verified_components": 3072,
+  "independent_sampler_all_exact": true,
+  "existing_triangle_regression_runs": 4,
+  "desktop_offloaded": false,
+  "tahoma_performance_tested": false,
+  "promoted_to_runtime": false
+}

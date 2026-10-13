@@ -125,3 +125,11 @@ before frame readback in both trials and recovery succeeds. The separate physica
 probe now submits a verified static frame, but lost ETW events prevent confirming
 independent flip. These results supersede the earlier waiting snapshots above;
 they do not establish a usable desktop or a Tahoma benefit.
+
+The subsequent [large-texture trials](../validation/2026-10-13/native-large-triangle-v1/)
+qualify segmented NPU texture reads and a larger-source general triangle packet.
+Actual DWM advances to 69 successful NPU operations, including visible textured
+draws, but still exits before a complete frame. The next captured derivative
+shader renders correctly in isolation; its live resource-table boundary remains
+unfinished. A live draw takes about 11.9 seconds, so compatibility and interactive
+performance both remain open. Physical migration and Tahoma relief are unproven.
