@@ -1,0 +1,18 @@
+from pathlib import Path
+from datetime import UTC,datetime
+import subprocess,hashlib,json,time
+r=Path('results/render-driver');root=r/'memory-cache-v1/native/windows/registered_lab';sdk=Path('/Users/tatef/.cache/uv/archive-v0/NCrWBKbOW6jRbRFR/openvino');out=r/'memory-cache-v1-local-v2';out.mkdir(exist_ok=False)
+base=['clang++','-std=c++17','-Wall','-Wextra','-Werror','-isystem',str(sdk/'include'),'-isystem','/opt/homebrew/opt/openssl@3/include']
+link=[str(sdk/'libs/libopenvino.2610.dylib'),'-L','/opt/homebrew/opt/openssl@3/lib','-lcrypto','-Wl,-rpath,'+str(sdk/'libs')]
+rows=[]
+for name,source in [('identity',root/'provider_cache_test.cpp'),('memory',root/'provider_memory_cache_test.cpp')]:
+ exe=out/name;cmd=base+[str(r/'memory-cache-v1-local-digest.cpp'),str(source)]+link+['-o',str(exe)]
+ p=subprocess.run(cmd,capture_output=True,timeout=120);(out/(name+'-build.stdout.log')).write_bytes(p.stdout);(out/(name+'-build.stderr.log')).write_bytes(p.stderr);assert p.returncode==0,p.stderr.decode()
+ start=time.perf_counter();p=subprocess.run([str(exe)],capture_output=True,timeout=120);(out/(name+'.stdout.jsonl')).write_bytes(p.stdout);(out/(name+'.stderr.log')).write_bytes(p.stderr);assert p.returncode==0,p.stderr.decode()
+ result=json.loads(p.stdout.decode());assert not p.stderr
+ rows.append(dict(test=name,passed=True,result=result,elapsed_ms=(time.perf_counter()-start)*1000,binary_sha256=hashlib.sha256(exe.read_bytes()).hexdigest()))
+unit=out/'compile-header.cpp';unit.write_text('#include "'+str((root/'provider_compile.hpp').resolve())+'"\n')
+p=subprocess.run(base+['-fsyntax-only',str(unit)],capture_output=True,timeout=120);(out/'compile-header.stdout.log').write_bytes(p.stdout);(out/'compile-header.stderr.log').write_bytes(p.stderr);assert p.returncode==0,p.stderr.decode()
+files=[r/'memory-cache-v1-local-digest.cpp']+[root/x for x in ['provider_cache.hpp','provider_cache_test.cpp','provider_compile.hpp','provider_compile_statistics.hpp','provider_memory_cache.hpp','provider_memory_cache_test.cpp']]
+report=dict(at=datetime.now(UTC).isoformat(),passed=True,platform='macOS arm64',openvino='2026.1.0',digest_adapter='OpenSSL SHA-256; Windows BCrypt unchanged',npu_execution_tested=False,tests=rows,compile_header_syntax_passed=True,source_sha256={str(f.relative_to(r)):hashlib.sha256(f.read_bytes()).hexdigest() for f in files})
+(out/'report.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps({k:v for k,v in report.items() if k!='source_sha256'}))

@@ -1,0 +1,309 @@
+--- a/native/windows/registered_lab/CMakeLists.txt
++++ b/native/windows/registered_lab/CMakeLists.txt
+@@ -238,3 +238,10 @@
+ target_compile_options(nr_private_queue_probe PRIVATE /W4 /WX)
+ target_link_libraries(nr_private_queue_probe PRIVATE openvino::runtime nr_registered_provider_cache)
+ set_property(TARGET nr_private_queue_probe PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
++
++add_executable(nr_registered_provider_memory_cache_test provider_memory_cache_test.cpp)
++target_compile_features(nr_registered_provider_memory_cache_test PRIVATE cxx_std_17)
++target_compile_options(nr_registered_provider_memory_cache_test PRIVATE /W4 /WX)
++target_link_libraries(nr_registered_provider_memory_cache_test PRIVATE nr_registered_provider_cache openvino::runtime)
++set_property(TARGET nr_registered_provider_memory_cache_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
++add_test(NAME registered_provider_memory_cache_contract COMMAND nr_registered_provider_memory_cache_test)
+--- a/native/windows/registered_lab/indexed_exchange_worker.cpp
++++ b/native/windows/registered_lab/indexed_exchange_worker.cpp
+@@ -2,10 +2,12 @@
+ #define NOMINMAX
+ #include "indexed_pipeline.hpp"
+ #include "provider_compile_statistics.hpp"
++#include "provider_compile.hpp"
+ #include "lab_exchange_io.hpp"
+ #include <cstdio>
+ #include <set>
+ #include <cwchar>
++#include <chrono>
+ namespace ex = nr::registered_lab::indexed_exchange;
+ namespace io = nr::registered_lab::exchange;
+ namespace {
+@@ -58,17 +60,17 @@
+                 std::memcpy(&header, bytes.data(), sizeof(header));
+                 ex::require(ex::request_valid(header, bytes.size()) && packet_name(header, false) == name); identified = true;
+                 const auto request = ex::decode(bytes); const auto &h = request.header;
+-                const auto began=GetTickCount64(); const auto before=nr::provider::compile_statistics();
++                const auto began=std::chrono::steady_clock::now(); const auto before=nr::provider::compile_statistics();
+                 const auto result=pipeline->execute(request);
+-                const auto elapsed=GetTickCount64()-began; const auto after=nr::provider::compile_statistics();
++                const auto elapsed=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-began).count(); const auto after=nr::provider::compile_statistics();
+                 publish(directory + L"\\" + packet_name(h, true), ex::response(h, result)); ++succeeded;
+-                std::printf("{\"client_pid\":%u,\"sequence\":%u,\"execution_device\":\"%s\",\"operation\":\"%s\",\"width\":%u,\"height\":%u,\"provider_requests\":%llu,\"draw_ms\":%.3f,\"compile_and_draw_ms\":%llu,\"compile_calls\":%llu,\"cache_requests\":%llu,\"cache_hits\":%llu,\"cache_status_unavailable\":%llu,\"passed\":true,\"displayed_frames\":0}\n",
++                std::printf("{\"client_pid\":%u,\"sequence\":%u,\"execution_device\":\"%s\",\"operation\":\"%s\",\"width\":%u,\"height\":%u,\"provider_requests\":%llu,\"draw_ms\":%.3f,\"compile_and_draw_ms\":%.3f,\"compile_calls\":%llu,\"cache_requests\":%llu,\"cache_hits\":%llu,\"cache_status_unavailable\":%llu,\"backend_compile_calls\":%llu,\"memory_cache_requests\":%llu,\"memory_cache_hits\":%llu,\"memory_cache_evictions\":%llu,\"provider_setup_ms\":%.3f,\"backend_compile_ms\":%.3f,\"passed\":true,\"displayed_frames\":0}\n",
+                     h.client_pid, h.sequence, result.execution_device.c_str(), ex::color_clear(h)?"color_clear":"draw", h.width, h.height,
+-                    static_cast<unsigned long long>(result.provider_requests), result.timings.total_ms, static_cast<unsigned long long>(elapsed),
++                    static_cast<unsigned long long>(result.provider_requests), result.timings.total_ms, elapsed,
+                     static_cast<unsigned long long>(after.calls-before.calls), static_cast<unsigned long long>(after.cache_requests-before.cache_requests),
+-                    static_cast<unsigned long long>(after.cache_hits-before.cache_hits), static_cast<unsigned long long>(after.cache_status_unavailable-before.cache_status_unavailable)); std::fflush(stdout);
++                    static_cast<unsigned long long>(after.cache_hits-before.cache_hits), static_cast<unsigned long long>(after.cache_status_unavailable-before.cache_status_unavailable),static_cast<unsigned long long>(after.backend_calls-before.backend_calls),static_cast<unsigned long long>(after.memory_requests-before.memory_requests),static_cast<unsigned long long>(after.memory_hits-before.memory_hits),static_cast<unsigned long long>(after.memory_evictions-before.memory_evictions),double(after.setup_ns-before.setup_ns)/1e6,double(after.backend_ns-before.backend_ns)/1e6); std::fflush(stdout);
+             } catch (const std::exception &error) {
+-                ++failed; pipeline=std::make_unique<ex::Pipeline>(); std::fprintf(stderr, "indexed NPU request failed: %.32000s\n", error.what()); std::fflush(stderr);
++                ++failed; nr::provider::poison_compiled_memory_cache(); pipeline=std::make_unique<ex::Pipeline>(); std::fprintf(stderr, "indexed NPU request failed: %.32000s\n", error.what()); std::fflush(stderr);
+                 if (identified) {
+                     auto h = header; h.kind = 3; h.device = 0; h.body_bytes = 0; ex::Writer writer; writer.value(h);
+                     publish(directory + L"\\" + packet_name(h, true), writer.finish());
+--- a/native/windows/registered_lab/provider_compile.hpp
++++ b/native/windows/registered_lab/provider_compile.hpp
+@@ -3,6 +3,7 @@
+ #include "provider_compile_statistics.hpp"
+ #include "provider_precision.hpp"
+ #include "provider_cache.hpp"
++#include "provider_memory_cache.hpp"
+ #include <cstdlib>
+ #include <filesystem>
+ #include <memory>
+@@ -38,35 +39,38 @@
+         throw std::invalid_argument("shared queue experiment requires the pinned qualified runtime");
+     return value[0]=='1';
+ }
++
++inline bool memory_cache_experiment(){
++#ifdef _MSC_VER
++    char *value=nullptr;size_t length=0;if(_dupenv_s(&value,&length,"NR_RENDER_MEMORY_CACHE"))throw std::runtime_error("cannot read model memory cache configuration");const std::unique_ptr<char,decltype(&std::free)> owner(value,&std::free);
++#else
++    const char *value=std::getenv("NR_RENDER_MEMORY_CACHE");
++#endif
++    if(!value || !*value || !std::strcmp(value,"0"))return false;
++    if(std::strcmp(value,"1"))throw std::invalid_argument("model memory cache requires 0 or 1");
++    if(std::strcmp(ov::get_openvino_version().buildNumber,"2026.4.1-22982-e213a147257-releases/2026/4"))throw std::invalid_argument("model memory cache requires the pinned runtime");
++    return true;
++}
++inline CompiledMemoryCache &compiled_memory_cache(){static CompiledMemoryCache cache(64);return cache;}
++inline void poison_compiled_memory_cache(){compiled_memory_cache().poison();}
+ inline ov::CompiledModel compile_model(ov::Core &core,const std::shared_ptr<ov::Model> &model,
+     const std::string &backend,const ov::AnyMap &properties){
+-    ++compile_calls;
+-    const auto directory=backend=="NPU"?model_cache_directory():std::string{};
+-    if(!directory.empty()){
+-        const std::filesystem::path path(directory);
+-        if(!path.is_absolute() || !std::filesystem::is_directory(path))throw std::invalid_argument("NPU cache must be an existing absolute directory");
+-        // Explicit controller-owned cache only. OpenVINO keys entries by graph
+-        // and compilation properties; frame pixels remain runtime inputs.
+-        core.set_property(ov::cache_dir(isolated_cache_directory(path,model).string()));++cache_requests;
+-    }
+-    auto configured=properties;
+-    if(backend=="NPU")if(const auto shared=shared_queue_experiment()){
+-        const ov::AnyMap queue_properties{{"NPU_SHARED_COMMON_QUEUE",*shared}};
+-        core.set_property("NPU",queue_properties);
+-        if(core.get_property("NPU","NPU_SHARED_COMMON_QUEUE").as<bool>()!=*shared)
+-            throw std::runtime_error("shared queue property verification failed");
+-        configured["NPU_SHARED_COMMON_QUEUE"]=*shared;
+-        static std::atomic<bool> logged{false};
+-        if(!logged.exchange(true)){
+-            std::printf("{\"kind\":\"private_shared_queue_experiment\",\"enabled\":%s,\"property_readback_verified\":true,\"hardware_queue_count_measured\":false}\n",*shared?"true":"false");
+-            std::fflush(stdout);
++    ++compile_calls;CompileTimer setup_timer(provider_setup_ns);const auto directory=backend=="NPU"?model_cache_directory():std::string{};
++    if(!directory.empty()){const std::filesystem::path path(directory);if(!path.is_absolute() || !std::filesystem::is_directory(path))throw std::invalid_argument("NPU cache must be an existing absolute directory");}
++    auto configured=properties;const auto shared=backend=="NPU"?shared_queue_experiment():std::nullopt;
++    if(shared)configured["NPU_SHARED_COMMON_QUEUE"]=*shared;
++    auto compile=[&](){
++        if(!directory.empty()){core.set_property(ov::cache_dir(isolated_cache_directory(directory,model).string()));++cache_requests;}
++        if(shared){
++            const ov::AnyMap queue_properties{{"NPU_SHARED_COMMON_QUEUE",*shared}};core.set_property("NPU",queue_properties);
++            if(core.get_property("NPU","NPU_SHARED_COMMON_QUEUE").as<bool>()!=*shared)throw std::runtime_error("shared queue property verification failed");
++            static std::atomic<bool> logged{false};if(!logged.exchange(true)){std::printf("{\"kind\":\"private_shared_queue_experiment\",\"enabled\":%s,\"property_readback_verified\":true,\"hardware_queue_count_measured\":false}\n",*shared?"true":"false");std::fflush(stdout);}
+         }
+-    }
+-    auto compiled=core.compile_model(model,backend,configured);
+-    if(!directory.empty()){
+-        try{if(compiled.get_property(ov::loaded_from_cache))++cache_hits;}
+-        catch(const ov::Exception &){++cache_status_unavailable;}
+-    }
+-    return compiled;
++        ++backend_compile_calls;ov::CompiledModel compiled;{CompileTimer backend_timer(backend_compile_ns);compiled=core.compile_model(model,backend,configured);}
++        if(!directory.empty()){try{if(compiled.get_property(ov::loaded_from_cache))++cache_hits;}catch(const ov::Exception &){++cache_status_unavailable;}}
++        return compiled;
++    };
++    if(backend=="NPU" && memory_cache_experiment())return compiled_memory_cache().get(core,model,backend,configured,directory,compile);
++    return compile();
+ }
+ }
+--- a/native/windows/registered_lab/provider_compile_statistics.hpp
++++ b/native/windows/registered_lab/provider_compile_statistics.hpp
+@@ -1,8 +1,16 @@
+ #pragma once
+ #include <atomic>
+ #include <cstdint>
++#include <chrono>
+ namespace nr::provider {
+-struct CompileStatistics {uint64_t calls=0,cache_requests=0,cache_hits=0,cache_status_unavailable=0;};
+-inline std::atomic<uint64_t> compile_calls{0},cache_requests{0},cache_hits{0},cache_status_unavailable{0};
+-inline CompileStatistics compile_statistics(){return {compile_calls.load(),cache_requests.load(),cache_hits.load(),cache_status_unavailable.load()};}
++struct CompileStatistics {uint64_t calls=0,cache_requests=0,cache_hits=0,cache_status_unavailable=0,backend_calls=0,memory_requests=0,memory_hits=0,memory_evictions=0,setup_ns=0,backend_ns=0;};
++inline std::atomic<uint64_t> compile_calls{0},cache_requests{0},cache_hits{0},cache_status_unavailable{0},backend_compile_calls{0},memory_cache_requests{0},memory_cache_hits{0},memory_cache_evictions{0},provider_setup_ns{0},backend_compile_ns{0};
++inline CompileStatistics compile_statistics(){return {compile_calls.load(),cache_requests.load(),cache_hits.load(),cache_status_unavailable.load(),backend_compile_calls.load(),memory_cache_requests.load(),memory_cache_hits.load(),memory_cache_evictions.load(),provider_setup_ns.load(),backend_compile_ns.load()};}
++class CompileTimer {
++    std::atomic<uint64_t> &total;
++    std::chrono::steady_clock::time_point started=std::chrono::steady_clock::now();
++public:
++    explicit CompileTimer(std::atomic<uint64_t> &counter):total(counter){}
++    ~CompileTimer(){total.fetch_add(uint64_t(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now()-started).count()),std::memory_order_relaxed);}
++};
+ }
+--- /dev/null
++++ b/native/windows/registered_lab/provider_memory_cache.hpp
+@@ -0,0 +1,71 @@
++#pragma once
++#include "provider_cache.hpp"
++#include "provider_compile_statistics.hpp"
++#include <list>
++#include <mutex>
++#include <vector>
++
++namespace nr::provider {
++inline std::string compiled_memory_identity(const std::shared_ptr<ov::Model> &model,
++    const std::string &backend,const ov::AnyMap &properties,const std::string &directory){
++    CacheDigest digest;digest.field("npu-render-compiled-memory-v1");
++    digest.field(cache_model_identity(model));digest.field(backend);digest.field(directory);
++    // Compiled models expose their original port aliases. Do not reuse one
++    // with different aliases, even when the canonical graph is identical.
++    for(const auto &ports:{model->inputs(),model->outputs()}){
++        digest.field(std::to_string(ports.size()));
++        for(const auto &port:ports){
++            const auto &names=port.get_names();std::vector<std::string> sorted(names.begin(),names.end());
++            std::sort(sorted.begin(),sorted.end());digest.field(std::to_string(sorted.size()));
++            for(const auto &name:sorted)digest.field(name);
++        }
++    }
++    digest.field(std::to_string(properties.size()));
++    for(const auto &entry:properties){
++        digest.field(entry.first);const auto &value=entry.second;
++        if(value.is<bool>()){digest.field("bool");digest.field(value.as<bool>()?"1":"0");}
++        else if(value.is<std::string>()){digest.field("string");digest.field(value.as<std::string>());}
++        else if(value.is<ov::hint::PerformanceMode>()){digest.field("performance_mode");digest.field(std::to_string(static_cast<int>(value.as<ov::hint::PerformanceMode>())));}
++        else if(value.is<ov::hint::ExecutionMode>()){digest.field("execution_mode");digest.field(std::to_string(static_cast<int>(value.as<ov::hint::ExecutionMode>())));}
++        else throw std::invalid_argument("unsupported compiled memory cache property type");
++    }
++    return digest.finish();
++}
++
++// This experiment owns all caller Core configuration. The key includes every
++// explicit compilation property; callers must not supply untracked Core-level
++// configuration or extensions. Each consumer creates its own InferRequest.
++class CompiledMemoryCache {
++    struct Entry {std::string key;ov::Core owner;ov::CompiledModel model;};
++    const size_t capacity;
++    std::mutex mutex;
++    std::list<Entry> entries;
++    bool failed=false;
++public:
++    explicit CompiledMemoryCache(size_t count):capacity(count){
++        if(!count || count>64)throw std::invalid_argument("compiled memory cache capacity out of range");
++    }
++    template<class Compile>
++    ov::CompiledModel get(ov::Core &core,const std::shared_ptr<ov::Model> &model,
++        const std::string &backend,const ov::AnyMap &properties,const std::string &directory,Compile compile){
++        const auto key=compiled_memory_identity(model,backend,properties,directory);
++        std::lock_guard<std::mutex> lock(mutex);
++        if(failed)throw std::runtime_error("compiled memory cache is poisoned");
++        ++memory_cache_requests;
++        for(auto it=entries.begin();it!=entries.end();++it)if(it->key==key){
++            ++memory_cache_hits;entries.splice(entries.begin(),entries,it);return entries.front().model;
++        }
++        try{
++            auto compiled=compile();
++            const auto devices=compiled.get_property(ov::execution_devices);
++            if(devices.size()!=1 || !(devices[0]==backend || devices[0].rfind(backend+".",0)==0))
++                throw std::runtime_error("compiled memory cache device mismatch");
++            entries.push_front(Entry{key,core,compiled});
++            if(entries.size()>capacity){entries.pop_back();++memory_cache_evictions;}
++            return compiled;
++        }catch(...){failed=true;entries.clear();throw;}
++    }
++    void poison(){std::lock_guard<std::mutex> lock(mutex);failed=true;entries.clear();}
++    size_t size(){std::lock_guard<std::mutex> lock(mutex);return entries.size();}
++};
++}
+--- /dev/null
++++ b/native/windows/registered_lab/provider_memory_cache_test.cpp
+@@ -0,0 +1,82 @@
++#include "provider_memory_cache.hpp"
++#include <openvino/opsets/opset13.hpp>
++#include <cstdio>
++#include <cstring>
++#include <memory>
++
++namespace {
++void require(bool value){if(!value)throw std::runtime_error("compiled memory cache contract failed");}
++std::shared_ptr<ov::Model> graph(float add=1.f,const std::string &input_name="input",const std::string &output_name="output",size_t count=64){
++    namespace op=ov::opset13;
++    auto input=std::make_shared<op::Parameter>(ov::element::f32,ov::Shape{1,count});
++    input->output(0).get_tensor().set_names({input_name});
++    auto output=std::make_shared<op::Add>(input,op::Constant::create(ov::element::f32,ov::Shape{},{add}));
++    output->output(0).get_tensor().set_names({output_name});
++    return std::make_shared<ov::Model>(ov::OutputVector{output},ov::ParameterVector{input});
++}
++uint64_t verified=0;
++void fill(ov::InferRequest &request,float offset){
++    auto tensor=request.get_tensor("input");require(tensor.get_size()==64);
++    for(size_t i=0;i<64;++i)tensor.data<float>()[i]=float(i)+offset;
++}
++void check(ov::InferRequest &request,float offset,float add){
++    request.infer();const auto tensor=request.get_tensor("output");require(tensor.get_size()==64);
++    for(size_t i=0;i<64;++i){require(tensor.data<const float>()[i]==float(i)+offset+add);++verified;}
++}
++}
++int main(int argc,char **argv)try{
++    if(argc>2)throw std::invalid_argument("expected optional CPU or NPU backend");
++    const std::string backend=argc==2?argv[1]:"CPU";
++    if(backend!="CPU" && backend!="NPU")throw std::invalid_argument("expected CPU or NPU backend");
++    const ov::AnyMap properties{ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY),ov::hint::execution_mode(ov::hint::ExecutionMode::ACCURACY)};
++    auto identity=[&](const std::shared_ptr<ov::Model> &model,const ov::AnyMap &p){return nr::provider::compiled_memory_identity(model,backend,p,"");};
++    const auto original=graph();const auto key=identity(original,properties);
++    require(key==identity(graph(),properties));
++    require(key!=identity(graph(2.f),properties));
++    require(key!=identity(graph(1.f,"different_input"),properties));
++    require(key!=identity(graph(1.f,"input","different_output"),properties));
++    require(key!=identity(graph(1.f,"input","output",32),properties));
++    auto profile=properties;profile[ov::enable_profiling.name()]=true;require(key!=identity(graph(),profile));
++    auto precision=properties;precision[ov::hint::execution_mode.name()]=ov::hint::ExecutionMode::PERFORMANCE;require(key!=identity(graph(),precision));
++    auto string_value=properties;string_value["TEST_KEY"]=std::string("true");auto bool_value=properties;bool_value["TEST_KEY"]=true;
++    require(identity(graph(),string_value)!=identity(graph(),bool_value));
++    require(key!=nr::provider::compiled_memory_identity(original,backend,properties,"different-directory"));
++    bool rejected=false;auto unsupported=properties;unsupported["TEST_KEY"]=std::vector<int>{1,2};
++    try{(void)identity(graph(),unsupported);}catch(const std::invalid_argument &){rejected=true;}require(rejected);
++    auto alias=graph();alias->output(0).get_tensor().set_names({"output","second_alias"});require(key!=identity(alias,properties));
++    nr::provider::CompiledMemoryCache cache(2);size_t backend_calls=0;
++    auto load=[&](ov::Core &core,const std::shared_ptr<ov::Model> &model){
++        return cache.get(core,model,backend,properties,"",[&](){++backend_calls;return core.compile_model(model,backend,properties);});
++    };
++    ov::InferRequest first,second;
++    {ov::Core core;first=load(core,graph()).create_infer_request();require(backend_calls==1);}
++    // The first caller Core has been destroyed. The cache owns its context.
++    ov::Core core;second=load(core,graph()).create_infer_request();require(backend_calls==1);
++    for(unsigned round=0;round<8;++round){
++        const auto a=float(round*128),b=-float(round*128);
++        fill(first,a);fill(second,b);check(first,a,1.f);check(second,b,1.f);
++        fill(first,a+64.f);check(second,b,1.f);check(first,a+64.f,1.f);
++    }
++    auto aliased=load(core,alias).create_infer_request();require(backend_calls==2);
++    fill(aliased,4.f);check(aliased,4.f,1.f);
++    auto changed=load(core,graph(2.f)).create_infer_request();require(backend_calls==3 && cache.size()==2);
++    fill(changed,5.f);check(changed,5.f,2.f);
++    // Eviction releases only the cached reference. Existing requests survive.
++    fill(first,9.f);check(first,9.f,1.f);
++    auto reloaded=load(core,graph()).create_infer_request();require(backend_calls==4 && cache.size()==2);
++    fill(reloaded,11.f);check(reloaded,11.f,1.f);
++    auto hit=load(core,graph()).create_infer_request();require(backend_calls==4);
++    fill(hit,13.f);check(hit,13.f,1.f);
++    bool injected=false;
++    try{(void)cache.get(core,graph(3.f),backend,properties,"",[&]()->ov::CompiledModel{injected=true;throw std::runtime_error("injected compile failure");});}
++    catch(const std::runtime_error &e){require(std::strcmp(e.what(),"injected compile failure")==0);}
++    require(injected && cache.size()==0);
++    bool ran=false;rejected=false;
++    try{(void)cache.get(core,graph(),backend,properties,"",[&](){ran=true;return core.compile_model(graph(),backend,properties);});}
++    catch(const std::runtime_error &e){require(std::strcmp(e.what(),"compiled memory cache is poisoned")==0);rejected=true;}
++    require(rejected && !ran);
++    const auto stats=nr::provider::compile_statistics();
++    require(stats.memory_requests==7 && stats.memory_hits==2 && stats.memory_evictions==2);
++    std::printf("{\"execution_device\":\"%s\",\"passed\":true,\"verified_values\":%llu,\"backend_calls\":%llu,\"memory_hits\":%llu,\"evictions\":%llu,\"binding_identity_isolated\":true,\"properties_isolated\":true,\"independent_mutable_inputs\":true,\"creator_core_lifetime\":true,\"eviction_preserves_active_requests\":true,\"compile_failure_poisoned\":true}\n",backend.c_str(),static_cast<unsigned long long>(verified),static_cast<unsigned long long>(backend_calls),static_cast<unsigned long long>(stats.memory_hits),static_cast<unsigned long long>(stats.memory_evictions));
++    return 0;
++}catch(const std::exception &e){std::fprintf(stderr,"%s\n",e.what());return 1;}

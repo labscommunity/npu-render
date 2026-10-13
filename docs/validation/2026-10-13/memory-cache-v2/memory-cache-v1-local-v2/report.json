@@ -1,0 +1,54 @@
+{
+  "at": "2026-10-13T06:18:02.523950+00:00",
+  "passed": true,
+  "platform": "macOS arm64",
+  "openvino": "2026.1.0",
+  "digest_adapter": "OpenSSL SHA-256; Windows BCrypt unchanged",
+  "npu_execution_tested": false,
+  "tests": [
+    {
+      "test": "identity",
+      "passed": true,
+      "result": {
+        "sha256_known_answers": true,
+        "constant_permutation_isolated": true,
+        "generated_names_stable": true,
+        "source_model_unchanged": true,
+        "shape_and_binding_names_isolated": true,
+        "npu_execution_tested": false
+      },
+      "elapsed_ms": 365.1835420168936,
+      "binary_sha256": "f8a9a72446a9238bde31446959ace539880a9bc202f21544fe90b823d1986034"
+    },
+    {
+      "test": "memory",
+      "passed": true,
+      "result": {
+        "execution_device": "CPU",
+        "passed": true,
+        "verified_values": 2368,
+        "backend_calls": 4,
+        "memory_hits": 2,
+        "evictions": 2,
+        "binding_identity_isolated": true,
+        "properties_isolated": true,
+        "independent_mutable_inputs": true,
+        "creator_core_lifetime": true,
+        "eviction_preserves_active_requests": true,
+        "compile_failure_poisoned": true
+      },
+      "elapsed_ms": 228.24045782908797,
+      "binary_sha256": "b667e737c5684291816f4db424a298ba573aa8774263e936a68cdf9e6cae1ecb"
+    }
+  ],
+  "compile_header_syntax_passed": true,
+  "source_sha256": {
+    "memory-cache-v1-local-digest.cpp": "3537ad904bf4b716099222cc34dd6544150068050ddf575e0bba96405fc025af",
+    "memory-cache-v1/native/windows/registered_lab/provider_cache.hpp": "6300575a46f0b6421825acd70adb2cabcd059d51230a9dc460831ef41d03f334",
+    "memory-cache-v1/native/windows/registered_lab/provider_cache_test.cpp": "a8ac57f2e75fc6beda7c350e026e95f407d6a57773b391c29efadb545d3b1930",
+    "memory-cache-v1/native/windows/registered_lab/provider_compile.hpp": "1359411b9c76b40a910ab13736b62a25295f4fba0af24aa5f7828aeb946e47b3",
+    "memory-cache-v1/native/windows/registered_lab/provider_compile_statistics.hpp": "998f074a66ade02a5f026cd51ece9104ca26d892ccbd8d13d800ef202c65a00a",
+    "memory-cache-v1/native/windows/registered_lab/provider_memory_cache.hpp": "ea949da921ec52bfd95cab0311f95119650f0902b55472129ff5a1b508826c1b",
+    "memory-cache-v1/native/windows/registered_lab/provider_memory_cache_test.cpp": "f91eab8906b6ccea650cb3251ed8245e27e33400350d931c3d279e4af47aa83d"
+  }
+}

@@ -1,0 +1,9 @@
+--- a/native/windows/registered_lab/CMakeLists.txt
++++ b/native/windows/registered_lab/CMakeLists.txt
+@@ -245,3 +245,6 @@
+ target_link_libraries(nr_registered_provider_memory_cache_test PRIVATE nr_registered_provider_cache openvino::runtime)
+ set_property(TARGET nr_registered_provider_memory_cache_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+ add_test(NAME registered_provider_memory_cache_contract COMMAND nr_registered_provider_memory_cache_test)
++
++# The worker now includes provider_compile.hpp for failure invalidation.
++target_link_libraries(nr_registered_indexed_worker PRIVATE openvino::runtime)
