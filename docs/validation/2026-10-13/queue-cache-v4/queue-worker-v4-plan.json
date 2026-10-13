@@ -1,0 +1,27 @@
+{
+  "status": "build_cpu_property_and_small_npu_checks_passed",
+  "parent": "queue-worker-v3",
+  "only_new_change": "per-request setup+draw elapsed time and existing provider compile/disk-cache counters",
+  "renderer": "present-umd-v229",
+  "default_cache": [
+    8,
+    24,
+    4
+  ],
+  "expanded_opt_in_cache": [
+    16,
+    48,
+    4
+  ],
+  "queue_private_opt_in": true,
+  "desktop_use_qualified": false,
+  "performance_improvement_measured": false,
+  "clean_build": true,
+  "cpu_suites": 6,
+  "small_npu_checks_passed": true,
+  "first_full_replay": "stopped_at_request_112_due_to_transient_reply_access_denial_worker_112_successes_0_failures",
+  "retry_helper": "replay-ordered-trace-v4.py",
+  "full_replay_in_progress": "ordered-queue-v4b",
+  "full_replay_session": 94800,
+  "memory_observer_session": 11572
+}

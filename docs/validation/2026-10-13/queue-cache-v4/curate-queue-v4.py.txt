@@ -1,0 +1,78 @@
+from pathlib import Path
+import difflib, hashlib, json
+from datetime import datetime
+r=Path('results/render-driver');out=Path('docs/validation/2026-10-13/queue-cache-v4');assert not (out/'report.json').exists();out.mkdir(parents=True,exist_ok=True)
+def read(p):
+ b=p.read_bytes();return b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig')
+def obj(p):return json.loads(read(p))
+def rows(p):return [json.loads(x) for x in read(p).splitlines() if x.startswith('{')]
+def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+manifest=[]
+def save(p,n):
+ b=p.read_bytes();manifest.append(dict(source=p.relative_to(r).as_posix(),bytes=len(b),sha256=sha(p)))
+ assert p.name!='private-token.bin' and p.suffix not in ['.bin','.zip','.pixels']
+ if n.endswith('.py'):n+='.txt'
+ dest=out/n;dest.parent.mkdir(parents=True,exist_ok=True)
+ text='\n'.join(x.rstrip() for x in read(p).splitlines()).rstrip();dest.write_text(text+'\n' if text else '')
+remote=obj(r/'queue-v4-evidence-sha256.json')
+for x in remote:
+ p=r/x['name'];assert p.stat().st_size==x['bytes'] and sha(p)==x['sha256'].lower(),x['name'];save(p,x['name'])
+for n in ['queue-v4-evidence-sha256.json','queue-v4-evidence-files.json','queue-worker-v4-source.json','queue-worker-v4-plan.json','build-queue-worker-v4.ps1','qualify-queue-worker-v4-smoke.ps1','qualify-queue-worker-v4b-smoke.ps1','qualify-queue-worker-v4c-smoke.ps1','qualify-ordered-queue-v4.ps1','qualify-ordered-queue-v4b.ps1','qualify-ordered-queue-v4c.ps1','replay-ordered-trace-v3.py','replay-ordered-trace-v4.py','replay-ordered-trace-v5.py','test-ordered-helper-v5-windows.py','ordered-helper-v4-tests.json','watch-ordered-queue-v4b-memory.ps1','watch-ordered-queue-v4c-memory.ps1','analyze-pipeline-cache-v3.py','probe-fresh-point-v1.py','npu-queue-pool-research-v3.json']:
+ save(r/n,n)
+changes=[];patch=[]
+for n,h in obj(r/'queue-worker-v4-source.json').items():
+ rel=n.replace('\\','/');p=r/'queue-worker-v4'/rel;assert sha(p)==h.lower();base=Path(rel)
+ before=base.read_text() if base.exists() else ''
+ after=p.read_text()
+ if before!=after:
+  changes.append(rel);patch+=difflib.unified_diff(before.splitlines(True),after.splitlines(True),fromfile='a/'+rel if base.exists() else '/dev/null',tofile='b/'+rel)
+(out/'experiment.patch').write_text(''.join(patch))
+build=obj(r/'queue-worker-v4-build/registered-build-report.json');assert build['clean_build'] and build['relevant_cpu_contracts_passed']
+assert '100% tests passed out of 6' in read(r/'queue-worker-v4-CPU-contracts.log')
+assert obj(r/'ordered-helper-v5-tests/report.json')['passed']
+for name in ['queue-worker-v4-probe/report.json','queue-worker-v4-smoke-qualified.json','queue-worker-v4b-smoke-qualified.json','queue-worker-v4c-smoke-qualified.json']:assert obj(r/name)['all_checks_passed']
+summary=obj(r/'ordered-queue-v4c-summary.json');assert summary['completed'] and summary['all_three_exact']
+trace={x['name']:x for x in obj(r/'v120-trace-sha256.json')};reports={};cases=[]
+mem=rows(r/'ordered-queue-v4b-memory.jsonl')+rows(r/'ordered-queue-v4c-memory.jsonl')
+for case,name in zip(summary['cases'],['ordered-queue-v4b-baseline','ordered-queue-v4b-shared','ordered-queue-v4c-expanded']):
+ p=r/name/'report.json';q=obj(p);reports[case['variant']]=q
+ assert q['completed'] and q['passed'] and q['worker_exit_code']==0 and len(q['requests'])==q['saved_requests']==1438
+ assert q['worker_sha256']==build['binary_sha256']['nr_registered_indexed_worker.exe'].lower()
+ assert q['trace_manifest_sha256']==sha(r/'v120-trace-sha256.json')
+ log=rows(r/name/'worker.stdout.jsonl');passed=[x for x in log if x.get('passed')];finish=[x for x in log if x.get('worker_finished')]
+ assert len(passed)==1438 and len(finish)==1 and finish[0]['succeeded']==1438 and finish[0]['failed']==0
+ assert not read(r/name/'worker.stderr.log').strip()
+ for i,(a,b) in enumerate(zip(q['requests'],passed),1):
+  assert a['passed'] and a['execution_device']==b['execution_device']=='NPU' and a['ordinal']==b['sequence']==i
+  assert a['source_sha256']==trace[a['source']]['sha256'].lower()
+  assert a['receipt']['provider_requests']==b['provider_requests']
+  if 'covered_samples' in b:assert a['receipt']['covered_samples']==b['covered_samples']
+  if case['variant']!='baseline':
+   z=reports['baseline']['requests'][i-1]
+   assert (a['normalized_sha256'],a['pixels_sha256'],a['receipt'])==(z['normalized_sha256'],z['pixels_sha256'],z['receipt']) and a['reference_output_and_receipt_exact']
+ for key in ['draw_ms','compile_and_draw_ms','compile_calls']:
+  assert abs(sum(x[key] for x in passed)-case[key])<.01
+ assert sum(x['cache_hits'] for x in passed)==case['disk_cache_hits']
+ observed=[x for x in mem if x['pid']==q['worker_pid'] and q['started']<=x['at']<=q['finished']]
+ assert observed
+ cases.append(dict(case,evidence=name,provider_requests=sum(x['provider_requests'] for x in passed),maximum_observed_private_bytes=max(x['private_bytes'] for x in observed),maximum_observed_working_bytes=max(x['working_bytes'] for x in observed),memory_samples=len(observed),memory_monitor_covers_entire_run=False))
+failures=[]
+for name,expected in [('ordered-queue-v4-baseline',112),('ordered-queue-v4b-expanded',506)]:
+ q=obj(r/name/'report.json');assert q['completed'] and not q['passed'] and q['worker_exit_code']==0 and len(q['requests'])==expected
+ log=rows(r/name/'worker.stdout.jsonl');passed=[x for x in log if x.get('passed')];finish=[x for x in log if x.get('worker_finished')];assert len(passed)==expected and finish[0]['failed']==0
+ failures.append(dict(evidence=name,verified_replies=sum(x['passed'] for x in q['requests']),successful_worker_requests=len(passed),worker_exit_code=0,error=q['error'],renderer_failure=False))
+probe=obj(r/'point-crop-reentry-v1/report.json');assert len(probe['cases'])==3
+for c in probe['cases']:assert c['passed'] and c['pixels_exact'] and c['fresh_receipt']['provider_requests']==3 and c['original_receipt']['provider_requests']==1538
+b=cases[0];e=cases[2]
+report=dict(build='queue-worker-v4',source_base_commit='233d03880981cc7309a4cd27c163acc6ce36a8b1',changed_files=changes,all_1438_ordered_requests_exact_across_three_modes=True,cases=cases,expanded_wall_time_reduction_percent=100*(1-e['elapsed_ms']/b['elapsed_ms']),expanded_setup_call_reduction_percent=100*(1-e['compile_calls']/b['compile_calls']),comparison_order_controlled=False,repeated_comparison=False,performance_causality_established=False,private_property='NPU_SHARED_COMMON_QUEUE',private_api_version_pinned='2026.4.1-22982-e213a147257-releases/2026/4',hardware_queue_count_measured=False,harness_failures_preserved=failures,windows_file_share_retry_test_passed=True,crop_reentry_hypothesis_confirmed_for_three_draws=True,crop_fix_implemented_in_this_build=False,default_renderer_policy_changed=False,desktop_qualification=False,physical_desktop_offloaded=False,tahoma_benefit_measured=False,limitations=[
+'Wall times include request/reply files, polling and report persistence, not just NPU execution. Setup-plus-draw counters use a coarse host clock. Concurrent compilation/inference was not introduced.',
+'All measured model setup calls report disk-cache hits. Keeping more live pipelines avoids repeated model setup despite disk-cache hits. This is a first comparison in a fixed order; warming, thermal state and order effects have not been isolated.',
+'Shared queue alone changes total time by approximately 1.65 percent. Do not infer a useful gain or a hardware queue count from the private property. Expanded mode also uses the shared queue property.',
+'The trace is the exact prior six-interaction VM desktop workload. Equivalent pixels and receipts against the prior NPU run are regression evidence; independent CPU/device oracles remain separate. No new live desktop or Tahoma performance result is established.',
+'Two controller failures come from Windows file sharing, while the worker successfully finishes the current request. The new helper bounds retries on real temporary sharing violations and does not retry unrelated failures.',
+'Fresh executors admit three later point-copy draws in three NPU calls instead of 1538, with identical complete output pixels. This confirms stale general-path selection for those draws; it is not a controlled latency comparison or a qualified fix.'
+])
+(out/'report.json').write_text(json.dumps(report,indent=2)+'\n');(out/'raw-manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
+save(r/'curate-queue-v4.py','curate-queue-v4.py.txt')
+(out/'raw-manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
+print('Verified and curated',len(manifest),'files;',report['expanded_wall_time_reduction_percent'],'percent first-pass elapsed reduction')

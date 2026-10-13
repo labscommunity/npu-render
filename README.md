@@ -227,6 +227,15 @@ remain unfinished. The [post-review](docs/validation/2026-10-13/sole-display-v12
 records two guest draw rejections during adapter removal after the visual checks,
 and separates relay/transport timing from rendering measurements.
 
+The [ordered workload comparison](docs/validation/2026-10-13/queue-cache-v4/README.md)
+replays all 1,438 requests with identical NPU pixels and execution receipts.
+Retaining more live pipelines reduces elapsed time from 888.312 to 641.906 seconds
+in the first comparison and model setup calls from 3,611 to 1,711. All setups
+report disk-cache hits. Run order and warming effects remain uncontrolled; this
+does not establish a live desktop or Tahoma speedup. The changes remain isolated
+experiments. Three fresh-executor probes also confirm a missed fast path for
+later full-screen copies, motivating a separate rendering fix.
+
 The v116 live draws expand into 26,995 provider calls. Their reported execution
 intervals total 138 seconds, versus 329 seconds including pipeline setup and
 other wrapper work. Of 1,921 model setup calls, 1,915 are disk-cache hits.

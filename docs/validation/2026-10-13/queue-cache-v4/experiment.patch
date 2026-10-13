@@ -1,0 +1,277 @@
+--- a/native/windows/registered_lab/CMakeLists.txt
++++ b/native/windows/registered_lab/CMakeLists.txt
+@@ -231,3 +231,10 @@
+ target_compile_options(nr_registered_provider_cache_test PRIVATE /W4 /WX)
+ set_property(TARGET nr_registered_provider_cache_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+ add_test(NAME registered_provider_cache_contract COMMAND nr_registered_provider_cache_test)
++
++# Isolated runtime-property qualification; not part of the production package.
++add_executable(nr_private_queue_probe private_queue_probe.cpp)
++target_compile_features(nr_private_queue_probe PRIVATE cxx_std_17)
++target_compile_options(nr_private_queue_probe PRIVATE /W4 /WX)
++target_link_libraries(nr_private_queue_probe PRIVATE openvino::runtime nr_registered_provider_cache)
++set_property(TARGET nr_private_queue_probe PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+--- a/native/windows/registered_lab/indexed_exchange_worker.cpp
++++ b/native/windows/registered_lab/indexed_exchange_worker.cpp
+@@ -1,6 +1,7 @@
+ // Finite physical-NPU filesystem worker. Its controller uses authenticated WinRM.
+ #define NOMINMAX
+ #include "indexed_pipeline.hpp"
++#include "provider_compile_statistics.hpp"
+ #include "lab_exchange_io.hpp"
+ #include <cstdio>
+ #include <set>
+@@ -26,10 +27,14 @@
+     ex::require(end != argv[2] && !*end && limit && limit <= ex::max_requests);
+     const auto attributes = GetFileAttributesW(directory.c_str());
+     ex::require(attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) && !(attributes & FILE_ATTRIBUTE_REPARSE_POINT));
++    uint32_t maximum_seconds=300;wchar_t seconds_value[16]{};
++    const auto seconds_size=GetEnvironmentVariableW(L"NR_RENDER_REPLAY_SECONDS",seconds_value,16);
++    if(seconds_size){wchar_t *seconds_end=nullptr;const auto value=std::wcstoul(seconds_value,&seconds_end,10);
++        ex::require(seconds_size<16 && seconds_end!=seconds_value && !*seconds_end && value>=60 && value<=1800);maximum_seconds=uint32_t(value);}
+     const auto started = GetTickCount64(); std::set<std::wstring> handled;
+     auto pipeline=std::make_unique<ex::Pipeline>();
+     uint32_t succeeded = 0, failed = 0;
+-    while (handled.size() < limit && GetTickCount64() - started < 300000 && GetFileAttributesW((directory + L"\\stop").c_str()) == INVALID_FILE_ATTRIBUTES) {
++    while (handled.size() < limit && GetTickCount64() - started < uint64_t(maximum_seconds)*1000 && GetFileAttributesW((directory + L"\\stop").c_str()) == INVALID_FILE_ATTRIBUTES) {
+         WIN32_FIND_DATAW found{}; HANDLE search = FindFirstFileW((directory + L"\\request-*.bin").c_str(), &found);
+         if (search == INVALID_HANDLE_VALUE) {
+             if (GetLastError() != ERROR_FILE_NOT_FOUND) throw std::runtime_error("worker directory search failed");
+@@ -53,11 +58,15 @@
+                 std::memcpy(&header, bytes.data(), sizeof(header));
+                 ex::require(ex::request_valid(header, bytes.size()) && packet_name(header, false) == name); identified = true;
+                 const auto request = ex::decode(bytes); const auto &h = request.header;
++                const auto began=GetTickCount64(); const auto before=nr::provider::compile_statistics();
+                 const auto result=pipeline->execute(request);
++                const auto elapsed=GetTickCount64()-began; const auto after=nr::provider::compile_statistics();
+                 publish(directory + L"\\" + packet_name(h, true), ex::response(h, result)); ++succeeded;
+-                std::printf("{\"client_pid\":%u,\"sequence\":%u,\"execution_device\":\"%s\",\"operation\":\"%s\",\"width\":%u,\"height\":%u,\"provider_requests\":%llu,\"draw_ms\":%.3f,\"passed\":true,\"displayed_frames\":0}\n",
++                std::printf("{\"client_pid\":%u,\"sequence\":%u,\"execution_device\":\"%s\",\"operation\":\"%s\",\"width\":%u,\"height\":%u,\"provider_requests\":%llu,\"draw_ms\":%.3f,\"compile_and_draw_ms\":%llu,\"compile_calls\":%llu,\"cache_requests\":%llu,\"cache_hits\":%llu,\"cache_status_unavailable\":%llu,\"passed\":true,\"displayed_frames\":0}\n",
+                     h.client_pid, h.sequence, result.execution_device.c_str(), ex::color_clear(h)?"color_clear":"draw", h.width, h.height,
+-                    static_cast<unsigned long long>(result.provider_requests), result.timings.total_ms); std::fflush(stdout);
++                    static_cast<unsigned long long>(result.provider_requests), result.timings.total_ms, static_cast<unsigned long long>(elapsed),
++                    static_cast<unsigned long long>(after.calls-before.calls), static_cast<unsigned long long>(after.cache_requests-before.cache_requests),
++                    static_cast<unsigned long long>(after.cache_hits-before.cache_hits), static_cast<unsigned long long>(after.cache_status_unavailable-before.cache_status_unavailable)); std::fflush(stdout);
+             } catch (const std::exception &error) {
+                 ++failed; pipeline=std::make_unique<ex::Pipeline>(); std::fprintf(stderr, "indexed NPU request failed: %.32000s\n", error.what()); std::fflush(stderr);
+                 if (identified) {
+--- a/native/windows/registered_lab/indexed_pipeline.hpp
++++ b/native/windows/registered_lab/indexed_pipeline.hpp
+@@ -1,6 +1,8 @@
+ #pragma once
+ #include "indexed_exchange_protocol.hpp"
+ #include "clear_executor.hpp"
++#include <cstdlib>
++#include <cstdio>
+ namespace nr::registered_lab::indexed_exchange {
+ class Pipeline {
+     static uint32_t vertex_capacity(uint32_t count) {
+@@ -11,6 +13,7 @@
+     }
+     struct ClearEntry {uint32_t width,height,format;std::unique_ptr<raster::ClearExecutor> executor;};
+     std::vector<ClearEntry> clear_cache;
++    uint32_t uniform_limit=8,triangle_limit=24;
+     struct UniformEntry {
+         Header header;
+         std::vector<uint32_t> vertex, pixel;
+@@ -31,6 +34,19 @@
+     };
+     std::vector<TriangleEntry> triangle_cache;
+ public:
++    Pipeline(){
++        char *value=nullptr;size_t length=0;
++        if(_dupenv_s(&value,&length,"NR_RENDER_PIPELINE_CACHE"))throw std::runtime_error("cannot read pipeline cache experiment");
++        std::unique_ptr<char,decltype(&std::free)> owner(value,&std::free);
++        if(value && *value){
++            if(std::strcmp(value,"expanded"))throw std::invalid_argument("pipeline cache experiment requires expanded");
++            uniform_limit=16;triangle_limit=48;
++        }
++        std::printf("{\"kind\":\"pipeline_cache_policy\",\"uniform_capacity\":%u,\"triangle_capacity\":%u,\"clear_capacity\":4,\"replacement\":\"FIFO\",\"hardware_queue_count_measured\":false}\n",uniform_limit,triangle_limit);std::fflush(stdout);
++    }
++    std::array<size_t,5> retained_pipeline_counts() const {
++        return {uniform_cache.size(),triangle_cache.size(),clear_cache.size(),texture_executor?1u:0u,linear_executor?1u:0u};
++    }
+     raster::UniformDrawExecutor::Result execute(const Request &request) {
+         if(color_clear(request.header)){
+             const auto &h=request.header;require(shape_valid(h));
+@@ -64,7 +80,7 @@
+             // encountered command-queue creation failures. This is a bounded
+             // policy, not a claim about the driver's hardware queue limit.
+             // Evict before constructing a successor for the qualified NPU driver.
+-            if(triangle_cache.size()==24)triangle_cache.erase(triangle_cache.begin());
++            if(triangle_cache.size()==triangle_limit)triangle_cache.erase(triangle_cache.begin());
+             auto candidate=std::make_unique<raster::TriangleTextureDrawExecutor>(request.vertex,request.pixel,capacity,h.width,h.height,h.format,
+                 resources,samplers,"NPU",blend_mode(h),uint8_t((h.flags>>8)&15),static_cast<raster::CullMode>((h.flags>>5)&3),(h.flags&128)!=0,batch);
+             auto result=candidate->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,resources,request.background,request.scissor,request.blend_constant);
+@@ -113,7 +129,7 @@
+         // Complete eviction before constructing a new NPU model. Releasing an
+         // old entry after creating its successor triggers a device-loss failure
+         // with the qualified 5540 runtime during mixed desktop draws.
+-        if(uniform_cache.size()==8)uniform_cache.erase(uniform_cache.begin());
++        if(uniform_cache.size()==uniform_limit)uniform_cache.erase(uniform_cache.begin());
+         const auto batch=raster::UniformDrawExecutor::raster_batch(h.width,h.height);
+         auto candidate=std::make_unique<raster::UniformDrawExecutor>(request.vertex,request.pixel,h.vertices,h.width,h.height,
+             "NPU",blend_mode(h),h.format==87,uint8_t((h.flags>>8)&15),batch,static_cast<raster::CullMode>((h.flags>>5)&3),(h.flags&128)!=0);
+--- a/native/windows/registered_lab/indexed_stream_worker.cpp
++++ b/native/windows/registered_lab/indexed_stream_worker.cpp
+@@ -9,7 +9,11 @@
+     wchar_t *end = nullptr; const auto limit = std::wcstoul(argv[2], &end, 10);
+     ex::require(end != argv[2] && !*end && limit && limit <= ex::max_requests);
+     stream::Winsock startup; stream::Socket socket(::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)); stream::nonblocking(socket.value);
+-    const auto deadline = GetTickCount64() + 600000;
++    uint32_t maximum_seconds=600;wchar_t seconds_value[16]{};
++    const auto seconds_size=GetEnvironmentVariableW(L"NR_RENDER_STREAM_SECONDS",seconds_value,16);
++    if(seconds_size){wchar_t *seconds_end=nullptr;const auto value=std::wcstoul(seconds_value,&seconds_end,10);
++        ex::require(seconds_size<16 && seconds_end!=seconds_value && !*seconds_end && value>=60 && value<=1800);maximum_seconds=uint32_t(value);}
++    const auto deadline = GetTickCount64() + uint64_t(maximum_seconds)*1000;
+     sockaddr_in address{}; address.sin_family = AF_INET; address.sin_port = htons(49406); address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+     if (connect(socket.value, reinterpret_cast<sockaddr *>(&address), sizeof(address)) == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK)
+         throw std::runtime_error("indexed loopback connect failed");
+@@ -17,22 +21,37 @@
+     int error = 0, size = sizeof(error);
+     if (getsockopt(socket.value, SOL_SOCKET, SO_ERROR, reinterpret_cast<char *>(&error), &size) || error) throw std::runtime_error("indexed loopback connection refused");
+     stream::authenticate(socket.value, stream::secret(argv[1]), false, GetTickCount64() + 15000);
+-    ex::Pipeline pipeline;uint32_t captured=0;
++    ex::Pipeline pipeline;uint32_t captured=0;uint64_t trace_bytes=0;bool trace_prefix_open=true;
++    char trace_flag[2]{};const bool trace_enabled=GetEnvironmentVariableA("NR_RENDER_TRACE_REQUESTS",trace_flag,2)==1 && trace_flag[0]=='1';
+     for (uint32_t count = 0; count < limit && GetTickCount64() < deadline; ++count) {
+         const auto bytes = stream::socket_read(socket.value, deadline); ex::Header h{};
+         std::memcpy(&h, bytes.data(), sizeof(h)); ex::require(ex::request_valid(h, bytes.size()));
++        bool stop_after_reply=false;
++        if(trace_enabled){
++            bool saved=false;
++            if(trace_prefix_open && trace_bytes+bytes.size()<=8ull*1024*1024*1024){
++                try {
++                    const std::wstring token_path=argv[1];const auto separator=token_path.find_last_of(L"\\/");ex::require(separator!=std::wstring::npos);
++                    wchar_t name[64]{};swprintf_s(name,L"trace-request-%04u.bin",count+1);
++                    nr::registered_lab::exchange::File capture(token_path.substr(0,separator+1)+name,true);capture.write(bytes.data(),DWORD(bytes.size()));capture.flush();saved=true;trace_bytes+=bytes.size();
++                } catch(const std::exception &capture_error){std::fprintf(stderr,"request trace failed: %.1024s\n",capture_error.what());}
++            }
++            if(!saved)trace_prefix_open=false;
++            const auto retained=pipeline.retained_pipeline_counts();
++            std::printf("{\"kind\":\"request_started\",\"ordinal\":%u,\"client_pid\":%u,\"sequence\":%u,\"bytes\":%zu,\"saved\":%s,\"trace_bytes\":%llu,\"trace_prefix_open\":%s,\"uniform_pipelines\":%zu,\"triangle_pipelines\":%zu,\"clear_pipelines\":%zu,\"point_pipeline\":%zu,\"linear_pipeline\":%zu,\"hardware_queue_count_measured\":false}\n",count+1,h.client_pid,h.sequence,bytes.size(),saved?"true":"false",static_cast<unsigned long long>(trace_bytes),trace_prefix_open?"true":"false",retained[0],retained[1],retained[2],retained[3],retained[4]);std::fflush(stdout);std::fflush(stderr);
++        }
+         std::vector<uint8_t> reply;const auto draw_started=GetTickCount64();const auto cache_before=nr::provider::compile_statistics();
+         try {
+             const auto request = ex::decode(bytes); const auto start = GetTickCount64();
+             const auto result = pipeline.execute(request); reply = ex::response(h, result);
+-            std::printf("{\"sequence\":%u,\"client_pid\":%u,\"execution_device\":\"%s\",\"operation\":\"%s\",\"width\":%u,\"height\":%u,\"textured\":%s,\"vertices\":%u,\"triangle_batch\":%u,\"provider_requests\":%llu,\"covered_samples\":%llu,\"tile_executions\":%llu,\"draw_ms\":%.3f,\"compile_and_draw_ms\":%llu,\"displayed_frames\":0,\"passed\":true}\n", h.sequence, h.client_pid, result.execution_device.c_str(), ex::color_clear(h)?"color_clear":"draw", h.width, h.height, (h.flags & 2) ? "true" : "false",h.vertices,(h.flags&0x3000)?ex::triangle_batch(request,nr::shader::RegisterExecutor::preferred_raster_batch(request.pixel)):0u,
++            std::printf("{\"ordinal\":%u,\"sequence\":%u,\"client_pid\":%u,\"execution_device\":\"%s\",\"operation\":\"%s\",\"width\":%u,\"height\":%u,\"textured\":%s,\"vertices\":%u,\"triangle_batch\":%u,\"provider_requests\":%llu,\"covered_samples\":%llu,\"tile_executions\":%llu,\"draw_ms\":%.3f,\"compile_and_draw_ms\":%llu,\"displayed_frames\":0,\"passed\":true}\n", count+1, h.sequence, h.client_pid, result.execution_device.c_str(), ex::color_clear(h)?"color_clear":"draw", h.width, h.height, (h.flags & 2) ? "true" : "false",h.vertices,(h.flags&0x3000)?ex::triangle_batch(request,nr::shader::RegisterExecutor::preferred_raster_batch(request.pixel)):0u,
+                 static_cast<unsigned long long>(result.provider_requests),static_cast<unsigned long long>(result.covered_samples),static_cast<unsigned long long>(result.tile_executions), result.timings.total_ms, static_cast<unsigned long long>(GetTickCount64() - start));
+         } catch (const std::exception &e) {
+             std::fprintf(stderr, "indexed stream draw rejected: %.32000s\n", e.what());
+             auto failed = h; failed.kind = 3; failed.body_bytes = 0; failed.device = 0; ex::Writer writer; writer.value(failed); reply = writer.finish();
+             // Unsupported draw state must not discard already qualified models.
+-            // Provider/runtime failures reset the cache before another request.
+-            if (!dynamic_cast<const std::invalid_argument *>(&e)) pipeline = ex::Pipeline{};
++            // Stop after returning failure when the provider/runtime has failed.
++            if (!dynamic_cast<const std::invalid_argument *>(&e)) stop_after_reply=true;
+         }
+         // Preserve a bounded sample of real slow draws for offline diagnosis.
+         // Files contain only public draw-packet data, never the stream secret.
+@@ -51,6 +70,7 @@
+             h.client_pid,h.sequence,static_cast<unsigned long long>(cache_after.calls-cache_before.calls),static_cast<unsigned long long>(cache_after.cache_requests-cache_before.cache_requests),
+             static_cast<unsigned long long>(cache_after.cache_hits-cache_before.cache_hits),static_cast<unsigned long long>(cache_after.cache_status_unavailable-cache_before.cache_status_unavailable));
+         std::fflush(stdout); std::fflush(stderr); stream::socket_write(socket.value, reply, (std::min)(deadline, GetTickCount64() + 90000));
++        if(stop_after_reply)throw std::runtime_error("provider failure; no further NPU requests attempted");
+     }
+     return 0;
+ } catch (const std::exception &e) { std::fprintf(stderr, "%s\n", e.what()); return 1; }
+--- /dev/null
++++ b/native/windows/registered_lab/private_queue_probe.cpp
+@@ -0,0 +1,37 @@
++#include "provider_compile.hpp"
++#include <openvino/opsets/opset13.hpp>
++#include <cstdio>
++#include <vector>
++int main()try{
++    namespace op=ov::opset13;
++    const auto shared=nr::provider::shared_queue_experiment();
++    if(!shared)throw std::invalid_argument("explicit experiment setting required");
++    std::vector<std::unique_ptr<ov::Core>> cores;
++    std::vector<ov::CompiledModel> models;
++    for(size_t i=0;i<3;++i){
++        auto core=std::make_unique<ov::Core>();
++        const size_t rows=4u<<i;
++        auto input=std::make_shared<op::Parameter>(ov::element::f32,ov::Shape{rows,4});
++        const std::vector<float> weights{0,0,1,0, 0,1,0,0, 1,0,0,0, 0,0,0,1};
++        auto matrix=op::Constant::create(ov::element::f32,ov::Shape{4,4},weights);
++        auto output=std::make_shared<op::MatMul>(input,matrix,false,false);
++        auto model=std::make_shared<ov::Model>(ov::OutputVector{output},ov::ParameterVector{input});
++        models.push_back(nr::provider::compile_model(*core,model,"NPU",{}));cores.push_back(std::move(core));
++        const auto devices=models.back().get_property(ov::execution_devices);
++        if(devices.size()!=1 || devices[0].find("NPU")==std::string::npos)throw std::runtime_error("NPU execution required");
++    }
++    size_t checked=0;
++    for(size_t repeat=0;repeat<3;++repeat)for(size_t i=0;i<models.size();++i){
++        auto request=models[i].create_infer_request();auto in=request.get_input_tensor();auto values=in.data<float>();
++        const size_t rows=4u<<i;
++        for(size_t row=0;row<rows;++row)for(size_t c=0;c<4;++c)values[row*4+c]=float(row*4+c+repeat*128)/4;
++        request.infer();const auto out=request.get_output_tensor();const auto actual=out.data<const float>();
++        for(size_t row=0;row<rows;++row)for(size_t c=0;c<4;++c){
++            const auto source=c==0?2:c==2?0:c;
++            if(actual[row*4+c]!=values[row*4+source])throw std::runtime_error("permutation pixel contract mismatch");
++            ++checked;
++        }
++    }
++    std::printf("{\"passed\":true,\"execution_device\":\"NPU\",\"private_shared_queue\":%s,\"simultaneously_retained_models\":3,\"separate_core_objects\":3,\"checked_values\":%zu,\"hardware_queue_count_measured\":false}\n",*shared?"true":"false",checked);
++    return 0;
++}catch(const std::exception &e){std::fprintf(stderr,"%s\n",e.what());return 1;}
+--- a/native/windows/registered_lab/provider_compile.hpp
++++ b/native/windows/registered_lab/provider_compile.hpp
+@@ -7,6 +7,10 @@
+ #include <filesystem>
+ #include <memory>
+ #include <stdexcept>
++#include <optional>
++#include <atomic>
++#include <cstdio>
++#include <cstring>
+ namespace nr::provider {
+ inline std::string model_cache_directory(){
+ #ifdef _MSC_VER
+@@ -17,6 +21,22 @@
+     const char *value=std::getenv("NR_RENDER_NPU_CACHE");
+ #endif
+     return value?std::string(value):std::string{};
++}
++// Isolated experiment only. Private API is restricted to the exact runtime
++// whose primary source and installed default were inspected.
++inline std::optional<bool> shared_queue_experiment(){
++#ifdef _MSC_VER
++    char *value=nullptr;size_t length=0;
++    if(_dupenv_s(&value,&length,"NR_RENDER_SHARED_QUEUE"))throw std::runtime_error("cannot read shared queue experiment");
++    const std::unique_ptr<char,decltype(&std::free)> owner(value,&std::free);
++#else
++    const char *value=std::getenv("NR_RENDER_SHARED_QUEUE");
++#endif
++    if(!value || !*value)return std::nullopt;
++    if(std::strcmp(value,"0") && std::strcmp(value,"1"))throw std::invalid_argument("shared queue experiment requires 0 or 1");
++    if(std::strcmp(ov::get_openvino_version().buildNumber,"2026.4.1-22982-e213a147257-releases/2026/4"))
++        throw std::invalid_argument("shared queue experiment requires the pinned qualified runtime");
++    return value[0]=='1';
+ }
+ inline ov::CompiledModel compile_model(ov::Core &core,const std::shared_ptr<ov::Model> &model,
+     const std::string &backend,const ov::AnyMap &properties){
+@@ -29,7 +49,20 @@
+         // and compilation properties; frame pixels remain runtime inputs.
+         core.set_property(ov::cache_dir(isolated_cache_directory(path,model).string()));++cache_requests;
+     }
+-    auto compiled=core.compile_model(model,backend,properties);
++    auto configured=properties;
++    if(backend=="NPU")if(const auto shared=shared_queue_experiment()){
++        const ov::AnyMap queue_properties{{"NPU_SHARED_COMMON_QUEUE",*shared}};
++        core.set_property("NPU",queue_properties);
++        if(core.get_property("NPU","NPU_SHARED_COMMON_QUEUE").as<bool>()!=*shared)
++            throw std::runtime_error("shared queue property verification failed");
++        configured["NPU_SHARED_COMMON_QUEUE"]=*shared;
++        static std::atomic<bool> logged{false};
++        if(!logged.exchange(true)){
++            std::printf("{\"kind\":\"private_shared_queue_experiment\",\"enabled\":%s,\"property_readback_verified\":true,\"hardware_queue_count_measured\":false}\n",*shared?"true":"false");
++            std::fflush(stdout);
++        }
++    }
++    auto compiled=core.compile_model(model,backend,configured);
+     if(!directory.empty()){
+         try{if(compiled.get_property(ov::loaded_from_cache))++cache_hits;}
+         catch(const ov::Exception &){++cache_status_unavailable;}

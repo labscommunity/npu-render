@@ -1,0 +1,53 @@
+"""Compare fresh point-texture instances against the full ordered replay.
+
+This tests crop admission. It is not a desktop trial or an independent CPU oracle.
+"""
+import argparse,hashlib,json,os,struct,subprocess,time
+from pathlib import Path
+from datetime import datetime,UTC
+H=struct.Struct('<3Q14I');R=struct.Struct('<5Q2I')
+def sha(b):return hashlib.sha256(b).hexdigest()
+def obj(p):
+ b=p.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+def read_reply(p,deadline):
+ while True:
+  try:return p.read_bytes()
+  except PermissionError:
+   if time.monotonic()>=deadline:raise
+   time.sleep(.01)
+def main():
+ p=argparse.ArgumentParser();p.add_argument('--root',type=Path,required=True);a=p.parse_args();r=a.root
+ base=obj(r/'vm/ordered-queue-v4b-baseline/report.json');summary=obj(r/'vm/ordered-queue-v4c-summary.json')
+ assert base['completed'] and base['passed'] and base['saved_requests']==1438 and summary['completed']
+ out=r/'vm/point-crop-reentry-v1';out.mkdir(exist_ok=False)
+ worker=r/'builds/queue-worker-v4/Release/nr_registered_indexed_worker.exe';build=obj(worker.parent.parent/'registered-build-report.json');assert sha(worker.read_bytes())==build['binary_sha256'][worker.name].lower()
+ manifest={x['ordinal']:x for x in obj(r/'vm/v120-trace-sha256.json')}
+ env=os.environ.copy();env['PATH']=str(r/'toolchains/openvino-2026.4.1/Lib/site-packages/openvino/libs')+os.pathsep+env.get('PATH','');env['NR_RENDER_NPU_CACHE']=str(r/'vm/model-cache-2026-4-v209');env['NR_RENDER_REPLAY_SECONDS']='90';env.pop('NR_RENDER_SHARED_QUEUE',None);env.pop('NR_RENDER_PIPELINE_CACHE',None)
+ report={'started':datetime.now(UTC).isoformat(),'worker_sha256':sha(worker.read_bytes()),'hypothesis':'A previously rejected crop forces later compatible point-texture draws to remain on the general path. A fresh instance could admit those later draws.','independent_cpu_oracle':False,'desktop_use_tested':False,'cases':[],'completed':False,'passed':False}
+ def persist(): (out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+ try:
+  for ordinal in (1326,1370,1432):
+   ref=base['requests'][ordinal-1];source=r/'vm/indexed-dwm-stream-v120'/manifest[ordinal]['name'];b=source.read_bytes();h=list(H.unpack_from(b));assert sha(b)==manifest[ordinal]['sha256'].lower()==ref['source_sha256']
+   row={'original_ordinal':ordinal,'source_sha256':sha(b),'abi':h[3],'flags':h[8],'original_receipt':ref['receipt'],'passed':False};report['cases'].append(row);persist()
+   if h[3]!=2 or h[8]!=0xf02:row.update(skipped=True,reason='Captured draw is not on the point-crop path');persist();continue
+   directory=out/str(ordinal);directory.mkdir();h[1]=0x7472616365763031;h[2]=ordinal;h[11]=ordinal;h[13]=42;b=H.pack(*h)+b[80:];assert sha(b)==ref['normalized_sha256']
+   suffix=f'-42-{h[1]:016x}{h[2]:016x}-{ordinal}.bin';(directory/('request'+suffix)).write_bytes(b)
+   began=time.monotonic()
+   with (directory/'worker.stdout.jsonl').open('xb') as stdout,(directory/'worker.stderr.log').open('xb') as stderr:
+    proc=subprocess.Popen([str(worker),str(directory),'1'],stdout=stdout,stderr=stderr,env=env)
+    try:
+     proc.wait(timeout=90);assert proc.returncode==0
+     data=read_reply(directory/('reply'+suffix),time.monotonic()+5);rh=list(H.unpack_from(data))
+     assert all(rh[i]==h[i] for i in range(17) if i not in (12,14,15));assert rh[14:17]==[2,3,0] and len(data)==128+h[4]*h[5]*4 and rh[12]==len(data)-80
+     receipt=dict(zip(['input_bytes','output_bytes','provider_requests','covered_samples','tile_executions','used_rectangle','reserved'],R.unpack_from(data,80)))
+     assert receipt['covered_samples']==ref['receipt']['covered_samples'] and receipt['reserved']==0 and sha(data[128:])==ref['pixels_sha256']
+     row.update(passed=True,elapsed_ms=(time.monotonic()-began)*1000,fresh_receipt=receipt,pixels_sha256=sha(data[128:]),pixels_exact=True,crop_admitted=receipt['used_rectangle']==1,execution_device='NPU')
+    finally:
+     if proc.poll() is None:proc.kill();proc.wait(timeout=5)
+   persist()
+  report['passed']=all(x.get('passed') or x.get('skipped') for x in report['cases'])
+ except Exception as e:report['error']=str(e)
+ finally:report['completed']=True;report['finished']=datetime.now(UTC).isoformat();persist()
+ print(json.dumps(report),flush=True)
+ if not report['passed']:raise SystemExit(1)
+if __name__=='__main__':main()

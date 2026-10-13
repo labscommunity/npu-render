@@ -1,0 +1,39 @@
+{
+    "completed":  true,
+    "all_three_exact":  true,
+    "request_count_per_variant":  1438,
+    "cases":  [
+                  {
+                      "variant":  "baseline",
+                      "elapsed_ms":  888312.0000000054,
+                      "draw_ms":  325586.41499999986,
+                      "compile_and_draw_ms":  728692,
+                      "compile_calls":  3611,
+                      "disk_cache_hits":  3611,
+                      "passed":  true
+                  },
+                  {
+                      "variant":  "shared",
+                      "elapsed_ms":  873656.0000000027,
+                      "draw_ms":  319629.89499999961,
+                      "compile_and_draw_ms":  712837,
+                      "compile_calls":  3611,
+                      "disk_cache_hits":  3611,
+                      "passed":  true
+                  },
+                  {
+                      "variant":  "expanded",
+                      "elapsed_ms":  641906.0000000027,
+                      "draw_ms":  301571.39900000015,
+                      "compile_and_draw_ms":  482117,
+                      "compile_calls":  1711,
+                      "disk_cache_hits":  1711,
+                      "passed":  true
+                  }
+              ],
+    "first_pass_order":  "baseline, shared, expanded interrupted by report publication denial, expanded retried with bounded publication retries",
+    "warming_and_order_effects_controlled":  false,
+    "desktop_use_qualified":  false,
+    "hardware_queue_count_measured":  false,
+    "tahoma_performance_tested":  false
+}

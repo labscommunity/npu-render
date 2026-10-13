@@ -1,0 +1,127 @@
+"""Replay the saved prefix in one NPU worker, publishing one request at a time."""
+import argparse, hashlib, json, os, struct, subprocess, time
+from datetime import UTC, datetime
+from pathlib import Path
+
+HEADER = struct.Struct('<3Q14I')
+RECEIPT = struct.Struct('<5Q2I')
+MAGIC = 0x4E525F4452415731
+
+def sha(data):
+    return hashlib.sha256(data).hexdigest()
+
+def retry_access(operation, deadline=None):
+    """Bound temporary Windows access denials; propagate every other failure."""
+    until=time.monotonic()+5.0
+    if deadline is not None:until=min(until,deadline)
+    retries=0
+    while True:
+        try:return operation(),retries
+        except PermissionError:
+            retries+=1
+            if time.monotonic()>=until:raise
+            time.sleep(min(.01,max(0.,until-time.monotonic())))
+
+def read_published_reply(path, deadline):
+    return retry_access(path.read_bytes,deadline)
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--trace', type=Path, required=True)
+    parser.add_argument('--worker', type=Path, required=True)
+    parser.add_argument('--runtime', type=Path, required=True)
+    parser.add_argument('--cache', type=Path, required=True)
+    parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--limit', type=int, default=4096)
+    parser.add_argument('--seconds', type=int, default=300)
+    parser.add_argument('--shared-queue', choices=['0','1'])
+    parser.add_argument('--pipeline-cache', choices=['expanded'])
+    parser.add_argument('--reference', type=Path)
+    parser.add_argument('--trace-manifest', type=Path)
+    args = parser.parse_args()
+    assert 1 <= args.limit <= 4096 and 60 <= args.seconds <= 1800 and args.worker.is_file() and args.runtime.is_dir()
+    files = sorted(args.trace.glob('trace-request-*.bin'))[:args.limit]
+    assert files and len(files) <= 4096
+    starts = [json.loads(line) for line in (args.trace/'worker.stdout.jsonl').read_text(encoding='utf-8-sig').splitlines() if line.startswith('{')]
+    starts = [r for r in starts if r.get('kind') == 'request_started']
+    by_ordinal = {r['ordinal']:r for r in starts}
+    for i,p in enumerate(files,1):
+        assert p.name == f'trace-request-{i:04d}.bin' and by_ordinal[i]['saved']
+        assert p.stat().st_size == by_ordinal[i]['bytes']
+    def read_json(path):
+        data=path.read_bytes()
+        return json.loads(data.decode('utf-16') if data.startswith((b'\xff\xfe',b'\xfe\xff')) else data.decode('utf-8-sig'))
+    build=read_json(args.worker.parent.parent/'registered-build-report.json')
+    assert sha(args.worker.read_bytes())==build['binary_sha256'][args.worker.name].lower()
+    assert args.seconds<=build.get('filesystem_replay_maximum_seconds',300)
+    if args.shared_queue is not None:assert build.get('private_queue_property_opt_in') is True
+    if args.pipeline_cache is not None:assert build.get('expanded_pipeline_capacity_opt_in') is True
+    expected={x['name']:x for x in read_json(args.trace_manifest)} if args.trace_manifest else {}
+    reference=read_json(args.reference) if args.reference else None
+    if reference:assert reference['completed'] and reference['passed'] and reference['saved_requests']==len(files)
+    args.output.mkdir(exist_ok=False)
+    report = {'started':datetime.now(UTC).isoformat(),'trace':args.trace.name,'worker':str(args.worker),'worker_sha256':sha(args.worker.read_bytes()),'saved_requests':len(files),'ordering':'publish one original ordinal; wait for its response before publishing the next','normalized_fields':['nonce','sequence','client_pid'],'bounded_permission_retries':['reply_read','progress_write','progress_replace','request_write','request_publish'],'all_render_state_bytes_preserved':True,'maximum_seconds':args.seconds,'private_shared_queue':args.shared_queue,'pipeline_cache':args.pipeline_cache,'reference_sha256':sha(args.reference.read_bytes()) if args.reference else None,'trace_manifest_sha256':sha(args.trace_manifest.read_bytes()) if args.trace_manifest else None,'reference_is_independent_cpu_oracle':False,'requests':[],'completed':False,'passed':False,'desktop_offload_tested':False}
+    def persist():
+        tmp = args.output/'report.json.tmp'
+        payload=json.dumps(report,indent=2)+'\n'
+        retry_access(lambda:tmp.write_text(payload,encoding='utf-8'))
+        retry_access(lambda:os.replace(tmp,args.output/'report.json'))
+    env=os.environ.copy();env['PATH']=str(args.runtime)+os.pathsep+env.get('PATH','');env['NR_RENDER_NPU_CACHE']=str(args.cache);env['NR_RENDER_REPLAY_SECONDS']=str(args.seconds)
+    env.pop('NR_RENDER_SHARED_QUEUE',None);env.pop('NR_RENDER_PIPELINE_CACHE',None)
+    if args.pipeline_cache is not None:env['NR_RENDER_PIPELINE_CACHE']=args.pipeline_cache
+    if args.shared_queue is not None:env['NR_RENDER_SHARED_QUEUE']=args.shared_queue
+    with (args.output/'worker.stdout.jsonl').open('xb') as stdout, (args.output/'worker.stderr.log').open('xb') as stderr:
+        proc=subprocess.Popen([str(args.worker),str(args.output),str(len(files))],stdout=stdout,stderr=stderr,env=env)
+        report['worker_pid']=proc.pid;started=time.monotonic();persist()
+        try:
+            for ordinal,path in enumerate(files,1):
+                original=path.read_bytes();h=list(HEADER.unpack_from(original))
+                if expected:assert sha(original)==expected[path.name]['sha256'].lower()
+                assert h[0]==MAGIC and h[14:17]==[1,0,0] and h[12]+80==len(original)
+                start=by_ordinal[ordinal];assert h[11]==start['sequence'] and h[13]==start['client_pid']
+                before=list(h);h[1]=0x7472616365763031;h[2]=ordinal;h[11]=ordinal;h[13]=42
+                request=HEADER.pack(*h)+original[80:]
+                for i in range(17):
+                    if i not in [1,2,11,13]:assert h[i]==before[i]
+                assert request[80:]==original[80:]
+                suffix=f'-42-{h[1]:016x}{h[2]:016x}-{ordinal}.bin'
+                ready=args.output/('request'+suffix);reply=args.output/('reply'+suffix)
+                temporary=ready.with_suffix('.tmp');retry_access(lambda:temporary.write_bytes(request),started+args.seconds-15);retry_access(lambda:os.replace(temporary,ready),started+args.seconds-15)
+                row={'ordinal':ordinal,'source':path.name,'source_sha256':sha(original),'normalized_sha256':sha(request),'original_client_pid':before[13],'original_sequence':before[11],'width':h[4],'height':h[5],'vertices':h[6],'flags':h[8],'passed':False}
+                report['requests'].append(row);persist();sent=time.monotonic()
+                while not reply.exists():
+                    if proc.poll() is not None:raise RuntimeError(f'Worker exited before response {ordinal}: {proc.returncode}')
+                    if time.monotonic()-sent>90 or time.monotonic()-started>args.seconds-15:raise TimeoutError(f'Bounded wait expired at request {ordinal}')
+                    time.sleep(.01)
+                data,retries=read_published_reply(reply,started+args.seconds-15);row["reply_access_retries"]=retries;rh=list(HEADER.unpack_from(data));row['roundtrip_ms']=(time.monotonic()-sent)*1000;row['reply_sha256']=sha(data)
+                assert all(rh[i]==h[i] for i in range(17) if i not in [12,14,15])
+                if rh[14]==3:
+                    assert rh[12]==0 and rh[15]==0 and len(data)==80
+                    row['negative_ack']=True;raise RuntimeError(f'NPU worker rejected ordinal {ordinal}; no subsequent request published')
+                assert rh[14]==2 and rh[15]==3 and rh[12]==len(data)-80 and len(data)==128+h[4]*h[5]*4
+                receipt=RECEIPT.unpack_from(data,80);assert receipt[6]==0 and receipt[5]<=1 and 0<receipt[2]<=4*1024*1024
+                assert receipt[3]<=h[4]*h[5]*(1 if h[3]==13 else h[6]//3)
+                if h[3]==13:assert receipt[:6]==(16,h[4]*h[5]*4,1,h[4]*h[5],1,0)
+                row.update(passed=True,execution_device='NPU',pixels_sha256=sha(data[128:]),receipt=dict(zip(['input_bytes','output_bytes','provider_requests','covered_samples','tile_executions','used_rectangle','reserved'],receipt)))
+                if reference:
+                    baseline=reference['requests'][ordinal-1]
+                    assert row['source_sha256']==baseline['source_sha256'] and row['normalized_sha256']==baseline['normalized_sha256']
+                    assert row['pixels_sha256']==baseline['pixels_sha256'] and row['receipt']==baseline['receipt']
+                    row['reference_output_and_receipt_exact']=True
+                persist()
+            report['passed']=True
+        except Exception as exc:
+            report['error']=str(exc)
+        finally:
+            (args.output/'stop').write_text('ordered replay finished\n')
+            try:proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                report['termination_requested']=True;proc.kill()
+                try:proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:report['worker_termination_pending']=True
+            report['worker_exit_code']=proc.poll();report['completed']=True;report['elapsed_ms']=(time.monotonic()-started)*1000;report['finished']=datetime.now(UTC).isoformat()
+            report['passed']=report['passed'] and proc.returncode==0 and not report.get('worker_termination_pending',False);persist()
+    print(json.dumps({k:report[k] for k in ['trace','saved_requests','completed','passed','elapsed_ms','worker_exit_code']}),flush=True)
+    if not report['passed']:raise SystemExit(1)
+
+if __name__=='__main__':main()

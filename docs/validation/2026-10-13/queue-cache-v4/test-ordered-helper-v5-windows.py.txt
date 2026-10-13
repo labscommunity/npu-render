@@ -1,0 +1,35 @@
+import ctypes,importlib.util,json,os,threading,time
+from ctypes import wintypes
+from pathlib import Path
+r=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm';out=r/'ordered-helper-v5-tests';out.mkdir(exist_ok=False)
+spec=importlib.util.spec_from_file_location('helper',r/'replay-ordered-trace-v5.py');m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+k=ctypes.WinDLL('kernel32',use_last_error=True)
+k.CreateFileW.argtypes=[wintypes.LPCWSTR,wintypes.DWORD,wintypes.DWORD,wintypes.LPVOID,wintypes.DWORD,wintypes.DWORD,wintypes.HANDLE];k.CreateFileW.restype=wintypes.HANDLE
+k.CloseHandle.argtypes=[wintypes.HANDLE];k.CloseHandle.restype=wintypes.BOOL
+cases=[]
+def locked_case(name,operation,share=0):
+ target=out/(name+'.txt');target.write_bytes(b'old bytes');temporary=out/(name+'.tmp');temporary.write_bytes(b'new exact bytes')
+ handle=k.CreateFileW(str(target),0x80000000,share,None,3,0x80,None);assert handle!=wintypes.HANDLE(-1).value
+ timer=threading.Timer(.15,lambda:k.CloseHandle(handle));timer.start()
+ try:
+  result,retries=m.retry_access(lambda:operation(target,temporary),time.monotonic()+2);assert retries>0
+ finally:timer.join()
+ cases.append({'operation':name,'actual_windows_access_denials':retries,'passed':True});return target,result
+p,result=locked_case('read',lambda p,t:p.read_bytes());assert result==b'old bytes'
+p,_=locked_case('write',lambda p,t:p.write_bytes(b'new exact bytes'));assert p.read_bytes()==b'new exact bytes'
+p,_=locked_case('replace',lambda p,t:os.replace(t,p),share=1);assert p.read_bytes()==b'new exact bytes'
+start=time.monotonic()
+def denied():raise PermissionError(13,'persistent injected denial')
+try:m.retry_access(denied,start+.025)
+except PermissionError:pass
+else:raise AssertionError('Unbounded or swallowed denial')
+assert time.monotonic()-start<.2
+calls=0
+def other_error():
+ global calls
+ calls+=1;raise OSError('unrelated error')
+try:m.retry_access(other_error)
+except OSError as e:assert str(e)=='unrelated error'
+else:raise AssertionError('Unrelated error swallowed')
+assert calls==1
+report={'passed':True,'real_windows_share_locks_tested':True,'cases':cases,'permanent_denial_bounded':True,'unrelated_error_not_retried':True};(out/'report.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report))

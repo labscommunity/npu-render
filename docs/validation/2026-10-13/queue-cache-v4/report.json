@@ -1,0 +1,101 @@
+{
+  "build": "queue-worker-v4",
+  "source_base_commit": "233d03880981cc7309a4cd27c163acc6ce36a8b1",
+  "changed_files": [
+    "native/windows/registered_lab/CMakeLists.txt",
+    "native/windows/registered_lab/indexed_exchange_worker.cpp",
+    "native/windows/registered_lab/indexed_pipeline.hpp",
+    "native/windows/registered_lab/indexed_stream_worker.cpp",
+    "native/windows/registered_lab/private_queue_probe.cpp",
+    "native/windows/registered_lab/provider_compile.hpp"
+  ],
+  "all_1438_ordered_requests_exact_across_three_modes": true,
+  "cases": [
+    {
+      "variant": "baseline",
+      "elapsed_ms": 888312.0000000054,
+      "draw_ms": 325586.41499999986,
+      "compile_and_draw_ms": 728692,
+      "compile_calls": 3611,
+      "disk_cache_hits": 3611,
+      "passed": true,
+      "evidence": "ordered-queue-v4b-baseline",
+      "provider_requests": 61822,
+      "maximum_observed_private_bytes": 450990080,
+      "maximum_observed_working_bytes": 1130729472,
+      "memory_samples": 134,
+      "memory_monitor_covers_entire_run": false
+    },
+    {
+      "variant": "shared",
+      "elapsed_ms": 873656.0000000027,
+      "draw_ms": 319629.8949999996,
+      "compile_and_draw_ms": 712837,
+      "compile_calls": 3611,
+      "disk_cache_hits": 3611,
+      "passed": true,
+      "evidence": "ordered-queue-v4b-shared",
+      "provider_requests": 61822,
+      "maximum_observed_private_bytes": 449642496,
+      "maximum_observed_working_bytes": 1143320576,
+      "memory_samples": 174,
+      "memory_monitor_covers_entire_run": false
+    },
+    {
+      "variant": "expanded",
+      "elapsed_ms": 641906.0000000027,
+      "draw_ms": 301571.39900000015,
+      "compile_and_draw_ms": 482117,
+      "compile_calls": 1711,
+      "disk_cache_hits": 1711,
+      "passed": true,
+      "evidence": "ordered-queue-v4c-expanded",
+      "provider_requests": 61822,
+      "maximum_observed_private_bytes": 686759936,
+      "maximum_observed_working_bytes": 1884717056,
+      "memory_samples": 126,
+      "memory_monitor_covers_entire_run": false
+    }
+  ],
+  "expanded_wall_time_reduction_percent": 27.738677401633794,
+  "expanded_setup_call_reduction_percent": 52.61700360011077,
+  "comparison_order_controlled": false,
+  "repeated_comparison": false,
+  "performance_causality_established": false,
+  "private_property": "NPU_SHARED_COMMON_QUEUE",
+  "private_api_version_pinned": "2026.4.1-22982-e213a147257-releases/2026/4",
+  "hardware_queue_count_measured": false,
+  "harness_failures_preserved": [
+    {
+      "evidence": "ordered-queue-v4-baseline",
+      "verified_replies": 111,
+      "successful_worker_requests": 112,
+      "worker_exit_code": 0,
+      "error": "[Errno 13] Permission denied: 'C:\\\\Users\\\\tatef\\\\AppData\\\\Local\\\\npu-render\\\\vm\\\\ordered-queue-v4-baseline\\\\reply-42-74726163657630310000000000000070-112.bin'",
+      "renderer_failure": false
+    },
+    {
+      "evidence": "ordered-queue-v4b-expanded",
+      "verified_replies": 505,
+      "successful_worker_requests": 506,
+      "worker_exit_code": 0,
+      "error": "[WinError 5] Access is denied: 'C:\\\\Users\\\\tatef\\\\AppData\\\\Local\\\\npu-render\\\\vm\\\\ordered-queue-v4b-expanded\\\\report.json.tmp' -> 'C:\\\\Users\\\\tatef\\\\AppData\\\\Local\\\\npu-render\\\\vm\\\\ordered-queue-v4b-expanded\\\\report.json'",
+      "renderer_failure": false
+    }
+  ],
+  "windows_file_share_retry_test_passed": true,
+  "crop_reentry_hypothesis_confirmed_for_three_draws": true,
+  "crop_fix_implemented_in_this_build": false,
+  "default_renderer_policy_changed": false,
+  "desktop_qualification": false,
+  "physical_desktop_offloaded": false,
+  "tahoma_benefit_measured": false,
+  "limitations": [
+    "Wall times include request/reply files, polling and report persistence, not just NPU execution. Setup-plus-draw counters use a coarse host clock. Concurrent compilation/inference was not introduced.",
+    "All measured model setup calls report disk-cache hits. Keeping more live pipelines avoids repeated model setup despite disk-cache hits. This is a first comparison in a fixed order; warming, thermal state and order effects have not been isolated.",
+    "Shared queue alone changes total time by approximately 1.65 percent. Do not infer a useful gain or a hardware queue count from the private property. Expanded mode also uses the shared queue property.",
+    "The trace is the exact prior six-interaction VM desktop workload. Equivalent pixels and receipts against the prior NPU run are regression evidence; independent CPU/device oracles remain separate. No new live desktop or Tahoma performance result is established.",
+    "Two controller failures come from Windows file sharing, while the worker successfully finishes the current request. The new helper bounds retries on real temporary sharing violations and does not retry unrelated failures.",
+    "Fresh executors admit three later point-copy draws in three NPU calls instead of 1538, with identical complete output pixels. This confirms stale general-path selection for those draws; it is not a controlled latency comparison or a qualified fix."
+  ]
+}

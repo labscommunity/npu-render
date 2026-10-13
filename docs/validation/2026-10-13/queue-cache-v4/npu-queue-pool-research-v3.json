@@ -1,0 +1,20 @@
+{
+  "checked_at": "2026-10-12T23:21:42.614153+00:00",
+  "runtime_source_commit": "e213a147257",
+  "supersedes_inference_in": "npu-queue-pool-research-v2.json",
+  "findings": [
+    {
+      "source": "https://github.com/openvinotoolkit/openvino/blob/e213a147257/src/plugins/intel_npu/src/utils/src/zero/zero_init.cpp",
+      "finding": "ZeroInitStructsHolder::getInstance uses a static weak instance; multiple concurrent ov::Core objects may share one underlying Level Zero context."
+    },
+    {
+      "source": "https://github.com/openvinotoolkit/openvino/blob/e213a147257/src/plugins/intel_npu/src/al/include/intel_npu/npu_private_properties.hpp",
+      "finding": "Private provider header inspected for exact shared queue configuration; this is not a stable public API guarantee."
+    }
+  ],
+  "configuration_changed": false,
+  "inferences": [
+    "Separate Core objects alone do not establish distinct NPU contexts. Queue sharing can be tested independently without assuming context ownership must change.",
+    "No hardware queue capacity or cause of earlier device loss is established."
+  ]
+}
