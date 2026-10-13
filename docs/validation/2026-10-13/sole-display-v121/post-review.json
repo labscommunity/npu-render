@@ -1,0 +1,128 @@
+{
+  "recorded_at": "2026-10-13T04:55:28.127177+00:00",
+  "original_gate_receipts_preserved": true,
+  "earlier_received_frames_manually_reviewed": [
+    {
+      "phase": "notepad",
+      "identity": [
+        7984,
+        20,
+        2012678791100
+      ],
+      "received_at": "2026-10-13T04:33:00.113143+00:00",
+      "seconds_after_action": 150.724502,
+      "packet_sha256": "bad348db949657ca245630a8d45f001e60079543d782824e673a0680d818328b",
+      "pixel_sha256": "05a1b5cdc773d611c5439aad80aff7972e89646e6810e4b153891a0ba6d60974",
+      "manual_visual_review": true,
+      "first_complete_among_reviewed_received_frames": true
+    },
+    {
+      "phase": "text",
+      "identity": [
+        7984,
+        31,
+        2059442765400
+      ],
+      "received_at": "2026-10-13T04:40:47.976252+00:00",
+      "seconds_after_action": 66.565121,
+      "packet_sha256": "7a180de230592ebb8db67c0969a7346a2154b8a45f951fe5fbef0acae3c7b8bf",
+      "pixel_sha256": "9decfb4afe4245aead7fe92901c1a6f67c22e5af58f367bce2b2f731ebf350b3",
+      "manual_visual_review": true,
+      "first_complete_among_reviewed_received_frames": true
+    },
+    {
+      "phase": "maximized",
+      "identity": [
+        7984,
+        35,
+        2077901400300
+      ],
+      "received_at": "2026-10-13T04:43:52.511839+00:00",
+      "seconds_after_action": 122.983473,
+      "packet_sha256": "267618cb5ae5c8252643e07cd6de19861ac6956ce333f272c431c9e30667c050",
+      "pixel_sha256": "4251cac97479d191ac63bd26d920dcd66ecdd9df73ebff586fa8b410df56095d",
+      "manual_visual_review": true,
+      "first_complete_among_reviewed_received_frames": true
+    },
+    {
+      "phase": "closed",
+      "identity": [
+        7984,
+        39,
+        2089688182200
+      ],
+      "received_at": "2026-10-13T04:45:50.366050+00:00",
+      "seconds_after_action": 78.018313,
+      "packet_sha256": "cb1f53e569e98d0706f93eda8f84d59024400b35761fdd38d317fe0d9aeb229d",
+      "pixel_sha256": "3c82a26f0540f48540e4d7214c1c154a1071315085ac31380d46735584e6a23d",
+      "manual_visual_review": true,
+      "first_complete_among_reviewed_received_frames": true
+    }
+  ],
+  "manual_review_delay_does_not_equal_rendering_latency": true,
+  "received_frame_sampling_is_not_exhaustive": true,
+  "first_frame_ever_completed_not_claimed": true,
+  "guest_cleanup_captures": [
+    {
+      "client_pid": 1984,
+      "archive_timestamp": [
+        2026,
+        10,
+        13,
+        4,
+        47,
+        22
+      ],
+      "bytes": 1808,
+      "capture": {
+        "event": "indexed_draw_capture",
+        "complete": false,
+        "execution_performed": false
+      },
+      "reject": {
+        "event": "reject",
+        "operation": "`anonymous-namespace'::draw_indexed_instanced",
+        "status": "88760870"
+      },
+      "at_or_after_controller_stop_timestamp": true
+    },
+    {
+      "client_pid": 7640,
+      "archive_timestamp": [
+        2026,
+        10,
+        13,
+        4,
+        47,
+        22
+      ],
+      "bytes": 1744,
+      "capture": {
+        "event": "indexed_draw_capture",
+        "complete": false,
+        "execution_performed": false
+      },
+      "reject": {
+        "event": "reject",
+        "operation": "`anonymous-namespace'::draw_indexed",
+        "status": "88760870"
+      },
+      "at_or_after_controller_stop_timestamp": true
+    }
+  ],
+  "controller_stop_archive_timestamp": [
+    2026,
+    10,
+    13,
+    4,
+    47,
+    10
+  ],
+  "npu_negative_acknowledgements": 0,
+  "cleanup_status_meaning_not_inferred_from_hresult": true,
+  "ordinary_display_restoration_visually_verified": true,
+  "owned_document_cleanup_visually_verified": true,
+  "owned_vm_shutdown_exit_code": 0,
+  "physical_machine_shutdown": false,
+  "physical_desktop_offloaded": false
+}

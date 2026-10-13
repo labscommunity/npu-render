@@ -1,0 +1,13 @@
+from pathlib import Path
+from datetime import UTC,datetime
+import json,hashlib,argparse
+p=argparse.ArgumentParser();p.add_argument("--packet",type=Path);a=p.parse_args()
+from PIL import Image
+from npu_render.indirect_frame import parse_frame,confirmed_sole_display
+r=Path('results/render-driver/collector-v121-live');b=(a.packet or r/'latest.bin').read_bytes();f=parse_frame(b);p=r/f'inspect-{f.identity[0]}-{f.identity[1]}'
+rows=[json.loads(x) for x in (r/'frames.jsonl').read_text().splitlines()];receipt=next(x for x in reversed(rows) if tuple(x['identity'])==f.identity)
+if not p.with_suffix('.bin').exists():p.with_suffix('.bin').write_bytes(b)
+if not p.with_suffix('.png').exists():Image.frombytes('RGBA',(f.width,f.height),f.pixels,'raw','BGRA' if f.format==87 else 'RGBA').convert('RGB').save(p.with_suffix('.png'))
+record={'image':p.with_suffix('.png').name,'identity':f.identity,'received_at':receipt['received_at'],'sole_indirect_at_receive':receipt['sole_indirect_at_receive'],'sole_gate_at_inspection':confirmed_sole_display(r/'input-ready.json'),'pixel_sha256':hashlib.sha256(f.pixels).hexdigest(),'inspected_at':datetime.now(UTC).isoformat(),'manual_visual_verification':False}
+if not p.with_suffix('.json').exists():p.with_suffix('.json').write_text(json.dumps(record,indent=2)+'\n')
+print(json.dumps(record))

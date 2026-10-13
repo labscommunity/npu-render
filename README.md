@@ -227,6 +227,14 @@ remain unfinished. The [post-review](docs/validation/2026-10-13/sole-display-v12
 records two guest draw rejections during adapter removal after the visual checks,
 and separates relay/transport timing from rendering measurements.
 
+The [v121 live trial](docs/validation/2026-10-13/sole-display-v121/README.md)
+repeats all six visual checks with the larger cache and point-crop reentry fix.
+All 1,419 NPU requests are acknowledged, and restoration succeeds. Earlier
+retained frames put application responses at roughly 67–253 seconds; delayed
+manual review is recorded separately. The result preserves correctness but
+remains far too slow for normal desktop use. Physical desktop offload and
+Tahoma resource relief remain unproven.
+
 The [ordered workload comparison](docs/validation/2026-10-13/queue-cache-v4/README.md)
 replays all 1,438 requests with identical NPU pixels and execution receipts.
 Retaining more live pipelines reduces elapsed time from 888.312 to 641.906 seconds
