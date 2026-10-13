@@ -34,15 +34,44 @@ void integer_operations(const std::string &backend){
      }}
     std::printf("{\"integer_ops\":[\"ishr\",\"imad\",\"ftoi\"],\"exact_components\":1536,\"execution_device\":\"%s\"}\n",backend.c_str());std::fflush(stdout);
 }
-void raster_lookup(const std::string &backend,const std::string &packet_path){
+void unsigned_operations(const std::string &backend){
+    const auto shift=compile(R"(struct O{float4 p:SV_Position;uint4 b:COLOR;};O main(uint4 v:POSITION,uint s:INDEX){O o;o.p=float4(0,0,0,1);o.b=v>>s;return o;})","vs_4_0");
+    const auto bits=compile(R"(struct O{float4 p:SV_Position;uint4 b:COLOR;};O main(uint4 v:POSITION,uint4 b:INDEX){O o;o.p=float4(0,0,0,1);o.b=v|b;return o;})","vs_4_0");
+    const uint32_t patterns[]{0,1,0x80000000,0x80000001,0xffffffff,0x7fffffff,0x12345678,0xfeaa55ff};
+    uint64_t checked=0;
+    for(const auto *program:{&shift,&bits}){
+        const bool shifting=program==&shift;
+        TEST(program->position_output==0 && program->outputs[1]==15);
+        TEST(std::any_of(program->instructions.begin(),program->instructions.end(),[&](const auto &i){return i.opcode==(shifting?Opcode::unsigned_shift_right:Opcode::bitwise_or);}));
+        std::vector<VertexRegisters> input(256);
+        for(unsigned n=0;n<input.size();++n)for(unsigned c=0;c<4;++c){
+            input[n][0][c]=patterns[(n/32+c)%std::size(patterns)];
+            input[n][1][c]=shifting?(n<128?n:(0xffffffe0u|(n&31))):patterns[(n+c)%std::size(patterns)];
+        }
+        VertexExecutor executor(*program,uint32_t(input.size()),backend);const auto result=executor.execute(input,{});
+        TEST(result.execution_device.rfind(backend,0)==0);
+        for(unsigned n=0;n<input.size();++n){
+            TEST(result.vertices[n]==reference_vertex(*program,input[n],{}));
+            for(unsigned c=0;c<4;++c){
+                const auto expected=shifting?(input[n][0][c]>>(input[n][1][0]&31)):(input[n][0][c]|input[n][1][c]);
+                TEST(result.vertices[n][1][c]==expected);++checked;
+            }
+        }
+        auto invalid=*program;for(auto &i:invalid.instructions)if(i.opcode==(shifting?Opcode::unsigned_shift_right:Opcode::bitwise_or)){i.saturate=true;break;}
+        bool rejected=false;try{VertexExecutor::validate(invalid);}catch(const std::invalid_argument&){rejected=true;}TEST(rejected);
+    }
+    std::printf("{\"integer_ops\":[\"ushr\",\"or\"],\"exact_components\":%llu,\"all_shift_counts_and_high_bits\":true,\"execution_device\":\"%s\"}\n",static_cast<unsigned long long>(checked),backend.c_str());std::fflush(stdout);
+}
+void raster_lookup(const std::string &backend,const std::string &packet_path,const Program *captured=nullptr){
     using namespace nr::raster;
     const auto vs=compile(R"(struct O{float4 p:SV_Position;noperspective float2 uv:TEXCOORD;nointerpolation uint3 d:COLOR;};
 O main(float4 p:POSITION,float2 uv:TEXCOORD,uint3 d:COLOR){O o;o.p=p;o.uv=uv;o.d=d;return o;})","vs_4_0");
-    const auto &words=nr::registered_lab::test_fixture::typed_lookup_pixel_words;const auto ps=parse_pixel(words,std::size(words));
+    const auto &words=nr::registered_lab::test_fixture::typed_lookup_pixel_words;const auto ps=captured?*captured:parse_pixel(words,std::size(words));
     PackedResources resources{};resources[0]={512,1,42,{}};resources[0].pixels.resize(512);
     for(unsigned n=0;n<512;++n){const uint32_t value=(n*37)%256;std::memcpy(resources[0].pixels[n].data(),&value,4);}
-    resources[1]={256,1,87,{}};resources[1].pixels.resize(256);
-    for(unsigned n=0;n<256;++n)resources[1].pixels[n]={uint8_t(n),uint8_t(255-n),uint8_t(n*17),255};
+    const unsigned palette_size=captured?1024u:256u;
+    resources[1]={palette_size,1,87,{}};resources[1].pixels.resize(palette_size);
+    for(unsigned n=0;n<palette_size;++n)resources[1].pixels[n]={uint8_t(n),uint8_t(255-n),uint8_t(n*17),255};
     const unsigned corners[6][2]{{0,0},{64,0},{64,64},{0,0},{64,64},{0,64}};
     std::vector<VertexRegisters> inputs(6);
     for(unsigned n=0;n<6;++n){const auto x=float(corners[n][0]),y=float(corners[n][1]);
@@ -50,11 +79,14 @@ O main(float4 p:POSITION,float2 uv:TEXCOORD,uint3 d:COLOR){O o;o.p=p;o.uv=uv;o.d
         inputs[n][1]={as_bits(x),as_bits(y),0,0};inputs[n][2]={0,8,0,1};}
     const Viewport viewport{0,0,64,64,0,1};std::vector<PackedColor> background(4096,{7,11,13,17});
     const std::array<int32_t,4> clip{3,5,61,59};
-    TriangleTextureDrawExecutor executor(vs,ps,6,64,64,87,resources,{},backend,false,15,CullMode::back,false,4096);
+    TriangleTextureDrawExecutor executor(vs,ps,6,64,64,87,resources,{},backend,false,15,CullMode::back,false,captured?256:4096);
     const auto result=executor.execute(inputs,{}, {},viewport,resources,background,clip);
     TEST(result.covered_samples==58*54 && result.execution_device.rfind(backend,0)==0);
     for(unsigned y=0;y<64;++y)for(unsigned x=0;x<64;++x){const auto n=y*64+x;
-        const auto expected=x>=3 && x<61 && y>=5 && y<59?resources[1].pixels[((y*8+x/8)*37)%256]:background[n];
+        const auto address=y*8+x/8;const auto low=(address*37)%256;
+        const auto high=address+1<512?((address+1)*37)%256:0;
+        const auto index=captured?((low>>(x&7))|(high<<(8-(x&7))))&1023:low;
+        const auto expected=x>=3 && x<61 && y>=5 && y<59?resources[1].pixels[index]:background[n];
         if(result.pixels[n]!=expected){std::fprintf(stderr,"lookup raster mismatch x=%u y=%u\n",x,y);TEST(false);}}
     if(!packet_path.empty()){
         namespace ex=nr::registered_lab::indexed_exchange;
@@ -71,7 +103,17 @@ O main(float4 p:POSITION,float2 uv:TEXCOORD,uint3 d:COLOR){O o;o.p=p;o.uv=uv;o.d
     std::printf("{\"typed_lookup_triangle_draw\":true,\"covered_samples\":3132,\"exact_pixels\":4096,\"execution_device\":\"%s\",\"desktop_offload_tested\":false}\n",backend.c_str());std::fflush(stdout);
 }
 int main(int argc,char **argv)try{
-    TEST(argc==1 || argc==2 || (argc==4 && !std::strcmp(argv[2],"--emit-packet")));const std::string backend=argc>=2?argv[1]:"CPU";integer_operations(backend);
+    TEST(argc==1 || argc==2 || (argc==4 && (!std::strcmp(argv[2],"--emit-packet") || !std::strcmp(argv[2],"--shader"))) ||
+        (argc==6 && !std::strcmp(argv[2],"--shader") && !std::strcmp(argv[4],"--emit-packet")));
+    const std::string backend=argc>=2?argv[1]:"CPU";integer_operations(backend);unsigned_operations(backend);
+    if(argc>=4 && !std::strcmp(argv[2],"--shader")){
+        std::ifstream f(argv[3],std::ios::binary|std::ios::ate);TEST(bool(f));const auto bytes=f.tellg();TEST(bytes>=12 && bytes<=65536 && !(bytes%4));
+        std::vector<uint32_t> captured(size_t(bytes)/4);f.seekg(0);f.read(reinterpret_cast<char*>(captured.data()),bytes);TEST(bool(f));
+        const auto program=parse_pixel(captured.data(),captured.size());VertexExecutor::validate(program);
+        TEST(program.texture_dimensions[0]==1 && program.texture_uint[0] && program.texture_dimensions[1]==3 && !program.texture_uint[1]);
+        raster_lookup(backend,argc==6?argv[5]:"",&program);
+        std::printf("{\"captured_packed_lookup_shader\":true,\"shader_words\":%zu,\"execution_device\":\"%s\"}\n",captured.size(),backend.c_str());return 0;
+    }
     const auto &words=nr::registered_lab::test_fixture::typed_lookup_pixel_words;const auto p=parse_pixel(words,std::size(words));
     TEST(p.texture_dimensions[0]==1 && p.texture_uint[0] && p.texture_dimensions[1]==3 && !p.texture_uint[1]);
     TextureShapes shapes{};shapes[0]={128,1,1};shapes[1]={256,4,15};TexturePixels textures;

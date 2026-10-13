@@ -84,6 +84,8 @@ inline Registers reference_vertex(const Program &program, const Registers &input
             else if (instruction.opcode == Opcode::select) value[i] = values[0][i] ? values[1][i] : values[2][i];
             else if (instruction.opcode == Opcode::integer_add) value[i] = values[0][i] + values[1][i];
             else if(instruction.opcode==Opcode::bitwise_and)value[i]=values[0][i]&values[1][i];
+            else if(instruction.opcode==Opcode::bitwise_or)value[i]=values[0][i]|values[1][i];
+            else if(instruction.opcode==Opcode::unsigned_shift_right)value[i]=values[0][i]>>(values[1][0]&31);
             else if(instruction.opcode==Opcode::integer_mad)value[i]=values[0][i]*values[1][i]+values[2][i];
             else if(instruction.opcode==Opcode::shift_right){
                 const auto amount=values[1][0]&31,raw=values[0][i];

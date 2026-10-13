@@ -489,6 +489,11 @@ struct RegisterExecutor::State {
                     if(a.predicate && b.floating)result[c].floating=choose(std::make_shared<op::NotEqual>(a.integer,integer(0)),b.floating,number(0));
                     else if(b.predicate && a.floating)result[c].floating=choose(std::make_shared<op::NotEqual>(b.integer,integer(0)),a.floating,number(0));
                 }
+                else if(instruction.opcode==Opcode::bitwise_or){
+                    const auto &a=sources[0][c],&b=sources[1][c];check(bool(a.integer) && bool(b.integer));
+                    result[c].integer=std::make_shared<op::BitwiseOr>(a.integer,b.integer);
+                    result[c].predicate=a.predicate && b.predicate;
+                }
                 else if (instruction.opcode == Opcode::integer_add) {
                     check(bool(sources[0][c].integer) && bool(sources[1][c].integer));
                     result[c].integer = std::make_shared<op::Add>(sources[0][c].integer, sources[1][c].integer);
@@ -514,6 +519,18 @@ struct RegisterExecutor::State {
                 } else if(instruction.opcode==Opcode::shift_right){
                     check(bool(sources[0][c].integer) && bool(sources[1][0].integer));
                     result[c].integer=shift_right(sources[0][c].integer,sources[1][0].integer);
+                } else if(instruction.opcode==Opcode::unsigned_shift_right){
+                    check(bool(sources[0][c].integer) && bool(sources[1][0].integer));
+                    const auto amount=std::make_shared<op::BitwiseAnd>(sources[1][0].integer,integer(31));
+                    const auto index=std::make_shared<op::Reshape>(batch(amount),indices({int64_t(count)}),false);
+                    std::vector<int32_t> masks(32);
+                    for(unsigned n=0;n<32;++n){const auto bits=UINT32_MAX>>n;std::memcpy(&masks[n],&bits,4);}
+                    const auto mask=std::make_shared<op::Reshape>(std::make_shared<op::Gather>(
+                        op::Constant::create(ov::element::i32,ov::Shape{32},masks),index,integer(0)),batch_shape,false);
+                    // Clear the sign extension after the exact arithmetic shift.
+                    // Amount zero preserves all 32 original bits, including bit 31.
+                    result[c].integer=std::make_shared<op::BitwiseAnd>(
+                        shift_right(sources[0][c].integer,amount),mask);
                 } else if(instruction.opcode==Opcode::float_to_integer){
                     // Decode the IEEE representation with integer operations.
                     // Native NPU Convert/clamp hangs on nonfinite and extreme
@@ -825,7 +842,7 @@ void RegisterExecutor::validate(const Program &original) {
             const auto a=predicates(instruction.sources[0]),b=predicates(instruction.sources[1]);
             bit_views=mask;predicate_views=a&b;
             floating_views=(a&available(instruction.sources[1],false))|(b&available(instruction.sources[0],false));
-        } else if (instruction.opcode == Opcode::integer_add || instruction.opcode == Opcode::integer_greater_equal || instruction.opcode == Opcode::integer_mad || instruction.opcode==Opcode::shift_right || instruction.opcode == Opcode::shift_left || instruction.opcode == Opcode::integer_to_float) {
+        } else if (instruction.opcode == Opcode::integer_add || instruction.opcode == Opcode::integer_greater_equal || instruction.opcode == Opcode::integer_mad || instruction.opcode==Opcode::shift_right || instruction.opcode==Opcode::unsigned_shift_right || instruction.opcode==Opcode::bitwise_or || instruction.opcode == Opcode::shift_left || instruction.opcode == Opcode::integer_to_float) {
             for (unsigned i = 0; i < instruction.source_count; ++i) check(!(mask & ~available(instruction.sources[i], true)));
             if (instruction.opcode != Opcode::integer_to_float) bit_views = mask; else floating_views = mask;
             if(instruction.opcode==Opcode::integer_greater_equal)predicate_views=mask;

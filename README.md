@@ -183,6 +183,18 @@ Both guest devices are subsequently removed successfully and the ordinary
 desktop is visually verified. The full request sequence and raw guest archive
 are preserved. Full desktop offload remains unfinished.
 
+With the relay lifetime corrected, the [v118 trial](docs/validation/2026-10-12/sole-display-v118/report.json)
+returns 971 acknowledged NPU results and 25 sole-display frames. The complete
+desktop, Run dialog and Notepad UI are visible. Typed text appears in Notepad's
+tab title but is absent from its editor, so typing, maximize and close remain
+unverified. The rejected editor shader uses unsigned right shift and bitwise OR.
+The [v225 implementation](docs/validation/2026-10-12/packed-lookup-v225/report.json)
+adds both instructions: 2,048 exact operation values and 4,096 captured-shader
+pixels pass on CPU and both NPU runtimes, along with all 71 historical packets.
+Both clean builds pass their 28 CPU suites. The installed desktop test is still
+required. v118 restores the original topology and removes both guest devices
+successfully; Run takes 118 seconds and the complete Notepad UI 193 seconds.
+
 The v116 live draws expand into 26,995 provider calls. Their reported execution
 intervals total 138 seconds, versus 329 seconds including pipeline setup and
 other wrapper work. Of 1,921 model setup calls, 1,915 are disk-cache hits.
