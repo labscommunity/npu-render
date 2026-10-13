@@ -1,0 +1,77 @@
+--- a/native/windows/registered_lab/linear_texture_draw.cpp
++++ b/native/windows/registered_lab/linear_texture_draw.cpp
+@@ -65,9 +65,12 @@
+ }
+ struct LinearTextureDrawExecutor::State {
+     shader::Program vs; Pattern pixel;
+-    uint32_t width,height,sw,sh,sf,rows,count; bool failed=false, point=false;
++    uint32_t width,height,sw,sh,sf,rows,count,source_chunk=0; bool failed=false, point=false;
+     shader::VertexExecutor vertex; ProjectionExecutor projection;
+     ov::Core core; ov::CompiledModel compiled; ov::InferRequest request; std::string device;
++    std::string source_name(unsigned channel,uint32_t base) const {
++        return "source"+std::to_string(channel)+(source_chunk<uint64_t(sw)*sh?"_"+std::to_string(base):"");
++    }
+     State(const shader::Program &v,const shader::Program &p,uint32_t w,uint32_t h,uint32_t format,
+         uint32_t source_width,uint32_t source_height,uint32_t source_format,const std::string &backend,bool blend,shader::TextureFilter filter)
+         : vs(v),pixel(pattern(p)),width(w),height(h),sw(source_width),sh(source_height),sf(source_format),
+@@ -82,11 +85,21 @@
+         auto parameter=[](ov::element::Type type,ov::Shape shape,const char *name) {
+             auto p=std::make_shared<op::Parameter>(type,shape);p->output(0).get_tensor().set_names({name});return p;
+         };
+-        std::array<std::shared_ptr<op::Parameter>,4> source{},color{};
++        // The qualified NPU stack wraps Gather indices at 2^21 for a scalar
++        // FP32 source. Independent probes reproduce the boundary. Separate
++        // <=2^20-element ports keep each Gather below it; mask selection and
++        // all filtering stay on the selected device. Small/CPU models retain
++        // their original ports and graph.
++        const auto source_size=sw*sh;
++        source_chunk=backend=="NPU" && source_size>2097152u?1048576u:source_size;
++        std::array<std::vector<std::shared_ptr<op::Parameter>>,4> source{};
++        std::array<std::shared_ptr<op::Parameter>,4> color{};
+         ov::ParameterVector parameters;
+         for(unsigned c=0;c<(pixel.opaque?3u:4u);++c) {
+-            source[c]=parameter(ov::element::f32,{size_t(sw)*sh,1},("source"+std::to_string(c)).c_str());
+-            parameters.push_back(source[c]);
++            for(uint32_t base=0;base<source_size;base+=source_chunk){
++                auto port=parameter(ov::element::f32,{(std::min)(source_chunk,source_size-base),1},source_name(c,base).c_str());
++                source[c].push_back(port);parameters.push_back(port);
++            }
+         }
+         for(unsigned c=0;c<4;++c) {
+             color[c]=parameter(ov::element::f32,{1,1},("color"+std::to_string(c)).c_str());
+@@ -123,7 +136,20 @@
+             auto sx=std::make_shared<op::Minimum>(add(ix,integer(dx)),integer(int32_t(sw-1)));
+             auto sy=std::make_shared<op::Minimum>(add(iy,integer(dy)),integer(int32_t(sh-1)));
+             auto index=std::make_shared<op::Reshape>(add(sx,mul(sy,integer(int32_t(sw)))),axes({count}),false);
+-            return std::make_shared<op::Gather>(source[channel],index,op::Constant::create(ov::element::i32,ov::Shape{},{0}));
++            const auto scalar=[](int32_t value){return op::Constant::create(ov::element::i32,ov::Shape{},{value});};
++            if(source[channel].size()==1)return std::make_shared<op::Gather>(source[channel][0],index,scalar(0));
++            Node selected;
++            for(uint32_t base=0,port=0;base<source_size;base+=source_chunk,++port){
++                const auto length=(std::min)(source_chunk,source_size-base);
++                const auto local=std::make_shared<op::Minimum>(std::make_shared<op::Maximum>(sub(index,scalar(int32_t(base))),scalar(0)),scalar(int32_t(length-1)));
++                const auto value=std::make_shared<op::Gather>(source[channel][port],local,scalar(0));
++                // LogicalAnd is miscompiled in this stack for index ranges;
++                // compose the established exact integer 0/1 comparisons.
++                const auto bits=both(pred(std::make_shared<op::GreaterEqual>(index,scalar(int32_t(base)))),pred(std::make_shared<op::Less>(index,scalar(int32_t(base+length)))));
++                const auto mask=floating(std::make_shared<op::Reshape>(bits,axes({count,1}),false));
++                const auto term=mul(value,mask);selected=selected?add(selected,term):term;
++            }
++            return selected;
+         };
+         auto mix=[](const Node &a,const Node &b,const Node &t)->Node{return add(mul(a,sub(number(1),t)),mul(b,t));};
+         auto tx=sub(x,floating(ix)),ty=sub(y,floating(iy));
+@@ -221,8 +247,11 @@
+     for(auto &v:clip)v*=256;
+     s.failed=true;began=Clock::now();
+     for(unsigned c=0;c<(s.pixel.opaque?3u:4u);++c) {
+-        auto *texels=s.request.get_tensor("source"+std::to_string(c)).data<float>();
+-        for(size_t n=0;n<source.pixels.size();++n)texels[n]=float(source.pixels[n][c])/255;
++        for(uint32_t base=0;base<source.pixels.size();base+=s.source_chunk){
++            auto *texels=s.request.get_tensor(s.source_name(c,base)).data<float>();
++            const auto length=(std::min)(size_t(s.source_chunk),source.pixels.size()-base);
++            for(size_t n=0;n<length;++n)texels[n]=float(source.pixels[base+n][c])/255;
++        }
+     }
+     for(unsigned c=0;c<4;++c)s.request.get_tensor("color"+std::to_string(c)).data<float>()[0]=color[c];
+     std::memcpy(s.request.get_tensor("uv").data<float>(),uv.data(),16);

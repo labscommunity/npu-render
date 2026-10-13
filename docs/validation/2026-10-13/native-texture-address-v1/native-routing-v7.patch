@@ -1,0 +1,134 @@
+--- a/native/windows/registered_lab/CMakeLists.txt
++++ b/native/windows/registered_lab/CMakeLists.txt
+@@ -303,3 +303,10 @@
+ target_link_libraries(nr_large_uniform_capture_probe PRIVATE nr_registered_vertex)
+ set_property(TARGET nr_large_uniform_capture_probe PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+ add_test(NAME large_uniform_contract COMMAND nr_large_uniform_capture_probe --contract)
++
++add_executable(nr_large_texture_capture_probe large_texture_capture_probe.cpp)
++target_compile_features(nr_large_texture_capture_probe PRIVATE cxx_std_17)
++target_compile_options(nr_large_texture_capture_probe PRIVATE /W4 /WX)
++target_link_libraries(nr_large_texture_capture_probe PRIVATE nr_registered_vertex)
++set_property(TARGET nr_large_texture_capture_probe PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
++add_test(NAME large_texture_contract COMMAND nr_large_texture_capture_probe --contract)
+--- a/native/windows/registered_lab/indexed_draw.hpp
++++ b/native/windows/registered_lab/indexed_draw.hpp
+@@ -204,7 +204,7 @@
+             sampler.desc.AddressU == D3D10_DDI_TEXTURE_ADDRESS_CLAMP && sampler.desc.AddressV == D3D10_DDI_TEXTURE_ADDRESS_CLAMP &&
+             sampler.desc.AddressW == D3D10_DDI_TEXTURE_ADDRESS_CLAMP && sampler.desc.MipLODBias == 0 && sampler.desc.MinLOD == 0 && sampler.desc.MaxLOD >= 0);
+         const auto &ss = source->surface;
+-        require((ss.format == 28 || ss.format == 87 || ss.format == 65) && ss.width <= 8192 && ss.height <= 8192 && uint64_t(ss.width)*ss.height <= 4*1024*1024);
++        require((ss.format == 28 || ss.format == 87 || ss.format == 65) && ss.width <= 8192 && ss.height <= 8192 && uint64_t(ss.width)*ss.height <= uint64_t(modulated && !general_texture?8:4)*1024*1024);
+         const auto source_bytes = read_pixels(*source); texture = {ss.width,ss.height,ss.format == 65 ? 28u : ss.format,{}};
+         texture.pixels.resize(size_t(ss.width)*ss.height);
+         // Format decoding only: sampling, shader math and blending remain on
+--- a/native/windows/registered_lab/indexed_exchange_protocol.hpp
++++ b/native/windows/registered_lab/indexed_exchange_protocol.hpp
+@@ -34,8 +34,15 @@
+ // existing reply packet budget. The reserved word carries the legacy ABI.
+ // Textured draws and clears retain their previous limits.
+ constexpr uint32_t large_uniform_pixels=(max_packet_bytes-sizeof(Header)-sizeof(Receipt))/4;
+-inline uint32_t payload_abi(const Header &h){return h.abi==16?h.reserved:h.abi;}
++inline uint32_t payload_abi(const Header &h){return (h.abi==16 || h.abi==17)?h.reserved:h.abi;}
+ inline bool shape_valid(const Header &h,bool component_payload=false,bool large_uniform=false) {
++    // ABI 17 admits larger source textures for the bounded six-vertex affine
++    // sampler only. Target, total packet, shader and operation limits are retained.
++    if(h.abi==17){
++        if(large_uniform || (h.reserved!=4 && h.reserved!=5))return false;
++        auto legacy=h;legacy.abi=h.reserved;legacy.reserved=0;
++        return shape_valid(legacy,component_payload,false);
++    }
+     if(h.abi==16){
+         const auto area=uint64_t(h.width)*h.height;
+         if(large_uniform || !h.reserved || h.reserved>15 || (h.flags&2) || area<=4194304 || area>large_uniform_pixels)return false;
+@@ -144,7 +151,7 @@
+ static_assert(sizeof(TextureDescription) == 16);
+ inline bool texture_valid(const TextureDescription &t, const Header &h) {
+     return t.width && t.width <= 8192 && t.height && t.height <= 8192 &&
+-        uint64_t(t.width)*t.height <= 4*1024*1024 && ((h.flags & 24) || (t.width >= h.width && t.height >= h.height)) &&
++        uint64_t(t.width)*t.height <= (h.abi==17?8u:4u)*1024*1024 && ((h.flags & 24) || (t.width >= h.width && t.height >= h.height)) &&
+         (t.format == 28 || t.format == 87) && !t.reserved;
+ }
+ class Writer {
+@@ -201,6 +208,9 @@
+ }
+ inline std::vector<uint8_t> encode(Request &r) {
+     auto &h = r.header;
++    if(h.abi!=17 && (h.flags&2) && uint64_t(r.texture.width)*r.texture.height>4194304){
++        require(!h.reserved && (h.abi==4 || h.abi==5));h.reserved=h.abi;h.abi=17;
++    }
+     if(h.abi!=16 && !color_clear(h) && uint64_t(h.width)*h.height>4194304){
+         require(!h.reserved && h.abi && h.abi<=15 && !(h.flags&2));
+         h.reserved=h.abi;h.abi=16;
+--- a/native/windows/registered_lab/indexed_pipeline.hpp
++++ b/native/windows/registered_lab/indexed_pipeline.hpp
+@@ -91,7 +91,7 @@
+         if (request.header.flags & 24) {
+             const auto &h=request.header,&old=previous_linear.header;
+             const auto &t=request.texture,&pt=previous_linear.texture;
+-            require(shape_valid(h) && h.abi==((h.flags&16)?5u:4u));
++            require(shape_valid(h) && payload_abi(h)==((h.flags&16)?5u:4u));
+             if(!linear_executor || old.width!=h.width || old.height!=h.height || old.format!=h.format ||
+                 (old.flags & ~4u)!=(h.flags & ~4u) || pt.width!=t.width || pt.height!=t.height || pt.format!=t.format ||
+                 previous_linear.vertex.bytecode!=request.vertex.bytecode || previous_linear.pixel.bytecode!=request.pixel.bytecode){
+--- /dev/null
++++ b/native/windows/registered_lab/large_texture_capture_probe.cpp
+@@ -0,0 +1,47 @@
++#define main original_draw_replay_main
++#include "draw_replay_probe.cpp"
++#undef main
++#include "indexed_exchange_protocol.hpp"
++#include <windows.h>
++namespace ex=nr::registered_lab::indexed_exchange;
++int main(int argc,char **argv)try{
++    ex::Header h;h.abi=17;h.reserved=4;h.nonce[0]=1;h.client_pid=1;h.sequence=1;
++    h.width=91;h.height=64;h.vertices=6;h.flags=0xf0a;h.format=87;h.vs_words=h.ps_words=3;
++    nr::capture::check(ex::shape_valid(h));unsigned negatives=0;
++    ex::TextureDescription t{2912,1824,87,0};nr::capture::check(ex::texture_valid(t,h));
++    auto legacy=h;legacy.abi=4;legacy.reserved=0;nr::capture::check(!ex::texture_valid(t,legacy));++negatives;
++    for(unsigned i=0;i<8;++i){auto bad=h;
++        switch(i){case 0:bad.reserved=1;break;case 1:bad.reserved=17;break;case 2:bad.flags=0xf02;bad.reserved=2;break;
++        case 3:bad.flags|=0x1000;break;case 4:bad.vertices=9;break;case 5:bad.width=4097;break;
++        case 6:bad.width=4096;bad.height=2048;break;case 7:bad.flags=0xf00;break;}
++        nr::capture::check(!ex::shape_valid(bad));++negatives;
++    }
++    auto point=h;point.reserved=5;point.flags=0xf12;nr::capture::check(ex::shape_valid(point));
++    auto too_big=t;too_big.width=8192;too_big.height=1025;nr::capture::check(!ex::texture_valid(too_big,h));++negatives;
++    auto changed=h;changed.reserved=5;nr::capture::check(!ex::same_request(h,changed));++negatives;
++    if(argc==2 && !std::strcmp(argv[1],"--contract")){
++        std::printf("{\"large_texture_contract\":true,\"negative_cases\":%u,\"legacy_large_source_rejected\":true,\"max_packet_bytes\":%u}\n",negatives,ex::max_packet_bytes);return 0;
++    }
++    nr::capture::check(argc==3);const nr::capture::Snapshot s(argv[1]);
++    const auto args=s.values<uint32_t>("arguments"),surface=s.values<uint32_t>("target-description"),source=s.values<uint32_t>("source-description"),sampler=s.values<uint32_t>("sampler-2-0");
++    const auto view=s.values<float>("viewport");const auto blend=s.values<uint32_t>("blend"),raster=s.values<uint32_t>("raster");
++    nr::capture::check(args.size()==9 && surface.size()==10 && source.size()==10 && sampler.size()==13 && view.size()==6 && blend.size()==17 && raster.size()==10);
++    nr::capture::check(args[0]==6 && args[3]==4 && args[4]==1 && args[7]==UINT32_MAX && !blend[0] && !blend[1] && (blend[15]&255)==15);
++    nr::capture::check(raster[0]==3 && raster[1]==1 && !raster[2] && !raster[3] && !raster[4] && !raster[5] && !raster[8] && !raster[9]);
++    nr::capture::check(s.values<uint32_t>("draw-indexed")==std::vector<uint32_t>{1} && s.values<uint32_t>("depth-target-bound")==std::vector<uint32_t>{0});
++    nr::capture::check(nr::registered_lab::single_mip_linear_filter(sampler[0]) && sampler[1]==3 && sampler[2]==3 && sampler[3]==3 && !sampler[4] && !sampler[11]);
++    ex::Request r;auto &header=r.header;header.abi=4;header.nonce[0]=1;header.sequence=1;header.client_pid=GetCurrentProcessId();header.width=surface[3];header.height=surface[4];header.format=surface[5];header.flags=0xf0a;
++    const auto vs=s.values<uint32_t>("vertex-shader"),ps=s.values<uint32_t>("pixel-shader");r.vertex=nr::shader::parse_vertex(vs.data(),vs.size());r.pixel=nr::shader::parse_pixel(ps.data(),ps.size());
++    nr::raster::LinearTextureDrawExecutor::validate_shader(r.pixel);
++    int32_t base;std::memcpy(&base,&args[2],4);r.inputs=fetch(s,args[0],args[1],base,r.vertex,true,args[3]);header.vertices=uint32_t(r.inputs.size());
++    r.viewport={view[0],view[1],view[2],view[3],view[4],view[5]};r.vertex_constants=constants(s,0,r.vertex);r.pixel_constants=constants(s,2,r.pixel);r.background=s.values<nr::raster::PackedColor>("target");
++    r.texture={source[3],source[4],source[5],s.values<nr::raster::PackedColor>("source")};
++    if(raster[7]){const auto scissor=s.values<int32_t>("scissors");nr::capture::check(scissor.size()==4);const std::array<int32_t,4> clip{scissor[0],scissor[1],scissor[2],scissor[3]};
++        if(clip!=std::array<int32_t,4>{0,0,int32_t(header.width),int32_t(header.height)}){r.scissor=clip;header.flags|=4;}}
++    const auto bytes=ex::encode(r);nr::capture::check(header.abi==17 && header.reserved==4 && ex::request_valid(header,bytes.size()));
++    const auto decoded=ex::decode(bytes);nr::capture::check(decoded.background==r.background && decoded.texture.pixels==r.texture.pixels && decoded.inputs==r.inputs && decoded.pixel.bytecode==r.pixel.bytecode);
++    auto corrupt=bytes;auto malformed=header;malformed.abi=4;malformed.reserved=0;std::memcpy(corrupt.data(),&malformed,sizeof(malformed));bool rejected=false;
++    try{(void)ex::decode(corrupt);}catch(const std::invalid_argument&){rejected=true;}nr::capture::check(rejected);++negatives;
++    std::ifstream existing(argv[2],std::ios::binary);nr::capture::check(!existing);existing.close();std::ofstream output(argv[2],std::ios::binary);nr::capture::check(bool(output));output.write(reinterpret_cast<const char*>(bytes.data()),std::streamsize(bytes.size()));output.close();nr::capture::check(bool(output));
++    std::printf("{\"large_texture_capture_packet\":true,\"abi\":%u,\"legacy_abi\":%u,\"width\":%u,\"height\":%u,\"source_width\":%u,\"source_height\":%u,\"bytes\":%zu,\"negative_cases\":%u,\"rendering_performed\":false}\n",header.abi,header.reserved,header.width,header.height,r.texture.width,r.texture.height,bytes.size(),negatives);return 0;
++}catch(const std::exception &e){std::fprintf(stderr,"%s\n",e.what());return 1;}
+--- a/native/windows/registered_lab/linear_texture_draw.cpp
++++ b/native/windows/registered_lab/linear_texture_draw.cpp
+@@ -75,7 +75,7 @@
+         // Alpha replacement happens after sampling. The RGB taps remain valid
+         // for both point and bilinear filtering; source alpha is unused.
+         require(filter==shader::TextureFilter::point || filter==shader::TextureFilter::linear);
+-        require(w && w<=4096 && h && h<=8192 && uint64_t(w)*h<=4*1024*1024 && sw && sw<=8192 && sh && sh<=8192 && uint64_t(sw)*sh<=4*1024*1024);
++        require(w && w<=4096 && h && h<=8192 && uint64_t(w)*h<=4*1024*1024 && sw && sw<=8192 && sh && sh<=8192 && uint64_t(sw)*sh<=8*1024*1024);
+         require((format==28 || format==87) && (sf==28 || sf==87) && vs.stage==shader::Stage::vertex && vs.position_output<16 &&
+             (vs.outputs[pixel.color]&15)==15 && (vs.outputs[pixel.uv]&3)==3);
+         rows=(std::min)(h,4096/w);while(h%rows)--rows;count=w*rows;

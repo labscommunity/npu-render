@@ -1,0 +1,27 @@
+from pathlib import Path
+import openvino as ov,numpy as np,json,os,gc,time,traceback
+from openvino import opset13 as op
+r=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm/large-gather-v6';r.mkdir(exist_ok=False);results=[]
+for n in (2097160,5311488):
+ record={'elements':n,'passed':False};started=time.perf_counter()
+ try:
+  indices=op.parameter([8],np.int32,name='indices');sources=[];gather=None
+  for base in range(0,n,1048576):
+   length=min(1048576,n-base);source=op.parameter([length,1],np.float32,name=f'source{base}');sources.append(source)
+   offset=op.subtract(indices,op.constant(base,np.int32));safe=op.minimum(op.maximum(offset,op.constant(0,np.int32)),op.constant(length-1,np.int32))
+   tap=op.gather(source,safe,op.constant(0,np.int32));mask=op.convert(op.reshape(op.bitwise_and(op.convert(op.greater_equal(indices,op.constant(base,np.int32)),np.int32),op.convert(op.less(indices,op.constant(base+length,np.int32)),np.int32)),op.constant([8,1],np.int64),False),np.float32)
+   term=op.multiply(tap,mask);gather=term if gather is None else op.add(gather,term)
+  model=ov.Model([gather],sources+[indices])
+  for node in model.get_ops():node.set_rt_info('', 'precise_0')
+  ov.serialize(model,str(r/f'model-{n}.xml'),str(r/f'model-{n}.bin'))
+  core=ov.Core();model=core.read_model(str(r/f'model-{n}.xml'));compiled=core.compile_model(model,'NPU',{'PERFORMANCE_HINT':'LATENCY','EXECUTION_MODE_HINT':'ACCURACY'});request=compiled.create_infer_request();devices=compiled.get_property('EXECUTION_DEVICES');record['execution_devices_raw']=repr(devices);devices=[devices] if isinstance(devices,str) else list(devices);assert all(str(x).startswith('NPU') for x in devices)
+  values=((np.arange(n,dtype=np.uint32)*17+13)%251).astype(np.float32).reshape(n,1)/np.float32(255)
+  positions=np.array([0,1,min(n-1,1048576),min(n-1,2097151),min(n-1,2097152),min(n-1,2097153),n-2,n-1],np.int32)
+  
+  for i,base in enumerate(range(0,n,1048576)):request.set_input_tensor(i,ov.Tensor(values[base:base+1048576].copy()))
+  request.set_input_tensor(len(sources),ov.Tensor(positions));request.infer();actual=request.get_output_tensor().data.copy().reshape(-1);expected=values[positions].reshape(-1)
+  record.update(passed=bool(np.array_equal(actual,expected)),maximum_error=float(np.max(np.abs(actual-expected))),indices=positions.tolist(),actual=actual.tolist(),expected=expected.tolist(),execution_devices=list(devices))
+  del request,compiled,model,core;gc.collect()
+ except Exception as e:record.update(error=repr(e),traceback=traceback.format_exc())
+ record['elapsed_ms']=(time.perf_counter()-started)*1000;results.append(record);(r/'report.json').write_text(json.dumps(results,indent=2)+'\n');print(json.dumps(record),flush=True)
+raise SystemExit(0 if all(x['passed'] for x in results) else 1)

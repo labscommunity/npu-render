@@ -37,6 +37,13 @@ before delivering a desktop frame; automatic cleanup passes. A separate static
 frame probe presents successfully, but its ETW trace fails to verify independent
 flip. Full desktop offload and a Tahoma speedup remain unproven.
 
+The [large texture investigation](docs/validation/2026-10-13/native-texture-address-v1/README.md)
+captures the next failing native draw and reproduces incorrect large `Gather`
+addresses on the NPU. Splitting source textures into bounded inputs fixes that
+captured draw: CPU, NPU and the local transport return identical pixels, and
+eight existing sampling regression runs pass. This repairs a specific desktop
+blocker; it does not yet establish a stable native desktop.
+
 The latest [scripted desktop trial](docs/validation/2026-10-13/sole-display-v121/README.md)
 renders the VM's desktop on Delta's physical NPU and passes desktop, Run,
 Notepad, typing, maximize and close checks through the guest's sole indirect

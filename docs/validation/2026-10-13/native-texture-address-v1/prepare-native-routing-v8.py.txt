@@ -1,0 +1,57 @@
+from pathlib import Path
+import shutil,json,hashlib,tarfile
+r=Path('results/render-driver');d=r/'native-routing-v8';shutil.copytree(r/'native-routing-v7',d);lab=d/'native/windows/registered_lab';p=lab/'linear_texture_draw.cpp';s=p.read_text()
+s=s.replace('uint32_t width,height,sw,sh,sf,rows,count;', 'uint32_t width,height,sw,sh,sf,rows,count,source_chunk=0;')
+needle='    State(const shader::Program &v'
+s=s.replace(needle,'''    std::string source_name(unsigned channel,uint32_t base) const {
+        return "source"+std::to_string(channel)+(source_chunk<uint64_t(sw)*sh?"_"+std::to_string(base):"");
+    }
+'''+needle)
+needle='        std::array<std::shared_ptr<op::Parameter>,4> source{},color{};'
+s=s.replace(needle,'''        // The qualified NPU stack wraps Gather indices at 2^21 for a scalar
+        // FP32 source. Independent probes reproduce the boundary. Separate
+        // <=2^20-element ports keep each Gather below it; mask selection and
+        // all filtering stay on the selected device. Small/CPU models retain
+        // their original ports and graph.
+        const auto source_size=sw*sh;
+        source_chunk=backend=="NPU" && source_size>2097152u?1048576u:source_size;
+        std::array<std::vector<std::shared_ptr<op::Parameter>>,4> source{};
+        std::array<std::shared_ptr<op::Parameter>,4> color{};''')
+old='''            source[c]=parameter(ov::element::f32,{size_t(sw)*sh,1},("source"+std::to_string(c)).c_str());
+            parameters.push_back(source[c]);'''
+new='''            for(uint32_t base=0;base<source_size;base+=source_chunk){
+                auto port=parameter(ov::element::f32,{(std::min)(source_chunk,source_size-base),1},source_name(c,base).c_str());
+                source[c].push_back(port);parameters.push_back(port);
+            }''';assert old in s;s=s.replace(old,new)
+old='''            return std::make_shared<op::Gather>(source[channel],index,op::Constant::create(ov::element::i32,ov::Shape{},{0}));'''
+new='''            const auto scalar=[](int32_t value){return op::Constant::create(ov::element::i32,ov::Shape{},{value});};
+            if(source[channel].size()==1)return std::make_shared<op::Gather>(source[channel][0],index,scalar(0));
+            Node selected;
+            for(uint32_t base=0,port=0;base<source_size;base+=source_chunk,++port){
+                const auto length=(std::min)(source_chunk,source_size-base);
+                const auto local=std::make_shared<op::Minimum>(std::make_shared<op::Maximum>(sub(index,scalar(int32_t(base))),scalar(0)),scalar(int32_t(length-1)));
+                const auto value=std::make_shared<op::Gather>(source[channel][port],local,scalar(0));
+                // LogicalAnd is miscompiled in this stack for index ranges;
+                // compose the established exact integer 0/1 comparisons.
+                const auto bits=both(pred(std::make_shared<op::GreaterEqual>(index,scalar(int32_t(base)))),pred(std::make_shared<op::Less>(index,scalar(int32_t(base+length)))));
+                const auto mask=floating(std::make_shared<op::Reshape>(bits,axes({count,1}),false));
+                const auto term=mul(value,mask);selected=selected?add(selected,term):term;
+            }
+            return selected;''';assert old in s;s=s.replace(old,new)
+old='''        auto *texels=s.request.get_tensor("source"+std::to_string(c)).data<float>();
+        for(size_t n=0;n<source.pixels.size();++n)texels[n]=float(source.pixels[n][c])/255;'''
+new='''        for(uint32_t base=0;base<source.pixels.size();base+=s.source_chunk){
+            auto *texels=s.request.get_tensor(s.source_name(c,base)).data<float>();
+            const auto length=(std::min)(size_t(s.source_chunk),source.pixels.size()-base);
+            for(size_t n=0;n<length;++n)texels[n]=float(source.pixels[base+n][c])/255;
+        }''';assert old in s;s=s.replace(old,new);p.write_text(s)
+(r/'native-routing-v8-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-routing-v8.tar.gz','w:gz') as f:f.add(d,arcname=d.name)
+s=(r/'build-native-routing-v7.ps1').read_text().replace('native-routing-v7','native-routing-v8');(r/'build-native-routing-v8.ps1').write_text(s)
+# Quickly test the replacement implementation using the qualified remaining v7
+# library objects; the complete v8 build is still required before installation.
+mini=r/'native-texture-oracle-v3';shutil.copytree(r/'native-texture-oracle-v2',mini)
+(mini/'diagnostic_linear.cpp').write_text(s if False else p.read_text())
+(r/'native-texture-oracle-v3-source.json').write_text(json.dumps({f.name:hashlib.sha256(f.read_bytes()).hexdigest() for f in mini.iterdir()},indent=2)+'\n')
+with tarfile.open(r/'native-texture-oracle-v3.tar.gz','w:gz') as f:f.add(mini,arcname=mini.name)
+s=(r/'build-texture-oracle-v2.ps1').read_text().replace('native-texture-oracle-v2','native-texture-oracle-v3').replace('native-routing-v7 plus extra sampler outputs','native-routing-v7 with native-routing-v8 segmented sampler');(r/'build-texture-oracle-v3.ps1').write_text(s)
