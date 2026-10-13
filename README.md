@@ -10,6 +10,18 @@ RGBA composition and an explicit backend switch. The packaged runtime passed
 GPU → NPU → CPU → GPU → NPU switching on Panther Lake. It supports CPU/GPU/NPU through
 its first OpenVINO provider; other providers can implement the same contracts.
 
+The latest [scripted desktop trial](docs/validation/2026-10-13/sole-display-v121/README.md)
+renders the VM's desktop on Delta's physical NPU and passes desktop, Run,
+Notepad, typing, maximize and close checks through the guest's sole indirect
+display. It remains far too slow for normal use. Delta's physical desktop has
+not migrated, and this path has not demonstrated a Tahoma benefit. The
+[physical presentation plan](docs/research/physical-desktop-presentation.md)
+describes the remaining integration. Current
+[matched coverage replays](docs/validation/2026-10-13/compact-abba-v1/README.md)
+preserve all 1,438 captured requests' pixels in four runs and reduce average
+replay time by 5.5%. This remains an isolated optimization. The following results
+describe earlier milestones and their individual limits.
+
 The switch affects participating integrations. A restricted Weston adapter passes
 Linux CPU headless/nested tests, and D3D12 shared buffers pass a real Panther Lake
 NPU round trip on Windows. Native Linux NPU presentation, Windows DWM replacement,

@@ -34,6 +34,16 @@ or composition. Those costs must be counted; a copied image must not be reported
 as entirely eliminating GPU activity. The older capture overlay is not sufficient:
 its original applications continue rendering through the existing GPU path.
 
+The current laboratory UMD also deliberately rejects `OpenAdapter10` outside
+the owned VM, and its external-worker transport has a separate guest-only
+admission check. The existing signed laboratory package cannot simply be
+installed as a physical desktop switch. Physical operation needs its own
+qualified admission, local worker transport, installation and recovery path;
+the guest guards remain the default. A physical presentation probe establishes
+only the output boundary. A read-only prerequisite snapshot can record active
+graphics drivers, code-integrity configuration and certificate trust while the
+interactive desktop is unavailable.
+
 The hybrid-GPU model does not solve DWM migration by itself. Microsoft's documented
 redirected and direct-flip paths use the integrated GPU for DWM composition, even
 when another adapter renders applications.

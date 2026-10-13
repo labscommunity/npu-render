@@ -1,0 +1,74 @@
+{
+    "recorded_at":  "2026-10-13T06:33:54.3348145Z",
+    "read_only":  true,
+    "interactive_user_present":  false,
+    "graphics_devices":  [
+                             {
+                                 "Status":  "OK",
+                                 "Class":  "Display",
+                                 "FriendlyName":  "Intel(R) Arc(TM) B390 GPU",
+                                 "InstanceId":  "PCI\\VEN_8086\u0026DEV_B080\u0026SUBSYS_14641043\u0026REV_04\\3\u002611583659\u00260\u002610"
+                             }
+                         ],
+    "graphics_and_npu_drivers":  [
+                                     {
+                                         "DeviceName":  "Intel(R) NPU",
+                                         "DriverVersion":  "32.0.100.5540",
+                                         "InfName":  "oem13.inf",
+                                         "IsSigned":  true,
+                                         "Signer":  "Microsoft Windows Hardware Compatibility Publisher"
+                                     },
+                                     {
+                                         "DeviceName":  "Intel(R) Arc(TM) B390 GPU",
+                                         "DriverVersion":  "32.0.101.8724",
+                                         "InfName":  "oem168.inf",
+                                         "IsSigned":  true,
+                                         "Signer":  "Microsoft Windows Hardware Compatibility Publisher"
+                                     }
+                                 ],
+    "device_guard":  {
+                         "VirtualizationBasedSecurityStatus":  2,
+                         "SecurityServicesConfigured":  [
+                                                            2,
+                                                            3,
+                                                            4
+                                                        ],
+                         "SecurityServicesRunning":  [
+                                                         2,
+                                                         3,
+                                                         4,
+                                                         7
+                                                     ],
+                         "CodeIntegrityPolicyEnforcementStatus":  2,
+                         "UsermodeCodeIntegrityPolicyEnforcementStatus":  0
+                     },
+    "device_guard_query_error":  null,
+    "laboratory_certificate":  [
+                                   {
+                                       "store":  "My",
+                                       "present":  true,
+                                       "subject":  "CN=NPU Render Isolated Lab 2026-10-12",
+                                       "not_after":  "2026-11-11T17:22:25.0000000Z",
+                                       "has_private_key":  true
+                                   },
+                                   {
+                                       "store":  "Root",
+                                       "present":  false,
+                                       "subject":  null,
+                                       "not_after":  null,
+                                       "has_private_key":  null
+                                   },
+                                   {
+                                       "store":  "TrustedPublisher",
+                                       "present":  false,
+                                       "subject":  null,
+                                       "not_after":  null,
+                                       "has_private_key":  null
+                                   }
+                               ],
+    "physical_lab_driver_installed_by_probe":  false,
+    "certificate_store_changed":  false,
+    "security_configuration_changed":  false,
+    "restart_requested":  false,
+    "physical_render_adapter_admission_tested":  false
+}

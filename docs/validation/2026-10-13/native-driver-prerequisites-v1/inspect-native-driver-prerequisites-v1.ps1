@@ -1,0 +1,9 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$out="$r\vm\native-driver-prerequisites-v1.json"
+if(Test-Path $out){throw 'Prerequisite record exists'}
+$thumb='3112355AF6B6C6265E9B849662D3E02F6797343A';$trust=@()
+foreach($store in @('My','Root','TrustedPublisher')){$cert=Get-Item "Cert:\LocalMachine\$store\$thumb" -ErrorAction SilentlyContinue;$trust+=[ordered]@{store=$store;present=[bool]$cert;subject=$(if($cert){$cert.Subject}else{$null});not_after=$(if($cert){$cert.NotAfter.ToUniversalTime().ToString('o')}else{$null});has_private_key=$(if($cert){$cert.HasPrivateKey}else{$null})}}
+$guard=$null;$guardError=$null;try{$guard=Get-CimInstance -Namespace root\Microsoft\Windows\DeviceGuard -ClassName Win32_DeviceGuard | Select-Object VirtualizationBasedSecurityStatus,SecurityServicesConfigured,SecurityServicesRunning,CodeIntegrityPolicyEnforcementStatus,UsermodeCodeIntegrityPolicyEnforcementStatus}catch{$guardError=$_.Exception.Message}
+$displays=@(Get-PnpDevice -Class Display -PresentOnly|Select-Object Status,Class,FriendlyName,InstanceId)
+$devices=@(Get-CimInstance Win32_PnPSignedDriver|Where-Object {$_.DeviceClass -eq 'DISPLAY' -or $_.DeviceName -match 'Intel.*(NPU|AI Boost)'}|Select-Object DeviceName,DriverVersion,InfName,IsSigned,Signer)
+[ordered]@{recorded_at=[DateTime]::UtcNow.ToString('o');read_only=$true;interactive_user_present=[bool](Get-CimInstance Win32_ComputerSystem).UserName;graphics_devices=$displays;graphics_and_npu_drivers=$devices;device_guard=$guard;device_guard_query_error=$guardError;laboratory_certificate=$trust;physical_lab_driver_installed_by_probe=$false;certificate_store_changed=$false;security_configuration_changed=$false;restart_requested=$false;physical_render_adapter_admission_tested=$false}|ConvertTo-Json -Depth 7|Set-Content $out
+'Read-only native driver prerequisite snapshot saved'

@@ -1,0 +1,97 @@
+{
+  "recorded_at": "2026-10-13T06:35:28.309777+00:00",
+  "passed": true,
+  "requests_per_run": 1438,
+  "total_exact_requests": 5752,
+  "source_and_binary_unchanged": true,
+  "worker_sha256": "9260ad17029bda0e81521a73b6864b09e5c234ae426c787bcbd5ba6ab8aa5e18",
+  "cases": [
+    {
+      "name": "A1",
+      "compact": false,
+      "started": "2026-10-13T05:55:38.7289027Z",
+      "finished": "2026-10-13T06:05:15.736945+00:00",
+      "elapsed_ms": 576911.396800002,
+      "draw_ms": 283754.81000000006,
+      "compile_and_draw_ms": 466746,
+      "compile_calls": 1730,
+      "cache_hits": 1730,
+      "compact_calls": 0,
+      "compact_samples": 0,
+      "wide_calls": 16759,
+      "passed": true
+    },
+    {
+      "name": "B1",
+      "compact": true,
+      "started": "2026-10-13T06:05:16.5770346Z",
+      "finished": "2026-10-13T06:14:21.924569+00:00",
+      "elapsed_ms": 545248.2276000082,
+      "draw_ms": 293976.7340000004,
+      "compile_and_draw_ms": 438254,
+      "compile_calls": 1775,
+      "cache_hits": 1775,
+      "compact_calls": 13992,
+      "compact_samples": 51063808,
+      "wide_calls": 2767,
+      "passed": true
+    },
+    {
+      "name": "B2",
+      "compact": true,
+      "started": "2026-10-13T06:14:22.7675948Z",
+      "finished": "2026-10-13T06:23:30.886146+00:00",
+      "elapsed_ms": 548028.9618000097,
+      "draw_ms": 295239.3089999998,
+      "compile_and_draw_ms": 439577,
+      "compile_calls": 1775,
+      "cache_hits": 1775,
+      "compact_calls": 13992,
+      "compact_samples": 51063808,
+      "wide_calls": 2767,
+      "passed": true
+    },
+    {
+      "name": "A2",
+      "compact": false,
+      "started": "2026-10-13T06:23:31.8464122Z",
+      "finished": "2026-10-13T06:33:11.545901+00:00",
+      "elapsed_ms": 579612.2571999877,
+      "draw_ms": 286118.5809999996,
+      "compile_and_draw_ms": 470572,
+      "compile_calls": 1730,
+      "cache_hits": 1730,
+      "compact_calls": 0,
+      "compact_samples": 0,
+      "wide_calls": 16759,
+      "passed": true
+    }
+  ],
+  "comparison": {
+    "elapsed_ms": {
+      "off_mean": 578261.8269999948,
+      "on_mean": 546638.594700009,
+      "relative_reduction": 0.05468670215367011
+    },
+    "compile_and_draw_ms": {
+      "off_mean": 468659,
+      "on_mean": 438915.5,
+      "relative_reduction": 0.06346512069543098
+    },
+    "draw_ms": {
+      "off_mean": 284936.6954999998,
+      "on_mean": 294608.0215000001,
+      "relative_reduction": -0.03394201642940131
+    }
+  },
+  "draw_time_scope_differs_due_to_lazy_compilation": true,
+  "execution_timer_coarse": true,
+  "controller_timer_high_resolution": true,
+  "one_abba_sequence": true,
+  "thermal_clocks_and_background_work_controlled": false,
+  "raw_files_remotely_hash_verified": 13,
+  "production_renderer_changed": false,
+  "live_desktop_tested": false,
+  "physical_desktop_offloaded": false,
+  "tahoma_performance_tested": false
+}

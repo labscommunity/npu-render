@@ -29,6 +29,12 @@ contracts supply independent expected results within their tested domains.
 | Model setup calls | 1,730 | 1,775 |
 | Disk cache hits | 1,730 | 1,770 |
 
+The draw-time scopes differ. The wide path constructs its coverage program
+before execution; the opt-in path creates the selected coverage program lazily
+inside `CoverageExecutor::execute`. Its first draw therefore includes setup
+that the earlier draw timer excludes. Summed draw time alone cannot establish
+a slowdown. Setup plus draw includes both in either configuration.
+
 Compact arithmetic handled 13,992 coverage calls and 51,063,808 samples across
 1,102 requests. The wide path handled 2,767 calls; 228 requests used both paths.
 Every provider-call count, coverage count, output-byte count, tile count, and
