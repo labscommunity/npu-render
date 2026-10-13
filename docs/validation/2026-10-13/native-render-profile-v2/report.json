@@ -1,0 +1,61 @@
+{
+  "recorded_at": "2026-10-13T08:42:45.631888+00:00",
+  "passed": true,
+  "case": {
+    "name": "combined",
+    "memory_cache_enabled": true,
+    "compact_coverage_enabled": true,
+    "passed": true,
+    "requests": 1438,
+    "acks": 1438,
+    "worker_sha256": "4c6163206ceff09082c32c723a18bdf98f2fe3d2b5bec6a53d6d23c373297e8c",
+    "elapsed_ms": 388210.63570000115,
+    "compile_and_draw_ms": 351364.5960000002,
+    "draw_ms": 259833.2680000004,
+    "memory_hits": 1194,
+    "backend_compiles": 581,
+    "compact_calls": 13992,
+    "compact_samples": 51063808,
+    "wide_calls": 2767,
+    "all_pixels_exact": true,
+    "all_receipts_exact_or_exact_compact_input_delta": true
+  },
+  "actual_runtime_configuration": {
+    "pipeline_cache_policy": {
+      "kind": "pipeline_cache_policy",
+      "uniform_capacity": 16,
+      "triangle_capacity": 48,
+      "clear_capacity": 4,
+      "replacement": "FIFO",
+      "hardware_queue_count_measured": false
+    },
+    "local_worker_ready": {
+      "local_worker_ready": true,
+      "pid": 2668,
+      "concurrent_clients": 4,
+      "provider_concurrency": 1,
+      "client_pid_verified": true,
+      "private_user_acl": true,
+      "network_listener": false
+    },
+    "private_shared_queue_experiment": {
+      "kind": "private_shared_queue_experiment",
+      "enabled": true,
+      "property_readback_verified": true,
+      "hardware_queue_count_measured": false
+    }
+  },
+  "cpu_suites": 32,
+  "npu_component_stages": 5,
+  "backend_calls_loaded_from_disk_cache": 581,
+  "provider_setup_ms": 55223.923,
+  "backend_compile_ms": 24642.369,
+  "memory_evictions": 517,
+  "replay_and_policy_boundary_cases": 107,
+  "raw_files_remotely_hash_verified": 18,
+  "single_corrected_combined_run": true,
+  "matched_performance_control": false,
+  "production_runtime_changed": false,
+  "physical_desktop_offloaded": false,
+  "tahoma_performance_tested": false
+}

@@ -1,0 +1,72 @@
+from pathlib import Path
+import importlib.util,copy
+p=Path('results/render-driver/replay-ordered-trace-v12-profile.py');s=importlib.util.spec_from_file_location('memory_replay',p);m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+a=dict(source_sha256='a',normalized_sha256='b',pixels_sha256='c',receipt=dict(input_bytes=100,output_bytes=50,provider_requests=8,covered_samples=20,tile_executions=2,used_rectangle=0,reserved=0))
+b=copy.deepcopy(a);b.update(ordinal=1,wire_client_pid=42,coverage_telemetry=dict(execution_device='NPU',client_pid=42,sequence=1,compile_calls=4,backend_compile_calls=2,memory_cache_requests=4,memory_cache_hits=2,memory_cache_evictions=1,cache_requests=2,cache_hits=2,compile_and_draw_ms=10.,provider_setup_ms=8.,backend_compile_ms=7.,compact_coverage_calls=0,compact_coverage_samples=0,wide_coverage_calls=3))
+assert m.compare_reference(b,a,2,0,False)=='exact';n=1
+for key in b['receipt']:
+ c=copy.deepcopy(b);c['receipt'][key]+=1
+ try:m.compare_reference(c,a,2,0,False)
+ except AssertionError:n+=1
+ else:raise AssertionError(key)
+for key in ('source_sha256','normalized_sha256','pixels_sha256'):
+ c=copy.deepcopy(b);c[key]='wrong'
+ try:m.compare_reference(c,a,2,0,False)
+ except AssertionError:n+=1
+ else:raise AssertionError(key)
+for key in (k for k in b['coverage_telemetry'] if not k.endswith('_ms')):
+ for value in (-1,'invalid',9999999):
+  c=copy.deepcopy(b);c['coverage_telemetry'][key]=value
+  try:m.compare_reference(c,a,2,0,False)
+  except AssertionError:n+=1
+  else:raise AssertionError((key,value))
+for key in ('compile_and_draw_ms','provider_setup_ms','backend_compile_ms'):
+ for value in (-1.,float('nan'),float('inf'),'invalid',True):
+  c=copy.deepcopy(b);c['coverage_telemetry'][key]=value
+  try:m.compare_reference(c,a,2,0,False)
+  except AssertionError:n+=1
+  else:raise AssertionError((key,value))
+for key,value in [('backend_compile_ms',9.),('provider_setup_ms',11.),('compile_and_draw_ms',7.)]:
+ c=copy.deepcopy(b);c['coverage_telemetry'][key]=value
+ try:m.compare_reference(c,a,2,0,False)
+ except AssertionError:n+=1
+ else:raise AssertionError((key,value))
+
+c=copy.deepcopy(b);c['coverage_telemetry'].update(compact_coverage_calls=2,compact_coverage_samples=4096,wide_coverage_calls=1);c['receipt']['input_bytes']+=4096*8
+assert m.compare_reference(c,a,2,0,True)=='compact_coverage_input_bytes';n+=1
+for allowed in (False,True):
+ for key,value in [('compact_coverage_calls',0),('compact_coverage_calls',True),('compact_coverage_samples',0),('compact_coverage_samples',2*65536+1),('wide_coverage_calls',7)]:
+  d=copy.deepcopy(c);d['coverage_telemetry'][key]=value
+  try:m.compare_reference(d,a,2,0,allowed)
+  except AssertionError:n+=1
+  else:raise AssertionError((allowed,key,value))
+try:m.compare_reference(c,a,2,0,False)
+except AssertionError:n+=1
+else:raise AssertionError('compact bytes allowed with option disabled')
+for key in ('input_bytes','output_bytes','provider_requests','covered_samples','tile_executions','used_rectangle','reserved'):
+ d=copy.deepcopy(c);d['receipt'][key]+=1
+ try:m.compare_reference(d,a,2,0,True)
+ except AssertionError:n+=1
+ else:raise AssertionError(('compact receipt mismatch',key))
+
+events={'local_worker_ready':dict(pid=123,private_user_acl=True,client_pid_verified=True,network_listener=False,concurrent_clients=4,provider_concurrency=1),'pipeline_cache_policy':dict(uniform_capacity=16,triangle_capacity=48,clear_capacity=4,replacement='FIFO',hardware_queue_count_measured=False),'private_shared_queue_experiment':dict(enabled=True,property_readback_verified=True,hardware_queue_count_measured=False)}
+m.verify_startup(events,123,True);m.verify_queue(events,'1');n+=2
+for kind in events:
+ for key,value in events[kind].items():
+  d=copy.deepcopy(events);d[kind][key]=not value if type(value) is bool else 999 if type(value) is int else 'invalid'
+  try:
+   if kind=='private_shared_queue_experiment':m.verify_queue(d,'1')
+   else:m.verify_startup(d,123,True)
+  except AssertionError:n+=1
+  else:raise AssertionError(('policy mismatch admitted',kind,key))
+for kind in ('local_worker_ready','pipeline_cache_policy'):
+ d=copy.deepcopy(events);del d[kind]
+ try:m.verify_startup(d,123,True)
+ except KeyError:n+=1
+ else:raise AssertionError('missing policy admitted')
+d=copy.deepcopy(events);d['pipeline_cache_policy'].update(uniform_capacity=8,triangle_capacity=24)
+m.verify_startup(d,123,False);n+=1
+try:m.verify_startup(d,123,True)
+except AssertionError:n+=1
+else:raise AssertionError('ignored expanded setting admitted')
+print(n,'profile and worker-configuration boundary cases passed')

@@ -1,0 +1,113 @@
+from pathlib import Path
+import shutil,hashlib,json,tarfile
+r=Path('results/render-driver');source=r/'native-probe-driver-v1';shutil.copytree(r/'native-client-promoted-v1',source);d=source/'native/windows/registered_lab'
+shutil.copyfile(r/'native-admission-v1/lease.hpp',d/'native_probe_lease.hpp')
+p=d/'indexed_exchange.hpp';s=p.read_text().replace('#include <bcrypt.h>','#include <bcrypt.h>\n#ifdef NR_NATIVE_PROBE\n#include "native_probe_lease.hpp"\n#include "local_indexed_client.hpp"\n#endif')
+a=s.index('inline bool indexed_exchange_configured() {');b=s.index('class IndexedNpuExchange',a)
+s=s[:a]+'''inline bool indexed_exchange_configured() {
+#ifdef NR_NATIVE_PROBE
+    try { nr::native_probe::Admission admission(nr::native_probe::read_mapping()); admission.verify(); return true; }
+    catch (...) { return false; }
+#else
+    return nr_fill_guest() && (GetFileAttributesW(L"C:\\\\npu-lab\\\\indexed-exchange-active.txt") != INVALID_FILE_ATTRIBUTES ||
+        GetFileAttributesW(L"C:\\\\npu-lab\\\\indexed-pipe-active.txt") != INVALID_FILE_ATTRIBUTES);
+#endif
+}
+''' +s[b:]
+s=s.replace('    bool failed = false;','''    bool failed = false;
+#ifdef NR_NATIVE_PROBE
+    std::unique_ptr<nr::native_probe::Admission> admission;
+    std::unique_ptr<LocalIndexedClient> local_client;
+#endif''')
+s=s.replace('    IndexedNpuExchange() {','''    IndexedNpuExchange() {
+#ifdef NR_NATIVE_PROBE
+        admission = std::make_unique<nr::native_probe::Admission>(nr::native_probe::read_mapping());
+        local_client = std::make_unique<LocalIndexedClient>(admission->pipe_name(), admission->worker_handle(), 90000);
+#else''')
+s=s.replace('    raster::UniformDrawExecutor::Result execute', '#endif\n    raster::UniformDrawExecutor::Result execute')
+# The conditional must end inside the constructor, not between declarations.
+s=s.replace('        }\n    }\n#endif\n    raster::UniformDrawExecutor::Result execute','        }\n#endif\n    }\n    raster::UniformDrawExecutor::Result execute')
+needle='            const auto bytes = indexed_exchange::encode(request);';assert s.count(needle)==1
+s=s.replace(needle,needle+'''
+#ifdef NR_NATIVE_PROBE
+            admission->verify();
+            auto result = indexed_exchange::decode_response(local_client->exchange(bytes), h);
+            result.execution_device = "NPU (local indexed)";
+            return result;
+#else''')
+s=s.replace('        } catch (...) { failed = true; throw; }','#endif\n        } catch (...) { failed = true; throw; }');p.write_text(s)
+p=d/'driver.cpp';s=p.read_text();s=s.replace('    if (!nr_fill_guest()) return DXGI_ERROR_UNSUPPORTED;','''#ifdef NR_NATIVE_PROBE
+    if (!indexed_exchange_configured()) return DXGI_ERROR_UNSUPPORTED;
+#else
+    if (!nr_fill_guest()) return DXGI_ERROR_UNSUPPORTED;
+#endif''')
+needle='''        d->backend = selected_backend;
+        if (d->backend == "NPU" && indexed_exchange_configured()) d->backend = "NPU_LAB_INDEXED";''';assert s.count(needle)==1
+s=s.replace(needle,'''#ifdef NR_NATIVE_PROBE
+        if (!indexed_exchange_configured()) throw Error{DXGI_ERROR_UNSUPPORTED};
+        d->backend = "NPU_LAB_INDEXED";
+#else
+'''+needle+'\n#endif')
+a=s.index('extern "C" __declspec(dllexport) BOOL nr_fill_configure');b=s.index('    if (!backend',a)
+s=s[:b]+'''#ifdef NR_NATIVE_PROBE
+    if (!backend || counters.live_contexts || counters.live_allocations ||
+        (std::strcmp(backend, "NPU") && std::strcmp(backend, "NPU_LAB_INDEXED")) || !indexed_exchange_configured()) return FALSE;
+    try { selected_backend = "NPU_LAB_INDEXED"; return TRUE; } catch (...) { return FALSE; }
+#else
+''' +s[b:];s=s[:s.rfind('\n}')]+ '\n#endif'+s[s.rfind('\n}'):];p.write_text(s)
+# Reuse actual DDI callbacks and the established independent pixel oracles.
+s=(d/'indexed_draw_test.hpp').read_text();s=s[:s.index('    blend.BlendEnable[0]=TRUE;')]+'''
+    f.pfnDestroyRenderTargetView(h, view);
+    for (unsigned i = 0; i < 4; ++i) f.pfnDestroyResource(h, resources[i]);
+    f.pfnDestroyDevice(h);
+    TEST(counters.executions == executions_before + 2 && counters.draws == draws_before + 2 && !counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
+    std::printf("{\\"native_indexed_ddi\\":true,\\"verified_draws\\":2,\\"changed_constants\\":true,\\"invalid_ranges_atomic\\":true,\\"execution_device\\":\\"%s\\"}\\n", counters.last_execution_device);
+    return 0;
+}
+''';(d/'native_indexed_probe_test.hpp').write_text(s)
+s=(d/'tests.cpp').read_text();s=s[:s.index('#include "upload_test.hpp"')]+'''
+#include "clear_ddi_test.hpp"
+#include "native_indexed_probe_test.hpp"
+int main(int argc, char **argv) {
+    std::setvbuf(stdout, nullptr, _IONBF, 0);
+    TEST(argc == 1 || (argc == 2 && !std::strcmp(argv[1], "--reject-unleased")));
+    D3DDDI_ADAPTERCALLBACKS callbacks{}; callbacks.pfnQueryAdapterInfoCb = query_adapter_cb;
+    D3D10_2DDI_ADAPTERFUNCS funcs{}; D3D10DDIARG_OPENADAPTER args{};
+    args.pAdapterCallbacks = &callbacks; args.pAdapterFuncs_2 = &funcs;
+    TEST(!nr_fill_configure("CPU") && !nr_fill_configure("GPU"));
+    if (argc == 2) {
+        TEST(!nr_fill_configure("NPU") && OpenAdapter10_2(&args) == DXGI_ERROR_UNSUPPORTED && !adapter_queries);
+        std::printf("{\\"unleased_native_adapter_rejected\\":true,\\"passed\\":true,\\"provider_requests\\":0}\\n"); return 0;
+    }
+    TEST(nr_fill_configure("NPU"));
+    TEST(OpenAdapter10_2(&args) == S_OK && adapter_queries == 1 && funcs.pfnCreateDevice && funcs.pfnCloseAdapter);
+    D3DDDI_DEVICECALLBACKS kt{};
+    kt.pfnCreateContextCb = create_context_cb; kt.pfnDestroyContextCb = destroy_context_cb;
+    kt.pfnAllocateCb = allocate_cb; kt.pfnDeallocateCb = deallocate_cb;
+    kt.pfnLockCb = lock_cb; kt.pfnUnlockCb = unlock_cb; kt.pfnRenderCb = render_cb;
+    D3D10DDI_CORELAYER_DEVICECALLBACKS um{}; um.pfnSetErrorCb = set_error;
+    TEST(test_provider_clears(kt,um,"NPU") == 0);
+    TEST(test_indexed_draw(kt,um,"NPU") == 0);
+    TEST(counters.executions == 10 && counters.remote_npu_executions == 10 && !counters.cpu_executions && !counters.gpu_executions && !counters.npu_executions);
+    TEST(!std::strcmp(counters.last_execution_device,"NPU (local indexed)"));
+    TEST(!counters.live_allocations && !counters.live_contexts && !counters.cleanup_errors && !contract_error);
+    TEST(funcs.pfnCloseAdapter(args.hAdapter) == S_OK);
+    std::printf("{\\"native_probe_ddi_component\\":true,\\"passed\\":true,\\"npu_local_executions\\":10,\\"clears\\":8,\\"draws\\":2,\\"cpu_executions\\":0,\\"gpu_executions\\":0,\\"allocation_callbacks_emulated\\":true,\\"registered_adapter_tested\\":false,\\"desktop_offloaded\\":false}\\n"); return 0;
+}
+''';(d/'native_probe_ddi_test.cpp').write_text(s)
+p=d/'CMakeLists.txt';p.write_text(p.read_text()+'''
+# Separate, uninstalled native-probe artifacts. The ordinary guest targets keep their guard.
+add_library(nr_native_probe_umd SHARED driver.cpp)
+add_executable(nr_native_probe_ddi_test native_probe_ddi_test.cpp)
+foreach(target nr_native_probe_umd nr_native_probe_ddi_test)
+ target_compile_definitions(${target} PRIVATE NR_NATIVE_PROBE=1)
+ target_compile_features(${target} PRIVATE cxx_std_17)
+ target_compile_options(${target} PRIVATE /W4 /WX)
+ target_include_directories(${target} PRIVATE "${NR_WDK_INCLUDE_ROOT}/um" "${NR_WDK_INCLUDE_ROOT}/shared" "${NR_WDK_INCLUDE_ROOT}/km")
+ target_link_libraries(${target} PRIVATE nr_registered_blend nr_registered_vertex d3dcompiler advapi32)
+ set_property(TARGET ${target} PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endforeach()
+''')
+(r/'native-probe-driver-v1-source.json').write_text(json.dumps({str(p.relative_to(source)).replace('/','\\'):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(source.rglob('*')) if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-probe-driver-v1.tar.gz','w:gz') as t:t.add(source,arcname=source.name)
+print('Prepared separate native diagnostic UMD and ten-operation component test; not installed')
