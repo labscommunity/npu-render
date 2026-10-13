@@ -58,7 +58,8 @@ try {
      $last=$rows|Where-Object {$null -ne $_.path_count}|Select-Object -Last 1
      $admitted=@($rows|Where-Object {$_.indirect_display_active -eq $true}).Count -gt 0
      $finished=@($rows|Where-Object {
-      $_.operation -eq 'restore' -or $null -ne $_.passed -or $null -ne $_.error
+      $_.operation -in @('restore_begin','restore') -or
+       $null -ne $_.passed -or $null -ne $_.error
      }).Count -gt 0
      $state.sole_indirect=$admitted -and !$finished -and
       $last.phase -eq 'extended' -and $last.path_count -eq 1
@@ -196,14 +197,32 @@ def run(args):
             if child.wait(timeout=15):
                 raise RuntimeError("frame collection failed; inspect ssh.stderr.log")
         finally:
-            deadline.cancel()
-            if child.poll() is None:
-                child.terminate()
-                try:
-                    child.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    child.kill()
-                    child.wait()
+            try:
+                # End the input lease before waiting for the management process.
+                # Otherwise its last true receipt survives after collection stops.
+                temporary = args.output / "incoming-state.json"
+                temporary.write_text(
+                    json.dumps(
+                        {
+                            "topology_name": args.topology_name,
+                            "sole_indirect": False,
+                            "reason": "frame collection ended",
+                        }
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+                temporary.replace(args.output / "input-ready.json")
+            finally:
+                deadline.cancel()
+
+                if child.poll() is None:
+                    child.terminate()
+                    try:
+                        child.wait(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        child.kill()
+                        child.wait()
 
 
 if __name__ == "__main__":
