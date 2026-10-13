@@ -1,0 +1,11 @@
+--- a/native/windows/registered_lab/large_uniform_capture_probe.cpp
++++ b/native/windows/registered_lab/large_uniform_capture_probe.cpp
+@@ -23,7 +23,7 @@
+     }
+     nr::capture::check(argc==3);
+     const nr::capture::Snapshot s(argv[1]);const auto args=s.values<uint32_t>("arguments"),surface=s.values<uint32_t>("target-description");
+-    const auto view=s.values<float>("viewport"),blend=s.values<uint32_t>("blend"),raster=s.values<uint32_t>("raster");
++    const auto view=s.values<float>("viewport");const auto blend=s.values<uint32_t>("blend"),raster=s.values<uint32_t>("raster");
+     nr::capture::check(args.size()==9 && surface.size()==10 && view.size()==6 && blend.size()==17 && raster.size()==10);
+     nr::capture::check(args[3]==4 && args[4]==1 && args[7]==UINT32_MAX && !blend[0] && blend[1] && blend[9]==2 && blend[10]==6 && blend[11]==1 && blend[12]==2 && blend[13]==6 && blend[14]==1 && (blend[15]&255)==15);
+     nr::capture::check(raster[0]==3 && raster[1]==1 && !raster[2] && !raster[3] && !raster[4] && !raster[5] && !raster[8] && !raster[9]);

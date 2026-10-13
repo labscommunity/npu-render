@@ -115,3 +115,13 @@ on October 13, 2026, to attempt the next tests after the owner signs in and unlo
 Its archived waiting snapshot is not an ongoing execution claim. Physical frame
 delivery, primary-display migration, input mapping, topology restoration, and
 matched Tahoma measurements remain outstanding.
+
+The later [native desktop trials](../validation/2026-10-13/native-desktop-live-v1/)
+run on the unlocked console and establish actual WUDFHost bootstrap, requested
+adapter selection and DWM NPU execution. They also expose native desktop failures:
+the first large untextured draw exceeds the transport limit; its repaired path
+works in the second trial, which rejects a subsequent textured draw. DWM exits
+before frame readback in both trials and recovery succeeds. The separate physical
+probe now submits a verified static frame, but lost ETW events prevent confirming
+independent flip. These results supersede the earlier waiting snapshots above;
+they do not establish a usable desktop or a Tahoma benefit.

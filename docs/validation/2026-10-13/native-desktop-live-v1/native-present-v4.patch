@@ -1,0 +1,45 @@
+--- a/frame_present_probe.cpp
++++ b/frame_present_probe.cpp
+@@ -17,7 +17,8 @@
+ using Microsoft::WRL::ComPtr;
+ namespace {
+ void require(bool value,const char *message){if(!value)throw std::runtime_error(message);}
+-void check(HRESULT status){if(FAILED(status)){char message[64];std::snprintf(message,sizeof(message),"graphics call failed: %08lx",static_cast<unsigned long>(status));throw std::runtime_error(message);}}
++const char *phase="startup";
++void check(HRESULT status){if(FAILED(status)){char message[192];std::snprintf(message,sizeof(message),"graphics call failed at %s: %08lx",phase,static_cast<unsigned long>(status));throw std::runtime_error(message);}}
+ struct FrameHeader {uint64_t magic;uint32_t version,header_bytes;uint64_t sequence;uint32_t width,height,format,row_bytes;uint64_t pixel_bytes,qpc;uint32_t producer_pid,reserved;};
+ static_assert(sizeof(FrameHeader)==64);
+ struct Frame {FrameHeader header{};std::vector<uint8_t> pixels;};
+@@ -65,25 +66,25 @@
+     require(SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)!=nullptr,"per-monitor thread DPI awareness unavailable");
+     require(AreDpiAwarenessContextsEqual(GetThreadDpiAwarenessContext(),DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)!=0,"DPI awareness readback mismatch");
+     const auto monitor=MonitorFromPoint(POINT{0,0},MONITOR_DEFAULTTOPRIMARY);MONITORINFO mi{};mi.cbSize=sizeof(mi);require(monitor && GetMonitorInfoW(monitor,&mi) && (mi.dwFlags&MONITORINFOF_PRIMARY),"primary monitor unavailable");
+-    ComPtr<IDXGIFactory2> factory;check(CreateDXGIFactory2(0,IID_PPV_ARGS(&factory)));ComPtr<IDXGIAdapter1> adapter;ComPtr<IDXGIOutput6> output;DXGI_ADAPTER_DESC1 adapter_desc{};DXGI_OUTPUT_DESC1 output_desc{};
++    phase="create-dxgi-factory";ComPtr<IDXGIFactory2> factory;check(CreateDXGIFactory2(0,IID_PPV_ARGS(&factory)));ComPtr<IDXGIAdapter1> adapter;ComPtr<IDXGIOutput6> output;DXGI_ADAPTER_DESC1 adapter_desc{};DXGI_OUTPUT_DESC1 output_desc{};
+     for(UINT i=0;!adapter;++i){ComPtr<IDXGIAdapter1> candidate;const auto status=factory->EnumAdapters1(i,&candidate);if(status==DXGI_ERROR_NOT_FOUND)break;check(status);DXGI_ADAPTER_DESC1 desc{};check(candidate->GetDesc1(&desc));if(desc.Flags&DXGI_ADAPTER_FLAG_SOFTWARE)continue;
+         for(UINT j=0;;++j){ComPtr<IDXGIOutput> original;const auto result=candidate->EnumOutputs(j,&original);if(result==DXGI_ERROR_NOT_FOUND)break;check(result);ComPtr<IDXGIOutput6> next;check(original.As(&next));DXGI_OUTPUT_DESC1 info{};check(next->GetDesc1(&info));if(info.Monitor==monitor && info.AttachedToDesktop){adapter=candidate;adapter_desc=desc;output=next;output_desc=info;break;}}
+     }
+     require(adapter && output,"physical output adapter not found");require(output_desc.ColorSpace==DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709 && output_desc.BitsPerColor==8,"probe requires an existing 8-bit SDR output");
+     UINT composition_flags=0;const auto composition_status=output->CheckHardwareCompositionSupport(&composition_flags);
+-    ComPtr<ID3D11Device> device;ComPtr<ID3D11DeviceContext> context;D3D_FEATURE_LEVEL level{};const D3D_FEATURE_LEVEL levels[]{D3D_FEATURE_LEVEL_11_0};
++    phase="create-d3d-device";ComPtr<ID3D11Device> device;ComPtr<ID3D11DeviceContext> context;D3D_FEATURE_LEVEL level{};const D3D_FEATURE_LEVEL levels[]{D3D_FEATURE_LEVEL_11_0};
+     check(D3D11CreateDevice(adapter.Get(),D3D_DRIVER_TYPE_UNKNOWN,nullptr,D3D11_CREATE_DEVICE_BGRA_SUPPORT,levels,1,D3D11_SDK_VERSION,&device,&level,&context));
+     Window window(mi.rcMonitor);DXGI_SWAP_CHAIN_DESC1 desc{};desc.Width=h.width;desc.Height=h.height;desc.Format=DXGI_FORMAT(h.format);desc.SampleDesc.Count=1;desc.BufferUsage=DXGI_USAGE_RENDER_TARGET_OUTPUT;desc.BufferCount=2;desc.Scaling=DXGI_SCALING_STRETCH;desc.SwapEffect=DXGI_SWAP_EFFECT_FLIP_DISCARD;desc.AlphaMode=DXGI_ALPHA_MODE_IGNORE;
+-    ComPtr<IDXGISwapChain1> swapchain;check(factory->CreateSwapChainForHwnd(device.Get(),window.handle,&desc,nullptr,output.Get(),&swapchain));check(factory->MakeWindowAssociation(window.handle,DXGI_MWA_NO_ALT_ENTER));
++    phase="create-swapchain";ComPtr<IDXGISwapChain1> swapchain;check(factory->CreateSwapChainForHwnd(device.Get(),window.handle,&desc,nullptr,output.Get(),&swapchain));phase="window-association";check(factory->MakeWindowAssociation(window.handle,DXGI_MWA_NO_ALT_ENTER));
+     D3D11_TEXTURE2D_DESC texture{};texture.Width=h.width;texture.Height=h.height;texture.MipLevels=texture.ArraySize=1;texture.Format=DXGI_FORMAT(h.format);texture.SampleDesc.Count=1;texture.Usage=D3D11_USAGE_IMMUTABLE;
+-    D3D11_SUBRESOURCE_DATA data{frame.pixels.data(),h.row_bytes,UINT(frame.pixels.size())};ComPtr<ID3D11Texture2D> source;check(device->CreateTexture2D(&texture,&data,&source));
+-    ComPtr<ID3D11Texture2D> back;check(swapchain->GetBuffer(0,IID_PPV_ARGS(&back)));context->CopyResource(back.Get(),source.Get());
+-    texture.Usage=D3D11_USAGE_STAGING;texture.CPUAccessFlags=D3D11_CPU_ACCESS_READ;ComPtr<ID3D11Texture2D> staging;check(device->CreateTexture2D(&texture,nullptr,&staging));context->CopyResource(staging.Get(),back.Get());D3D11_MAPPED_SUBRESOURCE mapped{};check(context->Map(staging.Get(),0,D3D11_MAP_READ,0,&mapped));bool exact=mapped.pData && mapped.RowPitch>=h.row_bytes;
++    phase="create-immutable-source";D3D11_SUBRESOURCE_DATA data{frame.pixels.data(),h.row_bytes,UINT(frame.pixels.size())};ComPtr<ID3D11Texture2D> source;check(device->CreateTexture2D(&texture,&data,&source));
++    phase="get-backbuffer";ComPtr<ID3D11Texture2D> back;check(swapchain->GetBuffer(0,IID_PPV_ARGS(&back)));context->CopyResource(back.Get(),source.Get());
++    phase="create-readback-staging";texture.Usage=D3D11_USAGE_STAGING;texture.CPUAccessFlags=D3D11_CPU_ACCESS_READ;ComPtr<ID3D11Texture2D> staging;check(device->CreateTexture2D(&texture,nullptr,&staging));context->CopyResource(staging.Get(),back.Get());phase="map-readback";D3D11_MAPPED_SUBRESOURCE mapped{};check(context->Map(staging.Get(),0,D3D11_MAP_READ,0,&mapped));bool exact=mapped.pData && mapped.RowPitch>=h.row_bytes;
+     if(exact)for(UINT y=0;y<h.height;++y)if(std::memcmp(static_cast<const uint8_t *>(mapped.pData)+size_t(y)*mapped.RowPitch,frame.pixels.data()+size_t(y)*h.row_bytes,h.row_bytes)){exact=false;break;}
+     context->Unmap(staging.Get(),0);require(exact,"backbuffer roundtrip pixel mismatch");staging.Reset();back.Reset();
+     std::printf("{\"probe_ready\":true,\"pid\":%lu,\"adapter_luid_high\":%ld,\"adapter_luid_low\":%lu,\"vendor_id\":%u,\"device_id\":%u,\"source_width\":%u,\"source_height\":%u,\"output_width\":%ld,\"output_height\":%ld,\"source_sequence\":%llu,\"source_producer_pid\":%u,\"hardware_composition_query\":%ld,\"hardware_composition_flags\":%u,\"backbuffer_roundtrip_exact\":true,\"shader_dispatches\":0,\"source_uploads\":1,\"source_npu_provenance_verified_by_probe\":false}\n",GetCurrentProcessId(),adapter_desc.AdapterLuid.HighPart,adapter_desc.AdapterLuid.LowPart,adapter_desc.VendorId,adapter_desc.DeviceId,h.width,h.height,mi.rcMonitor.right-mi.rcMonitor.left,mi.rcMonitor.bottom-mi.rcMonitor.top,static_cast<unsigned long long>(h.sequence),h.producer_pid,static_cast<long>(composition_status),composition_flags);std::fflush(stdout);
+     require(nr::present::current_console_default(),"interactive desktop changed before presentation");
+-    ShowWindow(window.handle,SW_SHOWNOACTIVATE);const auto start=GetTickCount64();uint64_t presents=0,stats_ok=0;UINT last_present_count=0;
++    phase="present-loop";ShowWindow(window.handle,SW_SHOWNOACTIVATE);const auto start=GetTickCount64();uint64_t presents=0,stats_ok=0;UINT last_present_count=0;
+     while(!window.stopped && GetTickCount64()-start<uint64_t(seconds)*1000){window.messages();if(window.stopped || !nr::present::current_console_default())break;
+         check(swapchain->GetBuffer(0,IID_PPV_ARGS(&back)));context->CopyResource(back.Get(),source.Get());back.Reset();const auto status=swapchain->Present(1,0);check(status);require(status==S_OK,"presentation not accepted as visible");++presents;
+         DXGI_FRAME_STATISTICS stats{};const auto stats_status=swapchain->GetFrameStatistics(&stats);if(SUCCEEDED(stats_status)){++stats_ok;last_present_count=stats.PresentCount;}

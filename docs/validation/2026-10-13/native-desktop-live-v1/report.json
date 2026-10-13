@@ -1,0 +1,91 @@
+{
+  "recorded_at": "2026-10-13T14:39:59.059305+00:00",
+  "evidence_checks_passed": true,
+  "raw_files_remotely_hash_verified": 186,
+  "native_desktop_trials": [
+    {
+      "trial": 1,
+      "npu_operations": 13,
+      "large_target_operations": 0,
+      "native_indirect_frame_produced": false,
+      "cleanup_passed": true,
+      "compositor_exited": true
+    },
+    {
+      "trial": 2,
+      "npu_operations": 21,
+      "large_target_operations": 7,
+      "native_indirect_frame_produced": false,
+      "cleanup_passed": true,
+      "compositor_exited": true
+    }
+  ],
+  "large_captured_draw_transport": {
+    "started": "2026-10-13T14:32:05.975390+00:00",
+    "completed": true,
+    "passed": true,
+    "driver_installed": false,
+    "desktop_changed": false,
+    "reference_sha256": "1e2ffcb8a2d4d221a435eff8c516970a06d2548e9d5a67d8169c26d5de4f27d3",
+    "capture_sha256": "ed43dab16de595523ec36ef0caf0a4b52ac326a0c433b34ca12e562c970c73f6",
+    "packet_contract": {
+      "large_uniform_capture_packet": true,
+      "abi": 16,
+      "legacy_abi": 1,
+      "width": 2880,
+      "height": 1800,
+      "vertices": 24,
+      "bytes": 20742696,
+      "negative_cases": 9,
+      "rendering_performed": false
+    },
+    "worker_pid": 19352,
+    "client_pid": 17056,
+    "abi": 16,
+    "legacy_abi": 1,
+    "request_bytes": 20742696,
+    "reply_bytes": 20736128,
+    "npu_operation_receipts": 1,
+    "delivery_acknowledgments": 1,
+    "pixels_match_cpu_reference": true,
+    "verified_components": 20736000,
+    "pixels_sha256": "1e2ffcb8a2d4d221a435eff8c516970a06d2548e9d5a67d8169c26d5de4f27d3",
+    "receipt": [
+      527848,
+      69312,
+      6,
+      0,
+      4,
+      0,
+      0
+    ],
+    "worker_exit_code": 0,
+    "finished": "2026-10-13T14:32:07.265146+00:00"
+  },
+  "physical_presentation_trials": [
+    {
+      "trial": 5,
+      "submitted_presents": 1802,
+      "elapsed_ms": 15000,
+      "exact_pixel_check": true,
+      "presentmon_trace_available": false
+    },
+    {
+      "trial": 6,
+      "submitted_presents": 1800,
+      "elapsed_ms": 15000,
+      "exact_pixel_check": true,
+      "presentmon_trace_available": false
+    }
+  ],
+  "physical_desktop_offloaded": false,
+  "tahoma_performance_tested": false,
+  "promoted_to_runtime": false,
+  "preserved_failures": [
+    "native compositor exited in both desktop trials, before frame readback",
+    "native-routing-v4 capture helper failed C++ compilation; v5 splits mixed auto types",
+    "registered-v4 qualification rejected an obsolete expected package version; v4b qualifies exact version 1304",
+    "presentation-v3 and v4 rejected immutable texture creation; v5 fixes texture bind flags",
+    "presentation-v5 and v6 completed presents but lost ETW events and produced no PresentMon CSV"
+  ]
+}

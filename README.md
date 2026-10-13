@@ -23,15 +23,19 @@ passes ten NPU operations from a Local Service process after adding bounded
 query/synchronization access to the owned controller and worker. The
 [native routing candidate](docs/validation/2026-10-13/native-routing-progress-v1/README.md)
 adds separate compositor/indirect-host admission and builds both driver packages;
-both packages stage and remove cleanly. Actual native DWM routing and physical
-frame delivery are still unverified.
+both packages stage and remove cleanly. The subsequent desktop trials below
+exercise actual native DWM routing; physical desktop migration remains unfinished.
 
 The [native desktop controller candidate](docs/validation/2026-10-13/native-desktop-progress-v1/README.md)
 revalidates the updated renderer through real D3D11, passes simultaneous NPU
 consumers, and exercises automatic timed recovery. Its installation, compositor
-admission, and cleanup sequence is assembled, but the desktop branch has not run:
-Delta has no signed-in unlocked console. Physical desktop offload and a Tahoma
-speedup remain unproven.
+admission, and cleanup sequence is assembled. The subsequent
+[native desktop trials](docs/validation/2026-10-13/native-desktop-live-v1/README.md)
+run after Delta is signed in and unlocked: actual DWM executes 13 NPU operations,
+then 21 after fixing a large-surface transport limit. Both trials still exit
+before delivering a desktop frame; automatic cleanup passes. A separate static
+frame probe presents successfully, but its ETW trace fails to verify independent
+flip. Full desktop offload and a Tahoma speedup remain unproven.
 
 The latest [scripted desktop trial](docs/validation/2026-10-13/sole-display-v121/README.md)
 renders the VM's desktop on Delta's physical NPU and passes desktop, Run,
