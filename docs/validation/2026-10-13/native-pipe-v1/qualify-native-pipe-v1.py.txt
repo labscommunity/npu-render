@@ -1,0 +1,75 @@
+"""Reject impostors and truncated clients, then verify cross-thread NPU delivery."""
+import argparse,os,subprocess,time,json,secrets,struct,hashlib
+from pathlib import Path
+from datetime import UTC,datetime
+from winpipe_client_v1 import Pipe
+HEADER=struct.Struct('<3Q14I');RECEIPT=struct.Struct('<5Q2I')
+def read_json(p):
+ b=p.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+def rows(p):return [json.loads(x) for x in p.read_text(encoding='utf-8-sig').splitlines() if x.startswith('{')]
+def main():
+ a=argparse.ArgumentParser()
+ for key in ('worker','runtime','cache','trace','reference','output'):a.add_argument('--'+key,type=Path,required=True)
+ args=a.parse_args();args.output.mkdir(exist_ok=False);out=args.output
+ build=read_json(args.worker.parent.parent/'registered-build-report.json');assert build['clean_build'] and build['native_pipe_worker'] and hashlib.sha256(args.worker.read_bytes()).hexdigest()==build['binary_sha256'][args.worker.name].lower()
+ env=os.environ.copy();env['PATH']=str(args.runtime)+os.pathsep+env.get('PATH','');env['NR_RENDER_NPU_CACHE']=str(args.cache);env['NR_RENDER_SHARED_QUEUE']='1';env['NR_RENDER_PIPELINE_CACHE']='expanded';env['NR_RENDER_MEMORY_CACHE']='1';env['NR_RENDER_COMPACT_COVERAGE']='0'
+ report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,negative_cases=[],valid_requests=[],desktop_offload_tested=False,physical_driver_installed=False)
+ def save():(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+ save();name=r'\\.\pipe\npu-render-indexed-'+secrets.token_hex(16)
+ for label,values in [('missing-arguments',[]),('invalid-pipe',['wrong','2','120']),('empty-budget',[name,'0','120']),('zero-duration',[name,'2','0'])]:
+  p=subprocess.run([str(args.worker),*values],env=env,capture_output=True,timeout=10);(out/(label+'.stderr.log')).write_bytes(p.stderr)
+  assert p.returncode==1 and not p.stdout and (b'expected ' in p.stderr if not values else b'invalid indexed NPU exchange packet' in p.stderr)
+  report['negative_cases'].append(dict(case=label,exit_code=p.returncode,passed=True));save()
+ original=(args.trace/'trace-request-0001.bin').read_bytes();baseline=read_json(args.reference)['requests'][0]
+ assert hashlib.sha256(original).hexdigest()==baseline['source_sha256']
+ def packet(sequence,pid=None):
+  h=list(HEADER.unpack_from(original));h[1]=0x7472616365763031;h[2]=sequence;h[11]=sequence;h[13]=os.getpid() if pid is None else pid
+  return HEADER.pack(*h)+original[80:]
+ with (out/'worker.stdout.jsonl').open('xb') as stdout,(out/'worker.stderr.log').open('xb') as stderr:
+  proc=subprocess.Popen([str(args.worker),name,'2','120'],env=env,stdout=stdout,stderr=stderr);report['worker_pid']=proc.pid
+  try:
+   until=time.perf_counter()+15;ready=[]
+   while time.perf_counter()<until:
+    ready=[x for x in rows(out/'worker.stdout.jsonl') if x.get('local_worker_ready')]
+    if ready:break
+    assert proc.poll() is None,'worker exited before ready';time.sleep(.02)
+   assert len(ready)==1 and ready[0]['pid']==proc.pid and ready[0]['private_user_acl'] and ready[0]['client_pid_verified'] and not ready[0]['network_listener'];report['ready']=ready[0]
+   try:
+    with Pipe(name,proc.pid+1,time.perf_counter()+5):raise AssertionError('wrong server PID admitted')
+   except RuntimeError as e:assert str(e)=='Private pipe server identity mismatch'
+   report['negative_cases'].append(dict(case='wrong-server-pid',passed=True));save()
+   for label,bad in [('spoofed-client-pid',packet(1,os.getpid()+1)),('short-declared-packet',None)]:
+    with Pipe(name,proc.pid,time.perf_counter()+5) as connection:
+     if bad is None:connection.transfer(struct.pack('<I',32),True)
+     else:connection.write_packet(bad)
+     try:connection.read_packet()
+     except OSError as e:assert e.winerror in (109,232,233),str(e)
+     else:raise AssertionError('invalid client was not disconnected')
+    report['negative_cases'].append(dict(case=label,passed=True));save()
+   with Pipe(name,proc.pid,time.perf_counter()+5) as connection:
+    connection.deadline=time.perf_counter()+.05;began=time.perf_counter()
+    try:connection.read_packet()
+    except TimeoutError:elapsed=(time.perf_counter()-began)*1000;assert elapsed<2000
+    else:raise AssertionError('pending client read did not time out')
+   report['negative_cases'].append(dict(case='overlapped-timeout-cancel-and-drain',elapsed_ms=elapsed,passed=True));save()
+   # Hold both connections open: they must be served by different pipe threads.
+   with Pipe(name,proc.pid,time.perf_counter()+60) as first,Pipe(name,proc.pid,time.perf_counter()+60) as second:
+    for sequence,connection in enumerate((first,second),1):
+     request=packet(sequence);h=list(HEADER.unpack_from(request));connection.write_packet(request);reply=connection.read_packet();rh=list(HEADER.unpack_from(reply))
+     assert all(rh[i]==h[i] for i in range(17) if i not in (12,14,15)) and rh[14]==2 and rh[15]==3 and len(reply)==128+h[4]*h[5]*4 and rh[12]==len(reply)-80
+     receipt=dict(zip(['input_bytes','output_bytes','provider_requests','covered_samples','tile_executions','used_rectangle','reserved'],RECEIPT.unpack_from(reply,80)))
+     digest=hashlib.sha256(reply[128:]).hexdigest();assert receipt==baseline['receipt'] and digest==baseline['pixels_sha256'];connection.acknowledge(sequence)
+     report['valid_requests'].append(dict(sequence=sequence,client_pid=os.getpid(),pixels_sha256=digest,receipt=receipt,passed=True));save()
+   proc.wait(timeout=10);assert proc.returncode==0
+   evidence=rows(out/'worker.stdout.jsonl');success=[x for x in evidence if x.get('passed')];done=[x for x in evidence if x.get('local_worker_finished')];acks=[x for x in evidence if x.get('worker_success')]
+   assert len(success)==2 and all(x['execution_device']=='NPU' for x in success) and len({x['server_thread_id'] for x in success})==2
+   assert len(done)==1 and done[0]['succeeded']==done[0]['settled']==2 and len(acks)==2 and not (out/'worker.stderr.log').read_bytes()
+   report.update(passed=True,execution_device='NPU',distinct_serving_threads=2,delivery_acknowledgments=2,worker_result=done[0])
+  except Exception as e:report['error']=str(e)
+  finally:
+   if proc.poll() is None:
+    proc.kill();proc.wait(timeout=5);report['owned_worker_terminated']=True
+   report.update(completed=True,worker_exit_code=proc.returncode,finished=datetime.now(UTC).isoformat());save()
+ print(json.dumps(report))
+ if not report['passed']:raise SystemExit(1)
+if __name__=='__main__':main()

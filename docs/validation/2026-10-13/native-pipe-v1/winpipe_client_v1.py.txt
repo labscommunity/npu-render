@@ -1,0 +1,76 @@
+"""Bounded overlapped Windows pipe client for an owned diagnostic worker."""
+import ctypes as C
+from ctypes import wintypes as W
+import math,struct,time,sys
+
+class Overlapped(C.Structure):
+    _fields_=[('Internal',C.c_size_t),('InternalHigh',C.c_size_t),('Offset',W.DWORD),('OffsetHigh',W.DWORD),('hEvent',W.HANDLE)]
+
+class Pipe:
+    def __init__(self,name,server_pid,deadline):
+        if sys.platform!='win32':raise RuntimeError('Windows required')
+        self.k=C.WinDLL('kernel32',use_last_error=True);self.handle=None;self.deadline=deadline
+        declarations={
+          'CreateFileW':([W.LPCWSTR,W.DWORD,W.DWORD,W.LPVOID,W.DWORD,W.DWORD,W.HANDLE],W.HANDLE),
+          'CreateEventW':([W.LPVOID,W.BOOL,W.BOOL,W.LPCWSTR],W.HANDLE),
+          'CloseHandle':([W.HANDLE],W.BOOL),'WaitNamedPipeW':([W.LPCWSTR,W.DWORD],W.BOOL),
+          'GetNamedPipeServerProcessId':([W.HANDLE,C.POINTER(W.ULONG)],W.BOOL),
+          'ReadFile':([W.HANDLE,W.LPVOID,W.DWORD,C.POINTER(W.DWORD),C.POINTER(Overlapped)],W.BOOL),
+          'WriteFile':([W.HANDLE,W.LPCVOID,W.DWORD,C.POINTER(W.DWORD),C.POINTER(Overlapped)],W.BOOL),
+          'WaitForSingleObject':([W.HANDLE,W.DWORD],W.DWORD),
+          'GetOverlappedResult':([W.HANDLE,C.POINTER(Overlapped),C.POINTER(W.DWORD),W.BOOL],W.BOOL),
+          'CancelIoEx':([W.HANDLE,C.POINTER(Overlapped)],W.BOOL)}
+        for key,(args,result) in declarations.items():
+            f=getattr(self.k,key);f.argtypes=args;f.restype=result
+        invalid=C.c_void_p(-1).value
+        while time.perf_counter()<deadline:
+            h=self.k.CreateFileW(name,0xc0000000,0,None,3,0x40110000,None)
+            if h!=invalid:
+                self.handle=h;break
+            error=C.get_last_error()
+            if error not in (2,231):raise C.WinError(error)
+            if error==231:self.k.WaitNamedPipeW(name,min(self.remaining(),100))
+            else:time.sleep(.01)
+        if self.handle is None:raise TimeoutError('Private pipe did not become available')
+        actual=W.ULONG()
+        if not self.k.GetNamedPipeServerProcessId(self.handle,C.byref(actual)) or actual.value!=server_pid:
+            self.close();raise RuntimeError('Private pipe server identity mismatch')
+    def remaining(self):
+        left=self.deadline-time.perf_counter()
+        if left<=0:raise TimeoutError('Private pipe deadline expired')
+        return min(90000,max(1,math.ceil(left*1000)))
+    def close(self):
+        if self.handle is not None:self.k.CloseHandle(self.handle);self.handle=None
+    def __enter__(self):return self
+    def __exit__(self,*ignored):self.close()
+    def transfer(self,data,write):
+        remaining=len(data) if write else data;position=0;parts=[]
+        while remaining:
+            count=min(65536,remaining);buffer=C.create_string_buffer(data[position:position+count],count) if write else C.create_string_buffer(count)
+            event=self.k.CreateEventW(None,True,False,None)
+            if not event:raise C.WinError(C.get_last_error())
+            operation=Overlapped();operation.hEvent=event;actual=W.DWORD()
+            try:
+                self.remaining();ready=(self.k.WriteFile if write else self.k.ReadFile)(self.handle,buffer,count,C.byref(actual),C.byref(operation))
+                if not ready:
+                    error=C.get_last_error()
+                    if error!=997:raise C.WinError(error)
+                    try:
+                        wait=self.k.WaitForSingleObject(event,self.remaining())
+                        if wait!=0:raise TimeoutError('Private pipe completion timed out or failed')
+                    except BaseException:
+                        self.k.CancelIoEx(self.handle,C.byref(operation));self.k.GetOverlappedResult(self.handle,C.byref(operation),C.byref(actual),True);raise
+                    if not self.k.GetOverlappedResult(self.handle,C.byref(operation),C.byref(actual),False):raise C.WinError(C.get_last_error())
+                if not 0<actual.value<=count:raise RuntimeError('Private pipe transfer truncated')
+                if not write:parts.append(buffer.raw[:actual.value])
+                position+=actual.value;remaining-=actual.value
+            finally:self.k.CloseHandle(event)
+        if not write:return b''.join(parts)
+    def write_packet(self,data):
+        if not 80<=len(data)<=32*1024*1024:raise ValueError('Packet size rejected')
+        self.transfer(struct.pack('<I',len(data)),True);self.transfer(data,True)
+    def read_packet(self):
+        size=struct.unpack('<I',self.transfer(4,False))[0]
+        if not 80<=size<=32*1024*1024:raise ValueError('Reply size rejected')
+        return self.transfer(size,False)
+    def acknowledge(self,sequence):self.transfer(struct.pack('<I',sequence),True)
