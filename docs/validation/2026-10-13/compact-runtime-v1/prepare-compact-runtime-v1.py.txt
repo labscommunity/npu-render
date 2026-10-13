@@ -1,0 +1,61 @@
+from pathlib import Path
+import shutil,hashlib,json
+r=Path('results/render-driver');s=r/'compact-runtime-v1';shutil.copytree(r/'point-reentry-v1',s);root=s/'native/windows/registered_lab'
+for name in ('compact_coverage.hpp','compact_coverage_test.cpp'):shutil.copyfile(r/'compact-coverage-v2/native/windows/registered_lab'/name,root/name)
+p=root/'raster_executor.hpp';t=p.read_text().replace('std::string execution_device; };','std::string execution_device; uint64_t input_bytes=0; };');assert t!=p.read_text();p.write_text(t)
+p=root/'raster_executor.cpp';t=p.read_text();t=t.replace('#include "raster_executor.hpp"','#include "raster_executor.hpp"\n#include "compact_coverage.hpp"\n#include "coverage_statistics.hpp"\n#include <cstdlib>')
+t=t.replace('struct CoverageExecutor::State {','struct WideCoverageState {').replace('    State(uint32_t size,','    WideCoverageState(uint32_t size,')
+start=t.index('CoverageExecutor::CoverageExecutor(');body_start=t.index('    auto &s = *state;',start);body=t[body_start:].replace('    auto &s = *state;', '    auto &s = *this;',1).replace('    Result result{{}, s.execution_device};','    CoverageExecutor::Result result{{}, s.execution_device};')
+assert body.endswith('}\n}\n');body=body[:-2]
+prefix=t[:start];assert prefix.endswith('};\n');prefix=prefix[:-3]+'''    CoverageExecutor::Result execute(const std::vector<Sample> &samples,const std::optional<std::array<int32_t,4>> &scissor);
+};
+CoverageExecutor::Result WideCoverageState::execute(const std::vector<Sample> &samples,const std::optional<std::array<int32_t,4>> &scissor) {
+'''
+p.write_text(prefix+body+r'''
+namespace {
+bool compact_experiment(){
+    char *value=nullptr;size_t length=0;if(_dupenv_s(&value,&length,"NR_RENDER_COMPACT_COVERAGE"))throw std::runtime_error("cannot read compact coverage experiment");const std::unique_ptr<char,decltype(&std::free)> owner(value,&std::free);
+    if(!value || !*value || !std::strcmp(value,"0"))return false;if(std::strcmp(value,"1"))throw std::invalid_argument("compact coverage experiment requires 0 or 1");return true;
+}
+}
+struct CoverageExecutor::State {
+    uint32_t count;std::string backend;CullMode cull;bool ccw,compact_enabled,failed=false;
+    std::unique_ptr<WideCoverageState> wide;std::unique_ptr<compact::Executor> fast;
+    State(uint32_t n,const std::string &device,CullMode mode,bool front):count(n),backend(device),cull(mode),ccw(front),compact_enabled(device=="NPU" && compact_experiment()){
+        require(count && count<=65536 && (backend=="CPU" || backend=="GPU" || backend=="NPU"));require(cull==CullMode::none || cull==CullMode::front || cull==CullMode::back);
+        if(!compact_enabled)wide=std::make_unique<WideCoverageState>(count,backend,cull,ccw);
+    }
+};
+CoverageExecutor::CoverageExecutor(uint32_t samples,const std::string &backend,CullMode cull,bool front_ccw):state(std::make_unique<State>(samples,backend,cull,front_ccw)){}
+CoverageExecutor::~CoverageExecutor()=default;
+CoverageExecutor::Result CoverageExecutor::execute(const std::vector<Sample> &samples,const std::optional<std::array<int32_t,4>> &scissor){
+    auto &s=*state;require(!s.failed && samples.size()==s.count);const auto clip=scissor.value_or(std::array<int32_t,4>{-coordinate_limit,-coordinate_limit,coordinate_limit+1,coordinate_limit+1});require(clip[0]<=clip[2] && clip[1]<=clip[3]);for(auto x:clip)require(x>=-coordinate_limit && x<=coordinate_limit+1);
+    bool eligible=s.compact_enabled;std::array<float,6> vertices;std::array<float,2> point;
+    for(const auto &sample:samples){for(const auto &p:sample.triangle)for(auto x:p)require(x>=-coordinate_limit && x<=coordinate_limit);for(auto x:sample.point)require(x>=-coordinate_limit && x<=coordinate_limit);if(eligible && !compact::normalize(sample,vertices,point))eligible=false;}
+    s.failed=true;Result result;
+    if(eligible){if(!s.fast)s.fast=std::make_unique<compact::Executor>(s.count,s.backend,s.cull,s.ccw);result=s.fast->execute(samples,clip);result.input_bytes=uint64_t(s.count)*40+16;++compact_coverage_calls;compact_coverage_samples+=s.count;}
+    else {if(!s.wide)s.wide=std::make_unique<WideCoverageState>(s.count,s.backend,s.cull,s.ccw);result=s.wide->execute(samples,clip);result.input_bytes=uint64_t(s.count)*32+16;++wide_coverage_calls;}
+    s.failed=false;return result;
+}
+}
+''')
+(root/'coverage_statistics.hpp').write_text('''#pragma once
+#include <cstdint>
+namespace nr::raster {
+struct CoverageStatistics {uint64_t compact_calls=0,compact_samples=0,wide_calls=0;};
+inline thread_local uint64_t compact_coverage_calls=0,compact_coverage_samples=0,wide_coverage_calls=0;
+inline CoverageStatistics coverage_statistics(){return {compact_coverage_calls,compact_coverage_samples,wide_coverage_calls};}
+}
+''')
+p=root/'uniform_draw.cpp';t=p.read_text().replace('result.input_bytes += uint64_t(s.batch) * 32 + 16;','result.input_bytes += selected.input_bytes;');assert t!=p.read_text();p.write_text(t)
+p=root/'triangle_texture_draw.cpp';t=p.read_text().replace('result.input_bytes+=uint64_t(s.batch)*32+16;','result.input_bytes+=covered.input_bytes;');assert t!=p.read_text();p.write_text(t)
+p=root/'indexed_exchange_worker.cpp';t=p.read_text().replace('#include "provider_compile_statistics.hpp"','#include "provider_compile_statistics.hpp"\n#include "coverage_statistics.hpp"');t=t.replace('const auto before=nr::provider::compile_statistics();','const auto before=nr::provider::compile_statistics();const auto coverage_before=nr::raster::coverage_statistics();');t=t.replace('const auto after=nr::provider::compile_statistics();','const auto after=nr::provider::compile_statistics();const auto coverage_after=nr::raster::coverage_statistics();');t=t.replace('\\"passed\\":true,\\"displayed_frames\\":0','\\"compact_coverage_calls\\":%llu,\\"compact_coverage_samples\\":%llu,\\"wide_coverage_calls\\":%llu,\\"passed\\":true,\\"displayed_frames\\":0');t=t.replace('static_cast<unsigned long long>(after.cache_status_unavailable-before.cache_status_unavailable));', 'static_cast<unsigned long long>(after.cache_status_unavailable-before.cache_status_unavailable),static_cast<unsigned long long>(coverage_after.compact_calls-coverage_before.compact_calls),static_cast<unsigned long long>(coverage_after.compact_samples-coverage_before.compact_samples),static_cast<unsigned long long>(coverage_after.wide_calls-coverage_before.wide_calls));');p.write_text(t)
+p=root/'CMakeLists.txt';p.write_text(p.read_text()+'''\nadd_executable(nr_registered_compact_coverage_test compact_coverage_test.cpp)
+target_compile_features(nr_registered_compact_coverage_test PRIVATE cxx_std_17)
+target_compile_options(nr_registered_compact_coverage_test PRIVATE /W4 /WX)
+target_link_libraries(nr_registered_compact_coverage_test PRIVATE nr_registered_vertex openvino::runtime)
+set_property(TARGET nr_registered_compact_coverage_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+add_test(NAME registered_compact_coverage_contract COMMAND nr_registered_compact_coverage_test)
+''')
+(r/'compact-runtime-v1-source.json').write_text(json.dumps({str(p.relative_to(s)).replace('/','\\'):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(s.rglob('*')) if p.is_file()},indent=2)+'\n')
+print('Prepared isolated opt-in runtime; no production files changed')

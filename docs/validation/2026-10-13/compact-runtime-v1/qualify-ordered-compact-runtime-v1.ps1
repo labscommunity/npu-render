@@ -1,0 +1,15 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$b="$r\builds\compact-runtime-v1";$out="$r\vm\ordered-compact-runtime-v1-expanded"
+$q=Get-Content "$r\vm\compact-runtime-v1-qualification\report.json" -Raw|ConvertFrom-Json
+if(!$q.completed -or !$q.npu_qualified -or $q.cases.Count -ne 3){throw 'Runtime hardware qualification missing'}
+if(@(Get-Process nr_registered_indexed_stream_worker,nr_registered_indexed_worker -ErrorAction SilentlyContinue).Count){throw 'Another renderer active'}
+$reference="$r\vm\ordered-point-reentry-v1-expanded\report.json";$baseline=Get-Content $reference -Raw|ConvertFrom-Json
+if(!$baseline.completed -or !$baseline.passed -or $baseline.saved_requests -ne 1438){throw 'Completed reference required'}
+$py="$r\toolchains\openvino-2026.4.1\Scripts\python.exe";$runtime="$r\toolchains\openvino-2026.4.1\Lib\site-packages\openvino\libs"
+& $py "$r\vm\replay-ordered-trace-v7-compact.py" --trace "$r\vm\indexed-dwm-stream-v120" --trace-manifest "$r\vm\v120-trace-sha256.json" --worker "$b\Release\nr_registered_indexed_worker.exe" --runtime $runtime --cache "$r\vm\model-cache-2026-4-v209" --output $out --seconds 1800 --limit 1438 --shared-queue 1 --pipeline-cache expanded --reference $reference --compact-coverage
+if($LASTEXITCODE){throw 'Full compact replay failed'}
+$report=Get-Content "$out\report.json" -Raw|ConvertFrom-Json;$rows=@(Get-Content "$out\worker.stdout.jsonl"|Where-Object {$_ -match '^\{'}|ForEach-Object {$_|ConvertFrom-Json});$success=@($rows|Where-Object {$_.passed});$finish=@($rows|Where-Object {$_.worker_finished})
+if(!$report.passed -or $success.Count -ne 1438 -or $finish.Count -ne 1 -or $finish[0].succeeded -ne 1438 -or $finish[0].failed -ne 0 -or @($success|Where-Object {$_.execution_device -ne 'NPU'}).Count){throw 'Incomplete NPU replay'}
+$compact=($success|Measure-Object compact_coverage_calls -Sum).Sum;$wide=($success|Measure-Object wide_coverage_calls -Sum).Sum
+if(!$compact -or !$wide){throw 'Replay did not exercise both coverage paths'}
+[ordered]@{completed=$true;passed=$true;build='compact-runtime-v1';request_count=1438;all_pixels_and_coverage_exact=$true;provider_call_and_output_byte_counts_exact=$true;input_byte_changes_match_compact_samples=$true;compact_calls=$compact;compact_samples=($success|Measure-Object compact_coverage_samples -Sum).Sum;wide_calls=$wide;reference='ordered-point-reentry-v1-expanded';elapsed_ms=$report.elapsed_ms;reference_elapsed_ms=$baseline.elapsed_ms;draw_ms=($success|Measure-Object draw_ms -Sum).Sum;compile_and_draw_ms=($success|Measure-Object compile_and_draw_ms -Sum).Sum;compile_calls=($success|Measure-Object compile_calls -Sum).Sum;disk_cache_hits=($success|Measure-Object cache_hits -Sum).Sum;provider_requests=($success|Measure-Object provider_requests -Sum).Sum;warming_and_order_effects_controlled=$false;desktop_use_qualified=$false;tahoma_performance_tested=$false}|ConvertTo-Json -Depth 7|Set-Content "$r\vm\ordered-compact-runtime-v1-summary.json"
+'Full compact trace passed 1438 pixel, coverage and measured receipt comparisons'

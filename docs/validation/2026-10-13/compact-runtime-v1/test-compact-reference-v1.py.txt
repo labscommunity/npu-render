@@ -1,0 +1,27 @@
+import importlib.util,copy
+from pathlib import Path
+p=Path('results/render-driver/replay-ordered-trace-v7-compact.py');spec=importlib.util.spec_from_file_location('compact_replay',p);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+baseline=dict(source_sha256='a',normalized_sha256='b',pixels_sha256='c',receipt=dict(input_bytes=1000000,output_bytes=100000,provider_requests=8,covered_samples=20,tile_executions=2,used_rectangle=0,reserved=0))
+row=copy.deepcopy(baseline);row.update(ordinal=1,coverage_telemetry=dict(execution_device='NPU',client_pid=42,sequence=1,compact_coverage_calls=1,compact_coverage_samples=4096,wide_coverage_calls=1));row['receipt']['input_bytes']+=4096*8
+assert m.compare_reference(row,baseline,2,0xf02,True)=='compact_coverage_input_bytes';cases=1
+for group,keys in [('receipt',list(row['receipt'])),('coverage_telemetry',list(row['coverage_telemetry']))]:
+ for key in keys:
+  for value in (-1,0,9999999,'invalid'):
+   bad=copy.deepcopy(row)
+   if bad[group][key]==value:continue
+   bad[group][key]=value
+   # Zero wide calls is a valid independent telemetry count.
+   if group=='coverage_telemetry' and key=='wide_coverage_calls' and value==0:continue
+   try:m.compare_reference(bad,baseline,2,0xf02,True)
+   except (AssertionError,TypeError):cases+=1
+   else:raise AssertionError((group,key,value))
+for key in ('source_sha256','normalized_sha256','pixels_sha256'):
+ bad=copy.deepcopy(row);bad[key]='wrong'
+ try:m.compare_reference(bad,baseline,2,0xf02,True)
+ except AssertionError:cases+=1
+ else:raise AssertionError(key)
+try:m.compare_reference(row,baseline,2,0xf02,False)
+except AssertionError:cases+=1
+else:raise AssertionError('missing opt-in')
+same=copy.deepcopy(row);same['receipt']=copy.deepcopy(baseline['receipt']);same['coverage_telemetry'].update(compact_coverage_calls=0,compact_coverage_samples=0);assert m.compare_reference(same,baseline,2,0xf02,False)=='exact';cases+=1
+print(cases,'compact receipt comparison boundary cases passed')
