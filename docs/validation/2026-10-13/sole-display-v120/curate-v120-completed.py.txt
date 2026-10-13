@@ -1,0 +1,67 @@
+from pathlib import Path
+from collections import Counter
+from datetime import datetime, UTC
+import hashlib, json, shutil
+from npu_render.indirect_frame import parse_frame
+r=Path('results/render-driver');out=Path('docs/validation/2026-10-13/sole-display-v120');out.mkdir(parents=True,exist_ok=False);manifest=[]
+def read(p):
+ b=p.read_bytes();return b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig')
+def obj(p):return json.loads(read(p))
+def rows(p):return [json.loads(x) for x in read(p).splitlines() if x.startswith('{')]
+def save(p,name=None):
+ assert p.name!='private-token.bin';b=p.read_bytes();m={'source':p.relative_to(r).as_posix(),'bytes':len(b),'sha256':hashlib.sha256(b).hexdigest()};manifest.append(m)
+ if p.suffix in ('.bin','.ppm','.png','.zip','.pixels','.cer'):m['raw_in_ignored_archive']=True;return
+ n=name or p.name
+ if n.endswith('.py'):n+='.txt'
+ t=out/n;t.parent.mkdir(parents=True,exist_ok=True);s='\n'.join(x.rstrip() for x in read(p).splitlines()).rstrip();t.write_text(s+'\n' if s else '')
+raw=r/'v120-after-cleanup';expected={x['name'].replace('\\','/'):x for x in obj(r/'v120-after-cleanup-sha256.json')}
+actual=[]
+for p in raw.rglob('*'):
+ if p.is_file():
+  n=p.relative_to(raw).as_posix();b=p.read_bytes();assert len(b)==expected[n]['bytes'] and hashlib.sha256(b).hexdigest()==expected[n]['sha256'].lower();save(p,'guest/'+n);actual.append(n)
+assert set(actual)==set(expected) and len(actual)==37
+for folder in ('indexed-dwm-stream-v120','input-v120','trace-worker-v5-smoke','trace-worker-v5-build'):
+ for p in (r/folder).iterdir():
+  if p.is_file():save(p,folder+'/'+p.name)
+for n in ['v120-early-records.json','v120-after-cleanup-sha256.json','v120-after-cleanup.zip','v120-trace-sha256.json','package-present-v120.ps1','stage-desktop-v120.ps1','run-desktop-v120.ps1','warm-indexed-v120.ps1','watch-v120-failures.ps1','archive-v120.ps1','check-viewer-input-v120.py','mark-v120-visual.py','inspect-received-v120.py','collect-lab-frames-v120.py','view-lab-desktop-v120.py','watch-v120-worker-memory.ps1','worker-memory-v120.jsonl','v120-visual-interaction-report.json','v120-collector-viewer-stop.json','v120-test-document-cleanup.json','v120-cleanup-reopen.json','desktop-v120-plan.json','archive-v120-trace.py','trace-worker-v5-qualified.json','qualify-trace-worker-v5.ps1','build-trace-worker-v5.ps1','build-trace-worker-v5-retry.ps1','trace-worker-v5-source.json','v120-staging.json']:
+ save(r/n)
+save(r/'viewer-v120-live.json','viewer-v120-live.jsonl')
+for n in ['frames.jsonl','topology.jsonl','ssh.stderr.log','input-ready.json']:save(r/'collector-v120-live'/n,'collector/'+n)
+visual=obj(r/'v120-visual-interaction-report.json');inputs=obj(r/'input-v120/report.json');actions={x['action']:x for x in inputs['actions']}
+keys={'desktop-ready':'wake-control','run-visible':'open-run','notepad-visible':'launch-notepad','text-visible':'type-test-text','maximized-visible':'maximize-notepad','closed-visible':'close-notepad'}
+f=rows(r/'collector-v120-live/frames.jsonl');receipts={tuple(x['identity']):x for x in f}
+assert len(visual['checks'])==6 and visual['all_six_visual_gates_passed']
+for check in visual['checks']:
+ key=check['marker'];m=obj(r/f'input-v120/{key}.json');packet=(r/f'input-v120/{key}-manual.bin').read_bytes();frame=parse_frame(packet)
+ assert tuple(m['identity'])==frame.identity==tuple(check['identity'])
+ assert hashlib.sha256(frame.pixels).hexdigest()==check['pixel_sha256']==m['pixel_sha256']
+ receipt=receipts[frame.identity];assert receipt['sole_indirect_at_receive'] and m['manual_visual_verification'] and m['sole_gate_at_inspection']
+ assert receipt['received_at']==m['received_at']==check['received_at']
+ elapsed=(datetime.fromisoformat(receipt['received_at'])-datetime.fromisoformat(actions[keys[key]]['at'])).total_seconds();assert elapsed==check['seconds_after_action'] and elapsed>0
+ p=r/'collector-v120-live'/m['image'];save(p);shutil.copyfile(p,out/(key+'.png'))
+for n,label in [('v120-restored-ordinary.png','ordinary-desktop-after-restoration'),('v120-owned-notepad-closed.png','ordinary-desktop-after-test-document-cleanup')]:
+ p=r/'mac-vm'/n;save(p);shutil.copyfile(p,out/(label+'.png'))
+w=rows(r/'indexed-dwm-stream-v120/worker.stdout.jsonl');relay=rows(r/'indexed-dwm-stream-v120/relay.stdout.jsonl');trace=obj(r/'v120-trace-sha256.json')
+success=[x for x in w if x.get('passed')];acks=[x for x in relay if x.get('worker_success')];starts=[x for x in w if x.get('kind')=='request_started'];nacks=[x for x in relay if x.get('worker_success') is False];cache=[x for x in w if x.get('kind')=='model_compile_cache']
+assert len(success)==len(acks)==len(starts)==len(trace)==1438 and not nacks
+assert all(x['execution_device']=='NPU' for x in success)
+assert Counter((x['client_pid'],x['sequence']) for x in success)==Counter((x['client_pid'],x['sequence']) for x in acks)
+assert [x['ordinal'] for x in starts]==[x['ordinal'] for x in trace]==list(range(1,1439)) and all(x['saved'] for x in starts)
+for a,b in zip(starts,trace):assert (a['client_pid'],a['sequence'],a['bytes'])==(b['client_pid'],b['sequence'],b['bytes'])
+assert len(f)==34 and sum(x['sole_indirect_at_receive'] for x in f)==33
+obs=obj(raw/'lab-v120-render-observation.json');stream=obj(r/'indexed-dwm-stream-v120/report.json');assert obs['cleanup_passed'] and stream['configuration_removed'] and stream['worker_output_complete']
+assert obj(r/'v120-early-records.json')==[]
+assert read(r/'indexed-dwm-stream-v120/worker.stderr.log').strip()=='indexed socket closed or timed out'
+topology=rows(raw/'idd-topology-v9bb.jsonl');assert any(x.get('operation')=='restore_begin' for x in topology) and any(x.get('passed') for x in topology)
+memory=rows(r/'worker-memory-v120.jsonl');assert memory
+report={'trial':'v120','renderer_source_commit':'233d03880981cc7309a4cd27c163acc6ce36a8b1','host_worker_build':'trace-worker-v5','guest_package_version':'0.0.105.0','guest_umd_build':'present-umd-v229-legacy','vm_execution_host':'Mac QEMU TCG','render_execution_device':'physical Panther Lake NPU on Delta','successful_worker_requests':1438,'live_worker_requests':1418,'prewarm_worker_requests':20,'acknowledged_successes':1438,'negative_acknowledgements':0,'worker_successes_by_client':dict(Counter(x['client_pid'] for x in success)),'trace_saved_requests':1438,'trace_bytes':sum(x['bytes'] for x in trace),'complete_request_order_preserved':True,'received_frames':34,'sole_indirect_received_frames':33,'all_six_visual_gates_passed':True,'visual_checks':visual['checks'],'all_worker_provider_requests':sum(x['provider_requests'] for x in success),'all_worker_draw_ms':round(sum(x['draw_ms'] for x in success),3),'all_worker_compile_and_draw_ms':sum(x['compile_and_draw_ms'] for x in success),'model_setup_counters':{k:sum(x[k] for x in cache) for k in ('compile_calls','cache_requests','cache_hits','cache_status_unavailable')},'maximum_observed_private_bytes':max(x['private_bytes'] for x in memory),'maximum_observed_working_bytes':max(x['working_bytes'] for x in memory),'worker_seconds_configured':1800,'relay_seconds_effective':1800,'observer_seconds_configured':1500,'worker_exit_code':stream['worker_exit_code'],'worker_output_complete':True,'npu_device_loss_recorded':False,'native_topology_restoration_recorded':True,'topology_wait_ms':obs['topology_wait_ms'],'guest_driver_removal_passed':True,'stream_configuration_removed':True,'collector_input_gate_revoked':not obj(r/'collector-v120-live/input-ready.json')['sole_indirect'],'verified_guest_archive_members':len(actual),'full_desktop_offload':False,'physical_delta_desktop_offloaded':False,'usable_interactive_desktop':False,'tahoma_performance_tested':False,'physical_driver_package_changed':False,'physical_npu_device_restarted':False,'physical_machine_restarted':False,'findings':[
+'The v229 component-coverage implementation renders the exact line npu desktop offload v120 in the Notepad editor. All six gates pass on received frames while the indirect display is the sole guest path: complete desktop, Run, Notepad, typed editor text, maximized editor with retained text, and closed Notepad with restored desktop.',
+'The input helper raw report intentionally remains unchanged: its visual_response_verified field is not updated by that helper. The six separate manual visual markers record verification; their raw packets, hashes, frame identities, receive times, and preceding input actions are independently matched during curation.',
+'One of 34 received frames precedes the sole-display gate; 33 were received with that gate active. Frame count is not an FPS or completeness claim. All six admitted visual frames satisfy the gate.',
+'All 1438 successful NPU requests have matching acknowledgements, including 20 prewarm and 1418 live requests. The consecutive 4398396820-byte request trace is hash indexed on Delta. No failure-capture records were produced. The only worker stderr message is the socket-close/timeout at bounded cleanup; exit code 1 is retained.',
+'All requests together expand to 61822 provider calls. Reported draw intervals sum to 323067.111 ms and setup-plus-draw intervals to 745397 ms; these are host wrapper timings, not pure hardware execution or compiler time. Of 3611 model setup calls, 3592 report disk-cache hits. The input-to-verified-frame intervals range from 83.057 to 206.893 seconds for the five application actions. They include VM, transport, rendering and frame collection.',
+'Topology is restored, both owned guest devices are removed, the stream configuration is removed and input admission is revoked. After restoration only, the owned persisted test document is reopened, cleared and closed using the ordinary graphics path. Those cleanup actions are not NPU rendering evidence.',
+'This validates the scripted Windows VM interaction through a physical NPU. It does not move Delta\'s physical desktop, qualify arbitrary applications, games or video, establish usable performance, or demonstrate a Tahoma benefit. Full desktop offload remains unfinished.'
+]}
+(out/'report.json').write_text(json.dumps(report,indent=2)+'\n');(out/'raw-manifest.json').write_text(json.dumps(manifest,indent=2)+'\n');print(out,len(manifest),'source hashes and six visual receipts verified')
+plan=obj(r/'desktop-v120-plan.json');plan.update(status='six_visual_gates_passed_cleanup_complete',updated=datetime.now(UTC).isoformat(),all_six_visual_gates_passed=True,cleanup_passed=True);(r/'desktop-v120-plan.json').write_text(json.dumps(plan,indent=2)+'\n')

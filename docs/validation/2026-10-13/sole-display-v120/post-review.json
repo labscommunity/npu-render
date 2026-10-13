@@ -1,0 +1,76 @@
+{
+  "recorded_at": "2026-10-13T02:55:23.266817+00:00",
+  "kind": "post-curation clarification and transport timing analysis",
+  "original_report_preserved": true,
+  "clarification": "The early failure watcher returned no records. The final guest archive nevertheless contains two incomplete draw captures and two guest DDI rejections with status 88760870. Both captures have archive timestamps after the controller stop file, during owned-device removal. No rendering-worker negative acknowledgement or physical NPU device-loss message is recorded. The original findings should not be read as claiming no guest rejection at cleanup.",
+  "guest_tail_events": [
+    {
+      "client_pid": 7640,
+      "reject": {
+        "event": "reject",
+        "operation": "`anonymous-namespace'::draw_indexed",
+        "status": "88760870"
+      },
+      "capture": {
+        "event": "indexed_draw_capture",
+        "complete": false,
+        "execution_performed": false
+      },
+      "zip_member": "umd-trace\\draw-7640.bin",
+      "zip_local_timestamp": [
+        2026,
+        10,
+        13,
+        2,
+        16,
+        0
+      ],
+      "bytes": 5372,
+      "capture_after_stop_file_timestamp": true,
+      "capture_complete": false
+    },
+    {
+      "client_pid": 1984,
+      "reject": {
+        "event": "reject",
+        "operation": "`anonymous-namespace'::draw",
+        "status": "88760870"
+      },
+      "capture": {
+        "event": "indexed_draw_capture",
+        "complete": false,
+        "execution_performed": false
+      },
+      "zip_member": "umd-trace\\draw-1984.bin",
+      "zip_local_timestamp": [
+        2026,
+        10,
+        13,
+        2,
+        16,
+        0
+      ],
+      "bytes": 1384,
+      "capture_after_stop_file_timestamp": true,
+      "capture_complete": false
+    }
+  ],
+  "inference": "Their timing and location at the ends of both process logs are consistent with guest adapter teardown. The HRESULT alone is not sufficient to distinguish Plug and Play removal from other device-removal causes.",
+  "all_six_visual_gates_remain_verified": true,
+  "all_six_marked_before_stop": true,
+  "relay_aggregate": {
+    "queue_wait_ms": 210232,
+    "worker_ms": 914679,
+    "roundtrip_ms": 1171700,
+    "request_bytes": 4398396820,
+    "reply_bytes": 3321838208
+  },
+  "timing_limits": [
+    "Relay sums include concurrent clients and must not be treated as elapsed wall-clock time.",
+    "worker_ms contains transport and worker response time; subtracting render wrapper totals is not a pure network measurement.",
+    "The complete trace carries about 4.4 GB of requests and 3.3 GB of replies. Source textures and backgrounds are repeatedly transmitted. Reducing model setup alone does not remove these costs."
+  ],
+  "reference": "https://learn.microsoft.com/windows-hardware/drivers/ddi/d3dumddi/nc-d3dumddi-pfnd3dddi_lockcb",
+  "physical_desktop_offloaded": false,
+  "tahoma_performance_tested": false
+}

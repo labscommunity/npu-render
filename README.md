@@ -223,7 +223,9 @@ and hash checked. Ordinary topology is restored and both guest devices removed.
 Application responses still take 83–207 seconds. This runs Windows in the test
 VM; Delta's physical desktop remains on its ordinary graphics path. Usable speed,
 general application coverage, physical desktop migration and a Tahoma benefit
-remain unfinished.
+remain unfinished. The [post-review](docs/validation/2026-10-13/sole-display-v120/post-review.json)
+records two guest draw rejections during adapter removal after the visual checks,
+and separates relay/transport timing from rendering measurements.
 
 The v116 live draws expand into 26,995 provider calls. Their reported execution
 intervals total 138 seconds, versus 329 seconds including pipeline setup and
