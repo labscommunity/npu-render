@@ -1,0 +1,51 @@
+from pathlib import Path
+import importlib.util,copy
+p=Path('results/render-driver/replay-ordered-trace-v11-profile.py');s=importlib.util.spec_from_file_location('memory_replay',p);m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+a=dict(source_sha256='a',normalized_sha256='b',pixels_sha256='c',receipt=dict(input_bytes=100,output_bytes=50,provider_requests=8,covered_samples=20,tile_executions=2,used_rectangle=0,reserved=0))
+b=copy.deepcopy(a);b.update(ordinal=1,wire_client_pid=42,coverage_telemetry=dict(execution_device='NPU',client_pid=42,sequence=1,compile_calls=4,backend_compile_calls=2,memory_cache_requests=4,memory_cache_hits=2,memory_cache_evictions=1,cache_requests=2,cache_hits=2,compile_and_draw_ms=10.,provider_setup_ms=8.,backend_compile_ms=7.,compact_coverage_calls=0,compact_coverage_samples=0,wide_coverage_calls=3))
+assert m.compare_reference(b,a,2,0,False)=='exact';n=1
+for key in b['receipt']:
+ c=copy.deepcopy(b);c['receipt'][key]+=1
+ try:m.compare_reference(c,a,2,0,False)
+ except AssertionError:n+=1
+ else:raise AssertionError(key)
+for key in ('source_sha256','normalized_sha256','pixels_sha256'):
+ c=copy.deepcopy(b);c[key]='wrong'
+ try:m.compare_reference(c,a,2,0,False)
+ except AssertionError:n+=1
+ else:raise AssertionError(key)
+for key in (k for k in b['coverage_telemetry'] if not k.endswith('_ms')):
+ for value in (-1,'invalid',9999999):
+  c=copy.deepcopy(b);c['coverage_telemetry'][key]=value
+  try:m.compare_reference(c,a,2,0,False)
+  except AssertionError:n+=1
+  else:raise AssertionError((key,value))
+for key in ('compile_and_draw_ms','provider_setup_ms','backend_compile_ms'):
+ for value in (-1.,float('nan'),float('inf'),'invalid',True):
+  c=copy.deepcopy(b);c['coverage_telemetry'][key]=value
+  try:m.compare_reference(c,a,2,0,False)
+  except AssertionError:n+=1
+  else:raise AssertionError((key,value))
+for key,value in [('backend_compile_ms',9.),('provider_setup_ms',11.),('compile_and_draw_ms',7.)]:
+ c=copy.deepcopy(b);c['coverage_telemetry'][key]=value
+ try:m.compare_reference(c,a,2,0,False)
+ except AssertionError:n+=1
+ else:raise AssertionError((key,value))
+
+c=copy.deepcopy(b);c['coverage_telemetry'].update(compact_coverage_calls=2,compact_coverage_samples=4096,wide_coverage_calls=1);c['receipt']['input_bytes']+=4096*8
+assert m.compare_reference(c,a,2,0,True)=='compact_coverage_input_bytes';n+=1
+for allowed in (False,True):
+ for key,value in [('compact_coverage_calls',0),('compact_coverage_calls',True),('compact_coverage_samples',0),('compact_coverage_samples',2*65536+1),('wide_coverage_calls',7)]:
+  d=copy.deepcopy(c);d['coverage_telemetry'][key]=value
+  try:m.compare_reference(d,a,2,0,allowed)
+  except AssertionError:n+=1
+  else:raise AssertionError((allowed,key,value))
+try:m.compare_reference(c,a,2,0,False)
+except AssertionError:n+=1
+else:raise AssertionError('compact bytes allowed with option disabled')
+for key in ('input_bytes','output_bytes','provider_requests','covered_samples','tile_executions','used_rectangle','reserved'):
+ d=copy.deepcopy(c);d['receipt'][key]+=1
+ try:m.compare_reference(d,a,2,0,True)
+ except AssertionError:n+=1
+ else:raise AssertionError(('compact receipt mismatch',key))
+print(n,'combined profile comparison boundary cases passed')

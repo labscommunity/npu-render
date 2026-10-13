@@ -1,0 +1,60 @@
+{
+  "recorded_at": "2026-10-13T08:30:22.981704+00:00",
+  "pixel_and_receipt_contract_passed": true,
+  "requested_expanded_configuration_passed": false,
+  "actual_pipeline_capacity": {
+    "uniform": 8,
+    "triangle": 24,
+    "clear": 4
+  },
+  "build_report_expanded_capability_was_incorrect": true,
+  "new_harness_rejects_missing_policy_before_rendering": true,
+  "requests_per_run": 1438,
+  "cases": [
+    {
+      "name": "A-disabled",
+      "memory_cache_enabled": false,
+      "compact_coverage_enabled": false,
+      "passed": true,
+      "requests": 1438,
+      "acks": 1438,
+      "worker_sha256": "33815f985a64981bb5b9f3ae53a628c24bdc041fdc7a8c367fc6ff4a21f8333d",
+      "elapsed_ms": 687089.4755000045,
+      "compile_and_draw_ms": 655795.0079999996,
+      "draw_ms": 291601.29600000003,
+      "memory_hits": 0,
+      "backend_compiles": 3630,
+      "compact_calls": 0,
+      "compact_samples": 0,
+      "wide_calls": 16759,
+      "all_pixels_exact": true,
+      "all_receipts_exact_or_exact_compact_input_delta": true
+    },
+    {
+      "name": "B-combined",
+      "memory_cache_enabled": true,
+      "compact_coverage_enabled": true,
+      "passed": true,
+      "requests": 1438,
+      "acks": 1438,
+      "worker_sha256": "33815f985a64981bb5b9f3ae53a628c24bdc041fdc7a8c367fc6ff4a21f8333d",
+      "elapsed_ms": 530684.0596999973,
+      "compile_and_draw_ms": 501526.8010000008,
+      "draw_ms": 306296.73000000016,
+      "memory_hits": 2443,
+      "backend_compiles": 1302,
+      "compact_calls": 13992,
+      "compact_samples": 51063808,
+      "wide_calls": 2767,
+      "all_pixels_exact": true,
+      "all_receipts_exact_or_exact_compact_input_delta": true
+    }
+  ],
+  "observed_elapsed_reduction": 0.22763471334819796,
+  "one_off_then_on_pair": true,
+  "thermal_clocks_and_background_work_controlled": false,
+  "comparable_to_previous_expanded_replays": false,
+  "production_runtime_changed": false,
+  "physical_desktop_offloaded": false,
+  "tahoma_performance_tested": false
+}
