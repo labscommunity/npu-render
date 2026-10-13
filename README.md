@@ -10,12 +10,13 @@ RGBA composition and an explicit backend switch. The packaged runtime passed
 GPU → NPU → CPU → GPU → NPU switching on Panther Lake. It supports CPU/GPU/NPU through
 its first OpenVINO provider; other providers can implement the same contracts.
 
-**Full desktop offload is unfinished.** Delta's physical desktop still uses the
-iGPU. The latest [native desktop trial](docs/validation/2026-10-13/native-large-triangle-v1/README.md)
-executes 69 NPU operations but the compositor exits before producing a complete
-frame. A tested large-texture fix advances compatibility; single draws can still
-take seconds. Stable native frames, physical presentation/input integration and
-a measured Tahoma benefit remain separate outstanding milestones.
+**Full desktop offload is unfinished.** The latest
+[native desktop trial](docs/validation/2026-10-13/native-large-quad-v1/README.md)
+produces its first 1024×768 Windows desktop frame through the NPU-backed indirect
+display, with 190 actual DWM NPU operations and verified readback. Bootstrap and
+immediate cleanup take about 184 seconds. Delta's physical desktop remains on its
+ordinary path. Sustained native frames, physical presentation/input integration,
+interactive performance and a measured Tahoma benefit remain outstanding.
 
 The [native registered-adapter trial](docs/validation/2026-10-13/native-windows-adapter-v1/README.md)
 now passes six clears and two indexed draws through Delta's ordinary Direct3D 11

@@ -1,0 +1,48 @@
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'native-routing-v10';shutil.copytree(r/'native-routing-v9',d);lab=d/'native/windows/registered_lab'
+def edit(name,old,new,count=1):
+ p=lab/name;s=p.read_text();assert s.count(old)==count,(name,old[:80],s.count(old));p.write_text(s.replace(old,new))
+edit('indexed_exchange_protocol.hpp','h.abi==17 || h.abi==18)?h.reserved','h.abi==17 || h.abi==18 || h.abi==19)?h.reserved')
+edit('indexed_exchange_protocol.hpp','inline bool shape_valid', 'inline uint32_t resource_pixels_limit(const Header &h){return h.abi==19?8388608u:4194304u;}\ninline bool shape_valid')
+edit('indexed_exchange_protocol.hpp','    if(h.abi==18){','''    // ABI 19 admits the same normalized source capacity for resource tables,
+    // including quad-derivative shaders. Buffer/typed-load limits and the total
+    // 32 MiB request budget remain enforced by resource validation and Writer.
+    if(h.abi==19){
+        if(large_uniform || (h.flags&0x3002)!=0x2002 ||
+           (h.reserved!=8 && h.reserved!=9 && h.reserved!=10 && h.reserved!=11 && h.reserved!=12 && h.reserved!=14 && h.reserved!=15))return false;
+        auto legacy=h;legacy.abi=h.reserved;legacy.reserved=0;
+        return shape_valid(legacy,component_payload,false);
+    }
+    if(h.abi==18){''')
+edit('indexed_exchange_protocol.hpp','    auto &h = r.header;','''    auto &h = r.header;
+    if(h.abi!=19 && (h.flags&0x2000) && std::any_of(r.resources.begin(),r.resources.end(),[](const auto &t){return uint64_t(t.width)*t.height>4194304;})){
+        require(!h.reserved && (h.abi==8 || h.abi==9 || h.abi==10 || h.abi==11 || h.abi==12 || h.abi==14 || h.abi==15));
+        h.reserved=h.abi;h.abi=19;
+    }''')
+edit('indexed_exchange_protocol.hpp','uint64_t(t.width)*t.height<=4194304 && t.pixels.size()', 'uint64_t(t.width)*t.height<=resource_pixels_limit(h) && t.pixels.size()')
+edit('indexed_exchange_protocol.hpp','uint64_t(d.width)*d.height<=4194304','uint64_t(d.width)*d.height<=resource_pixels_limit(h)')
+edit('indexed_exchange_protocol.hpp','if(h.abi==14 || h.abi==15){','if(payload_abi(h)==14 || payload_abi(h)==15){',2)
+edit('indexed_exchange_protocol.hpp','h.abi==12 || (!u && !v)','payload_abi(h)==12 || (!u && !v)')
+edit('indexed_exchange_protocol.hpp','h.abi==12?7u:1u','payload_abi(h)==12?7u:1u')
+edit('indexed_pipeline.hpp','if(h.flags&0x2000){require(h.abi==8 || h.abi==9 || h.abi==10 || h.abi==11 || h.abi==12 || h.abi==14 || h.abi==15);','if(h.flags&0x2000){const auto abi=payload_abi(h);require(abi==8 || abi==9 || abi==10 || abi==11 || abi==12 || abi==14 || abi==15);')
+edit('indexed_draw.hpp','ss.width<=8192 && ss.height<=8192 && uint64_t(ss.width)*ss.height<=4194304','ss.width<=8192 && ss.height<=8192 && uint64_t(ss.width)*ss.height<=8388608')
+s=(lab/'large_triangle_texture_capture_probe.cpp').read_text()
+s=s.replace('h.abi=18;h.reserved=7','h.abi=19;h.reserved=8').replace('h.width=91;h.height=64;h.vertices=24;h.flags=0x1f0b','h.width=2048;h.height=68;h.vertices=6;h.flags=0x2f03').replace('2912,1824','2880,1800')
+s=s.replace('ex::texture_valid(t,h)','uint64_t(t.width)*t.height<=ex::resource_pixels_limit(h)').replace('legacy.abi=7','legacy.abi=8').replace('!ex::texture_valid(t,legacy)','uint64_t(t.width)*t.height>ex::resource_pixels_limit(legacy)').replace('bad.reserved=18','bad.reserved=19').replace('bad.flags|=0x2000','bad.flags|=0x1000')
+s=s.replace('auto point=h;point.flags=0x1f13;nr::capture::check(ex::shape_valid(point));','for(const auto abi:{12u,14u}){auto addressed=h;addressed.reserved=abi;nr::capture::check(ex::shape_valid(addressed));}')
+s=s.replace('!ex::texture_valid(too_big,h)','uint64_t(too_big.width)*too_big.height>ex::resource_pixels_limit(h)').replace('args[0]==24','args[0]==6').replace('header.abi=7','header.abi=8').replace('header.flags=0x1f0b','header.flags=0x2f03')
+s=s.replace('r.texture={source[3],source[4],source[5],s.values<nr::raster::PackedColor>("source")};','''nr::capture::check(nr::shader::quad_derivatives(r.pixel));
+    for(unsigned slot=1;slot<16;++slot)nr::capture::check(!r.pixel.textures[slot] && !r.pixel.samplers[slot]);
+    const auto description=s.values<uint32_t>("resource-2-0-description"),resource_view=s.values<uint32_t>("resource-2-0-view");
+    nr::capture::check(description==source && resource_view.size()==4 && !resource_view[3]);
+    r.resources[0]={source[3],source[4],source[5],s.values<nr::raster::PackedColor>("resource-2-0")};
+    nr::capture::check(r.resources[0].pixels==s.values<nr::raster::PackedColor>("source"));
+    r.samplers[0].filter=nr::shader::TextureFilter::linear;''')
+s=s.replace('header.abi==18 && header.reserved==7','header.abi==19 && header.reserved==8').replace('decoded.texture.pixels==r.texture.pixels','decoded.resources[0].pixels==r.resources[0].pixels && nr::raster::sampler_layout_equal(decoded.samplers,r.samplers)').replace('malformed.abi=7','malformed.abi=8').replace('r.texture.width,r.texture.height','r.resources[0].width,r.resources[0].height').replace('large_triangle_texture','large_quad_texture')
+(lab/'large_quad_texture_capture_probe.cpp').write_text(s)
+cmake=(lab/'CMakeLists.txt').read_text();block='add_executable(nr_large_triangle_texture_capture_probe'+cmake.split('add_executable(nr_large_triangle_texture_capture_probe',1)[1];(lab/'CMakeLists.txt').write_text(cmake+'\n'+block.replace('large_triangle_texture','large_quad_texture'))
+(r/'native-routing-v10-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-routing-v10.tar.gz','w:gz') as f:f.add(d,arcname=d.name)
+s=(r/'build-native-routing-v9.ps1').read_text().replace('native-routing-v9','native-routing-v10').replace('nr_large_triangle_texture_capture_probe *>>','nr_large_triangle_texture_capture_probe nr_large_quad_texture_capture_probe *>>').replace('|large_triangle_texture_contract)', '|large_triangle_texture_contract|large_quad_texture_contract)').replace("'nr_large_triangle_texture_capture_probe.exe'))", "'nr_large_triangle_texture_capture_probe.exe','nr_large_quad_texture_capture_probe.exe'))");(r/'build-native-routing-v10.ps1').write_text(s)
+s=(r/'qualify-large-triangle-texture-v1.py').read_text().replace('h[3]==18','h[3]==19').replace('h[16]==7','h[16]==8').replace('abi=18,legacy_abi=7','abi=19,legacy_abi=8').replace('[91,64]','[2048,68]').replace('91*64*4','2048*68*4');(r/'qualify-large-quad-texture-v1.py').write_text(s)

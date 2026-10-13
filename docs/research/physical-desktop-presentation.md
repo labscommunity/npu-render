@@ -133,3 +133,11 @@ draws, but still exits before a complete frame. The next captured derivative
 shader renders correctly in isolation; its live resource-table boundary remains
 unfinished. A live draw takes about 11.9 seconds, so compatibility and interactive
 performance both remain open. Physical migration and Tahoma relief are unproven.
+
+The next [resource-table extension and bounded repeat](../validation/2026-10-13/native-large-quad-v1/)
+produce the first native 1024×768 desktop frame. DWM performs 190 verified NPU
+operations, the requested indirect render adapter is selected, and readback
+succeeds. Bootstrap and immediate cleanup take about 184 seconds. This establishes
+one native frame, with no explicit primary topology change or physical frame
+presentation. Live output, input, sustained delivery, performance and resource
+relief remain separate milestones.
