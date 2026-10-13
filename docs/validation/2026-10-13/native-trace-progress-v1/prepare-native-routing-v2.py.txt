@@ -1,0 +1,39 @@
+from pathlib import Path
+import shutil,json,hashlib,tarfile
+r=Path('results/render-driver');d=r/'native-routing-v2';shutil.copytree(r/'native-routing-v1',d);lab=d/'native/windows/registered_lab'
+p=lab/'lab_trace.hpp';s=p.read_text();needle='namespace nr::registered_lab {'
+s=s.replace(needle,r'''#ifdef NR_NATIVE_PROBE
+#include "native_probe_lease.hpp"
+#include <memory>
+#define NR_LAB_TRACE_ROOT L"C:\ProgramData\T8-NpuRender-NativeTraceV1"
+#else
+#define NR_LAB_TRACE_ROOT L"C:\npu-lab\umd-trace"
+#endif
+namespace nr::registered_lab {
+inline bool lab_trace_enabled() noexcept {
+#ifdef NR_NATIVE_PROBE
+    try {
+        static std::mutex admission_mutex;std::lock_guard<std::mutex> lock(admission_mutex);
+        static std::unique_ptr<nr::native_probe::Admission> admission;
+        if(!admission)admission=std::make_unique<nr::native_probe::Admission>(nr::native_probe::read_mapping());
+        admission->verify();return true;
+    }catch(...){return false;}
+#else
+    return nr_fill_guest();
+#endif
+}
+''')
+s=s.replace('    static const bool enabled = nr_fill_guest();\n    if (!enabled) return;','    if (!lab_trace_enabled()) return;').replace('if (!nr_fill_guest() || !code','if (!lab_trace_enabled() || !code')
+s=s.replace('L"C:'+chr(92)*2+'npu-lab'+chr(92)*2+'umd-trace'+chr(92)*2,'NR_LAB_TRACE_ROOT L"'+chr(92)*2);p.write_text(s)
+p=lab/'draw_capture.hpp';s=p.read_text().replace('if (!nr_fill_guest()) return;','if (!lab_trace_enabled()) return;').replace('L"C:'+chr(92)*2+'npu-lab'+chr(92)*2+'umd-trace'+chr(92)*2,'NR_LAB_TRACE_ROOT L"'+chr(92)*2);p.write_text(s)
+(r/'native-routing-v2-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-routing-v2.tar.gz','w:gz') as f:f.add(d,arcname=d.name)
+(r/'build-native-routing-v2.ps1').write_text((r/'build-native-routing-v1.ps1').read_text().replace('native-routing-v1','native-routing-v2'))
+s=(r/'qualify-native-routing-v1.py').read_text();s=s.replace("for name in ('worker','client','runtime','cache','output'):","for name in ('worker','client','runtime','cache','output','trace'):")
+needle="assert negative.returncode==0 and json.loads(negative.stdout)['unleased_native_adapter_rejected'];report['unleased_rejection_passed']=True;save()";assert needle in s;s=s.replace(needle,needle+"\n assert not list(v.trace.iterdir()),'Unleased process wrote native diagnostics';report['unleased_diagnostics_rejected']=True;save()")
+needle='  report.update(passed=True,component=done[0],npu_operation_receipts=10,delivery_acknowledgments=10,worker_exit_code=worker.returncode)';assert needle in s
+s=s.replace(needle,'''  trace_file=v.trace/f'process-{pid}.jsonl';trace=rows(trace_file);assert trace and trace[0]['event']=='process' and trace[0]['pid']==pid and trace_file.stat().st_size<=4*1024*1024
+  assert any(x.get('event')=='open_adapter' for x in trace) and any(x.get('event')=='color_clear_executed' and x.get('execution_device')=='NPU (local indexed)' for x in trace)
+  report.update(native_diagnostics_qualified=True,trace_lines=len(trace),trace_bytes=trace_file.stat().st_size,trace_sha256=hashlib.sha256(trace_file.read_bytes()).hexdigest())
+'''+needle)
+(r/'qualify-native-routing-v2.py').write_text(s)

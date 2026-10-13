@@ -1,0 +1,79 @@
+--- a/native/windows/registered_lab/draw_capture.hpp
++++ b/native/windows/registered_lab/draw_capture.hpp
+@@ -29,12 +29,12 @@
+     template<class T> void value(const char *name, const T &data) { record(name, &data, sizeof(data)); }
+ };
+ void lab_capture_indexed_draw(Device &d, UINT count, UINT first, INT base, bool indexed = true, UINT instances=1, UINT first_instance=0) noexcept {
+-    if (!nr_fill_guest()) return;
++    if (!lab_trace_enabled()) return;
+     static bool attempted = false; // Called under the UMD device mutex.
+     if (attempted) return;
+     attempted = true;
+     WCHAR path[MAX_PATH]{};
+-    swprintf_s(path, L"C:\\npu-lab\\umd-trace\\draw-%lu.bin", GetCurrentProcessId());
++    swprintf_s(path, NR_LAB_TRACE_ROOT L"\\draw-%lu.bin", GetCurrentProcessId());
+     // CREATE_NEW survives DLL unload/reload and bounds repeated device failures.
+     if (GetFileAttributesW(path) != INVALID_FILE_ATTRIBUTES) return;
+     try {
+--- a/native/windows/registered_lab/lab_trace.hpp
++++ b/native/windows/registered_lab/lab_trace.hpp
+@@ -4,10 +4,29 @@
+ #include <cstdio>
+ #include <mutex>
+ #include "contract.hpp"
++#ifdef NR_NATIVE_PROBE
++#include "native_probe_lease.hpp"
++#include <memory>
++#define NR_LAB_TRACE_ROOT L"C:\ProgramData\T8-NpuRender-NativeTraceV1"
++#else
++#define NR_LAB_TRACE_ROOT L"C:\npu-lab\umd-trace"
++#endif
+ namespace nr::registered_lab {
++inline bool lab_trace_enabled() noexcept {
++#ifdef NR_NATIVE_PROBE
++    try {
++        static std::mutex admission_mutex;std::lock_guard<std::mutex> lock(admission_mutex);
++        static std::unique_ptr<nr::native_probe::Admission> admission;
++        if(!admission)admission=std::make_unique<nr::native_probe::Admission>(nr::native_probe::read_mapping());
++        admission->verify();return true;
++    }catch(...){return false;}
++#else
++    return nr_fill_guest();
++#endif
++}
++
+ inline void lab_trace(const char *format, ...) noexcept {
+-    static const bool enabled = nr_fill_guest();
+-    if (!enabled) return;
++    if (!lab_trace_enabled()) return;
+     static std::mutex trace_mutex;
+     std::lock_guard<std::mutex> lock(trace_mutex);
+     static UINT lines = 0;
+@@ -19,7 +38,7 @@
+         uint64_t bytes = 0;
+         TraceFile() noexcept {
+             WCHAR path[MAX_PATH]{};
+-            swprintf_s(path, L"C:\\npu-lab\\umd-trace\\process-%lu.jsonl", GetCurrentProcessId());
++            swprintf_s(path, NR_LAB_TRACE_ROOT L"\\process-%lu.jsonl", GetCurrentProcessId());
+             handle = CreateFileW(path, FILE_APPEND_DATA | FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_DELETE,
+                                  nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+             LARGE_INTEGER size{};
+@@ -67,15 +86,15 @@
+     }
+ }
+ inline void lab_shader_capture(UINT kind, const UINT *code) noexcept {
+-    if (!nr_fill_guest() || !code || code[1] < 2 || code[1] > 16384) return;
++    if (!lab_trace_enabled() || !code || code[1] < 2 || code[1] > 16384) return;
+     // Preserve at most eight rejected programs per process across DLL reloads.
+     // The filename hash deduplicates diagnostics; it is not an integrity check.
+     uint64_t hash = 14695981039346656037ull;
+     for (UINT i = 0; i < code[1]; ++i) { hash ^= code[i]; hash *= 1099511628211ull; }
+     WCHAR path[MAX_PATH]{}, pattern[MAX_PATH]{};
+-    swprintf_s(path, L"C:\\npu-lab\\umd-trace\\shader-%lu-%u-%016llx.bin", GetCurrentProcessId(), kind, hash);
++    swprintf_s(path, NR_LAB_TRACE_ROOT L"\\shader-%lu-%u-%016llx.bin", GetCurrentProcessId(), kind, hash);
+     if (GetFileAttributesW(path) != INVALID_FILE_ATTRIBUTES) return;
+-    swprintf_s(pattern, L"C:\\npu-lab\\umd-trace\\shader-%lu-*.bin", GetCurrentProcessId());
++    swprintf_s(pattern, NR_LAB_TRACE_ROOT L"\\shader-%lu-*.bin", GetCurrentProcessId());
+     WIN32_FIND_DATAW entry{}; UINT count = 0;
+     const auto search = FindFirstFileW(pattern, &entry);
+     if (search != INVALID_HANDLE_VALUE) {

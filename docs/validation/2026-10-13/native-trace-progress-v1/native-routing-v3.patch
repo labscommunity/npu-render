@@ -1,0 +1,30 @@
+--- a/native/windows/registered_lab/lab_trace.hpp
++++ b/native/windows/registered_lab/lab_trace.hpp
+@@ -1,5 +1,5 @@
+ #pragma once
+-// Bounded diagnostics in the owned guest only; no display or execution claims.
++// Bounded diagnostics in the owned guest or a valid native lease; no display claims.
+ #include <cstdarg>
+ #include <cstdio>
+ #include <mutex>
+@@ -7,9 +7,9 @@
+ #ifdef NR_NATIVE_PROBE
+ #include "native_probe_lease.hpp"
+ #include <memory>
+-#define NR_LAB_TRACE_ROOT L"C:\ProgramData\T8-NpuRender-NativeTraceV1"
++#define NR_LAB_TRACE_ROOT LR"(C:\ProgramData\T8-NpuRender-NativeTraceV1)"
+ #else
+-#define NR_LAB_TRACE_ROOT L"C:\npu-lab\umd-trace"
++#define NR_LAB_TRACE_ROOT LR"(C:\npu-lab\umd-trace)"
+ #endif
+ namespace nr::registered_lab {
+ inline bool lab_trace_enabled() noexcept {
+@@ -21,7 +21,7 @@
+         admission->verify();return true;
+     }catch(...){return false;}
+ #else
+-    return nr_fill_guest();
++    static const bool enabled=nr_fill_guest();return enabled;
+ #endif
+ }
+ 
