@@ -1,0 +1,134 @@
+{
+  "trial": "v120",
+  "renderer_source_commit": "233d03880981cc7309a4cd27c163acc6ce36a8b1",
+  "host_worker_build": "trace-worker-v5",
+  "guest_package_version": "0.0.105.0",
+  "guest_umd_build": "present-umd-v229-legacy",
+  "vm_execution_host": "Mac QEMU TCG",
+  "render_execution_device": "physical Panther Lake NPU on Delta",
+  "successful_worker_requests": 1438,
+  "live_worker_requests": 1418,
+  "prewarm_worker_requests": 20,
+  "acknowledged_successes": 1438,
+  "negative_acknowledgements": 0,
+  "worker_successes_by_client": {
+    "42": 20,
+    "7640": 1197,
+    "1984": 117,
+    "5456": 56,
+    "3052": 48
+  },
+  "trace_saved_requests": 1438,
+  "trace_bytes": 4398396820,
+  "complete_request_order_preserved": true,
+  "received_frames": 34,
+  "sole_indirect_received_frames": 33,
+  "all_six_visual_gates_passed": true,
+  "visual_checks": [
+    {
+      "marker": "desktop-ready",
+      "identity": [
+        7672,
+        11,
+        1080728903900
+      ],
+      "received_at": "2026-10-13T01:57:40.940947+00:00",
+      "seconds_after_action": 115.916298,
+      "pixel_sha256": "f261d4a86751b900b62565db0bd14f3ccb57d6a9dd0c677933e4ab605bcc4a3c"
+    },
+    {
+      "marker": "run-visible",
+      "identity": [
+        7672,
+        19,
+        1102483168500
+      ],
+      "received_at": "2026-10-13T02:01:18.222340+00:00",
+      "seconds_after_action": 197.208781,
+      "pixel_sha256": "066229135a73e7f55eb64256d053137dc8b3919508a7540c310091b316794d47"
+    },
+    {
+      "marker": "notepad-visible",
+      "identity": [
+        7672,
+        24,
+        1124055759800
+      ],
+      "received_at": "2026-10-13T02:04:53.874479+00:00",
+      "seconds_after_action": 164.852912,
+      "pixel_sha256": "394b3935e795ac440a058a46978eee46824331069b624492866e2b96ffe8a728"
+    },
+    {
+      "marker": "text-visible",
+      "identity": [
+        7672,
+        28,
+        1137389474900
+      ],
+      "received_at": "2026-10-13T02:07:07.523079+00:00",
+      "seconds_after_action": 83.056706,
+      "pixel_sha256": "daf846fdd6b192ab1668b4d8db8d4919aa879fb4112b0ae6eae08055e92ab99a"
+    },
+    {
+      "marker": "maximized-visible",
+      "identity": [
+        7672,
+        33,
+        1161274863200
+      ],
+      "received_at": "2026-10-13T02:11:06.205794+00:00",
+      "seconds_after_action": 206.893069,
+      "pixel_sha256": "2ec2e216074a27bdd9186ef07eafaa201fd79b7504a46b39768ed2f7f2703c31"
+    },
+    {
+      "marker": "closed-visible",
+      "identity": [
+        7672,
+        38,
+        1185386598900
+      ],
+      "received_at": "2026-10-13T02:15:07.227971+00:00",
+      "seconds_after_action": 187.009112,
+      "pixel_sha256": "211c5316433a35ac6081ad44f971450c893ff36b9a04490e9c0439cde37f1e7d"
+    }
+  ],
+  "all_worker_provider_requests": 61822,
+  "all_worker_draw_ms": 323067.111,
+  "all_worker_compile_and_draw_ms": 745397,
+  "model_setup_counters": {
+    "compile_calls": 3611,
+    "cache_requests": 3611,
+    "cache_hits": 3592,
+    "cache_status_unavailable": 0
+  },
+  "maximum_observed_private_bytes": 652693504,
+  "maximum_observed_working_bytes": 1316098048,
+  "worker_seconds_configured": 1800,
+  "relay_seconds_effective": 1800,
+  "observer_seconds_configured": 1500,
+  "worker_exit_code": 1,
+  "worker_output_complete": true,
+  "npu_device_loss_recorded": false,
+  "native_topology_restoration_recorded": true,
+  "topology_wait_ms": 2089,
+  "guest_driver_removal_passed": true,
+  "stream_configuration_removed": true,
+  "collector_input_gate_revoked": true,
+  "verified_guest_archive_members": 37,
+  "full_desktop_offload": false,
+  "physical_delta_desktop_offloaded": false,
+  "usable_interactive_desktop": false,
+  "tahoma_performance_tested": false,
+  "physical_driver_package_changed": false,
+  "physical_npu_device_restarted": false,
+  "physical_machine_restarted": false,
+  "findings": [
+    "The v229 component-coverage implementation renders the exact line npu desktop offload v120 in the Notepad editor. All six gates pass on received frames while the indirect display is the sole guest path: complete desktop, Run, Notepad, typed editor text, maximized editor with retained text, and closed Notepad with restored desktop.",
+    "The input helper raw report intentionally remains unchanged: its visual_response_verified field is not updated by that helper. The six separate manual visual markers record verification; their raw packets, hashes, frame identities, receive times, and preceding input actions are independently matched during curation.",
+    "One of 34 received frames precedes the sole-display gate; 33 were received with that gate active. Frame count is not an FPS or completeness claim. All six admitted visual frames satisfy the gate.",
+    "All 1438 successful NPU requests have matching acknowledgements, including 20 prewarm and 1418 live requests. The consecutive 4398396820-byte request trace is hash indexed on Delta. No failure-capture records were produced. The only worker stderr message is the socket-close/timeout at bounded cleanup; exit code 1 is retained.",
+    "All requests together expand to 61822 provider calls. Reported draw intervals sum to 323067.111 ms and setup-plus-draw intervals to 745397 ms; these are host wrapper timings, not pure hardware execution or compiler time. Of 3611 model setup calls, 3592 report disk-cache hits. The input-to-verified-frame intervals range from 83.057 to 206.893 seconds for the five application actions. They include VM, transport, rendering and frame collection.",
+    "Topology is restored, both owned guest devices are removed, the stream configuration is removed and input admission is revoked. After restoration only, the owned persisted test document is reopened, cleared and closed using the ordinary graphics path. Those cleanup actions are not NPU rendering evidence.",
+    "This validates the scripted Windows VM interaction through a physical NPU. It does not move Delta's physical desktop, qualify arbitrary applications, games or video, establish usable performance, or demonstrate a Tahoma benefit. Full desktop offload remains unfinished."
+  ]
+}

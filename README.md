@@ -211,8 +211,19 @@ both runtime versions. Both clean builds pass 28 CPU suites; NPU checks cover
 688,128 blend components per runtime, 71 historical packets, three ABI 15
 packets, and 68 native driver draws. ABI 15 carries the text color as a runtime
 input and supports independent channel coverage with preserved write masks.
-The replay visibly renders the first editor glyph. A complete typed line and
-live desktop interaction still require the next installed trial.
+The replay visibly renders the first editor glyph.
+
+The [v120 installed trial](docs/validation/2026-10-13/sole-display-v120/report.json)
+passes all six scripted visual checks on the NPU path: desktop, Run, Notepad,
+typed editor text, maximize with retained text, and close back to the desktop.
+It returns 1,438 acknowledged NPU results and 34 frames, 33 received while the
+indirect display is the sole guest path. All six verified frames meet that gate.
+The complete ordered request trace and 37 guest archive members are preserved
+and hash checked. Ordinary topology is restored and both guest devices removed.
+Application responses still take 83–207 seconds. This runs Windows in the test
+VM; Delta's physical desktop remains on its ordinary graphics path. Usable speed,
+general application coverage, physical desktop migration and a Tahoma benefit
+remain unfinished.
 
 The v116 live draws expand into 26,995 provider calls. Their reported execution
 intervals total 138 seconds, versus 329 seconds including pipeline setup and
