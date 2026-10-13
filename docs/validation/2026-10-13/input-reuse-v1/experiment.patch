@@ -1,0 +1,216 @@
+--- a/native/windows/registered_lab/CMakeLists.txt
++++ b/native/windows/registered_lab/CMakeLists.txt
+@@ -238,3 +238,10 @@
+ target_compile_options(nr_private_queue_probe PRIVATE /W4 /WX)
+ target_link_libraries(nr_private_queue_probe PRIVATE openvino::runtime nr_registered_provider_cache)
+ set_property(TARGET nr_private_queue_probe PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
++
++add_executable(nr_registered_prepared_inputs_test prepared_inputs_test.cpp)
++target_compile_features(nr_registered_prepared_inputs_test PRIVATE cxx_std_17)
++target_compile_options(nr_registered_prepared_inputs_test PRIVATE /W4 /WX)
++target_link_libraries(nr_registered_prepared_inputs_test PRIVATE d3dcompiler nr_registered_vertex)
++set_property(TARGET nr_registered_prepared_inputs_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
++add_test(NAME registered_prepared_inputs_contract COMMAND nr_registered_prepared_inputs_test)
+--- a/native/windows/registered_lab/indexed_exchange_worker.cpp
++++ b/native/windows/registered_lab/indexed_exchange_worker.cpp
+@@ -62,9 +62,9 @@
+                 const auto result=pipeline->execute(request);
+                 const auto elapsed=GetTickCount64()-began; const auto after=nr::provider::compile_statistics();
+                 publish(directory + L"\\" + packet_name(h, true), ex::response(h, result)); ++succeeded;
+-                std::printf("{\"client_pid\":%u,\"sequence\":%u,\"execution_device\":\"%s\",\"operation\":\"%s\",\"width\":%u,\"height\":%u,\"provider_requests\":%llu,\"draw_ms\":%.3f,\"compile_and_draw_ms\":%llu,\"compile_calls\":%llu,\"cache_requests\":%llu,\"cache_hits\":%llu,\"cache_status_unavailable\":%llu,\"passed\":true,\"displayed_frames\":0}\n",
++                std::printf("{\"client_pid\":%u,\"sequence\":%u,\"execution_device\":\"%s\",\"operation\":\"%s\",\"width\":%u,\"height\":%u,\"provider_requests\":%llu,\"draw_ms\":%.3f,\"shader_ms\":%.3f,\"coverage_ms\":%.3f,\"projection_ms\":%.3f,\"merger_ms\":%.3f,\"compile_and_draw_ms\":%llu,\"compile_calls\":%llu,\"cache_requests\":%llu,\"cache_hits\":%llu,\"cache_status_unavailable\":%llu,\"passed\":true,\"displayed_frames\":0}\n",
+                     h.client_pid, h.sequence, result.execution_device.c_str(), ex::color_clear(h)?"color_clear":"draw", h.width, h.height,
+-                    static_cast<unsigned long long>(result.provider_requests), result.timings.total_ms, static_cast<unsigned long long>(elapsed),
++                    static_cast<unsigned long long>(result.provider_requests), result.timings.total_ms, result.timings.shader_ms, result.timings.coverage_ms, result.timings.projection_ms, result.timings.merger_ms, static_cast<unsigned long long>(elapsed),
+                     static_cast<unsigned long long>(after.calls-before.calls), static_cast<unsigned long long>(after.cache_requests-before.cache_requests),
+                     static_cast<unsigned long long>(after.cache_hits-before.cache_hits), static_cast<unsigned long long>(after.cache_status_unavailable-before.cache_status_unavailable)); std::fflush(stdout);
+             } catch (const std::exception &error) {
+--- /dev/null
++++ b/native/windows/registered_lab/prepared_inputs_test.cpp
+@@ -0,0 +1,79 @@
++#include "shader_contract.hpp"
++#include "shader_reference.hpp"
++#include "vertex_executor.hpp"
++#include <cstdio>
++#include <limits>
++using namespace nr::shader;
++#define TEST(v) do { if(!(v))throw std::runtime_error(#v); } while(false)
++namespace {
++template<class F> void rejects(F fn){bool rejected=false;try{fn();}catch(const std::invalid_argument &){rejected=true;}TEST(rejected);}
++void verify(const RegisterExecutor::Result &r,const Program &p,const std::vector<VertexRegisters> &inputs,
++ const VertexConstants &constants,const TextureShapes &shapes,const TextureSamplers &samplers,const TexturePixels &textures,const std::string &backend){
++ TEST(r.execution_device==backend || r.execution_device.rfind(backend+".",0)==0);
++ TEST(r.vertices.size()==inputs.size());
++ for(size_t n=0;n<inputs.size();++n)TEST(r.vertices[n]==reference_vertex(p,inputs[n],constants,shapes,samplers,textures));
++}
++void textures(const std::string &backend){
++ const auto words=nr::registered_lab::shader_tokens(
++  "cbuffer C:register(b0){float4 tint;}Texture2D image:register(t0);SamplerState filter:register(s0);"
++  "float4 main(float2 uv:TEXCOORD,float4 bias:COLOR):SV_Target{return image.Sample(filter,uv)*tint+bias;}","ps_4_0");
++ const auto p=parse_pixel(words.data(),words.size());TEST(p.inputs[0]==3 && p.inputs[1]==15 && p.constants[0]==1);
++ TextureShapes shapes{};shapes[0]={4,4};TextureSamplers samplers{};samplers[0].filter=TextureFilter::point;
++ PixelExecutor executor(p,64,backend,shapes,samplers);std::vector<VertexRegisters> input(64);
++ rejects([&]{(void)executor.execute_prepared(input);});
++ uint64_t input_bytes=0,output_bytes=0;unsigned verified=0;
++ for(unsigned draw=0;draw<3;++draw){
++  TexturePixels image;image[0].resize(16);VertexConstants constants;constants[0].resize(1);
++  for(unsigned c=0;c<4;++c)constants[0][0][c]=as_bits(float(c+draw+1)/8);
++  for(unsigned n=0;n<16;++n)for(unsigned c=0;c<4;++c)image[0][n][c]=float((n+c+draw*3)%16)/16;
++  const auto captured_image=image;const auto captured_constants=constants;
++  executor.prepare_inputs(constants,image);
++  // Mutate the original storage before the first execution, then destroy it.
++  // This distinguishes a snapshot from a live alias even if freed memory has
++  // not yet been reused by the allocator.
++  for(auto &texel:image[0])texel.fill(.9375f);
++  constants[0][0].fill(as_bits(7.f));
++  for(unsigned tile=0;tile<4;++tile){
++   for(unsigned n=0;n<input.size();++n){input[n][0]={as_bits((float((n+tile)%4)+.5f)/4),as_bits((float((n/4+tile)%4)+.5f)/4),0,0};
++    for(unsigned c=0;c<4;++c)input[n][1][c]=as_bits(float((n+c+tile)%8)/32);}
++   const auto result=executor.execute_prepared(input);verify(result,p,input,captured_constants,shapes,samplers,captured_image,backend);verified+=256;
++   if(!input_bytes){input_bytes=result.input_bytes;output_bytes=result.output_bytes;}
++   TEST(result.input_bytes==input_bytes && result.output_bytes==output_bytes);
++   if(!tile){image={};constants={};}
++  }
++  // The ordinary API must refresh all bindings and still produce the oracle.
++  const auto ordinary=executor.execute(input,captured_constants,captured_image);
++  verify(ordinary,p,input,captured_constants,shapes,samplers,captured_image,backend);verified+=256;
++  TEST(ordinary.input_bytes==input_bytes && ordinary.output_bytes==output_bytes);
++  rejects([&]{executor.prepare_inputs({},captured_image);});
++  rejects([&]{(void)executor.execute_prepared(input);});
++  executor.prepare_inputs(captured_constants,captured_image);
++  verify(executor.execute_prepared(input),p,input,captured_constants,shapes,samplers,captured_image,backend);verified+=256;
++ }
++ // A malformed texture upload fails closed; no stale prepared result is usable.
++ VertexConstants constants;constants[0].resize(1);TexturePixels malformed;
++ rejects([&]{executor.prepare_inputs(constants,malformed);});
++ rejects([&]{(void)executor.execute_prepared(input);});
++ rejects([&]{executor.prepare_inputs(constants,malformed);});
++ std::printf("{\"prepared_texture_and_constants\":true,\"source_lifetime_owned\":true,\"changing_fragment_registers\":true,\"new_draw_refresh\":true,\"invalid_preparation_revokes_inputs\":true,\"failed_upload_poisoned\":true,\"verified_components\":%u,\"execution_device\":\"%s\",\"passed\":true}\n",verified,backend.c_str());
++}
++void integer_constants(const std::string &backend){
++ Program p;p.stage=Stage::pixel;p.inputs[0]=p.outputs[0]=15;p.constants[0]=1;
++ Instruction i;i.opcode=Opcode::bitwise_or;i.destination.kind=Register::output;i.destination.mask=15;i.source_count=2;
++ i.sources[0].kind=Register::input;i.sources[1].kind=Register::constant;p.instructions.push_back(i);
++ PixelExecutor executor(p,64,backend);std::vector<VertexRegisters> input(64);unsigned verified=0;
++ for(unsigned draw=0;draw<3;++draw){
++  VertexConstants c;c[0].resize(1);c[0][0]={0x80000001u+draw,0xffffffffu-draw,0x12345678u+draw,0x80000000u+draw};const auto snapshot=c;
++  executor.prepare_inputs(c);c[0][0]={};
++  for(unsigned tile=0;tile<3;++tile){
++   for(unsigned n=0;n<input.size();++n)for(unsigned lane=0;lane<4;++lane)input[n][0][lane]=n*374763u+tile*13u+lane;
++   verify(executor.execute_prepared(input),p,input,snapshot,{},{},{},backend);verified+=256;
++  }
++ }
++ std::printf("{\"prepared_integer_constant_bits\":true,\"verified_components\":%u,\"execution_device\":\"%s\",\"passed\":true}\n",verified,backend.c_str());
++}
++}
++int main(int argc,char **argv)try{
++ TEST(argc==1 || (argc==3 && std::string(argv[1])=="--backend"));const std::string backend=argc==3?argv[2]:"CPU";
++ textures(backend);integer_constants(backend);return 0;
++}catch(const std::exception &e){std::fprintf(stderr,"%s\n",e.what());return 1;}
+--- a/native/windows/registered_lab/triangle_texture_draw.cpp
++++ b/native/windows/registered_lab/triangle_texture_draw.cpp
+@@ -130,6 +130,7 @@
+     }
+     std::vector<size_t> triangle_base(s.batch),pixel_index(s.batch);
+     std::vector<uint8_t> stored_pixel(s.batch);
++    bool pixel_inputs_prepared=false;
+     const auto submit=[&](size_t valid){
+         require(valid && valid<=s.batch && (!s.quads || !(valid%4)));
+         for(size_t n=0;n<s.batch;++n){
+@@ -179,7 +180,9 @@
+             for(size_t q=0;q<s.batch;q+=4)if(!interpolation_coverage[q])
+                 for(size_t lane=0;lane<4;++lane)fragments[q+lane]=fragments[live_quad+lane];
+         }else for(size_t n=0;n<s.batch;++n)if(!covered.covered[n])fragments[n]=fragments[first_live];
+-        began=Clock::now();const auto pixels=s.pixel->execute(fragments,pc,textures);require(pixels.execution_device==result.execution_device);
++        began=Clock::now();
++        if(!pixel_inputs_prepared){s.pixel->prepare_inputs(pc,textures);pixel_inputs_prepared=true;}
++        const auto pixels=s.pixel->execute_prepared(fragments);require(pixels.execution_device==result.execution_device);
+         result.timings.shader_ms+=ms(began);result.input_bytes+=pixels.input_bytes;result.output_bytes+=pixels.output_bytes;++result.provider_requests;
+         for(size_t n=0;n<s.batch;++n)std::memcpy(colors[n].data(),pixels.vertices[n][0].data(),16);
+         for(size_t n=0;n<s.batch;++n)tile[n]=stored_pixel[n]?result.pixels[pixel_index[n]]:PackedColor{};
+--- a/native/windows/registered_lab/vertex_executor.cpp
++++ b/native/windows/registered_lab/vertex_executor.cpp
+@@ -69,7 +69,7 @@
+     ov::CompiledModel compiled;
+     ov::InferRequest request;
+     std::string execution_device;
+-    bool failed = false, ready = false;
++    bool failed = false, ready = false, bindings_ready = false;
+     State(const Program &p, uint32_t vertices, const std::string &backend,
+           const TextureShapes &shapes, const TextureSamplers &samplers, uint32_t tap_limit=128, bool defer_compile=false) : program(mirrored_loop_shader(p)?mirrored_tap_program(p):lower_bounded_loops(p)), count(vertices), logical_count(vertices), tap_capacity(tap_limit), mirrored_taps(mirrored_loop_shader(p)), texture_shapes(shapes) {
+         check(count && count <= 65536 && (backend == "CPU" || backend == "GPU" || backend == "NPU"));
+@@ -908,11 +908,10 @@
+     if(mirrored_loop_shader(p))configuration=std::make_unique<Configuration>(Configuration{p,count,backend,textures,samplers});
+ }
+ RegisterExecutor::~RegisterExecutor() = default;
+-RegisterExecutor::Result RegisterExecutor::execute(const std::vector<VertexRegisters> &vertices, const VertexConstants &constants,
+-                                                   const TexturePixels &textures) {
+-    check(state && !state->failed && vertices.size() == state->logical_count);
++void RegisterExecutor::prepare_inputs(const VertexConstants &constants,const TexturePixels &textures) {
++    check(state && !state->failed);
++    state->bindings_ready=false;
+     for (unsigned i = 0; i < 14; ++i) check(constants[i].size() >= state->program.constants[i]);
+-    Result result;
+     if(state->mirrored_taps){
+         int32_t taps;std::memcpy(&taps,&constants[0][0][3],4);check(taps<=128);
+         uint32_t capacity=1;while(taps>int32_t(capacity))capacity*=2;
+@@ -931,7 +930,6 @@
+     try {
+         for (size_t i = 0; i < state->bindings.size(); ++i) {
+             const auto &binding = state->bindings[i]; auto tensor = state->request.get_tensor(binding.name);
+-            result.input_bytes += tensor.get_byte_size();
+             if (binding.half_texel) {
+                 check(tensor.get_size() == 1 && tensor.get_element_type() == ov::element::f32);
+                 *tensor.data<float>() = .5f;
+@@ -943,12 +941,31 @@
+             } else if (binding.constant) {
+                 check(tensor.get_byte_size() == size_t(state->program.constants[binding.index]) * sizeof(VertexBits));
+                 std::memcpy(tensor.data(), constants[binding.index].data(), tensor.get_byte_size());
+-            } else {
+-                check(tensor.get_byte_size() == vertices.size() * sizeof(VertexBits));
+-                auto *destination = static_cast<uint8_t *>(tensor.data());
+-                for (size_t v = 0; v < vertices.size(); ++v)
+-                    std::memcpy(destination + v * sizeof(VertexBits), vertices[v][binding.index].data(), sizeof(VertexBits));
+-            }
++            }
++        }
++        state->bindings_ready=true;
++    } catch (...) { state->failed=true; state->bindings_ready=false; throw; }
++}
++RegisterExecutor::Result RegisterExecutor::execute(const std::vector<VertexRegisters> &vertices, const VertexConstants &constants,
++                                                   const TexturePixels &textures) {
++    check(state && !state->failed && vertices.size() == state->logical_count);
++    prepare_inputs(constants,textures);
++    return execute_prepared(vertices);
++}
++RegisterExecutor::Result RegisterExecutor::execute_prepared(const std::vector<VertexRegisters> &vertices) {
++    check(state && !state->failed && state->bindings_ready && vertices.size() == state->logical_count);
++    Result result;
++    try {
++        for (const auto &binding:state->bindings) {
++            auto tensor=state->request.get_tensor(binding.name);
++            // Logical provider input size remains unchanged. This counter is
++            // not a measurement of host copies or physical DMA traffic.
++            result.input_bytes+=tensor.get_byte_size();
++            if(binding.half_texel || binding.texture || binding.constant)continue;
++            check(tensor.get_byte_size()==vertices.size()*sizeof(VertexBits));
++            auto *destination=static_cast<uint8_t *>(tensor.data());
++            for(size_t v=0;v<vertices.size();++v)
++                std::memcpy(destination+v*sizeof(VertexBits),vertices[v][binding.index].data(),sizeof(VertexBits));
+         }
+         state->request.infer();
+         if (state->checks_sample_coordinates) {
+--- a/native/windows/registered_lab/vertex_executor.hpp
++++ b/native/windows/registered_lab/vertex_executor.hpp
+@@ -31,6 +31,11 @@
+     RegisterExecutor(const RegisterExecutor &) = delete;
+     RegisterExecutor &operator=(const RegisterExecutor &) = delete;
+     struct Result { std::vector<VertexRegisters> vertices; std::string execution_device; uint64_t input_bytes = 0, output_bytes = 0; };
++    // Snapshot constants and textures into this executor's owned input tensors.
++    // Call again for every new draw. Subsequent prepared executions change only
++    // vertex/fragment registers; caller-owned resource mutations do not leak in.
++    void prepare_inputs(const VertexConstants &constants, const TexturePixels &textures = {});
++    Result execute_prepared(const std::vector<VertexRegisters> &vertices);
+     Result execute(const std::vector<VertexRegisters> &vertices, const VertexConstants &constants,
+                    const TexturePixels &textures = {});
+ };

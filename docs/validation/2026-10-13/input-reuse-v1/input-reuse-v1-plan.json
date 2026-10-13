@@ -1,0 +1,21 @@
+{
+  "status": "full_trace_exact_but_loop_qualification_correction_pending",
+  "parent": "queue-worker-v4",
+  "renderer": "present-umd-v229",
+  "change": "Snapshot immutable per-draw shader constants and textures once into existing InferRequest tensors; change only fragment registers for subsequent tiles. Graphs and logical input-byte receipts unchanged.",
+  "activation": "isolated experimental build only",
+  "new_api": "prepare_inputs / execute_prepared",
+  "guard": "New draw always prepares; lazy loop capacity resolved during preparation; failure poisons executor; no pointer-identity cache",
+  "independent_snapshot_tests_required": true,
+  "all_existing_cpu_shader_and_raster_contracts_required": true,
+  "full_trace_exact_pixel_and_receipt_comparison_required": true,
+  "host_copy_savings_measured": false,
+  "physical_dma_savings_measured": false,
+  "npu_execution_tested": true,
+  "installed": false,
+  "full_trace_exact_requests": 1438,
+  "first_pass_elapsed_ms": 638532,
+  "reference_elapsed_ms": 641906,
+  "meaningful_performance_improvement_established": false,
+  "loop_invocation_audit": "Original --backend NPU selected no cases. Correct positional invocation NPU all is prepared with 77 receipt checks."
+}

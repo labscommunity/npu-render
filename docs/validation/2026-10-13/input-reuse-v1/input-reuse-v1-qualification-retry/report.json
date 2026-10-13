@@ -1,0 +1,45 @@
+{
+    "completed":  true,
+    "passed":  true,
+    "build":  "input-reuse-v1",
+    "cases":  [
+                  {
+                      "test":  "prepared_inputs",
+                      "backend":  "NPU",
+                      "passed":  true,
+                      "verified_components":  6912,
+                      "evidence":  "input-reuse-v1-qualification/prepared_inputs-NPU.stdout.jsonl",
+                      "reused_prior_pass":  true
+                  },
+                  {
+                      "test":  "prepared_inputs",
+                      "backend":  "GPU",
+                      "passed":  true,
+                      "verified_components":  6912,
+                      "evidence":  "input-reuse-v1-qualification/prepared_inputs-GPU.stdout.jsonl",
+                      "reused_prior_pass":  true
+                  },
+                  {
+                      "test":  "texture",
+                      "backend":  "NPU",
+                      "passed":  true,
+                      "elapsed_ms":  307
+                  },
+                  {
+                      "test":  "loop",
+                      "backend":  "NPU",
+                      "passed":  true,
+                      "elapsed_ms":  28
+                  }
+              ],
+    "prepared_input_oracle_components_per_device":  6912,
+    "source_snapshot_and_lifetime_verified":  true,
+    "new_draw_refresh_verified":  true,
+    "invalid_preparation_revokes_inputs":  true,
+    "graph_math_changed":  false,
+    "full_trace_replay_tested":  false,
+    "performance_improvement_measured":  false,
+    "desktop_use_qualified":  false,
+    "prior_controller_failure":  "PowerShell script-scope collection was an ordered dictionary; second successful test could not append metadata. Raw results preserved; no device failure.",
+    "original_evidence_preserved":  true
+}

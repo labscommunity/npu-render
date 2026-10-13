@@ -1,0 +1,51 @@
+{
+  "build": "input-reuse-v1",
+  "parent": "queue-worker-v4",
+  "changed_files": [
+    "native/windows/registered_lab/CMakeLists.txt",
+    "native/windows/registered_lab/indexed_exchange_worker.cpp",
+    "native/windows/registered_lab/prepared_inputs_test.cpp",
+    "native/windows/registered_lab/triangle_texture_draw.cpp",
+    "native/windows/registered_lab/vertex_executor.cpp",
+    "native/windows/registered_lab/vertex_executor.hpp"
+  ],
+  "cpu_contracts_passed": 29,
+  "independent_components_per_device": 6912,
+  "snapshot_ownership_and_refresh_verified": true,
+  "texture_regressions_on_npu": true,
+  "loop_regression_receipts_on_npu": 77,
+  "original_loop_invocation_was_noop": true,
+  "original_qualification_report_incorrect_for_loop_test": true,
+  "loop_qualification_corrected": true,
+  "full_trace_requests": 1438,
+  "all_pixels_and_receipts_exact": true,
+  "elapsed_ms": 638531.999999992,
+  "reference_elapsed_ms": 641906.0000000027,
+  "elapsed_reduction_percent": 0.5256221315910303,
+  "meaningful_performance_improvement_established": false,
+  "stage_ms": {
+    "shader_ms": 121638.07699999992,
+    "coverage_ms": 86638.96900000006,
+    "projection_ms": 2481.299999999999,
+    "merger_ms": 70615.82299999995,
+    "draw_ms": 298295.09799999994,
+    "compile_and_draw_ms": 478636
+  },
+  "model_setup_calls": 1711,
+  "all_model_setups_disk_cache_hits": true,
+  "provider_requests": 61822,
+  "physical_dma_savings_measured": false,
+  "repeated_comparison": false,
+  "order_effects_controlled": false,
+  "production_api_changed": false,
+  "desktop_use_qualified": false,
+  "tahoma_tested": false,
+  "findings": [
+    "The experimental API snapshots constants and textures into owned InferRequest input tensors once per draw. Each raster tile changes only fragment registers. Ordinary execute still prepares all inputs. Graph arithmetic and logical input-byte accounting remain unchanged.",
+    "The independent test mutates and releases caller inputs after preparation, refreshes them for a new draw, exercises exact integer bits and invalid preparation, and verifies that upload failure poisons the executor. CPU, NPU and GPU checks pass.",
+    "Elapsed replay time improves only 0.526 percent in a single uncontrolled comparison. This does not establish a useful speedup. The API remains experimental and is not used in the subsequent crop/cache desktop trial.",
+    "Stage timings wrap host preparation, synchronous inference and readback, not pure hardware execution. The merger label also includes existing fused image operations on specialized paths. Coverage plus merger wrappers sum to approximately 157 seconds; shader and interpolation wrappers sum to approximately 122 seconds.",
+    "The first qualification controller fails when appending its second successful test result because of PowerShell scope/collection behavior. Both actual NPU/GPU independent test outputs are preserved and reused.",
+    "A later evidence audit finds that the loop test was invoked with --backend NPU, but it expects positional backend and section. It silently selected no cases and returned zero. The empty log and inaccurate earlier report are preserved. The corrected NPU all invocation runs all 77 expected device-attributed cases; curation verifies their explicit counts."
+  ]
+}

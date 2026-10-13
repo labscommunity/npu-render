@@ -1,0 +1,16 @@
+{
+    "completed":  true,
+    "passed":  true,
+    "build":  "input-reuse-v1",
+    "backend":  "NPU",
+    "invocation":  "NPU all",
+    "test_result_rows":  77,
+    "expected_test_result_rows":  77,
+    "elapsed_ms":  10842,
+    "original_incorrect_invocation":  "--backend NPU",
+    "original_invocation_ran_no_cases":  true,
+    "original_empty_stdout_preserved":  true,
+    "original_exit_zero_was_not_test_evidence":  true,
+    "all_77_device_receipts_required":  true,
+    "correction":  "The loop test accepts positional backend and section arguments, unlike texture/prepared-input tests. The earlier controller only checked its zero exit code. This run uses positional arguments and validates every expected device receipt."
+}

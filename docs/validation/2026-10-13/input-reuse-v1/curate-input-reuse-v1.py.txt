@@ -1,0 +1,50 @@
+from pathlib import Path
+import json,hashlib,difflib
+r=Path('results/render-driver');out=Path('docs/validation/2026-10-13/input-reuse-v1');assert not (out/'report.json').exists();out.mkdir(parents=True,exist_ok=True)
+def read(p):
+ b=p.read_bytes();return b.decode('utf-16') if b[:2]==b'\xff\xfe' else b.decode('utf-8-sig')
+def obj(p):return json.loads(read(p))
+def rows(p):return [json.loads(x) for x in read(p).splitlines() if x.startswith('{')]
+def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+manifest=[]
+def save(p,n):
+ assert p.name!='private-token.bin';manifest.append(dict(source=p.relative_to(r).as_posix(),bytes=p.stat().st_size,sha256=sha(p)))
+ if n.endswith('.py'):n+='.txt'
+ t=out/n;t.parent.mkdir(parents=True,exist_ok=True);s='\n'.join(x.rstrip() for x in read(p).splitlines()).rstrip();t.write_text(s+'\n' if s else '')
+for item in obj(r/'input-reuse-v1-evidence-sha256.json'):
+ p=r/item['name'];assert p.stat().st_size==item['bytes'] and sha(p)==item['sha256'].lower();save(p,item['name'])
+for name in ['input-reuse-v1-source.json','input-reuse-v1-plan.json','input-reuse-v1-evidence-sha256.json','build-input-reuse-v1.ps1','qualify-input-reuse-v1.ps1','qualify-input-reuse-v1-resume.ps1','qualify-ordered-input-reuse-v1.ps1','correct-input-reuse-v1-loop-qualification.ps1','input-reuse-v1-stage-analysis.json','curate-input-reuse-v1.py']:save(r/name,name)
+build=obj(r/'input-reuse-v1-build/registered-build-report.json');s=obj(r/'ordered-input-reuse-v1-summary.json');a=obj(r/'ordered-input-reuse-v1-expanded/report.json');b=obj(r/'ordered-queue-v4c-expanded/report.json')
+assert build['clean_build'] and build['relevant_cpu_contracts_passed'] and build['immutable_per_draw_inputs']
+assert '100% tests passed out of 29' in read(r/'input-reuse-v1-CPU-contracts.log')
+for device in ['NPU','GPU']:
+ log=rows(r/f'input-reuse-v1-qualification/prepared_inputs-{device}.stdout.jsonl');assert len(log)==2 and sum(x['verified_components'] for x in log)==6912 and all(x['passed'] and x['execution_device']==device for x in log)
+ assert not read(r/f'input-reuse-v1-qualification/prepared_inputs-{device}.stderr.log').strip()
+ assert log[0]['source_lifetime_owned'] and log[0]['new_draw_refresh'] and log[0]['invalid_preparation_revokes_inputs'] and log[0]['failed_upload_poisoned']
+loops=rows(r/'input-reuse-v1-loop-correction/stdout.jsonl');correction=obj(r/'input-reuse-v1-loop-correction/report.json')
+assert correction['passed'] and len(loops)==77 and all(x['execution_device']=='NPU' for x in loops)
+assert sum(x.get('bounded_loop_components',0) for x in loops)==128 and sum(x.get('exact_components',0) for x in loops)==768 and sum(x.get('verified_components',0) for x in loops)==1152 and sum(x.get('captured_loop_raster_pixels',0) for x in loops)==1024
+assert (r/'input-reuse-v1-qualification-retry/loop-NPU.stdout.jsonl').stat().st_size==0
+texture=rows(r/'input-reuse-v1-qualification-retry/texture-NPU.stdout.jsonl');assert len(texture)==7 and all(x['execution_device']=='NPU' for x in texture)
+assert a['completed'] and a['passed'] and a['worker_exit_code']==0 and len(a['requests'])==1438 and s['passed']
+assert a['worker_sha256']==build['binary_sha256']['nr_registered_indexed_worker.exe'].lower() and a['reference_sha256']==sha(r/'ordered-queue-v4c-expanded/report.json')
+log=rows(r/'ordered-input-reuse-v1-expanded/worker.stdout.jsonl');passed=[x for x in log if x.get('passed')];finish=[x for x in log if x.get('worker_finished')];assert len(passed)==1438 and finish[0]['failed']==0 and finish[0]['succeeded']==1438
+assert not read(r/'ordered-input-reuse-v1-expanded/worker.stderr.log').strip()
+for x,y,w in zip(a['requests'],b['requests'],passed):
+ assert x['passed'] and x['reference_output_and_receipt_exact'] and x['execution_device']==w['execution_device']=='NPU'
+ for key in ['source_sha256','normalized_sha256','pixels_sha256','receipt']:assert x[key]==y[key]
+for key in ['draw_ms','shader_ms','coverage_ms','projection_ms','merger_ms','compile_and_draw_ms','compile_calls']:assert abs(sum(x[key] for x in passed)-s[key])<.01
+patch=[];modified=[]
+for name,value in obj(r/'input-reuse-v1-source.json').items():
+ rel=name.replace('\\','/');p=r/'input-reuse-v1'/rel;parent=r/'queue-worker-v4'/rel;assert sha(p)==value.lower();before=parent.read_text() if parent.exists() else '';after=p.read_text()
+ if before!=after:modified.append(rel);patch+=difflib.unified_diff(before.splitlines(True),after.splitlines(True),fromfile='a/'+rel if parent.exists() else '/dev/null',tofile='b/'+rel)
+(out/'experiment.patch').write_text(''.join(patch))
+report=dict(build='input-reuse-v1',parent='queue-worker-v4',changed_files=modified,cpu_contracts_passed=29,independent_components_per_device=6912,snapshot_ownership_and_refresh_verified=True,texture_regressions_on_npu=True,loop_regression_receipts_on_npu=77,original_loop_invocation_was_noop=True,original_qualification_report_incorrect_for_loop_test=True,loop_qualification_corrected=True,full_trace_requests=1438,all_pixels_and_receipts_exact=True,elapsed_ms=s['elapsed_ms'],reference_elapsed_ms=s['reference_elapsed_ms'],elapsed_reduction_percent=100*(1-s['elapsed_ms']/s['reference_elapsed_ms']),meaningful_performance_improvement_established=False,stage_ms={k:s[k] for k in ['shader_ms','coverage_ms','projection_ms','merger_ms','draw_ms','compile_and_draw_ms']},model_setup_calls=1711,all_model_setups_disk_cache_hits=True,provider_requests=sum(x['provider_requests'] for x in passed),physical_dma_savings_measured=False,repeated_comparison=False,order_effects_controlled=False,production_api_changed=False,desktop_use_qualified=False,tahoma_tested=False,findings=[
+'The experimental API snapshots constants and textures into owned InferRequest input tensors once per draw. Each raster tile changes only fragment registers. Ordinary execute still prepares all inputs. Graph arithmetic and logical input-byte accounting remain unchanged.',
+'The independent test mutates and releases caller inputs after preparation, refreshes them for a new draw, exercises exact integer bits and invalid preparation, and verifies that upload failure poisons the executor. CPU, NPU and GPU checks pass.',
+'Elapsed replay time improves only 0.526 percent in a single uncontrolled comparison. This does not establish a useful speedup. The API remains experimental and is not used in the subsequent crop/cache desktop trial.',
+'Stage timings wrap host preparation, synchronous inference and readback, not pure hardware execution. The merger label also includes existing fused image operations on specialized paths. Coverage plus merger wrappers sum to approximately 157 seconds; shader and interpolation wrappers sum to approximately 122 seconds.',
+'The first qualification controller fails when appending its second successful test result because of PowerShell scope/collection behavior. Both actual NPU/GPU independent test outputs are preserved and reused.',
+'A later evidence audit finds that the loop test was invoked with --backend NPU, but it expects positional backend and section. It silently selected no cases and returned zero. The empty log and inaccurate earlier report are preserved. The corrected NPU all invocation runs all 77 expected device-attributed cases; curation verifies their explicit counts.'
+])
+(out/'report.json').write_text(json.dumps(report,indent=2)+'\n');(out/'raw-manifest.json').write_text(json.dumps(manifest,indent=2)+'\n');print('Verified input reuse evidence:',len(manifest),'files; 1438 exact replay responses and 77 corrected NPU loop receipts')
