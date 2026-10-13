@@ -1,0 +1,102 @@
+"""Read-only Windows process discovery with held handles and exact identities."""
+from native_session_broker_v1 import C,W,k,require,process_identity,process_sid
+from pathlib import Path
+import os
+
+class ProcessEntry(C.Structure):
+    _fields_=[('size',W.DWORD),('usage',W.DWORD),('pid',W.DWORD),('heap',C.c_size_t),('module',W.DWORD),('threads',W.DWORD),('parent',W.DWORD),('priority',W.LONG),('flags',W.DWORD),('name',W.WCHAR*260)]
+class UnicodeString(C.Structure):
+    _fields_=[('length',W.USHORT),('maximum',W.USHORT),('buffer',W.LPVOID)]
+for name,args,result in [('CreateToolhelp32Snapshot',[W.DWORD,W.DWORD],W.HANDLE),('Process32FirstW',[W.HANDLE,C.POINTER(ProcessEntry)],W.BOOL),('Process32NextW',[W.HANDLE,C.POINTER(ProcessEntry)],W.BOOL),('QueryFullProcessImageNameW',[W.HANDLE,W.DWORD,W.LPWSTR,C.POINTER(W.DWORD)],W.BOOL),('WaitForSingleObject',[W.HANDLE,W.DWORD],W.DWORD)]:
+    f=getattr(k,name);f.argtypes=args;f.restype=result
+nt=C.WinDLL('ntdll',use_last_error=True)
+nt.NtQueryInformationProcess.argtypes=[W.HANDLE,W.ULONG,W.LPVOID,W.ULONG,C.POINTER(W.ULONG)];nt.NtQueryInformationProcess.restype=W.LONG
+shell=C.WinDLL('shell32',use_last_error=True)
+shell.CommandLineToArgvW.argtypes=[W.LPCWSTR,C.POINTER(C.c_int)];shell.CommandLineToArgvW.restype=C.POINTER(W.LPWSTR)
+
+def named_processes(name):
+    handle=k.CreateToolhelp32Snapshot(2,0)
+    if handle==C.c_void_p(-1).value:raise C.WinError(C.get_last_error())
+    try:
+        item=ProcessEntry();item.size=C.sizeof(item);ok=k.Process32FirstW(handle,C.byref(item))
+        while ok:
+            if item.name.casefold()==name.casefold():yield item.pid
+            ok=k.Process32NextW(handle,C.byref(item))
+        if C.get_last_error()!=18:raise C.WinError(C.get_last_error())
+    finally:k.CloseHandle(handle)
+
+def process_image(handle):
+    size=W.DWORD(32768);buffer=C.create_unicode_buffer(size.value)
+    require(k.QueryFullProcessImageNameW(handle,0,buffer,C.byref(size)))
+    return buffer.value
+
+def command_arguments(handle):
+    # ProcessCommandLineInformation returns a counted UNICODE_STRING in this buffer.
+    count=W.ULONG();status=nt.NtQueryInformationProcess(handle,60,None,0,C.byref(count))
+    assert status<0 and C.sizeof(UnicodeString)<=count.value<=131072,hex(status&0xffffffff)
+    buffer=C.create_string_buffer(count.value);status=nt.NtQueryInformationProcess(handle,60,buffer,count,C.byref(count))
+    assert status>=0,hex(status&0xffffffff)
+    value=C.cast(buffer,C.POINTER(UnicodeString)).contents
+    assert value.length%2==0 and value.length<=value.maximum
+    begin=C.addressof(buffer);assert begin<=value.buffer<=begin+C.sizeof(buffer) and value.buffer+value.length<=begin+C.sizeof(buffer)
+    text=C.wstring_at(value.buffer,value.length//2)
+    total=C.c_int();args=shell.CommandLineToArgvW(text,C.byref(total));require(args)
+    try:return [args[index] for index in range(total.value)]
+    finally:k.LocalFree(args)
+
+class PinnedProcess:
+    def __init__(self,pid):
+        self.handle=k.OpenProcess(0x101000,False,pid);require(self.handle)
+        try:
+            self.identity=process_identity(self.handle);self.image=process_image(self.handle);self.sid=process_sid(self.handle)[1]
+            assert self.identity.pid==pid and k.WaitForSingleObject(self.handle,0)==258
+        except BaseException:self.close();raise
+    def verify(self):
+        assert self.handle and k.WaitForSingleObject(self.handle,0)==258
+        now=process_identity(self.handle);assert bytes(now)==bytes(self.identity)
+    def close(self):
+        if self.handle:k.CloseHandle(self.handle);self.handle=None
+    def report(self):
+        return dict(pid=self.identity.pid,session=self.identity.session,creation_filetime=self.identity.created,image_name=Path(self.image).name,sid=self.sid)
+
+def exact_system_image(peer,name):
+    expected=str(Path(os.environ['SystemRoot'])/'System32'/name)
+    assert os.path.normcase(peer.image)==os.path.normcase(expected)
+
+def find_compositor(session):
+    found=[]
+    try:
+        for pid in named_processes('dwm.exe'):
+            peer=PinnedProcess(pid)
+            try:
+                if peer.identity.session!=session:continue
+                exact_system_image(peer,'dwm.exe');assert peer.sid==f'S-1-5-90-0-{session}'
+                found.append(peer);peer=None
+            finally:
+                if peer:peer.close()
+        assert len(found)==1,'Expected exactly one compositor for active session'
+        result=found.pop();return result
+    finally:
+        for peer in found:peer.close()
+
+def find_indirect_host(baseline,earliest):
+    found=[]
+    try:
+        for pid in named_processes('WUDFHost.exe'):
+            peer=None
+            try:
+                peer=PinnedProcess(pid)
+                if (peer.identity.pid,peer.identity.created) in baseline or peer.identity.created<earliest:continue
+                exact_system_image(peer,'WUDFHost.exe')
+                if peer.identity.session!=0 or peer.sid!='S-1-5-19':continue
+                if '-DeviceGroupId:T8NativeIddV1' not in command_arguments(peer.handle):continue
+                found.append(peer);peer=None
+            except OSError:
+                # A process can finish between enumeration and opening it.
+                continue
+            finally:
+                if peer:peer.close()
+        assert len(found)<=1,'Multiple new owned indirect display hosts'
+        return found.pop() if found else None
+    finally:
+        for peer in found:peer.close()

@@ -104,3 +104,14 @@ NPU mode under the same visual workload and Tahoma settings. Retain GPU graphics
 copy and compute activity, NPU activity, frame latency, inference throughput and
 power measurements. Keeping scanout hardware active is compatible with freeing
 GPU compute; the amount of useful capacity recovered remains a measured question.
+
+The [native desktop controller candidate](../validation/2026-10-13/native-desktop-progress-v1/)
+connects the two packages, pins the compositor and newly created indirect host,
+publishes separate leases, and records native frame/NPU evidence. Its supporting
+registered D3D11, simultaneous-consumer, identity-observer, and actual timed
+recovery trials pass. The launcher rejects unavailable interactive desktops;
+its actual desktop installation branch has not run. A finite watcher was armed
+on October 13, 2026, to attempt the next tests after the owner signs in and unlocks.
+Its archived waiting snapshot is not an ongoing execution claim. Physical frame
+delivery, primary-display migration, input mapping, topology restoration, and
+matched Tahoma measurements remain outstanding.

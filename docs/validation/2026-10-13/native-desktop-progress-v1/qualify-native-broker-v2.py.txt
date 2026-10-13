@@ -1,0 +1,74 @@
+"""Exercise simultaneous owned native leases against one NPU worker; no drivers."""
+from native_session_broker_v2 import *
+import traceback,_winapi
+p=argparse.ArgumentParser()
+for n in ('worker','client','runtime','cache','output'):p.add_argument('--'+n,type=Path,required=True)
+v=p.parse_args();v.output.mkdir(exist_ok=False);out=v.output
+for path in (v.worker,v.client):
+ b=obj(path.parent.parent/'registered-build-report.json');assert b['clean_build'] and hashlib.sha256(path.read_bytes()).hexdigest()==b['binary_sha256'][path.name].lower()
+def logs(path):return [json.loads(x) for x in path.read_text(encoding='utf-8-sig').splitlines() if x.startswith('{') and x.endswith('}')]
+env=os.environ.copy();env['PATH']=str(v.runtime)+os.pathsep+env.get('PATH','');env.update(NR_RENDER_NPU_CACHE=str(v.cache),NR_RENDER_SHARED_QUEUE='1',NR_RENDER_PIPELINE_CACHE='expanded',NR_RENDER_MEMORY_CACHE='1',NR_RENDER_COMPACT_COVERAGE='0')
+report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,negative_cases=[],consumers=[],native_consumers=2,controller_pid=os.getpid(),driver_installed=False,actual_dwm_execution=False,actual_umdf_execution=False,desktop_offloaded=False,process_permissions_modified=False)
+def save():(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+save();worker=None;children=[];leases=[];permissions=[]
+try:
+ suffix=secrets.token_hex(16);pipe=r'\\.\pipe\npu-render-indexed-'+suffix
+ with (out/'worker.stdout.jsonl').open('xb') as ws,(out/'worker.stderr.log').open('xb') as we:
+  worker=subprocess.Popen([str(v.worker),pipe,'20','120'],env=env,stdin=subprocess.DEVNULL,stdout=ws,stderr=we,creationflags=subprocess.CREATE_NO_WINDOW);report['worker_pid']=worker.pid;save()
+  until=time.perf_counter()+15
+  while not any(x.get('local_worker_ready') for x in logs(out/'worker.stdout.jsonl')):
+   assert worker.poll() is None and time.perf_counter()<until;time.sleep(.02)
+  k.WTSGetActiveConsoleSessionId.argtypes=[];k.WTSGetActiveConsoleSessionId.restype=W.DWORD
+  session=k.WTSGetActiveConsoleSessionId();assert 0<session<0xffffffff
+  report['process_permissions_modified']=True
+  for handle in (k.GetCurrentProcess(),int(worker._handle)):
+   for sid in (f'S-1-5-90-0-{session}','S-1-5-19'):permissions.append(ProcessGrant(handle,sid))
+  for index in range(2):
+   with (out/f'consumer-{index}.stdout.jsonl').open('xb') as cs,(out/f'consumer-{index}.stderr.log').open('xb') as ce,open(os.devnull,'rb') as null:
+    info=subprocess.STARTUPINFO();info.dwFlags|=subprocess.STARTF_USESTDHANDLES;handles=[msvcrt.get_osfhandle(f.fileno()) for f in (null,cs,ce)];info.hStdInput,info.hStdOutput,info.hStdError=handles;info.lpAttributeList={'handle_list':handles}
+    for handle in handles:os.set_handle_inheritable(handle,True)
+    try:hp,ht,pid,tid=_winapi.CreateProcess(str(v.client),subprocess.list2cmdline([str(v.client)]),None,None,True,subprocess.CREATE_NO_WINDOW|0x4,env,None,info)
+    finally:
+     for handle in handles:os.set_handle_inheritable(handle,False)
+   children.append(dict(hp=hp,ht=ht,pid=pid))
+  for label,kwargs in [('zero-lifetime',dict(milliseconds=0)),('oversized-lifetime',dict(milliseconds=120001)),('diagnostic-desktop-scope',dict(desktop_session=1)),('wrong-compositor-identity',dict(scope=1,desktop_session=1)),('wrong-host-identity',dict(scope=2,desktop_session=1))]:
+   rejected=False
+   try:bad=LeaseGrant(int(worker._handle),children[0]['hp'],suffix,**kwargs)
+   except AssertionError:rejected=True
+   else:bad.close()
+   assert rejected;report['negative_cases'].append(label)
+  for child in children:
+   grant=LeaseGrant(int(worker._handle),child['hp'],suffix);leases.append(grant)
+   report['consumers'].append(dict(pid=child['pid'],lease_name=grant.name,lease_sha256=hashlib.sha256(bytes(grant.record)).hexdigest(),scope=0,session=grant.record.consumer.session))
+  rejected=False
+  try:duplicate=LeaseGrant(int(worker._handle),children[0]['hp'],suffix)
+  except AssertionError as error:assert str(error)=='Consumer admission record already exists';rejected=True
+  else:duplicate.close()
+  assert rejected;report['negative_cases'].append('duplicate-consumer-record');save()
+  for child in children:
+   assert k.ResumeThread(child['ht'])!=0xffffffff;_winapi.CloseHandle(child['ht']);child['ht']=None
+  for index,child in enumerate(children):
+   assert _winapi.WaitForSingleObject(child['hp'],110000)==0,'Owned native consumer timed out';code=_winapi.GetExitCodeProcess(child['hp']);assert code==0
+   done=[x for x in logs(out/f'consumer-{index}.stdout.jsonl') if x.get('native_probe_ddi_component')];assert len(done)==1 and done[0]['passed'] and done[0]['npu_local_executions']==10 and done[0]['cpu_executions']==done[0]['gpu_executions']==0
+   expected=[]
+   for fmt in (28,87):expected.extend([f'nr_fill_umd: resource dimension=3 mips=1 array=1 format={fmt} samples=1/0 misc=2 usage=0 bind=20 map=0 primary=0 initial=1 runtime_resource=1','nr_fill_umd: resource extent=65x7x1'])
+   assert (out/f'consumer-{index}.stderr.log').read_text().splitlines()==expected
+   report['consumers'][index].update(exit_code=code,component=done[0]);save()
+  for grant in reversed(permissions):grant.restore()
+  report['owned_process_acl_grants']=len(permissions);report['owned_process_acls_restored_exactly']=all(x.restored for x in permissions)
+  worker.wait(timeout=10);entries=logs(out/'worker.stdout.jsonl');renders=[x for x in entries if x.get('passed')];acks=[x for x in entries if x.get('worker_success')];done=[x for x in entries if x.get('local_worker_finished')]
+  assert worker.returncode==0 and len(renders)==len(acks)==20 and len(done)==1 and done[0]['succeeded']==done[0]['settled']==20 and not (out/'worker.stderr.log').read_bytes()
+  for child in children:assert sum(x['client_pid']==child['pid'] and x['execution_device']=='NPU' for x in renders)==10 and sum(x['client_pid']==child['pid'] for x in acks)==10
+  report.update(passed=True,npu_operation_receipts=20,delivery_acknowledgments=20,worker_exit_code=worker.returncode)
+except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+finally:
+ for grant in reversed(permissions):
+  if grant.active:grant.restore()
+ for child in children:
+  if _winapi.WaitForSingleObject(child['hp'],0)!=0:_winapi.TerminateProcess(child['hp'],1);_winapi.WaitForSingleObject(child['hp'],5000);report['owned_consumer_terminated']=True
+  _winapi.CloseHandle(child['hp'])
+  if child['ht'] is not None:_winapi.CloseHandle(child['ht'])
+ for lease in leases:lease.close()
+ if worker is not None and worker.poll() is None:worker.kill();worker.wait(timeout=5);report['owned_worker_terminated']=True
+ report.update(completed=True,finished=datetime.now(UTC).isoformat());save()
+print(json.dumps(report));raise SystemExit(0 if report['passed'] else 1)

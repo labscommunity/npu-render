@@ -26,6 +26,13 @@ adds separate compositor/indirect-host admission and builds both driver packages
 both packages stage and remove cleanly. Actual native DWM routing and physical
 frame delivery are still unverified.
 
+The [native desktop controller candidate](docs/validation/2026-10-13/native-desktop-progress-v1/README.md)
+revalidates the updated renderer through real D3D11, passes simultaneous NPU
+consumers, and exercises automatic timed recovery. Its installation, compositor
+admission, and cleanup sequence is assembled, but the desktop branch has not run:
+Delta has no signed-in unlocked console. Physical desktop offload and a Tahoma
+speedup remain unproven.
+
 The latest [scripted desktop trial](docs/validation/2026-10-13/sole-display-v121/README.md)
 renders the VM's desktop on Delta's physical NPU and passes desktop, Run,
 Notepad, typing, maximize and close checks through the guest's sole indirect

@@ -1,0 +1,31 @@
+"""Read-only qualification; no host admission or process permission changes."""
+from native_process_observer_v1 import *
+from native_session_broker_v1 import json,hashlib,datetime,UTC,time
+import argparse,traceback
+p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);v=p.parse_args();v.output.mkdir(exist_ok=False)
+report=dict(started=datetime.now(UTC).isoformat(),passed=False,completed=False,read_only=True,driver_installed=False,desktop_changed=False,leases_published=False,process_permissions_modified=False)
+held=[]
+try:
+    k.WTSGetActiveConsoleSessionId.argtypes=[];k.WTSGetActiveConsoleSessionId.restype=W.DWORD
+    session=k.WTSGetActiveConsoleSessionId();assert 0<session<0xffffffff
+    compositor=find_compositor(session);held.append(compositor);compositor.verify();report['compositor']=compositor.report()
+    hosts=[];baseline=set()
+    for pid in named_processes('WUDFHost.exe'):
+        host=PinnedProcess(pid);held.append(host);exact_system_image(host,'WUDFHost.exe');args=command_arguments(host.handle)
+        groups=[x.split(':',1)[1] for x in args if x.startswith('-DeviceGroupId:')]
+        assert len(groups)==1
+        baseline.add((host.identity.pid,host.identity.created));hosts.append(dict(**host.report(),group=groups[0],arguments_read=True))
+    assert hosts and not any(x['group']=='T8NativeIddV1' for x in hosts)
+    began=time.perf_counter();assert find_indirect_host(set(),0) is None;elapsed=(time.perf_counter()-began)*1000
+    assert find_indirect_host(baseline,0) is None
+    failed=False
+    try:exact_system_image(compositor,'WUDFHost.exe')
+    except AssertionError:failed=True
+    assert failed
+    for peer in held:peer.verify()
+    report.update(passed=True,hosts=hosts,unowned_host_rejected=True,prior_processes_excluded=True,wrong_image_rejected=True,host_scan_ms=elapsed)
+except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+finally:
+    for peer in held:peer.close()
+    report.update(completed=True,finished=datetime.now(UTC).isoformat());(v.output/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(report));raise SystemExit(0 if report['passed'] else 1)
