@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.25)
+project(nr_native_loaded_test LANGUAGES CXX)
+add_executable(nr_native_loaded_test test.cpp)
+target_compile_features(nr_native_loaded_test PRIVATE cxx_std_17)
+target_compile_options(nr_native_loaded_test PRIVATE /W4 /WX)
+target_include_directories(nr_native_loaded_test PRIVATE "${NR_WDK_INCLUDE_ROOT}/um" "${NR_WDK_INCLUDE_ROOT}/shared" "${NR_WDK_INCLUDE_ROOT}/km")
+set_property(TARGET nr_native_loaded_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")

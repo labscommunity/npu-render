@@ -44,6 +44,24 @@ only the output boundary. A read-only prerequisite snapshot can record active
 graphics drivers, code-integrity configuration and certificate trust while the
 interactive desktop is unavailable.
 
+The [native registered-adapter trial](../validation/2026-10-13/native-windows-adapter-v1/)
+now qualifies a separate native UMD for one bounded controller-owned process:
+six clears and two draws pass ordinary Direct3D 11 calls and real Windows callbacks
+on Delta's NPU. The installed diagnostic and temporary certificate trust were
+removed successfully with memory integrity still running. This closes the
+single-process native loader/transport boundary. It does not admit DWM or select
+that adapter for an indirect monitor.
+
+The [session snapshot](../validation/2026-10-13/native-adapter-promoted-v1/)
+confirms that DWM runs under a separate virtual account in console session 1,
+while the remote diagnostic controller and worker used the services session.
+The current lease requires all three processes in one session and binds one
+consumer PID/creation time. Desktop integration therefore needs qualified
+session/account admission, multiple participating consumers, worker access for
+the compositor, and bounded revocation/recovery. At the snapshot time there was
+no signed-in user in either a console or remote desktop session. Secure sign-in
+must not be substituted for an interactive user desktop test.
+
 The hybrid-GPU model does not solve DWM migration by itself. Microsoft's documented
 redirected and direct-flip paths use the integrated GPU for DWM composition, even
 when another adapter renders applications.

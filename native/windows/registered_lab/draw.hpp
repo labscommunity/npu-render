@@ -167,6 +167,9 @@ void APIENTRY draw(D3D10DDI_HDEVICE h, UINT count, UINT first) {
             require(d.blend.SrcBlend == D3D10_DDI_BLEND_ONE && d.blend.DestBlend == D3D10_DDI_BLEND_INV_SRC_ALPHA &&
                     d.blend.BlendOp == D3D10_DDI_BLEND_OP_ADD && d.blend.SrcBlendAlpha == D3D10_DDI_BLEND_ONE &&
                     d.blend.DestBlendAlpha == D3D10_DDI_BLEND_INV_SRC_ALPHA && d.blend.BlendOpAlpha == D3D10_DDI_BLEND_OP_ADD);
+#ifdef NR_NATIVE_PROBE
+        throw Error{DXGI_ERROR_UNSUPPORTED};
+#else
         // All state validation precedes preparation and any resource traffic.
         if (!d.executor) d.executor = std::make_unique<BlendExecutor>(d.backend);
         auto foreground = read_pixels(*source);
@@ -184,6 +187,7 @@ void APIENTRY draw(D3D10DDI_HDEVICE h, UINT count, UINT first) {
         // VidMm, counted even when inference itself executes on the NPU.
         upload(*target, nullptr, result.pixels.data(), s.width * 4);
         ++counters.draws;
+#endif
     });
 }
 void APIENTRY null_shader(D3D10DDI_HDEVICE h, D3D10DDI_HSHADER value) { guard(h, __FUNCTION__, [&] { require(!value.pDrvPrivate); }); }

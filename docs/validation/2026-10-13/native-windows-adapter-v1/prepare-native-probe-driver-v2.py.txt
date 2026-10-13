@@ -1,0 +1,17 @@
+from pathlib import Path
+import shutil,hashlib,json,tarfile
+r=Path('results/render-driver');d=r/'native-probe-driver-v2';shutil.copytree(r/'native-probe-driver-v1',d);lab=d/'native/windows/registered_lab'
+p=lab/'driver.cpp';s=p.read_text();a=s.index('    std::unique_ptr<BlendExecutor> executor;');b=s.index('    std::unique_ptr<IndexedNpuExchange>',a);s=s[:a]+'#ifndef NR_NATIVE_PROBE\n'+s[a:b]+'#endif\n'+s[b:]
+a=s.index('                const std::array<uint32_t,3> key');b=s.index('\n            }',a);s=s[:a]+'#ifdef NR_NATIVE_PROBE\n                throw Error{DXGI_ERROR_UNSUPPORTED};\n#else\n'+s[a:b]+'\n#endif'+s[b:];p.write_text(s)
+p=lab/'indexed_draw.hpp';s=p.read_text();a=s.index('    } else if(general_resources)');b=s.index('\n    ++counters.executions;',a);s=s[:a]+'\n#ifndef NR_NATIVE_PROBE\n'+s[a:b-6]+'\n#else\n    } else { throw Error{DXGI_ERROR_UNSUPPORTED};\n#endif\n    }'+s[b:];p.write_text(s)
+p=lab/'draw.hpp';s=p.read_text();a=s.index('        // All state validation precedes preparation');b=s.index('        ++counters.draws;',a)+len('        ++counters.draws;');s=s[:a]+'#ifdef NR_NATIVE_PROBE\n        throw Error{DXGI_ERROR_UNSUPPORTED};\n#else\n'+s[a:b]+'\n#endif'+s[b:];p.write_text(s)
+p=lab/'CMakeLists.txt';s=p.read_text()+'''\n# Permit the native consumer to retain validation functions without graph code.
+target_compile_options(nr_registered_vertex PRIVATE /Gy)
+target_link_options(nr_native_probe_umd PRIVATE /OPT:REF)
+''';p.write_text(s)
+manifest={p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()}
+(r/'native-probe-driver-v2-source.json').write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/'native-probe-driver-v2.tar.gz','w:gz') as archive:archive.add(d,arcname=d.name)
+(r/'build-native-probe-driver-v2.ps1').write_text((r/'build-native-probe-driver-v1.ps1').read_text().replace('native-probe-driver-v1','native-probe-driver-v2'))
+(r/'qualify-native-probe-driver-v2.ps1').write_text((r/'qualify-native-probe-driver-v1.ps1').read_text().replace('native-probe-driver-v1\\Release','native-probe-driver-v2\\Release').replace('native-probe-driver-v1-qualification','native-probe-driver-v2-qualification'))
+print('Prepared native driver without direct provider objects')

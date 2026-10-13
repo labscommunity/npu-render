@@ -1,0 +1,76 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$out="$r\vm\native-driver-package-v1";$thumb='3112355AF6B6C6265E9B849662D3E02F6797343A'
+if(Test-Path $out){throw 'Package evidence exists'}
+foreach($rel in @('native-probe-driver-v2-qualification\report.json','native-loaded-v3-qualification\report.json','native-v2-guest-regression-report.json')){$q=Get-Content "$r\vm\$rel" -Raw|ConvertFrom-Json;if(!$q.passed){throw 'Required qualification missing'}}
+$build=Get-Content "$r\builds\native-probe-driver-v2\registered-build-report.json" -Raw|ConvertFrom-Json
+$umd="$r\builds\native-probe-driver-v2\Release\nr_native_probe_umd.dll";$kernel="$r\vm\driver-package-v116-compositor\nr_render_kmd.sys"
+if((Get-FileHash $umd).Hash -ne $build.binary_sha256.'nr_native_probe_umd.dll' -or (Get-FileHash $kernel).Hash -ne 'A08B9376F8D74AC1DC500BC33EEC2B1AA3CB121D7C099B562D23DBFF01759D9F'){throw 'Qualified binary mismatch'}
+$c=Get-Item "Cert:\LocalMachine\My\$thumb";if(!$c.HasPrivateKey -or $c.NotAfter -lt [DateTime]::Now -or @($c.Extensions|Where-Object {$_.Oid.Value -eq '2.5.29.37'}|ForEach-Object {$_.EnhancedKeyUsages}|ForEach-Object {$_.Value}) -notcontains '1.3.6.1.5.5.7.3.3'){throw 'Lab code signing identity unavailable'}
+New-Item -ItemType Directory $out|Out-Null
+Copy-Item $umd $out;Copy-Item $kernel $out
+Export-Certificate -Cert $c -FilePath "$out\test-signing.cer"|Out-Null
+@'
+[Version]
+Signature="$WINDOWS NT$"
+Class=Display
+ClassGuid={4d36e968-e325-11ce-bfc1-08002be10318}
+Provider=%Provider%
+DriverVer=10/13/2026,0.0.1301.0
+CatalogFile=nr_native_probe.cat
+PnpLockdown=1
+
+[Manufacturer]
+%Provider%=Models,NTamd64.10.0...19041
+
+[Models.NTamd64.10.0...19041]
+%Description%=Install,ROOT\NPURENDER_NATIVE_PROBE
+
+[Install.NT]
+CopyFiles=KernelFiles,UserFiles
+AddReg=NativeSoftware
+FeatureScore=F9
+
+[Install.NT.Services]
+AddService=nr_native_probe,0x00000002,Service
+
+[Service]
+DisplayName=%Description%
+ServiceType=1
+StartType=3
+ErrorControl=1
+ServiceBinary=%13%\nr_render_kmd.sys
+
+[DestinationDirs]
+KernelFiles=13
+UserFiles=13
+
+[SourceDisksNames]
+1=%Media%
+
+[SourceDisksFiles]
+nr_render_kmd.sys=1
+nr_native_probe_umd.dll=1
+
+[KernelFiles]
+nr_render_kmd.sys
+
+[UserFiles]
+nr_native_probe_umd.dll
+
+[NativeSoftware]
+HKR,,UserModeDriverName,0x00010000,%13%\nr_native_probe_umd.dll,%13%\nr_native_probe_umd.dll,%13%\nr_native_probe_umd.dll
+HKR,,InstalledDisplayDrivers,0x00010000,nr_native_probe_umd
+
+[Strings]
+Provider="NPU Render Laboratory"
+Description="NPU Render Native Diagnostic (render only; leased consumer)"
+Media="NPU Render Native Diagnostic Files"
+'@ | Set-Content "$out\nr_native_probe.inf" -Encoding ascii
+& "$r\dependencies\wdk-tools\infverif.exe" /w "$out\nr_native_probe.inf" *> "$out\infverif.log";if($LASTEXITCODE){throw 'INF validation failed'}
+$sign='C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\signtool.exe'
+& $sign sign /sm /s My /fd SHA256 /sha1 $thumb "$out\nr_native_probe_umd.dll" *> "$out\sign-umd.log";if($LASTEXITCODE){throw 'UMD signing failed'}
+& "$r\dependencies\wdk-tools\Inf2Cat.exe" "/driver:$out" /os:10_GE_X64 *> "$out\catalog.log";if($LASTEXITCODE){throw 'Catalog generation failed'}
+& $sign sign /sm /s My /fd SHA256 /sha1 $thumb "$out\nr_native_probe.cat" *> "$out\sign-catalog.log";if($LASTEXITCODE){throw 'Catalog signing failed'}
+$manifest=@(Get-ChildItem $out -File|Where-Object Extension -in '.sys','.dll','.cat','.inf','.cer'|ForEach-Object {[ordered]@{name=$_.Name;bytes=$_.Length;sha256=(Get-FileHash $_.FullName).Hash}})
+$manifest|ConvertTo-Json -Depth 4|Set-Content "$out\sha256.json"
+[ordered]@{prepared=$true;installed=$false;hardware_id='ROOT\NPURENDER_NATIVE_PROBE';service='nr_native_probe';version='0.0.1301.0';signer_thumbprint=$thumb;unsigned_umd_sha256=$build.binary_sha256.'nr_native_probe_umd.dll';files=$manifest;runtime_dependencies='Windows libraries only';kernel_binary_unchanged=$true;desktop_offloaded=$false;finished=[DateTime]::UtcNow.ToString('o')}|ConvertTo-Json -Depth 5|Set-Content "$out\report.json"
+Get-Content "$out\report.json"

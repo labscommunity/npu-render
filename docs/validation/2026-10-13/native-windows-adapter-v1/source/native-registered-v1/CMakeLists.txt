@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.25)
+project(nr_native_registered_probe LANGUAGES CXX)
+add_executable(nr_native_registered_probe probe.cpp)
+target_compile_features(nr_native_registered_probe PRIVATE cxx_std_17)
+target_compile_options(nr_native_registered_probe PRIVATE /W4 /WX)
+target_link_libraries(nr_native_registered_probe PRIVATE d3d11 dxgi gdi32 d3dcompiler)
+set_property(TARGET nr_native_registered_probe PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")

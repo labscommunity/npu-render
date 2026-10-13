@@ -71,6 +71,10 @@ def main():
     binaries = {}
     for name in (
         "nr_fill_umd.dll",
+        "nr_native_probe_umd.dll",
+        "nr_native_probe_ddi_test.exe",
+        "nr_native_probe_lease_test.exe",
+        "nr_native_registered_probe.exe",
         "nr_registered_clear_probe.exe",
         "nr_registered_color_clear_test.exe",
         "nr_registered_lab_test.exe",

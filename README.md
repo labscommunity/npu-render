@@ -10,6 +10,14 @@ RGBA composition and an explicit backend switch. The packaged runtime passed
 GPU → NPU → CPU → GPU → NPU switching on Panther Lake. It supports CPU/GPU/NPU through
 its first OpenVINO provider; other providers can implement the same contracts.
 
+The [native registered-adapter trial](docs/validation/2026-10-13/native-windows-adapter-v1/README.md)
+now passes six clears and two indexed draws through Delta's ordinary Direct3D 11
+runtime, real Windows allocations and a separate NPU worker. Its driver needs
+only Windows libraries; memory integrity stayed enabled. The temporary diagnostic
+adapter, package and certificate trust were removed after verification. This
+establishes native integration for the tested operations, not physical desktop
+offload or a Tahoma speedup.
+
 The latest [scripted desktop trial](docs/validation/2026-10-13/sole-display-v121/README.md)
 renders the VM's desktop on Delta's physical NPU and passes desktop, Run,
 Notepad, typing, maximize and close checks through the guest's sole indirect

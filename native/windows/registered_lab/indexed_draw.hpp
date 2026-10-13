@@ -236,6 +236,8 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
         request.viewport = viewport; request.vertex = *d.vertex_program; request.pixel = *d.pixel_program;
         request.inputs = inputs; request.vertex_constants = vc; request.pixel_constants = pc; request.background = std::move(background);
         result = d.indexed_exchange->execute(std::move(request));
+
+#ifndef NR_NATIVE_PROBE
     } else if(general_resources){
         const uint64_t options=(uint64_t(blend_mode)<<12)|uint64_t(d.blend.RenderTargetWriteMask[0])|(uint64_t(blend)<<4)|(uint64_t(cull)<<6)|(uint64_t(front_ccw)<<8);
         const std::array<uint64_t,5> key{s.width,s.height,s.format,count,options};
@@ -295,6 +297,9 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
             d.indexed_executor = std::move(candidate); d.indexed_key = key; d.indexed_vertex = d.vertex_program; d.indexed_pixel = d.pixel_program;
         }
         result = d.indexed_executor->execute(inputs, vc, pc, viewport, background, clip,blend_constant);
+#else
+    } else { throw Error{DXGI_ERROR_UNSUPPORTED};
+#endif
     }
     ++counters.executions;
     if (d.backend == "NPU_LAB_INDEXED") ++counters.remote_npu_executions;

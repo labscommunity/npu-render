@@ -1010,3 +1010,36 @@ Synthetic replies are not NPU execution evidence. Separate physical validation
 connects this same client source to Delta's NPU worker. Existing guest-only UMD
 and exchange admission remain unchanged; cross-account DWM access, integrity
 levels and physical adapter admission require their own qualification.
+
+
+## Leased native diagnostic adapter
+
+`nr_native_probe_umd.dll` is a separate native variant. It requires the protected,
+process-bound lease in `native_probe_lease.hpp`, pins the controller/worker process
+identities and expires after at most 120 seconds. Every rendering request verifies
+that lease. Only the local indexed NPU transport is admitted. The standard
+`nr_fill_umd.dll` retains its guest-only admission and existing provider controls.
+Neither target installs itself or changes display topology.
+
+The native variant excludes direct execution objects. Its qualified Windows image
+imports four Windows libraries and loads without OpenVINO in the consumer; the
+separate NPU worker still uses OpenVINO. Unsupported legacy direct-provider draws
+fail explicitly. The build retains the same shader validation functions through
+function-level linking. This does not establish general feature-level conformance.
+
+`nr_native_probe_lease_test` checks lease shape, ACL ownership and separate-process
+identity cases. `nr_native_probe_ddi_test --reject-unleased` verifies rejection
+without an admission mapping. Its admitted mode checks eight clears and two draws
+with allocation callbacks emulated. `nr_native_registered_probe <installed-DLL>`
+checks six clears and two draws through an explicitly selected installed adapter,
+normal Direct3D 11 calls and real Windows callbacks. It requires a controller-owned
+lease and worker; `--reject-unleased` is the corresponding negative test. Neither
+probe is a desktop switch.
+
+The [native Windows validation](../../../docs/validation/2026-10-13/native-windows-adapter-v1/README.md)
+retains exact pixels, provider receipts, installation identity and cleanup evidence
+from Delta. Its diagnostic package temporarily added one render-only adapter and
+test-certificate trust, then removed both with memory integrity still running.
+The production build helper builds/tests these components but does not sign or
+install them. Native compositor admission, physical presentation, input/recovery
+integration and useful Tahoma performance remain separate qualification work.

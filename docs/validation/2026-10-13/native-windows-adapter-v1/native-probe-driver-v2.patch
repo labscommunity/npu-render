@@ -1,0 +1,85 @@
+--- a/native/windows/registered_lab/CMakeLists.txt
++++ b/native/windows/registered_lab/CMakeLists.txt
+@@ -257,3 +257,7 @@
+  target_link_libraries(${target} PRIVATE nr_registered_blend nr_registered_vertex d3dcompiler advapi32)
+  set_property(TARGET ${target} PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+ endforeach()
++
++# Permit the native consumer to retain validation functions without graph code.
++target_compile_options(nr_registered_vertex PRIVATE /Gy)
++target_link_options(nr_native_probe_umd PRIVATE /OPT:REF)
+--- a/native/windows/registered_lab/draw.hpp
++++ b/native/windows/registered_lab/draw.hpp
+@@ -167,6 +167,9 @@
+             require(d.blend.SrcBlend == D3D10_DDI_BLEND_ONE && d.blend.DestBlend == D3D10_DDI_BLEND_INV_SRC_ALPHA &&
+                     d.blend.BlendOp == D3D10_DDI_BLEND_OP_ADD && d.blend.SrcBlendAlpha == D3D10_DDI_BLEND_ONE &&
+                     d.blend.DestBlendAlpha == D3D10_DDI_BLEND_INV_SRC_ALPHA && d.blend.BlendOpAlpha == D3D10_DDI_BLEND_OP_ADD);
++#ifdef NR_NATIVE_PROBE
++        throw Error{DXGI_ERROR_UNSUPPORTED};
++#else
+         // All state validation precedes preparation and any resource traffic.
+         if (!d.executor) d.executor = std::make_unique<BlendExecutor>(d.backend);
+         auto foreground = read_pixels(*source);
+@@ -184,6 +187,7 @@
+         // VidMm, counted even when inference itself executes on the NPU.
+         upload(*target, nullptr, result.pixels.data(), s.width * 4);
+         ++counters.draws;
++#endif
+     });
+ }
+ void APIENTRY null_shader(D3D10DDI_HDEVICE h, D3D10DDI_HSHADER value) { guard(h, __FUNCTION__, [&] { require(!value.pDrvPrivate); }); }
+--- a/native/windows/registered_lab/driver.cpp
++++ b/native/windows/registered_lab/driver.cpp
+@@ -47,6 +47,7 @@
+     std::shared_ptr<Allocation> bound_target;
+     std::shared_ptr<Allocation> bound_source;
+     std::array<std::array<View, 128>, 3> shader_sources{};
++#ifndef NR_NATIVE_PROBE
+     std::unique_ptr<BlendExecutor> executor;
+     std::unique_ptr<nr::raster::ClearExecutor> clear_executor;
+     std::array<uint32_t,3> clear_key{};
+@@ -65,6 +66,7 @@
+     std::array<uint64_t,5> resources_key{};
+     nr::raster::PackedResources resources_layout{};
+     nr::shader::TextureSamplers resources_samplers{};
++#endif
+     std::unique_ptr<IndexedNpuExchange> indexed_exchange;
+     std::shared_ptr<const nr::shader::Program> indexed_vertex, indexed_pixel;
+     std::array<uint64_t, 5> indexed_key{};
+@@ -328,11 +330,15 @@
+                 auto result=d.indexed_exchange->execute(std::move(request));pixels=std::move(result.pixels);execution_device=std::move(result.execution_device);
+             }else{
+                 require(d.backend=="NPU" || d.backend=="GPU");
++#ifdef NR_NATIVE_PROBE
++                throw Error{DXGI_ERROR_UNSUPPORTED};
++#else
+                 const std::array<uint32_t,3> key{surface.width,surface.height,surface.format};
+                 if(!d.clear_executor || d.clear_key!=key){
+                     d.clear_executor.reset();d.clear_executor=std::make_unique<nr::raster::ClearExecutor>(key[0],key[1],key[2],d.backend);d.clear_key=key;
+                 }
+                 auto result=d.clear_executor->execute(input);pixels=std::move(result.pixels);execution_device=std::move(result.execution_device);
++#endif
+             }
+             // VidMm upload/copy remains transport; every returned color byte was
+             // generated and quantized on the explicitly selected provider.
+--- a/native/windows/registered_lab/indexed_draw.hpp
++++ b/native/windows/registered_lab/indexed_draw.hpp
+@@ -236,6 +236,8 @@
+         request.viewport = viewport; request.vertex = *d.vertex_program; request.pixel = *d.pixel_program;
+         request.inputs = inputs; request.vertex_constants = vc; request.pixel_constants = pc; request.background = std::move(background);
+         result = d.indexed_exchange->execute(std::move(request));
++
++#ifndef NR_NATIVE_PROBE
+     } else if(general_resources){
+         const uint64_t options=(uint64_t(blend_mode)<<12)|uint64_t(d.blend.RenderTargetWriteMask[0])|(uint64_t(blend)<<4)|(uint64_t(cull)<<6)|(uint64_t(front_ccw)<<8);
+         const std::array<uint64_t,5> key{s.width,s.height,s.format,count,options};
+@@ -295,6 +297,9 @@
+             d.indexed_executor = std::move(candidate); d.indexed_key = key; d.indexed_vertex = d.vertex_program; d.indexed_pixel = d.pixel_program;
+         }
+         result = d.indexed_executor->execute(inputs, vc, pc, viewport, background, clip,blend_constant);
++#else
++    } else { throw Error{DXGI_ERROR_UNSUPPORTED};
++#endif
+     }
+     ++counters.executions;
+     if (d.backend == "NPU_LAB_INDEXED") ++counters.remote_npu_executions;

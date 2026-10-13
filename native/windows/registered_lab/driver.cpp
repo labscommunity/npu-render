@@ -47,6 +47,7 @@ struct Device {
     std::shared_ptr<Allocation> bound_target;
     std::shared_ptr<Allocation> bound_source;
     std::array<std::array<View, 128>, 3> shader_sources{};
+#ifndef NR_NATIVE_PROBE
     std::unique_ptr<BlendExecutor> executor;
     std::unique_ptr<nr::raster::ClearExecutor> clear_executor;
     std::array<uint32_t,3> clear_key{};
@@ -65,6 +66,7 @@ struct Device {
     std::array<uint64_t,5> resources_key{};
     nr::raster::PackedResources resources_layout{};
     nr::shader::TextureSamplers resources_samplers{};
+#endif
     std::unique_ptr<IndexedNpuExchange> indexed_exchange;
     std::shared_ptr<const nr::shader::Program> indexed_vertex, indexed_pixel;
     std::array<uint64_t, 5> indexed_key{};
@@ -328,11 +330,15 @@ void APIENTRY clear(D3D10DDI_HDEVICE h, D3D10DDI_HRENDERTARGETVIEW v, FLOAT colo
                 auto result=d.indexed_exchange->execute(std::move(request));pixels=std::move(result.pixels);execution_device=std::move(result.execution_device);
             }else{
                 require(d.backend=="NPU" || d.backend=="GPU");
+#ifdef NR_NATIVE_PROBE
+                throw Error{DXGI_ERROR_UNSUPPORTED};
+#else
                 const std::array<uint32_t,3> key{surface.width,surface.height,surface.format};
                 if(!d.clear_executor || d.clear_key!=key){
                     d.clear_executor.reset();d.clear_executor=std::make_unique<nr::raster::ClearExecutor>(key[0],key[1],key[2],d.backend);d.clear_key=key;
                 }
                 auto result=d.clear_executor->execute(input);pixels=std::move(result.pixels);execution_device=std::move(result.execution_device);
+#endif
             }
             // VidMm upload/copy remains transport; every returned color byte was
             // generated and quantized on the explicitly selected provider.
@@ -614,8 +620,13 @@ HRESULT APIENTRY create_device(D3D10DDI_HADAPTER, D3D10DDIARG_CREATEDEVICE *a) {
         // The runtime may replace table entries between UMD calls. Retain the
         // table address, and read only the entry supported by this DDI version.
         d->dxgi_callbacks = a->DXGIBaseDDI.pDXGIBaseCallbacks;
+#ifdef NR_NATIVE_PROBE
+        if (!indexed_exchange_configured()) throw Error{DXGI_ERROR_UNSUPPORTED};
+        d->backend = "NPU_LAB_INDEXED";
+#else
         d->backend = selected_backend;
         if (d->backend == "NPU" && indexed_exchange_configured()) d->backend = "NPU_LAB_INDEXED";
+#endif
         d->vertex_code = shader_tokens(nr_ddi_vertex_shader, "vs_4_0");
         d->pixel_code = shader_tokens(nr_ddi_pixel_shader, "ps_4_0");
         auto &f = d->functions;
@@ -690,7 +701,11 @@ HRESULT APIENTRY caps(D3D10DDI_HADAPTER, const D3D10_2DDIARG_GETCAPS *a) {
 } // namespace
 extern "C" __declspec(dllexport) HRESULT APIENTRY OpenAdapter10(D3D10DDIARG_OPENADAPTER *a) {
     if (!a || !a->pAdapterFuncs || !a->pAdapterCallbacks || !a->pAdapterCallbacks->pfnQueryAdapterInfoCb) return E_INVALIDARG;
+#ifdef NR_NATIVE_PROBE
+    if (!indexed_exchange_configured()) return DXGI_ERROR_UNSUPPORTED;
+#else
     if (!nr_fill_guest()) return DXGI_ERROR_UNSUPPORTED;
+#endif
     lab_trace("{\"event\":\"open_adapter\",\"interface\":%u,\"version\":%u}\n", a->Interface, a->Version);
     nr::kernel_contract::AdapterInfo info{};
     std::memset(&info, 0, sizeof(info));
@@ -732,8 +747,14 @@ extern "C" __declspec(dllexport) BOOL nr_fill_stats(NrFillStats *out) {
 }
 extern "C" __declspec(dllexport) BOOL nr_fill_configure(const char *backend) {
     std::lock_guard<std::recursive_mutex> lock(mutex);
+#ifdef NR_NATIVE_PROBE
+    if (!backend || counters.live_contexts || counters.live_allocations ||
+        (std::strcmp(backend, "NPU") && std::strcmp(backend, "NPU_LAB_INDEXED")) || !indexed_exchange_configured()) return FALSE;
+    try { selected_backend = "NPU_LAB_INDEXED"; return TRUE; } catch (...) { return FALSE; }
+#else
     if (!backend || counters.live_contexts || counters.live_allocations ||
         (std::strcmp(backend, "CPU") && std::strcmp(backend, "GPU") && std::strcmp(backend, "NPU") &&
          ((std::strcmp(backend, "NPU_LAB_FILE") && std::strcmp(backend, "NPU_LAB_INDEXED")) || !nr_fill_guest()))) return FALSE;
     try { selected_backend = backend; return TRUE; } catch (...) { return FALSE; }
+#endif
 }
