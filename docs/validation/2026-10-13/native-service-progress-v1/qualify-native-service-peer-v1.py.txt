@@ -1,0 +1,119 @@
+"""Run a leased native-DDI component in one owned process; never install a driver."""
+import base64,re,argparse,ctypes as C,json,os,secrets,subprocess,time,hashlib,msvcrt,_winapi
+from ctypes import wintypes as W
+from pathlib import Path
+from datetime import UTC,datetime
+class Identity(C.Structure):_fields_=[('pid',C.c_uint32),('session',C.c_uint32),('created',C.c_uint64)]
+class Lease(C.Structure):_fields_=[('magic',C.c_uint64),('version',C.c_uint32),('bytes',C.c_uint32),('issued_tick',C.c_uint64),('deadline_tick',C.c_uint64),('controller',Identity),('worker',Identity),('consumer',Identity),('scope',C.c_uint32),('sid_bytes',C.c_uint32),('nonce',C.c_uint64*2),('pipe_suffix',C.c_char*32),('consumer_sid',C.c_uint8*68),('reserved',C.c_uint32*5)]
+class Attributes(C.Structure):_fields_=[('length',W.DWORD),('descriptor',W.LPVOID),('inherit',W.BOOL)]
+assert C.sizeof(Lease)==224
+k=C.WinDLL('kernel32',use_last_error=True);adv=C.WinDLL('advapi32',use_last_error=True)
+for name,args,result in [('GetCurrentProcess',[],W.HANDLE),('GetProcessTimes',[W.HANDLE,W.LPVOID,W.LPVOID,W.LPVOID,W.LPVOID],W.BOOL),('GetTickCount64',[],C.c_uint64),('ProcessIdToSessionId',[W.DWORD,C.POINTER(W.DWORD)],W.BOOL),('CreateFileMappingW',[W.HANDLE,C.POINTER(Attributes),W.DWORD,W.DWORD,W.DWORD,W.LPCWSTR],W.HANDLE),('MapViewOfFile',[W.HANDLE,W.DWORD,W.DWORD,W.DWORD,C.c_size_t],W.LPVOID),('UnmapViewOfFile',[W.LPCVOID],W.BOOL),('CloseHandle',[W.HANDLE],W.BOOL),('LocalFree',[W.LPVOID],W.LPVOID),('ResumeThread',[W.HANDLE],W.DWORD)]:
+ f=getattr(k,name);f.argtypes=args;f.restype=result
+adv.OpenProcessToken.argtypes=[W.HANDLE,W.DWORD,C.POINTER(W.HANDLE)];adv.OpenProcessToken.restype=W.BOOL
+adv.GetTokenInformation.argtypes=[W.HANDLE,C.c_int,W.LPVOID,W.DWORD,C.POINTER(W.DWORD)];adv.GetTokenInformation.restype=W.BOOL
+adv.GetLengthSid.argtypes=[W.LPVOID];adv.GetLengthSid.restype=W.DWORD
+adv.ConvertStringSecurityDescriptorToSecurityDescriptorW.argtypes=[W.LPCWSTR,W.DWORD,C.POINTER(W.LPVOID),W.LPVOID];adv.ConvertStringSecurityDescriptorToSecurityDescriptorW.restype=W.BOOL
+def require(v):
+ if not v:raise C.WinError(C.get_last_error())
+def created(handle):
+ values=[C.c_uint64() for _ in range(4)];require(k.GetProcessTimes(handle,*[C.byref(x) for x in values]));return values[0].value
+def obj(p):
+ b=p.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+def rows(p):return [json.loads(x) for x in p.read_text(encoding='utf-8-sig').splitlines() if x.startswith('{')]
+class Trustee(C.Structure):_fields_=[('multiple',W.LPVOID),('operation',C.c_int),('form',C.c_int),('type',C.c_int),('name',W.LPWSTR)]
+class Explicit(C.Structure):_fields_=[('permissions',W.DWORD),('mode',C.c_int),('inheritance',W.DWORD),('trustee',Trustee)]
+for name,args,result in [('GetSecurityInfo',[W.HANDLE,C.c_int,W.DWORD,W.LPVOID,W.LPVOID,C.POINTER(W.LPVOID),W.LPVOID,C.POINTER(W.LPVOID)],W.DWORD),('SetSecurityInfo',[W.HANDLE,C.c_int,W.DWORD,W.LPVOID,W.LPVOID,W.LPVOID,W.LPVOID],W.DWORD),('SetEntriesInAclW',[W.DWORD,C.POINTER(Explicit),W.LPVOID,C.POINTER(W.LPVOID)],W.DWORD),('ConvertStringSidToSidW',[W.LPCWSTR,C.POINTER(W.LPVOID)],W.BOOL),('GetAclInformation',[W.LPVOID,W.LPVOID,W.DWORD,C.c_int],W.BOOL)]:
+ f=getattr(adv,name);f.argtypes=args;f.restype=result
+k.OpenProcess.argtypes=[W.DWORD,W.BOOL,W.DWORD];k.OpenProcess.restype=W.HANDLE
+class AclInfo(C.Structure):_fields_=[('count',W.DWORD),('bytes',W.DWORD),('free',W.DWORD)]
+def acl_bytes(acl):
+ size=AclInfo();require(adv.GetAclInformation(acl,C.byref(size),C.sizeof(size),2));return C.string_at(acl,size.bytes)
+def process_acl(handle):
+ acl=W.LPVOID();sd=W.LPVOID();code=adv.GetSecurityInfo(handle,6,4,None,None,C.byref(acl),None,C.byref(sd));assert code==0,code;return acl,sd
+class ProcessGrant:
+ def __init__(self,handle):
+  self.handle=handle;self.acl,self.sd=process_acl(handle);self.before=acl_bytes(self.acl);self.active=False;self.restored=False
+  sid=W.LPVOID();candidate=W.LPVOID()
+  try:
+   require(adv.ConvertStringSidToSidW('S-1-5-19',C.byref(sid)));entry=Explicit(0x101000,1,0,Trustee(None,0,0,1,C.cast(sid,W.LPWSTR)))
+   code=adv.SetEntriesInAclW(1,C.byref(entry),self.acl,C.byref(candidate));assert code==0,code
+   code=adv.SetSecurityInfo(handle,6,4,None,None,candidate,None);assert code==0,code;self.active=True
+  finally:
+   if sid:k.LocalFree(sid)
+   if candidate:k.LocalFree(candidate)
+ def restore(self):
+  if self.active:
+   code=adv.SetSecurityInfo(self.handle,6,4,None,None,self.acl,None);assert code==0,code
+   acl,sd=process_acl(self.handle)
+   try:assert acl_bytes(acl)==self.before,'Owned process DACL did not restore exactly'
+   finally:k.LocalFree(sd)
+   self.active=False;self.restored=True
+  if self.sd:k.LocalFree(self.sd);self.sd=None
+p=argparse.ArgumentParser()
+for name in ('worker','client','runtime','cache','output','build'):p.add_argument('--'+name,type=Path,required=True)
+p.add_argument('--task',required=True);p.add_argument('--grant-process-access',action='store_true');v=p.parse_args();assert re.fullmatch(r'T8-NpuRender-ServicePeerV1-(denied|granted)',v.task)
+out=v.output;assert out.is_dir() and not (out/'report.json').exists()
+b=obj(v.build/'registered-build-report.json');assert b['clean_build']
+for path in (v.worker,v.client):assert hashlib.sha256(path.read_bytes()).hexdigest()==b['binary_sha256'][path.name].lower()
+env=os.environ.copy();env['PATH']=str(v.runtime)+os.pathsep+env.get('PATH','');env.update(NR_RENDER_NPU_CACHE=str(v.cache),NR_RENDER_SHARED_QUEUE='1',NR_RENDER_PIPELINE_CACHE='expanded',NR_RENDER_MEMORY_CACHE='1',NR_RENDER_COMPACT_COVERAGE='0')
+report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,process_permission_granted=v.grant_process_access,controller_pid=os.getpid(),consumer_account='LocalService',controller_and_consumer_same_account=False,cross_session_execution_tested=False,dwm_execution_tested=False,umdf_execution_tested=False,desktop_offloaded=False,driver_installed=False)
+def save():(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+save();worker=None;hp=None;mapping=None;descriptor=W.LPVOID();grants=[]
+try:
+ command="$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';Start-ScheduledTask -TaskName '"+v.task+"'"
+ subprocess.run(['powershell.exe','-NoProfile','-NonInteractive','-EncodedCommand',base64.b64encode(command.encode('utf-16-le')).decode()],capture_output=True,check=True,timeout=15)
+ until=time.perf_counter()+15;ready=[]
+ while not ready:
+  if (out/'service.stdout.jsonl').exists():ready=[x for x in rows(out/'service.stdout.jsonl') if x.get('local_service_probe_ready')]
+  assert time.perf_counter()<until,'LocalService task did not become ready';time.sleep(.02)
+ assert len(ready)==1 and ready[0]['local_service_identity_verified'] and ready[0]['session']==0
+ pid=ready[0]['pid'];hp=k.OpenProcess(0x101001,False,pid);require(hp);assert created(hp)==ready[0]['creation_filetime'];report['consumer_pid']=pid;save()
+ # Baseline process lifetime and identity are pinned before starting the provider.
+ suffix=secrets.token_hex(16);pipe=r'\\.\pipe\npu-render-indexed-'+suffix
+ with (out/'worker.stdout.jsonl').open('xb') as ws,(out/'worker.stderr.log').open('xb') as we:
+  worker=subprocess.Popen([str(v.worker),pipe,'10','120',str(pid),str(created(hp)),'local-service-probe'],env=env,stdin=subprocess.DEVNULL,stdout=ws,stderr=we,creationflags=subprocess.CREATE_NO_WINDOW);report['worker_pid']=worker.pid
+  until=time.perf_counter()+10
+  while not any(x.get('local_worker_ready') for x in rows(out/'worker.stdout.jsonl')):
+   assert worker.poll() is None and time.perf_counter()<until,'Worker failed readiness';time.sleep(.02)
+  if v.grant_process_access:
+   grants.append(ProcessGrant(k.GetCurrentProcess()));grants.append(ProcessGrant(int(worker._handle)))
+  session=W.DWORD();require(k.ProcessIdToSessionId(os.getpid(),C.byref(session)));assert session.value==0
+  record=Lease();record.magic=0x32564250524e3854;record.version=2;record.bytes=C.sizeof(Lease);record.issued_tick=k.GetTickCount64();record.deadline_tick=record.issued_tick+120000
+  record.controller=Identity(os.getpid(),0,created(k.GetCurrentProcess()));record.worker=Identity(worker.pid,0,created(int(worker._handle)));record.consumer=Identity(pid,0,created(hp));record.scope=0
+  token=W.HANDLE();require(adv.OpenProcessToken(hp,8,C.byref(token)))
+  try:
+   size=W.DWORD();adv.GetTokenInformation(token,1,None,0,C.byref(size));assert 0<size.value<=65536;buffer=C.create_string_buffer(size.value);require(adv.GetTokenInformation(token,1,buffer,size,C.byref(size)));sid=C.cast(buffer,C.POINTER(W.LPVOID)).contents.value;count=adv.GetLengthSid(sid);assert 8<=count<=68;record.sid_bytes=count;C.memmove(C.addressof(record)+Lease.consumer_sid.offset,sid,count)
+  finally:k.CloseHandle(token)
+  record.nonce[0]=secrets.randbits(64)|1;record.nonce[1]=secrets.randbits(64);record.pipe_suffix=suffix.encode()
+  require(adv.ConvertStringSecurityDescriptorToSecurityDescriptorW('O:BAG:BAD:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;0x00020004;;;LS)',1,C.byref(descriptor),None));attributes=Attributes(C.sizeof(Attributes),descriptor,False)
+  mapping=k.CreateFileMappingW(C.c_void_p(-1),C.byref(attributes),4,0,C.sizeof(record),rf'Global\T8.NpuRender.NativeSession.v1.{pid}');error=C.get_last_error();require(mapping);assert error!=183
+  view=k.MapViewOfFile(mapping,2,0,0,C.sizeof(record));require(view);C.memmove(view,C.byref(record),C.sizeof(record));require(k.UnmapViewOfFile(view))
+  report['lease_sha256']=hashlib.sha256(bytes(record)).hexdigest();save()
+  assert _winapi.WaitForSingleObject(hp,100000)==0,'LocalService consumer timed out';code=_winapi.GetExitCodeProcess(hp);report['consumer_exit_code']=code;save()
+  consumer=rows(out/'service.stdout.jsonl');assert any(x.get('unleased_native_adapter_rejected') for x in consumer)
+  if v.grant_process_access:
+   done=[x for x in consumer if x.get('native_probe_ddi_component')];assert code==0 and len(done)==1 and done[0]['passed'] and done[0]['npu_local_executions']==10
+   worker.wait(timeout=10);logs=rows(out/'worker.stdout.jsonl');renders=[x for x in logs if x.get('passed')];acks=[x for x in logs if x.get('worker_success')]
+   assert worker.returncode==0 and len(renders)==len(acks)==10 and all(x['execution_device']=='NPU' and x['client_pid']==pid for x in renders) and not (out/'worker.stderr.log').read_bytes() and not (out/'service.stderr.log').read_bytes()
+   report.update(component=done[0],npu_operation_receipts=10,delivery_acknowledgments=10,worker_exit_code=worker.returncode)
+  else:
+   assert code==1 and not any(x.get('native_probe_ddi_component') for x in consumer)
+   assert not any(x.get('passed') or x.get('worker_success') for x in rows(out/'worker.stdout.jsonl'))
+   assert 'nr_fill_configure("NPU")' in (out/'service.stderr.log').read_text()
+   report.update(expected_access_failure=True,npu_operation_receipts=0,delivery_acknowledgments=0)
+  report['passed']=True
+except Exception as e:report['error']=repr(e)
+finally:
+ for grant in reversed(grants):
+  try:grant.restore()
+  except Exception as e:report.update(passed=False,permission_restore_error=repr(e))
+ report['owned_process_permissions_restored']=all(g.restored for g in grants)
+ if hp:
+  if _winapi.WaitForSingleObject(hp,0)!=0:_winapi.TerminateProcess(hp,1);_winapi.WaitForSingleObject(hp,5000);report['owned_consumer_terminated']=True
+  k.CloseHandle(hp)
+ if worker is not None and worker.poll() is None:worker.kill();worker.wait(timeout=5);report['owned_worker_terminated']=True
+ if mapping:k.CloseHandle(mapping)
+ if descriptor:k.LocalFree(descriptor)
+ report.update(completed=True,finished=datetime.now(UTC).isoformat());save()
+print(json.dumps(report));raise SystemExit(0 if report['passed'] else 1)

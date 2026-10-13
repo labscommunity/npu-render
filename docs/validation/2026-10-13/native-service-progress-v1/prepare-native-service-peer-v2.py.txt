@@ -1,0 +1,36 @@
+from pathlib import Path
+import shutil,json,hashlib,tarfile
+r=Path('results/render-driver');d=r/'native-service-peer-v2';shutil.copytree(r/'native-service-peer-v1',d)
+p=d/'native/windows/registered_lab/native_service_probe.cpp';s=p.read_text().replace('#include <sddl.h>','#include <sddl.h>\n#include <io.h>\n#include <fcntl.h>')
+a=s.index('int wmain');s=s[:a]+r'''void redirect_shared(FILE *stream,const std::wstring &path){
+    FILE *opened=nullptr;nr::native_probe::require(_wfreopen_s(&opened,L"NUL",L"wb",stream)==0);
+    const auto handle=CreateFileW(path.c_str(),GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,nullptr,CREATE_NEW,FILE_ATTRIBUTE_NORMAL,nullptr);nr::native_probe::require(handle!=INVALID_HANDLE_VALUE);
+    const auto fd=_open_osfhandle(reinterpret_cast<intptr_t>(handle),_O_WRONLY|_O_BINARY);if(fd<0){CloseHandle(handle);throw std::runtime_error("output handle conversion failed");}
+    const auto code=_dup2(fd,_fileno(stream));_close(fd);nr::native_probe::require(code==0);
+}
+'''+s[a:]
+a=s.index('    const auto directory=');b=s.index('    std::setvbuf',a)
+s=s[:a]+r'''    const auto directory=std::wstring(argv[1]);
+    redirect_shared(stdout,directory+LR"(\service.stdout.jsonl)");redirect_shared(stderr,directory+LR"(\service.stderr.log)");
+'''+s[b:]
+a=s.index('    while(GetTickCount64()<deadline)');b=s.index('    return 5;',a)
+s=s[:a]+r'''    const auto ready_name=nr::native_probe::mapping_name(GetCurrentProcessId())+L".Ready";
+    while(GetTickCount64()<deadline){HANDLE ready=OpenEventW(SYNCHRONIZE,FALSE,ready_name.c_str());if(ready){const auto result=WaitForSingleObject(ready,DWORD(deadline-GetTickCount64()));CloseHandle(ready);if(result==WAIT_OBJECT_0)return native_component_main(1,args);return 6;}const auto error=GetLastError();if(error!=ERROR_FILE_NOT_FOUND)return 4;Sleep(20);}
+'''+s[b:];p.write_text(s)
+(r/'native-service-peer-v2-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-service-peer-v2.tar.gz','w:gz') as f:f.add(d,arcname=d.name)
+(r/'build-native-service-peer-v2.ps1').write_text((r/'build-native-service-peer-v1.ps1').read_text().replace('native-service-peer-v1','native-service-peer-v2'))
+s=(r/'qualify-native-service-peer-v1b.py').read_text().replace('ServicePeerV1b','ServicePeerV2')
+pos=s.index('class Trustee');s=s[:pos]+'''k.CreateEventW.argtypes=[C.POINTER(Attributes),W.BOOL,W.BOOL,W.LPCWSTR];k.CreateEventW.restype=W.HANDLE
+k.SetEvent.argtypes=[W.HANDLE];k.SetEvent.restype=W.BOOL
+'''+s[pos:]
+s=s.replace('mapping=None;descriptor=W.LPVOID();grants=[]','mapping=None;ready_event=None;descriptor=W.LPVOID();grants=[]')
+needle="  report['lease_sha256']=hashlib.sha256(bytes(record)).hexdigest();save()";assert needle in s
+s=s.replace(needle,'''  event_sd=W.LPVOID();require(adv.ConvertStringSecurityDescriptorToSecurityDescriptorW('O:BAG:BAD:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;0x00100000;;;LS)',1,C.byref(event_sd),None))
+  try:
+   event_attributes=Attributes(C.sizeof(Attributes),event_sd,False);ready_event=k.CreateEventW(C.byref(event_attributes),True,False,rf'Global\\T8.NpuRender.NativeSession.v1.{pid}.Ready');event_error=C.get_last_error();require(ready_event);assert event_error!=183;require(k.SetEvent(ready_event))
+  finally:k.LocalFree(event_sd)
+'''+needle)
+s=s.replace(' if mapping:k.CloseHandle(mapping)',' if ready_event:k.CloseHandle(ready_event)\n if mapping:k.CloseHandle(mapping)')
+(r/'qualify-native-service-peer-v2.py').write_text(s)
+s=(r/'qualify-native-service-peer-v1.ps1').read_text().replace('ServicePeerV1','ServicePeerV2').replace('native-service-peer-v1','native-service-peer-v2');(r/'qualify-native-service-peer-v2.ps1').write_text(s)

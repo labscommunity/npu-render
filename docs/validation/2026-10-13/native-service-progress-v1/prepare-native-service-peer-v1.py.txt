@@ -1,0 +1,53 @@
+from pathlib import Path
+import json,hashlib,tarfile,shutil
+r=Path('results/render-driver');d=r/'native-service-peer-v1';shutil.copytree(r/'native-dwm-worker-v1',d)
+lab=d/'native/windows/registered_lab';src=r/'native-session-driver-v1/native/windows/registered_lab'
+for n in ('driver.cpp','draw.hpp','indexed_draw.hpp','indexed_exchange.hpp','native_probe_lease.hpp','native_probe_ddi_test.cpp','native_indexed_probe_test.hpp','local_indexed_client.hpp'):shutil.copy2(src/n,lab/n)
+p=lab/'native_compositor_peer.hpp';s=p.read_text().replace('uint64_t timestamp):','uint64_t timestamp,bool service_probe=false):')
+s=s.replace('ProcessIdToSessionId(pid,&session) && session','ProcessIdToSessionId(pid,&session) && (service_probe?session==0:session!=0)')
+s=s.replace('        indexed_exchange::require(!_wcsicmp(path,(std::wstring(system)+L"'+chr(92)*2+'dwm.exe").c_str()));',r'''        std::wstring expected;
+        if(service_probe){wchar_t own[32768]{};const auto n=GetModuleFileNameW(nullptr,own,32768);indexed_exchange::require(n && n<32768);expected=own;const auto slash=expected.find_last_of(L"\\/");indexed_exchange::require(slash!=std::wstring::npos);expected.resize(slash+1);expected+=L"nr_native_service_probe.exe";}else expected=std::wstring(system)+LR"(\dwm.exe)";
+        indexed_exchange::require(!_wcsicmp(path,expected.c_str()));''')
+s=s.replace('identity==L"S-1-5-90-0-"+std::to_wstring(session)','identity==(service_probe?std::wstring(L"S-1-5-19"):L"S-1-5-90-0-"+std::to_wstring(session))')
+assert 'expected=own' in s;p.write_text(s)
+p=lab/'local_indexed_worker.cpp';s=p.read_text().replace('argc!=4 && argc!=6','argc!=4 && argc!=6 && argc!=7').replace('if(argc==6)compositor=', 'if(argc>=6)compositor=').replace('::number(argv[5],UINT64_MAX));','::number(argv[5],UINT64_MAX),argc==7);')
+s=s.replace('    ex::Pipeline pipeline;', '    ex::require(argc!=7 || !std::wcscmp(argv[6],L"local-service-probe"));\n    ex::Pipeline pipeline;')
+p.write_text(s)
+(lab/'native_service_probe.cpp').write_text(r'''// Owned LocalService account diagnostic; not WUDFHost or DWM execution.
+#define main native_component_main
+#include "native_probe_ddi_test.cpp"
+#undef main
+#include <thread>
+#include <sddl.h>
+int wmain(int argc,wchar_t **argv) try {
+    if(argc!=2)return 2;
+    DWORD session=UINT32_MAX;nr::native_probe::require(ProcessIdToSessionId(GetCurrentProcessId(),&session) && session==0);
+    const auto sid=nr::native_probe::user_sid(GetCurrentProcess());nr::native_probe::require(IsWellKnownSid(const_cast<uint8_t*>(sid.data()),WinLocalServiceSid)!=FALSE);
+    const auto directory=std::wstring(argv[1]);FILE *out=nullptr,*err=nullptr;
+    if(_wfreopen_s(&out,(directory+LR"(\service.stdout.jsonl)").c_str(),L"wb",stdout) || _wfreopen_s(&err,(directory+LR"(\service.stderr.log)").c_str(),L"wb",stderr))return 3;
+    std::setvbuf(stdout,nullptr,_IONBF,0);std::setvbuf(stderr,nullptr,_IONBF,0);
+    std::thread([]{Sleep(110000);ExitProcess(124);}).detach();
+    char executable[]="native_service_probe",negative[]="--reject-unleased";char *args[]={executable,negative};
+    const auto rejected=native_component_main(2,args);if(rejected)return rejected;
+    std::printf("{\"local_service_probe_ready\":true,\"pid\":%lu,\"session\":%lu,\"local_service_identity_verified\":true,\"creation_filetime\":%llu,\"dwm_execution\":false,\"umdf_execution\":false}\n",GetCurrentProcessId(),session,static_cast<unsigned long long>(nr::native_probe::creation_time(GetCurrentProcess())));
+    const auto deadline=GetTickCount64()+30000;
+    while(GetTickCount64()<deadline){HANDLE mapping=OpenFileMappingW(FILE_MAP_READ,FALSE,nr::native_probe::mapping_name(GetCurrentProcessId()).c_str());if(mapping){CloseHandle(mapping);return native_component_main(1,args);}const auto error=GetLastError();if(error!=ERROR_FILE_NOT_FOUND)return 4;Sleep(20);}
+    return 5;
+}catch(const std::exception &e){std::fprintf(stderr,"LocalService probe: %s (%lu)\n",e.what(),GetLastError());return 1;}
+''')
+p=lab/'CMakeLists.txt';s=p.read_text()+r'''
+add_executable(nr_native_service_probe native_service_probe.cpp)
+target_compile_definitions(nr_native_service_probe PRIVATE NR_NATIVE_PROBE=1)
+target_compile_features(nr_native_service_probe PRIVATE cxx_std_17)
+target_compile_options(nr_native_service_probe PRIVATE /W4 /WX)
+target_include_directories(nr_native_service_probe PRIVATE "${NR_WDK_INCLUDE_ROOT}/um" "${NR_WDK_INCLUDE_ROOT}/shared" "${NR_WDK_INCLUDE_ROOT}/km")
+target_link_libraries(nr_native_service_probe PRIVATE nr_registered_blend nr_registered_vertex d3dcompiler advapi32 user32 wtsapi32)
+set_property(TARGET nr_native_service_probe PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+target_compile_options(nr_registered_vertex PRIVATE /Gy)
+target_link_options(nr_native_service_probe PRIVATE /OPT:REF)
+''';p.write_text(s)
+(r/'native-service-peer-v1-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-service-peer-v1.tar.gz','w:gz') as f:f.add(d,arcname=d.name)
+s=(r/'build-native-dwm-worker-v1.ps1').read_text().replace('native-dwm-worker-v1','native-service-peer-v1').replace('--target nr_registered_local_indexed_worker','--target nr_registered_local_indexed_worker nr_native_service_probe').replace("binary_sha256=@{", "binary_sha256=@{'nr_native_service_probe.exe'=(Get-FileHash \"$b\\Release\\nr_native_service_probe.exe\").Hash;")
+(r/'build-native-service-peer-v1.ps1').write_text(s)
+print('Prepared LocalService diagnostic and explicit pinned worker peer')

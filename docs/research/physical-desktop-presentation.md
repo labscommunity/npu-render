@@ -71,6 +71,13 @@ Explicit identity entries pass the DACL calculations. Live cross-account calls,
 actual cross-session execution and native indirect-display bootstrap remain
 unqualified; preparing an ACL is not compositor execution.
 
+The [Local Service account trial](../validation/2026-10-13/native-service-progress-v1/)
+then reproduces denial with the original process permissions and passes ten real
+NPU operations after adding query/synchronization access to the owned controller
+and worker. Exact original DACLs and temporary tasks/files are restored. This
+qualifies an owned diagnostic under the driver host's account; actual WUDFHost
+bootstrap and DWM execution remain separate work.
+
 The hybrid-GPU model does not solve DWM migration by itself. Microsoft's documented
 redirected and direct-flip paths use the integrated GPU for DWM composition, even
 when another adapter renders applications.

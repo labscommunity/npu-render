@@ -1,0 +1,678 @@
+--- a/native/windows/registered_lab/CMakeLists.txt
++++ b/native/windows/registered_lab/CMakeLists.txt
+@@ -260,3 +260,13 @@
+  set_property(TARGET nr_registered_${kind}_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+  add_test(NAME registered_${kind}_contract COMMAND nr_registered_${kind}_test)
+ endforeach()
++
++add_executable(nr_native_service_probe native_service_probe.cpp)
++target_compile_definitions(nr_native_service_probe PRIVATE NR_NATIVE_PROBE=1)
++target_compile_features(nr_native_service_probe PRIVATE cxx_std_17)
++target_compile_options(nr_native_service_probe PRIVATE /W4 /WX)
++target_include_directories(nr_native_service_probe PRIVATE "${NR_WDK_INCLUDE_ROOT}/um" "${NR_WDK_INCLUDE_ROOT}/shared" "${NR_WDK_INCLUDE_ROOT}/km")
++target_link_libraries(nr_native_service_probe PRIVATE nr_registered_blend nr_registered_vertex d3dcompiler advapi32 user32 wtsapi32)
++set_property(TARGET nr_native_service_probe PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
++target_compile_options(nr_registered_vertex PRIVATE /Gy)
++target_link_options(nr_native_service_probe PRIVATE /OPT:REF)
+--- a/native/windows/registered_lab/draw.hpp
++++ b/native/windows/registered_lab/draw.hpp
+@@ -167,6 +167,9 @@
+             require(d.blend.SrcBlend == D3D10_DDI_BLEND_ONE && d.blend.DestBlend == D3D10_DDI_BLEND_INV_SRC_ALPHA &&
+                     d.blend.BlendOp == D3D10_DDI_BLEND_OP_ADD && d.blend.SrcBlendAlpha == D3D10_DDI_BLEND_ONE &&
+                     d.blend.DestBlendAlpha == D3D10_DDI_BLEND_INV_SRC_ALPHA && d.blend.BlendOpAlpha == D3D10_DDI_BLEND_OP_ADD);
++#ifdef NR_NATIVE_PROBE
++        throw Error{DXGI_ERROR_UNSUPPORTED};
++#else
+         // All state validation precedes preparation and any resource traffic.
+         if (!d.executor) d.executor = std::make_unique<BlendExecutor>(d.backend);
+         auto foreground = read_pixels(*source);
+@@ -184,6 +187,7 @@
+         // VidMm, counted even when inference itself executes on the NPU.
+         upload(*target, nullptr, result.pixels.data(), s.width * 4);
+         ++counters.draws;
++#endif
+     });
+ }
+ void APIENTRY null_shader(D3D10DDI_HDEVICE h, D3D10DDI_HSHADER value) { guard(h, __FUNCTION__, [&] { require(!value.pDrvPrivate); }); }
+--- a/native/windows/registered_lab/driver.cpp
++++ b/native/windows/registered_lab/driver.cpp
+@@ -47,6 +47,7 @@
+     std::shared_ptr<Allocation> bound_target;
+     std::shared_ptr<Allocation> bound_source;
+     std::array<std::array<View, 128>, 3> shader_sources{};
++#ifndef NR_NATIVE_PROBE
+     std::unique_ptr<BlendExecutor> executor;
+     std::unique_ptr<nr::raster::ClearExecutor> clear_executor;
+     std::array<uint32_t,3> clear_key{};
+@@ -65,6 +66,7 @@
+     std::array<uint64_t,5> resources_key{};
+     nr::raster::PackedResources resources_layout{};
+     nr::shader::TextureSamplers resources_samplers{};
++#endif
+     std::unique_ptr<IndexedNpuExchange> indexed_exchange;
+     std::shared_ptr<const nr::shader::Program> indexed_vertex, indexed_pixel;
+     std::array<uint64_t, 5> indexed_key{};
+@@ -328,11 +330,15 @@
+                 auto result=d.indexed_exchange->execute(std::move(request));pixels=std::move(result.pixels);execution_device=std::move(result.execution_device);
+             }else{
+                 require(d.backend=="NPU" || d.backend=="GPU");
++#ifdef NR_NATIVE_PROBE
++                throw Error{DXGI_ERROR_UNSUPPORTED};
++#else
+                 const std::array<uint32_t,3> key{surface.width,surface.height,surface.format};
+                 if(!d.clear_executor || d.clear_key!=key){
+                     d.clear_executor.reset();d.clear_executor=std::make_unique<nr::raster::ClearExecutor>(key[0],key[1],key[2],d.backend);d.clear_key=key;
+                 }
+                 auto result=d.clear_executor->execute(input);pixels=std::move(result.pixels);execution_device=std::move(result.execution_device);
++#endif
+             }
+             // VidMm upload/copy remains transport; every returned color byte was
+             // generated and quantized on the explicitly selected provider.
+@@ -614,8 +620,13 @@
+         // The runtime may replace table entries between UMD calls. Retain the
+         // table address, and read only the entry supported by this DDI version.
+         d->dxgi_callbacks = a->DXGIBaseDDI.pDXGIBaseCallbacks;
++#ifdef NR_NATIVE_PROBE
++        if (!indexed_exchange_configured()) throw Error{DXGI_ERROR_UNSUPPORTED};
++        d->backend = "NPU_LAB_INDEXED";
++#else
+         d->backend = selected_backend;
+         if (d->backend == "NPU" && indexed_exchange_configured()) d->backend = "NPU_LAB_INDEXED";
++#endif
+         d->vertex_code = shader_tokens(nr_ddi_vertex_shader, "vs_4_0");
+         d->pixel_code = shader_tokens(nr_ddi_pixel_shader, "ps_4_0");
+         auto &f = d->functions;
+@@ -690,7 +701,11 @@
+ } // namespace
+ extern "C" __declspec(dllexport) HRESULT APIENTRY OpenAdapter10(D3D10DDIARG_OPENADAPTER *a) {
+     if (!a || !a->pAdapterFuncs || !a->pAdapterCallbacks || !a->pAdapterCallbacks->pfnQueryAdapterInfoCb) return E_INVALIDARG;
++#ifdef NR_NATIVE_PROBE
++    if (!indexed_exchange_configured()) return DXGI_ERROR_UNSUPPORTED;
++#else
+     if (!nr_fill_guest()) return DXGI_ERROR_UNSUPPORTED;
++#endif
+     lab_trace("{\"event\":\"open_adapter\",\"interface\":%u,\"version\":%u}\n", a->Interface, a->Version);
+     nr::kernel_contract::AdapterInfo info{};
+     std::memset(&info, 0, sizeof(info));
+@@ -732,8 +747,14 @@
+ }
+ extern "C" __declspec(dllexport) BOOL nr_fill_configure(const char *backend) {
+     std::lock_guard<std::recursive_mutex> lock(mutex);
++#ifdef NR_NATIVE_PROBE
++    if (!backend || counters.live_contexts || counters.live_allocations ||
++        (std::strcmp(backend, "NPU") && std::strcmp(backend, "NPU_LAB_INDEXED")) || !indexed_exchange_configured()) return FALSE;
++    try { selected_backend = "NPU_LAB_INDEXED"; return TRUE; } catch (...) { return FALSE; }
++#else
+     if (!backend || counters.live_contexts || counters.live_allocations ||
+         (std::strcmp(backend, "CPU") && std::strcmp(backend, "GPU") && std::strcmp(backend, "NPU") &&
+          ((std::strcmp(backend, "NPU_LAB_FILE") && std::strcmp(backend, "NPU_LAB_INDEXED")) || !nr_fill_guest()))) return FALSE;
+     try { selected_backend = backend; return TRUE; } catch (...) { return FALSE; }
+-}
++#endif
++}
+--- a/native/windows/registered_lab/indexed_draw.hpp
++++ b/native/windows/registered_lab/indexed_draw.hpp
+@@ -236,6 +236,8 @@
+         request.viewport = viewport; request.vertex = *d.vertex_program; request.pixel = *d.pixel_program;
+         request.inputs = inputs; request.vertex_constants = vc; request.pixel_constants = pc; request.background = std::move(background);
+         result = d.indexed_exchange->execute(std::move(request));
++
++#ifndef NR_NATIVE_PROBE
+     } else if(general_resources){
+         const uint64_t options=(uint64_t(blend_mode)<<12)|uint64_t(d.blend.RenderTargetWriteMask[0])|(uint64_t(blend)<<4)|(uint64_t(cull)<<6)|(uint64_t(front_ccw)<<8);
+         const std::array<uint64_t,5> key{s.width,s.height,s.format,count,options};
+@@ -295,6 +297,9 @@
+             d.indexed_executor = std::move(candidate); d.indexed_key = key; d.indexed_vertex = d.vertex_program; d.indexed_pixel = d.pixel_program;
+         }
+         result = d.indexed_executor->execute(inputs, vc, pc, viewport, background, clip,blend_constant);
++#else
++    } else { throw Error{DXGI_ERROR_UNSUPPORTED};
++#endif
+     }
+     ++counters.executions;
+     if (d.backend == "NPU_LAB_INDEXED") ++counters.remote_npu_executions;
+--- a/native/windows/registered_lab/indexed_exchange.hpp
++++ b/native/windows/registered_lab/indexed_exchange.hpp
+@@ -4,17 +4,34 @@
+ #include "contract.hpp"
+ #include "indexed_pipe.hpp"
+ #include <bcrypt.h>
++#ifdef NR_NATIVE_PROBE
++#include "native_probe_lease.hpp"
++#include "local_indexed_client.hpp"
++#endif
+ namespace nr::registered_lab {
+ inline bool indexed_exchange_configured() {
++#ifdef NR_NATIVE_PROBE
++    try { nr::native_probe::Admission admission(nr::native_probe::read_mapping()); admission.verify(); return true; }
++    catch (...) { return false; }
++#else
+     return nr_fill_guest() && (GetFileAttributesW(L"C:\\npu-lab\\indexed-exchange-active.txt") != INVALID_FILE_ATTRIBUTES ||
+         GetFileAttributesW(L"C:\\npu-lab\\indexed-pipe-active.txt") != INVALID_FILE_ATTRIBUTES);
++#endif
+ }
+ class IndexedNpuExchange {
+     std::wstring directory, pipe;
+     uint32_t sequence = 0;
+     bool failed = false;
++#ifdef NR_NATIVE_PROBE
++    std::unique_ptr<nr::native_probe::Admission> admission;
++    std::unique_ptr<LocalIndexedClient> local_client;
++#endif
+ public:
+     IndexedNpuExchange() {
++#ifdef NR_NATIVE_PROBE
++        admission = std::make_unique<nr::native_probe::Admission>(nr::native_probe::read_mapping());
++        local_client = std::make_unique<LocalIndexedClient>(admission->pipe_name(), admission->worker_handle(), 90000);
++#else
+         if (!nr_fill_guest()) throw std::runtime_error("indexed NPU transport requires the owned guest");
+         if (GetFileAttributesW(L"C:\\npu-lab\\indexed-pipe-active.txt") != INVALID_FILE_ATTRIBUTES) {
+             indexed_exchange::require(GetFileAttributesW(L"C:\\npu-lab\\indexed-exchange-active.txt") == INVALID_FILE_ATTRIBUTES);
+@@ -33,6 +50,7 @@
+             const auto a = GetFileAttributesW(p.c_str());
+             indexed_exchange::require(a != INVALID_FILE_ATTRIBUTES && (a & FILE_ATTRIBUTE_DIRECTORY) && !(a & FILE_ATTRIBUTE_REPARSE_POINT));
+         }
++#endif
+     }
+     raster::UniformDrawExecutor::Result execute(indexed_exchange::Request request) {
+         if (failed) throw std::runtime_error("indexed NPU transport previously failed");
+@@ -41,6 +59,12 @@
+             if (BCryptGenRandom(nullptr, reinterpret_cast<PUCHAR>(h.nonce), sizeof(h.nonce), BCRYPT_USE_SYSTEM_PREFERRED_RNG) < 0)
+                 throw std::runtime_error("indexed NPU nonce generation failed");
+             const auto bytes = indexed_exchange::encode(request);
++#ifdef NR_NATIVE_PROBE
++            admission->verify();
++            auto result = indexed_exchange::decode_response(local_client->exchange(bytes), h);
++            result.execution_device = "NPU (local indexed)";
++            return result;
++#else
+             if (!pipe.empty()) return indexed_exchange::decode_response(indexed_stream::exchange_packet(pipe, bytes), h);
+             wchar_t suffix[100]{}; swprintf_s(suffix, L"-%u-%016llx%016llx-%u.bin", h.client_pid,
+                 static_cast<unsigned long long>(h.nonce[0]), static_cast<unsigned long long>(h.nonce[1]), h.sequence);
+@@ -57,6 +81,7 @@
+             indexed_exchange::require(size >= sizeof(indexed_exchange::Header) && size <= indexed_exchange::max_packet_bytes);
+             std::vector<uint8_t> response(size_t(size), 0); file.read(response.data(), DWORD(response.size()));
+             return indexed_exchange::decode_response(response, h);
++#endif
+         } catch (...) { failed = true; throw; }
+     }
+ };
+--- a/native/windows/registered_lab/local_indexed_worker.cpp
++++ b/native/windows/registered_lab/local_indexed_worker.cpp
+@@ -22,14 +22,15 @@
+ }
+ }
+ int wmain(int argc, wchar_t **argv) try {
+-    if(argc!=4 && argc!=6)throw std::invalid_argument("expected <private pipe> <requests> <seconds> [compositor-pid creation-filetime]");
++    if(argc!=4 && argc!=6 && argc!=7)throw std::invalid_argument("expected <private pipe> <requests> <seconds> [compositor-pid creation-filetime]");
+     wchar_t *end = nullptr; const auto limit = std::wcstoul(argv[2], &end, 10);
+     ex::require(end != argv[2] && !*end && limit && limit <= ex::max_requests);
+     const std::wstring name = argv[1]; ex::require(stream::pipe_name_valid(name));
+     end=nullptr;const auto seconds=std::wcstoul(argv[3],&end,10);ex::require(end!=argv[3] && !*end && seconds>=60 && seconds<=1800);
+     const auto deadline=GetTickCount64()+uint64_t(seconds)*1000;
+     std::unique_ptr<nr::registered_lab::NativeCompositorPeer> compositor;
+-    if(argc==6)compositor=std::make_unique<nr::registered_lab::NativeCompositorPeer>(DWORD(nr::registered_lab::NativeCompositorPeer::number(argv[4],UINT32_MAX)),nr::registered_lab::NativeCompositorPeer::number(argv[5],UINT64_MAX));
++    if(argc>=6)compositor=std::make_unique<nr::registered_lab::NativeCompositorPeer>(DWORD(nr::registered_lab::NativeCompositorPeer::number(argv[4],UINT32_MAX)),nr::registered_lab::NativeCompositorPeer::number(argv[5],UINT64_MAX),argc==7);
++    ex::require(argc!=7 || !std::wcscmp(argv[6],L"local-service-probe"));
+     ex::Pipeline pipeline;std::atomic<uint32_t> succeeded{0};
+     PSECURITY_DESCRIPTOR descriptor = nullptr;
+     // Private per-job endpoint: only this user and SYSTEM, local clients only.
+--- a/native/windows/registered_lab/native_compositor_peer.hpp
++++ b/native/windows/registered_lab/native_compositor_peer.hpp
+@@ -13,11 +13,13 @@
+ public:
+     static uint64_t number(const wchar_t *text,uint64_t maximum){indexed_exchange::require(text && *text>=L'0' && *text<=L'9');wchar_t *end=nullptr;errno=0;const auto n=std::wcstoull(text,&end,10);indexed_exchange::require(!errno && end!=text && !*end && n && n<=maximum);return n;}
+     static std::wstring user(HANDLE h){HANDLE raw=nullptr;indexed_exchange::require(OpenProcessToken(h,TOKEN_QUERY,&raw)!=FALSE);indexed_stream::Handle token(raw);DWORD size=0;GetTokenInformation(token.value,TokenUser,nullptr,0,&size);indexed_exchange::require(GetLastError()==ERROR_INSUFFICIENT_BUFFER && size && size<=65536);std::vector<uint8_t> bytes(size);indexed_exchange::require(GetTokenInformation(token.value,TokenUser,bytes.data(),size,&size)!=FALSE);LPWSTR s=nullptr;indexed_exchange::require(ConvertSidToStringSidW(reinterpret_cast<TOKEN_USER*>(bytes.data())->User.Sid,&s)!=FALSE);try{std::wstring result(s);LocalFree(s);return result;}catch(...){LocalFree(s);throw;}}
+-    NativeCompositorPeer(DWORD pid,uint64_t timestamp):process(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION|SYNCHRONIZE,FALSE,pid)),process_id(pid),created(timestamp){
+-        indexed_exchange::require(pid && timestamp && ProcessIdToSessionId(pid,&session) && session);
++    NativeCompositorPeer(DWORD pid,uint64_t timestamp,bool service_probe=false):process(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION|SYNCHRONIZE,FALSE,pid)),process_id(pid),created(timestamp){
++        indexed_exchange::require(pid && timestamp && ProcessIdToSessionId(pid,&session) && (service_probe?session==0:session!=0));
+         wchar_t path[32768]{},system[MAX_PATH]{};DWORD length=32768;indexed_exchange::require(QueryFullProcessImageNameW(process.value,0,path,&length)!=FALSE && GetSystemDirectoryW(system,MAX_PATH)!=0);
+-        indexed_exchange::require(!_wcsicmp(path,(std::wstring(system)+L"\\dwm.exe").c_str()));
+-        identity=user(process.value);indexed_exchange::require(identity==L"S-1-5-90-0-"+std::to_wstring(session));verify();
++        std::wstring expected;
++        if(service_probe){wchar_t own[32768]{};const auto n=GetModuleFileNameW(nullptr,own,32768);indexed_exchange::require(n && n<32768);expected=own;const auto slash=expected.find_last_of(L"\\/");indexed_exchange::require(slash!=std::wstring::npos);expected.resize(slash+1);expected+=L"nr_native_service_probe.exe";}else expected=std::wstring(system)+LR"(\dwm.exe)";
++        indexed_exchange::require(!_wcsicmp(path,expected.c_str()));
++        identity=user(process.value);indexed_exchange::require(identity==(service_probe?std::wstring(L"S-1-5-19"):L"S-1-5-90-0-"+std::to_wstring(session)));verify();
+     }
+     void verify()const{DWORD current=0;indexed_exchange::require(WaitForSingleObject(process.value,0)==WAIT_TIMEOUT && GetProcessId(process.value)==process_id && creation(process.value)==created && ProcessIdToSessionId(process_id,&current) && current==session && user(process.value)==identity);}
+     const std::wstring &sid()const{return identity;}
+--- /dev/null
++++ b/native/windows/registered_lab/native_indexed_probe_test.hpp
+@@ -0,0 +1,98 @@
++// Real indexed-draw DDI with explicit runtime allocation shims. No OS adapter.
++#include "point_texture_fixture.hpp"
++#include "linear_texture_fixture.hpp"
++#include <cfloat>
++#include "vertex_id_fixture.hpp"
++int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER_DEVICECALLBACKS &um, const char *backend) {
++    TEST(nr_fill_configure(backend)); emulate_copies = true; last_error = S_OK;
++    const auto draws_before = counters.draws, executions_before = counters.executions;
++    alignas(Device) unsigned char device_store[sizeof(Device)]{};
++    D3D10DDI_DEVICEFUNCS f{}; DXGI_DDI_BASE_FUNCTIONS dxgi{}; D3D10DDIARG_CREATEDEVICE create{};
++    create.hDrvDevice.pDrvPrivate = device_store; create.hRTDevice.handle = runtime_handle;
++    create.pDeviceFuncs = &f; create.pUMCallbacks = &um; create.pKTCallbacks = &kt;
++    create.DXGIBaseDDI.pDXGIDDIBaseFunctions = &dxgi; create.Interface = D3D10_0_DDI_INTERFACE_VERSION;
++    TEST(create_device({}, &create) == DXGI_STATUS_NO_REDIRECTION); const auto h = create.hDrvDevice;
++    constexpr UINT width = 64, height = 64;
++    alignas(Resource) unsigned char resource_store[6][sizeof(Resource)]{};
++    D3D10DDI_HRESOURCE resources[6]{}; for (unsigned i = 0; i < 6; ++i) resources[i].pDrvPrivate = resource_store[i];
++    D3D10DDI_MIPINFO mip{}; mip.TexelWidth = width; mip.TexelHeight = height; mip.TexelDepth = 1;
++    std::vector<uint8_t> background(width * height * 4, 53);
++    D3D10_DDIARG_SUBRESOURCE_UP initial{}; initial.pSysMem = background.data(); initial.SysMemPitch = width * 4;
++    D3D10DDIARG_CREATERESOURCE args{}; args.ResourceDimension = D3D10DDIRESOURCE_TEXTURE2D;
++    args.MipLevels = args.ArraySize = args.SampleDesc.Count = 1; args.pMipInfoList = &mip;
++    args.Format = DXGI_FORMAT_B8G8R8A8_UNORM; args.Usage = D3D10_DDI_USAGE_DEFAULT;
++    args.BindFlags = D3D10_DDI_BIND_RENDER_TARGET; args.pInitialDataUP = &initial;
++    f.pfnCreateResource(h, &args, resources[0], {}); TEST(last_error == S_OK);
++    const auto target_index = resource(resources[0]).allocation->handle;
++    const float positions[5][4]{{0,0,0,0},{-1,1,.5f,1},{1,1,.5f,1},{1,-1,.5f,1},{-1,-1,.5f,1}};
++    const uint16_t indices[]{9999,9999,0,1,2,2,3,0}; float color[4]{.5f,.25f,.125f,1};
++    auto buffer = [&](unsigned i, UINT bind, UINT bytes, const void *data) {
++        D3D10DDI_MIPINFO m{}; m.TexelWidth = bytes; m.TexelHeight = m.TexelDepth = 1;
++        D3D10_DDIARG_SUBRESOURCE_UP up{}; up.pSysMem = const_cast<void *>(data);
++        D3D10DDIARG_CREATERESOURCE a{}; a.ResourceDimension = D3D10DDIRESOURCE_BUFFER;
++        a.MipLevels = a.ArraySize = a.SampleDesc.Count = 1; a.pMipInfoList = &m;
++        a.Usage = D3D10_DDI_USAGE_DEFAULT; a.BindFlags = bind; a.pInitialDataUP = &up;
++        f.pfnCreateResource(h, &a, resources[i], {}); return last_error == S_OK;
++    };
++    TEST(buffer(1, D3D10_DDI_BIND_VERTEX_BUFFER, sizeof(positions), positions));
++    TEST(buffer(2, D3D10_DDI_BIND_INDEX_BUFFER, sizeof(indices), indices));
++    TEST(buffer(3, D3D10_DDI_BIND_CONSTANT_BUFFER, sizeof(color), color));
++    alignas(View) unsigned char view_store[sizeof(View)]{}; D3D10DDI_HRENDERTARGETVIEW view{}; view.pDrvPrivate = view_store;
++    D3D10DDIARG_CREATERENDERTARGETVIEW target{}; target.hDrvResource = resources[0];
++    target.ResourceDimension = D3D10DDIRESOURCE_TEXTURE2D; target.Format = args.Format; target.Tex2D.ArraySize = 1;
++    f.pfnCreateRenderTargetView(h, &target, view, {}); f.pfnSetRenderTargets(h, &view, 1, 0, {});
++    const auto vw = shader_tokens("cbuffer C {float4 color;}; struct O {float4 p:SV_Position;float4 c:COLOR;}; O main(float4 p:POSITION){O o;o.p=p;o.c=color;return o;}", "vs_4_0");
++    const auto pw = shader_tokens("float4 main(float4 p:SV_Position,float4 c:COLOR):SV_Target{return c;}", "ps_4_0");
++    alignas(Shader) unsigned char shader_store[2][sizeof(Shader)]{}; D3D10DDI_HSHADER shaders[2]{};
++    for (unsigned i = 0; i < 2; ++i) shaders[i].pDrvPrivate = shader_store[i];
++    f.pfnCreateVertexShader(h, vw.data(), shaders[0], {}, nullptr); f.pfnCreatePixelShader(h, pw.data(), shaders[1], {}, nullptr);
++    f.pfnVsSetShader(h, shaders[0]); f.pfnPsSetShader(h, shaders[1]);
++    f.pfnDestroyShader(h, shaders[0]); f.pfnDestroyShader(h, shaders[1]); // Bound programs retain their token streams.
++    D3D10DDIARG_INPUT_ELEMENT_DESC element{}; element.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
++    D3D10DDIARG_CREATEELEMENTLAYOUT layout_args{}; layout_args.NumElements = 1; layout_args.pVertexElements = &element;
++    alignas(ElementLayout) unsigned char layout_store[sizeof(ElementLayout)]{}; D3D10DDI_HELEMENTLAYOUT layout{}; layout.pDrvPrivate = layout_store;
++    f.pfnCreateElementLayout(h, &layout_args, layout, {}); f.pfnIaSetInputLayout(h, layout); f.pfnDestroyElementLayout(h, layout);
++    const UINT stride = 16, offset = 0; f.pfnIaSetVertexBuffers(h, 0, 1, &resources[1], &stride, &offset);
++    f.pfnIaSetIndexBuffer(h, resources[2], DXGI_FORMAT_R16_UINT, 2);
++    f.pfnVsSetConstantBuffers(h, 0, 1, &resources[3]);
++    f.pfnIaSetTopology(h, D3D10_DDI_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
++    D3D10_DDI_VIEWPORT viewport{}; viewport.Width = width; viewport.Height = height; viewport.MaxDepth = 1;
++    f.pfnSetViewports(h, 1, 0, &viewport);
++    D3D10_DDI_RASTERIZER_DESC raster{}; raster.FillMode = D3D10_DDI_FILL_SOLID; raster.CullMode = D3D10_DDI_CULL_NONE;
++    raster.DepthClipEnable = TRUE; raster.ScissorEnable = TRUE; D3D10DDI_HRASTERIZERSTATE rs{}; rs.pDrvPrivate = &raster;
++    f.pfnSetRasterizerState(h, rs);
++    D3D10_DDI_RECT scissor{0,0,width,height}; f.pfnSetScissorRects(h, 1, 0, &scissor);
++    D3D10_DDI_BLEND_DESC blend{}; blend.RenderTargetWriteMask[0] = 15; D3D10DDI_HBLENDSTATE bs{}; bs.pDrvPrivate = &blend;
++    f.pfnSetBlendState(h, bs, nullptr, ~0u); TEST(last_error == S_OK);
++    {
++        auto &mapped=*resource(resources[1]).allocation;(void)mapped.lock(false);
++        const auto before=memory[target_index];const auto executions=counters.executions;
++        f.pfnIaSetVertexBuffers(h,0,1,&resources[1],&stride,&offset);TEST(last_error==S_OK && mapped.locked);
++        f.pfnDrawIndexed(h,6,1,1);TEST(last_error==E_INVALIDARG && memory[target_index]==before && counters.executions==executions);
++        TEST(mapped.unlock()==S_OK);last_error=S_OK;
++    }
++    for (unsigned frame = 0; frame < 2; ++frame) {
++        D3D10_DDI_DEPTH_STENCIL_DESC enabled{};enabled.DepthEnable=enabled.StencilEnable=TRUE;
++        enabled.DepthFunc=enabled.FrontFace.StencilFunc=enabled.BackFace.StencilFunc=D3D10_DDI_COMPARISON_NEVER;
++        D3D10DDI_HDEPTHSTENCILSTATE state{};if(frame)state.pDrvPrivate=&enabled;
++        f.pfnSetDepthStencilState(h,state,1); // Default LESS, then NEVER; neither has a bound DSV.
++        if (frame) {
++            color[0] = .25f; color[1] = .125f; color[2] = .5f;
++            f.pfnDefaultConstantBufferUpdateSubresourceUP(h, resources[3], 0, nullptr, color, 0, 0);
++        }
++        f.pfnDrawIndexed(h, 6, 1, 1); TEST(last_error == S_OK && counters.draws == draws_before + frame + 1);
++        for (size_t i = 0; i < width * height; ++i) for (unsigned c = 0; c < 4; ++c)
++            TEST(memory[target_index][i * 4 + c] == uint8_t(std::nearbyint(double(color[c < 3 ? 2 - c : c]) * 255)));
++        const auto before = memory[target_index]; const auto draws = counters.draws;
++        f.pfnDrawIndexed(h, 6, 1, -1); TEST(last_error == E_INVALIDARG && memory[target_index] == before && counters.draws == draws);
++        last_error = S_OK; f.pfnDrawIndexed(h, 6, UINT_MAX, 1);
++        TEST(last_error == E_INVALIDARG && memory[target_index] == before && counters.draws == draws); last_error = S_OK;
++    }
++
++    f.pfnDestroyRenderTargetView(h, view);
++    for (unsigned i = 0; i < 4; ++i) f.pfnDestroyResource(h, resources[i]);
++    f.pfnDestroyDevice(h);
++    TEST(counters.executions == executions_before + 2 && counters.draws == draws_before + 2 && !counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
++    std::printf("{\"native_indexed_ddi\":true,\"verified_draws\":2,\"changed_constants\":true,\"invalid_ranges_atomic\":true,\"execution_device\":\"%s\"}\n", counters.last_execution_device);
++    return 0;
++}
+--- /dev/null
++++ b/native/windows/registered_lab/native_probe_ddi_test.cpp
+@@ -0,0 +1,159 @@
++// Actual UMD callbacks with owned runtime shims. This is not a live adapter test.
++#include "driver.cpp"
++#include "blend_reference.hpp"
++#include <cstdio>
++#include <vector>
++#include <map>
++#include <cmath>
++#define TEST(x) do { if (!(x)) { std::fprintf(stderr, "line %d: %s\n", __LINE__, #x); return 1; } } while (false)
++namespace {
++// Two complete 11-level textures plus transfer allocations in the mip tests.
++std::array<std::vector<unsigned char>, 64> memory;
++std::array<bool, 64> locked{};
++std::array<UINT, 64> references{};
++std::map<HANDLE, UINT> resource_handles;
++nr::kernel_contract::FillSurface commands[2]{};
++D3DDDI_ALLOCATIONLIST lists[2][2]{};
++UINT current_buffer = 0, renders = 0, destroys = 0, released = 0;
++bool contract_error = false, allocation_failure = false, render_failure = false;
++bool lock_failure = false, lock_busy=false, last_lock_read_only=false, last_lock_write_only=false, last_lock_do_not_wait=false;
++bool emulate_copies = false;
++std::vector<std::pair<UINT, UINT>> pending_copies;
++HRESULT last_error = S_OK;
++unsigned adapter_queries = 0;
++HRESULT APIENTRY query_adapter_cb(HANDLE, const D3DDDICB_QUERYADAPTERINFO *args) {
++    ++adapter_queries;
++    if (!args || args->PrivateDriverDataSize != sizeof(nr::kernel_contract::AdapterInfo)) return E_INVALIDARG;
++    const nr::kernel_contract::AdapterInfo info{};
++    std::memcpy(args->pPrivateDriverData, &info, sizeof(info));
++    return S_OK;
++}
++HANDLE runtime_handle = reinterpret_cast<HANDLE>(uintptr_t(0x1234));
++HANDLE context_handle = reinterpret_cast<HANDLE>(uintptr_t(0x5678));
++void verify(bool v) { if (!v) contract_error = true; }
++void APIENTRY set_error(D3D10DDI_HRTCORELAYER, HRESULT status) { last_error = status; }
++HRESULT APIENTRY create_context_cb(HANDLE rt, D3DDDICB_CREATECONTEXT *a) {
++    verify(rt == runtime_handle && a->EngineAffinity == 1 && !a->NodeOrdinal && !a->Flags.Value);
++    a->hContext = context_handle;
++    a->pCommandBuffer = &commands[current_buffer]; a->CommandBufferSize = sizeof(commands[0]);
++    a->pAllocationList = lists[current_buffer]; a->AllocationListSize = 2;
++    return S_OK;
++}
++HRESULT APIENTRY destroy_context_cb(HANDLE rt, const D3DDDICB_DESTROYCONTEXT *a) {
++    verify(rt == runtime_handle && a->hContext == context_handle);
++    for (const auto &m : memory) verify(m.empty());
++    ++destroys;
++    return S_OK;
++}
++HRESULT APIENTRY allocate_cb(HANDLE rt, D3DDDICB_ALLOCATE *a) {
++    verify(rt == runtime_handle && a->NumAllocations == 1);
++    verify(a->hResource ? a->PrivateDriverDataSize == sizeof(nr::kernel_contract::Surface) && a->pPrivateDriverData
++                       : !a->PrivateDriverDataSize);
++    if (allocation_failure) return E_OUTOFMEMORY;
++    const auto &s = *static_cast<const nr::kernel_contract::Surface *>(a->pAllocationInfo->pPrivateDriverData);
++    verify(nr::kernel_contract::valid(s));
++    for (UINT i = 1; i < memory.size(); ++i) {
++        if (memory[i].empty()) {
++            memory[i].resize(size_t(s.allocation_bytes), 0x35); references[i] = 1;
++            a->pAllocationInfo->hAllocation = i;
++            if (a->hResource) { resource_handles[a->hResource] = i; a->hKMResource = 77; }
++            return S_OK;
++        }
++    }
++    return E_OUTOFMEMORY;
++}
++HRESULT APIENTRY deallocate_cb(HANDLE rt, const D3DDDICB_DEALLOCATE *a) {
++    verify(rt == runtime_handle);
++    UINT i = 0;
++    if (a->hResource) {
++        verify(!a->NumAllocations && !a->HandleList);
++        auto found = resource_handles.find(a->hResource);
++        if (found == resource_handles.end()) return E_INVALIDARG;
++        i = found->second; resource_handles.erase(found);
++    } else {
++        verify(a->NumAllocations == 1 && a->HandleList);
++        i = *a->HandleList;
++    }
++    if (i >= memory.size() || memory[i].empty() || locked[i]) return E_INVALIDARG;
++    for (const auto &copy : pending_copies) verify(copy.first != i && copy.second != i);
++    if (!--references[i]) { memory[i].clear(); ++released; }
++    return S_OK;
++}
++HRESULT APIENTRY lock_cb(HANDLE rt, D3DDDICB_LOCK *a) {
++    verify(rt == runtime_handle && a->Flags.LockEntire && a->Flags.DonotEvict && !a->Flags.Discard);
++    last_lock_read_only=a->Flags.ReadOnly!=0;last_lock_write_only=a->Flags.WriteOnly!=0;
++    last_lock_do_not_wait=a->Flags.DonotWait!=0;
++    verify(!(last_lock_read_only && last_lock_write_only));
++    if(lock_busy && a->Flags.DonotWait)return D3DDDIERR_WASSTILLDRAWING;
++    if (lock_failure && !a->Flags.ReadOnly) return E_ACCESSDENIED;
++    const auto i = a->hAllocation;
++    for (const auto &resource : resource_handles) if (resource.second == i) return E_ACCESSDENIED;
++    if (i >= memory.size() || memory[i].empty() || locked[i]) return E_INVALIDARG;
++    // Explicit test-only executor. Deferred until a blocking lock, so tests
++    // detect upload storage that is freed or modified before submission retires.
++    for (const auto &copy : pending_copies) {
++        verify(memory[copy.first].size() == memory[copy.second].size());
++        memory[copy.second] = memory[copy.first];
++    }
++    pending_copies.clear();
++    locked[i] = true; a->pData = memory[i].data();
++    return S_OK;
++}
++HRESULT APIENTRY unlock_cb(HANDLE rt, const D3DDDICB_UNLOCK *a) {
++    verify(rt == runtime_handle && a->NumAllocations == 1 && a->phAllocations);
++    const auto i = *a->phAllocations;
++    if (i >= memory.size() || !locked[i]) return E_INVALIDARG;
++    locked[i] = false;
++    return S_OK;
++}
++HRESULT APIENTRY render_cb(HANDLE rt, D3DDDICB_RENDER *a) {
++    verify(rt == runtime_handle && a->hContext == context_handle && a->CommandLength == sizeof(commands[0]) &&
++           !a->NumPatchLocations && !a->CommandOffset);
++    verify(commands[current_buffer].signature == nr::kernel_contract::magic);
++    if (commands[current_buffer].operation == 2) {
++        verify(a->NumAllocations == 2 && !lists[current_buffer][0].WriteOperation && lists[current_buffer][1].WriteOperation);
++        verify(lists[current_buffer][0].hAllocation != lists[current_buffer][1].hAllocation);
++        verify(!commands[current_buffer].pattern && !commands[current_buffer].reserved);
++    } else {
++        verify(a->NumAllocations == 1 && commands[current_buffer].operation == 1 && commands[current_buffer].pattern == 0xff0000ff);
++        verify(lists[current_buffer][0].hAllocation == 1 && lists[current_buffer][0].WriteOperation);
++    }
++    ++renders;
++    if (render_failure) return E_ACCESSDENIED;
++    if (emulate_copies && commands[current_buffer].operation == 2)
++        pending_copies.emplace_back(lists[current_buffer][0].hAllocation, lists[current_buffer][1].hAllocation);
++    current_buffer ^= 1;
++    a->pNewCommandBuffer = &commands[current_buffer]; a->NewCommandBufferSize = sizeof(commands[0]);
++    a->pNewAllocationList = lists[current_buffer]; a->NewAllocationListSize = 2;
++    return S_OK;
++}
++}
++
++#include "clear_ddi_test.hpp"
++#include "native_indexed_probe_test.hpp"
++int main(int argc, char **argv) {
++    std::setvbuf(stdout, nullptr, _IONBF, 0);
++    TEST(argc == 1 || (argc == 2 && !std::strcmp(argv[1], "--reject-unleased")));
++    D3DDDI_ADAPTERCALLBACKS callbacks{}; callbacks.pfnQueryAdapterInfoCb = query_adapter_cb;
++    D3D10_2DDI_ADAPTERFUNCS funcs{}; D3D10DDIARG_OPENADAPTER args{};
++    args.pAdapterCallbacks = &callbacks; args.pAdapterFuncs_2 = &funcs;
++    TEST(!nr_fill_configure("CPU") && !nr_fill_configure("GPU"));
++    if (argc == 2) {
++        TEST(!nr_fill_configure("NPU") && OpenAdapter10_2(&args) == DXGI_ERROR_UNSUPPORTED && !adapter_queries);
++        std::printf("{\"unleased_native_adapter_rejected\":true,\"passed\":true,\"provider_requests\":0}\n"); return 0;
++    }
++    TEST(nr_fill_configure("NPU"));
++    TEST(OpenAdapter10_2(&args) == S_OK && adapter_queries == 1 && funcs.pfnCreateDevice && funcs.pfnCloseAdapter);
++    D3DDDI_DEVICECALLBACKS kt{};
++    kt.pfnCreateContextCb = create_context_cb; kt.pfnDestroyContextCb = destroy_context_cb;
++    kt.pfnAllocateCb = allocate_cb; kt.pfnDeallocateCb = deallocate_cb;
++    kt.pfnLockCb = lock_cb; kt.pfnUnlockCb = unlock_cb; kt.pfnRenderCb = render_cb;
++    D3D10DDI_CORELAYER_DEVICECALLBACKS um{}; um.pfnSetErrorCb = set_error;
++    TEST(test_provider_clears(kt,um,"NPU") == 0);
++    TEST(test_indexed_draw(kt,um,"NPU") == 0);
++    TEST(counters.executions == 10 && counters.remote_npu_executions == 10 && !counters.cpu_executions && !counters.gpu_executions && !counters.npu_executions);
++    TEST(!std::strcmp(counters.last_execution_device,"NPU (local indexed)"));
++    TEST(!counters.live_allocations && !counters.live_contexts && !counters.cleanup_errors && !contract_error);
++    TEST(funcs.pfnCloseAdapter(args.hAdapter) == S_OK);
++    std::printf("{\"native_probe_ddi_component\":true,\"passed\":true,\"npu_local_executions\":10,\"clears\":8,\"draws\":2,\"cpu_executions\":0,\"gpu_executions\":0,\"allocation_callbacks_emulated\":true,\"registered_adapter_tested\":false,\"desktop_offloaded\":false}\n"); return 0;
++}
+--- /dev/null
++++ b/native/windows/registered_lab/native_probe_lease.hpp
+@@ -0,0 +1,149 @@
++#pragma once
++#ifndef NOMINMAX
++#define NOMINMAX
++#endif
++#include <windows.h>
++#include <aclapi.h>
++#include <wtsapi32.h>
++#include <cwchar>
++#include <cstdint>
++#include <cstring>
++#include <stdexcept>
++#include <string>
++#include <vector>
++namespace nr::native_probe {
++inline std::wstring mapping_name(DWORD pid) { return L"Global\\T8.NpuRender.NativeSession.v1."+std::to_wstring(pid); }
++constexpr uint64_t signature = 0x32564250524e3854ull;
++struct ProcessIdentity { uint32_t pid = 0, session = 0; uint64_t created = 0; };
++struct Lease {
++    uint64_t magic = signature;
++    uint32_t version = 2, bytes = sizeof(Lease);
++    uint64_t issued_tick = 0, deadline_tick = 0;
++    ProcessIdentity controller, worker, consumer;
++    uint32_t scope = 0, sid_bytes = 0; // 0 owned same-session probe; 1 interactive compositor.
++    uint64_t nonce[2]{};
++    char pipe_suffix[32]{};
++    uint8_t consumer_sid[SECURITY_MAX_SID_SIZE]{};
++    uint32_t reserved[5]{};
++};
++static_assert(sizeof(Lease) == 224);
++inline void require(bool ok) { if (!ok) throw std::runtime_error("native probe lease rejected"); }
++struct Handle {
++    HANDLE value;
++    explicit Handle(HANDLE h) : value(h) { require(h && h != INVALID_HANDLE_VALUE); }
++    ~Handle() { CloseHandle(value); }
++    Handle(const Handle &) = delete;
++};
++inline uint64_t creation_time(HANDLE process) {
++    FILETIME created{}, exited{}, kernel{}, user{};
++    require(GetProcessTimes(process, &created, &exited, &kernel, &user) != 0);
++    return (uint64_t(created.dwHighDateTime) << 32) | created.dwLowDateTime;
++}
++inline bool sid_valid(const Lease &r) {
++    if(r.sid_bytes<8 || r.sid_bytes>sizeof(r.consumer_sid) || r.consumer_sid[0]!=SID_REVISION || r.consumer_sid[1]>SID_MAX_SUB_AUTHORITIES || r.sid_bytes!=8u+4u*r.consumer_sid[1])return false;
++    if(!IsValidSid(const_cast<uint8_t*>(r.consumer_sid)))return false;
++    for(size_t i=r.sid_bytes;i<sizeof(r.consumer_sid);++i)if(r.consumer_sid[i])return false;
++    return true;
++}
++inline bool compositor_sid(const Lease &r) {
++    if(!sid_valid(r) || r.consumer_sid[1]!=3)return false;
++    auto sid=const_cast<uint8_t*>(r.consumer_sid);const SID_IDENTIFIER_AUTHORITY nt=SECURITY_NT_AUTHORITY;
++    return !std::memcmp(GetSidIdentifierAuthority(sid),&nt,sizeof(nt)) && *GetSidSubAuthority(sid,0)==90 && *GetSidSubAuthority(sid,1)==0 && *GetSidSubAuthority(sid,2)==r.consumer.session;
++}
++inline bool shape_valid(const Lease &r, uint64_t now, DWORD pid, uint64_t created, DWORD session) {
++    const auto maximum=r.scope==1?900000u:120000u;
++    if(r.magic!=signature || r.version!=2 || r.bytes!=sizeof(Lease) || r.scope>1 || !sid_valid(r) ||
++       !r.issued_tick || r.issued_tick>now || r.deadline_tick<=now || r.deadline_tick<=r.issued_tick || r.deadline_tick-r.issued_tick>maximum ||
++       r.consumer.pid!=pid || r.consumer.created!=created || r.consumer.session!=session || !(r.nonce[0] || r.nonce[1]))return false;
++    for(const auto &p:{r.controller,r.worker,r.consumer})if(!p.pid || !p.created || p.session==UINT32_MAX)return false;
++    if(r.scope==0){if(r.controller.session!=session || r.worker.session!=session || compositor_sid(r))return false;}
++    else if(r.controller.session || r.worker.session || !session || !compositor_sid(r))return false;
++    if(r.controller.pid==r.worker.pid || r.controller.pid==pid || r.worker.pid==pid)return false;
++    for(const auto c:r.pipe_suffix)if(!(c>='0' && c<='9') && !(c>='a' && c<='f'))return false;
++    for(const auto v:r.reserved)if(v)return false;
++    return true;
++}
++inline std::vector<uint8_t> user_sid(HANDLE process) {
++    HANDLE raw=nullptr;require(OpenProcessToken(process,TOKEN_QUERY,&raw)!=FALSE);Handle token(raw);DWORD size=0;
++    GetTokenInformation(token.value,TokenUser,nullptr,0,&size);require(GetLastError()==ERROR_INSUFFICIENT_BUFFER && size && size<=65536);
++    std::vector<uint8_t> data(size);require(GetTokenInformation(token.value,TokenUser,data.data(),size,&size)!=FALSE);
++    auto sid=reinterpret_cast<TOKEN_USER*>(data.data())->User.Sid;require(IsValidSid(sid)!=FALSE);const auto bytes=GetLengthSid(sid);require(bytes<=SECURITY_MAX_SID_SIZE);
++    std::vector<uint8_t> result(bytes);require(CopySid(bytes,result.data(),sid)!=FALSE);return result;
++}
++inline void set_consumer_sid(Lease &r,HANDLE process) {
++    const auto sid=user_sid(process);r.sid_bytes=DWORD(sid.size());std::memset(r.consumer_sid,0,sizeof(r.consumer_sid));std::memcpy(r.consumer_sid,sid.data(),sid.size());
++}
++inline bool session_unlocked(DWORD session) {
++    LPWSTR name=nullptr;DWORD bytes=0;
++    if(!WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE,session,WTSUserName,&name,&bytes))return false;
++    const bool has_user=name && bytes>=sizeof(wchar_t) && *name;WTSFreeMemory(name);if(!has_user)return false;
++    LPWSTR raw=nullptr;if(!WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE,session,WTSSessionInfoEx,&raw,&bytes))return false;
++    const auto info=reinterpret_cast<const WTSINFOEXW*>(raw);
++    const bool ready=bytes>=sizeof(WTSINFOEXW) && info->Level==1 && info->Data.WTSInfoExLevel1.SessionId==session && info->Data.WTSInfoExLevel1.SessionState==WTSActive && info->Data.WTSInfoExLevel1.SessionFlags==WTS_SESSIONSTATE_UNLOCK;
++    WTSFreeMemory(raw);return ready;
++}
++inline bool current_input_is_default() {
++    const auto desktop=OpenInputDesktop(0,FALSE,DESKTOP_READOBJECTS);if(!desktop)return false;
++    wchar_t name[128]{};DWORD bytes=0;const bool ready=GetUserObjectInformationW(desktop,UOI_NAME,name,sizeof(name),&bytes) && bytes<=sizeof(name) && !std::wcscmp(name,L"Default");CloseDesktop(desktop);return ready;
++}
++inline bool current_image_is_compositor() {
++    wchar_t path[32768]{},root[MAX_PATH]{};DWORD bytes=32768;
++    return QueryFullProcessImageNameW(GetCurrentProcess(),0,path,&bytes) && GetSystemDirectoryW(root,MAX_PATH) && !_wcsicmp(path,(std::wstring(root)+L"\\dwm.exe").c_str());
++}
++inline bool administrator_or_system(PSID sid) {
++    return sid && (IsWellKnownSid(sid, WinBuiltinAdministratorsSid) || IsWellKnownSid(sid, WinLocalSystemSid));
++}
++inline bool readonly_to_unprivileged(PSECURITY_DESCRIPTOR descriptor) {
++    PSID owner = nullptr; BOOL defaulted = FALSE, present = FALSE; PACL acl = nullptr;
++    if (!GetSecurityDescriptorOwner(descriptor, &owner, &defaulted) || !administrator_or_system(owner) ||
++        !GetSecurityDescriptorDacl(descriptor, &present, &acl, &defaulted) || !present || !acl || !IsValidAcl(acl)) return false;
++    constexpr ACCESS_MASK write_bits = FILE_MAP_WRITE | 0x10u /* SECTION_EXTEND_SIZE */ | WRITE_DAC | WRITE_OWNER | DELETE | GENERIC_WRITE | GENERIC_ALL;
++    for (DWORD index = 0; index < acl->AceCount; ++index) {
++        void *raw = nullptr; if (!GetAce(acl, index, &raw)) return false;
++        const auto header = static_cast<ACE_HEADER *>(raw);
++        if (header->AceType == ACCESS_DENIED_ACE_TYPE) continue;
++        if (header->AceType != ACCESS_ALLOWED_ACE_TYPE) return false;
++        const auto ace = static_cast<ACCESS_ALLOWED_ACE *>(raw);
++        if ((ace->Mask & write_bits) && !administrator_or_system(reinterpret_cast<PSID>(&ace->SidStart))) return false;
++    }
++    return true;
++}
++inline Lease read_mapping(const wchar_t *name = nullptr) {
++    const auto own=mapping_name(GetCurrentProcessId());if(!name)name=own.c_str();
++    Handle mapping(OpenFileMappingW(FILE_MAP_READ | READ_CONTROL, FALSE, name));
++    PSECURITY_DESCRIPTOR descriptor = nullptr; PSID owner = nullptr; PACL acl = nullptr;
++    require(GetSecurityInfo(mapping.value, SE_KERNEL_OBJECT, OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
++                            &owner, nullptr, &acl, nullptr, &descriptor) == ERROR_SUCCESS);
++    const bool permitted = readonly_to_unprivileged(descriptor); LocalFree(descriptor); require(permitted);
++    const auto view = MapViewOfFile(mapping.value, FILE_MAP_READ, 0, 0, sizeof(Lease)); require(view != nullptr);
++    Lease record{}; std::memcpy(&record, view, sizeof(record)); UnmapViewOfFile(view); return record;
++}
++class Admission {
++    Lease lease;
++    Handle controller, worker;
++    static HANDLE open(const ProcessIdentity &identity) {
++        return OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, identity.pid);
++    }
++    static void verify_process(HANDLE handle, const ProcessIdentity &identity) {
++        DWORD actual_session = 0;
++        require(GetProcessId(handle) == identity.pid && creation_time(handle) == identity.created &&
++                WaitForSingleObject(handle, 0) == WAIT_TIMEOUT && ProcessIdToSessionId(identity.pid, &actual_session) && actual_session == identity.session);
++    }
++public:
++    explicit Admission(const Lease &record) : lease(record), controller(open(record.controller)), worker(open(record.worker)) { verify(); }
++    void verify() const {
++        DWORD session = 0; require(ProcessIdToSessionId(GetCurrentProcessId(), &session) != 0);
++        require(shape_valid(lease, GetTickCount64(), GetCurrentProcessId(), creation_time(GetCurrentProcess()), session));
++        const auto sid=user_sid(GetCurrentProcess());
++        require(sid.size()==lease.sid_bytes && EqualSid(const_cast<uint8_t*>(lease.consumer_sid),const_cast<uint8_t*>(sid.data())));
++        verify_process(controller.value, lease.controller);
++        verify_process(worker.value, lease.worker);
++        if(lease.scope==1)require(session_unlocked(session) && current_image_is_compositor() && current_input_is_default());
++    }
++    HANDLE worker_handle() const { verify(); return worker.value; }
++    std::wstring pipe_name() const {
++        verify(); const std::string suffix(lease.pipe_suffix, sizeof(lease.pipe_suffix));
++        return L"\\\\.\\pipe\\npu-render-indexed-" + std::wstring(suffix.begin(), suffix.end());
++    }
++};
++}
+--- /dev/null
++++ b/native/windows/registered_lab/native_service_probe.cpp
+@@ -0,0 +1,21 @@
++// Owned LocalService account diagnostic; not WUDFHost or DWM execution.
++#define main native_component_main
++#include "native_probe_ddi_test.cpp"
++#undef main
++#include <thread>
++#include <sddl.h>
++int wmain(int argc,wchar_t **argv) try {
++    if(argc!=2)return 2;
++    DWORD session=UINT32_MAX;nr::native_probe::require(ProcessIdToSessionId(GetCurrentProcessId(),&session) && session==0);
++    const auto sid=nr::native_probe::user_sid(GetCurrentProcess());nr::native_probe::require(IsWellKnownSid(const_cast<uint8_t*>(sid.data()),WinLocalServiceSid)!=FALSE);
++    const auto directory=std::wstring(argv[1]);FILE *out=nullptr,*err=nullptr;
++    if(_wfreopen_s(&out,(directory+LR"(\service.stdout.jsonl)").c_str(),L"wb",stdout) || _wfreopen_s(&err,(directory+LR"(\service.stderr.log)").c_str(),L"wb",stderr))return 3;
++    std::setvbuf(stdout,nullptr,_IONBF,0);std::setvbuf(stderr,nullptr,_IONBF,0);
++    std::thread([]{Sleep(110000);ExitProcess(124);}).detach();
++    char executable[]="native_service_probe",negative[]="--reject-unleased";char *args[]={executable,negative};
++    const auto rejected=native_component_main(2,args);if(rejected)return rejected;
++    std::printf("{\"local_service_probe_ready\":true,\"pid\":%lu,\"session\":%lu,\"local_service_identity_verified\":true,\"creation_filetime\":%llu,\"dwm_execution\":false,\"umdf_execution\":false}\n",GetCurrentProcessId(),session,static_cast<unsigned long long>(nr::native_probe::creation_time(GetCurrentProcess())));
++    const auto deadline=GetTickCount64()+30000;
++    while(GetTickCount64()<deadline){HANDLE mapping=OpenFileMappingW(FILE_MAP_READ,FALSE,nr::native_probe::mapping_name(GetCurrentProcessId()).c_str());if(mapping){CloseHandle(mapping);return native_component_main(1,args);}const auto error=GetLastError();if(error!=ERROR_FILE_NOT_FOUND)return 4;Sleep(20);}
++    return 5;
++}catch(const std::exception &e){std::fprintf(stderr,"LocalService probe: %s (%lu)\n",e.what(),GetLastError());return 1;}
