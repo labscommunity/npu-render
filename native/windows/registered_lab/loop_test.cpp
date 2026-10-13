@@ -107,6 +107,11 @@ void raster(const std::string &backend,const std::string &packet_path){
  std::printf("{\"captured_loop_raster_pixels\":1024,\"covered_samples\":572,\"requested_batch\":1024,\"bounded_batch\":256,\"execution_device\":\"%s\",\"desktop_offload_tested\":false}\n",backend.c_str());std::fflush(stdout);
 }
 }
-int main(int argc,char **argv)try{TEST(argc<=3 || (argc==5 && !std::strcmp(argv[3],"--emit-packet")));const std::string backend=argc>=2?argv[1]:"CPU";const std::string section=argc>=3?argv[2]:"all";
+int main(int argc,char **argv)try{
+ if(!(argc<=3 || (argc==5 && !std::strcmp(argv[3],"--emit-packet"))))throw std::invalid_argument("invalid loop test arguments");
+ const std::string backend=argc>=2?argv[1]:"CPU";const std::string section=argc>=3?argv[2]:"all";
+ if(backend!="CPU" && backend!="GPU" && backend!="NPU")throw std::invalid_argument("invalid loop test backend");
+ if(section!="all" && section!="loops" && section!="arithmetic" && section!="captured" && section!="raster")throw std::invalid_argument("invalid loop test section");
+ if(argc==5 && ((section!="all" && section!="raster") || !argv[4][0]))throw std::invalid_argument("invalid loop test packet output");
  if(section=="all" || section=="loops")loops(backend);if(section=="all" || section=="arithmetic")arithmetic(backend);if(section=="all" || section=="captured")captured(backend);if(section=="all" || section=="raster")raster(backend,argc==5?argv[4]:"");return 0;
 }catch(const std::exception&e){std::fprintf(stderr,"loop test: %s\n",e.what());return 1;}

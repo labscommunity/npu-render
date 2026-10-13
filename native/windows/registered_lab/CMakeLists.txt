@@ -189,6 +189,10 @@ target_compile_options(nr_registered_loop_test PRIVATE /W4 /WX)
 set_property(TARGET nr_registered_loop_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 add_test(NAME registered_loop_contract COMMAND nr_registered_loop_test)
 set_tests_properties(registered_loop_contract PROPERTIES TIMEOUT 600)
+add_test(NAME registered_loop_cli_contract COMMAND "${CMAKE_COMMAND}"
+  "-DPROGRAM=$<TARGET_FILE:nr_registered_loop_test>"
+  -P "${CMAKE_CURRENT_SOURCE_DIR}/loop_cli_test.cmake")
+set_tests_properties(registered_loop_cli_contract PROPERTIES TIMEOUT 60)
 
 add_executable(nr_registered_mask_test mask_test.cpp)
 target_link_libraries(nr_registered_mask_test PRIVATE d3dcompiler nr_registered_vertex)
