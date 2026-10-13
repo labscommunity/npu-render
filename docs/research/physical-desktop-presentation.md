@@ -62,6 +62,15 @@ the compositor, and bounded revocation/recovery. At the snapshot time there was
 no signed-in user in either a console or remote desktop session. Secure sign-in
 must not be substituted for an interactive user desktop test.
 
+The [session admission experiments](../validation/2026-10-13/native-session-progress-v1/)
+now qualify the global per-consumer record in an owned process, including ten
+NPU drawing operations. They also expose a concrete access gap: read-only checks
+using the actual DWM and Local Service driver-host tokens deny both the current
+worker pipe and an owned probe process's query/synchronization permissions.
+Explicit identity entries pass the DACL calculations. Live cross-account calls,
+actual cross-session execution and native indirect-display bootstrap remain
+unqualified; preparing an ACL is not compositor execution.
+
 The hybrid-GPU model does not solve DWM migration by itself. Microsoft's documented
 redirected and direct-flip paths use the integrated GPU for DWM composition, even
 when another adapter renders applications.

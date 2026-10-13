@@ -1,0 +1,52 @@
+from pathlib import Path
+import shutil,json,hashlib,tarfile
+r=Path('results/render-driver');d=r/'native-dwm-worker-v1';shutil.copytree(r/'native-render-profile-v2',d);lab=d/'native/windows/registered_lab'
+(lab/'native_compositor_peer.hpp').write_text(r'''#pragma once
+#include "indexed_pipe.hpp"
+#include <sddl.h>
+#include <cwchar>
+#include <cerrno>
+namespace nr::registered_lab {
+class NativeCompositorPeer {
+    indexed_stream::Handle process;
+    DWORD process_id=0,session=0;
+    uint64_t created=0;
+    std::wstring identity;
+    static uint64_t creation(HANDLE h){FILETIME c{},e{},k{},u{};indexed_exchange::require(GetProcessTimes(h,&c,&e,&k,&u)!=FALSE);return (uint64_t(c.dwHighDateTime)<<32)|c.dwLowDateTime;}
+public:
+    static uint64_t number(const wchar_t *text,uint64_t maximum){indexed_exchange::require(text && *text>=L'0' && *text<=L'9');wchar_t *end=nullptr;errno=0;const auto n=std::wcstoull(text,&end,10);indexed_exchange::require(!errno && end!=text && !*end && n && n<=maximum);return n;}
+    static std::wstring user(HANDLE h){HANDLE raw=nullptr;indexed_exchange::require(OpenProcessToken(h,TOKEN_QUERY,&raw)!=FALSE);indexed_stream::Handle token(raw);DWORD size=0;GetTokenInformation(token.value,TokenUser,nullptr,0,&size);indexed_exchange::require(GetLastError()==ERROR_INSUFFICIENT_BUFFER && size && size<=65536);std::vector<uint8_t> bytes(size);indexed_exchange::require(GetTokenInformation(token.value,TokenUser,bytes.data(),size,&size)!=FALSE);LPWSTR s=nullptr;indexed_exchange::require(ConvertSidToStringSidW(reinterpret_cast<TOKEN_USER*>(bytes.data())->User.Sid,&s)!=FALSE);try{std::wstring result(s);LocalFree(s);return result;}catch(...){LocalFree(s);throw;}}
+    NativeCompositorPeer(DWORD pid,uint64_t timestamp):process(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION|SYNCHRONIZE,FALSE,pid)),process_id(pid),created(timestamp){
+        indexed_exchange::require(pid && timestamp && ProcessIdToSessionId(pid,&session) && session);
+        wchar_t path[32768]{},system[MAX_PATH]{};DWORD length=32768;indexed_exchange::require(QueryFullProcessImageNameW(process.value,0,path,&length)!=FALSE && GetSystemDirectoryW(system,MAX_PATH)!=0);
+        indexed_exchange::require(!_wcsicmp(path,(std::wstring(system)+L"\\dwm.exe").c_str()));
+        identity=user(process.value);indexed_exchange::require(identity==L"S-1-5-90-0-"+std::to_wstring(session));verify();
+    }
+    void verify()const{DWORD current=0;indexed_exchange::require(WaitForSingleObject(process.value,0)==WAIT_TIMEOUT && GetProcessId(process.value)==process_id && creation(process.value)==created && ProcessIdToSessionId(process_id,&current) && current==session && user(process.value)==identity);}
+    const std::wstring &sid()const{return identity;}
+    DWORD pid()const{return process_id;}
+    DWORD session_id()const{return session;}
+    uint64_t creation_time()const{return created;}
+    void authorize(DWORD actual_client,const std::wstring &worker_user)const{
+        if(actual_client==process_id){verify();return;}
+        indexed_stream::Handle client(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION|SYNCHRONIZE,FALSE,actual_client));
+        const auto actor=user(client.value);indexed_exchange::require(actor==worker_user || actor==L"S-1-5-18");
+        indexed_exchange::require(WaitForSingleObject(client.value,0)==WAIT_TIMEOUT);
+    }
+};
+}
+''')
+p=lab/'local_indexed_worker.cpp';s=p.read_text().replace('#include "fifo_dispatch.hpp"','#include "fifo_dispatch.hpp"\n#include "native_compositor_peer.hpp"')
+s=s.replace('if(argc!=4)throw std::invalid_argument("expected <private pipe name> <maximum requests> <seconds 60..1800>");','if(argc!=4 && argc!=6)throw std::invalid_argument("expected <private pipe> <requests> <seconds> [compositor-pid creation-filetime]");')
+s=s.replace('    ex::Pipeline pipeline;', '''    std::unique_ptr<nr::registered_lab::NativeCompositorPeer> compositor;
+    if(argc==6)compositor=std::make_unique<nr::registered_lab::NativeCompositorPeer>(DWORD(nr::registered_lab::NativeCompositorPeer::number(argv[4],UINT32_MAX)),nr::registered_lab::NativeCompositorPeer::number(argv[5],UINT64_MAX));
+    ex::Pipeline pipeline;''')
+s=s.replace('    const auto acl=L"D:P(A;;GA;;;SY)(A;;GA;;;"+current_user_sid()+L")";', '''    const auto worker_user=current_user_sid();
+    const auto acl=L"D:P(A;;GA;;;SY)(A;;GA;;;"+worker_user+L")"+(compositor?L"(A;;GA;;;"+compositor->sid()+L")":L"");''')
+needle='ULONG actual_client=0;ex::require(GetNamedPipeClientProcessId(pipe,&actual_client)!=0 && actual_client==h.client_pid);';assert s.count(needle)==1;s=s.replace(needle,needle+'\n                    if(compositor)compositor->authorize(actual_client,worker_user);')
+needle='    std::vector<std::thread> threads;';assert s.count(needle)==1;s=s.replace(needle,'''    if(compositor){std::printf("{\\"compositor_peer_prepared\\":true,\\"pid\\":%lu,\\"session\\":%lu,\\"creation_filetime\\":%llu,\\"request_identity_pinned\\":true,\\"desktop_admission_performed\\":false}\\n",compositor->pid(),compositor->session_id(),static_cast<unsigned long long>(compositor->creation_time()));std::fflush(stdout);}
+'''+needle);p.write_text(s)
+m={p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()};(r/'native-dwm-worker-v1-source.json').write_text(json.dumps(m,indent=2)+'\n')
+with tarfile.open(r/'native-dwm-worker-v1.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-native-probe-driver-v1.ps1').read_text();s=s[:s.index('$env:PATH=')]+'''[ordered]@{clean_build=$true;source_sha256=$expected;binary_sha256=@{'nr_registered_local_indexed_worker.exe'=(Get-FileHash "$b\\Release\\nr_registered_local_indexed_worker.exe").Hash};desktop_admission_performed=$false}|ConvertTo-Json -Depth 5|Set-Content "$b\\registered-build-report.json"
+''';s=s.replace('native-probe-driver-v1','native-dwm-worker-v1').replace('--target nr_native_probe_umd nr_native_probe_ddi_test','--target nr_registered_local_indexed_worker');(r/'build-native-dwm-worker-v1.ps1').write_text(s)

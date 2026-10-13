@@ -1,0 +1,44 @@
+from pathlib import Path
+import json,hashlib,tarfile
+r=Path('results/render-driver');d=r/'native-peer-access-v1';d.mkdir(exist_ok=False)
+base=(r/'native-dwm-access-v1/probe.cpp').read_text()
+base=base[:base.index('int wmain')].replace('#include <sddl.h>','#include <sddl.h>\n#include <aclapi.h>')
+base=base.replace('const std::wstring &sddl){','PSECURITY_DESCRIPTOR sd,DWORD desired){').replace('PSECURITY_DESCRIPTOR sd=nullptr;AUTHZ_RESOURCE_MANAGER_HANDLE','AUTHZ_RESOURCE_MANAGER_HANDLE').replace('check(ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl.c_str(),SDDL_REVISION_1,&sd,nullptr)!=FALSE);','').replace('request.DesiredAccess=FILE_GENERIC_READ|FILE_GENERIC_WRITE;','request.DesiredAccess=desired;').replace('LocalFree(sd);return result;','return result;').replace('if(sd)LocalFree(sd);throw;','throw;')
+base+=r'''
+Access text_access(HANDLE token,const std::wstring &sddl,DWORD desired){PSECURITY_DESCRIPTOR sd=nullptr;check(ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl.c_str(),1,&sd,nullptr)!=FALSE);try{const auto result=evaluate(token,sd,desired);LocalFree(sd);return result;}catch(...){LocalFree(sd);throw;}}
+DWORD restricted_count(HANDLE token){DWORD bytes=0;GetTokenInformation(token,TokenRestrictedSids,nullptr,0,&bytes);check(bytes && bytes<65536);std::vector<unsigned char> data(bytes);check(GetTokenInformation(token,TokenRestrictedSids,data.data(),bytes,&bytes)!=FALSE);return reinterpret_cast<TOKEN_GROUPS*>(data.data())->GroupCount;}
+void peer(DWORD pid,bool compositor,HANDLE own_token,PSECURITY_DESCRIPTOR process_sd){
+    Handle process(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION|SYNCHRONIZE,FALSE,pid));check(process.value!=nullptr);
+    WCHAR path[32768]{},system[MAX_PATH]{};DWORD length=32768;check(QueryFullProcessImageNameW(process.value,0,path,&length)!=FALSE && GetSystemDirectoryW(system,MAX_PATH));
+    check(!_wcsicmp(path,(std::wstring(system)+(compositor?L"\dwm.exe":L"\WUDFHost.exe")).c_str()));DWORD session=0;check(ProcessIdToSessionId(pid,&session));
+    HANDLE raw=nullptr;check(OpenProcessToken(process.value,TOKEN_QUERY,&raw));Handle token(raw);const auto sid=user_sid(token.value);check(sid==(compositor?L"S-1-5-90-0-"+std::to_wstring(session):L"S-1-5-19"));
+    const auto caller=user_sid(own_token);const auto base=L"O:SYG:SYD:P(A;;0x001f01ff;;;SY)(A;;0x001f01ff;;;"+caller+L")";
+    const auto pipe=text_access(token.value,base,FILE_GENERIC_READ|FILE_GENERIC_WRITE);
+    const auto pipe_added=text_access(token.value,base+L"(A;;0x0012019f;;;"+sid+L")",FILE_GENERIC_READ|FILE_GENERIC_WRITE);
+    const auto mapping=text_access(token.value,L"O:BAG:BAD:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;0x00020004;;;AU)",FILE_MAP_READ|READ_CONTROL);
+    const auto mapping_added=text_access(token.value,L"O:BAG:BAD:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;0x00020004;;;"+sid+L")",FILE_MAP_READ|READ_CONTROL);
+    constexpr DWORD process_rights=PROCESS_QUERY_LIMITED_INFORMATION|SYNCHRONIZE;
+    const auto current=evaluate(token.value,process_sd,process_rights);
+    BOOL present=FALSE,defaulted=FALSE;PACL acl=nullptr;PSID owner=nullptr;check(GetSecurityDescriptorDacl(process_sd,&present,&acl,&defaulted) && present && acl);check(GetSecurityDescriptorOwner(process_sd,&owner,&defaulted));
+    EXPLICIT_ACCESSW grant{};grant.grfAccessPermissions=process_rights;grant.grfAccessMode=GRANT_ACCESS;grant.grfInheritance=NO_INHERITANCE;grant.Trustee.TrusteeForm=TRUSTEE_IS_SID;grant.Trustee.TrusteeType=TRUSTEE_IS_USER;
+    PSID parsed=nullptr;check(ConvertStringSidToSidW(sid.c_str(),&parsed));grant.Trustee.ptstrName=reinterpret_cast<LPWSTR>(parsed);PACL candidate=nullptr;const auto status=SetEntriesInAclW(1,&grant,acl,&candidate);LocalFree(parsed);check(status==ERROR_SUCCESS);
+    SECURITY_DESCRIPTOR proposed{};check(InitializeSecurityDescriptor(&proposed,SECURITY_DESCRIPTOR_REVISION) && SetSecurityDescriptorOwner(&proposed,owner,FALSE) && SetSecurityDescriptorDacl(&proposed,TRUE,candidate,FALSE));const auto added=evaluate(token.value,&proposed,process_rights);LocalFree(candidate);
+    check(WaitForSingleObject(process.value,0)==WAIT_TIMEOUT);
+    std::printf("{\"peer\":\"%s\",\"pid\":%lu,\"session\":%lu,\"restricted_sid_count\":%lu,\"pipe_current_allowed\":%s,\"pipe_scoped_sid_allowed\":%s,\"mapping_authenticated_users_allowed\":%s,\"mapping_scoped_sid_allowed\":%s,\"owned_probe_process_current_allowed\":%s,\"owned_probe_process_scoped_sid_allowed\":%s,\"process_requested_mask\":%lu,\"process_error\":%lu,\"process_candidate_error\":%lu,\"actual_peer_execution\":false,\"mandatory_integrity_tested\":false,\"security_changes\":false}\n",compositor?"dwm":"umdf",pid,session,restricted_count(token.value),pipe.allowed?"true":"false",pipe_added.allowed?"true":"false",mapping.allowed?"true":"false",mapping_added.allowed?"true":"false",current.allowed?"true":"false",added.allowed?"true":"false",process_rights,current.error,added.error);
+}
+int wmain(int argc,wchar_t **argv)try{
+    check(argc==3);HANDLE raw=nullptr;check(OpenProcessToken(GetCurrentProcess(),TOKEN_QUERY,&raw));Handle token(raw);
+    PSECURITY_DESCRIPTOR sd=nullptr;check(GetSecurityInfo(GetCurrentProcess(),SE_KERNEL_OBJECT,OWNER_SECURITY_INFORMATION|DACL_SECURITY_INFORMATION,nullptr,nullptr,nullptr,nullptr,&sd)==ERROR_SUCCESS);
+    try{for(int i=1;i<argc;++i){wchar_t *end=nullptr;const auto pid=std::wcstoul(argv[i],&end,10);check(pid && end!=argv[i] && !*end);peer(pid,i==1,token.value,sd);}LocalFree(sd);}catch(...){LocalFree(sd);throw;}
+    std::printf("{\"inspection_completed\":true,\"peer_count\":2,\"changes_performed\":false}\n");return 0;
+}catch(const std::exception &e){std::fprintf(stderr,"%s: %lu\n",e.what(),GetLastError());return 1;}
+'''
+(d/'probe.cpp').write_text(base)
+(d/'CMakeLists.txt').write_text((r/'native-dwm-access-v1/CMakeLists.txt').read_text().replace('dwm_access','peer_access'))
+(r/'native-peer-access-v1-source.json').write_text(json.dumps({p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir()},indent=2)+'\n')
+with tarfile.open(r/'native-peer-access-v1.tar.gz','w:gz') as f:f.add(d,arcname=d.name)
+s=(r/'build-native-dwm-access-v1.ps1').read_text().replace('native-dwm-access-v1','native-peer-access-v1').replace('nr_native_dwm_access','nr_native_peer_access')
+s=s.replace("$ErrorActionPreference='Continue';&", "$hostProcess=@(Get-Process WUDFHost|Sort-Object Id)[0];if(!$hostProcess){throw 'No UMDF host for read-only inspection'}\n$ErrorActionPreference='Continue';&")
+s=s.replace('$dwm[0].Id 1>', '$dwm[0].Id $hostProcess.Id 1>')
+(r/'build-native-peer-access-v1.ps1').write_text(s)
+print('Prepared read-only peer access inspection')

@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.25)
+project(nr_native_peer_access LANGUAGES CXX)
+add_executable(nr_native_peer_access probe.cpp)
+target_compile_features(nr_native_peer_access PRIVATE cxx_std_17)
+target_compile_options(nr_native_peer_access PRIVATE /W4 /WX)
+target_link_libraries(nr_native_peer_access PRIVATE advapi32 authz)
+set_property(TARGET nr_native_peer_access PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")

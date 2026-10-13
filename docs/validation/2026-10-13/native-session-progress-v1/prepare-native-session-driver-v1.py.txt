@@ -1,0 +1,32 @@
+from pathlib import Path
+import shutil,json,hashlib,tarfile
+r=Path('results/render-driver');d=r/'native-session-driver-v1';shutil.copytree(r/'native-adapter-promoted-v1',d);lab=d/'native/windows/registered_lab'
+shutil.copyfile(r/'native-session-admission-v2/lease.hpp',lab/'native_probe_lease.hpp')
+(lab/'native_probe_lease_test.cpp').write_text((r/'native-session-admission-v2/test.cpp').read_text().replace('#include "lease.hpp"','#include "native_probe_lease.hpp"'))
+p=lab/'CMakeLists.txt';s=p.read_text().replace('PRIVATE nr_registered_blend nr_registered_vertex d3dcompiler advapi32)', 'PRIVATE nr_registered_blend nr_registered_vertex d3dcompiler advapi32 user32 wtsapi32)').replace('nr_native_probe_lease_test PRIVATE advapi32)', 'nr_native_probe_lease_test PRIVATE advapi32 user32 wtsapi32)');p.write_text(s)
+m={p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()};(r/'native-session-driver-v1-source.json').write_text(json.dumps(m,indent=2)+'\n')
+with tarfile.open(r/'native-session-driver-v1.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-native-adapter-promoted-v1.ps1').read_text().replace('native-adapter-promoted-v1','native-session-driver-v1');s=s.replace('Get-Content $log -Tail 5;', 'Get-Content $log -Tail 10|Where-Object {$_ -notmatch \'^\\{\'};');(r/'build-native-session-driver-v1.ps1').write_text(s)
+s=(r/'qualify-native-probe-driver-v1.py').read_text()
+s=s.replace("('reserved',C.c_uint32),('created'", "('session',C.c_uint32),('created'")
+s=s.replace("('session',C.c_uint32),('flags',C.c_uint32)", "('scope',C.c_uint32),('sid_bytes',C.c_uint32)").replace("('reserved',C.c_uint32*4)", "('consumer_sid',C.c_uint8*68),('reserved',C.c_uint32*5)").replace('C.sizeof(Lease)==152','C.sizeof(Lease)==224')
+needle="adv.ConvertStringSecurityDescriptorToSecurityDescriptorW.argtypes=";a=s.index(needle);s=s[:a]+'''adv.OpenProcessToken.argtypes=[W.HANDLE,W.DWORD,C.POINTER(W.HANDLE)];adv.OpenProcessToken.restype=W.BOOL
+adv.GetTokenInformation.argtypes=[W.HANDLE,C.c_int,W.LPVOID,W.DWORD,C.POINTER(W.DWORD)];adv.GetTokenInformation.restype=W.BOOL
+adv.GetLengthSid.argtypes=[W.LPVOID];adv.GetLengthSid.restype=W.DWORD
+'''+s[a:]
+s=s.replace('report=dict(started=', 'report=dict(admission_protocol=2,cross_session_execution_tested=False,started=')
+s=s.replace('  record=Lease();record.magic=0x31564250524e3854;record.version=1;', '  session=W.DWORD();require(k.ProcessIdToSessionId(os.getpid(),C.byref(session)))\n  record=Lease();record.magic=0x32564250524e3854;record.version=2;')
+s=s.replace(',0,created(', ',session.value,created(')
+needle='  session=W.DWORD();require(k.ProcessIdToSessionId(os.getpid(),C.byref(session)));record.session=session.value;record.nonce[0]'
+assert s.count(needle)==1;s=s.replace(needle,'''  record.scope=0
+  token=W.HANDLE();require(adv.OpenProcessToken(hp,8,C.byref(token)))
+  try:
+   size=W.DWORD();adv.GetTokenInformation(token,1,None,0,C.byref(size));assert 0<size.value<=65536
+   buffer=C.create_string_buffer(size.value);require(adv.GetTokenInformation(token,1,buffer,size,C.byref(size)))
+   sid=C.cast(buffer,C.POINTER(W.LPVOID)).contents.value;count=adv.GetLengthSid(sid);assert 8<=count<=68
+   record.sid_bytes=count;C.memmove(C.addressof(record)+Lease.consumer_sid.offset,sid,count)
+  finally:k.CloseHandle(token)
+  record.nonce[0]''')
+s=s.replace("r'Local\\T8.NpuRender.NativeProbe.v1'", "rf'Global\\T8.NpuRender.NativeSession.v1.{pid}'").replace('one-owned-consumer-same-session-120-seconds','global-mapping-owned-same-session-120-seconds')
+(r/'qualify-native-session-driver-v1.py').write_text(s)
+s=(r/'qualify-native-probe-driver-v2.ps1').read_text().replace('qualify-native-probe-driver-v1.py','qualify-native-session-driver-v1.py').replace('native-probe-driver-v2\\Release','native-session-driver-v1\\Release').replace('native-probe-driver-v2-qualification','native-session-driver-v1-qualification');(r/'qualify-native-session-driver-v1.ps1').write_text(s)
