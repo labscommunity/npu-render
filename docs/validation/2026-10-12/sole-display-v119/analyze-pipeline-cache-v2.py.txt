@@ -1,0 +1,82 @@
+"""Read an immutable ordered trace and simulate renderer cache replacement only."""
+import argparse,collections,hashlib,json,struct
+from pathlib import Path
+p=argparse.ArgumentParser();p.add_argument('trace',type=Path);p.add_argument('manifest',type=Path);p.add_argument('output',type=Path);a=p.parse_args()
+def read(p):
+ b=p.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+def sha(b):return hashlib.sha256(b).hexdigest()
+manifest=read(a.manifest);assert [x['ordinal'] for x in manifest]==list(range(1,len(manifest)+1))
+rows=[json.loads(x) for x in (a.trace/'worker.stdout.jsonl').read_text(encoding='utf-8-sig').splitlines() if x.startswith('{')]
+success={};compiled={};current=None
+for row in rows:
+ if row.get('passed'):
+  current=row['ordinal'];success[current]=row;compiled[current]=0
+ elif row.get('kind')=='model_compile_cache':
+  assert current and row['client_pid']==success[current]['client_pid'] and row['sequence']==success[current]['sequence'];compiled[current]+=row['compile_calls']
+assert len(success)==len(manifest)
+def program(b):
+ w=struct.unpack('<'+'I'*(len(b)//4),b);assert w[1]==len(w);at=2;constants=0
+ while at<len(w):
+  token=w[at];length=(token>>24)&127;opcode=token&2047;assert not token>>31 and length and at+length<=len(w)
+  if opcode==89:
+   assert length==4 and w[at+2]<14 and 0<w[at+3]<=4096
+   constants+=w[at+3]
+  at+=length
+ assert at==len(w);return constants
+items=[]
+for m in manifest:
+ data=(a.trace/m['name']).read_bytes();assert len(data)==m['bytes'] and sha(data)==m['sha256'].lower()
+ h=struct.unpack_from('<3Q14I',data);sig,nonce1,nonce2,abi,width,height,vertices,fmt,flags,vsn,psn,seq,body,pid,kind,device,reserved=h
+ assert sig==0x4e525f4452415731 and len(data)==80+body and (kind,device,reserved)==(1,0,0)
+ s=success[m['ordinal']];assert (seq,pid)==(s['sequence'],s['client_pid'])
+ if abi==13:
+  assert flags==0x200000 and len(data)==96;bucket='clear';key=(width,height,fmt)
+ else:
+  off=104
+  if flags&4:off+=16
+  vs=data[off:off+4*vsn];off+=4*vsn;ps=data[off:off+4*psn];off+=4*psn
+  off+=vertices*256+(program(vs)+program(ps))*16+width*height*4
+  layout=[(0,0,0)]*16;samplers=[(0,0,0,0.,0.,0.,0.)]*16
+  def texture():
+   global off
+   tw,th,tf,tr=struct.unpack_from('<4I',data,off);assert tr==0;off+=16+tw*th*4;assert off<=len(data);return tw,th,tf
+  if flags&0x2000:
+   layout=[texture() for _ in range(16)]
+   for i in range(16):
+    encoded,=struct.unpack_from('<I',data,off);off+=4
+    if abi==14:
+     border=struct.unpack_from('<4f',data,off);off+=16;u=(encoded>>1)&3;v=(encoded>>3)&3
+    else:border=(0.,)*4;u=(encoded>>1)&1;v=(encoded>>2)&1
+    samplers[i]=(encoded&1,u,v,*border)
+  elif flags&2:
+   layout[0]=texture()
+   if flags&0x3000:samplers[0]=(0 if flags&16 else 1,0,0,0.,0.,0.,0.)
+  assert off==len(data),(m['ordinal'],off,len(data))
+  codes=(sha(vs),sha(ps))
+  if flags&0x3000:
+   capacity=3
+   while capacity<vertices:capacity=min(4095,capacity*2)
+   bucket='triangle';key=(s['triangle_batch'],capacity,fmt,flags&~4,tuple(layout),tuple(samplers),*codes)
+  elif flags&24:bucket='linear';key=(width,height,fmt,flags&~4,layout[0],*codes)
+  elif flags&2:bucket='texture';key=(width,height,fmt,layout[0],*codes)
+  else:bucket='uniform';key=(width,height,vertices,fmt,flags&~4,*codes)
+ items.append({'ordinal':m['ordinal'],'bucket':bucket,'key':key,'observed_compile_calls':compiled[m['ordinal']],'draw_ms':s['draw_ms'],'compile_and_draw_ms':s['compile_and_draw_ms']})
+caps={'clear':4,'uniform':8,'triangle':24,'linear':1,'texture':1}
+def simulate(policy,caps):
+ caches={k:[] for k in caps};counts=collections.Counter();mismatches=[];miss_ordinals=[]
+ for i in items:
+  bucket=i['bucket'];cache=caches[bucket];key=i['key'];hit=key in cache
+  if hit:
+   counts[bucket+'_hits']+=1
+   if policy=='lru':cache.remove(key);cache.append(key)
+  else:
+   counts[bucket+'_misses']+=1;miss_ordinals.append(i['ordinal'])
+   if len(cache)==caps[bucket]:cache.pop(0)
+   cache.append(key)
+  if not hit and not i['observed_compile_calls']:mismatches.append(i['ordinal'])
+  if hit and i['observed_compile_calls'] and i['bucket']!='texture':mismatches.append(i['ordinal'])
+ return {'policy':policy,'capacities':caps,'counts':dict(counts),'total_misses':len(miss_ordinals),'observed_compile_presence_mismatches':mismatches,'miss_ordinals':miss_ordinals}
+base=simulate('fifo',caps)
+report={'trace':a.trace.name,'requests':len(items),'trace_manifest_sha256':sha(a.manifest.read_bytes()),'simulation_only':True,'npu_execution_tested':False,'timing_savings_measured':False,'unique_pipeline_keys':{k:len({i['key'] for i in items if i['bucket']==k}) for k in caps},'observed_compile_calls':sum(compiled.values()),'point_texture_lazy_compilation_is_not_a_pipeline_miss':True,'limitation':'Models lazy-created inside an existing point-texture pipeline are not counted as pipeline misses. Replacement predictions do not establish NPU queue safety, exact outputs, or timing savings.','baseline':base,'alternatives':[simulate('lru',caps),simulate('fifo',{**caps,'triangle':48,'uniform':16}),simulate('lru',{**caps,'triangle':48,'uniform':16})]}
+a.output.open('x').write(json.dumps(report,indent=2)+'\n');print(json.dumps({k:report[k] for k in ('requests','unique_pipeline_keys','observed_compile_calls')}));print(json.dumps({'baseline_misses':base['total_misses'],'baseline_mismatches':base['observed_compile_presence_mismatches'],'alternatives':[(x['policy'],x['capacities'],x['total_misses']) for x in report['alternatives']]}))
+if base['observed_compile_presence_mismatches']:raise SystemExit('Cache model does not match observed compile events')

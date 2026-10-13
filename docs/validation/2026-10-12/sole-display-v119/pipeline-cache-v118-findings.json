@@ -1,0 +1,20 @@
+{
+  "trace": "v118",
+  "requests": 971,
+  "observed_model_setup_calls": 2409,
+  "pipeline_misses_fifo_current": 460,
+  "pipeline_misses_lru_current_simulated": 438,
+  "pipeline_misses_fifo_48_triangles_16_uniform_simulated": 277,
+  "pipeline_misses_lru_48_triangles_16_uniform_simulated": 260,
+  "first_analysis_mismatch": {
+    "ordinal": 22,
+    "cause": "A retained point-texture pipeline lazily compiles a new crop-origin model; this is not a complete pipeline miss. TextureCropExecutor::execute retains up to eight crop models.",
+    "first_report_preserved": "pipeline-cache-v118-simulation-v1.json"
+  },
+  "simulation_qualification": "All complete-pipeline misses have observed model setup. One setup on a point-texture pipeline hit is explained by lazy crop compilation. Other hits have no setup.",
+  "predicted_larger_cache_miss_reduction_fraction": 0.3978260869565217,
+  "hardware_savings_measured": false,
+  "driver_queue_capacity_measured": false,
+  "next_experiment": "Keep shader math fixed; compare default queues/cache, shared queue/default cache, shared queue/expanded cache on the same ordered saved workload. Verify exact output and stop at first failed request.",
+  "desktop_trial_not_modified": true
+}

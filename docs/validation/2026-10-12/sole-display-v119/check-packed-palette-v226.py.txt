@@ -1,0 +1,44 @@
+"""Make every ten-bit palette index observable, using a captured shader packet."""
+import hashlib,json,os,struct,sys
+from pathlib import Path
+r=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm';o=r/'packed-palette-v226';action=sys.argv[1]
+def sha(b):return hashlib.sha256(b).hexdigest()
+def constants(b):
+ w=struct.unpack('<'+'I'*(len(b)//4),b);assert w[1]==len(w);at=2;n=0
+ while at<len(w):
+  length=(w[at]>>24)&127;assert length and at+length<=len(w)
+  if w[at]&2047==89:assert length==4;n+=w[at+3]
+  at+=length
+ return n
+if action=='prepare':
+ o.mkdir(exist_ok=False);original=(r/'packed-lookup-v225/modern-CPU.packet').read_bytes();data=bytearray(original);h=list(struct.unpack_from('<3Q14I',data));assert h[4:6]==[64,64] and h[8]&0x2004==0x2004
+ assert h[10]==146
+ off=104;clip=struct.unpack_from('<4i',data,off);assert clip==(3,5,61,59);off+=16
+ vs=data[off:off+h[9]*4];off+=h[9]*4;ps=data[off:off+h[10]*4];off+=h[10]*4
+ assert sha(ps)=='2d9638588a4c1aca08354bf6e5f2f8e5c7df0339b4a2889e6b0d7523cc6a6dd3'
+ off+=h[6]*256+(constants(vs)+constants(ps))*16
+ background=data[off:off+16384];assert background==bytes([7,11,13,17])*4096;off+=16384
+ assert struct.unpack_from('<4I',data,off)==(512,1,42,0);off+=16
+ packed=struct.unpack_from('<512I',data,off);off+=512*4;assert packed==tuple((n*37)%256 for n in range(512))
+ assert struct.unpack_from('<4I',data,off)==(1024,1,87,0);off+=16
+ palette=bytes(c for n in range(1024) for c in (n&255,n>>8,(n*17)&255,255));assert len({palette[n*4:n*4+4] for n in range(1024)})==1024
+ data[off:off+4096]=palette
+ expected=bytearray(background);indices=set()
+ for y in range(5,59):
+  for x in range(3,61):
+   address=y*8+x//8;lo=packed[address];hi=packed[address+1];index=((lo>>(x&7))|(hi<<(8-(x&7))))&1023;indices.add(index)
+   expected[(y*64+x)*4:(y*64+x+1)*4]=palette[index*4:index*4+4]
+ assert {i>>8 for i in indices}=={0,1,2,3}
+ h[1]=0x70616c6574746532;h[2]=1;h[11]=1;h[13]=42;data[:80]=struct.pack('<3Q14I',*h)
+ name=f'request-42-{h[1]:016x}{h[2]:016x}-1.bin';(o/name).write_bytes(data);(o/'expected.pixels').write_bytes(expected)
+ report={'packet':name,'source_packet_sha256':sha(original),'request_sha256':sha(data),'expected_sha256':sha(expected),'distinct_palette_entries':1024,'sampled_indices':len(indices),'sampled_upper_index_bits':[0,1,2,3],'covered_samples':3132,'pixels':4096,'independent_oracle':'Scalar unsigned shifts, bitwise OR and palette lookup from known inputs','npu_execution_tested':False}
+ (o/'prepared.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report))
+elif action=='compare':
+ report=json.loads((o/'prepared.json').read_text());data=(o/report['packet']).read_bytes();assert sha(data)==report['request_sha256'];h=struct.unpack_from('<3Q14I',data)
+ response=(o/report['packet'].replace('request-','reply-',1)).read_bytes();rh=struct.unpack_from('<3Q14I',response)
+ assert all(rh[i]==h[i] for i in range(17) if i not in (12,14,15)) and rh[14:16]==(2,3) and len(response)==128+16384
+ receipt=struct.unpack_from('<5Q2I',response,80);assert receipt[3]==3132 and receipt[6]==0
+ expected=(o/'expected.pixels').read_bytes();assert sha(expected)==report['expected_sha256'] and response[128:]==expected
+ report.update(npu_execution_tested=True,all_pixels_exact=True,execution_device='NPU',desktop_offload_tested=False)
+ (o/'report.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report))
+else:raise ValueError(action)

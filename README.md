@@ -195,6 +195,16 @@ Both clean builds pass their 28 CPU suites. The installed desktop test is still
 required. v118 restores the original topology and removes both guest devices
 successfully; Run takes 118 seconds and the complete Notepad UI 193 seconds.
 
+The [v119 installed trial](docs/validation/2026-10-12/sole-display-v119/report.json)
+accepts that shader but exposes a second rejection: Notepad blends its glyph
+mask with a constant text color using independent color-channel coverage.
+The complete rejected draw is preserved and the unchanged CPU replay rejects
+its blend state too. The trial returns 906 acknowledged NPU results and twenty
+sole-display frames, then restores the ordinary display and removes both guest
+devices. Editor text, maximize and close remain unverified on the NPU path.
+A subsequent lookup test with 1,024 distinct palette colors passes every pixel
+on the NPU; it does not resolve this separate blend rejection.
+
 The v116 live draws expand into 26,995 provider calls. Their reported execution
 intervals total 138 seconds, versus 329 seconds including pipeline setup and
 other wrapper work. Of 1,921 model setup calls, 1,915 are disk-cache hits.
