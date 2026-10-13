@@ -1,0 +1,94 @@
+"""Independent ABI-15 glyph-mask oracle; no CPU renderer fallback."""
+import hashlib
+import json
+import os
+from pathlib import Path
+import struct
+import sys
+
+root = Path(os.environ['LOCALAPPDATA']) / 'npu-render/vm'
+out = root / 'component-coverage-v229/packets'
+action = sys.argv[1]
+def sha(data):
+    return hashlib.sha256(data).hexdigest()
+def constants(data):
+    words = struct.unpack('<' + 'I' * (len(data) // 4), data)
+    assert words[1] == len(words)
+    at = 2
+    count = 0
+    while at < len(words):
+        length = (words[at] >> 24) & 127
+        assert length and at + length <= len(words)
+        if words[at] & 2047 == 89:
+            assert length == 4
+            count += words[at + 3]
+        at += length
+    return count
+if action == 'prepare':
+    source = root / 'packed-palette-v226'
+    prior = json.loads((source / 'prepared.json').read_text(encoding='utf-8-sig'))
+    original = (source / prior['packet']).read_bytes()
+    assert sha(original) == prior['request_sha256']
+    mask_pixels = (source / 'expected.pixels').read_bytes()
+    assert sha(mask_pixels) == prior['expected_sha256']
+    header = list(struct.unpack_from('<3Q14I', original))
+    assert header[3] == 8 and header[4:6] == [64, 64] and header[8] & 0x2004 == 0x2004
+    offset = 120
+    vs = original[offset:offset + header[9] * 4]
+    offset += len(vs)
+    ps = original[offset:offset + header[10] * 4]
+    offset += len(ps) + header[6] * 256 + (constants(vs) + constants(ps)) * 16
+    assert original[offset:offset + 16384] == bytes([7, 11, 13, 17]) * 4096
+    filters = struct.unpack('<16I', original[-64:])
+    assert all(f <= 1 for f in filters)
+    samplers = b''.join(struct.pack('<I4f', f, 0, 0, 0, 0) for f in filters)
+    out.mkdir(exist_ok=False)
+    entries = []
+    for sequence, (constant, write_mask) in enumerate([((0, 0, 0, 1), 7), ((0, 1, 0, 1), 7), ((1, 0, 0, 1), 15)], 1):
+        data = bytearray(original)
+        background = bytes([255, 255, 255, 17]) * 4096
+        data[offset:offset + 16384] = background
+        data[-64:] = samplers
+        data[104:104] = struct.pack('<4f', *constant)
+        h = header.copy()
+        h[1:4] = [0x636f6d706f6e656e, 1, 15]
+        h[8] = (h[8] & ~0x1fcf01) | 0x10001 | (13 << 17) | (write_mask << 8)
+        h[11], h[12], h[13] = sequence, len(data) - 80, 42
+        data[:80] = struct.pack('<3Q14I', *h)
+        expected = bytearray(background)
+        for y in range(5, 59):
+            for x in range(3, 61):
+                n = (y * 64 + x) * 4
+                for channel in range(4):
+                    lane = 2 - channel if channel < 3 else channel
+                    if write_mask & (1 << lane):
+                        coverage = mask_pixels[n + channel]
+                        # Integer identity for RGB (white background); exact alpha is 255.
+                        expected[n + channel] = (coverage * constant[lane] + 255 - coverage) if channel < 3 else 255
+        name = f'request-42-{h[1]:016x}{h[2]:016x}-{sequence}.bin'
+        (out / name).write_bytes(data)
+        (out / f'{sequence}.expected').write_bytes(expected)
+        entries.append(dict(packet=name, sha256=sha(data), expected_sha256=sha(expected), constant=constant, write_mask=write_mask))
+    report = dict(abi=15, cases=entries, shader_sha256=sha(ps), source_packet_sha256=sha(original), pixels_per_case=4096, covered_samples=3132)
+    (out / 'prepared.json').write_text(json.dumps(report, indent=2) + '\n')
+    print(json.dumps(report))
+elif action == 'compare':
+    report = json.loads((out / 'prepared.json').read_text())
+    for sequence, entry in enumerate(report['cases'], 1):
+        packet = (out / entry['packet']).read_bytes()
+        assert sha(packet) == entry['sha256']
+        h = struct.unpack_from('<3Q14I', packet)
+        response = (out / entry['packet'].replace('request-', 'reply-', 1)).read_bytes()
+        rh = struct.unpack_from('<3Q14I', response)
+        assert all(rh[i] == h[i] for i in range(17) if i not in (12, 14, 15))
+        assert rh[14:16] == (2, 3) and len(response) == 128 + 16384
+        receipt = struct.unpack_from('<5Q2I', response, 80)
+        assert receipt[3] == 3132 and receipt[6] == 0
+        expected = (out / f'{sequence}.expected').read_bytes()
+        assert sha(expected) == entry['expected_sha256']
+        assert response[128:] == expected
+    report.update(all_pixels_exact=True, execution_device='NPU', desktop_offload_tested=False)
+    (out / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
+    print(json.dumps(report))
+else:
+    raise ValueError(action)

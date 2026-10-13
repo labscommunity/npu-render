@@ -30,7 +30,16 @@ inline raster::BlendMode blend_mode(const Header &h) {
     return (h.flags & 0x8000) ? raster::BlendMode::destination_out : (h.flags & 0x4000) ? raster::BlendMode::destination_in : raster::source_blend((h.flags & 1) != 0);
 }
 inline bool color_clear(const Header &h){return h.abi==13 && h.flags==0x200000;}
-inline bool shape_valid(const Header &h) {
+inline bool shape_valid(const Header &h,bool component_payload=false) {
+    // ABI 15 adds a finite RGBA blend constant after the viewport and retains
+    // ABI 14 sampler encodings when resources are present. Older packets cannot
+    // select this mode without carrying the constant.
+    if(h.abi==15){
+        if(!(h.flags&0x10000) || blend_mode(h)!=raster::BlendMode::component_coverage)return false;
+        auto legacy=h;legacy.abi=(h.flags&0x2000)?14u:11u;
+        return shape_valid(legacy,true);
+    }
+    if(blend_mode(h)==raster::BlendMode::component_coverage && !component_payload)return false;
     if(h.abi==13)return color_clear(h) && h.signature==magic && (h.nonce[0] || h.nonce[1]) && h.client_pid &&
         h.width && h.width<=8192 && h.height && h.height<=8192 && uint64_t(h.width)*h.height<=4194304 &&
         (h.format==28 || h.format==87) && !h.vertices && !h.vs_words && !h.ps_words &&
@@ -42,14 +51,14 @@ inline bool shape_valid(const Header &h) {
     if(h.abi==12 || h.abi==14){
         if(!(h.flags&0x2000))return false;
         auto legacy=h;legacy.abi=(h.flags&0x10000)?11u:(h.flags&0x8000)?10u:(h.flags&0x4000)?9u:8u;
-        return shape_valid(legacy);
+        return shape_valid(legacy,component_payload);
     }
     if(h.flags & 0x1f0000){
         if(!(h.flags&0x10000) || h.abi!=11 || !raster::extended_blend(blend_mode(h)) ||
             !(h.flags&1) || (h.flags&0xc000) || ((h.flags&2) && !(h.flags&0x3000)))return false;
         auto legacy=h;legacy.flags&=~0x1f0000u;
         legacy.abi=(legacy.flags&0x2000)?8u:(legacy.flags&0x1000)?7u:(legacy.flags&0xe0)?6u:(legacy.flags&4)?3u:1u;
-        return shape_valid(legacy);
+        return shape_valid(legacy,component_payload);
     }
     if (h.flags & 0xc000) {
         const auto mode=h.flags & 0xc000;
@@ -57,7 +66,7 @@ inline bool shape_valid(const Header &h) {
         auto legacy = h; legacy.flags &= ~0xc000u;
         legacy.abi = (legacy.flags & 0x2000) ? 8u : (legacy.flags & 0x1000) ? 7u :
             (legacy.flags & 0xe0) ? 6u : (legacy.flags & 4) ? 3u : 1u;
-        return shape_valid(legacy);
+        return shape_valid(legacy,component_payload);
     }
     const uint32_t abi=(h.flags&0x2000)?8u:(h.flags&0x1000)?7u:(h.flags&0xe0)?6u:(h.flags&16)?5u:(h.flags&8)?4u:(h.flags&4)?3u:(h.flags&2)?2u:1u;
     const bool valid = h.signature == magic && h.abi == abi && (h.nonce[0] || h.nonce[1]) && h.client_pid &&
@@ -107,6 +116,7 @@ struct Request {
     Header header;
     raster::Color clear_color{};
     raster::Viewport viewport{};
+    raster::Color blend_constant{1,1,1,1};
     std::optional<std::array<int32_t,4>> scissor;
     shader::Program vertex, pixel;
     std::vector<shader::VertexRegisters> inputs;
@@ -190,6 +200,8 @@ inline std::vector<uint8_t> encode(Request &r) {
     h.vs_words = uint32_t(r.vertex.bytecode.size()); h.ps_words = uint32_t(r.pixel.bytecode.size());
     require(shape_valid(h) && h.kind == 1 && !h.device && r.inputs.size() == h.vertices && r.background.size() == size_t(h.width) * h.height);
     Writer w; w.value(h); w.value(r.viewport);
+    if(h.abi==15){for(const auto value:r.blend_constant)require(std::isfinite(value));w.value(r.blend_constant);}
+    else require(r.blend_constant==raster::Color{1,1,1,1});
     if (h.flags & 4) { require(r.scissor.has_value() && scissor_valid(*r.scissor,h)); w.value(*r.scissor); }
     else require(!r.scissor.has_value());
     require(triangle_scissor_valid(r));
@@ -207,7 +219,7 @@ inline std::vector<uint8_t> encode(Request &r) {
         for(const auto &sampler:r.samplers){
             const auto filter=uint32_t(sampler.filter),u=uint32_t(sampler.u),v=uint32_t(sampler.v);
             for(const auto value:sampler.border)require(std::isfinite(value));
-            if(h.abi==14){require(filter<=1 && u<=2 && v<=2);w.value(filter|(u<<1)|(v<<3));w.value(sampler.border);}
+            if(h.abi==14 || h.abi==15){require(filter<=1 && u<=2 && v<=2);w.value(filter|(u<<1)|(v<<3));w.value(sampler.border);}
             else {
                 require(filter<=1 && u<=1 && v<=1 && (h.abi==12 || (!u && !v)) && sampler.border==std::array<float,4>{});
                 w.value(filter|(u<<1)|(v<<2));
@@ -229,6 +241,7 @@ inline Request decode(const std::vector<uint8_t> &bytes) {
         for(const auto value:r.clear_color)require(std::isfinite(value));require(reader.done());return r;
     }
     r.viewport = reader.value<raster::Viewport>();
+    if(h.abi==15){r.blend_constant=reader.value<raster::Color>();for(const auto value:r.blend_constant)require(std::isfinite(value));}
     if (h.flags & 4) { r.scissor = reader.value<std::array<int32_t,4>>(); require(scissor_valid(*r.scissor,h)); }
     require(triangle_scissor_valid(r));
     require(r.viewport.x == 0 && r.viewport.y == 0 && r.viewport.width == float(h.width) && r.viewport.height == float(h.height) &&
@@ -245,7 +258,7 @@ inline Request decode(const std::vector<uint8_t> &bytes) {
         (void)raster::resource_shapes(r.pixel,r.resources);
         for(auto &sampler:r.samplers){const auto encoded=reader.value<uint32_t>();
             sampler.filter=static_cast<shader::TextureFilter>(encoded&1);
-            if(h.abi==14){
+            if(h.abi==14 || h.abi==15){
                 require(!(encoded>>5) && ((encoded>>1)&3)<=2 && ((encoded>>3)&3)<=2);
                 sampler.u=static_cast<shader::TextureAddress>((encoded>>1)&3);sampler.v=static_cast<shader::TextureAddress>((encoded>>3)&3);
                 sampler.border=reader.value<std::array<float,4>>();for(const auto value:sampler.border)require(std::isfinite(value));

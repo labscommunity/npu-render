@@ -132,14 +132,20 @@ int main(int argc, char **argv) try {
         const auto bound=snapshot.values<uint32_t>("depth-target-bound");nr::capture::check(bound.size()==1 && !bound[0]);
     }
     // Only target zero is bound in this captured draw; other blend slots are unused.
-    BlendMode blend_mode=BlendMode::source_copy;
+    BlendMode blend_mode=BlendMode::source_copy;Color blend_constant{1,1,1,1};
     if(blend[1]){
-        nr::capture::check(blend[11]==1 && blend[14]==1 && blend[9]==blend[12] && blend[10]==blend[13]);
+        nr::capture::check(blend[11]==1 && blend[14]==1);
+        if(blend[9]==14 && blend[10]==4 && blend[12]==14 && blend[13]==6){
+            blend_mode=BlendMode::component_coverage;const auto factor=snapshot.values<float>("blend-factor");
+            nr::capture::check(factor.size()==4);for(unsigned c=0;c<4;++c){nr::capture::check(std::isfinite(factor[c]));blend_constant[c]=factor[c];}
+        }else{
+        nr::capture::check(blend[9]==blend[12] && blend[10]==blend[13]);
         constexpr std::array<uint32_t,6> ddi_factors{1,2,5,6,7,8};bool found=false;
         for(uint32_t mode=0;mode<blend_factors.size();++mode){const auto pair=blend_factors[mode];
             if(blend[9]==ddi_factors[uint32_t(pair[0])] && blend[10]==ddi_factors[uint32_t(pair[1])]){blend_mode=BlendMode(mode);found=true;break;}
         }
         nr::capture::check(found);
+        }
     }
     const bool blending=blend_mode!=BlendMode::source_copy;
     nr::capture::check(raster.size() == 10 && raster[0] == 3 && raster[1] >= 1 && raster[1] <= 3 && !raster[3] && !raster[4] && !raster[5] && !raster[8] && !raster[9]);
@@ -277,7 +283,7 @@ int main(int argc, char **argv) try {
     std::vector<PackedColor> reference_pixels;
     for (uint32_t iteration = 0; iteration < repeats; ++iteration) {
         const Viewport viewport{view[0],view[1],view[2],view[3],view[4],view[5]};
-        phase="provider execute";result = general_resources ? triangle_executor->execute(inputs,cb,pixel_cb,viewport,resources,pixels,clip) : triangle_executor ? triangle_executor->execute(inputs,cb,pixel_cb,viewport,texture,pixels,clip) : linear_executor ? linear_executor->execute(inputs,cb,viewport,texture,pixels,clip) : textured ? texture_executor->execute_adaptive(inputs,cb,viewport,texture,pixels) : executor->execute(inputs, cb, pixel_cb, viewport, pixels, clip);
+        phase="provider execute";result = general_resources ? triangle_executor->execute(inputs,cb,pixel_cb,viewport,resources,pixels,clip,blend_constant) : triangle_executor ? triangle_executor->execute(inputs,cb,pixel_cb,viewport,texture,pixels,clip,blend_constant) : linear_executor ? linear_executor->execute(inputs,cb,viewport,texture,pixels,clip) : textured ? texture_executor->execute_adaptive(inputs,cb,viewport,texture,pixels) : executor->execute(inputs, cb, pixel_cb, viewport, pixels, clip,blend_constant);
         uint64_t fused_matches=0,reciprocal_matches=0;
         phase="vertex oracle";for (size_t i = 0; i < inputs.size(); ++i) {
             const auto expected = reference_vertex(vs, inputs[i], cb);
@@ -362,7 +368,7 @@ int main(int argc, char **argv) try {
                         const auto lane=format==87 && c<3 ? 2-c : c;
                         if(!((blend[15]&255)&(1u<<lane)))continue;
                         const double alpha=std::clamp(double(as_float(fragment[3])),0.,1.);
-                        const auto terms=reference_blend_terms(blend_mode,std::clamp(double(as_float(fragment[lane])),0.,1.),alpha,double(pixel[c]),double(pixel[3]));
+                        const auto terms=reference_blend_terms(blend_mode,std::clamp(double(as_float(fragment[lane])),0.,1.),alpha,double(pixel[c]),double(pixel[3]),std::clamp(double(blend_constant[lane]),0.,1.));
                         const double value=terms[0]+terms[1];
                         pixel[c]=uint8_t(std::nearbyint((std::clamp)(value,0.,255.)));
                     }

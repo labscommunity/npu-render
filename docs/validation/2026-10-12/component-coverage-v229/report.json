@@ -1,0 +1,32 @@
+{
+  "build": "present-umd-v229",
+  "all_checks_passed": true,
+  "modern_and_legacy_cpu_suites_each": 28,
+  "captured_draw_trial": "v119",
+  "captured_draw_sha256": "c2295cb197e6928f8bc97cb8852325c22100fb59c6daffddbbeec5237ee9fd01",
+  "captured_draw_pixels": 306936,
+  "captured_draw_covered_samples": 56,
+  "captured_draw_visual": "First editor glyph n appears in the replayed target.",
+  "captured_draw_repeats_per_backend": 2,
+  "cpu_npu_modern_legacy_pixels_exact": true,
+  "npu_blend_components_per_runtime": 688128,
+  "invalid_requests_rejected_per_runtime": 174,
+  "abi15_npu_packets_exact": 3,
+  "historical_packets_exact": 71,
+  "native_indexed_draws": 68,
+  "native_component_coverage_draws": 4,
+  "full_desktop_offload": false,
+  "physical_delta_desktop_offloaded": false,
+  "tahoma_performance_tested": false,
+  "findings": [
+    "The captured Notepad draw uses source BLEND_FACTOR and destination INV_SRC_COLOR for RGB; alpha uses BLEND_FACTOR and INV_SRC_ALPHA. Its constant is (0,0,0,1) and RGB write mask is 7. The NPU evaluates independent channel coverage, clamps source and constant values, preserves unwritten channels, and quantizes the result.",
+    "ABI 15 carries a finite runtime blend constant after the viewport. Older packets cannot select this blend mode without the new payload. Color changes are runtime inputs rather than pipeline keys; the three exact NPU packets exercise changes on a retained pipeline and RGB-only versus RGBA writes.",
+    "The exact complete failed draw now matches the independent scalar coverage and color oracle on CPU and NPU. Its entire 756 by 406 target agrees across both runtime versions and two consecutive executions. This captured draw covers 56 samples and renders one glyph, not a complete typed line or live desktop.",
+    "v227 first failed compilation because a test variable shadowed an existing local. Review also found that a scalar blend-constant lane needed broadcasting before the existing batched clamp graph. Both were corrected before v228. v228 passed the new numerical tests but failed the old total-draw assertion (64 instead of 68). v229 corrects that count and passes clean builds and hardware qualification.",
+    "No physical display driver, NPU driver, or physical power configuration changed for these checks. No performance gain or usable desktop interaction is claimed."
+  ],
+  "sources": [
+    "https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3d10umddi/ne-d3d10umddi-d3d10_ddi_blend",
+    "https://learn.microsoft.com/en-us/windows/win32/direct3d11/d3d10-graphics-programming-guide-output-merger-stage"
+  ]
+}

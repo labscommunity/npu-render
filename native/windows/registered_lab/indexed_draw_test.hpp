@@ -126,6 +126,25 @@ int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
         }
     }
     }
+    // Constant text color with independent per-channel glyph coverage, including
+    // RGB-only writes and runtime color changes on a retained native pipeline.
+    blend.SrcBlend=blend.SrcBlendAlpha=D3D10_DDI_BLEND_BLEND_FACTOR;
+    blend.DestBlend=D3D10_DDI_BLEND_INV_SRC_COLOR;blend.DestBlendAlpha=D3D10_DDI_BLEND_INV_SRC_ALPHA;
+    for(const UINT mask:{7u,15u})for(const nr::raster::Color factor:{nr::raster::Color{0,0,0,1},nr::raster::Color{.25f,.75f,1,.5f}}){
+        blend.RenderTargetWriteMask[0]=UINT8(mask);f.pfnSetBlendState(h,bs,factor.data(),~0u);
+        for(size_t i=0;i<memory[target_index].size();++i)memory[target_index][i]=uint8_t((i*37+i/4*13)&255);
+        const auto before=memory[target_index];const auto draws=counters.draws;
+        color[0]=.75f;color[1]=.25f;color[2]=1.f;color[3]=.5f;
+        f.pfnDefaultConstantBufferUpdateSubresourceUP(h,resources[3],0,nullptr,color,0,0);
+        f.pfnDrawIndexedInstanced(h,6,1,1,1,0);TEST(last_error==S_OK && counters.draws==draws+1);
+        for(UINT y=0;y<height;++y)for(UINT x=0;x<width;++x)for(UINT c=0;c<4;++c){
+            const auto at=(size_t(y)*width+x)*4+c;const auto lane=c<3?2-c:c;
+            const bool inside=x>=5 && x<width-3 && y>=7 && y<height-5 && (mask&(1u<<lane));
+            const double value=double(color[lane])*double(factor[lane])*255+double(before[at])*(1-double(color[lane]));
+            const auto expected=inside?uint8_t(std::nearbyint(value)):before[at];TEST(memory[target_index][at]==expected);
+        }
+    }
+    blend.RenderTargetWriteMask[0]=15;
     // A blend factor we have not implemented remains rejected without writes.
     blend.DestBlend=D3D10_DDI_BLEND_DEST_COLOR;f.pfnSetBlendState(h,bs,nullptr,~0u);
     {const auto before=memory[target_index];const auto draws=counters.draws;
@@ -364,7 +383,7 @@ int test_indexed_draw(const D3DDDI_DEVICECALLBACKS &kt, const D3D10DDI_CORELAYER
     f.pfnDestroyRenderTargetView(h, view);
     for (const auto r : resources) f.pfnDestroyResource(h, r);
     f.pfnDestroyDevice(h);
-    TEST(counters.executions == executions_before + 64 && !counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
-    std::printf("{\"kind\":\"indexed-ddi-runtime-shim\",\"requested_backend\":\"%s\",\"execution_device\":\"%s\",\"verified_draws\":%llu,\"porter_duff_components\":540672,\"porter_duff_additional_modes\":11,\"derivative_ddi_components\":16384,\"loop_ddi_components\":65536,\"loop_overflow_preserved_target\":true,\"blended_scissored_draws\":6,\"textured_draws\":14,\"opaque_linear_ddi_draws\":2,\"border_ddi_draws\":2,\"partial_point_preserved_target\":true,\"mirrored_ddi_components\":16384,\"point_scaled_blended_draws\":2,\"linear_scaled_blended_draws\":2,\"base_vertex_and_start_index\":true,\"invalid_ranges_and_sampler_rejected\":true,\"registered_adapter_tested\":false,\"desktop_offload_tested\":false}\n", backend, counters.last_execution_device, static_cast<unsigned long long>(counters.draws-draws_before));
+    TEST(counters.executions == executions_before + 68 && !counters.live_contexts && !counters.live_allocations && !counters.cleanup_errors && !contract_error);
+    std::printf("{\"kind\":\"indexed-ddi-runtime-shim\",\"requested_backend\":\"%s\",\"execution_device\":\"%s\",\"verified_draws\":%llu,\"porter_duff_components\":540672,\"porter_duff_additional_modes\":11,\"component_coverage_draws\":4,\"derivative_ddi_components\":16384,\"loop_ddi_components\":65536,\"loop_overflow_preserved_target\":true,\"blended_scissored_draws\":6,\"textured_draws\":14,\"opaque_linear_ddi_draws\":2,\"border_ddi_draws\":2,\"partial_point_preserved_target\":true,\"mirrored_ddi_components\":16384,\"point_scaled_blended_draws\":2,\"linear_scaled_blended_draws\":2,\"base_vertex_and_start_index\":true,\"invalid_ranges_and_sampler_rejected\":true,\"registered_adapter_tested\":false,\"desktop_offload_tested\":false}\n", backend, counters.last_execution_device, static_cast<unsigned long long>(counters.draws-draws_before));
     return 0;
 }

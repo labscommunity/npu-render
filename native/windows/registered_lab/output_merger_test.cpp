@@ -20,8 +20,8 @@ int main(int argc, char **argv) try {
     std::vector<Color> colors(count);
     std::vector<PackedColor> background(count);
     std::vector<uint8_t> coverage(count);
-    uint64_t checked = 0;
-    for (uint32_t mode=0;mode<blend_factors.size();++mode) for (const bool bgra : {false, true}) for (const uint8_t mask : {uint8_t(15), uint8_t(5), uint8_t(10)}) {
+    uint64_t checked = 0;unsigned invalid_requests=0;
+    for (uint32_t mode=0;mode<=uint32_t(BlendMode::component_coverage);++mode) for (const bool bgra : {false, true}) for (const uint8_t mask : {uint8_t(15), uint8_t(5), uint8_t(10)}) {
         const auto blend=BlendMode(mode);OutputMerger merger(count, backend, blend, bgra, mask);
         for (unsigned frame = 0; frame < 4; ++frame) {
             for (size_t i = 0; i < count; ++i) {
@@ -34,7 +34,14 @@ int main(int argc, char **argv) try {
                 if (frame == 1) coverage[i] = 0;
                 if (frame == 2) colors[i][3] = 1;
             }
-            const auto result = merger.execute(colors, background, coverage);
+            Color constant{1,1,1,1};
+            if(blend==BlendMode::component_coverage){
+                constexpr Color factors[]{{0,0,0,1},{1,.25f,.75f,.5f},{.75f,.25f,1,0},{-.5f,1.5f,.5f,1}};
+                constant=factors[frame];
+                if(!frame)for(size_t i=0;i<count;++i)colors[i]={float(i%17)/16,float((i+5)%17)/16,float((i+11)%17)/16,1};
+            }
+            const auto result = merger.execute(colors, background, coverage,constant);
+            TEST(result.execution_device.rfind(backend,0)==0);
             TEST(result.pixels.size() == count);
             uint32_t scalar_differences = 0;
             for (size_t i = 0; i < count; ++i) for (unsigned channel = 0; channel < 4; ++channel) {
@@ -42,12 +49,12 @@ int main(int argc, char **argv) try {
                 const auto actual = result.pixels[i][channel], old = background[i][channel];
                 if (!coverage[i] || !(mask & (1u << source))) TEST(actual == old);
                 else {
-                    const auto terms=reference_blend_terms(blend,std::clamp(colors[i][source],0.f,1.f),std::clamp(colors[i][3],0.f,1.f),float(old),float(background[i][3]));
+                    const auto terms=reference_blend_terms(blend,std::clamp(colors[i][source],0.f,1.f),std::clamp(colors[i][3],0.f,1.f),float(old),float(background[i][3]),std::clamp(constant[source],0.f,1.f));
                     volatile float foreground=terms[0],contribution=terms[1];
                     volatile float value=foreground+contribution;
                     const auto expected=uint8_t(std::nearbyint(std::clamp(float(value),0.f,255.f)));
                     if(actual!=expected)++scalar_differences;
-                    const auto precise=reference_blend_terms(blend,std::clamp(double(colors[i][source]),0.,1.),std::clamp(double(colors[i][3]),0.,1.),double(old),double(background[i][3]));
+                    const auto precise=reference_blend_terms(blend,std::clamp(double(colors[i][source]),0.,1.),std::clamp(double(colors[i][3]),0.,1.),double(old),double(background[i][3]),std::clamp(double(constant[source]),0.,1.));
                     const double ideal=std::clamp(precise[0]+precise[1],0.,255.);
                     if (std::abs(double(actual)-ideal)>.6 || (backend=="NPU" && actual!=expected)) {
                         std::fprintf(stderr, "merger mismatch blend=%u bgra=%u mask=%u frame=%u sample=%zu channel=%u actual=%u expected=%u ideal=%.9g\n",
@@ -63,13 +70,18 @@ int main(int argc, char **argv) try {
         colors[0][0] = std::numeric_limits<float>::quiet_NaN();
         bool rejected = false;
         try { (void)merger.execute(colors, background, coverage); } catch (const std::invalid_argument &) { rejected = true; }
-        TEST(rejected); colors[0] = valid;
+        TEST(rejected);++invalid_requests; colors[0] = valid;
         const auto valid_coverage = coverage[0]; coverage[0] = 2; rejected = false;
         try { (void)merger.execute(colors, background, coverage); } catch (const std::invalid_argument &) { rejected = true; }
-        TEST(rejected); coverage[0] = valid_coverage;
+        TEST(rejected);++invalid_requests; coverage[0] = valid_coverage;
+        if(blend==BlendMode::component_coverage){
+            Color invalid{1,1,1,std::numeric_limits<float>::infinity()};rejected=false;
+            try{(void)merger.execute(colors,background,coverage,invalid);}catch(const std::invalid_argument &){rejected=true;}
+            TEST(rejected);++invalid_requests;
+        }
         TEST(merger.execute(colors, background, coverage).pixels.size() == count);
     }
-    std::printf("{\"checked_output_components\":%llu,\"invalid_requests_rejected\":156,\"reusable_after_input_rejection\":true}\n",
-                static_cast<unsigned long long>(checked));
+    std::printf("{\"checked_output_components\":%llu,\"invalid_requests_rejected\":%u,\"reusable_after_input_rejection\":true}\n",
+                static_cast<unsigned long long>(checked),invalid_requests);
     return 0;
 } catch (const std::exception &e) { std::fprintf(stderr, "%s\n", e.what()); return 1; }

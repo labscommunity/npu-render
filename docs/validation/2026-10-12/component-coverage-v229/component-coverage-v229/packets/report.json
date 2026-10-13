@@ -1,0 +1,48 @@
+{
+  "abi": 15,
+  "cases": [
+    {
+      "packet": "request-42-636f6d706f6e656e0000000000000001-1.bin",
+      "sha256": "d397d8ccc5170a4286ff648269df29ebab44e958befcd276e7789154d9abe7fc",
+      "expected_sha256": "55ee116fb733baa4f42b4fa81651bce5a592125c20b776ff2a1879b73353bab1",
+      "constant": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "write_mask": 7
+    },
+    {
+      "packet": "request-42-636f6d706f6e656e0000000000000001-2.bin",
+      "sha256": "be1036d4995afb2719f132a1f6e7b5d232d82911363e49625e3c9b5f74da01e9",
+      "expected_sha256": "7fb5fc3d86b6633ab7ef33e0a8c908d275234a2482d4e836f32f6ac630c39831",
+      "constant": [
+        0,
+        1,
+        0,
+        1
+      ],
+      "write_mask": 7
+    },
+    {
+      "packet": "request-42-636f6d706f6e656e0000000000000001-3.bin",
+      "sha256": "15cf34529e767d99cea2fe1006da905a615bebece647a587d4369f4c31b35d17",
+      "expected_sha256": "704e2ae1a58096b45e1ceb907efa95e079393722df5101ae23b899e01b086caa",
+      "constant": [
+        1,
+        0,
+        0,
+        1
+      ],
+      "write_mask": 15
+    }
+  ],
+  "shader_sha256": "2d9638588a4c1aca08354bf6e5f2f8e5c7df0339b4a2889e6b0d7523cc6a6dd3",
+  "source_packet_sha256": "a2bc186f2fc90422cf72bcac65f1222a382e03a497f55e0657801db23d77a148",
+  "pixels_per_case": 4096,
+  "covered_samples": 3132,
+  "all_pixels_exact": true,
+  "execution_device": "NPU",
+  "desktop_offload_tested": false
+}

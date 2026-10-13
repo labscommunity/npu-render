@@ -37,6 +37,11 @@ struct OutputMerger::State {
         auto colors = std::make_shared<op::Parameter>(ov::element::f32, ov::Shape{count, 4});
         auto background = std::make_shared<op::Parameter>(ov::element::u8, ov::Shape{count, 4});
         auto coverage = std::make_shared<op::Parameter>(ov::element::i32, ov::Shape{count, 1});
+        std::shared_ptr<op::Parameter> blend_constant;
+        if(blend==BlendMode::component_coverage){
+            blend_constant=std::make_shared<op::Parameter>(ov::element::f32,ov::Shape{1,4});
+            blend_constant->output(0).get_tensor().set_names({"blend_constant"});
+        }
         colors->output(0).get_tensor().set_names({"colors"}); background->output(0).get_tensor().set_names({"background"});
         coverage->output(0).get_tensor().set_names({"coverage"});
         std::vector<int32_t> rows(count); for (uint32_t i = 0; i < count; ++i) rows[i] = int32_t(i);
@@ -57,7 +62,7 @@ struct OutputMerger::State {
                 choose(std::make_shared<op::Greater>(v,number(1)),number(1),v));
         };
         auto alpha = clamp_source(lane(colors, 3));
-        const auto factors=blend_factors[uint32_t(blend)];
+        const auto factors=blend_factors[blend==BlendMode::component_coverage?0u:uint32_t(blend)];
         const Node destination_alpha=std::make_shared<op::Convert>(lane(background,3),ov::element::f32);
         const auto source_scale=[&]() -> Node {
             switch(factors[0]){
@@ -89,7 +94,11 @@ struct OutputMerger::State {
             const Node destination=std::make_shared<op::Convert>(bc,ov::element::f32);
             const Node contribution=factors[1]==BlendFactor::one?destination:mul(destination,destination_scale);
             Node value;
-            if(factors[0]==BlendFactor::zero)value=contribution;
+            if(blend==BlendMode::component_coverage){
+                const auto constant=clamp_source(std::make_shared<op::Broadcast>(lane(blend_constant,source),shape));
+                value=add(mul(fg,mul(constant,number(255))),mul(destination,sub(number(1),fg)));
+            }
+            else if(factors[0]==BlendFactor::zero)value=contribution;
             else if(factors[1]==BlendFactor::zero)value=mul(fg,source_scale);
             else value=add(mul(fg,source_scale),contribution);
             value = choose(std::make_shared<op::Less>(value, number(0)), number(0),
@@ -103,7 +112,9 @@ struct OutputMerger::State {
             channels.push_back(add(mul(quantized, coverage), mul(pred(bc), sub(integer(1), coverage))));
         }
         auto output = std::make_shared<op::Convert>(std::make_shared<op::Concat>(channels, 1), ov::element::u8);
-        auto model = std::make_shared<ov::Model>(ov::OutputVector{output}, ov::ParameterVector{colors, background, coverage});
+        ov::ParameterVector parameters{colors,background,coverage};
+        if(blend_constant)parameters.push_back(blend_constant);
+        auto model = std::make_shared<ov::Model>(ov::OutputVector{output}, parameters);
         ov::AnyMap properties{ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY)};
         if (backend == "NPU") {
             for (const auto &node : model->get_ops()) node->get_rt_info()["precise_0"] = std::string{};
@@ -127,18 +138,21 @@ OutputMerger::OutputMerger(uint32_t samples, const std::string &backend, BlendMo
     : state(std::make_unique<State>(samples, backend, blend, bgra, mask)) {}
 OutputMerger::~OutputMerger() = default;
 OutputMerger::Result OutputMerger::execute(const std::vector<Color> &colors, const std::vector<PackedColor> &background,
-                                         const std::vector<uint8_t> &coverage) {
+                                         const std::vector<uint8_t> &coverage,const Color &blend_constant) {
     auto &s = *state;
     require(!s.failed && colors.size() == s.count && background.size() == s.count && coverage.size() == s.count);
     for (size_t i = 0; i < s.count; ++i) {
         require(coverage[i] <= 1);
         for (const auto value : colors[i]) require(std::isfinite(value) && std::abs(value) <= 16);
     }
+    for(const auto value:blend_constant)require(std::isfinite(value));
     s.failed = true;
     auto col = s.request.get_tensor("colors"), bg = s.request.get_tensor("background"), cov = s.request.get_tensor("coverage");
     std::memcpy(col.data<float>(), colors.data(), colors.size() * sizeof(Color));
     std::memcpy(bg.data<uint8_t>(), background.data(), background.size() * sizeof(PackedColor));
     for (size_t i = 0; i < s.count; ++i) cov.data<int32_t>()[i] = coverage[i];
+    if(s.blend==BlendMode::component_coverage)
+        std::memcpy(s.request.get_tensor("blend_constant").data<float>(),blend_constant.data(),sizeof(Color));
     s.request.infer(); const auto output = s.request.get_output_tensor();
     require(output.get_element_type() == ov::element::u8 && output.get_size() == size_t(s.count) * 4);
     Result result{{}, s.execution_device}; result.pixels.resize(s.count);

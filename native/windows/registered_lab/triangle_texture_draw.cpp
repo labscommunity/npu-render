@@ -26,7 +26,7 @@ void TriangleTextureDrawExecutor::validate_shader(const shader::Program &p){
 struct TriangleTextureDrawExecutor::State {
     shader::Program vs,ps;
     uint32_t count,width,height,format,batch;
-    bool quads;
+    bool quads,component_coverage;
     PackedResources layout;
     shader::VertexExecutor vertex;
     ProjectionExecutor projection;
@@ -38,7 +38,7 @@ struct TriangleTextureDrawExecutor::State {
     State(const shader::Program &v,const shader::Program &p,uint32_t n,uint32_t w,uint32_t h,uint32_t f,
         const PackedResources &resources,const shader::TextureSamplers &samplers,const std::string &backend,
         BlendMode blend,uint8_t mask,CullMode cull,bool ccw,uint32_t b)
-        :vs(v),ps(p),count(n),width(w),height(h),format(f),batch(b<=shader::RegisterExecutor::maximum_batch(p)?b:std::gcd(b,shader::RegisterExecutor::maximum_batch(p))),quads(shader::quad_derivatives(p)),layout(resource_layout(resources)),
+        :vs(v),ps(p),count(n),width(w),height(h),format(f),batch(b<=shader::RegisterExecutor::maximum_batch(p)?b:std::gcd(b,shader::RegisterExecutor::maximum_batch(p))),quads(shader::quad_derivatives(p)),component_coverage(blend==BlendMode::component_coverage),layout(resource_layout(resources)),
          vertex(v,n,backend),projection(n,backend),coverage(batch,backend,cull,ccw),merger(batch,backend,blend,f==87,mask){
         validate_shader(ps);
         require(n && n<=4096 && !(n%3) && w && w<=8192 && h && h<=8192 && uint64_t(w)*h<=4*1024*1024 &&
@@ -77,12 +77,12 @@ TriangleTextureDrawExecutor::TriangleTextureDrawExecutor(const shader::Program &
 TriangleTextureDrawExecutor::~TriangleTextureDrawExecutor()=default;
 UniformDrawExecutor::Result TriangleTextureDrawExecutor::execute(const std::vector<shader::VertexRegisters> &inputs,
     const shader::VertexConstants &vc,const shader::VertexConstants &pc,const Viewport &viewport,const PackedTexture &source,
-    const std::vector<PackedColor> &background,const std::optional<std::array<int32_t,4>> &scissor){
-    PackedResources resources{};resources[0]=source;return execute(inputs,vc,pc,viewport,resources,background,scissor);
+    const std::vector<PackedColor> &background,const std::optional<std::array<int32_t,4>> &scissor,const Color &blend_constant){
+    PackedResources resources{};resources[0]=source;return execute(inputs,vc,pc,viewport,resources,background,scissor,blend_constant);
 }
 UniformDrawExecutor::Result TriangleTextureDrawExecutor::execute(const std::vector<shader::VertexRegisters> &inputs,
     const shader::VertexConstants &vc,const shader::VertexConstants &pc,const Viewport &viewport,const PackedResources &resources,
-    const std::vector<PackedColor> &background,const std::optional<std::array<int32_t,4>> &scissor){
+    const std::vector<PackedColor> &background,const std::optional<std::array<int32_t,4>> &scissor,const Color &blend_constant){
     auto &s=*state;const auto start=Clock::now();
     // Projection accepts viewport dimensions as provider inputs; coverage and
     // merger models operate on bounded batches, independent of target shape.
@@ -183,8 +183,8 @@ UniformDrawExecutor::Result TriangleTextureDrawExecutor::execute(const std::vect
         result.timings.shader_ms+=ms(began);result.input_bytes+=pixels.input_bytes;result.output_bytes+=pixels.output_bytes;++result.provider_requests;
         for(size_t n=0;n<s.batch;++n)std::memcpy(colors[n].data(),pixels.vertices[n][0].data(),16);
         for(size_t n=0;n<s.batch;++n)tile[n]=stored_pixel[n]?result.pixels[pixel_index[n]]:PackedColor{};
-        began=Clock::now();const auto merged=s.merger.execute(colors,tile,covered.covered);require(merged.execution_device==result.execution_device);
-        result.timings.merger_ms+=ms(began);result.input_bytes+=uint64_t(s.batch)*24;result.output_bytes+=uint64_t(s.batch)*4;++result.provider_requests;
+        began=Clock::now();const auto merged=s.merger.execute(colors,tile,covered.covered,blend_constant);require(merged.execution_device==result.execution_device);
+        result.timings.merger_ms+=ms(began);result.input_bytes+=uint64_t(s.batch)*24+(s.component_coverage?16u:0u);result.output_bytes+=uint64_t(s.batch)*4;++result.provider_requests;
         for(size_t n=0;n<valid;++n)if(stored_pixel[n])result.pixels[pixel_index[n]]=merged.pixels[n];
         ++result.tile_executions;
     };

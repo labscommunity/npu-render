@@ -267,6 +267,18 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
         try{(void)ex::encode(legacy);}catch(const std::invalid_argument &){rejected=true;}test(rejected);
     }
     {auto bad=r;bad.header.abi=14;test(!ex::shape_valid(bad.header));}
+    for(const auto &base:{r,triangles,resources}){
+        auto component=base;component.header.abi=15;component.header.flags|=0x10001|(13u<<17);
+        component.blend_constant={-.25f,.5f,1.25f,1};
+        const auto packet=ex::encode(component);const auto component_decoded=ex::decode(packet);
+        test(ex::blend_mode(component_decoded.header)==nr::raster::BlendMode::component_coverage && component_decoded.blend_constant==component.blend_constant &&
+            component_decoded.inputs==component.inputs && component_decoded.background==component.background && nr::raster::sampler_layout_equal(component_decoded.samplers,component.samplers));
+        auto changed=component;changed.blend_constant={1,0,0,0};const auto other=ex::decode(ex::encode(changed));test(other.blend_constant!=component_decoded.blend_constant);
+        auto bad=packet;const uint32_t nan=0x7fc00000;std::memcpy(bad.data()+sizeof(ex::Header)+sizeof(nr::raster::Viewport),&nan,4);rejects(bad);
+        bad=packet;bad.pop_back();rejects(bad);
+        for(const uint32_t abi:{1u,8u,11u,12u,14u}){auto legacy=component.header;legacy.abi=abi;test(!ex::shape_valid(legacy));}
+        auto wrong=component.header;wrong.flags&=~0x1f0000u;test(!ex::shape_valid(wrong));
+    }
     for(uint32_t mode=4;mode<13;++mode){
         for(const auto &base : {triangles,resources}){auto candidate=base;candidate.header.abi=11;candidate.header.flags|=0x10001|(mode<<17);
             const auto roundtrip=ex::decode(ex::encode(candidate));

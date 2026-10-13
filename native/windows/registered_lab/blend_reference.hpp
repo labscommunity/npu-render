@@ -5,7 +5,7 @@
 namespace nr::raster {
 // Source color/alpha are clamped normalized values; destination channels and
 // alpha are bytes. Keep source and destination terms separate for FP32 checks.
-template<class T> std::array<T,2> reference_blend_terms(BlendMode mode,T color,T alpha,T destination,T destination_alpha){
+template<class T> std::array<T,2> reference_blend_terms(BlendMode mode,T color,T alpha,T destination,T destination_alpha,T constant=T(1)){
     switch(mode){
     case BlendMode::source_copy:return {color*T(255),T(0)};
     case BlendMode::source_over:return {color*T(255),destination*(T(1)-alpha)};
@@ -20,6 +20,7 @@ template<class T> std::array<T,2> reference_blend_terms(BlendMode mode,T color,T
     case BlendMode::plus:return {color*T(255),destination};
     case BlendMode::destination_copy:return {T(0),destination};
     case BlendMode::clear:return {T(0),T(0)};
+    case BlendMode::component_coverage:return {color*(constant*T(255)),destination*(T(1)-color)};
     }
     throw std::invalid_argument("invalid reference blend mode");
 }

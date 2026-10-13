@@ -71,7 +71,7 @@ UniformDrawExecutor::UniformDrawExecutor(const shader::Program &vs, const shader
 UniformDrawExecutor::~UniformDrawExecutor() = default;
 UniformDrawExecutor::Result UniformDrawExecutor::execute(const std::vector<shader::VertexRegisters> &inputs,
     const shader::VertexConstants &vc, const shader::VertexConstants &pc, const Viewport &viewport,
-    const std::vector<PackedColor> &background, const std::optional<std::array<int32_t,4>> &scissor) {
+    const std::vector<PackedColor> &background, const std::optional<std::array<int32_t,4>> &scissor,const Color &blend_constant) {
     auto &s = *state; const auto start = Clock::now(); Result result{};
     require(inputs.size() == s.count && background.size() == size_t(s.width) * s.height &&
         viewport.x == 0 && viewport.y == 0 && viewport.width == float(s.width) && viewport.height == float(s.height));
@@ -163,8 +163,8 @@ UniformDrawExecutor::Result UniformDrawExecutor::execute(const std::vector<shade
             result.timings.shader_ms+=milliseconds(began);result.input_bytes+=uint64_t(s.batch)*12+84;
             result.output_bytes+=uint64_t(s.batch)*16;++result.provider_requests;
         }
-        began = Clock::now(); const auto merged = s.merger->execute(colors, tile, selected.covered);
-        result.input_bytes += uint64_t(s.batch) * 24; result.output_bytes += uint64_t(s.batch) * 4; ++result.provider_requests;
+        began = Clock::now(); const auto merged = s.merger->execute(colors, tile, selected.covered,blend_constant);
+        result.input_bytes += uint64_t(s.batch) * 24+(s.blending==BlendMode::component_coverage?16u:0u); result.output_bytes += uint64_t(s.batch) * 4; ++result.provider_requests;
         result.timings.merger_ms += milliseconds(began); require(merged.execution_device == result.execution_device);
         for(size_t i=0;i<valid;++i)result.pixels[pixel_index(i)]=merged.pixels[i];
         ++result.tile_executions;

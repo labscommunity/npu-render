@@ -101,9 +101,15 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
         require(clip[0] >= 0 && clip[1] >= 0 && clip[0] <= clip[2] && clip[1] <= clip[3] && clip[2] <= full[2] && clip[3] <= full[3]);
     }
     nr::raster::BlendMode blend_mode=nr::raster::BlendMode::source_copy;
+    nr::raster::Color blend_constant{1,1,1,1};
     if(d.blend.BlendEnable[0]){
-        require(d.blend.BlendOp==D3D10_DDI_BLEND_OP_ADD && d.blend.BlendOpAlpha==D3D10_DDI_BLEND_OP_ADD &&
-            d.blend.SrcBlend==d.blend.SrcBlendAlpha && d.blend.DestBlend==d.blend.DestBlendAlpha);
+        require(d.blend.BlendOp==D3D10_DDI_BLEND_OP_ADD && d.blend.BlendOpAlpha==D3D10_DDI_BLEND_OP_ADD);
+        if(d.blend.SrcBlend==D3D10_DDI_BLEND_BLEND_FACTOR && d.blend.DestBlend==D3D10_DDI_BLEND_INV_SRC_COLOR &&
+            d.blend.SrcBlendAlpha==D3D10_DDI_BLEND_BLEND_FACTOR && d.blend.DestBlendAlpha==D3D10_DDI_BLEND_INV_SRC_ALPHA){
+            blend_mode=nr::raster::BlendMode::component_coverage;
+            for(unsigned c=0;c<4;++c){require(std::isfinite(d.blend_factor[c]));blend_constant[c]=d.blend_factor[c];}
+        }else{
+        require(d.blend.SrcBlend==d.blend.SrcBlendAlpha && d.blend.DestBlend==d.blend.DestBlendAlpha);
         constexpr std::array<D3D10_DDI_BLEND,6> factors{D3D10_DDI_BLEND_ZERO,D3D10_DDI_BLEND_ONE,D3D10_DDI_BLEND_SRC_ALPHA,
             D3D10_DDI_BLEND_INV_SRC_ALPHA,D3D10_DDI_BLEND_DEST_ALPHA,D3D10_DDI_BLEND_INV_DEST_ALPHA};
         bool found=false;
@@ -113,6 +119,7 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
             }
         }
         require(found);
+        }
     }
     const bool blend=blend_mode!=nr::raster::BlendMode::source_copy;
     const bool destination_in=blend_mode==nr::raster::BlendMode::destination_in;
@@ -225,6 +232,7 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
         if(nr::raster::extended_blend(blend_mode)){request.header.abi=11;request.header.flags|=0x10000|(uint32_t(blend_mode)<<17);}
         if(addressed)request.header.abi=12;
         if(bordered)request.header.abi=14;
+        if(blend_mode==nr::raster::BlendMode::component_coverage){request.header.abi=15;request.blend_constant=blend_constant;}
         request.viewport = viewport; request.vertex = *d.vertex_program; request.pixel = *d.pixel_program;
         request.inputs = inputs; request.vertex_constants = vc; request.pixel_constants = pc; request.background = std::move(background);
         result = d.indexed_exchange->execute(std::move(request));
@@ -239,7 +247,7 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
             d.resources_executor=std::move(candidate);d.resources_key=key;d.resources_layout=nr::raster::resource_layout(resources);d.resources_samplers=resource_samplers;
             d.resources_vertex=d.vertex_program;d.resources_pixel=d.pixel_program;
         }
-        result=d.resources_executor->execute(inputs,vc,pc,viewport,resources,background,clip);
+        result=d.resources_executor->execute(inputs,vc,pc,viewport,resources,background,clip,blend_constant);
     } else if(general_texture) {
         const uint64_t options=(uint64_t(blend_mode)<<12)|uint64_t(d.blend.RenderTargetWriteMask[0])|(uint64_t(blend)<<4)|(uint64_t(linear)<<5)|(uint64_t(cull)<<6)|(uint64_t(front_ccw)<<8);
         const std::array<uint64_t,8> key{s.width,s.height,s.format,texture.width,texture.height,texture.format,count,options};
@@ -252,7 +260,7 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
             d.triangle_texture_executor=std::move(candidate);d.triangle_texture_key=key;
             d.triangle_texture_vertex=d.vertex_program;d.triangle_texture_pixel=d.pixel_program;
         }
-        result=d.triangle_texture_executor->execute(inputs,vc,pc,viewport,texture,background,clip);
+        result=d.triangle_texture_executor->execute(inputs,vc,pc,viewport,texture,background,clip,blend_constant);
     } else if (modulated) {
         const std::array<uint64_t,8> key{s.width,s.height,s.format,texture.width,texture.height,texture.format,uint64_t(blend),uint64_t(linear)};
         if(!d.linear_texture_executor || d.linear_texture_vertex!=d.vertex_program || d.linear_texture_pixel!=d.pixel_program || d.linear_texture_key!=key){
@@ -286,7 +294,7 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
                 s.width, s.height, d.backend, blend_mode, s.format == 87, d.blend.RenderTargetWriteMask[0], batch, cull, front_ccw);
             d.indexed_executor = std::move(candidate); d.indexed_key = key; d.indexed_vertex = d.vertex_program; d.indexed_pixel = d.pixel_program;
         }
-        result = d.indexed_executor->execute(inputs, vc, pc, viewport, background, clip);
+        result = d.indexed_executor->execute(inputs, vc, pc, viewport, background, clip,blend_constant);
     }
     ++counters.executions;
     if (d.backend == "NPU_LAB_INDEXED") ++counters.remote_npu_executions;

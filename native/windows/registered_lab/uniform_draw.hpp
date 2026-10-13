@@ -41,6 +41,7 @@ public:
                    const shader::VertexConstants &vertex_constants,
                    const shader::VertexConstants &pixel_constants,
                    const Viewport &viewport, const std::vector<PackedColor> &background,
-                   const std::optional<std::array<int32_t,4>> &scissor = std::nullopt);
+                   const std::optional<std::array<int32_t,4>> &scissor = std::nullopt,
+                   const Color &blend_constant = Color{1,1,1,1});
 };
 }

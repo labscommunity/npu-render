@@ -33,10 +33,12 @@ public:
     UniformDrawExecutor::Result execute(const std::vector<shader::VertexRegisters> &vertices,
         const shader::VertexConstants &vertex_constants,const shader::VertexConstants &pixel_constants,
         const Viewport &viewport,const PackedResources &resources,const std::vector<PackedColor> &background,
-        const std::optional<std::array<int32_t,4>> &scissor=std::nullopt);
+        const std::optional<std::array<int32_t,4>> &scissor=std::nullopt,
+        const Color &blend_constant=Color{1,1,1,1});
     UniformDrawExecutor::Result execute(const std::vector<shader::VertexRegisters> &vertices,
         const shader::VertexConstants &vertex_constants,const shader::VertexConstants &pixel_constants,
         const Viewport &viewport,const PackedTexture &source,const std::vector<PackedColor> &background,
-        const std::optional<std::array<int32_t,4>> &scissor=std::nullopt);
+        const std::optional<std::array<int32_t,4>> &scissor=std::nullopt,
+        const Color &blend_constant=Color{1,1,1,1});
 };
 }

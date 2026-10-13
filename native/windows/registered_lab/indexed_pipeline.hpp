@@ -51,13 +51,13 @@ public:
             const auto batch=triangle_batch(request,shader::RegisterExecutor::preferred_raster_batch(request.pixel));
             const auto capacity=vertex_capacity(h.vertices);
             raster::PackedResources resources;shader::TextureSamplers samplers{};
-            if(h.flags&0x2000){require(h.abi==8 || h.abi==9 || h.abi==10 || h.abi==11 || h.abi==12 || h.abi==14);resources=request.resources;samplers=request.samplers;}
-            else {require(h.abi==7 || h.abi==9 || h.abi==10 || h.abi==11);resources[0]=request.texture;samplers[0].filter=(h.flags&16)?shader::TextureFilter::point:shader::TextureFilter::linear;}
+            if(h.flags&0x2000){require(h.abi==8 || h.abi==9 || h.abi==10 || h.abi==11 || h.abi==12 || h.abi==14 || h.abi==15);resources=request.resources;samplers=request.samplers;}
+            else {require(h.abi==7 || h.abi==9 || h.abi==10 || h.abi==11 || h.abi==15);resources[0]=request.texture;samplers[0].filter=(h.flags&16)?shader::TextureFilter::point:shader::TextureFilter::linear;}
             for(auto &entry:triangle_cache){const auto &old=entry.header;
                 if(entry.batch==batch && old.vertices==capacity && old.format==h.format &&
                     (old.flags&~4u)==(h.flags&~4u) && raster::resource_layout_equal(resources,entry.layout) &&
                     raster::sampler_layout_equal(samplers,entry.samplers) && entry.vertex==request.vertex.bytecode && entry.pixel==request.pixel.bytecode)
-                    return entry.executor->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,resources,request.background,request.scissor);
+                    return entry.executor->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,resources,request.background,request.scissor,request.blend_constant);
             }
             // Target shape is a runtime projection input, not a model shape.
             // Retain fewer complete pipelines after the 64-entry desktop trial
@@ -67,7 +67,7 @@ public:
             if(triangle_cache.size()==24)triangle_cache.erase(triangle_cache.begin());
             auto candidate=std::make_unique<raster::TriangleTextureDrawExecutor>(request.vertex,request.pixel,capacity,h.width,h.height,h.format,
                 resources,samplers,"NPU",blend_mode(h),uint8_t((h.flags>>8)&15),static_cast<raster::CullMode>((h.flags>>5)&3),(h.flags&128)!=0,batch);
-            auto result=candidate->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,resources,request.background,request.scissor);
+            auto result=candidate->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,resources,request.background,request.scissor,request.blend_constant);
             auto key=h;key.vertices=capacity;
             triangle_cache.push_back({key,batch,request.vertex.bytecode,request.pixel.bytecode,raster::resource_layout(resources),samplers,std::move(candidate)});
             return result;
@@ -108,7 +108,7 @@ public:
             const auto &old=entry.header;
             if(old.width==h.width && old.height==h.height && old.vertices==h.vertices && old.format==h.format &&
                (old.flags & ~4u)==(h.flags & ~4u) && entry.vertex==request.vertex.bytecode && entry.pixel==request.pixel.bytecode)
-                return entry.executor->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,request.background,request.scissor);
+                return entry.executor->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,request.background,request.scissor,request.blend_constant);
         }
         // Complete eviction before constructing a new NPU model. Releasing an
         // old entry after creating its successor triggers a device-loss failure
@@ -117,7 +117,7 @@ public:
         const auto batch=raster::UniformDrawExecutor::raster_batch(h.width,h.height);
         auto candidate=std::make_unique<raster::UniformDrawExecutor>(request.vertex,request.pixel,h.vertices,h.width,h.height,
             "NPU",blend_mode(h),h.format==87,uint8_t((h.flags>>8)&15),batch,static_cast<raster::CullMode>((h.flags>>5)&3),(h.flags&128)!=0);
-        auto result=candidate->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,request.background,request.scissor);
+        auto result=candidate->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,request.background,request.scissor,request.blend_constant);
         uniform_cache.push_back({h,request.vertex.bytecode,request.pixel.bytecode,std::move(candidate)});
         return result;
     }

@@ -205,6 +205,15 @@ devices. Editor text, maximize and close remain unverified on the NPU path.
 A subsequent lookup test with 1,024 distinct palette colors passes every pixel
 on the NPU; it does not resolve this separate blend rejection.
 
+The [v229 blend fix](docs/validation/2026-10-12/component-coverage-v229/report.json)
+replays that complete captured glyph draw with identical CPU/NPU pixels under
+both runtime versions. Both clean builds pass 28 CPU suites; NPU checks cover
+688,128 blend components per runtime, 71 historical packets, three ABI 15
+packets, and 68 native driver draws. ABI 15 carries the text color as a runtime
+input and supports independent channel coverage with preserved write masks.
+The replay visibly renders the first editor glyph. A complete typed line and
+live desktop interaction still require the next installed trial.
+
 The v116 live draws expand into 26,995 provider calls. Their reported execution
 intervals total 138 seconds, versus 329 seconds including pipeline setup and
 other wrapper work. Of 1,921 model setup calls, 1,915 are disk-cache hits.
