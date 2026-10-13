@@ -1,0 +1,54 @@
+{
+  "build": "point-reentry-v1",
+  "parent": "queue-worker-v4",
+  "changed_files": [
+    "native/windows/registered_lab/point_texture_draw.cpp",
+    "native/windows/registered_lab/point_texture_draw_test.cpp"
+  ],
+  "cpu_contracts_passed": 28,
+  "independent_npu_components": 3576128,
+  "npu_invalid_inputs_rejected": 16,
+  "changing_source_and_destination_tested": true,
+  "adaptive_transition_frames": 18,
+  "gpu_qualified": false,
+  "gpu_failure_reproduced_on_unchanged_renderer": true,
+  "gpu_failure_precedes_modified_adaptive_path": true,
+  "full_ordered_requests": 1438,
+  "all_pixels_and_coverage_exact": true,
+  "non_point_receipts_exact": true,
+  "changed_receipt_ordinals": [
+    1165,
+    1245,
+    1326,
+    1370,
+    1432
+  ],
+  "fast_crop_ordinals": [
+    1326,
+    1370,
+    1432
+  ],
+  "prior_provider_calls_per_readmitted_draw": 1538,
+  "new_provider_calls_per_readmitted_draw": 3,
+  "total_prior_provider_calls": 61822,
+  "total_new_provider_calls": 57221,
+  "elapsed_ms": 631781.0000000027,
+  "reference_elapsed_ms": 641906.0000000027,
+  "elapsed_reduction_percent": 1.5773337529170872,
+  "model_setup_calls": 1730,
+  "reference_model_setup_calls": 1711,
+  "all_model_setups_disk_cache_hits": true,
+  "repeated_comparison": false,
+  "order_effects_controlled": false,
+  "new_live_desktop_tested": false,
+  "physical_desktop_offloaded": false,
+  "tahoma_tested": false,
+  "findings": [
+    "A prior general draw no longer permanently disables crop admission. Each later draw proves the full crop conditions again using the selected provider. Only a failed crop proof selects the general renderer; malformed input and provider errors still propagate.",
+    "The old general requests are destroyed before new crop state is created, preserving the qualified release-before-create ordering. Repeated ineligible draws therefore incur fresh proof/setup work; two requests gain two provider calls each and total model setup calls rise by 19.",
+    "The scalar oracle covers full, partial, full, scaled, partial, partial, full, scaled, full transitions in both channel orders, changing both source and destination on every draw.",
+    "The GPU control fails in the unchanged captured-backdrop projection check before adaptive transitions, exactly as the original present-umd-v229 test. CPU and physical NPU qualification pass; GPU qualification is not claimed.",
+    "The complete replay uses the same expanded cache/private shared queue as its reference and changes only crop admission. Five execution receipts change as expected; every output pixel and coverage count remains exact. Timings include filesystem exchange and are a single uncontrolled comparison.",
+    "The live guest package, physical host graphics configuration and Tahoma are unchanged by this qualification."
+  ]
+}

@@ -1,0 +1,56 @@
+from pathlib import Path
+import json,hashlib,difflib
+r=Path('results/render-driver');out=Path('docs/validation/2026-10-13/point-reentry-v1');assert not (out/'report.json').exists();out.mkdir(parents=True,exist_ok=True)
+def read(p):
+ b=p.read_bytes();return b.decode('utf-16') if b[:2]==b'\xff\xfe' else b.decode('utf-8-sig')
+def obj(p):return json.loads(read(p))
+def rows(p):return [json.loads(x) for x in read(p).splitlines() if x.startswith('{')]
+def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+manifest=[]
+def save(p,n):
+ assert p.name!='private-token.bin';manifest.append(dict(source=p.relative_to(r).as_posix(),bytes=p.stat().st_size,sha256=sha(p)))
+ if n.endswith('.py'):n+='.txt'
+ target=out/n;target.parent.mkdir(parents=True,exist_ok=True);text='\n'.join(x.rstrip() for x in read(p).splitlines()).rstrip();target.write_text(text+'\n' if text else '')
+for item in obj(r/'point-reentry-v1-evidence-sha256.json'):
+ p=r/item['name'];assert p.stat().st_size==item['bytes'] and sha(p)==item['sha256'].lower();save(p,item['name'])
+for name in ['point-reentry-v1-source.json','point-reentry-v1-plan.json','point-reentry-v1-evidence-sha256.json','build-point-reentry-v1.ps1','qualify-point-reentry-v1.ps1','qualify-ordered-point-reentry-v1.ps1','replay-ordered-trace-v6-point.py','test-point-reentry-comparison-v1.py','point-reentry-comparison-v1-tests.json','curate-point-reentry-v1.py']:save(r/name,name)
+build=obj(r/'point-reentry-v1-build/registered-build-report.json');q=obj(r/'point-reentry-v1-NPU-qualified.json');s=obj(r/'ordered-point-reentry-v1-summary.json');a=obj(r/'ordered-point-reentry-v1-expanded/report.json');b=obj(r/'ordered-queue-v4c-expanded/report.json')
+assert build['clean_build'] and build['relevant_cpu_contracts_passed'] and build['point_crop_reentry']
+assert '100% tests passed out of 28' in read(r/'point-reentry-v1-CPU-contracts.log')
+assert q['npu_qualified'] and q['baseline_gpu_failure_reproduced'] and not q['gpu_qualified']
+assert a['completed'] and a['passed'] and a['worker_exit_code']==0 and len(a['requests'])==1438 and s['passed']
+assert a['worker_sha256']==build['binary_sha256']['nr_registered_indexed_worker.exe'].lower()
+assert a['reference_sha256']==sha(r/'ordered-queue-v4c-expanded/report.json')
+log=rows(r/'ordered-point-reentry-v1-expanded/worker.stdout.jsonl');passed=[x for x in log if x.get('passed')];finish=[x for x in log if x.get('worker_finished')]
+assert len(passed)==1438 and finish[0]['succeeded']==1438 and finish[0]['failed']==0 and not read(r/'ordered-point-reentry-v1-expanded/worker.stderr.log').strip()
+changes=[]
+for x,y,w in zip(a['requests'],b['requests'],passed):
+ assert x['passed'] and x['execution_device']==w['execution_device']=='NPU' and x['reference_output_exact']
+ for key in ['source_sha256','normalized_sha256','pixels_sha256']:assert x[key]==y[key]
+ assert x['receipt']['covered_samples']==y['receipt']['covered_samples']
+ if x['receipt']!=y['receipt']:
+  assert x['flags']==0xf02 and not x['reference_output_and_receipt_exact'] and x['reference_receipt']==y['receipt'];changes.append(x['ordinal'])
+ else:assert x['reference_output_and_receipt_exact']
+assert changes==[1165,1245,1326,1370,1432]
+assert sum(x['provider_requests'] for x in passed)==57221==s['provider_requests']
+for device in ['NPU','GPU']:
+ log=rows(r/f'point-reentry-v1-qualification/point-{device}.stdout.jsonl')
+ if device=='NPU':assert log[-1]['verified_components']==3576128 and log[-1]['invalid_draws_rejected']==16 and len([x for x in log if x.get('adaptive_point_texture')])==18
+ else:assert len(log)==8 and all(x['point_texture_draw'] for x in log)
+assert read(r/'point-reentry-v1-qualification/point-GPU.stderr.log').strip()==read(r/'point-reentry-v1-GPU-baseline/stderr.log').strip()=='unsupported projection request'
+patch=[];modified=[]
+for name,value in obj(r/'point-reentry-v1-source.json').items():
+ rel=name.replace('\\','/');p=r/'point-reentry-v1'/rel;parent=r/'queue-worker-v4'/rel;assert sha(p)==value.lower()
+ if p.read_bytes()!=parent.read_bytes():
+  modified.append(rel);patch+=difflib.unified_diff(parent.read_text().splitlines(True),p.read_text().splitlines(True),fromfile='a/'+rel,tofile='b/'+rel)
+assert modified==['native/windows/registered_lab/point_texture_draw.cpp','native/windows/registered_lab/point_texture_draw_test.cpp']
+(out/'renderer-change.patch').write_text(''.join(patch))
+report=dict(build='point-reentry-v1',parent='queue-worker-v4',changed_files=modified,cpu_contracts_passed=28,independent_npu_components=3576128,npu_invalid_inputs_rejected=16,changing_source_and_destination_tested=True,adaptive_transition_frames=18,gpu_qualified=False,gpu_failure_reproduced_on_unchanged_renderer=True,gpu_failure_precedes_modified_adaptive_path=True,full_ordered_requests=1438,all_pixels_and_coverage_exact=True,non_point_receipts_exact=True,changed_receipt_ordinals=changes,fast_crop_ordinals=[1326,1370,1432],prior_provider_calls_per_readmitted_draw=1538,new_provider_calls_per_readmitted_draw=3,total_prior_provider_calls=61822,total_new_provider_calls=57221,elapsed_ms=s['elapsed_ms'],reference_elapsed_ms=s['reference_elapsed_ms'],elapsed_reduction_percent=100*(1-s['elapsed_ms']/s['reference_elapsed_ms']),model_setup_calls=s['compile_calls'],reference_model_setup_calls=1711,all_model_setups_disk_cache_hits=s['compile_calls']==s['disk_cache_hits'],repeated_comparison=False,order_effects_controlled=False,new_live_desktop_tested=False,physical_desktop_offloaded=False,tahoma_tested=False,findings=[
+'A prior general draw no longer permanently disables crop admission. Each later draw proves the full crop conditions again using the selected provider. Only a failed crop proof selects the general renderer; malformed input and provider errors still propagate.',
+'The old general requests are destroyed before new crop state is created, preserving the qualified release-before-create ordering. Repeated ineligible draws therefore incur fresh proof/setup work; two requests gain two provider calls each and total model setup calls rise by 19.',
+'The scalar oracle covers full, partial, full, scaled, partial, partial, full, scaled, full transitions in both channel orders, changing both source and destination on every draw.',
+'The GPU control fails in the unchanged captured-backdrop projection check before adaptive transitions, exactly as the original present-umd-v229 test. CPU and physical NPU qualification pass; GPU qualification is not claimed.',
+'The complete replay uses the same expanded cache/private shared queue as its reference and changes only crop admission. Five execution receipts change as expected; every output pixel and coverage count remains exact. Timings include filesystem exchange and are a single uncontrolled comparison.',
+'The live guest package, physical host graphics configuration and Tahoma are unchanged by this qualification.'
+])
+(out/'report.json').write_text(json.dumps(report,indent=2)+'\n');(out/'raw-manifest.json').write_text(json.dumps(manifest,indent=2)+'\n');print('Verified crop reentry evidence:',len(manifest),'files; all 1438 pixels/coverage exact')

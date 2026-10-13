@@ -1,0 +1,40 @@
+"""Check that deliberate point-path receipt changes cannot mask regressions."""
+import copy
+import importlib.util
+import json
+from pathlib import Path
+
+root=Path(__file__).parent
+spec=importlib.util.spec_from_file_location('replay',root/'replay-ordered-trace-v6-point.py')
+module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+probe=json.loads((root/'point-crop-reentry-v1/report.json').read_text(encoding='utf-8-sig'))
+checks=0
+def accepted(current,prior,abi=2,flags=0xf02,allow=True):
+    global checks
+    result=module.compare_reference(current,prior,abi,flags,allow);checks+=1;return result
+def rejected(current,prior,abi=2,flags=0xf02,allow=True):
+    global checks
+    try:module.compare_reference(current,prior,abi,flags,allow)
+    except AssertionError:checks+=1;return
+    raise AssertionError('Invalid comparison accepted')
+for case in probe['cases']:
+    prior=dict(source_sha256=case['source_sha256'],normalized_sha256='same-request',pixels_sha256=case['pixels_sha256'],width=1024,height=768,receipt=case['original_receipt'])
+    current=copy.deepcopy(prior);current['receipt']=case['fresh_receipt']
+    assert accepted(current,prior)=='point_crop_readmitted'
+    assert accepted(prior,prior,abi=15,flags=0x2000,allow=False)=='exact'
+    for key in ['source_sha256','normalized_sha256','pixels_sha256']:
+        bad=copy.deepcopy(current);bad[key]='different';rejected(bad,prior)
+    rejected(current,prior,allow=False);rejected(current,prior,abi=15);rejected(current,prior,flags=0x1002)
+    for key in ['covered_samples','reserved','provider_requests','tile_executions']:
+        bad=copy.deepcopy(current);bad['receipt'][key]+=1;rejected(bad,prior)
+    bad=copy.deepcopy(current);bad['width']+=1;rejected(bad,prior)
+    bad=copy.deepcopy(prior);bad['receipt']['used_rectangle']=1;rejected(current,bad)
+    general=copy.deepcopy(prior)
+    for key,extra in [('provider_requests',2),('input_bytes',512),('output_bytes',512)]:general['receipt'][key]+=extra
+    assert accepted(general,prior)=='point_crop_reproof_before_general'
+    for key,value in [('provider_requests',prior['receipt']['provider_requests']+3),('tile_executions',prior['receipt']['tile_executions']+1),('input_bytes',prior['receipt']['input_bytes']-1),('output_bytes',prior['receipt']['output_bytes']-1),('used_rectangle',2)]:
+        bad=copy.deepcopy(general);bad['receipt'][key]=value;rejected(bad,prior)
+    bad=copy.deepcopy(general);bad['receipt']['unknown']=0;rejected(bad,prior)
+report=dict(passed=True,checks=checks,changed_point_receipts_explicitly_scoped=True,all_pixels_and_request_identity_still_exact=True,unrelated_receipt_changes_rejected=True,hardware_test=False)
+(root/'point-reentry-comparison-v1-tests.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(report))

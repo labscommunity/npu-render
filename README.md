@@ -236,6 +236,15 @@ does not establish a live desktop or Tahoma speedup. The changes remain isolated
 experiments. Three fresh-executor probes also confirm a missed fast path for
 later full-screen copies, motivating a separate rendering fix.
 
+The [crop re-entry fix](docs/validation/2026-10-13/point-reentry-v1/README.md)
+now rechecks later draws after a partial copy. It passes 28 CPU suites,
+3,576,128 independent NPU pixel checks, and the full ordered desktop trace.
+Three affected copies use three NPU calls each instead of 1,538, preserving
+every pixel and coverage count. Total calls fall from 61,822 to 57,221. A single
+replay finishes 1.6% sooner; live desktop and Tahoma gains remain unproven.
+The GPU control reproduces an existing projection rejection before the changed
+path, so this qualification covers CPU and NPU only.
+
 The v116 live draws expand into 26,995 provider calls. Their reported execution
 intervals total 138 seconds, versus 329 seconds including pipeline setup and
 other wrapper work. Of 1,921 model setup calls, 1,915 are disk-cache hits.

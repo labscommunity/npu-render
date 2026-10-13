@@ -127,11 +127,19 @@ UniformDrawExecutor::Result PointTextureDrawExecutor::execute_adaptive(const std
         source.pixels.size()==size_t(source.width)*source.height && background.size()==size_t(c.width)*c.height &&
         viewport.x==0 && viewport.y==0 && viewport.width==float(c.width) && viewport.height==float(c.height));
     UniformDrawExecutor::Result attempted{};
+    if(!state){
+        // Crop eligibility depends on this draw's transformed vertices and UVs.
+        // A prior partial draw must not permanently exclude a later full crop.
+        // Release the general provider's requests before constructing successors.
+        general.reset();
+        state=std::make_unique<State>(c.vertex,c.pixel,c.width,c.height,c.format,
+            c.source_width,c.source_height,c.source_format,c.backend);
+    }
     if(state){
         try{return execute(inputs,constants,viewport,source);}
         catch(const CropNotApplicable &mismatch){attempted=mismatch.attempted;}
         // Retire old NPU requests before creating successors (driver 5540).
-        // Stay general thereafter, including if construction must be retried.
+        // The next draw must prove eligibility again; provider errors propagate.
         state.reset();
     }
     if(!general)general=std::make_unique<TriangleTextureDrawExecutor>(c.vertex,c.pixel,6,c.width,c.height,c.format,

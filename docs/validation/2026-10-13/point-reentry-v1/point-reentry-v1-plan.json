@@ -1,0 +1,19 @@
+{
+  "status": "prepared_not_built_or_qualified",
+  "parent": "queue-worker-v4",
+  "change": "Re-prove crop eligibility after a prior general draw; release general requests before recreating crop provider state. Only CropNotApplicable permits general rendering; all provider errors propagate.",
+  "independent_oracle_sequence": [
+    "full",
+    "partial",
+    "full",
+    "scaled",
+    "partial",
+    "partial",
+    "full",
+    "scaled",
+    "full"
+  ],
+  "source_and_background_change_each_draw": true,
+  "input_reuse_enabled": false,
+  "installed": false
+}

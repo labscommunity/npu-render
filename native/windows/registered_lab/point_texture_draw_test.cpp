@@ -78,8 +78,9 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
             }
         }
     }
-    // Full crop -> partial height -> full crop -> scaled sample. Uncovered
-    // pixels retain a nonuniform destination; both byte channel orders matter.
+    // Re-enter crop after partial and scaled draws, including consecutive
+    // general draws. Both source and uncovered destination change each draw;
+    // both byte channel orders must match the independent scalar oracle.
     for(const bool swap:{false,true}){
         constexpr uint32_t w=32,h=24,sw=128,sh=80,ox=5,oy=7;
         PackedTexture source{sw,sh,87,{}};source.pixels.resize(size_t(sw)*sh);
@@ -88,8 +89,11 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
         for(size_t i=0;i<background.size();++i)for(unsigned c=0;c<4;++c)background[i][c]=uint8_t((i*13+c*37)&255);
         PointTextureDrawExecutor executor(vs,ps,w,h,swap?28u:87u,sw,sh,87,backend);
         const Viewport view{0,0,float(w),float(h),0,1};
-        for(unsigned frame=0;frame<4;++frame){
-            const uint32_t draw_height=frame==1?13u:h,scale=frame==3?3u:1u;
+        constexpr unsigned cases[]{0,1,0,2,1,1,0,2,0};
+        for(unsigned frame=0;frame<std::size(cases);++frame){
+            const uint32_t draw_height=cases[frame]==1?13u:h,scale=cases[frame]==2?3u:1u;
+            for(size_t i=0;i<source.pixels.size();++i)for(unsigned c=0;c<4;++c)source.pixels[i][c]=uint8_t((i*17+c*71+frame*29)&255);
+            for(size_t i=0;i<background.size();++i)for(unsigned c=0;c<4;++c)background[i][c]=uint8_t((i*13+c*37+frame*19)&255);
             const uint32_t corners[6][2]{{0,0},{w,0},{w,draw_height},{w,draw_height},{0,draw_height},{0,0}};
             std::vector<VertexRegisters> inputs(6);
             for(unsigned i=0;i<6;++i){
@@ -103,7 +107,7 @@ O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.
             }
             const auto out=executor.execute_adaptive(inputs,{},view,source,background);
             test(out.covered_samples==uint64_t(w)*draw_height && out.execution_device.rfind(backend,0)==0);
-            test(!frame ? out.used_rectangle && out.provider_requests==3 : !out.used_rectangle && out.provider_requests>3);
+            test(cases[frame]==0 ? out.used_rectangle && out.provider_requests==3 : !out.used_rectangle && out.provider_requests>3);
             for(unsigned y=0;y<h;++y)for(unsigned x=0;x<w;++x)for(unsigned c=0;c<4;++c){
                 // A scale of three selects the center texel of each triplet.
                 const auto expected=y>=draw_height?background[size_t(y)*w+x][c]:c==3?uint8_t(255):
