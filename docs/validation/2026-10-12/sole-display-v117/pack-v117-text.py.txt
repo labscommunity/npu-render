@@ -1,0 +1,28 @@
+from pathlib import Path
+import hashlib,json,zipfile
+r=Path.home()/'AppData/Local/npu-render/vm'
+p=r/'v117-after-cleanup.zip';m=r/'v117-after-cleanup-sha256.json'
+def read(p):
+ b=p.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+manifest=read(m);want={x['name'].replace('\\','/'):x for x in manifest};out=r/'v117-text-evidence.zip'
+assert not out.exists()
+checked=[]
+with zipfile.ZipFile(p) as z,zipfile.ZipFile(out,'x',compression=zipfile.ZIP_DEFLATED) as dst:
+ for info in z.infolist():
+  if info.is_dir():continue
+  name=info.filename.replace('\\','/');assert name in want and not name.startswith('/') and '..' not in name.split('/')
+  row=want[name];h=hashlib.sha256();size=0
+  with z.open(info) as f:
+   while b:=f.read(1024*1024):h.update(b);size+=len(b)
+  assert h.hexdigest()==row['sha256'].lower() and size==row['bytes']
+  checked.append(name)
+  if Path(name).suffix in ['.json','.jsonl','.log','.txt','.ps1']:
+   assert size<16*1024*1024
+   dst.writestr(name,z.read(info))
+assert set(checked)==set(want)
+h=hashlib.sha256()
+with p.open('rb') as f:
+ while b:=f.read(1024*1024):h.update(b)
+report={'raw_archive_bytes':p.stat().st_size,'raw_archive_sha256':h.hexdigest(),'archive_members_verified':len(checked),'all_manifest_members_present':True,'text_archive_bytes':out.stat().st_size,'text_archive_sha256':hashlib.sha256(out.read_bytes()).hexdigest(),'raw_archive_preserved_on_delta':True,'raw_archive_downloaded_to_mac':False}
+(r/'v117-archive-verification.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(report),flush=True)

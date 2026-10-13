@@ -1,0 +1,24 @@
+{
+  "recorded_at": "2026-10-12T23:54:18.184319+00:00",
+  "trial": "v117",
+  "status": "transport_expired_awaiting_automatic_topology_restoration",
+  "worker_successes_observed": 830,
+  "last_frame_identity": [
+    4404,
+    21,
+    286692101800
+  ],
+  "worker_maximum_seconds_requested": 1800,
+  "observer_seconds_requested": 1500,
+  "relay_seconds_compiled": 600,
+  "relay_stdout_last_write_utc": "2026-10-12T23:45:29Z",
+  "relay_stderr_creation_utc": "2026-10-12T23:35:28Z",
+  "first_complete_failed_guest_draw_capture_utc": "2026-10-12T23:45:30.8345820Z",
+  "worker_error": "indexed socket closed or timed out",
+  "relay_final_records": "client_departure in connect phase; win32_error 1460",
+  "worker_process_absent": true,
+  "npu_device_loss_recorded": false,
+  "cause": "Controller configured only the worker duration; relay retained its independent hardcoded 600000 ms lifetime.",
+  "correction_prepared": "Explicit bounded relay duration argument and shared controller setting; original defaults preserved.",
+  "full_desktop_offload": false
+}

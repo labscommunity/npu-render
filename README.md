@@ -172,6 +172,17 @@ archive alongside normal bounded cleanup. Full desktop offload is unfinished.
 The Windows VM runs on the Mac; Delta provides the physical NPU. Delta's own
 Windows desktop continues using its ordinary graphics path.
 
+The extended [v117 trial](docs/validation/2026-10-12/sole-display-v117/report.json)
+returns 830 acknowledged NPU results and nineteen frames, eighteen received after
+sole-display confirmation. Run appears after 142 seconds; complete Notepad
+interaction remains unverified. The trial exposes a harness error: the worker
+was extended to thirty minutes while its relay retained a ten-minute cutoff.
+Transport closure precedes the captured DWM failures; no NPU device loss is
+logged. The native topology task later terminates without a restoration record.
+Both guest devices are subsequently removed successfully and the ordinary
+desktop is visually verified. The full request sequence and raw guest archive
+are preserved. Full desktop offload remains unfinished.
+
 The v116 live draws expand into 26,995 provider calls. Their reported execution
 intervals total 138 seconds, versus 329 seconds including pipeline setup and
 other wrapper work. Of 1,921 model setup calls, 1,915 are disk-cache hits.

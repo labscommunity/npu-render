@@ -1,0 +1,50 @@
+import sys,json,time,hashlib
+from datetime import datetime,UTC
+from pathlib import Path
+sys.path.insert(0,str(Path.cwd()))
+from tools.view_lab_desktop import LabInput
+from npu_render.indirect_frame import confirmed_sole_display,parse_frame
+root=Path('results/render-driver');out=root/'input-v117';out.mkdir(exist_ok=False)
+source=root/'collector-v117-live/latest.bin';gate=source.parent/'input-ready.json';control=LabInput(33237,49400)
+report={'started':datetime.now(UTC).isoformat(),'actions':[],'snapshots':[],'visual_response_verified':False,'sole_gate_observed':False}
+def persist():
+ (out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+def snapshot(name):
+ if source.exists():
+  data=source.read_bytes();frame=parse_frame(data);(out/(name+'.bin')).write_bytes(data)
+  report['snapshots'].append({'name':name,'captured_at':datetime.now(UTC).isoformat(),'sole_indirect_at_snapshot':confirmed_sole_display(gate),'identity':frame.identity,'pixel_sha256':hashlib.sha256(frame.pixels).hexdigest()})
+try:
+ deadline=time.monotonic()+1850;woke=False
+ while time.monotonic()<deadline:
+  if confirmed_sole_display(gate):
+   report['sole_gate_observed']=True
+   if not woke:
+    control.key('ctrl',True);time.sleep(.2);control.key('ctrl',False);woke=True
+    report['actions'].append({'action':'wake-control','at':datetime.now(UTC).isoformat()});persist()
+   if (out/'desktop-ready.json').exists():break
+  time.sleep(.5)
+ if not confirmed_sole_display(gate) or not (out/'desktop-ready.json').exists():raise RuntimeError('No complete sole-display desktop received')
+ snapshot('before-run')
+ control.key('meta_l',True);control.key('r',True);time.sleep(.2);control.key('r',False);control.key('meta_l',False)
+ report['actions'].append({'action':'open-run','at':datetime.now(UTC).isoformat()});persist()
+ for marker in ('run-visible','notepad-visible','text-visible','maximized-visible','closed-visible'):
+  while time.monotonic()<deadline and not ((out/(marker+'.json')).exists() and confirmed_sole_display(gate)):time.sleep(.5)
+  if time.monotonic()>=deadline or not (out/(marker+'.json')).exists() or not confirmed_sole_display(gate):break
+  snapshot(marker);persist()
+  if marker=='run-visible':
+   for code in 'notepad':control.key(code,True);time.sleep(.1);control.key(code,False);time.sleep(.15)
+   control.key('ret',True);time.sleep(.2);control.key('ret',False)
+   report['actions'].append({'action':'launch-notepad','at':datetime.now(UTC).isoformat()})
+  elif marker=='notepad-visible':
+   for character in 'npu desktop offload v117':
+    code='spc' if character==' ' else character;control.key(code,True);time.sleep(.1);control.key(code,False);time.sleep(.15)
+   report['actions'].append({'action':'type-test-text','text':'npu desktop offload v117','at':datetime.now(UTC).isoformat()})
+  elif marker=='text-visible':
+   control.key('meta_l',True);control.key('up',True);time.sleep(.2);control.key('up',False);control.key('meta_l',False)
+   report['actions'].append({'action':'maximize-notepad','at':datetime.now(UTC).isoformat()})
+  elif marker=='maximized-visible':
+   control.key('alt',True);control.key('f4',True);time.sleep(.2);control.key('f4',False);control.key('alt',False)
+   report['actions'].append({'action':'close-notepad','at':datetime.now(UTC).isoformat()})
+  persist()
+finally:
+ control.release();report['finished']=datetime.now(UTC).isoformat();persist();print(json.dumps(report))

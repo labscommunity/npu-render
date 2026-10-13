@@ -1,0 +1,42 @@
+{
+  "trial": "v117",
+  "status": "running",
+  "renderer_source_commit": "04069b560a44c278b6150da68f678767b8b2b41e",
+  "host_worker_build": "trace-worker-v2",
+  "guest_umd_build": "present-umd-v224-legacy",
+  "package_reused_from": "v116",
+  "package_version": "0.0.103.0",
+  "topology_duration_build": "topology-duration-v31",
+  "observer_seconds": 1500,
+  "worker_seconds": 1800,
+  "collector_and_viewer_seconds": 1800,
+  "vm_pid": 33237,
+  "vm_lease_until": "2026-10-13T04:57:00Z",
+  "topology": "idd-topology-v9ay",
+  "local_harness": {
+    "collect-lab-frames-v117.py": {
+      "sha256": "82408ddc7d658c612692e9b685fc5be441e06f3599c32ad513762ebeac69c759",
+      "base": "tools/collect_lab_frames.py",
+      "only_change": "Allowed finite maximum duration and its error message: 600 to 1800 seconds."
+    },
+    "view-lab-desktop-v117.py": {
+      "sha256": "70131d0155c9a91d9f970517aacea862029908e3584da5b0bd046f8f637b9de8",
+      "base": "tools/view_lab_desktop.py",
+      "only_change": "Allowed finite maximum duration and its error message: 600 to 1800 seconds."
+    }
+  },
+  "renderer_math_changed_since_v116": false,
+  "cache_policy_changed_since_v116": false,
+  "private_queue_setting_changed": false,
+  "ordinary_desktop_before_trial_verified": true,
+  "full_desktop_offload": false,
+  "tahoma_performance_tested": false,
+  "sessions": {
+    "controller": 89663,
+    "collector": 48469,
+    "viewer": 12030,
+    "input": 99457,
+    "failure_watch": 34560,
+    "memory_watch": 34782
+  }
+}
