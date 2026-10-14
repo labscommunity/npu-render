@@ -14,9 +14,9 @@ renderer does not establish where every application renders.
 
 | Gate | Work | Acceptance evidence | Current status |
 | --- | --- | --- | --- |
-| 1. Routing | Record active physical and indirect paths before, during, and after admission; identify clone/extended configuration and actual rendering adapter. | Timestamped topology, native DWM NPU receipts, selected adapter, frame producer, exact restoration. | Automatic clone identified; extension applied with physical path preserved. Compositor failure interrupted clone restoration; final physical baseline restored. |
-| 2. Continuous rendering | Keep the native renderer alive across changing windows and content; diagnose every failed draw; distinguish model preparation from rendering and transport. | Multiple changing frames, timestamps and pixel checks, sustained operation, no hidden fallback. | Three changing clone frames: first at 70.8 seconds, then 56.4 and 23.4 seconds apart. Extended-desktop clear rejection under investigation. |
-| 3. Physical presentation | Present new NPU frames on the physical output with distinct logical desktops and no recursive mirroring. | Live sequence-to-present correlation, output identity, measured presentation mode and residual GPU work. | Static finite copy probe works; live physical bridge unimplemented. |
+| 1. Routing | Record active physical and indirect paths before, during, and after admission; identify clone/extended configuration and actual rendering adapter. | Timestamped topology, native DWM NPU receipts, selected adapter, frame producer, exact restoration. | Automatic clone identified; v11 applies extension with the physical path preserved, produces a frame while extended, restores the clone exactly, and restores the final physical baseline. |
+| 2. Continuous rendering | Keep the native renderer alive across changing windows and content; diagnose every failed draw; distinguish model preparation from rendering and transport. | Multiple changing frames, timestamps and pixel checks, sustained operation, no hidden fallback. | V11 survives extension/restoration and produces three different frames: first at 69.5 seconds, then 93.7 and 115.4 seconds apart. Controlled application changes and sustained extended operation remain unqualified. |
+| 3. Physical presentation | Present new NPU frames on the physical output with distinct logical desktops and no recursive mirroring. | Live sequence-to-present correlation, output identity, measured presentation mode and residual GPU work. | Static finite copy probe works; live bridge candidate builds and its packet reader passes eleven cases. Live physical delivery remains unqualified. |
 | 4. Interaction and recovery | Migrate the logical desktop, route pointer/keyboard/focus correctly, handle cursor/DPI/resolution, restore exact topology and windows. | Scripted interaction visible on physical output; emergency exit and owned-process failure recovery; ordinary login/lock path retained. | VM interaction proof exists; native interaction unqualified. |
 | 5. Responsiveness | Optimize resource reuse, graph compilation, dispatch granularity, transfer volume and frame pacing. | Initial target: ordinary desktop interaction at 30 fps, p95 visible response ≤100 ms, 30-minute stable run. Report cold-start time separately. | Not met; several individual draws take seconds. |
 | 6. Application coverage | Admit and implement required graphics operations across browser, video and representative 3D workloads. Establish per-process adapter choice. | Capability matrix plus real hardware runs; every remaining iGPU operation accounted for. | General application/video/game migration unqualified. |
@@ -30,12 +30,13 @@ role, and any GPU rendering/copy cost in the bridge must be measured.
 
 ## Immediate experiment
 
-The [first topology investigation](../validation/2026-10-14/native-topology-progress-v1/README.md)
-identified automatic cloning and applied an explicitly extended layout. The
-compositor then exited after a rejected clear. The next work is to qualify a
-bounded larger clear operation, add failure diagnostics, and repeat extension
-with a controller that correctly fails on errors occurring after the first frame.
-Live physical feedback remains gated on reliable display separation.
+The [large-surface investigation](../validation/2026-10-14/native-large-surface-v1/README.md)
+qualifies the captured full-resolution draw and completes native extension and
+restoration with DWM alive. Next, keep the displays extended, generate controlled
+content changes on the indirect desktop, and correlate verified NPU-produced
+frame sequences with physical presentation. The live candidate rejects cloned
+layouts, producer changes, sequence regression and session changes. This trial
+must not be presented as interaction support or acceptable performance.
 
 ## Architecture constraints from primary documentation
 

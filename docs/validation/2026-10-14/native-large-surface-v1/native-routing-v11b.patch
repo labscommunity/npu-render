@@ -1,0 +1,17 @@
+--- a/native/windows/registered_lab/large_clear_probe.cpp
++++ b/native/windows/registered_lab/large_clear_probe.cpp
+@@ -1,3 +1,5 @@
++#define WIN32_LEAN_AND_MEAN
++#define NOMINMAX
+ #include "indexed_exchange_protocol.hpp"
+ #include "clear_executor.hpp"
+ #include <windows.h>
+@@ -15,7 +17,7 @@
+  for(unsigned n=0;n<11;++n){auto h=r.header;switch(n){case 0:h.abi=13;h.reserved=0;break;case 1:h.width=4096;h.height=2048;break;case 2:h.width=0;break;case 3:h.width=8193;break;case 4:h.reserved=12;break;case 5:h.flags|=1;break;case 6:h.vertices=6;break;case 7:h.body_bytes=20;break;case 8:h.width=1024;h.height=768;break;case 9:h.abi=16;break;case 10:h.sequence=0;break;}check(!ex::request_valid(h,80+uint64_t(h.body_bytes)));++rejected;}
+  auto truncated=packet;truncated.pop_back();bool failed=false;try{(void)ex::decode(truncated);}catch(const std::invalid_argument&){failed=true;}check(failed);++rejected;
+  auto bad=request();bad.clear_color[0]=std::numeric_limits<float>::quiet_NaN();failed=false;try{(void)ex::encode(bad);}catch(const std::invalid_argument&){failed=true;}check(failed);++rejected;
+- auto small=request();small.header.width=1024;small.header.height=768;const auto small_packet=ex::encode(small);check(small.header.abi==13&&!small.header.reserved&&ex::decode(small_packet).clear_color==small.clear_color);
++ auto legacy_request=request();legacy_request.header.width=1024;legacy_request.header.height=768;const auto small_packet=ex::encode(legacy_request);check(legacy_request.header.abi==13&&!legacy_request.header.reserved&&ex::decode(small_packet).clear_color==legacy_request.clear_color);
+  return rejected;
+ }
+ int main(int argc,char **argv)try{

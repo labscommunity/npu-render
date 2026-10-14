@@ -1,0 +1,161 @@
+--- a/native/windows/registered_lab/CMakeLists.txt
++++ b/native/windows/registered_lab/CMakeLists.txt
+@@ -331,3 +331,11 @@
+ target_link_libraries(nr_large_clear_probe PRIVATE nr_registered_vertex)
+ set_property(TARGET nr_large_clear_probe PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+ add_test(NAME large_clear_contract COMMAND nr_large_clear_probe --contract)
++
++add_executable(nr_large_surface_capture_probe large_surface_capture_probe.cpp)
++target_compile_features(nr_large_surface_capture_probe PRIVATE cxx_std_17)
++target_compile_options(nr_large_surface_capture_probe PRIVATE /W4 /WX)
++target_link_libraries(nr_large_surface_capture_probe PRIVATE nr_registered_vertex)
++set_property(TARGET nr_large_surface_capture_probe PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
++add_test(NAME large_surface_contract COMMAND nr_large_surface_capture_probe --contract)
++
+--- a/native/windows/registered_lab/indexed_exchange_protocol.hpp
++++ b/native/windows/registered_lab/indexed_exchange_protocol.hpp
+@@ -12,7 +12,7 @@
+ #include <stdexcept>
+ namespace nr::registered_lab::indexed_exchange {
+ constexpr uint64_t magic = 0x4e525f4452415731ull;
+-constexpr uint32_t max_packet_bytes = 32u * 1024 * 1024, max_requests = 4096;
++constexpr uint32_t legacy_packet_bytes=32u*1024*1024, max_packet_bytes=64u*1024*1024, max_requests=4096;
+ struct Header {
+     uint64_t signature = magic, nonce[2]{};
+     uint32_t abi = 1, width = 0, height = 0, vertices = 0, format = 0, flags = 0;
+@@ -34,11 +34,21 @@
+ // ABI 16 wraps a legacy untextured draw and admits targets bounded by the
+ // existing reply packet budget. The reserved word carries the legacy ABI.
+ // Textured draws retain their previous target limits; ABI 20 separately admits large clears.
+-constexpr uint32_t large_uniform_pixels=(max_packet_bytes-sizeof(Header)-sizeof(Receipt))/4;
+-inline uint32_t payload_abi(const Header &h){return (h.abi==16 || h.abi==17 || h.abi==18 || h.abi==19 || h.abi==20)?h.reserved:h.abi;}
++constexpr uint32_t large_uniform_pixels=(legacy_packet_bytes-sizeof(Header)-sizeof(Receipt))/4;
++inline uint32_t payload_abi(const Header &h){return (h.abi==16 || h.abi==17 || h.abi==18 || h.abi==19 || h.abi==20 || h.abi==21)?h.reserved:h.abi;}
+ inline uint32_t resource_pixels_limit(const Header &h){return h.abi==19?8388608u:4194304u;}
+ inline bool shape_valid(const Header &h,bool component_payload=false,bool large_uniform=false,bool large_clear=false) {
+     if(large_clear && h.abi!=13)return false;
++    // ABI 21 carries a large affine target plus its source/background in at
++    // most 64 MiB. All legacy bodies retain their 32 MiB budget, and the
++    // unchanged reply limit keeps every rendered target below 8 Mi pixels.
++    if(h.abi==21){
++        const auto area=uint64_t(h.width)*h.height;
++        if(large_uniform || large_clear || (h.reserved!=4 && h.reserved!=5) ||
++           area<=4194304 || area>large_uniform_pixels || h.body_bytes>max_packet_bytes-sizeof(Header))return false;
++        auto legacy=h;legacy.abi=h.reserved;legacy.reserved=0;legacy.body_bytes=0;
++        return shape_valid(legacy,false,true,false);
++    }
+     if(h.abi==20){
+         const auto area=uint64_t(h.width)*h.height;
+         if(large_uniform || large_clear || h.reserved!=13 || area<=4194304 || area>large_uniform_pixels)return false;
+@@ -88,7 +98,7 @@
+     if(h.abi==13)return color_clear(h) && h.signature==magic && (h.nonce[0] || h.nonce[1]) && h.client_pid &&
+         h.width && h.width<=8192 && h.height && h.height<=8192 && uint64_t(h.width)*h.height<=(large_clear?large_uniform_pixels:4194304u) &&
+         (h.format==28 || h.format==87) && !h.vertices && !h.vs_words && !h.ps_words &&
+-        h.sequence && h.sequence<=max_requests && h.body_bytes<=max_packet_bytes-sizeof(Header) && !h.reserved;
++        h.sequence && h.sequence<=max_requests && h.body_bytes<=legacy_packet_bytes-sizeof(Header) && !h.reserved;
+ 
+     // ABI 12 adds U/V address bits to each existing sampler word. Older
+     // ABIs remain clamp-only; all shape/blend rules are inherited unchanged.
+@@ -119,7 +129,7 @@
+         h.vertices && h.vertices <= 4096 && !(h.vertices % 3) && (h.format == 28 || h.format == 87) &&
+         !(h.flags & ~0x3fffu) && (h.flags & 0xf00u) && h.vs_words >= 3 && h.vs_words <= 16384 &&
+         h.ps_words >= 3 && h.ps_words <= 16384 && h.sequence && h.sequence <= max_requests &&
+-        h.body_bytes <= max_packet_bytes - sizeof(Header) && !h.reserved;
++        h.body_bytes <= legacy_packet_bytes - sizeof(Header) && !h.reserved;
+     if (!valid) return false;
+     if(h.flags & 0x2000) {
+         if(!(h.flags&2) || (h.flags&0x1018) || (h.flags&96)==96)return false;
+@@ -178,7 +188,7 @@
+ static_assert(sizeof(TextureDescription) == 16);
+ inline bool texture_valid(const TextureDescription &t, const Header &h) {
+     return t.width && t.width <= 8192 && t.height && t.height <= 8192 &&
+-        uint64_t(t.width)*t.height <= ((h.abi==17 || h.abi==18)?8u:4u)*1024*1024 && ((h.flags & 24) || (t.width >= h.width && t.height >= h.height)) &&
++        uint64_t(t.width)*t.height <= ((h.abi==17 || h.abi==18 || h.abi==21)?8u:4u)*1024*1024 && ((h.flags & 24) || (t.width >= h.width && t.height >= h.height)) &&
+         (t.format == 28 || t.format == 87) && !t.reserved;
+ }
+ class Writer {
+@@ -246,7 +256,11 @@
+         require(triangle?(h.abi==7 || h.abi==9 || h.abi==10 || h.abi==11 || h.abi==15):(h.abi==4 || h.abi==5));
+         h.reserved=h.abi;h.abi=triangle?18u:17u;
+     }
+-    if(h.abi!=16 && !color_clear(h) && uint64_t(h.width)*h.height>4194304){
++    if(h.abi!=21 && uint64_t(h.width)*h.height>4194304 && (h.abi==4 || h.abi==5 || h.abi==17)){
++        const auto legacy=h.abi==17?h.reserved:h.abi;
++        require((legacy==4 || legacy==5) && (h.abi==17 || !h.reserved));h.reserved=legacy;h.abi=21;
++    }
++    if(h.abi!=16 && h.abi!=21 && !color_clear(h) && uint64_t(h.width)*h.height>4194304){
+         require(!h.reserved && h.abi && h.abi<=15 && !(h.flags&2));
+         h.reserved=h.abi;h.abi=16;
+     }
+--- /dev/null
++++ b/native/windows/registered_lab/large_surface_capture_probe.cpp
+@@ -0,0 +1,51 @@
++#define main original_draw_replay_main
++#include "draw_replay_probe.cpp"
++#undef main
++#include "indexed_exchange_protocol.hpp"
++#include <windows.h>
++namespace ex=nr::registered_lab::indexed_exchange;
++int main(int argc,char **argv)try{
++    ex::Header h;h.abi=21;h.reserved=4;h.nonce[0]=1;h.client_pid=1;h.sequence=1;
++    h.width=2880;h.height=1800;h.vertices=6;h.flags=0xf0a;h.format=87;h.vs_words=h.ps_words=3;
++    nr::capture::check(ex::shape_valid(h));unsigned negatives=0;
++    ex::TextureDescription t{2912,1824,87,0};nr::capture::check(ex::texture_valid(t,h));
++    auto legacy=h;legacy.abi=4;legacy.reserved=0;nr::capture::check(!ex::texture_valid(t,legacy));++negatives;
++    for(unsigned i=0;i<8;++i){auto bad=h;
++        switch(i){case 0:bad.reserved=1;break;case 1:bad.reserved=21;break;case 2:bad.flags=0xf02;bad.reserved=2;break;
++        case 3:bad.flags|=0x1000;break;case 4:bad.vertices=9;break;case 5:bad.width=4097;break;
++        case 6:bad.width=4096;bad.height=2048;break;case 7:bad.flags=0xf00;break;}
++        nr::capture::check(!ex::shape_valid(bad));++negatives;
++    }
++    auto oversized_legacy=h;oversized_legacy.abi=17;oversized_legacy.reserved=4;oversized_legacy.width=91;oversized_legacy.height=64;oversized_legacy.body_bytes=ex::legacy_packet_bytes;
++    nr::capture::check(!ex::shape_valid(oversized_legacy));++negatives;
++    auto expanded=h;expanded.body_bytes=ex::legacy_packet_bytes;nr::capture::check(ex::shape_valid(expanded));expanded.body_bytes=ex::max_packet_bytes;nr::capture::check(!ex::shape_valid(expanded));++negatives;
++    auto small_target=h;small_target.width=1024;small_target.height=768;nr::capture::check(!ex::shape_valid(small_target));++negatives;
++    auto point=h;point.reserved=5;point.flags=0xf12;nr::capture::check(ex::shape_valid(point));
++    auto too_big=t;too_big.width=8192;too_big.height=1025;nr::capture::check(!ex::texture_valid(too_big,h));++negatives;
++    auto changed=h;changed.reserved=5;nr::capture::check(!ex::same_request(h,changed));++negatives;
++    if(argc==2 && !std::strcmp(argv[1],"--contract")){
++        std::printf("{\"large_surface_contract\":true,\"negative_cases\":%u,\"legacy_large_source_rejected\":true,\"max_packet_bytes\":%u}\n",negatives,ex::max_packet_bytes);return 0;
++    }
++    nr::capture::check(argc==3);const nr::capture::Snapshot s(argv[1]);
++    const auto args=s.values<uint32_t>("arguments"),surface=s.values<uint32_t>("target-description"),source=s.values<uint32_t>("source-description"),sampler=s.values<uint32_t>("sampler-2-0");
++    const auto view=s.values<float>("viewport");const auto blend=s.values<uint32_t>("blend"),raster=s.values<uint32_t>("raster");
++    nr::capture::check(args.size()==9 && surface.size()==10 && source.size()==10 && sampler.size()==13 && view.size()==6 && blend.size()==17 && raster.size()==10);
++    nr::capture::check(args[0]==6 && args[3]==4 && args[4]==1 && args[7]==UINT32_MAX && !blend[0] && !blend[1] && (blend[15]&255)==15);
++    nr::capture::check(raster[0]==3 && raster[1]==1 && !raster[2] && !raster[3] && !raster[4] && !raster[5] && !raster[8] && !raster[9]);
++    nr::capture::check(s.values<uint32_t>("draw-indexed")==std::vector<uint32_t>{1} && s.values<uint32_t>("depth-target-bound")==std::vector<uint32_t>{0});
++    nr::capture::check(nr::registered_lab::single_mip_linear_filter(sampler[0]) && sampler[1]==3 && sampler[2]==3 && sampler[3]==3 && !sampler[4] && !sampler[11]);
++    ex::Request r;auto &header=r.header;header.abi=4;header.nonce[0]=1;header.sequence=1;header.client_pid=GetCurrentProcessId();header.width=surface[3];header.height=surface[4];header.format=surface[5];header.flags=0xf0a;
++    const auto vs=s.values<uint32_t>("vertex-shader"),ps=s.values<uint32_t>("pixel-shader");r.vertex=nr::shader::parse_vertex(vs.data(),vs.size());r.pixel=nr::shader::parse_pixel(ps.data(),ps.size());
++    nr::raster::LinearTextureDrawExecutor::validate_shader(r.pixel);
++    int32_t base;std::memcpy(&base,&args[2],4);r.inputs=fetch(s,args[0],args[1],base,r.vertex,true,args[3]);header.vertices=uint32_t(r.inputs.size());
++    r.viewport={view[0],view[1],view[2],view[3],view[4],view[5]};r.vertex_constants=constants(s,0,r.vertex);r.pixel_constants=constants(s,2,r.pixel);r.background=s.values<nr::raster::PackedColor>("target");
++    r.texture={source[3],source[4],source[5],s.values<nr::raster::PackedColor>("source")};
++    if(raster[7]){const auto scissor=s.values<int32_t>("scissors");nr::capture::check(scissor.size()==4);const std::array<int32_t,4> clip{scissor[0],scissor[1],scissor[2],scissor[3]};
++        if(clip!=std::array<int32_t,4>{0,0,int32_t(header.width),int32_t(header.height)}){r.scissor=clip;header.flags|=4;}}
++    const auto bytes=ex::encode(r);nr::capture::check(header.abi==21 && header.reserved==4 && ex::request_valid(header,bytes.size()));
++    const auto decoded=ex::decode(bytes);nr::capture::check(decoded.background==r.background && decoded.texture.pixels==r.texture.pixels && decoded.inputs==r.inputs && decoded.pixel.bytecode==r.pixel.bytecode);
++    auto corrupt=bytes;auto malformed=header;malformed.abi=4;malformed.reserved=0;std::memcpy(corrupt.data(),&malformed,sizeof(malformed));bool rejected=false;
++    try{(void)ex::decode(corrupt);}catch(const std::invalid_argument&){rejected=true;}nr::capture::check(rejected);++negatives;
++    std::ifstream existing(argv[2],std::ios::binary);nr::capture::check(!existing);existing.close();std::ofstream output(argv[2],std::ios::binary);nr::capture::check(bool(output));output.write(reinterpret_cast<const char*>(bytes.data()),std::streamsize(bytes.size()));output.close();nr::capture::check(bool(output));
++    std::printf("{\"large_surface_capture_packet\":true,\"abi\":%u,\"legacy_abi\":%u,\"width\":%u,\"height\":%u,\"source_width\":%u,\"source_height\":%u,\"bytes\":%zu,\"negative_cases\":%u,\"rendering_performed\":false}\n",header.abi,header.reserved,header.width,header.height,r.texture.width,r.texture.height,bytes.size(),negatives);return 0;
++}catch(const std::exception &e){std::fprintf(stderr,"%s\n",e.what());return 1;}
+--- a/native/windows/registered_lab/linear_texture_draw.cpp
++++ b/native/windows/registered_lab/linear_texture_draw.cpp
+@@ -78,10 +78,13 @@
+         // Alpha replacement happens after sampling. The RGB taps remain valid
+         // for both point and bilinear filtering; source alpha is unused.
+         require(filter==shader::TextureFilter::point || filter==shader::TextureFilter::linear);
+-        require(w && w<=4096 && h && h<=8192 && uint64_t(w)*h<=4*1024*1024 && sw && sw<=8192 && sh && sh<=8192 && uint64_t(sw)*sh<=8*1024*1024);
++        require(w && w<=4096 && h && h<=8192 && uint64_t(w)*h<=8388576 && sw && sw<=8192 && sh && sh<=8192 && uint64_t(sw)*sh<=8*1024*1024);
+         require((format==28 || format==87) && (sf==28 || sf==87) && vs.stage==shader::Stage::vertex && vs.position_output<16 &&
+             (vs.outputs[pixel.color]&15)==15 && (vs.outputs[pixel.uv]&3)==3);
+-        rows=(std::min)(h,4096/w);while(h%rows)--rows;count=w*rows;
++        // Larger targets use a larger NPU raster batch so full-resolution
++        // rendering does not require one inference for every output row.
++        const uint32_t capacity=uint64_t(w)*h>4194304?16384u:4096u;
++        rows=(std::min)(h,capacity/w);while(h%rows)--rows;count=w*rows;
+         auto parameter=[](ov::element::Type type,ov::Shape shape,const char *name) {
+             auto p=std::make_shared<op::Parameter>(type,shape);p->output(0).get_tensor().set_names({name});return p;
+         };

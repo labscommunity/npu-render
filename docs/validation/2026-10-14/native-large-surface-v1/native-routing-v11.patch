@@ -1,0 +1,132 @@
+--- a/native/windows/registered_lab/CMakeLists.txt
++++ b/native/windows/registered_lab/CMakeLists.txt
+@@ -324,3 +324,10 @@
+ target_link_libraries(nr_large_quad_texture_capture_probe PRIVATE nr_registered_vertex)
+ set_property(TARGET nr_large_quad_texture_capture_probe PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+ add_test(NAME large_quad_texture_contract COMMAND nr_large_quad_texture_capture_probe --contract)
++
++add_executable(nr_large_clear_probe large_clear_probe.cpp)
++target_compile_features(nr_large_clear_probe PRIVATE cxx_std_17)
++target_compile_options(nr_large_clear_probe PRIVATE /W4 /WX)
++target_link_libraries(nr_large_clear_probe PRIVATE nr_registered_vertex)
++set_property(TARGET nr_large_clear_probe PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
++add_test(NAME large_clear_contract COMMAND nr_large_clear_probe --contract)
+--- a/native/windows/registered_lab/clear_executor.cpp
++++ b/native/windows/registered_lab/clear_executor.cpp
+@@ -17,7 +17,7 @@
+     ov::Core core;ov::CompiledModel compiled;ov::InferRequest request;
+     std::string execution_device;bool failed=false;
+     State(uint32_t w,uint32_t h,uint32_t format,const std::string &backend):width(w),height(h){
+-        require(w && w<=8192 && h && h<=8192 && uint64_t(w)*h<=4194304 && (format==28 || format==87));
++        require(w && w<=8192 && h && h<=8192 && uint64_t(w)*h<=8388576 && (format==28 || format==87));
+         require(backend=="CPU" || backend=="GPU" || backend=="NPU");
+         const auto integer=[](int32_t x){return op::Constant::create(ov::element::i32,ov::Shape{},{x});};
+         const auto number=[](float x){return op::Constant::create(ov::element::f32,ov::Shape{},{x});};
+--- a/native/windows/registered_lab/driver.cpp
++++ b/native/windows/registered_lab/driver.cpp
+@@ -119,7 +119,11 @@
+     try { f(); }
+     catch (const Error &e) { reject(h, e.status, operation); }
+     catch (const std::bad_alloc &) { reject(h, E_OUTOFMEMORY, operation); }
+-    catch (const std::exception &e) { std::fprintf(stderr, "nr_fill_umd: %s\n", e.what()); reject(h, E_FAIL, operation); }
++    catch (const std::exception &e) {
++        char detail[384]{};size_t n=0;for(const auto *c=e.what();*c && n+3<sizeof(detail);++c){if(*c=='"' || *c=='\\')detail[n++]='\\';detail[n++]=(*c>=32 && *c<127)?*c:' ';}
++        lab_trace("{\"event\":\"operation_exception\",\"operation\":\"%s\",\"message\":\"%s\"}\n",operation,detail);
++        std::fprintf(stderr, "nr_fill_umd: %s\n", e.what()); reject(h, E_FAIL, operation);
++    }
+     catch (...) { reject(h, E_FAIL, operation); }
+ }
+ template<class T, size_t Offset> struct Unsupported;
+@@ -318,6 +322,7 @@
+         auto a = static_cast<View *>(v.pDrvPrivate)->allocation;
+         auto &d=device(h);require(a && !a->locked && a->context==d.context && !d.context->poisoned);
+         for(unsigned n=0;n<4;++n)require(std::isfinite(color[n]));
++        lab_trace("{\"event\":\"color_clear_requested\",\"width\":%u,\"height\":%u,\"format\":%u}\n",a->surface.width,a->surface.height,a->surface.format);
+         // The historical blend-only file bridge retains its documented CPU
+         // clears. Full desktop experiments use the indexed ABI 13 path.
+         if(d.backend!="CPU" && d.backend!="NPU_LAB_FILE"){
+--- a/native/windows/registered_lab/indexed_exchange_protocol.hpp
++++ b/native/windows/registered_lab/indexed_exchange_protocol.hpp
+@@ -30,14 +30,21 @@
+     if(h.flags & 0x10000)return raster::BlendMode((h.flags>>17)&15);
+     return (h.flags & 0x8000) ? raster::BlendMode::destination_out : (h.flags & 0x4000) ? raster::BlendMode::destination_in : raster::source_blend((h.flags & 1) != 0);
+ }
+-inline bool color_clear(const Header &h){return h.abi==13 && h.flags==0x200000;}
++inline bool color_clear(const Header &h){return (h.abi==13 || (h.abi==20 && h.reserved==13)) && h.flags==0x200000;}
+ // ABI 16 wraps a legacy untextured draw and admits targets bounded by the
+ // existing reply packet budget. The reserved word carries the legacy ABI.
+-// Textured draws and clears retain their previous limits.
++// Textured draws retain their previous target limits; ABI 20 separately admits large clears.
+ constexpr uint32_t large_uniform_pixels=(max_packet_bytes-sizeof(Header)-sizeof(Receipt))/4;
+-inline uint32_t payload_abi(const Header &h){return (h.abi==16 || h.abi==17 || h.abi==18 || h.abi==19)?h.reserved:h.abi;}
++inline uint32_t payload_abi(const Header &h){return (h.abi==16 || h.abi==17 || h.abi==18 || h.abi==19 || h.abi==20)?h.reserved:h.abi;}
+ inline uint32_t resource_pixels_limit(const Header &h){return h.abi==19?8388608u:4194304u;}
+-inline bool shape_valid(const Header &h,bool component_payload=false,bool large_uniform=false) {
++inline bool shape_valid(const Header &h,bool component_payload=false,bool large_uniform=false,bool large_clear=false) {
++    if(large_clear && h.abi!=13)return false;
++    if(h.abi==20){
++        const auto area=uint64_t(h.width)*h.height;
++        if(large_uniform || large_clear || h.reserved!=13 || area<=4194304 || area>large_uniform_pixels)return false;
++        auto legacy=h;legacy.abi=13;legacy.reserved=0;
++        return shape_valid(legacy,false,false,true);
++    }
+     // ABI 17 admits larger source textures for the bounded six-vertex affine
+     // sampler only. Target, total packet, shader and operation limits are retained.
+     // ABI 18 extends a single normalized source for general triangle draws.
+@@ -79,7 +86,7 @@
+     }
+     if(blend_mode(h)==raster::BlendMode::component_coverage && !component_payload)return false;
+     if(h.abi==13)return color_clear(h) && h.signature==magic && (h.nonce[0] || h.nonce[1]) && h.client_pid &&
+-        h.width && h.width<=8192 && h.height && h.height<=8192 && uint64_t(h.width)*h.height<=4194304 &&
++        h.width && h.width<=8192 && h.height && h.height<=8192 && uint64_t(h.width)*h.height<=(large_clear?large_uniform_pixels:4194304u) &&
+         (h.format==28 || h.format==87) && !h.vertices && !h.vs_words && !h.ps_words &&
+         h.sequence && h.sequence<=max_requests && h.body_bytes<=max_packet_bytes-sizeof(Header) && !h.reserved;
+ 
+@@ -228,6 +235,7 @@
+ }
+ inline std::vector<uint8_t> encode(Request &r) {
+     auto &h = r.header;
++    if(h.abi==13 && color_clear(h) && uint64_t(h.width)*h.height>4194304){require(!h.reserved);h.reserved=13;h.abi=20;}
+     if(h.abi!=19 && (h.flags&0x2000) && std::any_of(r.resources.begin(),r.resources.end(),[](const auto &t){return uint64_t(t.width)*t.height>4194304;})){
+         require(!h.reserved && (h.abi==8 || h.abi==9 || h.abi==10 || h.abi==11 || h.abi==12 || h.abi==14 || h.abi==15));
+         h.reserved=h.abi;h.abi=19;
+--- /dev/null
++++ b/native/windows/registered_lab/large_clear_probe.cpp
+@@ -0,0 +1,37 @@
++#include "indexed_exchange_protocol.hpp"
++#include "clear_executor.hpp"
++#include <windows.h>
++#include <fstream>
++#include <algorithm>
++#include <cmath>
++#include <limits>
++#include <cstdio>
++namespace ex=nr::registered_lab::indexed_exchange;
++using namespace nr::raster;
++void check(bool v){if(!v)throw std::runtime_error("large clear contract failed");}
++ex::Request request(){ex::Request r;auto &h=r.header;h.abi=13;h.flags=0x200000;h.width=2880;h.height=1800;h.format=87;h.sequence=1;h.client_pid=GetCurrentProcessId();h.nonce[0]=1;r.clear_color={-.2f,.25f,.75f,1};return r;}
++unsigned contract(){
++ auto r=request();const auto packet=ex::encode(r);check(r.header.abi==20&&r.header.reserved==13&&packet.size()==96&&ex::request_valid(r.header,packet.size()));const auto decoded=ex::decode(packet);check(decoded.clear_color==r.clear_color);unsigned rejected=0;
++ for(unsigned n=0;n<11;++n){auto h=r.header;switch(n){case 0:h.abi=13;h.reserved=0;break;case 1:h.width=4096;h.height=2048;break;case 2:h.width=0;break;case 3:h.width=8193;break;case 4:h.reserved=12;break;case 5:h.flags|=1;break;case 6:h.vertices=6;break;case 7:h.body_bytes=20;break;case 8:h.width=1024;h.height=768;break;case 9:h.abi=16;break;case 10:h.sequence=0;break;}check(!ex::request_valid(h,80+uint64_t(h.body_bytes)));++rejected;}
++ auto truncated=packet;truncated.pop_back();bool failed=false;try{(void)ex::decode(truncated);}catch(const std::invalid_argument&){failed=true;}check(failed);++rejected;
++ auto bad=request();bad.clear_color[0]=std::numeric_limits<float>::quiet_NaN();failed=false;try{(void)ex::encode(bad);}catch(const std::invalid_argument&){failed=true;}check(failed);++rejected;
++ auto small=request();small.header.width=1024;small.header.height=768;const auto small_packet=ex::encode(small);check(small.header.abi==13&&!small.header.reserved&&ex::decode(small_packet).clear_color==small.clear_color);
++ return rejected;
++}
++int main(int argc,char **argv)try{
++ const auto negative=contract();
++ if(argc==2&&!std::strcmp(argv[1],"--contract")){std::printf("{\"large_clear_contract\":true,\"negative_cases\":%u,\"legacy_small_clear_preserved\":true}\n",negative);return 0;}
++ if(argc==3&&!std::strcmp(argv[1],"--emit")){auto r=request();const auto packet=ex::encode(r);std::ofstream f(argv[2],std::ios::binary);f.write(reinterpret_cast<const char *>(packet.data()),std::streamsize(packet.size()));check(bool(f));std::printf("{\"large_clear_request_emitted\":true,\"abi\":20,\"legacy_abi\":13,\"negative_cases\":%u}\n",negative);return 0;}
++ check(argc==2);const std::string backend=argv[1];uint64_t components=0;unsigned cases=0;
++ const std::array<Color,4> colors{{{-2,0,1,3},{.5f,.25f,.75f,1},{126.5f/255,127.5f/255,std::nextafter(128.5f/255,0.f),1},{1.f/255,127.f/255,128.f/255,254.f/255}}};
++ for(const auto shape:{std::array<uint32_t,2>{2880,1800},{4096,2047},{8191,1024}})for(const auto format:{28u,87u}){
++  ClearExecutor executor(shape[0],shape[1],format,backend);
++  for(const auto &color:colors){const auto result=executor.execute(color);check(result.execution_device==backend||result.execution_device.rfind(backend+".",0)==0);check(result.pixels.size()==uint64_t(shape[0])*shape[1]);PackedColor expected{};
++   for(unsigned c=0;c<4;++c){const auto lane=format==87&&c<3?2-c:c;expected[c]=uint8_t(std::nearbyint(std::clamp(color[lane],0.f,1.f)*255));}
++   for(const auto &pixel:result.pixels)check(pixel==expected);components+=uint64_t(result.pixels.size())*4;++cases;
++   std::printf("{\"large_clear_case\":true,\"width\":%u,\"height\":%u,\"format\":%u,\"execution_device\":\"%s\",\"draw_ms\":%.3f,\"pixels_exact\":true}\n",shape[0],shape[1],format,result.execution_device.c_str(),result.milliseconds);std::fflush(stdout);
++  }
++ }
++ bool failed=false;try{ClearExecutor bad(4096,2048,87,backend);}catch(const std::invalid_argument&){failed=true;}check(failed);
++ std::printf("{\"completed\":true,\"passed\":true,\"large_clear_cases\":%u,\"verified_components\":%llu,\"negative_packet_cases\":%u,\"oversized_executor_rejected\":true,\"execution_device\":\"%s\"}\n",cases,static_cast<unsigned long long>(components),negative,backend.c_str());return 0;
++}catch(const std::exception &e){std::fprintf(stderr,"%s\n",e.what());return 1;}

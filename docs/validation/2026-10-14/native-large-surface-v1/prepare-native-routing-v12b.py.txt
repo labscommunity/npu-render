@@ -1,0 +1,20 @@
+from pathlib import Path
+import shutil,hashlib,json,tarfile
+r=Path('results/render-driver');d=r/'native-routing-v12b';shutil.copytree(r/'native-routing-v12',d);lab=d/'native/windows/registered_lab'
+p=lab/'triangle_regions.hpp';s=p.read_text().replace('uint32_t batch,bool quads=false)', 'uint32_t batch,bool quads=false,bool large_affine=false)').replace('if(!batch || batch>8192 || (quads && batch%4)', 'if(!batch || batch>(large_affine?16384u:8192u) || (large_affine && quads) || (quads && batch%4)');p.write_text(s)
+p=lab/'linear_texture_draw.cpp';s=p.read_text().replace('clip,s.count);','clip,s.count,false,uint64_t(s.width)*s.height>4194304);');p.write_text(s)
+p=lab/'indexed_exchange_protocol.hpp';s=p.read_text().replace('h.abi!=17 && h.abi!=18 &&', 'h.abi!=17 && h.abi!=18 && h.abi!=21 &&');p.write_text(s)
+p=lab/'large_surface_capture_probe.cpp';s=p.read_text().replace('#include <windows.h>', '#include <windows.h>\n#include "triangle_regions.hpp"')
+a='    if(argc==2 && !std::strcmp(argv[1],"--contract"))';b='''    const std::array<int32_t,4> full{0,0,2880,1800};
+    nr::capture::check(nr::raster::bounded_triangle_regions({full,full},full,14400,false,true).size()==2);
+    for(unsigned i=0;i<4;++i){bool rejected=false;try{
+        (void)nr::raster::bounded_triangle_regions({full},full,i==2?16385u:14400u,i==3,i!=0);
+    }catch(const std::invalid_argument &){rejected=true;}
+        if(i==1)nr::capture::check(!rejected);else{nr::capture::check(rejected);++negatives;}}
+'''+a
+assert a in s;s=s.replace(a,b);p.write_text(s)
+(r/'native-routing-v12b-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-routing-v12b.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+(r/'build-native-routing-v12b.ps1').write_text((r/'build-native-routing-v12.ps1').read_text().replace('native-routing-v12','native-routing-v12b'))
+(r/'replay-large-surface-v2.ps1').write_text((r/'replay-large-surface-v1.ps1').read_text().replace('native-routing-v12','native-routing-v12b').replace('large-surface-v1-replay','large-surface-v2-replay'))
+(r/'qualify-native-routing-v12b.ps1').write_text((r/'qualify-native-routing-v12.ps1').read_text().replace('native-routing-v12','native-routing-v12b'))

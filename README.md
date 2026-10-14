@@ -11,19 +11,21 @@ GPU → NPU → CPU → GPU → NPU switching on Panther Lake. It supports CPU/G
 its first OpenVINO provider; other providers can implement the same contracts.
 
 **Full desktop offload is unfinished.** The latest
-[native desktop trial](docs/validation/2026-10-13/native-large-quad-v1/README.md)
-produces its first 1024×768 Windows desktop frame through the NPU-backed indirect
-display, with 190 actual DWM NPU operations and verified readback. Bootstrap and
-immediate cleanup take about 184 seconds. Delta's physical desktop remains on its
-ordinary path. Sustained native frames, physical presentation/input integration,
-interactive performance and a measured Tahoma benefit remain outstanding.
+[native desktop trial](docs/validation/2026-10-14/native-large-surface-v1/README.md)
+produces three different 1024×768 Windows desktop frames with 457 acknowledged
+NPU operations. It produces a frame while the displays are extended, survives
+restoration, and cleans up successfully. The first frame takes 69.5 seconds;
+subsequent frames arrive 93.7 and 115.4 seconds apart. Delta's physical desktop
+remains on its ordinary path. Controlled application changes, live physical
+presentation/input integration, interactive performance and a measured Tahoma
+benefit remain outstanding.
 The [desktop offload execution plan](docs/research/desktop-offload-plan.md)
 defines the ordered acceptance gates through a usable switch and matched Tahoma
 measurements, including application graphics coverage.
 The [topology investigation](docs/validation/2026-10-14/native-topology-progress-v1/README.md)
-now confirms automatic cloning and three changing NPU frames, still tens of
-seconds apart. An explicit extension preserves the physical output but exposes a
-compositor failure after a rejected clear; recovery restores the physical desktop.
+established automatic cloning and exposed earlier compositor failures. The latest
+candidate qualifies larger clears and the captured full-resolution textured draw;
+its extended layout preserves the physical output and restores the clone exactly.
 
 The [native registered-adapter trial](docs/validation/2026-10-13/native-windows-adapter-v1/README.md)
 now passes six clears and two indexed draws through Delta's ordinary Direct3D 11

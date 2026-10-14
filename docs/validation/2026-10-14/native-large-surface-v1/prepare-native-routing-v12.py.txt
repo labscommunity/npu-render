@@ -1,0 +1,42 @@
+from pathlib import Path
+import shutil,hashlib,json,tarfile
+r=Path('results/render-driver');d=r/'native-routing-v12';shutil.copytree(r/'native-routing-v11b',d);lab=d/'native/windows/registered_lab'
+p=lab/'indexed_exchange_protocol.hpp';s=p.read_text()
+s=s.replace('constexpr uint32_t max_packet_bytes = 32u * 1024 * 1024, max_requests = 4096;', 'constexpr uint32_t legacy_packet_bytes=32u*1024*1024, max_packet_bytes=64u*1024*1024, max_requests=4096;')
+s=s.replace('large_uniform_pixels=(max_packet_bytes-', 'large_uniform_pixels=(legacy_packet_bytes-')
+s=s.replace('h.abi==19 || h.abi==20)?', 'h.abi==19 || h.abi==20 || h.abi==21)?')
+s=s.replace('h.body_bytes<=max_packet_bytes-sizeof(Header)', 'h.body_bytes<=legacy_packet_bytes-sizeof(Header)').replace('h.body_bytes <= max_packet_bytes - sizeof(Header)', 'h.body_bytes <= legacy_packet_bytes - sizeof(Header)')
+a='    if(large_clear && h.abi!=13)return false;';b=a+'''
+    // ABI 21 carries a large affine target plus its source/background in at
+    // most 64 MiB. All legacy bodies retain their 32 MiB budget, and the
+    // unchanged reply limit keeps every rendered target below 8 Mi pixels.
+    if(h.abi==21){
+        const auto area=uint64_t(h.width)*h.height;
+        if(large_uniform || large_clear || (h.reserved!=4 && h.reserved!=5) ||
+           area<=4194304 || area>large_uniform_pixels || h.body_bytes>max_packet_bytes-sizeof(Header))return false;
+        auto legacy=h;legacy.abi=h.reserved;legacy.reserved=0;legacy.body_bytes=0;
+        return shape_valid(legacy,false,true,false);
+    }''';assert a in s;s=s.replace(a,b)
+s=s.replace('(h.abi==17 || h.abi==18)?8u', '(h.abi==17 || h.abi==18 || h.abi==21)?8u')
+s=s.replace('    if(h.abi!=16 && !color_clear(h) && uint64_t(h.width)*h.height>4194304){', '''    if(h.abi!=21 && uint64_t(h.width)*h.height>4194304 && (h.abi==4 || h.abi==5 || h.abi==17)){
+        const auto legacy=h.abi==17?h.reserved:h.abi;
+        require((legacy==4 || legacy==5) && (h.abi==17 || !h.reserved));h.reserved=legacy;h.abi=21;
+    }
+    if(h.abi!=16 && h.abi!=21 && !color_clear(h) && uint64_t(h.width)*h.height>4194304){''')
+p.write_text(s)
+p=lab/'linear_texture_draw.cpp';s=p.read_text().replace('uint64_t(w)*h<=4*1024*1024', 'uint64_t(w)*h<=8388576');a='rows=(std::min)(h,4096/w);while(h%rows)--rows;count=w*rows;';b='''// Larger targets use a larger NPU raster batch so full-resolution
+        // rendering does not require one inference for every output row.
+        const uint32_t capacity=uint64_t(w)*h>4194304?16384u:4096u;
+        rows=(std::min)(h,capacity/w);while(h%rows)--rows;count=w*rows;''';assert a in s;s=s.replace(a,b);p.write_text(s)
+s=(lab/'large_texture_capture_probe.cpp').read_text().replace('h.abi=17;h.reserved=4','h.abi=21;h.reserved=4').replace('h.width=91;h.height=64','h.width=2880;h.height=1800').replace('bad.reserved=17','bad.reserved=21').replace('header.abi==17 && header.reserved==4','header.abi==21 && header.reserved==4').replace('large_texture','large_surface')
+s=s.replace('    auto point=h;', '''    auto oversized_legacy=h;oversized_legacy.abi=17;oversized_legacy.reserved=4;oversized_legacy.width=91;oversized_legacy.height=64;oversized_legacy.body_bytes=ex::legacy_packet_bytes;
+    nr::capture::check(!ex::shape_valid(oversized_legacy));++negatives;
+    auto expanded=h;expanded.body_bytes=ex::legacy_packet_bytes;nr::capture::check(ex::shape_valid(expanded));expanded.body_bytes=ex::max_packet_bytes;nr::capture::check(!ex::shape_valid(expanded));++negatives;
+    auto small_target=h;small_target.width=1024;small_target.height=768;nr::capture::check(!ex::shape_valid(small_target));++negatives;
+    auto point=h;''')
+(lab/'large_surface_capture_probe.cpp').write_text(s)
+p=lab/'CMakeLists.txt';s=p.read_text();block=s[s.index('add_executable(nr_large_texture_capture_probe'):s.index('add_executable(nr_large_triangle_texture_capture_probe')];p.write_text(s+'\n'+block.replace('large_texture','large_surface'))
+(r/'native-routing-v12-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-routing-v12.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-native-routing-v11b.ps1').read_text().replace('native-routing-v11b','native-routing-v12').replace('nr_large_clear_probe *>>','nr_large_clear_probe nr_large_surface_capture_probe *>>').replace('|large_clear_contract)', '|large_clear_contract|large_surface_contract)').replace("'nr_large_clear_probe.exe'))", "'nr_large_clear_probe.exe','nr_large_surface_capture_probe.exe'))")
+(r/'build-native-routing-v12.ps1').write_text(s)

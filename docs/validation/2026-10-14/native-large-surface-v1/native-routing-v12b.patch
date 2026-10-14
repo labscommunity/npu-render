@@ -1,0 +1,58 @@
+--- a/native/windows/registered_lab/indexed_exchange_protocol.hpp
++++ b/native/windows/registered_lab/indexed_exchange_protocol.hpp
+@@ -250,7 +250,7 @@
+         require(!h.reserved && (h.abi==8 || h.abi==9 || h.abi==10 || h.abi==11 || h.abi==12 || h.abi==14 || h.abi==15));
+         h.reserved=h.abi;h.abi=19;
+     }
+-    if(h.abi!=17 && h.abi!=18 && (h.flags&2) && uint64_t(r.texture.width)*r.texture.height>4194304){
++    if(h.abi!=17 && h.abi!=18 && h.abi!=21 && (h.flags&2) && uint64_t(r.texture.width)*r.texture.height>4194304){
+         require(!h.reserved && !(h.flags&0x2000));
+         const bool triangle=(h.flags&0x1000)!=0;
+         require(triangle?(h.abi==7 || h.abi==9 || h.abi==10 || h.abi==11 || h.abi==15):(h.abi==4 || h.abi==5));
+--- a/native/windows/registered_lab/large_surface_capture_probe.cpp
++++ b/native/windows/registered_lab/large_surface_capture_probe.cpp
+@@ -3,6 +3,7 @@
+ #undef main
+ #include "indexed_exchange_protocol.hpp"
+ #include <windows.h>
++#include "triangle_regions.hpp"
+ namespace ex=nr::registered_lab::indexed_exchange;
+ int main(int argc,char **argv)try{
+     ex::Header h;h.abi=21;h.reserved=4;h.nonce[0]=1;h.client_pid=1;h.sequence=1;
+@@ -23,6 +24,12 @@
+     auto point=h;point.reserved=5;point.flags=0xf12;nr::capture::check(ex::shape_valid(point));
+     auto too_big=t;too_big.width=8192;too_big.height=1025;nr::capture::check(!ex::texture_valid(too_big,h));++negatives;
+     auto changed=h;changed.reserved=5;nr::capture::check(!ex::same_request(h,changed));++negatives;
++    const std::array<int32_t,4> full{0,0,2880,1800};
++    nr::capture::check(nr::raster::bounded_triangle_regions({full,full},full,14400,false,true).size()==2);
++    for(unsigned i=0;i<4;++i){bool rejected=false;try{
++        (void)nr::raster::bounded_triangle_regions({full},full,i==2?16385u:14400u,i==3,i!=0);
++    }catch(const std::invalid_argument &){rejected=true;}
++        if(i==1)nr::capture::check(!rejected);else{nr::capture::check(rejected);++negatives;}}
+     if(argc==2 && !std::strcmp(argv[1],"--contract")){
+         std::printf("{\"large_surface_contract\":true,\"negative_cases\":%u,\"legacy_large_source_rejected\":true,\"max_packet_bytes\":%u}\n",negatives,ex::max_packet_bytes);return 0;
+     }
+--- a/native/windows/registered_lab/linear_texture_draw.cpp
++++ b/native/windows/registered_lab/linear_texture_draw.cpp
+@@ -237,7 +237,7 @@
+     // The provider has already projected and bounded both triangles. Schedule
+     // only row blocks intersecting those bounds and the scissor; the graph
+     // still decides exact sample coverage, sampling and blending.
+-    const auto regions=bounded_triangle_regions(projected.triangle_bounds,clip,s.count);
++    const auto regions=bounded_triangle_regions(projected.triangle_bounds,clip,s.count,false,uint64_t(s.width)*s.height>4194304);
+     uint32_t first_row=s.height,end_row=0;
+     for(const auto &region:regions)if(region[0]<region[2] && region[1]<region[3]){
+         first_row=(std::min)(first_row,uint32_t(region[1]));end_row=(std::max)(end_row,uint32_t(region[3]));
+--- a/native/windows/registered_lab/triangle_regions.hpp
++++ b/native/windows/registered_lab/triangle_regions.hpp
+@@ -8,8 +8,8 @@
+ // Address scheduling over bounds already computed by the selected device.
+ // This does not evaluate vertex shaders, triangle edges or sample coverage.
+ inline std::vector<std::array<int32_t,4>> bounded_triangle_regions(
+-    const std::vector<std::array<int32_t,4>> &bounds,const std::array<int32_t,4> &clip,uint32_t batch,bool quads=false){
+-    if(!batch || batch>8192 || (quads && batch%4) || clip[0]<0 || clip[1]<0 || clip[0]>clip[2] || clip[1]>clip[3] || clip[2]>8192 || clip[3]>8192)
++    const std::vector<std::array<int32_t,4>> &bounds,const std::array<int32_t,4> &clip,uint32_t batch,bool quads=false,bool large_affine=false){
++    if(!batch || batch>(large_affine?16384u:8192u) || (large_affine && quads) || (quads && batch%4) || clip[0]<0 || clip[1]<0 || clip[0]>clip[2] || clip[1]>clip[3] || clip[2]>8192 || clip[3]>8192)
+         throw std::invalid_argument("invalid triangle region parameters");
+     std::vector<std::array<int32_t,4>> regions;regions.reserve(bounds.size());uint64_t tiles=0;
+     for(const auto &b:bounds){

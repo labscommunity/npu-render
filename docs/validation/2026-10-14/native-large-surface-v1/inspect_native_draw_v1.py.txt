@@ -1,0 +1,17 @@
+import argparse,struct,json,hashlib
+from pathlib import Path
+p=argparse.ArgumentParser();p.add_argument('--capture',type=Path,required=True);p.add_argument('--output',type=Path,required=True);v=p.parse_args();assert not v.output.exists()
+report=dict(bytes=v.capture.stat().st_size,records=[]);assert 48<=report['bytes']<=96*1024*1024
+with v.capture.open('rb') as f:
+ assert f.read(8)==b'NPDRAW01';complete=False
+ while f.tell()<report['bytes']:
+  assert not complete;label=f.read(32);size=struct.unpack('<Q',f.read(8))[0];assert len(label)==32 and label[-1]==0 and size<=report['bytes']-f.tell();name=label.split(b'\0')[0].decode();entry=dict(name=name,bytes=size)
+  if size<=1024 and name in ('arguments','target-description','source-description','viewport','blend','raster','depth','scissors','vertex-shader','pixel-shader','source-view','draw-indexed'):
+   data=f.read(size);assert size%4==0;entry['values']=list(struct.unpack('<'+('f' if name=='viewport' else 'I')*(size//4),data))
+  else:f.seek(size,1)
+  report['records'].append(entry);complete=name=='complete';assert len(report['records'])<=128
+ assert complete
+h=hashlib.sha256()
+with v.capture.open('rb') as f:
+ for data in iter(lambda:f.read(1024*1024),b''):h.update(data)
+report['sha256']=h.hexdigest();v.output.parent.mkdir(exist_ok=True);v.output.write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report))
