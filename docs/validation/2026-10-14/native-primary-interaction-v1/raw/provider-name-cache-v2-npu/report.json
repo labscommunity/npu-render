@@ -1,0 +1,23 @@
+{
+  "started": "2026-10-14T22:31:23.396280+00:00",
+  "completed": true,
+  "passed": false,
+  "backend": "NPU",
+  "runtime": "2026.4.1-22982-e213a147257-releases/2026/4",
+  "runs": [],
+  "desktop_changed": false,
+  "renderer_changed": false,
+  "pending": {
+    "group": "original",
+    "turn": 0,
+    "devices": [
+      "N",
+      "P",
+      "U"
+    ],
+    "compile_ms": 135.58329999796115
+  },
+  "error": "AssertionError()",
+  "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\probe-provider-name-cache-v2.py\", line 36, in <module>\n    devices=list(compiled.get_property('EXECUTION_DEVICES'));report['pending']=dict(group=group,turn=turn,devices=devices,compile_ms=elapsed);assert len(devices)==1 and (devices[0]==v.backend or devices[0].startswith(v.backend+'.'))\n                                                                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n",
+  "finished": "2026-10-14T22:31:23.540349+00:00"
+}

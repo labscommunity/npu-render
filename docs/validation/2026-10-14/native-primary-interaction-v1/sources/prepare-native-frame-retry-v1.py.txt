@@ -1,0 +1,38 @@
+from pathlib import Path
+import ast, hashlib, json
+
+r = Path('results/render-driver')
+for old, new in [('native_desktop_bootstrap_v14.py', 'native_desktop_bootstrap_v15.py'), ('relay_native_frames_v4.py', 'relay_native_frames_v5.py')]:
+    s = (r/old).read_text()
+    pos = s.index('\nfrom ')
+    s = s[:pos] + '\nfrom native_frame_io_v1 import open_shared_frame, statistics as frame_io_statistics' + s[pos:]
+    if old.startswith('native_desktop'):
+        block = "    handle=k.CreateFileW(str(path),0x80000000,7,None,3,0,None)\n    if handle==C.c_void_p(-1).value:\n        error=C.get_last_error()\n        if error in (2,3):return None\n        raise C.WinError(error)"
+        replacement = "    handle=open_shared_frame(path)\n    if handle is None:return None"
+    else:
+        block = "  handle=k.CreateFileW(str(source),0x80000000,7,None,3,0,None)\n  if handle==C.c_void_p(-1).value:\n   error=C.get_last_error()\n   if error in (2,3):time.sleep(.1);continue\n   raise C.WinError(error)"
+        replacement = "  handle=open_shared_frame(source)\n  if handle is None:continue"
+    assert s.count(block) == 1
+    s = s.replace(block, replacement)
+    s = s.replace("def save():(out/'report.json').write_text", "def save():\n report['frame_io_statistics']=frame_io_statistics.copy()\n (out/'report.json').write_text")
+    ast.parse(s); (r/new).write_text(s)
+for prefix in ['run', 'recover']:
+    s = (r/f'{prefix}-native-desktop-v29.ps1').read_text()
+    for a,b in [('desktop-v29','desktop-v30'),('admission-v29','admission-v30'),('Recovery-v29','Recovery-v30'),('bootstrap_v14','bootstrap_v15')]:
+        s=s.replace(a,b)
+    if prefix == 'run':
+        anchor = "$recovery=Get-Content"
+        assert s.count(anchor) == 1
+        s=s.replace(anchor, "$frameIO=Get-Content \"$r\\vm\\native-frame-io-v1\\report.json\" -Raw|ConvertFrom-Json;if(!$frameIO.completed -or !$frameIO.passed){throw 'Frame IO prerequisite failed'}\n" + anchor)
+    (r/f'{prefix}-native-desktop-v30.ps1').write_text(s)
+keys=[n.replace('desktop-v29','desktop-v30').replace('bootstrap_v14','bootstrap_v15').replace('relay_native_frames_v4','relay_native_frames_v5') for n in json.loads((r/'native-desktop-v29-source.json').read_text())]
+keys += ['native_frame_io_v1.py']
+(r/'native-desktop-v30-source.json').write_text(json.dumps({n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in keys},indent=2)+'\n')
+s=(r/'start-native-topology-v30.ps1').read_text().replace('topology-v30','topology-v31').replace('Topology-V30','Topology-V31')
+(r/'start-native-topology-v31.ps1').write_text(s)
+s=(r/'run-native-live-v18.ps1').read_text()
+for a,b in [('native-live-v18','native-live-v19'),('NativeLiveV18','NativeLiveV19'),('admission-v29','admission-v30'),('desktop-v29','desktop-v30'),('Recovery-v29','Recovery-v30'),('topology-v30','topology-v31'),('primary-v5','primary-v6'),('observe_physical_patch_v4','observe_physical_patch_v5'),('relay_native_frames_v4','relay_native_frames_v5')]:s=s.replace(a,b)
+(r/'run-native-live-v19.ps1').write_text(s)
+for name in ['native_frame_io_v1.py','qualify-native-frame-io-v1.py','observe_physical_patch_v5.py']:
+    ast.parse((r/name).read_text())
+print('Prepared bounded-retry controller v30 / live v19; NPU worker and driver unchanged.')

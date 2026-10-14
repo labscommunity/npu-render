@@ -1,0 +1,57 @@
+--- native-present-v15/input_stimulus.hpp
++++ native-present-v16/input_stimulus.hpp
+@@ -2,17 +2,27 @@
+ // SendInput targets only this window; no arbitrary key or screen content is logged.
+ struct InputStimulus {
+     static constexpr ULONG_PTR tag=0x4e505549;
+-    HWND window=nullptr,original_foreground=nullptr;POINT original_cursor{};bool cursor_saved=false,stopped=false,paint_failed=false;unsigned step=0,clicks=0,keys=0;
++    HWND window=nullptr,original_foreground=nullptr;POINT original_cursor{};bool cursor_saved=false,stopped=false,paint_failed=false;unsigned step=0,clicks=0,keys=0,unicode_packets=0;bool unicode_pending=false;ULONGLONG unicode_pending_at=0;
+     static void receipt(const char *kind,unsigned step){LARGE_INTEGER qpc{};QueryPerformanceCounter(&qpc);std::printf("{\"input_event\":\"%s\",\"step\":%u,\"qpc\":%lld,\"owned_window\":true}\n",kind,step,qpc.QuadPart);std::fflush(stdout);}
+     static LRESULT CALLBACK procedure(HWND hwnd,UINT message,WPARAM w,LPARAM l){
+         auto *self=reinterpret_cast<InputStimulus *>(GetWindowLongPtrW(hwnd,GWLP_USERDATA));
+         if(message==WM_NCCREATE){self=static_cast<InputStimulus *>(reinterpret_cast<CREATESTRUCTW *>(l)->lpCreateParams);SetWindowLongPtrW(hwnd,GWLP_USERDATA,reinterpret_cast<LONG_PTR>(self));}
+         if(self && message==WM_CLOSE){self->stopped=true;return 0;}
+         if(self && message==WM_LBUTTONUP && GetMessageExtraInfo()==tag && self->step==0){self->step=1;++self->clicks;receipt("mouse_received",self->step);InvalidateRect(hwnd,nullptr,FALSE);return 0;}
+-        if(self && self->step==1 && (message==WM_CHAR || message==WM_KEYDOWN || message==WM_KEYUP)){
++        if(self && self->step==1 && ((message==WM_CHAR && w==L'R') || ((message==WM_KEYDOWN || message==WM_KEYUP) && w==VK_PACKET))){
+             std::printf("{\"owned_keyboard_diagnostic\":true,\"message\":%u,\"tag_matches\":%s,\"is_packet\":%s,\"is_expected_character\":%s,\"message_time\":%ld,\"message_parameter\":%lld}\n",message,GetMessageExtraInfo()==tag?"true":"false",w==VK_PACKET?"true":"false",w==L'R'?"true":"false",GetMessageTime(),static_cast<long long>(l));std::fflush(stdout);
+         }
+-        if(self && message==WM_CHAR && w==L'R' && GetMessageExtraInfo()==tag && self->step==1){self->step=2;++self->keys;receipt("key_received",self->step);InvalidateRect(hwnd,nullptr,FALSE);return 0;}
++        if(self && message==WM_KILLFOCUS)self->unicode_pending=false;
++        if(self && message==WM_KEYDOWN && self->step==1){
++            self->unicode_pending=w==VK_PACKET && GetMessageExtraInfo()==tag && GetFocus()==hwnd;
++            if(self->unicode_pending){++self->unicode_packets;self->unicode_pending_at=GetTickCount64();receipt("unicode_packet_received",self->step);}
++        }
++        if(self && message==WM_CHAR && self->step==1){
++            const bool expected=w==L'R' && self->unicode_pending && GetTickCount64()-self->unicode_pending_at<=2000 && GetFocus()==hwnd;
++            self->unicode_pending=false;
++            if(expected){self->step=2;++self->keys;receipt("key_received",self->step);InvalidateRect(hwnd,nullptr,FALSE);}
++            return 0;
++        }
+         if(self && message==WM_PAINT){PAINTSTRUCT paint{};const auto dc=BeginPaint(hwnd,&paint);RECT rect{};GetClientRect(hwnd,&rect);const COLORREF colors[]{RGB(30,60,180),RGB(20,180,60),RGB(180,30,80)};const auto brush=CreateSolidBrush(colors[self->step]);FillRect(dc,&rect,brush);DeleteObject(brush);EndPaint(hwnd,&paint);if(!GdiFlush())self->paint_failed=true;receipt("painted",self->step);return 0;}
+         return DefWindowProcW(hwnd,message,w,l);
+     }
+@@ -44,7 +54,7 @@
+         if(!key_sent && window.step==1 && cue(L"key")){window.key();key_sent=true;}
+         Sleep(50);
+     }
+-    const bool passed=window.clicks==1 && window.keys==1 && window.step==2;
++    const bool passed=window.clicks==1 && window.keys==1 && window.unicode_packets==1 && window.step==2;
+     std::printf("{\"completed\":true,\"input_stimulus_only\":true,\"passed\":%s,\"mouse_receipts\":%u,\"key_receipts\":%u,\"desktop_offloaded\":false}\n",passed?"true":"false",window.clicks,window.keys);return passed?0:1;
+ }
+ 
+@@ -56,8 +66,12 @@
+     while(GetTickCount64()-start<12000 && window.step!=2){MSG message{};while(PeekMessageW(&message,nullptr,0,0,PM_REMOVE)){TranslateMessage(&message);DispatchMessageW(&message);}
+         require(nr::present::current_console_default(),"input contract desktop changed");
+         if(!clicked && GetTickCount64()-start>500){window.click();clicked=true;}
+-        if(!keyed && window.step==1){window.key();keyed=true;}
++        if(!keyed && window.step==1){
++            SendMessageW(window.window,WM_CHAR,L'R',1);require(window.step==1 && window.keys==0,"unauthenticated character accepted");
++            std::printf("{\"unauthenticated_character_rejected\":true}\n");std::fflush(stdout);window.key();keyed=true;
++        }
+         Sleep(50);
+     }
+-    const bool passed=window.clicks==1 && window.keys==1 && window.step==2;std::printf("{\"input_contract\":true,\"completed\":true,\"passed\":%s,\"mouse_receipts\":%u,\"key_receipts\":%u,\"npu_tested\":false}\n",passed?"true":"false",window.clicks,window.keys);return passed?0:1;
++    SendMessageW(window.window,WM_CHAR,L'R',1);require(window.keys<=1,"duplicate character accepted");
++    const bool passed=window.clicks==1 && window.keys==1 && window.unicode_packets==1 && window.step==2;std::printf("{\"input_contract\":true,\"completed\":true,\"passed\":%s,\"mouse_receipts\":%u,\"key_receipts\":%u,\"npu_tested\":false}\n",passed?"true":"false",window.clicks,window.keys);return passed?0:1;
+ }

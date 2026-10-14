@@ -1,0 +1,12 @@
+--- native-topology-control-v8/topology.cpp
++++ native-topology-control-v9/topology.cpp
+@@ -98,7 +98,8 @@
+   require(equivalent(expected_physical,actual_physical),"physical mode or routing changed");require(!same_source(active.paths[0],active.paths[1]),"sources still cloned");
+   const auto &a=source(active,active.paths[0]),&b=source(active,active.paths[1]);require(a.position.x+LONG(a.width)<=b.position.x||b.position.x+LONG(b.width)<=a.position.x,"logical desktops overlap");
+   std::printf("{\"extension_verified\":true,\"physical_path_preserved\":%s,\"physical_mode_preserved\":true,\"indirect_primary\":%s,\"seconds\":%lu}\n",primary?"false":"true",primary?"true":"false",seconds);std::fflush(stdout);
+-  for(unsigned i=0;i<seconds*10;++i){require(!escape.requested(),"primary trial emergency exit requested");require(nr::present::current_console_default(),"interactive desktop changed");if(primary && !(i%10))require(equivalent(active,query(QDC_ONLY_ACTIVE_PATHS)),"primary route changed during trial");Sleep(100);}passed=true;
++  const auto observation_deadline=GetTickCount64()+uint64_t(seconds)*1000;
++  for(unsigned i=0;GetTickCount64()<observation_deadline;++i){require(!escape.requested(),"primary trial emergency exit requested");require(nr::present::current_console_default(),"interactive desktop changed");if(primary && !(i%10))require(equivalent(active,query(QDC_ONLY_ACTIVE_PATHS)),"primary route changed during trial");Sleep(100);}passed=true;
+  }catch(const std::exception &e){std::fprintf(stderr,"extension trial: %s\n",e.what());}
+  const auto status=set(restore,SDC_APPLY);const auto after=query(QDC_ONLY_ACTIVE_PATHS);print("restored",after);const bool exact=status==ERROR_SUCCESS&&equivalent(before,after);
+  const bool baseline=physical_baseline_matches(before,after);const bool windows_restored=!windows || ((exact || baseline) && windows->restore());passed=passed&&windows_restored;

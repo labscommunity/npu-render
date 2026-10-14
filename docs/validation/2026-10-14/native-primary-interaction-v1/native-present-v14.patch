@@ -1,0 +1,22 @@
+--- native-present-v13/frame_present_probe.cpp
++++ native-present-v14/frame_present_probe.cpp
+@@ -89,7 +89,7 @@
+     std::printf("{\"display_observation\":true,\"source_sequence\":%llu,\"observed_qpc\":%lld,\"submitted_count_status\":%ld,\"submitted_present_count\":%u,\"statistics_status\":%ld,\"displayed_present_count\":%u,\"present_refresh_count\":%u,\"sync_refresh_count\":%u,\"sync_qpc\":%lld,\"media_status\":%ld,\"media_present_count\":%u,\"media_sync_qpc\":%lld,\"media_composition_mode\":%u,\"residual_gpu_work_measured\":false}\n",static_cast<unsigned long long>(source_sequence),observed.QuadPart,static_cast<long>(count_status),submitted_count,static_cast<long>(stats_status),stats.PresentCount,stats.PresentRefreshCount,stats.SyncRefreshCount,stats.SyncQPCTime.QuadPart,static_cast<long>(media_status),detail.PresentCount,detail.SyncQPCTime.QuadPart,UINT(detail.CompositionMode));std::fflush(stdout);
+ }
+ int live(const wchar_t *path,const wchar_t *duration,const wchar_t *producer){
+-    wchar_t *end=nullptr;const auto seconds=std::wcstoul(duration,&end,10);require(end!=duration && !*end && seconds>=1 && seconds<=240,"live duration rejected");
++    wchar_t *end=nullptr;const auto seconds=std::wcstoul(duration,&end,10);require(end!=duration && !*end && seconds>=1 && seconds<=550,"live duration rejected");
+     const auto expected_producer=std::wcstoul(producer,&end,10);require(end!=producer && !*end && expected_producer,"live producer rejected");
+     auto frame=read_frame(path);const auto h=frame.header;auto last_header=h;require(h.producer_pid==expected_producer,"live producer mismatch");
+     const auto initial=nr::live::separated();
+--- native-present-v13/input_stimulus.hpp
++++ native-present-v14/input_stimulus.hpp
+@@ -30,7 +30,7 @@
+     }
+ };
+ int input_stimulus(const wchar_t *directory,const wchar_t *duration){
+-    wchar_t *end=nullptr;const auto seconds=std::wcstoul(duration,&end,10);require(end!=duration && !*end && seconds>=1 && seconds<=285,"input duration rejected");require(nr::present::current_console_default(),"input requires Default console");
++    wchar_t *end=nullptr;const auto seconds=std::wcstoul(duration,&end,10);require(end!=duration && !*end && seconds>=1 && seconds<=585,"input duration rejected");require(nr::present::current_console_default(),"input requires Default console");
+     require(SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)!=nullptr,"input DPI unavailable");const auto route=nr::live::separated();InputStimulus window(route.indirect);ShowWindow(window.window,SW_SHOWNOACTIVATE);UpdateWindow(window.window);const auto start=GetTickCount64();bool click_sent=false,key_sent=false;unsigned refresh=0;
+     const std::wstring root(directory);const auto cue=[&](const wchar_t *name){return GetFileAttributesW((root+L"\\"+name).c_str())!=INVALID_FILE_ATTRIBUTES;};
+     std::printf("{\"input_ready\":true,\"pid\":%lu,\"indirect_primary\":true,\"cursor_confined\":false}\n",GetCurrentProcessId());std::fflush(stdout);

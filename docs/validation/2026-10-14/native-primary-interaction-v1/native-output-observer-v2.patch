@@ -1,0 +1,27 @@
+--- native-output-observer-v1/observer.cpp
++++ native-output-observer-v2/observer.cpp
+@@ -19,7 +19,7 @@
+ void check(HRESULT hr){if(FAILED(hr)){char text[64];std::snprintf(text,sizeof(text),"DXGI observer failure %08lx",static_cast<unsigned long>(hr));throw std::runtime_error(text);}}
+ #include "live_topology.hpp"
+ long long qpc(){LARGE_INTEGER q{};require(QueryPerformanceCounter(&q)!=0,"QPC unavailable");return q.QuadPart;}
+-const char *boolean(bool b){return b?"true":"false";}
++const char *json_bool(bool b){return b?"true":"false";}
+ struct Owner {HWND window{};DWORD pid{};};
+ Owner owner(POINT point){Owner o;o.window=WindowFromPoint(point);GetWindowThreadProcessId(o.window,&o.pid);return o;}
+ struct Peer {
+@@ -75,7 +75,7 @@
+     }
+     void emit(const Observation &o){
+         std::printf("{\"qpc\":%lld,\"read_completed_qpc\":%lld,\"last_present_qpc\":%lld,\"accumulated_frames\":%u,\"ownership_verified_before_and_after\":true,\"points\":[",o.begin,o.end,o.present,o.accumulated);
+-        for(size_t i=0;i<2;++i)std::printf("%s{\"x\":%ld,\"y\":%ld,\"owned_presenter_at_point\":%s,\"known_blue\":%s,\"known_green\":%s,\"known_red\":%s}",i?",":"",points[i].x,points[i].y,boolean(o.owned[i]),boolean(o.blue[i]),boolean(o.green[i]),boolean(o.red[i]));
++        for(size_t i=0;i<2;++i)std::printf("%s{\"x\":%ld,\"y\":%ld,\"owned_presenter_at_point\":%s,\"known_blue\":%s,\"known_green\":%s,\"known_red\":%s}",i?",":"",points[i].x,points[i].y,json_bool(o.owned[i]),json_bool(o.blue[i]),json_bool(o.green[i]),json_bool(o.red[i]));
+         std::printf("]}\n");std::fflush(stdout);
+     }
+ };
+@@ -104,5 +104,5 @@
+     if(argc==2 && !std::wcscmp(argv[1],L"--self-test")){self_test();return 0;}
+     require(argc==4 && !std::wcscmp(argv[1],L"--observe"),"expected --observe <presenter-pid> <seconds>");wchar_t *end=nullptr;const auto pid=std::wcstoul(argv[2],&end,10);require(end!=argv[2] && !*end && pid,"PID rejected");const auto seconds=std::wcstoul(argv[3],&end,10);require(end!=argv[3] && !*end && seconds>=1 && seconds<=550,"duration rejected");Peer peer(pid);const auto initial=nr::live::separated();require(initial.indirect.left==0 && initial.indirect.top==0 && initial.physical.left==1024 && initial.physical.top==0,"observer route rejected");Reader reader(initial.physical,initial.physical_source,{{{1222,166},{1312,234}}});const auto deadline=GetTickCount64()+seconds*1000ull;unsigned blue=0,green=0,red=0,rows=0;
+     while(GetTickCount64()<deadline){peer.verify();require(nr::present::current_console_default() && nr::live::same(initial,nr::live::separated()),"observer desktop changed");Observation o;if(reader.sample(pid,o)){peer.verify();reader.emit(o);++rows;for(size_t i=0;i<2;++i){blue+=o.owned[i] && o.blue[i];green+=o.owned[i] && o.green[i];red+=o.owned[i] && o.red[i];}}Sleep(100);}
+-    const bool passed=blue && green && red;std::printf("{\"completed\":true,\"passed\":%s,\"physical_output_observer\":true,\"rows\":%u,\"blue\":%u,\"green\":%u,\"red\":%u,\"gpu_copy_commands\":%llu,\"timeouts\":%llu,\"physical_panel_observed\":false,\"desktop_offloaded\":false}\n",boolean(passed),rows,blue,green,red,reader.copies,reader.timeouts);return passed?0:1;
++    const bool passed=blue && green && red;std::printf("{\"completed\":true,\"passed\":%s,\"physical_output_observer\":true,\"rows\":%u,\"blue\":%u,\"green\":%u,\"red\":%u,\"gpu_copy_commands\":%llu,\"timeouts\":%llu,\"physical_panel_observed\":false,\"desktop_offloaded\":false}\n",json_bool(passed),rows,blue,green,red,reader.copies,reader.timeouts);return passed?0:1;
+ }catch(const std::exception &e){std::fprintf(stderr,"%s\n",e.what());return 1;}

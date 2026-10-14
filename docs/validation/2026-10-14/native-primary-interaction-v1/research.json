@@ -1,0 +1,26 @@
+{
+  "sources": [
+    {
+      "url": "https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew",
+      "finding": "Incompatible open sharing modes fail with ERROR_SHARING_VIOLATION. The options remain in force until the conflicting handle closes. A bounded retry is tested separately from frame validation."
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/windows/win32/direct3ddxgi/desktop-dup-api",
+      "finding": "Desktop Duplication provides a DXGI surface with the output desktop image in BGRA8 format. The observer reads two controlled locations and adds GPU copy work. This is not a camera or a zero-GPU claim."
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/windows/win32/api/d3d11/nf-d3d11-id3d11devicecontext-map",
+      "finding": "DO_NOT_WAIT returns DXGI_ERROR_WAS_STILL_DRAWING when the GPU has not completed the resource. The diagnostic retries this status within two seconds; other errors remain fatal."
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-keybdinput",
+      "finding": "KEYEVENTF_UNICODE produces VK_PACKET key events. TranslateMessage posts the character message. The lab must verify the key-to-character path rather than assume arbitrary metadata survives translation."
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/iddcx/nf-iddcx-iddcxmonitorsetuphardwarecursor",
+      "finding": "Software cursor is enabled by default when a mode is committed. The current IDD does not enable a hardware cursor. Cursor presentation and ordinary physical-pointer behavior still require local qualification."
+    }
+  ],
+  "external_messages_sent": false,
+  "full_desktop_offload_proven": false
+}

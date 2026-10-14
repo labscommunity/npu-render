@@ -1,0 +1,53 @@
+"""Exercise real Windows sharing conflicts without installing a driver."""
+from native_frame_io_v1 import C, W, k, INVALID, statistics, open_shared_frame
+from pathlib import Path
+from datetime import datetime, UTC
+import json, sys, threading, time
+
+out = Path(sys.argv[1]); out.mkdir(exist_ok=False)
+report = dict(started=datetime.now(UTC).isoformat(), completed=False, passed=False,
+              desktop_changed=False, driver_installed=False)
+locked = None; timer = None
+try:
+    fixture = out / 'fixture.bin'; fixture.write_bytes(bytes(range(64)))
+    assert open_shared_frame(out / 'missing.bin') is None
+    handle = open_shared_frame(fixture); assert handle and handle != INVALID
+    assert k.CloseHandle(handle)
+    locked = k.CreateFileW(str(fixture), 0x80000000, 0, None, 3, 0, None)
+    assert locked != INVALID
+    owned = locked
+    timer = threading.Timer(.075, lambda: k.CloseHandle(owned)); timer.start()
+    began = time.monotonic(); handle = open_shared_frame(fixture)
+    report['transient_retry_elapsed_ms'] = (time.monotonic()-began)*1000
+    timer.join(); timer = None; locked = None
+    assert handle and handle != INVALID and k.CloseHandle(handle)
+    assert statistics['sharing_retries'] > 0 and fixture.read_bytes() == bytes(range(64))
+    report['transient_conflict_recovered'] = True
+    locked = k.CreateFileW(str(fixture), 0x80000000, 0, None, 3, 0, None); assert locked != INVALID
+    began = time.monotonic()
+    try: open_shared_frame(fixture, timeout_ms=50)
+    except OSError as error: assert error.winerror == 32
+    else: raise AssertionError('persistent sharing conflict was accepted')
+    report['persistent_conflict_elapsed_ms'] = (time.monotonic()-began)*1000
+    assert statistics['sharing_timeouts'] == 1 and report['persistent_conflict_elapsed_ms'] >= 45
+    assert k.CloseHandle(locked); locked = None
+    before = statistics.copy()
+    try: open_shared_frame(out)
+    except OSError as error: assert error.winerror == 5
+    else: raise AssertionError('directory access failure was accepted')
+    assert statistics == before
+    for bound in (0, 1001):
+        try: open_shared_frame(fixture, bound)
+        except ValueError: pass
+        else: raise AssertionError('unbounded retry was accepted')
+    report.update(passed=True, missing_frame_not_admitted=True,
+                  persistent_conflict_rejected=True, nonsharing_error_not_retried=True,
+                  invalid_bounds_rejected=True, statistics=statistics.copy())
+except Exception as error:
+    report['error'] = repr(error)
+finally:
+    if timer: timer.join(); locked = None
+    if locked is not None: k.CloseHandle(locked)
+    report.update(completed=True, finished=datetime.now(UTC).isoformat())
+    (out/'report.json').write_text(json.dumps(report, indent=2)+'\n')
+print(json.dumps(report)); raise SystemExit(0 if report['passed'] else 1)

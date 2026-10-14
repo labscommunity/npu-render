@@ -1,0 +1,40 @@
+--- native-present-v14/frame_present_probe.cpp
++++ native-present-v15/frame_present_probe.cpp
+@@ -173,6 +173,7 @@
+ }
+ #include "input_stimulus.hpp"
+ int wmain(int argc,wchar_t **argv)try{
++    if(argc==2 && !std::wcscmp(argv[1],L"--input-contract"))return input_contract();
+     if(argc==4 && !std::wcscmp(argv[1],L"--input-stimulus"))return input_stimulus(argv[2],argv[3]);
+     if(argc==3 && !std::wcscmp(argv[1],L"--stimulus"))return stimulus(argv[2]);
+     if(argc==4 && !std::wcscmp(argv[1],L"--read-pair")){
+--- native-present-v14/input_stimulus.hpp
++++ native-present-v15/input_stimulus.hpp
+@@ -9,6 +9,9 @@
+         if(message==WM_NCCREATE){self=static_cast<InputStimulus *>(reinterpret_cast<CREATESTRUCTW *>(l)->lpCreateParams);SetWindowLongPtrW(hwnd,GWLP_USERDATA,reinterpret_cast<LONG_PTR>(self));}
+         if(self && message==WM_CLOSE){self->stopped=true;return 0;}
+         if(self && message==WM_LBUTTONUP && GetMessageExtraInfo()==tag && self->step==0){self->step=1;++self->clicks;receipt("mouse_received",self->step);InvalidateRect(hwnd,nullptr,FALSE);return 0;}
++        if(self && self->step==1 && (message==WM_CHAR || message==WM_KEYDOWN || message==WM_KEYUP)){
++            std::printf("{\"owned_keyboard_diagnostic\":true,\"message\":%u,\"tag_matches\":%s,\"is_packet\":%s,\"is_expected_character\":%s,\"message_time\":%ld,\"message_parameter\":%lld}\n",message,GetMessageExtraInfo()==tag?"true":"false",w==VK_PACKET?"true":"false",w==L'R'?"true":"false",GetMessageTime(),static_cast<long long>(l));std::fflush(stdout);
++        }
+         if(self && message==WM_CHAR && w==L'R' && GetMessageExtraInfo()==tag && self->step==1){self->step=2;++self->keys;receipt("key_received",self->step);InvalidateRect(hwnd,nullptr,FALSE);return 0;}
+         if(self && message==WM_PAINT){PAINTSTRUCT paint{};const auto dc=BeginPaint(hwnd,&paint);RECT rect{};GetClientRect(hwnd,&rect);const COLORREF colors[]{RGB(30,60,180),RGB(20,180,60),RGB(180,30,80)};const auto brush=CreateSolidBrush(colors[self->step]);FillRect(dc,&rect,brush);DeleteObject(brush);EndPaint(hwnd,&paint);if(!GdiFlush())self->paint_failed=true;receipt("painted",self->step);return 0;}
+         return DefWindowProcW(hwnd,message,w,l);
+@@ -44,3 +47,17 @@
+     const bool passed=window.clicks==1 && window.keys==1 && window.step==2;
+     std::printf("{\"completed\":true,\"input_stimulus_only\":true,\"passed\":%s,\"mouse_receipts\":%u,\"key_receipts\":%u,\"desktop_offloaded\":false}\n",passed?"true":"false",window.clicks,window.keys);return passed?0:1;
+ }
++
++int input_contract(){
++    require(nr::present::current_console_default(),"input contract requires Default console");require(SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)!=nullptr,"input contract DPI unavailable");
++    const auto monitor=MonitorFromPoint(POINT{0,0},MONITOR_DEFAULTTOPRIMARY);MONITORINFO mi{};mi.cbSize=sizeof(mi);require(monitor && GetMonitorInfoW(monitor,&mi) && (mi.dwFlags&MONITORINFOF_PRIMARY),"input contract primary unavailable");
++    InputStimulus window(mi.rcMonitor);require(SetWindowPos(window.window,HWND_TOPMOST,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE|SWP_SHOWWINDOW)!=0,"input contract exposure failed");UpdateWindow(window.window);
++    const auto start=GetTickCount64();bool clicked=false,keyed=false;
++    while(GetTickCount64()-start<12000 && window.step!=2){MSG message{};while(PeekMessageW(&message,nullptr,0,0,PM_REMOVE)){TranslateMessage(&message);DispatchMessageW(&message);}
++        require(nr::present::current_console_default(),"input contract desktop changed");
++        if(!clicked && GetTickCount64()-start>500){window.click();clicked=true;}
++        if(!keyed && window.step==1){window.key();keyed=true;}
++        Sleep(50);
++    }
++    const bool passed=window.clicks==1 && window.keys==1 && window.step==2;std::printf("{\"input_contract\":true,\"completed\":true,\"passed\":%s,\"mouse_receipts\":%u,\"key_receipts\":%u,\"npu_tested\":false}\n",passed?"true":"false",window.clicks,window.keys);return passed?0:1;
++}

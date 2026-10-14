@@ -1,0 +1,37 @@
+from pathlib import Path
+import json, hashlib
+r=Path('results/render-driver')
+for prefix in ['run','recover']:
+ s=(r/f'{prefix}-native-desktop-v30.ps1').read_text()
+ for a,b in [('desktop-v30','desktop-v31'),('admission-v30','admission-v31'),('Recovery-v30','Recovery-v31')]:s=s.replace(a,b)
+ (r/f'{prefix}-native-desktop-v31.ps1').write_text(s)
+keys=[n.replace('desktop-v30','desktop-v31') for n in json.loads((r/'native-desktop-v30-source.json').read_text())]
+(r/'native-desktop-v31-source.json').write_text(json.dumps({n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in keys},indent=2)+'\n')
+s=(r/'start-native-topology-v31.ps1').read_text().replace('topology-v31','topology-v32').replace('Topology-V31','Topology-V32')
+(r/'start-native-topology-v32.ps1').write_text(s)
+s=(r/'run-native-live-v19.ps1').read_text()
+for a,b in [('native-live-v19','native-live-v20'),('NativeLiveV19','NativeLiveV20'),('admission-v30','admission-v31'),('desktop-v30','desktop-v31'),('Recovery-v30','Recovery-v31'),('topology-v31','topology-v32'),('primary-v6','primary-v7')]:s=s.replace(a,b)
+anchor="New-Item -ItemType Directory $out|Out-Null"
+assert s.count(anchor)==1
+s=s.replace(anchor,'''$screenProof=Get-Content "$r\\builds\\native-output-observer-v3\\build-report.json" -Raw|ConvertFrom-Json
+$screenQualification=Get-Content "$r\\vm\\native-output-observer-v3-qualification\\report.json" -Raw|ConvertFrom-Json
+$screenBinary="$r\\builds\\native-output-observer-v3\\Release\\nr_output_observer.exe"
+if(!$screenProof.clean_build -or !$screenQualification.completed -or !$screenQualification.passed -or $screenQualification.binary_sha256 -ne $screenProof.binary_sha256 -or (Get-FileHash $screenBinary).Hash -ne $screenProof.binary_sha256){throw 'Physical output observer is not qualified'}
+'''+anchor)
+old='Start-Interactive \'screen\' @("$source\\venv\\Scripts\\python.exe","$r\\vm\\observe_physical_patch_v5.py","$out\\screen\\capture",([string]$presentReady[0].pid),([string]$duration),([string]$inputReady[0].pid));$screenStarted=$true'
+new='Start-Interactive \'screen\' @($screenBinary,\'--observe\',([string]$presentReady[0].pid),([string]$duration),"$out\\screen\\stop");$screenStarted=$true'
+assert old in s;s=s.replace(old,new)
+s=s.replace('$out\\screen\\capture\\observations.jsonl','$out\\screen\\probe.log').replace('$out\\screen\\capture\\stop','$out\\screen\\stop').replace('Test-Path "$out\\screen\\capture"','Test-Path "$out\\screen"')
+anchor="  if(!$clickCued -and $blueSubmitted -and $blueObserved)"
+assert anchor in s
+s=s.replace(anchor,'''  $redObserved=@($screenRows|Where-Object {@($_.points|Where-Object {$_.owned_presenter_at_point -and $_.known_red}).Count -gt 0}).Count -gt 0
+  if($screenStarted -and $blueObserved -and $greenObserved -and $redObserved -and !(Test-Path "$out\\screen\\stop")){New-Item -ItemType File "$out\\screen\\stop"|Out-Null}
+'''+anchor)
+old=' $screenResult=Get-Content "$out\\screen\\capture\\report.json" -Raw|ConvertFrom-Json\n $report.physical_blue_green_red_observed=[bool]$screenResult.passed'
+new=''' $screenFinalRows=Read-Rows "$out\\screen\\probe.log";$screenDone=@($screenFinalRows|Where-Object {$_.completed -and $_.physical_output_observer});$screenExit=@($screenFinalRows|Where-Object {$_.PSObject.Properties.Name -contains 'exit_code'})
+ $report.physical_blue_green_red_observed=($screenDone.Count -eq 1 -and $screenDone[0].passed -and $screenExit.Count -eq 1 -and $screenExit[0].exit_code -eq 0)
+ $report.screen_observer='DXGI physical-output duplication; two-pixel GPU readback; ownership before and after'
+ if($screenDone.Count -eq 1){$report.screen_observer_result=$screenDone[0]}'''
+assert old in s;s=s.replace(old,new)
+(r/'run-native-live-v20.ps1').write_text(s)
+print('Prepared live v20; gated on DXGI observer qualification.')

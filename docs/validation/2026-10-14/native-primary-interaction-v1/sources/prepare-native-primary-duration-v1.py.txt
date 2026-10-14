@@ -1,0 +1,32 @@
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver')
+for name,base in [('native-present-v14','native-present-v13'),('native-topology-control-v8','native-topology-control-v7')]:
+ d=r/name;shutil.copytree(r/base,d)
+ if name.startswith('native-present'):
+  p=d/'frame_present_probe.cpp';s=p.read_text();assert s.count('seconds<=240')==1;p.write_text(s.replace('seconds<=240','seconds<=550'))
+  p=d/'input_stimulus.hpp';s=p.read_text();assert s.count('seconds<=285')==1;p.write_text(s.replace('seconds<=285','seconds<=585'))
+ else:
+  p=d/'topology.cpp';s=p.read_text();assert s.count('seconds<=300')==1;p.write_text(s.replace('seconds<=300','seconds<=600').replace('1..300 seconds','1..600 seconds'))
+ (r/(name+'-source.json')).write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+ with tarfile.open(r/(name+'.tar.gz'),'w:gz') as t:t.add(d,arcname=name)
+ (r/('build-'+name+'.ps1')).write_text((r/('build-'+base+'.ps1')).read_text().replace(base,name))
+s=(r/'run-native-topology-helper-v7.ps1').read_text().replace('control-v7','control-v8').replace('ValidateRange(1,300)','ValidateRange(1,600)').replace('-Minutes 6','-Minutes 12');(r/'run-native-topology-helper-v8.ps1').write_text(s)
+s=(r/'native_desktop_bootstrap_v13.py').read_text().replace('monitor_seconds=360','monitor_seconds=660').replace("pipe,'4096','405'","pipe,'4096','705'").replace('milliseconds=420000','milliseconds=720000').replace('deadline=admission_started+360','deadline=admission_started+660');(r/'native_desktop_bootstrap_v14.py').write_text(s)
+s=(r/'relay_native_frames_v3.py').read_text().replace('v.seconds<=300','v.seconds<=600');(r/'relay_native_frames_v4.py').write_text(s)
+s=(r/'observe_physical_patch_v3.py').read_text().replace('seconds<=240','seconds<=550');(r/'observe_physical_patch_v4.py').write_text(s)
+s=(r/'observe_native_topology_v5.py').read_text().replace('deadline=time.monotonic()+480','deadline=time.monotonic()+780');(r/'observe_native_topology_v6.py').write_text(s)
+for name in ['run-native-desktop-v28.ps1','recover-native-desktop-v28.ps1']:
+ s=(r/name).read_text().replace('desktop-v28','desktop-v29').replace('admission-v28','admission-v29').replace('Recovery-v28','Recovery-v29')
+ if name.startswith('run-'):
+  s=s.replace('bootstrap_v13','bootstrap_v14').replace('AddMinutes(9)','AddMinutes(13)').replace("'bootstrap' 450","'bootstrap' 750")
+  anchor='$recovery=Get-Content';s=s.replace(anchor,"$visibleReplay=Get-Content \"$r\\vm\\native-ordered-replay-v27-primary-visible\\report.json\" -Raw|ConvertFrom-Json;if(!$visibleReplay.completed -or !$visibleReplay.passed){throw 'Visible-window replay prerequisite failed'}\n"+anchor)
+ (r/name.replace('v28','v29')).write_text(s)
+keys=[n.replace('desktop-v28','desktop-v29').replace('bootstrap_v13','bootstrap_v14').replace('relay_native_frames_v3','relay_native_frames_v4') for n in json.loads((r/'native-desktop-v28-source.json').read_text())]
+(r/'native-desktop-v29-source.json').write_text(json.dumps({n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in keys},indent=2)+'\n')
+s=(r/'start-native-topology-v29.ps1').read_text().replace('topology-v29','topology-v30').replace('Topology-V29','Topology-V30').replace('observe_native_topology_v5','observe_native_topology_v6').replace('-Minutes 9','-Minutes 14');(r/'start-native-topology-v30.ps1').write_text(s)
+s=(r/'run-native-live-v17.ps1').read_text()
+for a,b in [('native-live-v17','native-live-v18'),('NativeLiveV17','NativeLiveV18'),('native-present-v13','native-present-v14'),('live-frame-reader-v6','live-frame-reader-v7'),('admission-v28','admission-v29'),('desktop-v28','desktop-v29'),('Recovery-v28','Recovery-v29'),('topology-v29','topology-v30'),('primary-v4','primary-v5'),('helper-v7','helper-v8'),('observe_physical_patch_v3','observe_physical_patch_v4'),('relay_native_frames_v3','relay_native_frames_v4')]:s=s.replace(a,b)
+for a,b in [('-Minutes 6','-Minutes 11'),("-Seconds','300'","-Seconds','600'"),("'285')","'585')"),("'--seconds','290'","'--seconds','590'"),('$remaining=280-','$remaining=580-'),('[Math]::Min(240,','[Math]::Min(550,'),('WaitForExit(340000)','WaitForExit(640000)'),('WaitForExit(450000)','WaitForExit(780000)')]:
+ assert a in s,a;s=s.replace(a,b)
+(r/'run-native-live-v18.ps1').write_text(s)

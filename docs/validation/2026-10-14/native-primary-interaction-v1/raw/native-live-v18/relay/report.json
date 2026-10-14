@@ -1,0 +1,45 @@
+{
+  "started": "2026-10-14T22:08:56.586770+00:00",
+  "completed": true,
+  "passed": false,
+  "published": 8,
+  "desktop_offloaded": false,
+  "producer": {
+    "pid": 6500,
+    "session": 0,
+    "creation_filetime": 134364893305920748,
+    "image_name": "WUDFHost.exe",
+    "sid": "S-1-5-19"
+  },
+  "compositor": {
+    "pid": 16980,
+    "session": 1,
+    "creation_filetime": 134364673055826287,
+    "image_name": "dwm.exe",
+    "sid": "S-1-5-90-0-1"
+  },
+  "earliest_qpc": 2240469285080,
+  "latest": {
+    "sequence": 8,
+    "qpc": 2243058670766,
+    "producer_pid": 6500,
+    "width": 1024,
+    "height": 768,
+    "format": 87,
+    "pixel_bytes": 3145728,
+    "pixel_sha256": "c3c679d9583719ed218ddf51b6595e9c58d96cc9d55a3e7d117c048f67685d00",
+    "packet_sha256": "c51689def581e55cbc92a6b83fa7de19de041eb19cb5d45709908e10fb1de72b",
+    "observed": "2026-10-14T22:13:15.617188+00:00",
+    "npu_receipts_observed": 730,
+    "known_stimulus_pixel": [
+      180,
+      60,
+      30,
+      255
+    ]
+  },
+  "producer_and_compositor_verified": true,
+  "error": "AssertionError()",
+  "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\relay_native_frames_v4.py\", line 31, in <module>\n    for peer in peers:peer.verify()\n                      ^^^^^^^^^^^^^\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\native_process_observer_v1.py\", line 55, in verify\n    assert self.handle and k.WaitForSingleObject(self.handle,0)==258\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n",
+  "finished": "2026-10-14T22:13:15.825556+00:00"
+}

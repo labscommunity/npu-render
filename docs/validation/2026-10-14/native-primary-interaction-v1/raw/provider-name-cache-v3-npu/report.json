@@ -1,0 +1,149 @@
+{
+  "started": "2026-10-14T22:31:48.357946+00:00",
+  "completed": true,
+  "passed": true,
+  "backend": "NPU",
+  "runtime": "2026.4.1-22982-e213a147257-releases/2026/4",
+  "runs": [
+    {
+      "group": "original",
+      "turn": 0,
+      "changed_constant": false,
+      "loaded_from_cache": false,
+      "compile_ms": 147.49890001257882,
+      "execution_devices": [
+        "NPU"
+      ],
+      "exact": true,
+      "blob_files": 1
+    },
+    {
+      "group": "original",
+      "turn": 1,
+      "changed_constant": false,
+      "loaded_from_cache": true,
+      "compile_ms": 14.206200023181736,
+      "execution_devices": [
+        "NPU"
+      ],
+      "exact": true,
+      "blob_files": 1
+    },
+    {
+      "group": "original",
+      "turn": 2,
+      "changed_constant": true,
+      "loaded_from_cache": false,
+      "compile_ms": 94.26020001410507,
+      "execution_devices": [
+        "NPU"
+      ],
+      "exact": true,
+      "blob_files": 2
+    },
+    {
+      "group": "canonical",
+      "turn": 0,
+      "changed_constant": false,
+      "loaded_from_cache": false,
+      "compile_ms": 97.62489999411628,
+      "execution_devices": [
+        "NPU"
+      ],
+      "exact": true,
+      "blob_files": 1
+    },
+    {
+      "group": "canonical",
+      "turn": 1,
+      "changed_constant": false,
+      "loaded_from_cache": true,
+      "compile_ms": 12.377200007904321,
+      "execution_devices": [
+        "NPU"
+      ],
+      "exact": true,
+      "blob_files": 1
+    },
+    {
+      "group": "canonical",
+      "turn": 2,
+      "changed_constant": true,
+      "loaded_from_cache": false,
+      "compile_ms": 88.11590002733283,
+      "execution_devices": [
+        "NPU"
+      ],
+      "exact": true,
+      "blob_files": 2
+    }
+  ],
+  "desktop_changed": false,
+  "renderer_changed": false,
+  "pending": {
+    "group": "canonical",
+    "turn": 2,
+    "devices": [
+      "NPU"
+    ],
+    "compile_ms": 88.11590002733283,
+    "actual_synthetic": [
+      [
+        0.0,
+        0.5,
+        1.0,
+        1.5
+      ],
+      [
+        2.0,
+        2.5,
+        3.0,
+        3.5
+      ],
+      [
+        4.0,
+        4.5,
+        5.0,
+        5.5
+      ],
+      [
+        6.0,
+        6.5,
+        7.0,
+        7.5
+      ]
+    ],
+    "expected_synthetic": [
+      [
+        0.0,
+        0.5,
+        1.0,
+        1.5
+      ],
+      [
+        2.0,
+        2.5,
+        3.0,
+        3.5
+      ],
+      [
+        4.0,
+        4.5,
+        5.0,
+        5.5
+      ],
+      [
+        6.0,
+        6.5,
+        7.0,
+        7.5
+      ]
+    ],
+    "actual_dtype": "float32",
+    "actual_shape": [
+      4,
+      4
+    ]
+  },
+  "finished": "2026-10-14T22:31:48.838637+00:00"
+}

@@ -1,0 +1,44 @@
+"""Isolated cache diagnostic, not a renderer or a desktop performance test."""
+from pathlib import Path
+from datetime import datetime, UTC
+import argparse, json, time
+import numpy as np
+import openvino as ov
+from openvino import opset13 as op
+
+p=argparse.ArgumentParser();p.add_argument('--backend',choices=['CPU','NPU'],required=True);p.add_argument('--output',type=Path,required=True);v=p.parse_args()
+v.output.mkdir(exist_ok=False)
+report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,backend=v.backend,runtime=ov.get_version(),runs=[],desktop_changed=False,renderer_changed=False)
+held=[]
+def graph(swapped=True):
+    a=op.parameter([4,4],dtype=np.float32);a.output(0).get_tensor().set_names({'input'})
+    indices=op.constant(np.array([2,1,0,3] if swapped else [0,1,2,3],np.int32));axis=op.constant(np.int32(1))
+    g=op.gather(a,indices,axis);o=op.multiply(g,op.constant(np.float32(.5)))
+    o.output(0).get_tensor().set_names({'output'})
+    return ov.Model([o],[a])
+def canonical(model):
+    copy=model.clone();copy.set_friendly_name('npu_render_cache_model')
+    nodes=copy.get_ordered_ops();names={n.get_friendly_name():f'node_{i}' for i,n in enumerate(nodes)}
+    for i,n in enumerate(nodes):
+        n.set_friendly_name(f'node_{i}')
+        for output in n.outputs():output.get_tensor().set_names({names.get(name,name) for name in output.get_names()})
+    return copy
+try:
+    assert ov.get_version()=='2026.4.1-22982-e213a147257-releases/2026/4'
+    core=ov.Core();value=np.arange(16,dtype=np.float32).reshape(4,4)
+    for group in ['original','canonical']:
+        cache=v.output/group;cache.mkdir();core.set_property({'CACHE_DIR':str(cache.resolve())})
+        for turn in range(3):
+            for _ in range(17):graph()
+            model=graph(turn!=2)
+            if group=='canonical':model=canonical(model)
+            began=time.perf_counter();compiled=core.compile_model(model,v.backend,{'PERFORMANCE_HINT':'LATENCY'});elapsed=(time.perf_counter()-began)*1000;held.append(compiled)
+            devices=list(compiled.get_property('EXECUTION_DEVICES'));assert len(devices)==1 and (devices[0]==v.backend or devices[0].startswith(v.backend+'.'))
+            request=compiled.create_infer_request();held.append(request);request.infer({0:value});actual=request.get_output_tensor(0).data.copy();expected=value[:,[2,1,0,3] if turn!=2 else [0,1,2,3]]*.5
+            assert np.array_equal(actual,expected)
+            report['runs'].append(dict(group=group,turn=turn,changed_constant=turn==2,loaded_from_cache=bool(compiled.get_property('LOADED_FROM_CACHE')),compile_ms=elapsed,execution_devices=devices,exact=True,blob_files=len(list(cache.glob('*.blob')))))
+    report['passed']=True
+except Exception as e:report['error']=repr(e)
+finally:
+    report.update(completed=True,finished=datetime.now(UTC).isoformat());(v.output/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(report));raise SystemExit(0 if report['passed'] else 1)

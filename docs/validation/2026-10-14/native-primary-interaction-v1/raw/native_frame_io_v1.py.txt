@@ -1,0 +1,33 @@
+"""Bounded shared-delete reads of atomically published frames; no pixel parsing."""
+import ctypes as C
+from ctypes import wintypes as W
+import time
+
+k = C.WinDLL('kernel32', use_last_error=True)
+k.CreateFileW.argtypes = [W.LPCWSTR, W.DWORD, W.DWORD, W.LPVOID, W.DWORD, W.DWORD, W.HANDLE]
+k.CreateFileW.restype = W.HANDLE
+k.CloseHandle.argtypes = [W.HANDLE]
+k.CloseHandle.restype = W.BOOL
+INVALID = C.c_void_p(-1).value
+statistics = {'sharing_retries': 0, 'sharing_timeouts': 0}
+
+
+def open_shared_frame(path, timeout_ms=1000):
+    if not isinstance(timeout_ms, int) or not 1 <= timeout_ms <= 1000:
+        raise ValueError('frame-open retry bound rejected')
+    deadline = time.monotonic() + timeout_ms / 1000
+    while True:
+        handle = k.CreateFileW(str(path), 0x80000000, 7, None, 3, 0, None)
+        if handle != INVALID:
+            return handle
+        error = C.get_last_error()
+        if error in (2, 3):
+            return None
+        if error not in (32, 33):
+            raise C.WinError(error)
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            statistics['sharing_timeouts'] += 1
+            raise C.WinError(error)
+        statistics['sharing_retries'] += 1
+        time.sleep(min(.01, remaining))
