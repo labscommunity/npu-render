@@ -1,0 +1,8 @@
+from pathlib import Path
+import shutil,json,hashlib,tarfile
+r=Path('results/render-driver');d=r/'native-routing-v24';shutil.copytree(r/'native-routing-v23',d);lab=d/'native/windows/registered_lab'
+shutil.copyfile(r/'point-crop-v1/opaque_affine_crop.hpp',lab/'opaque_affine_crop.hpp')
+p=lab/'linear_texture_draw.cpp';s=p.read_text();a='if(!crop || point)prepare_general();';assert s.count(a)==1;s=s.replace(a,'if(!crop)prepare_general();');p.write_text(s)
+(r/'native-routing-v24-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-routing-v24.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-native-routing-v23.ps1').read_text().replace('native-routing-v23','native-routing-v24').replace('--target nr_texture_scope_test','--target nr_registered_linear_texture_draw_test nr_texture_scope_test').replace("@('nr_texture_scope_test.exe'","@('nr_registered_linear_texture_draw_test.exe','nr_texture_scope_test.exe'");(r/'build-native-routing-v24.ps1').write_text(s)

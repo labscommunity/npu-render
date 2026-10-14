@@ -1,0 +1,9 @@
+from pathlib import Path
+import shutil,json,hashlib,tarfile
+r=Path('results/render-driver');d=r/'crop-transition-v2';shutil.copytree(r/'crop-transition-v1c',d)
+p=d/'contract.cpp';s=p.read_text().replace('for(const uint32_t format:{28u,87u}){','for(const uint32_t format:{28u,87u})for(const auto filter:{TextureFilter::linear,TextureFilter::point}){').replace('backend,true,TextureFilter::linear);','backend,true,filter);').replace('\\"draws\\":60','\\"draws\\":120');p.write_text(s)
+(r/'crop-transition-v2-source.json').write_text(json.dumps({p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'crop-transition-v2.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-crop-transition-v1c.ps1').read_text().replace('crop-transition-v1c','crop-transition-v2').replace('native-routing-v18','native-routing-v25');s=s.replace("if(Test-Path $b){throw 'Build exists'}","if((Test-Path $b) -or (Test-Path $source)){throw 'Build exists'}\n& tar -xf \"$r\\vm\\crop-transition-v2.tar.gz\" -C \"$r\\vm\";if($LASTEXITCODE){throw 'Extraction failed'}");(r/'build-crop-transition-v2.ps1').write_text(s)
+s=(r/'run-crop-transition-v1c.ps1').read_text().replace('crop-transition-v1c','crop-transition-v2').replace("NR_RENDER_MEMORY_CACHE='1'","NR_RENDER_MEMORY_CACHE='0'").replace("$env:NR_RENDER_AFFINE_BATCH='65535'","Remove-Item Env:NR_RENDER_AFFINE_BATCH -ErrorAction SilentlyContinue")
+s=s.replace("if(Test-Path $out)","if(@(Get-Process nr_registered_local_indexed_worker -ErrorAction SilentlyContinue).Count){throw 'Renderer active'}\nif(Test-Path $out)");(r/'run-crop-transition-v2.ps1').write_text(s)

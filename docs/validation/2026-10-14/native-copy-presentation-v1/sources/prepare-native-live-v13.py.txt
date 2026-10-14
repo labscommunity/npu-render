@@ -1,0 +1,20 @@
+from pathlib import Path
+import hashlib,json
+r=Path('results/render-driver')
+for name in ['qualify-native-registered-v18.py','run-native-registration-v18.ps1','recover-native-registration-v18.ps1']:
+ s=(r/name).read_text().replace('registered-v18','registered-v19').replace('registration-v18','registration-v19').replace('Recovery-v18','Recovery-v19').replace('native-routing-v21','native-routing-v25')
+ (r/name.replace('v18','v19')).write_text(s)
+for name in ['run-native-desktop-v23.ps1','recover-native-desktop-v23.ps1']:
+ s=(r/name).read_text().replace('desktop-v23','desktop-v24').replace('admission-v23','admission-v24').replace('Recovery-v23','Recovery-v24').replace('native-registration-v18','native-registration-v19').replace('native-routing-v21','native-routing-v25')
+ if name.startswith('run-'):
+  anchor='$recovery=Get-Content'
+  checks="""foreach($candidate in @('point-crop-v1-qualification','point-crop-integrated-v1','crop-transition-v2-qualification','native-ordered-replay-v15-point','native-ordered-replay-v16-point','native-ordered-replay-v17-point')){
+ $qualified=Get-Content "$r\\vm\\$candidate\\report.json" -Raw|ConvertFrom-Json;if(!$qualified.completed -or !$qualified.passed){throw "Unqualified point-copy prerequisite: $candidate"}
+}
+"""
+  assert s.count(anchor)==1;s=s.replace(anchor,checks+anchor)
+ (r/name.replace('v23','v24')).write_text(s)
+keys=list(json.loads((r/'native-desktop-v23-source.json').read_text()));keys=[n.replace('desktop-v23','desktop-v24') for n in keys]
+(r/'native-desktop-v24-source.json').write_text(json.dumps({n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in keys},indent=2)+'\n')
+s=(r/'start-native-topology-v24.ps1').read_text().replace('topology-v24','topology-v25').replace('Topology-V24','Topology-V25').replace('Topology-V23','Topology-V24');(r/'start-native-topology-v25.ps1').write_text(s)
+s=(r/'run-native-live-v12.ps1').read_text().replace('native-live-v12','native-live-v13').replace('NativeLiveV12','NativeLiveV13').replace('native-present-v9','native-present-v10').replace('live-frame-reader-v2','live-frame-reader-v3').replace('admission-v23','admission-v24').replace('desktop-v23','desktop-v24').replace('Recovery-v23','Recovery-v24').replace('topology-v24','topology-v25').replace('extension-v14','extension-v15');(r/'run-native-live-v13.ps1').write_text(s)

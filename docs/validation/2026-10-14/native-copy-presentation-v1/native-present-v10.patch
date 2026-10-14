@@ -1,0 +1,49 @@
+--- a/frame_present_probe.cpp
++++ b/frame_present_probe.cpp
+@@ -79,6 +79,15 @@
+     return 0;
+ }
+ #include "live_topology.hpp"
++// Diagnostic observations are kept separate from Present acceptance. A media
++// composition mode is recorded as reported, not interpreted as zero GPU work.
++void observe_display(IDXGISwapChain1 *swapchain,IDXGISwapChainMedia *media,
++                     uint64_t source_sequence,UINT submitted_count,HRESULT count_status){
++    DXGI_FRAME_STATISTICS stats{};const auto stats_status=swapchain->GetFrameStatistics(&stats);
++    DXGI_FRAME_STATISTICS_MEDIA detail{};const auto media_status=media?media->GetFrameStatisticsMedia(&detail):E_NOINTERFACE;
++    LARGE_INTEGER observed{};QueryPerformanceCounter(&observed);
++    std::printf("{\"display_observation\":true,\"source_sequence\":%llu,\"observed_qpc\":%lld,\"submitted_count_status\":%ld,\"submitted_present_count\":%u,\"statistics_status\":%ld,\"displayed_present_count\":%u,\"present_refresh_count\":%u,\"sync_refresh_count\":%u,\"sync_qpc\":%lld,\"media_status\":%ld,\"media_present_count\":%u,\"media_sync_qpc\":%lld,\"media_composition_mode\":%u,\"residual_gpu_work_measured\":false}\n",static_cast<unsigned long long>(source_sequence),observed.QuadPart,static_cast<long>(count_status),submitted_count,static_cast<long>(stats_status),stats.PresentCount,stats.PresentRefreshCount,stats.SyncRefreshCount,stats.SyncQPCTime.QuadPart,static_cast<long>(media_status),detail.PresentCount,detail.SyncQPCTime.QuadPart,UINT(detail.CompositionMode));std::fflush(stdout);
++}
+ int live(const wchar_t *path,const wchar_t *duration,const wchar_t *producer){
+     wchar_t *end=nullptr;const auto seconds=std::wcstoul(duration,&end,10);require(end!=duration && !*end && seconds>=1 && seconds<=240,"live duration rejected");
+     const auto expected_producer=std::wcstoul(producer,&end,10);require(end!=producer && !*end && expected_producer,"live producer rejected");
+@@ -98,6 +107,8 @@
+     check(D3D11CreateDevice(adapter.Get(),D3D_DRIVER_TYPE_UNKNOWN,nullptr,D3D11_CREATE_DEVICE_BGRA_SUPPORT,levels,1,D3D11_SDK_VERSION,&device,&level,&context));
+     Window window(mi.rcMonitor);DXGI_SWAP_CHAIN_DESC1 desc{};desc.Width=h.width;desc.Height=h.height;desc.Format=DXGI_FORMAT(h.format);desc.SampleDesc.Count=1;desc.BufferUsage=DXGI_USAGE_RENDER_TARGET_OUTPUT;desc.BufferCount=2;desc.Scaling=DXGI_SCALING_STRETCH;desc.SwapEffect=DXGI_SWAP_EFFECT_FLIP_DISCARD;desc.AlphaMode=DXGI_ALPHA_MODE_IGNORE;
+     phase="create-swapchain";ComPtr<IDXGISwapChain1> swapchain;check(factory->CreateSwapChainForHwnd(device.Get(),window.handle,&desc,nullptr,output.Get(),&swapchain));phase="window-association";check(factory->MakeWindowAssociation(window.handle,DXGI_MWA_NO_ALT_ENTER));
++    ComPtr<IDXGISwapChainMedia> media;const auto media_interface_status=swapchain.As(&media);
++    std::printf("{\"media_interface_status\":%ld}\n",static_cast<long>(media_interface_status));std::fflush(stdout);
+     D3D11_TEXTURE2D_DESC texture{};texture.Width=h.width;texture.Height=h.height;texture.MipLevels=texture.ArraySize=1;texture.Format=DXGI_FORMAT(h.format);texture.SampleDesc.Count=1;texture.Usage=D3D11_USAGE_DEFAULT;texture.BindFlags=0;
+     phase="create-live-source";D3D11_SUBRESOURCE_DATA data{frame.pixels.data(),h.row_bytes,UINT(frame.pixels.size())};ComPtr<ID3D11Texture2D> source;check(device->CreateTexture2D(&texture,&data,&source));
+     phase="get-backbuffer";ComPtr<ID3D11Texture2D> back;check(swapchain->GetBuffer(0,IID_PPV_ARGS(&back)));context->CopyResource(back.Get(),source.Get());
+@@ -107,10 +118,12 @@
+     std::printf("{\"probe_ready\":true,\"pid\":%lu,\"adapter_luid_high\":%ld,\"adapter_luid_low\":%lu,\"vendor_id\":%u,\"device_id\":%u,\"source_width\":%u,\"source_height\":%u,\"output_width\":%ld,\"output_height\":%ld,\"source_sequence\":%llu,\"source_producer_pid\":%u,\"hardware_composition_query\":%ld,\"hardware_composition_flags\":%u,\"backbuffer_roundtrip_exact\":true,\"shader_dispatches\":0,\"source_uploads\":1,\"source_npu_provenance_verified_by_probe\":false}\n",GetCurrentProcessId(),adapter_desc.AdapterLuid.HighPart,adapter_desc.AdapterLuid.LowPart,adapter_desc.VendorId,adapter_desc.DeviceId,h.width,h.height,mi.rcMonitor.right-mi.rcMonitor.left,mi.rcMonitor.bottom-mi.rcMonitor.top,static_cast<unsigned long long>(h.sequence),h.producer_pid,static_cast<long>(composition_status),composition_flags);std::fflush(stdout);
+     require(nr::present::current_console_default(),"interactive desktop changed before presentation");
+     phase="live-present-loop";ShowWindow(window.handle,SW_SHOWNOACTIVATE);const auto start=GetTickCount64();uint64_t presents=0,uploads=1,readbacks=1,sequence=0,qpc=0;bool first=true;
++    UINT submitted_count=0;HRESULT count_status=E_PENDING;ULONGLONG last_observation=0;
+     LARGE_INTEGER frequency{};require(QueryPerformanceFrequency(&frequency)!=0,"QPC frequency unavailable");
+     while(!window.stopped && GetTickCount64()-start<uint64_t(seconds)*1000){
+         window.messages();if(window.stopped)break;require(nr::present::current_console_default(),"live interactive desktop changed");
+         require(nr::live::same(initial,nr::live::separated()),"live topology changed");
++        if(!first && GetTickCount64()-last_observation>=500){observe_display(swapchain.Get(),media.Get(),sequence,submitted_count,count_status);last_observation=GetTickCount64();}
+         auto next=first?std::move(frame):read_frame(path,&last_header);const auto &n=next.header;
+         require(n.producer_pid==expected_producer && n.width==h.width && n.height==h.height && n.format==h.format && n.pixel_bytes==h.pixel_bytes,"live frame identity changed");
+         require(n.sequence>=sequence && n.qpc>=qpc,"live frame sequence regressed");
+@@ -126,6 +139,8 @@
+         back.Reset();LARGE_INTEGER submitted{},accepted{};require(QueryPerformanceCounter(&submitted)!=0,"QPC unavailable");
+         const auto status=swapchain->Present(1,0);check(status);require(status==S_OK,"live present not visible");require(QueryPerformanceCounter(&accepted)!=0,"QPC unavailable");++presents;
+         std::printf("{\"live_frame_presented\":true,\"source_sequence\":%llu,\"source_qpc\":%llu,\"producer_pid\":%u,\"submitted_qpc\":%lld,\"accepted_qpc\":%lld,\"qpc_frequency\":%lld,\"backbuffer_exact\":true,\"pixel_bytes\":%llu,\"scanout_mode_verified\":false}\n",static_cast<unsigned long long>(n.sequence),static_cast<unsigned long long>(n.qpc),n.producer_pid,submitted.QuadPart,accepted.QuadPart,frequency.QuadPart,static_cast<unsigned long long>(n.pixel_bytes));std::fflush(stdout);
++        count_status=swapchain->GetLastPresentCount(&submitted_count);
++        observe_display(swapchain.Get(),media.Get(),n.sequence,submitted_count,count_status);last_observation=GetTickCount64();
+         sequence=n.sequence;qpc=n.qpc;last_header=n;first=false;Sleep(100);
+     }
+     ShowWindow(window.handle,SW_HIDE);std::printf("{\"completed\":true,\"live_bridge_tested\":true,\"submitted_presents\":%llu,\"source_uploads\":%llu,\"gpu_copy_commands\":%llu,\"readback_copies\":%llu,\"shader_dispatches\":0,\"elapsed_ms\":%llu,\"topology_preserved\":true,\"input_forwarding_tested\":false,\"scanout_mode_verified\":false,\"desktop_offloaded\":false}\n",static_cast<unsigned long long>(presents),static_cast<unsigned long long>(uploads),static_cast<unsigned long long>(presents+readbacks),static_cast<unsigned long long>(readbacks),static_cast<unsigned long long>(GetTickCount64()-start));return 0;

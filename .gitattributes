@@ -50,3 +50,7 @@ docs/validation/2026-10-12/component-coverage-v229/** -text whitespace=cr-at-eol
 docs/validation/2026-10-14/native-retained-desktop-v1/raw/** -text whitespace=cr-at-eol
 # This captured PowerShell error contains trailing spaces; retain the original bytes.
 docs/validation/2026-10-14/native-retained-desktop-v1/raw/native-live-v11/native.stderr.log whitespace=cr-at-eol,-blank-at-eol
+docs/validation/2026-10-14/native-copy-presentation-v1/raw/** -text whitespace=cr-at-eol
+# Unified-diff context markers and original error output are evidence bytes.
+docs/validation/2026-10-14/native-copy-presentation-v1/*.patch whitespace=-blank-at-eol
+docs/validation/2026-10-14/native-copy-presentation-v1/raw/native-ordered-replay-v11-scope/worker.stderr.log whitespace=cr-at-eol,-blank-at-eof

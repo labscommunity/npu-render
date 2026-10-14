@@ -1,0 +1,11 @@
+from pathlib import Path
+import json,struct,hashlib,os
+r=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm';capture=r/'native-desktop-admission-v22/bootstrap/requests';out=r/'recorded-native-v3-shaders/tokens.json';assert not out.exists()
+result=[]
+for ticket in [4,282,419,565]:
+ with (capture/f'request-{ticket:08d}.bin').open('rb') as f:
+  h=struct.unpack('<3Q14I',f.read(80));legacy=h[-1] if h[3]>=16 else h[3];f.seek(80+24+(16 if legacy==15 else 0)+(16 if h[8]&4 else 0))
+  for stage,count in [('vertex',h[9]),('pixel',h[10])]:
+   data=f.read(count*4);result.append(dict(ticket=ticket,stage=stage,sha256=hashlib.sha256(data).hexdigest(),words=struct.unpack('<'+'I'*count,data)))
+out.write_text(json.dumps(result,indent=2)+'\n')
+print(json.dumps(dict(pixel_data_exported=False,shader_programs=len(result))))

@@ -1,0 +1,27 @@
+from pathlib import Path
+import shutil,hashlib,json
+r=Path('results/render-driver');d=r/'point-crop-v1';shutil.copytree(r/'crop-tiles-v1',d)
+p=d/'opaque_affine_crop.hpp';s=(r/'native-routing-v21/native/windows/registered_lab/opaque_affine_crop.hpp').read_text().replace('if(point || color!=','if(color!=')
+a='const auto error=255*(ax->error+ay->error)+.002;if(!(error<.5))return {};'
+b='''// Point sampling uses floor(uv*extent). The proven coordinate interval
+        // is centered on the texel center, so a strict half-texel bound selects
+        // the same integer texel for every possible FP32 evaluation.
+        const auto error=point?0.:255*(ax->error+ay->error)+.002;
+        if(point){if(!(ax->error<.49 && ay->error<.49))return {};}
+        else if(!(error<.5))return {};'''
+assert a in s;s=s.replace(a,b);p.write_text(s)
+p=d/'contract.cpp';s=p.read_text().replace('for(const bool swap:{false,true}){','for(const bool swap:{false,true})for(const bool point:{false,true}){')
+s=s.replace('const std::array<float,4> uv{','std::array<float,4> uv{')
+s=s.replace('   if(w==64 && !swap && style==0){', '''   if(point && style==2){uv[0]+=.25f/sw;uv[2]+=.25f/sw;uv[1]-=.25f/sh;uv[3]-=.25f/sh;}
+   if(w==64 && !swap && !point && style==0){''')
+s=s.replace('bool point=false;', 'bool negative_point=false;').replace('if(bad==0)point=true;', 'if(bad==0){negative_point=true;u[0]+=.5f/sw;u[2]+=.5f/sw;}').replace('source,bg,point));++rejected;', 'source,bg,negative_point));++rejected;')
+s=s.replace('source,bg,false);','source,bg,point);')
+s=s.replace('const auto actual=result->pixels[at][c];', '''if(point){const auto sx=std::clamp(int32_t(std::floor(tx+.5)),0,int32_t(sw)-1),sy=std::clamp(int32_t(std::floor(ty+.5)),0,int32_t(sh)-1);value=c==3?255.:source.pixels[size_t(sy)*sw+sx][swap?2-c:c];}
+      const auto actual=result->pixels[at][c];''')
+s=s.replace('\\"crop_case\\":true,','\\"point_sampling\\":%s,\\"crop_case\\":true,').replace('milliseconds,result->provider_calls,w,h,','point?"true":"false",milliseconds,result->provider_calls,w,h,')
+p.write_text(s)
+p=d/'CMakeLists.txt';p.write_text(p.read_text().replace('nr_crop_tiles','nr_point_crop'))
+(r/'point-crop-v1-source.json').write_text(json.dumps({p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()},indent=2)+'\n')
+s=(r/'build-crop-tiles-v1.ps1').read_text().replace('crop-tiles-v1','point-crop-v1').replace('native-routing-v16','native-routing-v21').replace('nr_crop_tiles','nr_point_crop');(r/'build-point-crop-v1.ps1').write_text(s)
+s=(r/'run-crop-tiles-v1.ps1').read_text().replace('crop-tiles-v1','point-crop-v1').replace('nr_crop_tiles','nr_point_crop').replace("NR_RENDER_MEMORY_CACHE='1'","NR_RENDER_MEMORY_CACHE='0'")
+s+='\nif(!$report.passed){exit 1}\n';(r/'run-point-crop-v1.ps1').write_text(s)

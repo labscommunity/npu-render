@@ -1,0 +1,20 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$b="$r\builds\native-routing-v25";$out="$r\vm\point-crop-integrated-v1"
+if(@(Get-Process nr_registered_local_indexed_worker -ErrorAction SilentlyContinue).Count){throw 'Renderer active'}
+if(Test-Path $out){throw 'Evidence exists'};$build=Get-Content "$b\registered-build-report.json" -Raw|ConvertFrom-Json
+foreach($name in @('nr_registered_linear_texture_draw_test.exe')){if((Get-FileHash "$b\Release\$name").Hash -ne $build.binary_sha256.$name){throw 'Build mismatch'}}
+New-Item -ItemType Directory $out|Out-Null
+$env:PATH="$r\toolchains\openvino-2026.4.1\Lib\site-packages\openvino\libs;$env:PATH";$env:NR_RENDER_NPU_CACHE="$r\vm\model-cache-2026-4-v209";$env:NR_RENDER_SHARED_QUEUE='1';$env:NR_RENDER_PIPELINE_CACHE='retained';$env:NR_RENDER_MEMORY_CACHE='0';$env:NR_RENDER_COMPACT_COVERAGE='0';Remove-Item Env:NR_RENDER_AFFINE_BATCH -ErrorAction SilentlyContinue;$env:NR_RENDER_SHARED_CORE='1';$env:NR_RENDER_OPAQUE_CROP='1'
+$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');passed=$false;completed=$false;batch='default';driver_installed=$false;desktop_changed=$false;runs=@()}
+function Run-Check([string]$exe,[string[]]$arguments,[string]$label){
+ $launch=@{FilePath="$b\Release\$exe";PassThru=$true;NoNewWindow=$true;RedirectStandardOutput="$out\$label.stdout.jsonl";RedirectStandardError="$out\$label.stderr.log"};if($arguments.Count){$launch.ArgumentList=$arguments};$p=Start-Process @launch;[void]$p.Handle
+ if(!$p.WaitForExit(240000)){$p.Kill();$p.WaitForExit();throw 'Owned regression exceeded 240 seconds'};$p.Refresh();$code=$p.ExitCode;$p.Dispose()
+ $report.runs+=@{label=$label;exit_code=$code};$report|ConvertTo-Json -Depth 6|Set-Content "$out\report.json";if($code){throw "$label failed"}
+}
+try{
+ foreach($backend in @('CPU','NPU')){foreach($mode in @('linear','point','point-opaque','linear-opaque')){
+  $arguments=@($backend);if($mode -ne 'linear'){$arguments+=('--'+$mode)};Run-Check 'nr_registered_linear_texture_draw_test.exe' $arguments "$backend-$mode"
+ }}
+ $report.passed=$true
+}catch{$report.error=$_.Exception.Message}
+finally{$report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');$report|ConvertTo-Json -Depth 6|Set-Content "$out\report.json"}
+Get-Content "$out\report.json";if(!$report.passed){exit 1}

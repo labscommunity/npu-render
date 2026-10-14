@@ -1,0 +1,34 @@
+from pathlib import Path
+import shutil, hashlib, json, tarfile
+r=Path('results/render-driver');d=r/'native-present-v10';shutil.copytree(r/'native-present-v9',d)
+p=d/'frame_present_probe.cpp';s=p.read_text()
+needle='int live(const wchar_t *path,const wchar_t *duration,const wchar_t *producer){'
+helper=r'''// Diagnostic observations are kept separate from Present acceptance. A media
+// composition mode is recorded as reported, not interpreted as zero GPU work.
+void observe_display(IDXGISwapChain1 *swapchain,IDXGISwapChainMedia *media,
+                     uint64_t source_sequence,UINT submitted_count,HRESULT count_status){
+    DXGI_FRAME_STATISTICS stats{};const auto stats_status=swapchain->GetFrameStatistics(&stats);
+    DXGI_FRAME_STATISTICS_MEDIA detail{};const auto media_status=media?media->GetFrameStatisticsMedia(&detail):E_NOINTERFACE;
+    LARGE_INTEGER observed{};QueryPerformanceCounter(&observed);
+    std::printf("{\"display_observation\":true,\"source_sequence\":%llu,\"observed_qpc\":%lld,\"submitted_count_status\":%ld,\"submitted_present_count\":%u,\"statistics_status\":%ld,\"displayed_present_count\":%u,\"present_refresh_count\":%u,\"sync_refresh_count\":%u,\"sync_qpc\":%lld,\"media_status\":%ld,\"media_present_count\":%u,\"media_sync_qpc\":%lld,\"media_composition_mode\":%u,\"residual_gpu_work_measured\":false}\n",static_cast<unsigned long long>(source_sequence),observed.QuadPart,static_cast<long>(count_status),submitted_count,static_cast<long>(stats_status),stats.PresentCount,stats.PresentRefreshCount,stats.SyncRefreshCount,stats.SyncQPCTime.QuadPart,static_cast<long>(media_status),detail.PresentCount,detail.SyncQPCTime.QuadPart,UINT(detail.CompositionMode));std::fflush(stdout);
+}
+'''
+assert s.count(needle)==1;s=s.replace(needle,helper+needle)
+start=s.index(needle);end=s.index('struct Stimulus',start);part=s[start:end]
+a='    D3D11_TEXTURE2D_DESC texture{};'
+b='    ComPtr<IDXGISwapChainMedia> media;const auto media_interface_status=swapchain.As(&media);\n    std::printf("{\\\"media_interface_status\\\":%ld}\\n",static_cast<long>(media_interface_status));std::fflush(stdout);\n'+a
+assert part.count(a)==1;part=part.replace(a,b)
+a='    LARGE_INTEGER frequency{};';b='    UINT submitted_count=0;HRESULT count_status=E_PENDING;ULONGLONG last_observation=0;\n'+a;assert part.count(a)==1;part=part.replace(a,b)
+a='        auto next=first?std::move(frame):read_frame(path,&last_header);'
+b='''        if(!first && GetTickCount64()-last_observation>=500){observe_display(swapchain.Get(),media.Get(),sequence,submitted_count,count_status);last_observation=GetTickCount64();}
+'''+a
+assert part.count(a)==1;part=part.replace(a,b)
+a='        sequence=n.sequence;qpc=n.qpc;last_header=n;first=false;Sleep(100);'
+b='''        count_status=swapchain->GetLastPresentCount(&submitted_count);
+        observe_display(swapchain.Get(),media.Get(),n.sequence,submitted_count,count_status);last_observation=GetTickCount64();
+'''+a
+assert part.count(a)==1;part=part.replace(a,b)
+s=s[:start]+part+s[end:];p.write_text(s)
+(r/'native-present-v10-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-present-v10.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-native-present-v9.ps1').read_text().replace('native-present-v9','native-present-v10');(r/'build-native-present-v10.ps1').write_text(s)

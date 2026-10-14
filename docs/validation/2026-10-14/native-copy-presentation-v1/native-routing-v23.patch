@@ -1,0 +1,9 @@
+--- a/native/windows/registered_lab/CMakeLists.txt
++++ b/native/windows/registered_lab/CMakeLists.txt
+@@ -371,5 +371,5 @@
+ add_executable(nr_texture_scope_test texture_scope_test.cpp)
+ target_compile_features(nr_texture_scope_test PRIVATE cxx_std_17)
+ target_compile_options(nr_texture_scope_test PRIVATE /W4 /WX)
+-target_link_libraries(nr_texture_scope_test PRIVATE nr_registered_vertex)
++target_link_libraries(nr_texture_scope_test PRIVATE nr_registered_vertex d3dcompiler)
+ set_property(TARGET nr_texture_scope_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")

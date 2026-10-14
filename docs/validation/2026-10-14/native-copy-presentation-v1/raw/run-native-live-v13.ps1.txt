@@ -1,0 +1,75 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$out="$r\vm\native-live-v13";$source="$env:LOCALAPPDATA\Temp\npu-graphics-probe-0146a2388f25";$native=$null;$topology=$null;$relay=$null;$tasks=@()
+if(Test-Path $out){throw 'Live trial exists'}
+$proof=Get-Content "$r\builds\native-present-v10\build-report.json" -Raw|ConvertFrom-Json;$present="$r\builds\native-present-v10\Release\nr_frame_present_probe.exe"
+$reader=Get-Content "$r\vm\live-frame-reader-v3\report.json" -Raw|ConvertFrom-Json
+if(!$proof.clean_build -or !$reader.passed -or (Get-FileHash $present).Hash -ne $proof.binary_sha256 -or $reader.binary_sha256 -ne $proof.binary_sha256){throw 'Live presenter identity not qualified'}
+$prior=Get-Content "$r\vm\native-extended-v2\report.json" -Raw|ConvertFrom-Json;if(!$prior.passed -or !$prior.cleanup_passed){throw 'Native extension prerequisite failed'}
+New-Item -ItemType Directory $out|Out-Null
+$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');completed=$false;passed=$false;native_trial='native-desktop-admission-v24';topology_trial='native-topology-extension-v15';desktop_offloaded=$false;input_forwarding_tested=$false;tahoma_tested=$false}
+function Save-Report{$report|ConvertTo-Json -Depth 6|Set-Content "$out\report.json"}
+function Start-Owned([string]$exe,[string[]]$arguments,[string]$name){$quoted=@($arguments|ForEach-Object {'"'+$_.Replace('"','\"')+'"'});$process=Start-Process $exe -ArgumentList $quoted -PassThru -NoNewWindow -RedirectStandardOutput "$out\$name.stdout.log" -RedirectStandardError "$out\$name.stderr.log";[void]$process.Handle;return $process}
+function Start-Interactive([string]$name,[string[]]$command){
+ $dir="$out\$name";New-Item -ItemType Directory $dir|Out-Null;$task="T8-NpuRender-NativeLiveV13-$name"
+ @{command=$command;log="$dir\probe.log"}|ConvertTo-Json -Depth 4|Set-Content -Encoding UTF8 "$dir\job.json"
+ $action=New-ScheduledTaskAction -Execute "$source\venv\Scripts\pythonw.exe" -Argument ('"'+$source+'\native_runner.py" "'+$dir+'\job.json"')
+ $principal=New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value) -LogonType Interactive -RunLevel Limited
+ $settings=New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 6) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+ Register-ScheduledTask -TaskName $task -Action $action -Principal $principal -Settings $settings|Out-Null;$script:tasks+=$task;Start-ScheduledTask -TaskName $task
+}
+function Read-Rows([string]$path){if(!(Test-Path $path)){return @()};return @(Get-Content $path|Where-Object {$_ -match '^\{.*\}$'}|ForEach-Object {$_|ConvertFrom-Json})}
+Save-Report
+try{
+ & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File "$r\vm\start-native-topology-v25.ps1" > "$out\observer-start.log";if($LASTEXITCODE){throw 'Observer failed'}
+ $native=Start-Owned "$env:windir\System32\WindowsPowerShell\v1.0\powershell.exe" @('-NoProfile','-NonInteractive','-ExecutionPolicy','RemoteSigned','-File',"$r\vm\run-native-desktop-v24.ps1",'-Mode','admit') 'native';$report.controller_pid=$native.Id;Save-Report
+ $deadline=[DateTime]::UtcNow.AddSeconds(75);$ready=$false
+ while([DateTime]::UtcNow -lt $deadline){
+  if($native.HasExited){throw 'Native admission exited early'}
+  try{$b=Get-Content "$r\vm\native-desktop-admission-v24\bootstrap\report.json" -Raw|ConvertFrom-Json;$sample=Get-Content "$r\vm\native-topology-v25\samples.jsonl" -Tail 1|ConvertFrom-Json;$ready=$b.admission_published -and !$b.completed -and @($sample.entries|Where-Object active_path).Count -eq 2}catch{}
+  if($ready){break};Start-Sleep -Milliseconds 250
+ };if(!$ready){throw 'Indirect topology not ready'}
+ if(!(Get-ScheduledTask -TaskName T8-NpuRender-NativeDesktopRecovery-v24 -ErrorAction SilentlyContinue)){throw 'Independent recovery not armed'}
+ $topology=Start-Owned "$env:windir\System32\WindowsPowerShell\v1.0\powershell.exe" @('-NoProfile','-NonInteractive','-ExecutionPolicy','RemoteSigned','-File',"$r\vm\run-native-topology-helper-v4.ps1",'-Mode','extend','-Trial','native-topology-extension-v15','-Seconds','300') 'topology'
+ $topologyLog="$r\vm\native-topology-extension-v15\probe.log";$deadline=[DateTime]::UtcNow.AddSeconds(45);$extended=$false
+ while([DateTime]::UtcNow -lt $deadline){if($topology.HasExited -or $native.HasExited){throw 'Trial ended before extension'};$extended=@(Read-Rows $topologyLog|Where-Object extension_verified).Count -eq 1;if($extended){break};Start-Sleep -Milliseconds 250}
+ if(!$extended){throw 'Independent desktop extension not verified'};$extensionObserved=[DateTime]::UtcNow
+ Start-Interactive 'stimulus' @($present,'--stimulus','285')
+ $relay=Start-Owned "$r\toolchains\openvino-2026.4.1\Scripts\python.exe" @("$r\vm\relay_native_frames_v2.py",'--transaction',"$r\vm\native-desktop-admission-v24",'--topology',$topologyLog,'--output',"$out\relay",'--seconds','290') 'relay'
+ $deadline=[DateTime]::UtcNow.AddSeconds(150);$frame=$null
+ while([DateTime]::UtcNow -lt $deadline){if($relay.HasExited -or $native.HasExited -or $topology.HasExited){throw 'Trial ended before relay frame'}
+  try{$rr=Get-Content "$out\relay\report.json" -Raw|ConvertFrom-Json;if($rr.published -gt 0 -and $rr.producer_and_compositor_verified){$frame=$rr.latest;break}}catch{}
+  Start-Sleep -Milliseconds 250
+ };if(!$frame){throw 'No verified live relay frame within 150 seconds'}
+ $remaining=280-([DateTime]::UtcNow-$extensionObserved).TotalSeconds;$duration=[Math]::Min(240,[Math]::Floor($remaining));if($duration -lt 20){throw 'Insufficient separated-desktop time for live test'}
+ Start-Interactive 'present' @($present,'--live',"$out\relay\latest.bin",([string]$duration),([string]$frame.producer_pid));$report.first_relay=$frame;$report.presentation_seconds=$duration;Save-Report
+ $deadline=[DateTime]::UtcNow.AddSeconds($duration+15)
+ do{Start-Sleep -Milliseconds 250;$presentState=(Get-ScheduledTask -TaskName T8-NpuRender-NativeLiveV13-present).State;$presentRows=Read-Rows "$out\present\probe.log"}while(($presentState -eq 'Running' -or !$presentRows.Count) -and [DateTime]::UtcNow -lt $deadline)
+ if($presentState -eq 'Running'){throw 'Presenter exceeded finite duration'}
+ $presentInfo=Get-ScheduledTaskInfo -TaskName T8-NpuRender-NativeLiveV13-present;$report.presenter_task_result=$presentInfo.LastTaskResult
+ if(!$topology.WaitForExit(340000)){throw 'Topology trial timed out'};$topology.Refresh();$report.topology_exit=$topology.ExitCode
+ if(!$native.WaitForExit(450000)){throw 'Native trial timed out'};$native.Refresh();$report.native_exit=$native.ExitCode
+ $nr=Get-Content "$r\vm\native-desktop-admission-v24\report.json" -Raw|ConvertFrom-Json;$report.cleanup_passed=$nr.cleanup_passed
+ $frames=@($presentRows|Where-Object live_frame_presented);$done=@($presentRows|Where-Object live_bridge_tested);$published=Read-Rows "$out\relay\frames.jsonl"
+ $report.physically_submitted_frames=$frames.Count;$report.matching_source_frames=@($frames|Where-Object {$f=$_;@($published|Where-Object {$_.sequence -eq $f.source_sequence -and $_.qpc -eq $f.source_qpc -and $_.producer_pid -eq $f.producer_pid}).Count -eq 1}).Count
+ $report.backbuffer_copies_exact=@($frames|Where-Object {!$_.backbuffer_exact}).Count -eq 0
+ $report.distinct_source_pixel_hashes=@($published|Select-Object -ExpandProperty pixel_sha256 -Unique).Count
+ $report.stimulus_task_result=(Get-ScheduledTaskInfo -TaskName T8-NpuRender-NativeLiveV13-stimulus).LastTaskResult
+ $presentExit=@($presentRows|Where-Object {$_.PSObject.Properties.Name -contains 'exit_code'});$stimulusRows=Read-Rows "$out\stimulus\probe.log";$stimulusExit=@($stimulusRows|Where-Object {$_.PSObject.Properties.Name -contains 'exit_code'})
+ $report.presenter_child_success=($presentExit.Count -eq 1 -and $presentExit[0].exit_code -eq 0)
+ $report.stimulus_child_success=($stimulusExit.Count -eq 1 -and $stimulusExit[0].exit_code -eq 0 -and @($stimulusRows|Where-Object {$_.completed -and $_.stimulus_only}).Count -eq 1)
+ $report.controlled_color_submitted=@($frames|Where-Object {$f=$_;@($published|Where-Object {$_.sequence -eq $f.source_sequence -and $_.qpc -eq $f.source_qpc -and $_.producer_pid -eq $f.producer_pid -and (($_.known_stimulus_pixel -join ',') -in @('60,180,20,255','80,30,180,255'))}).Count -eq 1}).Count -ge 1
+ $report.passed=($report.presenter_child_success -and $report.stimulus_child_success -and $report.controlled_color_submitted -and $report.presenter_task_result -eq 0 -and $report.topology_exit -eq 0 -and $report.native_exit -eq 0 -and $nr.passed -and $nr.cleanup_passed -and $frames.Count -ge 2 -and $report.matching_source_frames -eq $frames.Count -and $report.backbuffer_copies_exact -and $done.Count -eq 1 -and $report.distinct_source_pixel_hashes -ge 2 -and $report.stimulus_task_result -eq 0)
+}catch{$report.error=$_.Exception.Message}
+finally{
+ if(Test-Path "$out\relay"){New-Item -ItemType File "$out\relay\stop" -Force|Out-Null}
+ if($relay -and !$relay.HasExited){if(!$relay.WaitForExit(5000)){$relay.Kill();$relay.WaitForExit()}}
+ foreach($task in $tasks){Stop-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue;Unregister-ScheduledTask -TaskName $task -Confirm:$false -ErrorAction SilentlyContinue}
+ if($topology -and !$topology.HasExited){[void]$topology.WaitForExit(340000)}
+ if($native -and !$native.HasExited){[void]$native.WaitForExit(450000)}
+ if(Test-Path "$r\vm\native-topology-v25"){New-Item -ItemType File "$r\vm\native-topology-v25\stop" -Force|Out-Null}
+ if($native -and $native.HasExited){$native.Refresh();$report.native_exit=$native.ExitCode}
+ if($topology -and $topology.HasExited){$topology.Refresh();$report.topology_exit=$topology.ExitCode}
+ try{$finalNative=Get-Content "$r\vm\native-desktop-admission-v24\report.json" -Raw|ConvertFrom-Json;$report.cleanup_passed=[bool]$finalNative.cleanup_passed}catch{$report.cleanup_passed=$false;$report.cleanup_read_error=$_.Exception.Message}
+ foreach($process in @($relay,$topology,$native)){if($process){$process.Dispose()}}
+ $report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');Save-Report
+}
+$report|ConvertTo-Json -Depth 6;if(!$report.passed){exit 1}

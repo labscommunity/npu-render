@@ -1,0 +1,172 @@
+--- a/native/windows/registered_lab/CMakeLists.txt
++++ b/native/windows/registered_lab/CMakeLists.txt
+@@ -367,3 +367,9 @@
+ target_compile_options(nr_opaque_affine_crop_test PRIVATE /W4 /WX)
+ target_link_libraries(nr_opaque_affine_crop_test PRIVATE openvino::runtime nr_registered_provider_cache)
+ set_property(TARGET nr_opaque_affine_crop_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
++
++add_executable(nr_texture_scope_test texture_scope_test.cpp)
++target_compile_features(nr_texture_scope_test PRIVATE cxx_std_17)
++target_compile_options(nr_texture_scope_test PRIVATE /W4 /WX)
++target_link_libraries(nr_texture_scope_test PRIVATE nr_registered_vertex)
++set_property(TARGET nr_texture_scope_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+--- a/native/windows/registered_lab/texture_scope_test.cpp
++++ b/native/windows/registered_lab/texture_scope_test.cpp
+@@ -0,0 +1,29 @@
++#define NOMINMAX
++#include "vertex_executor.hpp"
++#include "shader_contract.hpp"
++#include <cstdio>
++using namespace nr::shader;
++#define CHECK(v) do{if(!(v))throw std::runtime_error(#v);}while(false)
++uint32_t bits(float value){uint32_t output;std::memcpy(&output,&value,4);return output;}
++float value(uint32_t input){float output;std::memcpy(&output,&input,4);return output;}
++int main(int argc,char **argv)try{
++ CHECK(argc==2);const std::string backend=argv[1];
++ const auto code=nr::registered_lab::shader_tokens(R"(Texture2D<float4> image:register(t0);SamplerState sampler0:register(s0);cbuffer Params:register(b0){float4 scale;}float4 main(float2 uv:TEXCOORD0):SV_Target{return image.Sample(sampler0,uv)*scale;})","ps_4_0");
++ const auto program=parse_pixel(code.data(),code.size());TextureShapes shapes{};shapes[0]={4,4,15};TextureSamplers samplers{};samplers[0].filter=TextureFilter::point;
++ RegisterExecutor executor(program,4,backend,shapes,samplers);TexturePixels textures{};textures[0].resize(16);uint64_t checked=0,uploaded=0,reused=0;unsigned rejections=0;
++ for(unsigned generation=0;generation<6;++generation){
++  for(unsigned n=0;n<16;++n)for(unsigned c=0;c<4;++c)textures[0][n][c]=float((n+c+generation)%16)/16;
++  std::vector<VertexRegisters> inputs(4);VertexConstants constants{};constants[0].resize(1);
++  auto prepare=[&](unsigned row,float scale){for(unsigned n=0;n<4;++n){inputs[n][0]={bits((n+.5f)/4),bits((row+.5f)/4),0,0};for(unsigned c=0;c<4;++c)constants[0][0][c]=bits(scale);}};
++  auto verify=[&](const RegisterExecutor::Result &result,unsigned row,float scale){CHECK(result.execution_device.rfind(backend,0)==0);for(unsigned n=0;n<4;++n)for(unsigned c=0;c<4;++c){CHECK(value(result.vertices[n][0][c])==textures[0][row*4+n][c]*scale);++checked;}uploaded+=result.texture_upload_bytes;reused+=result.texture_reused_bytes;};
++  {
++   auto batch=executor.bind_textures(textures);prepare(0,1);
++   bool rejected=false;try{auto nested=executor.bind_textures(textures);}catch(const std::invalid_argument &){rejected=true;}CHECK(rejected);++rejections;
++   rejected=false;try{(void)executor.execute(inputs,constants,textures);}catch(const std::invalid_argument &){rejected=true;}CHECK(rejected);++rejections;
++   const auto first=batch.execute(inputs,constants);verify(first,0,1);CHECK(first.texture_upload_bytes>0 && !first.texture_reused_bytes);
++   for(unsigned row=1;row<4;++row){prepare(row,.5f);const auto next=batch.execute(inputs,constants);verify(next,row,.5f);CHECK(!next.texture_upload_bytes && next.texture_reused_bytes==first.texture_upload_bytes);}
++  }
++  prepare(0,1);const auto ordinary=executor.execute(inputs,constants,textures);verify(ordinary,0,1);CHECK(ordinary.texture_upload_bytes>0 && !ordinary.texture_reused_bytes);
++ }
++ std::printf("{\"passed\":true,\"execution_device\":\"%s\",\"checked_components\":%llu,\"host_uploaded_bytes\":%llu,\"host_recopy_bytes_avoided\":%llu,\"invalid_scope_uses_rejected\":%u,\"resource_generations\":6,\"desktop_offloaded\":false}\n",backend.c_str(),static_cast<unsigned long long>(checked),static_cast<unsigned long long>(uploaded),static_cast<unsigned long long>(reused),rejections);return 0;
++}catch(const std::exception &e){std::fprintf(stderr,"%s\n",e.what());return 1;}
+--- a/native/windows/registered_lab/triangle_texture_draw.cpp
++++ b/native/windows/registered_lab/triangle_texture_draw.cpp
+@@ -116,6 +116,7 @@
+     const auto regions=bounded_triangle_regions(projected.triangle_bounds,clip,s.batch,s.quads);
+     const auto layers=triangle_region_layers(regions);
+     const auto textures=decode_resources(s.ps,resources);
++    auto texture_batch=s.pixel->bind_textures(textures);uint64_t texture_upload_bytes=0,texture_reused_bytes=0;
+     result.pixels=background;std::vector<Sample> samples(s.batch);std::vector<Point> points(s.batch);
+     std::vector<PackedColor> tile(s.batch);std::vector<Color> colors(s.batch);std::vector<shader::VertexRegisters> fragments(s.batch);
+     std::vector<std::array<ProjectedVertex,3>> vertices(s.batch);
+@@ -179,8 +180,8 @@
+             for(size_t q=0;q<s.batch;q+=4)if(!interpolation_coverage[q])
+                 for(size_t lane=0;lane<4;++lane)fragments[q+lane]=fragments[live_quad+lane];
+         }else for(size_t n=0;n<s.batch;++n)if(!covered.covered[n])fragments[n]=fragments[first_live];
+-        began=Clock::now();const auto pixels=s.pixel->execute(fragments,pc,textures);require(pixels.execution_device==result.execution_device);
+-        result.timings.shader_ms+=ms(began);result.input_bytes+=pixels.input_bytes;result.output_bytes+=pixels.output_bytes;++result.provider_requests;
++        began=Clock::now();const auto pixels=texture_batch.execute(fragments,pc);require(pixels.execution_device==result.execution_device);
++        texture_upload_bytes+=pixels.texture_upload_bytes;texture_reused_bytes+=pixels.texture_reused_bytes;result.timings.shader_ms+=ms(began);result.input_bytes+=pixels.input_bytes;result.output_bytes+=pixels.output_bytes;++result.provider_requests;
+         for(size_t n=0;n<s.batch;++n)std::memcpy(colors[n].data(),pixels.vertices[n][0].data(),16);
+         for(size_t n=0;n<s.batch;++n)tile[n]=stored_pixel[n]?result.pixels[pixel_index[n]]:PackedColor{};
+         began=Clock::now();const auto merged=s.merger.execute(colors,tile,covered.covered,blend_constant);require(merged.execution_device==result.execution_device);
+@@ -210,6 +211,7 @@
+         }
+         if(filled)submit(filled);
+     }
++    std::printf("{\"texture_upload_scope\":true,\"host_uploaded_bytes\":%llu,\"host_recopy_bytes_avoided\":%llu,\"device_dma_measured\":false}\n",static_cast<unsigned long long>(texture_upload_bytes),static_cast<unsigned long long>(texture_reused_bytes));
+     result.vertices=std::move(shaded.vertices);result.timings.total_ms=ms(start);return result;
+ }
+ }
+--- a/native/windows/registered_lab/vertex_executor.cpp
++++ b/native/windows/registered_lab/vertex_executor.cpp
+@@ -69,7 +69,7 @@
+     ov::CompiledModel compiled;
+     ov::InferRequest request;
+     std::string execution_device;
+-    bool failed = false, ready = false;
++    bool failed = false, ready = false, textures_uploaded=false;
+     State(const Program &p, uint32_t vertices, const std::string &backend,
+           const TextureShapes &shapes, const TextureSamplers &samplers, uint32_t tap_limit=128, bool defer_compile=false) : program(mirrored_loop_shader(p)?mirrored_tap_program(p):lower_bounded_loops(p)), count(vertices), logical_count(vertices), tap_capacity(tap_limit), mirrored_taps(mirrored_loop_shader(p)), texture_shapes(shapes) {
+         check(count && count <= 65536 && (backend == "CPU" || backend == "GPU" || backend == "NPU"));
+@@ -945,8 +945,18 @@
+     if(mirrored_loop_shader(p))configuration=std::make_unique<Configuration>(Configuration{p,count,backend,textures,samplers});
+ }
+ RegisterExecutor::~RegisterExecutor() = default;
+-RegisterExecutor::Result RegisterExecutor::execute(const std::vector<VertexRegisters> &vertices, const VertexConstants &constants,
+-                                                   const TexturePixels &textures) {
++RegisterExecutor::TextureBatch::TextureBatch(RegisterExecutor &executor,const TexturePixels &resources):owner(executor),textures(resources){
++    check(owner.state && !owner.state->failed && !owner.active_batch);owner.active_batch=this;owner.state->textures_uploaded=false;
++}
++RegisterExecutor::TextureBatch::~TextureBatch(){owner.active_batch=nullptr;}
++RegisterExecutor::Result RegisterExecutor::TextureBatch::execute(const std::vector<VertexRegisters> &vertices,const VertexConstants &constants){
++    check(owner.active_batch==this);return owner.execute_internal(vertices,constants,textures,true);
++}
++RegisterExecutor::TextureBatch RegisterExecutor::bind_textures(const TexturePixels &textures){return TextureBatch(*this,textures);}
++RegisterExecutor::Result RegisterExecutor::execute(const std::vector<VertexRegisters> &vertices,const VertexConstants &constants,const TexturePixels &textures){
++    check(!active_batch);return execute_internal(vertices,constants,textures,false);
++}
++RegisterExecutor::Result RegisterExecutor::execute_internal(const std::vector<VertexRegisters> &vertices,const VertexConstants &constants,const TexturePixels &textures,bool reuse){
+     check(state && !state->failed && vertices.size() == state->logical_count);
+     for (unsigned i = 0; i < 14; ++i) check(constants[i].size() >= state->program.constants[i]);
+     Result result;
+@@ -968,7 +978,7 @@
+     try {
+         for (size_t i = 0; i < state->bindings.size(); ++i) {
+             const auto &binding = state->bindings[i]; auto tensor = state->request.get_tensor(binding.name);
+-            result.input_bytes += tensor.get_byte_size();
++            if(!binding.texture || !reuse || !state->textures_uploaded)result.input_bytes += tensor.get_byte_size();
+             if (binding.half_texel) {
+                 check(tensor.get_size() == 1 && tensor.get_element_type() == ov::element::f32);
+                 *tensor.data<float>() = .5f;
+@@ -978,7 +988,8 @@
+                 const auto length=binding.texture_rows?size_t(binding.texture_rows):total;
+                 check(textures[binding.index].size()==total && binding.texture_offset<=total && length<=total-binding.texture_offset &&
+                       tensor.get_byte_size()==length*sizeof(std::array<float,4>));
+-                std::memcpy(tensor.data(),textures[binding.index].data()+binding.texture_offset,tensor.get_byte_size());
++                if(!reuse || !state->textures_uploaded){std::memcpy(tensor.data(),textures[binding.index].data()+binding.texture_offset,tensor.get_byte_size());result.texture_upload_bytes+=tensor.get_byte_size();}
++                else result.texture_reused_bytes+=tensor.get_byte_size();
+             } else if (binding.constant) {
+                 check(tensor.get_byte_size() == size_t(state->program.constants[binding.index]) * sizeof(VertexBits));
+                 std::memcpy(tensor.data(), constants[binding.index].data(), tensor.get_byte_size());
+@@ -989,7 +1000,7 @@
+                     std::memcpy(destination + v * sizeof(VertexBits), vertices[v][binding.index].data(), sizeof(VertexBits));
+             }
+         }
+-        state->request.infer();
++        state->request.infer();state->textures_uploaded=true;
+         if (state->checks_sample_coordinates) {
+             const auto status = state->request.get_tensor("invalid_sample_coordinates");
+             result.output_bytes += status.get_byte_size();
+--- a/native/windows/registered_lab/vertex_executor.hpp
++++ b/native/windows/registered_lab/vertex_executor.hpp
+@@ -13,6 +13,10 @@
+ // does not implement rasterization or interpolation. Texture sampling accepts
+ // only the explicit single-mip addressing contract in shader_texture.hpp.
+ class RegisterExecutor {
++public:
++    class TextureBatch;
++private:
++    TextureBatch *active_batch=nullptr;
+     struct State;
+     struct Configuration;
+     std::unique_ptr<State> state;
+@@ -30,9 +34,24 @@
+     ~RegisterExecutor();
+     RegisterExecutor(const RegisterExecutor &) = delete;
+     RegisterExecutor &operator=(const RegisterExecutor &) = delete;
+-    struct Result { std::vector<VertexRegisters> vertices; std::string execution_device; uint64_t input_bytes = 0, output_bytes = 0; };
++    struct Result { std::vector<VertexRegisters> vertices; std::string execution_device; uint64_t input_bytes = 0, output_bytes = 0, texture_upload_bytes=0, texture_reused_bytes=0; };
+     Result execute(const std::vector<VertexRegisters> &vertices, const VertexConstants &constants,
+                    const TexturePixels &textures = {});
++    // Textures must remain immutable and outlive the scope. One scope per
++    // executor; all calls are synchronous and occur on the owning caller.
++    TextureBatch bind_textures(const TexturePixels &textures);
++private:
++    Result execute_internal(const std::vector<VertexRegisters> &vertices,const VertexConstants &constants,const TexturePixels &textures,bool reuse);
++};
++class RegisterExecutor::TextureBatch {
++    friend class RegisterExecutor;
++    RegisterExecutor &owner;const TexturePixels &textures;
++    TextureBatch(RegisterExecutor &executor,const TexturePixels &resources);
++public:
++    ~TextureBatch();
++    TextureBatch(const TextureBatch &)=delete;TextureBatch &operator=(const TextureBatch &)=delete;
++    TextureBatch(TextureBatch &&)=delete;TextureBatch &operator=(TextureBatch &&)=delete;
++    Result execute(const std::vector<VertexRegisters> &vertices,const VertexConstants &constants);
+ };
+ using VertexExecutor = RegisterExecutor;
+ using PixelExecutor = RegisterExecutor;
