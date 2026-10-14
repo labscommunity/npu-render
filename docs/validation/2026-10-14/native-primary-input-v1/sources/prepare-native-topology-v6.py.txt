@@ -1,0 +1,30 @@
+from pathlib import Path
+import shutil,json,hashlib,tarfile
+r=Path('results/render-driver');d=r/'native-topology-control-v6';shutil.copytree(r/'native-topology-control-v5',d)
+p=d/'topology.cpp';s=p.read_text();needle='LONG set(Topology &t,UINT action)'
+extra=r'''void extension_contract(){
+ Topology before;DISPLAYCONFIG_PATH_INFO physical{},indirect{},candidate{};DISPLAYCONFIG_MODE_INFO mode{};
+ physical.flags=DISPLAYCONFIG_PATH_ACTIVE|DISPLAYCONFIG_PATH_SUPPORT_VIRTUAL_MODE;physical.sourceInfo.adapterId.LowPart=1;physical.sourceInfo.id=0;physical.sourceInfo.sourceModeInfoIdx=0;physical.targetInfo.adapterId.LowPart=1;physical.targetInfo.id=9;physical.targetInfo.outputTechnology=DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INTERNAL;
+ indirect=physical;indirect.targetInfo.adapterId.LowPart=2;indirect.targetInfo.id=7;indirect.targetInfo.outputTechnology=DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INDIRECT_WIRED;
+ mode.infoType=DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE;mode.adapterId=physical.sourceInfo.adapterId;mode.id=0;mode.sourceMode.width=2880;mode.sourceMode.height=1800;mode.sourceMode.pixelFormat=DISPLAYCONFIG_PIXELFORMAT_32BPP;mode.sourceMode.position={0,0};before.paths={physical,indirect};before.modes={mode};
+ candidate=indirect;candidate.sourceInfo.adapterId.LowPart=2;candidate.sourceInfo.id=1;candidate.targetInfo.targetAvailable=TRUE;Topology all;all.paths={physical,indirect,candidate};
+ for(const bool primary:{false,true}){const auto next=extension(before,all,primary);require(next.paths.size()==2&&!same_source(next.paths[0],next.paths[1]),"contract distinct routes");const auto &p=source(next,next.paths[0]),&i=source(next,next.paths[1]);require(p.width==2880&&p.height==1800&&i.width==1024&&i.height==768,"contract dimensions");require(p.position.x==(primary?1024:0)&&i.position.x==(primary?0:2880)&&p.position.y==0&&i.position.y==0,"contract positions");require(source(before,before.paths[0]).position.x==0,"contract input mutation");}
+ bool rejected=false;try{Topology missing;missing.paths={physical,indirect};(void)extension(before,missing,true);}catch(const std::exception &){rejected=true;}require(rejected,"contract missing route accepted");
+ std::printf("{\"passed\":true,\"topology_contract\":true,\"primary_and_secondary_layouts_checked\":true,\"missing_route_rejected\":true,\"display_changed\":false}\n");
+}
+struct PrimaryEscape {
+ bool active=false;
+ explicit PrimaryEscape(bool enabled){if(enabled){require(RegisterHotKey(nullptr,0x4e50,MOD_CONTROL|MOD_ALT|MOD_SHIFT|MOD_NOREPEAT,VK_F11)!=0,"primary emergency hotkey unavailable");active=true;}}
+ ~PrimaryEscape(){if(active)UnregisterHotKey(nullptr,0x4e50);}
+ bool requested(){MSG message{};while(PeekMessageW(&message,nullptr,0,0,PM_REMOVE)){if(message.message==WM_HOTKEY&&message.wParam==0x4e50)return true;TranslateMessage(&message);DispatchMessageW(&message);}return false;}
+};
+'''
+assert s.count(needle)==1;s=s.replace(needle,extra+needle)
+s=s.replace('int wmain(int argc,wchar_t **argv)try{','int wmain(int argc,wchar_t **argv)try{\n if(argc==2&&!std::wcscmp(argv[1],L"--contract")){extension_contract();return 0;}')
+s=s.replace('auto restore=before;bool passed=false;std::unique_ptr<WindowPlacements> windows;', 'auto restore=before;bool passed=false;PrimaryEscape escape(primary);std::unique_ptr<WindowPlacements> windows;')
+s=s.replace('for(unsigned i=0;i<seconds*10;++i){require(nr::present::current_console_default(),"interactive desktop changed");Sleep(100);}passed=true;','for(unsigned i=0;i<seconds*10;++i){require(!escape.requested(),"primary trial emergency exit requested");require(nr::present::current_console_default(),"interactive desktop changed");Sleep(100);}passed=true;')
+p.write_text(s)
+(r/'native-topology-control-v6-source.json').write_text(json.dumps({p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-topology-control-v6.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-native-topology-control-v5.ps1').read_text().replace('native-topology-control-v5','native-topology-control-v6');s+='\n& "$b\\Release\\nr_native_topology.exe" --contract > "$b\\contract.json";if($LASTEXITCODE){throw \'Topology construction contract failed\'}\nGet-Content "$b\\contract.json"\n';(r/'build-native-topology-control-v6.ps1').write_text(s)
+s=(r/'run-native-topology-helper-v5.ps1').read_text().replace('native-topology-control-v5','native-topology-control-v6');(r/'run-native-topology-helper-v6.ps1').write_text(s)

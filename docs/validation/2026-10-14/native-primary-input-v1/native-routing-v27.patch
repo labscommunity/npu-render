@@ -1,0 +1,54 @@
+--- a/native/windows/registered_lab/linear_texture_draw.cpp
++++ b/native/windows/registered_lab/linear_texture_draw.cpp
+@@ -277,7 +277,7 @@
+         try{auto cropped=s.crop->execute(bounds,clip,uv,color,source,background,s.point);if(cropped){
+             require(cropped->device==s.device);result.timings.merger_ms=elapsed(began);result.pixels=std::move(cropped->pixels);result.covered_samples=cropped->covered;
+             result.input_bytes+=cropped->input_bytes;result.output_bytes+=cropped->output_bytes;result.provider_requests+=cropped->provider_calls;result.tile_executions=cropped->provider_calls;result.used_rectangle=true;result.vertices=std::move(shaded.vertices);result.timings.total_ms=elapsed(start);
+-            std::printf("{\"opaque_affine_crop\":true,\"maximum_byte_error_bound\":%.9g,\"source_x\":%u,\"source_y\":%u,\"width\":%u,\"height\":%u}\n",cropped->maximum_byte_error,cropped->mapping[4],cropped->mapping[5],cropped->mapping[2],cropped->mapping[3]);return result;
++            std::printf("{\"affine_crop\":true,\"alpha_replaced\":%s,\"source_over\":%s,\"point_sampling\":%s,\"maximum_byte_error_bound\":%.9g,\"source_x\":%u,\"source_y\":%u,\"width\":%u,\"height\":%u}\n",s.pixel.opaque?"true":"false",s.source_over?"true":"false",s.point?"true":"false",cropped->maximum_byte_error,cropped->mapping[4],cropped->mapping[5],cropped->mapping[2],cropped->mapping[3]);return result;
+         }}catch(...){s.failed=true;throw;}
+     }
+     try{s.prepare_general();require(result.execution_device==s.device);}catch(...){s.failed=true;throw;}
+--- a/native/windows/registered_lab/opaque_affine_crop.hpp
++++ b/native/windows/registered_lab/opaque_affine_crop.hpp
+@@ -1,7 +1,7 @@
+ #pragma once
+ #include "provider_compile.hpp"
+ #include <openvino/openvino.hpp>
+-#include <openvino/opsets/opset13.hpp>
++#include <openvino/opsets/opset15.hpp>
+ #include <map>
+ #include <optional>
+ #include <array>
+@@ -40,7 +40,7 @@
+         return result;
+     }
+     Entry create(const Key &key){
+-        namespace op=ov::opset13;using Node=std::shared_ptr<ov::Node>;
++        namespace op=ov::opset15;using Node=std::shared_ptr<ov::Node>;
+         const auto values=[](std::initializer_list<int64_t> a){return op::Constant::create(ov::element::i64,ov::Shape{a.size()},std::vector<int64_t>(a));};
+         const auto rows=key[0],x=key[1],cw=key[2],sx=key[3];
+         auto source=std::make_shared<op::Parameter>(ov::element::u8,ov::Shape{rows,sw,4});source->output(0).get_tensor().set_names({"source"});
+@@ -52,16 +52,17 @@
+         if(opaque)channels.push_back(op::Constant::create(ov::element::u8,ov::Shape{rows,cw,1},{uint8_t(255)}));else channels.push_back(slice(source,sx,cw,3,1));
+         Node center=std::make_shared<op::Concat>(channels,2);
+         if(!opaque && source_over){
+-            // For exact u8 point samples with unit modulation, premultiplied
+-            // source-over quantizes (255*s + (255*a_inv)*d) / 255. Keeping the
+-            // numerator integral avoids intermediate f16 precision loss.
++            // s is integral: round(s+d*(255-a)/255)=s+round(d*(255-a)/255).
++            // For 0<=d*(255-a)<=65025, t=product+128 gives exact nearest
++            // integer division by 255 as (t+(t>>8))>>8. No FP32 Divide node.
+             const auto integer=[](int32_t v){return op::Constant::create(ov::element::i32,ov::Shape{}, {v});};
+             Node foreground=std::make_shared<op::Convert>(center,ov::element::i32);
+             Node destination=std::make_shared<op::Convert>(slice(bg,x,cw,0,4),ov::element::i32);
+             Node alpha=std::make_shared<op::Convert>(slice(source,sx,cw,3,1),ov::element::i32);
+             Node inverse=std::make_shared<op::Subtract>(integer(255),alpha);
+-            Node numerator=std::make_shared<op::Add>(std::make_shared<op::Multiply>(foreground,integer(255)),std::make_shared<op::Multiply>(destination,inverse));
+-            Node rounded=std::make_shared<op::Divide>(std::make_shared<op::Add>(numerator,integer(127)),integer(255));
++            Node t=std::make_shared<op::Add>(std::make_shared<op::Multiply>(destination,inverse),integer(128));
++            Node term=std::make_shared<op::BitwiseRightShift>(std::make_shared<op::Add>(t,std::make_shared<op::BitwiseRightShift>(t,integer(8))),integer(8));
++            Node rounded=std::make_shared<op::Add>(foreground,term);
+             center=std::make_shared<op::Convert>(std::make_shared<op::Minimum>(rounded,integer(255)),ov::element::u8);
+         }
+         ov::OutputVector output;

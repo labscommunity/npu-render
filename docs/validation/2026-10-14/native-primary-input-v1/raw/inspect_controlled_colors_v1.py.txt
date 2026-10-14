@@ -1,0 +1,14 @@
+"""Count only exact known test colors in captured packets; export no pixels."""
+from pathlib import Path
+import json,hashlib,struct,sys,time
+capture=Path(sys.argv[1]);out=Path(sys.argv[2]);assert not out.exists()
+index=(capture/'index.jsonl').read_bytes();entries=[json.loads(x) for x in index.decode('utf-8-sig').splitlines() if x.startswith('{')];records=[];began=time.perf_counter()
+colors={'blue_bgra':bytes((180,60,30,255)),'blue_rgba':bytes((30,60,180,255)),'red_bgra':bytes((80,30,180,255)),'green_bgra':bytes((60,180,20,255))}
+for entry in entries:
+ if not entry.get('request_recorded'):continue
+ data=(capture/entry['file']).read_bytes();assert len(data)==entry['bytes'] and hashlib.sha256(data).hexdigest()==entry['sha256'].lower()
+ counts={name:data.count(value) for name,value in colors.items()};h=struct.unpack_from('<3Q14I',data)
+ if max(counts.values())>=64:records.append(dict(ticket=entry['ticket'],abi=h[3],width=h[4],height=h[5],vertices=h[6],flags=h[8],color_occurrences=counts))
+assert (capture/'index.jsonl').read_bytes()==index
+result=dict(passed=True,capture_index_sha256=hashlib.sha256(index).hexdigest(),requests=sum(bool(x.get('request_recorded')) for x in entries),matching_requests=records,elapsed_seconds=time.perf_counter()-began,pixel_data_exported=False,raw_pattern_counts_are_not_rendering_proof=True)
+out.write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(dict(passed=True,requests=result['requests'],matching_requests=len(records),maximum_counts={k:max([x['color_occurrences'][k] for x in records],default=0) for k in colors})))

@@ -1,0 +1,40 @@
+{
+    "started":  "2026-10-14T18:10:31.4828325Z",
+    "passed":  false,
+    "completed":  true,
+    "driver_installed":  false,
+    "desktop_changed":  false,
+    "runs":  [
+                 {
+                     "label":  "CPU-all",
+                     "shared_core":  "1",
+                     "exit_code":  0,
+                     "timed_out":  false,
+                     "result":  [
+                                    {
+                                        "passed":  true,
+                                        "checked_components":  36274176,
+                                        "npu_or_cpu_crop_calls":  192,
+                                        "negative_cases":  7,
+                                        "maximum_oracle_error":  0.498039216,
+                                        "execution_device":  "CPU",
+                                        "desktop_offloaded":  false
+                                    }
+                                ]
+                 },
+                 {
+                     "label":  "NPU-all",
+                     "shared_core":  "1",
+                     "exit_code":  1,
+                     "timed_out":  false
+                 },
+                 {
+                     "label":  "NPU-repeat",
+                     "shared_core":  "1",
+                     "exit_code":  1,
+                     "timed_out":  false
+                 }
+             ],
+    "finished":  "2026-10-14T18:10:34.6296861Z",
+    "all_runs_passed":  false
+}

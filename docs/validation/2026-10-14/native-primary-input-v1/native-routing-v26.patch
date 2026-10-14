@@ -1,0 +1,67 @@
+--- a/native/windows/registered_lab/linear_texture_draw.cpp
++++ b/native/windows/registered_lab/linear_texture_draw.cpp
+@@ -81,7 +81,7 @@
+           rows(1),count(w),point(filter==shader::TextureFilter::point),target_format(format),source_over(blend),selected_backend(backend),vertex(v,6,backend),projection(6,backend),device(backend) {
+         char *crop_text=nullptr;size_t crop_length=0;
+         require(!_dupenv_s(&crop_text,&crop_length,"NR_RENDER_OPAQUE_CROP"));
+-        if(crop_text){const std::string value(crop_text);std::free(crop_text);require(value=="1");if(pixel.opaque)crop=std::make_unique<OpaqueAffineCrop>(sw,sh,w,h,format!=sf,backend);}
++        if(crop_text){const std::string value(crop_text);std::free(crop_text);require(value=="1");if(pixel.opaque || point)crop=std::make_unique<OpaqueAffineCrop>(sw,sh,w,h,format!=sf,backend,pixel.opaque,source_over);}
+         // Alpha replacement happens after sampling. The RGB taps remain valid
+         // for both point and bilinear filtering; source alpha is unused.
+         require(filter==shader::TextureFilter::point || filter==shader::TextureFilter::linear);
+--- a/native/windows/registered_lab/opaque_affine_crop.hpp
++++ b/native/windows/registered_lab/opaque_affine_crop.hpp
+@@ -13,7 +13,7 @@
+ class OpaqueAffineCrop {
+     using Range=std::array<double,2>;
+     using Key=std::array<uint32_t,6>; // output x/y/w/h, source x/y
+-    uint32_t sw,sh,w,h;bool swap,failed=false;std::string backend;ov::Core core;
++    uint32_t sw,sh,w,h;bool swap,opaque,source_over,failed=false;std::string backend;ov::Core core;
+     // Tile keys: rows, output x, width, source x, reserved, reserved.
+     struct Entry {ov::CompiledModel model;ov::InferRequest request;std::string device;bool needs_background;};
+     std::map<Key,Entry> entries;
+@@ -49,11 +49,25 @@
+             return std::make_shared<op::Slice>(node,values({0,start,channel}),values({rows,start+cols,channel+channels}),values({1,1,1}),values({0,1,2}));
+         };
+         ov::OutputVector channels;for(uint32_t c=0;c<3;++c)channels.push_back(slice(source,sx,cw,swap?2-c:c,1));
+-        channels.push_back(op::Constant::create(ov::element::u8,ov::Shape{rows,cw,1},{uint8_t(255)}));
+-        Node center=std::make_shared<op::Concat>(channels,2);ov::OutputVector output;
++        if(opaque)channels.push_back(op::Constant::create(ov::element::u8,ov::Shape{rows,cw,1},{uint8_t(255)}));else channels.push_back(slice(source,sx,cw,3,1));
++        Node center=std::make_shared<op::Concat>(channels,2);
++        if(!opaque && source_over){
++            // For exact u8 point samples with unit modulation, premultiplied
++            // source-over quantizes (255*s + (255*a_inv)*d) / 255. Keeping the
++            // numerator integral avoids intermediate f16 precision loss.
++            const auto integer=[](int32_t v){return op::Constant::create(ov::element::i32,ov::Shape{}, {v});};
++            Node foreground=std::make_shared<op::Convert>(center,ov::element::i32);
++            Node destination=std::make_shared<op::Convert>(slice(bg,x,cw,0,4),ov::element::i32);
++            Node alpha=std::make_shared<op::Convert>(slice(source,sx,cw,3,1),ov::element::i32);
++            Node inverse=std::make_shared<op::Subtract>(integer(255),alpha);
++            Node numerator=std::make_shared<op::Add>(std::make_shared<op::Multiply>(foreground,integer(255)),std::make_shared<op::Multiply>(destination,inverse));
++            Node rounded=std::make_shared<op::Divide>(std::make_shared<op::Add>(numerator,integer(127)),integer(255));
++            center=std::make_shared<op::Convert>(std::make_shared<op::Minimum>(rounded,integer(255)),ov::element::u8);
++        }
++        ov::OutputVector output;
+         if(x)output.push_back(slice(bg,0,x,0,4));output.push_back(center);if(x+cw<w)output.push_back(slice(bg,x+cw,w-x-cw,0,4));
+         Node result=output.size()==1?output[0].get_node_shared_ptr():Node(std::make_shared<op::Concat>(output,1));
+-        const bool needs_background=x || cw!=w;ov::ParameterVector ports{source};if(needs_background)ports.push_back(bg);
++        const bool needs_background=x || cw!=w || (!opaque && source_over);ov::ParameterVector ports{source};if(needs_background)ports.push_back(bg);
+         auto graph=std::make_shared<ov::Model>(ov::OutputVector{result},ports);
+         const ov::AnyMap properties{ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY)};
+         auto model=nr::provider::compile_model(core,graph,backend,properties);const auto devices=model.get_property(ov::execution_devices);
+@@ -62,13 +76,13 @@
+     }
+ 
+ public:
+-    OpaqueAffineCrop(uint32_t source_w,uint32_t source_h,uint32_t width,uint32_t height,bool exchange,std::string selected):sw(source_w),sh(source_h),w(width),h(height),swap(exchange),backend(std::move(selected)){
++    OpaqueAffineCrop(uint32_t source_w,uint32_t source_h,uint32_t width,uint32_t height,bool exchange,std::string selected,bool replace_alpha=true,bool blend=false):sw(source_w),sh(source_h),w(width),h(height),swap(exchange),opaque(replace_alpha),source_over(blend),backend(std::move(selected)){
+         if(!sw || sw>8192 || !sh || sh>8192 || uint64_t(sw)*sh>8388608 || !w || w>4096 || !h || h>8192 || uint64_t(w)*h>8388576 || (backend!="CPU" && backend!="NPU" && backend!="GPU"))throw std::invalid_argument("invalid crop dimensions/backend");
+     }
+     struct Result {std::vector<PackedColor> pixels;std::string device;uint64_t covered;double maximum_byte_error;Key mapping;uint32_t provider_calls=0;uint64_t input_bytes=0,output_bytes=0;};
+     std::optional<Result> execute(const std::array<int32_t,4> &bounds,const std::array<int32_t,4> &clip,const std::array<float,4> &uv,const std::array<float,4> &color,const PackedTexture &source,const std::vector<PackedColor> &background,bool point){
+         if(failed)throw std::runtime_error("crop context poisoned");
+-        if(color!=std::array<float,4>{1,1,1,1})return {};
++        if(color!=std::array<float,4>{1,1,1,1} || (!opaque && !point))return {};
+         const auto first=[](int32_t bound){return int32_t(std::ceil((double(bound)-128)/256));};
+         const int32_t x=(std::max)(clip[0],first(bounds[0])),y=(std::max)(clip[1],first(bounds[1]));
+         const int32_t right=(std::min)(clip[2],first(bounds[2])),bottom=(std::min)(clip[3],first(bounds[3]));

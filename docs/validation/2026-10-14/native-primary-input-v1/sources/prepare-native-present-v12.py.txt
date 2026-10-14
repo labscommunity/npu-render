@@ -1,0 +1,11 @@
+from pathlib import Path
+import shutil,json,hashlib,tarfile
+r=Path('results/render-driver');d=r/'native-present-v12';shutil.copytree(r/'native-present-v11',d)
+p=d/'input_stimulus.hpp';s=p.read_text().replace('cursor_saved=false,stopped=false','cursor_saved=false,stopped=false,paint_failed=false')
+s=s.replace('EndPaint(hwnd,&paint);receipt("painted",self->step);','EndPaint(hwnd,&paint);if(!GdiFlush())self->paint_failed=true;receipt("painted",self->step);')
+s=s.replace('bool click_sent=false,key_sent=false;','bool click_sent=false,key_sent=false;unsigned refresh=0;')
+s=s.replace('        if(!click_sent && cue(L"click"))','        require(!window.paint_failed,"owned GDI batch flush failed");const auto tick=unsigned((GetTickCount64()-start)/15000);if(tick!=refresh){refresh=tick;InvalidateRect(window.window,nullptr,FALSE);UpdateWindow(window.window);}\n        if(!click_sent && cue(L"click"))')
+p.write_text(s)
+(r/'native-present-v12-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-present-v12.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-native-present-v11.ps1').read_text().replace('native-present-v11','native-present-v12');(r/'build-native-present-v12.ps1').write_text(s)

@@ -1,0 +1,63 @@
+--- a/topology.cpp
++++ b/topology.cpp
+@@ -2,6 +2,7 @@
+ #define NOMINMAX
+ #include <windows.h>
+ #include <vector>
++#include <cstdint>
+ #include <cstdio>
+ #include <cwchar>
+ #include <stdexcept>
+@@ -50,6 +51,11 @@
+  }
+  desired.modes.push_back(mode);desired.paths.push_back(candidate);return desired;
+ }
++bool physical_baseline_matches(const Topology &before,const Topology &after){
++ if(after.paths.size()!=1 || after.paths[0].targetInfo.outputTechnology==DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INDIRECT_WIRED)return false;
++ Topology expected;expected.modes=before.modes;for(const auto &p:before.paths)if(p.targetInfo.outputTechnology!=DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INDIRECT_WIRED)expected.paths.push_back(p);
++ return expected.paths.size()==1 && equivalent(expected,after);
++}
+ void extension_contract(){
+  Topology before;DISPLAYCONFIG_PATH_INFO physical{},indirect{},candidate{};DISPLAYCONFIG_MODE_INFO mode{};
+  physical.flags=DISPLAYCONFIG_PATH_ACTIVE|DISPLAYCONFIG_PATH_SUPPORT_VIRTUAL_MODE;physical.sourceInfo.adapterId.LowPart=1;physical.sourceInfo.id=0;physical.sourceInfo.sourceModeInfoIdx=0;physical.targetInfo.adapterId.LowPart=1;physical.targetInfo.id=9;physical.targetInfo.outputTechnology=DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INTERNAL;
+@@ -92,9 +98,10 @@
+   require(equivalent(expected_physical,actual_physical),"physical mode or routing changed");require(!same_source(active.paths[0],active.paths[1]),"sources still cloned");
+   const auto &a=source(active,active.paths[0]),&b=source(active,active.paths[1]);require(a.position.x+LONG(a.width)<=b.position.x||b.position.x+LONG(b.width)<=a.position.x,"logical desktops overlap");
+   std::printf("{\"extension_verified\":true,\"physical_path_preserved\":%s,\"physical_mode_preserved\":true,\"indirect_primary\":%s,\"seconds\":%lu}\n",primary?"false":"true",primary?"true":"false",seconds);std::fflush(stdout);
+-  for(unsigned i=0;i<seconds*10;++i){require(!escape.requested(),"primary trial emergency exit requested");require(nr::present::current_console_default(),"interactive desktop changed");Sleep(100);}passed=true;
++  for(unsigned i=0;i<seconds*10;++i){require(!escape.requested(),"primary trial emergency exit requested");require(nr::present::current_console_default(),"interactive desktop changed");if(primary && !(i%10))require(equivalent(active,query(QDC_ONLY_ACTIVE_PATHS)),"primary route changed during trial");Sleep(100);}passed=true;
+  }catch(const std::exception &e){std::fprintf(stderr,"extension trial: %s\n",e.what());}
+  const auto status=set(restore,SDC_APPLY);const auto after=query(QDC_ONLY_ACTIVE_PATHS);print("restored",after);const bool exact=status==ERROR_SUCCESS&&equivalent(before,after);
+- const bool windows_restored=!windows || (exact && windows->restore());passed=passed&&windows_restored;
++ const bool baseline=physical_baseline_matches(before,after);const bool windows_restored=!windows || ((exact || baseline) && windows->restore());passed=passed&&windows_restored;
++ std::printf("{\"placement_restore_gate\":true,\"original_extended_topology_restored\":%s,\"physical_baseline_restored_after_device_removal\":%s,\"windows_restored\":%s}\n",exact?"true":"false",baseline?"true":"false",windows_restored?"true":"false");std::fflush(stdout);
+  std::printf("{\"completed\":true,\"passed\":%s,\"restore_status\":%ld,\"topology_restored_exactly\":%s,\"desktop_offloaded\":false}\n",passed&&exact?"true":"false",status,exact?"true":"false");return passed&&exact?0:1;
+ }catch(const std::exception &e){std::fprintf(stderr,"%s\n",e.what());return 1;}
+--- a/window_placement_guard.hpp
++++ b/window_placement_guard.hpp
+@@ -14,7 +14,13 @@
+         if(!GetWindowPlacement(window,&placement)){CloseHandle(process);return TRUE;}
+         self.entries.push_back({window,pid,process,placement});return TRUE;
+     }
+-    WindowPlacements(){cursor_saved=GetCursorPos(&cursor)!=0;foreground=GetForegroundWindow();if(!EnumWindows(collect,reinterpret_cast<LPARAM>(this)))throw std::runtime_error("window snapshot failed");}
++    WindowPlacements(){
++        if(!SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))throw std::runtime_error("placement DPI context unavailable");
++        cursor_saved=GetCursorPos(&cursor)!=0;foreground=GetForegroundWindow();if(!EnumWindows(collect,reinterpret_cast<LPARAM>(this)))throw std::runtime_error("window snapshot failed");
++        for(const auto &e:entries){FILETIME created{},exited{},kernel{},user{};if(!GetProcessTimes(e.process,&created,&exited,&kernel,&user))throw std::runtime_error("placement owner creation time unavailable");const auto &p=e.placement;
++            std::printf("{\"window_placement_snapshot\":true,\"hwnd\":%llu,\"pid\":%lu,\"created\":%llu,\"flags\":%u,\"show\":%u,\"normal\":[%ld,%ld,%ld,%ld],\"minimum\":[%ld,%ld],\"maximum\":[%ld,%ld]}\n",static_cast<unsigned long long>(reinterpret_cast<ULONG_PTR>(e.window)),e.pid,(uint64_t(created.dwHighDateTime)<<32)|created.dwLowDateTime,p.flags,p.showCmd,p.rcNormalPosition.left,p.rcNormalPosition.top,p.rcNormalPosition.right,p.rcNormalPosition.bottom,p.ptMinPosition.x,p.ptMinPosition.y,p.ptMaxPosition.x,p.ptMaxPosition.y);}
++        std::printf("{\"window_snapshot_complete\":true,\"windows\":%zu,\"cursor_saved\":%s,\"cursor\":[%ld,%ld],\"foreground\":%llu,\"titles_or_content_recorded\":false}\n",entries.size(),cursor_saved?"true":"false",cursor.x,cursor.y,static_cast<unsigned long long>(reinterpret_cast<ULONG_PTR>(foreground)));std::fflush(stdout);
++    }
+     WindowPlacements(const WindowPlacements &)=delete;
+     ~WindowPlacements(){for(const auto &entry:entries)CloseHandle(entry.process);}
+     bool restore(){
+@@ -24,8 +30,8 @@
+             WINDOWPLACEMENT after{};after.length=sizeof(after);
+             if(!SetWindowPlacement(entry.window,&entry.placement) || !GetWindowPlacement(entry.window,&after) || after.showCmd!=entry.placement.showCmd || !EqualRect(&after.rcNormalPosition,&entry.placement.rcNormalPosition)){++failed;continue;}++restored;
+         }
+-        const bool cursor_ok=!cursor_saved || SetCursorPos(cursor.x,cursor.y)!=0;
+-        const bool focus_ok=!foreground || GetForegroundWindow()==foreground || SetForegroundWindow(foreground)!=0;
++        POINT actual{};const bool cursor_ok=!cursor_saved || (SetCursorPos(cursor.x,cursor.y)!=0 && GetCursorPos(&actual) && actual.x==cursor.x && actual.y==cursor.y);
++        const bool focus_ok=!foreground || !IsWindow(foreground) || GetForegroundWindow()==foreground || (SetForegroundWindow(foreground)!=0 && GetForegroundWindow()==foreground);
+         std::printf("{\"window_placement_recovery\":true,\"captured\":%zu,\"restored\":%u,\"closed_during_trial\":%u,\"failed\":%u,\"cursor_restored\":%s,\"foreground_restored\":%s,\"titles_or_content_recorded\":false}\n",entries.size(),restored,closed,failed,cursor_ok?"true":"false",focus_ok?"true":"false");std::fflush(stdout);
+         return !failed && cursor_ok && focus_ok;
+     }

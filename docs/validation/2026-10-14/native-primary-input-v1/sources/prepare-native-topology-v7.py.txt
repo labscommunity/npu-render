@@ -1,0 +1,33 @@
+from pathlib import Path
+import shutil,json,hashlib,tarfile
+r=Path('results/render-driver');d=r/'native-topology-control-v7';shutil.copytree(r/'native-topology-control-v6',d)
+p=d/'window_placement_guard.hpp';s=p.read_text()
+a='WindowPlacements(){cursor_saved=GetCursorPos(&cursor)!=0;foreground=GetForegroundWindow();if(!EnumWindows(collect,reinterpret_cast<LPARAM>(this)))throw std::runtime_error("window snapshot failed");}'
+b=r'''WindowPlacements(){
+        if(!SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))throw std::runtime_error("placement DPI context unavailable");
+        cursor_saved=GetCursorPos(&cursor)!=0;foreground=GetForegroundWindow();if(!EnumWindows(collect,reinterpret_cast<LPARAM>(this)))throw std::runtime_error("window snapshot failed");
+        for(const auto &e:entries){FILETIME created{},exited{},kernel{},user{};if(!GetProcessTimes(e.process,&created,&exited,&kernel,&user))throw std::runtime_error("placement owner creation time unavailable");const auto &p=e.placement;
+            std::printf("{\"window_placement_snapshot\":true,\"hwnd\":%llu,\"pid\":%lu,\"created\":%llu,\"flags\":%u,\"show\":%u,\"normal\":[%ld,%ld,%ld,%ld],\"minimum\":[%ld,%ld],\"maximum\":[%ld,%ld]}\n",static_cast<unsigned long long>(reinterpret_cast<ULONG_PTR>(e.window)),e.pid,(uint64_t(created.dwHighDateTime)<<32)|created.dwLowDateTime,p.flags,p.showCmd,p.rcNormalPosition.left,p.rcNormalPosition.top,p.rcNormalPosition.right,p.rcNormalPosition.bottom,p.ptMinPosition.x,p.ptMinPosition.y,p.ptMaxPosition.x,p.ptMaxPosition.y);}
+        std::printf("{\"window_snapshot_complete\":true,\"windows\":%zu,\"cursor_saved\":%s,\"cursor\":[%ld,%ld],\"foreground\":%llu,\"titles_or_content_recorded\":false}\n",entries.size(),cursor_saved?"true":"false",cursor.x,cursor.y,static_cast<unsigned long long>(reinterpret_cast<ULONG_PTR>(foreground)));std::fflush(stdout);
+    }'''
+assert s.count(a)==1;s=s.replace(a,b)
+s=s.replace('const bool cursor_ok=!cursor_saved || SetCursorPos(cursor.x,cursor.y)!=0;','POINT actual{};const bool cursor_ok=!cursor_saved || (SetCursorPos(cursor.x,cursor.y)!=0 && GetCursorPos(&actual) && actual.x==cursor.x && actual.y==cursor.y);')
+s=s.replace('const bool focus_ok=!foreground || GetForegroundWindow()==foreground || SetForegroundWindow(foreground)!=0;','const bool focus_ok=!foreground || !IsWindow(foreground) || GetForegroundWindow()==foreground || (SetForegroundWindow(foreground)!=0 && GetForegroundWindow()==foreground);')
+p.write_text(s)
+p=d/'topology.cpp';s=p.read_text().replace('#include <vector>','#include <vector>\n#include <cstdint>')
+needle='void extension_contract(){'
+extra=r'''bool physical_baseline_matches(const Topology &before,const Topology &after){
+ if(after.paths.size()!=1 || after.paths[0].targetInfo.outputTechnology==DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INDIRECT_WIRED)return false;
+ Topology expected;expected.modes=before.modes;for(const auto &p:before.paths)if(p.targetInfo.outputTechnology!=DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INDIRECT_WIRED)expected.paths.push_back(p);
+ return expected.paths.size()==1 && equivalent(expected,after);
+}
+'''
+assert s.count(needle)==1;s=s.replace(needle,extra+needle)
+s=s.replace('require(nr::present::current_console_default(),"interactive desktop changed");Sleep(100);','require(nr::present::current_console_default(),"interactive desktop changed");if(primary && !(i%10))require(equivalent(active,query(QDC_ONLY_ACTIVE_PATHS)),"primary route changed during trial");Sleep(100);')
+a='const bool windows_restored=!windows || (exact && windows->restore());passed=passed&&windows_restored;'
+b='const bool baseline=physical_baseline_matches(before,after);const bool windows_restored=!windows || ((exact || baseline) && windows->restore());passed=passed&&windows_restored;\n std::printf("{\\\"placement_restore_gate\\\":true,\\\"original_extended_topology_restored\\\":%s,\\\"physical_baseline_restored_after_device_removal\\\":%s,\\\"windows_restored\\\":%s}\\n",exact?"true":"false",baseline?"true":"false",windows_restored?"true":"false");std::fflush(stdout);'
+assert s.count(a)==1;s=s.replace(a,b);p.write_text(s)
+(r/'native-topology-control-v7-source.json').write_text(json.dumps({p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-topology-control-v7.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+for name in ('build-native-topology-control-v6.ps1','run-native-topology-helper-v6.ps1'):
+ s=(r/name).read_text().replace('native-topology-control-v6','native-topology-control-v7');(r/name.replace('v6','v7')).write_text(s)

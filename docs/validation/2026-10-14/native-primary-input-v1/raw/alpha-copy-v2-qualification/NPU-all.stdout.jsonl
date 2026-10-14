@@ -1,0 +1,17 @@
+{"crop_begin":true,"width":64,"style":0,"swap":false,"frame":0}
+{"shared_provider_core_experiment":true,"single_core_for_npu_compilation":true,"hardware_context_count_measured":false}
+{"kind":"private_shared_queue_experiment","enabled":true,"property_readback_verified":true,"hardware_queue_count_measured":false}
+{"source_over":false,"point_sampling":true,"crop_case":true,"milliseconds":149.978000,"provider_calls":1,"width":64,"height":48,"swap":false,"style":0,"frame":0,"error_bound":0,"execution_device":"NPU"}
+{"crop_begin":true,"width":64,"style":0,"swap":false,"frame":1}
+{"source_over":false,"point_sampling":true,"crop_case":true,"milliseconds":0.169800,"provider_calls":1,"width":64,"height":48,"swap":false,"style":0,"frame":1,"error_bound":0,"execution_device":"NPU"}
+{"crop_begin":true,"width":64,"style":1,"swap":false,"frame":0}
+{"source_over":false,"point_sampling":true,"crop_case":true,"milliseconds":91.989600,"provider_calls":1,"width":64,"height":48,"swap":false,"style":1,"frame":0,"error_bound":0,"execution_device":"NPU"}
+{"crop_begin":true,"width":64,"style":1,"swap":false,"frame":1}
+{"source_over":false,"point_sampling":true,"crop_case":true,"milliseconds":0.250900,"provider_calls":1,"width":64,"height":48,"swap":false,"style":1,"frame":1,"error_bound":0,"execution_device":"NPU"}
+{"crop_begin":true,"width":64,"style":2,"swap":false,"frame":0}
+{"source_over":false,"point_sampling":true,"crop_case":true,"milliseconds":94.334500,"provider_calls":1,"width":64,"height":48,"swap":false,"style":2,"frame":0,"error_bound":0,"execution_device":"NPU"}
+{"crop_begin":true,"width":64,"style":2,"swap":false,"frame":1}
+{"source_over":false,"point_sampling":true,"crop_case":true,"milliseconds":0.507700,"provider_calls":1,"width":64,"height":48,"swap":false,"style":2,"frame":1,"error_bound":0,"execution_device":"NPU"}
+{"crop_begin":true,"width":64,"style":0,"swap":false,"frame":0}
+[ERROR] 11:10:34.350 [vpux-compiler] InferenceExecutionAnalysis Pass failed : Can't convert a F32/SI32 workload as CostModel does not support
+[ERROR] 11:10:34.350 [vpux-compiler] Failed Pass InferenceExecutionAnalysis on Operation loc(fused<{name = "main", type = "Func"}>["main"])

@@ -1,0 +1,31 @@
+import ctypes as C,json,sys,struct,collections
+from ctypes import wintypes as W
+from pathlib import Path
+pids={int(x) for x in sys.argv[1].split(',')};frame=Path(sys.argv[2]);out=Path(sys.argv[3]);assert not out.exists()
+u=C.WinDLL('user32',use_last_error=True);g=C.WinDLL('gdi32',use_last_error=True);d=C.WinDLL('dwmapi',use_last_error=True)
+u.WindowFromPoint.argtypes=[W.POINT];u.WindowFromPoint.restype=W.HWND;u.GetClassNameW.argtypes=[W.HWND,W.LPWSTR,C.c_int]
+u.GetDC.argtypes=[W.HWND];u.GetDC.restype=W.HDC;u.ReleaseDC.argtypes=[W.HWND,W.HDC];g.GetPixel.argtypes=[W.HDC,C.c_int,C.c_int];g.GetPixel.restype=W.DWORD
+d.DwmGetWindowAttribute.argtypes=[W.HWND,W.DWORD,W.LPVOID,W.DWORD]
+u.GetWindowThreadProcessId.argtypes=[W.HWND,C.POINTER(W.DWORD)];u.GetWindowRect.argtypes=[W.HWND,C.POINTER(W.RECT)];u.IsWindowVisible.argtypes=[W.HWND];u.GetDpiForWindow.argtypes=[W.HWND]
+u.SetThreadDpiAwarenessContext.argtypes=[W.HANDLE];u.SetThreadDpiAwarenessContext.restype=W.HANDLE;assert u.SetThreadDpiAwarenessContext(W.HANDLE(-4))
+callback=C.WINFUNCTYPE(W.BOOL,W.HWND,W.LPARAM);entries=[]
+@callback
+def visit(hwnd,_):
+ pid=W.DWORD();u.GetWindowThreadProcessId(hwnd,C.byref(pid))
+ if pid.value in pids:
+  rect=W.RECT();assert u.GetWindowRect(hwnd,C.byref(rect));entries.append(dict(pid=pid.value,visible=bool(u.IsWindowVisible(hwnd)),rect=[rect.left,rect.top,rect.right,rect.bottom],dpi=u.GetDpiForWindow(hwnd)))
+ return True
+u.EnumWindows.argtypes=[callback,W.LPARAM];assert u.EnumWindows(visit,0)
+point=W.POINT(70,70);hit=u.WindowFromPoint(point);hit_pid=W.DWORD();u.GetWindowThreadProcessId(hit,C.byref(hit_pid));name=C.create_unicode_buffer(256);u.GetClassNameW(hit,name,256);cloak=W.DWORD();cloak_status=d.DwmGetWindowAttribute(hit,14,C.byref(cloak),4)
+record=dict(owned_windows=entries,pixel_data_exported=False,hit_test_pid=hit_pid.value,hit_test_owned=hit_pid.value in pids,hit_test_class=name.value,hit_test_cloak_status=cloak_status,hit_test_cloak=cloak.value)
+if hit_pid.value in pids:
+ dc=u.GetDC(hit);assert dc
+ try:
+  color=g.GetPixel(dc,6,6);record.update(owned_client_pixel_valid=color!=0xffffffff,owned_client_pixel_is_blue=color==(30|(60<<8)|(180<<16)))
+ finally:u.ReleaseDC(hit,dc)
+
+if frame.exists():
+ b=frame.read_bytes();h=struct.unpack_from('<QIIQIIIIQQII',b);assert len(b)==64+h[8] and h[6]==87
+ blue=bytes((180,60,30,255));locations=[i for i in range(0,h[8],4) if b[64+i:68+i]==blue]
+ record.update(sequence=h[3],controlled_blue_pixels=len(locations),controlled_blue_bbox=([min(i//4%h[4] for i in locations),min(i//4//h[4] for i in locations),max(i//4%h[4] for i in locations),max(i//4//h[4] for i in locations)] if locations else None))
+out.write_text(json.dumps(record,indent=2)+'\n');print(json.dumps(record))

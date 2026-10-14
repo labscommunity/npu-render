@@ -1,0 +1,47 @@
+--- a/topology.cpp
++++ b/topology.cpp
+@@ -50,9 +50,26 @@
+  }
+  desired.modes.push_back(mode);desired.paths.push_back(candidate);return desired;
+ }
++void extension_contract(){
++ Topology before;DISPLAYCONFIG_PATH_INFO physical{},indirect{},candidate{};DISPLAYCONFIG_MODE_INFO mode{};
++ physical.flags=DISPLAYCONFIG_PATH_ACTIVE|DISPLAYCONFIG_PATH_SUPPORT_VIRTUAL_MODE;physical.sourceInfo.adapterId.LowPart=1;physical.sourceInfo.id=0;physical.sourceInfo.sourceModeInfoIdx=0;physical.targetInfo.adapterId.LowPart=1;physical.targetInfo.id=9;physical.targetInfo.outputTechnology=DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INTERNAL;
++ indirect=physical;indirect.targetInfo.adapterId.LowPart=2;indirect.targetInfo.id=7;indirect.targetInfo.outputTechnology=DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INDIRECT_WIRED;
++ mode.infoType=DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE;mode.adapterId=physical.sourceInfo.adapterId;mode.id=0;mode.sourceMode.width=2880;mode.sourceMode.height=1800;mode.sourceMode.pixelFormat=DISPLAYCONFIG_PIXELFORMAT_32BPP;mode.sourceMode.position={0,0};before.paths={physical,indirect};before.modes={mode};
++ candidate=indirect;candidate.sourceInfo.adapterId.LowPart=2;candidate.sourceInfo.id=1;candidate.targetInfo.targetAvailable=TRUE;Topology all;all.paths={physical,indirect,candidate};
++ for(const bool primary:{false,true}){const auto next=extension(before,all,primary);require(next.paths.size()==2&&!same_source(next.paths[0],next.paths[1]),"contract distinct routes");const auto &p=source(next,next.paths[0]),&i=source(next,next.paths[1]);require(p.width==2880&&p.height==1800&&i.width==1024&&i.height==768,"contract dimensions");require(p.position.x==(primary?1024:0)&&i.position.x==(primary?0:2880)&&p.position.y==0&&i.position.y==0,"contract positions");require(source(before,before.paths[0]).position.x==0,"contract input mutation");}
++ bool rejected=false;try{Topology missing;missing.paths={physical,indirect};(void)extension(before,missing,true);}catch(const std::exception &){rejected=true;}require(rejected,"contract missing route accepted");
++ std::printf("{\"passed\":true,\"topology_contract\":true,\"primary_and_secondary_layouts_checked\":true,\"missing_route_rejected\":true,\"display_changed\":false}\n");
++}
++struct PrimaryEscape {
++ bool active=false;
++ explicit PrimaryEscape(bool enabled){if(enabled){require(RegisterHotKey(nullptr,0x4e50,MOD_CONTROL|MOD_ALT|MOD_SHIFT|MOD_NOREPEAT,VK_F11)!=0,"primary emergency hotkey unavailable");active=true;}}
++ ~PrimaryEscape(){if(active)UnregisterHotKey(nullptr,0x4e50);}
++ bool requested(){MSG message{};while(PeekMessageW(&message,nullptr,0,0,PM_REMOVE)){if(message.message==WM_HOTKEY&&message.wParam==0x4e50)return true;TranslateMessage(&message);DispatchMessageW(&message);}return false;}
++};
+ LONG set(Topology &t,UINT action){return SetDisplayConfig(UINT(t.paths.size()),t.paths.data(),UINT(t.modes.size()),t.modes.data(),SDC_USE_SUPPLIED_DISPLAY_CONFIG|SDC_VIRTUAL_MODE_AWARE|action);}
+ }
+ int wmain(int argc,wchar_t **argv)try{
++ if(argc==2&&!std::wcscmp(argv[1],L"--contract")){extension_contract();return 0;}
+  require(argc==2||argc==3,"expected --inspect, --validate-extend or --extend <1..300 seconds>");require(nr::present::current_console_default(),"unlocked Default console required");
+  const auto before=query(QDC_ONLY_ACTIVE_PATHS),all=query(QDC_ALL_PATHS);print("before",before);print("available",all);
+  if(argc==2&&!std::wcscmp(argv[1],L"--inspect"))return 0;
+@@ -60,7 +77,7 @@
+  const bool apply=argc==3&&(!std::wcscmp(argv[1],L"--extend")||!std::wcscmp(argv[1],L"--primary"));require(apply||(argc==2&&(!std::wcscmp(argv[1],L"--validate-extend")||!std::wcscmp(argv[1],L"--validate-primary"))),"mode rejected");
+  wchar_t *end=nullptr;const auto seconds=apply?std::wcstoul(argv[2],&end,10):0;require(!apply||(end!=argv[2]&&!*end&&seconds>=1&&seconds<=300),"duration rejected");
+  auto desired=extension(before,all,primary);print("requested",desired);const auto validation=set(desired,SDC_VALIDATE|SDC_ALLOW_CHANGES);std::printf("{\"validation_status\":%ld,\"display_changed\":false}\n",validation);std::fflush(stdout);require(validation==ERROR_SUCCESS,"extension validation failed");if(!apply)return 0;
+- auto restore=before;bool passed=false;std::unique_ptr<WindowPlacements> windows;if(primary)windows=std::make_unique<WindowPlacements>();
++ auto restore=before;bool passed=false;PrimaryEscape escape(primary);std::unique_ptr<WindowPlacements> windows;if(primary)windows=std::make_unique<WindowPlacements>();
+  try{
+   require(nr::present::current_console_default(),"console changed before application");const auto code=set(desired,SDC_APPLY|SDC_ALLOW_CHANGES);std::printf("{\"apply_status\":%ld}\n",code);std::fflush(stdout);require(code==ERROR_SUCCESS,"extension application failed");
+   const auto active=query(QDC_ONLY_ACTIVE_PATHS);print("extended",active);require(active.paths.size()==2,"extended path count mismatch");
+@@ -75,7 +92,7 @@
+   require(equivalent(expected_physical,actual_physical),"physical mode or routing changed");require(!same_source(active.paths[0],active.paths[1]),"sources still cloned");
+   const auto &a=source(active,active.paths[0]),&b=source(active,active.paths[1]);require(a.position.x+LONG(a.width)<=b.position.x||b.position.x+LONG(b.width)<=a.position.x,"logical desktops overlap");
+   std::printf("{\"extension_verified\":true,\"physical_path_preserved\":%s,\"physical_mode_preserved\":true,\"indirect_primary\":%s,\"seconds\":%lu}\n",primary?"false":"true",primary?"true":"false",seconds);std::fflush(stdout);
+-  for(unsigned i=0;i<seconds*10;++i){require(nr::present::current_console_default(),"interactive desktop changed");Sleep(100);}passed=true;
++  for(unsigned i=0;i<seconds*10;++i){require(!escape.requested(),"primary trial emergency exit requested");require(nr::present::current_console_default(),"interactive desktop changed");Sleep(100);}passed=true;
+  }catch(const std::exception &e){std::fprintf(stderr,"extension trial: %s\n",e.what());}
+  const auto status=set(restore,SDC_APPLY);const auto after=query(QDC_ONLY_ACTIVE_PATHS);print("restored",after);const bool exact=status==ERROR_SUCCESS&&equivalent(before,after);
+  const bool windows_restored=!windows || (exact && windows->restore());passed=passed&&windows_restored;

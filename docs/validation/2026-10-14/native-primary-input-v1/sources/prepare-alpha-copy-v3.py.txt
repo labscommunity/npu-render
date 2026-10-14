@@ -1,0 +1,27 @@
+"""Use exact integer division-by-255 identity, avoiding integer Divide lowering."""
+from pathlib import Path
+import shutil,json,hashlib,tarfile
+r=Path('results/render-driver');d=r/'alpha-copy-v3';shutil.copytree(r/'alpha-copy-v1',d)
+for a in range(256):
+ for b in range(256):
+  t=a*b+128
+  assert ((t+(t>>8))>>8)==(a*b+127)//255
+p=d/'opaque_affine_crop.hpp';s=p.read_text().replace('<openvino/opsets/opset13.hpp>','<openvino/opsets/opset15.hpp>').replace('namespace op=ov::opset13','namespace op=ov::opset15')
+a=s.index('            // For exact u8 point samples');b=s.index('\n        }\n        ov::OutputVector output;',a)
+s=s[:a]+r'''            // s is integral: round(s+d*(255-a)/255)=s+round(d*(255-a)/255).
+            // For 0<=d*(255-a)<=65025, t=product+128 gives exact nearest
+            // integer division by 255 as (t+(t>>8))>>8. No FP32 Divide node.
+            const auto integer=[](int32_t v){return op::Constant::create(ov::element::i32,ov::Shape{}, {v});};
+            Node foreground=std::make_shared<op::Convert>(center,ov::element::i32);
+            Node destination=std::make_shared<op::Convert>(slice(bg,x,cw,0,4),ov::element::i32);
+            Node alpha=std::make_shared<op::Convert>(slice(source,sx,cw,3,1),ov::element::i32);
+            Node inverse=std::make_shared<op::Subtract>(integer(255),alpha);
+            Node t=std::make_shared<op::Add>(std::make_shared<op::Multiply>(destination,inverse),integer(128));
+            Node term=std::make_shared<op::BitwiseRightShift>(std::make_shared<op::Add>(t,std::make_shared<op::BitwiseRightShift>(t,integer(8))),integer(8));
+            Node rounded=std::make_shared<op::Add>(foreground,term);
+            center=std::make_shared<op::Convert>(std::make_shared<op::Minimum>(rounded,integer(255)),ov::element::u8);'''+s[b:];p.write_text(s)
+p=d/'contract.cpp';s=p.read_text().replace('for(const bool swap:{false,true})','for(const bool padded:{false,true})for(const bool swap:{false,true})').replace('sw=w+32,sh=h+24','sw=w+(padded?32:0),sh=h+(padded?24:0)').replace('(2+double(bounds[0])/256)','((padded?2:0)+double(bounds[0])/256)').replace('(1+double(bounds[1])/256)','((padded?1:0)+double(bounds[1])/256)').replace('(2+double(bounds[2])/256)','((padded?2:0)+double(bounds[2])/256)').replace('(1+double(bounds[3])/256)','((padded?1:0)+double(bounds[3])/256)');p.write_text(s)
+(r/'alpha-copy-v3-source.json').write_text(json.dumps({p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'alpha-copy-v3.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+for name in ('build-alpha-copy-v1.ps1','run-alpha-copy-v1.ps1'):
+ s=(r/name).read_text().replace('alpha-copy-v1','alpha-copy-v3').replace('WaitForExit(180000)','WaitForExit(300000)');(r/name.replace('v1','v3')).write_text(s)

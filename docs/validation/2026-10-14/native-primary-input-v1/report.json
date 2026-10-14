@@ -1,0 +1,501 @@
+{
+  "recorded": "2026-10-14T18:30:08.570664+00:00",
+  "evidence_checks_passed": true,
+  "raw_files_remotely_hash_verified": 256,
+  "raw_bytes": 3344359,
+  "alpha_qualifications": {
+    "alpha-copy-v1": {
+      "started": "2026-10-14T17:47:04.0030915Z",
+      "passed": true,
+      "completed": true,
+      "driver_installed": false,
+      "desktop_changed": false,
+      "runs": [
+        {
+          "label": "CPU-all",
+          "shared_core": "1",
+          "exit_code": 0,
+          "timed_out": false,
+          "result": [
+            {
+              "passed": true,
+              "checked_components": 573456384,
+              "npu_or_cpu_crop_calls": 2304,
+              "negative_cases": 7,
+              "maximum_oracle_error": 0.498039216,
+              "execution_device": "CPU",
+              "desktop_offloaded": false
+            }
+          ]
+        },
+        {
+          "label": "NPU-all",
+          "shared_core": "1",
+          "exit_code": 0,
+          "timed_out": false,
+          "result": [
+            {
+              "passed": true,
+              "checked_components": 573456384,
+              "npu_or_cpu_crop_calls": 2304,
+              "negative_cases": 7,
+              "maximum_oracle_error": 0.498039216,
+              "execution_device": "NPU",
+              "desktop_offloaded": false
+            }
+          ]
+        },
+        {
+          "label": "NPU-repeat",
+          "shared_core": "1",
+          "exit_code": 0,
+          "timed_out": false,
+          "result": [
+            {
+              "passed": true,
+              "checked_components": 573456384,
+              "npu_or_cpu_crop_calls": 2304,
+              "negative_cases": 7,
+              "maximum_oracle_error": 0.498039216,
+              "execution_device": "NPU",
+              "desktop_offloaded": false
+            }
+          ]
+        }
+      ],
+      "finished": "2026-10-14T17:48:39.5354230Z",
+      "all_runs_passed": true
+    },
+    "alpha-copy-v2": {
+      "started": "2026-10-14T18:10:31.4828325Z",
+      "passed": false,
+      "completed": true,
+      "driver_installed": false,
+      "desktop_changed": false,
+      "runs": [
+        {
+          "label": "CPU-all",
+          "shared_core": "1",
+          "exit_code": 0,
+          "timed_out": false,
+          "result": [
+            {
+              "passed": true,
+              "checked_components": 36274176,
+              "npu_or_cpu_crop_calls": 192,
+              "negative_cases": 7,
+              "maximum_oracle_error": 0.498039216,
+              "execution_device": "CPU",
+              "desktop_offloaded": false
+            }
+          ]
+        },
+        {
+          "label": "NPU-all",
+          "shared_core": "1",
+          "exit_code": 1,
+          "timed_out": false
+        },
+        {
+          "label": "NPU-repeat",
+          "shared_core": "1",
+          "exit_code": 1,
+          "timed_out": false
+        }
+      ],
+      "finished": "2026-10-14T18:10:34.6296861Z",
+      "all_runs_passed": false
+    },
+    "alpha-copy-v3": {
+      "started": "2026-10-14T18:15:51.7993451Z",
+      "passed": true,
+      "completed": true,
+      "driver_installed": false,
+      "desktop_changed": false,
+      "runs": [
+        {
+          "label": "CPU-all",
+          "shared_core": "1",
+          "exit_code": 0,
+          "timed_out": false,
+          "result": [
+            {
+              "passed": true,
+              "checked_components": 1146912768,
+              "npu_or_cpu_crop_calls": 4608,
+              "negative_cases": 14,
+              "maximum_oracle_error": 0.498039216,
+              "execution_device": "CPU",
+              "desktop_offloaded": false
+            }
+          ]
+        },
+        {
+          "label": "NPU-all",
+          "shared_core": "1",
+          "exit_code": 0,
+          "timed_out": false,
+          "result": [
+            {
+              "passed": true,
+              "checked_components": 1146912768,
+              "npu_or_cpu_crop_calls": 4608,
+              "negative_cases": 14,
+              "maximum_oracle_error": 0.498039216,
+              "execution_device": "NPU",
+              "desktop_offloaded": false
+            }
+          ]
+        },
+        {
+          "label": "NPU-repeat",
+          "shared_core": "1",
+          "exit_code": 0,
+          "timed_out": false,
+          "result": [
+            {
+              "passed": true,
+              "checked_components": 1146912768,
+              "npu_or_cpu_crop_calls": 4608,
+              "negative_cases": 14,
+              "maximum_oracle_error": 0.498039216,
+              "execution_device": "NPU",
+              "desktop_offloaded": false
+            }
+          ]
+        }
+      ],
+      "finished": "2026-10-14T18:20:00.1299406Z",
+      "all_runs_passed": true
+    }
+  },
+  "replays": {
+    "native-ordered-replay-v18-alpha": {
+      "started": "2026-10-14T17:52:34.910383+00:00",
+      "completed": true,
+      "passed": true,
+      "desktop_changed": false,
+      "driver_installed": false,
+      "desktop_offloaded": false,
+      "recorded_requests": 117,
+      "first_original_ticket": 0,
+      "verification_scope": "consistency_with_original_successful_outputs_only",
+      "capture_index_sha256": "080119feb206f40746bc420f37ece8447f302468cd2542f48760359356089c65",
+      "affine_batch": "default",
+      "pipeline_cache": "retained",
+      "shared_core": "1",
+      "shared_queue": "1",
+      "memory_cache": "0",
+      "successful_replays": 117,
+      "original_pixel_hashes_matched": 116,
+      "unreferenced_successes": 1,
+      "worker_pid": 2776,
+      "current_ticket": 116,
+      "delivery_acknowledgments": 117,
+      "worker_exit": 0,
+      "original_failure_reproduced": false,
+      "finished": "2026-10-14T17:53:28.516360+00:00"
+    },
+    "native-ordered-replay-v19-alpha": {
+      "started": "2026-10-14T17:53:29.076683+00:00",
+      "completed": true,
+      "passed": false,
+      "desktop_changed": false,
+      "driver_installed": false,
+      "desktop_offloaded": false,
+      "recorded_requests": 256,
+      "first_original_ticket": 0,
+      "verification_scope": "consistency_with_original_successful_outputs_only",
+      "capture_index_sha256": "8a3b9096c11897436586287855cccc483195da2c3e4beae5de4a37f3cebb88e5",
+      "affine_batch": "default",
+      "pipeline_cache": "retained",
+      "shared_core": "1",
+      "shared_queue": "1",
+      "memory_cache": "0",
+      "successful_replays": 179,
+      "original_pixel_hashes_matched": 179,
+      "unreferenced_successes": 0,
+      "worker_pid": 14988,
+      "current_ticket": 179,
+      "worker_failure_exit": 1,
+      "error": "AssertionError('Client request failed at ticket 179')",
+      "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\replay-recorded-requests-v5.py\", line 45, in <module>\n    assert result.returncode==0 and not result.stderr,f'Client request failed at ticket {n}'\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: Client request failed at ticket 179\n",
+      "finished": "2026-10-14T17:54:58.197801+00:00"
+    },
+    "native-ordered-replay-v21-primary-last": {
+      "started": "2026-10-14T18:11:46.197257+00:00",
+      "completed": true,
+      "passed": true,
+      "desktop_changed": false,
+      "driver_installed": false,
+      "desktop_offloaded": false,
+      "recorded_requests": 1,
+      "first_original_ticket": 476,
+      "verification_scope": "consistency_with_original_successful_outputs_only",
+      "capture_index_sha256": "7de0916042c7af0045a8a9a69afe98159eaedb6e8bf5118ef5b46c22f16f872d",
+      "affine_batch": "default",
+      "pipeline_cache": "retained",
+      "shared_core": "1",
+      "shared_queue": "1",
+      "memory_cache": "0",
+      "successful_replays": 1,
+      "original_pixel_hashes_matched": 0,
+      "unreferenced_successes": 1,
+      "worker_pid": 11420,
+      "current_ticket": 476,
+      "delivery_acknowledgments": 1,
+      "worker_exit": 0,
+      "original_failure_reproduced": false,
+      "finished": "2026-10-14T18:11:46.810961+00:00"
+    },
+    "native-ordered-replay-v22-primary-full": {
+      "started": "2026-10-14T18:11:47.205947+00:00",
+      "completed": true,
+      "passed": true,
+      "desktop_changed": false,
+      "driver_installed": false,
+      "desktop_offloaded": false,
+      "recorded_requests": 477,
+      "first_original_ticket": 0,
+      "verification_scope": "consistency_with_original_successful_outputs_only",
+      "capture_index_sha256": "7de0916042c7af0045a8a9a69afe98159eaedb6e8bf5118ef5b46c22f16f872d",
+      "affine_batch": "default",
+      "pipeline_cache": "retained",
+      "shared_core": "1",
+      "shared_queue": "1",
+      "memory_cache": "0",
+      "successful_replays": 477,
+      "original_pixel_hashes_matched": 476,
+      "unreferenced_successes": 1,
+      "worker_pid": 17268,
+      "current_ticket": 476,
+      "delivery_acknowledgments": 477,
+      "worker_exit": 0,
+      "original_failure_reproduced": false,
+      "finished": "2026-10-14T18:15:48.659341+00:00"
+    }
+  },
+  "primary_trials": {
+    "native-live-v14": {
+      "live": {
+        "started": "2026-10-14T18:04:16.7594572Z",
+        "completed": true,
+        "passed": false,
+        "native_trial": "native-desktop-admission-v25",
+        "topology_trial": "native-topology-primary-v1",
+        "desktop_offloaded": false,
+        "input_forwarding_tested": false,
+        "tahoma_tested": false,
+        "controller_pid": 8964,
+        "first_relay": {
+          "sequence": 1,
+          "qpc": 2094526489392,
+          "producer_pid": 4292,
+          "width": 1024,
+          "height": 768,
+          "format": 87,
+          "pixel_bytes": 3145728,
+          "pixel_sha256": "79d3843e05cee6b6070dc0f8ca9ef4bd566266e741730c964d626bd4b5b7da09",
+          "packet_sha256": "a76bb278d478651bf13d480b7ba1046fd36a142a8e3d865b1435b4ee4574f735",
+          "observed": "2026-10-14T18:05:42.591837+00:00",
+          "npu_receipts_observed": 164,
+          "known_stimulus_pixel": [
+            62,
+            55,
+            44,
+            255
+          ]
+        },
+        "presentation_seconds": 217,
+        "presenter_task_result": 0,
+        "topology_exit": 1,
+        "native_exit": 1,
+        "cleanup_passed": true,
+        "physically_submitted_frames": 5,
+        "matching_source_frames": 5,
+        "backbuffer_copies_exact": true,
+        "distinct_source_pixel_hashes": 5,
+        "stimulus_task_result": 1,
+        "presenter_child_success": true,
+        "stimulus_child_success": false,
+        "controlled_color_submitted": false,
+        "mouse_received": false,
+        "keyboard_received": false,
+        "physical_blue_green_red_observed": false,
+        "primary_topology_restored": false,
+        "ordinary_windows_restored": false,
+        "normal_windows_input_tested": false,
+        "finished": "2026-10-14T18:10:21.4169857Z"
+      },
+      "native_operations": 476,
+      "delivery_acknowledgments": 475,
+      "native_frames": 5,
+      "native_passed": false,
+      "window_inspection": {
+        "owned_windows": [
+          {
+            "pid": 22232,
+            "visible": true,
+            "rect": [
+              1024,
+              0,
+              3904,
+              1800
+            ],
+            "dpi": 192
+          },
+          {
+            "pid": 14196,
+            "visible": true,
+            "rect": [
+              64,
+              64,
+              576,
+              320
+            ],
+            "dpi": 96
+          },
+          {
+            "pid": 22232,
+            "visible": false,
+            "rect": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "dpi": 96
+          },
+          {
+            "pid": 14196,
+            "visible": false,
+            "rect": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "dpi": 96
+          }
+        ],
+        "pixel_data_exported": false,
+        "sequence": 5,
+        "controlled_blue_pixels": 0,
+        "controlled_blue_bbox": null
+      },
+      "controlled_color_occurrences_absent": true,
+      "display_observations": 383,
+      "maximum_displayed_count": 1,
+      "reported_media_mode_samples": {
+        "2": 218,
+        "0": 14,
+        "1": 151
+      }
+    },
+    "native-live-v15": {
+      "live": {
+        "started": "2026-10-14T18:20:02.4224478Z",
+        "completed": true,
+        "passed": false,
+        "native_trial": "native-desktop-admission-v26",
+        "topology_trial": "native-topology-primary-v2",
+        "desktop_offloaded": false,
+        "input_forwarding_tested": false,
+        "tahoma_tested": false,
+        "controller_pid": 10148,
+        "first_relay": {
+          "sequence": 1,
+          "qpc": 2104543106451,
+          "producer_pid": 8948,
+          "width": 1024,
+          "height": 768,
+          "format": 87,
+          "pixel_bytes": 3145728,
+          "pixel_sha256": "0f922ba58aae58adf17fc5e83ef0b87725373f31c6cfe12003c318dfa944d860",
+          "packet_sha256": "ea1a1041f639c0a9f4d384da17dc89aaa42a2631b6eed05000a3d4775323db19",
+          "observed": "2026-10-14T18:22:24.230163+00:00",
+          "npu_receipts_observed": 166,
+          "known_stimulus_pixel": [
+            62,
+            55,
+            44,
+            255
+          ]
+        },
+        "presentation_seconds": 163,
+        "presenter_task_result": 0,
+        "topology_exit": 0,
+        "native_exit": 0,
+        "cleanup_passed": true,
+        "physically_submitted_frames": 4,
+        "matching_source_frames": 4,
+        "backbuffer_copies_exact": true,
+        "distinct_source_pixel_hashes": 4,
+        "stimulus_task_result": 1,
+        "presenter_child_success": true,
+        "stimulus_child_success": false,
+        "controlled_color_submitted": false,
+        "mouse_received": false,
+        "keyboard_received": false,
+        "physical_blue_green_red_observed": false,
+        "primary_topology_restored": true,
+        "ordinary_windows_restored": true,
+        "normal_windows_input_tested": false,
+        "finished": "2026-10-14T18:26:45.1892855Z"
+      },
+      "native_operations": 481,
+      "delivery_acknowledgments": 481,
+      "native_frames": 4,
+      "native_passed": true,
+      "window_inspection": {
+        "owned_windows": [
+          {
+            "pid": 15056,
+            "visible": true,
+            "rect": [
+              64,
+              64,
+              576,
+              320
+            ],
+            "dpi": 96
+          },
+          {
+            "pid": 15056,
+            "visible": false,
+            "rect": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "dpi": 96
+          }
+        ],
+        "pixel_data_exported": false,
+        "hit_test_pid": 15056,
+        "hit_test_owned": true,
+        "hit_test_class": "NpuRenderPrimaryInputStimulus",
+        "hit_test_cloak_status": 0,
+        "hit_test_cloak": 0,
+        "owned_client_pixel_valid": true,
+        "owned_client_pixel_is_blue": true,
+        "sequence": 1,
+        "controlled_blue_pixels": 0,
+        "controlled_blue_bbox": null
+      },
+      "controlled_color_occurrences_absent": true,
+      "display_observations": 295,
+      "maximum_displayed_count": 1,
+      "reported_media_mode_samples": {
+        "2": 207,
+        "0": 88
+      }
+    }
+  },
+  "source27_registered_or_native_qualified_in_this_archive": false,
+  "native_input_qualified": false,
+  "desktop_offloaded": false,
+  "tahoma_tested": false,
+  "promoted_to_runtime": false
+}

@@ -1,0 +1,9 @@
+"""Reproduce equal-width band shapes missing from the first alpha-copy fixture."""
+from pathlib import Path
+import shutil,json,hashlib,tarfile
+r=Path('results/render-driver');d=r/'alpha-copy-v2';shutil.copytree(r/'alpha-copy-v1',d)
+p=d/'contract.cpp';s=p.read_text().replace('{1024,768},{2880,1800}','{1024,96},{2880,96}').replace('sw=w+32,sh=h+24','sw=w,sh=h').replace('(2+double(bounds[0])/256)','(double(bounds[0])/256)').replace('(1+double(bounds[1])/256)','(double(bounds[1])/256)').replace('(2+double(bounds[2])/256)','(double(bounds[2])/256)').replace('(1+double(bounds[3])/256)','(double(bounds[3])/256)');p.write_text(s)
+(r/'alpha-copy-v2-source.json').write_text(json.dumps({p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'alpha-copy-v2.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+for name in ('build-alpha-copy-v1.ps1','run-alpha-copy-v1.ps1'):
+ s=(r/name).read_text().replace('alpha-copy-v1','alpha-copy-v2');(r/name.replace('v1','v2')).write_text(s)

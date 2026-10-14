@@ -1,0 +1,35 @@
+from pathlib import Path
+import shutil,json,hashlib,tarfile
+r=Path('results/render-driver');d=r/'alpha-copy-v1';shutil.copytree(r/'point-crop-v1',d)
+p=d/'opaque_affine_crop.hpp';s=p.read_text().replace('bool swap,failed=false;','bool swap,opaque,source_over,failed=false;')
+s=s.replace('bool exchange,std::string selected):sw(source_w),sh(source_h),w(width),h(height),swap(exchange),backend(std::move(selected))','bool exchange,std::string selected,bool replace_alpha=true,bool blend=false):sw(source_w),sh(source_h),w(width),h(height),swap(exchange),opaque(replace_alpha),source_over(blend),backend(std::move(selected))')
+s=s.replace('if(color!=std::array<float,4>{1,1,1,1})return {};','if(color!=std::array<float,4>{1,1,1,1} || (!opaque && !point))return {};')
+a='channels.push_back(op::Constant::create(ov::element::u8,ov::Shape{rows,cw,1},{uint8_t(255)}));'
+b='if(opaque)channels.push_back(op::Constant::create(ov::element::u8,ov::Shape{rows,cw,1},{uint8_t(255)}));else channels.push_back(slice(source,sx,cw,3,1));'
+assert a in s;s=s.replace(a,b)
+a='Node center=std::make_shared<op::Concat>(channels,2);ov::OutputVector output;'
+b='''Node center=std::make_shared<op::Concat>(channels,2);
+        if(!opaque && source_over){
+            // For exact u8 point samples with unit modulation, premultiplied
+            // source-over quantizes (255*s + (255*a_inv)*d) / 255. Keeping the
+            // numerator integral avoids intermediate f16 precision loss.
+            const auto integer=[](int32_t v){return op::Constant::create(ov::element::i32,ov::Shape{}, {v});};
+            Node foreground=std::make_shared<op::Convert>(center,ov::element::i32);
+            Node destination=std::make_shared<op::Convert>(slice(bg,x,cw,0,4),ov::element::i32);
+            Node alpha=std::make_shared<op::Convert>(slice(source,sx,cw,3,1),ov::element::i32);
+            Node inverse=std::make_shared<op::Subtract>(integer(255),alpha);
+            Node numerator=std::make_shared<op::Add>(std::make_shared<op::Multiply>(foreground,integer(255)),std::make_shared<op::Multiply>(destination,inverse));
+            Node rounded=std::make_shared<op::Divide>(std::make_shared<op::Add>(numerator,integer(127)),integer(255));
+            center=std::make_shared<op::Convert>(std::make_shared<op::Minimum>(rounded,integer(255)),ov::element::u8);
+        }
+        ov::OutputVector output;'''
+assert a in s;s=s.replace(a,b).replace('const bool needs_background=x || cw!=w;','const bool needs_background=x || cw!=w || (!opaque && source_over);');p.write_text(s)
+p=d/'contract.cpp';s=p.read_text().replace('for(const bool point:{false,true}){','for(const bool blend:{false,true}){const bool point=true;').replace('OpaqueAffineCrop executor(sw,sh,w,h,swap,backend);','OpaqueAffineCrop executor(sw,sh,w,h,swap,backend,false,blend);').replace('if(w==64 && !swap && !point && style==0){','if(w==64 && !swap && !blend && style==0){').replace('bool negative_point=false;','bool negative_point=true;').replace('if(bad==2){u[0]+=.25f/sw;u[2]+=.25f/sw;}','if(bad==2)negative_point=false;')
+a='value=c==3?255.:source.pixels[size_t(sy)*sw+sx][swap?2-c:c];'
+b='const auto &sample=source.pixels[size_t(sy)*sw+sx];value=sample[c==3?3:swap?2-c:c];if(blend)value=(std::min)(255.,value+double(bg[at][c])*(255-sample[3])/255.);'
+assert a in s;s=s.replace(a,b).replace('\\"point_sampling\\":%s,','\\"source_over\\":%s,\\"point_sampling\\":%s,').replace('point?"true":"false",milliseconds,','blend?"true":"false",point?"true":"false",milliseconds,');p.write_text(s)
+p=d/'CMakeLists.txt';p.write_text(p.read_text().replace('nr_point_crop','nr_alpha_copy'))
+(r/'alpha-copy-v1-source.json').write_text(json.dumps({p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'alpha-copy-v1.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-point-crop-v1.ps1').read_text().replace('point-crop-v1','alpha-copy-v1').replace('nr_point_crop','nr_alpha_copy');s=s.replace("if(Test-Path $b){throw 'Build exists'}","if((Test-Path $b) -or (Test-Path $source)){throw 'Build exists'}\n& tar -xf \"$r\\vm\\alpha-copy-v1.tar.gz\" -C \"$r\\vm\";if($LASTEXITCODE){throw 'Extraction failed'}");(r/'build-alpha-copy-v1.ps1').write_text(s)
+s=(r/'run-point-crop-v1.ps1').read_text().replace('point-crop-v1','alpha-copy-v1').replace('nr_point_crop','nr_alpha_copy');(r/'run-alpha-copy-v1.ps1').write_text(s)

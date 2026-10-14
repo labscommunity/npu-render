@@ -1,0 +1,11 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$source="$r\vm\alpha-copy-v3";$b="$r\builds\alpha-copy-v3";$base="$r\builds\native-routing-v21";$sdk="$r\toolchains\openvino-2026.4.1\Lib\site-packages\openvino";$log="$r\vm\build-alpha-copy-v3.log"
+if((Test-Path $b) -or (Test-Path $source)){throw 'Build exists'}
+& tar -xf "$r\vm\alpha-copy-v3.tar.gz" -C "$r\vm";if($LASTEXITCODE){throw 'Extraction failed'}
+$expected=Get-Content "$r\vm\alpha-copy-v3-source.json" -Raw|ConvertFrom-Json;foreach($f in $expected.psobject.Properties){if((Get-FileHash "$source\$($f.Name)").Hash -ne $f.Value){throw 'Source mismatch'}}
+$proof=Get-Content "$base\registered-build-report.json" -Raw|ConvertFrom-Json;if(!$proof.clean_build){throw 'Qualified static library build absent'}
+$inputs=@(foreach($n in @('nr_registered_vertex.lib','nr_registered_provider_cache.lib')){[ordered]@{name=$n;sha256=(Get-FileHash "$base\Release\$n").Hash}})
+$ErrorActionPreference='Continue'
+& cmake -S $source -B $b -A x64 "-DOpenVINO_DIR=$sdk\cmake" "-DNR_SOURCE=$r\vm\native-routing-v21" "-DNR_BUILD=$base" *> $log;$code=$LASTEXITCODE
+if(!$code){& cmake --build $b --config Release --clean-first --target nr_alpha_copy *>> $log;$code=$LASTEXITCODE}
+$ErrorActionPreference='Stop';Get-Content $log -Tail 4;if($code){throw 'Build failed'}
+[ordered]@{clean_build=$true;source_sha256=$expected;linked_libraries=$inputs;binary_sha256=(Get-FileHash "$b\Release\nr_alpha_copy.exe").Hash;desktop_changed=$false}|ConvertTo-Json -Depth 5|Set-Content "$b\build-report.json"

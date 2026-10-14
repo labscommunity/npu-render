@@ -1,0 +1,81 @@
+--- a/frame_present_probe.cpp
++++ b/frame_present_probe.cpp
+@@ -96,7 +96,8 @@
+     require(nr::present::current_console_default(),"signed-in unlocked Default console desktop required");
+     require(SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)!=nullptr,"per-monitor thread DPI awareness unavailable");
+     require(AreDpiAwarenessContextsEqual(GetThreadDpiAwarenessContext(),DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)!=0,"DPI awareness readback mismatch");
+-    const auto monitor=MonitorFromPoint(POINT{0,0},MONITOR_DEFAULTTOPRIMARY);MONITORINFO mi{};mi.cbSize=sizeof(mi);require(monitor && GetMonitorInfoW(monitor,&mi) && (mi.dwFlags&MONITORINFOF_PRIMARY),"primary monitor unavailable");
++    const auto monitor=MonitorFromRect(&initial.physical,MONITOR_DEFAULTTONULL);MONITORINFO mi{};mi.cbSize=sizeof(mi);require(monitor && GetMonitorInfoW(monitor,&mi) && EqualRect(&mi.rcMonitor,&initial.physical),"physical route monitor unavailable");
++    std::printf("{\"physical_route_selected\":true,\"physical_x\":%ld,\"physical_y\":%ld,\"indirect_primary\":%s}\n",mi.rcMonitor.left,mi.rcMonitor.top,initial.indirect.left==0&&initial.indirect.top==0?"true":"false");std::fflush(stdout);
+     phase="create-dxgi-factory";ComPtr<IDXGIFactory2> factory;check(CreateDXGIFactory2(0,IID_PPV_ARGS(&factory)));ComPtr<IDXGIAdapter1> adapter;ComPtr<IDXGIOutput6> output;DXGI_ADAPTER_DESC1 adapter_desc{};DXGI_OUTPUT_DESC1 output_desc{};
+     for(UINT i=0;!adapter;++i){ComPtr<IDXGIAdapter1> candidate;const auto status=factory->EnumAdapters1(i,&candidate);if(status==DXGI_ERROR_NOT_FOUND)break;check(status);DXGI_ADAPTER_DESC1 desc{};check(candidate->GetDesc1(&desc));if(desc.Flags&DXGI_ADAPTER_FLAG_SOFTWARE)continue;
+         for(UINT j=0;;++j){ComPtr<IDXGIOutput> original;const auto result=candidate->EnumOutputs(j,&original);if(result==DXGI_ERROR_NOT_FOUND)break;check(result);ComPtr<IDXGIOutput6> next;check(original.As(&next));DXGI_OUTPUT_DESC1 info{};check(next->GetDesc1(&info));if(info.Monitor==monitor && info.AttachedToDesktop){adapter=candidate;adapter_desc=desc;output=next;output_desc=info;break;}}
+@@ -170,7 +171,9 @@
+         require(nr::present::current_console_default() && nr::live::same(route,nr::live::separated()),"stimulus desktop changed");const auto step=unsigned((GetTickCount64()-start)/15000);if(step!=window.step){window.step=step;InvalidateRect(window.window,nullptr,FALSE);UpdateWindow(window.window);}Sleep(100);}
+     std::printf("{\"completed\":true,\"stimulus_only\":true,\"steps\":%u,\"desktop_offloaded\":false}\n",window.step+1);return 0;
+ }
++#include "input_stimulus.hpp"
+ int wmain(int argc,wchar_t **argv)try{
++    if(argc==4 && !std::wcscmp(argv[1],L"--input-stimulus"))return input_stimulus(argv[2],argv[3]);
+     if(argc==3 && !std::wcscmp(argv[1],L"--stimulus"))return stimulus(argv[2]);
+     if(argc==4 && !std::wcscmp(argv[1],L"--read-pair")){
+         const auto first=read_frame(argv[2]);const auto next=read_frame(argv[3],&first.header);
+--- a/input_stimulus.hpp
++++ b/input_stimulus.hpp
+@@ -0,0 +1,45 @@
++// Finite owned-window test of normal Windows input on an indirect primary.
++// SendInput targets only this window; no arbitrary key or screen content is logged.
++struct InputStimulus {
++    static constexpr ULONG_PTR tag=0x4e505549;
++    HWND window=nullptr,original_foreground=nullptr;POINT original_cursor{};bool cursor_saved=false,stopped=false;unsigned step=0,clicks=0,keys=0;
++    static void receipt(const char *kind,unsigned step){LARGE_INTEGER qpc{};QueryPerformanceCounter(&qpc);std::printf("{\"input_event\":\"%s\",\"step\":%u,\"qpc\":%lld,\"owned_window\":true}\n",kind,step,qpc.QuadPart);std::fflush(stdout);}
++    static LRESULT CALLBACK procedure(HWND hwnd,UINT message,WPARAM w,LPARAM l){
++        auto *self=reinterpret_cast<InputStimulus *>(GetWindowLongPtrW(hwnd,GWLP_USERDATA));
++        if(message==WM_NCCREATE){self=static_cast<InputStimulus *>(reinterpret_cast<CREATESTRUCTW *>(l)->lpCreateParams);SetWindowLongPtrW(hwnd,GWLP_USERDATA,reinterpret_cast<LONG_PTR>(self));}
++        if(self && message==WM_CLOSE){self->stopped=true;return 0;}
++        if(self && message==WM_LBUTTONUP && GetMessageExtraInfo()==tag && self->step==0){self->step=1;++self->clicks;receipt("mouse_received",self->step);InvalidateRect(hwnd,nullptr,FALSE);return 0;}
++        if(self && message==WM_CHAR && w==L'R' && GetMessageExtraInfo()==tag && self->step==1){self->step=2;++self->keys;receipt("key_received",self->step);InvalidateRect(hwnd,nullptr,FALSE);return 0;}
++        if(self && message==WM_PAINT){PAINTSTRUCT paint{};const auto dc=BeginPaint(hwnd,&paint);RECT rect{};GetClientRect(hwnd,&rect);const COLORREF colors[]{RGB(30,60,180),RGB(20,180,60),RGB(180,30,80)};const auto brush=CreateSolidBrush(colors[self->step]);FillRect(dc,&rect,brush);DeleteObject(brush);EndPaint(hwnd,&paint);receipt("painted",self->step);return 0;}
++        return DefWindowProcW(hwnd,message,w,l);
++    }
++    explicit InputStimulus(const RECT &area){
++        original_foreground=GetForegroundWindow();cursor_saved=GetCursorPos(&original_cursor)!=0;
++        WNDCLASSW cls{};cls.lpfnWndProc=procedure;cls.hInstance=GetModuleHandleW(nullptr);cls.hCursor=LoadCursorW(nullptr,IDC_ARROW);cls.lpszClassName=L"NpuRenderPrimaryInputStimulus";require(RegisterClassW(&cls)!=0,"input class failed");
++        require(area.left==0 && area.top==0 && area.right>=640 && area.bottom>=384,"input needs indirect primary");
++        window=CreateWindowExW(WS_EX_TOOLWINDOW|WS_EX_TOPMOST,cls.lpszClassName,L"NPU desktop input test",WS_POPUP,64,64,512,256,nullptr,nullptr,cls.hInstance,this);require(window!=nullptr,"input window failed");
++    }
++    ~InputStimulus(){if(window){if(GetForegroundWindow()==window && original_foreground && IsWindow(original_foreground))SetForegroundWindow(original_foreground);ShowWindow(window,SW_HIDE);DestroyWindow(window);}if(cursor_saved)SetCursorPos(original_cursor.x,original_cursor.y);}
++    void neutral(){for(const int key:{VK_SHIFT,VK_CONTROL,VK_MENU,VK_LWIN,VK_RWIN,VK_LBUTTON,VK_RBUTTON,VK_MBUTTON})require(!(GetAsyncKeyState(key)&0x8000),"user input active during owned test");}
++    void click(){
++        neutral();require(SetCursorPos(300,180)!=0,"input cursor move failed");POINT point{};require(GetCursorPos(&point) && point.x==300 && point.y==180 && WindowFromPoint(point)==window,"owned click target not exposed");
++        INPUT inputs[2]{};for(auto &x:inputs){x.type=INPUT_MOUSE;x.mi.dwExtraInfo=tag;}inputs[0].mi.dwFlags=MOUSEEVENTF_LEFTDOWN;inputs[1].mi.dwFlags=MOUSEEVENTF_LEFTUP;receipt("mouse_sent",step);require(SendInput(2,inputs,sizeof(INPUT))==2,"owned mouse injection failed");
++    }
++    void key(){
++        neutral();require(GetForegroundWindow()==window && GetFocus()==window,"owned keyboard focus absent");INPUT inputs[2]{};for(auto &x:inputs){x.type=INPUT_KEYBOARD;x.ki.wScan=L'R';x.ki.dwFlags=KEYEVENTF_UNICODE;x.ki.dwExtraInfo=tag;}inputs[1].ki.dwFlags|=KEYEVENTF_KEYUP;receipt("key_sent",step);require(SendInput(2,inputs,sizeof(INPUT))==2,"owned key injection failed");
++    }
++};
++int input_stimulus(const wchar_t *directory,const wchar_t *duration){
++    wchar_t *end=nullptr;const auto seconds=std::wcstoul(duration,&end,10);require(end!=duration && !*end && seconds>=1 && seconds<=285,"input duration rejected");require(nr::present::current_console_default(),"input requires Default console");
++    require(SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)!=nullptr,"input DPI unavailable");const auto route=nr::live::separated();InputStimulus window(route.indirect);ShowWindow(window.window,SW_SHOWNOACTIVATE);UpdateWindow(window.window);const auto start=GetTickCount64();bool click_sent=false,key_sent=false;
++    const std::wstring root(directory);const auto cue=[&](const wchar_t *name){return GetFileAttributesW((root+L"\\"+name).c_str())!=INVALID_FILE_ATTRIBUTES;};
++    std::printf("{\"input_ready\":true,\"pid\":%lu,\"indirect_primary\":true,\"cursor_confined\":false}\n",GetCurrentProcessId());std::fflush(stdout);
++    while(!window.stopped && GetTickCount64()-start<uint64_t(seconds)*1000){MSG message{};while(PeekMessageW(&message,nullptr,0,0,PM_REMOVE)){if(message.message==WM_QUIT)window.stopped=true;TranslateMessage(&message);DispatchMessageW(&message);}
++        require(nr::present::current_console_default() && nr::live::same(route,nr::live::separated()),"input desktop changed");
++        if(!click_sent && cue(L"click")){window.click();click_sent=true;}
++        if(!key_sent && window.step==1 && cue(L"key")){window.key();key_sent=true;}
++        Sleep(50);
++    }
++    const bool passed=window.clicks==1 && window.keys==1 && window.step==2;
++    std::printf("{\"completed\":true,\"input_stimulus_only\":true,\"passed\":%s,\"mouse_receipts\":%u,\"key_receipts\":%u,\"desktop_offloaded\":false}\n",passed?"true":"false",window.clicks,window.keys);return passed?0:1;
++}
+--- a/live_topology.hpp
++++ b/live_topology.hpp
+@@ -11,7 +11,7 @@
+         for(const auto &p:paths){const auto i=(p.flags&DISPLAYCONFIG_PATH_SUPPORT_VIRTUAL_MODE)?p.sourceInfo.sourceModeInfoIdx:p.sourceInfo.modeInfoIdx;require(i<mc && modes[i].infoType==DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE && (p.flags&DISPLAYCONFIG_PATH_ACTIVE),"live source mode unavailable");const auto &s=modes[i].sourceMode;require(s.width && s.width<=8192 && s.height && s.height<=8192,"live mode bounds rejected");RECT rect{s.position.x,s.position.y,s.position.x+LONG(s.width),s.position.y+LONG(s.height)};
+             if(p.targetInfo.outputTechnology==DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INDIRECT_WIRED){++indirect;result.indirect_source=p.sourceInfo.adapterId;result.indirect_source_id=p.sourceInfo.id;result.indirect_target=p.targetInfo.adapterId;result.indirect_target_id=p.targetInfo.id;result.indirect=rect;}
+             else{++physical;result.physical_source=p.sourceInfo.adapterId;result.physical_source_id=p.sourceInfo.id;result.physical_target=p.targetInfo.adapterId;result.physical_target_id=p.targetInfo.id;result.physical=rect;}}
+-        require(physical==1 && indirect==1 && result.physical.left==0 && result.physical.top==0,"live physical layout rejected");
++        require(physical==1 && indirect==1 && ((result.physical.left==0 && result.physical.top==0) || (result.indirect.left==0 && result.indirect.top==0)),"live physical layout rejected");
+         require(!(equal(result.physical_source,result.indirect_source) && result.physical_source_id==result.indirect_source_id),"live clone source rejected");RECT overlap{};require(!IntersectRect(&overlap,&result.physical,&result.indirect),"live overlapping desktops rejected");return result;
+     }throw std::runtime_error("live topology unstable");
+ }

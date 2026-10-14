@@ -1,0 +1,84 @@
+{
+  "passed": true,
+  "tests": [
+    {
+      "name": "same",
+      "accepted": true,
+      "expected_accepted": true,
+      "stderr": "",
+      "receipt": {
+        "frame_pair_valid": true,
+        "new_pixel_bytes_read": 0,
+        "sequence_advanced": false
+      }
+    },
+    {
+      "name": "new",
+      "accepted": true,
+      "expected_accepted": true,
+      "stderr": "",
+      "receipt": {
+        "frame_pair_valid": true,
+        "new_pixel_bytes_read": 32,
+        "sequence_advanced": true
+      }
+    },
+    {
+      "name": "sequence-backwards",
+      "accepted": false,
+      "expected_accepted": false,
+      "stderr": "frame pair identity rejected"
+    },
+    {
+      "name": "time-backwards",
+      "accepted": false,
+      "expected_accepted": false,
+      "stderr": "frame pair identity rejected"
+    },
+    {
+      "name": "same-time",
+      "accepted": false,
+      "expected_accepted": false,
+      "stderr": "frame pair timestamp rejected"
+    },
+    {
+      "name": "producer-change",
+      "accepted": false,
+      "expected_accepted": false,
+      "stderr": "frame pair identity rejected"
+    },
+    {
+      "name": "duplicate-mutation",
+      "accepted": false,
+      "expected_accepted": false,
+      "stderr": "live sequence header reused"
+    },
+    {
+      "name": "truncated",
+      "accepted": false,
+      "expected_accepted": false,
+      "stderr": "frame layout rejected"
+    },
+    {
+      "name": "bad-stride",
+      "accepted": false,
+      "expected_accepted": false,
+      "stderr": "frame layout rejected"
+    },
+    {
+      "name": "bad-format",
+      "accepted": false,
+      "expected_accepted": false,
+      "stderr": "frame layout rejected"
+    },
+    {
+      "name": "reserved",
+      "accepted": false,
+      "expected_accepted": false,
+      "stderr": "frame identity rejected"
+    }
+  ],
+  "binary_sha256": "4872EE69C9E646AE7FC9131B1097CA38B2F1C70A21CCD19D440806035EAAFED0",
+  "physical_presentation_tested": false,
+  "desktop_changed": false
+}

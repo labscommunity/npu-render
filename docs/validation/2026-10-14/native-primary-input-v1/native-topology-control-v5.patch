@@ -1,0 +1,100 @@
+--- a/topology.cpp
++++ b/topology.cpp
+@@ -6,6 +6,8 @@
+ #include <cwchar>
+ #include <stdexcept>
+ #include "session_gate.hpp"
++#include "window_placement_guard.hpp"
++#include <memory>
+ namespace {
+ void require(bool value,const char *message){if(!value)throw std::runtime_error(message);}
+ struct Topology {std::vector<DISPLAYCONFIG_PATH_INFO> paths;std::vector<DISPLAYCONFIG_MODE_INFO> modes;};
+@@ -32,7 +34,7 @@
+   if(!found)return false;}
+  return true;
+ }
+-Topology extension(const Topology &before,const Topology &all){
++Topology extension(const Topology &before,const Topology &all,bool primary=false){
+  require(before.paths.size()==2,"exactly one physical and one indirect path required");size_t pi=2,ii=2;
+  for(size_t i=0;i<2;++i){if(before.paths[i].targetInfo.outputTechnology==DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INDIRECT_WIRED)ii=i;else pi=i;}
+  require(pi<2&&ii<2,"physical and indirect paths required");const auto &physical=before.paths[pi],&indirect=before.paths[ii];const auto &original=source(before,physical);
+@@ -42,6 +44,10 @@
+  require(found,"no independent indirect source path available");
+  Topology desired=before;desired.paths={physical};DISPLAYCONFIG_MODE_INFO mode{};mode.infoType=DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE;mode.id=candidate.sourceInfo.id;mode.adapterId=candidate.sourceInfo.adapterId;mode.sourceMode.width=1024;mode.sourceMode.height=768;mode.sourceMode.pixelFormat=DISPLAYCONFIG_PIXELFORMAT_32BPP;mode.sourceMode.position={LONG(original.width),0};
+  if(candidate.flags&DISPLAYCONFIG_PATH_SUPPORT_VIRTUAL_MODE){candidate.sourceInfo.sourceModeInfoIdx=UINT(desired.modes.size());candidate.sourceInfo.cloneGroupId=DISPLAYCONFIG_PATH_CLONE_GROUP_INVALID;candidate.targetInfo.targetModeInfoIdx=DISPLAYCONFIG_PATH_TARGET_MODE_IDX_INVALID;candidate.targetInfo.desktopModeInfoIdx=DISPLAYCONFIG_PATH_DESKTOP_IMAGE_IDX_INVALID;}else{candidate.sourceInfo.modeInfoIdx=UINT(desired.modes.size());candidate.targetInfo.modeInfoIdx=DISPLAYCONFIG_PATH_MODE_IDX_INVALID;}candidate.targetInfo.refreshRate={60,1};candidate.targetInfo.rotation=DISPLAYCONFIG_ROTATION_IDENTITY;candidate.targetInfo.scaling=DISPLAYCONFIG_SCALING_IDENTITY;candidate.targetInfo.scanLineOrdering=DISPLAYCONFIG_SCANLINE_ORDERING_PROGRESSIVE;candidate.flags|=DISPLAYCONFIG_PATH_ACTIVE;
++ if(primary){
++  mode.sourceMode.position={0,0};const auto index=(physical.flags&DISPLAYCONFIG_PATH_SUPPORT_VIRTUAL_MODE)?physical.sourceInfo.sourceModeInfoIdx:physical.sourceInfo.modeInfoIdx;
++  require(index<desired.modes.size(),"physical mode index missing");desired.modes[index].sourceMode.position={LONG(mode.sourceMode.width),0};
++ }
+  desired.modes.push_back(mode);desired.paths.push_back(candidate);return desired;
+ }
+ LONG set(Topology &t,UINT action){return SetDisplayConfig(UINT(t.paths.size()),t.paths.data(),UINT(t.modes.size()),t.modes.data(),SDC_USE_SUPPLIED_DISPLAY_CONFIG|SDC_VIRTUAL_MODE_AWARE|action);}
+@@ -50,20 +56,28 @@
+  require(argc==2||argc==3,"expected --inspect, --validate-extend or --extend <1..300 seconds>");require(nr::present::current_console_default(),"unlocked Default console required");
+  const auto before=query(QDC_ONLY_ACTIVE_PATHS),all=query(QDC_ALL_PATHS);print("before",before);print("available",all);
+  if(argc==2&&!std::wcscmp(argv[1],L"--inspect"))return 0;
+- const bool apply=argc==3&&!std::wcscmp(argv[1],L"--extend");require(apply||(argc==2&&!std::wcscmp(argv[1],L"--validate-extend")),"mode rejected");
++ const bool primary=!std::wcscmp(argv[1],L"--primary") || !std::wcscmp(argv[1],L"--validate-primary");
++ const bool apply=argc==3&&(!std::wcscmp(argv[1],L"--extend")||!std::wcscmp(argv[1],L"--primary"));require(apply||(argc==2&&(!std::wcscmp(argv[1],L"--validate-extend")||!std::wcscmp(argv[1],L"--validate-primary"))),"mode rejected");
+  wchar_t *end=nullptr;const auto seconds=apply?std::wcstoul(argv[2],&end,10):0;require(!apply||(end!=argv[2]&&!*end&&seconds>=1&&seconds<=300),"duration rejected");
+- auto desired=extension(before,all);print("requested",desired);const auto validation=set(desired,SDC_VALIDATE|SDC_ALLOW_CHANGES);std::printf("{\"validation_status\":%ld,\"display_changed\":false}\n",validation);std::fflush(stdout);require(validation==ERROR_SUCCESS,"extension validation failed");if(!apply)return 0;
+- auto restore=before;bool passed=false;
++ auto desired=extension(before,all,primary);print("requested",desired);const auto validation=set(desired,SDC_VALIDATE|SDC_ALLOW_CHANGES);std::printf("{\"validation_status\":%ld,\"display_changed\":false}\n",validation);std::fflush(stdout);require(validation==ERROR_SUCCESS,"extension validation failed");if(!apply)return 0;
++ auto restore=before;bool passed=false;std::unique_ptr<WindowPlacements> windows;if(primary)windows=std::make_unique<WindowPlacements>();
+  try{
+   require(nr::present::current_console_default(),"console changed before application");const auto code=set(desired,SDC_APPLY|SDC_ALLOW_CHANGES);std::printf("{\"apply_status\":%ld}\n",code);std::fflush(stdout);require(code==ERROR_SUCCESS,"extension application failed");
+   const auto active=query(QDC_ONLY_ACTIVE_PATHS);print("extended",active);require(active.paths.size()==2,"extended path count mismatch");
+   Topology expected_physical,actual_physical;for(const auto &p:before.paths)if(p.targetInfo.outputTechnology!=DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INDIRECT_WIRED)expected_physical.paths.push_back(p);expected_physical.modes=before.modes;
+   for(const auto &p:active.paths)if(p.targetInfo.outputTechnology!=DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INDIRECT_WIRED)actual_physical.paths.push_back(p);actual_physical.modes=active.modes;
+-  require(equivalent(expected_physical,actual_physical),"physical path changed");require(!same_source(active.paths[0],active.paths[1]),"sources still cloned");
++  if(primary){
++   require(actual_physical.paths.size()==1,"physical path missing");const auto &p=actual_physical.paths[0];const auto index=(p.flags&DISPLAYCONFIG_PATH_SUPPORT_VIRTUAL_MODE)?p.sourceInfo.sourceModeInfoIdx:p.sourceInfo.modeInfoIdx;
++   const auto &position=source(actual_physical,p).position;require(position.x==1024 && position.y==0,"physical secondary position mismatch");
++   actual_physical.modes[index].sourceMode.position=source(expected_physical,expected_physical.paths[0]).position;
++   for(const auto &path:active.paths)if(path.targetInfo.outputTechnology==DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INDIRECT_WIRED){const auto &mode=source(active,path);require(mode.position.x==0 && mode.position.y==0 && mode.width==1024 && mode.height==768,"indirect primary not established");}
++  }
++  require(equivalent(expected_physical,actual_physical),"physical mode or routing changed");require(!same_source(active.paths[0],active.paths[1]),"sources still cloned");
+   const auto &a=source(active,active.paths[0]),&b=source(active,active.paths[1]);require(a.position.x+LONG(a.width)<=b.position.x||b.position.x+LONG(b.width)<=a.position.x,"logical desktops overlap");
+-  std::printf("{\"extension_verified\":true,\"physical_path_preserved\":true,\"seconds\":%lu}\n",seconds);std::fflush(stdout);
++  std::printf("{\"extension_verified\":true,\"physical_path_preserved\":%s,\"physical_mode_preserved\":true,\"indirect_primary\":%s,\"seconds\":%lu}\n",primary?"false":"true",primary?"true":"false",seconds);std::fflush(stdout);
+   for(unsigned i=0;i<seconds*10;++i){require(nr::present::current_console_default(),"interactive desktop changed");Sleep(100);}passed=true;
+  }catch(const std::exception &e){std::fprintf(stderr,"extension trial: %s\n",e.what());}
+  const auto status=set(restore,SDC_APPLY);const auto after=query(QDC_ONLY_ACTIVE_PATHS);print("restored",after);const bool exact=status==ERROR_SUCCESS&&equivalent(before,after);
++ const bool windows_restored=!windows || (exact && windows->restore());passed=passed&&windows_restored;
+  std::printf("{\"completed\":true,\"passed\":%s,\"restore_status\":%ld,\"topology_restored_exactly\":%s,\"desktop_offloaded\":false}\n",passed&&exact?"true":"false",status,exact?"true":"false");return passed&&exact?0:1;
+ }catch(const std::exception &e){std::fprintf(stderr,"%s\n",e.what());return 1;}
+--- a/window_placement_guard.hpp
++++ b/window_placement_guard.hpp
+@@ -0,0 +1,32 @@
++#pragma once
++// Preserve ordinary top-level application placements during the finite primary
++// topology experiment. No titles, document content or screen pixels are read.
++struct WindowPlacements {
++    struct Entry {HWND window;DWORD pid;HANDLE process;WINDOWPLACEMENT placement;};
++    std::vector<Entry> entries;POINT cursor{};HWND foreground=nullptr;bool cursor_saved=false;
++    static BOOL CALLBACK collect(HWND window,LPARAM parameter){
++        auto &self=*reinterpret_cast<WindowPlacements *>(parameter);
++        if(!IsWindowVisible(window) || (GetWindowLongPtrW(window,GWL_STYLE)&WS_CAPTION)!=WS_CAPTION || (GetWindowLongPtrW(window,GWL_EXSTYLE)&WS_EX_TOOLWINDOW))return TRUE;
++        DWORD pid=0,session=0,current=0;GetWindowThreadProcessId(window,&pid);
++        if(!pid || !ProcessIdToSessionId(pid,&session) || !ProcessIdToSessionId(GetCurrentProcessId(),&current) || session!=current)return TRUE;
++        const auto process=OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION|SYNCHRONIZE,FALSE,pid);if(!process)return TRUE;
++        WINDOWPLACEMENT placement{};placement.length=sizeof(placement);
++        if(!GetWindowPlacement(window,&placement)){CloseHandle(process);return TRUE;}
++        self.entries.push_back({window,pid,process,placement});return TRUE;
++    }
++    WindowPlacements(){cursor_saved=GetCursorPos(&cursor)!=0;foreground=GetForegroundWindow();if(!EnumWindows(collect,reinterpret_cast<LPARAM>(this)))throw std::runtime_error("window snapshot failed");}
++    WindowPlacements(const WindowPlacements &)=delete;
++    ~WindowPlacements(){for(const auto &entry:entries)CloseHandle(entry.process);}
++    bool restore(){
++        unsigned restored=0,closed=0,failed=0;
++        for(const auto &entry:entries){DWORD pid=0;GetWindowThreadProcessId(entry.window,&pid);
++            if(!IsWindow(entry.window) || pid!=entry.pid || WaitForSingleObject(entry.process,0)!=WAIT_TIMEOUT){++closed;continue;}
++            WINDOWPLACEMENT after{};after.length=sizeof(after);
++            if(!SetWindowPlacement(entry.window,&entry.placement) || !GetWindowPlacement(entry.window,&after) || after.showCmd!=entry.placement.showCmd || !EqualRect(&after.rcNormalPosition,&entry.placement.rcNormalPosition)){++failed;continue;}++restored;
++        }
++        const bool cursor_ok=!cursor_saved || SetCursorPos(cursor.x,cursor.y)!=0;
++        const bool focus_ok=!foreground || GetForegroundWindow()==foreground || SetForegroundWindow(foreground)!=0;
++        std::printf("{\"window_placement_recovery\":true,\"captured\":%zu,\"restored\":%u,\"closed_during_trial\":%u,\"failed\":%u,\"cursor_restored\":%s,\"foreground_restored\":%s,\"titles_or_content_recorded\":false}\n",entries.size(),restored,closed,failed,cursor_ok?"true":"false",focus_ok?"true":"false");std::fflush(stdout);
++        return !failed && cursor_ok && focus_ok;
++    }
++};

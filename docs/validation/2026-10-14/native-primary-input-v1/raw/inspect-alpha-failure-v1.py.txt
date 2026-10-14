@@ -1,0 +1,14 @@
+"""Read request shape metadata only; never export captured desktop pixels."""
+import struct,json,sys
+from pathlib import Path
+p=Path(sys.argv[1]);out=Path(sys.argv[2]);assert not out.exists()
+H=struct.Struct('<3Q14I')
+with p.open('rb') as f:
+ h=H.unpack(f.read(80));abi,w,height,verts,fmt,flags,vlen,plen=h[3:11]
+ size=p.stat().st_size;base=80+24+(16 if h[-1]==15 else 0)+(16 if flags&4 else 0)+4*(vlen+plen)+verts*256+w*height*4
+ candidates=[]
+ for offset in range(base,min(base+1048576,size-15),16):
+  f.seek(offset);sw,sh,sfmt,reserved=struct.unpack('<4I',f.read(16))
+  if 0<sw<=8192 and 0<sh<=8192 and sfmt in (28,87) and reserved==0 and offset+16+sw*sh*4==size:candidates.append(dict(offset=offset,source_width=sw,source_height=sh,source_format=sfmt))
+record=dict(abi=abi,width=w,height=height,vertices=verts,format=fmt,flags=flags,vertex_words=vlen,pixel_words=plen,texture_descriptions=candidates,pixel_data_exported=False)
+out.write_text(json.dumps(record,indent=2)+'\n');print(json.dumps(record))

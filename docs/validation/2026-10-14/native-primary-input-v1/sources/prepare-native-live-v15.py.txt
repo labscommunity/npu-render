@@ -1,0 +1,15 @@
+from pathlib import Path
+import hashlib,json
+r=Path('results/render-driver')
+for name in ['run-native-desktop-v25.ps1','recover-native-desktop-v25.ps1']:
+ s=(r/name).read_text().replace('desktop-v25','desktop-v26').replace('admission-v25','admission-v26').replace('Recovery-v25','Recovery-v26')
+ if name.startswith('run-'):
+  anchor="$recovery=Get-Content"
+  s=s.replace(anchor,"$replay=Get-Content \"$r\\vm\\native-ordered-replay-v22-primary-full\\report.json\" -Raw|ConvertFrom-Json;if(!$replay.completed -or !$replay.passed){throw 'Primary recorded stream not qualified'}\n"+anchor)
+ (r/name.replace('v25','v26')).write_text(s)
+keys=list(json.loads((r/'native-desktop-v25-source.json').read_text()));keys=[n.replace('desktop-v25','desktop-v26') for n in keys]
+(r/'native-desktop-v26-source.json').write_text(json.dumps({n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in keys},indent=2)+'\n')
+s=(r/'start-native-topology-v26.ps1').read_text().replace('topology-v26','topology-v27').replace('Topology-V26','Topology-V27').replace('Topology-V25','Topology-V26');(r/'start-native-topology-v27.ps1').write_text(s)
+s=(r/'run-native-live-v14.ps1').read_text()
+for a,b in [('native-live-v14','native-live-v15'),('NativeLiveV14','NativeLiveV15'),('native-present-v11','native-present-v12'),('live-frame-reader-v4','live-frame-reader-v5'),('admission-v25','admission-v26'),('desktop-v25','desktop-v26'),('Recovery-v25','Recovery-v26'),('topology-v26','topology-v27'),('primary-v1','primary-v2'),('helper-v6','helper-v7')]:s=s.replace(a,b)
+(r/'run-native-live-v15.ps1').write_text(s)

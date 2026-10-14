@@ -1,0 +1,68 @@
+from pathlib import Path
+import shutil,json,hashlib,tarfile
+r=Path('results/render-driver');d=r/'native-topology-control-v5';shutil.copytree(r/'native-topology-control-v4',d)
+(d/'window_placement_guard.hpp').write_text(r'''#pragma once
+// Preserve ordinary top-level application placements during the finite primary
+// topology experiment. No titles, document content or screen pixels are read.
+struct WindowPlacements {
+    struct Entry {HWND window;DWORD pid;HANDLE process;WINDOWPLACEMENT placement;};
+    std::vector<Entry> entries;POINT cursor{};HWND foreground=nullptr;bool cursor_saved=false;
+    static BOOL CALLBACK collect(HWND window,LPARAM parameter){
+        auto &self=*reinterpret_cast<WindowPlacements *>(parameter);
+        if(!IsWindowVisible(window) || (GetWindowLongPtrW(window,GWL_STYLE)&WS_CAPTION)!=WS_CAPTION || (GetWindowLongPtrW(window,GWL_EXSTYLE)&WS_EX_TOOLWINDOW))return TRUE;
+        DWORD pid=0,session=0,current=0;GetWindowThreadProcessId(window,&pid);
+        if(!pid || !ProcessIdToSessionId(pid,&session) || !ProcessIdToSessionId(GetCurrentProcessId(),&current) || session!=current)return TRUE;
+        const auto process=OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION|SYNCHRONIZE,FALSE,pid);if(!process)return TRUE;
+        WINDOWPLACEMENT placement{};placement.length=sizeof(placement);
+        if(!GetWindowPlacement(window,&placement)){CloseHandle(process);return TRUE;}
+        self.entries.push_back({window,pid,process,placement});return TRUE;
+    }
+    WindowPlacements(){cursor_saved=GetCursorPos(&cursor)!=0;foreground=GetForegroundWindow();if(!EnumWindows(collect,reinterpret_cast<LPARAM>(this)))throw std::runtime_error("window snapshot failed");}
+    WindowPlacements(const WindowPlacements &)=delete;
+    ~WindowPlacements(){for(const auto &entry:entries)CloseHandle(entry.process);}
+    bool restore(){
+        unsigned restored=0,closed=0,failed=0;
+        for(const auto &entry:entries){DWORD pid=0;GetWindowThreadProcessId(entry.window,&pid);
+            if(!IsWindow(entry.window) || pid!=entry.pid || WaitForSingleObject(entry.process,0)!=WAIT_TIMEOUT){++closed;continue;}
+            WINDOWPLACEMENT after{};after.length=sizeof(after);
+            if(!SetWindowPlacement(entry.window,&entry.placement) || !GetWindowPlacement(entry.window,&after) || after.showCmd!=entry.placement.showCmd || !EqualRect(&after.rcNormalPosition,&entry.placement.rcNormalPosition)){++failed;continue;}++restored;
+        }
+        const bool cursor_ok=!cursor_saved || SetCursorPos(cursor.x,cursor.y)!=0;
+        const bool focus_ok=!foreground || GetForegroundWindow()==foreground || SetForegroundWindow(foreground)!=0;
+        std::printf("{\"window_placement_recovery\":true,\"captured\":%zu,\"restored\":%u,\"closed_during_trial\":%u,\"failed\":%u,\"cursor_restored\":%s,\"foreground_restored\":%s,\"titles_or_content_recorded\":false}\n",entries.size(),restored,closed,failed,cursor_ok?"true":"false",focus_ok?"true":"false");std::fflush(stdout);
+        return !failed && cursor_ok && focus_ok;
+    }
+};
+''')
+p=d/'topology.cpp';s=p.read_text();s=s.replace('#include "session_gate.hpp"','#include "session_gate.hpp"\n#include "window_placement_guard.hpp"\n#include <memory>')
+s=s.replace('Topology extension(const Topology &before,const Topology &all){','Topology extension(const Topology &before,const Topology &all,bool primary=false){')
+a='desired.modes.push_back(mode);desired.paths.push_back(candidate);return desired;'
+b='''if(primary){
+  mode.sourceMode.position={0,0};const auto index=(physical.flags&DISPLAYCONFIG_PATH_SUPPORT_VIRTUAL_MODE)?physical.sourceInfo.sourceModeInfoIdx:physical.sourceInfo.modeInfoIdx;
+  require(index<desired.modes.size(),"physical mode index missing");desired.modes[index].sourceMode.position={LONG(mode.sourceMode.width),0};
+ }
+ desired.modes.push_back(mode);desired.paths.push_back(candidate);return desired;''';assert a in s;s=s.replace(a,b)
+a=' const bool apply=argc==3&&!std::wcscmp(argv[1],L"--extend");require(apply||(argc==2&&!std::wcscmp(argv[1],L"--validate-extend")),"mode rejected");'
+b=' const bool primary=!std::wcscmp(argv[1],L"--primary") || !std::wcscmp(argv[1],L"--validate-primary");\n const bool apply=argc==3&&(!std::wcscmp(argv[1],L"--extend")||!std::wcscmp(argv[1],L"--primary"));require(apply||(argc==2&&(!std::wcscmp(argv[1],L"--validate-extend")||!std::wcscmp(argv[1],L"--validate-primary"))),"mode rejected");';assert a in s;s=s.replace(a,b).replace('auto desired=extension(before,all);','auto desired=extension(before,all,primary);').replace('auto restore=before;bool passed=false;','auto restore=before;bool passed=false;std::unique_ptr<WindowPlacements> windows;if(primary)windows=std::make_unique<WindowPlacements>();')
+a='  require(equivalent(expected_physical,actual_physical),"physical path changed");'
+b='''  if(primary){
+   require(actual_physical.paths.size()==1,"physical path missing");const auto &p=actual_physical.paths[0];const auto index=(p.flags&DISPLAYCONFIG_PATH_SUPPORT_VIRTUAL_MODE)?p.sourceInfo.sourceModeInfoIdx:p.sourceInfo.modeInfoIdx;
+   const auto &position=source(actual_physical,p).position;require(position.x==1024 && position.y==0,"physical secondary position mismatch");
+   actual_physical.modes[index].sourceMode.position=source(expected_physical,expected_physical.paths[0]).position;
+   for(const auto &path:active.paths)if(path.targetInfo.outputTechnology==DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INDIRECT_WIRED){const auto &mode=source(active,path);require(mode.position.x==0 && mode.position.y==0 && mode.width==1024 && mode.height==768,"indirect primary not established");}
+  }
+  require(equivalent(expected_physical,actual_physical),"physical mode or routing changed");''';assert a in s;s=s.replace(a,b)
+a='  std::printf("{\\"extension_verified\\":true,\\"physical_path_preserved\\":true,\\"seconds\\":%lu}\\n",seconds);std::fflush(stdout);'
+b='  std::printf("{\\"extension_verified\\":true,\\"physical_path_preserved\\":%s,\\"physical_mode_preserved\\":true,\\"indirect_primary\\":%s,\\"seconds\\":%lu}\\n",primary?"false":"true",primary?"true":"false",seconds);std::fflush(stdout);';assert a in s;s=s.replace(a,b)
+a=' const auto status=set(restore,SDC_APPLY);const auto after=query(QDC_ONLY_ACTIVE_PATHS);print("restored",after);const bool exact=status==ERROR_SUCCESS&&equivalent(before,after);'
+b=a+'\n const bool windows_restored=!windows || (exact && windows->restore());passed=passed&&windows_restored;';assert a in s;s=s.replace(a,b)
+p.write_text(s)
+(r/'native-topology-control-v5-source.json').write_text(json.dumps({p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-topology-control-v5.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-native-topology-control-v4.ps1').read_text().replace('native-topology-control-v4','native-topology-control-v5');(r/'build-native-topology-control-v5.ps1').write_text(s)
+s=(r/'run-native-topology-helper-v4.ps1').read_text().replace("'inspect','validate-extend','extend'","'inspect','validate-extend','extend','validate-primary','primary'").replace('native-topology-control-v4','native-topology-control-v5').replace("if($Mode -eq 'extend')","if($Mode -in @('extend','primary'))")
+s=s.replace("$report.task_result=$info.LastTaskResult;$report.passed=($info.LastTaskResult -eq 0)",'''$report.task_result=$info.LastTaskResult
+ $rows=@(Get-Content "$out\\probe.log"|Where-Object {$_ -match '^\\{.*\\}$'}|ForEach-Object {$_|ConvertFrom-Json});$child=@($rows|Where-Object {$_.PSObject.Properties.Name -contains 'exit_code'})
+ $report.child_exit=if($child.Count -eq 1){$child[0].exit_code}else{$null};$report.passed=($info.LastTaskResult -eq 0 -and $child.Count -eq 1 -and $child[0].exit_code -eq 0)
+ if($Mode -in @('extend','primary')){$done=@($rows|Where-Object {$_.completed -and $_.topology_restored_exactly});$report.passed=$report.passed -and $done.Count -eq 1 -and $done[0].passed}''')
+(r/'run-native-topology-helper-v5.ps1').write_text(s)

@@ -1,0 +1,16 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$b="$r\builds\alpha-copy-v2";$out="$r\vm\alpha-copy-v2-qualification";$exe="$b\Release\nr_alpha_copy.exe"
+if(Test-Path $out){throw 'Evidence exists'};$proof=Get-Content "$b\build-report.json" -Raw|ConvertFrom-Json;if(!$proof.clean_build -or (Get-FileHash $exe).Hash -ne $proof.binary_sha256){throw 'Build mismatch'}
+New-Item -ItemType Directory $out|Out-Null
+$env:PATH="$r\toolchains\openvino-2026.4.1\Lib\site-packages\openvino\libs;$env:PATH";$env:NR_RENDER_NPU_CACHE="$r\vm\model-cache-2026-4-v209";$env:NR_RENDER_SHARED_QUEUE='1';$env:NR_RENDER_MEMORY_CACHE='0';$env:NR_RENDER_COMPACT_COVERAGE='0'
+$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');passed=$false;completed=$false;driver_installed=$false;desktop_changed=$false;runs=@()}
+foreach($config in @(@{label='CPU-all';shared='1';args=@('CPU')},@{label='NPU-all';shared='1';args=@('NPU')},@{label='NPU-repeat';shared='1';args=@('NPU')})){
+ $env:NR_RENDER_SHARED_CORE=$config.shared;$label=$config.label
+ $p=Start-Process $exe -ArgumentList $config.args -PassThru -NoNewWindow -RedirectStandardOutput "$out\$label.stdout.jsonl" -RedirectStandardError "$out\$label.stderr.log";[void]$p.Handle
+ $timedOut=!$p.WaitForExit(180000);if($timedOut){$p.Kill();$p.WaitForExit()};$p.Refresh();$code=$p.ExitCode;$p.Dispose()
+ $entry=[ordered]@{label=$label;shared_core=$config.shared;exit_code=$code;timed_out=$timedOut};$report.runs+=,$entry
+ if(!$code){$entry.result=@(Get-Content "$out\$label.stdout.jsonl"|Where-Object {$_ -match '^\{.*\}$'}|ForEach-Object {$_|ConvertFrom-Json}|Where-Object passed)}
+ $report|ConvertTo-Json -Depth 6|Set-Content "$out\report.json"
+}
+$report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');$report.all_runs_passed=@($report.runs|Where-Object exit_code -ne 0).Count -eq 0;$report.passed=$report.all_runs_passed;$report|ConvertTo-Json -Depth 6|Set-Content "$out\report.json";Get-Content "$out\report.json"
+
+if(!$report.passed){exit 1}

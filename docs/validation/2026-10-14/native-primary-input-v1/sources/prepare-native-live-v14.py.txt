@@ -1,0 +1,52 @@
+from pathlib import Path
+import hashlib,json
+r=Path('results/render-driver')
+for name in ['run-native-desktop-v24.ps1','recover-native-desktop-v24.ps1']:
+ s=(r/name).read_text().replace('desktop-v24','desktop-v25').replace('admission-v24','admission-v25').replace('Recovery-v24','Recovery-v25')
+ (r/name.replace('v24','v25')).write_text(s)
+keys=list(json.loads((r/'native-desktop-v24-source.json').read_text()));keys=[n.replace('desktop-v24','desktop-v25').replace('relay_native_frames_v2','relay_native_frames_v3') for n in keys]
+(r/'native-desktop-v25-source.json').write_text(json.dumps({n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in keys},indent=2)+'\n')
+s=(r/'start-native-topology-v25.ps1').read_text().replace('topology-v25','topology-v26').replace('Topology-V25','Topology-V26').replace('Topology-V24','Topology-V25');(r/'start-native-topology-v26.ps1').write_text(s)
+s=(r/'observe_physical_patch_v1.py').read_text().replace('seconds<=180','seconds<=240').replace('red=0,green=0,unknown=0','red=0,green=0,blue=0,unknown=0').replace('time.monotonic()-began<seconds:',"time.monotonic()-began<seconds and not (out/'stop').exists():").replace('[(198,166),(288,234)]','[(1222,166),(1312,234)]')
+s=s.replace('red=value==','blue=value==(30|(60<<8)|(180<<16));red=value==').replace('known_red=red,known_green=green','known_red=red,known_green=green,known_blue=blue').replace("report['unknown']+=int(not red and not green)","report['blue']+=int(owned and blue);report['unknown']+=int(not red and not green and not blue)")
+s=s.replace("report['rows']+=1;time.sleep(.5)","report['rows']+=1;time.sleep(.5)").replace("report['red']>0 and report['green']>0","report['red']>0 and report['green']>0 and report['blue']>0")
+(r/'observe_physical_patch_v2.py').write_text(s)
+s=(r/'run-native-live-v13.ps1').read_text()
+for a,b in [('native-live-v13','native-live-v14'),('NativeLiveV13','NativeLiveV14'),('native-present-v10','native-present-v11'),('live-frame-reader-v3','live-frame-reader-v4'),('admission-v24','admission-v25'),('desktop-v24','desktop-v25'),('Recovery-v24','Recovery-v25'),('topology-v25','topology-v26'),('extension-v15','primary-v1'),('helper-v4','helper-v6'),("'-Mode','extend'","'-Mode','primary'"),('relay_native_frames_v2','relay_native_frames_v3')]:s=s.replace(a,b)
+s=s.replace("Start-Interactive 'stimulus' @($present,'--stimulus','285')","New-Item -ItemType Directory \"$out\\cues\"|Out-Null\n Start-Interactive 'stimulus' @($present,'--input-stimulus',\"$out\\cues\",'285')")
+a=" do{Start-Sleep -Milliseconds 250;$presentState=(Get-ScheduledTask -TaskName T8-NpuRender-NativeLiveV14-present).State;$presentRows=Read-Rows \"$out\\present\\probe.log\"}while(($presentState -eq 'Running' -or !$presentRows.Count) -and [DateTime]::UtcNow -lt $deadline)"
+b=r''' $screenStarted=$false;$clickCued=$false;$keyCued=$false
+ do{
+  Start-Sleep -Milliseconds 250;$presentState=(Get-ScheduledTask -TaskName T8-NpuRender-NativeLiveV14-present).State;$presentRows=Read-Rows "$out\present\probe.log"
+  $presentReady=@($presentRows|Where-Object probe_ready);$physicalRoute=@($presentRows|Where-Object physical_route_selected)
+  if(!$screenStarted -and $presentReady.Count -eq 1 -and $physicalRoute.Count -eq 1){
+   if(!$physicalRoute[0].indirect_primary -or $physicalRoute[0].physical_x -ne 1024 -or $physicalRoute[0].physical_y -ne 0){throw 'Primary presentation route mismatch'}
+   Start-Interactive 'screen' @("$source\venv\Scripts\python.exe","$r\vm\observe_physical_patch_v2.py","$out\screen\capture",([string]$presentReady[0].pid),([string]$duration));$screenStarted=$true
+  }
+  $submitted=@($presentRows|Where-Object live_frame_presented);$publishedNow=Read-Rows "$out\relay\frames.jsonl";$screenRows=Read-Rows "$out\screen\capture\observations.jsonl"
+  $blueSubmitted=@($submitted|Where-Object {$f=$_;@($publishedNow|Where-Object {$_.sequence -eq $f.source_sequence -and $_.qpc -eq $f.source_qpc -and ($_.known_stimulus_pixel -join ',') -eq '180,60,30,255'}).Count -eq 1}).Count -gt 0
+  $greenSubmitted=@($submitted|Where-Object {$f=$_;@($publishedNow|Where-Object {$_.sequence -eq $f.source_sequence -and $_.qpc -eq $f.source_qpc -and ($_.known_stimulus_pixel -join ',') -eq '60,180,20,255'}).Count -eq 1}).Count -gt 0
+  $blueObserved=@($screenRows|Where-Object {@($_.points|Where-Object {$_.owned_presenter_at_point -and $_.known_blue}).Count -gt 0}).Count -gt 0
+  $greenObserved=@($screenRows|Where-Object {@($_.points|Where-Object {$_.owned_presenter_at_point -and $_.known_green}).Count -gt 0}).Count -gt 0
+  if(!$clickCued -and $blueSubmitted -and $blueObserved){New-Item -ItemType File "$out\cues\click"|Out-Null;$clickCued=$true;$report.click_cued_at=[DateTime]::UtcNow.ToString('o');Save-Report}
+  if(!$keyCued -and $greenSubmitted -and $greenObserved){New-Item -ItemType File "$out\cues\key"|Out-Null;$keyCued=$true;$report.key_cued_at=[DateTime]::UtcNow.ToString('o');Save-Report}
+ }while(($presentState -eq 'Running' -or !$presentRows.Count) -and [DateTime]::UtcNow -lt $deadline)
+ if($screenStarted){New-Item -ItemType File "$out\screen\capture\stop" -Force|Out-Null;$screenDeadline=[DateTime]::UtcNow.AddSeconds(40);while((Get-ScheduledTask -TaskName T8-NpuRender-NativeLiveV14-screen).State -eq 'Running' -and [DateTime]::UtcNow -lt $screenDeadline){Start-Sleep -Milliseconds 250}}
+'''
+assert s.count(a)==1;s=s.replace(a,b)
+s=s.replace('$_.completed -and $_.stimulus_only','$_.completed -and $_.input_stimulus_only -and $_.passed')
+a=' $report.passed=('
+b=r''' $inputEvents=@($stimulusRows|Where-Object input_event)
+ $report.mouse_received=@($inputEvents|Where-Object {$_.input_event -eq 'mouse_received' -and $_.step -eq 1}).Count -eq 1
+ $report.keyboard_received=@($inputEvents|Where-Object {$_.input_event -eq 'key_received' -and $_.step -eq 2}).Count -eq 1
+ $screenResult=Get-Content "$out\screen\capture\report.json" -Raw|ConvertFrom-Json
+ $report.physical_blue_green_red_observed=[bool]$screenResult.passed
+ $topologyResult=Get-Content "$r\vm\native-topology-primary-v1\report.json" -Raw|ConvertFrom-Json
+ $recoveryRows=Read-Rows $topologyLog;$placements=@($recoveryRows|Where-Object window_placement_recovery)
+ $report.primary_topology_restored=$topologyResult.passed -and @($recoveryRows|Where-Object {$_.completed -and $_.passed -and $_.topology_restored_exactly}).Count -eq 1
+ $report.ordinary_windows_restored=$placements.Count -eq 1 -and $placements[0].failed -eq 0 -and $placements[0].cursor_restored -and $placements[0].foreground_restored
+ $report.normal_windows_input_tested=$report.mouse_received -and $report.keyboard_received -and $report.physical_blue_green_red_observed
+ $report.passed=($report.normal_windows_input_tested -and $report.primary_topology_restored -and $report.ordinary_windows_restored -and '''
+assert s.count(a)==1;s=s.replace(a,b)
+s=s.replace(' if(Test-Path "$out\\relay")',' if(Test-Path "$out\\screen\\capture"){New-Item -ItemType File "$out\\screen\\capture\\stop" -Force|Out-Null}\n if(Test-Path "$out\\relay")')
+(r/'run-native-live-v14.ps1').write_text(s)

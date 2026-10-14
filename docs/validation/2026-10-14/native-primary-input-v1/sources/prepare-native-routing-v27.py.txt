@@ -1,0 +1,9 @@
+from pathlib import Path
+import shutil,json,hashlib,tarfile
+r=Path('results/render-driver');d=r/'native-routing-v27';shutil.copytree(r/'native-routing-v26',d);lab=d/'native/windows/registered_lab'
+shutil.copyfile(r/'alpha-copy-v3/opaque_affine_crop.hpp',lab/'opaque_affine_crop.hpp')
+p=lab/'linear_texture_draw.cpp';s=p.read_text();a='std::printf("{\\\"opaque_affine_crop\\\":true,\\\"maximum_byte_error_bound\\\":%.9g,';b='std::printf("{\\\"affine_crop\\\":true,\\\"alpha_replaced\\\":%s,\\\"source_over\\\":%s,\\\"point_sampling\\\":%s,\\\"maximum_byte_error_bound\\\":%.9g,';assert s.count(a)==1;s=s.replace(a,b).replace('cropped->maximum_byte_error,cropped->mapping[4]','s.pixel.opaque?"true":"false",s.source_over?"true":"false",s.point?"true":"false",cropped->maximum_byte_error,cropped->mapping[4]');p.write_text(s)
+(r/'native-routing-v27-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-routing-v27.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-native-routing-v26.ps1').read_text().replace('native-routing-v26','native-routing-v27');(r/'build-native-routing-v27.ps1').write_text(s)
+s=(r/'qualify-alpha-copy-integrated-v1.ps1').read_text().replace('native-routing-v26','native-routing-v27').replace('alpha-copy-integrated-v1','alpha-copy-integrated-v2');(r/'qualify-alpha-copy-integrated-v2.ps1').write_text(s)
