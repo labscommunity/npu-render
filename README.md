@@ -17,6 +17,9 @@ display, with 190 actual DWM NPU operations and verified readback. Bootstrap and
 immediate cleanup take about 184 seconds. Delta's physical desktop remains on its
 ordinary path. Sustained native frames, physical presentation/input integration,
 interactive performance and a measured Tahoma benefit remain outstanding.
+The [desktop offload execution plan](docs/research/desktop-offload-plan.md)
+defines the ordered acceptance gates through a usable switch and matched Tahoma
+measurements, including application graphics coverage.
 
 The [native registered-adapter trial](docs/validation/2026-10-13/native-windows-adapter-v1/README.md)
 now passes six clears and two indexed draws through Delta's ordinary Direct3D 11
