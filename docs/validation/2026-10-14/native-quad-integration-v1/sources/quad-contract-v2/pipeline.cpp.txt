@@ -1,0 +1,19 @@
+#define main geometry_contract_main
+#include "contract.cpp"
+#undef main
+#include "indexed_pipeline.hpp"
+int main()try{
+ TEST(_putenv_s("NR_RENDER_QUAD_BATCH","1")==0);ex::Pipeline pipeline;
+ ex::Request original;auto &h=original.header;h.nonce[0]=1;h.client_pid=1;h.sequence=1;h.abi=7;h.width=32;h.height=24;h.format=87;h.vertices=12;h.flags=0x1f13;
+ original.vertex=vertex();original.pixel=parse_pixel(nr::registered_lab::test_fixture::linear_texture_pixel_words,std::size(nr::registered_lab::test_fixture::linear_texture_pixel_words));original.viewport={0,0,32,24,0,1};original.texture={64,64,87,std::vector<PackedColor>(4096,PackedColor{32,64,96,128})};original.background.resize(768);original.inputs.resize(12);
+ for(size_t i=0;i<original.background.size();++i)for(unsigned c=0;c<4;++c)original.background[i][c]=uint8_t((i*17+c*31)%256);
+ const unsigned order[6]{0,1,2,2,3,0};const float rects[2][4]{{2,2,22,14},{9,7,29,21}};
+ for(unsigned q=0;q<2;++q)for(unsigned n=0;n<6;++n){const auto k=order[n];const float x=rects[q][k==1||k==2?2:0],y=rects[q][k>=2?3:1];auto &v=original.inputs[q*6+n];v[0]={as_bits(x/16-1),as_bits(1-y/12),as_bits(.5f),as_bits(1.f)};v[1]={as_bits(1.f),as_bits(1.f),as_bits(1.f),as_bits(1.f)};v[2]={as_bits(x/64),as_bits(y/64),0,0};}
+ unsigned cases=0;uint64_t checked=0;
+ for(unsigned kind=0;kind<3;++kind){auto input=original;if(kind==1)input.inputs[7][0][0]=as_bits(.25f);if(kind==2)input.header.flags|=0x20;auto r=ex::decode(ex::encode(input));const auto background=r.background;
+  TriangleTextureDrawExecutor reference(r.vertex,r.pixel,12,32,24,87,64,64,87,"CPU",true,15,TextureFilter::point,static_cast<CullMode>((r.header.flags>>5)&3),false,256);
+  const auto expected=reference.execute(r.inputs,{}, {},r.viewport,r.texture,r.background);const auto actual=pipeline.execute(r);TEST(actual.execution_device=="NPU" && actual.pixels==expected.pixels && r.background==background);checked+=actual.pixels.size()*4;++cases;
+  std::printf("{\"pipeline_quad_contract\":true,\"case\":%u,\"exact_generic_cpu_pixels\":true,\"execution_device\":\"NPU\",\"provider_requests\":%llu}\n",kind,static_cast<unsigned long long>(actual.provider_requests));std::fflush(stdout);
+ }
+ std::printf("{\"completed\":true,\"passed\":true,\"pipeline_contract\":true,\"cases\":%u,\"checked_components\":%llu,\"execution_device\":\"NPU\",\"desktop_changed\":false}\n",cases,static_cast<unsigned long long>(checked));return 0;
+}catch(const std::exception &e){std::fprintf(stderr,"%s\n",e.what());return 1;}

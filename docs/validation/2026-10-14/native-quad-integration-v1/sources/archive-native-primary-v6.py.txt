@@ -1,0 +1,37 @@
+from pathlib import Path
+from datetime import datetime,UTC
+import json,hashlib,difflib
+r=Path('results/render-driver');raw=r/'primary-raw-v6';out=Path('docs/validation/2026-10-14/native-quad-integration-v1');out.mkdir(exist_ok=False)
+def obj(p):
+ b=p.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+manifest=obj(r/'native-primary-v6-artifact-sha256.json')
+for item in manifest:
+ p=raw/item['source'];b=p.read_bytes();assert len(b)==item['bytes'] and hashlib.sha256(b).hexdigest()==item['sha256'].lower()
+ dest=out/'raw'/item['source'];dest=dest.with_suffix(dest.suffix+'.txt') if dest.suffix in ('.py','.ps1') else dest;dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(b);item['archive_path']=dest.relative_to(out).as_posix()
+(out/'raw-manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
+source_manifest=[]
+for name in ['quad-contract-v1','quad-contract-v2']:
+ for name_in,sha in obj(raw/(name+'-source.json')).items():
+  p=r/name/name_in;b=p.read_bytes();assert hashlib.sha256(b).hexdigest()==sha
+  dest=out/'sources'/name/(name_in+'.txt');dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(b);source_manifest.append(dict(path=dest.relative_to(out).as_posix(),sha256=sha,remote_manifest=name+'-source.json'))
+base=r/'native-routing-v27';new=r/'native-routing-v28';patch=[]
+for name,sha in obj(raw/'native-routing-v28-source.json').items():
+ p=new/name;assert hashlib.sha256(p.read_bytes()).hexdigest()==sha
+ old=base/name
+ if not old.exists() or old.read_bytes()!=p.read_bytes():patch.extend(difflib.unified_diff(old.read_text().splitlines(keepends=True) if old.exists() else [],p.read_text().splitlines(keepends=True),fromfile='a/'+name if old.exists() else '/dev/null',tofile='b/'+name))
+(out/'native-routing-v28.patch').write_text(''.join(patch))
+for name in ['prepare-native-routing-v28.py','prepare-native-quad-promotion-v1.py','collect-native-primary-v6.py','archive-native-primary-v6.py']:
+ p=r/name;dest=out/'sources'/(name+'.txt');dest.write_bytes(p.read_bytes());source_manifest.append(dict(path=dest.relative_to(out).as_posix(),sha256=hashlib.sha256(p.read_bytes()).hexdigest(),origin='local-experiment-script'))
+(out/'source-manifest.json').write_text(json.dumps(source_manifest,indent=2)+'\n')
+root=obj(raw/'native-live-v23/report.json');native=obj(raw/'native-desktop-admission-v34/bootstrap/report.json');matched=obj(raw/'native-quad-abba-v1-analysis/report.json');pipeline=obj(raw/'quad-pipeline-v1-qualification/report.json');abba=obj(raw/'native-quad-abba-v1/report.json')
+assert root['completed'] and root['passed'] and root['cleanup_passed'] and root['pointer_confined_and_restored'] and root['pointer_reacquisitions']>=1 and root['relative_mouse_received'] and root['mouse_received'] and root['keyboard_received'] and root['ordinary_windows_restored'] and root['primary_topology_restored']
+assert native['completed'] and native['passed'] and native['npu_receipts']==native['delivery_acknowledgments']==1559 and native['observed_frame_count']==31
+assert root['physically_submitted_frames']==root['matching_source_frames']==28
+assert matched['passed'] and matched['order']==['A1','B1','B2','A2'] and len(matched['phases'])==4 and all(p['exact_pixels']==13 for p in matched['phases'])
+assert pipeline['passed'] and pipeline['contract']['execution_device']=='NPU' and pipeline['contract']['cases']==3
+assert abba['passed'] and abba['contract']['cases']==16 and abba['contract']['geometry_rejections_before_raster']==16 and abba['contract']['static_rejections']==20
+for backend in ['cpu','npu']:
+ q=obj(raw/f'native-quad-v2-{backend}/report.json');assert q['passed'] and len(q['cases'])==13 and all(c['exact_original_pixels'] and c['private_output_removed_after_hash'] for c in q['cases'])
+report=dict(recorded=datetime.now(UTC).isoformat(),evidence_checks_passed=True,raw_files_remotely_hash_verified=len(manifest),raw_bytes=sum(x['bytes'] for x in manifest),live=root,native=native,matched_quad_comparison=matched,pipeline_contract=pipeline,quad_contract=abba['contract'],full_desktop_offload=False,tahoma_tested=False,quad_promoted_to_live_worker=False,device_loss_resolved=False,native_pointer_finite_trial_passed=True,live23_timing_confounders=['CPU builds and CPU contract checks ran during this diagnostic trial.','Private request recording and physical-output diagnostics are enabled.'],ordered_replay29_and_live24_separate=True)
+(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(dict(archive=str(out),files=len(manifest),bytes=report['raw_bytes'])))

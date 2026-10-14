@@ -1,0 +1,20 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$out="$r\vm\quad-pipeline-v1-qualification"
+if(Test-Path $out){throw 'Pipeline qualification exists'}
+$deadline=[DateTime]::UtcNow.AddMinutes(15);$comparison=$null
+while([DateTime]::UtcNow -lt $deadline){try{$comparison=Get-Content "$r\vm\native-quad-abba-v1\report.json" -Raw|ConvertFrom-Json;if($comparison.completed){break}}catch{};Start-Sleep -Seconds 2}
+if(!$comparison.completed -or !$comparison.passed){throw 'Matched quad comparison did not pass'}
+if(@(Get-Process nr_registered*,nr_quad_contract,nr_quad_batch_probe,nr_quad_pipeline -ErrorAction SilentlyContinue).Count){throw 'Another renderer active'}
+$proof=Get-Content "$r\builds\quad-contract-v2\build-report.json" -Raw|ConvertFrom-Json;$binary="$r\builds\quad-contract-v2\Release\nr_quad_pipeline.exe"
+if(!$proof.clean_build -or (Get-FileHash $binary).Hash -ne $proof.binary_sha256){throw 'Pipeline contract identity mismatch'}
+New-Item -ItemType Directory $out|Out-Null;Copy-Item "$r\builds\quad-contract-v2\build-report.json" "$out\build-report.json"
+$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');completed=$false;passed=$false;desktop_changed=$false;tahoma_tested=$false;binary_sha256=$proof.binary_sha256}
+try{
+ $env:PATH="$r\toolchains\openvino-2026.4.1\Lib\site-packages\openvino\libs;"+$env:PATH;$env:NR_RENDER_OPAQUE_CROP='1';$env:NR_RENDER_SHARED_CORE='1';$env:NR_RENDER_SHARED_QUEUE='1';$env:NR_RENDER_MEMORY_CACHE='0';$env:NR_RENDER_NPU_CACHE="$r\vm\model-cache-2026-4-v209";$env:NR_RENDER_PIPELINE_CACHE='retained'
+ $process=Start-Process $binary -NoNewWindow -PassThru -RedirectStandardOutput "$out\probe.stdout.jsonl" -RedirectStandardError "$out\probe.stderr.log"
+ try{[void]$process.Handle;if(!$process.WaitForExit(180000)){$process.Kill();$process.WaitForExit();throw 'Pipeline contract timed out'};$process.Refresh();$report.exit_code=$process.ExitCode;if($process.ExitCode){throw 'Pipeline contract failed'}}finally{$process.Dispose()}
+ $rows=@(Get-Content "$out\probe.stdout.jsonl"|Where-Object {$_ -match '^\{.*\}$'}|ForEach-Object {$_|ConvertFrom-Json});$done=@($rows|Where-Object {$_.completed -and $_.pipeline_contract});$attempts=@($rows|Where-Object quad_batch_attempt)
+ if($done.Count -ne 1 -or !$done[0].passed -or $done[0].cases -ne 3 -or $done[0].execution_device -ne 'NPU' -or $attempts.Count -ne 2 -or @($attempts|Where-Object accepted).Count -ne 1 -or @($attempts|Where-Object {!$_.accepted -and $_.fallback_backend -eq 'NPU'}).Count -ne 1 -or (Get-Item "$out\probe.stderr.log").Length){throw 'Pipeline fallback evidence incomplete'}
+ $report.passed=$true;$report.contract=$done[0];$report.attempts=$attempts
+}catch{$report.error=$_.Exception.Message}
+finally{$report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');$report|ConvertTo-Json -Depth 6|Set-Content "$out\report.json"}
+$report|ConvertTo-Json -Depth 6;if(!$report.passed){exit 1}

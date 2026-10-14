@@ -1,0 +1,11 @@
+{"kind":"pipeline_cache_policy","uniform_capacity":64,"triangle_capacity":128,"clear_capacity":16,"replacement":"FIFO","hardware_queue_count_measured":false}
+{"shared_provider_core_experiment":true,"single_core_for_npu_compilation":true,"hardware_context_count_measured":false}
+{"kind":"private_shared_queue_experiment","enabled":true,"property_readback_verified":true,"hardware_queue_count_measured":false}
+{"affine_crop":true,"alpha_replaced":false,"source_over":true,"point_sampling":true,"maximum_byte_error_bound":0,"source_x":2,"source_y":2,"width":20,"height":12}
+{"affine_crop":true,"alpha_replaced":false,"source_over":true,"point_sampling":true,"maximum_byte_error_bound":0,"source_x":9,"source_y":7,"width":20,"height":14}
+{"quad_batch_attempt":true,"accepted":true,"vertices":12,"provider_requests":10,"pipeline_count":1,"fallback_backend":"none"}
+{"pipeline_quad_contract":true,"case":0,"exact_generic_cpu_pixels":true,"execution_device":"NPU","provider_requests":10}
+{"quad_batch_attempt":true,"accepted":false,"vertices":12,"provider_requests":4,"pipeline_count":1,"fallback_backend":"NPU"}
+{"pipeline_quad_contract":true,"case":1,"exact_generic_cpu_pixels":true,"execution_device":"NPU","provider_requests":22}
+{"pipeline_quad_contract":true,"case":2,"exact_generic_cpu_pixels":true,"execution_device":"NPU","provider_requests":6}
+{"completed":true,"passed":true,"pipeline_contract":true,"cases":3,"checked_components":9216,"execution_device":"NPU","desktop_changed":false}

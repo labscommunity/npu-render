@@ -1,0 +1,35 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$out="$r\vm\native-quad-abba-v1";$py="$r\toolchains\openvino-2026.4.1\Scripts\python.exe"
+if(Test-Path $out){throw 'Comparison already exists'}
+$deadline=[DateTime]::UtcNow.AddMinutes(14);$ready=$false
+while([DateTime]::UtcNow -lt $deadline){try{$prior=Get-Content "$r\vm\native-desktop-admission-v34\report.json" -Raw|ConvertFrom-Json;$live=Get-Content "$r\vm\native-live-v23\report.json" -Raw|ConvertFrom-Json;$ready=$prior.completed -and $prior.cleanup_passed -and $live.completed -and $live.cleanup_passed}catch{};if($ready){break};Start-Sleep -Seconds 2}
+if(!$ready){throw 'Native trial cleanup not confirmed'}
+if(@(Get-Process nr_registered*,nr_native_topology,nr_quad_batch_probe,nr_frame_present_probe -ErrorAction SilentlyContinue).Count){throw 'Another experiment active'}
+New-Item -ItemType Directory $out|Out-Null
+$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');completed=$false;passed=$false;desktop_changed=$false;tahoma_tested=$false;native_live23_passed=[bool]$live.passed;order=@('A1','B1','B2','A2');phases=@();source_sha256=@{runner=(Get-FileHash "$r\vm\run-native-quad-abba-v1.ps1").Hash;replay=(Get-FileHash "$r\vm\replay-recorded-requests-v7.py").Hash;qualifier=(Get-FileHash "$r\vm\qualify-native-quad-v2.py").Hash}}
+function Save{$report|ConvertTo-Json -Depth 8|Set-Content "$out\report.json"};Save
+try{
+ $proof=Get-Content "$r\builds\quad-contract-v1\build-report.json" -Raw|ConvertFrom-Json;$binary="$r\builds\quad-contract-v1\Release\nr_quad_contract.exe"
+ if(!$proof.clean_build -or (Get-FileHash $binary).Hash -ne $proof.binary_sha256){throw 'Contract build identity mismatch'}
+ $env:PATH="$r\toolchains\openvino-2026.4.1\Lib\site-packages\openvino\libs;"+$env:PATH;$env:NR_RENDER_OPAQUE_CROP='1';$env:NR_RENDER_SHARED_CORE='1';$env:NR_RENDER_SHARED_QUEUE='1';$env:NR_RENDER_MEMORY_CACHE='0';$env:NR_RENDER_NPU_CACHE="$r\vm\model-cache-2026-4-v209"
+ $process=Start-Process $binary -ArgumentList NPU -NoNewWindow -PassThru -RedirectStandardOutput "$out\contract.stdout.jsonl" -RedirectStandardError "$out\contract.stderr.log"
+ try{[void]$process.Handle;if(!$process.WaitForExit(180000)){$process.Kill();$process.WaitForExit();throw 'NPU contract timed out'};$process.Refresh();if($process.ExitCode){throw 'NPU contract failed'}}finally{$process.Dispose()}
+ $contract=Get-Content "$out\contract.stdout.jsonl"|Where-Object {$_ -match '^\{.*\}$'}|ForEach-Object {$_|ConvertFrom-Json}|Where-Object completed
+ if(!$contract.passed -or $contract.backend -ne 'NPU' -or $contract.cases -ne 16 -or $contract.geometry_rejections_before_raster -ne 16 -or $contract.static_rejections -ne 20){throw 'Contract evidence incomplete'}
+ $report.contract=$contract;Save
+ & $py "$r\vm\qualify-native-quad-v2.py" --backend NPU --tickets 454,574,629,695,750,805,871,926,981,1047,1102,1157,1227 --output "$r\vm\native-quad-v2-npu" > "$out\qualification.stdout.log" 2> "$out\qualification.stderr.log"
+ if($LASTEXITCODE){throw 'Integrated quad pixel qualification failed'}
+ $qualified=Get-Content "$r\vm\native-quad-v2-npu\report.json" -Raw|ConvertFrom-Json;if(!$qualified.passed -or @($qualified.cases).Count -ne 13){throw 'Integrated quad qualification incomplete'}
+ $report.integrated_quad_pixels_passed=$true;Save
+ foreach($phase in @('A1','B1','B2','A2')){
+  $candidate=$phase.StartsWith('B');$build=if($candidate){'native-routing-v28'}else{'native-routing-v27'};$enabled=if($candidate){'1'}else{'0'};$trial="native-quad-abba-v1-$phase"
+  $report.current_phase=$phase;Save
+  & $py "$r\vm\replay-recorded-requests-v7.py" --worker "$r\builds\$build\Release\nr_registered_local_indexed_worker.exe" --client "$r\builds\native-routing-v20\Release\nr_registered_local_indexed_client_probe.exe" --runtime "$r\toolchains\openvino-2026.4.1\Lib\site-packages\openvino\libs" --cache "$r\vm\model-cache-2026-4-v209" --capture "$r\vm\native-desktop-admission-v32\bootstrap\requests" --output "$r\vm\$trial" --memory-cache 0 --shared-queue 1 --shared-core 1 --pipeline-cache retained --tickets 454,574,629,695,750,805,871,926,981,1047,1102,1157,1227 --quad-batch $enabled > "$out\$phase.stdout.log" 2> "$out\$phase.stderr.log"
+  if($LASTEXITCODE){throw "Replay $phase failed"}
+  $result=Get-Content "$r\vm\$trial\report.json" -Raw|ConvertFrom-Json
+  if(!$result.completed -or !$result.passed -or $result.original_pixel_hashes_matched -ne 13 -or $result.delivery_acknowledgments -ne 13){throw 'Replay evidence incomplete'}
+  $report.phases+=@{phase=$phase;build=$build;trial=$trial;result=$result};Save
+ }
+ $report.passed=$report.phases.Count -eq 4
+}catch{$report.error=$_.Exception.Message}
+finally{$report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');Save}
+$report|ConvertTo-Json -Depth 8;if(!$report.passed){exit 1}

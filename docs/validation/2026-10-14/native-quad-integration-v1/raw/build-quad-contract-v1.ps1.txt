@@ -1,0 +1,18 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$name='quad-contract-v1';$source="$r\vm\$name";$b="$r\builds\$name";$base="$r\builds\native-routing-v28";$sdk="$r\toolchains\openvino-2026.4.1\Lib\site-packages\openvino";$log="$r\vm\build-$name.log"
+$proof=Get-Content "$base\registered-build-report.json" -Raw|ConvertFrom-Json;if(!$proof.clean_build){throw 'Base build is not complete'}
+if((Test-Path $source) -or (Test-Path $b)){throw 'Contract build exists'}
+& tar -xf "$r\vm\$name.tar.gz" -C "$r\vm";if($LASTEXITCODE){throw 'Extraction failed'}
+$expected=Get-Content "$r\vm\$name-source.json" -Raw|ConvertFrom-Json
+foreach($f in $expected.psobject.Properties){if((Get-FileHash "$source\$($f.Name)").Hash -ne $f.Value){throw 'Source mismatch'}}
+foreach($f in $proof.source_sha256.psobject.Properties){if((Get-FileHash "$r\vm\native-routing-v28\$($f.Name)").Hash -ne $f.Value){throw 'Base source changed'}}
+$libraries=@{};foreach($n in @('nr_registered_vertex.lib','nr_registered_provider_cache.lib')){$libraries[$n]=(Get-FileHash "$base\Release\$n").Hash}
+$env:CMAKE_BUILD_PARALLEL_LEVEL='4';$ErrorActionPreference='Continue'
+& cmake -S $source -B $b -A x64 "-DOpenVINO_DIR=$sdk\cmake" "-DNR_BASE_SOURCE=$r\vm\native-routing-v28" "-DNR_BASE_BUILD=$base" *> $log;$code=$LASTEXITCODE
+if(!$code){& cmake --build $b --config Release --clean-first *>> $log;$code=$LASTEXITCODE}
+$ErrorActionPreference='Stop';Get-Content $log -Tail 6;if($code){throw 'Contract build failed'}
+foreach($n in $libraries.Keys){if((Get-FileHash "$base\Release\$n").Hash -ne $libraries[$n]){throw 'Base library changed during build'}}
+[ordered]@{clean_build=$true;source_sha256=$expected;binary_sha256=(Get-FileHash "$b\Release\nr_quad_contract.exe").Hash;libraries_sha256=$libraries;base_build='native-routing-v28';base_build_report_sha256=(Get-FileHash "$base\registered-build-report.json").Hash;npu_tested=$false}|ConvertTo-Json -Depth 6|Set-Content "$b\build-report.json"
+$env:PATH="$sdk\libs;"+$env:PATH;$env:NR_RENDER_OPAQUE_CROP='1'
+& "$b\Release\nr_quad_contract.exe" CPU > "$r\vm\quad-contract-v1-cpu.stdout.jsonl" 2> "$r\vm\quad-contract-v1-cpu.stderr.log"
+if($LASTEXITCODE){Get-Content "$r\vm\quad-contract-v1-cpu.stderr.log";throw 'CPU quad contract failed'}
+Get-Content "$r\vm\quad-contract-v1-cpu.stdout.jsonl" -Tail 1

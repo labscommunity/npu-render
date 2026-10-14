@@ -1,0 +1,170 @@
+{
+  "recorded": "2026-10-14T23:25:46.637795+00:00",
+  "passed": true,
+  "matched_recorded_workload": true,
+  "order": [
+    "A1",
+    "B1",
+    "B2",
+    "A2"
+  ],
+  "desktop_performance_qualified": false,
+  "tahoma_tested": false,
+  "source_recording": "native-desktop-admission-v32",
+  "phases": [
+    {
+      "phase": "A1",
+      "worker_binary_sha256": "286c8fbbbbf419ed64fc3eff23eb7f3a124d79bc0f3ff75b0518384c5312e813",
+      "worker_log_sha256": "3a5b1441ad44e4a8b72f008c027c1345da1f7e847f724372dfd0de253abd6df2",
+      "selected_tickets": [
+        454,
+        574,
+        629,
+        695,
+        750,
+        805,
+        871,
+        926,
+        981,
+        1047,
+        1102,
+        1157,
+        1227
+      ],
+      "total": {
+        "draw_ms": 121016.137,
+        "compile_and_draw_ms": 121425.994,
+        "backend_compile_ms": 93.314,
+        "provider_requests": 15898,
+        "worker_ms": 121468,
+        "roundtrip_ms": 121735
+      },
+      "median_draw_ms": 9348.142,
+      "whole_run_ms": 123177.768,
+      "exact_pixels": 13
+    },
+    {
+      "phase": "B1",
+      "worker_binary_sha256": "3992ac3371e70548f42f3cd519cc40ca9afcdbbc4886ef53934eb1d0b69c6adf",
+      "worker_log_sha256": "4ec720c3eeb2eb8fe68f74f83344167aec245f7fe073e0df6165813eb49775eb",
+      "selected_tickets": [
+        454,
+        574,
+        629,
+        695,
+        750,
+        805,
+        871,
+        926,
+        981,
+        1047,
+        1102,
+        1157,
+        1227
+      ],
+      "total": {
+        "draw_ms": 3007.385,
+        "compile_and_draw_ms": 3069.181,
+        "backend_compile_ms": 80.434,
+        "provider_requests": 880,
+        "worker_ms": 3232,
+        "roundtrip_ms": 3482
+      },
+      "median_draw_ms": 221.898,
+      "whole_run_ms": 5169.548,
+      "exact_pixels": 13
+    },
+    {
+      "phase": "B2",
+      "worker_binary_sha256": "3992ac3371e70548f42f3cd519cc40ca9afcdbbc4886ef53934eb1d0b69c6adf",
+      "worker_log_sha256": "9a5406302d99f302c0cbd7a3af71ea3484cf27b915ecad8c3561b32775403a54",
+      "selected_tickets": [
+        454,
+        574,
+        629,
+        695,
+        750,
+        805,
+        871,
+        926,
+        981,
+        1047,
+        1102,
+        1157,
+        1227
+      ],
+      "total": {
+        "draw_ms": 3066.49,
+        "compile_and_draw_ms": 3130.069,
+        "backend_compile_ms": 78.579,
+        "provider_requests": 880,
+        "worker_ms": 3217,
+        "roundtrip_ms": 3516
+      },
+      "median_draw_ms": 234.547,
+      "whole_run_ms": 4667.405,
+      "exact_pixels": 13
+    },
+    {
+      "phase": "A2",
+      "worker_binary_sha256": "286c8fbbbbf419ed64fc3eff23eb7f3a124d79bc0f3ff75b0518384c5312e813",
+      "worker_log_sha256": "0cb1493ba7ca8119fc365b58d34896c0be412a61ccad10d2d16c016cd701744e",
+      "selected_tickets": [
+        454,
+        574,
+        629,
+        695,
+        750,
+        805,
+        871,
+        926,
+        981,
+        1047,
+        1102,
+        1157,
+        1227
+      ],
+      "total": {
+        "draw_ms": 120037.536,
+        "compile_and_draw_ms": 120462.192,
+        "backend_compile_ms": 93.969,
+        "provider_requests": 15898,
+        "worker_ms": 120579,
+        "roundtrip_ms": 120768
+      },
+      "median_draw_ms": 9267.711,
+      "whole_run_ms": 122196.602,
+      "exact_pixels": 13
+    }
+  ],
+  "draw_ms_comparison": {
+    "baseline_mean_total": 120526.8365,
+    "candidate_mean_total": 3036.9375,
+    "ratio": 39.68696639295343,
+    "reduction_percent": 97.4802810824625
+  },
+  "compile_and_draw_ms_comparison": {
+    "baseline_mean_total": 120944.093,
+    "candidate_mean_total": 3099.625,
+    "ratio": 39.018943581884905,
+    "reduction_percent": 97.43714230012044
+  },
+  "worker_ms_comparison": {
+    "baseline_mean_total": 121023.5,
+    "candidate_mean_total": 3224.5,
+    "ratio": 37.53248565669096,
+    "reduction_percent": 97.3356414250125
+  },
+  "roundtrip_ms_comparison": {
+    "baseline_mean_total": 121251.5,
+    "candidate_mean_total": 3499.0,
+    "ratio": 34.65318662474993,
+    "reduction_percent": 97.11426250396902
+  },
+  "provider_requests_comparison": {
+    "baseline_mean_total": 15898.0,
+    "candidate_mean_total": 880.0,
+    "ratio": 18.06590909090909,
+    "reduction_percent": 94.46471254245817
+  }
+}

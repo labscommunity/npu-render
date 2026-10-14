@@ -1,0 +1,39 @@
+from pathlib import Path
+import json,hashlib
+r=Path('results/render-driver')
+s=(r/'qualify-native-registered-v20.py').read_text().replace("NR_RENDER_OPAQUE_CROP='1'", "NR_RENDER_OPAQUE_CROP='1',NR_RENDER_QUAD_BATCH='1'").replace('desktop_offloaded=False)',"desktop_offloaded=False,quad_batch='1')");(r/'qualify-native-registered-v21.py').write_text(s)
+s=(r/'run-native-registration-v20.ps1').read_text()
+for a,b in [('registration-v20','registration-v21'),('NativeRecovery-v20','NativeRecovery-v21'),('registered-v20','registered-v21'),('native-routing-v27','native-routing-v28')]:s=s.replace(a,b)
+anchor="$principal=[Security.Principal.WindowsPrincipal]"
+insert='''$sources=Get-Content "$r\\vm\\native-registration-v21-source.json" -Raw|ConvertFrom-Json
+foreach($f in $sources.psobject.Properties){if((Get-FileHash "$r\\vm\\$($f.Name)").Hash -ne $f.Value){throw 'Registration source mismatch'}}
+foreach($path in @('native-quad-abba-v1','quad-pipeline-v1-qualification','native-ordered-replay-v29-quad-rollback')){$q=Get-Content "$r\\vm\\$path\\report.json" -Raw|ConvertFrom-Json;if(!$q.completed -or !$q.passed){throw 'Quad promotion prerequisites failed'}}
+'''
+assert anchor in s;s=s.replace(anchor,insert+anchor,1);(r/'run-native-registration-v21.ps1').write_text(s)
+s=(r/'recover-native-registration-v20.ps1').read_text().replace('registration-v20','registration-v21').replace('NativeRecovery-v20','NativeRecovery-v21');(r/'recover-native-registration-v21.ps1').write_text(s)
+keys=['run-native-registration-v21.ps1','recover-native-registration-v21.ps1','qualify-native-registered-v21.py','native_session_broker_v1.py'];(r/'native-registration-v21-source.json').write_text(json.dumps({k:hashlib.sha256((r/k).read_bytes()).hexdigest() for k in keys},indent=2)+'\n')
+s=(r/'native_desktop_bootstrap_v15.py').read_text().replace("NR_RENDER_OPAQUE_CROP='1'", "NR_RENDER_OPAQUE_CROP='1',NR_RENDER_QUAD_BATCH='1'").replace('monitor_seconds=660)','monitor_seconds=660,quad_batch=\'1\')');(r/'native_desktop_bootstrap_v16.py').write_text(s)
+for prefix in ['run','recover']:
+ s=(r/f'{prefix}-native-desktop-v34.ps1').read_text()
+ for a,b in [('desktop-v34','desktop-v35'),('admission-v34','admission-v35'),('Recovery-v34','Recovery-v35'),('native-routing-v27','native-routing-v28'),('registration-v20','registration-v21'),('bootstrap_v15','bootstrap_v16')]:s=s.replace(a,b)
+ (r/f'{prefix}-native-desktop-v35.ps1').write_text(s)
+s=(r/'start-native-topology-v35.ps1').read_text().replace('topology-v35','topology-v36').replace('Topology-V35','Topology-V36');(r/'start-native-topology-v36.ps1').write_text(s)
+s=(r/'run-native-live-v23.ps1').read_text()
+for a,b in [('native-live-v23','native-live-v24'),('NativeLiveV23','NativeLiveV24'),('admission-v34','admission-v35'),('desktop-v34','desktop-v35'),('Recovery-v34','Recovery-v35'),('topology-v35','topology-v36'),('primary-v10','primary-v11')]:s=s.replace(a,b)
+anchor='New-Item -ItemType Directory $out|Out-Null'
+insert='''$pointerQualified=Get-Content "$r\\vm\\native-live-v23\\report.json" -Raw|ConvertFrom-Json
+if(!$pointerQualified.completed -or !$pointerQualified.passed -or !$pointerQualified.pointer_confined_and_restored -or !$pointerQualified.cleanup_passed){throw 'Native pointer baseline is not qualified'}
+foreach($path in @('native-quad-abba-v1','quad-pipeline-v1-qualification','native-ordered-replay-v29-quad-rollback','native-registration-v21')){$q=Get-Content "$r\\vm\\$path\\report.json" -Raw|ConvertFrom-Json;if(!$q.completed -or !$q.passed){throw 'Quad runtime prerequisites failed'}}
+$baselineMs=0.;$candidateMs=0.
+foreach($phase in @('A1','B1','B2','A2')){
+ $draws=@(Get-Content "$r\\vm\\native-quad-abba-v1-$phase\\worker.stdout.jsonl"|Where-Object {$_ -match '^\\{.*\\}$'}|ForEach-Object {$_|ConvertFrom-Json}|Where-Object {$_.PSObject.Properties.Name -contains 'compile_and_draw_ms'})
+ if($draws.Count -ne 13){throw 'Matched worker timing evidence incomplete'}
+ $sum=($draws|Measure-Object -Property compile_and_draw_ms -Sum).Sum
+ if($phase.StartsWith('A')){$baselineMs+=$sum}else{$candidateMs+=$sum}
+}
+if($candidateMs -ge $baselineMs/2){throw 'Candidate did not meet the measured component improvement gate'}
+'''
+assert s.count(anchor)==1;s=s.replace(anchor,insert+anchor);(r/'run-native-live-v24.ps1').write_text(s)
+keys=[k.replace('desktop-v34','desktop-v35').replace('bootstrap_v15','bootstrap_v16').replace('live-v23','live-v24').replace('topology-v35','topology-v36') for k in json.loads((r/'native-desktop-v34-source.json').read_text())]
+(r/'native-desktop-v35-source.json').write_text(json.dumps({k:hashlib.sha256((r/k).read_bytes()).hexdigest() for k in keys},indent=2)+'\n')
+print('Prepared registered v21 and live v24; execution requires all completed qualifications.')

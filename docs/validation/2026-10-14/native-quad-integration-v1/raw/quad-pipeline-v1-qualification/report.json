@@ -1,0 +1,37 @@
+{
+    "started":  "2026-10-14T23:24:51.3997732Z",
+    "completed":  true,
+    "passed":  true,
+    "desktop_changed":  false,
+    "tahoma_tested":  false,
+    "binary_sha256":  "3849E1D28C36CCA03FECBF674C62E1F7BC5AC53B9E60E29C4DCA5BEEA17C6D50",
+    "exit_code":  0,
+    "contract":  {
+                     "completed":  true,
+                     "passed":  true,
+                     "pipeline_contract":  true,
+                     "cases":  3,
+                     "checked_components":  9216,
+                     "execution_device":  "NPU",
+                     "desktop_changed":  false
+                 },
+    "attempts":  [
+                     {
+                         "quad_batch_attempt":  true,
+                         "accepted":  true,
+                         "vertices":  12,
+                         "provider_requests":  10,
+                         "pipeline_count":  1,
+                         "fallback_backend":  "none"
+                     },
+                     {
+                         "quad_batch_attempt":  true,
+                         "accepted":  false,
+                         "vertices":  12,
+                         "provider_requests":  4,
+                         "pipeline_count":  1,
+                         "fallback_backend":  "NPU"
+                     }
+                 ],
+    "finished":  "2026-10-14T23:24:58.4598317Z"
+}

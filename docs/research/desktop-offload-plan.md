@@ -8,8 +8,10 @@ routing and exact ordinary recovery now work. The controlled input window appear
 in completed NPU primary frames. A longer trial now receives mouse input and
 shows the resulting green window on the physical output. Corrected live v21 now
 passes the complete controlled mouse/keyboard/color sequence and exact ordinary
-recovery. Normal pointer behavior, a responsive usable switch, application coverage
-and a Tahoma benefit remain unqualified.
+recovery. V23 also passes finite pointer confinement and foreground reacquisition.
+A matched worker comparison cuts thirteen expensive draw operations from about
+121 seconds to 3.1 seconds with exact pixels. A responsive usable switch,
+application coverage and a Tahoma benefit remain unqualified.
 
 The end state is one switch that moves desktop graphics work to the NPU, retains
 physical display scanout, supports normal interaction, and leaves the iGPU
@@ -24,8 +26,8 @@ renderer does not establish where every application renders.
 | 1. Routing | Record active physical and indirect paths before, during, and after admission; identify clone/extended configuration and actual rendering adapter. | Timestamped topology, native DWM NPU receipts, selected adapter, frame producer, exact restoration. | Automatic clone identified; v11 applies extension with the physical path preserved, produces a frame while extended, restores the clone exactly, and restores the final physical baseline. |
 | 2. Continuous rendering | Keep the native renderer alive across changing windows and content; diagnose every failed draw; distinguish model preparation from rendering and transport. | Multiple changing frames, timestamps and pixel checks, sustained operation, no hidden fallback. | Retaining rendering models clears both reproduced failures. Native v11b and v12 each complete six minutes, with 581 and 724 acknowledged NPU operations and 12 and 17 frames. No provider errors occur; 30-minute stability and behavior at eventual cache eviction remain unqualified. |
 | 3. Physical presentation | Present new NPU frames on the physical output with distinct logical desktops and no recursive mirroring. | Live sequence-to-present correlation, output identity, measured presentation mode and residual GPU work. | Live v13 submits 13 matching frames. Direct statistics reach 13 displayed frames and report both composed and overlay modes; a separate screen reader verifies both controlled colors beneath the owned presenter. GPU residual cost remains unmeasured. Updates remain slow. |
-| 4. Interaction and recovery | Migrate the logical desktop, route pointer/keyboard/focus correctly, handle cursor/DPI/resolution, restore exact topology and windows. | Scripted interaction visible on physical output; emergency exit and owned-process failure recovery; ordinary login/lock path retained. | V21 passes blue → mouse → green → keyboard → red on the physical output and exact ordinary recovery. A static standard arrow matches the NPU frame exactly. Normal pointer confinement/motion and fault recovery remain open; visible response is still about 56 seconds in this instrumented trial. |
-| 5. Responsiveness | Optimize resource reuse, graph compilation, dispatch granularity, transfer volume and frame pacing. | Initial target: ordinary desktop interaction at 30 fps, p95 visible response ≤100 ms, 30-minute stable run. Report cold-start time separately. | Not met; several individual draws take seconds. |
+| 4. Interaction and recovery | Migrate the logical desktop, route pointer/keyboard/focus correctly, handle cursor/DPI/resolution, restore exact topology and windows. | Scripted interaction visible on physical output; emergency exit and owned-process failure recovery; ordinary login/lock path retained. | V23 passes relative motion, blue → mouse → green → keyboard → red, two foreground confinement reacquisitions, and exact ordinary recovery. A static standard arrow matches the NPU frame exactly. Secure desktop, sleep/wake, full cursor fidelity and all fault cases remain open. |
+| 5. Responsiveness | Optimize resource reuse, graph compilation, dispatch granularity, transfer volume and frame pacing. | Initial target: ordinary desktop interaction at 30 fps, p95 visible response ≤100 ms, 30-minute stable run. Report cold-start time separately. | Not met. Matched v27/v28 replay reduces thirteen expensive operations' mean compile-plus-draw total from 120,944 to 3,100 ms with exact pixels. Complete desktop performance remains unqualified. |
 | 6. Application coverage | Admit and implement required graphics operations across browser, video and representative 3D workloads. Establish per-process adapter choice. | Capability matrix plus real hardware runs; every remaining iGPU operation accounted for. | General application/video/game migration unqualified. |
 | 7. Tahoma benefit | Run repeated baseline/offload trials under matched power, resolution and application load. | Report Tahoma throughput/latency, desktop frame times, per-engine GPU/NPU/CPU activity, memory and power; demonstrate GPU relief and no material Tahoma regression. | Earlier experiments regressed; native desktop A/B not yet run. |
 | 8. Usable switch | Integrate qualified components, install/on/off/status, recovery, documentation and CI; resolve distribution signing requirements. | Repeated clean install and enable/disable cycles, sleep/wake and failures, end-to-end test on target hardware. | Research candidates isolated; no usable full-offload product. |
@@ -87,10 +89,16 @@ rollback remains unresolved. An isolated quad candidate matches thirteen expensi
 draws exactly on NPU, reducing their calls from 1,186/1,282 to 54/72. Its warm draw
 times are 143–248 ms, without live integration or a matched worker comparison yet.
 
-Next, qualify native foreground recovery and integrate the quad candidate with
-checked geometry and explicit same-NPU fallback. Establish responsive long-duration
-operation, application coverage and matched Tahoma benefit. A component pass does
-not complete a later gate.
+The [quad integration investigation](../validation/2026-10-14/native-quad-integration-v1/README.md)
+passes finite native pointer recovery and qualifies the integrated candidate,
+including geometry checks and explicit same-NPU fallback. Matched A/B/B/A replay
+shows a 39.02× compile-plus-draw reduction for thirteen expensive operations with
+all 52 output hashes matching. These are component timings, not desktop frame rate.
+
+Next, complete the full rollback-stream replay, registered-driver qualification
+and live integration. Then establish responsive long-duration operation,
+application coverage and matched Tahoma benefit. A component pass does not
+complete a later gate.
 
 ## Architecture constraints from primary documentation
 
