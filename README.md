@@ -10,7 +10,13 @@ RGBA composition and an explicit backend switch. The packaged runtime passed
 GPU → NPU → CPU → GPU → NPU switching on Panther Lake. It supports CPU/GPU/NPU through
 its first OpenVINO provider; other providers can implement the same contracts.
 
-**Full desktop offload is unfinished.** The latest
+**Full desktop offload is unfinished.** A [live bridge trial](docs/validation/2026-10-14/native-live-bridge-v1/README.md)
+submitted two changing NPU-composed frames to the physical output, 62 seconds
+apart, before an NPU device-loss error. Recovery restored the physical baseline.
+Input, sustained responsiveness, physical scanout mode and Tahoma benefit remain
+unqualified.
+
+ The latest
 [native desktop trial](docs/validation/2026-10-14/native-large-surface-v1/README.md)
 produces three different 1024×768 Windows desktop frames with 457 acknowledged
 NPU operations. It produces a frame while the displays are extended, survives

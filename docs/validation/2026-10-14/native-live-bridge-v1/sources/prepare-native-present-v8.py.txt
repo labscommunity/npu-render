@@ -1,0 +1,34 @@
+from pathlib import Path
+import shutil,hashlib,json,tarfile
+r=Path('results/render-driver');d=r/'native-present-v8';shutil.copytree(r/'native-present-v7',d)
+p=d/'frame_present_probe.cpp';s=p.read_text();a='int wmain(int argc,wchar_t **argv)try{'
+b='''struct Stimulus {
+    HWND window=nullptr;unsigned step=0;bool stopped=false;
+    static LRESULT CALLBACK procedure(HWND hwnd,UINT message,WPARAM w,LPARAM l){
+        auto *self=reinterpret_cast<Stimulus *>(GetWindowLongPtrW(hwnd,GWLP_USERDATA));
+        if(message==WM_NCCREATE){self=static_cast<Stimulus *>(reinterpret_cast<CREATESTRUCTW *>(l)->lpCreateParams);SetWindowLongPtrW(hwnd,GWLP_USERDATA,reinterpret_cast<LONG_PTR>(self));}
+        if(message==WM_MOUSEACTIVATE)return MA_NOACTIVATE;
+        if(self && message==WM_CLOSE){self->stopped=true;return 0;}
+        if(self && message==WM_PAINT){PAINTSTRUCT paint{};const auto dc=BeginPaint(hwnd,&paint);RECT rect{};GetClientRect(hwnd,&rect);
+            const auto brush=CreateSolidBrush(self->step%2?RGB(20,180,60):RGB(180,30,80));FillRect(dc,&rect,brush);DeleteObject(brush);
+            wchar_t label[80]{};std::swprintf(label,80,L"NPU desktop stimulus %u",self->step);SetBkMode(dc,TRANSPARENT);SetTextColor(dc,RGB(255,255,255));DrawTextW(dc,label,-1,&rect,DT_CENTER|DT_VCENTER|DT_SINGLELINE);EndPaint(hwnd,&paint);
+            LARGE_INTEGER qpc{};QueryPerformanceCounter(&qpc);std::printf("{\\"stimulus_painted\\":true,\\"step\\":%u,\\"qpc\\":%lld,\\"content_produced_by\\":\\"GDI\\"}\\n",self->step,qpc.QuadPart);std::fflush(stdout);return 0;}
+        return DefWindowProcW(hwnd,message,w,l);
+    }
+    explicit Stimulus(const RECT &area){WNDCLASSW cls{};cls.lpfnWndProc=procedure;cls.hInstance=GetModuleHandleW(nullptr);cls.lpszClassName=L"NpuRenderIndirectStimulus";require(RegisterClassW(&cls)!=0,"stimulus class failed");
+        require(area.right-area.left>=640 && area.bottom-area.top>=384,"stimulus desktop too small");window=CreateWindowExW(WS_EX_TOOLWINDOW|WS_EX_NOACTIVATE,cls.lpszClassName,L"NPU desktop composition stimulus",WS_POPUP,area.left+64,area.top+64,512,256,nullptr,nullptr,cls.hInstance,this);require(window!=nullptr,"stimulus window failed");}
+    ~Stimulus(){if(window){ShowWindow(window,SW_HIDE);DestroyWindow(window);}}
+};
+int stimulus(const wchar_t *duration){
+    wchar_t *end=nullptr;const auto seconds=std::wcstoul(duration,&end,10);require(end!=duration && !*end && seconds>=1 && seconds<=120,"stimulus duration rejected");require(nr::present::current_console_default(),"stimulus requires Default console");
+    require(SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)!=nullptr,"stimulus DPI unavailable");const auto route=nr::live::separated();Stimulus window(route.indirect);ShowWindow(window.window,SW_SHOWNOACTIVATE);UpdateWindow(window.window);const auto start=GetTickCount64();
+    while(!window.stopped && GetTickCount64()-start<uint64_t(seconds)*1000){MSG message{};while(PeekMessageW(&message,nullptr,0,0,PM_REMOVE)){if(message.message==WM_QUIT)window.stopped=true;TranslateMessage(&message);DispatchMessageW(&message);}
+        require(nr::present::current_console_default() && nr::live::same(route,nr::live::separated()),"stimulus desktop changed");const auto step=unsigned((GetTickCount64()-start)/15000);if(step!=window.step){window.step=step;InvalidateRect(window.window,nullptr,FALSE);UpdateWindow(window.window);}Sleep(100);}
+    std::printf("{\\"completed\\":true,\\"stimulus_only\\":true,\\"steps\\":%u,\\"desktop_offloaded\\":false}\\n",window.step+1);return 0;
+}
+'''+a+'\n    if(argc==3 && !std::wcscmp(argv[1],L"--stimulus"))return stimulus(argv[2]);'
+assert a in s;s=s.replace(a,b);p.write_text(s)
+p=d/'CMakeLists.txt';p.write_text(p.read_text().replace('dxgi user32','dxgi user32 gdi32'))
+(r/'native-present-v8-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-present-v8.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+(r/'build-native-present-v8.ps1').write_text((r/'build-native-present-v7.ps1').read_text().replace('native-present-v7','native-present-v8'))
