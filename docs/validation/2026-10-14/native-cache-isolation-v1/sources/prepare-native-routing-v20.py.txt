@@ -1,0 +1,56 @@
+from pathlib import Path
+import shutil,json,hashlib,tarfile
+r=Path('results/render-driver');d=r/'native-routing-v20';shutil.copytree(r/'native-routing-v18',d);lab=d/'native/windows/registered_lab'
+(lab/'request_recording.hpp').write_text(r'''#pragma once
+#include "indexed_pipe.hpp"
+#include "provider_cache.hpp"
+#include <filesystem>
+#include <fstream>
+#include <memory>
+#include <cstdlib>
+#include <cstdio>
+namespace nr::registered_lab {
+// Optional, bounded local diagnostic capture. The caller creates a private
+// directory. Recorded pixels stay on the test machine and never enter Git.
+class RequestRecording {
+    std::filesystem::path directory;uint64_t bytes=0;
+    static constexpr uint64_t maximum=uint64_t(16)*1024*1024*1024;
+    void append(const std::string &line){std::ofstream log(directory/"index.jsonl",std::ios::binary|std::ios::app);if(!log || !(log<<line<<'\n') || !log.flush())throw std::runtime_error("request recording index failed");}
+    static std::string digest(const uint8_t *data,size_t size){nr::provider::CacheDigest value;value.bytes(data,size);return value.finish();}
+public:
+    RequestRecording(){
+        wchar_t *value=nullptr;size_t length=0;if(_wdupenv_s(&value,&length,L"NR_RENDER_CAPTURE_DIRECTORY"))throw std::runtime_error("cannot read recording directory");
+        const std::unique_ptr<wchar_t,decltype(&std::free)> owner(value,&std::free);if(!value || !*value)return;directory=value;
+        if(!directory.is_absolute() || !std::filesystem::is_directory(directory) || !std::filesystem::is_empty(directory) || std::filesystem::space(directory).available<maximum+uint64_t(1024)*1024*1024)throw std::runtime_error("recording requires an empty absolute directory and 17 GiB free");
+        append("{\"recording_started\":true,\"maximum_request_bytes\":17179869184,\"contains_private_pixels\":true,\"performance_measurement_valid\":false}");
+    }
+    void request(uint32_t ticket,const std::vector<uint8_t> &data){
+        if(directory.empty())return;if(data.size()>maximum-bytes)throw std::runtime_error("request recording budget exceeded");
+        char filename[32];std::snprintf(filename,sizeof(filename),"request-%08u.bin",ticket);const auto path=directory/filename;
+        indexed_stream::Handle file(CreateFileW(path.c_str(),GENERIC_WRITE,FILE_SHARE_READ,nullptr,CREATE_NEW,FILE_ATTRIBUTE_NORMAL,nullptr));DWORD written=0;
+        if(!WriteFile(file.value,data.data(),DWORD(data.size()),&written,nullptr) || written!=data.size() || !FlushFileBuffers(file.value))throw std::runtime_error("request recording write failed");
+        bytes+=data.size();append("{\"request_recorded\":true,\"ticket\":"+std::to_string(ticket)+",\"file\":\""+filename+"\",\"bytes\":"+std::to_string(data.size())+",\"sha256\":\""+digest(data.data(),data.size())+"\",\"cumulative_bytes\":"+std::to_string(bytes)+"}");
+    }
+    void response(uint32_t ticket,const std::vector<uint8_t> &data){
+        if(directory.empty())return;if(data.size()<128)throw std::runtime_error("recorded response layout rejected");
+        append("{\"provider_response_recorded\":true,\"ticket\":"+std::to_string(ticket)+",\"pixel_bytes\":"+std::to_string(data.size()-128)+",\"pixels_sha256\":\""+digest(data.data()+128,data.size()-128)+"\",\"delivery_acknowledged\":false}");
+    }
+};
+}
+''')
+p=lab/'local_indexed_worker.cpp';s=p.read_text().replace('#include "fifo_dispatch.hpp"','#include "fifo_dispatch.hpp"\n#include "request_recording.hpp"').replace('ex::Pipeline pipeline;std::atomic<uint32_t>', 'ex::Pipeline pipeline;nr::registered_lab::RequestRecording recording;std::atomic<uint32_t>').replace('entered=GetTickCount64();', 'entered=GetTickCount64();recording.request(ticket,bytes);').replace('ex::require(rendered.execution_device=="NPU");const auto result=ex::response(h,rendered);++succeeded;', 'ex::require(rendered.execution_device=="NPU");const auto result=ex::response(h,rendered);recording.response(ticket,result);++succeeded;');p.write_text(s)
+(r/'native-routing-v20-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-routing-v20.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-native-routing-v18.ps1').read_text().replace('native-routing-v18','native-routing-v20');(r/'build-native-routing-v20.ps1').write_text(s)
+s=(r/'qualify-native-routing-v18.ps1').read_text().replace('native-routing-v18','native-routing-v20').replace("$env:NR_RENDER_AFFINE_BATCH='65535';", 'Remove-Item Env:NR_RENDER_AFFINE_BATCH -ErrorAction SilentlyContinue;')
+s=s.replace("try{", '''$capture="$r\\vm\\native-routing-v20-capture"
+if(Test-Path $capture){throw 'Capture directory exists'};New-Item -ItemType Directory $capture|Out-Null
+$acl=New-Object System.Security.AccessControl.DirectorySecurity;$acl.SetSecurityDescriptorSddlForm('O:BAG:BAD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)');Set-Acl $capture -AclObject $acl
+$env:NR_RENDER_CAPTURE_DIRECTORY=$capture
+try{''',1)
+s+='''
+$records=@(Get-Content "$capture\\index.jsonl"|ForEach-Object {$_|ConvertFrom-Json});$requests=@($records|Where-Object request_recorded);$responses=@($records|Where-Object provider_response_recorded)
+if($requests.Count -ne 10 -or $responses.Count -ne 10){throw 'Recording count mismatch'}
+for($i=0;$i -lt 10;++$i){$a=$requests[$i];$b=$responses[$i];if($a.ticket -ne $i -or $b.ticket -ne $i -or (Get-FileHash "$capture\\$($a.file)").Hash -ne $a.sha256){throw 'Recording integrity mismatch'}}
+[ordered]@{passed=$true;requests=10;provider_responses=10;request_hashes_verified=$true;contains_private_pixels=$true;desktop_offloaded=$false}|ConvertTo-Json|Set-Content "$capture\\report.json"
+''';(r/'qualify-native-routing-v20.ps1').write_text(s)

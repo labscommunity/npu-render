@@ -1,0 +1,48 @@
+from pathlib import Path
+import shutil,json,hashlib,tarfile
+r=Path('results/render-driver');d=r/'native-routing-v19';shutil.copytree(r/'native-routing-v18',d);lab=d/'native/windows/registered_lab'
+p=lab/'vertex_executor.hpp';s=p.read_text().replace('class RegisterExecutor {', 'class RegisterExecutor {\npublic:\n    class TextureBatch;\nprivate:\n    TextureBatch *active_batch=nullptr;')
+s=s.replace('uint64_t input_bytes = 0, output_bytes = 0;', 'uint64_t input_bytes = 0, output_bytes = 0, texture_upload_bytes=0, texture_reused_bytes=0;')
+s=s.replace('                   const TexturePixels &textures = {});\n};', '''                   const TexturePixels &textures = {});
+    // Textures must remain immutable and outlive the scope. One scope per
+    // executor; all calls are synchronous and occur on the owning caller.
+    TextureBatch bind_textures(const TexturePixels &textures);
+private:
+    Result execute_internal(const std::vector<VertexRegisters> &vertices,const VertexConstants &constants,const TexturePixels &textures,bool reuse);
+};
+class RegisterExecutor::TextureBatch {
+    friend class RegisterExecutor;
+    RegisterExecutor &owner;const TexturePixels &textures;
+    TextureBatch(RegisterExecutor &executor,const TexturePixels &resources);
+public:
+    ~TextureBatch();
+    TextureBatch(const TextureBatch &)=delete;TextureBatch &operator=(const TextureBatch &)=delete;
+    TextureBatch(TextureBatch &&)=delete;TextureBatch &operator=(TextureBatch &&)=delete;
+    Result execute(const std::vector<VertexRegisters> &vertices,const VertexConstants &constants);
+};''');p.write_text(s)
+p=lab/'vertex_executor.cpp';s=p.read_text().replace('bool failed = false, ready = false;', 'bool failed = false, ready = false, textures_uploaded=false;')
+a=s.index('RegisterExecutor::Result RegisterExecutor::execute(');b=s.index('    check(state',a)
+s=s[:a]+'''RegisterExecutor::TextureBatch::TextureBatch(RegisterExecutor &executor,const TexturePixels &resources):owner(executor),textures(resources){
+    check(owner.state && !owner.state->failed && !owner.active_batch);owner.active_batch=this;owner.state->textures_uploaded=false;
+}
+RegisterExecutor::TextureBatch::~TextureBatch(){owner.active_batch=nullptr;}
+RegisterExecutor::Result RegisterExecutor::TextureBatch::execute(const std::vector<VertexRegisters> &vertices,const VertexConstants &constants){
+    check(owner.active_batch==this);return owner.execute_internal(vertices,constants,textures,true);
+}
+RegisterExecutor::TextureBatch RegisterExecutor::bind_textures(const TexturePixels &textures){return TextureBatch(*this,textures);}
+RegisterExecutor::Result RegisterExecutor::execute(const std::vector<VertexRegisters> &vertices,const VertexConstants &constants,const TexturePixels &textures){
+    check(!active_batch);return execute_internal(vertices,constants,textures,false);
+}
+RegisterExecutor::Result RegisterExecutor::execute_internal(const std::vector<VertexRegisters> &vertices,const VertexConstants &constants,const TexturePixels &textures,bool reuse){
+''' +s[b:]
+s=s.replace('            result.input_bytes += tensor.get_byte_size();', '            if(!binding.texture || !reuse || !state->textures_uploaded)result.input_bytes += tensor.get_byte_size();')
+s=s.replace('                std::memcpy(tensor.data(),textures[binding.index].data()+binding.texture_offset,tensor.get_byte_size());', '''                if(!reuse || !state->textures_uploaded){std::memcpy(tensor.data(),textures[binding.index].data()+binding.texture_offset,tensor.get_byte_size());result.texture_upload_bytes+=tensor.get_byte_size();}
+                else result.texture_reused_bytes+=tensor.get_byte_size();''')
+s=s.replace('        state->request.infer();', '        state->request.infer();state->textures_uploaded=true;');p.write_text(s)
+p=lab/'triangle_texture_draw.cpp';s=p.read_text().replace('    const auto textures=decode_resources(s.ps,resources);', '    const auto textures=decode_resources(s.ps,resources);\n    auto texture_batch=s.pixel->bind_textures(textures);uint64_t texture_upload_bytes=0,texture_reused_bytes=0;')
+s=s.replace('s.pixel->execute(fragments,pc,textures)', 'texture_batch.execute(fragments,pc)').replace('result.timings.shader_ms+=ms(began);result.input_bytes+=pixels.input_bytes;', 'texture_upload_bytes+=pixels.texture_upload_bytes;texture_reused_bytes+=pixels.texture_reused_bytes;result.timings.shader_ms+=ms(began);result.input_bytes+=pixels.input_bytes;')
+s=s.replace('    result.vertices=std::move(shaded.vertices);', '''    std::printf("{\\\"texture_upload_scope\\\":true,\\\"host_uploaded_bytes\\\":%llu,\\\"host_recopy_bytes_avoided\\\":%llu,\\\"device_dma_measured\\\":false}\\n",static_cast<unsigned long long>(texture_upload_bytes),static_cast<unsigned long long>(texture_reused_bytes));
+    result.vertices=std::move(shaded.vertices);''');p.write_text(s)
+(r/'native-routing-v19-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-routing-v19.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-native-routing-v18.ps1').read_text().replace('native-routing-v18','native-routing-v19');(r/'build-native-routing-v19.ps1').write_text(s)

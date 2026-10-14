@@ -1,0 +1,33 @@
+from pathlib import Path
+import shutil, json, hashlib, tarfile
+r=Path('results/render-driver')
+def new(name,text):
+ p=r/name
+ with p.open('x') as f:f.write(text)
+def replace(s,a,b,n=None):
+ count=s.count(a)
+ assert count and (n is None or count==n),(a,count)
+ return s.replace(a,b)
+for old,name,file,changes in [('native-topology-control-v3','native-topology-control-v4','topology.cpp',[('1..180','1..300'),('seconds<=180','seconds<=300')]),('native-present-v8','native-present-v9','frame_present_probe.cpp',[('seconds<=90','seconds<=240'),('seconds<=120','seconds<=285')])]:
+ d=r/name;shutil.copytree(r/old,d);p=d/file;s=p.read_text()
+ for a,b in changes:s=replace(s,a,b,1)
+ p.write_text(s)
+ new(name+'-source.json',json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+ with tarfile.open(r/(name+'.tar.gz'),'w:gz') as t:t.add(d,arcname=name)
+ new('build-'+name+'.ps1',(r/('build-'+old+'.ps1')).read_text().replace(old,name))
+s=(r/'run-native-topology-helper-v3.ps1').read_text().replace('native-topology-control-v3','native-topology-control-v4').replace('ValidateRange(1,180)','ValidateRange(1,300)').replace('Minutes 4','Minutes 6');new('run-native-topology-helper-v4.ps1',s)
+s=(r/'qualify-native-registered-v15.py').read_text().replace("NR_RENDER_MEMORY_CACHE='1'","NR_RENDER_MEMORY_CACHE='0'");new('qualify-native-registered-v16.py',s)
+s=(r/'run-native-registration-v15.ps1').read_text().replace('native-registration-v15','native-registration-v16').replace('NativeRecovery-v15','NativeRecovery-v16').replace('qualify-native-registered-v15','qualify-native-registered-v16');new('run-native-registration-v16.ps1',s)
+s=(r/'recover-native-registration-v15.ps1').read_text().replace('NativeRecovery-v15','NativeRecovery-v16');new('recover-native-registration-v16.ps1',s)
+s=(r/'native_desktop_bootstrap_v10.py').read_text().replace("NR_RENDER_MEMORY_CACHE='1'","NR_RENDER_MEMORY_CACHE='0'")
+s=replace(s,"            if len(observed_frames)>=3 and time.perf_counter()-admission_started>=210:break\n",'',1)
+s=replace(s,"affine_batch='default')","affine_batch='default',memory_cache='0',monitor_seconds=360)",1)
+new('native_desktop_bootstrap_v11.py',s)
+s=(r/'run-native-desktop-v18.ps1').read_text().replace('native-desktop-admission-v18','native-desktop-admission-v19').replace('NativeDesktopRecovery-v18','NativeDesktopRecovery-v19').replace('native-desktop-v18','native-desktop-v19').replace('native-registration-v15','native-registration-v16').replace('native_desktop_bootstrap_v10','native_desktop_bootstrap_v11');new('run-native-desktop-v19.ps1',s)
+s=(r/'recover-native-desktop-v18.ps1').read_text().replace('NativeDesktopRecovery-v18','NativeDesktopRecovery-v19');new('recover-native-desktop-v19.ps1',s)
+names=['native_desktop_bootstrap_v11.py','native_process_observer_v1.py','native_session_broker_v1.py','native_session_broker_v2.py','run-native-desktop-v19.ps1','recover-native-desktop-v19.ps1'];new('native-desktop-v19-source.json',json.dumps({n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in names},indent=2)+'\n')
+s=(r/'start-native-topology-v18.ps1').read_text().replace('native-topology-v18','native-topology-v19').replace('InspectTopology-V18','InspectTopology-V19').replace('InspectTopology-V17','InspectTopology-V18');new('start-native-topology-v19.ps1',s)
+s=(r/'run-native-live-v8.ps1').read_text()
+for a,b in [('native-live-v8','native-live-v9'),('NativeLiveV8','NativeLiveV9'),('native-present-v8','native-present-v9'),('live-frame-reader-v1','live-frame-reader-v2'),('native-desktop-admission-v18','native-desktop-admission-v19'),('native-desktop-v18','native-desktop-v19'),('NativeDesktopRecovery-v18','NativeDesktopRecovery-v19'),('native-topology-extension-v10','native-topology-extension-v11'),('native-topology-v18','native-topology-v19'),('native-topology-helper-v3','native-topology-helper-v4'),('Minutes 3','Minutes 6'),("'-Seconds','180'","'-Seconds','300'"),("'--stimulus','120'","'--stimulus','285'"),("'--seconds','170'","'--seconds','290'"),('AddSeconds(100)','AddSeconds(150)'),('within 100 seconds','within 150 seconds'),('$remaining=165-','$remaining=280-'),('[Math]::Min(80,','[Math]::Min(240,'),('WaitForExit(220000)','WaitForExit(340000)')]:s=replace(s,a,b)
+new('run-native-live-v9.ps1',s)
+print('Prepared bounded live trial with memory cache disabled')

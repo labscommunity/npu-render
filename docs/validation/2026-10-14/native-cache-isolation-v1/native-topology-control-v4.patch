@@ -1,0 +1,16 @@
+--- a/topology.cpp
++++ b/topology.cpp
+@@ -47,11 +47,11 @@
+ LONG set(Topology &t,UINT action){return SetDisplayConfig(UINT(t.paths.size()),t.paths.data(),UINT(t.modes.size()),t.modes.data(),SDC_USE_SUPPLIED_DISPLAY_CONFIG|SDC_VIRTUAL_MODE_AWARE|action);}
+ }
+ int wmain(int argc,wchar_t **argv)try{
+- require(argc==2||argc==3,"expected --inspect, --validate-extend or --extend <1..180 seconds>");require(nr::present::current_console_default(),"unlocked Default console required");
++ require(argc==2||argc==3,"expected --inspect, --validate-extend or --extend <1..300 seconds>");require(nr::present::current_console_default(),"unlocked Default console required");
+  const auto before=query(QDC_ONLY_ACTIVE_PATHS),all=query(QDC_ALL_PATHS);print("before",before);print("available",all);
+  if(argc==2&&!std::wcscmp(argv[1],L"--inspect"))return 0;
+  const bool apply=argc==3&&!std::wcscmp(argv[1],L"--extend");require(apply||(argc==2&&!std::wcscmp(argv[1],L"--validate-extend")),"mode rejected");
+- wchar_t *end=nullptr;const auto seconds=apply?std::wcstoul(argv[2],&end,10):0;require(!apply||(end!=argv[2]&&!*end&&seconds>=1&&seconds<=180),"duration rejected");
++ wchar_t *end=nullptr;const auto seconds=apply?std::wcstoul(argv[2],&end,10):0;require(!apply||(end!=argv[2]&&!*end&&seconds>=1&&seconds<=300),"duration rejected");
+  auto desired=extension(before,all);print("requested",desired);const auto validation=set(desired,SDC_VALIDATE|SDC_ALLOW_CHANGES);std::printf("{\"validation_status\":%ld,\"display_changed\":false}\n",validation);std::fflush(stdout);require(validation==ERROR_SUCCESS,"extension validation failed");if(!apply)return 0;
+  auto restore=before;bool passed=false;
+  try{

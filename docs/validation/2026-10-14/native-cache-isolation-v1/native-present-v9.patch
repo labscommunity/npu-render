@@ -1,0 +1,20 @@
+--- a/frame_present_probe.cpp
++++ b/frame_present_probe.cpp
+@@ -80,7 +80,7 @@
+ }
+ #include "live_topology.hpp"
+ int live(const wchar_t *path,const wchar_t *duration,const wchar_t *producer){
+-    wchar_t *end=nullptr;const auto seconds=std::wcstoul(duration,&end,10);require(end!=duration && !*end && seconds>=1 && seconds<=90,"live duration rejected");
++    wchar_t *end=nullptr;const auto seconds=std::wcstoul(duration,&end,10);require(end!=duration && !*end && seconds>=1 && seconds<=240,"live duration rejected");
+     const auto expected_producer=std::wcstoul(producer,&end,10);require(end!=producer && !*end && expected_producer,"live producer rejected");
+     auto frame=read_frame(path);const auto h=frame.header;auto last_header=h;require(h.producer_pid==expected_producer,"live producer mismatch");
+     const auto initial=nr::live::separated();
+@@ -149,7 +149,7 @@
+     ~Stimulus(){if(window){ShowWindow(window,SW_HIDE);DestroyWindow(window);}}
+ };
+ int stimulus(const wchar_t *duration){
+-    wchar_t *end=nullptr;const auto seconds=std::wcstoul(duration,&end,10);require(end!=duration && !*end && seconds>=1 && seconds<=120,"stimulus duration rejected");require(nr::present::current_console_default(),"stimulus requires Default console");
++    wchar_t *end=nullptr;const auto seconds=std::wcstoul(duration,&end,10);require(end!=duration && !*end && seconds>=1 && seconds<=285,"stimulus duration rejected");require(nr::present::current_console_default(),"stimulus requires Default console");
+     require(SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)!=nullptr,"stimulus DPI unavailable");const auto route=nr::live::separated();Stimulus window(route.indirect);ShowWindow(window.window,SW_SHOWNOACTIVATE);UpdateWindow(window.window);const auto start=GetTickCount64();
+     while(!window.stopped && GetTickCount64()-start<uint64_t(seconds)*1000){MSG message{};while(PeekMessageW(&message,nullptr,0,0,PM_REMOVE)){if(message.message==WM_QUIT)window.stopped=true;TranslateMessage(&message);DispatchMessageW(&message);}
+         require(nr::present::current_console_default() && nr::live::same(route,nr::live::separated()),"stimulus desktop changed");const auto step=unsigned((GetTickCount64()-start)/15000);if(step!=window.step){window.step=step;InvalidateRect(window.window,nullptr,FALSE);UpdateWindow(window.window);}Sleep(100);}
