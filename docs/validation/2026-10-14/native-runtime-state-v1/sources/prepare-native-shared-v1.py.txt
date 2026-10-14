@@ -1,0 +1,26 @@
+from pathlib import Path
+import hashlib,json
+r=Path('results/render-driver')
+s=(r/'qualify-native-routing-v16.ps1').read_text().replace('native-routing-v16','native-routing-v17').replace("$env:NR_RENDER_AFFINE_BATCH='65535'", "$env:NR_RENDER_AFFINE_BATCH='65535';$env:NR_RENDER_SHARED_CORE='1'");(r/'qualify-native-routing-v17.ps1').write_text(s)
+s=(r/'package-native-driver-v12.ps1').read_text().replace('native-driver-package-v12','native-driver-package-v13').replace('native-routing-v16','native-routing-v17').replace('0.0.1312.0','0.0.1313.0').replace("'affine-regression-v2-65535\\report.json'))", "'affine-regression-v2-65535\\report.json','shared-core-regression-v1-65535\\report.json'))");(r/'package-native-driver-v13.ps1').write_text(s)
+for name in ['run-native-registration-v12.ps1','recover-native-registration-v12.ps1','qualify-native-registered-v12.py']:
+ s=(r/name).read_text().replace('-v12','-v13').replace('0.0.1312.0','0.0.1313.0').replace('native-routing-v16','native-routing-v17')
+ if name.endswith('.py'):s=s.replace("NR_RENDER_AFFINE_BATCH='65535'", "NR_RENDER_AFFINE_BATCH='65535',NR_RENDER_SHARED_CORE='1'")
+ (r/name.replace('-v12','-v13')).write_text(s)
+s=(r/'native_desktop_bootstrap_v7.py').read_text().replace("NR_RENDER_AFFINE_BATCH='65535'", "NR_RENDER_AFFINE_BATCH='65535',NR_RENDER_SHARED_CORE='1'");(r/'native_desktop_bootstrap_v8.py').write_text(s)
+for name in ['run-native-desktop-v15.ps1','recover-native-desktop-v15.ps1']:
+ s=(r/name).read_text().replace('-v15','-v16').replace('native-routing-v16','native-routing-v17').replace('native-driver-package-v12','native-driver-package-v13').replace('native-registration-v12','native-registration-v13').replace('0.0.1312.0','0.0.1313.0').replace('native_desktop_bootstrap_v7','native_desktop_bootstrap_v8');(r/name.replace('-v15','-v16')).write_text(s)
+keys=['native_desktop_bootstrap_v8.py','native_process_observer_v1.py','native_session_broker_v1.py','native_session_broker_v2.py','run-native-desktop-v16.ps1','recover-native-desktop-v16.ps1'];(r/'native-desktop-v16-source.json').write_text(json.dumps({n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in keys},indent=2)+'\n')
+s=(r/'start-native-topology-v15.ps1').read_text().replace('native-topology-v15','native-topology-v16').replace('Topology-V15','Topology-V16').replace('Topology-V14','Topology-V15');(r/'start-native-topology-v16.ps1').write_text(s)
+s=(r/'run-native-live-v5.ps1').read_text().replace('native-live-v5','native-live-v6').replace('NativeLiveV5','NativeLiveV6').replace('native-desktop-admission-v15','native-desktop-admission-v16').replace('native-desktop-v15','native-desktop-v16').replace('NativeDesktopRecovery-v15','NativeDesktopRecovery-v16').replace('native-topology-v15','native-topology-v16').replace('native-topology-extension-v7','native-topology-extension-v8')
+s=s.replace(" $report.passed=($report.presenter_task_result", ''' $presentExit=@($presentRows|Where-Object {$_.PSObject.Properties.Name -contains 'exit_code'});$stimulusRows=Read-Rows "$out\\stimulus\\probe.log";$stimulusExit=@($stimulusRows|Where-Object {$_.PSObject.Properties.Name -contains 'exit_code'})
+ $report.presenter_child_success=($presentExit.Count -eq 1 -and $presentExit[0].exit_code -eq 0)
+ $report.stimulus_child_success=($stimulusExit.Count -eq 1 -and $stimulusExit[0].exit_code -eq 0 -and @($stimulusRows|Where-Object {$_.completed -and $_.stimulus_only}).Count -eq 1)
+ $report.controlled_color_submitted=@($frames|Where-Object {$f=$_;@($published|Where-Object {$_.sequence -eq $f.source_sequence -and $_.qpc -eq $f.source_qpc -and $_.producer_pid -eq $f.producer_pid -and (($_.known_stimulus_pixel -join ',') -in @('60,180,20,255','80,30,180,255'))}).Count -eq 1}).Count -ge 1
+ $report.passed=($report.presenter_child_success -and $report.stimulus_child_success -and $report.controlled_color_submitted -and $report.presenter_task_result''')
+(r/'run-native-live-v6.ps1').write_text(s)
+(r/'prepare-native-shared-v1.ps1').write_text('''$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\\npu-render"
+foreach($name in @('qualify-native-routing-v17.ps1','package-native-driver-v13.ps1')){& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File "$r\\vm\\$name" > "$r\\vm\\$name.console.log";if($LASTEXITCODE){throw "$name failed"}}
+foreach($mode in @('stage','render')){& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File "$r\\vm\\run-native-registration-v13.ps1" -Mode $mode > "$r\\vm\\native-registration-v13-$mode.console.log";if($LASTEXITCODE){throw "$mode failed"}}
+'Native shared-core prerequisites passed'
+''')

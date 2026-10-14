@@ -1,0 +1,186 @@
+{
+  "recorded": "2026-10-14T15:48:29.832699+00:00",
+  "evidence_checks_passed": true,
+  "raw_files_remotely_hash_verified": 184,
+  "raw_bytes": 836903,
+  "native_live_v5": {
+    "passed": false,
+    "npu_operations": 165,
+    "delivery_acknowledgments": 165,
+    "physical_present_submissions": 1,
+    "controlled_stimulus_verified": false,
+    "device_lost": true,
+    "cleanup_passed": true
+  },
+  "fresh_failed_request_replay": {
+    "completed": true,
+    "created": "2026-10-14T15:42:54.362275+00:00",
+    "passed": true,
+    "header_semantics_equal": true,
+    "excluded_header_identity_fields": [
+      "nonce_0",
+      "nonce_1",
+      "sequence",
+      "client_pid"
+    ],
+    "bodies_exact": true,
+    "body_sha256": "f377063f76f38b4b177bdf7b083f46a9e0d2c27367170d777f4ead69c22733f2",
+    "failed_capture_sha256": "32ad9e19aaa3bd95e993719846e4f01aaa53ad772c11844d38f4634ba66e4856",
+    "reference_request_sha256": "04dcd84f157c9ceb1fe569a71774ed282fed070a27746a7fac045f7583b363e8",
+    "fresh_reply_pixels_exact_cpu_reference": true,
+    "verified_components": 20736000,
+    "pixels_sha256": "f6504542768e41e196a111189f27aa8bbfd3e0807f224e97b4cbd3d4cd55f1ed",
+    "state_dependent_failure_supported": true,
+    "root_cause_proven": false,
+    "desktop_offloaded": false
+  },
+  "crop_capture": {
+    "started": "2026-10-14T15:19:10.3497261Z",
+    "passed": true,
+    "completed": true,
+    "driver_installed": false,
+    "desktop_changed": false,
+    "runs": [
+      {
+        "backend": "CPU",
+        "exit_code": 0,
+        "exact_reference": true,
+        "crop_executions": 3,
+        "timings": [
+          {
+            "kind": "draw_stage_timing",
+            "iteration": 0,
+            "batch": 4096,
+            "compile_ms": 434.383,
+            "shader_ms": 0.421,
+            "projection_ms": 0.536,
+            "coverage_ms": 0.0,
+            "merger_ms": 163.614,
+            "draw_ms": 172.201,
+            "rectangle_path": true,
+            "execution_device": "CPU"
+          },
+          {
+            "kind": "draw_stage_timing",
+            "iteration": 1,
+            "batch": 4096,
+            "compile_ms": 434.383,
+            "shader_ms": 0.135,
+            "projection_ms": 0.343,
+            "coverage_ms": 0.0,
+            "merger_ms": 30.483,
+            "draw_ms": 39.126,
+            "rectangle_path": true,
+            "execution_device": "CPU"
+          },
+          {
+            "kind": "draw_stage_timing",
+            "iteration": 2,
+            "batch": 4096,
+            "compile_ms": 434.383,
+            "shader_ms": 0.172,
+            "projection_ms": 0.259,
+            "coverage_ms": 0.0,
+            "merger_ms": 30.246,
+            "draw_ms": 38.926,
+            "rectangle_path": true,
+            "execution_device": "CPU"
+          }
+        ],
+        "pixels_sha256": "94340CF80DA885505DE315A7495AF9439BD0487456F82710192DDC941BB845B4"
+      },
+      {
+        "backend": "NPU",
+        "exit_code": 0,
+        "exact_reference": true,
+        "crop_executions": 3,
+        "timings": [
+          {
+            "kind": "draw_stage_timing",
+            "iteration": 0,
+            "batch": 4096,
+            "compile_ms": 419.434,
+            "shader_ms": 8.277,
+            "projection_ms": 2.397,
+            "coverage_ms": 0.0,
+            "merger_ms": 655.113,
+            "draw_ms": 673.37,
+            "rectangle_path": true,
+            "execution_device": "NPU"
+          },
+          {
+            "kind": "draw_stage_timing",
+            "iteration": 1,
+            "batch": 4096,
+            "compile_ms": 419.434,
+            "shader_ms": 1.125,
+            "projection_ms": 0.943,
+            "coverage_ms": 0.0,
+            "merger_ms": 252.974,
+            "draw_ms": 259.248,
+            "rectangle_path": true,
+            "execution_device": "NPU"
+          },
+          {
+            "kind": "draw_stage_timing",
+            "iteration": 2,
+            "batch": 4096,
+            "compile_ms": 419.434,
+            "shader_ms": 0.49,
+            "projection_ms": 0.912,
+            "coverage_ms": 0.0,
+            "merger_ms": 164.716,
+            "draw_ms": 172.159,
+            "rectangle_path": true,
+            "execution_device": "NPU"
+          }
+        ],
+        "pixels_sha256": "94340CF80DA885505DE315A7495AF9439BD0487456F82710192DDC941BB845B4"
+      }
+    ],
+    "finished": "2026-10-14T15:19:13.5932238Z"
+  },
+  "broad_crop_qualification_passed": false,
+  "shared_core_context_results": [
+    {
+      "label": "separate-large",
+      "shared_core": "0",
+      "exit_code": 1,
+      "timed_out": false
+    },
+    {
+      "label": "shared-large",
+      "shared_core": "1",
+      "exit_code": 0,
+      "timed_out": false,
+      "result": [
+        {
+          "passed": true,
+          "checked_components": 82944000,
+          "npu_or_cpu_crop_calls": 4,
+          "negative_cases": 0,
+          "maximum_oracle_error": 0.0141014716,
+          "execution_device": "NPU",
+          "desktop_offloaded": false
+        }
+      ]
+    },
+    {
+      "label": "shared-all",
+      "shared_core": "1",
+      "exit_code": 1,
+      "timed_out": false
+    },
+    {
+      "label": "separate-all",
+      "shared_core": "0",
+      "exit_code": 1,
+      "timed_out": false
+    }
+  ],
+  "shared_core_regression_checks": 10,
+  "registered_d3d11_npu_operations": 8,
+  "desktop_offloaded": false,
+  "tahoma_tested": false,
+  "promoted_to_runtime": false
+}

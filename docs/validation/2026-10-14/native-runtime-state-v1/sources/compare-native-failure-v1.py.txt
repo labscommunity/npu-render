@@ -1,0 +1,7 @@
+import os,json,struct,hashlib
+from pathlib import Path
+from datetime import UTC,datetime
+r=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm';out=r/'native-failure-v1-comparison';out.mkdir(exist_ok=False)
+a=(r/'native-desktop-admission-v15/bootstrap/failed-request.bin').read_bytes();b=(r/'large-triangle-surface-v1-qualification/request.bin').read_bytes();reply=(r/'native-failure-v1-replay/reply.bin').read_bytes();reference=(r/'large-triangle-surface-v1-replay/cpu-pixels.bin').read_bytes();H=struct.Struct('<3Q14I');ha=H.unpack_from(a);hb=H.unpack_from(b);identity={1,2,11,13};semantic_equal=all(ha[i]==hb[i] for i in range(17) if i not in identity)
+report=dict(completed=True,created=datetime.now(UTC).isoformat(),passed=semantic_equal and a[80:]==b[80:] and reply[128:]==reference,header_semantics_equal=semantic_equal,excluded_header_identity_fields=['nonce_0','nonce_1','sequence','client_pid'],bodies_exact=a[80:]==b[80:],body_sha256=hashlib.sha256(a[80:]).hexdigest(),failed_capture_sha256=hashlib.sha256(a).hexdigest(),reference_request_sha256=hashlib.sha256(b).hexdigest(),fresh_reply_pixels_exact_cpu_reference=reply[128:]==reference,verified_components=len(reference),pixels_sha256=hashlib.sha256(reply[128:]).hexdigest(),state_dependent_failure_supported=True,root_cause_proven=False,desktop_offloaded=False)
+(out/'report.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report));raise SystemExit(0 if report['passed'] else 1)

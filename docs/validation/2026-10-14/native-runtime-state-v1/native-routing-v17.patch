@@ -1,0 +1,62 @@
+--- a/native/windows/registered_lab/CMakeLists.txt
++++ b/native/windows/registered_lab/CMakeLists.txt
+@@ -355,3 +355,9 @@
+ set_property(TARGET nr_large_resource_surface_capture_probe PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+ add_test(NAME large_resource_surface_contract COMMAND nr_large_resource_surface_capture_probe --contract)
+ 
++
++add_executable(nr_shared_core_test provider_shared_core_test.cpp)
++target_compile_features(nr_shared_core_test PRIVATE cxx_std_17)
++target_compile_options(nr_shared_core_test PRIVATE /W4 /WX)
++target_link_libraries(nr_shared_core_test PRIVATE openvino::runtime nr_registered_provider_cache)
++set_property(TARGET nr_shared_core_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+--- a/native/windows/registered_lab/provider_compile.hpp
++++ b/native/windows/registered_lab/provider_compile.hpp
+@@ -53,13 +53,23 @@
+ }
+ inline CompiledMemoryCache &compiled_memory_cache(){static CompiledMemoryCache cache(64);return cache;}
+ inline void poison_compiled_memory_cache(){compiled_memory_cache().poison();}
+-inline ov::CompiledModel compile_model(ov::Core &core,const std::shared_ptr<ov::Model> &model,
++inline bool shared_core_experiment(){
++    char *text=nullptr;size_t length=0;if(_dupenv_s(&text,&length,"NR_RENDER_SHARED_CORE"))throw std::runtime_error("cannot read shared core experiment");
++    if(!text)return false;const std::string value(text);std::free(text);
++    if(value!="0" && value!="1")throw std::invalid_argument("invalid shared core experiment");return value=="1";
++}
++inline ov::Core &shared_npu_core(){static ov::Core value;return value;}
++inline std::mutex &shared_npu_compile_mutex(){static std::mutex value;return value;}
++inline ov::CompiledModel compile_model(ov::Core &caller,const std::shared_ptr<ov::Model> &model,
+     const std::string &backend,const ov::AnyMap &properties){
++    const bool one_core=backend=="NPU" && shared_core_experiment();auto &core=one_core?shared_npu_core():caller;
++    if(one_core){static std::atomic<bool> logged{false};if(!logged.exchange(true)){std::printf("{\"shared_provider_core_experiment\":true,\"single_core_for_npu_compilation\":true,\"hardware_context_count_measured\":false}\n");std::fflush(stdout);}}
+     ++compile_calls;CompileTimer setup_timer(provider_setup_ns);const auto directory=backend=="NPU"?model_cache_directory():std::string{};
+     if(!directory.empty()){const std::filesystem::path path(directory);if(!path.is_absolute() || !std::filesystem::is_directory(path))throw std::invalid_argument("NPU cache must be an existing absolute directory");}
+     auto configured=properties;const auto shared=backend=="NPU"?shared_queue_experiment():std::nullopt;
+     if(shared)configured["NPU_SHARED_COMMON_QUEUE"]=*shared;
+     auto compile=[&](){
++        std::unique_lock<std::mutex> shared_lock(shared_npu_compile_mutex(),std::defer_lock);if(one_core)shared_lock.lock();
+         if(!directory.empty()){core.set_property(ov::cache_dir(isolated_cache_directory(directory,model).string()));++cache_requests;}
+         if(shared){
+             const ov::AnyMap queue_properties{{"NPU_SHARED_COMMON_QUEUE",*shared}};core.set_property("NPU",queue_properties);
+--- a/native/windows/registered_lab/provider_shared_core_test.cpp
++++ b/native/windows/registered_lab/provider_shared_core_test.cpp
+@@ -0,0 +1,20 @@
++#include "provider_compile.hpp"
++#include <openvino/opsets/opset13.hpp>
++#include <cstdio>
++namespace op=ov::opset13;
++int main()try{
++ if(!nr::provider::shared_core_experiment())throw std::runtime_error("shared-core experiment required");
++ std::vector<ov::InferRequest> requests;uint64_t checked=0;
++ for(size_t count:{16u,32u,64u,128u}){
++  ov::Core caller;auto input=std::make_shared<op::Parameter>(ov::element::f32,ov::Shape{1,count});input->output(0).get_tensor().set_names({"input"});
++  auto value=std::make_shared<op::Add>(input,op::Constant::create(ov::element::f32,ov::Shape{1},{1.f}));auto model=std::make_shared<ov::Model>(ov::OutputVector{value},ov::ParameterVector{input});
++  auto compiled=nr::provider::compile_model(caller,model,"NPU",ov::AnyMap{ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY)});
++  if(compiled.get_property(ov::execution_devices)!=std::vector<std::string>{"NPU"})throw std::runtime_error("device mismatch");
++  requests.push_back(compiled.create_infer_request());requests.push_back(compiled.create_infer_request());
++ }
++ for(unsigned frame=0;frame<8;++frame)for(size_t index=0;index<requests.size();++index){
++  auto &request=requests[index];auto input=request.get_tensor("input");for(size_t n=0;n<input.get_size();++n)input.data<float>()[n]=float(n+index+frame);
++  request.infer();auto output=request.get_output_tensor();for(size_t n=0;n<output.get_size();++n){if(output.data<const float>()[n]!=float(n+index+frame+1))throw std::runtime_error("shared core result mismatch");++checked;}
++ }
++ std::printf("{\"passed\":true,\"execution_device\":\"NPU\",\"checked_values\":%llu,\"independent_requests\":8,\"provider_calls\":64,\"caller_core_lifetimes_ended\":true,\"hardware_context_count_measured\":false}\n",static_cast<unsigned long long>(checked));return 0;
++}catch(const std::exception &e){std::fprintf(stderr,"%s\n",e.what());return 1;}

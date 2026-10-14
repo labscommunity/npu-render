@@ -1,0 +1,25 @@
+import struct,math,json
+f=lambda x:struct.unpack('<f',struct.pack('<f',x))[0]
+def ulp(x):
+ x=abs(x)
+ if x==0:return 2**-149
+ return 2**(math.floor(math.log2(x))-23)
+def pad(a,b,units):
+ e=max(ulp(a),ulp(b))*units
+ return a-e,b+e
+def mul(a,b):
+ p=[x*y for x in a for y in b];return pad(min(p),max(p),.5)
+def add(a,b):return pad(a[0]+b[0],a[1]+b[1],.5)
+def check(extent,low,high,u0,u1,first,end):
+ u0,u1=f(u0),f(u1);du=pad(u1-u0,u1-u0,.5);origin=None;error=0
+ for x in range(first,end):
+  q=(x+.5-low)/(high-low);t=pad(q,q,1)
+  v=mul(add((u0,u0),mul(t,du)),(extent,extent));v=v[0]-.5,v[1]-.5
+  if origin is None:origin=round(sum(v)/2)-x
+  expected=x+origin;error=max(error,abs(v[0]-expected),abs(v[1]-expected))
+ return dict(offset=origin,max_coordinate_error=error)
+x=check(2912,.5,2879.5,.000858516491,.989526153,0,2879)
+y=check(1824,.5,1799.5,.000274122809,.986567974,0,1799)
+report=dict(x=x,y=y,max_byte_error=255*(x['max_coordinate_error']+y['max_coordinate_error'])+.002,rendering_performed=False)
+report['crop_quantization_proven']=report['max_byte_error']<.5
+print(json.dumps(report,indent=2))
