@@ -1,0 +1,28 @@
+from pathlib import Path
+import shutil,hashlib,json,tarfile
+r=Path('results/render-driver');d=r/'native-routing-v15';shutil.copytree(r/'native-routing-v14',d);lab=d/'native/windows/registered_lab'
+p=lab/'linear_texture_draw.cpp';s=p.read_text().replace('#include <sstream>','#include <sstream>\n#include <cstdlib>')
+a='        const uint32_t capacity=uint64_t(w)*h>4194304?16384u:4096u;';b='''        uint32_t capacity=uint64_t(w)*h>4194304?16384u:4096u;
+        // Isolated batch-size qualification. Unset preserves the existing graph.
+        // The generated graph and cache identity include the resulting shape.
+        char *batch_text=nullptr;size_t batch_length=0;
+        require(!_dupenv_s(&batch_text,&batch_length,"NR_RENDER_AFFINE_BATCH"));
+        if(batch_text){
+            const std::string value(batch_text);std::free(batch_text);
+            if(value=="16384")capacity=16384;
+            else if(value=="65536")capacity=65536;
+            else if(value=="262144")capacity=262144;
+            else throw std::invalid_argument("unsupported affine batch experiment");
+        }
+''';assert a in s;s=s.replace(a,b).replace('s.count,false,uint64_t(s.width)*s.height>4194304','s.count,false,s.count>8192');p.write_text(s)
+p=lab/'triangle_regions.hpp';s=p.read_text().replace('large_affine?16384u:8192u','large_affine?262144u:8192u');p.write_text(s)
+p=lab/'triangle_texture_draw_test.cpp';s=p.read_text();a='    TEST(bounded_triangle_regions(std::vector<std::array<int32_t,4>>(70,{4,4,6,6})';b='''    TEST(bounded_triangle_regions({full},full,262144,false,true).size()==1);
+    for(const auto batch:{262145u,UINT32_MAX}){
+        rejected=false;try{bounded_triangle_regions({full},full,batch,false,true);}catch(const std::invalid_argument &){rejected=true;}TEST(rejected);
+    }
+    rejected=false;try{bounded_triangle_regions({full},full,16384,true,true);}catch(const std::invalid_argument &){rejected=true;}TEST(rejected);
+'''+a;assert a in s;s=s.replace(a,b);p.write_text(s)
+(r/'native-routing-v15-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-routing-v15.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-native-routing-v14.ps1').read_text().replace('native-routing-v14','native-routing-v15').replace('nr_large_resource_surface_capture_probe *>>','nr_large_resource_surface_capture_probe nr_registered_triangle_texture_draw_test nr_registered_linear_texture_draw_test *>>').replace("'nr_large_resource_surface_capture_probe.exe'))", "'nr_large_resource_surface_capture_probe.exe','nr_registered_triangle_texture_draw_test.exe','nr_registered_linear_texture_draw_test.exe'))")
+(r/'build-native-routing-v15.ps1').write_text(s)

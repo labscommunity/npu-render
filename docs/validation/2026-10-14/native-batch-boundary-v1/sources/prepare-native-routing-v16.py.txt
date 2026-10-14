@@ -1,0 +1,21 @@
+from pathlib import Path
+import shutil,hashlib,json,tarfile
+r=Path('results/render-driver');d=r/'native-routing-v16';shutil.copytree(r/'native-routing-v15b',d);p=d/'native/windows/registered_lab/linear_texture_draw.cpp';p.write_bytes((r/'affine-isolated-v2/linear_texture_draw.cpp').read_bytes())
+(r/'native-routing-v16-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-routing-v16.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-native-routing-v15b.ps1').read_text().replace('native-routing-v15b','native-routing-v16');(r/'build-native-routing-v16.ps1').write_text(s)
+s=(r/'qualify-affine-regression-v1.ps1').read_text().replace('native-routing-v15b','native-routing-v16').replace('affine-regression-v1-$Batch','affine-regression-v2-$Batch').replace("'65536','262144'","'65535'").replace("$Batch='65536'","$Batch='65535'")
+(r/'qualify-affine-regression-v2.ps1').write_text(s)
+s=(r/'qualify-native-routing-v13.ps1').read_text().replace('native-routing-v13','native-routing-v16').replace("try{", "try{\n $env:NR_RENDER_AFFINE_BATCH='65535'",1);(r/'qualify-native-routing-v16.ps1').write_text(s)
+s=(r/'package-native-driver-v11.ps1').read_text().replace('native-driver-package-v11','native-driver-package-v12').replace('native-routing-v13','native-routing-v16').replace('0.0.1311.0','0.0.1312.0')
+s=s.replace("'cache-retirement-v1\\report.json'))", "'cache-retirement-v1\\report.json','large-resource-surface-v1-comparison\\report.json','large-resource-surface-v2-qualification\\report.json','affine-regression-v2-65535\\report.json'))");(r/'package-native-driver-v12.ps1').write_text(s)
+for name in ['run-native-registration-v11.ps1','recover-native-registration-v11.ps1','qualify-native-registered-v11.py']:
+ p=r/name;s=p.read_text().replace('-v11','-v12').replace('0.0.1311.0','0.0.1312.0').replace('native-routing-v13','native-routing-v16')
+ if name.endswith('.py'):s=s.replace("NR_RENDER_COMPACT_COVERAGE='0'", "NR_RENDER_COMPACT_COVERAGE='0',NR_RENDER_AFFINE_BATCH='65535'")
+ (r/name.replace('-v11','-v12')).write_text(s)
+s=(r/'native_desktop_bootstrap_v6.py').read_text().replace("NR_RENDER_FAILURE_PACKET=str(out/'failed-request.bin')", "NR_RENDER_FAILURE_PACKET=str(out/'failed-request.bin'),NR_RENDER_AFFINE_BATCH='65535'");(r/'native_desktop_bootstrap_v7.py').write_text(s)
+for name in ['run-native-desktop-v14.ps1','recover-native-desktop-v14.ps1']:
+ s=(r/name).read_text().replace('-v14','-v15').replace('native-routing-v13','native-routing-v16').replace('native-driver-package-v11','native-driver-package-v12').replace('native-registration-v11','native-registration-v12').replace('0.0.1311.0','0.0.1312.0').replace('native_desktop_bootstrap_v6','native_desktop_bootstrap_v7');(r/name.replace('-v14','-v15')).write_text(s)
+keys=['native_desktop_bootstrap_v7.py','native_process_observer_v1.py','native_session_broker_v1.py','native_session_broker_v2.py','run-native-desktop-v15.ps1','recover-native-desktop-v15.ps1'];(r/'native-desktop-v15-source.json').write_text(json.dumps({n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in keys},indent=2)+'\n')
+s=(r/'start-native-topology-v13.ps1').read_text().replace('native-topology-v13','native-topology-v14').replace('Topology-V13','Topology-V14').replace('Topology-V12','Topology-V13');(r/'start-native-topology-v14.ps1').write_text(s)
+s=(r/'run-native-live-v3.ps1').read_text().replace('native-live-v3','native-live-v4').replace('NativeLiveV3','NativeLiveV4').replace('native-desktop-admission-v14','native-desktop-admission-v15').replace('native-desktop-v14','native-desktop-v15').replace('NativeDesktopRecovery-v14','NativeDesktopRecovery-v15').replace('native-topology-v13','native-topology-v14').replace('native-topology-extension-v6','native-topology-extension-v7');(r/'run-native-live-v4.ps1').write_text(s)

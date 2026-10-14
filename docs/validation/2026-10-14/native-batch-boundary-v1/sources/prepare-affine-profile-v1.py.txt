@@ -1,0 +1,32 @@
+from pathlib import Path
+import shutil,hashlib,json,tarfile
+r=Path('results/render-driver');d=r/'affine-profile-v1';shutil.copytree(r/'native-routing-v15b',d);lab=d/'native/windows/registered_lab'
+p=lab/'linear_texture_draw.cpp';s=p.read_text().replace('#include <cstdlib>','#include <cstdlib>\n#include <map>\n#include <iomanip>')
+s=s.replace('bool failed=false, point=false;', 'bool failed=false, point=false, profile=false;')
+a='        auto model=std::make_shared<ov::Model>';assert a in s
+s=s.replace('        ov::AnyMap properties{ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY)};', '''        ov::AnyMap properties{ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY)};
+        char *profile_text=nullptr;size_t profile_length=0;
+        require(!_dupenv_s(&profile_text,&profile_length,"NR_RENDER_AFFINE_PROFILE"));
+        if(profile_text){const std::string value(profile_text);std::free(profile_text);require(value=="1");profile=true;properties.emplace(ov::enable_profiling(true));}
+''')
+s=s.replace('    for(uint32_t y=first_row;y<end_row;y+=s.rows){', '''    const auto packing_ms=elapsed(began);double inference_ms=0;bool first_profile=true;
+    for(uint32_t y=first_row;y<end_row;y+=s.rows){''')
+a='std::memcpy(s.request.get_tensor("background").data<uint8_t>(),background.data()+offset,size_t(s.count)*4);s.request.infer();'
+b='''std::memcpy(s.request.get_tensor("background").data<uint8_t>(),background.data()+offset,size_t(s.count)*4);
+        const auto infer_began=Clock::now();s.request.infer();inference_ms+=elapsed(infer_began);
+        if(s.profile && first_profile){
+            std::map<std::string,std::pair<uint64_t,int64_t>> groups;
+            for(const auto &record:s.request.get_profiling_info()){
+                if(record.status!=ov::ProfilingInfo::Status::EXECUTED)continue;
+                auto &group=groups[record.node_type+"/"+record.exec_type];++group.first;group.second+=record.real_time.count();
+            }
+            for(const auto &entry:groups){std::ostringstream row;row<<"{\\"affine_profile_group\\":true,\\"type\\":"<<std::quoted(entry.first)<<",\\"nodes\\":"<<entry.second.first<<",\\"sum_node_real_us\\":"<<entry.second.second<<"}\\n";std::fputs(row.str().c_str(),stdout);}
+            first_profile=false;
+        }''';assert a in s;s=s.replace(a,b)
+a='    result.timings.merger_ms=elapsed(began);';b='''    if(s.profile)std::printf("{\\"affine_host_timing\\":true,\\"batch_pixels\\":%u,\\"batch_rows\\":%u,\\"tiles\\":%llu,\\"packing_ms\\":%.3f,\\"inference_wall_ms\\":%.3f,\\"loop_plus_packing_ms\\":%.3f}\\n",s.count,s.rows,static_cast<unsigned long long>(result.tile_executions),packing_ms,inference_ms,elapsed(began));
+'''+a;assert a in s;s=s.replace(a,b);p.write_text(s)
+(r/'affine-profile-v1-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'affine-profile-v1.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-native-routing-v15b.ps1').read_text();start=s.index('$name=');s=s[:start]+s[start:].replace('native-routing-v15b','affine-profile-v1');start=s.index(' --target ');end=s.index(' *>> $log',start);s=s[:start]+' --target nr_registered_draw_replay_probe'+s[end:]
+start=s.index('& "$b\\Release\\nr_native_probe_lease_test.exe"');end=s.index('$hashes=@{}',start);s=s[:start]+s[end:]
+start=s.index("@('nr_registered_local_indexed_worker.exe'");end=s.index(')){$hashes',start);s=s[:start]+"@('nr_registered_draw_replay_probe.exe'"+s[end:];s=s.replace('admission_contract_passed=$true','admission_contract_passed=$false');(r/'build-affine-profile-v1.ps1').write_text(s)

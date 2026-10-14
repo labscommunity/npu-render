@@ -1,0 +1,10 @@
+from pathlib import Path
+import json,hashlib
+r=Path.home()/'AppData/Local/npu-render/vm';src=r/'large-resource-surface-v1-replay';out=r/'large-resource-surface-v1-comparison';out.mkdir(exist_ok=False)
+a=(src/'cpu-pixels.bin').read_bytes();b=(src/'npu-pixels.bin').read_bytes();assert len(a)==len(b)==20736000
+changed=[(n,abs(x-y)) for n,(x,y) in enumerate(zip(a,b)) if x!=y]
+maximum=max((d for _,d in changed),default=0);outside=sum(n//(2880*4)<1704 for n,_ in changed);channels={str(c):sum(n%4==c for n,_ in changed) for c in range(4)}
+rows=lambda p:[json.loads(x) for x in p.read_text().splitlines() if x.startswith('{')]
+oracles={k:next(x for x in rows(src/(k+'.stdout.jsonl')) if 'coverage_exact' in x) for k in ('cpu','npu')}
+report=dict(passed=maximum<=1 and not outside and all(o['coverage_exact'] and o['oracle_max_byte_error']<=1 for o in oracles.values()),exact_cpu_npu_match=not changed,maximum_cpu_npu_byte_difference=maximum,differing_components=len(changed),outside_scissor_differences=outside,channels=channels,independent_oracles=oracles,all_components=len(a),cpu_sha256=hashlib.sha256(a).hexdigest(),npu_sha256=hashlib.sha256(b).hexdigest(),accepted_tolerance_source='existing replay oracle permits one 8-bit quantization step; exact coverage and unchanged outside-scissor pixels required',desktop_offloaded=False)
+(out/'report.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report));raise SystemExit(0 if report['passed'] else 1)

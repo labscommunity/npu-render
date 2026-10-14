@@ -1,0 +1,9 @@
+from pathlib import Path
+import shutil,hashlib,json,tarfile
+r=Path('results/render-driver');d=r/'native-routing-v15b';shutil.copytree(r/'native-routing-v15',d);lab=d/'native/windows/registered_lab'
+p=lab/'large_surface_capture_probe.cpp';s=p.read_text();assert 'i==2?16385u:14400u' in s;p.write_text(s.replace('i==2?16385u:14400u','i==2?262145u:14400u'))
+(r/'native-routing-v15b-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-routing-v15b.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-native-routing-v15.ps1').read_text().replace('native-routing-v15','native-routing-v15b');(r/'build-native-routing-v15b.ps1').write_text(s)
+for name in ['qualify-affine-batches-v1.ps1','qualify-affine-regression-v1.ps1']:
+ p=r/name;s=p.read_text().replace('native-routing-v15','native-routing-v15b');p.write_text(s)

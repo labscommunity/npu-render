@@ -30,6 +30,12 @@ role, and any GPU rendering/copy cost in the bridge must be measured.
 
 ## Immediate experiment
 
+The [resource and batch investigation](../validation/2026-10-14/native-batch-boundary-v1/README.md)
+qualifies the next two-texture draw and isolates a batch-shape-dependent device
+failure. Capacity 65,535 passes the full sampler checks; larger requested batches
+are not generally safe. Repeat native delivery before integrating the separate
+opaque-crop performance candidate.
+
 The [latest native resource trial](../validation/2026-10-14/native-resource-progress-v1/README.md)
 records successful recovery and the remaining resource-table capacity gap.
 The [live bridge investigation](../validation/2026-10-14/native-live-bridge-v1/README.md)

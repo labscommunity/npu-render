@@ -1,0 +1,11 @@
+--- a/native/windows/registered_lab/large_surface_capture_probe.cpp
++++ b/native/windows/registered_lab/large_surface_capture_probe.cpp
+@@ -27,7 +27,7 @@
+     const std::array<int32_t,4> full{0,0,2880,1800};
+     nr::capture::check(nr::raster::bounded_triangle_regions({full,full},full,14400,false,true).size()==2);
+     for(unsigned i=0;i<4;++i){bool rejected=false;try{
+-        (void)nr::raster::bounded_triangle_regions({full},full,i==2?16385u:14400u,i==3,i!=0);
++        (void)nr::raster::bounded_triangle_regions({full},full,i==2?262145u:14400u,i==3,i!=0);
+     }catch(const std::invalid_argument &){rejected=true;}
+         if(i==1)nr::capture::check(!rejected);else{nr::capture::check(rejected);++negatives;}}
+     if(argc==2 && !std::strcmp(argv[1],"--contract")){

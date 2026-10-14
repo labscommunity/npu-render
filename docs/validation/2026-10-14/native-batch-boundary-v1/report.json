@@ -1,0 +1,65 @@
+{
+  "recorded": "2026-10-14T15:25:32.489065+00:00",
+  "evidence_checks_passed": true,
+  "raw_files_remotely_hash_verified": 205,
+  "raw_bytes": 895259,
+  "large_resource_draw": {
+    "abi": 23,
+    "pixel_components": 20736000,
+    "exact_cpu_npu_match": false,
+    "maximum_cpu_npu_byte_difference": 1,
+    "differing_components": 48,
+    "coverage_exact": true,
+    "outside_scissor_exact": true,
+    "worker_delivery_matches_qualified_npu_reference_exactly": true
+  },
+  "batch_experiment": [
+    {
+      "requested_batch": "default",
+      "median_draw_ms": 9701.381,
+      "draws_ms": [
+        9701.381,
+        9932.058,
+        9459.173
+      ],
+      "model_setup_ms": 420.941,
+      "exact_pixels": true
+    },
+    {
+      "requested_batch": "65536",
+      "median_draw_ms": 7484.463,
+      "draws_ms": [
+        7496.321,
+        7390.468,
+        7484.463
+      ],
+      "model_setup_ms": 4371.713,
+      "exact_pixels": true
+    },
+    {
+      "requested_batch": "262144",
+      "median_draw_ms": 7170.231,
+      "draws_ms": [
+        7257.219,
+        7065.65,
+        7170.231
+      ],
+      "model_setup_ms": 6357.009,
+      "exact_pixels": true
+    }
+  ],
+  "isolated_regression": {
+    "default_passes": 4,
+    "batch_16384_passes": 4,
+    "batch_65536_failures": 4,
+    "batch_262144_failures": 4,
+    "batch_65535_passes": 4
+  },
+  "full_batch_65535_regression_runs": 9,
+  "registered_d3d11_npu_operations": 8,
+  "cleanup_passed": true,
+  "memory_integrity_preserved": true,
+  "desktop_offloaded": false,
+  "tahoma_tested": false,
+  "promoted_to_runtime": false
+}

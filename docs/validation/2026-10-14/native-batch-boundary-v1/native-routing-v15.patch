@@ -1,0 +1,65 @@
+--- a/native/windows/registered_lab/linear_texture_draw.cpp
++++ b/native/windows/registered_lab/linear_texture_draw.cpp
+@@ -8,6 +8,7 @@
+ #include <cstring>
+ #include <chrono>
+ #include <sstream>
++#include <cstdlib>
+ namespace nr::raster {
+ namespace {
+ void require(bool v) { if (!v) throw std::invalid_argument("unsupported linear-textured rectangle draw"); }
+@@ -83,7 +84,19 @@
+             (vs.outputs[pixel.color]&15)==15 && (vs.outputs[pixel.uv]&3)==3);
+         // Larger targets use a larger NPU raster batch so full-resolution
+         // rendering does not require one inference for every output row.
+-        const uint32_t capacity=uint64_t(w)*h>4194304?16384u:4096u;
++        uint32_t capacity=uint64_t(w)*h>4194304?16384u:4096u;
++        // Isolated batch-size qualification. Unset preserves the existing graph.
++        // The generated graph and cache identity include the resulting shape.
++        char *batch_text=nullptr;size_t batch_length=0;
++        require(!_dupenv_s(&batch_text,&batch_length,"NR_RENDER_AFFINE_BATCH"));
++        if(batch_text){
++            const std::string value(batch_text);std::free(batch_text);
++            if(value=="16384")capacity=16384;
++            else if(value=="65536")capacity=65536;
++            else if(value=="262144")capacity=262144;
++            else throw std::invalid_argument("unsupported affine batch experiment");
++        }
++
+         rows=(std::min)(h,capacity/w);while(h%rows)--rows;count=w*rows;
+         auto parameter=[](ov::element::Type type,ov::Shape shape,const char *name) {
+             auto p=std::make_shared<op::Parameter>(type,shape);p->output(0).get_tensor().set_names({name});return p;
+@@ -237,7 +250,7 @@
+     // The provider has already projected and bounded both triangles. Schedule
+     // only row blocks intersecting those bounds and the scissor; the graph
+     // still decides exact sample coverage, sampling and blending.
+-    const auto regions=bounded_triangle_regions(projected.triangle_bounds,clip,s.count,false,uint64_t(s.width)*s.height>4194304);
++    const auto regions=bounded_triangle_regions(projected.triangle_bounds,clip,s.count,false,s.count>8192);
+     uint32_t first_row=s.height,end_row=0;
+     for(const auto &region:regions)if(region[0]<region[2] && region[1]<region[3]){
+         first_row=(std::min)(first_row,uint32_t(region[1]));end_row=(std::max)(end_row,uint32_t(region[3]));
+--- a/native/windows/registered_lab/triangle_regions.hpp
++++ b/native/windows/registered_lab/triangle_regions.hpp
+@@ -9,7 +9,7 @@
+ // This does not evaluate vertex shaders, triangle edges or sample coverage.
+ inline std::vector<std::array<int32_t,4>> bounded_triangle_regions(
+     const std::vector<std::array<int32_t,4>> &bounds,const std::array<int32_t,4> &clip,uint32_t batch,bool quads=false,bool large_affine=false){
+-    if(!batch || batch>(large_affine?16384u:8192u) || (large_affine && quads) || (quads && batch%4) || clip[0]<0 || clip[1]<0 || clip[0]>clip[2] || clip[1]>clip[3] || clip[2]>8192 || clip[3]>8192)
++    if(!batch || batch>(large_affine?262144u:8192u) || (large_affine && quads) || (quads && batch%4) || clip[0]<0 || clip[1]<0 || clip[0]>clip[2] || clip[1]>clip[3] || clip[2]>8192 || clip[3]>8192)
+         throw std::invalid_argument("invalid triangle region parameters");
+     std::vector<std::array<int32_t,4>> regions;regions.reserve(bounds.size());uint64_t tiles=0;
+     for(const auto &b:bounds){
+--- a/native/windows/registered_lab/triangle_texture_draw_test.cpp
++++ b/native/windows/registered_lab/triangle_texture_draw_test.cpp
+@@ -17,6 +17,11 @@
+     TEST(bounded_triangle_regions(std::vector<std::array<int32_t,4>>(32,full),full,8192).size()==32);
+     rejected=false;try{bounded_triangle_regions(std::vector<std::array<int32_t,4>>(33,full),full,8192);}catch(const std::invalid_argument &){rejected=true;}TEST(rejected);
+     rejected=false;try{bounded_triangle_regions({full},full,16384);}catch(const std::invalid_argument &){rejected=true;}TEST(rejected);
++    TEST(bounded_triangle_regions({full},full,262144,false,true).size()==1);
++    for(const auto batch:{262145u,UINT32_MAX}){
++        rejected=false;try{bounded_triangle_regions({full},full,batch,false,true);}catch(const std::invalid_argument &){rejected=true;}TEST(rejected);
++    }
++    rejected=false;try{bounded_triangle_regions({full},full,16384,true,true);}catch(const std::invalid_argument &){rejected=true;}TEST(rejected);
+     TEST(bounded_triangle_regions(std::vector<std::array<int32_t,4>>(70,{4,4,6,6}),full,256).size()==70);
+     TEST(bounded_triangle_regions(std::vector<std::array<int32_t,4>>(70,full),{0,0,0,0},1).size()==70);
+     for(const std::array<int32_t,4> bad:{std::array<int32_t,4>{-1,0,2,2},{0,0,8193,2},{2,2,1,1}}){

@@ -1,0 +1,10 @@
+--- a/native/windows/registered_lab/linear_texture_draw.cpp
++++ b/native/windows/registered_lab/linear_texture_draw.cpp
+@@ -92,6 +92,7 @@
+         if(batch_text){
+             const std::string value(batch_text);std::free(batch_text);
+             if(value=="16384")capacity=16384;
++            else if(value=="65535")capacity=65535;
+             else if(value=="65536")capacity=65536;
+             else if(value=="262144")capacity=262144;
+             else throw std::invalid_argument("unsupported affine batch experiment");

@@ -1,0 +1,49 @@
+from pathlib import Path
+import shutil,hashlib,json,tarfile
+r=Path('results/render-driver');d=r/'native-routing-v14';shutil.copytree(r/'native-routing-v13',d);lab=d/'native/windows/registered_lab'
+p=lab/'indexed_exchange_protocol.hpp';s=p.read_text().replace('h.abi==22)?h.reserved','h.abi==22 || h.abi==23)?h.reserved').replace('return h.abi==19?8388608u','return (h.abi==19 || h.abi==23)?8388608u')
+a='    if(h.abi==22){';b='''    // ABI 23 combines bounded large targets with the resource-table payload.
+    // Shader/format/sampler checks and the selected-device tile limit remain.
+    if(h.abi==23){
+        const auto area=uint64_t(h.width)*h.height;
+        if(large_uniform || large_clear || area<=4194304 || area>large_uniform_pixels ||
+           h.body_bytes>max_packet_bytes-sizeof(Header) || (h.flags&0x3002)!=0x2002 ||
+           (h.reserved!=8 && h.reserved!=9 && h.reserved!=10 && h.reserved!=11 && h.reserved!=12 && h.reserved!=14 && h.reserved!=15))return false;
+        auto legacy=h;legacy.abi=h.reserved;legacy.reserved=0;legacy.body_bytes=0;
+        return shape_valid(legacy,component_payload,true,false);
+    }
+'''+a;assert a in s;s=s.replace(a,b)
+s=s.replace('if(h.abi!=19 && (h.flags&0x2000)', 'if(h.abi!=19 && h.abi!=23 && (h.flags&0x2000)')
+a='    if(h.abi!=22 && uint64_t(h.width)*h.height>4194304';b='''    if(h.abi!=23 && uint64_t(h.width)*h.height>4194304 && (h.flags&0x3002)==0x2002){
+        const auto legacy=h.abi==19?h.reserved:h.abi;
+        require((legacy==8 || legacy==9 || legacy==10 || legacy==11 || legacy==12 || legacy==14 || legacy==15) && (h.abi==19 || !h.reserved));h.reserved=legacy;h.abi=23;
+    }
+'''+a;assert a in s;s=s.replace(a,b).replace('h.abi!=22 && !color_clear(h)','h.abi!=22 && h.abi!=23 && !color_clear(h)');p.write_text(s)
+s=(lab/'large_quad_texture_capture_probe.cpp').read_text().replace('h.abi=19;','h.abi=23;').replace('bad.reserved=19','bad.reserved=23').replace('h.width=2048;h.height=68','h.width=2880;h.height=1800').replace('header.abi==19','header.abi==23').replace('large_quad_texture','large_resource_surface').replace('args[0]==6','args[0]==30')
+a='    auto too_big=t;';b='''    auto expanded=h;expanded.body_bytes=ex::legacy_packet_bytes;nr::capture::check(ex::shape_valid(expanded));expanded.body_bytes=ex::max_packet_bytes;nr::capture::check(!ex::shape_valid(expanded));++negatives;
+    auto small_target=h;small_target.width=2048;small_target.height=68;nr::capture::check(!ex::shape_valid(small_target));++negatives;
+'''+a;s=s.replace(a,b)
+start=s.index('    nr::capture::check(nr::shader::quad_derivatives(r.pixel));');end=s.index('    if(raster[7])',start)
+s=s[:start]+'''    for(unsigned slot=0;slot<16;++slot){
+        if(r.pixel.samplers[slot]){
+            const auto sm=s.values<uint32_t>("sampler-2-"+std::to_string(slot));
+            nr::capture::check(sm.size()==13 && nr::registered_lab::single_mip_filter_supported(sm[0]) && sm[1]==3 && sm[2]==3 && sm[3]==3 && !sm[4] && !sm[11]);
+            r.samplers[slot].filter=nr::registered_lab::single_mip_point_filter(sm[0])?nr::shader::TextureFilter::point:nr::shader::TextureFilter::linear;
+        }
+        if(!r.pixel.textures[slot])continue;
+        const auto name="resource-2-"+std::to_string(slot);
+        const auto desc=s.values<uint32_t>(name+"-description"),view_desc=s.values<uint32_t>(name+"-view");
+        nr::capture::check(desc.size()==10 && view_desc.size()==4 && !view_desc[3] && (desc[5]==28 || desc[5]==87));
+        r.resources[slot]={desc[3],desc[4],desc[5],s.values<nr::raster::PackedColor>(name)};
+    }
+    nr::capture::check(r.pixel.textures[0] && r.pixel.textures[1]);
+''' + s[end:]
+s=s.replace('decoded.resources[0].pixels==r.resources[0].pixels &&','decoded.resources[0].pixels==r.resources[0].pixels && decoded.resources[1].pixels==r.resources[1].pixels &&')
+s=s.replace('    const auto decoded=ex::decode(bytes);','    const auto repeated=ex::encode(r);nr::capture::check(repeated==bytes);\n    const auto decoded=ex::decode(bytes);')
+(lab/'large_resource_surface_capture_probe.cpp').write_text(s)
+p=lab/'CMakeLists.txt';s=p.read_text();block=s[s.index('add_executable(nr_large_triangle_surface_capture_probe'):];p.write_text(s+'\n'+block.replace('large_triangle_surface','large_resource_surface'))
+(r/'native-routing-v14-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-routing-v14.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-native-routing-v13.ps1').read_text().replace('native-routing-v13','native-routing-v14').replace('nr_registered_provider_memory_cache_test *>>','nr_registered_provider_memory_cache_test nr_large_resource_surface_capture_probe *>>').replace('|large_triangle_surface_contract)', '|large_triangle_surface_contract|large_resource_surface_contract)').replace("'nr_registered_provider_memory_cache_test.exe'))", "'nr_registered_provider_memory_cache_test.exe','nr_large_resource_surface_capture_probe.exe'))")
+(r/'build-native-routing-v14.ps1').write_text(s)
+s=(r/'replay-large-triangle-surface-v1.ps1').read_text().replace('native-routing-v13','native-routing-v14').replace('large-triangle-surface-v1-replay','large-resource-surface-v1-replay').replace('native-desktop-admission-v13','native-desktop-admission-v14').replace('9F0C079B60569E32F9CA9A979224A163594481E03CB612259DD24F5D77536D29','50221ECD856ED49B9A7F9215E55BE6815F33CB38DA47607460F57E9959EC8484');(r/'replay-large-resource-surface-v1.ps1').write_text(s)
