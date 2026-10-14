@@ -1,0 +1,167 @@
+{
+  "recorded": "2026-10-14T16:11:08.088544+00:00",
+  "evidence_checks_passed": true,
+  "raw_files_remotely_hash_verified": 254,
+  "raw_bytes": 1449388,
+  "tiled_npu_suites": 2,
+  "npu_components_checked": 573456384,
+  "npu_crop_requests": 2304,
+  "integrated_regression_checks": 12,
+  "default_batch_regression_checks": 10,
+  "transition_draws_per_backend_run": 60,
+  "native_live_v6": {
+    "passed": false,
+    "npu_operations": 129,
+    "device_lost": true,
+    "dwm_crashed": true,
+    "cleanup_passed": true
+  },
+  "native_live_v7": {
+    "passed": false,
+    "npu_operations": 188,
+    "physical_present_submissions": 1,
+    "backbuffer_exact": true,
+    "controlled_stimulus_verified": false,
+    "invalid_npu_projection_bounds": true,
+    "cleanup_passed": true
+  },
+  "fresh_failed_request_replay": {
+    "started": "2026-10-14T16:03:23.098993+00:00",
+    "completed": true,
+    "passed": true,
+    "driver_installed": false,
+    "desktop_changed": false,
+    "pixel_correctness_verified": false,
+    "capture_sha256": "344b05f682d0940ae371d75a89124c9397cf24c9685f8a8f4cb80c507e703262",
+    "worker_pid": 16704,
+    "client_pid": 10572,
+    "abi": 23,
+    "legacy_abi": 8,
+    "request_bytes": 24992136,
+    "reply_bytes": 20736128,
+    "npu_operation_receipts": 1,
+    "delivery_acknowledgments": 1,
+    "rendered_components": 20736000,
+    "pixels_sha256": "fac6cedf88b9f05bdf6873cdabfd4d92b063f31b9f84f2aabce4efbd916ebc44",
+    "receipt": [
+      1434465732,
+      42049180,
+      291,
+      276480,
+      76,
+      0,
+      0
+    ],
+    "worker_exit_code": 0,
+    "finished": "2026-10-14T16:03:27.414613+00:00"
+  },
+  "captured_crop_replay": {
+    "started": "2026-10-14T15:55:44.9158707Z",
+    "passed": true,
+    "completed": true,
+    "driver_installed": false,
+    "desktop_changed": false,
+    "runs": [
+      {
+        "backend": "CPU",
+        "exit_code": 0,
+        "exact_reference": true,
+        "crop_executions": 3,
+        "timings": [
+          {
+            "kind": "draw_stage_timing",
+            "iteration": 0,
+            "batch": 4096,
+            "compile_ms": 272.736,
+            "shader_ms": 0.296,
+            "projection_ms": 0.469,
+            "coverage_ms": 0.0,
+            "merger_ms": 69.643,
+            "draw_ms": 76.606,
+            "rectangle_path": true,
+            "execution_device": "CPU"
+          },
+          {
+            "kind": "draw_stage_timing",
+            "iteration": 1,
+            "batch": 4096,
+            "compile_ms": 272.736,
+            "shader_ms": 0.136,
+            "projection_ms": 0.302,
+            "coverage_ms": 0.0,
+            "merger_ms": 35.051,
+            "draw_ms": 41.652,
+            "rectangle_path": true,
+            "execution_device": "CPU"
+          },
+          {
+            "kind": "draw_stage_timing",
+            "iteration": 2,
+            "batch": 4096,
+            "compile_ms": 272.736,
+            "shader_ms": 0.12,
+            "projection_ms": 0.266,
+            "coverage_ms": 0.0,
+            "merger_ms": 35.718,
+            "draw_ms": 42.274,
+            "rectangle_path": true,
+            "execution_device": "CPU"
+          }
+        ],
+        "pixels_sha256": "94340CF80DA885505DE315A7495AF9439BD0487456F82710192DDC941BB845B4"
+      },
+      {
+        "backend": "NPU",
+        "exit_code": 0,
+        "exact_reference": true,
+        "crop_executions": 3,
+        "timings": [
+          {
+            "kind": "draw_stage_timing",
+            "iteration": 0,
+            "batch": 4096,
+            "compile_ms": 254.869,
+            "shader_ms": 5.239,
+            "projection_ms": 2.376,
+            "coverage_ms": 0.0,
+            "merger_ms": 314.011,
+            "draw_ms": 327.632,
+            "rectangle_path": true,
+            "execution_device": "NPU"
+          },
+          {
+            "kind": "draw_stage_timing",
+            "iteration": 1,
+            "batch": 4096,
+            "compile_ms": 254.869,
+            "shader_ms": 0.445,
+            "projection_ms": 0.912,
+            "coverage_ms": 0.0,
+            "merger_ms": 240.937,
+            "draw_ms": 248.41,
+            "rectangle_path": true,
+            "execution_device": "NPU"
+          },
+          {
+            "kind": "draw_stage_timing",
+            "iteration": 2,
+            "batch": 4096,
+            "compile_ms": 254.869,
+            "shader_ms": 0.492,
+            "projection_ms": 0.968,
+            "coverage_ms": 0.0,
+            "merger_ms": 302.584,
+            "draw_ms": 310.119,
+            "rectangle_path": true,
+            "execution_device": "NPU"
+          }
+        ],
+        "pixels_sha256": "94340CF80DA885505DE315A7495AF9439BD0487456F82710192DDC941BB845B4"
+      }
+    ],
+    "finished": "2026-10-14T15:55:47.4108008Z"
+  },
+  "desktop_offloaded": false,
+  "tahoma_tested": false,
+  "promoted_to_runtime": false
+}

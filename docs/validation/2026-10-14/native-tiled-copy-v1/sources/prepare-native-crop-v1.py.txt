@@ -1,0 +1,27 @@
+from pathlib import Path
+import hashlib,json
+r=Path('results/render-driver')
+s=(r/'qualify-native-routing-v17.ps1').read_text().replace('native-routing-v17','native-routing-v18').replace("$env:NR_RENDER_SHARED_CORE='1'", "$env:NR_RENDER_SHARED_CORE='1';$env:NR_RENDER_OPAQUE_CROP='1'");(r/'qualify-native-routing-v18.ps1').write_text(s)
+s=(r/'package-native-driver-v13.ps1').read_text().replace('native-driver-package-v13','native-driver-package-v14').replace('native-routing-v17','native-routing-v18').replace('0.0.1313.0','0.0.1314.0').replace("'shared-core-regression-v1-65535\\report.json'))", "'shared-core-regression-v1-65535\\report.json','crop-integrated-regression-v1-65535\\report.json','crop-integrated-v1-replay\\report.json','crop-transition-v1-qualification\\report.json'))");(r/'package-native-driver-v14.ps1').write_text(s)
+for name in ['run-native-registration-v13.ps1','recover-native-registration-v13.ps1','qualify-native-registered-v13.py']:
+ s=(r/name).read_text().replace('-v13','-v14').replace('0.0.1313.0','0.0.1314.0').replace('native-routing-v17','native-routing-v18')
+ if name.endswith('.py'):s=s.replace("NR_RENDER_SHARED_CORE='1'", "NR_RENDER_SHARED_CORE='1',NR_RENDER_OPAQUE_CROP='1'")
+ (r/name.replace('-v13','-v14')).write_text(s)
+s=(r/'native_desktop_bootstrap_v8.py').read_text().replace("NR_RENDER_SHARED_CORE='1'", "NR_RENDER_SHARED_CORE='1',NR_RENDER_OPAQUE_CROP='1'");(r/'native_desktop_bootstrap_v9.py').write_text(s)
+for name in ['run-native-desktop-v16.ps1','recover-native-desktop-v16.ps1']:
+ s=(r/name).read_text().replace('-v16','-v17').replace('native-routing-v17','native-routing-v18').replace('native-driver-package-v13','native-driver-package-v14').replace('native-registration-v13','native-registration-v14').replace('0.0.1313.0','0.0.1314.0').replace('native_desktop_bootstrap_v8','native_desktop_bootstrap_v9');(r/name.replace('-v16','-v17')).write_text(s)
+keys=['native_desktop_bootstrap_v9.py','native_process_observer_v1.py','native_session_broker_v1.py','native_session_broker_v2.py','run-native-desktop-v17.ps1','recover-native-desktop-v17.ps1'];(r/'native-desktop-v17-source.json').write_text(json.dumps({n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in keys},indent=2)+'\n')
+s=(r/'start-native-topology-v16.ps1').read_text().replace('native-topology-v16','native-topology-v17').replace('Topology-V16','Topology-V17').replace('Topology-V15','Topology-V16');(r/'start-native-topology-v17.ps1').write_text(s)
+s=(r/'run-native-live-v6.ps1').read_text().replace('native-live-v6','native-live-v7').replace('NativeLiveV6','NativeLiveV7').replace('native-desktop-admission-v16','native-desktop-admission-v17').replace('native-desktop-v16','native-desktop-v17').replace('NativeDesktopRecovery-v16','NativeDesktopRecovery-v17').replace('native-topology-v16','native-topology-v17').replace('native-topology-extension-v8','native-topology-extension-v9')
+s=s.replace(' foreach($process in @($relay,$topology,$native)){if($process){$process.Dispose()}}', ''' if($native -and $native.HasExited){$native.Refresh();$report.native_exit=$native.ExitCode}
+ if($topology -and $topology.HasExited){$topology.Refresh();$report.topology_exit=$topology.ExitCode}
+ try{$finalNative=Get-Content "$r\\vm\\native-desktop-admission-v17\\report.json" -Raw|ConvertFrom-Json;$report.cleanup_passed=[bool]$finalNative.cleanup_passed}catch{$report.cleanup_passed=$false;$report.cleanup_read_error=$_.Exception.Message}
+ foreach($process in @($relay,$topology,$native)){if($process){$process.Dispose()}}''')
+(r/'run-native-live-v7.ps1').write_text(s)
+(r/'prepare-native-crop-v1.ps1').write_text('''$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\\npu-render"
+foreach($name in @('qualify-crop-integrated-regression-v1.ps1','replay-crop-integrated-v1.ps1')){& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File "$r\\vm\\$name" > "$r\\vm\\$name.console.log";if($LASTEXITCODE){throw "$name failed"}}
+if(Test-Path "$r\\vm\\crop-transition-v1"){throw 'Transition source exists'};& tar.exe -xf "$r\\vm\\crop-transition-v1.tar.gz" -C "$r\\vm";if($LASTEXITCODE){throw 'Extraction failed'}
+foreach($name in @('build-crop-transition-v1.ps1','run-crop-transition-v1.ps1','qualify-native-routing-v18.ps1','package-native-driver-v14.ps1')){& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File "$r\\vm\\$name" > "$r\\vm\\$name.console.log";if($LASTEXITCODE){throw "$name failed"}}
+foreach($mode in @('stage','render')){& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File "$r\\vm\\run-native-registration-v14.ps1" -Mode $mode > "$r\\vm\\native-registration-v14-$mode.console.log";if($LASTEXITCODE){throw "$mode failed"}}
+'Native crop prerequisites passed'
+''')

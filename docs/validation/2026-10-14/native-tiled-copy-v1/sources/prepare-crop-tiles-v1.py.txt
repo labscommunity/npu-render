@@ -1,0 +1,58 @@
+from pathlib import Path
+import shutil,json,hashlib,tarfile
+r=Path('results/render-driver');d=r/'crop-tiles-v1';shutil.copytree(r/'crop-context-v1',d)
+p=d/'opaque_affine_crop.hpp';s=p.read_text().replace('struct Entry {','// Tile keys: rows, output x, width, source x, reserved, reserved.\n    struct Entry {')
+a=s.index('    Entry create(');b=s.index('\npublic:',a)
+s=s[:a]+r'''    Entry create(const Key &key){
+        namespace op=ov::opset13;using Node=std::shared_ptr<ov::Node>;
+        const auto values=[](std::initializer_list<int64_t> a){return op::Constant::create(ov::element::i64,ov::Shape{a.size()},std::vector<int64_t>(a));};
+        const auto rows=key[0],x=key[1],cw=key[2],sx=key[3];
+        auto source=std::make_shared<op::Parameter>(ov::element::u8,ov::Shape{rows,sw,4});source->output(0).get_tensor().set_names({"source"});
+        auto bg=std::make_shared<op::Parameter>(ov::element::u8,ov::Shape{rows,w,4});bg->output(0).get_tensor().set_names({"background"});
+        auto slice=[&](const Node &node,uint32_t start,uint32_t cols,uint32_t channel,uint32_t channels)->Node{
+            return std::make_shared<op::Slice>(node,values({0,start,channel}),values({rows,start+cols,channel+channels}),values({1,1,1}),values({0,1,2}));
+        };
+        ov::OutputVector channels;for(uint32_t c=0;c<3;++c)channels.push_back(slice(source,sx,cw,swap?2-c:c,1));
+        channels.push_back(op::Constant::create(ov::element::u8,ov::Shape{rows,cw,1},{uint8_t(255)}));
+        Node center=std::make_shared<op::Concat>(channels,2);ov::OutputVector output;
+        if(x)output.push_back(slice(bg,0,x,0,4));output.push_back(center);if(x+cw<w)output.push_back(slice(bg,x+cw,w-x-cw,0,4));
+        Node result=output.size()==1?output[0].get_node_shared_ptr():Node(std::make_shared<op::Concat>(output,1));
+        const bool needs_background=x || cw!=w;ov::ParameterVector ports{source};if(needs_background)ports.push_back(bg);
+        auto graph=std::make_shared<ov::Model>(ov::OutputVector{result},ports);
+        const ov::AnyMap properties{ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY)};
+        auto model=nr::provider::compile_model(core,graph,backend,properties);const auto devices=model.get_property(ov::execution_devices);
+        if(devices.size()!=1 || !(devices[0]==backend || devices[0].rfind(backend+".",0)==0))throw std::runtime_error("crop device mismatch");
+        return {model,model.create_infer_request(),devices[0],needs_background};
+    }
+''' +s[b:]
+s=s.replace('double maximum_byte_error;Key mapping;', 'double maximum_byte_error;Key mapping;uint32_t provider_calls=0;')
+a=s.index('        failed=true;',s.index('std::optional<Result> execute'))
+b=s.index('\n    }\n};',a)
+s=s[:a]+r'''        failed=true;
+        // Unchanged rows remain byte copies of the existing render target.
+        // Every changed row is produced by NPU/CPU backend inference. Host work
+        // moves complete input/output bands and does not compute changed pixels.
+        Result result{background,backend,uint64_t(right-x)*uint64_t(bottom-y),error,key};
+        const auto band=(std::max)(1u,65535u/(std::max)(sw,w));
+        for(uint32_t row=uint32_t(y);row<uint32_t(bottom);row+=band){
+            const auto rows=(std::min)(band,uint32_t(bottom)-row);
+            const Key tile{rows,uint32_t(x),uint32_t(right-x),uint32_t(x+ax->offset),0,0};
+            if(!entries.count(tile)){if(entries.size()>=8)entries.erase(entries.begin());entries.emplace(tile,create(tile));}
+            auto &entry=entries.at(tile);const size_t srcrow=size_t(int32_t(row)+ay->offset);
+            std::memcpy(entry.request.get_tensor("source").data<uint8_t>(),source.pixels.data()+srcrow*sw,size_t(rows)*sw*4);
+            if(entry.needs_background)std::memcpy(entry.request.get_tensor("background").data<uint8_t>(),background.data()+size_t(row)*w,size_t(rows)*w*4);
+            entry.request.infer();++result.provider_calls;const auto tensor=entry.request.get_output_tensor();
+            if(tensor.get_element_type()!=ov::element::u8 || tensor.get_byte_size()!=size_t(rows)*w*4)throw std::runtime_error("crop output mismatch");
+            std::memcpy(result.pixels.data()+size_t(row)*w,tensor.data<const uint8_t>(),tensor.get_byte_size());result.device=entry.device;
+        }
+        failed=false;return result;''' +s[b:]
+p.write_text(s)
+p=d/'contract.cpp';s=p.read_text().replace('#include <limits>','#include <limits>\n#include <chrono>').replace('const auto result=executor.execute(bounds,clip,uv,color,source,bg,false);', 'const auto begin=std::chrono::steady_clock::now();const auto result=executor.execute(bounds,clip,uv,color,source,bg,false);const auto milliseconds=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-begin).count();').replace('++calls;', 'calls+=result->provider_calls;')
+s=s.replace('"crop_case\\\":true,', '"crop_case\\\":true,\\\"milliseconds\\\":%.6f,\\\"provider_calls\\\":%u,').replace(',w,h,swap?', ',milliseconds,result->provider_calls,w,h,swap?');p.write_text(s)
+p=d/'CMakeLists.txt';p.write_text(p.read_text().replace('nr_crop_context','nr_crop_tiles'))
+(r/'crop-tiles-v1-source.json').write_text(json.dumps({p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'crop-tiles-v1.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-crop-context-v1.ps1').read_text().replace('crop-context-v1','crop-tiles-v1').replace('nr_crop_context','nr_crop_tiles');(r/'build-crop-tiles-v1.ps1').write_text(s)
+s=(r/'run-crop-context-v1.ps1').read_text().replace('crop-context-v1','crop-tiles-v1').replace('nr_crop_context','nr_crop_tiles')
+s=s.replace("@(@{label='separate-large';shared='0';args=@('NPU','2880','0')},@{label='shared-large';shared='1';args=@('NPU','2880','0')},@{label='shared-all';shared='1';args=@('NPU')},@{label='separate-all';shared='0';args=@('NPU')})", "@(@{label='CPU-all';shared='1';args=@('CPU')},@{label='NPU-all';shared='1';args=@('NPU')},@{label='NPU-repeat';shared='1';args=@('NPU')})")
+(r/'run-crop-tiles-v1.ps1').write_text(s)

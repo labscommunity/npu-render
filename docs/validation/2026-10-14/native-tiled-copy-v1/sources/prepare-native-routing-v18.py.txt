@@ -1,0 +1,33 @@
+from pathlib import Path
+import shutil,json,hashlib,tarfile
+r=Path('results/render-driver');d=r/'native-routing-v18';shutil.copytree(r/'native-routing-v17',d);lab=d/'native/windows/registered_lab'
+s=(r/'crop-tiles-v1/opaque_affine_crop.hpp').read_text().replace('uint32_t provider_calls=0;', 'uint32_t provider_calls=0;uint64_t input_bytes=0,output_bytes=0;')
+s=s.replace('entry.request.infer();++result.provider_calls;', 'entry.request.infer();++result.provider_calls;result.input_bytes+=uint64_t(rows)*sw*4+(entry.needs_background?uint64_t(rows)*w*4:0);result.output_bytes+=uint64_t(rows)*w*4;')
+(lab/'opaque_affine_crop.hpp').write_text(s)
+s=(r/'affine-crop-v1/linear_texture_draw.cpp').read_text()
+s=s.replace('std::unique_ptr<OpaqueAffineCrop> crop;', 'uint32_t target_format;bool source_over,general_ready=false;std::string selected_backend;\n    std::unique_ptr<OpaqueAffineCrop> crop;')
+s=s.replace('point(filter==shader::TextureFilter::point),vertex(v,6,backend),projection(6,backend)', 'point(filter==shader::TextureFilter::point),target_format(format),source_over(blend),selected_backend(backend),vertex(v,6,backend),projection(6,backend),device(backend)')
+a=s.index('        auto parameter=[]');b=s.index('\n    }\n};',a);body=s[a:b];body+='\n        general_ready=true;'
+s=s[:a]+'''        if(!crop || point)prepare_general();
+    }
+    void prepare_general(){
+        if(general_ready)return;
+        const auto w=width,format=target_format;const auto &backend=selected_backend;const bool blend=source_over;
+'''+body+s[b:]
+s=s.replace('result.input_bytes+=(uint64_t(source.pixels.size())+background.size())*4;result.output_bytes+=uint64_t(result.pixels.size())*4;++result.provider_requests;result.tile_executions=1;', 'result.input_bytes+=cropped->input_bytes;result.output_bytes+=cropped->output_bytes;result.provider_requests+=cropped->provider_calls;result.tile_executions=cropped->provider_calls;')
+s=s.replace('    first_row-=first_row%s.rows;', '    try{s.prepare_general();require(result.execution_device==s.device);}catch(...){s.failed=true;throw;}\n    first_row-=first_row%s.rows;')
+(lab/'linear_texture_draw.cpp').write_text(s)
+(lab/'opaque_affine_crop_test.cpp').write_bytes((r/'crop-tiles-v1/contract.cpp').read_bytes())
+p=lab/'CMakeLists.txt';s=p.read_text()+'''
+add_executable(nr_opaque_affine_crop_test opaque_affine_crop_test.cpp)
+target_compile_features(nr_opaque_affine_crop_test PRIVATE cxx_std_17)
+target_compile_options(nr_opaque_affine_crop_test PRIVATE /W4 /WX)
+target_link_libraries(nr_opaque_affine_crop_test PRIVATE openvino::runtime nr_registered_provider_cache)
+set_property(TARGET nr_opaque_affine_crop_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+''';p.write_text(s)
+(r/'native-routing-v18-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-routing-v18.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-native-routing-v17.ps1').read_text().replace('native-routing-v17','native-routing-v18').replace('nr_shared_core_test *>>','nr_shared_core_test nr_opaque_affine_crop_test *>>').replace("'nr_shared_core_test.exe'))", "'nr_shared_core_test.exe','nr_opaque_affine_crop_test.exe'))");(r/'build-native-routing-v18.ps1').write_text(s)
+s=(r/'qualify-shared-core-regression-v1.ps1').read_text().replace('native-routing-v17','native-routing-v18').replace('shared-core-regression-v1','crop-integrated-regression-v1').replace("$env:NR_RENDER_SHARED_CORE='1'", "$env:NR_RENDER_SHARED_CORE='1';$env:NR_RENDER_OPAQUE_CROP='1'").replace("'nr_shared_core_test.exe'))", "'nr_shared_core_test.exe','nr_opaque_affine_crop_test.exe'))")
+s=s.replace(" Run-Check 'nr_shared_core_test.exe'", " Run-Check 'nr_opaque_affine_crop_test.exe' @('CPU') 'crop-CPU'\n Run-Check 'nr_opaque_affine_crop_test.exe' @('NPU') 'crop-NPU'\n Run-Check 'nr_shared_core_test.exe'");(r/'qualify-crop-integrated-regression-v1.ps1').write_text(s)
+s=(r/'replay-affine-crop-v1.ps1').read_text().replace('builds\\affine-crop-v1','builds\\native-routing-v18').replace('affine-crop-v1-replay','crop-integrated-v1-replay').replace('nr_affine_crop.exe','nr_registered_draw_replay_probe.exe').replace('build-report.json','registered-build-report.json').replace('$build.binary_sha256)', "$build.binary_sha256.'nr_registered_draw_replay_probe.exe')").replace("$env:NR_RENDER_OPAQUE_CROP='1'", "$env:NR_RENDER_OPAQUE_CROP='1';$env:NR_RENDER_SHARED_CORE='1'");(r/'replay-crop-integrated-v1.ps1').write_text(s)

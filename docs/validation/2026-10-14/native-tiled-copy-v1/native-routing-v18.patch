@@ -1,0 +1,236 @@
+--- a/native/windows/registered_lab/CMakeLists.txt
++++ b/native/windows/registered_lab/CMakeLists.txt
+@@ -361,3 +361,9 @@
+ target_compile_options(nr_shared_core_test PRIVATE /W4 /WX)
+ target_link_libraries(nr_shared_core_test PRIVATE openvino::runtime nr_registered_provider_cache)
+ set_property(TARGET nr_shared_core_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
++
++add_executable(nr_opaque_affine_crop_test opaque_affine_crop_test.cpp)
++target_compile_features(nr_opaque_affine_crop_test PRIVATE cxx_std_17)
++target_compile_options(nr_opaque_affine_crop_test PRIVATE /W4 /WX)
++target_link_libraries(nr_opaque_affine_crop_test PRIVATE openvino::runtime nr_registered_provider_cache)
++set_property(TARGET nr_opaque_affine_crop_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+--- a/native/windows/registered_lab/linear_texture_draw.cpp
++++ b/native/windows/registered_lab/linear_texture_draw.cpp
+@@ -1,6 +1,7 @@
+ #include "provider_compile.hpp"
+ #include "linear_texture_draw.hpp"
+ #include "triangle_regions.hpp"
++#include "opaque_affine_crop.hpp"
+ #include <openvino/openvino.hpp>
+ #include <openvino/opsets/opset13.hpp>
+ #include <openvino/pass/serialize.hpp>
+@@ -67,6 +68,8 @@
+ struct LinearTextureDrawExecutor::State {
+     shader::Program vs; Pattern pixel;
+     uint32_t width,height,sw,sh,sf,rows,count,source_chunk=0; bool failed=false, point=false;
++    uint32_t target_format;bool source_over,general_ready=false;std::string selected_backend;
++    std::unique_ptr<OpaqueAffineCrop> crop;
+     shader::VertexExecutor vertex; ProjectionExecutor projection;
+     ov::Core core; ov::CompiledModel compiled; ov::InferRequest request; std::string device;
+     std::string source_name(unsigned channel,uint32_t base) const {
+@@ -75,7 +78,10 @@
+     State(const shader::Program &v,const shader::Program &p,uint32_t w,uint32_t h,uint32_t format,
+         uint32_t source_width,uint32_t source_height,uint32_t source_format,const std::string &backend,bool blend,shader::TextureFilter filter)
+         : vs(v),pixel(pattern(p)),width(w),height(h),sw(source_width),sh(source_height),sf(source_format),
+-          rows(1),count(w),point(filter==shader::TextureFilter::point),vertex(v,6,backend),projection(6,backend) {
++          rows(1),count(w),point(filter==shader::TextureFilter::point),target_format(format),source_over(blend),selected_backend(backend),vertex(v,6,backend),projection(6,backend),device(backend) {
++        char *crop_text=nullptr;size_t crop_length=0;
++        require(!_dupenv_s(&crop_text,&crop_length,"NR_RENDER_OPAQUE_CROP"));
++        if(crop_text){const std::string value(crop_text);std::free(crop_text);require(value=="1");if(pixel.opaque)crop=std::make_unique<OpaqueAffineCrop>(sw,sh,w,h,format!=sf,backend);}
+         // Alpha replacement happens after sampling. The RGB taps remain valid
+         // for both point and bilinear filtering; source alpha is unused.
+         require(filter==shader::TextureFilter::point || filter==shader::TextureFilter::linear);
+@@ -99,6 +105,11 @@
+         }
+ 
+         rows=(std::min)(h,capacity/w);while(h%rows)--rows;count=w*rows;
++        if(!crop || point)prepare_general();
++    }
++    void prepare_general(){
++        if(general_ready)return;
++        const auto w=width,format=target_format;const auto &backend=selected_backend;const bool blend=source_over;
+         auto parameter=[](ov::element::Type type,ov::Shape shape,const char *name) {
+             auto p=std::make_shared<op::Parameter>(type,shape);p->output(0).get_tensor().set_names({name});return p;
+         };
+@@ -209,6 +220,7 @@
+         }
+         compiled=nr::provider::compile_model(core,model,backend,properties);const auto devices=compiled.get_property(ov::execution_devices);
+         require(devices.size()==1 && (devices[0]==backend || devices[0].rfind(backend+".",0)==0));device=devices[0];request=compiled.create_infer_request();
++        general_ready=true;
+     }
+ };
+ void LinearTextureDrawExecutor::validate_shader(const shader::Program &p){(void)pattern(p);}
+@@ -260,6 +272,15 @@
+     if(first_row>=end_row){
+         result.timings.total_ms=elapsed(start);result.used_rectangle=true;result.vertices=std::move(shaded.vertices);return result;
+     }
++    if(s.crop){
++        began=Clock::now();
++        try{auto cropped=s.crop->execute(bounds,clip,uv,color,source,background,s.point);if(cropped){
++            require(cropped->device==s.device);result.timings.merger_ms=elapsed(began);result.pixels=std::move(cropped->pixels);result.covered_samples=cropped->covered;
++            result.input_bytes+=cropped->input_bytes;result.output_bytes+=cropped->output_bytes;result.provider_requests+=cropped->provider_calls;result.tile_executions=cropped->provider_calls;result.used_rectangle=true;result.vertices=std::move(shaded.vertices);result.timings.total_ms=elapsed(start);
++            std::printf("{\"opaque_affine_crop\":true,\"maximum_byte_error_bound\":%.9g,\"source_x\":%u,\"source_y\":%u,\"width\":%u,\"height\":%u}\n",cropped->maximum_byte_error,cropped->mapping[4],cropped->mapping[5],cropped->mapping[2],cropped->mapping[3]);return result;
++        }}catch(...){s.failed=true;throw;}
++    }
++    try{s.prepare_general();require(result.execution_device==s.device);}catch(...){s.failed=true;throw;}
+     first_row-=first_row%s.rows;
+     for(auto &v:clip)v*=256;
+     s.failed=true;began=Clock::now();
+--- a/native/windows/registered_lab/opaque_affine_crop.hpp
++++ b/native/windows/registered_lab/opaque_affine_crop.hpp
+@@ -0,0 +1,102 @@
++#pragma once
++#include "provider_compile.hpp"
++#include <openvino/openvino.hpp>
++#include <openvino/opsets/opset13.hpp>
++#include <map>
++#include <optional>
++#include <array>
++#include <cmath>
++#include <cstring>
++namespace nr::raster {
++// Host-side specialization proof over already device-transformed geometry.
++// Pixel production, alpha replacement, channel order and merging run on backend.
++class OpaqueAffineCrop {
++    using Range=std::array<double,2>;
++    using Key=std::array<uint32_t,6>; // output x/y/w/h, source x/y
++    uint32_t sw,sh,w,h;bool swap,failed=false;std::string backend;ov::Core core;
++    // Tile keys: rows, output x, width, source x, reserved, reserved.
++    struct Entry {ov::CompiledModel model;ov::InferRequest request;std::string device;bool needs_background;};
++    std::map<Key,Entry> entries;
++    static double ulp(double x){return x==0?std::ldexp(1.,-149):std::ldexp(1.,(std::max)(-126,int(std::floor(std::log2(std::abs(x)))))-23);}
++    static Range pad(double low,double high,double units){const auto e=(std::max)(ulp(low),ulp(high))*units+1e-12;return {low-e,high+e};}
++    static Range mul(Range a,Range b){const double v[]{a[0]*b[0],a[0]*b[1],a[1]*b[0],a[1]*b[1]};return pad(*std::min_element(v,v+4),*std::max_element(v,v+4),.5);}
++    static Range add(Range a,Range b){return pad(a[0]+b[0],a[1]+b[1],.5);}
++    struct Axis {int32_t offset;double error;};
++    static std::optional<Axis> axis(uint32_t extent,int32_t lo,int32_t hi,float u0,float u1,int32_t first,int32_t end){
++        if(lo>=hi || first>=end || !std::isfinite(u0) || !std::isfinite(u1) || u0<0 || u1>1 || u0>=u1)return {};
++        const auto low=double(lo)/256,span=double(hi-lo)/256;const auto delta=pad(double(u1)-u0,double(u1)-u0,.5);
++        Axis result{};
++        for(int32_t x=first;x<end;++x){
++            // Snapped bounds, half-pixel centers and subtraction are exact in
++            // FP32 at these dimensions. Division allows 1 ULP; arithmetic .5.
++            const auto t=(x+.5-low)/span;
++            auto mapped=mul(add({u0,u0},mul(pad(t,t,1),delta)),{double(extent),double(extent)});
++            mapped[0]-=.5;mapped[1]-=.5;
++            if(x==first)result.offset=int32_t(std::round((mapped[0]+mapped[1])*.5))-x;
++            const auto expected=x+result.offset;
++            if(expected<0 || expected>=int32_t(extent))return {};
++            result.error=(std::max)({result.error,std::abs(mapped[0]-expected),std::abs(mapped[1]-expected)});
++        }
++        return result;
++    }
++    Entry create(const Key &key){
++        namespace op=ov::opset13;using Node=std::shared_ptr<ov::Node>;
++        const auto values=[](std::initializer_list<int64_t> a){return op::Constant::create(ov::element::i64,ov::Shape{a.size()},std::vector<int64_t>(a));};
++        const auto rows=key[0],x=key[1],cw=key[2],sx=key[3];
++        auto source=std::make_shared<op::Parameter>(ov::element::u8,ov::Shape{rows,sw,4});source->output(0).get_tensor().set_names({"source"});
++        auto bg=std::make_shared<op::Parameter>(ov::element::u8,ov::Shape{rows,w,4});bg->output(0).get_tensor().set_names({"background"});
++        auto slice=[&](const Node &node,uint32_t start,uint32_t cols,uint32_t channel,uint32_t channels)->Node{
++            return std::make_shared<op::Slice>(node,values({0,start,channel}),values({rows,start+cols,channel+channels}),values({1,1,1}),values({0,1,2}));
++        };
++        ov::OutputVector channels;for(uint32_t c=0;c<3;++c)channels.push_back(slice(source,sx,cw,swap?2-c:c,1));
++        channels.push_back(op::Constant::create(ov::element::u8,ov::Shape{rows,cw,1},{uint8_t(255)}));
++        Node center=std::make_shared<op::Concat>(channels,2);ov::OutputVector output;
++        if(x)output.push_back(slice(bg,0,x,0,4));output.push_back(center);if(x+cw<w)output.push_back(slice(bg,x+cw,w-x-cw,0,4));
++        Node result=output.size()==1?output[0].get_node_shared_ptr():Node(std::make_shared<op::Concat>(output,1));
++        const bool needs_background=x || cw!=w;ov::ParameterVector ports{source};if(needs_background)ports.push_back(bg);
++        auto graph=std::make_shared<ov::Model>(ov::OutputVector{result},ports);
++        const ov::AnyMap properties{ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY)};
++        auto model=nr::provider::compile_model(core,graph,backend,properties);const auto devices=model.get_property(ov::execution_devices);
++        if(devices.size()!=1 || !(devices[0]==backend || devices[0].rfind(backend+".",0)==0))throw std::runtime_error("crop device mismatch");
++        return {model,model.create_infer_request(),devices[0],needs_background};
++    }
++
++public:
++    OpaqueAffineCrop(uint32_t source_w,uint32_t source_h,uint32_t width,uint32_t height,bool exchange,std::string selected):sw(source_w),sh(source_h),w(width),h(height),swap(exchange),backend(std::move(selected)){
++        if(!sw || sw>8192 || !sh || sh>8192 || uint64_t(sw)*sh>8388608 || !w || w>4096 || !h || h>8192 || uint64_t(w)*h>8388576 || (backend!="CPU" && backend!="NPU" && backend!="GPU"))throw std::invalid_argument("invalid crop dimensions/backend");
++    }
++    struct Result {std::vector<PackedColor> pixels;std::string device;uint64_t covered;double maximum_byte_error;Key mapping;uint32_t provider_calls=0;uint64_t input_bytes=0,output_bytes=0;};
++    std::optional<Result> execute(const std::array<int32_t,4> &bounds,const std::array<int32_t,4> &clip,const std::array<float,4> &uv,const std::array<float,4> &color,const PackedTexture &source,const std::vector<PackedColor> &background,bool point){
++        if(failed)throw std::runtime_error("crop context poisoned");
++        if(point || color!=std::array<float,4>{1,1,1,1})return {};
++        const auto first=[](int32_t bound){return int32_t(std::ceil((double(bound)-128)/256));};
++        const int32_t x=(std::max)(clip[0],first(bounds[0])),y=(std::max)(clip[1],first(bounds[1]));
++        const int32_t right=(std::min)(clip[2],first(bounds[2])),bottom=(std::min)(clip[3],first(bounds[3]));
++        if(x<0 || y<0 || x>=right || y>=bottom || right>int32_t(w) || bottom>int32_t(h))return {};
++        const auto ax=axis(sw,bounds[0],bounds[2],uv[0],uv[2],x,right),ay=axis(sh,bounds[1],bounds[3],uv[1],uv[3],y,bottom);if(!ax || !ay)return {};
++        // For any u8 texture, bilinear deviation from this integer texel is
++        // <=255*(ex+ey). Reserve .002 byte for normalized-value arithmetic.
++        const auto error=255*(ax->error+ay->error)+.002;if(!(error<.5))return {};
++        if(source.width!=sw || source.height!=sh || source.pixels.size()!=size_t(sw)*sh || background.size()!=size_t(w)*h)throw std::invalid_argument("crop storage mismatch");
++        const Key key{uint32_t(x),uint32_t(y),uint32_t(right-x),uint32_t(bottom-y),uint32_t(x+ax->offset),uint32_t(y+ay->offset)};
++        failed=true;
++        // Unchanged rows remain byte copies of the existing render target.
++        // Every changed row is produced by NPU/CPU backend inference. Host work
++        // moves complete input/output bands and does not compute changed pixels.
++        Result result{background,backend,uint64_t(right-x)*uint64_t(bottom-y),error,key};
++        const auto band=(std::max)(1u,65535u/(std::max)(sw,w));
++        for(uint32_t row=uint32_t(y);row<uint32_t(bottom);row+=band){
++            const auto rows=(std::min)(band,uint32_t(bottom)-row);
++            const Key tile{rows,uint32_t(x),uint32_t(right-x),uint32_t(x+ax->offset),0,0};
++            if(!entries.count(tile)){if(entries.size()>=8)entries.erase(entries.begin());entries.emplace(tile,create(tile));}
++            auto &entry=entries.at(tile);const size_t srcrow=size_t(int32_t(row)+ay->offset);
++            std::memcpy(entry.request.get_tensor("source").data<uint8_t>(),source.pixels.data()+srcrow*sw,size_t(rows)*sw*4);
++            if(entry.needs_background)std::memcpy(entry.request.get_tensor("background").data<uint8_t>(),background.data()+size_t(row)*w,size_t(rows)*w*4);
++            entry.request.infer();++result.provider_calls;result.input_bytes+=uint64_t(rows)*sw*4+(entry.needs_background?uint64_t(rows)*w*4:0);result.output_bytes+=uint64_t(rows)*w*4;const auto tensor=entry.request.get_output_tensor();
++            if(tensor.get_element_type()!=ov::element::u8 || tensor.get_byte_size()!=size_t(rows)*w*4)throw std::runtime_error("crop output mismatch");
++            std::memcpy(result.pixels.data()+size_t(row)*w,tensor.data<const uint8_t>(),tensor.get_byte_size());result.device=entry.device;
++        }
++        failed=false;return result;
++    }
++};
++}
+--- a/native/windows/registered_lab/opaque_affine_crop_test.cpp
++++ b/native/windows/registered_lab/opaque_affine_crop_test.cpp
+@@ -0,0 +1,49 @@
++#include "linear_texture_draw.hpp"
++#include "opaque_affine_crop.hpp"
++#include <cstdio>
++#include <limits>
++#include <chrono>
++using namespace nr::raster;
++#define CHECK(v) do{if(!(v))throw std::runtime_error(#v);}while(false)
++int main(int argc,char **argv)try{
++ CHECK(argc==2 || argc==4);const std::string backend=argv[1];uint64_t checked=0,calls=0;unsigned rejected=0;double maximum=0;uint32_t random=42;
++ auto byte=[&](){random^=random<<13;random^=random>>17;random^=random<<5;return uint8_t(random);};
++ for(const auto shape:{std::array<uint32_t,2>{64,48},{1024,768},{2880,1800}})for(const bool swap:{false,true}){
++  const auto w=shape[0],h=shape[1],sw=w+32,sh=h+24;
++  if(argc==4 && w!=uint32_t(std::stoul(argv[2])))continue;OpaqueAffineCrop executor(sw,sh,w,h,swap,backend);
++  PackedTexture source{sw,sh,87,std::vector<PackedColor>(size_t(sw)*sh)};std::vector<PackedColor> bg(size_t(w)*h);
++  for(const unsigned style:{0u,1u,2u}){
++   if(argc==4 && style!=uint32_t(std::stoul(argv[3])))continue;
++   const int32_t inset=style==0?0:128;const std::array<int32_t,4> bounds{inset,inset,int32_t(w*256)-inset,int32_t(h*256)-inset};
++   const std::array<int32_t,4> clip=style==2?std::array<int32_t,4>{2,3,int32_t(w)-2,int32_t(h)-3}:std::array<int32_t,4>{0,0,int32_t(w),int32_t(h)};
++   const std::array<float,4> uv{float((2+double(bounds[0])/256)/sw),float((1+double(bounds[1])/256)/sh),float((2+double(bounds[2])/256)/sw),float((1+double(bounds[3])/256)/sh)};const std::array<float,4> color{1,1,1,1};
++   if(w==64 && !swap && style==0){
++    const auto before=nr::provider::compile_statistics().calls;
++    for(unsigned bad=0;bad<7;++bad){auto u=uv,c=color;auto b=bounds,sc=clip;bool point=false;
++     if(bad==0)point=true;if(bad==1)c[0]=.999f;if(bad==2){u[0]+=.25f/sw;u[2]+=.25f/sw;}if(bad==3)u[2]+=.01f;if(bad==4)std::swap(u[0],u[2]);if(bad==5)u[0]=std::numeric_limits<float>::quiet_NaN();if(bad==6)sc[2]=sc[0];
++     CHECK(!executor.execute(b,sc,u,c,source,bg,point));++rejected;
++    }
++    CHECK(nr::provider::compile_statistics().calls==before);
++   }
++   for(unsigned frame=0;frame<2;++frame){
++    for(uint32_t y=0;y<sh;++y)for(uint32_t x=0;x<sw;++x)for(unsigned c=0;c<4;++c)source.pixels[size_t(y)*sw+x][c]=frame?byte():uint8_t(((x+y+c)&1)?255:0);
++    for(auto &pixel:bg)for(auto &channel:pixel)channel=byte();
++    std::printf("{\"crop_begin\":true,\"width\":%u,\"style\":%u,\"swap\":%s,\"frame\":%u}\n",w,style,swap?"true":"false",frame);std::fflush(stdout);
++    const auto begin=std::chrono::steady_clock::now();const auto result=executor.execute(bounds,clip,uv,color,source,bg,false);const auto milliseconds=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-begin).count();CHECK(result && result->device.rfind(backend,0)==0 && result->maximum_byte_error<.5);calls+=result->provider_calls;
++    uint64_t covered=0;
++    for(uint32_t y=0;y<h;++y)for(uint32_t x=0;x<w;++x){const auto at=size_t(y)*w+x;
++     const bool inside=int32_t(x*256+128)>=bounds[0] && int32_t(x*256+128)<bounds[2] && int32_t(y*256+128)>=bounds[1] && int32_t(y*256+128)<bounds[3] && int32_t(x)>=clip[0] && int32_t(x)<clip[2] && int32_t(y)>=clip[1] && int32_t(y)<clip[3];
++     if(!inside){CHECK(result->pixels[at]==bg[at]);checked+=4;continue;}++covered;
++     const double tx=(double(uv[0])+(x+.5-double(bounds[0])/256)/(double(bounds[2]-bounds[0])/256)*(double(uv[2])-uv[0]))*sw-.5;
++     const double ty=(double(uv[1])+(y+.5-double(bounds[1])/256)/(double(bounds[3]-bounds[1])/256)*(double(uv[3])-uv[1]))*sh-.5;
++     const auto ix=int32_t(std::floor(tx)),iy=int32_t(std::floor(ty));const auto fx=tx-ix,fy=ty-iy;
++     for(unsigned c=0;c<4;++c){double value=c==3?255.:0.;if(c!=3)for(int dy=0;dy<2;++dy)for(int dx=0;dx<2;++dx){const auto sx=std::clamp(ix+dx,0,int32_t(sw)-1),sy=std::clamp(iy+dy,0,int32_t(sh)-1);value+=source.pixels[size_t(sy)*sw+sx][swap?2-c:c]*(dx?fx:1-fx)*(dy?fy:1-fy);}
++      const auto actual=result->pixels[at][c];maximum=(std::max)(maximum,std::abs(actual-value));CHECK(actual==uint8_t(std::nearbyint(value)));++checked;
++     }
++    }
++    CHECK(result->covered==covered);std::printf("{\"crop_case\":true,\"milliseconds\":%.6f,\"provider_calls\":%u,\"width\":%u,\"height\":%u,\"swap\":%s,\"style\":%u,\"frame\":%u,\"error_bound\":%.9g,\"execution_device\":\"%s\"}\n",milliseconds,result->provider_calls,w,h,swap?"true":"false",style,frame,result->maximum_byte_error,result->device.c_str());std::fflush(stdout);
++   }
++  }
++ }
++ std::printf("{\"passed\":true,\"checked_components\":%llu,\"npu_or_cpu_crop_calls\":%llu,\"negative_cases\":%u,\"maximum_oracle_error\":%.9g,\"execution_device\":\"%s\",\"desktop_offloaded\":false}\n",static_cast<unsigned long long>(checked),static_cast<unsigned long long>(calls),rejected,maximum,backend.c_str());return 0;
++}catch(const std::exception &e){std::fprintf(stderr,"%s\n",e.what());return 1;}

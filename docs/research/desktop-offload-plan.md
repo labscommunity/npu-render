@@ -15,7 +15,7 @@ renderer does not establish where every application renders.
 | Gate | Work | Acceptance evidence | Current status |
 | --- | --- | --- | --- |
 | 1. Routing | Record active physical and indirect paths before, during, and after admission; identify clone/extended configuration and actual rendering adapter. | Timestamped topology, native DWM NPU receipts, selected adapter, frame producer, exact restoration. | Automatic clone identified; v11 applies extension with the physical path preserved, produces a frame while extended, restores the clone exactly, and restores the final physical baseline. |
-| 2. Continuous rendering | Keep the native renderer alive across changing windows and content; diagnose every failed draw; distinguish model preparation from rendering and transport. | Multiple changing frames, timestamps and pixel checks, sustained operation, no hidden fallback. | Three changing frames were observed in live v3, with source intervals of 94.14 and 6.19 seconds. The next resource-table draw is now qualified, but live v5 loses the NPU after 165 acknowledged operations. Continuous operation remains unqualified. |
+| 2. Continuous rendering | Keep the native renderer alive across changing windows and content; diagnose every failed draw; distinguish model preparation from rendering and transport. | Multiple changing frames, timestamps and pixel checks, sustained operation, no hidden fallback. | Three changing frames were observed in live v3, with source intervals of 94.14 and 6.19 seconds. The next resource-table draw is qualified. Live v7 acknowledges 188 operations and produces one frame before invalid NPU projection output stops rendering. Continuous operation remains unqualified. |
 | 3. Physical presentation | Present new NPU frames on the physical output with distinct logical desktops and no recursive mirroring. | Live sequence-to-present correlation, output identity, measured presentation mode and residual GPU work. | Live v2 submits two byte-exact changing frames, including a controlled window color, but they are 62 seconds apart and the NPU later fails. Live v3 avoids that failure and restores topology but submits only one frame during its 80-second window. Scanout and residual GPU cost remain unqualified. |
 | 4. Interaction and recovery | Migrate the logical desktop, route pointer/keyboard/focus correctly, handle cursor/DPI/resolution, restore exact topology and windows. | Scripted interaction visible on physical output; emergency exit and owned-process failure recovery; ordinary login/lock path retained. | VM interaction proof exists; native interaction unqualified. |
 | 5. Responsiveness | Optimize resource reuse, graph compilation, dispatch granularity, transfer volume and frame pacing. | Initial target: ordinary desktop interaction at 30 fps, p95 visible response ≤100 ms, 30-minute stable run. Report cold-start time separately. | Not met; several individual draws take seconds. |
@@ -30,18 +30,19 @@ role, and any GPU rendering/copy cost in the bridge must be measured.
 
 ## Immediate experiment
 
-The [runtime-state investigation](../validation/2026-10-14/native-runtime-state-v1/README.md)
-records 165 acknowledged NPU operations followed by device loss. The exact failed
-request succeeds in a fresh worker and matches the CPU reference. Source v17
-qualifies a shared OpenVINO Core at component level; continuous desktop operation
-remains a separate gate. A whole-screen crop optimization is substantially faster
-on one captured draw but fails broader NPU tests. Test bounded input/output bands
-before integrating that optimization.
+The [tiled-copy investigation](../validation/2026-10-14/native-tiled-copy-v1/README.md)
+qualifies a bounded opaque-copy path and on-demand preparation of the general
+sampler. Two broad NPU suites, mixed-path transition tests and captured replay
+pass. The captured operation falls from about 7.5 seconds to 248–328 ms, but the
+native desktop still stops after 188 acknowledged operations with invalid NPU
+projection output. The exact failed request succeeds in a fresh worker.
 
-The [resource and batch investigation](../validation/2026-10-14/native-batch-boundary-v1/README.md)
-qualifies the previously rejected two-texture draw. Batch capacity 65,535 passes
-its sampler suite; larger capacities are not generally safe. The compatibility
-fix alone did not make the following native trial reliable.
+Record the ordered native request sequence privately on Delta and replay it in
+an isolated worker. Compare successful output hashes and isolate the first
+state-dependent failure. Use the qualified default raster-batch policy for this
+recording. Separately qualify scoped texture-upload reuse; the current general
+shader recopies unchanged textures for each raster batch. Neither change is a
+usable desktop switch yet.
 
 ## Architecture constraints from primary documentation
 
