@@ -1,0 +1,22 @@
+{
+  "sources": [
+    {
+      "url": "https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/iddcx/nf-iddcx-iddcxmonitorsetuphardwarecursor",
+      "finding": "Indirect paths default to software cursor composition; this IDD does not opt into hardware cursor support. A controlled standard-arrow reference comparison checks one actual frame. Motion is a separate requirement."
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-drawiconex",
+      "finding": "DrawIconEx draws a cursor into a device context. The diagnostic uses an offscreen CPU DIB as a reference, never as the native frame source. A delayed standard-arrow comparison passes exactly; the immediate comparison involved a different hotspot and fails."
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/windows/win32/api/dxgi1_3/ne-dxgi1_3-dxgi_frame_presentation_mode",
+      "finding": "The enumeration maps 0 to COMPOSED, 1 to OVERLAY, 2 to NONE and 3 to COMPOSITION_FAILURE. The run reports composed mode during observation and later overlay mode after the observer exits. This temporal association is not a controlled proof of causation or zero GPU cost."
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-clipcursor",
+      "finding": "ClipCursor bounds ordinary pointer movement and SetCursorPos. It is shared state that must be released. A future pointer mode needs saved state, independent recovery, and checks under ordinary relative movement; no confinement is claimed in this run."
+    }
+  ],
+  "external_messages_sent": false,
+  "all_gpu_functions_migrated": false
+}

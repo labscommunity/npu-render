@@ -6,9 +6,10 @@ trials deliver changing frames to the physical presenter, and independent screen
 reads confirm controlled colors with the physical desktop primary. NPU-primary
 routing and exact ordinary recovery now work. The controlled input window appears
 in completed NPU primary frames. A longer trial now receives mouse input and
-shows the resulting green window on the physical output. A keyboard-test defect
-is reproduced on the ordinary desktop and corrected independently. Full native interaction,
-a usable switch and a Tahoma benefit remain unqualified.
+shows the resulting green window on the physical output. Corrected live v21 now
+passes the complete controlled mouse/keyboard/color sequence and exact ordinary
+recovery. Normal pointer behavior, a responsive usable switch, application coverage
+and a Tahoma benefit remain unqualified.
 
 The end state is one switch that moves desktop graphics work to the NPU, retains
 physical display scanout, supports normal interaction, and leaves the iGPU
@@ -23,7 +24,7 @@ renderer does not establish where every application renders.
 | 1. Routing | Record active physical and indirect paths before, during, and after admission; identify clone/extended configuration and actual rendering adapter. | Timestamped topology, native DWM NPU receipts, selected adapter, frame producer, exact restoration. | Automatic clone identified; v11 applies extension with the physical path preserved, produces a frame while extended, restores the clone exactly, and restores the final physical baseline. |
 | 2. Continuous rendering | Keep the native renderer alive across changing windows and content; diagnose every failed draw; distinguish model preparation from rendering and transport. | Multiple changing frames, timestamps and pixel checks, sustained operation, no hidden fallback. | Retaining rendering models clears both reproduced failures. Native v11b and v12 each complete six minutes, with 581 and 724 acknowledged NPU operations and 12 and 17 frames. No provider errors occur; 30-minute stability and behavior at eventual cache eviction remain unqualified. |
 | 3. Physical presentation | Present new NPU frames on the physical output with distinct logical desktops and no recursive mirroring. | Live sequence-to-present correlation, output identity, measured presentation mode and residual GPU work. | Live v13 submits 13 matching frames. Direct statistics reach 13 displayed frames and report both composed and overlay modes; a separate screen reader verifies both controlled colors beneath the owned presenter. GPU residual cost remains unmeasured. Updates remain slow. |
-| 4. Interaction and recovery | Migrate the logical desktop, route pointer/keyboard/focus correctly, handle cursor/DPI/resolution, restore exact topology and windows. | Scripted interaction visible on physical output; emergency exit and owned-process failure recovery; ordinary login/lock path retained. | V19 receives a mouse click and displays green through the NPU primary route. Keyboard validation fails and is reproduced without the NPU; its correction passes independently. Ordinary recovery passes after a topology timing overrun. Corrected native keyboard/timing qualification, ordinary pointer behavior and fault recovery remain open. |
+| 4. Interaction and recovery | Migrate the logical desktop, route pointer/keyboard/focus correctly, handle cursor/DPI/resolution, restore exact topology and windows. | Scripted interaction visible on physical output; emergency exit and owned-process failure recovery; ordinary login/lock path retained. | V21 passes blue → mouse → green → keyboard → red on the physical output and exact ordinary recovery. A static standard arrow matches the NPU frame exactly. Normal pointer confinement/motion and fault recovery remain open; visible response is still about 56 seconds in this instrumented trial. |
 | 5. Responsiveness | Optimize resource reuse, graph compilation, dispatch granularity, transfer volume and frame pacing. | Initial target: ordinary desktop interaction at 30 fps, p95 visible response ≤100 ms, 30-minute stable run. Report cold-start time separately. | Not met; several individual draws take seconds. |
 | 6. Application coverage | Admit and implement required graphics operations across browser, video and representative 3D workloads. Establish per-process adapter choice. | Capability matrix plus real hardware runs; every remaining iGPU operation accounted for. | General application/video/game migration unqualified. |
 | 7. Tahoma benefit | Run repeated baseline/offload trials under matched power, resolution and application load. | Report Tahoma throughput/latency, desktop frame times, per-engine GPU/NPU/CPU activity, memory and power; demonstrate GPU relief and no material Tahoma regression. | Earlier experiments regressed; native desktop A/B not yet run. |
@@ -71,8 +72,14 @@ requires a tag on a translated character; ordinary-desktop reproduction and its
 correction are retained. A DXGI observer and elapsed-time topology deadline are
 prepared for the next native qualification.
 
-Next, complete the blue/mouse/green/key/red test with those corrections. Qualify
-ordinary pointer behavior and fault recovery, then
+The [controlled native interaction run](../validation/2026-10-14/native-primary-e2e-v1/README.md)
+passes the corrected blue/mouse/green/key/red sequence, with 1,465 acknowledged
+NPU operations, 41 native frames, and 38 matching physical submissions. Exact
+topology and ordinary window/cursor/foreground restoration pass. A static standard
+arrow matches a CPU reference exactly. Visible response remains about 56 seconds;
+this finite diagnostic is not a performance qualification or full desktop offload.
+
+Next, qualify ordinary pointer behavior and fault recovery, then
 reduce graph preparation and dispatch costs. Establish responsive long-duration
 operation, application coverage and matched Tahoma benefit. A component pass does
 not complete a later gate.
