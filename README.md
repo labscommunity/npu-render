@@ -14,17 +14,19 @@ its first OpenVINO provider; other providers can implement the same contracts.
 submitted two changing NPU-composed frames to the physical output, 62 seconds
 apart, before an NPU device-loss error. Recovery restored the physical baseline.
 Input, sustained responsiveness, physical scanout mode and Tahoma benefit remain
-unqualified.
+unqualified. A [follow-up trial](docs/validation/2026-10-14/native-resource-progress-v1/README.md)
+restores topology without observed NPU device loss, but is still too slow for
+continuous delivery and exposes another unsupported draw.
 
- The latest
+The preceding
 [native desktop trial](docs/validation/2026-10-14/native-large-surface-v1/README.md)
 produces three different 1024×768 Windows desktop frames with 457 acknowledged
 NPU operations. It produces a frame while the displays are extended, survives
 restoration, and cleans up successfully. The first frame takes 69.5 seconds;
 subsequent frames arrive 93.7 and 115.4 seconds apart. Delta's physical desktop
-remains on its ordinary path. Controlled application changes, live physical
-presentation/input integration, interactive performance and a measured Tahoma
-benefit remain outstanding.
+remains on its ordinary path. This earlier trial established extended-topology
+rendering; the live bridge above adds limited physical delivery. Input integration,
+interactive performance and a measured Tahoma benefit remain outstanding.
 The [desktop offload execution plan](docs/research/desktop-offload-plan.md)
 defines the ordered acceptance gates through a usable switch and matched Tahoma
 measurements, including application graphics coverage.

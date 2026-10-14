@@ -1,0 +1,51 @@
+from pathlib import Path
+import shutil,hashlib,json,tarfile
+r=Path('results/render-driver');d=r/'native-routing-v13';shutil.copytree(r/'native-routing-v12b',d);lab=d/'native/windows/registered_lab'
+p=lab/'indexed_exchange_protocol.hpp';s=p.read_text().replace('h.abi==21)?','h.abi==21 || h.abi==22)?').replace('h.abi==18 || h.abi==21)?8u','h.abi==18 || h.abi==21 || h.abi==22)?8u')
+a='    if(h.abi==21){';b='''    // ABI 22 admits large targets for the existing single-source triangle
+    // payload, retaining its shader, blend, geometry and work-budget checks.
+    if(h.abi==22){
+        const auto area=uint64_t(h.width)*h.height;
+        if(large_uniform || large_clear || area<=4194304 || area>large_uniform_pixels ||
+           h.body_bytes>max_packet_bytes-sizeof(Header) || (h.flags&0x3002)!=0x1002 ||
+           (h.reserved!=7 && h.reserved!=9 && h.reserved!=10 && h.reserved!=11 && h.reserved!=15))return false;
+        auto legacy=h;legacy.abi=h.reserved;legacy.reserved=0;legacy.body_bytes=0;
+        return shape_valid(legacy,component_payload,true,false);
+    }
+'''+a;assert a in s;s=s.replace(a,b)
+s=s.replace('h.abi!=18 && h.abi!=21 &&', 'h.abi!=18 && h.abi!=21 && h.abi!=22 &&')
+a='    if(h.abi!=21 && uint64_t(h.width)*h.height>4194304';b='''    if(h.abi!=22 && uint64_t(h.width)*h.height>4194304 && (h.flags&0x3002)==0x1002){
+        const auto legacy=h.abi==18?h.reserved:h.abi;
+        require((legacy==7 || legacy==9 || legacy==10 || legacy==11 || legacy==15) && (h.abi==18 || !h.reserved));h.reserved=legacy;h.abi=22;
+    }
+'''+a;assert a in s;s=s.replace(a,b).replace('if(h.abi!=16 && h.abi!=21 && !color_clear(h)', 'if(h.abi!=16 && h.abi!=21 && h.abi!=22 && !color_clear(h)');p.write_text(s)
+p=lab/'triangle_texture_draw.cpp';s=p.read_text().replace('uint64_t(w)*h<=4*1024*1024','uint64_t(w)*h<=8388576').replace('uint64_t(target_width)*target_height<=4*1024*1024','uint64_t(target_width)*target_height<=8388576');p.write_text(s)
+s=(lab/'large_triangle_texture_capture_probe.cpp').read_text().replace('h.abi=18;','h.abi=22;').replace('bad.reserved=18','bad.reserved=22').replace('h.width=91;h.height=64','h.width=2880;h.height=1800').replace('header.abi==18','header.abi==22').replace('large_triangle_texture','large_triangle_surface')
+a='    auto point=h;';b='''    auto expanded=h;expanded.body_bytes=ex::legacy_packet_bytes;nr::capture::check(ex::shape_valid(expanded));expanded.body_bytes=ex::max_packet_bytes;nr::capture::check(!ex::shape_valid(expanded));++negatives;
+    auto small_target=h;small_target.width=91;small_target.height=64;nr::capture::check(!ex::shape_valid(small_target));++negatives;
+'''+a;s=s.replace(a,b);(lab/'large_triangle_surface_capture_probe.cpp').write_text(s)
+p=lab/'provider_memory_cache.hpp';s=p.read_text().replace('''        try{
+            auto compiled=compile();''','''        try{
+            // Complete retirement before compiling a successor. The pinned NPU
+            // stack has previously failed when last references were released
+            // after replacement model creation in the pipeline caches.
+            if(entries.size()==capacity){entries.pop_back();++memory_cache_evictions;}
+            auto compiled=compile();''').replace('            if(entries.size()>capacity){entries.pop_back();++memory_cache_evictions;}\n','');p.write_text(s)
+p=lab/'provider_memory_cache_test.cpp';s=p.read_text().replace('[&](){++backend_calls;return core.compile_model(model,backend,properties);}', '[&](){++backend_calls;require(nr::provider::compile_statistics().memory_evictions==(backend_calls>2?backend_calls-2:0));return core.compile_model(model,backend,properties);}')
+s=s.replace('injected=true;throw std::runtime_error("injected compile failure");', 'require(nr::provider::compile_statistics().memory_evictions==3);injected=true;throw std::runtime_error("injected compile failure");').replace('stats.memory_evictions==2','stats.memory_evictions==3');p.write_text(s)
+p=lab/'local_indexed_worker.cpp';s=p.read_text();a='int wmain(int argc, wchar_t **argv) try {';b='''void capture_failed_request(const std::vector<uint8_t> &bytes,const ex::Header &h,uint32_t ticket)noexcept{
+    bool captured=false;wchar_t *path=nullptr;size_t length=0;
+    if(!_wdupenv_s(&path,&length,L"NR_RENDER_FAILURE_PACKET") && path && *path && bytes.size()<=ex::max_packet_bytes){
+        const auto file=CreateFileW(path,GENERIC_WRITE,FILE_SHARE_READ,nullptr,CREATE_NEW,FILE_ATTRIBUTE_NORMAL,nullptr);
+        if(file!=INVALID_HANDLE_VALUE){DWORD written=0;captured=WriteFile(file,bytes.data(),DWORD(bytes.size()),&written,nullptr) && written==bytes.size() && FlushFileBuffers(file);CloseHandle(file);}
+    }
+    std::free(path);std::printf("{\\"provider_request_failed\\":true,\\"dispatch_ticket\\":%u,\\"client_pid\\":%u,\\"sequence\\":%u,\\"abi\\":%u,\\"width\\":%u,\\"height\\":%u,\\"vertices\\":%u,\\"flags\\":%u,\\"request_bytes\\":%zu,\\"failure_packet_captured\\":%s}\\n",ticket,h.client_pid,h.sequence,h.abi,h.width,h.height,h.vertices,h.flags,bytes.size(),captured?"true":"false");std::fflush(stdout);
+}
+'''+a;assert a in s;s=s.replace(a,b)
+a='const auto rendered=pipeline.execute(request);';b='''const auto rendered=[&]{try{return pipeline.execute(request);}catch(...){capture_failed_request(bytes,h,ticket);throw;}}();''';assert a in s;s=s.replace(a,b);p.write_text(s)
+p=lab/'CMakeLists.txt';s=p.read_text();block=s[s.index('add_executable(nr_large_triangle_texture_capture_probe'):s.index('add_executable(nr_large_quad_texture_capture_probe')];p.write_text(s+'\n'+block.replace('large_triangle_texture','large_triangle_surface'))
+(r/'native-routing-v13-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-routing-v13.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-native-routing-v12b.ps1').read_text().replace('native-routing-v12b','native-routing-v13').replace('nr_large_surface_capture_probe *>>','nr_large_surface_capture_probe nr_large_triangle_surface_capture_probe nr_registered_provider_memory_cache_test *>>').replace('|large_surface_contract)', '|large_surface_contract|large_triangle_surface_contract)').replace("'nr_large_surface_capture_probe.exe'))", "'nr_large_surface_capture_probe.exe','nr_large_triangle_surface_capture_probe.exe','nr_registered_provider_memory_cache_test.exe'))")
+(r/'build-native-routing-v13.ps1').write_text(s)
+s=(r/'replay-large-surface-v2.ps1').read_text().replace('native-routing-v12b','native-routing-v13').replace('large-surface-v2-replay','large-triangle-surface-v1-replay').replace('native-desktop-admission-v10','native-desktop-admission-v13').replace('draw-17280.bin','draw-3324.bin').replace('BB4AC8F898081FCB01C36A7C9740959B05AC31549A79610C7A7EE303AA59B9A4','9F0C079B60569E32F9CA9A979224A163594481E03CB612259DD24F5D77536D29');(r/'replay-large-triangle-surface-v1.ps1').write_text(s)
