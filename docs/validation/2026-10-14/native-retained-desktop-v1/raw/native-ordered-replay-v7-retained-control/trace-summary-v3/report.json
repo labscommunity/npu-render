@@ -1,0 +1,452 @@
+{
+    "trace_sha256":  "3BE9B5BAF2F533DFE8C0591FC128C2A83D531E3ADCBF3BC7BD976D9018E1910C",
+    "trace_bytes":  35192832,
+    "trace_stopped":  true,
+    "event_loss_checked":  false,
+    "selected_event_count":  5067,
+    "selection":  "Level Zero model/queue/context/fence lifetime and host waits; both provider warnings/errors",
+    "worker_events":  5067,
+    "first":  "2026-10-14T16:54:09.7135420Z",
+    "last":  "2026-10-14T16:55:01.1025489Z",
+    "counts":  {
+                   "Intel-NPU-LevelZero:2307":  256,
+                   "Intel-NPU-LevelZero:257":  1,
+                   "Intel-NPU-LevelZero:259":  1,
+                   "Intel-NPU-LevelZero:1537":  233,
+                   "Intel-NPU-LevelZero:515":  1,
+                   "Intel-NPU-LevelZero:1539":  233,
+                   "Intel-NPU-LevelZero:2305":  256,
+                   "Intel-NPU-LevelZero:1541":  4085,
+                   "Intel-NPU-LevelZero:513":  1
+               },
+    "successful_create_calls":  {
+                                    "context":  1,
+                                    "queue":  1,
+                                    "fence":  233,
+                                    "graph":  256
+                                },
+    "successful_destroy_calls":  {
+                                     "context":  1,
+                                     "queue":  1,
+                                     "fence":  233,
+                                     "graph":  256
+                                 },
+    "maximum_create_minus_destroy":  {
+                                         "context":  1,
+                                         "queue":  1,
+                                         "fence":  230,
+                                         "graph":  253
+                                     },
+    "final_create_minus_destroy":  {
+                                       "context":  0,
+                                       "queue":  0,
+                                       "fence":  0,
+                                       "graph":  0
+                                   },
+    "hardware_resource_count_independently_verified":  false,
+    "warning_error_events":  0,
+    "tail":  [
+                 {
+                     "time":  "2026-10-14T16:55:00.9830303Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  2307,
+                     "level":  4,
+                     "task":  10,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:00.9844435Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  2307,
+                     "level":  4,
+                     "task":  10,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:00.9849856Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  1539,
+                     "level":  4,
+                     "task":  8,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:00.9891429Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  2307,
+                     "level":  4,
+                     "task":  10,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:00.9901648Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  1539,
+                     "level":  4,
+                     "task":  8,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:00.9948483Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  2307,
+                     "level":  4,
+                     "task":  10,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:00.9954268Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  1539,
+                     "level":  4,
+                     "task":  8,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0002365Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  2307,
+                     "level":  4,
+                     "task":  10,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0013912Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  1539,
+                     "level":  4,
+                     "task":  8,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0068496Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  2307,
+                     "level":  4,
+                     "task":  10,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0078074Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  1539,
+                     "level":  4,
+                     "task":  8,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0122284Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  2307,
+                     "level":  4,
+                     "task":  10,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0153271Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  2307,
+                     "level":  4,
+                     "task":  10,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0161505Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  1539,
+                     "level":  4,
+                     "task":  8,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0210631Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  2307,
+                     "level":  4,
+                     "task":  10,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0227282Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  1539,
+                     "level":  4,
+                     "task":  8,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0267550Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  2307,
+                     "level":  4,
+                     "task":  10,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0275319Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  1539,
+                     "level":  4,
+                     "task":  8,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0323933Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  2307,
+                     "level":  4,
+                     "task":  10,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0333477Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  1539,
+                     "level":  4,
+                     "task":  8,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0387005Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  2307,
+                     "level":  4,
+                     "task":  10,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0400728Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  1539,
+                     "level":  4,
+                     "task":  8,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0444702Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  2307,
+                     "level":  4,
+                     "task":  10,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0465018Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  2307,
+                     "level":  4,
+                     "task":  10,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0472146Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  1539,
+                     "level":  4,
+                     "task":  8,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0537150Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  2307,
+                     "level":  4,
+                     "task":  10,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0554648Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  1539,
+                     "level":  4,
+                     "task":  8,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0594685Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  2307,
+                     "level":  4,
+                     "task":  10,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0602101Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  1539,
+                     "level":  4,
+                     "task":  8,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0638127Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  2307,
+                     "level":  4,
+                     "task":  10,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0646096Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  1539,
+                     "level":  4,
+                     "task":  8,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0692496Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  2307,
+                     "level":  4,
+                     "task":  10,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0708899Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  1539,
+                     "level":  4,
+                     "task":  8,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0752167Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  2307,
+                     "level":  4,
+                     "task":  10,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0770683Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  1539,
+                     "level":  4,
+                     "task":  8,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0817998Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  2307,
+                     "level":  4,
+                     "task":  10,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0836896Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  1539,
+                     "level":  4,
+                     "task":  8,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0852269Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  259,
+                     "level":  4,
+                     "task":  2,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.0904696Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  2307,
+                     "level":  4,
+                     "task":  10,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 },
+                 {
+                     "time":  "2026-10-14T16:55:01.1025489Z",
+                     "provider":  "Intel-NPU-LevelZero",
+                     "id":  515,
+                     "level":  4,
+                     "task":  3,
+                     "opcode":  2,
+                     "worker_process":  true,
+                     "thread_id":  14772
+                 }
+             ],
+    "raw_trace_committed":  false,
+    "desktop_offloaded":  false
+}

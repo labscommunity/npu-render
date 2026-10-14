@@ -1,0 +1,45 @@
+--- a/native/windows/registered_lab/indexed_pipeline.hpp
++++ b/native/windows/registered_lab/indexed_pipeline.hpp
+@@ -13,7 +13,7 @@
+     }
+     struct ClearEntry {uint32_t width,height,format;std::unique_ptr<raster::ClearExecutor> executor;};
+     std::vector<ClearEntry> clear_cache;
+-    uint32_t uniform_limit=8,triangle_limit=24;
++    uint32_t uniform_limit=8,triangle_limit=24,clear_limit=4;
+     struct UniformEntry {
+         Header header;
+         std::vector<uint32_t> vertex, pixel;
+@@ -39,10 +39,11 @@
+         if(_dupenv_s(&value,&length,"NR_RENDER_PIPELINE_CACHE"))throw std::runtime_error("cannot read pipeline cache experiment");
+         std::unique_ptr<char,decltype(&std::free)> owner(value,&std::free);
+         if(value && *value){
+-            if(std::strcmp(value,"expanded"))throw std::invalid_argument("pipeline cache experiment requires expanded");
+-            uniform_limit=16;triangle_limit=48;
++            if(!std::strcmp(value,"expanded")){uniform_limit=16;triangle_limit=48;}
++            else if(!std::strcmp(value,"retained")){uniform_limit=64;triangle_limit=128;clear_limit=16;}
++            else throw std::invalid_argument("pipeline cache experiment requires expanded or retained");
+         }
+-        std::printf("{\"kind\":\"pipeline_cache_policy\",\"uniform_capacity\":%u,\"triangle_capacity\":%u,\"clear_capacity\":4,\"replacement\":\"FIFO\",\"hardware_queue_count_measured\":false}\n",uniform_limit,triangle_limit);std::fflush(stdout);
++        std::printf("{\"kind\":\"pipeline_cache_policy\",\"uniform_capacity\":%u,\"triangle_capacity\":%u,\"clear_capacity\":%u,\"replacement\":\"FIFO\",\"hardware_queue_count_measured\":false}\n",uniform_limit,triangle_limit,clear_limit);std::fflush(stdout);
+     }
+     std::array<size_t,5> retained_pipeline_counts() const {
+         return {uniform_cache.size(),triangle_cache.size(),clear_cache.size(),texture_executor?1u:0u,linear_executor?1u:0u};
+@@ -53,7 +54,7 @@
+             raster::ClearExecutor *executor=nullptr;
+             for(auto &entry:clear_cache)if(entry.width==h.width && entry.height==h.height && entry.format==h.format){executor=entry.executor.get();break;}
+             if(!executor){
+-                if(clear_cache.size()==4)clear_cache.erase(clear_cache.begin());
++                if(clear_cache.size()==clear_limit)clear_cache.erase(clear_cache.begin());
+                 auto candidate=std::make_unique<raster::ClearExecutor>(h.width,h.height,h.format,"NPU");
+                 clear_cache.push_back({h.width,h.height,h.format,std::move(candidate)});executor=clear_cache.back().executor.get();
+             }
+--- a/native/windows/registered_lab/local_indexed_worker.cpp
++++ b/native/windows/registered_lab/local_indexed_worker.cpp
+@@ -93,6 +93,7 @@
+                     phase="provider";
+                     const auto reply=dispatch.execute(ticket,turn_deadline,[&]{
+                         entered=GetTickCount64();recording.request(ticket,bytes);
++                        const auto counts=pipeline.retained_pipeline_counts();std::printf("{\"pipeline_before_request\":true,\"dispatch_ticket\":%u,\"uniform\":%zu,\"triangle\":%zu,\"clear\":%zu,\"point\":%zu,\"linear\":%zu}\n",ticket,counts[0],counts[1],counts[2],counts[3],counts[4]);std::fflush(stdout);
+                         const auto request=ex::decode(bytes);const auto began=std::chrono::steady_clock::now();const auto before=nr::provider::compile_statistics();const auto coverage_before=nr::raster::coverage_statistics();
+                         const auto rendered=[&]{try{return pipeline.execute(request);}catch(...){capture_failed_request(bytes,h,ticket);throw;}}();const auto after=nr::provider::compile_statistics();const auto coverage_after=nr::raster::coverage_statistics();const auto elapsed=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-began).count();
+                         ex::require(rendered.execution_device=="NPU");const auto result=ex::response(h,rendered);recording.response(ticket,result);++succeeded;

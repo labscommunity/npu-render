@@ -1,0 +1,45 @@
+{
+  "started": "2026-10-14T17:09:34.289016+00:00",
+  "completed": true,
+  "passed": false,
+  "published": 15,
+  "desktop_offloaded": false,
+  "producer": {
+    "pid": 20792,
+    "session": 0,
+    "creation_filetime": 134364713679381530,
+    "image_name": "WUDFHost.exe",
+    "sid": "S-1-5-19"
+  },
+  "compositor": {
+    "pid": 16980,
+    "session": 1,
+    "creation_filetime": 134364673055826287,
+    "image_name": "dwm.exe",
+    "sid": "S-1-5-90-0-1"
+  },
+  "earliest_qpc": 2060846305449,
+  "latest": {
+    "sequence": 15,
+    "qpc": 2063552037114,
+    "producer_pid": 20792,
+    "width": 1024,
+    "height": 768,
+    "format": 87,
+    "pixel_bytes": 3145728,
+    "pixel_sha256": "e6d43387bc44562edda881a9e97f688a797349cb0cb1e1a8c5c8ca0c38a2f469",
+    "packet_sha256": "6f04bf630bb64f5c2b74a950f7233506c3cac1348405894c718024af608ea691",
+    "observed": "2026-10-14T17:14:04.969849+00:00",
+    "npu_receipts_observed": 710,
+    "known_stimulus_pixel": [
+      80,
+      30,
+      180,
+      255
+    ]
+  },
+  "producer_and_compositor_verified": true,
+  "error": "PermissionError(13, 'The process cannot access the file because it is being used by another process.', None, 32)",
+  "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\relay_native_frames_v2.py\", line 39, in <module>\n    raise C.WinError(error)\nPermissionError: [WinError 32] The process cannot access the file because it is being used by another process.\n",
+  "finished": "2026-10-14T17:14:20.301690+00:00"
+}
