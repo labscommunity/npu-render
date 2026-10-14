@@ -1,0 +1,44 @@
+{
+  "recorded": "2026-10-14T13:51:56.007064+00:00",
+  "evidence_checks_passed": true,
+  "raw_files_remotely_hash_verified": 137,
+  "raw_bytes": 1713049,
+  "clone_trial": {
+    "passed": true,
+    "observed_frames": 3,
+    "distinct_pixel_hashes": 3,
+    "first_frame_ms": 70783.86659998796,
+    "subsequent_frame_intervals_ms": [
+      56390.98369999556,
+      23394.885000016075
+    ],
+    "npu_operations": 399,
+    "delivery_acknowledgments": 399,
+    "physical_topology_restored": true,
+    "worker_totals": {
+      "provider_requests": 14369,
+      "draw_ms": 104349.673,
+      "compile_and_draw_ms": 145405.336,
+      "provider_setup_ms": 25887.897,
+      "backend_compile_ms": 14479.792,
+      "declared_request_packet_bytes": 1314326448
+    }
+  },
+  "extension_trial": {
+    "effective_passed": false,
+    "layout_applied_and_verified": true,
+    "physical_path_preserved": true,
+    "compositor_exited_after_first_frame": true,
+    "raw_controller_passed_flag_is_incorrect": true,
+    "clear_rejected": true,
+    "clear_dimensions_unknown": true,
+    "clone_topology_restored": false,
+    "final_physical_topology_restored": true,
+    "cleanup_passed": true
+  },
+  "failure_reporting_fix_regression_passed": true,
+  "desktop_offloaded": false,
+  "live_physical_presentation_tested": false,
+  "tahoma_performance_tested": false,
+  "promoted_to_runtime": false
+}

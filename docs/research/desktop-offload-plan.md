@@ -14,8 +14,8 @@ renderer does not establish where every application renders.
 
 | Gate | Work | Acceptance evidence | Current status |
 | --- | --- | --- | --- |
-| 1. Routing | Record active physical and indirect paths before, during, and after admission; identify clone/extended configuration and actual rendering adapter. | Timestamped topology, native DWM NPU receipts, selected adapter, frame producer, exact restoration. | First native frame qualified; topology during admission unmeasured. |
-| 2. Continuous rendering | Keep the native renderer alive across changing windows and content; diagnose every failed draw; distinguish model preparation from rendering and transport. | Multiple changing frames, timestamps and pixel checks, sustained operation, no hidden fallback. | One 1024×768 frame after about 184 seconds; sustained behavior unqualified. |
+| 1. Routing | Record active physical and indirect paths before, during, and after admission; identify clone/extended configuration and actual rendering adapter. | Timestamped topology, native DWM NPU receipts, selected adapter, frame producer, exact restoration. | Automatic clone identified; extension applied with physical path preserved. Compositor failure interrupted clone restoration; final physical baseline restored. |
+| 2. Continuous rendering | Keep the native renderer alive across changing windows and content; diagnose every failed draw; distinguish model preparation from rendering and transport. | Multiple changing frames, timestamps and pixel checks, sustained operation, no hidden fallback. | Three changing clone frames: first at 70.8 seconds, then 56.4 and 23.4 seconds apart. Extended-desktop clear rejection under investigation. |
 | 3. Physical presentation | Present new NPU frames on the physical output with distinct logical desktops and no recursive mirroring. | Live sequence-to-present correlation, output identity, measured presentation mode and residual GPU work. | Static finite copy probe works; live physical bridge unimplemented. |
 | 4. Interaction and recovery | Migrate the logical desktop, route pointer/keyboard/focus correctly, handle cursor/DPI/resolution, restore exact topology and windows. | Scripted interaction visible on physical output; emergency exit and owned-process failure recovery; ordinary login/lock path retained. | VM interaction proof exists; native interaction unqualified. |
 | 5. Responsiveness | Optimize resource reuse, graph compilation, dispatch granularity, transfer volume and frame pacing. | Initial target: ordinary desktop interaction at 30 fps, p95 visible response ≤100 ms, 30-minute stable run. Report cold-start time separately. | Not met; several individual draws take seconds. |
@@ -30,12 +30,12 @@ role, and any GPU rendering/copy cost in the bridge must be measured.
 
 ## Immediate experiment
 
-Run a read-only topology observer in the signed-in console before admitting the
-existing qualified native renderer. Keep admission bounded with the independent
-recovery task. Record every newly published frame and elapsed time, instead of
-ending the experiment at the first frame. Restore the original display path and
-remove the temporary devices and trust. Do not introduce live physical feedback
-until the topology is identified.
+The [first topology investigation](../validation/2026-10-14/native-topology-progress-v1/README.md)
+identified automatic cloning and applied an explicitly extended layout. The
+compositor then exited after a rejected clear. The next work is to qualify a
+bounded larger clear operation, add failure diagnostics, and repeat extension
+with a controller that correctly fails on errors occurring after the first frame.
+Live physical feedback remains gated on reliable display separation.
 
 ## Architecture constraints from primary documentation
 

@@ -20,6 +20,10 @@ interactive performance and a measured Tahoma benefit remain outstanding.
 The [desktop offload execution plan](docs/research/desktop-offload-plan.md)
 defines the ordered acceptance gates through a usable switch and matched Tahoma
 measurements, including application graphics coverage.
+The [topology investigation](docs/validation/2026-10-14/native-topology-progress-v1/README.md)
+now confirms automatic cloning and three changing NPU frames, still tens of
+seconds apart. An explicit extension preserves the physical output but exposes a
+compositor failure after a rejected clear; recovery restores the physical desktop.
 
 The [native registered-adapter trial](docs/validation/2026-10-13/native-windows-adapter-v1/README.md)
 now passes six clears and two indexed draws through Delta's ordinary Direct3D 11

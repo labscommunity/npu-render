@@ -1,0 +1,13 @@
+from pathlib import Path
+import shutil,hashlib,json,tarfile
+r=Path('results/render-driver');name='native-topology-control-v3';d=r/name;shutil.copytree(r/'native-topology-control-v2',d)
+p=d/'topology.cpp';s=p.read_text().replace('Topology query(UINT flags){','Topology query(UINT flags){\n flags|=QDC_VIRTUAL_MODE_AWARE;')
+s=s.replace('const auto i=p.sourceInfo.modeInfoIdx;', 'const auto i=(p.flags&DISPLAYCONFIG_PATH_SUPPORT_VIRTUAL_MODE)?p.sourceInfo.sourceModeInfoIdx:p.sourceInfo.modeInfoIdx;')
+a='candidate.sourceInfo.modeInfoIdx=UINT(desired.modes.size());candidate.targetInfo.modeInfoIdx=DISPLAYCONFIG_PATH_MODE_IDX_INVALID;'
+b='''if(candidate.flags&DISPLAYCONFIG_PATH_SUPPORT_VIRTUAL_MODE){candidate.sourceInfo.sourceModeInfoIdx=UINT(desired.modes.size());candidate.sourceInfo.cloneGroupId=DISPLAYCONFIG_PATH_CLONE_GROUP_INVALID;candidate.targetInfo.targetModeInfoIdx=DISPLAYCONFIG_PATH_TARGET_MODE_IDX_INVALID;candidate.targetInfo.desktopModeInfoIdx=DISPLAYCONFIG_PATH_DESKTOP_IMAGE_IDX_INVALID;}else{candidate.sourceInfo.modeInfoIdx=UINT(desired.modes.size());candidate.targetInfo.modeInfoIdx=DISPLAYCONFIG_PATH_MODE_IDX_INVALID;}'''
+assert a in s;s=s.replace(a,b).replace('candidate.flags=DISPLAYCONFIG_PATH_ACTIVE;', 'candidate.flags|=DISPLAYCONFIG_PATH_ACTIVE;').replace('SDC_USE_SUPPLIED_DISPLAY_CONFIG|action','SDC_USE_SUPPLIED_DISPLAY_CONFIG|SDC_VIRTUAL_MODE_AWARE|action')
+p.write_text(s)
+(r/(name+'-source.json')).write_text(json.dumps({p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir()},indent=2)+'\n')
+with tarfile.open(r/(name+'.tar.gz'),'w:gz') as t:t.add(d,arcname=name)
+(r/('build-'+name+'.ps1')).write_text((r/'build-native-topology-control-v2.ps1').read_text().replace('native-topology-control-v2',name))
+(r/'run-native-topology-helper-v3.ps1').write_text((r/'run-native-topology-helper-v2.ps1').read_text().replace('native-topology-control-v2',name))
