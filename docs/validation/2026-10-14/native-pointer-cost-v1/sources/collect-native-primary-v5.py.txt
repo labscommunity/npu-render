@@ -1,0 +1,32 @@
+from pathlib import Path
+import base64,subprocess,json,hashlib,concurrent.futures
+r=Path("results/render-driver")
+directories=['native-live-v22','native-desktop-admission-v33','native-topology-primary-v9','native-topology-v34','native-cursor-guard-v1-qualification','native-cursor-guard-v2-qualification','native-present-v17-qualification','native-present-v18-qualification','native-present-v19-qualification','live-frame-reader-v10','native-render-cost-v1-metadata','native-quad-v1-cpu','native-quad-v1-cpu-expanded','native-quad-v1-npu','native-ordered-replay-v28-pointer-rollback','native-primary-v5-build-reports']
+extras=['native-desktop-v33-source.json','native-topology-control-v10-source.json','native-topology-control-v11-source.json','native-present-v17-source.json','native-present-v18-source.json','native-present-v19-source.json','native-quad-v1-source.json','native-quad-v1-inspection.jsonl','build-native-topology-control-v10.log','build-native-topology-control-v11.log','build-native-present-v17.log','build-native-present-v18.log','build-native-present-v19.log','build-native-quad-v1.log']
+source_files=['run-native-desktop-v33.ps1','recover-native-desktop-v33.ps1','start-native-topology-v34.ps1','run-native-live-v22.ps1','run-native-topology-helper-v10.ps1','cursor_recovery_watchdog_v1.py','qualify-native-cursor-v1.ps1','qualify-native-cursor-v2.ps1','qualify-native-input-v17.ps1','qualify-native-input-v18.ps1','qualify-native-input-v19.ps1','qualify-native-quad-v1.py','build-native-topology-control-v10.ps1','build-native-topology-control-v11.ps1','build-native-present-v17.ps1','build-native-present-v18.ps1','build-native-present-v19.ps1','build-native-quad-v1.ps1','inspect-recorded-shaders-v1.py']
+ps=r'''$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render"
+function ArtifactHash([string]$path){$stream=[IO.File]::Open($path,[IO.FileMode]::Open,[IO.FileAccess]::Read,([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete));try{return (Get-FileHash -InputStream $stream -Algorithm SHA256).Hash}finally{$stream.Dispose()}}
+$items=@(foreach($name in @('''+','.join("'"+d+"'" for d in directories)+r''')){
+ Get-ChildItem "$r\vm\$name" -File -Recurse|Where-Object {($_.Extension -in @('.json','.jsonl','.log','.txt','.inf','.ps1','.py')) -and ($_.Name -notlike 'client-*' -or ($_.Name -like '*.stderr.log' -and $_.Length -gt 0))}|ForEach-Object {
+ if($_.Length -gt 5000000){throw 'Unexpected artifact size'}
+ [ordered]@{source=$_.FullName.Substring(("$r\vm\").Length).Replace('\','/');bytes=$_.Length;sha256=(ArtifactHash $_.FullName)}
+ }
+}
+foreach($name in @('''+','.join("'"+d+"'" for d in extras+source_files)+r''')){[ordered]@{source=$name;bytes=(Get-Item "$r\vm\$name").Length;sha256=(ArtifactHash "$r\vm\$name")}}
+);$items|ConvertTo-Json -Depth 5
+'''
+p=r/'hash-native-primary-v5.ps1';p.write_text(ps)
+subprocess.run(['scp','-q',str(p),'delta:AppData/Local/npu-render/vm/'],capture_output=True,check=True,timeout=30)
+invoke=r'''$r="$env:LOCALAPPDATA\npu-render";& ([scriptblock]::Create([IO.File]::ReadAllText("$r\vm\hash-native-primary-v5.ps1")))'''
+result=subprocess.run(['ssh','-o','BatchMode=yes','-o','ConnectTimeout=8','delta','powershell.exe -NoProfile -NonInteractive -EncodedCommand '+base64.b64encode(invoke.encode('utf-16-le')).decode()],capture_output=True,timeout=45)
+if result.returncode:print(result.stderr.decode(errors='replace')[:2000]);raise SystemExit(result.returncode)
+receipts=json.loads(result.stdout.decode('utf-8-sig'));assert 0<len(receipts)<1000
+(r/'native-primary-v5-artifact-sha256.json').write_text(json.dumps(receipts,indent=2)+'\n')
+def fetch(item):
+    name=item['source'];assert '..' not in name and not name.startswith('/');dest=r/'primary-raw-v5'/name;dest.parent.mkdir(parents=True,exist_ok=True)
+    subprocess.run(['scp','-q','-o','BatchMode=yes','delta:AppData/Local/npu-render/vm/'+name,str(dest)],capture_output=True,check=True,timeout=90)
+    data=dest.read_bytes();assert len(data)==item['bytes'] and hashlib.sha256(data).hexdigest()==item['sha256'].lower()
+    if name in source_files:assert data==(r/name).read_bytes()
+    return len(data)
+with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:sizes=list(pool.map(fetch,receipts))
+print(json.dumps(dict(hash_verified_files=len(sizes),bytes=sum(sizes),source_files_matched_local=len(source_files))))

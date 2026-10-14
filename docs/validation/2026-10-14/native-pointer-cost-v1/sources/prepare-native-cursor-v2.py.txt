@@ -1,0 +1,34 @@
+from pathlib import Path
+import shutil,hashlib,json,tarfile
+r=Path('results/render-driver');d=r/'native-topology-control-v11';shutil.copytree(r/'native-topology-control-v10',d)
+p=d/'cursor_confinement.hpp';s=p.read_text().replace('bool active=false,released=false;','bool active=false,released=false;unsigned reacquired=0;')
+a='if(!EqualRect(&actual,&desired)){active=false;throw std::runtime_error("cursor confinement changed");}'
+b=r'''if(!EqualRect(&actual,&desired)){
+            const RECT full=desktop();DWORD foreground_pid=0;GetWindowThreadProcessId(GetForegroundWindow(),&foreground_pid);
+            std::printf("{\"cursor_clip_changed\":true,\"actual\":[%ld,%ld,%ld,%ld],\"was_unconfined\":%s,\"foreground_pid\":%lu}\n",actual.left,actual.top,actual.right,actual.bottom,EqualRect(&actual,&full)?"true":"false",foreground_pid);std::fflush(stdout);
+            if(!EqualRect(&actual,&full)){active=false;throw std::runtime_error("different cursor confinement appeared");}
+            // Foreground transitions may release the shared cursor constraint.
+            // The finite admitted mode restores only an unrestricted pointer;
+            // another application's different rectangle remains untouched.
+            if(!ClipCursor(&desired) || !GetClipCursor(&actual) || !EqualRect(&actual,&desired))throw std::runtime_error("cursor confinement reacquisition failed");
+            ++reacquired;std::printf("{\"cursor_reacquired_after_release\":true,\"count\":%u,\"foreground_pid\":%lu}\n",reacquired,foreground_pid);std::fflush(stdout);
+        }'''
+assert a in s;p.write_text(s.replace(a,b))
+(r/'native-topology-control-v11-source.json').write_text(json.dumps({p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir()},indent=2)+'\n')
+with tarfile.open(r/'native-topology-control-v11.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+(r/'build-native-topology-control-v11.ps1').write_text((r/'build-native-topology-control-v10.ps1').read_text().replace('control-v10','control-v11'))
+s=(r/'qualify-native-cursor-v1.ps1').read_text().replace('guard-v1-qualification','guard-v2-qualification').replace('CursorGuardV1','CursorGuardV2').replace('control-v10','control-v11').replace('admission-v32','admission-v33')
+anchor="  if($case -eq 'owner-terminated'){"
+insert='''  if($case -eq 'normal'){
+   $inputProof=Get-Content "$r\\builds\\native-present-v19\\build-report.json" -Raw|ConvertFrom-Json;$inputBinary="$r\\builds\\native-present-v19\\Release\\nr_frame_present_probe.exe"
+   if(!$inputProof.clean_build -or (Get-FileHash $inputBinary).Hash -ne $inputProof.binary_sha256){throw 'Input fixture identity mismatch'}
+   Interactive "$case-input" "$dir\\input" @($inputBinary,'--input-contract')
+   $inputDeadline=[DateTime]::UtcNow.AddSeconds(20);$inputDone=@();do{$inputDone=@(Rows "$dir\\input\\probe.log"|Where-Object {$_.completed -and $_.input_contract});if($inputDone.Count){break};Start-Sleep -Milliseconds 100}while([DateTime]::UtcNow -lt $inputDeadline)
+   if($inputDone.Count -ne 1 -or !$inputDone[0].passed){throw 'Foreground input did not pass'}
+   $reacquisition=@(Rows "$dir\\helper\\probe.log"|Where-Object cursor_reacquired_after_release)
+   if(!$reacquisition.Count){throw 'Foreground transition did not exercise reacquisition'}
+   $report.foreground_input_passed=$true;$report.foreground_release_reacquired=$true
+  }
+'''
+assert s.count(anchor)==1;s=s.replace(anchor,insert+anchor);s=s.replace('$report.passed=$report.cases.Count -eq 2','$report.passed=$report.cases.Count -eq 2 -and $report.foreground_input_passed -and $report.foreground_release_reacquired')
+(r/'qualify-native-cursor-v2.ps1').write_text(s)

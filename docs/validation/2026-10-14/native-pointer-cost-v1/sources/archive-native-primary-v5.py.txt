@@ -1,0 +1,44 @@
+from pathlib import Path
+from datetime import datetime,UTC
+import json,hashlib,difflib,shutil,statistics
+r=Path('results/render-driver');raw=r/'primary-raw-v5';out=Path('docs/validation/2026-10-14/native-pointer-cost-v1');out.mkdir(exist_ok=False)
+def obj(p):
+ b=p.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+manifest=json.loads((r/'native-primary-v5-artifact-sha256.json').read_text())
+for item in manifest:
+ p=raw/item['source'];b=p.read_bytes();assert len(b)==item['bytes'] and hashlib.sha256(b).hexdigest()==item['sha256'].lower()
+ dest=out/'raw'/item['source'];dest=dest.with_suffix(dest.suffix+'.txt') if dest.suffix in ('.py','.ps1') else dest;dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(b);item['archive_path']=dest.relative_to(out).as_posix()
+(out/'raw-manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
+source_manifest=[]
+for name in ['native-topology-control-v10','native-topology-control-v11','native-present-v17','native-present-v18','native-present-v19']:
+ expected=obj(raw/(name+'-source.json'))
+ for name_in,sha in expected.items():
+  p=r/name/name_in;b=p.read_bytes();assert hashlib.sha256(b).hexdigest()==sha
+  dest=out/'sources'/name/(name_in+'.txt');dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(b);source_manifest.append(dict(path=dest.relative_to(out).as_posix(),sha256=sha,remote_manifest=name+'-source.json'))
+base=r/'native-routing-v27';new=r/'native-quad-v1';expected=obj(raw/'native-quad-v1-source.json');patch=[]
+for name,sha in expected.items():
+ p=new/name;assert hashlib.sha256(p.read_bytes()).hexdigest()==sha
+ old=base/name
+ if not old.exists() or old.read_bytes()!=p.read_bytes():
+  patch.extend(difflib.unified_diff(old.read_text().splitlines(keepends=True) if old.exists() else [],p.read_text().splitlines(keepends=True),fromfile='a/'+name if old.exists() else '/dev/null',tofile='b/'+name))
+(out/'native-quad-v1.patch').write_text(''.join(patch))
+for name in ['prepare-native-cursor-v2.py','prepare-native-pointer-v1.py','prepare-native-quad-v1.py','analyze-native-render-cost-v1.py','collect-native-primary-v5.py','archive-native-primary-v5.py']:
+ p=r/name;dest=out/'sources'/(name+'.txt');dest.write_bytes(p.read_bytes());source_manifest.append(dict(path=dest.relative_to(out).as_posix(),sha256=hashlib.sha256(p.read_bytes()).hexdigest(),origin='local-experiment-script'))
+(out/'source-manifest.json').write_text(json.dumps(source_manifest,indent=2)+'\n')
+root=obj(raw/'native-live-v22/report.json');native=obj(raw/'native-desktop-admission-v33/bootstrap/report.json');guard1=obj(raw/'native-cursor-guard-v1-qualification/report.json');guard2=obj(raw/'native-cursor-guard-v2-qualification/report.json');replay=obj(raw/'native-ordered-replay-v28-pointer-rollback/report.json')
+assert root['completed'] and not root['passed'] and root['cleanup_passed'] and root['relative_mouse_received'] and root['mouse_received'] and not root['keyboard_received'] and root['pointer_confined_and_restored']
+assert not native['passed'] and native['worker_exit_code']==1 and 'DEVICE_LOST' in (raw/'native-desktop-admission-v33/bootstrap/worker.stderr.log').read_text()
+assert guard1['passed'] and guard2['passed'] and guard2['foreground_input_passed'] and guard2['foreground_release_reacquired']
+for guard in [guard1,guard2]:assert len(guard['cases'])==2 and next(x for x in guard['cases'] if x['case']=='owner-terminated')['recovery']['recovery_released_owned_clip']
+assert replay['passed'] and replay['unreferenced_successes']==1 and replay['first_original_ticket']==971
+input_reports={str(v):obj(raw/f'native-present-v{v}-qualification/report.json') for v in [17,18,19]}
+assert not input_reports['17']['passed'] and not input_reports['18']['passed'] and input_reports['19']['passed']
+cpu=obj(raw/'native-quad-v1-cpu-expanded/report.json');npu=obj(raw/'native-quad-v1-npu/report.json')
+assert cpu['passed'] and npu['passed'] and len(cpu['cases'])==len(npu['cases'])==13
+assert all(x['exact_original_pixels'] and x['private_output_removed_after_hash'] for q in [cpu,npu] for x in q['cases'])
+cost=obj(r/'native-render-cost-v1-analysis/report.json');shutil.copyfile(r/'native-render-cost-v1-analysis/report.json',out/'cost-analysis.json')
+warm=[x['renders'][1]['draw_ms'] for x in npu['cases']]
+result=dict(recorded=datetime.now(UTC).isoformat(),evidence_checks_passed=True,raw_files_remotely_hash_verified=len(manifest),raw_bytes=sum(x['bytes'] for x in manifest),live=root,native=native,cursor_contracts=[guard1,guard2],ordinary_input=input_reports,isolated_failed_request_replay=replay,quad_cpu=cpu,quad_npu=npu,quad_warm_draw_ms=dict(min=min(warm),median=statistics.median(warm),max=max(warm)),quad_provider_calls=sorted({x['renders'][1]['provider_requests'] for x in npu['cases']}),full_desktop_offload=False,tahoma_tested=False,promoted_to_live_worker=False,device_loss_resolved=False,native_cursor_foreground_recovery_qualified=False,live23_running_separately=True)
+(out/'report.json').write_text(json.dumps(result,indent=2)+'\n')
+(out/'research.json').write_text(json.dumps(dict(sources=[dict(url='https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-mouseinput',supports='Relative movement, event metadata, and opting out of mouse-message coalescing.'),dict(url='https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-clipcursor',supports='Shared cursor confinement and release; observed foreground release is local experimental evidence.'),dict(url='https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setforegroundwindow',supports='Foreground activation and restrictions; no claim that this source guarantees automatic clip release.')],local_evidence='The qualified foreground test logs unrestricted clip rectangles at two foreground transitions, then verifies reacquisition.'),indent=2)+'\n')
+print(json.dumps(dict(archive=str(out),files=len(manifest),bytes=result['raw_bytes'],quad_warm_draw_ms=result['quad_warm_draw_ms'])))

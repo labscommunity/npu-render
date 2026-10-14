@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.24)
+project(nr_native_topology LANGUAGES CXX)
+add_executable(nr_native_topology topology.cpp)
+target_compile_features(nr_native_topology PRIVATE cxx_std_17)
+target_link_libraries(nr_native_topology PRIVATE user32 wtsapi32)

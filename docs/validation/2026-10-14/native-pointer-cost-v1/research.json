@@ -1,0 +1,17 @@
+{
+  "sources": [
+    {
+      "url": "https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-mouseinput",
+      "supports": "Relative movement, event metadata, and opting out of mouse-message coalescing."
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-clipcursor",
+      "supports": "Shared cursor confinement and release; observed foreground release is local experimental evidence."
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setforegroundwindow",
+      "supports": "Foreground activation and restrictions; no claim that this source guarantees automatic clip release."
+    }
+  ],
+  "local_evidence": "The qualified foreground test logs unrestricted clip rectangles at two foreground transitions, then verifies reacquisition."
+}

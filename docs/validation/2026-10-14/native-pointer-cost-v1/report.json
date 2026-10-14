@@ -1,0 +1,1346 @@
+{
+  "recorded": "2026-10-14T23:11:27.478430+00:00",
+  "evidence_checks_passed": true,
+  "raw_files_remotely_hash_verified": 203,
+  "raw_bytes": 2919538,
+  "live": {
+    "started": "2026-10-14T22:56:36.3328378Z",
+    "completed": true,
+    "passed": false,
+    "native_trial": "native-desktop-admission-v33",
+    "topology_trial": "native-topology-primary-v9",
+    "desktop_offloaded": false,
+    "input_forwarding_tested": false,
+    "tahoma_tested": false,
+    "controller_pid": 21216,
+    "first_relay": {
+      "sequence": 1,
+      "qpc": 2269991030954,
+      "producer_pid": 4796,
+      "width": 1024,
+      "height": 768,
+      "format": 87,
+      "pixel_bytes": 3145728,
+      "pixel_sha256": "0c3fe925f628cd5f424b32a98db157810d32cb966bf8ce38ea6c2c7dad5f3864",
+      "packet_sha256": "6720ba63e35e96762a6b2881d7ccefdd932649661329b2f85cf7e2f106f06805",
+      "observed": "2026-10-14T22:58:08.877074+00:00",
+      "npu_receipts_observed": 178,
+      "known_stimulus_pixel": [
+        62,
+        55,
+        44,
+        255
+      ]
+    },
+    "presentation_seconds": 510,
+    "cursor_cued_at": "2026-10-14T22:58:12.9845907Z",
+    "click_cued_at": "2026-10-14T23:01:02.4566719Z",
+    "presenter_task_result": 1,
+    "topology_exit": 1,
+    "native_exit": 1,
+    "cleanup_passed": true,
+    "physically_submitted_frames": 6,
+    "matching_source_frames": 6,
+    "backbuffer_copies_exact": true,
+    "distinct_source_pixel_hashes": 7,
+    "stimulus_task_result": 1,
+    "presenter_child_success": false,
+    "stimulus_child_success": false,
+    "controlled_color_submitted": false,
+    "mouse_received": true,
+    "keyboard_received": false,
+    "physical_blue_green_red_observed": false,
+    "screen_observer": "DXGI physical-output duplication; two-pixel GPU readback; ownership before and after",
+    "primary_topology_restored": false,
+    "ordinary_windows_restored": false,
+    "pointer_confined_and_restored": true,
+    "relative_mouse_received": true,
+    "normal_windows_input_tested": false,
+    "cursor_cleanup_passed": true,
+    "finished": "2026-10-14T23:04:26.2397078Z"
+  },
+  "native": {
+    "started": "2026-10-14T22:56:53.788285+00:00",
+    "passed": false,
+    "completed": true,
+    "desktop_offloaded": false,
+    "physical_frame_presented": false,
+    "display_topology_requested": false,
+    "actual_dwm_npu_execution": true,
+    "actual_umdf_npu_execution": false,
+    "controller_pid": 22168,
+    "frame_io_statistics": {
+      "sharing_retries": 0,
+      "sharing_timeouts": 0
+    },
+    "session_gate": {
+      "session_inspection": true,
+      "console_session": 1,
+      "signed_in_and_unlocked": true,
+      "controller_matches_console_user": true,
+      "ready_for_interactive_task": true,
+      "desktop_changed": false
+    },
+    "compositor": {
+      "pid": 16980,
+      "session": 1,
+      "creation_filetime": 134364673055826287,
+      "image_name": "dwm.exe",
+      "sid": "S-1-5-90-0-1"
+    },
+    "indirect_host": {
+      "pid": 4796,
+      "session": 0,
+      "creation_filetime": 134364922139674236,
+      "image_name": "WUDFHost.exe",
+      "sid": "S-1-5-19"
+    },
+    "host_found_after_ms": 130.3011999989394,
+    "request_recording_enabled": true,
+    "recording_byte_budget": 17179869184,
+    "performance_measurement_valid": false,
+    "affine_batch": "default",
+    "memory_cache": "0",
+    "pipeline_cache": "retained",
+    "monitor_seconds": 660,
+    "worker_pid": 1572,
+    "admission_published": true,
+    "admission_publication_ms": 92.11030000005849,
+    "npu_receipts": 971,
+    "delivery_acknowledgments": 971,
+    "native_driver_entry": true,
+    "preferred_adapter_selected": true,
+    "successful_frame_readback": true,
+    "latest_frame": {
+      "sequence": 15,
+      "width": 1024,
+      "height": 768,
+      "format": 87,
+      "pixel_bytes": 3145728,
+      "producer_pid": 4796,
+      "qpc": 2272808650794,
+      "pixel_sha256": "4f9246b9cc89d03c24240de99466905f17583daf0488865469778cd986e66c28"
+    },
+    "observed_frame_count": 12,
+    "distinct_pixel_hashes": 10,
+    "native_indirect_frame_produced": true,
+    "multiple_frames_observed": true,
+    "sustained_rendering_qualified": false,
+    "error": "AssertionError('NPU worker stopped before native frame evidence')",
+    "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\native_desktop_bootstrap_v15.py\", line 98, in <module>\n    assert worker.poll() is None,'NPU worker stopped before native frame evidence'\n           ^^^^^^^^^^^^^^^^^^^^^\nAssertionError: NPU worker stopped before native frame evidence\n",
+    "indirect_remove_exit": 0,
+    "owned_process_acls_restored_exactly": true,
+    "installer_exit_code": 0,
+    "worker_exit_code": 1,
+    "finished": "2026-10-14T23:04:04.441688+00:00"
+  },
+  "cursor_contracts": [
+    {
+      "started": "2026-10-14T22:48:08.4120285Z",
+      "completed": true,
+      "passed": true,
+      "cases": [
+        {
+          "recovery": {
+            "started": "2026-10-14T22:48:09.176326+00:00",
+            "completed": true,
+            "passed": true,
+            "independent_cursor_recovery": true,
+            "desktop_topology_changed": false,
+            "owner": {
+              "pid": 17480,
+              "session": 1,
+              "creation_filetime": 134364916890590210,
+              "image_name": "nr_native_topology.exe",
+              "sid": "S-1-5-21-2947748748-2550461803-2526238337-1002"
+            },
+            "snapshot": {
+              "cursor_guard_snapshot": true,
+              "schema": 1,
+              "pid": 17480,
+              "created": 134364916890590210,
+              "session": 1,
+              "original_unconfined": true,
+              "original_cursor": [
+                1440,
+                900
+              ],
+              "desired_clip": [
+                64,
+                64,
+                576,
+                320
+              ]
+            },
+            "owned_confinement_observed": true,
+            "trigger": "owner-exited",
+            "clip_before_recovery": [
+              0,
+              0,
+              2880,
+              1800
+            ],
+            "original_unconfined_restored": true,
+            "original_cursor_position_restored": true,
+            "finished": "2026-10-14T22:48:39.078700+00:00"
+          },
+          "case": "normal",
+          "passed": true
+        },
+        {
+          "recovery": {
+            "started": "2026-10-14T22:48:39.641135+00:00",
+            "completed": true,
+            "passed": true,
+            "independent_cursor_recovery": true,
+            "desktop_topology_changed": false,
+            "owner": {
+              "pid": 13068,
+              "session": 1,
+              "creation_filetime": 134364917194643664,
+              "image_name": "nr_native_topology.exe",
+              "sid": "S-1-5-21-2947748748-2550461803-2526238337-1002"
+            },
+            "snapshot": {
+              "cursor_guard_snapshot": true,
+              "schema": 1,
+              "pid": 13068,
+              "created": 134364917194643664,
+              "session": 1,
+              "original_unconfined": true,
+              "original_cursor": [
+                1440,
+                900
+              ],
+              "desired_clip": [
+                64,
+                64,
+                576,
+                320
+              ]
+            },
+            "owned_confinement_observed": true,
+            "trigger": "owner-exited",
+            "clip_before_recovery": [
+              64,
+              64,
+              576,
+              320
+            ],
+            "recovery_released_owned_clip": true,
+            "original_unconfined_restored": true,
+            "original_cursor_position_restored": true,
+            "finished": "2026-10-14T22:48:39.841732+00:00"
+          },
+          "case": "owner-terminated",
+          "passed": true
+        }
+      ],
+      "topology_changed": false,
+      "npu_tested": false,
+      "finished": "2026-10-14T22:48:47.4314027Z"
+    },
+    {
+      "started": "2026-10-14T23:05:01.2462153Z",
+      "completed": true,
+      "passed": true,
+      "cases": [
+        {
+          "recovery": {
+            "started": "2026-10-14T23:05:01.932246+00:00",
+            "completed": true,
+            "passed": true,
+            "independent_cursor_recovery": true,
+            "desktop_topology_changed": false,
+            "owner": {
+              "pid": 6188,
+              "session": 1,
+              "creation_filetime": 134364927018208890,
+              "image_name": "nr_native_topology.exe",
+              "sid": "S-1-5-21-2947748748-2550461803-2526238337-1002"
+            },
+            "snapshot": {
+              "cursor_guard_snapshot": true,
+              "schema": 1,
+              "pid": 6188,
+              "created": 134364927018208890,
+              "session": 1,
+              "original_unconfined": true,
+              "original_cursor": [
+                512,
+                384
+              ],
+              "desired_clip": [
+                64,
+                64,
+                576,
+                320
+              ]
+            },
+            "owned_confinement_observed": true,
+            "trigger": "owner-exited",
+            "clip_before_recovery": [
+              0,
+              0,
+              2880,
+              1800
+            ],
+            "original_unconfined_restored": true,
+            "original_cursor_position_restored": true,
+            "finished": "2026-10-14T23:05:31.900017+00:00"
+          },
+          "case": "normal",
+          "passed": true
+        },
+        {
+          "recovery": {
+            "started": "2026-10-14T23:05:32.411012+00:00",
+            "completed": true,
+            "passed": true,
+            "independent_cursor_recovery": true,
+            "desktop_topology_changed": false,
+            "owner": {
+              "pid": 20772,
+              "session": 1,
+              "creation_filetime": 134364927322495216,
+              "image_name": "nr_native_topology.exe",
+              "sid": "S-1-5-21-2947748748-2550461803-2526238337-1002"
+            },
+            "snapshot": {
+              "cursor_guard_snapshot": true,
+              "schema": 1,
+              "pid": 20772,
+              "created": 134364927322495216,
+              "session": 1,
+              "original_unconfined": true,
+              "original_cursor": [
+                512,
+                384
+              ],
+              "desired_clip": [
+                64,
+                64,
+                576,
+                320
+              ]
+            },
+            "owned_confinement_observed": true,
+            "trigger": "owner-exited",
+            "clip_before_recovery": [
+              64,
+              64,
+              576,
+              320
+            ],
+            "recovery_released_owned_clip": true,
+            "original_unconfined_restored": true,
+            "original_cursor_position_restored": true,
+            "finished": "2026-10-14T23:05:32.661859+00:00"
+          },
+          "case": "owner-terminated",
+          "passed": true
+        }
+      ],
+      "topology_changed": false,
+      "npu_tested": false,
+      "foreground_input_passed": true,
+      "foreground_release_reacquired": true,
+      "finished": "2026-10-14T23:05:41.5853489Z"
+    }
+  ],
+  "ordinary_input": {
+    "17": {
+      "started": "2026-10-14T22:50:34.8880492Z",
+      "completed": true,
+      "passed": false,
+      "binary_sha256": "FE6236B5BEC4A950442934519837EA283D2C82DAE80E5D09B2692C013C05DECB",
+      "driver_installed": false,
+      "topology_changed": false,
+      "npu_tested": false,
+      "task_result": 1,
+      "child_exit": 1,
+      "unauthenticated_character_rejected": false,
+      "relative_mouse_received": false,
+      "observer_result": {
+        "input_contract": true,
+        "completed": true,
+        "passed": false,
+        "mouse_receipts": 0,
+        "key_receipts": 0,
+        "npu_tested": false
+      },
+      "finished": "2026-10-14T22:50:50.4058736Z"
+    },
+    "18": {
+      "started": "2026-10-14T22:55:12.3521234Z",
+      "completed": true,
+      "passed": false,
+      "binary_sha256": "A7149DE076BF8100EB8BB70946826073291A8E5D2B0186278CC90CF694BA5E3C",
+      "driver_installed": false,
+      "topology_changed": false,
+      "npu_tested": false,
+      "task_result": 1,
+      "child_exit": 1,
+      "unauthenticated_character_rejected": false,
+      "relative_mouse_received": false,
+      "observer_result": {
+        "input_contract": true,
+        "completed": true,
+        "passed": false,
+        "mouse_receipts": 0,
+        "key_receipts": 0,
+        "npu_tested": false
+      },
+      "finished": "2026-10-14T22:55:28.0801382Z"
+    },
+    "19": {
+      "started": "2026-10-14T22:56:07.1625654Z",
+      "completed": true,
+      "passed": true,
+      "binary_sha256": "927B7178304DAC615566445CAEE83DBD94292DB261A4F8CB386C2A8A1908F643",
+      "driver_installed": false,
+      "topology_changed": false,
+      "npu_tested": false,
+      "task_result": 0,
+      "child_exit": 0,
+      "unauthenticated_character_rejected": true,
+      "relative_mouse_received": true,
+      "observer_result": {
+        "input_contract": true,
+        "completed": true,
+        "passed": true,
+        "mouse_receipts": 1,
+        "key_receipts": 1,
+        "npu_tested": false
+      },
+      "finished": "2026-10-14T22:56:12.1079964Z"
+    }
+  },
+  "isolated_failed_request_replay": {
+    "started": "2026-10-14T23:07:48.891691+00:00",
+    "completed": true,
+    "passed": true,
+    "desktop_changed": false,
+    "driver_installed": false,
+    "desktop_offloaded": false,
+    "recorded_requests": 1,
+    "first_original_ticket": 971,
+    "verification_scope": "consistency_with_original_successful_outputs_only",
+    "capture_index_sha256": "0f22ee6a6f4184e06a4338562abc24b843ad7b3882fec6c189bdaa9983237d9d",
+    "affine_batch": "default",
+    "pipeline_cache": "retained",
+    "shared_core": "1",
+    "shared_queue": "1",
+    "memory_cache": "0",
+    "successful_replays": 1,
+    "original_pixel_hashes_matched": 0,
+    "unreferenced_successes": 1,
+    "worker_pid": 1688,
+    "current_ticket": 971,
+    "delivery_acknowledgments": 1,
+    "worker_exit": 0,
+    "original_failure_reproduced": false,
+    "finished": "2026-10-14T23:07:49.195182+00:00"
+  },
+  "quad_cpu": {
+    "started": "2026-10-14T23:04:41.954414+00:00",
+    "completed": true,
+    "passed": true,
+    "backend": "CPU",
+    "desktop_changed": false,
+    "tahoma_tested": false,
+    "live_performance_qualified": false,
+    "binary_sha256": "93662842687FE0A67AF40978AF7A8291D6BA22EE6931BB2BA075249978DF46F0",
+    "capture_index_sha256": "f91aa08fa1576b39bd3d093d788d835a890622c2879a2efdb58d1047ccf0a6b3",
+    "cases": [
+      {
+        "ticket": 454,
+        "exit_code": 0,
+        "elapsed_ms": 449.1099999868311,
+        "renders": [
+          {
+            "quad_rendered": true,
+            "repetition": 0,
+            "execution_device": "CPU",
+            "construction_ms": 107.229,
+            "draw_ms": 171.184,
+            "provider_requests": 72,
+            "tiles": 64,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          },
+          {
+            "quad_rendered": true,
+            "repetition": 1,
+            "execution_device": "CPU",
+            "construction_ms": 107.229,
+            "draw_ms": 102.212,
+            "provider_requests": 72,
+            "tiles": 64,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          }
+        ],
+        "pixel_bytes": 3145728,
+        "pixel_sha256": "db468de716265a642f57acad5a2ee9034ac001530c3f63534d73362614cdce5d",
+        "exact_original_pixels": true,
+        "private_output_removed_after_hash": true
+      },
+      {
+        "ticket": 574,
+        "exit_code": 0,
+        "elapsed_ms": 389.7844999737572,
+        "renders": [
+          {
+            "quad_rendered": true,
+            "repetition": 0,
+            "execution_device": "CPU",
+            "construction_ms": 107.608,
+            "draw_ms": 131.197,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          },
+          {
+            "quad_rendered": true,
+            "repetition": 1,
+            "execution_device": "CPU",
+            "construction_ms": 107.608,
+            "draw_ms": 87.994,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          }
+        ],
+        "pixel_bytes": 3145728,
+        "pixel_sha256": "e14ef753859be622ea109aab1a9ee86e2df8ca6619f3cd782bd334acec5c2d68",
+        "exact_original_pixels": true,
+        "private_output_removed_after_hash": true
+      },
+      {
+        "ticket": 629,
+        "exit_code": 0,
+        "elapsed_ms": 412.14259999105707,
+        "renders": [
+          {
+            "quad_rendered": true,
+            "repetition": 0,
+            "execution_device": "CPU",
+            "construction_ms": 100.08,
+            "draw_ms": 155.947,
+            "provider_requests": 72,
+            "tiles": 64,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          },
+          {
+            "quad_rendered": true,
+            "repetition": 1,
+            "execution_device": "CPU",
+            "construction_ms": 100.08,
+            "draw_ms": 97.41,
+            "provider_requests": 72,
+            "tiles": 64,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          }
+        ],
+        "pixel_bytes": 3145728,
+        "pixel_sha256": "65d378c70e70ceb01fd079ac06cd7504b9b8333c2740df7f50ed25e25f1ba1c7",
+        "exact_original_pixels": true,
+        "private_output_removed_after_hash": true
+      },
+      {
+        "ticket": 695,
+        "exit_code": 0,
+        "elapsed_ms": 378.67990002268925,
+        "renders": [
+          {
+            "quad_rendered": true,
+            "repetition": 0,
+            "execution_device": "CPU",
+            "construction_ms": 99.675,
+            "draw_ms": 129.392,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          },
+          {
+            "quad_rendered": true,
+            "repetition": 1,
+            "execution_device": "CPU",
+            "construction_ms": 99.675,
+            "draw_ms": 91.421,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          }
+        ],
+        "pixel_bytes": 3145728,
+        "pixel_sha256": "1afc928d8fe4fc03d3cc4a78316ad2c30277f247456f22d78bcafb7dd2f4a129",
+        "exact_original_pixels": true,
+        "private_output_removed_after_hash": true
+      },
+      {
+        "ticket": 750,
+        "exit_code": 0,
+        "elapsed_ms": 380.75099998968653,
+        "renders": [
+          {
+            "quad_rendered": true,
+            "repetition": 0,
+            "execution_device": "CPU",
+            "construction_ms": 100.047,
+            "draw_ms": 131.768,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          },
+          {
+            "quad_rendered": true,
+            "repetition": 1,
+            "execution_device": "CPU",
+            "construction_ms": 100.047,
+            "draw_ms": 88.707,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          }
+        ],
+        "pixel_bytes": 3145728,
+        "pixel_sha256": "1afc928d8fe4fc03d3cc4a78316ad2c30277f247456f22d78bcafb7dd2f4a129",
+        "exact_original_pixels": true,
+        "private_output_removed_after_hash": true
+      },
+      {
+        "ticket": 805,
+        "exit_code": 0,
+        "elapsed_ms": 413.7093999888748,
+        "renders": [
+          {
+            "quad_rendered": true,
+            "repetition": 0,
+            "execution_device": "CPU",
+            "construction_ms": 99.854,
+            "draw_ms": 156.559,
+            "provider_requests": 72,
+            "tiles": 64,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          },
+          {
+            "quad_rendered": true,
+            "repetition": 1,
+            "execution_device": "CPU",
+            "construction_ms": 99.854,
+            "draw_ms": 97.484,
+            "provider_requests": 72,
+            "tiles": 64,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          }
+        ],
+        "pixel_bytes": 3145728,
+        "pixel_sha256": "320d2344741751869693158bd856c0acdbf08917c02d38ae02f8e0d7cbc785e2",
+        "exact_original_pixels": true,
+        "private_output_removed_after_hash": true
+      },
+      {
+        "ticket": 871,
+        "exit_code": 0,
+        "elapsed_ms": 380.42470000800677,
+        "renders": [
+          {
+            "quad_rendered": true,
+            "repetition": 0,
+            "execution_device": "CPU",
+            "construction_ms": 102.241,
+            "draw_ms": 129.929,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          },
+          {
+            "quad_rendered": true,
+            "repetition": 1,
+            "execution_device": "CPU",
+            "construction_ms": 102.241,
+            "draw_ms": 88.051,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          }
+        ],
+        "pixel_bytes": 3145728,
+        "pixel_sha256": "c74147407ae8bf18e7f18ed0e4c0731c6e5cd12f943b5305c3cda383ec838a41",
+        "exact_original_pixels": true,
+        "private_output_removed_after_hash": true
+      },
+      {
+        "ticket": 926,
+        "exit_code": 0,
+        "elapsed_ms": 382.2604000160936,
+        "renders": [
+          {
+            "quad_rendered": true,
+            "repetition": 0,
+            "execution_device": "CPU",
+            "construction_ms": 98.365,
+            "draw_ms": 132.701,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          },
+          {
+            "quad_rendered": true,
+            "repetition": 1,
+            "execution_device": "CPU",
+            "construction_ms": 98.365,
+            "draw_ms": 88.868,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          }
+        ],
+        "pixel_bytes": 3145728,
+        "pixel_sha256": "c74147407ae8bf18e7f18ed0e4c0731c6e5cd12f943b5305c3cda383ec838a41",
+        "exact_original_pixels": true,
+        "private_output_removed_after_hash": true
+      },
+      {
+        "ticket": 981,
+        "exit_code": 0,
+        "elapsed_ms": 415.87799999979325,
+        "renders": [
+          {
+            "quad_rendered": true,
+            "repetition": 0,
+            "execution_device": "CPU",
+            "construction_ms": 98.736,
+            "draw_ms": 157.145,
+            "provider_requests": 72,
+            "tiles": 64,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          },
+          {
+            "quad_rendered": true,
+            "repetition": 1,
+            "execution_device": "CPU",
+            "construction_ms": 98.736,
+            "draw_ms": 97.689,
+            "provider_requests": 72,
+            "tiles": 64,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          }
+        ],
+        "pixel_bytes": 3145728,
+        "pixel_sha256": "0b384218a393348ad0f79cb4270a79637327fd94c0d618efe2089f0506a42c97",
+        "exact_original_pixels": true,
+        "private_output_removed_after_hash": true
+      },
+      {
+        "ticket": 1047,
+        "exit_code": 0,
+        "elapsed_ms": 385.77619998250157,
+        "renders": [
+          {
+            "quad_rendered": true,
+            "repetition": 0,
+            "execution_device": "CPU",
+            "construction_ms": 100.358,
+            "draw_ms": 134.164,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          },
+          {
+            "quad_rendered": true,
+            "repetition": 1,
+            "execution_device": "CPU",
+            "construction_ms": 100.358,
+            "draw_ms": 90.767,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          }
+        ],
+        "pixel_bytes": 3145728,
+        "pixel_sha256": "830b463e58460534d3a4f6663a8446ff9c430bb19c3a2a8880eb19bd9177e230",
+        "exact_original_pixels": true,
+        "private_output_removed_after_hash": true
+      },
+      {
+        "ticket": 1102,
+        "exit_code": 0,
+        "elapsed_ms": 386.51280000340194,
+        "renders": [
+          {
+            "quad_rendered": true,
+            "repetition": 0,
+            "execution_device": "CPU",
+            "construction_ms": 99.642,
+            "draw_ms": 132.595,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          },
+          {
+            "quad_rendered": true,
+            "repetition": 1,
+            "execution_device": "CPU",
+            "construction_ms": 99.642,
+            "draw_ms": 91.636,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          }
+        ],
+        "pixel_bytes": 3145728,
+        "pixel_sha256": "830b463e58460534d3a4f6663a8446ff9c430bb19c3a2a8880eb19bd9177e230",
+        "exact_original_pixels": true,
+        "private_output_removed_after_hash": true
+      },
+      {
+        "ticket": 1157,
+        "exit_code": 0,
+        "elapsed_ms": 423.8815999997314,
+        "renders": [
+          {
+            "quad_rendered": true,
+            "repetition": 0,
+            "execution_device": "CPU",
+            "construction_ms": 101.238,
+            "draw_ms": 163.251,
+            "provider_requests": 72,
+            "tiles": 64,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          },
+          {
+            "quad_rendered": true,
+            "repetition": 1,
+            "execution_device": "CPU",
+            "construction_ms": 101.238,
+            "draw_ms": 96.108,
+            "provider_requests": 72,
+            "tiles": 64,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          }
+        ],
+        "pixel_bytes": 3145728,
+        "pixel_sha256": "64cc5579363c517f9a2d4a5344169e21f6b46d8b349077a4bb247b0f93d1c76d",
+        "exact_original_pixels": true,
+        "private_output_removed_after_hash": true
+      },
+      {
+        "ticket": 1227,
+        "exit_code": 0,
+        "elapsed_ms": 381.85150001663715,
+        "renders": [
+          {
+            "quad_rendered": true,
+            "repetition": 0,
+            "execution_device": "CPU",
+            "construction_ms": 100.912,
+            "draw_ms": 130.294,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          },
+          {
+            "quad_rendered": true,
+            "repetition": 1,
+            "execution_device": "CPU",
+            "construction_ms": 100.912,
+            "draw_ms": 88.761,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          }
+        ],
+        "pixel_bytes": 3145728,
+        "pixel_sha256": "830b463e58460534d3a4f6663a8446ff9c430bb19c3a2a8880eb19bd9177e230",
+        "exact_original_pixels": true,
+        "private_output_removed_after_hash": true
+      }
+    ],
+    "finished": "2026-10-14T23:04:47.644803+00:00"
+  },
+  "quad_npu": {
+    "started": "2026-10-14T23:05:41.927841+00:00",
+    "completed": true,
+    "passed": true,
+    "backend": "NPU",
+    "desktop_changed": false,
+    "tahoma_tested": false,
+    "live_performance_qualified": false,
+    "binary_sha256": "93662842687FE0A67AF40978AF7A8291D6BA22EE6931BB2BA075249978DF46F0",
+    "capture_index_sha256": "f91aa08fa1576b39bd3d093d788d835a890622c2879a2efdb58d1047ccf0a6b3",
+    "cases": [
+      {
+        "ticket": 454,
+        "exit_code": 0,
+        "elapsed_ms": 996.5470999886747,
+        "renders": [
+          {
+            "quad_rendered": true,
+            "repetition": 0,
+            "execution_device": "NPU",
+            "construction_ms": 69.518,
+            "draw_ms": 594.271,
+            "provider_requests": 72,
+            "tiles": 64,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          },
+          {
+            "quad_rendered": true,
+            "repetition": 1,
+            "execution_device": "NPU",
+            "construction_ms": 69.518,
+            "draw_ms": 248.311,
+            "provider_requests": 72,
+            "tiles": 64,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          }
+        ],
+        "pixel_bytes": 3145728,
+        "pixel_sha256": "db468de716265a642f57acad5a2ee9034ac001530c3f63534d73362614cdce5d",
+        "exact_original_pixels": true,
+        "private_output_removed_after_hash": true
+      },
+      {
+        "ticket": 574,
+        "exit_code": 0,
+        "elapsed_ms": 732.7832999872044,
+        "renders": [
+          {
+            "quad_rendered": true,
+            "repetition": 0,
+            "execution_device": "NPU",
+            "construction_ms": 58.491,
+            "draw_ms": 403.557,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          },
+          {
+            "quad_rendered": true,
+            "repetition": 1,
+            "execution_device": "NPU",
+            "construction_ms": 58.491,
+            "draw_ms": 198.269,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          }
+        ],
+        "pixel_bytes": 3145728,
+        "pixel_sha256": "e14ef753859be622ea109aab1a9ee86e2df8ca6619f3cd782bd334acec5c2d68",
+        "exact_original_pixels": true,
+        "private_output_removed_after_hash": true
+      },
+      {
+        "ticket": 629,
+        "exit_code": 0,
+        "elapsed_ms": 663.798499997938,
+        "renders": [
+          {
+            "quad_rendered": true,
+            "repetition": 0,
+            "execution_device": "NPU",
+            "construction_ms": 59.222,
+            "draw_ms": 314.508,
+            "provider_requests": 72,
+            "tiles": 64,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          },
+          {
+            "quad_rendered": true,
+            "repetition": 1,
+            "execution_device": "NPU",
+            "construction_ms": 59.222,
+            "draw_ms": 208.799,
+            "provider_requests": 72,
+            "tiles": 64,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          }
+        ],
+        "pixel_bytes": 3145728,
+        "pixel_sha256": "65d378c70e70ceb01fd079ac06cd7504b9b8333c2740df7f50ed25e25f1ba1c7",
+        "exact_original_pixels": true,
+        "private_output_removed_after_hash": true
+      },
+      {
+        "ticket": 695,
+        "exit_code": 0,
+        "elapsed_ms": 512.4875000037719,
+        "renders": [
+          {
+            "quad_rendered": true,
+            "repetition": 0,
+            "execution_device": "NPU",
+            "construction_ms": 60.608,
+            "draw_ms": 240.505,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          },
+          {
+            "quad_rendered": true,
+            "repetition": 1,
+            "execution_device": "NPU",
+            "construction_ms": 60.608,
+            "draw_ms": 142.554,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          }
+        ],
+        "pixel_bytes": 3145728,
+        "pixel_sha256": "1afc928d8fe4fc03d3cc4a78316ad2c30277f247456f22d78bcafb7dd2f4a129",
+        "exact_original_pixels": true,
+        "private_output_removed_after_hash": true
+      },
+      {
+        "ticket": 750,
+        "exit_code": 0,
+        "elapsed_ms": 592.8840000124183,
+        "renders": [
+          {
+            "quad_rendered": true,
+            "repetition": 0,
+            "execution_device": "NPU",
+            "construction_ms": 59.853,
+            "draw_ms": 275.107,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          },
+          {
+            "quad_rendered": true,
+            "repetition": 1,
+            "execution_device": "NPU",
+            "construction_ms": 59.853,
+            "draw_ms": 178.559,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          }
+        ],
+        "pixel_bytes": 3145728,
+        "pixel_sha256": "1afc928d8fe4fc03d3cc4a78316ad2c30277f247456f22d78bcafb7dd2f4a129",
+        "exact_original_pixels": true,
+        "private_output_removed_after_hash": true
+      },
+      {
+        "ticket": 805,
+        "exit_code": 0,
+        "elapsed_ms": 701.5924000006635,
+        "renders": [
+          {
+            "quad_rendered": true,
+            "repetition": 0,
+            "execution_device": "NPU",
+            "construction_ms": 58.606,
+            "draw_ms": 325.251,
+            "provider_requests": 72,
+            "tiles": 64,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          },
+          {
+            "quad_rendered": true,
+            "repetition": 1,
+            "execution_device": "NPU",
+            "construction_ms": 58.606,
+            "draw_ms": 232.134,
+            "provider_requests": 72,
+            "tiles": 64,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          }
+        ],
+        "pixel_bytes": 3145728,
+        "pixel_sha256": "320d2344741751869693158bd856c0acdbf08917c02d38ae02f8e0d7cbc785e2",
+        "exact_original_pixels": true,
+        "private_output_removed_after_hash": true
+      },
+      {
+        "ticket": 871,
+        "exit_code": 0,
+        "elapsed_ms": 592.8057999990415,
+        "renders": [
+          {
+            "quad_rendered": true,
+            "repetition": 0,
+            "execution_device": "NPU",
+            "construction_ms": 59.35,
+            "draw_ms": 270.467,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          },
+          {
+            "quad_rendered": true,
+            "repetition": 1,
+            "execution_device": "NPU",
+            "construction_ms": 59.35,
+            "draw_ms": 183.806,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          }
+        ],
+        "pixel_bytes": 3145728,
+        "pixel_sha256": "c74147407ae8bf18e7f18ed0e4c0731c6e5cd12f943b5305c3cda383ec838a41",
+        "exact_original_pixels": true,
+        "private_output_removed_after_hash": true
+      },
+      {
+        "ticket": 926,
+        "exit_code": 0,
+        "elapsed_ms": 580.3502000053413,
+        "renders": [
+          {
+            "quad_rendered": true,
+            "repetition": 0,
+            "execution_device": "NPU",
+            "construction_ms": 60.184,
+            "draw_ms": 261.337,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          },
+          {
+            "quad_rendered": true,
+            "repetition": 1,
+            "execution_device": "NPU",
+            "construction_ms": 60.184,
+            "draw_ms": 180.007,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          }
+        ],
+        "pixel_bytes": 3145728,
+        "pixel_sha256": "c74147407ae8bf18e7f18ed0e4c0731c6e5cd12f943b5305c3cda383ec838a41",
+        "exact_original_pixels": true,
+        "private_output_removed_after_hash": true
+      },
+      {
+        "ticket": 981,
+        "exit_code": 0,
+        "elapsed_ms": 690.39440000779,
+        "renders": [
+          {
+            "quad_rendered": true,
+            "repetition": 0,
+            "execution_device": "NPU",
+            "construction_ms": 58.501,
+            "draw_ms": 325.885,
+            "provider_requests": 72,
+            "tiles": 64,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          },
+          {
+            "quad_rendered": true,
+            "repetition": 1,
+            "execution_device": "NPU",
+            "construction_ms": 58.501,
+            "draw_ms": 226.233,
+            "provider_requests": 72,
+            "tiles": 64,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          }
+        ],
+        "pixel_bytes": 3145728,
+        "pixel_sha256": "0b384218a393348ad0f79cb4270a79637327fd94c0d618efe2089f0506a42c97",
+        "exact_original_pixels": true,
+        "private_output_removed_after_hash": true
+      },
+      {
+        "ticket": 1047,
+        "exit_code": 0,
+        "elapsed_ms": 612.4561999749858,
+        "renders": [
+          {
+            "quad_rendered": true,
+            "repetition": 0,
+            "execution_device": "NPU",
+            "construction_ms": 59.99,
+            "draw_ms": 288.708,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          },
+          {
+            "quad_rendered": true,
+            "repetition": 1,
+            "execution_device": "NPU",
+            "construction_ms": 59.99,
+            "draw_ms": 189.971,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          }
+        ],
+        "pixel_bytes": 3145728,
+        "pixel_sha256": "830b463e58460534d3a4f6663a8446ff9c430bb19c3a2a8880eb19bd9177e230",
+        "exact_original_pixels": true,
+        "private_output_removed_after_hash": true
+      },
+      {
+        "ticket": 1102,
+        "exit_code": 0,
+        "elapsed_ms": 579.2039999796543,
+        "renders": [
+          {
+            "quad_rendered": true,
+            "repetition": 0,
+            "execution_device": "NPU",
+            "construction_ms": 59.011,
+            "draw_ms": 262.503,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          },
+          {
+            "quad_rendered": true,
+            "repetition": 1,
+            "execution_device": "NPU",
+            "construction_ms": 59.011,
+            "draw_ms": 179.998,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          }
+        ],
+        "pixel_bytes": 3145728,
+        "pixel_sha256": "830b463e58460534d3a4f6663a8446ff9c430bb19c3a2a8880eb19bd9177e230",
+        "exact_original_pixels": true,
+        "private_output_removed_after_hash": true
+      },
+      {
+        "ticket": 1157,
+        "exit_code": 0,
+        "elapsed_ms": 692.1701999963261,
+        "renders": [
+          {
+            "quad_rendered": true,
+            "repetition": 0,
+            "execution_device": "NPU",
+            "construction_ms": 58.83,
+            "draw_ms": 326.603,
+            "provider_requests": 72,
+            "tiles": 64,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          },
+          {
+            "quad_rendered": true,
+            "repetition": 1,
+            "execution_device": "NPU",
+            "construction_ms": 58.83,
+            "draw_ms": 226.082,
+            "provider_requests": 72,
+            "tiles": 64,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          }
+        ],
+        "pixel_bytes": 3145728,
+        "pixel_sha256": "64cc5579363c517f9a2d4a5344169e21f6b46d8b349077a4bb247b0f93d1c76d",
+        "exact_original_pixels": true,
+        "private_output_removed_after_hash": true
+      },
+      {
+        "ticket": 1227,
+        "exit_code": 0,
+        "elapsed_ms": 599.2313999740873,
+        "renders": [
+          {
+            "quad_rendered": true,
+            "repetition": 0,
+            "execution_device": "NPU",
+            "construction_ms": 60.615,
+            "draw_ms": 271.638,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          },
+          {
+            "quad_rendered": true,
+            "repetition": 1,
+            "execution_device": "NPU",
+            "construction_ms": 60.615,
+            "draw_ms": 184.704,
+            "provider_requests": 54,
+            "tiles": 48,
+            "geometry_qualified": true,
+            "desktop_changed": false
+          }
+        ],
+        "pixel_bytes": 3145728,
+        "pixel_sha256": "830b463e58460534d3a4f6663a8446ff9c430bb19c3a2a8880eb19bd9177e230",
+        "exact_original_pixels": true,
+        "private_output_removed_after_hash": true
+      }
+    ],
+    "finished": "2026-10-14T23:05:51.027161+00:00"
+  },
+  "quad_warm_draw_ms": {
+    "min": 142.554,
+    "median": 189.971,
+    "max": 248.311
+  },
+  "quad_provider_calls": [
+    54,
+    72
+  ],
+  "full_desktop_offload": false,
+  "tahoma_tested": false,
+  "promoted_to_live_worker": false,
+  "device_loss_resolved": false,
+  "native_cursor_foreground_recovery_qualified": false,
+  "live23_running_separately": true
+}

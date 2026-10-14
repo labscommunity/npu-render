@@ -79,8 +79,16 @@ topology and ordinary window/cursor/foreground restoration pass. A static standa
 arrow matches a CPU reference exactly. Visible response remains about 56 seconds;
 this finite diagnostic is not a performance qualification or full desktop offload.
 
-Next, qualify ordinary pointer behavior and fault recovery, then
-reduce graph preparation and dispatch costs. Establish responsive long-duration
+The [pointer and rendering-cost investigation](../validation/2026-10-14/native-pointer-cost-v1/README.md)
+qualifies ordinary-desktop confinement, foreground-transition reacquisition and
+independent recovery after owner termination. Native v22 receives relative motion
+and a click but aborts on a confinement change; later NPU device loss after topology
+rollback remains unresolved. An isolated quad candidate matches thirteen expensive
+draws exactly on NPU, reducing their calls from 1,186/1,282 to 54/72. Its warm draw
+times are 143–248 ms, without live integration or a matched worker comparison yet.
+
+Next, qualify native foreground recovery and integrate the quad candidate with
+checked geometry and explicit same-NPU fallback. Establish responsive long-duration
 operation, application coverage and matched Tahoma benefit. A component pass does
 not complete a later gate.
 

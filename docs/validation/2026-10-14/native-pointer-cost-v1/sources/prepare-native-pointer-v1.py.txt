@@ -1,0 +1,57 @@
+from pathlib import Path
+import hashlib,json
+r=Path('results/render-driver')
+s=(r/'run-native-topology-helper-v9.ps1').read_text().replace("'validate-primary','primary'", "'validate-primary','primary','primary-cursor'").replace("[int]$Seconds=60)", "[int]$Seconds=60,[string]$CursorCue='')").replace('control-v9','control-v10')
+s=s.replace("@('extend','primary')", "@('extend','primary','primary-cursor')")
+anchor='@{command=$command;'
+s=s.replace(anchor,"if($Mode -eq 'primary-cursor'){if(!$CursorCue){throw 'Cursor cue is required'};$command+=$CursorCue}\n"+anchor)
+(r/'run-native-topology-helper-v10.ps1').write_text(s)
+for prefix in ['run','recover']:
+ s=(r/f'{prefix}-native-desktop-v32.ps1').read_text()
+ for a,b in [('desktop-v32','desktop-v33'),('admission-v32','admission-v33'),('Recovery-v32','Recovery-v33')]:s=s.replace(a,b)
+ (r/f'{prefix}-native-desktop-v33.ps1').write_text(s)
+s=(r/'start-native-topology-v33.ps1').read_text().replace('topology-v33','topology-v34').replace('Topology-V33','Topology-V34');(r/'start-native-topology-v34.ps1').write_text(s)
+s=(r/'run-native-live-v21.ps1').read_text()
+for a,b in [('native-live-v21','native-live-v22'),('NativeLiveV21','NativeLiveV22'),('admission-v32','admission-v33'),('desktop-v32','desktop-v33'),('Recovery-v32','Recovery-v33'),('topology-v33','topology-v34'),('primary-v8','primary-v9'),('native-present-v16','native-present-v17'),('live-frame-reader-v8','live-frame-reader-v9'),('helper-v9','helper-v10')]:s=s.replace(a,b)
+s=s.replace('$tasks=@()', '$tasks=@();$cursorStarted=$false;$cursorCued=$false')
+s=s.replace('-ExecutionTimeLimit (New-TimeSpan -Minutes 11)', "-ExecutionTimeLimit (New-TimeSpan -Minutes $(if($name -eq 'cursor'){14}else{11}))")
+s=s.replace("'-Mode','primary','-Trial','native-topology-primary-v9','-Seconds','600'", "'-Mode','primary-cursor','-Trial','native-topology-primary-v9','-Seconds','600','-CursorCue',\"$out\\cues\\cursor\"")
+anchor='New-Item -ItemType Directory $out|Out-Null'
+s=s.replace(anchor,'''$cursorProof=Get-Content "$r\\builds\\native-topology-control-v10\\build-report.json" -Raw|ConvertFrom-Json
+$cursorQualification=Get-Content "$r\\vm\\native-cursor-guard-v1-qualification\\report.json" -Raw|ConvertFrom-Json
+if(!$cursorProof.clean_build -or !$cursorQualification.passed -or !$cursorQualification.completed -or @($cursorQualification.cases).Count -ne 2 -or @($cursorQualification.cases|Where-Object {$_.case -eq 'owner-terminated' -and $_.recovery.recovery_released_owned_clip -and $_.passed}).Count -ne 1 -or !$inputQualification.relative_mouse_received){throw 'Pointer qualification failed'}
+'''+anchor)
+anchor=' New-Item -ItemType Directory "$out\\cues"|Out-Null'
+s=s.replace(anchor,anchor+'''
+ Start-Interactive 'cursor' @("$source\\venv\\Scripts\\python.exe","$r\\vm\\cursor_recovery_watchdog_v1.py",'--log',$topologyLog,'--binary-sha256',$cursorProof.binary_sha256,'--output',"$out\\cursor\\recovery",'--seconds','700');$cursorStarted=$true
+ $cursorDeadline=[DateTime]::UtcNow.AddSeconds(15);while(!(Test-Path "$out\\cursor\\recovery\\ready.json") -and [DateTime]::UtcNow -lt $cursorDeadline){Start-Sleep -Milliseconds 100}
+ if(!(Test-Path "$out\\cursor\\recovery\\ready.json")){throw 'Independent cursor watchdog did not arm'}
+''')
+anchor='  $blueSubmitted=@('
+s=s.replace(anchor,'''  if(!$cursorCued -and $screenStarted -and @($screenRows|Where-Object {@($_.points|Where-Object owned_presenter_at_point).Count -gt 0}).Count -gt 0){
+   $cursorReady=Get-Content "$out\\cursor\\recovery\\ready.json" -Raw|ConvertFrom-Json;if(!$cursorReady.armed){throw 'Cursor recovery no longer armed'}
+   New-Item -ItemType File "$out\\cues\\cursor"|Out-Null;$cursorCued=$true;$report.cursor_cued_at=[DateTime]::UtcNow.ToString('o');Save-Report
+  }
+'''+anchor)
+anchor=' $report.normal_windows_input_tested='
+s=s.replace(anchor,''' $cursorResult=Get-Content "$out\\cursor\\recovery\\report.json" -Raw|ConvertFrom-Json
+ $report.pointer_confined_and_restored=($cursorCued -and $cursorResult.completed -and $cursorResult.passed -and $cursorResult.owned_confinement_observed -and $cursorResult.original_unconfined_restored)
+ $report.relative_mouse_received=@($stimulusRows|Where-Object {$_.input_event -eq 'relative_mouse_received'}).Count -eq 1
+'''+anchor)
+s=s.replace('$report.passed=($report.normal_windows_input_tested', '$report.passed=($report.pointer_confined_and_restored -and $report.relative_mouse_received -and $report.normal_windows_input_tested')
+old=' foreach($task in $tasks){Stop-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue;Unregister-ScheduledTask -TaskName $task -Confirm:$false -ErrorAction SilentlyContinue}'
+new=" foreach($task in @($tasks|Where-Object {$_ -notlike '*-cursor'})){Stop-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue;Unregister-ScheduledTask -TaskName $task -Confirm:$false -ErrorAction SilentlyContinue}"
+assert old in s;s=s.replace(old,new)
+anchor=' if($native -and !$native.HasExited){[void]$native.WaitForExit(780000)}'
+s=s.replace(anchor,''' if($cursorStarted){
+  $cursorDone=$null;if(Test-Path "$out\\cursor\\recovery"){New-Item -ItemType File "$out\\cursor\\recovery\\stop" -Force|Out-Null}
+  $cursorDeadline=[DateTime]::UtcNow.AddSeconds(15);do{try{$cursorDone=Get-Content "$out\\cursor\\recovery\\report.json" -Raw|ConvertFrom-Json;if($cursorDone.completed){break}}catch{};Start-Sleep -Milliseconds 100}while([DateTime]::UtcNow -lt $cursorDeadline)
+  if($cursorDone.completed -and $cursorDone.passed -and $cursorDone.original_unconfined_restored){Stop-ScheduledTask -TaskName T8-NpuRender-NativeLiveV22-cursor -ErrorAction SilentlyContinue;Unregister-ScheduledTask -TaskName T8-NpuRender-NativeLiveV22-cursor -Confirm:$false -ErrorAction SilentlyContinue;$report.cursor_cleanup_passed=$true}
+  else{$report.cursor_cleanup_passed=$false;$report.passed=$false;$report.cursor_recovery_task_retained=$true}
+ }
+'''+anchor)
+(r/'run-native-live-v22.ps1').write_text(s)
+keys=[n.replace('desktop-v32','desktop-v33') for n in json.loads((r/'native-desktop-v32-source.json').read_text())]
+keys+=['cursor_recovery_watchdog_v1.py','run-native-topology-helper-v10.ps1','run-native-live-v22.ps1']
+(r/'native-desktop-v33-source.json').write_text(json.dumps({n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in keys},indent=2)+'\n')
+print('Prepared native pointer trial v22 with independent cursor recovery.')
