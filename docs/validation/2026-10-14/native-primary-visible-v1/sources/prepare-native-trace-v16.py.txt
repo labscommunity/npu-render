@@ -1,0 +1,67 @@
+from pathlib import Path
+import hashlib
+import json
+import shutil
+import tarfile
+
+r = Path('results/render-driver')
+d = r / 'native-trace-v16'
+shutil.copytree(r / 'native-routing-v20', d)
+lab = d / 'native/windows/registered_lab'
+p = lab / 'lab_trace.hpp'
+s = p.read_text()
+s = s.replace('#define NR_LAB_TRACE_ROOT LR"(C:\\ProgramData\\T8-NpuRender-NativeTraceV1)"', '#ifndef NR_LAB_TRACE_ROOT\n#define NR_LAB_TRACE_ROOT LR"(C:\\ProgramData\\T8-NpuRender-NativeTraceV1)"\n#endif')
+a = s.index('inline bool lab_trace_enabled() noexcept {')
+b = s.index('\ninline void lab_trace(', a)
+s = s[:a] + '''// The compositor can retain this DLL after a finite trial ends. Validate a
+// fresh lease after the prior controller/worker expires; never retain a failed
+// admission forever. The generation also retires the prior diagnostic handle.
+inline uint64_t lab_trace_session() noexcept {
+#ifdef NR_NATIVE_PROBE
+    try {
+        static std::mutex admission_mutex;
+        std::lock_guard<std::mutex> lock(admission_mutex);
+        static std::unique_ptr<nr::native_probe::Admission> admission;
+        static uint64_t generation = 0;
+        if (admission) {
+            try { admission->verify(); return generation; }
+            catch (...) { admission.reset(); }
+        }
+        admission = std::make_unique<nr::native_probe::Admission>(nr::native_probe::read_mapping());
+        return ++generation;
+    } catch (...) { return 0; }
+#else
+    static const bool enabled = nr_fill_guest(); return enabled ? 1 : 0;
+#endif
+}
+inline bool lab_trace_enabled() noexcept { return lab_trace_session() != 0; }
+''' + s[b:]
+s = s.replace('    if (!lab_trace_enabled()) return;', '    const auto session = lab_trace_session();\n    if (!session) return;')
+s = s.replace('    static UINT lines = 0;\n', '')
+s = s.replace('        uint64_t bytes = 0;\n        TraceFile() noexcept {', '''        uint64_t bytes = 0, generation = 0;
+        UINT lines = 0;
+        void begin(uint64_t session) noexcept {
+            if (handle != INVALID_HANDLE_VALUE) CloseHandle(handle);
+            handle = INVALID_HANDLE_VALUE; bytes = 0; lines = 0; generation = session;''')
+s = s.replace('    if (lines >= 4096 ||', '''    // A delayed call from an older verified lease cannot reopen its old epoch.
+    if (session < trace.generation) return;
+    if (session != trace.generation) trace.begin(session);
+    if (trace.lines >= 16384 ||''')
+s = s.replace('    if (!lines) {', '    if (!trace.lines) {').replace('    ++lines;', '    ++trace.lines;')
+p.write_text(s)
+shutil.copyfile(r / 'native-trace-lifecycle-test-v1.cpp', lab / 'native_trace_lifecycle_test.cpp')
+p = lab / 'CMakeLists.txt'
+s = p.read_text()
+s += '''
+add_executable(nr_native_trace_lifecycle_test native_trace_lifecycle_test.cpp)
+target_compile_features(nr_native_trace_lifecycle_test PRIVATE cxx_std_17)
+target_compile_options(nr_native_trace_lifecycle_test PRIVATE /W4 /WX)
+target_link_libraries(nr_native_trace_lifecycle_test PRIVATE advapi32 user32 wtsapi32)
+set_property(TARGET nr_native_trace_lifecycle_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+add_test(NAME registered_native_trace_lifecycle_contract COMMAND nr_native_trace_lifecycle_test)
+set_tests_properties(registered_native_trace_lifecycle_contract PROPERTIES TIMEOUT 30)
+'''
+p.write_text(s)
+(r / 'native-trace-v16-source.json').write_text(json.dumps({p.relative_to(d).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()}, indent=2) + '\n')
+with tarfile.open(r / 'native-trace-v16.tar.gz', 'w:gz') as t:
+    t.add(d, arcname=d.name)

@@ -1,0 +1,14 @@
+from pathlib import Path
+import hashlib,json
+r=Path('results/render-driver')
+for name in ['run-native-desktop-v26.ps1','recover-native-desktop-v26.ps1']:
+ s=(r/name).read_text().replace('desktop-v26','desktop-v27').replace('admission-v26','admission-v27').replace('Recovery-v26','Recovery-v27');(r/name.replace('v26','v27')).write_text(s)
+keys=list(json.loads((r/'native-desktop-v26-source.json').read_text()));keys=[n.replace('desktop-v26','desktop-v27') for n in keys]
+(r/'native-desktop-v27-source.json').write_text(json.dumps({n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in keys},indent=2)+'\n')
+s=(r/'start-native-topology-v27.ps1').read_text().replace('topology-v27','topology-v28').replace('Topology-V27','Topology-V28').replace('Topology-V26','Topology-V27');(r/'start-native-topology-v28.ps1').write_text(s)
+s=(r/'run-native-live-v15.ps1').read_text()
+for a,b in [('native-live-v15','native-live-v16'),('NativeLiveV15','NativeLiveV16'),('native-present-v12','native-present-v13'),('live-frame-reader-v5','live-frame-reader-v6'),('admission-v26','admission-v27'),('desktop-v26','desktop-v27'),('Recovery-v26','Recovery-v27'),('topology-v27','topology-v28'),('primary-v2','primary-v3'),('observe_physical_patch_v2','observe_physical_patch_v3')]:s=s.replace(a,b)
+anchor="   Start-Interactive 'screen'"
+s=s.replace(anchor,'   $inputReady=@(Read-Rows "$out\\stimulus\\probe.log"|Where-Object input_ready);if($inputReady.Count -ne 1){throw \'Owned input process identity missing\'}\n'+anchor)
+a='([string]$presentReady[0].pid),([string]$duration));$screenStarted=$true';b='([string]$presentReady[0].pid),([string]$duration),([string]$inputReady[0].pid));$screenStarted=$true';assert s.count(a)==1;s=s.replace(a,b)
+(r/'run-native-live-v16.ps1').write_text(s)

@@ -4,8 +4,9 @@ Updated 2026-10-14. Target: Delta, Windows 11, Panther Lake. The repository stay
 private. Full desktop offload is **unfinished**. Six-minute native NPU desktop
 trials deliver changing frames to the physical presenter, and independent screen
 reads confirm controlled colors with the physical desktop primary. NPU-primary
-routing and exact ordinary recovery now work, but the controlled input window's
-content has not appeared in the captured primary frames. Native interaction,
+routing and exact ordinary recovery now work. The controlled input window appears
+in a completed NPU primary frame, but initialization consumes nearly the entire
+finite interaction test. Native interaction,
 a usable switch and a Tahoma benefit remain unqualified.
 
 The end state is one switch that moves desktop graphics work to the NPU, retains
@@ -21,7 +22,7 @@ renderer does not establish where every application renders.
 | 1. Routing | Record active physical and indirect paths before, during, and after admission; identify clone/extended configuration and actual rendering adapter. | Timestamped topology, native DWM NPU receipts, selected adapter, frame producer, exact restoration. | Automatic clone identified; v11 applies extension with the physical path preserved, produces a frame while extended, restores the clone exactly, and restores the final physical baseline. |
 | 2. Continuous rendering | Keep the native renderer alive across changing windows and content; diagnose every failed draw; distinguish model preparation from rendering and transport. | Multiple changing frames, timestamps and pixel checks, sustained operation, no hidden fallback. | Retaining rendering models clears both reproduced failures. Native v11b and v12 each complete six minutes, with 581 and 724 acknowledged NPU operations and 12 and 17 frames. No provider errors occur; 30-minute stability and behavior at eventual cache eviction remain unqualified. |
 | 3. Physical presentation | Present new NPU frames on the physical output with distinct logical desktops and no recursive mirroring. | Live sequence-to-present correlation, output identity, measured presentation mode and residual GPU work. | Live v13 submits 13 matching frames. Direct statistics reach 13 displayed frames and report both composed and overlay modes; a separate screen reader verifies both controlled colors beneath the owned presenter. GPU residual cost remains unmeasured. Updates remain slow. |
-| 4. Interaction and recovery | Migrate the logical desktop, route pointer/keyboard/focus correctly, handle cursor/DPI/resolution, restore exact topology and windows. | Scripted interaction visible on physical output; emergency exit and owned-process failure recovery; ordinary login/lock path retained. | NPU-primary routing and physical presentation work. V15 restores exact topology, the captured ordinary window, cursor and foreground. The owned input window is painted and hit-testable but absent from captured primary frames; no scripted input is sent. Fault recovery and visible native interaction remain open. |
+| 4. Interaction and recovery | Migrate the logical desktop, route pointer/keyboard/focus correctly, handle cursor/DPI/resolution, restore exact topology and windows. | Scripted interaction visible on physical output; emergency exit and owned-process failure recovery; ordinary login/lock path retained. | V17 delivers the blue window in a completed NPU primary frame and restores exact topology, the captured ordinary window, cursor and foreground. The useful frame arrives near expiry; no scripted input is sent. Longer interaction qualification, ordinary pointer behavior and fault recovery remain open. |
 | 5. Responsiveness | Optimize resource reuse, graph compilation, dispatch granularity, transfer volume and frame pacing. | Initial target: ordinary desktop interaction at 30 fps, p95 visible response ≤100 ms, 30-minute stable run. Report cold-start time separately. | Not met; several individual draws take seconds. |
 | 6. Application coverage | Admit and implement required graphics operations across browser, video and representative 3D workloads. Establish per-process adapter choice. | Capability matrix plus real hardware runs; every remaining iGPU operation accounted for. | General application/video/game migration unqualified. |
 | 7. Tahoma benefit | Run repeated baseline/offload trials under matched power, resolution and application load. | Report Tahoma throughput/latency, desktop frame times, per-engine GPU/NPU/CPU activity, memory and power; demonstrate GPU relief and no material Tahoma regression. | Earlier experiments regressed; native desktop A/B not yet run. |
@@ -52,11 +53,19 @@ deadline; a later fresh replay passes all 477 captured requests. New primary tri
 still encounter 24–27 second compilations. An alpha-copy compiler failure is
 reproduced and a revised integer graph passes enlarged CPU/NPU fixtures.
 
-Next, isolate why the primary input window is missing from the captured surface,
-including window style and virtual-screen observations. Complete visible input
-and fault recovery, qualify the corrected alpha path, and reduce graph preparation
-and dispatch costs. Then establish responsive long-duration operation, application
-coverage and matched Tahoma benefit. A component pass does not complete a later gate.
+The [primary visibility investigation](../validation/2026-10-14/native-primary-visible-v1/README.md)
+finds the blue window in an in-progress buffer before a 91.5-second compilation
+exceeds the client deadline. The corrected alpha worker clears five complete
+recorded streams and registered Direct3D qualification. V17 completes 828
+acknowledged NPU operations and delivers a blue completed frame near the end of
+the interaction window. A screen read detects blue, with documented blocking-read
+and ownership-timing limitations. Exact ordinary recovery passes.
+
+Next, complete a longer bounded blue/mouse/green/key/red test and strengthen screen
+observation timing. Qualify ordinary pointer behavior and fault recovery, then
+reduce graph preparation and dispatch costs. Establish responsive long-duration
+operation, application coverage and matched Tahoma benefit. A component pass does
+not complete a later gate.
 
 ## Architecture constraints from primary documentation
 

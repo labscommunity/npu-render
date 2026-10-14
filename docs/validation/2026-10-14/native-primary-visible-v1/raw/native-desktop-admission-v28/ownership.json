@@ -1,0 +1,61 @@
+{
+  "schema": 3,
+  "packages": [
+    {
+      "hardware_id": "ROOT\\NPURENDER_NATIVE_PROBE",
+      "inf": "nr_native_probe.inf",
+      "inf_sha256": "15D1980AF7F0DBA6D2F6DF57A279EAC99D276A68706E4EB2115B99983C9B246A",
+      "folder": "native-driver-package-v16",
+      "version": "0.0.1316.0"
+    },
+    {
+      "hardware_id": "ROOT\\NPURENDER_NATIVE_INDIRECT_V1",
+      "inf": "nr_native_indirect_probe.inf",
+      "inf_sha256": "07AC5029EA11EFB930C5543FC4377F47C2FD15809340932A5667768BA9334438",
+      "folder": "native-idd-package-v1",
+      "version": "0.0.1301.0"
+    }
+  ],
+  "thumbprint": "3112355AF6B6C6265E9B849662D3E02F6797343A",
+  "devcon": "C:\\Users\\tatef\\AppData\\Local\\npu-render\\dependencies\\wdk-tools\\devcon.exe",
+  "devcon_sha256": "282FF232C35FCB82DAD2FDAE56C775523409494B175A5A83D7441B5FA65CB3F9",
+  "physical_display_before": [
+    {
+      "instance": "PCI\\VEN_8086&DEV_B080&SUBSYS_14641043&REV_04\\3&11583659&0&10",
+      "status": "OK",
+      "hardware_ids": [
+        "PCI\\VEN_8086&DEV_B080&SUBSYS_14641043&REV_04",
+        "PCI\\VEN_8086&DEV_B080&SUBSYS_14641043",
+        "PCI\\VEN_8086&DEV_B080&CC_030000",
+        "PCI\\VEN_8086&DEV_B080&CC_0300"
+      ]
+    }
+  ],
+  "added_stores": [
+    "Root",
+    "TrustedPublisher"
+  ],
+  "owned_processes": [
+    {
+      "pid": 15376,
+      "created": 134364888698622529,
+      "image": "C:\\Users\\tatef\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+      "sha256": "4d6f5f81a4bca11191c4c7c6b43632694d0a4ce74e068619d8fdc161d469859a",
+      "role": "controller"
+    },
+    {
+      "pid": 22152,
+      "created": 134364888701431149,
+      "image": "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\native-routing-v27\\Release\\nr_registered_local_indexed_worker.exe",
+      "sha256": "286c8fbbbbf419ed64fc3eff23eb7f3a124d79bc0f3ff75b0518384c5312e813",
+      "role": "worker"
+    }
+  ],
+  "owned_trace_directories": [
+    "T8-NpuRender-NativeTraceV1",
+    "T8-NpuRender-NativeIddV1"
+  ],
+  "controller_pid": 21616,
+  "created": "2026-10-14T22:01:02.6149517Z",
+  "mode": "native-admission"
+}

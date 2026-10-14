@@ -1,0 +1,39 @@
+"""Read only the owned test window's known color patch; no screenshots saved."""
+import ctypes as C,json,sys,time
+from ctypes import wintypes as W
+from pathlib import Path
+from datetime import UTC,datetime
+out=Path(sys.argv[1]);expected_pid=int(sys.argv[2]);seconds=int(sys.argv[3]);input_pid=int(sys.argv[4]);assert 1<=seconds<=240;out.mkdir(exist_ok=False)
+u=C.WinDLL('user32',use_last_error=True);g=C.WinDLL('gdi32',use_last_error=True);k=C.WinDLL('kernel32',use_last_error=True)
+u.GetDC.argtypes=[W.HWND];u.GetDC.restype=W.HDC;u.ReleaseDC.argtypes=[W.HWND,W.HDC]
+g.GetPixel.argtypes=[W.HDC,C.c_int,C.c_int];g.GetPixel.restype=W.DWORD
+u.WindowFromPoint.argtypes=[W.POINT];u.WindowFromPoint.restype=W.HWND;u.GetWindowThreadProcessId.argtypes=[W.HWND,C.POINTER(W.DWORD)]
+u.OpenInputDesktop.argtypes=[W.DWORD,W.BOOL,W.DWORD];u.OpenInputDesktop.restype=W.HANDLE;u.CloseDesktop.argtypes=[W.HANDLE]
+u.GetUserObjectInformationW.argtypes=[W.HANDLE,C.c_int,W.LPVOID,W.DWORD,C.POINTER(W.DWORD)];u.GetUserObjectInformationW.restype=W.BOOL
+u.SetThreadDpiAwarenessContext.argtypes=[W.HANDLE];u.SetThreadDpiAwarenessContext.restype=W.HANDLE
+k.QueryPerformanceCounter.argtypes=[C.POINTER(C.c_longlong)];k.WTSGetActiveConsoleSessionId.restype=W.DWORD
+report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,method='GDI screen DC GetPixel at owned controlled patch',physical_panel_observed=False,scanout_mode_verified=False,screenshots_saved=False,rows=0,red=0,green=0,blue=0,unknown=0)
+try:
+ sid=W.DWORD();assert k.ProcessIdToSessionId(k.GetCurrentProcessId(),C.byref(sid)) and sid.value==k.WTSGetActiveConsoleSessionId();assert u.SetThreadDpiAwarenessContext(W.HANDLE(-4))
+ began=time.monotonic()
+ with (out/'observations.jsonl').open('x',buffering=1) as f:
+  while time.monotonic()-began<seconds and not (out/'stop').exists():
+   desktop=u.OpenInputDesktop(0,False,1);assert desktop
+   try:
+    name=C.create_unicode_buffer(128);needed=W.DWORD();assert u.GetUserObjectInformationW(desktop,2,name,C.sizeof(name),C.byref(needed)) and name.value=='Default'
+   finally:u.CloseDesktop(desktop)
+   dc=u.GetDC(None);assert dc
+   row=dict(observed=datetime.now(UTC).isoformat(),points=[]);counter=C.c_longlong();assert k.QueryPerformanceCounter(C.byref(counter));row['qpc']=counter.value
+   try:
+    hwnd=u.WindowFromPoint(W.POINT(70,70));pid=W.DWORD();u.GetWindowThreadProcessId(hwnd,C.byref(pid));value=g.GetPixel(dc,70,70);assert value!=0xffffffff
+    row['virtual_primary_sample']=dict(owned_input_window=pid.value==input_pid,known_blue=value==(30|(60<<8)|(180<<16)),known_red=value==(180|(30<<8)|(80<<16)),known_green=value==(20|(180<<8)|(60<<16)))
+    for x,y in [(1222,166),(1312,234)]:
+     hwnd=u.WindowFromPoint(W.POINT(x,y));pid=W.DWORD();u.GetWindowThreadProcessId(hwnd,C.byref(pid));value=g.GetPixel(dc,x,y);assert value!=0xffffffff
+     blue=value==(30|(60<<8)|(180<<16));red=value==(180|(30<<8)|(80<<16));green=value==(20|(180<<8)|(60<<16));owned=pid.value==expected_pid
+     row['points'].append(dict(x=x,y=y,owned_presenter_at_point=owned,window_pid=pid.value,known_red=red,known_green=green,known_blue=blue));report['red']+=int(owned and red);report['green']+=int(owned and green);report['blue']+=int(owned and blue);report['unknown']+=int(not red and not green and not blue)
+   finally:u.ReleaseDC(None,dc)
+   f.write(json.dumps(row)+'\n');report['rows']+=1;time.sleep(.5)
+ report['passed']=report['red']>0 and report['green']>0 and report['blue']>0
+except Exception as error:report['error']=repr(error)
+finally:report['completed']=True;report['finished']=datetime.now(UTC).isoformat();(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(report));raise SystemExit(0 if report['passed'] else 1)

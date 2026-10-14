@@ -1,0 +1,11 @@
+--- a/input_stimulus.hpp
++++ b/input_stimulus.hpp
+@@ -17,7 +17,7 @@
+         original_foreground=GetForegroundWindow();cursor_saved=GetCursorPos(&original_cursor)!=0;
+         WNDCLASSW cls{};cls.lpfnWndProc=procedure;cls.hInstance=GetModuleHandleW(nullptr);cls.hCursor=LoadCursorW(nullptr,IDC_ARROW);cls.lpszClassName=L"NpuRenderPrimaryInputStimulus";require(RegisterClassW(&cls)!=0,"input class failed");
+         require(area.left==0 && area.top==0 && area.right>=640 && area.bottom>=384,"input needs indirect primary");
+-        window=CreateWindowExW(WS_EX_TOOLWINDOW|WS_EX_TOPMOST,cls.lpszClassName,L"NPU desktop input test",WS_POPUP,64,64,512,256,nullptr,nullptr,cls.hInstance,this);require(window!=nullptr,"input window failed");
++        window=CreateWindowExW(WS_EX_TOOLWINDOW,cls.lpszClassName,L"NPU desktop input test",WS_POPUP,64,64,512,256,nullptr,nullptr,cls.hInstance,this);require(window!=nullptr,"input window failed");
+     }
+     ~InputStimulus(){if(window){if(GetForegroundWindow()==window && original_foreground && IsWindow(original_foreground))SetForegroundWindow(original_foreground);ShowWindow(window,SW_HIDE);DestroyWindow(window);}if(cursor_saved)SetCursorPos(original_cursor.x,original_cursor.y);}
+     void neutral(){for(const int key:{VK_SHIFT,VK_CONTROL,VK_MENU,VK_LWIN,VK_RWIN,VK_LBUTTON,VK_RBUTTON,VK_MBUTTON})require(!(GetAsyncKeyState(key)&0x8000),"user input active during owned test");}

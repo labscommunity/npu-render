@@ -1,0 +1,12 @@
+--- a/native/windows/registered_lab/native_trace_lifecycle_test.cpp
++++ b/native/windows/registered_lab/native_trace_lifecycle_test.cpp
+@@ -7,7 +7,8 @@
+ #include <iterator>
+ namespace n = nr::native_probe;
+ namespace l = nr::registered_lab;
+-void check(bool value) { if (!value) throw std::runtime_error("trace lifecycle contract failed"); }
++void check_at(bool value, int line) { if (!value) { std::fprintf(stderr,"trace assertion line %d (Win32 %lu)\n",line,GetLastError()); throw std::runtime_error("trace lifecycle contract failed"); } }
++#define check(value) check_at((value), __LINE__)
+ struct Child {
+     PROCESS_INFORMATION info{};
+     Child() {

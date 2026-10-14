@@ -1,0 +1,28 @@
+{
+  "observed": "2026-10-14",
+  "sources": [
+    {
+      "url": "https://learn.microsoft.com/en-us/windows-hardware/drivers/display/rendering-on-a-discrete-gpu-using-cross-adapter-resources",
+      "finding": "Microsoft describes GDI redirection and DWM opening shared surfaces. This supports investigating the resource-to-composition boundary; it does not prove the cause of the local failure."
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmdt/ne-d3dkmdt-_d3dkmdt_gdisurfacetype",
+      "finding": "Microsoft documents cross-adapter GDI texture alignment and reserves certain surface types for system use."
+    },
+    {
+      "url": "https://docs.openvino.ai/2026/openvino-workflow/running-inference/inference-devices-and-modes/npu-device.html",
+      "finding": "OpenVINO documents NPU model caching and performance properties. Turbo can affect compilation, memory, latency and compatibility; it is not a proven remedy here."
+    },
+    {
+      "url": "https://github.com/openvinotoolkit/openvino/issues/38403",
+      "finding": "An independent Lunar Lake reporter on NPU driver 5540 reports intermittent multi-model device loss. Later tests also fail with turbo, disabled idle-memory pruning, and keep-alive inference, weakening the initial idle-power hypothesis. Different hardware and models; no demonstrated equivalence to Delta."
+    },
+    {
+      "url": "https://www.intel.com/content/www/us/en/download/794734/intel-npu-driver-windows.html",
+      "finding": "Intel currently advertises NPU driver 32.0.100.5540, already installed on Delta."
+    }
+  ],
+  "external_reports_prove_local_root_cause": false,
+  "external_messages_sent": false,
+  "driver_settings_changed_from_research": false
+}

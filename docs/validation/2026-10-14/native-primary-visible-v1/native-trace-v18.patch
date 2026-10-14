@@ -1,0 +1,15 @@
+--- a/native/windows/registered_lab/native_trace_lifecycle_test.cpp
++++ b/native/windows/registered_lab/native_trace_lifecycle_test.cpp
+@@ -62,7 +62,11 @@
+     first_worker.stop(); check(l::lab_trace_session() == 0);
+     l::lab_trace("{\"invalid\":true}\n");
+     check(contents(root + file).find("invalid") == std::string::npos);
+-    check(MoveFileW(root.c_str(), archived.c_str()) != 0);
++    // Windows refuses a directory rename while a child file is open, even
++    // with FILE_SHARE_DELETE. Archive the file itself, which is permitted.
++    check(CreateDirectoryW(archived.c_str(), nullptr) != 0);
++    check(MoveFileW((root + file).c_str(), (archived + file).c_str()) != 0);
++    check(RemoveDirectoryW(root.c_str()) != 0);
+     check(CreateDirectoryW(root.c_str(), nullptr) != 0);
+     lease.worker = {second_worker.info.dwProcessId, session, n::creation_time(second_worker.info.hProcess)};
+     lease.nonce[0] = 0; publish(); check(l::lab_trace_session() == 0);

@@ -1,0 +1,59 @@
+Start testing: Oct 14 14:55 Pacific Daylight Time
+----------------------------------------------------------
+33/43 Testing: registered_native_lease_contract
+33/43 Test: registered_native_lease_contract
+Command: "C:/Users/tatef/AppData/Local/npu-render/builds/native-trace-v17/Release/nr_native_probe_lease_test.exe"
+Directory: C:/Users/tatef/AppData/Local/npu-render/builds/native-trace-v17
+"registered_native_lease_contract" start time: Oct 14 14:55 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+{"console_session":1,"interactive_session_unlocked":true,"compositor_execution_tested":false}
+{"process_case":0,"child_exit_code":0}
+{"process_case":1,"child_exit_code":0}
+{"process_case":2,"child_exit_code":0}
+{"process_case":3,"child_exit_code":0}
+{"process_case":4,"child_exit_code":0}
+{"process_case":5,"child_exit_code":0}
+{"native_session_admission_contract":true,"passed":true,"shape_cases":44,"acl_cases":11,"separate_process_cases":6,"driver_installed":false,"npu_execution_tested":false}
+<end of output>
+Test time =   0.65 sec
+----------------------------------------------------------
+Test Passed.
+"registered_native_lease_contract" end time: Oct 14 14:55 Pacific Daylight Time
+"registered_native_lease_contract" time elapsed: 00:00:00
+----------------------------------------------------------
+
+34/43 Testing: registered_native_unleased_contract
+34/43 Test: registered_native_unleased_contract
+Command: "C:/Users/tatef/AppData/Local/npu-render/builds/native-trace-v17/Release/nr_native_probe_ddi_test.exe" "--reject-unleased"
+Directory: C:/Users/tatef/AppData/Local/npu-render/builds/native-trace-v17
+"registered_native_unleased_contract" start time: Oct 14 14:55 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+{"unleased_native_adapter_rejected":true,"passed":true,"provider_requests":0}
+<end of output>
+Test time =   0.29 sec
+----------------------------------------------------------
+Test Passed.
+"registered_native_unleased_contract" end time: Oct 14 14:55 Pacific Daylight Time
+"registered_native_unleased_contract" time elapsed: 00:00:00
+----------------------------------------------------------
+
+43/43 Testing: registered_native_trace_lifecycle_contract
+43/43 Test: registered_native_trace_lifecycle_contract
+Command: "C:/Users/tatef/AppData/Local/npu-render/builds/native-trace-v17/Release/nr_native_trace_lifecycle_test.exe"
+Directory: C:/Users/tatef/AppData/Local/npu-render/builds/native-trace-v17
+"registered_native_trace_lifecycle_contract" start time: Oct 14 14:55 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+trace assertion line 65 (Win32 5)
+trace lifecycle contract failed (Win32 5)
+<end of output>
+Test time =   0.59 sec
+----------------------------------------------------------
+Test Failed.
+"registered_native_trace_lifecycle_contract" end time: Oct 14 14:55 Pacific Daylight Time
+"registered_native_trace_lifecycle_contract" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 14 14:55 Pacific Daylight Time

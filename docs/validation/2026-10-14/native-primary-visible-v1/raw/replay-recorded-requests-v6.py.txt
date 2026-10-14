@@ -1,0 +1,64 @@
+"""Replay an integrity-checked ordered request recording on one isolated NPU worker."""
+import argparse,hashlib,json,os,secrets,struct,subprocess,time,traceback
+from pathlib import Path
+from datetime import UTC,datetime
+H=struct.Struct('<3Q14I')
+def obj(path):
+ data=path.read_bytes();return json.loads(data.decode('utf-16') if data.startswith(b'\xff\xfe') else data.decode('utf-8-sig'))
+def rows(path):return [json.loads(x) for x in path.read_text(encoding='utf-8-sig').splitlines() if x.startswith('{') and x.endswith('}')]
+a=argparse.ArgumentParser()
+for name in ('worker','client','runtime','cache','capture','output'):a.add_argument('--'+name,type=Path,required=True)
+a.add_argument('--affine-batch',choices=('default','65535'),default='default')
+for name in ('shared-core','shared-queue','memory-cache'):a.add_argument('--'+name,choices=('0','1'),default='1')
+a.add_argument('--pipeline-cache',choices=('default','expanded','retained'),default='expanded')
+a.add_argument('--prefix',type=int)
+a.add_argument('--start',type=int,default=0)
+v=a.parse_args();v.output.mkdir(exist_ok=False);out=v.output;worker=None
+for binary in (v.worker,v.client):
+ proof=obj(binary.parent.parent/'registered-build-report.json');assert proof['clean_build'] and hashlib.sha256(binary.read_bytes()).hexdigest()==proof['binary_sha256'][binary.name].lower()
+index=(v.capture/'index.jsonl').read_bytes();entries=rows(v.capture/'index.jsonl');assert entries[0]['recording_started'] and entries[0]['maximum_request_bytes']==17179869184
+requests=[x for x in entries if x.get('request_recorded')];responses={x['ticket']:x for x in entries if x.get('provider_response_recorded')}
+assert 0<len(requests)<=4096 and all(x['ticket']==n and x['file']==f'request-{n:08d}.bin' and 80<=x['bytes']<=67108864 for n,x in enumerate(requests))
+assert 0<=v.start<len(requests)
+requests=requests[v.start:]
+if v.prefix is not None:assert 0<v.prefix<=len(requests);requests=requests[:v.prefix]
+env=os.environ.copy();env['PATH']=str(v.runtime)+os.pathsep+env.get('PATH','');env.pop('NR_RENDER_CAPTURE_DIRECTORY',None);env.pop('NR_RENDER_AFFINE_BATCH',None)
+env.update(NR_RENDER_NPU_CACHE=str(v.cache),NR_RENDER_PIPELINE_CACHE=v.pipeline_cache,NR_RENDER_SHARED_CORE=v.shared_core,NR_RENDER_SHARED_QUEUE=v.shared_queue,NR_RENDER_MEMORY_CACHE=v.memory_cache,NR_RENDER_COMPACT_COVERAGE='0',NR_RENDER_OPAQUE_CROP='1',NR_RENDER_FAILURE_PACKET=str(out/'failed-request.bin'))
+if v.pipeline_cache=='default':env.pop('NR_RENDER_PIPELINE_CACHE',None)
+if v.affine_batch!='default':env['NR_RENDER_AFFINE_BATCH']=v.affine_batch
+report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,desktop_changed=False,driver_installed=False,desktop_offloaded=False,recorded_requests=len(requests),first_original_ticket=v.start,verification_scope='consistency_with_original_successful_outputs_only',capture_index_sha256=hashlib.sha256(index).hexdigest(),affine_batch=v.affine_batch,pipeline_cache=v.pipeline_cache,shared_core=v.shared_core,shared_queue=v.shared_queue,memory_cache=v.memory_cache,successful_replays=0,original_pixel_hashes_matched=0,unreferenced_successes=0)
+def save():(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+save()
+try:
+ pipe=r'\\.\pipe\npu-render-indexed-'+secrets.token_hex(16)
+ with (out/'worker.stdout.jsonl').open('xb') as stdout,(out/'worker.stderr.log').open('xb') as stderr:
+  worker=subprocess.Popen([str(v.worker),pipe,str(len(requests)),'1800'],env=env,stdout=stdout,stderr=stderr,creationflags=subprocess.CREATE_NO_WINDOW);report['worker_pid']=worker.pid;save();deadline=time.perf_counter()+15
+  while not any(x.get('local_worker_ready') for x in rows(out/'worker.stdout.jsonl')):assert worker.poll() is None and time.perf_counter()<deadline;time.sleep(.02)
+  for entry in requests:
+   n=entry['ticket'];report['current_ticket']=n;save();path=v.capture/entry['file'];data=path.read_bytes();assert len(data)==entry['bytes'] and hashlib.sha256(data).hexdigest()==entry['sha256'].lower();h=list(H.unpack_from(data));assert h[12]+80==len(data);expected_pixel_bytes=h[4]*h[5]*4;del data
+   began=time.perf_counter();result=subprocess.run([str(v.client),pipe,str(worker.pid),str(path),str(out/'reply.bin'),'90000','success'],env=env,capture_output=True,timeout=100)
+   record=dict(ticket=n,client_exit=result.returncode,elapsed_ms=(time.perf_counter()-began)*1000)
+   (out/f'client-{n:08d}.stdout.jsonl').write_bytes(result.stdout);(out/f'client-{n:08d}.stderr.log').write_bytes(result.stderr)
+   if result.returncode:
+    try:worker.wait(timeout=45);report['worker_failure_exit']=worker.returncode
+    except subprocess.TimeoutExpired:report['worker_still_running_after_client_failure']=True
+   assert result.returncode==0 and not result.stderr,f'Client request failed at ticket {n}'
+   client=json.loads(result.stdout);assert client['native_client_success'];reply=(out/'reply.bin').read_bytes();rh=list(H.unpack_from(reply));h[13]=client['client_pid'];assert all(h[i]==rh[i] for i in range(17) if i not in (12,14,15)) and rh[14:16]==[2,3] and len(reply)==128+expected_pixel_bytes
+   pixels=reply[128:];record['controlled_blue_components'] = pixels.count(bytes((180,60,30,255)));record['known_blue_at_70_70'] = h[4]>70 and h[5]>70 and pixels[(70*h[4]+70)*4:(70*h[4]+70)*4+4]==bytes((180,60,30,255));checksum=hashlib.sha256(pixels).hexdigest();del pixels;record.update(pixels_sha256=checksum,pixel_bytes=expected_pixel_bytes,original_reference_available=n in responses);report['successful_replays']+=1
+   if n in responses:
+    expected=responses[n];record['exact_recorded_pixels']=checksum==expected['pixels_sha256'] and expected_pixel_bytes==expected['pixel_bytes']
+    if record['exact_recorded_pixels']:report['original_pixel_hashes_matched']+=1
+   else:report['unreferenced_successes']+=1
+   with (out/'replays.jsonl').open('a') as stream:stream.write(json.dumps(record)+'\n')
+   assert n not in responses or record['exact_recorded_pixels'],f'Pixels differ at ticket {n}'
+   (out/'reply.bin').unlink();save()
+   if n%25==0:print(json.dumps(dict(replayed=n+1,original_pixel_hashes_matched=report['original_pixel_hashes_matched'])),flush=True)
+  worker.wait(timeout=10);evidence=rows(out/'worker.stdout.jsonl');renders=[x for x in evidence if x.get('passed')];acks=[x for x in evidence if x.get('worker_success')];done=[x for x in evidence if x.get('local_worker_finished')]
+  assert worker.returncode==0 and len(renders)==len(acks)==len(requests) and all(x['execution_device']=='NPU' for x in renders) and len(done)==1 and done[0]['succeeded']==done[0]['settled']==len(requests) and not (out/'worker.stderr.log').read_bytes()
+  assert (v.capture/'index.jsonl').read_bytes()==index,'Capture changed during replay'
+  report.update(passed=True,delivery_acknowledgments=len(acks),worker_exit=worker.returncode,original_failure_reproduced=False)
+except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+finally:
+ if worker is not None and worker.poll() is None:worker.kill();worker.wait(timeout=5);report['owned_worker_terminated']=True
+ report.update(completed=True,finished=datetime.now(UTC).isoformat());save()
+print(json.dumps(report));raise SystemExit(0 if report['passed'] else 1)
