@@ -1,0 +1,76 @@
+--- a/native/windows/registered_lab/local_indexed_worker.cpp
++++ b/native/windows/registered_lab/local_indexed_worker.cpp
+@@ -96,7 +96,7 @@
+                         entered=GetTickCount64();recording.request(ticket,bytes);
+                         const auto counts=pipeline.retained_pipeline_counts();std::printf("{\"pipeline_before_request\":true,\"dispatch_ticket\":%u,\"uniform\":%zu,\"triangle\":%zu,\"clear\":%zu,\"point\":%zu,\"linear\":%zu}\n",ticket,counts[0],counts[1],counts[2],counts[3],counts[4]);std::fflush(stdout);
+                         const auto request=ex::decode(bytes);const auto began=std::chrono::steady_clock::now();const auto before=nr::provider::compile_statistics();const auto coverage_before=nr::raster::coverage_statistics();
+-                        const auto rendered=[&]{try{if(provider.enabled())return provider.execute(bytes,h,request_deadline,stop_event.value);return pipeline.execute(request);}catch(...){capture_failed_request(bytes,h,ticket);throw;}}();const auto after=nr::provider::compile_statistics();const auto coverage_after=nr::raster::coverage_statistics();const auto elapsed=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-began).count();
++                        const auto rendered=[&]{try{if(provider.enabled())return provider.execute(bytes,h,request_deadline,stop_event.value);nr::registered_lab::provider_test_exception(ticket);return pipeline.execute(request);}catch(const std::exception &error){capture_failed_request(bytes,h,ticket);std::fprintf(stderr,"%s\n",error.what());std::fflush(stderr);throw;}catch(...){capture_failed_request(bytes,h,ticket);throw;}}();const auto after=nr::provider::compile_statistics();const auto coverage_after=nr::raster::coverage_statistics();const auto elapsed=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-began).count();
+                         ex::require(rendered.execution_device=="NPU");const auto result=ex::response(h,rendered);recording.response(ticket,result);++succeeded;
+                         std::printf("{\"client_pid\":%u,\"sequence\":%u,\"execution_device\":\"NPU\",\"server_thread_id\":%lu,\"provider_requests\":%llu,\"draw_ms\":%.3f,\"compile_and_draw_ms\":%.3f,\"compile_calls\":%llu,\"backend_compile_calls\":%llu,\"memory_cache_requests\":%llu,\"memory_cache_hits\":%llu,\"memory_cache_evictions\":%llu,\"cache_requests\":%llu,\"cache_hits\":%llu,\"provider_setup_ms\":%.3f,\"backend_compile_ms\":%.3f,\"compact_coverage_calls\":%llu,\"compact_coverage_samples\":%llu,\"wide_coverage_calls\":%llu,\"passed\":true,\"displayed_frames\":0}\n",
+                             h.client_pid,h.sequence,GetCurrentThreadId(),static_cast<unsigned long long>(rendered.provider_requests),rendered.timings.total_ms,elapsed,
+--- a/native/windows/registered_lab/provider_process.hpp
++++ b/native/windows/registered_lab/provider_process.hpp
+@@ -16,7 +16,7 @@
+     using Handle=indexed_stream::Handle;
+     bool active_=false,test_killed_=false;
+     uint32_t generation_=0,restarts_=0,requests_=0;
+-    uint32_t test_kill_ticket_=UINT32_MAX;
++    uint32_t test_kill_ticket_=UINT32_MAX,test_exception_ticket_=UINT32_MAX;
+     std::filesystem::path root_,current_;
+     std::wstring pipe_;
+     std::unique_ptr<Handle> job_,process_;
+@@ -27,7 +27,7 @@
+         return text?text:L"";
+     }
+     static void require(bool value,const char *message){if(!value)throw std::runtime_error(message);}
+-    static std::vector<wchar_t> child_environment(const std::filesystem::path &failure){
++    std::vector<wchar_t> child_environment(const std::filesystem::path &failure){
+         const auto block=GetEnvironmentStringsW();require(block!=nullptr,"provider environment unavailable");
+         std::vector<std::wstring> entries;
+         try{
+@@ -37,6 +37,8 @@
+                 if(!_wcsicmp(key.c_str(),L"NR_RENDER_PROVIDER_RECOVERY") ||
+                    !_wcsicmp(key.c_str(),L"NR_RENDER_PROVIDER_RECOVERY_DIR") ||
+                    !_wcsicmp(key.c_str(),L"NR_RENDER_RECOVERY_TEST_KILL_TICKET") ||
++                   !_wcsicmp(key.c_str(),L"NR_RENDER_RECOVERY_TEST_EXCEPTION_TICKET") ||
++                   !_wcsicmp(key.c_str(),L"NR_RENDER_PROVIDER_TEST_INFER_EXCEPTION_TICKET") ||
+                    !_wcsicmp(key.c_str(),L"NR_RENDER_CAPTURE_DIRECTORY") ||
+                    !_wcsicmp(key.c_str(),L"NR_RENDER_FAILURE_PACKET"))continue;
+                 entries.push_back(std::move(entry));
+@@ -44,6 +46,7 @@
+         }catch(...){FreeEnvironmentStringsW(block);throw;}
+         FreeEnvironmentStringsW(block);
+         entries.push_back(L"NR_RENDER_PROVIDER_RECOVERY=0");
++        if(generation_==1 && test_exception_ticket_!=UINT32_MAX)entries.push_back(L"NR_RENDER_PROVIDER_TEST_INFER_EXCEPTION_TICKET="+std::to_wstring(test_exception_ticket_));
+         entries.push_back(L"NR_RENDER_FAILURE_PACKET="+failure.wstring());
+         std::sort(entries.begin(),entries.end(),[](const auto &a,const auto &b){return _wcsicmp(a.c_str(),b.c_str())<0;});
+         std::vector<wchar_t> result;
+@@ -115,6 +118,11 @@
+         if(!active_)return;
+         root_=setting(L"NR_RENDER_PROVIDER_RECOVERY_DIR");
+         require(root_.is_absolute() && std::filesystem::is_directory(root_),"provider evidence root unavailable");
++        const auto exception=setting(L"NR_RENDER_RECOVERY_TEST_EXCEPTION_TICKET");
++        if(!exception.empty()){
++            wchar_t *end=nullptr;const auto value=std::wcstoul(exception.c_str(),&end,10);
++            require(end!=exception.c_str() && !*end && value>0 && value<4096,"invalid provider exception injection ticket");test_exception_ticket_=value;
++        }
+         const auto test=setting(L"NR_RENDER_RECOVERY_TEST_KILL_TICKET");
+         if(!test.empty()){
+             wchar_t *end=nullptr;const auto value=std::wcstoul(test.c_str(),&end,10);
+@@ -152,4 +160,15 @@
+         throw std::runtime_error("provider recovery exhausted");
+     }
+ };
++inline void provider_test_exception(uint32_t ticket){
++    static const uint32_t target=[](){
++        wchar_t *text=nullptr;size_t size=0;if(_wdupenv_s(&text,&size,L"NR_RENDER_PROVIDER_TEST_INFER_EXCEPTION_TICKET"))throw std::runtime_error("provider test setting unavailable");
++        const std::unique_ptr<wchar_t,decltype(&std::free)> owner(text,&std::free);if(!text)return UINT32_MAX;
++        wchar_t *end=nullptr;const auto value=std::wcstoul(text,&end,10);
++        if(end==text || *end || !value || value>=4096)throw std::invalid_argument("invalid provider test exception ticket");return uint32_t(value);
++    }();
++    if(ticket!=target)return;
++    std::printf("{\"provider_device_loss_injected\":true,\"dispatch_ticket\":%u,\"real_device_loss\":false}\n",ticket);std::fflush(stdout);
++    throw std::runtime_error("injected test only: ZE_RESULT_ERROR_DEVICE_LOST");
+ }
++}

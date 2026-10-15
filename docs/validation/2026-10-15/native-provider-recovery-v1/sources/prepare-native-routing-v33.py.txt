@@ -1,0 +1,29 @@
+from pathlib import Path
+import hashlib
+import json
+import shutil
+import tarfile
+
+r = Path('results/render-driver')
+d = r / 'native-routing-v33'
+shutil.copytree(r / 'native-routing-v32', d)
+lab = d / 'native/windows/registered_lab'
+(lab / 'provider_process.hpp').write_bytes((r / 'provider-process-v1.hpp').read_bytes())
+p = lab / 'local_indexed_worker.cpp'
+s = p.read_text().replace('#include "indexed_pipeline.hpp"', '#include "indexed_pipeline.hpp"\n#include "provider_process.hpp"')
+s = s.replace('ex::Pipeline pipeline;nr::registered_lab::RequestRecording', 'ex::Pipeline pipeline;nr::registered_lab::ProviderProcess provider;nr::registered_lab::RequestRecording')
+old = 'const auto rendered=[&]{try{return pipeline.execute(request);}catch(...){capture_failed_request(bytes,h,ticket);throw;}}();'
+new = 'const auto rendered=[&]{try{if(provider.enabled())return provider.execute(bytes,h,request_deadline,stop_event.value);return pipeline.execute(request);}catch(...){capture_failed_request(bytes,h,ticket);throw;}}();'
+assert s.count(old) == 1
+s = s.replace(old, new)
+p.write_text(s)
+(r / 'native-routing-v33-source.json').write_text(json.dumps({p.relative_to(d).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()}, indent=2) + '\n')
+with tarfile.open(r / 'native-routing-v33.tar.gz', 'w:gz') as t:
+    t.add(d, arcname=d.name)
+(r / 'build-native-routing-v33.ps1').write_text((r / 'build-native-routing-v32.ps1').read_text().replace('native-routing-v32', 'native-routing-v33'))
+s = (r / 'replay-recorded-requests-v10.py').read_text()
+s = s.replace("a.add_argument('--compile-trace'", "a.add_argument('--provider-recovery',choices=('0','1'),default='0')\na.add_argument('--test-kill-ticket',type=int,default=-1)\na.add_argument('--compile-trace'")
+s = s.replace("env['NR_RENDER_COMPILE_TRACE']=v.compile_trace", "env['NR_RENDER_PROVIDER_RECOVERY']=v.provider_recovery\nenv.pop('NR_RENDER_RECOVERY_TEST_KILL_TICKET',None)\nif v.provider_recovery=='1':\n recovery=out/'provider-processes';recovery.mkdir(exist_ok=False);env['NR_RENDER_PROVIDER_RECOVERY_DIR']=str(recovery)\n if v.test_kill_ticket>=0:env['NR_RENDER_RECOVERY_TEST_KILL_TICKET']=str(v.test_kill_ticket)\nelse:assert v.test_kill_ticket<0\nenv['NR_RENDER_COMPILE_TRACE']=v.compile_trace")
+s = s.replace('report.update(compile_trace=v.compile_trace,', 'report.update(provider_recovery=v.provider_recovery,test_kill_ticket=v.test_kill_ticket,compile_trace=v.compile_trace,')
+(r / 'replay-recorded-requests-v11.py').write_text(s)
+print('Prepared isolated NPU process recovery experiment; hardware qualification pending.')

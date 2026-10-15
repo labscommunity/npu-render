@@ -1,0 +1,24 @@
+param([ValidatePattern('^[a-z0-9-]+$')][string]$Trial='native-ordered-replay-v1',[ValidateSet('0','1')][string]$MemoryCache='1',[ValidateSet('0','1')][string]$SharedQueue='1',[ValidateSet('0','1')][string]$SharedCore='1',[switch]$Trace,[ValidatePattern('^native-desktop-admission-v[0-9]+$')][string]$NativeTrial='native-desktop-admission-v19',[ValidateSet('default','expanded','retained')][string]$PipelineCache='expanded',[ValidateRange(0,4095)][int]$Start=0,[ValidatePattern('^native-routing-v[0-9]+$')][string]$WorkerBuild='native-routing-v20')
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$native="$r\vm\$NativeTrial";$out="$r\vm\$Trial-control";$traceName="T8-NpuRender-$Trial";$started=$false
+if(Test-Path $out){throw 'Replay control evidence exists'}
+$prior=Get-Content "$native\report.json" -Raw|ConvertFrom-Json
+if(!$prior.completed -or !$prior.cleanup_passed){throw 'Native cleanup not complete'}
+if(@(Get-Process nr_registered_local_indexed_worker -ErrorAction SilentlyContinue).Count){throw 'NPU renderer already running'}
+New-Item -ItemType Directory $out|Out-Null
+$acl=New-Object System.Security.AccessControl.DirectorySecurity;$acl.SetSecurityDescriptorSddlForm('O:BAG:BAD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)');Set-Acl $out -AclObject $acl
+$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');completed=$false;passed=$false;desktop_changed=$false;trace_requested=[bool]$Trace;trace_stopped=$false}
+try{
+ if($Trace){
+  # Context, queue, graph, memory, fence, shared-buffer/cache and error metadata.
+  @('{416F823F-2CE2-44B9-A1BA-7E98BA4CD4BA} 0x2060686 5','{B3B1AAB1-3C04-4B6D-A069-59547BC18233} 0xF55 4')|Set-Content "$out\providers.txt" -Encoding ascii
+  & logman.exe query $traceName -ets *> "$out\trace-before.log";if(!$LASTEXITCODE){throw 'Trace name is already owned'}
+  & logman.exe create trace $traceName -o "$out\npu.etl" -f bincirc -max 256 -pf "$out\providers.txt" -ets *> "$out\trace-start.log";if($LASTEXITCODE){throw 'Trace creation failed'};$started=$true
+ }
+ & "$r\toolchains\openvino-2026.4.1\Scripts\python.exe" "$r\vm\replay-recorded-requests-v9.py" --worker "$r\builds\$WorkerBuild\Release\nr_registered_local_indexed_worker.exe" --client "$r\builds\native-routing-v20\Release\nr_registered_local_indexed_client_probe.exe" --runtime "$r\toolchains\openvino-2026.4.1\Lib\site-packages\openvino\libs" --cache "$r\vm\model-cache-2026-4-v209" --capture "$native\bootstrap\requests" --output "$r\vm\$Trial" --memory-cache $MemoryCache --shared-queue $SharedQueue --shared-core $SharedCore --start $Start --pipeline-cache $PipelineCache --quad-batch 1 --repeat 3 --infer-trace 1 > "$out\replay.stdout.log" 2> "$out\replay.stderr.log"
+ $report.replay_exit=$LASTEXITCODE;$report.passed=$LASTEXITCODE -eq 0
+}catch{$report.error=$_.Exception.Message}
+finally{
+ if($started){& logman.exe stop $traceName -ets *> "$out\trace-stop.log";$report.trace_stop_exit=$LASTEXITCODE;$report.trace_stopped=$LASTEXITCODE -eq 0;if(!$report.trace_stopped){$report.passed=$false}}
+ $report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');$report|ConvertTo-Json -Depth 5|Set-Content "$out\report.json"
+}
+Get-Content "$out\report.json";if(!$report.passed){exit 1}

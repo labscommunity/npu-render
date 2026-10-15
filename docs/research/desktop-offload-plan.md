@@ -1,6 +1,6 @@
 # Full desktop offload: acceptance and execution plan
 
-Updated 2026-10-14. Target: Delta, Windows 11, Panther Lake. The repository stays
+Updated 2026-10-15. Target: Delta, Windows 11, Panther Lake. The repository stays
 private. Full desktop offload is **unfinished**. Six-minute native NPU desktop
 trials deliver changing frames to the physical presenter, and independent screen
 reads confirm controlled colors with the physical desktop primary. NPU-primary
@@ -105,10 +105,20 @@ request loses the NPU device. The final failed request passes in isolation.
 Larger crop-band candidates pass exact isolated CPU/NPU contracts and remain
 outside the live path pending reliability qualification.
 
-Next, use recorded-stream and inference-stage traces to locate the device loss,
-then prepare expensive models before admission while preserving the active
-desktop if preparation fails. Require sustained rendering and reliable recovery
-before another promotion. Then establish responsive long-duration operation,
+The [provider recovery investigation](../validation/2026-10-15/native-provider-recovery-v1/README.md)
+reproduces device loss in a recorded stream without changing the desktop. A later
+3,291-request diagnostic soak passes, so the fault remains intermittent. A new
+isolated provider preserves exact outputs across worker termination and simulated
+device loss, and proves child cleanup when the supervisor exits. This does not yet
+qualify recovery from an actual device loss or native desktop use. A cached replay
+reduces the formerly 93-second request to 1.3 seconds; general preparation remains
+unfinished.
+
+Next, finish the isolated provider's full-stream soak, then qualify its registered
+and native desktop paths. Continue driver/inference diagnosis and prepare
+expensive models before admission while preserving the active desktop if
+preparation fails. Require sustained rendering and reliable recovery before
+another promotion. Then establish responsive long-duration operation,
 application coverage, residual GPU cost and matched Tahoma benefit. Component
 passes do not complete those later gates.
 

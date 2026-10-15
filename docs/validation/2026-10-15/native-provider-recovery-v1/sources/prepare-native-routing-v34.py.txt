@@ -1,0 +1,56 @@
+from pathlib import Path
+import hashlib
+import json
+import shutil
+import tarfile
+
+r = Path('results/render-driver')
+d = r / 'native-routing-v34'
+shutil.copytree(r / 'native-routing-v33', d)
+lab = d / 'native/windows/registered_lab'
+p = lab / 'provider_process.hpp'
+s = p.read_text().replace('uint32_t test_kill_ticket_=UINT32_MAX;', 'uint32_t test_kill_ticket_=UINT32_MAX,test_exception_ticket_=UINT32_MAX;')
+s = s.replace('static std::vector<wchar_t> child_environment(const std::filesystem::path &failure)', 'std::vector<wchar_t> child_environment(const std::filesystem::path &failure)')
+s = s.replace('!_wcsicmp(key.c_str(),L"NR_RENDER_CAPTURE_DIRECTORY") ||', '!_wcsicmp(key.c_str(),L"NR_RENDER_RECOVERY_TEST_EXCEPTION_TICKET") ||\n                   !_wcsicmp(key.c_str(),L"NR_RENDER_PROVIDER_TEST_INFER_EXCEPTION_TICKET") ||\n                   !_wcsicmp(key.c_str(),L"NR_RENDER_CAPTURE_DIRECTORY") ||')
+s = s.replace('entries.push_back(L"NR_RENDER_PROVIDER_RECOVERY=0");', 'entries.push_back(L"NR_RENDER_PROVIDER_RECOVERY=0");\n        if(generation_==1 && test_exception_ticket_!=UINT32_MAX)entries.push_back(L"NR_RENDER_PROVIDER_TEST_INFER_EXCEPTION_TICKET="+std::to_wstring(test_exception_ticket_));')
+needle='const auto test=setting(L"NR_RENDER_RECOVERY_TEST_KILL_TICKET");'
+assert s.count(needle)==1
+s=s.replace(needle, '''const auto exception=setting(L"NR_RENDER_RECOVERY_TEST_EXCEPTION_TICKET");
+        if(!exception.empty()){
+            wchar_t *end=nullptr;const auto value=std::wcstoul(exception.c_str(),&end,10);
+            require(end!=exception.c_str() && !*end && value>0 && value<4096,"invalid provider exception injection ticket");test_exception_ticket_=value;
+        }
+        '''+needle)
+end='''};
+}
+'''
+assert s.endswith(end)
+s=s[:-len(end)]+'''};
+inline void provider_test_exception(uint32_t ticket){
+    static const uint32_t target=[](){
+        wchar_t *text=nullptr;size_t size=0;if(_wdupenv_s(&text,&size,L"NR_RENDER_PROVIDER_TEST_INFER_EXCEPTION_TICKET"))throw std::runtime_error("provider test setting unavailable");
+        const std::unique_ptr<wchar_t,decltype(&std::free)> owner(text,&std::free);if(!text)return UINT32_MAX;
+        wchar_t *end=nullptr;const auto value=std::wcstoul(text,&end,10);
+        if(end==text || *end || !value || value>=4096)throw std::invalid_argument("invalid provider test exception ticket");return uint32_t(value);
+    }();
+    if(ticket!=target)return;
+    std::printf("{\\"provider_device_loss_injected\\":true,\\"dispatch_ticket\\":%u,\\"real_device_loss\\":false}\\n",ticket);std::fflush(stdout);
+    throw std::runtime_error("injected test only: ZE_RESULT_ERROR_DEVICE_LOST");
+}
+}
+'''
+p.write_text(s)
+p=lab/'local_indexed_worker.cpp';s=p.read_text()
+old='if(provider.enabled())return provider.execute(bytes,h,request_deadline,stop_event.value);return pipeline.execute(request);}catch(...){capture_failed_request(bytes,h,ticket);throw;}'
+new='if(provider.enabled())return provider.execute(bytes,h,request_deadline,stop_event.value);nr::registered_lab::provider_test_exception(ticket);return pipeline.execute(request);}catch(const std::exception &error){capture_failed_request(bytes,h,ticket);std::fprintf(stderr,"%s\\n",error.what());std::fflush(stderr);throw;}catch(...){capture_failed_request(bytes,h,ticket);throw;}'
+assert s.count(old)==1;p.write_text(s.replace(old,new))
+(r/'native-routing-v34-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-routing-v34.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+(r/'build-native-routing-v34.ps1').write_text((r/'build-native-routing-v33.ps1').read_text().replace('native-routing-v33','native-routing-v34'))
+s=(r/'replay-recorded-requests-v11.py').read_text().replace("a.add_argument('--test-kill-ticket'", "a.add_argument('--test-exception-ticket',type=int,default=-1)\na.add_argument('--test-kill-ticket'")
+s=s.replace("env.pop('NR_RENDER_RECOVERY_TEST_KILL_TICKET',None)", "env.pop('NR_RENDER_RECOVERY_TEST_EXCEPTION_TICKET',None)\nenv.pop('NR_RENDER_PROVIDER_TEST_INFER_EXCEPTION_TICKET',None)\nenv.pop('NR_RENDER_RECOVERY_TEST_KILL_TICKET',None)")
+s=s.replace(" if v.test_kill_ticket>=0:", " if v.test_exception_ticket>=0:env['NR_RENDER_RECOVERY_TEST_EXCEPTION_TICKET']=str(v.test_exception_ticket)\n if v.test_kill_ticket>=0:")
+s=s.replace("else:assert v.test_kill_ticket<0", "else:assert v.test_kill_ticket<0 and v.test_exception_ticket<0")
+s=s.replace('report.update(provider_recovery=', 'report.update(test_exception_ticket=v.test_exception_ticket,provider_recovery=')
+(r/'replay-recorded-requests-v12.py').write_text(s)
+print('Prepared early provider error receipts and explicit synthetic-loss recovery test.')

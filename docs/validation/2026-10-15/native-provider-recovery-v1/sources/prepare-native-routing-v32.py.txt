@@ -1,0 +1,71 @@
+from pathlib import Path
+import hashlib
+import json
+import shutil
+import tarfile
+
+r = Path('results/render-driver')
+d = r / 'native-routing-v32'
+shutil.copytree(r / 'native-routing-v31', d)
+lab = d / 'native/windows/registered_lab'
+(lab / 'provider_compile_trace.hpp').write_text(r'''#pragma once
+#include <atomic>
+#include <chrono>
+#include <cstdio>
+#include <cstdlib>
+#include <memory>
+#include <stdexcept>
+#include <string>
+namespace nr::provider {
+inline bool compile_trace_enabled(){static const bool enabled=[](){
+ char *text=nullptr;size_t length=0;
+ if(_dupenv_s(&text,&length,"NR_RENDER_COMPILE_TRACE"))throw std::runtime_error("cannot read compile trace setting");
+ const std::unique_ptr<char,decltype(&std::free)> owner(text,&std::free);
+ if(!text)return false;const std::string value(text);
+ if(value!="0" && value!="1")throw std::invalid_argument("invalid compile trace setting");
+ return value=="1";}();return enabled;}
+class CompileTrace {
+ using Clock=std::chrono::steady_clock;
+ bool enabled=false,passed=false;int cache_hit=-1;uint64_t id=0;
+ Clock::time_point began{};
+public:
+ CompileTrace(bool active,const std::string &identity,size_t nodes,size_t inputs):enabled(active){
+  if(!enabled)return;static std::atomic<uint64_t> next{0};id=next.fetch_add(1);began=Clock::now();
+  const auto utc=std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+  std::printf("{\"compile_trace_begin\":true,\"id\":%llu,\"utc_us\":%lld,\"graph_sha256\":\"%s\",\"nodes\":%zu,\"inputs\":%zu,\"pixel_data_recorded\":false}\n",static_cast<unsigned long long>(id),static_cast<long long>(utc),identity.c_str(),nodes,inputs);std::fflush(stdout);
+ }
+ void success(int hit)noexcept{passed=true;cache_hit=hit;}
+ ~CompileTrace(){if(!enabled)return;
+  const auto elapsed=std::chrono::duration_cast<std::chrono::microseconds>(Clock::now()-began).count();
+  std::printf("{\"compile_trace_end\":true,\"id\":%llu,\"elapsed_us\":%lld,\"loaded_from_cache\":%d,\"passed\":%s}\n",static_cast<unsigned long long>(id),static_cast<long long>(elapsed),cache_hit,passed?"true":"false");std::fflush(stdout);
+ }
+};
+}
+''')
+p = lab / 'provider_compile.hpp'
+s = p.read_text().replace('#include "provider_compile_statistics.hpp"', '#include "provider_compile_statistics.hpp"\n#include "provider_compile_trace.hpp"')
+before = 'if(!directory.empty()){core.set_property(ov::cache_dir(isolated_cache_directory(directory,model).string()));++cache_requests;}'
+after = '''const bool trace=compile_trace_enabled();std::string graph_identity;
+        if(!directory.empty()){const auto path=isolated_cache_directory(directory,model);core.set_property(ov::cache_dir(path.string()));++cache_requests;if(trace)graph_identity=path.filename().string();}
+        if(trace && graph_identity.empty())graph_identity=cache_model_identity(model);'''
+assert s.count(before) == 1
+s = s.replace(before, after)
+before = '++backend_compile_calls;ov::CompiledModel compiled;'
+after = 'CompileTrace compile_trace(trace,graph_identity,trace?model->get_ordered_ops().size():0,trace?model->inputs().size():0);\n        ++backend_compile_calls;ov::CompiledModel compiled;'
+assert s.count(before) == 1
+s = s.replace(before, after)
+before = 'if(!directory.empty()){try{if(compiled.get_property(ov::loaded_from_cache))++cache_hits;}catch(const ov::Exception &){++cache_status_unavailable;}}'
+after = 'int loaded=-1;if(!directory.empty()){try{loaded=compiled.get_property(ov::loaded_from_cache)?1:0;if(loaded)++cache_hits;}catch(const ov::Exception &){++cache_status_unavailable;}}\n        compile_trace.success(loaded);'
+assert s.count(before) == 1
+p.write_text(s.replace(before, after))
+(r / 'native-routing-v32-source.json').write_text(json.dumps({p.relative_to(d).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()}, indent=2) + '\n')
+with tarfile.open(r / 'native-routing-v32.tar.gz', 'w:gz') as t:
+    t.add(d, arcname=d.name)
+(r / 'build-native-routing-v32.ps1').write_text((r / 'build-native-routing-v31.ps1').read_text().replace('native-routing-v31', 'native-routing-v32'))
+s = (r / 'replay-recorded-requests-v9.py').read_text()
+s = s.replace("a.add_argument('--infer-trace'", "a.add_argument('--compile-trace',choices=('0','1'),default='0')\na.add_argument('--infer-trace'")
+s = s.replace("env['NR_RENDER_INFER_TRACE']=v.infer_trace", "env['NR_RENDER_COMPILE_TRACE']=v.compile_trace\nenv['NR_RENDER_INFER_TRACE']=v.infer_trace")
+s = s.replace('report.update(repetitions=v.repeat,', 'report.update(compile_trace=v.compile_trace,repetitions=v.repeat,')
+s = s.replace("renders=[x for x in evidence if x.get('passed')]", "renders=[x for x in evidence if x.get('passed') and x.get('execution_device')=='NPU']")
+(r / 'replay-recorded-requests-v10.py').write_text(s)
+print('Prepared compile graph identity/timing diagnostics; rendering policy unchanged.')

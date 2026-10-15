@@ -1,0 +1,9 @@
+#include "provider_infer_trace.hpp"
+#include <atomic>
+struct Request{std::atomic<unsigned> calls{0};bool fail=false;void infer(){++calls;if(fail)throw std::runtime_error("sentinel provider exception");}};
+int main()try{
+ Request a,b;std::thread first([&]{nr::provider::traced_infer(a,__FILE__,__LINE__);});first.join();nr::provider::traced_infer(a,__FILE__,__LINE__);b.fail=true;bool caught=false;
+ try{nr::provider::traced_infer(b,__FILE__,__LINE__);}catch(const std::runtime_error &e){caught=!std::strcmp(e.what(),"sentinel provider exception");}
+ if(!caught || a.calls!=2 || b.calls!=1 || nr::provider::infer_trace::history().issued!=(nr::provider::infer_trace::enabled()?3u:0u))throw std::runtime_error("trace changed execution semantics");
+ std::printf("{\"trace_contract\":true,\"passed\":true,\"actual_calls\":3,\"original_exception_preserved\":true,\"hardware_executed\":false}\n");return 0;
+}catch(const std::exception &e){std::fprintf(stderr,"%s\n",e.what());return 1;}

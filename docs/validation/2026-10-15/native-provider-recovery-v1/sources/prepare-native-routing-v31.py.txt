@@ -1,0 +1,57 @@
+from pathlib import Path
+import json,hashlib,shutil,tarfile,re
+r=Path('results/render-driver');d=r/'native-routing-v31';shutil.copytree(r/'native-routing-v28',d);lab=d/'native/windows/registered_lab'
+(lab/'provider_infer_trace.hpp').write_text(r'''#pragma once
+#include <array>
+#include <chrono>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <functional>
+#include <mutex>
+#include <stdexcept>
+#include <string>
+#include <thread>
+namespace nr::provider {
+namespace infer_trace {
+using Clock=std::chrono::steady_clock;
+inline bool enabled(){static const bool result=[](){char *text=nullptr;size_t length=0;
+ if(_dupenv_s(&text,&length,"NR_RENDER_INFER_TRACE"))throw std::runtime_error("cannot read inference trace setting");
+ if(!text)return false;const std::string value(text);std::free(text);if(value!="0" && value!="1")throw std::invalid_argument("invalid inference trace setting");return value=="1";}();return result;}
+struct Event{uint64_t sequence=0,thread=0,request_address=0,utc_us=0,duration_us=0,gap_us=0;const char *site="";unsigned line=0;bool failed=false;};
+struct History{std::mutex mutex;std::array<Event,512> events{};uint64_t issued=0,maximum_gap_us=0;Clock::time_point last_finished{};};
+inline History &history(){static History value;return value;}
+inline void save(Event event,Clock::time_point began){auto &h=history();std::lock_guard<std::mutex> lock(h.mutex);
+ const auto ended=Clock::now();event.duration_us=std::chrono::duration_cast<std::chrono::microseconds>(ended-began).count();
+ event.gap_us=h.issued && began>h.last_finished?uint64_t(std::chrono::duration_cast<std::chrono::microseconds>(began-h.last_finished).count()):0;
+ if(event.gap_us>h.maximum_gap_us)h.maximum_gap_us=event.gap_us;event.sequence=h.issued++;h.events[event.sequence%h.events.size()]=event;h.last_finished=ended;
+ if(!event.failed)return;
+ std::printf("{\"inference_failure_history\":true,\"total_inferences\":%llu,\"maximum_inter_inference_gap_us\":%llu,\"ring_capacity\":512,\"pixel_data_recorded\":false}\n",static_cast<unsigned long long>(h.issued),static_cast<unsigned long long>(h.maximum_gap_us));
+ const auto first=h.issued>h.events.size()?h.issued-h.events.size():0;
+ for(uint64_t n=first;n<h.issued;++n){const auto &e=h.events[n%h.events.size()];
+  std::printf("{\"inference_history\":true,\"index\":%llu,\"thread_id_hash\":%llu,\"request_address\":%llu,\"utc_us\":%llu,\"duration_us\":%llu,\"gap_us\":%llu,\"site\":\"%s\",\"line\":%u,\"failed\":%s}\n",static_cast<unsigned long long>(e.sequence),static_cast<unsigned long long>(e.thread),static_cast<unsigned long long>(e.request_address),static_cast<unsigned long long>(e.utc_us),static_cast<unsigned long long>(e.duration_us),static_cast<unsigned long long>(e.gap_us),e.site,e.line,e.failed?"true":"false");
+ }std::fflush(stdout);
+}
+}
+template<class Request> void traced_infer(Request &request,const char *file,unsigned line){
+ if(!infer_trace::enabled()){request.infer();return;}
+ const auto began=infer_trace::Clock::now();const char *site=std::strrchr(file,'\\');if(!site)site=std::strrchr(file,'/');site=site?site+1:file;
+ infer_trace::Event event{};event.thread=std::hash<std::thread::id>{}(std::this_thread::get_id());event.request_address=uint64_t(reinterpret_cast<uintptr_t>(&request));event.utc_us=std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();event.site=site;event.line=line;
+ try{request.infer();infer_trace::save(event,began);}catch(...){event.failed=true;infer_trace::save(event,began);throw;}
+}
+}
+''')
+names=['output_merger.cpp','compact_coverage.hpp','linear_texture_draw.cpp','color_interpolator.cpp','opaque_affine_crop.hpp','raster_executor.cpp','projection_executor.cpp','vertex_executor.cpp','solid_rectangle.cpp','texture_crop.cpp','blend_executor.cpp','clear_executor.cpp']
+for name in names:
+ p=lab/name;s=p.read_text();s,count=re.subn(r'((?:state->|s\.|entry\.|model\.)?request)\.infer\(\)',r'nr::provider::traced_infer(\1,__FILE__,__LINE__)',s);assert count==1,(name,count);p.write_text('#include "provider_infer_trace.hpp"\n'+s)
+(r/'native-routing-v31-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-routing-v31.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+(r/'build-native-routing-v31.ps1').write_text((r/'build-native-routing-v28.ps1').read_text().replace('native-routing-v28','native-routing-v31'))
+s=(r/'replay-recorded-requests-v7.py').read_text();s=s.replace("a.add_argument('--quad-batch'", "a.add_argument('--repeat',type=int,default=1)\na.add_argument('--infer-trace',choices=('0','1'),default='0')\na.add_argument('--quad-batch'")
+s=s.replace("env=os.environ.copy();", "assert 1<=v.repeat<=3 and len(requests)*v.repeat<=4096\nrequests=requests*v.repeat\nenv=os.environ.copy();")
+s=s.replace("env.pop('NR_RENDER_QUAD_BATCH',None)", "env['NR_RENDER_INFER_TRACE']=v.infer_trace\nenv.pop('NR_RENDER_QUAD_BATCH',None)")
+s=s.replace('report.update(quad_batch=v.quad_batch,','report.update(repetitions=v.repeat,infer_trace=v.infer_trace,quad_batch=v.quad_batch,')
+s=s.replace('  for entry in requests:', '  for iteration,entry in enumerate(requests):').replace("report['current_ticket']=n;", "report['current_ticket']=n;report['current_iteration']=iteration;")
+s=s.replace('record=dict(ticket=n,','record=dict(iteration=iteration,ticket=n,').replace('client-{n:08d}', 'client-{iteration:08d}')
+(r/'replay-recorded-requests-v9.py').write_text(s)
+print('Prepared inference-stage ring tracing and repeated-stream replay; no rendering policy change.')
