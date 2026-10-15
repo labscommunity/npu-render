@@ -1,0 +1,23 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$vm="$r\vm";$out="$vm\ptl-custom-indexed-v1-controller"
+if(Test-Path $out){throw 'Experiment exists'};New-Item -ItemType Directory $out|Out-Null
+$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');completed=$false;passed=$false;desktop_changed=$false;driver_changed=$false;active_phase='waiting-for-desktop-cleanup'}
+function Save-Report{$report|ConvertTo-Json -Depth 6|Set-Content "$out\report.json"};Save-Report
+try{
+ $deadline=[DateTime]::UtcNow.AddMinutes(45)
+ do{if([DateTime]::UtcNow -gt $deadline){throw 'Desktop completion deadline'};Start-Sleep -Seconds 2;try{$q=Get-Content "$vm\native-delivery-long-v1\report.json" -Raw|ConvertFrom-Json}catch{$q=$null}}while(!$q.completed)
+ $report.previous_desktop_trial_passed=$q.passed
+ $q=Get-Content "$vm\native-desktop-admission-v46\report.json" -Raw|ConvertFrom-Json;if(!$q.completed -or !$q.cleanup_passed){throw 'Desktop cleanup incomplete'}
+ if(@(Get-Process nr_registered_local_indexed_worker,nr_pixel_merger_fusion,nr_uniform_draw_diagnostic,nr_native_topology,nr_frame_present_probe -ErrorAction SilentlyContinue).Count){throw 'Another graphics experiment active'}
+ $report.driver_before=@(Get-CimInstance Win32_PnPSignedDriver|Where-Object {$_.DeviceName -eq 'Intel(R) NPU'}|Select-Object DeviceName,DriverVersion,InfName)
+ if($report.driver_before.Count -ne 1 -or $report.driver_before[0].DriverVersion -ne '32.0.100.5540'){throw 'Pinned NPU driver absent'}
+ $report.active_phase='indexed-kernel';Save-Report
+ $py="$env:LOCALAPPDATA\Temp\npu-graphics-probe-0146a2388f25\venv\Scripts\python.exe"
+ & $py "$vm\qualify-ptl-custom-indexed-v1.py" > "$out\probe.stdout.log" 2> "$out\probe.stderr.log";$report.probe_exit=$LASTEXITCODE
+ $q=Get-Content "$vm\ptl-custom-indexed-v1\report.json" -Raw|ConvertFrom-Json
+ $report.driver_after=@(Get-CimInstance Win32_PnPSignedDriver|Where-Object {$_.DeviceName -eq 'Intel(R) NPU'}|Select-Object DeviceName,DriverVersion,InfName)
+ $report.installed_driver_unchanged=($report.driver_before|ConvertTo-Json -Compress) -eq ($report.driver_after|ConvertTo-Json -Compress)
+ if($report.probe_exit -ne 0 -or !$q.completed -or !$q.passed -or !$report.installed_driver_unchanged){throw 'Indexed kernel qualification failed'}
+ $report.passed=$true
+}catch{$report.error=$_.Exception.Message;$report.error_position=$_.InvocationInfo.PositionMessage}
+finally{$report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');Save-Report}
+Get-Content "$out\report.json";if(!$report.passed){exit 1}

@@ -1,0 +1,72 @@
+{
+  "started": "2026-10-15T05:29:33.024818+00:00",
+  "name": "add4096",
+  "completed": true,
+  "passed": true,
+  "custom_kernel_executed": false,
+  "openvino_version": "2026.4.1-22982-e213a147257-releases/2026/4",
+  "device_name": "Intel(R) AI Boost",
+  "config": {
+    "PERFORMANCE_HINT": "LATENCY"
+  },
+  "input_shapes": [
+    [
+      1,
+      4096
+    ]
+  ],
+  "compile_ms": 103.9027,
+  "execution_devices": [
+    "NPU"
+  ],
+  "blob_sha256": "01144fd3ddc48bfe2d9b7c1078c8231405896cd74eb411260880703ab33bd70f",
+  "blob_bytes": 86145,
+  "checks": [
+    {
+      "iteration": 0,
+      "exact_components": 4096,
+      "elapsed_ms": 2.8467,
+      "input_sha256": [
+        "d6739f3c6dd31a834fe3849c4330d2ab5dfe579e425d9f17bbf7c922708f7ae9"
+      ],
+      "output_sha256": "613beb5b3fadc9cdc0131f446a6ed538e51c763b645867735edbd9f219ec4b15"
+    },
+    {
+      "iteration": 1,
+      "exact_components": 4096,
+      "elapsed_ms": 0.285,
+      "input_sha256": [
+        "fe7dbc0af9ac901ac2a428495400d51b81e50a5adbb1da6f516adb2768143890"
+      ],
+      "output_sha256": "a806d865c5bf1746088314a09dc17aa7eff67a042358f0f58468c86504585b84"
+    },
+    {
+      "iteration": 2,
+      "exact_components": 4096,
+      "elapsed_ms": 0.189,
+      "input_sha256": [
+        "0f0b5eafc1275c4bc9f95c330a4f7ae1f10c9fa75b2d1df0f799dc41ba875720"
+      ],
+      "output_sha256": "faec8137c4ee5bd2838cd6438ee525c53d9a52804f109f06457fc3c6785dd72b"
+    },
+    {
+      "iteration": 3,
+      "exact_components": 4096,
+      "elapsed_ms": 0.2051,
+      "input_sha256": [
+        "82df2780fb22a53a0fcbf3468506631bab464ffbe1c607b01d9640b63ce2468f"
+      ],
+      "output_sha256": "66b932fc1b8b2846abd4b31a11e449356c966a27ee1028303c14658ff8333146"
+    }
+  ],
+  "software_invocations": [
+    "task.shave.invocation.0.0",
+    "task.shave.invocation.1.0",
+    "task.shave.invocation.2.0",
+    "task.shave.invocation.0.1",
+    "task.shave.invocation.1.1",
+    "task.shave.invocation.2.1"
+  ],
+  "dpu_sections": [],
+  "finished": "2026-10-15T05:29:33.289853+00:00"
+}

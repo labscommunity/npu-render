@@ -1,0 +1,21 @@
+[INFO] 22:29:35.309 [dump-statistics-of-task-ops]   Input size - 32.25 KB Output size - 512 bytes
+[INFO] 22:29:35.309 [dump-statistics-of-task-ops]   DDR heap size - 512 bytes
+[INFO] 22:29:35.309 [dump-statistics-of-task-ops]   VPUIP tasks statistics:
+[INFO] 22:29:35.309 [dump-statistics-of-task-ops]   VPUIP Tasks - 8 ops
+[INFO] 22:29:35.309 [dump-statistics-of-task-ops]     VPUIP.NNDMA - 4 ops : Size - 33.25 KB
+[INFO] 22:29:35.309 [dump-statistics-of-task-ops]       CMX2DDR - 1 ops : Size - 512 bytes
+[INFO] 22:29:35.309 [dump-statistics-of-task-ops]       DDR2CMX - 2 ops : Size - 32.25 KB
+[INFO] 22:29:35.310 [dump-statistics-of-task-ops]       DDR2DDR - 1 ops : Size - 512 bytes
+[INFO] 22:29:35.310 [dump-statistics-of-task-ops]     VPUIP.SW.Kernel - 1 ops
+[INFO] 22:29:35.310 [dump-statistics-of-task-ops]       builtin_Gather - 1 ops
+[INFO] 22:29:35.310 [dump-statistics-of-task-ops]     VPUIP.BarProgDMA - 1 ops
+[INFO] 22:29:35.310 [dump-statistics-of-task-ops]     VPUIP.EnqueueDMA - 1 ops
+[INFO] 22:29:35.311 [dump-statistics-of-task-ops]     VPUIP.FetchDMA - 1 ops
+[INFO] 22:29:35.311 [dump-statistics-of-task-ops]   Barrier statistics:
+[INFO] 22:29:35.311 [dump-statistics-of-task-ops]     VPURT.ConfigureBarrierOp - 5 ops
+[INFO] 22:29:35.311 [dump-statistics-of-task-ops]   Weights statistics:
+[INFO] 22:29:35.311 [dump-statistics-of-task-ops]     Total weights - count: 0, size: 0 bytes (no compression)
+[INFO] 22:29:35.311 [dump-statistics-of-task-ops]   Const swizzling statistics:
+[INFO] 22:29:35.311 [dump-statistics-of-task-ops]     Swizzled constants     - count: 0, size: 0 bytes
+[INFO] 22:29:35.311 [dump-statistics-of-task-ops]     Not swizzled constants - count: 0, size: 0 bytes
+{"started": "2026-10-15T05:29:35.125703+00:00", "name": "gather4096-sw-one-tile", "completed": true, "passed": true, "custom_kernel_executed": false, "openvino_version": "2026.4.1-22982-e213a147257-releases/2026/4", "device_name": "Intel(R) AI Boost", "config": {"PERFORMANCE_HINT": "LATENCY", "NPU_COMPILATION_MODE": "ReferenceSW", "NPU_TILES": 1}, "input_shapes": [[4096, 4], [64]], "compile_ms": 81.0559, "execution_devices": ["NPU"], "blob_sha256": "396e48ffc50833902337e1a568e5b50ce38dc8a01225a614378445f9dd71f07a", "blob_bytes": 69768, "checks": [{"iteration": 0, "exact_components": 256, "elapsed_ms": 2.0265, "input_sha256": ["e6625b3bfbd6c264e24d143e0fbfb36cd7bd75214862febf3e4da5e1f0f5b191", "aee90b9394b1b7dc201a1df0d1b7547f72e15dcb19f5c7a2f48809f3e2a01e7e"], "output_sha256": "6ba8c0e89522b826710c341f448428ec20116dbddadb2e9eca2f19015a8212e6"}, {"iteration": 1, "exact_components": 256, "elapsed_ms": 0.2735, "input_sha256": ["30a75e37820d81e96b3568b62cf29542015d50de07e63efc047039cc3d525dc4", "64f3f78b7990f5223ed9378874f6337abc8b677a0bcb4c167497a571c777e045"], "output_sha256": "2e124d623dae59c014202cae6ef584696a5321fce5b624cf5d907c43f8122769"}, {"iteration": 2, "exact_components": 256, "elapsed_ms": 0.224, "input_sha256": ["3facb680198ee0599d3e9c4b73470ccc557e78f3033ccc89012d49224c2d7e1f", "c4ae95fb1fa73e63b80bc25cba68a79905ffb0304b2d2842bb0ac2afb1c5acb5"], "output_sha256": "3ad590889e18525836a46d87f6b293e837c9427cbea3d8d2eff0f3d81a700ac9"}, {"iteration": 3, "exact_components": 256, "elapsed_ms": 0.2213, "input_sha256": ["726dce17b3e667ac601ed8e2f32020e5db0b52b6dc71b6c76fe4ac32f320e6a4", "01e1aded4ffe3304b357c03d97e90b34e0b6417a58687a70043cac665401da09"], "output_sha256": "65f2d18963894ce00488146d9f560d742e1b9606d39d193776ecce2ff78e5112"}], "software_invocations": ["task.shave.invocation.0.0"], "dpu_sections": [], "finished": "2026-10-15T05:29:35.337489+00:00"}

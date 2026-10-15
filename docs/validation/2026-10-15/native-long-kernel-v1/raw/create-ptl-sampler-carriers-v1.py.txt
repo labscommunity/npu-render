@@ -1,0 +1,68 @@
+"""Export unmodified larger and indexed NPU graphs for offline ABI examination."""
+from datetime import UTC,datetime
+from pathlib import Path
+import argparse,hashlib,json,os,struct,subprocess,sys,time,traceback,ast
+
+def obj(p):
+ b=p.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+p=argparse.ArgumentParser();p.add_argument('--child',choices=['add4096','add4096-sw-one-tile','gather256','gather256-sw-one-tile','gather4096-sw-one-tile','gather256-f32-sw-one-tile']);p.add_argument('--output',type=Path);v=p.parse_args()
+r=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=r/'vm'
+# Reuse only the metadata reader, without executing the older experiment.
+module=ast.parse((vm/'create-ptl-kernel-carriers-v3.py').read_text());node=next(x for x in module.body if isinstance(x,ast.FunctionDef) and x.name=='inspect');exec(compile(ast.Module(body=[node],type_ignores=[]),'verified-elf-metadata-reader','exec'))
+if v.child:
+ import numpy as np
+ import openvino as ov
+ from openvino import opset13 as op
+ name=v.child;out=v.output;report=dict(started=datetime.now(UTC).isoformat(),name=name,completed=False,passed=False,custom_kernel_executed=False)
+ def save():(out/(name+'.json')).write_text(json.dumps(report,indent=2)+'\n')
+ try:
+  core=ov.Core();assert 'NPU' in core.available_devices
+  report['openvino_version']=ov.get_version();report['device_name']=str(core.get_property('NPU','FULL_DEVICE_NAME'))
+  config={'PERFORMANCE_HINT':'LATENCY'}
+  if '-sw-one-tile' in name:config.update(NPU_COMPILATION_MODE='ReferenceSW',NPU_TILES=1)
+  dtype=np.float32 if '-f32-' in name else np.float16;kind=ov.Type.f32 if dtype==np.float32 else ov.Type.f16
+  if name.startswith('add'):
+   source=op.parameter([1,4096],ov.Type.f16,name='source');params=[source];root=op.add(source,op.constant(np.float16(1)))
+  else:
+   elements=4096 if name.startswith('gather4096') else 256
+   source=op.parameter([elements,4],kind,name='source');indices=op.parameter([64],ov.Type.i32,name='indices');params=[source,indices];root=op.gather(source,indices,op.constant(np.int64(0)))
+  report.update(config=config,input_shapes=[list(x.get_shape()) for x in params]);save()
+  graph=ov.Model([root],params,name)
+  if dtype==np.float32:
+   for node in graph.get_ops():node.set_rt_info('', 'precise_0')
+   ov.serialize(graph,str(out/(name+'.xml')),str(out/(name+'.bin')));graph=core.read_model(str(out/(name+'.xml')))
+   config['EXECUTION_MODE_HINT']='ACCURACY'
+  began=time.perf_counter_ns();model=core.compile_model(graph,'NPU',config);report['compile_ms']=(time.perf_counter_ns()-began)/1e6
+  raw=model.get_property('EXECUTION_DEVICES');devices=[raw] if isinstance(raw,str) else list(raw);assert devices in (['NPU'],['NPU.0']);report['execution_devices']=devices;save()
+  request=model.create_infer_request();checks=[]
+  for iteration in range(4):
+   rng=np.random.default_rng(7910+iteration)
+   if name.startswith('add'):
+    data=rng.integers(-128,128,(1,4096)).astype(np.float16)/np.float16(4);inputs={0:data};expected=(data+np.float16(1)).astype(np.float16)
+   else:
+    data=(rng.uniform(-2,2,(elements,4)).astype(np.float32) if dtype==np.float32 else rng.integers(-128,128,(elements,4)).astype(np.float16)/np.float16(4));ix=rng.integers(0,elements,64,dtype=np.int32);ix[:4]=[0,elements-1,elements//2,elements//2-1];inputs={0:data,1:ix};expected=data[ix].copy()
+   start=time.perf_counter_ns();request.start_async(inputs);assert request.wait_for(10000),'inference deadline';observed=request.get_output_tensor(0).data.copy();elapsed=(time.perf_counter_ns()-start)/1e6
+   assert observed.dtype==expected.dtype and observed.shape==expected.shape and np.array_equal(observed,expected),'independent pixel oracle'
+   checks.append(dict(iteration=iteration,exact_components=int(expected.size),elapsed_ms=elapsed,input_sha256=[hashlib.sha256(inputs[k].tobytes()).hexdigest() for k in sorted(inputs)],output_sha256=hashlib.sha256(observed.tobytes()).hexdigest()))
+  exported=model.export_model();blob=exported.getvalue() if hasattr(exported,'getvalue') else bytes(exported);metadata=inspect(blob)
+  (out/(name+'.blob')).write_bytes(blob);(out/(name+'.elf-metadata.json')).write_text(json.dumps(metadata,indent=2)+'\n')
+  report.update(blob_sha256=hashlib.sha256(blob).hexdigest(),blob_bytes=len(blob),checks=checks,software_invocations=[x['name'] for x in metadata['sections'] if x['name'].startswith('task.shave.invocation.')],dpu_sections=[x['name'] for x in metadata['sections'] if 'dpu' in x['name'].lower()],passed=True)
+ except Exception as e:report.update(error=repr(e),traceback=traceback.format_exc())
+ finally:report.update(completed=True,finished=datetime.now(UTC).isoformat());save()
+ print(json.dumps(report));raise SystemExit(0 if report['passed'] else 1)
+
+out=vm/'ptl-sampler-carriers-v1';out.mkdir(exist_ok=False);report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,custom_kernel_executed=False,desktop_changed=False,cases=[])
+try:
+ proof=obj(vm/'ptl-custom-indexed-v1-controller/report.json');assert proof['completed'] and proof['passed'],'previous isolated NPU test must be healthy'
+ for name in ['add4096','add4096-sw-one-tile','gather256','gather256-sw-one-tile','gather4096-sw-one-tile','gather256-f32-sw-one-tile']:
+  with (out/(name+'.stdout.log')).open('xb') as stdout,(out/(name+'.stderr.log')).open('xb') as stderr:
+   child=subprocess.Popen([sys.executable,__file__,'--child',name,'--output',str(out)],stdout=stdout,stderr=stderr,creationflags=subprocess.CREATE_NO_WINDOW)
+   try:child.wait(timeout=90)
+   except subprocess.TimeoutExpired:child.kill();child.wait(timeout=5)
+  case=obj(out/(name+'.json')) if (out/(name+'.json')).exists() else dict(name=name,completed=False,passed=False)
+  case['child_exit']=child.returncode;report['cases'].append(case)
+  (out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+ report['passed']=all(x['completed'] and x['passed'] and x['child_exit']==0 for x in report['cases'])
+except Exception as e:report.update(error=repr(e),traceback=traceback.format_exc())
+finally:report.update(completed=True,finished=datetime.now(UTC).isoformat());(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(report));raise SystemExit(0 if report['passed'] else 1)

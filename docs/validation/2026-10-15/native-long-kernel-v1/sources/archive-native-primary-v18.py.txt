@@ -1,0 +1,34 @@
+"""Preserve long delivery, reusable custom-kernel hardware checks and raw transport."""
+from pathlib import Path
+from datetime import UTC,datetime
+import hashlib,json
+r=Path('results/render-driver');raw=r/'primary-raw-v18';out=Path('docs/validation/2026-10-15/native-long-kernel-v1')
+def obj(p):
+ b=p.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+long=obj(raw/'native-live-v36/report.json');gate=obj(raw/'native-live-v36/delivery-validation.json');relay=obj(raw/'native-live-v36/relay/report.json')
+assert long['completed'] and long['passed'] and long['cleanup_passed'] and long['cursor_cleanup_passed'] and long['thirty_minute_delivery_gate_passed']
+assert gate['passed'] and gate['matching_submissions']==167 and gate['first_to_last_seconds']>=1800 and gate['last_delivery_age_seconds']<=60 and gate['fresh_physical_observations']>0
+assert relay['passed'] and relay['publication_statistics']['retries']==2 and relay['publication_statistics']['timeouts']==0
+assert long['hardware_child_receipts']==1833 and not long['application_graphics_offload_qualified']
+indexed=obj(raw/'ptl-custom-indexed-v1/report.json');assert indexed['passed'] and indexed['custom_kernel_execution_qualified'] and indexed['child_exit']==0
+for name in ['identity','indexed']:
+ q=obj(raw/f'ptl-reusable-{name}-v1/report.json');assert q['passed'] and q['custom_kernel_execution_qualified'] and q['child_exit']==0
+ assert len(q['child_result']['phases'])==3 and all(x['passed'] and x['exact_components']==1024 and x['execution_devices']==['NPU'] for x in q['child_result']['phases'])
+q=obj(raw/'ptl-reusable-build-identity-v1/report.json');assert q['passed'] and q['child_result']['elf_sha256']=='5d5217d9fffd0562becfb61604037ee2cba932efd07212c8d9063ecfbad3ba66'
+q=obj(raw/'ptl-raw-identity-v1/report.json');assert q['passed'] and q['raw_word_transport_qualified'] and q['raw_words']==4112
+carriers=obj(raw/'ptl-sampler-carriers-v1/report.json');assert carriers['passed'] and len(carriers['cases'])==6 and all(x['passed'] for x in carriers['cases'])
+canonical=obj(raw/'ptl-reusable-harness-v1/source-manifest.json')
+for name,sha in canonical.items():assert hashlib.sha256((raw/'ptl-reusable-harness-v1'/name).read_bytes()).hexdigest()==sha==hashlib.sha256(Path(name).read_bytes()).hexdigest()
+assert (raw/'ptl-reusable-harness-v1/tools/build_ptl_kernel.py').read_bytes()==Path('tools/build_ptl_kernel.py').read_bytes()
+manifest=obj(r/'native-primary-v18-artifact-sha256.json');out.mkdir(parents=True,exist_ok=False)
+for item in manifest:
+ data=(raw/item['source']).read_bytes();assert len(data)==item['bytes'] and hashlib.sha256(data).hexdigest()==item['sha256'].lower()
+ dest=out/'raw'/item['source']
+ if dest.suffix in ('.py','.ps1','.c'):dest=dest.with_suffix(dest.suffix+'.txt')
+ dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(data);item['archive_path']=dest.relative_to(out).as_posix()
+(out/'raw-manifest.json').write_text(json.dumps(manifest,indent=2)+'\n');sources=[]
+for name in ['collect-native-primary-v18.py','archive-native-primary-v18.py','prepare-ptl-indexed-v1.py','prepare-ptl-indexed-test-v1.py','ptl-indexed-kernel-v1.c','ptl-gather-kernel-draft-v1.c','prepare-ptl-gather-draft-v1.py','inspect-ptl-invocations-v1.py','inspect-ptl-invocations-v2.py','summarize-native-v35-cost-v1.py','native-v35-cost-summary-v1.json','ptl-carrier-options-v1/sources.json']:
+ data=(r/name).read_bytes();dest=out/'sources'/(name+'.txt');dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(data);sources.append(dict(path=dest.relative_to(out).as_posix(),sha256=hashlib.sha256(data).hexdigest()))
+(out/'source-manifest.json').write_text(json.dumps(sources,indent=2)+'\n')
+report=dict(recorded=datetime.now(UTC).isoformat(),evidence_checks_passed=True,raw_files_remotely_hash_verified=len(manifest),raw_bytes=sum(x['bytes'] for x in manifest),thirty_minute_controlled_delivery_qualified=True,matching_submissions=167,delivery_span_seconds=gate['first_to_last_seconds'],last_delivery_age_seconds=gate['last_delivery_age_seconds'],fresh_physical_observations=gate['fresh_physical_observations'],npu_acknowledgments=1833,normal_restore_passed=True,publication_contention_retries=2,publication_timeouts=0,responsiveness_qualified=False,reusable_kernel_builder_reproduces_qualified_binary=True,reusable_identity_and_indexed_kernel_oracles_passed=True,custom_raw_words_exact=4112,unmodified_larger_carriers_qualified=6,custom_full_source_gather_qualified=False,matched_kernel_benchmark=False,general_application_offload=False,full_desktop_offload=False,tahoma_tested=False)
+(out/'report.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report))

@@ -1,0 +1,224 @@
+{
+  "completed": true,
+  "passed": true,
+  "source_sha256": "e783821bec1e1d0d29638944165b26263f6aece88cab99a09291a854d6a5827c",
+  "scope": "Entire child worker lifetime including startup and cleanup; not matched to presentation interval",
+  "successful_operations": 1253,
+  "incremental_bootstrap_snapshot_receipts": 1248,
+  "late_completed_operations": 5,
+  "statistics": {
+    "compile_and_draw_ms": {
+      "total": 264358.069,
+      "median": 59.615,
+      "p95_nearest_rank": 787.472,
+      "maximum": 9596.503
+    },
+    "draw_ms": {
+      "total": 206690.527,
+      "median": 49.438,
+      "p95_nearest_rank": 653.208,
+      "maximum": 9583.126
+    },
+    "provider_setup_ms": {
+      "total": 32011.221,
+      "median": 0.0,
+      "p95_nearest_rank": 129.21,
+      "maximum": 2277.715
+    },
+    "backend_compile_ms": {
+      "total": 11885.775,
+      "median": 0.0,
+      "p95_nearest_rank": 58.974,
+      "maximum": 691.385
+    },
+    "provider_requests": {
+      "total": 42760,
+      "median": 12,
+      "p95_nearest_rank": 115,
+      "maximum": 1282
+    },
+    "memory_cache_requests": {
+      "total": 1380,
+      "median": 0,
+      "p95_nearest_rank": 6,
+      "maximum": 7
+    },
+    "memory_cache_hits": {
+      "total": 1099,
+      "median": 0,
+      "p95_nearest_rank": 5,
+      "maximum": 6
+    },
+    "cache_requests": {
+      "total": 281,
+      "median": 0,
+      "p95_nearest_rank": 2,
+      "maximum": 6
+    },
+    "cache_hits": {
+      "total": 281,
+      "median": 0,
+      "p95_nearest_rank": 2,
+      "maximum": 6
+    }
+  },
+  "host_uploaded_texture_bytes": 3846926288,
+  "host_texture_recopy_bytes_avoided": 143438044112,
+  "largest_operations": [
+    {
+      "dispatch_ticket": 1121,
+      "sequence": 11,
+      "server_thread_id": 10552,
+      "request_bytes": 23884708,
+      "reply_bytes": 3145856,
+      "wide_coverage_calls": 320,
+      "provider_requests": 1282,
+      "compile_and_draw_ms": 9596.503,
+      "draw_ms": 9583.126,
+      "provider_setup_ms": 0.0,
+      "backend_compile_ms": 0.0,
+      "memory_cache_hits": 0,
+      "cache_hits": 0
+    },
+    {
+      "dispatch_ticket": 41,
+      "sequence": 42,
+      "server_thread_id": 10552,
+      "request_bytes": 23884708,
+      "reply_bytes": 3145856,
+      "wide_coverage_calls": 320,
+      "provider_requests": 1282,
+      "compile_and_draw_ms": 8401.321,
+      "draw_ms": 8389.834,
+      "provider_setup_ms": 0.0,
+      "backend_compile_ms": 0.0,
+      "memory_cache_hits": 0,
+      "cache_hits": 0
+    },
+    {
+      "dispatch_ticket": 354,
+      "sequence": 355,
+      "server_thread_id": 3864,
+      "request_bytes": 23884708,
+      "reply_bytes": 3145856,
+      "wide_coverage_calls": 320,
+      "provider_requests": 1282,
+      "compile_and_draw_ms": 8015.636,
+      "draw_ms": 8004.051,
+      "provider_setup_ms": 0.0,
+      "backend_compile_ms": 0.0,
+      "memory_cache_hits": 0,
+      "cache_hits": 0
+    },
+    {
+      "dispatch_ticket": 333,
+      "sequence": 334,
+      "server_thread_id": 10552,
+      "request_bytes": 25524940,
+      "reply_bytes": 20736128,
+      "wide_coverage_calls": 80,
+      "provider_requests": 322,
+      "compile_and_draw_ms": 4250.657,
+      "draw_ms": 4247.474,
+      "provider_setup_ms": 0.0,
+      "backend_compile_ms": 0.0,
+      "memory_cache_hits": 0,
+      "cache_hits": 0
+    },
+    {
+      "dispatch_ticket": 292,
+      "sequence": 293,
+      "server_thread_id": 11752,
+      "request_bytes": 25524940,
+      "reply_bytes": 20736128,
+      "wide_coverage_calls": 80,
+      "provider_requests": 322,
+      "compile_and_draw_ms": 4174.032,
+      "draw_ms": 4170.76,
+      "provider_setup_ms": 0.0,
+      "backend_compile_ms": 0.0,
+      "memory_cache_hits": 0,
+      "cache_hits": 0
+    },
+    {
+      "dispatch_ticket": 479,
+      "sequence": 480,
+      "server_thread_id": 2256,
+      "request_bytes": 156172,
+      "reply_bytes": 49280,
+      "wide_coverage_calls": 2,
+      "provider_requests": 10,
+      "compile_and_draw_ms": 4107.335,
+      "draw_ms": 177.746,
+      "provider_setup_ms": 2233.079,
+      "backend_compile_ms": 691.385,
+      "memory_cache_hits": 3,
+      "cache_hits": 3
+    },
+    {
+      "dispatch_ticket": 481,
+      "sequence": 482,
+      "server_thread_id": 10552,
+      "request_bytes": 107020,
+      "reply_bytes": 49280,
+      "wide_coverage_calls": 2,
+      "provider_requests": 10,
+      "compile_and_draw_ms": 4084.038,
+      "draw_ms": 140.59,
+      "provider_setup_ms": 2277.715,
+      "backend_compile_ms": 675.794,
+      "memory_cache_hits": 3,
+      "cache_hits": 3
+    },
+    {
+      "dispatch_ticket": 1009,
+      "sequence": 1010,
+      "server_thread_id": 10552,
+      "request_bytes": 25123208,
+      "reply_bytes": 20736128,
+      "wide_coverage_calls": 76,
+      "provider_requests": 291,
+      "compile_and_draw_ms": 3698.784,
+      "draw_ms": 3695.089,
+      "provider_setup_ms": 0.0,
+      "backend_compile_ms": 0.0,
+      "memory_cache_hits": 0,
+      "cache_hits": 0
+    },
+    {
+      "dispatch_ticket": 172,
+      "sequence": 173,
+      "server_thread_id": 11752,
+      "request_bytes": 7934668,
+      "reply_bytes": 3145856,
+      "wide_coverage_calls": 36,
+      "provider_requests": 146,
+      "compile_and_draw_ms": 3678.576,
+      "draw_ms": 2176.641,
+      "provider_setup_ms": 809.635,
+      "backend_compile_ms": 259.207,
+      "memory_cache_hits": 3,
+      "cache_hits": 3
+    },
+    {
+      "dispatch_ticket": 302,
+      "sequence": 303,
+      "server_thread_id": 3864,
+      "request_bytes": 25123208,
+      "reply_bytes": 20736128,
+      "wide_coverage_calls": 76,
+      "provider_requests": 291,
+      "compile_and_draw_ms": 3494.833,
+      "draw_ms": 3491.936,
+      "provider_setup_ms": 0.0,
+      "backend_compile_ms": 0.0,
+      "memory_cache_hits": 0,
+      "cache_hits": 0
+    }
+  ],
+  "stage_timers_overlap_do_not_sum": true,
+  "benchmark_qualified": false,
+  "device_dma_measured": false,
+  "tahoma_tested": false,
+  "full_desktop_offload": false
+}

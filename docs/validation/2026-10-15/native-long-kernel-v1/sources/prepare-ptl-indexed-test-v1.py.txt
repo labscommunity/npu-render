@@ -1,0 +1,22 @@
+from pathlib import Path
+import ast
+r=Path('results/render-driver');s=(r/'qualify-ptl-custom-identity-v1.py').read_text()
+s=s.replace('identity kernel','indexed arithmetic kernel').replace('custom-identity','custom-indexed').replace('movitools-kernel-identity','movitools-kernel-indexed')
+s=s.replace('5d5217d9fffd0562becfb61604037ee2cba932efd07212c8d9063ecfbad3ba66','be83c1f85a86729df29ee7adc5531455ea0669bca993902d0e99f6592c72fc55').replace('len(texts[0])==288','len(texts[0])==1280')
+s=s.replace('for i in range(8):','for i in range(64):')
+s=s.replace('data=(np.arange(16,dtype=np.float32).reshape(1,16)-8+i/4).astype(np.float16)', '''data=(np.arange(16,dtype=np.float32).reshape(1,16)-8+i/4).astype(np.float16) if i<8 else np.random.default_rng(809+i).uniform(-16,16,(1,16)).astype(np.float16)''')
+s=s.replace("began=time.monotonic();", "began=time.perf_counter_ns();")
+s=s.replace("output=request.get_output_tensor(0).data.copy();expected=data if phase=='custom-indexed' else (data+np.float16(1)).astype(np.float16)", """output=request.get_output_tensor(0).data.copy()
+    permutation=np.array([3,0,5,2,7,4,1,6])
+    expected=np.clip(data.reshape(2,8).astype(np.float32)[:,permutation]*np.float32(.5)+np.float32(1),-2,2).astype(np.float16).reshape(1,16) if phase=='custom-indexed' else (data+np.float16(1)).astype(np.float16)""")
+s=s.replace('(time.monotonic()-began)*1000','(time.perf_counter_ns()-began)/1e6').replace('identity_distinct_from_original=True','custom_oracle="clamp(local_permutation(x)*0.5+1,-2,2)"').replace('exact_components=128,checks=checks','exact_components=1024,checks=checks')
+needle="r=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=r/'vm'\n"
+addition="""# The controller may use the old bootstrap Python; inference always uses the
+# same pinned OpenVINO installation as the live desktop and identity proof.
+expected_python=r/'toolchains/openvino-2026.4.1/Scripts/python.exe'
+if str(Path(sys.executable).resolve()).casefold()!=str(expected_python.resolve()).casefold():
+ raise SystemExit(subprocess.run([str(expected_python),__file__,*sys.argv[1:]],check=False).returncode)
+"""
+s=s.replace(needle,needle+addition,1)
+s=s.replace("core=ov.Core();require_devices=core.available_devices", "assert ov.get_version()=='2026.4.1-22982-e213a147257-releases/2026/4','pinned runtime mismatch'\n  core=ov.Core();require_devices=core.available_devices")
+ast.parse(s);(r/'qualify-ptl-custom-indexed-v1.py').write_text(s)

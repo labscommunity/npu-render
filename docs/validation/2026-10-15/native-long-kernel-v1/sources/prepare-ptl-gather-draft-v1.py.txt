@@ -1,0 +1,5 @@
+from pathlib import Path
+import ast,hashlib,json
+r=Path('results/render-driver');source=(r/'ptl-gather-kernel-draft-v1.c').read_bytes();s=(r/'build-ptl-identity-kernel-v1.py').read_text();a=s.index('source=');z=s.index('\nif v.child:',a);s=s[:a]+'source='+repr(source)+s[z:];s=s.replace('movitools-kernel-identity-v1','movitools-kernel-gather-draft-v1');ast.parse(s);(r/'build-ptl-gather-draft-v1.py').write_text(s)
+s=(r/'link-ptl-identity-kernel-v1.py').read_text().replace('movitools-kernel-identity','movitools-kernel-gather-draft');ast.parse(s);(r/'link-ptl-gather-draft-v1.py').write_text(s)
+print(json.dumps(dict(source_sha256=hashlib.sha256(source).hexdigest(),kernel_admitted=False)))

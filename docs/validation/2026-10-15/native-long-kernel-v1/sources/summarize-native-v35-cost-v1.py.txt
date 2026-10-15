@@ -1,0 +1,21 @@
+"""Diagnostic counters over the entire owned worker lifetime, not an A/B benchmark."""
+from pathlib import Path
+import hashlib,json,statistics
+r=Path('results/render-driver');root=r/'primary-raw-v17/native-desktop-admission-v45/bootstrap';path=root/'provider-processes/generation-1/worker.stdout.jsonl';data=path.read_bytes()
+rows=[json.loads(s) for s in data.decode('utf-8-sig').splitlines() if s.startswith('{') and s.endswith('}')]
+operations=[];ticket=None
+for row in rows:
+ if row.get('pipeline_before_request'):ticket=row['dispatch_ticket']
+ if 'client_pid' in row and 'compile_and_draw_ms' in row:
+  assert ticket is not None;operations.append(dict(row,dispatch_ticket=ticket))
+assert len({x['dispatch_ticket'] for x in operations})==len(operations)
+packets={x['dispatch_ticket']:x for x in rows if 'request_bytes' in x and x.get('worker_success')}
+for row in operations:
+ packet=packets[row['dispatch_ticket']];assert row['sequence']==packet['sequence'] and row['client_pid']==packet['client_pid'];row.update(request_bytes=packet['request_bytes'],reply_bytes=packet['reply_bytes'])
+assert len(operations)==1253 and all(x['passed'] and x['execution_device']=='NPU' for x in operations)
+summary={}
+for key in ['compile_and_draw_ms','draw_ms','provider_setup_ms','backend_compile_ms','provider_requests','memory_cache_requests','memory_cache_hits','cache_requests','cache_hits']:
+ values=sorted(x[key] for x in operations);summary[key]=dict(total=sum(values),median=statistics.median(values),p95_nearest_rank=values[max(0,(__import__('math').ceil(.95*len(values)))-1)],maximum=values[-1])
+largest=[{k:x[k] for k in ['dispatch_ticket','sequence','server_thread_id','request_bytes','reply_bytes','wide_coverage_calls','provider_requests','compile_and_draw_ms','draw_ms','provider_setup_ms','backend_compile_ms','memory_cache_hits','cache_hits']} for x in sorted(operations,key=lambda x:x['compile_and_draw_ms'],reverse=True)[:10]]
+report=dict(completed=True,passed=True,source_sha256=hashlib.sha256(data).hexdigest(),scope='Entire child worker lifetime including startup and cleanup; not matched to presentation interval',successful_operations=len(operations),incremental_bootstrap_snapshot_receipts=1248,late_completed_operations=5,statistics=summary,host_uploaded_texture_bytes=sum(x['host_uploaded_bytes'] for x in rows if x.get('texture_upload_scope')),host_texture_recopy_bytes_avoided=sum(x['host_recopy_bytes_avoided'] for x in rows if x.get('texture_upload_scope')),largest_operations=largest,stage_timers_overlap_do_not_sum=True,benchmark_qualified=False,device_dma_measured=False,tahoma_tested=False,full_desktop_offload=False)
+(r/'native-v35-cost-summary-v1.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(dict(operations=len(operations),provider_requests=summary['provider_requests']['total'],draw_ms=summary['draw_ms']['total'],backend_compile_ms=summary['backend_compile_ms']['total'],host_uploaded_texture_bytes=report['host_uploaded_texture_bytes'])))

@@ -1,0 +1,187 @@
+{
+  "accepted": true,
+  "blob_sha256": "4a6c494f103b730bea94a719a6001bb5344136dc14ec073f451e020558583446",
+  "blob_bytes": 86145,
+  "code_offset": 28672,
+  "code_bytes": 27552,
+  "entry": 486539264,
+  "invocations": [
+    {
+      "name": "task.shave.invocation.0.0",
+      "tile": 0,
+      "chunk": 0,
+      "parameter_offset": 0,
+      "tensors": [
+        {
+          "address": 1075937280,
+          "elements": 8,
+          "bytes": 16,
+          "role": "input",
+          "precision": "FP16"
+        },
+        {
+          "address": 1075937408,
+          "elements": 1,
+          "bytes": 2,
+          "role": "input",
+          "precision": "FP16"
+        },
+        {
+          "address": 1075937344,
+          "elements": 8,
+          "bytes": 16,
+          "role": "output",
+          "precision": "FP16"
+        }
+      ]
+    },
+    {
+      "name": "task.shave.invocation.1.0",
+      "tile": 1,
+      "chunk": 0,
+      "parameter_offset": 320,
+      "tensors": [
+        {
+          "address": 1078034432,
+          "elements": 8,
+          "bytes": 16,
+          "role": "input",
+          "precision": "FP16"
+        },
+        {
+          "address": 1078034560,
+          "elements": 1,
+          "bytes": 2,
+          "role": "input",
+          "precision": "FP16"
+        },
+        {
+          "address": 1078034496,
+          "elements": 8,
+          "bytes": 16,
+          "role": "output",
+          "precision": "FP16"
+        }
+      ]
+    },
+    {
+      "name": "task.shave.invocation.2.0",
+      "tile": 2,
+      "chunk": 0,
+      "parameter_offset": 640,
+      "tensors": [
+        {
+          "address": 1082228736,
+          "elements": 8,
+          "bytes": 16,
+          "role": "input",
+          "precision": "FP16"
+        },
+        {
+          "address": 1082228864,
+          "elements": 1,
+          "bytes": 2,
+          "role": "input",
+          "precision": "FP16"
+        },
+        {
+          "address": 1082228800,
+          "elements": 8,
+          "bytes": 16,
+          "role": "output",
+          "precision": "FP16"
+        }
+      ]
+    },
+    {
+      "name": "task.shave.invocation.0.1",
+      "tile": 0,
+      "chunk": 1,
+      "parameter_offset": 960,
+      "tensors": [
+        {
+          "address": 1075937296,
+          "elements": 8,
+          "bytes": 16,
+          "role": "input",
+          "precision": "FP16"
+        },
+        {
+          "address": 1075937408,
+          "elements": 1,
+          "bytes": 2,
+          "role": "input",
+          "precision": "FP16"
+        },
+        {
+          "address": 1075937360,
+          "elements": 8,
+          "bytes": 16,
+          "role": "output",
+          "precision": "FP16"
+        }
+      ]
+    },
+    {
+      "name": "task.shave.invocation.1.1",
+      "tile": 1,
+      "chunk": 1,
+      "parameter_offset": 1280,
+      "tensors": [
+        {
+          "address": 1078034448,
+          "elements": 8,
+          "bytes": 16,
+          "role": "input",
+          "precision": "FP16"
+        },
+        {
+          "address": 1078034560,
+          "elements": 1,
+          "bytes": 2,
+          "role": "input",
+          "precision": "FP16"
+        },
+        {
+          "address": 1078034512,
+          "elements": 8,
+          "bytes": 16,
+          "role": "output",
+          "precision": "FP16"
+        }
+      ]
+    },
+    {
+      "name": "task.shave.invocation.2.1",
+      "tile": 2,
+      "chunk": 1,
+      "parameter_offset": 1600,
+      "tensors": [
+        {
+          "address": 1082228752,
+          "elements": 8,
+          "bytes": 16,
+          "role": "input",
+          "precision": "FP16"
+        },
+        {
+          "address": 1082228864,
+          "elements": 1,
+          "bytes": 2,
+          "role": "input",
+          "precision": "FP16"
+        },
+        {
+          "address": 1082228816,
+          "elements": 8,
+          "bytes": 16,
+          "role": "output",
+          "precision": "FP16"
+        }
+      ]
+    }
+  ],
+  "partition_elements_per_tile": 16,
+  "replica_tiles": 3,
+  "custom_kernel_execution_qualified": false
+}

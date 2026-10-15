@@ -1,0 +1,268 @@
+"""Bounds-checked offline contract for the observed Panther Lake FP16 add carrier.
+
+Intel's NPU50XX register definitions describe 40-byte ranges and 96-byte
+invocations. MemRefData is 40 bytes. This narrow parser neither admits arbitrary
+graphs nor establishes custom-kernel execution merely by accepting a file.
+"""
+
+import hashlib
+import re
+import struct
+
+
+def require(ok, message):
+    if not ok:
+        raise ValueError(message)
+
+
+def inspect_identity_carrier(blob: bytes) -> dict:
+    require(64 <= len(blob) <= 4 * 1024 * 1024, "blob size")
+    require(blob[:6] == b"\x7fELF\x02\x01", "ELF identity")
+    h = struct.unpack_from("<16sHHIQQQIHHHHHH", blob)
+    require(h[1:6] == (1, 0, 0, 0, 0) and h[7:12] == (0, 64, 0, 0, 64), "native graph header")
+    require(0 < h[12] <= 512 and h[13] < h[12] and h[6] + h[12] * 64 <= len(blob), "section table")
+    raw = [struct.unpack_from("<IIQQQQIIQQ", blob, h[6] + i * 64) for i in range(h[12])]
+
+    def region(offset, size):
+        require(0 <= offset <= len(blob) and 0 <= size <= len(blob) - offset, "file extent")
+        return blob[offset : offset + size]
+
+    names = region(raw[h[13]][4], raw[h[13]][5])
+    sections = []
+    by_name = {}
+    for i, s in enumerate(raw):
+        require(s[0] < len(names), "section name offset")
+        end = names.find(b"\0", s[0])
+        require(end >= 0, "section name termination")
+        name = names[s[0] : end].decode("ascii")
+        require(name not in by_name, "duplicate section name")
+        # Intel ELF reader explicitly defines these three non-file-backed types.
+        data = None if s[1] in (8, 0x8AAAAAAC, 0x8AAAAAAD) else region(s[4], s[5])
+        section = dict(
+            index=i,
+            name=name,
+            type=s[1],
+            flags=s[2],
+            offset=s[4],
+            size=s[5],
+            link=s[6],
+            info=s[7],
+            entry=s[9],
+            data=data,
+        )
+        sections.append(section)
+        by_name[name] = section
+
+    def section(name):
+        require(name in by_name, "required section " + name)
+        return by_name[name]
+
+    def relocations(target):
+        result = {}
+        for s in sections:
+            if s["type"] != 4 or s["info"] != target["index"]:
+                continue
+            require(
+                s["entry"] == 24 and s["size"] % 24 == 0 and s["link"] < len(sections),
+                "relocation table",
+            )
+            symbols = sections[s["link"]]
+            require(
+                symbols["type"] == 2 and symbols["entry"] == 24 and symbols["size"] % 24 == 0,
+                "relocation symbols",
+            )
+            for at in range(0, s["size"], 24):
+                offset, info, addend = struct.unpack_from("<QQq", s["data"], at)
+                symbol = info >> 32
+                kind = info & 0xFFFFFFFF
+                require(
+                    symbol < symbols["size"] // 24 and offset not in result, "relocation identity"
+                )
+                st = struct.unpack_from("<IBBHQQ", symbols["data"], symbol * 24)
+                require(st[3] < len(sections), "symbol section")
+                require(0 <= offset < target["size"] and addend >= 0, "relocation extent")
+                result[offset] = dict(type=kind, target=sections[st[3]], addend=addend + st[4])
+        return result
+
+    code = section("shave.text")
+    params = section("shave.params")
+    kernel_data = section("shave.data")
+    require(code["type"] == params["type"] == kernel_data["type"] == 1, "carrier section type")
+    require(not relocations(code), "carrier code relocations unsupported")
+    require(not any("dpu" in s["name"].lower() for s in sections), "DPU carrier rejected")
+    ranges = [s for s in sections if re.fullmatch(r"task\.shave\.range\.[012]\.[01]", s["name"])]
+    invocations = [
+        s for s in sections if re.fullmatch(r"task\.shave\.invocation\.[012]\.[01]", s["name"])
+    ]
+    require(len(ranges) == len(invocations) == 6, "six invocation carrier required")
+    require(
+        len([s for s in sections if s["name"].startswith("task.shave.")]) == 12,
+        "extra ACT records rejected",
+    )
+    extents = []
+    for s in ranges:
+        require(s["size"] == 40, "range size")
+        kind, entry, base, size, deprecated, count, pad = struct.unpack("<B7xQQIIII", s["data"])
+        require(
+            kind == base == deprecated == count == pad == 0 and entry == 0x1D000000, "range fields"
+        )
+        rs = relocations(s)
+        require(set(rs) == {16}, "range relocation shape")
+        rel = rs[16]
+        require(
+            rel["type"] == 0 and rel["target"]["index"] == code["index"] and rel["addend"] == 0,
+            "range code selector",
+        )
+        require(0 < size <= code["size"], "code size")
+        extents.append(size)
+    require(len(set(extents)) == 1, "shared code extent")
+    prs = relocations(params)
+    require(len(prs) == 36, "parameter relocation count")
+    calls = []
+    seen_parameter_offsets = set()
+    for s in invocations:
+        require(s["size"] == 96, "invocation size")
+        rs = relocations(s)
+        require(set(rs) == {8, 16}, "invocation relocation shape")
+        require(
+            rs[8]["type"] == rs[16]["type"] == 0
+            and rs[8]["target"]["index"] == params["index"]
+            and rs[16]["target"]["index"] == kernel_data["index"]
+            and rs[16]["addend"] == 0,
+            "invocation references",
+        )
+        base = rs[8]["addend"]
+        require(
+            base % 320 == 0
+            and 0 <= base <= 1600
+            and base not in seen_parameter_offsets
+            and base + 264 <= params["size"],
+            "parameter block",
+        )
+        seen_parameter_offsets.add(base)
+        tensors = []
+        for n in range(3):
+            at = base + n * 40
+            d = struct.unpack_from("<10I", params["data"], at)
+            require(
+                d[0] > 0
+                and d[1:4] == (0, 1, 4)
+                and d[4:7] == (0, 0, 2)
+                and d[7:] == (0x4321, 0, 2),
+                "static FP16 descriptor",
+            )
+            dims = []
+            for offset, width, fmt in [(16, 16, "<4i"), (20, 32, "<4q")]:
+                require(at + offset in prs, "tensor relocation absent")
+                rel = prs[at + offset]
+                require(
+                    rel["type"] == 4
+                    and rel["target"]["index"] == params["index"]
+                    and base + 120 <= rel["addend"]
+                    and rel["addend"] + width <= base + 320,
+                    "tensor relocation bounds",
+                )
+                dims.append(struct.unpack_from(fmt, params["data"], rel["addend"]))
+            count = 1 if n == 1 else 8
+            require(
+                dims[0] == (count, 1, 1, 1) and dims[1] == (16, count * 16, count * 16, count * 16),
+                "dense invocation shape",
+            )
+            tensors.append(
+                dict(
+                    address=d[0],
+                    elements=count,
+                    bytes=count * 2,
+                    role="output" if n == 2 else "input",
+                    precision="FP16",
+                )
+            )
+        require(tensors[2]["address"] == tensors[0]["address"] + 64, "output placement")
+        require(tensors[1]["address"] > tensors[2]["address"] + 16, "scalar placement")
+        tile = struct.unpack_from("<I", s["data"], 84)[0]
+        chunk = int(s["name"].rsplit(".", 1)[1])
+        require(tile == int(s["name"].split(".")[-2]), "tile identity")
+        calls.append(
+            dict(name=s["name"], tile=tile, chunk=chunk, parameter_offset=base, tensors=tensors)
+        )
+    for tile in range(3):
+        pair = sorted([c for c in calls if c["tile"] == tile], key=lambda c: c["chunk"])
+        require(len(pair) == 2, "tile partition count")
+        for n in range(3):
+            require(
+                pair[1]["tensors"][n]["address"]
+                == pair[0]["tensors"][n]["address"] + (0 if n == 1 else 16),
+                "tile partition span",
+            )
+    return dict(
+        accepted=True,
+        blob_sha256=hashlib.sha256(blob).hexdigest(),
+        blob_bytes=len(blob),
+        code_offset=code["offset"],
+        code_bytes=extents[0],
+        entry=0x1D000000,
+        invocations=calls,
+        partition_elements_per_tile=16,
+        replica_tiles=3,
+        custom_kernel_execution_qualified=False,
+    )
+
+
+def replace_identity_code(blob: bytes, text: bytes) -> tuple[bytes, dict]:
+    contract = inspect_identity_carrier(blob)
+    require(
+        0 < len(text) <= contract["code_bytes"] and len(text) % 16 == 0, "replacement code extent"
+    )
+    result = bytearray(blob)
+    start = contract["code_offset"]
+    size = contract["code_bytes"]
+    result[start : start + size] = text + bytes(size - len(text))
+    require(
+        result[:start] == blob[:start] and result[start + size :] == blob[start + size :],
+        "non-code bytes changed",
+    )
+    inspect_identity_carrier(bytes(result))
+    return bytes(result), contract
+
+
+def read_kernel_text(elf: bytes) -> bytes:
+    """Extract one statically linked SHAVE text image without mutable data.
+
+    This validates file structure, not the safety or semantics of instructions.
+    Callers must pin the intended kernel hash and qualify its behavior separately.
+    """
+    require(52 <= len(elf) <= 1024 * 1024, "kernel ELF size")
+    require(elf[:7] == b"\x7fELF\x01\x01\x01", "kernel ELF identity")
+    header = struct.unpack_from("<16sHHIIIIIHHHHHH", elf)
+    require(header[1:5] == (2, 2, 1, 0x1D000000), "kernel architecture and entry")
+    require(
+        header[11] == 40
+        and 0 < header[12] < 64
+        and header[13] < header[12]
+        and header[6] + header[12] * 40 <= len(elf),
+        "kernel section table",
+    )
+    sections = [struct.unpack_from("<10I", elf, header[6] + i * 40) for i in range(header[12])]
+    names_section = sections[header[13]]
+    require(names_section[4] + names_section[5] <= len(elf), "kernel names extent")
+    strings = elf[names_section[4] : names_section[4] + names_section[5]]
+    names = set()
+    text = []
+    for section in sections:
+        require(section[0] < len(strings), "kernel section name")
+        end = strings.find(b"\0", section[0])
+        require(end >= 0, "kernel section name termination")
+        name = strings[section[0] : end]
+        require(name not in names, "duplicate kernel section name")
+        names.add(name)
+        require(section[4] + section[5] <= len(elf), "kernel section extent")
+        require(section[1] not in (4, 8, 9), "kernel relocation or BSS unsupported")
+        if name == b".arg.data":
+            require(section[5] == 0, "kernel mutable data unsupported")
+        if name != b".text" and section[2] & 2:
+            require(section[5] == 0, "kernel extra allocated section unsupported")
+        if name == b".text":
+            require(section[3] == 0x1D000000 and section[2] & 4, "kernel text address")
+            text.append(elf[section[4] : section[4] + section[5]])
+    require(len(text) == 1 and len(text[0]) > 0 and len(text[0]) % 16 == 0, "kernel text extent")
+    return text[0]

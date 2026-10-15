@@ -1,0 +1,18 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$vm="$r\vm";$out="$vm\ptl-sampler-carriers-v1-controller"
+if(Test-Path $out){throw 'Experiment exists'};New-Item -ItemType Directory $out|Out-Null
+$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');completed=$false;passed=$false;desktop_changed=$false;active_phase='waiting-for-indexed-kernel'}
+function Save-Report{$report|ConvertTo-Json -Depth 5|Set-Content "$out\report.json"};Save-Report
+try{
+ $deadline=[DateTime]::UtcNow.AddMinutes(45)
+ do{if([DateTime]::UtcNow -gt $deadline){throw 'Predecessor completion deadline'};Start-Sleep -Seconds 2;try{$q=Get-Content "$vm\ptl-custom-indexed-v1-controller\report.json" -Raw|ConvertFrom-Json}catch{$q=$null}}while(!$q.completed)
+ if(!$q.passed){throw 'Prior kernel test not qualified'}
+ $q=Get-Content "$vm\native-desktop-admission-v46\report.json" -Raw|ConvertFrom-Json;if(!$q.completed -or !$q.cleanup_passed){throw 'Desktop cleanup incomplete'}
+ if(@(Get-Process nr_registered_local_indexed_worker,nr_pixel_merger_fusion,nr_uniform_draw_diagnostic,nr_native_topology,nr_frame_present_probe -ErrorAction SilentlyContinue).Count){throw 'Graphics experiment active'}
+ $report.active_phase='unmodified-carriers';Save-Report
+ & "$r\toolchains\openvino-2026.4.1\Scripts\python.exe" "$vm\create-ptl-sampler-carriers-v1.py" > "$out\probe.stdout.log" 2> "$out\probe.stderr.log";$report.probe_exit=$LASTEXITCODE
+ $q=Get-Content "$vm\ptl-sampler-carriers-v1\report.json" -Raw|ConvertFrom-Json
+ if($report.probe_exit -ne 0 -or !$q.completed -or !$q.passed){throw 'Carrier exploration has failures'}
+ $report.passed=$true
+}catch{$report.error=$_.Exception.Message;$report.error_position=$_.InvocationInfo.PositionMessage}
+finally{$report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');Save-Report}
+Get-Content "$out\report.json";if(!$report.passed){exit 1}

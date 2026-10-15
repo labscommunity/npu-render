@@ -1,0 +1,22 @@
+from pathlib import Path
+import re,ast,hashlib,json
+r=Path('results/render-driver')
+s=(r/'ptl-identity-kernel-v1.c').read_text()
+s=s.replace('unsigned short','__fp16').replace('for (unsigned i = 0; i < 8; ++i) output[i] = input[i];', '''for (unsigned i = 0; i < 8; ++i) {
+        /* Every indexed read stays inside this validated eight-value span. */
+        const unsigned index = (i * 5 + 3) & 7;
+        const __fp16 *bias = (const __fp16 *)load32(params + 40);
+        const float sampled = (float)input[index];
+        const float blended = sampled * 0.5f + (float)bias[0];
+        output[i] = (__fp16)(blended < -2.0f ? -2.0f :
+                            blended > 2.0f ? 2.0f : blended);
+    }''')
+s=s.replace('Bounded experimental entry','Bounded indexed arithmetic experimental entry')
+(r/'ptl-indexed-kernel-v1.c').write_text(s)
+b=(r/'build-ptl-identity-kernel-v1.py').read_text();a=b.index('source=');z=b.index('\nif v.child:',a);b=b[:a]+'source='+repr(s.encode())+b[z:]
+b=b.replace('movitools-kernel-identity-v1','movitools-kernel-indexed-v1')
+(r/'build-ptl-indexed-kernel-v1.py').write_text(b)
+l=(r/'link-ptl-identity-kernel-v1.py').read_text().replace('movitools-kernel-identity','movitools-kernel-indexed')
+(r/'link-ptl-indexed-kernel-v1.py').write_text(l)
+for n in ['build-ptl-indexed-kernel-v1.py','link-ptl-indexed-kernel-v1.py']:ast.parse((r/n).read_text())
+print(json.dumps({'source_sha256':hashlib.sha256(s.encode()).hexdigest(),'addresses':'eight input values only; scalar input; eight outputs','hardware_executed':False}))

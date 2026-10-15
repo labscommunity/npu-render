@@ -1,0 +1,47 @@
+"""Test bit-preserving tensor transport through the previously qualified kernel."""
+from pathlib import Path
+from datetime import UTC,datetime
+import argparse,hashlib,json,os,subprocess,sys,time,traceback
+p=argparse.ArgumentParser();p.add_argument('--child',type=Path);a=p.parse_args();r=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=r/'vm'
+def obj(p):
+ b=p.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+if a.child:
+ import openvino as ov
+ import numpy as np
+ out=a.child;report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,phases=[],raw_words=0)
+ def save():(out/'child-report.json').write_text(json.dumps(report,indent=2)+'\n')
+ try:
+  assert ov.get_version()=='2026.4.1-22982-e213a147257-releases/2026/4';core=ov.Core()
+  for phase,file in [('original-before','original.blob'),('identity-bits','patched.blob'),('original-after','original.blob')]:
+   report['active_phase']=phase;save();blob=(vm/'ptl-custom-identity-v1'/file).read_bytes()
+   expected_hash='d7fc3aa45b0d2449be68a2608cb3e9f958def2982253868d407ff138e0f451d6' if phase=='identity-bits' else '4a6c494f103b730bea94a719a6001bb5344136dc14ec073f451e020558583446';assert hashlib.sha256(blob).hexdigest()==expected_hash
+   model=core.import_model(blob,'NPU');raw=model.get_property('EXECUTION_DEVICES');devices=[raw] if isinstance(raw,str) else list(raw);assert devices in (['NPU'],['NPU.0']);request=model.create_infer_request();checks=[]
+   for iteration in range(257 if phase=='identity-bits' else 8):
+    if phase=='identity-bits':
+     words=(np.array([0,0x8000,1,0x03ff,0x0400,0x3c00,0x7bff,0x7c00,0xfc00,0x7e00,0x7fff,0xfe00,0x3555,0xffff,0x00ff,0xff00],np.uint16) if iteration==0 else np.random.default_rng(9100+iteration).integers(0,65536,16,dtype=np.uint16)).reshape(1,16)
+     data=words.view(np.float16);expected=words
+    else:data=(np.arange(16).reshape(1,16)-8+iteration/4).astype(np.float16);expected=(data+np.float16(1)).astype(np.float16).view(np.uint16)
+    start=time.perf_counter_ns();request.start_async({0:data});assert request.wait_for(10000),'inference deadline';observed=request.get_output_tensor(0).data.copy();elapsed=(time.perf_counter_ns()-start)/1e6
+    assert observed.dtype==np.float16 and observed.shape==(1,16) and np.array_equal(observed.view(np.uint16),expected),'raw tensor bits changed'
+    checks.append(dict(iteration=iteration,elapsed_ms=elapsed,input_sha256=hashlib.sha256(data.tobytes()).hexdigest(),output_sha256=hashlib.sha256(observed.tobytes()).hexdigest()))
+   if phase=='identity-bits':report['raw_words']=257*16
+   report['phases'].append(dict(phase=phase,passed=True,execution_devices=devices,checks=checks));del request,model;save()
+  report['passed']=True
+ except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+ finally:report.update(completed=True,finished=datetime.now(UTC).isoformat());save()
+ print(json.dumps({k:v for k,v in report.items() if k!='phases'}));raise SystemExit(0 if report['passed'] else 1)
+out=vm/'ptl-raw-identity-v1';out.mkdir(exist_ok=False);report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,desktop_changed=False,full_desktop_offload=False,tahoma_tested=False);child=None
+try:
+ q=obj(vm/'ptl-reusable-harness-v1-controller/report.json');assert q['completed'] and q['passed']
+ with (out/'child.stdout.log').open('xb') as stdout,(out/'child.stderr.log').open('xb') as stderr:
+  child=subprocess.Popen([sys.executable,__file__,'--child',str(out)],stdout=stdout,stderr=stderr,creationflags=subprocess.CREATE_NO_WINDOW)
+  try:child.wait(timeout=60)
+  except subprocess.TimeoutExpired:child.kill();child.wait(timeout=5);report['child_timeout']=True
+ report['child_exit']=child.returncode
+ q=obj(out/'child-report.json') if (out/'child-report.json').exists() else {}
+ report.update(raw_word_transport_qualified=bool(q.get('passed')),raw_words=q.get('raw_words'),passed=child.returncode==0 and q.get('passed',False))
+except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+finally:
+ if child is not None and child.poll() is None:child.kill();child.wait(timeout=5)
+ report.update(completed=True,finished=datetime.now(UTC).isoformat());(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(report));raise SystemExit(0 if report['passed'] else 1)

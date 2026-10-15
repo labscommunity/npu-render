@@ -1,0 +1,82 @@
+"""Bounded, isolated hardware experiment for the validated PTL indexed arithmetic kernel."""
+from datetime import UTC,datetime
+from pathlib import Path
+import argparse,hashlib,json,os,struct,subprocess,sys,time,traceback
+from ptl_carrier_contract_v1 import parse,patch
+
+def obj(p):
+ b=p.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+p=argparse.ArgumentParser();p.add_argument('--child',type=Path);v=p.parse_args()
+r=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=r/'vm'
+# The controller may use the old bootstrap Python; inference always uses the
+# same pinned OpenVINO installation as the live desktop and identity proof.
+expected_python=r/'toolchains/openvino-2026.4.1/Scripts/python.exe'
+if str(Path(sys.executable).resolve()).casefold()!=str(expected_python.resolve()).casefold():
+ raise SystemExit(subprocess.run([str(expected_python),__file__,*sys.argv[1:]],check=False).returncode)
+if v.child:
+ import numpy as np
+ import openvino as ov
+ out=v.child;report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,custom_kernel_execution_qualified=False,phases=[])
+ def save():(out/'child-report.json').write_text(json.dumps(report,indent=2)+'\n')
+ try:
+  assert ov.get_version()=='2026.4.1-22982-e213a147257-releases/2026/4','pinned runtime mismatch'
+  core=ov.Core();require_devices=core.available_devices;assert 'NPU' in require_devices
+  report['openvino_version']=ov.get_version();report['device_name']=str(core.get_property('NPU','FULL_DEVICE_NAME'));save()
+  for phase,file in [('unmodified-before','original.blob'),('custom-indexed','patched.blob'),('unmodified-after','original.blob')]:
+   report['active_phase']=phase;save();model=core.import_model((out/file).read_bytes(),'NPU')
+   raw=model.get_property('EXECUTION_DEVICES');devices=[raw] if isinstance(raw,str) else list(raw)
+   assert len(devices)==1 and devices[0] in ('NPU','NPU.0')
+   request=model.create_infer_request();checks=[]
+   for i in range(64):
+    data=(np.arange(16,dtype=np.float32).reshape(1,16)-8+i/4).astype(np.float16) if i<8 else np.random.default_rng(809+i).uniform(-16,16,(1,16)).astype(np.float16)
+    began=time.perf_counter_ns();request.start_async({0:data});assert request.wait_for(10000),'NPU inference fence deadline'
+    output=request.get_output_tensor(0).data.copy()
+    permutation=np.array([3,0,5,2,7,4,1,6])
+    expected=np.clip(data.reshape(2,8).astype(np.float32)[:,permutation]*np.float32(.5)+np.float32(1),-2,2).astype(np.float16).reshape(1,16) if phase=='custom-indexed' else (data+np.float16(1)).astype(np.float16)
+    assert output.dtype==expected.dtype and output.shape==expected.shape
+    if not np.array_equal(output,expected):
+     report['mismatch']=dict(phase=phase,iteration=i,observed=output.flatten().tolist(),expected=expected.flatten().tolist());save();raise AssertionError('NPU output differs from independent oracle')
+    checks.append(dict(iteration=i,exact_components=16,elapsed_ms=(time.perf_counter_ns()-began)/1e6,input_sha256=hashlib.sha256(data.tobytes()).hexdigest(),output_sha256=hashlib.sha256(output.tobytes()).hexdigest(),custom_oracle="clamp(local_permutation(x)*0.5+1,-2,2)"))
+   report['phases'].append(dict(phase=phase,passed=True,execution_devices=devices,exact_components=1024,checks=checks));save()
+   del request,model
+  report['passed']=True;report['custom_kernel_execution_qualified']=True
+ except Exception as e:report.update(error=repr(e),traceback=traceback.format_exc())
+ finally:report.update(completed=True,finished=datetime.now(UTC).isoformat());save()
+ print(json.dumps(report));raise SystemExit(0 if report['passed'] else 1)
+
+out=vm/'ptl-custom-indexed-v1';out.mkdir(exist_ok=False);child=None
+report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,desktop_changed=False,driver_changed=False,custom_kernel_execution_qualified=False,full_desktop_offload=False,tahoma_tested=False)
+def save():(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+try:
+ carrier=obj(vm/'ptl-kernel-carriers-v3/report.json');assert carrier['completed'] and carrier['passed']
+ proof=next(x for x in carrier['cases'] if x['name']=='add1-float16');blob=(vm/'ptl-kernel-carriers-v3/add1-float16.blob').read_bytes()
+ assert hashlib.sha256(blob).hexdigest()==proof['blob_sha256']=='4a6c494f103b730bea94a719a6001bb5344136dc14ec073f451e020558583446'
+ parser_proof=obj(vm/'ptl-carrier-contract-v1-qualification.json');assert parser_proof['passed'] and parser_proof['blob_sha256']==proof['blob_sha256'] and parser_proof['contract_sha256']==hashlib.sha256(Path(__file__).with_name('ptl_carrier_contract_v1.py').read_bytes()).hexdigest()
+ link=obj(vm/'movitools-kernel-indexed-link-v1/5000xx.json');elf=(vm/'movitools-kernel-indexed-link-v1/5000xx.elf').read_bytes()
+ assert link['completed'] and link['passed'] and hashlib.sha256(elf).hexdigest()==link['elf_sha256']=='be83c1f85a86729df29ee7adc5531455ea0669bca993902d0e99f6592c72fc55'
+ assert elf[:7]==b'\x7fELF\x01\x01\x01';h=struct.unpack_from('<16sHHIIIIIHHHHHH',elf)
+ assert h[1:5]==(2,2,1,0x1d000000) and h[11]==40 and 0<h[12]<64 and h[13]<h[12] and h[6]+h[12]*40<=len(elf)
+ sections=[struct.unpack_from('<10I',elf,h[6]+i*40) for i in range(h[12])];s=sections[h[13]];assert s[4]+s[5]<=len(elf);names=elf[s[4]:s[4]+s[5]];texts=[]
+ for s in sections:
+  assert s[0]<len(names) and s[4]+s[5]<=len(elf) and s[1] not in (4,9)
+  name=names[s[0]:].split(b'\0',1)[0]
+  if name==b'.arg.data':assert s[5]==0
+  if name==b'.text':assert s[3]==0x1d000000 and s[2]&4;texts.append(elf[s[4]:s[4]+s[5]])
+ assert len(texts)==1 and len(texts[0])==1280
+ modified,contract=patch(blob,texts[0]);(out/'original.blob').write_bytes(blob);(out/'patched.blob').write_bytes(modified)
+ (out/'carrier-contract.json').write_text(json.dumps(contract,indent=2)+'\n')
+ report.update(original_sha256=hashlib.sha256(blob).hexdigest(),patched_sha256=hashlib.sha256(modified).hexdigest(),kernel_elf_sha256=link['elf_sha256'],replacement_text_bytes=len(texts[0]),non_code_bytes_preserved=True,replica_tiles=3,invocations=6);save()
+ with (out/'child.stdout.log').open('xb') as stdout,(out/'child.stderr.log').open('xb') as stderr:
+  child=subprocess.Popen([sys.executable,__file__,'--child',str(out)],stdout=stdout,stderr=stderr,creationflags=subprocess.CREATE_NO_WINDOW)
+  report['owned_child_pid']=child.pid;save()
+  try:child.wait(timeout=45)
+  except subprocess.TimeoutExpired:report['child_timeout']=True;child.kill();child.wait(timeout=5)
+ report['child_exit']=child.returncode
+ if (out/'child-report.json').exists():report['child_result']=obj(out/'child-report.json')
+ report['passed']=child.returncode==0 and report.get('child_result',{}).get('passed',False)
+ report['custom_kernel_execution_qualified']=report['passed']
+except Exception as e:report.update(error=repr(e),traceback=traceback.format_exc())
+finally:
+ if child is not None and child.poll() is None:child.kill();child.wait(timeout=5)
+ report.update(completed=True,finished=datetime.now(UTC).isoformat());save()
+print(json.dumps(report));raise SystemExit(0 if report['passed'] else 1)

@@ -1,0 +1,76 @@
+{
+  "started": "2026-10-15T05:29:34.619857+00:00",
+  "name": "gather256-sw-one-tile",
+  "completed": true,
+  "passed": true,
+  "custom_kernel_executed": false,
+  "openvino_version": "2026.4.1-22982-e213a147257-releases/2026/4",
+  "device_name": "Intel(R) AI Boost",
+  "config": {
+    "PERFORMANCE_HINT": "LATENCY",
+    "NPU_COMPILATION_MODE": "ReferenceSW",
+    "NPU_TILES": 1
+  },
+  "input_shapes": [
+    [
+      256,
+      4
+    ],
+    [
+      64
+    ]
+  ],
+  "compile_ms": 81.2281,
+  "execution_devices": [
+    "NPU"
+  ],
+  "blob_sha256": "ab4032f6cf98e8d492f73cb0a2f7863859223fac6db3388887bd540d3ee70e67",
+  "blob_bytes": 69768,
+  "checks": [
+    {
+      "iteration": 0,
+      "exact_components": 256,
+      "elapsed_ms": 1.9587,
+      "input_sha256": [
+        "900e64bf04e44c7024fd0e9e1ffc4dcb5154923bc46ac0dec6c40db76a1fe2e9",
+        "7577be175764dcb69025c73979509d1e6f51b7c7aaad3b6db63daae210f33c78"
+      ],
+      "output_sha256": "36225357475392c618ce8bda63117dcdb4eaa1f620bfb45b4a86f88f426d25bf"
+    },
+    {
+      "iteration": 1,
+      "exact_components": 256,
+      "elapsed_ms": 0.243,
+      "input_sha256": [
+        "a7873071bfeeb9a839f8fa169e3f42ae73aeb02b531391a42630f5f8e2f77697",
+        "2de510ded865fa89b358a258e1d0edc747e105f1ee9ef6989e14a1dfa43b6818"
+      ],
+      "output_sha256": "bb8d3b8d857b5f080a916bd505c8f616b2589926cc7d442bdc78ee7bab37bcf0"
+    },
+    {
+      "iteration": 2,
+      "exact_components": 256,
+      "elapsed_ms": 0.1888,
+      "input_sha256": [
+        "8920ad9c2e6faeb7f6661d2d4d04548e04c0e6d21a85504f72d1ba37454607f0",
+        "eb16b9b7ff7c46a9896963ce06129027228d71135c98e0ea5e45a63062222ced"
+      ],
+      "output_sha256": "97bd7c9e65ec0b8192a47a350b9c4006bab9f24499275eb2b73ccd0708560a11"
+    },
+    {
+      "iteration": 3,
+      "exact_components": 256,
+      "elapsed_ms": 0.1787,
+      "input_sha256": [
+        "34c5fa9edd0d5c58bb07399be2b04ec3aee8b99f1c84d81113ffe47c28a49737",
+        "6362121eb449f49398e944c58a188f35dd7c157850aa9faa1e4fd2f484215381"
+      ],
+      "output_sha256": "696c2975e801bd5b3cb10fc8033f2fddc085f90f6511cadf9f6f1d975e1c5851"
+    }
+  ],
+  "software_invocations": [
+    "task.shave.invocation.0.0"
+  ],
+  "dpu_sections": [],
+  "finished": "2026-10-15T05:29:34.835624+00:00"
+}
