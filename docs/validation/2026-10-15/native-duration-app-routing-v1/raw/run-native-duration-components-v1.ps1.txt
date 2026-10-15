@@ -1,0 +1,32 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$vm="$r\vm";$out="$vm\native-duration-components-v1"
+if(Test-Path $out){throw 'Duration component trial exists'};New-Item -ItemType Directory $out|Out-Null
+$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');completed=$false;passed=$false;desktop_changed=$false;driver_installed=$false;long_duration_tested=$false;phases=@()}
+function Save-Report{$report|ConvertTo-Json -Depth 6|Set-Content "$out\report.json"};Save-Report
+try{
+ $deadline=[DateTime]::UtcNow.AddMinutes(180)
+ while($true){
+  $ready=$false;try{$q=Get-Content "$vm\native-uniform-lanes-v1\report.json" -Raw|ConvertFrom-Json;$ready=$q.completed}catch{}
+  if($ready){break};if([DateTime]::UtcNow -gt $deadline){throw 'Earlier rendering trial did not finish'};Start-Sleep -Seconds 3
+ }
+ if(@(Get-Process nr_registered_local_indexed_worker,nr_native_topology,nr_frame_present_probe -ErrorAction SilentlyContinue).Count){throw 'Another graphics experiment is active'}
+ foreach($name in @('native-routing-v41','native-trace-v19','native-topology-control-v12','native-present-v20','native-output-observer-v4')){
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$vm\build-$name.ps1" > "$out\$name.stdout.log" 2> "$out\$name.stderr.log"
+  if($LASTEXITCODE){throw "Duration component build failed: $name"}
+  $report.phases+=@{phase=$name;passed=$true};Save-Report
+ }
+ $python="$r\toolchains\openvino-2026.4.1\Scripts\python.exe"
+ & $python "$vm\test-native-incremental-evidence-v1.py" > "$out\incremental.stdout.jsonl" 2> "$out\incremental.stderr.log"
+ if($LASTEXITCODE){throw 'Incremental evidence Windows contract failed'}
+ $report.phases+=@{phase='incremental_evidence';passed=$true};Save-Report
+ & $python "$vm\qualify-live-frame-reader-v1.py" --exe "$r\builds\native-present-v20\Release\nr_frame_present_probe.exe" --output "$vm\live-frame-reader-v11" > "$out\reader.stdout.log" 2> "$out\reader.stderr.log"
+ if($LASTEXITCODE){throw 'Long-duration presenter frame reader contract failed'}
+ $report.phases+=@{phase='frame_reader';passed=$true};Save-Report
+ & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$vm\qualify-native-broker-v3.ps1" > "$out\broker.stdout.log" 2> "$out\broker.stderr.log"
+ if($LASTEXITCODE){throw 'Long-duration broker ordinary lease contract failed'}
+ $report.phases+=@{phase='broker';passed=$true};Save-Report
+ & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$vm\package-native-driver-v17.ps1" > "$out\package.stdout.log" 2> "$out\package.stderr.log"
+ if($LASTEXITCODE){throw 'Duration package creation failed'}
+ $report.phases+=@{phase='package';passed=$true};$report.passed=$true
+}catch{$report.error=$_.Exception.Message}
+finally{$report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');Save-Report}
+Get-Content "$out\report.json";if(!$report.passed){exit 1}

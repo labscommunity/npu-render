@@ -1,0 +1,65 @@
+--- a/input_stimulus.hpp
++++ b/input_stimulus.hpp
+@@ -2,7 +2,7 @@
+ // SendInput targets only this window; no arbitrary key or screen content is logged.
+ struct InputStimulus {
+     static constexpr ULONG_PTR tag=0x4e505549;
+-    HWND window=nullptr,original_foreground=nullptr;POINT original_cursor{};bool cursor_saved=false,stopped=false,paint_failed=false;unsigned step=0,clicks=0,keys=0,unicode_packets=0,relative_moves=0;bool relative_requested=false,relative_button_sent=false;POINT relative_origin{};bool unicode_pending=false;ULONGLONG unicode_pending_at=0;
++    HWND window=nullptr,original_foreground=nullptr;POINT original_cursor{};bool cursor_saved=false,stopped=false,paint_failed=false;unsigned animation=0,step=0,clicks=0,keys=0,unicode_packets=0,relative_moves=0;bool relative_requested=false,relative_button_sent=false;POINT relative_origin{};bool unicode_pending=false;ULONGLONG unicode_pending_at=0;
+     static void receipt(const char *kind,unsigned step){LARGE_INTEGER qpc{};QueryPerformanceCounter(&qpc);std::printf("{\"input_event\":\"%s\",\"step\":%u,\"qpc\":%lld,\"owned_window\":true}\n",kind,step,qpc.QuadPart);std::fflush(stdout);}
+     static LRESULT CALLBACK procedure(HWND hwnd,UINT message,WPARAM w,LPARAM l){
+         auto *self=reinterpret_cast<InputStimulus *>(GetWindowLongPtrW(hwnd,GWLP_USERDATA));
+@@ -30,7 +30,7 @@
+             if(expected){self->step=2;++self->keys;receipt("key_received",self->step);InvalidateRect(hwnd,nullptr,FALSE);}
+             return 0;
+         }
+-        if(self && message==WM_PAINT){PAINTSTRUCT paint{};const auto dc=BeginPaint(hwnd,&paint);RECT rect{};GetClientRect(hwnd,&rect);const COLORREF colors[]{RGB(30,60,180),RGB(20,180,60),RGB(180,30,80)};const auto brush=CreateSolidBrush(colors[self->step]);FillRect(dc,&rect,brush);DeleteObject(brush);EndPaint(hwnd,&paint);if(!GdiFlush())self->paint_failed=true;receipt("painted",self->step);return 0;}
++        if(self && message==WM_PAINT){PAINTSTRUCT paint{};const auto dc=BeginPaint(hwnd,&paint);RECT rect{};GetClientRect(hwnd,&rect);const COLORREF colors[]{RGB(30,60,180),RGB(20,180,60),RGB(180,30,80)};const unsigned color_step=self->step==2 && self->animation?(self->animation-1)%3:self->step;const auto brush=CreateSolidBrush(colors[color_step]);FillRect(dc,&rect,brush);DeleteObject(brush);EndPaint(hwnd,&paint);if(!GdiFlush())self->paint_failed=true;receipt("painted",self->step);LARGE_INTEGER stamp{};QueryPerformanceCounter(&stamp);std::printf("{\"stimulus_paint_color\":%u,\"animation_sequence\":%u,\"qpc\":%lld}\n",color_step,self->animation,stamp.QuadPart);std::fflush(stdout);return 0;}
+         return DefWindowProcW(hwnd,message,w,l);
+     }
+     explicit InputStimulus(const RECT &area){
+@@ -55,13 +55,13 @@
+     }
+ };
+ int input_stimulus(const wchar_t *directory,const wchar_t *duration){
+-    wchar_t *end=nullptr;const auto seconds=std::wcstoul(duration,&end,10);require(end!=duration && !*end && seconds>=1 && seconds<=585,"input duration rejected");require(nr::present::current_console_default(),"input requires Default console");
++    wchar_t *end=nullptr;const auto seconds=std::wcstoul(duration,&end,10);require(end!=duration && !*end && seconds>=1 && seconds<=2145,"input duration rejected");require(nr::present::current_console_default(),"input requires Default console");
+     require(SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)!=nullptr,"input DPI unavailable");const auto route=nr::live::separated();InputStimulus window(route.indirect);ShowWindow(window.window,SW_SHOWNOACTIVATE);UpdateWindow(window.window);const auto start=GetTickCount64();bool click_sent=false,key_sent=false;unsigned refresh=0;
+     const std::wstring root(directory);const auto cue=[&](const wchar_t *name){return GetFileAttributesW((root+L"\\"+name).c_str())!=INVALID_FILE_ATTRIBUTES;};
+     std::printf("{\"input_ready\":true,\"pid\":%lu,\"indirect_primary\":true,\"cursor_confined\":false}\n",GetCurrentProcessId());std::fflush(stdout);
+     while(!window.stopped && GetTickCount64()-start<uint64_t(seconds)*1000){MSG message{};while(PeekMessageW(&message,nullptr,0,0,PM_REMOVE)){if(message.message==WM_QUIT)window.stopped=true;TranslateMessage(&message);DispatchMessageW(&message);}
+         require(nr::present::current_console_default() && nr::live::same(route,nr::live::separated()),"input desktop changed");
+-        require(!window.paint_failed,"owned GDI batch flush failed");const auto tick=unsigned((GetTickCount64()-start)/15000);if(tick!=refresh){refresh=tick;InvalidateRect(window.window,nullptr,FALSE);UpdateWindow(window.window);}
++        require(!window.paint_failed,"owned GDI batch flush failed");const auto tick=unsigned((GetTickCount64()-start)/15000);if(tick!=refresh){refresh=tick;if(window.step==2)++window.animation;InvalidateRect(window.window,nullptr,FALSE);UpdateWindow(window.window);}
+         if(!click_sent && cue(L"click")){window.click();click_sent=true;}
+         window.continue_relative_click();
+         if(!key_sent && window.step==1 && cue(L"key")){window.key();key_sent=true;}
+--- a/frame_present_probe.cpp
++++ b/frame_present_probe.cpp
+@@ -89,7 +89,7 @@
+     std::printf("{\"display_observation\":true,\"source_sequence\":%llu,\"observed_qpc\":%lld,\"submitted_count_status\":%ld,\"submitted_present_count\":%u,\"statistics_status\":%ld,\"displayed_present_count\":%u,\"present_refresh_count\":%u,\"sync_refresh_count\":%u,\"sync_qpc\":%lld,\"media_status\":%ld,\"media_present_count\":%u,\"media_sync_qpc\":%lld,\"media_composition_mode\":%u,\"residual_gpu_work_measured\":false}\n",static_cast<unsigned long long>(source_sequence),observed.QuadPart,static_cast<long>(count_status),submitted_count,static_cast<long>(stats_status),stats.PresentCount,stats.PresentRefreshCount,stats.SyncRefreshCount,stats.SyncQPCTime.QuadPart,static_cast<long>(media_status),detail.PresentCount,detail.SyncQPCTime.QuadPart,UINT(detail.CompositionMode));std::fflush(stdout);
+ }
+ int live(const wchar_t *path,const wchar_t *duration,const wchar_t *producer){
+-    wchar_t *end=nullptr;const auto seconds=std::wcstoul(duration,&end,10);require(end!=duration && !*end && seconds>=1 && seconds<=550,"live duration rejected");
++    wchar_t *end=nullptr;const auto seconds=std::wcstoul(duration,&end,10);require(end!=duration && !*end && seconds>=1 && seconds<=2100,"live duration rejected");
+     const auto expected_producer=std::wcstoul(producer,&end,10);require(end!=producer && !*end && expected_producer,"live producer rejected");
+     auto frame=read_frame(path);const auto h=frame.header;auto last_header=h;require(h.producer_pid==expected_producer,"live producer mismatch");
+     const auto initial=nr::live::separated();
+@@ -128,7 +128,7 @@
+         auto next=first?std::move(frame):read_frame(path,&last_header);const auto &n=next.header;
+         require(n.producer_pid==expected_producer && n.width==h.width && n.height==h.height && n.format==h.format && n.pixel_bytes==h.pixel_bytes,"live frame identity changed");
+         require(n.sequence>=sequence && n.qpc>=qpc,"live frame sequence regressed");
+-        if(!first && n.sequence==sequence){require(n.qpc==qpc,"live sequence reused");Sleep(100);continue;}
++        if(!first && n.sequence==sequence){require(n.qpc==qpc,"live sequence reused");Sleep(1);continue;}
+         require(first || n.qpc>qpc,"live timestamp did not advance");
+         if(!first){context->UpdateSubresource(source.Get(),0,nullptr,next.pixels.data(),n.row_bytes,UINT(next.pixels.size()));++uploads;}
+         check(swapchain->GetBuffer(0,IID_PPV_ARGS(&back)));if(!first)context->CopyResource(back.Get(),source.Get());
+@@ -142,7 +142,7 @@
+         std::printf("{\"live_frame_presented\":true,\"source_sequence\":%llu,\"source_qpc\":%llu,\"producer_pid\":%u,\"submitted_qpc\":%lld,\"accepted_qpc\":%lld,\"qpc_frequency\":%lld,\"backbuffer_exact\":true,\"pixel_bytes\":%llu,\"scanout_mode_verified\":false}\n",static_cast<unsigned long long>(n.sequence),static_cast<unsigned long long>(n.qpc),n.producer_pid,submitted.QuadPart,accepted.QuadPart,frequency.QuadPart,static_cast<unsigned long long>(n.pixel_bytes));std::fflush(stdout);
+         count_status=swapchain->GetLastPresentCount(&submitted_count);
+         observe_display(swapchain.Get(),media.Get(),n.sequence,submitted_count,count_status);last_observation=GetTickCount64();
+-        sequence=n.sequence;qpc=n.qpc;last_header=n;first=false;Sleep(100);
++        sequence=n.sequence;qpc=n.qpc;last_header=n;first=false;
+     }
+     ShowWindow(window.handle,SW_HIDE);std::printf("{\"completed\":true,\"live_bridge_tested\":true,\"submitted_presents\":%llu,\"source_uploads\":%llu,\"gpu_copy_commands\":%llu,\"readback_copies\":%llu,\"shader_dispatches\":0,\"elapsed_ms\":%llu,\"topology_preserved\":true,\"input_forwarding_tested\":false,\"scanout_mode_verified\":false,\"desktop_offloaded\":false}\n",static_cast<unsigned long long>(presents),static_cast<unsigned long long>(uploads),static_cast<unsigned long long>(presents+readbacks),static_cast<unsigned long long>(readbacks),static_cast<unsigned long long>(GetTickCount64()-start));return 0;
+ 

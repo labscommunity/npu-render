@@ -1,0 +1,69 @@
+{
+  "started": "2026-10-15T02:44:08.980307+00:00",
+  "completed": true,
+  "passed": true,
+  "negative_cases": [
+    "zero-lifetime",
+    "oversized-lifetime",
+    "diagnostic-desktop-scope",
+    "wrong-compositor-identity",
+    "wrong-host-identity",
+    "duplicate-consumer-record"
+  ],
+  "consumers": [
+    {
+      "pid": 7348,
+      "lease_name": "Global\\T8.NpuRender.NativeSession.v3.7348",
+      "lease_sha256": "74df2a37ac1f38e78fc0aa172e1ab015accaf9a56bef5d411fc8859118cdaf57",
+      "scope": 0,
+      "session": 0,
+      "exit_code": 0,
+      "component": {
+        "native_probe_ddi_component": true,
+        "passed": true,
+        "npu_local_executions": 10,
+        "clears": 8,
+        "draws": 2,
+        "cpu_executions": 0,
+        "gpu_executions": 0,
+        "allocation_callbacks_emulated": true,
+        "registered_adapter_tested": false,
+        "desktop_offloaded": false
+      }
+    },
+    {
+      "pid": 1852,
+      "lease_name": "Global\\T8.NpuRender.NativeSession.v3.1852",
+      "lease_sha256": "8d5d640c87d56e7562adb01d8c3e8148a2331f8b64e2aeb522abb8c8e66e852d",
+      "scope": 0,
+      "session": 0,
+      "exit_code": 0,
+      "component": {
+        "native_probe_ddi_component": true,
+        "passed": true,
+        "npu_local_executions": 10,
+        "clears": 8,
+        "draws": 2,
+        "cpu_executions": 0,
+        "gpu_executions": 0,
+        "allocation_callbacks_emulated": true,
+        "registered_adapter_tested": false,
+        "desktop_offloaded": false
+      }
+    }
+  ],
+  "native_consumers": 2,
+  "controller_pid": 20652,
+  "driver_installed": false,
+  "actual_dwm_execution": false,
+  "actual_umdf_execution": false,
+  "desktop_offloaded": false,
+  "process_permissions_modified": true,
+  "worker_pid": 18176,
+  "owned_process_acl_grants": 4,
+  "owned_process_acls_restored_exactly": true,
+  "npu_operation_receipts": 20,
+  "delivery_acknowledgments": 20,
+  "worker_exit_code": 0,
+  "finished": "2026-10-15T02:44:09.874962+00:00"
+}

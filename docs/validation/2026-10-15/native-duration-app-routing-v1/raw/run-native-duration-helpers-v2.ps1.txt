@@ -1,0 +1,32 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$vm="$r\vm";$out="$vm\native-duration-helpers-v2";$observer=$null
+if(Test-Path $out){throw 'Duration helper qualification exists'};New-Item -ItemType Directory $out|Out-Null
+$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');completed=$false;passed=$false;driver_installed=$false;topology_changed=$false;phases=@()}
+function Save-Report{$report|ConvertTo-Json -Depth 6|Set-Content "$out\report.json"};Save-Report
+try{
+ $prior=Get-Content "$vm\native-duration-helpers-v1\report.json" -Raw|ConvertFrom-Json
+ if(!$prior.completed -or $prior.passed -or $prior.error -ne 'Observer did not start'){throw 'Unexpected helper continuation state'}
+ $q=Get-Content "$vm\native-duration-components-v2\report.json" -Raw|ConvertFrom-Json;if(!$q.completed -or !$q.passed){throw 'Duration components not qualified'}
+ if(@(Get-Process nr_registered_local_indexed_worker,nr_uniform_draw_diagnostic,nr_native_topology,nr_frame_present_probe -ErrorAction SilentlyContinue).Count){throw 'Another graphics experiment active'}
+ $build=Get-Content "$r\builds\native-adapter-choice-v1\build-report.json" -Raw|ConvertFrom-Json
+ if(!$build.clean_build -or (Get-FileHash "$r\builds\native-adapter-choice-v1\Release\nr_default_adapter_probe.exe").Hash -ne $build.binary_sha256){throw 'Adapter build identity changed'}
+ $report.phases+=@{phase='adapter_probe_build';passed=$true;reused_verified_build=$true};Save-Report
+ & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$vm\dismiss-native-saver-v3.ps1" > "$out\saver.stdout.log" 2> "$out\saver.stderr.log"
+ if($LASTEXITCODE){throw 'Ordinary screen saver dismissal failed'}
+ & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$vm\start-native-topology-v43.ps1" > "$out\observer43.stdout.log" 2> "$out\observer43.stderr.log"
+ if($LASTEXITCODE){throw 'Default desktop not verified after ordinary screen saver closure'};$observer=43
+ $report.interactive_observer=$observer;Save-Report
+ foreach($name in @('qualify-native-adapter-choice-v1','qualify-native-input-v20','qualify-native-output-observer-v4','qualify-native-cursor-v3')){
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$vm\$name.ps1" > "$out\$name.stdout.log" 2> "$out\$name.stderr.log"
+  if($LASTEXITCODE){throw "Interactive helper failed: $name"};$report.phases+=@{phase=$name;passed=$true};Save-Report
+ }
+ $report.passed=$true
+}catch{$report.error=$_.Exception.Message}
+finally{
+ foreach($n in @(42,43)){
+  if(Test-Path "$vm\native-topology-v$n"){New-Item -ItemType File "$vm\native-topology-v$n\stop" -Force|Out-Null}
+  $task="T8-NpuRender-InspectTopology-V$n";$q=Get-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue
+  if($q){$deadline=[DateTime]::UtcNow.AddSeconds(15);while((Get-ScheduledTask -TaskName $task).State -eq 'Running' -and [DateTime]::UtcNow -lt $deadline){Start-Sleep -Milliseconds 200};Stop-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue;Unregister-ScheduledTask -TaskName $task -Confirm:$false}
+ }
+ $report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');Save-Report
+}
+Get-Content "$out\report.json";if(!$report.passed){exit 1}

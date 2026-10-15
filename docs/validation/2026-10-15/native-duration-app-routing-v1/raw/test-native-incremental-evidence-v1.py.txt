@@ -1,0 +1,87 @@
+"""Exercise partial publication, exact counting and failed append-only contracts."""
+from pathlib import Path
+import json
+import tempfile
+from native_incremental_evidence_v1 import JsonlTail, NativeEvidence
+
+
+def append(path, rows):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open('ab') as stream:
+        stream.write(b''.join(json.dumps(row).encode() + b'\r\n' for row in rows))
+
+
+def rejects(action):
+    try:
+        action()
+    except (RuntimeError, ValueError):
+        return
+    raise AssertionError('Invalid evidence accepted')
+
+
+with tempfile.TemporaryDirectory() as directory:
+    root = Path(directory)
+    path = root / 'tail.jsonl'
+    tail = JsonlTail(path, chunk_bytes=64, line_bytes=32)
+    assert tail.poll() == []
+    path.write_bytes(b'\xef\xbb\xbf{"a":')
+    assert tail.poll() == [] and tail.records == 0
+    with path.open('ab') as stream:
+        stream.write(b'1}\r\nwarning\n{"b":2}\n')
+    assert tail.poll() == [{'a': 1}, {'b': 2}]
+    assert tail.poll() == [] and tail.records == 2
+    append(path, [{'n': n} for n in range(100)])
+    values = []
+    while True:
+        values.extend(tail.poll())
+        if not tail.backlog:
+            break
+    assert values == [{'n': n} for n in range(100)]
+    assert tail.offset == path.stat().st_size and tail.records == 102
+    path.write_bytes(b'')
+    rejects(tail.poll)
+    replaced = root / 'replacement.jsonl'
+    replaced.write_bytes(b'{"n":1}\n')
+    replacing = JsonlTail(replaced)
+    assert replacing.poll() == [{'n': 1}]
+    other = root / 'other.jsonl'
+    other.write_bytes(b'{"n":2}\n')
+    other.replace(replaced)
+    rejects(replacing.poll)
+    malformed = root / 'malformed.jsonl'
+    malformed.write_bytes(b'{bad}\n')
+    rejects(JsonlTail(malformed).poll)
+    oversized = root / 'oversized.jsonl'
+    oversized.write_bytes(b'{' + b'a' * 32)
+    rejects(JsonlTail(oversized, chunk_bytes=64, line_bytes=32).poll)
+    parent = root / 'native/worker.stdout.jsonl'
+    host = root / 'host.jsonl'
+    child1 = root / 'native/provider-processes/generation-1/worker.stdout.jsonl'
+    child2 = root / 'native/provider-processes/generation-2/worker.stdout.jsonl'
+    evidence = NativeEvidence(parent.parent, host)
+    evidence.poll()
+    append(parent, [dict(local_worker_ready=True), dict(provider_process_started=True),
+                    dict(passed=True, execution_device='NPU', client_pid=5), dict(worker_success=True, client_pid=5)])
+    append(host, [dict(event='driver_entry'), dict(event='assigned', preferred_selected=True),
+                  dict(event='frame_readback', status='00000000')])
+    append(child1, [dict(passed=True, execution_device='NPU')])
+    evidence.poll()
+    first = evidence.snapshot(5, 6)
+    assert evidence.ready and first['npu_receipts'] == first['delivery_acknowledgments'] == first['hardware_child_receipts'] == 1
+    assert first['actual_dwm_npu_execution'] and not first['actual_umdf_npu_execution']
+    evidence.poll()
+    assert evidence.snapshot(5, 6) == first
+    append(parent, [dict(provider_process_failure=True), dict(provider_process_started=True),
+                    dict(provider_process_response=True, attempt=1), dict(passed=True, execution_device='NPU', client_pid=6),
+                    dict(worker_success=True, client_pid=6), dict(passed=False, execution_device='NPU', client_pid=5)])
+    append(child2, [dict(passed=True, execution_device='NPU'), dict(passed=False, execution_device='NPU')])
+    evidence.poll()
+    result = evidence.snapshot(5, 6)
+    assert result['npu_receipts'] == result['delivery_acknowledgments'] == result['hardware_child_receipts'] == 2
+    assert result['provider_generations'] == 2 and result['provider_faults'] == result['provider_retries'] == 1
+    assert result['actual_umdf_npu_execution'] and result['successful_frame_readback']
+    assert result['evidence_bytes_read'] == sum(p.stat().st_size for p in (parent, host, child1, child2))
+    child1.unlink()
+    rejects(evidence.poll)
+print(json.dumps(dict(incremental_evidence_contract=True, partial_lines=True, exact_counts=True,
+                      truncation_and_replacement_rejected=True, bounded_reads=True, passed=True)))

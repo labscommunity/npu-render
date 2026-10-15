@@ -1,0 +1,56 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$vm="$r\vm";$out="$vm\native-duration-components-v2"
+if(Test-Path $out){throw 'Duration continuation already exists'};New-Item -ItemType Directory $out|Out-Null
+$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');completed=$false;passed=$false;desktop_changed=$false;driver_installed=$false;long_duration_tested=$false;prior_trial='native-duration-components-v1';phases=@()}
+function Save-Report{$report|ConvertTo-Json -Depth 8|Set-Content "$out\report.json"};Save-Report
+function Verify-Build($name,$receipt,$singleBinary){
+ $expected=Get-Content "$vm\$name-source.json" -Raw|ConvertFrom-Json
+ $proof=Get-Content "$r\builds\$name\$receipt" -Raw|ConvertFrom-Json
+ if(!$proof.clean_build){throw "Clean build absent: $name"}
+ if(@($expected.psobject.Properties).Count -ne @($proof.source_sha256.psobject.Properties).Count){throw "Build source set changed: $name"}
+ foreach($f in $expected.psobject.Properties){
+  if((Get-FileHash "$vm\$name\$($f.Name)").Hash -ne $f.Value -or $proof.source_sha256.($f.Name) -ne $f.Value){throw "Build source identity changed: $name"}
+ }
+ if($singleBinary){if((Get-FileHash "$r\builds\$name\Release\$singleBinary").Hash -ne $proof.binary_sha256){throw "Binary identity changed: $name"}}
+ else{
+  if(!$proof.admission_contract_passed){throw "Admission contract absent: $name"}
+  foreach($f in $proof.binary_sha256.psobject.Properties){if((Get-FileHash "$r\builds\$name\Release\$($f.Name)").Hash -ne $f.Value){throw "Binary identity changed: $name"}}
+ }
+ Copy-Item "$r\builds\$name\$receipt" "$out\$name-build.json"
+ $report.phases+=@{phase=$name;passed=$true;reused_verified_clean_build=$true};Save-Report
+}
+try{
+ $deadline=[DateTime]::UtcNow.AddMinutes(180)
+ while($true){
+  $ready=$false;try{$q=Get-Content "$vm\native-texture-scope-v1\report.json" -Raw|ConvertFrom-Json;$ready=$q.completed}catch{}
+  if($ready){break};if([DateTime]::UtcNow -gt $deadline){throw 'Earlier timing trial did not finish'};Start-Sleep -Seconds 3
+ }
+ if(@(Get-Process nr_registered_local_indexed_worker,nr_native_topology,nr_frame_present_probe -ErrorAction SilentlyContinue).Count){throw 'Another graphics experiment is active'}
+ $prior=Get-Content "$vm\native-duration-components-v1\report.json" -Raw|ConvertFrom-Json
+ if(!$prior.completed -or $prior.passed -or $prior.error -ne 'Atomic frame notification contract failed'){throw 'Unexpected prior continuation state'}
+ $notification=Get-Content "$vm\native-frame-notifications-v2\report.json" -Raw|ConvertFrom-Json
+ if(!$notification.completed -or !$notification.passed -or !$notification.shared_delete_reader_used){throw 'Corrected notification contract absent'}
+ Copy-Item "$vm\native-frame-notifications-v2\report.json" "$out\notification-report.json"
+ Verify-Build 'native-routing-v41' 'registered-build-report.json' $null
+ Verify-Build 'native-trace-v19' 'registered-build-report.json' $null
+ Verify-Build 'native-topology-control-v12' 'build-report.json' 'nr_native_topology.exe'
+ Verify-Build 'native-present-v20' 'build-report.json' 'nr_frame_present_probe.exe'
+ $report.phases+=@{phase='frame_notification_shared_reader';passed=$true};Save-Report
+ & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$vm\build-native-output-observer-v4.ps1" > "$out\native-output-observer-v4.stdout.log" 2> "$out\native-output-observer-v4.stderr.log"
+ if($LASTEXITCODE){throw 'Output observer build failed'}
+ $report.phases+=@{phase='native-output-observer-v4';passed=$true};Save-Report
+ $python="$r\toolchains\openvino-2026.4.1\Scripts\python.exe"
+ & $python "$vm\test-native-incremental-evidence-v1.py" > "$out\incremental.stdout.jsonl" 2> "$out\incremental.stderr.log"
+ if($LASTEXITCODE){throw 'Incremental evidence Windows contract failed'}
+ $report.phases+=@{phase='incremental_evidence';passed=$true};Save-Report
+ & $python "$vm\qualify-live-frame-reader-v1.py" --exe "$r\builds\native-present-v20\Release\nr_frame_present_probe.exe" --output "$vm\live-frame-reader-v11" > "$out\reader.stdout.log" 2> "$out\reader.stderr.log"
+ if($LASTEXITCODE){throw 'Long-duration presenter frame reader contract failed'}
+ $report.phases+=@{phase='frame_reader';passed=$true};Save-Report
+ & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$vm\qualify-native-broker-v3.ps1" > "$out\broker.stdout.log" 2> "$out\broker.stderr.log"
+ if($LASTEXITCODE){throw 'Long-duration broker ordinary lease contract failed'}
+ $report.phases+=@{phase='broker';passed=$true};Save-Report
+ & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$vm\package-native-driver-v17.ps1" > "$out\package.stdout.log" 2> "$out\package.stderr.log"
+ if($LASTEXITCODE){throw 'Duration package creation failed'}
+ $report.phases+=@{phase='package';passed=$true};$report.passed=$true
+}catch{$report.error=$_.Exception.Message}
+finally{$report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');Save-Report}
+Get-Content "$out\report.json";if(!$report.passed){exit 1}

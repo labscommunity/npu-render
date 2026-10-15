@@ -1,0 +1,31 @@
+"""Prepare bounded thirty-minute trial prerequisites; no desktop admission."""
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver')
+assets=[('native-routing-v41','native-routing-v39'),('native-trace-v19','native-trace-v18'),('native-topology-control-v12','native-topology-control-v11'),('native-present-v20','native-present-v19'),('native-output-observer-v4','native-output-observer-v3')]
+for name,base in assets:
+ d=r/name;shutil.copytree(r/base,d)
+ if name in ('native-routing-v41','native-trace-v19'):
+  lab=d/'native/windows/registered_lab'
+  p=lab/'native_probe_lease.hpp';s=p.read_text();assert s.count('r.scope?900000u:120000u')==1
+  s=s.replace('r.scope?900000u:120000u','r.scope?2400000u:120000u',1);p.write_text(s)
+  p=lab/'native_probe_lease_test.cpp';s=p.read_text().replace('+900000','+2400000');p.write_text(s)
+  p=lab/'indexed_exchange_protocol.hpp';s=p.read_text();assert s.count('max_requests=4096')==1;s=s.replace('max_requests=4096','max_requests=65536',1);p.write_text(s)
+  if name=='native-routing-v41':
+   p=lab/'local_indexed_worker.cpp';s=p.read_text();assert s.count('seconds<=1800')==1;p.write_text(s.replace('seconds<=1800','seconds<=2400',1))
+   p=lab/'provider_process.hpp';s=p.read_text();assert s.count('4096 1800')==1;p.write_text(s.replace('4096 1800','65536 2400',1))
+ elif name=='native-topology-control-v12':
+  p=d/'topology.cpp';s=p.read_text();assert s.count('seconds<=600')==1;p.write_text(s.replace('seconds<=600','seconds<=2160').replace('1..600 seconds','1..2160 seconds'))
+ elif name=='native-present-v20':
+  p=d/'frame_present_probe.cpp';s=p.read_text();assert s.count('seconds<=550')==1;p.write_text(s.replace('seconds<=550','seconds<=2100'))
+  p=d/'input_stimulus.hpp';s=p.read_text();assert s.count('seconds<=585')==1;p.write_text(s.replace('seconds<=585','seconds<=2145'))
+ elif name=='native-output-observer-v4':
+  p=d/'observer.cpp';s=p.read_text();assert s.count('seconds<=550')==1;p.write_text(s.replace('seconds<=550','seconds<=2100'))
+ (r/(name+'-source.json')).write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+ with tarfile.open(r/(name+'.tar.gz'),'w:gz') as t:t.add(d,arcname=name)
+ (r/('build-'+name+'.ps1')).write_text((r/('build-'+base+'.ps1')).read_text().replace(base,name))
+for source,dest,old,new in [('native_session_broker_v2.py','native_session_broker_v3.py','milliseconds<=900000','milliseconds<=2400000'),('relay_native_frames_v5.py','relay_native_frames_v6.py','v.seconds<=600','v.seconds<=2160'),('cursor_recovery_watchdog_v1.py','cursor_recovery_watchdog_v2.py','v.seconds<=720','v.seconds<=2400')]:
+ s=(r/source).read_text();assert s.count(old)==1;(r/dest).write_text(s.replace(old,new))
+s=(r/'run-native-topology-helper-v11.ps1').read_text().replace('control-v11','control-v12').replace('ValidateRange(1,600)','ValidateRange(1,2160)').replace('-Minutes 12','-Minutes 40');(r/'run-native-topology-helper-v12.ps1').write_text(s)
+(r/'native-duration-v2-plan.json').write_text(json.dumps(dict(prepared_only=True,hardware_executed=False,desktop_admitted=False,lease_max_ms=2400000,worker_seconds_max=2400,request_budget=65536,topology_seconds_max=2160,presenter_seconds_max=2100,scope_zero_lease_ms_unchanged=120000,remaining=['build and validate lease/packet contracts','package new UMD with existing qualified kernel','bind new bounded controller and recovery deadlines','disable full request recording for sustained measurement','short registered and live qualification before long admission','measure thirty continuous minutes after first physical presentation']),indent=2)+'\n')
+print('Prepared finite forty-minute lease and helper ceilings; no controller, package, build or admission yet.')

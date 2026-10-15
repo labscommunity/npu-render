@@ -1,0 +1,43 @@
+"""A finite wait hint for atomic frame publication in a local Windows directory."""
+import ctypes as C
+from ctypes import wintypes as W
+
+k = C.WinDLL('kernel32', use_last_error=True)
+for name, arguments, result in (
+    ('FindFirstChangeNotificationW', [W.LPCWSTR, W.BOOL, W.DWORD], W.HANDLE),
+    ('FindNextChangeNotification', [W.HANDLE], W.BOOL),
+    ('FindCloseChangeNotification', [W.HANDLE], W.BOOL),
+    ('WaitForSingleObject', [W.HANDLE, W.DWORD], W.DWORD),
+):
+    function = getattr(k, name)
+    function.argtypes = arguments
+    function.restype = result
+
+
+class FrameNotification:
+    def __init__(self, directory):
+        self.handle = k.FindFirstChangeNotificationW(str(directory.resolve()), False, 0x19)
+        if self.handle is None or self.handle == W.HANDLE(-1).value:
+            self.handle = None
+            raise C.WinError(C.get_last_error())
+        self.notifications = 0
+
+    def wait(self, milliseconds=100):
+        if self.handle is None or not 1 <= milliseconds <= 100:
+            raise ValueError('Invalid bounded frame wait')
+        result = k.WaitForSingleObject(self.handle, milliseconds)
+        if result == 258:
+            return False
+        if result != 0:
+            raise C.WinError(C.get_last_error())
+        # Rearm only after a signaled wait. A timeout must retry that wait.
+        if not k.FindNextChangeNotification(self.handle):
+            raise C.WinError(C.get_last_error())
+        self.notifications += 1
+        return True
+
+    def close(self):
+        if self.handle is not None:
+            handle, self.handle = self.handle, None
+            if not k.FindCloseChangeNotification(handle):
+                raise C.WinError(C.get_last_error())

@@ -1,0 +1,18 @@
+--- a/topology.cpp
++++ b/topology.cpp
+@@ -95,13 +95,13 @@
+ int wmain(int argc,wchar_t **argv)try{
+  if(argc==4&&!std::wcscmp(argv[1],L"--cursor-contract"))return cursor_contract(argv[2],argv[3]);
+  if(argc==2&&!std::wcscmp(argv[1],L"--contract")){extension_contract();return 0;}
+- require(argc==2||argc==3||argc==4,"expected --inspect, --validate-extend or --extend <1..600 seconds>");require(nr::present::current_console_default(),"unlocked Default console required");
++ require(argc==2||argc==3||argc==4,"expected --inspect, --validate-extend or --extend <1..2160 seconds>");require(nr::present::current_console_default(),"unlocked Default console required");
+  const auto before=query(QDC_ONLY_ACTIVE_PATHS),all=query(QDC_ALL_PATHS);print("before",before);print("available",all);
+  if(argc==2&&!std::wcscmp(argv[1],L"--inspect"))return 0;
+  const bool pointer=argc==4 && !std::wcscmp(argv[1],L"--primary-cursor");
+  const bool primary=pointer || !std::wcscmp(argv[1],L"--primary") || !std::wcscmp(argv[1],L"--validate-primary");
+  const bool apply=pointer || (argc==3&&(!std::wcscmp(argv[1],L"--extend")||!std::wcscmp(argv[1],L"--primary")));require(apply||(argc==2&&(!std::wcscmp(argv[1],L"--validate-extend")||!std::wcscmp(argv[1],L"--validate-primary"))),"mode rejected");
+- wchar_t *end=nullptr;const auto seconds=apply?std::wcstoul(argv[2],&end,10):0;require(!apply||(end!=argv[2]&&!*end&&seconds>=1&&seconds<=600),"duration rejected");
++ wchar_t *end=nullptr;const auto seconds=apply?std::wcstoul(argv[2],&end,10):0;require(!apply||(end!=argv[2]&&!*end&&seconds>=1&&seconds<=2160),"duration rejected");
+  auto desired=extension(before,all,primary);print("requested",desired);const auto validation=set(desired,SDC_VALIDATE|SDC_ALLOW_CHANGES);std::printf("{\"validation_status\":%ld,\"display_changed\":false}\n",validation);std::fflush(stdout);require(validation==ERROR_SUCCESS,"extension validation failed");if(!apply)return 0;
+  auto restore=before;bool passed=false;PrimaryEscape escape(primary);std::unique_ptr<WindowPlacements> windows;if(primary)windows=std::make_unique<WindowPlacements>();
+  std::unique_ptr<CursorConfinement> cursor;if(pointer)cursor=std::make_unique<CursorConfinement>(RECT{0,0,1024,768},argv[3]);

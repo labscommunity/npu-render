@@ -1,0 +1,46 @@
+"""Remove diagnostic frame pacing ceilings using finite Windows change waits."""
+from pathlib import Path
+import hashlib
+import json
+import tarfile
+
+r = Path('results/render-driver')
+d = r / 'native-present-v20'
+p = d / 'frame_present_probe.cpp'
+s = p.read_text()
+begin = s.index('int live(')
+end = s.index('struct Stimulus', begin)
+block = s[begin:end]
+assert block.count('Sleep(100)') in (0, 2)
+block = block.replace('Sleep(100);continue;', 'Sleep(1);continue;', 1)
+block = block.replace('first=false;Sleep(100);', 'first=false;', 1)
+assert 'Sleep(100)' not in block
+s = s[:begin] + block + s[end:]
+p.write_text(s)
+(r / 'native-present-v20-source.json').write_text(json.dumps({p.relative_to(d).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()}, indent=2) + '\n')
+with tarfile.open(r / 'native-present-v20.tar.gz', 'w:gz') as archive:
+    archive.add(d, arcname=d.name)
+
+s = (r / 'relay_native_frames_v6.py').read_text()
+s = s.replace('from native_frame_io_v1 import', 'from native_frame_notification_v1 import FrameNotification\nfrom native_frame_io_v1 import', 1)
+s = s.replace('last=None', 'last=None;change=None', 1)
+needle = "source=Path(__import__('os').environ['ProgramData'])/'T8-NpuRender-NativeIddV1'/f'latest-frame-{host.identity.pid}.bin';deadline=time.perf_counter()+v.seconds"
+assert s.count(needle) == 1
+s = s.replace(needle, needle + """
+ change=FrameNotification(source.parent)
+ report['frame_wait']='directory change notification, 100ms maximum cancellation wait';report['change_notifications']=0;save()
+ first_observation=True""", 1)
+needle = '  time.sleep(.1)\n  for peer in peers:peer.verify()'
+assert s.count(needle) == 1
+s = s.replace(needle, """  if not first_observation:
+   change.wait(100);report['change_notifications']=change.notifications
+  first_observation=False
+  for peer in peers:peer.verify()""", 1)
+assert s.count('time.sleep(.1);continue') == 1
+s = s.replace('time.sleep(.1);continue', 'continue', 1)
+s = s.replace("report['producer_and_compositor_verified']=True;save();time.sleep(.1)", "report['producer_and_compositor_verified']=True;save()", 1)
+s = s.replace('finally:\n for peer in peers:peer.close()', 'finally:\n if change is not None:change.close()\n for peer in peers:peer.close()', 1)
+assert 'time.sleep(.1)' not in s
+compile(s, 'relay_native_frames_v7.py', 'exec')
+(r / 'relay_native_frames_v7.py').write_text(s)
+print('Prepared event-driven relay and removed presenter fixed update sleep; no measured frame-rate claim.')

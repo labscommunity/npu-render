@@ -1,0 +1,57 @@
+--- /dev/null
++++ b/CMakeLists.txt
+@@ -0,0 +1,10 @@
++cmake_minimum_required(VERSION 3.25)
++project(npu_render_adapter_choice LANGUAGES CXX)
++if(NOT WIN32 OR NOT MSVC)
++    message(FATAL_ERROR "Windows MSVC is required")
++endif()
++add_executable(nr_default_adapter_probe adapter_choice.cpp)
++target_compile_features(nr_default_adapter_probe PRIVATE cxx_std_17)
++target_compile_options(nr_default_adapter_probe PRIVATE /W4 /WX)
++target_link_libraries(nr_default_adapter_probe PRIVATE d3d11 dxgi)
++set_property(TARGET nr_default_adapter_probe PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+--- /dev/null
++++ b/adapter_choice.cpp
+@@ -0,0 +1,41 @@
++#define WIN32_LEAN_AND_MEAN
++#include <windows.h>
++#include <d3d11.h>
++#include <dxgi1_2.h>
++#include <wrl/client.h>
++#include <cstdio>
++#include <initializer_list>
++#include <stdexcept>
++using Microsoft::WRL::ComPtr;
++void check(HRESULT result) {if(FAILED(result))throw std::runtime_error("adapter observation failed");}
++void describe(const char *kind,UINT index,const DXGI_ADAPTER_DESC1 &description) {
++    std::printf("{\"adapter_observation\":\"%s\",\"index\":%u,\"luid_low\":%lu,\"luid_high\":%ld,\"vendor_id\":%u,\"device_id\":%u,\"software\":%s}\n",
++        kind,index,description.AdapterLuid.LowPart,description.AdapterLuid.HighPart,
++        description.VendorId,description.DeviceId,(description.Flags&DXGI_ADAPTER_FLAG_SOFTWARE)?"true":"false");
++}
++int main() try {
++    DWORD session=0;if(!ProcessIdToSessionId(GetCurrentProcessId(),&session))throw std::runtime_error("session identity unavailable");
++    std::printf("{\"adapter_probe_started\":true,\"pid\":%lu,\"session\":%lu,\"explicit_native_lease\":false}\n",GetCurrentProcessId(),session);
++    ComPtr<IDXGIFactory1> factory;check(CreateDXGIFactory1(IID_PPV_ARGS(&factory)));
++    unsigned adapters=0;
++    for(UINT index=0;;++index) {
++        ComPtr<IDXGIAdapter1> adapter;const auto result=factory->EnumAdapters1(index,&adapter);
++        if(result==DXGI_ERROR_NOT_FOUND)break;check(result);
++        DXGI_ADAPTER_DESC1 description{};check(adapter->GetDesc1(&description));describe("enumerated",index,description);++adapters;
++    }
++    for(const bool compatible:{false,true}) {
++        const D3D_FEATURE_LEVEL levels[]{D3D_FEATURE_LEVEL_10_0};D3D_FEATURE_LEVEL selected{};
++        ComPtr<ID3D11Device> device;ComPtr<ID3D11DeviceContext> context;
++        const auto result=D3D11CreateDevice(nullptr,D3D_DRIVER_TYPE_HARDWARE,nullptr,0,
++            compatible?levels:nullptr,compatible?1u:0u,D3D11_SDK_VERSION,&device,&selected,&context);
++        std::printf("{\"default_device_request\":true,\"feature_level_10_only\":%s,\"hresult\":\"%08lx\",\"device_created\":%s,\"feature_level\":%u}\n",
++            compatible?"true":"false",static_cast<unsigned long>(result),SUCCEEDED(result)?"true":"false",unsigned(selected));
++        if(SUCCEEDED(result)) {
++            ComPtr<IDXGIDevice> dxgi;check(device.As(&dxgi));ComPtr<IDXGIAdapter> adapter;check(dxgi->GetAdapter(&adapter));
++            ComPtr<IDXGIAdapter1> identified;check(adapter.As(&identified));DXGI_ADAPTER_DESC1 description{};check(identified->GetDesc1(&description));
++            describe(compatible?"default-feature-10":"default-feature-list",0,description);
++        }
++    }
++    std::printf("{\"adapter_probe_completed\":true,\"passed\":true,\"adapters\":%u,\"graphics_draws_submitted\":0,\"npu_execution_qualified\":false}\n",adapters);
++    return 0;
++} catch(const std::exception &error) {std::fprintf(stderr,"%s\n",error.what());return 1;}

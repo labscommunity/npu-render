@@ -1,0 +1,57 @@
+--- a/native/windows/registered_lab/native_probe_lease.hpp
++++ b/native/windows/registered_lab/native_probe_lease.hpp
+@@ -51,7 +51,7 @@
+     return !std::memcmp(GetSidIdentifierAuthority(sid),&nt,sizeof(nt)) && *GetSidSubAuthority(sid,0)==90 && *GetSidSubAuthority(sid,1)==0 && *GetSidSubAuthority(sid,2)==r.consumer.session;
+ }
+ inline bool shape_valid(const Lease &r, uint64_t now, DWORD pid, uint64_t created, DWORD session) {
+-    const auto maximum=r.scope?900000u:120000u;
++    const auto maximum=r.scope?2400000u:120000u;
+     if(r.magic!=signature || r.version!=3 || r.bytes!=sizeof(Lease) || r.scope>2 || !sid_valid(r) ||
+        !r.issued_tick || r.issued_tick>now || r.deadline_tick<=now || r.deadline_tick<=r.issued_tick || r.deadline_tick-r.issued_tick>maximum ||
+        r.consumer.pid!=pid || r.consumer.created!=created || r.consumer.session!=session || !(r.nonce[0] || r.nonce[1]))return false;
+--- a/native/windows/registered_lab/native_probe_lease_test.cpp
++++ b/native/windows/registered_lab/native_probe_lease_test.cpp
+@@ -77,8 +77,8 @@
+     for(unsigned kind=0;kind<6;++kind){auto value=base;switch(kind){case 0:value.sid_bytes=0;break;case 1:value.sid_bytes=69;break;case 2:value.consumer_sid[0]=0;break;case 3:value.consumer_sid[1]=16;break;case 4:value.consumer_sid[67]=1;break;case 5:value.desktop_session=1;break;}check(!n::shape_valid(value,10000,3,19,4));++shape_cases;}
+     auto desktop=base;desktop.scope=1;desktop.desktop_session=4;desktop.controller.session=desktop.worker.session=0;desktop.consumer.session=4;
+     PSID dwm_sid=nullptr;check(ConvertStringSidToSidW(L"S-1-5-90-0-4",&dwm_sid)!=FALSE);desktop.sid_bytes=GetLengthSid(dwm_sid);std::memset(desktop.consumer_sid,0,sizeof(desktop.consumer_sid));check(CopySid(sizeof(desktop.consumer_sid),desktop.consumer_sid,dwm_sid)!=FALSE);LocalFree(dwm_sid);
+-    check(n::shape_valid(desktop,10000,3,19,4));++shape_cases;desktop.deadline_tick=desktop.issued_tick+900000;check(n::shape_valid(desktop,10000,3,19,4));++shape_cases;++desktop.deadline_tick;check(!n::shape_valid(desktop,10000,3,19,4));++shape_cases;desktop.deadline_tick=11000;desktop.scope=0;check(!n::shape_valid(desktop,10000,3,19,4));++shape_cases;
+-    auto host=base;host.scope=2;host.desktop_session=4;host.controller.session=host.worker.session=host.consumer.session=0;host.deadline_tick=host.issued_tick+900000;
++    check(n::shape_valid(desktop,10000,3,19,4));++shape_cases;desktop.deadline_tick=desktop.issued_tick+2400000;check(n::shape_valid(desktop,10000,3,19,4));++shape_cases;++desktop.deadline_tick;check(!n::shape_valid(desktop,10000,3,19,4));++shape_cases;desktop.deadline_tick=11000;desktop.scope=0;check(!n::shape_valid(desktop,10000,3,19,4));++shape_cases;
++    auto host=base;host.scope=2;host.desktop_session=4;host.controller.session=host.worker.session=host.consumer.session=0;host.deadline_tick=host.issued_tick+2400000;
+     PSID host_sid=nullptr;check(ConvertStringSidToSidW(L"S-1-5-19",&host_sid)!=FALSE);host.sid_bytes=GetLengthSid(host_sid);std::memset(host.consumer_sid,0,sizeof(host.consumer_sid));check(CopySid(sizeof(host.consumer_sid),host.consumer_sid,host_sid)!=FALSE);LocalFree(host_sid);
+     check(n::shape_valid(host,10000,3,19,0));++shape_cases;
+     for(unsigned kind=0;kind<7;++kind){auto value=host;switch(kind){case 0:value.desktop_session=0;break;case 1:value.desktop_session=UINT32_MAX;break;case 2:value.consumer.session=1;break;case 3:value.controller.session=1;break;case 4:value.worker.session=1;break;case 5:value.scope=1;break;case 6:++value.deadline_tick;break;}check(!n::shape_valid(value,10000,3,19,0));++shape_cases;}
+--- a/native/windows/registered_lab/indexed_exchange_protocol.hpp
++++ b/native/windows/registered_lab/indexed_exchange_protocol.hpp
+@@ -12,7 +12,7 @@
+ #include <stdexcept>
+ namespace nr::registered_lab::indexed_exchange {
+ constexpr uint64_t magic = 0x4e525f4452415731ull;
+-constexpr uint32_t legacy_packet_bytes=32u*1024*1024, max_packet_bytes=64u*1024*1024, max_requests=4096;
++constexpr uint32_t legacy_packet_bytes=32u*1024*1024, max_packet_bytes=64u*1024*1024, max_requests=65536;
+ struct Header {
+     uint64_t signature = magic, nonce[2]{};
+     uint32_t abi = 1, width = 0, height = 0, vertices = 0, format = 0, flags = 0;
+--- a/native/windows/registered_lab/local_indexed_worker.cpp
++++ b/native/windows/registered_lab/local_indexed_worker.cpp
+@@ -37,7 +37,7 @@
+     wchar_t *end = nullptr; const auto limit = std::wcstoul(argv[2], &end, 10);
+     ex::require(end != argv[2] && !*end && limit && limit <= ex::max_requests);
+     const std::wstring name = argv[1]; ex::require(stream::pipe_name_valid(name));
+-    end=nullptr;const auto seconds=std::wcstoul(argv[3],&end,10);ex::require(end!=argv[3] && !*end && seconds>=60 && seconds<=1800);
++    end=nullptr;const auto seconds=std::wcstoul(argv[3],&end,10);ex::require(end!=argv[3] && !*end && seconds>=60 && seconds<=2400);
+     const auto deadline=GetTickCount64()+uint64_t(seconds)*1000;
+     std::unique_ptr<nr::registered_lab::NativeCompositorPeer> compositor;
+     if(argc>=6)compositor=std::make_unique<nr::registered_lab::NativeCompositorPeer>(DWORD(nr::registered_lab::NativeCompositorPeer::number(argv[4],UINT32_MAX)),nr::registered_lab::NativeCompositorPeer::number(argv[5],UINT64_MAX),argc==7?1u:0u);
+--- a/native/windows/registered_lab/provider_process.hpp
++++ b/native/windows/registered_lab/provider_process.hpp
+@@ -72,7 +72,7 @@
+         std::vector<wchar_t> executable(32768);const auto length=GetModuleFileNameW(nullptr,executable.data(),DWORD(executable.size()));
+         require(length && length<executable.size(),"provider executable identity unavailable");
+         const std::wstring image(executable.data(),length);
+-        std::wstring command=L"\""+image+L"\" \""+pipe_+L"\" 4096 1800";
++        std::wstring command=L"\""+image+L"\" \""+pipe_+L"\" 65536 2400";
+         auto environment=child_environment(current_/L"failed-request.bin");
+         SECURITY_ATTRIBUTES attributes{sizeof(SECURITY_ATTRIBUTES),nullptr,TRUE};
+         Handle output(CreateFileW((current_/L"worker.stdout.jsonl").c_str(),GENERIC_WRITE,FILE_SHARE_READ,&attributes,CREATE_NEW,FILE_ATTRIBUTE_NORMAL,nullptr));

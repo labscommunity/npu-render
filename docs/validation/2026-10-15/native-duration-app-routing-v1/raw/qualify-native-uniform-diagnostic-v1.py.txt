@@ -1,0 +1,52 @@
+"""Separate changed graph semantics from NPU lowering on one failed real draw."""
+from datetime import UTC, datetime
+from pathlib import Path
+import hashlib,json,os,subprocess,traceback
+import numpy as np
+
+root=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=root/'vm';out=vm/'native-uniform-diagnostic-v1-evidence';out.mkdir(exist_ok=False)
+binary=root/'builds/native-routing-v44/Release/nr_uniform_draw_diagnostic.exe'
+capture=vm/'native-desktop-admission-v37/bootstrap/requests';packet=capture/'request-00000140.bin'
+report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,diagnostic_only=True,desktop_changed=False,candidate_qualified=False,phases=[])
+def save():(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+def obj(path):
+ b=path.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+def rows(path):return [json.loads(s) for s in path.read_text(encoding='utf-8-sig').splitlines() if s.startswith('{') and s.endswith('}')]
+def differences(left,right):
+ a=np.frombuffer(left,dtype=np.uint8);b=np.frombuffer(right,dtype=np.uint8);assert a.size==b.size==20736000
+ delta=np.abs(a.astype(np.int16)-b.astype(np.int16));pixels=np.any(a.reshape(-1,4)!=b.reshape(-1,4),axis=1)
+ return dict(exact=left==right,different_components=int(np.count_nonzero(delta)),different_pixels=int(np.count_nonzero(pixels)),maximum_channel_difference=int(delta.max()),channel_difference_histogram=np.bincount(delta,minlength=256).tolist())
+save()
+try:
+ proof=obj(binary.parent.parent/'registered-build-report.json');assert proof['clean_build']
+ assert hashlib.sha256(binary.read_bytes()).hexdigest()==proof['binary_sha256'][binary.name].lower()
+ report['binary_sha256']=proof['binary_sha256'][binary.name]
+ assert hashlib.sha256(packet.read_bytes()).hexdigest()=='ada6344306c97780331888e96a9f357c49834efd67264a86173e0887d1123080'
+ reference=[r['pixels_sha256'] for r in rows(capture/'index.jsonl') if r.get('provider_response_recorded') and r['ticket']==140];assert len(reference)==1
+ env={k:v for k,v in os.environ.items() if not k.startswith('NR_RENDER_')}
+ env['PATH']=str(root/'toolchains/openvino-2026.4.1/Lib/site-packages/openvino/libs')+os.pathsep+env.get('PATH','')
+ env.update(NR_RENDER_NPU_CACHE=str(vm/'model-cache-2026-4-v209'),NR_RENDER_SHARED_CORE='1',NR_RENDER_SHARED_QUEUE='1',NR_RENDER_MEMORY_CACHE='1',NR_RENDER_MEMORY_CACHE_CAPACITY='512',NR_RENDER_GENERIC_BATCH='4096',NR_RENDER_COMPACT_COVERAGE='0',NR_RENDER_OPAQUE_CROP='1',NR_RENDER_INFER_TRACE='0',NR_RENDER_COMPILE_TRACE='0',NR_RENDER_INFER_PROFILE='0',NR_RENDER_UNIFORM_LANES='1')
+ baseline={}
+ for device,mask in [('CPU',0),('CPU',7),('NPU',0),('NPU',7),('NPU',1),('NPU',2),('NPU',9)]:
+  phase=f'{device}-mask-{mask}';report['active_phase']=phase;save();env['NR_RENDER_UNIFORM_LANE_MASK']=str(mask)
+  destination=out/(phase+'.bin')
+  with (out/(phase+'.stdout.log')).open('xb') as stdout,(out/(phase+'.stderr.log')).open('xb') as stderr:
+   p=subprocess.run([str(binary),str(packet),device,str(destination)],env=env,stdout=stdout,stderr=stderr,timeout=600,creationflags=subprocess.CREATE_NO_WINDOW)
+  assert p.returncode==0,phase
+  proofs=[r for r in rows(out/(phase+'.stdout.log')) if r.get('recorded_draw_diagnostic')];assert len(proofs)==1 and proofs[0]['passed'] and proofs[0]['execution_device']==device
+  data=destination.read_bytes();assert len(data)==20736000
+  if mask==0:baseline[device]=data
+  entry=dict(phase=phase,mask=mask,proof=proofs[0],pixel_sha256=hashlib.sha256(data).hexdigest(),comparison_to_same_backend_baseline=differences(data,baseline[device]))
+  entry['matches_original_recording']=entry['pixel_sha256']==reference[0]
+  if device=='NPU':entry['comparison_to_cpu_baseline']=differences(data,baseline['CPU'])
+  if device=='NPU' and mask==0:assert entry['matches_original_recording'],'Diagnostic NPU baseline differs from recorded worker'
+  if device=='NPU' and mask==7:
+   original=(vm/'native-uniform-lanes-v2-warm-B/reply.bin').read_bytes()[128:]
+   entry['matches_failed_candidate']=data==original
+   assert entry['matches_failed_candidate'],'Diagnostic failed to reproduce the original candidate mismatch'
+  report['phases'].append(entry);save()
+ report['cpu_baseline_vs_npu_baseline']=differences(baseline['CPU'],baseline['NPU'])
+ report['passed']=True
+except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+finally:report.update(completed=True,finished=datetime.now(UTC).isoformat());save()
+print(json.dumps({k:v for k,v in report.items() if k!='phases'}));raise SystemExit(0 if report['passed'] else 1)

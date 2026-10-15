@@ -125,6 +125,17 @@ windows and pointer state after 1,107 acknowledged NPU operations and 35 matchin
 physical submissions. Controlled input responses are 20.645 seconds and 0.567
 seconds in an instrumented trial. Neither is a responsiveness qualification.
 
+The [short duration and application-routing investigation](../validation/2026-10-15/native-duration-app-routing-v1/README.md)
+qualifies the bounded duration components, incremental evidence collection,
+notification-driven relay and registered v23. Live v28 completes 1,536
+acknowledged NPU operations and exact ordinary restoration, but only 31 matching
+physical submissions over 512 seconds. One actual device loss takes 63 seconds
+to recover. The native renderer becomes adapter zero, and ordinary unleased
+default Direct3D device creation fails. A separately leased default-adapter
+application proof and a thirty-minute native trial are next; neither establishes
+automatic admission for all applications. This remains a prototype with a large
+responsiveness and compatibility gap, not a near-term usable switch.
+
 The [independent batching and sharing checks](../validation/2026-10-15/native-batch-sharing-v1/README.md)
 pass, and the [combined correctness and matched cost investigation](../validation/2026-10-15/native-combined-cost-v1/README.md)
 is complete. All available references match across six full replays. Larger batches
@@ -142,20 +153,25 @@ Reported binding bytes are not measured host-copy or device-bus traffic.
 Keeping uniform shader expressions scalar passes 9.44 million checked components
 in each CPU/NPU baseline/candidate configuration, but the recorded candidate
 differs at ticket 140. It remains excluded from desktop admission. A diagnostic
-separates each graph transformation and compares both providers on that captured
-draw before attributing the mismatch to semantics or compiler lowering.
+now reproduces the mismatch: CPU baseline/candidate match all 20,736,000 output
+components, while scalar constant-buffer lookup changes three NPU components by
+one byte each. The NPU baseline also differs from CPU in 141 components. This
+narrows the investigation without qualifying the candidate or changing the pixel
+acceptance contract.
 
 The diagnostic relay and presenter also impose fixed 100 ms waits. Those waits
 prevent a 30 fps bridge even if rendering becomes faster. An event-driven relay
-and a presenter without the fixed post-present wait are prepared, but their live
-behavior remains unqualified. Directory notifications are wake-up hints; frame
+and a presenter without the fixed post-present wait pass live v28 integration;
+that trial remains very slow. The presenter still polls unchanged frames every
+millisecond. A message-aware notification wait is prepared separately to remove
+that host work, with no measured speed or power claim yet. Directory notifications are wake-up hints; frame
 identity, completeness and monotonicity checks remain required.
 [Microsoft: directory notifications](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-findfirstchangenotificationw),
 [rearming notification waits](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-findnextchangenotification).
 
-The tested native lease implementation caps desktop admission at fifteen minutes.
-A bounded forty-minute ceiling, incremental evidence collection, matching recovery
-deadlines, and short/long controllers are prepared for qualification. The long
+The bounded forty-minute lease ceiling, incremental evidence collection and
+matching recovery deadlines now pass component and short native integration.
+The long
 trial requires advancing presentation timestamps and an independent physical-output
 color observation after thirty minutes, followed by exact ordinary restoration.
 Prepared code and parser checks do not satisfy the duration gate.

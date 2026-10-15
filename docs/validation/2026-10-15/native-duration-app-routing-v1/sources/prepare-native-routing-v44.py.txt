@@ -1,0 +1,29 @@
+"""Isolate uniform transformations on a captured draw; no candidate promotion."""
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'native-routing-v44';shutil.copytree(r/'native-routing-v43',d);lab=d/'native/windows/registered_lab'
+p=lab/'vertex_executor.cpp';s=p.read_text();needle='        const auto scalar=[&]';assert s.count(needle)==1
+s=s.replace(needle,'''        unsigned uniform_mask=7;char *mask_setting=nullptr;size_t mask_length=0;
+        if(_dupenv_s(&mask_setting,&mask_length,"NR_RENDER_UNIFORM_LANE_MASK"))throw std::runtime_error("uniform mask unavailable");
+        if(mask_setting){const std::string value(mask_setting);std::free(mask_setting);check(!value.empty() && value.size()<=2 && value.find_first_not_of("0123456789")==std::string::npos);uniform_mask=unsigned(std::stoul(value));check(uniform_mask<=15);}
+'''+needle,1)
+s=s.replace('selected_count=scalar(condition) && scalar(yes) && scalar(no)?1u:count;', 'selected_count=(uniform_mask&2) && scalar(condition) && scalar(yes) && scalar(no)?1u:count;',1)
+s=s.replace('lookup_count=scalar(index)?1u:count;', 'lookup_count=(uniform_mask&1) && scalar(index)?1u:count;',1)
+s=s.replace('lookup_count=scalar(chunk)?1u:count;', 'lookup_count=(uniform_mask&4) && scalar(chunk)?1u:count;',1)
+needle='                for (unsigned c = 0; c < 4; ++c) raw[c] = {lane(f, c), lane(i, c)};';assert s.count(needle)==1
+s=s.replace(needle,needle+'''
+                if(uniform_lanes && (uniform_mask&8))for(auto &component:raw){component.floating=batch(component.floating);component.integer=batch(component.integer);}
+''',1);p.write_text(s)
+shutil.copyfile(r/'uniform-draw-diagnostic-v1.cpp',lab/'uniform_draw_diagnostic.cpp')
+p=lab/'CMakeLists.txt';p.write_text(p.read_text()+'''
+add_executable(nr_uniform_draw_diagnostic uniform_draw_diagnostic.cpp)
+target_compile_features(nr_uniform_draw_diagnostic PRIVATE cxx_std_17)
+target_compile_options(nr_uniform_draw_diagnostic PRIVATE /W4 /WX)
+target_link_libraries(nr_uniform_draw_diagnostic PRIVATE nr_registered_vertex)
+set_property(TARGET nr_uniform_draw_diagnostic PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+''')
+(r/'native-routing-v44-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-routing-v44.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-native-routing-v41.ps1').read_text().replace('native-routing-v41','native-routing-v44').replace('--target nr_registered_provider_memory_cache_test','--target nr_uniform_draw_diagnostic nr_registered_uniform_lanes_test nr_registered_provider_memory_cache_test').replace("@('nr_registered_provider_memory_cache_test.exe'","@('nr_uniform_draw_diagnostic.exe','nr_registered_uniform_lanes_test.exe','nr_registered_provider_memory_cache_test.exe'")
+(r/'build-native-routing-v44.ps1').write_text(s)
+print('Prepared per-transform uniform diagnostic and CPU/NPU captured-draw probe.')

@@ -1,0 +1,10 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$name='native-adapter-choice-v1';$source="$r\vm\$name";$b="$r\builds\$name";$log="$r\vm\build-$name.log"
+if((Test-Path $source) -or (Test-Path $b)){throw 'Adapter probe build already exists'}
+& tar -xf "$r\vm\$name.tar.gz" -C "$r\vm";if($LASTEXITCODE){throw 'Archive extraction failed'}
+$expected=Get-Content "$r\vm\$name-source.json" -Raw|ConvertFrom-Json
+foreach($f in $expected.psobject.Properties){if((Get-FileHash "$source\$($f.Name)").Hash -ne $f.Value){throw 'Source mismatch'}}
+$env:CMAKE_BUILD_PARALLEL_LEVEL='4';$ErrorActionPreference='Continue'
+& cmake -S $source -B $b -A x64 *> $log;$code=$LASTEXITCODE
+if(!$code){& cmake --build $b --config Release --clean-first *>> $log;$code=$LASTEXITCODE}
+$ErrorActionPreference='Stop';Get-Content $log -Tail 6;if($code){throw 'Adapter choice probe build failed'}
+[ordered]@{clean_build=$true;source_sha256=$expected;binary_sha256=(Get-FileHash "$b\Release\nr_default_adapter_probe.exe").Hash;executed=$false;desktop_changed=$false}|ConvertTo-Json -Depth 6|Set-Content "$b\build-report.json"

@@ -1,0 +1,92 @@
+--- a/native/windows/registered_lab/CMakeLists.txt
++++ b/native/windows/registered_lab/CMakeLists.txt
+@@ -380,3 +380,9 @@
+ target_compile_options(nr_quad_batch_probe PRIVATE /W4 /WX)
+ target_link_libraries(nr_quad_batch_probe PRIVATE nr_registered_vertex)
+ set_property(TARGET nr_quad_batch_probe PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
++
++add_executable(nr_uniform_draw_diagnostic uniform_draw_diagnostic.cpp)
++target_compile_features(nr_uniform_draw_diagnostic PRIVATE cxx_std_17)
++target_compile_options(nr_uniform_draw_diagnostic PRIVATE /W4 /WX)
++target_link_libraries(nr_uniform_draw_diagnostic PRIVATE nr_registered_vertex)
++set_property(TARGET nr_uniform_draw_diagnostic PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+--- a/native/windows/registered_lab/vertex_executor.cpp
++++ b/native/windows/registered_lab/vertex_executor.cpp
+@@ -124,6 +124,9 @@
+         bool uniform_lanes=false;char *uniform_setting=nullptr;size_t uniform_length=0;
+         if(_dupenv_s(&uniform_setting,&uniform_length,"NR_RENDER_UNIFORM_LANES"))throw std::runtime_error("uniform lane setting unavailable");
+         if(uniform_setting){const std::string value(uniform_setting);std::free(uniform_setting);check(value=="0" || value=="1");uniform_lanes=value=="1" && program.stage==Stage::pixel;}
++        unsigned uniform_mask=7;char *mask_setting=nullptr;size_t mask_length=0;
++        if(_dupenv_s(&mask_setting,&mask_length,"NR_RENDER_UNIFORM_LANE_MASK"))throw std::runtime_error("uniform mask unavailable");
++        if(mask_setting){const std::string value(mask_setting);std::free(mask_setting);check(!value.empty() && value.size()<=2 && value.find_first_not_of("0123456789")==std::string::npos);uniform_mask=unsigned(std::stoul(value));check(uniform_mask<=15);}
+         const auto scalar=[&](const Node &value){check(bool(value));const auto shape=value->get_output_shape(0);
+             return uniform_lanes && (shape.empty() || shape==ov::Shape{1} || shape==ov::Shape{1,1});};
+         const auto batch_shape = indices({int64_t(count), 1});
+@@ -136,7 +139,7 @@
+         auto choose = [&](const Node &condition, const Node &yes, const Node &no) -> Node {
+             // Keep the existing integer-index selection contract. A one-element
+             // condition and alternatives need one selection, not one per pixel.
+-            const uint32_t selected_count=scalar(condition) && scalar(yes) && scalar(no)?1u:count;
++            const uint32_t selected_count=(uniform_mask&2) && scalar(condition) && scalar(yes) && scalar(no)?1u:count;
+             const auto selected_shape=indices({int64_t(selected_count),1});
+             const auto widen=[&](const Node &value)->Node{return std::make_shared<op::Broadcast>(value,selected_shape);};
+             const auto alternate=std::make_shared<op::Reshape>(std::make_shared<op::Convert>(
+@@ -161,7 +164,7 @@
+                     // need another lowering and are explicitly rejected here.
+                     check(bool(relative)); index = std::make_shared<op::Add>(index, relative);
+                 }
+-                const uint32_t lookup_count=scalar(index)?1u:count;
++                const uint32_t lookup_count=(uniform_mask&1) && scalar(index)?1u:count;
+                 index=std::make_shared<op::Reshape>(lookup_count==1?index:batch(index),indices({int64_t(lookup_count)}),false);
+                 // The 2026.4 NPU compiler miscomputes LogicalAnd for these
+                 // integer-index comparisons. Combine exact 0/1 integer masks,
+@@ -185,6 +188,8 @@
+                 const auto f = std::make_shared<op::Gather>(padded_f, safe, integer(0));
+                 const auto i = std::make_shared<op::Gather>(padded_i, safe, integer(0));
+                 for (unsigned c = 0; c < 4; ++c) raw[c] = {lane(f, c), lane(i, c)};
++                if(uniform_lanes && (uniform_mask&8))for(auto &component:raw){component.floating=batch(component.floating);component.integer=batch(component.integer);}
++
+             } else check(false);
+             Lanes result{};
+             for (unsigned c = 0; c < 4; ++c) {
+@@ -445,7 +450,7 @@
+             for(unsigned step=0;step<4;++step){
+                 const auto chunk=std::make_shared<op::Minimum>(std::make_shared<op::Maximum>(
+                     std::make_shared<op::Subtract>(amount,integer(int32_t(step*8))),integer(0)),integer(8));
+-                const uint32_t lookup_count=scalar(chunk)?1u:count;
++                const uint32_t lookup_count=(uniform_mask&4) && scalar(chunk)?1u:count;
+                 const auto lookup_shape=indices({int64_t(lookup_count),1});
+                 const auto index=std::make_shared<op::Reshape>(lookup_count==1?chunk:batch(chunk),indices({int64_t(lookup_count)}),false);
+                 std::vector<float> scales(9);for(unsigned n=0;n<9;++n)scales[n]=std::ldexp(1.f,-int(n));
+--- /dev/null
++++ b/native/windows/registered_lab/uniform_draw_diagnostic.cpp
+@@ -0,0 +1,29 @@
++// Replay one recorded general-texture draw directly on an explicit provider.
++// This diagnostic does not admit a desktop, change routing, or display pixels.
++#include "indexed_exchange_protocol.hpp"
++#include "provider_compile_statistics.hpp"
++#include <chrono>
++#include <fstream>
++#include <cstdio>
++namespace ex=nr::registered_lab::indexed_exchange;
++int main(int argc,char **argv)try{
++ ex::require(argc==4);const std::string device(argv[2]);ex::require(device=="CPU" || device=="NPU");
++ std::ifstream file(argv[1],std::ios::binary|std::ios::ate);ex::require(bool(file));const auto length=file.tellg();
++ ex::require(length>=80 && length<=ex::max_packet_bytes);file.seekg(0);std::vector<uint8_t> bytes(size_t(length),0);
++ file.read(reinterpret_cast<char*>(bytes.data()),length);ex::require(bool(file));const auto request=ex::decode(bytes);const auto &h=request.header;
++ ex::require((h.flags&0x2000) && h.vertices && h.vertices<=4095 && !(h.vertices%3));
++ uint32_t capacity=3;while(capacity<h.vertices)capacity=(std::min)(4095u,capacity*2);
++ const auto batch=ex::triangle_batch(request,nr::shader::RegisterExecutor::preferred_raster_batch(request.pixel));
++ const auto start=std::chrono::steady_clock::now();
++ nr::raster::TriangleTextureDrawExecutor executor(request.vertex,request.pixel,capacity,h.width,h.height,h.format,
++   request.resources,request.samplers,device,ex::blend_mode(h),uint8_t((h.flags>>8)&15),static_cast<nr::raster::CullMode>((h.flags>>5)&3),(h.flags&128)!=0,batch);
++ const auto result=executor.execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,
++   request.resources,request.background,request.scissor,request.blend_constant);
++ ex::require(result.execution_device==device && result.pixels.size()==size_t(h.width)*h.height);
++ std::ifstream exists(argv[3],std::ios::binary);ex::require(!exists);exists.close();
++ std::ofstream output(argv[3],std::ios::binary);ex::require(bool(output));output.write(reinterpret_cast<const char*>(result.pixels.data()),std::streamsize(result.pixels.size()*4));output.close();ex::require(bool(output));
++ const auto elapsed=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-start).count();
++ std::printf("{\"recorded_draw_diagnostic\":true,\"execution_device\":\"%s\",\"width\":%u,\"height\":%u,\"vertex_capacity\":%u,\"batch\":%u,\"pixel_bytes\":%llu,\"provider_requests\":%llu,\"draw_ms\":%.3f,\"compile_and_draw_ms\":%.3f,\"desktop_changed\":false,\"passed\":true}\n",
++  device.c_str(),h.width,h.height,capacity,batch,static_cast<unsigned long long>(result.pixels.size()*4),static_cast<unsigned long long>(result.provider_requests),result.timings.total_ms,elapsed);
++ return 0;
++}catch(const std::exception &error){std::fprintf(stderr,"%s\n",error.what());return 1;}

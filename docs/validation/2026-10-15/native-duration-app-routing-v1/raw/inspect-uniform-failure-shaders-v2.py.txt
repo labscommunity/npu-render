@@ -1,0 +1,23 @@
+from pathlib import Path
+import os,struct,hashlib,json,importlib.util
+r=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm';capture=r/'native-desktop-admission-v37/bootstrap/requests';out=r/'native-uniform-failure-shaders-v2';out.mkdir(exist_ok=False)
+spec=importlib.util.spec_from_file_location('inventory',Path(os.environ['LOCALAPPDATA'])/'Temp/npu-graphics-probe-0146a2388f25/inventory_windows_compositor_shaders.py');mod=importlib.util.module_from_spec(spec);spec.loader.exec_module(mod);dis=mod.Disassembler(Path(os.environ['SystemRoot'])/'System32/d3dcompiler_47.dll')
+system=Path(os.environ['SystemRoot'])/'System32';containers=[]
+for module in ['dwmcore.dll','d2d1.dll','dcomp.dll']:
+ path=system/module;data=path.read_bytes()
+ for offset,container,_ in mod.containers(data):
+  for i in range(struct.unpack_from('<I',container,28)[0]):
+   pos=struct.unpack_from('<I',container,32+i*4)[0];tag,n=struct.unpack_from('<4sI',container,pos)
+   if tag in [b'SHDR',b'SHEX']:containers.append((container[pos+8:pos+8+n],container,module))
+def matched_dis(raw):
+ for tokens,container,module in containers:
+  if tokens==raw:return dict(module=module,text=dis(container))
+ container=b'DXBC'+bytes(16)+struct.pack('<IIII',1,44+len(raw),1,36)+b'SHDR'+struct.pack('<I',len(raw))+raw
+ return dict(matched=False,text=dis(container))
+index={x['ticket']:x for x in map(json.loads,(capture/'index.jsonl').read_text(encoding='utf-8-sig').splitlines()) if x.get('request_recorded')};records=[]
+for ticket in [140]:
+ entry=index[ticket];data=(capture/entry['file']).read_bytes();assert hashlib.sha256(data).hexdigest()==entry['sha256'];h=struct.unpack_from('<3Q14I',data);abi,w,height,vertices,fmt,flags,vlen,plen=h[3:11];legacy=h[-1] if abi>=16 else abi;at=80+24+(16 if legacy==15 else 0)+(16 if flags&4 else 0);record=dict(ticket=ticket,abi=abi,width=w,height=height,vertices=vertices,flags=flags,request_sha256=entry['sha256'],shaders={})
+ for stage,count in [('vertex',vlen),('pixel',plen)]:
+  raw=data[at:at+count*4];at+=count*4;container=b'DXBC'+bytes(16)+struct.pack('<IIII',1,44+len(raw),1,36)+b'SHDR'+struct.pack('<I',len(raw))+raw;record['shaders'][stage]=dict(sha256=hashlib.sha256(raw).hexdigest(),disassembly=matched_dis(raw),tokens=list(struct.unpack('<'+'I'*count,raw)))
+ records.append(record)
+(out/'report.json').write_text(json.dumps(dict(pixel_data_exported=False,cases=records),indent=2)+'\n');print(json.dumps(dict(pixel_data_exported=False,cases=[dict(ticket=x['ticket'],shaders={k:dict(sha256=v['sha256'],disassembly=v['disassembly']) for k,v in x['shaders'].items()}) for x in records])))

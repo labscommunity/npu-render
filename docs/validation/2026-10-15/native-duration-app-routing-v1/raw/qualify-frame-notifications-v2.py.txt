@@ -1,0 +1,91 @@
+"""Exercise real Windows atomic publication, coalescing, timeout and cleanup."""
+from datetime import UTC, datetime
+from pathlib import Path
+import json
+import os
+import tempfile
+import threading
+import time
+import traceback
+from native_frame_notification_v1 import FrameNotification
+from native_frame_io_v1 import open_shared_frame, k, C, W, statistics
+
+out = Path(os.environ['LOCALAPPDATA']) / 'npu-render/vm/native-frame-notifications-v2'
+out.mkdir(exist_ok=False)
+report = dict(started=datetime.now(UTC).isoformat(), completed=False, passed=False,
+              desktop_changed=False, rendering_tested=False, cases=[])
+watcher = None
+k.ReadFile.argtypes=[W.HANDLE,W.LPVOID,W.DWORD,C.POINTER(W.DWORD),W.LPVOID]
+k.ReadFile.restype=W.BOOL
+
+def published_bytes(path):
+    handle=open_shared_frame(path)
+    if handle is None:
+        return None
+    try:
+        buffer=C.create_string_buffer(128);count=W.DWORD()
+        if not k.ReadFile(handle,buffer,128,C.byref(count),None):
+            raise C.WinError(C.get_last_error())
+        return buffer.raw[:count.value]
+    finally:
+        k.CloseHandle(handle)
+
+try:
+    with tempfile.TemporaryDirectory(dir=out) as temporary:
+        root = Path(temporary)
+        frame = root / 'latest.bin'
+        watcher = FrameNotification(root)
+        assert not watcher.wait(1)
+        for case in ('atomic-replace', 'coalesced-publications', 'after-timeout'):
+            # Drain pending directory events; each successful wait rearms once.
+            deadline = time.perf_counter() + 2
+            while watcher.wait(1):
+                assert time.perf_counter() < deadline
+            assert not watcher.wait(10)
+            target = (case + '-complete').encode()
+            failures = []
+
+            def publish():
+                try:
+                    time.sleep(.02)
+                    for payload in ([b'first', b'second', target] if case == 'coalesced-publications' else [target]):
+                        staged = root / 'next.tmp'
+                        staged.write_bytes(payload)
+                        staged.replace(frame)
+                except BaseException as error:
+                    failures.append(repr(error))
+
+            publisher = threading.Thread(target=publish)
+            publisher.start()
+            observed = False
+            signaled = 0
+            deadline = time.perf_counter() + 2
+            while time.perf_counter() < deadline:
+                signaled += watcher.wait(100)
+                try:
+                    observed = published_bytes(frame) == target
+                except FileNotFoundError:
+                    observed = False
+                if observed:
+                    break
+            publisher.join(timeout=2)
+            assert not publisher.is_alive() and not failures and observed and signaled > 0
+            report['cases'].append(dict(case=case, published_bytes_exact=True, notifications=signaled))
+        watcher.close()
+        watcher.close()
+        rejected = False
+        try:
+            watcher.wait(1)
+        except ValueError:
+            rejected = True
+        assert rejected
+        report.update(passed=True, wait_after_close_rejected=True, frame_io_statistics=statistics, shared_delete_reader_used=True)
+except Exception as error:
+    report.update(error=repr(error), traceback=traceback.format_exc())
+finally:
+    if watcher is not None:
+        watcher.close()
+    report.update(completed=True, finished=datetime.now(UTC).isoformat())
+    (out / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
+print(json.dumps(report))
+raise SystemExit(0 if report['passed'] else 1)

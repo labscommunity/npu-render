@@ -1,0 +1,11 @@
+{
+  "started": "2026-10-15T02:27:56.628218+00:00",
+  "completed": true,
+  "passed": false,
+  "desktop_changed": false,
+  "rendering_tested": false,
+  "cases": [],
+  "error": "PermissionError(13, 'Permission denied')",
+  "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\qualify-frame-notifications-v1.py\", line 50, in <module>\n    observed = frame.read_bytes() == target\n               ^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\tatef\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\pathlib.py\", line 1019, in read_bytes\n    with self.open(mode='rb') as f:\n         ^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\tatef\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\pathlib.py\", line 1013, in open\n    return io.open(self, mode, buffering, encoding, errors, newline)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nPermissionError: [Errno 13] Permission denied: 'C:\\\\Users\\\\tatef\\\\AppData\\\\Local\\\\npu-render\\\\vm\\\\native-frame-notifications-v1\\\\tmpshrlr42f\\\\latest.bin'\n",
+  "finished": "2026-10-15T02:27:56.717397+00:00"
+}

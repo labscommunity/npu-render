@@ -1,0 +1,26 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$vm="$r\vm";$out="$vm\native-duration-short-v2"
+if(Test-Path $out){throw 'Short duration integration exists'};New-Item -ItemType Directory $out|Out-Null
+$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');completed=$false;passed=$false;full_desktop_offload=$false;tahoma_tested=$false;phases=@()}
+function Save-Report{$report|ConvertTo-Json -Depth 5|Set-Content "$out\report.json"};Save-Report
+try{
+ $deadline=[DateTime]::UtcNow.AddMinutes(120)
+ while($true){$ready=$false;try{$q=Get-Content "$vm\native-duration-helpers-v2\report.json" -Raw|ConvertFrom-Json;$ready=$q.completed}catch{};if($ready){break};if([DateTime]::UtcNow -gt $deadline){throw 'Interactive qualification did not finish'};Start-Sleep -Seconds 3}
+ if(!$q.passed){throw 'Interactive helpers not qualified'}
+ foreach($mode in @('stage','render')){
+  $report.active_phase=$mode;Save-Report
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$vm\run-native-registration-v23.ps1" -Mode $mode > "$out\$mode.stdout.log" 2> "$out\$mode.stderr.log"
+  if($LASTEXITCODE){throw "Registration phase failed: $mode"}
+  $name=if($mode -eq 'stage'){'native-registration-stage-v17'}else{'native-registration-v23'}
+  $q=Get-Content "$vm\$name\report.json" -Raw|ConvertFrom-Json
+  if(!$q.completed -or !$q.passed -or !$q.cleanup_passed){throw "Registration did not restore baseline: $mode"}
+  $report.phases+=@{phase=$mode;passed=$true;cleanup_passed=$true};Save-Report
+ }
+ $report.active_phase='native-live-v28';Save-Report
+ & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$vm\run-native-live-v28.ps1" > "$out\live.stdout.log" 2> "$out\live.stderr.log"
+ if($LASTEXITCODE){throw 'Short desktop integration failed'}
+ $q=Get-Content "$vm\native-live-v28\report.json" -Raw|ConvertFrom-Json
+ if(!$q.completed -or !$q.passed -or !$q.cleanup_passed){throw 'Short desktop evidence incomplete'}
+ $report.phases+=@{phase='native-live-v28';passed=$true;cleanup_passed=$true};$report.passed=$true
+}catch{$report.error=$_.Exception.Message}
+finally{$report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');Save-Report}
+Get-Content "$out\report.json";if(!$report.passed){exit 1}

@@ -1,0 +1,15 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$vm="$r\vm";$out="$vm\native-uniform-diagnostic-v1"
+if(Test-Path $out){throw 'Uniform diagnostic exists'};New-Item -ItemType Directory $out|Out-Null
+$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');completed=$false;passed=$false;desktop_changed=$false;diagnostic_only=$true;phases=@()}
+function Save-Report{$report|ConvertTo-Json -Depth 5|Set-Content "$out\report.json"};Save-Report
+try{
+ $deadline=[DateTime]::UtcNow.AddMinutes(180)
+ while($true){$ready=$false;try{$q=Get-Content "$vm\native-duration-components-v2\report.json" -Raw|ConvertFrom-Json;$ready=$q.completed}catch{};if($ready){break};if([DateTime]::UtcNow -gt $deadline){throw 'Predecessor did not finish'};Start-Sleep -Seconds 3}
+ if(@(Get-Process nr_registered_local_indexed_worker,nr_native_topology,nr_frame_present_probe -ErrorAction SilentlyContinue).Count){throw 'Another graphics experiment active'}
+ & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$vm\build-native-routing-v44.ps1" > "$out\build.stdout.log" 2> "$out\build.stderr.log"
+ if($LASTEXITCODE){throw 'Uniform diagnostic build failed'};$report.phases+=@{phase='build';passed=$true};Save-Report
+ & "$r\toolchains\openvino-2026.4.1\Scripts\python.exe" "$vm\qualify-native-uniform-diagnostic-v1.py" > "$out\qualify.stdout.log" 2> "$out\qualify.stderr.log"
+ if($LASTEXITCODE){throw 'Uniform draw diagnostic failed'};$report.phases+=@{phase='captured_draw_diagnostic';passed=$true};$report.passed=$true
+}catch{$report.error=$_.Exception.Message}
+finally{$report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');Save-Report}
+Get-Content "$out\report.json";if(!$report.passed){exit 1}

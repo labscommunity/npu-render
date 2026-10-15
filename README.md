@@ -40,6 +40,13 @@ Larger batches alone are 8.5% slower; adding model sharing yields only a 3.1%
 overall improvement. The combination also regresses on the separate expensive-draw
 sample. It is not promoted as a responsiveness fix.
 
+The [latest short desktop trial](docs/validation/2026-10-15/native-duration-app-routing-v1/README.md)
+completes 1,536 acknowledged NPU operations and exact restoration, but delivers
+only 31 correlated physical submissions over 512 seconds. Another real device
+loss takes 63 seconds to recover. Ordinary unleased applications fail to create
+a default Direct3D device while the native adapter is primary; general application
+admission is a separate outstanding requirement.
+
 The goal remains a single switch that moves graphics work to the NPU and frees
 iGPU capacity for Tahoma. The
 [execution plan](docs/research/desktop-offload-plan.md) tracks stability,

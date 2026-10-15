@@ -1,0 +1,67 @@
+{
+  "recorded": "2026-10-15T03:17:07.355865+00:00",
+  "evidence_checks_passed": true,
+  "raw_files_remotely_hash_verified": 278,
+  "raw_bytes": 4999551,
+  "npu_acknowledged_operations": 1536,
+  "provider_faults": 1,
+  "retried_request_elapsed_ms": 63000,
+  "physically_submitted_frames": 31,
+  "matching_source_frames": 31,
+  "presentation_elapsed_ms": 512000,
+  "first_to_last_presentation_seconds": 503.4844612,
+  "presentation_intervals_seconds": {
+    "median": 10.08106205,
+    "p95_nearest_rank": 86.5551912,
+    "maximum": 98.7965984
+  },
+  "controlled_input_observation_latency": {
+    "mouse": {
+      "sent_to_received_seconds": 9.8528109,
+      "sent_to_output_observation_seconds": 37.3751126,
+      "received_to_output_observation_seconds": 27.5223017
+    },
+    "key": {
+      "sent_to_received_seconds": 0.0650629,
+      "sent_to_output_observation_seconds": 105.5081645,
+      "received_to_output_observation_seconds": 105.4431016
+    }
+  },
+  "gpu_commands": {
+    "completed": true,
+    "live_bridge_tested": true,
+    "submitted_presents": 31,
+    "source_uploads": 31,
+    "gpu_copy_commands": 62,
+    "readback_copies": 31,
+    "shader_dispatches": 0,
+    "elapsed_ms": 512000,
+    "topology_preserved": true,
+    "input_forwarding_tested": false,
+    "scanout_mode_verified": false,
+    "desktop_offloaded": false
+  },
+  "ordinary_default_adapter_requests": [
+    {
+      "default_device_request": true,
+      "feature_level_10_only": false,
+      "hresult": "887a0004",
+      "device_created": false,
+      "feature_level": 0
+    },
+    {
+      "default_device_request": true,
+      "feature_level_10_only": true,
+      "hresult": "887a0004",
+      "device_created": false,
+      "feature_level": 0
+    }
+  ],
+  "ordinary_application_admission_qualified": false,
+  "uniform_diagnostic_qualified": true,
+  "uniform_candidate_promoted": false,
+  "thirty_minute_stability_qualified": false,
+  "responsiveness_qualified": false,
+  "full_desktop_offload": false,
+  "tahoma_tested": false
+}

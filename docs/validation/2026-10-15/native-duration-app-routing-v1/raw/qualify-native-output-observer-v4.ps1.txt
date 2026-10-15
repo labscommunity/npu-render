@@ -1,0 +1,24 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$out="$r\vm\native-output-observer-v4-qualification";$s="$env:LOCALAPPDATA\Temp\npu-graphics-probe-0146a2388f25";$task='T8-NpuRender-OutputObserverV4-Qualification';$registered=$false
+$proof=Get-Content "$r\builds\native-output-observer-v4\build-report.json" -Raw|ConvertFrom-Json;$binary="$r\builds\native-output-observer-v4\Release\nr_output_observer.exe"
+if(!$proof.clean_build -or (Get-FileHash $binary).Hash -ne $proof.binary_sha256){throw 'Observer build identity mismatch'}
+if((Test-Path $out) -or (Get-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue)){throw 'Qualification already exists'}
+$prior=Get-Content "$r\vm\native-desktop-admission-v37\report.json" -Raw|ConvertFrom-Json;if(!$prior.completed -or !$prior.cleanup_passed){throw 'Prior native experiment has not recovered'}
+if(@(Get-Process nr_registered*,nr_frame_present_probe,nr_native_topology -ErrorAction SilentlyContinue).Count){throw 'Another graphics experiment remains active'}
+New-Item -ItemType Directory $out|Out-Null;Copy-Item "$r\builds\native-output-observer-v4\build-report.json" "$out\build-report.json"
+$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');completed=$false;passed=$false;binary_sha256=$proof.binary_sha256;driver_installed=$false;topology_changed=$false;npu_tested=$false}
+try{
+ @{command=@($binary,'--self-test');log="$out\probe.log"}|ConvertTo-Json -Depth 4|Set-Content -Encoding UTF8 "$out\job.json"
+ $action=New-ScheduledTaskAction -Execute "$s\venv\Scripts\pythonw.exe" -Argument ('"'+$s+'\native_runner.py" "'+$out+'\job.json"')
+ $principal=New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value) -LogonType Interactive -RunLevel Limited
+ $settings=New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 2) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+ Register-ScheduledTask -TaskName $task -Action $action -Principal $principal -Settings $settings|Out-Null;$registered=$true;Start-ScheduledTask -TaskName $task
+ $deadline=[DateTime]::UtcNow.AddSeconds(75)
+ do{Start-Sleep -Milliseconds 250;$state=(Get-ScheduledTask -TaskName $task).State}while(($state -eq 'Running' -or !(Test-Path "$out\probe.log")) -and [DateTime]::UtcNow -lt $deadline)
+ if($state -eq 'Running'){throw 'Observer self-test exceeded finite deadline'}
+ $rows=@(Get-Content "$out\probe.log"|Where-Object {$_ -match '^\{.*\}$'}|ForEach-Object {$_|ConvertFrom-Json});$done=@($rows|Where-Object {$_.completed -and $_.self_test});$exits=@($rows|Where-Object {$_.PSObject.Properties.Name -contains 'exit_code'})
+ $report.task_result=(Get-ScheduledTaskInfo -TaskName $task).LastTaskResult;$report.child_exit=if($exits.Count -eq 1){$exits[0].exit_code}else{$null}
+ $report.passed=$report.task_result -eq 0 -and $report.child_exit -eq 0 -and $done.Count -eq 1 -and $done[0].passed -and $done[0].wrong_owner_rejected -and $done[0].colors_verified -eq 3
+ if($done.Count -eq 1){$report.observer_result=$done[0]}
+}catch{$report.error=$_.Exception.Message}
+finally{if($registered){Stop-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue;Unregister-ScheduledTask -TaskName $task -Confirm:$false -ErrorAction SilentlyContinue};$report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');$report|ConvertTo-Json -Depth 5|Set-Content "$out\report.json"}
+$report|ConvertTo-Json -Depth 5;if(!$report.passed){Get-Content "$out\probe.log" -Tail 8 -ErrorAction SilentlyContinue;exit 1}

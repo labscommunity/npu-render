@@ -1,0 +1,102 @@
+"""Bounded incremental reads of append-only native-renderer evidence logs."""
+import json
+from collections import Counter
+from pathlib import Path
+
+
+class JsonlTail:
+    def __init__(self, path, chunk_bytes=4 * 1024 * 1024, line_bytes=1024 * 1024):
+        assert 0 < line_bytes <= chunk_bytes <= 4 * 1024 * 1024
+        self.path = Path(path)
+        self.chunk_bytes = chunk_bytes
+        self.line_bytes = line_bytes
+        self.offset = 0
+        self.pending = b''
+        self.identity = None
+        self.records = 0
+        self.backlog = False
+
+    def poll(self):
+        try:
+            stream = self.path.open('rb')
+        except FileNotFoundError:
+            if self.identity is not None:
+                raise RuntimeError('Evidence log disappeared') from None
+            return []
+        with stream:
+            stat = __import__('os').fstat(stream.fileno())
+            identity = (stat.st_dev, stat.st_ino)
+            if self.identity is not None and identity != self.identity:
+                raise RuntimeError('Evidence log identity changed')
+            if stat.st_size < self.offset:
+                raise RuntimeError('Evidence log truncated')
+            self.identity = identity
+            stream.seek(self.offset)
+            data = stream.read(self.chunk_bytes)
+            self.offset += len(data)
+            self.backlog = __import__('os').fstat(stream.fileno()).st_size > self.offset
+        lines = (self.pending + data).split(b'\n')
+        self.pending = lines.pop()
+        if len(self.pending) > self.line_bytes or any(len(line) > self.line_bytes for line in lines):
+            raise RuntimeError('Evidence line exceeds bound')
+        result = []
+        for line in lines:
+            text = line.decode('utf-8-sig').rstrip('\r')
+            if not text.startswith('{'):
+                continue
+            value = json.loads(text)
+            if not isinstance(value, dict):
+                raise RuntimeError('Evidence record is not an object')
+            result.append(value)
+        self.records += len(result)
+        return result
+
+
+class NativeEvidence:
+    def __init__(self, directory, host_log):
+        self.directory = Path(directory)
+        self.parent = JsonlTail(self.directory / 'worker.stdout.jsonl')
+        self.host = JsonlTail(host_log)
+        self.children = {}
+        self.render_pids = Counter()
+        self.ack_pids = Counter()
+        self.generations = self.faults = self.retries = self.hardware_receipts = 0
+        self.ready = False
+        self.driver_entry = self.preferred_selected = self.frame_readback = False
+
+    def poll(self):
+        for entry in self.parent.poll():
+            if entry.get('local_worker_ready'):
+                self.ready = True
+            if entry.get('passed') and entry.get('execution_device') == 'NPU':
+                self.render_pids[entry.get('client_pid')] += 1
+            if entry.get('worker_success'):
+                self.ack_pids[entry.get('client_pid')] += 1
+            self.generations += bool(entry.get('provider_process_started'))
+            self.faults += bool(entry.get('provider_process_failure'))
+            self.retries += bool(entry.get('provider_process_response') and entry.get('attempt') == 1)
+        paths = set((self.directory / 'provider-processes').glob('generation-*/worker.stdout.jsonl'))
+        if not set(self.children).issubset(paths):
+            raise RuntimeError('Provider evidence log disappeared')
+        for path in sorted(paths):
+            if path not in self.children:
+                if len(self.children) >= 64:
+                    raise RuntimeError('Provider evidence generations exceed bound')
+                self.children[path] = JsonlTail(path)
+            for entry in self.children[path].poll():
+                self.hardware_receipts += bool(entry.get('passed') and entry.get('execution_device') == 'NPU')
+        for entry in self.host.poll():
+            self.driver_entry |= entry.get('event') == 'driver_entry'
+            self.preferred_selected |= bool(entry.get('event') == 'assigned' and entry.get('preferred_selected'))
+            self.frame_readback |= entry.get('event') == 'frame_readback' and entry.get('status') == '00000000'
+
+    def snapshot(self, compositor_pid, host_pid):
+        tails = [self.parent, self.host, *self.children.values()]
+        return dict(npu_receipts=sum(self.render_pids.values()), delivery_acknowledgments=sum(self.ack_pids.values()),
+                    hardware_child_receipts=self.hardware_receipts, provider_generations=self.generations,
+                    provider_faults=self.faults, provider_retries=self.retries,
+                    actual_dwm_npu_execution=self.render_pids[compositor_pid] > 0,
+                    actual_umdf_npu_execution=self.render_pids[host_pid] > 0,
+                    native_driver_entry=self.driver_entry, preferred_adapter_selected=self.preferred_selected,
+                    successful_frame_readback=self.frame_readback,
+                    evidence_bytes_read=sum(t.offset for t in tails), evidence_backlog=any(t.backlog for t in tails))

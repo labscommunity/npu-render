@@ -1,0 +1,71 @@
+"""Verify short live integration, default-adapter failure, and numerical diagnosis."""
+from pathlib import Path
+from datetime import UTC, datetime
+import difflib,hashlib,json,math,statistics
+
+r=Path('results/render-driver');raw=r/'primary-raw-v13';out=Path('docs/validation/2026-10-15/native-duration-app-routing-v1')
+def obj(p):
+ b=p.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+def rows(p):return [json.loads(s) for s in p.read_text(encoding='utf-8-sig').splitlines() if s.startswith('{') and s.endswith('}')]
+manifest=obj(r/'native-primary-v13-artifact-sha256.json')
+for name in ['native-duration-components-v2','native-duration-helpers-v2','native-duration-short-v2','native-live-v28','native-desktop-admission-v38','native-registration-stage-v17','native-registration-v23','native-frame-notifications-v2','native-uniform-diagnostic-v1-evidence']:
+ q=obj(raw/name/'report.json');assert q['completed'] and q['passed'],name
+for name in ['native-duration-components-v1','native-duration-helpers-v1','native-duration-short-v1','native-frame-notifications-v1']:
+ q=obj(raw/name/'report.json');assert q['completed'] and not q['passed'],name
+live=obj(raw/'native-live-v28/report.json');bootstrap=obj(raw/'native-desktop-admission-v38/bootstrap/report.json')
+assert live['cleanup_passed'] and live['primary_topology_restored'] and live['ordinary_windows_restored'] and live['cursor_cleanup_passed']
+assert live['physical_blue_green_red_observed'] and live['pointer_confined_and_restored'] and live['pointer_reacquisitions']==2
+assert bootstrap['npu_receipts']==bootstrap['delivery_acknowledgments']==bootstrap['hardware_child_receipts']==1536
+assert bootstrap['provider_faults']==bootstrap['provider_retries']==1 and bootstrap['provider_generations']==2
+parent=rows(raw/'native-desktop-admission-v38/bootstrap/worker.stdout.jsonl')
+assert sum(bool(x.get('worker_success')) for x in parent)==1536
+faults=[x for x in parent if x.get('provider_process_failure')];assert len(faults)==1 and faults[0]['dispatch_ticket']==991 and faults[0]['fallback_backend']=='none'
+retries=[x for x in parent if x.get('provider_process_response') and x['attempt']>0];assert len(retries)==1 and retries[0]['dispatch_ticket']==991 and retries[0]['elapsed_ms']==63000
+stderr=(raw/'native-desktop-admission-v38/bootstrap/provider-processes/generation-1/worker.stderr.log').read_text()
+assert 'ZE_RESULT_ERROR_DEVICE_LOST' in stderr
+child=[x for p in (raw/'native-desktop-admission-v38/bootstrap/provider-processes').glob('generation-*/worker.stdout.jsonl') for x in rows(p)]
+assert sum(bool(x.get('passed') and x.get('execution_device')=='NPU' and 'compile_and_draw_ms' in x) for x in child)==1536
+present=rows(raw/'native-live-v28/present/probe.log');frames=[x for x in present if x.get('live_frame_presented')]
+published=rows(raw/'native-live-v28/relay/frames.jsonl');assert len(frames)==31
+for f in frames:
+ assert f['backbuffer_exact'] and sum(p['sequence']==f['source_sequence'] and p['qpc']==f['source_qpc'] and p['producer_pid']==f['producer_pid'] for p in published)==1
+hz=frames[0]['qpc_frequency'];assert all(x['qpc_frequency']==hz for x in frames)
+gaps=[(b['accepted_qpc']-a['accepted_qpc'])/hz for a,b in zip(frames,frames[1:])]
+assert all(g>0 for g in gaps)
+present_done=[x for x in present if x.get('live_bridge_tested')];assert len(present_done)==1 and present_done[0]['submitted_presents']==31
+screen=rows(raw/'native-live-v28/screen/probe.log');stimulus=rows(raw/'native-live-v28/stimulus/probe.log')
+latencies={}
+for event,color in [('mouse','green'),('key','red')]:
+ sent=next(x['qpc'] for x in stimulus if x.get('input_event')==event+'_sent');received=next(x['qpc'] for x in stimulus if x.get('input_event')==event+'_received')
+ observed=next(x['qpc'] for x in screen if x.get('qpc',0)>=received and x.get('ownership_verified_before_and_after') and any(p.get('owned_presenter_at_point') and p.get('known_'+color) for p in x.get('points',[])))
+ latencies[event]=dict(sent_to_received_seconds=(received-sent)/hz,sent_to_output_observation_seconds=(observed-sent)/hz,received_to_output_observation_seconds=(observed-received)/hz)
+adapter=live['application_adapter_observation'];requests=[x for x in adapter if x.get('default_device_request')]
+assert len(requests)==2 and all(x['hresult']=='887a0004' and not x['device_created'] for x in requests)
+enumerated=[x for x in adapter if x.get('adapter_observation')=='enumerated'];assert enumerated[0]['vendor_id']==0 and enumerated[1]['vendor_id']==32902
+diagnostic=obj(raw/'native-uniform-diagnostic-v1-evidence/report.json');cases={p['phase']:p for p in diagnostic['phases']}
+assert cases['CPU-mask-7']['comparison_to_same_backend_baseline']['exact']
+for mask in (1,7):
+ diff=cases[f'NPU-mask-{mask}']['comparison_to_same_backend_baseline'];assert diff['different_components']==3 and diff['maximum_channel_difference']==1
+assert cases['NPU-mask-2']['comparison_to_same_backend_baseline']['exact']
+assert cases['NPU-mask-9']['comparison_to_same_backend_baseline']['different_components']==65413
+assert diagnostic['cpu_baseline_vs_npu_baseline']['different_components']==141
+out.mkdir(parents=True,exist_ok=False)
+for item in manifest:
+ data=(raw/item['source']).read_bytes();assert len(data)==item['bytes'] and hashlib.sha256(data).hexdigest()==item['sha256'].lower()
+ destination=out/'raw'/item['source']
+ if destination.suffix in ('.py','.ps1'):destination=destination.with_suffix(destination.suffix+'.txt')
+ destination.parent.mkdir(parents=True,exist_ok=True);destination.write_bytes(data);item['archive_path']=destination.relative_to(out).as_posix()
+(out/'raw-manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
+sources=[]
+for base,new in [('native-routing-v39','native-routing-v41'),('native-routing-v43','native-routing-v44'),('native-trace-v18','native-trace-v19'),('native-topology-control-v11','native-topology-control-v12'),('native-present-v19','native-present-v20'),('native-output-observer-v3','native-output-observer-v4'),(None,'native-adapter-choice-v1')]:
+ patch=[]
+ for name,checksum in obj(raw/(new+'-source.json')).items():
+  path=r/new/name;old=r/base/name if base else None;assert hashlib.sha256(path.read_bytes()).hexdigest()==checksum
+  if old is None or not old.exists() or old.read_bytes()!=path.read_bytes():patch.extend(difflib.unified_diff(old.read_text().splitlines(keepends=True) if old and old.exists() else [],path.read_text().splitlines(keepends=True),fromfile='a/'+name if old and old.exists() else '/dev/null',tofile='b/'+name))
+ destination=out/(new+'-from-'+(base or 'empty')+'.patch');destination.write_text(''.join(patch));sources.append(dict(path=destination.name,sha256=hashlib.sha256(destination.read_bytes()).hexdigest(),base=base))
+for name in ['prepare-native-duration-v2.py','prepare-native-frame-notifications-v1.py','prepare-native-duration-admission-v1.py','prepare-native-routing-v44.py','collect-native-primary-v13.py','archive-native-primary-v13.py']:
+ destination=out/'sources'/(name+'.txt');destination.parent.mkdir(parents=True,exist_ok=True);destination.write_bytes((r/name).read_bytes());sources.append(dict(path=destination.relative_to(out).as_posix(),sha256=hashlib.sha256(destination.read_bytes()).hexdigest()))
+(out/'source-manifest.json').write_text(json.dumps(sources,indent=2)+'\n')
+report=dict(recorded=datetime.now(UTC).isoformat(),evidence_checks_passed=True,raw_files_remotely_hash_verified=len(manifest),raw_bytes=sum(m['bytes'] for m in manifest),npu_acknowledged_operations=1536,provider_faults=1,retried_request_elapsed_ms=63000,physically_submitted_frames=31,matching_source_frames=31,presentation_elapsed_ms=present_done[0]['elapsed_ms'],first_to_last_presentation_seconds=(frames[-1]['accepted_qpc']-frames[0]['accepted_qpc'])/hz,presentation_intervals_seconds=dict(median=statistics.median(gaps),p95_nearest_rank=sorted(gaps)[math.ceil(.95*len(gaps))-1],maximum=max(gaps)),controlled_input_observation_latency=latencies,gpu_commands=present_done[0],ordinary_default_adapter_requests=requests,ordinary_application_admission_qualified=False,uniform_diagnostic_qualified=True,uniform_candidate_promoted=False,thirty_minute_stability_qualified=False,responsiveness_qualified=False,full_desktop_offload=False,tahoma_tested=False)
+(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(dict(archive=str(out),raw_files=len(manifest),raw_bytes=report['raw_bytes'],presentation_intervals=report['presentation_intervals_seconds'],input=latencies)))

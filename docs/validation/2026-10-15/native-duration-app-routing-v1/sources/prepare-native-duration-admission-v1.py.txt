@@ -1,0 +1,140 @@
+"""Prepare short qualification then bounded thirty-minute native stability trials."""
+from pathlib import Path
+import hashlib
+import json
+
+r = Path('results/render-driver')
+
+
+def changed(source, replacements):
+    text = (r / source).read_text()
+    for before, after in replacements:
+        assert before in text, (source, before)
+        text = text.replace(before, after)
+    return text
+
+
+def manifest(name, files):
+    (r / name).write_text(json.dumps({file: hashlib.sha256((r / file).read_bytes()).hexdigest() for file in files}, indent=2) + '\n')
+
+
+for name in ('run-native-registration', 'recover-native-registration'):
+    s = changed(name + '-v22.ps1', [('v22', 'v23'), ('0.0.1316.0', '0.0.1317.0')])
+    if name == 'run-native-registration':
+        s = s.replace('native-driver-package-v16', 'native-driver-package-v17').replace('native-registration-stage-v16', 'native-registration-stage-v17').replace('native-routing-v34', 'native-routing-v41')
+        s = s.replace("$principal=[Security.Principal.WindowsPrincipal]", "foreach($path in @('native-duration-components-v2','native-combined-v3')){$q=Get-Content \"$r\\vm\\$path\\report.json\" -Raw|ConvertFrom-Json;if(!$q.completed -or !$q.passed){throw 'Duration renderer prerequisites failed'}}\n$principal=[Security.Principal.WindowsPrincipal]", 1)
+    (r / (name + '-v23.ps1')).write_text(s)
+s = changed('qualify-native-registered-v22.py', [('0.0.1316.0', '0.0.1317.0')])
+s = s.replace('report=dict(dll_sha256=', 'report=dict(worker_binary_sha256=hashlib.sha256(v.worker.read_bytes()).hexdigest(),dll_sha256=', 1)
+(r / 'qualify-native-registered-v23.py').write_text(s)
+manifest('native-registration-v23-source.json', ['run-native-registration-v23.ps1', 'recover-native-registration-v23.ps1', 'qualify-native-registered-v23.py', 'native_session_broker_v1.py'])
+s = changed('observe_native_topology_v7.py', [('deadline=time.monotonic()+780', 'deadline=time.monotonic()+2340')])
+(r / 'observe_native_topology_v8.py').write_text(s)
+
+for live, admission, observer, primary, monitor in ((28, 38, 40, 14, 660), (29, 39, 41, 15, 2220)):
+    long = live == 29
+    name = f'run-native-desktop-v{admission}.ps1'
+    s = changed('run-native-desktop-v37.ps1', [
+        ('native-desktop-admission-v37', f'native-desktop-admission-v{admission}'),
+        ('native-desktop-v37', f'native-desktop-v{admission}'),
+        ('NativeDesktopRecovery-v37', f'NativeDesktopRecovery-v{admission}'),
+        ('native-registration-v22', 'native-registration-v23'),
+        ('native-broker-v2-qualification', 'native-broker-v3-qualification'),
+        ('native-routing-v34', 'native-routing-v41'),
+        ('native-driver-package-v16', 'native-driver-package-v17'),
+        ('0.0.1316.0', '0.0.1317.0'),
+        ('native_desktop_bootstrap_v17', 'native_desktop_bootstrap_v18'),
+        ('(Get-Date).AddMinutes(13)', f'(Get-Date).AddSeconds({monitor + 150})'),
+        ("$arguments 'bootstrap' 750", f"$arguments 'bootstrap' {monitor + 120}"),
+    ])
+    s = s.replace("$arguments=@(\"$r\\vm\\native_desktop_bootstrap_v18.py\",", f"$arguments=@(\"$r\\vm\\native_desktop_bootstrap_v18.py\",'--monitor-seconds','{monitor}',", 1)
+    needle = "foreach($name in @('T8-NpuRender-NativeTraceV1'"
+    assert needle in s
+    s = s.replace(needle, "$registeredWorker=Get-Content \"$r\\vm\\native-registration-v23\\qualification\\report.json\" -Raw|ConvertFrom-Json;if(!$registeredWorker.passed -or $registeredWorker.worker_binary_sha256 -ne (Get-FileHash $worker).Hash){throw 'Registered worker identity mismatch'}\n" + needle, 1)
+    if long:
+        s = s.replace('$worker="', '$short=Get-Content "$r\\vm\\native-live-v28\\report.json" -Raw|ConvertFrom-Json;if(!$short.completed -or !$short.passed -or !$short.cleanup_passed){throw \'Short duration integration is not qualified\'}\n$worker="', 1)
+    (r / name).write_text(s)
+    s = changed('recover-native-desktop-v37.ps1', [('NativeDesktopRecovery-v37', f'NativeDesktopRecovery-v{admission}'), ('0.0.1316.0', '0.0.1317.0')])
+    (r / f'recover-native-desktop-v{admission}.ps1').write_text(s)
+    s = changed('start-native-topology-v39.ps1', [
+        ('native-topology-v39', f'native-topology-v{observer}'),
+        ('InspectTopology-V39', f'InspectTopology-V{observer}'),
+        ('observe_native_topology_v7', 'observe_native_topology_v8'),
+        ('-Minutes 14', '-Minutes 42'),
+    ])
+    # An unrelated older observer task must not be removed by this new trial.
+    s = '\n'.join(line for line in s.splitlines() if not line.startswith('Unregister-ScheduledTask -TaskName T8-NpuRender-InspectTopology-V27')) + '\n'
+    (r / f'start-native-topology-v{observer}.ps1').write_text(s)
+    s = changed('run-native-live-v27.ps1', [
+        ('native-live-v27', f'native-live-v{live}'), ('NativeLiveV27', f'NativeLiveV{live}'),
+        ('native-present-v19', 'native-present-v20'), ('live-frame-reader-v10', 'live-frame-reader-v11'),
+        ('native-output-observer-v3', 'native-output-observer-v4'),
+        ('native-topology-control-v11', 'native-topology-control-v12'),
+        ('native-cursor-guard-v2', 'native-cursor-guard-v3'),
+        ('native-registration-v22', 'native-registration-v23'),
+        ('native-desktop-admission-v37', f'native-desktop-admission-v{admission}'),
+        ('run-native-desktop-v37', f'run-native-desktop-v{admission}'),
+        ('NativeDesktopRecovery-v37', f'NativeDesktopRecovery-v{admission}'),
+        ('native-topology-primary-v13', f'native-topology-primary-v{primary}'),
+        ('native-topology-v39', f'native-topology-v{observer}'),
+        ('run-native-topology-helper-v11', 'run-native-topology-helper-v12'),
+        ('cursor_recovery_watchdog_v1', 'cursor_recovery_watchdog_v2'),
+        ('relay_native_frames_v5', 'relay_native_frames_v7'),
+    ])
+    if long:
+        for before, after in [
+            ("{14}else{11}", "{41}else{40}"), ("'-Seconds','600'", "'-Seconds','2160'"),
+            ("'--seconds','700'", "'--seconds','2320'"), ("'585'", "'2145'"),
+            ("'--seconds','590'", "'--seconds','2150'"),
+            ('$remaining=580-', '$remaining=2140-'), ('[Math]::Min(550,', '[Math]::Min(2100,'),
+            ('$duration -lt 20', '$duration -lt 1800'),
+            ('WaitForExit(640000)', 'WaitForExit(2200000)'), ('WaitForExit(780000)', 'WaitForExit(2370000)'),
+        ]:
+            assert before in s, before
+            s = s.replace(before, after)
+        # Stop independent reads only after late evidence, while their owned
+        # presenter still exists; natural presenter exit is not an observer fault.
+        needle = '  if($screenStarted -and $blueObserved -and $greenObserved -and $redObserved -and !(Test-Path "$out\\screen\\stop")){New-Item -ItemType File "$out\\screen\\stop"|Out-Null}\n'
+        assert needle in s
+        s = s.replace(needle, """  if($screenStarted -and $blueObserved -and $greenObserved -and $redObserved -and $submitted.Count -ge 2 -and !(Test-Path "$out\\screen\\stop")){
+   $firstPresentation=$submitted[0];$lateThreshold=$firstPresentation.accepted_qpc+1800*$firstPresentation.qpc_frequency
+   $lateColor=@($screenRows|Where-Object {$_.qpc -ge $lateThreshold -and $_.last_present_qpc -ge $lateThreshold -and @($_.points|Where-Object {$_.owned_presenter_at_point -and $_.known_red}).Count -gt 0})
+   if($submitted[-1].accepted_qpc -ge $lateThreshold -and $lateColor.Count){New-Item -ItemType File "$out\\screen\\stop"|Out-Null}
+  }
+""", 1)
+        needle = ' $report.passed=($report.pointer_reacquisitions'
+        assert needle in s
+        s = s.replace(needle, """ $report.thirty_minute_stability_tested=$true;$report.responsiveness_qualified=$false
+ $orderedFrames=@($frames|Sort-Object accepted_qpc);$frequencies=@($frames|Select-Object -ExpandProperty qpc_frequency -Unique)
+ if($orderedFrames.Count -lt 2 -or $frequencies.Count -ne 1 -or $frequencies[0] -le 0){throw 'Long-duration presentation clock evidence absent'}
+ $report.first_to_last_present_seconds=($orderedFrames[-1].accepted_qpc-$orderedFrames[0].accepted_qpc)/[double]$frequencies[0]
+ $latePhysical=@($screenFinalRows|Where-Object {$_.qpc -ge $orderedFrames[0].accepted_qpc+1800*$frequencies[0] -and $_.last_present_qpc -ge $orderedFrames[0].accepted_qpc+1800*$frequencies[0] -and @($_.points|Where-Object {$_.owned_presenter_at_point -and $_.known_red}).Count -gt 0})
+ $report.physical_color_verified_after_thirty_minutes=$latePhysical.Count -gt 0
+ $report.duration_gate_passed=$report.first_to_last_present_seconds -ge 1800 -and $report.physical_color_verified_after_thirty_minutes
+ $report.passed=($report.duration_gate_passed -and $report.pointer_reacquisitions""", 1)
+    needle = "$lastNative=Get-Content"
+    assert needle in s
+    s = s.replace(needle, """$adapterProof=Get-Content "$r\\builds\\native-adapter-choice-v1\\build-report.json" -Raw|ConvertFrom-Json
+$adapterBaseline=Get-Content "$r\\vm\\native-adapter-choice-v1-baseline\\report.json" -Raw|ConvertFrom-Json
+$adapterBinary="$r\\builds\\native-adapter-choice-v1\\Release\\nr_default_adapter_probe.exe"
+if(!$adapterProof.clean_build -or !$adapterBaseline.completed -or !$adapterBaseline.passed -or $adapterBaseline.binary_sha256 -ne $adapterProof.binary_sha256 -or (Get-FileHash $adapterBinary).Hash -ne $adapterProof.binary_sha256){throw 'Ordinary adapter baseline not qualified'}
+""" + needle, 1)
+    needle = " Start-Interactive 'stimulus'"
+    assert needle in s
+    s = s.replace(needle, " Start-Interactive 'adapter' @($adapterBinary)\n" + needle, 1)
+    needle = ' $frames=@($presentRows|Where-Object live_frame_presented);'
+    assert needle in s
+    s = s.replace(needle, """ $adapterRows=Read-Rows "$out\\adapter\\probe.log";$adapterDone=@($adapterRows|Where-Object adapter_probe_completed);$adapterExit=@($adapterRows|Where-Object {$_.PSObject.Properties.Name -contains 'exit_code'})
+ if($adapterDone.Count -ne 1 -or !$adapterDone[0].passed -or $adapterDone[0].graphics_draws_submitted -ne 0 -or $adapterExit.Count -ne 1 -or $adapterExit[0].exit_code -ne 0){throw 'Ordinary adapter observation incomplete'}
+ $report.application_adapter_observation=@($adapterRows|Where-Object {$_.adapter_observation -or $_.default_device_request -or $_.adapter_probe_started})
+ $report.application_adapter_baseline=$adapterBaseline.adapters;$report.application_graphics_offload_qualified=$false
+""" + needle, 1)
+    (r / f'run-native-live-v{live}.ps1').write_text(s)
+    manifest(f'native-desktop-v{admission}-source.json', [
+        'native_desktop_bootstrap_v18.py', 'native_incremental_evidence_v1.py',
+        'native_process_observer_v1.py', 'native_session_broker_v1.py', 'native_session_broker_v3.py',
+        name, f'recover-native-desktop-v{admission}.ps1', 'relay_native_frames_v7.py', 'native_frame_notification_v1.py',
+        'native_frame_io_v1.py', 'cursor_recovery_watchdog_v2.py', 'run-native-topology-helper-v12.ps1',
+        f'run-native-live-v{live}.ps1', f'start-native-topology-v{observer}.ps1', 'observe_native_topology_v8.py',
+    ])
+print('Prepared registered v23, short live v28 and bounded long live v29. Not admitted or qualified.')
