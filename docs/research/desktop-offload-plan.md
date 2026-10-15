@@ -1,22 +1,21 @@
 # Full desktop offload: acceptance and execution plan
 
 Updated 2026-10-15. Target: Delta, Windows 11, Panther Lake. The repository stays
-private. Full desktop offload is **unfinished**. Six-minute native NPU desktop
-trials deliver changing frames to the physical presenter, and independent screen
-reads confirm controlled colors with the physical desktop primary. NPU-primary
-routing and exact ordinary recovery now work. The controlled input window appears
-in completed NPU primary frames. A longer trial now receives mouse input and
-shows the resulting green window on the physical output. Corrected live v21 now
-passes the complete controlled mouse/keyboard/color sequence and exact ordinary
-recovery. V23 also passes finite pointer confinement and foreground reacquisition.
-A matched worker comparison cuts thirteen expensive draw operations from about
-121 seconds to 3.1 seconds with exact pixels. A responsive usable switch,
-application coverage and a Tahoma benefit remain unqualified. The optimized v24
-live trial subsequently fails: one new model exceeds the client deadline, and a
-later request loses the NPU device. Ordinary physical desktop recovery passes. The isolated provider subsequently
-recovers a real device loss during a complete recorded stream. Native v27 passes
-1,107 acknowledged NPU operations, 35 matching physical submissions, controlled
-input and exact ordinary recovery; response remains too slow.
+private. **Full desktop offload is unfinished.** The latest qualified native trial
+routes Windows desktop composition through the NPU, delivers 43 matching frames
+over 518.6 seconds to the physical output, verifies mouse/keyboard color changes,
+and restores the machine. Its 60-second freshness gate proves continued delivery,
+not usability. Normal application admission and a Tahoma benefit remain open.
+
+The primary obstacle is responsiveness. A captured cold graph takes 89.1 seconds
+to compile; even cached work and frame updates remain much slower than the target.
+We have now executed our own bounded identity kernel on Panther Lake's NPU with
+exact changing-input checks and a successful original-graph health check afterward.
+This establishes a direct-kernel development path; it is not yet a sampler or a
+performance improvement. The next work is the 30-minute delivery qualification,
+then indexed/arithmetic kernels, texture-span addressing, matched sampler timing,
+and integration into the live provider. General application support and Tahoma A/B
+remain required before calling the switch usable.
 
 The end state is one switch that moves desktop graphics work to the NPU, retains
 physical display scanout, supports normal interaction, and leaves the iGPU
@@ -29,11 +28,11 @@ renderer does not establish where every application renders.
 | Gate | Work | Acceptance evidence | Current status |
 | --- | --- | --- | --- |
 | 1. Routing | Record active physical and indirect paths before, during, and after admission; identify clone/extended configuration and actual rendering adapter. | Timestamped topology, native DWM NPU receipts, selected adapter, frame producer, exact restoration. | Automatic clone identified; v11 applies extension with the physical path preserved, produces a frame while extended, restores the clone exactly, and restores the final physical baseline. |
-| 2. Continuous rendering | Keep the native renderer alive across changing windows and content; diagnose every failed draw; distinguish model preparation from rendering and transport. | Multiple changing frames, timestamps and pixel checks, sustained operation, no hidden fallback. | Finite v23 passes with 1,559 acknowledged NPU operations. Optimized v24 later loses the NPU after 1,096 completed operations and 1,095 acknowledgments. A 93-second cold compilation precedes a client departure. Isolated-provider v27 subsequently passes 1,107 acknowledged operations; recorded recovery from a real loss takes 62.9 seconds. Thirty-minute stability remains unqualified. |
-| 3. Physical presentation | Present new NPU frames on the physical output with distinct logical desktops and no recursive mirroring. | Live sequence-to-present correlation, output identity, measured presentation mode and residual GPU work. | Live v13 submits 13 matching frames. Direct statistics reach 13 displayed frames and report both composed and overlay modes; a separate screen reader verifies both controlled colors beneath the owned presenter. GPU residual cost remains unmeasured. Updates remain slow. |
-| 4. Interaction and recovery | Migrate the logical desktop, route pointer/keyboard/focus correctly, handle cursor/DPI/resolution, restore exact topology and windows. | Scripted interaction visible on physical output; emergency exit and owned-process failure recovery; ordinary login/lock path retained. | V23 passes relative motion, blue → mouse → green → keyboard → red, two foreground confinement reacquisitions, and exact ordinary recovery. A static standard arrow matches the NPU frame exactly. Secure desktop, sleep/wake, full cursor fidelity and all fault cases remain open. |
-| 5. Responsiveness | Optimize resource reuse, graph compilation, dispatch granularity, transfer volume and frame pacing. | Initial target: ordinary desktop interaction at 30 fps, p95 visible response ≤100 ms, 30-minute stable run. Report cold-start time separately. | Not met. Matched v27/v28 replay reduces thirteen expensive operations' mean compile-plus-draw total from 120,944 to 3,100 ms with exact pixels. Complete desktop performance remains unqualified. |
-| 6. Application coverage | Admit and implement required graphics operations across browser, video and representative 3D workloads. Establish per-process adapter choice. | Capability matrix plus real hardware runs; every remaining iGPU operation accounted for. | General application/video/game migration unqualified. |
+| 2. Continuous rendering | Keep the native renderer alive across changing windows and content; diagnose every failed draw; distinguish model preparation from rendering and transport. | Multiple changing frames, timestamps and pixel checks, sustained operation, no hidden fallback. | V35 passes with 1,248 acknowledged NPU operations, 43 exact frame deliveries spanning 518.6 seconds, and fresh owned physical observations near the end. V31 was a frozen-relay false positive and remains rejected. Thirty-minute stability remains unqualified. |
+| 3. Physical presentation | Present new NPU frames on the physical output with distinct logical desktops and no recursive mirroring. | Live sequence-to-present correlation, output identity, measured presentation mode and residual GPU work. | V35 correlates 43 exact matching submissions and verifies blue/green/red on the owned physical output. Presenter: 86 GPU copy commands; measurement observer: 254 additional copies. Residual GPU cost and a matched baseline remain unqualified. |
+| 4. Interaction and recovery | Migrate the logical desktop, route pointer/keyboard/focus correctly, handle cursor/DPI/resolution, restore exact topology and windows. | Scripted interaction visible on physical output; emergency exit and owned-process failure recovery; ordinary login/lock path retained. | V35 passes relative motion, controlled mouse/keyboard/color changes, confinement/reacquisition and ordinary recovery. Deliberately stopping the relay in v34 triggers full owned cleanup in 25.75 seconds. Secure desktop, sleep/wake, full cursor fidelity and other faults remain open. |
+| 5. Responsiveness | Optimize resource reuse, graph compilation, dispatch granularity, transfer volume and frame pacing. | Initial target: ordinary desktop interaction at 30 fps, p95 visible response ≤100 ms, 30-minute stable run. Report cold-start time separately. | Not met. Large cold graph compilation is reproduced at 89.1 seconds. Cached replay helps but does not meet usability. A custom identity kernel now executes correctly on Panther Lake; indexed sampling, full spans, end-to-end timing and live integration are next. |
+| 6. Application coverage | Admit and implement required graphics operations across browser, video and representative 3D workloads. Establish per-process adapter choice. | Capability matrix plus real hardware runs; every remaining iGPU operation accounted for. | A manually admitted default-adapter D3D11 fixture passes eight NPU operations. Unadmitted default device creation still fails in v35. Automatic admission, API coverage, browser/video/game migration remain unqualified. |
 | 7. Tahoma benefit | Run repeated baseline/offload trials under matched power, resolution and application load. | Report Tahoma throughput/latency, desktop frame times, per-engine GPU/NPU/CPU activity, memory and power; demonstrate GPU relief and no material Tahoma regression. | Earlier experiments regressed; native desktop A/B not yet run. |
 | 8. Usable switch | Integrate qualified components, install/on/off/status, recovery, documentation and CI; resolve distribution signing requirements. | Repeated clean install and enable/disable cycles, sleep/wake and failures, end-to-end test on target hardware. | Research candidates isolated; no usable full-offload product. |
 
@@ -42,7 +41,28 @@ completion date. Gate 6 remains open if any requested application graphics class
 still runs on the iGPU. Physical display scanout is an explicit remaining hardware
 role, and any GPU rendering/copy cost in the bridge must be measured.
 
-## Immediate experiment
+## Immediate work and decision gates
+
+1. Complete the 30-minute native delivery test with the corrected relay, observer
+   timing and early-failure cleanup. Record failure as failure; do not relax the
+   existing freshness or physical-output requirements.
+2. Extend the verified custom kernel from identity to bounded indexed reads and
+   arithmetic. Then validate larger, explicitly supplied texture spans and output
+   partitions before any full sampler executes.
+3. Compare that sampler against the current provider with identical pixels and
+   complete transfer/preparation/commit timing. Promote only an exact, measured
+   improvement, then repeat live responsiveness and stability checks.
+4. Add automatic application admission and the missing graphics operations;
+   establish per-process rendering devices under representative real workloads.
+5. Measure matched Tahoma baseline/offload performance and remaining GPU work.
+   Finish install/on/off/recovery only after these functional and benefit gates.
+
+The [latest evidence](../validation/2026-10-15/native-delivery-custom-kernel-v1/README.md)
+qualifies short continuous delivery, forced-relay-failure recovery and the first
+bounded custom Panther Lake kernel. These are prerequisites toward the stated
+goal, not substitutes for application migration or Tahoma improvement.
+
+## Earlier experiments
 
 The [retained-model investigation](../validation/2026-10-14/native-retained-desktop-v1/README.md)
 clears both captured failures and establishes a six-minute changing-frame bridge.

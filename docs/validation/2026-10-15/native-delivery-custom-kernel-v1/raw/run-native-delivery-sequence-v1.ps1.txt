@@ -1,0 +1,20 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$vm="$r\vm";$out="$vm\native-delivery-sequence-v1"
+if(Test-Path $out){throw 'Delivery sequence exists'};New-Item -ItemType Directory $out|Out-Null
+$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');completed=$false;passed=$false;phases=@();full_desktop_offload=$false;tahoma_tested=$false}
+function Save-Report{$report|ConvertTo-Json -Depth 6|Set-Content "$out\report.json"};Save-Report
+try{
+ $deadline=[DateTime]::UtcNow.AddMinutes(30)
+ do{$done=$false;try{$q=Get-Content "$vm\native-delivery-fault-v2\report.json" -Raw|ConvertFrom-Json;$done=$q.completed}catch{};if($done){break};if([DateTime]::UtcNow -gt $deadline){throw 'Early recovery predecessor incomplete'};Start-Sleep -Seconds 2}while($true)
+ if(!$q.passed){throw 'Early recovery did not qualify'}
+ $cleanup=Get-Content "$vm\native-desktop-admission-v44\report.json" -Raw|ConvertFrom-Json;if(!$cleanup.completed -or !$cleanup.cleanup_passed){throw 'Native restoration incomplete'}
+ if(@(Get-Process nr_registered_local_indexed_worker,nr_frame_present_probe,nr_native_topology -ErrorAction SilentlyContinue).Count){throw 'Native child remains'}
+ $report.active_phase='unmodified-ptl-carrier';Save-Report
+ $p=Start-Process "$r\toolchains\openvino-2026.4.1\Scripts\python.exe" -ArgumentList ('"'+$vm+'\create-ptl-kernel-carriers-v3.py"') -PassThru -NoNewWindow -RedirectStandardOutput "$out\carrier.stdout.log" -RedirectStandardError "$out\carrier.stderr.log";[void]$p.Handle
+ try{if(!$p.WaitForExit(180000)){$p.Kill();$p.WaitForExit();throw 'Carrier deadline'};$p.Refresh();if($p.ExitCode){throw 'Carrier failed'}}finally{$p.Dispose()}
+ $report.phases+=@{phase='unmodified-ptl-carrier';passed=$true};$report.active_phase='native-delivery-live-v3';Save-Report
+ & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$vm\run-native-delivery-live-v3.ps1" > "$out\live.stdout.log" 2> "$out\live.stderr.log"
+ if($LASTEXITCODE){throw 'Observer timing retry failed'}
+ $report.phases+=@{phase='native-delivery-live-v3';passed=$true};$report.passed=$true
+}catch{$report.error=$_.Exception.Message;$report.error_position=$_.InvocationInfo.PositionMessage}
+finally{$report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');Save-Report}
+Get-Content "$out\report.json";if(!$report.passed){exit 1}

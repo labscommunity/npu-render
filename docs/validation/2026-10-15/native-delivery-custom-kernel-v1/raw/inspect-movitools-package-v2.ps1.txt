@@ -1,0 +1,29 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$out="$r\vm\movitools-package-v2"
+if(Test-Path $out){throw 'Toolchain inspection exists'};New-Item -ItemType Directory $out|Out-Null
+$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');completed=$false;passed=$false;driver_installed=$false;npu_execution_tested=$false;source_url='https://download.lenovo.com/pccbbs/mobiles/r2gvp04w_v2.exe';expected_sha256='CF767EEA31DEBAA199B084CCE06EB82443AA251D5963EF97030F5219B9FE28DB'}
+function Save-Report{$report|ConvertTo-Json -Depth 6|Set-Content "$out\report.json"};Save-Report
+try{
+ $report.driver_before=@(Get-CimInstance Win32_PnPSignedDriver|Where-Object {$_.DeviceName -eq 'Intel(R) NPU' -and $_.DriverProviderName -eq 'Intel Corporation'}|Select-Object DeviceName,DriverVersion,InfName,DriverProviderName)
+ if($report.driver_before.Count -ne 1 -or $report.driver_before[0].DriverVersion -ne '32.0.100.5540'){throw 'Pinned installed NPU driver not confirmed'}
+ $package="$out\r2gvp04w_v2.exe"
+ Invoke-WebRequest -UseBasicParsing -Uri $report.source_url -OutFile $package -TimeoutSec 90
+ $report.download_sha256=(Get-FileHash $package).Hash;$report.download_bytes=(Get-Item $package).Length
+ if($report.download_sha256 -ne $report.expected_sha256){throw 'Vendor package hash mismatch'}
+ $signature=Get-AuthenticodeSignature $package;$report.signature_status=[string]$signature.Status;$report.signer=$signature.SignerCertificate.Subject
+ if($signature.Status -ne 'Valid'){throw 'Vendor package signature not valid'};Save-Report
+ $extract="$out\extracted";$args=@('/VERYSILENT',('/DIR="'+$extract+'"'),'/EXTRACT=YES',('/LOG="'+$out+'\extract.log"'))
+ $p=Start-Process $package -ArgumentList $args -PassThru -WindowStyle Hidden;[void]$p.Handle
+ try{if(!$p.WaitForExit(90000)){$p.Kill();$p.WaitForExit();throw 'Extraction exceeded deadline'};$p.Refresh();$report.extract_exit=$p.ExitCode;if($p.ExitCode){throw 'Vendor extraction failed'}}finally{$p.Dispose()}
+ $roots=@(Get-ChildItem $extract -Directory -Recurse -Filter MVC_DEPEND)
+ if($roots.Count -ne 1){throw 'Expected one extracted compiler payload'}
+ $report.compiler_root_relative=$roots[0].FullName.Substring($out.Length+1)
+ $files=@(Get-ChildItem $roots[0].FullName -File -Recurse|ForEach-Object {[ordered]@{path=$_.FullName.Substring($roots[0].FullName.Length+1);bytes=$_.Length;sha256=(Get-FileHash $_.FullName).Hash;file_version=$_.VersionInfo.FileVersion}})
+ $files|ConvertTo-Json -Depth 4|Set-Content "$out\compiler-files.json"
+ foreach($name in @('moviCompile64.dll','moviAsm64.dll','moviLLD64.dll')){if(@($files|Where-Object {[IO.Path]::GetFileName($_.path) -eq $name}).Count -ne 1){throw 'Expected compiler component missing'}}
+ $report.compiler_files=$files.Count;$report.driver_after=@(Get-CimInstance Win32_PnPSignedDriver|Where-Object {$_.DeviceName -eq 'Intel(R) NPU' -and $_.DriverProviderName -eq 'Intel Corporation'}|Select-Object DeviceName,DriverVersion,InfName,DriverProviderName)
+ $report.installed_driver_unchanged=($report.driver_before|ConvertTo-Json -Compress) -eq ($report.driver_after|ConvertTo-Json -Compress)
+ if(!$report.installed_driver_unchanged){throw 'Installed driver observation changed'}
+ $report.passed=$true
+}catch{$report.error=$_.Exception.Message;$report.error_position=$_.InvocationInfo.PositionMessage}
+finally{$report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');Save-Report}
+Get-Content "$out\report.json";if(!$report.passed){exit 1}

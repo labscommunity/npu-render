@@ -1,0 +1,8 @@
+{
+  "started": "2026-10-15T04:30:53.647731+00:00",
+  "completed": true,
+  "passed": false,
+  "error": "AssertionError('physical observer did not complete')",
+  "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\validate-native-delivery-v1.py\", line 52, in <module>\n    try:report.update(validate(v.trial))\n                      ^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\validate-native-delivery-v1.py\", line 44, in validate\n    assert len(screen_done)==1 and screen_done[0]['passed'] and [x['exit_code'] for x in screen if 'exit_code' in x]==[0],'physical observer did not complete'\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: physical observer did not complete\n",
+  "finished": "2026-10-15T04:30:53.647731+00:00"
+}

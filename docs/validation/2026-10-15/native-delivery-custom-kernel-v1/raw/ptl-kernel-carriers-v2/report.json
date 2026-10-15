@@ -1,0 +1,17 @@
+{
+  "started": "2026-10-15T04:32:35.274591+00:00",
+  "completed": true,
+  "passed": false,
+  "custom_kernel_executed": false,
+  "desktop_changed": false,
+  "cases": [],
+  "openvino_version": "2026.4.1-22982-e213a147257-releases/2026/4",
+  "device_name": "Intel(R) AI Boost",
+  "observed_execution_devices": [
+    "NPU"
+  ],
+  "execution_property_type": "str",
+  "error": "AssertionError()",
+  "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\create-ptl-kernel-carriers-v2.py\", line 39, in <module>\n    (out/(name+'.blob')).write_bytes(blob);metadata=inspect(blob)\n                                                    ^^^^^^^^^^^^^\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\create-ptl-kernel-carriers-v2.py\", line 18, in inspect\n    assert s[0]<len(strings) and (s[1]==8 or s[4]+s[5]<=len(data))\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n",
+  "finished": "2026-10-15T04:32:35.560763+00:00"
+}

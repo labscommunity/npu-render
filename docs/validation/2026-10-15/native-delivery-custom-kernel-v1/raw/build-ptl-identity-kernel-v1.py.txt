@@ -1,0 +1,54 @@
+"""Compile tiny kernels in bounded child processes; never load an NPU graph."""
+from datetime import UTC,datetime
+from pathlib import Path
+import argparse,ctypes as C,hashlib,json,os,subprocess,sys,time,traceback
+
+def obj(p):
+ b=p.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+
+p=argparse.ArgumentParser();p.add_argument('--child',choices=['3720xx','4000xx','5000xx','invalid-npu-target']);p.add_argument('--root',type=Path);p.add_argument('--output',type=Path);v=p.parse_args()
+source=b"/* Bounded experimental entry for one validated 8-element FP16 invocation.\n * MemRefData offsets and void* entry come from Intel's common_types.h and\n * vpu_nnrt_shavert.h. The host validates every descriptor before admission.\n * No graph has been patched or executed by merely compiling this file.\n */\nstatic __attribute__((always_inline)) inline unsigned load32(const unsigned char *p) {\n    return (unsigned)p[0] | ((unsigned)p[1] << 8) |\n           ((unsigned)p[2] << 16) | ((unsigned)p[3] << 24);\n}\n\nvoid nr_probe_kernel(const unsigned char *params) {\n    if (!params) return;\n    /* Three descriptors: eight input values, a scalar, eight output values. */\n    for (unsigned record = 0; record < 3; ++record) {\n        const unsigned char *p = params + record * 40;\n        if (!load32(p) || load32(p + 4) || load32(p + 8) != 1 ||\n            load32(p + 12) != 4 || load32(p + 24) != 2 ||\n            load32(p + 28) != 0x4321 || load32(p + 32) || load32(p + 36) != 2)\n            return;\n    }\n    const unsigned short *input = (const unsigned short *)load32(params);\n    unsigned short *output = (unsigned short *)load32(params + 80);\n    if ((unsigned)input == (unsigned)output) return;\n    /* Host contract fixes all six invocations to exactly eight dense elements. */\n    #pragma clang loop unroll(full)\n    for (unsigned i = 0; i < 8; ++i) output[i] = input[i];\n}\n"
+if v.child:
+ dll=v.root/'bin/moviCompile64.dll';result=dict(target=v.child,completed=False,passed=False,npu_execution=False,dll_sha256=hashlib.sha256(dll.read_bytes()).hexdigest())
+ try:
+  with os.add_dll_directory(str(dll.parent)):
+   lib=C.CDLL(str(dll),winmode=0x1100)
+   main=lib.main;main.argtypes=[C.c_int,C.POINTER(C.c_char_p),C.c_void_p,C.c_size_t,C.POINTER(C.c_void_p),C.POINTER(C.c_size_t),C.POINTER(C.c_void_p),C.POINTER(C.c_size_t)];main.restype=C.c_int
+   cleanup=lib.freeResults;cleanup.argtypes=[];cleanup.restype=None
+   args=[b'moviCompile.dll',b'-cc1',b'-triple',b'shave',b'-target-cpu',v.child.encode(),b'-S',b'-O2',b'-x',b'c',b'entry.c',b'-ffunction-sections',b'-fdata-sections',b'-o',b'-']
+   argv=(C.c_char_p*len(args))(*args);buf=C.create_string_buffer(source)
+   output=C.c_void_p();size=C.c_size_t();diagnostic=C.c_void_p();diagnostic_size=C.c_size_t();start=time.monotonic()
+   try:
+    code=main(len(args),argv,buf,len(source),C.byref(output),C.byref(size),C.byref(diagnostic),C.byref(diagnostic_size))
+    assert size.value<=16*1024*1024 and diagnostic_size.value<=1024*1024
+    data=C.string_at(output,size.value) if output.value else b''
+    diag=C.string_at(diagnostic,diagnostic_size.value) if diagnostic.value else b''
+    (v.output/(v.child+'.s')).write_bytes(data);(v.output/(v.child+'.diagnostic.txt')).write_bytes(diag)
+    result.update(tool_return=code,assembly_bytes=len(data),assembly_sha256=hashlib.sha256(data).hexdigest(),diagnostic_bytes=len(diag),elapsed_ms=(time.monotonic()-start)*1000,passed=code==0 and len(data)>0)
+   finally:cleanup()
+ except Exception as e:result.update(error=repr(e),traceback=traceback.format_exc())
+ result.update(completed=True);(v.output/(v.child+'.json')).write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result));raise SystemExit(0)
+
+r=Path(os.environ['LOCALAPPDATA'])/'npu-render';package=r/'vm/movitools-package-v2';proof=obj(package/'report.json')
+assert proof['completed'] and proof['passed'] and proof['installed_driver_unchanged']
+root=package/proof['compiler_root_relative'];manifest=obj(package/'compiler-files.json')
+for item in manifest:
+ assert hashlib.sha256((root/item['path']).read_bytes()).hexdigest()==item['sha256'].lower()
+out=r/'vm/movitools-kernel-identity-v1';out.mkdir(exist_ok=False)
+report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,npu_execution_tested=False,driver_changed=False,source_sha256=hashlib.sha256(source).hexdigest(),cases=[])
+try:
+ for target in ['3720xx','4000xx','5000xx','invalid-npu-target']:
+  with (out/(target+'.stdout.log')).open('xb') as stdout,(out/(target+'.stderr.log')).open('xb') as stderr:
+   child=subprocess.Popen([sys.executable,__file__,'--child',target,'--root',str(root),'--output',str(out)],stdout=stdout,stderr=stderr,creationflags=subprocess.CREATE_NO_WINDOW|0x4000)
+   try:child.wait(timeout=30)
+   except subprocess.TimeoutExpired:child.kill();child.wait();report['cases'].append(dict(target=target,timed_out=True,child_exit=child.returncode));continue
+  result=obj(out/(target+'.json')) if (out/(target+'.json')).exists() else dict(target=target,completed=False)
+  result['child_exit']=child.returncode;report['cases'].append(result)
+  (out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+ baseline=report['cases'][0];negative=report['cases'][-1]
+ report['passed']=bool(baseline.get('passed') and not negative.get('passed'))
+ report['target_5000_compilation_accepted']=bool(report['cases'][2].get('passed'))
+except Exception as e:report.update(error=repr(e),traceback=traceback.format_exc())
+finally:
+ report.update(completed=True,finished=datetime.now(UTC).isoformat());(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(report));raise SystemExit(0 if report['passed'] else 1)

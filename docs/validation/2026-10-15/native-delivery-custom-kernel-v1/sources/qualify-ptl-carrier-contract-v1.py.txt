@@ -1,0 +1,26 @@
+"""Offline negative contracts for a pinned Panther Lake carrier; no execution."""
+from pathlib import Path
+import hashlib,json,struct,sys
+from ptl_carrier_contract_v1 import parse,patch
+r=Path(__file__).parent;source=r/'ptl-add1-float16-v3.blob';blob=source.read_bytes();contract=parse(blob);cases=[]
+def reject(name,data):
+ try:parse(data)
+ except (ValueError,struct.error):cases.append(dict(case=name,passed=True));return
+ raise AssertionError(name+' was accepted')
+reject('truncated-header',blob[:63]);reject('truncated-section-table',blob[:4096])
+for name,offset,fmt,value in [('wrong-ELF-machine',18,'<H',62),('huge-section-count',60,'<H',65535),('invalid-section-string-index',62,'<H',65535)]:
+ b=bytearray(blob);struct.pack_into(fmt,b,offset,value);reject(name,bytes(b))
+h=struct.unpack_from('<16sHHIQQQIHHHHHH',blob);ss=[struct.unpack_from('<IIQQQQIIQQ',blob,h[6]+i*64) for i in range(h[12])];s=ss[h[13]];names=blob[s[4]:s[4]+s[5]];indices={names[x[0]:].split(b'\0',1)[0].decode():i for i,x in enumerate(ss)}
+for name,section,offset,fmt,value in [('oversize-code','task.shave.range.0.0',24,'<I',0xffffffff),('wrong-code-entry','task.shave.range.0.0',8,'<Q',1),('wrong-tile','task.shave.invocation.0.0',84,'<I',2),('wrong-precision','shave.params',24,'<I',1),('nonstatic-tensor','shave.params',8,'<I',0),('wide-tensor-address','shave.params',4,'<I',1),('overlapping-output','shave.params',80,'<I',contract['invocations'][0]['tensors'][0]['address'])]:
+ b=bytearray(blob);struct.pack_into(fmt,b,ss[indices[section]][4]+offset,value);reject(name,bytes(b))
+# Mutation targets the first dimension-array pointer, beyond the bounded block.
+s=ss[indices['rela.shave.params.symtab']];b=bytearray(blob);struct.pack_into('<q',b,s[4]+16,2**62);reject('out-of-range-dimensions-relocation',bytes(b))
+for name,text in [('empty-code',b''),('unaligned-code',b'abc'),('oversize-code',bytes(contract['code_bytes']+16))]:
+ try:patch(blob,text)
+ except ValueError:cases.append(dict(case='patch-'+name,passed=True))
+ else:raise AssertionError(name+' patch accepted')
+patched,checked=patch(blob,bytes(16));start=checked['code_offset'];end=start+checked['code_bytes']
+assert patched[:start]==blob[:start] and patched[end:]==blob[end:]
+cases.append(dict(case='only-validated-code-extent-changed',passed=True))
+report=dict(completed=True,passed=True,hardware_execution_tested=False,blob_sha256=hashlib.sha256(blob).hexdigest(),contract_sha256=hashlib.sha256((r/'ptl_carrier_contract_v1.py').read_bytes()).hexdigest(),cases=cases)
+(r/'ptl-carrier-contract-v1-qualification.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report))

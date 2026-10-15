@@ -1,0 +1,35 @@
+"""Bounded atomic frame publication; never expose a partially written frame."""
+import os
+import time
+from pathlib import Path
+
+statistics = dict(publications=0, retries=0, timeouts=0, errors={})
+
+
+def publish_frame(path, data, timeout_ms=1000):
+    if type(timeout_ms) is not int or not 1 <= timeout_ms <= 1000:
+        raise ValueError('publication retry bound rejected')
+    path = Path(path)
+    temporary = path.with_name(path.name + '.publish-' + str(os.getpid()) + '.tmp')
+    # One publisher owns this directory. A failed publication retains its complete
+    # temporary file for diagnosis and leaves the previous frame unchanged.
+    with temporary.open('xb') as stream:
+        stream.write(data)
+    deadline = time.monotonic() + timeout_ms / 1000
+    while True:
+        try:
+            temporary.replace(path)
+            statistics['publications'] += 1
+            return
+        except OSError as error:
+            code = getattr(error, 'winerror', None)
+            if code not in (5, 32, 33):
+                raise
+            key = str(code)
+            statistics['errors'][key] = statistics['errors'].get(key, 0) + 1
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                statistics['timeouts'] += 1
+                raise
+            statistics['retries'] += 1
+            time.sleep(min(.01, remaining))

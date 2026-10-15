@@ -1,0 +1,33 @@
+from pathlib import Path
+import base64,subprocess,json,hashlib,concurrent.futures
+r=Path("results/render-driver")
+directories=['native-live-v33', 'native-desktop-admission-v43', 'native-topology-primary-v19', 'native-topology-v50', 'native-topology-v51', 'native-delivery-live-v2', 'native-live-v34', 'native-desktop-admission-v44', 'native-topology-primary-v20', 'native-topology-v52', 'native-delivery-fault-v1', 'native-delivery-fault-v2', 'native-delivery-sequence-v1', 'native-live-v35', 'native-desktop-admission-v45', 'native-topology-primary-v21', 'native-topology-v54', 'native-topology-v55', 'native-delivery-live-v3', 'movitools-package-v1', 'movitools-targets-v1', 'movitools-link-v1', 'ptl-kernel-carriers-v1', 'ptl-kernel-carriers-v2', 'ptl-kernel-carriers-v3', 'movitools-kernel-identity-v1', 'movitools-kernel-identity-link-v1', 'ptl-custom-identity-v1', 'ptl-custom-identity-v1-controller']
+extras=['native-desktop-v43-source.json', 'native-desktop-v44-source.json', 'native-desktop-v45-source.json', 'ptl-carrier-contract-v1-qualification.json', 'movitools-package-v2/report.json', 'movitools-package-v2/compiler-files.json', 'movitools-package-v2/extract.log']
+source_files=['native_desktop_bootstrap_v20.py', 'run-native-desktop-v43.ps1', 'recover-native-desktop-v43.ps1', 'run-native-live-v33.ps1', 'run-native-delivery-live-v2.ps1', 'run-native-desktop-v44.ps1', 'recover-native-desktop-v44.ps1', 'run-native-live-v34.ps1', 'run-native-delivery-fault-v1.ps1', 'run-native-delivery-fault-v2.ps1', 'run-native-delivery-sequence-v1.ps1', 'run-native-desktop-v45.ps1', 'recover-native-desktop-v45.ps1', 'run-native-live-v35.ps1', 'run-native-delivery-live-v3.ps1', 'validate-native-delivery-v1.py', 'relay_native_frames_v8.py', 'native_frame_publish_v1.py', 'run-native-topology-helper-v13.ps1', 'inspect-movitools-package-v1.ps1', 'inspect-movitools-package-v2.ps1', 'probe-movitools-targets-v1.py', 'probe-movitools-link-v1.py', 'create-ptl-kernel-carriers-v1.py', 'create-ptl-kernel-carriers-v2.py', 'create-ptl-kernel-carriers-v3.py', 'build-ptl-identity-kernel-v1.py', 'link-ptl-identity-kernel-v1.py', 'ptl_carrier_contract_v1.py', 'qualify-ptl-custom-identity-v1.py']
+ps=r'''$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render"
+foreach($trial in @('native-live-v33','native-live-v34','native-live-v35','native-desktop-admission-v43','native-desktop-admission-v44','native-desktop-admission-v45','ptl-custom-identity-v1')){$q=Get-Content "$r\vm\$trial\report.json" -Raw|ConvertFrom-Json;if(!$q.completed){throw 'Cannot archive active comparison'}}
+function ArtifactHash([string]$path){$stream=[IO.File]::Open($path,[IO.FileMode]::Open,[IO.FileAccess]::Read,([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete));try{return (Get-FileHash -InputStream $stream -Algorithm SHA256).Hash}finally{$stream.Dispose()}}
+$items=@(foreach($name in @('''+','.join("'"+d+"'" for d in directories)+r''')){
+ Get-ChildItem "$r\vm\$name" -File -Recurse|Where-Object {($_.Extension -in @('.json','.jsonl','.log','.txt','.inf','.ps1','.py')) -and ($_.Name -notlike 'client-*' -or ($_.Name -like '*.stderr.log' -and $_.Length -gt 0))}|ForEach-Object {
+ if($_.Length -gt 18000000){throw 'Unexpected artifact size'}
+ [ordered]@{source=$_.FullName.Substring(("$r\vm\").Length).Replace('\','/');bytes=$_.Length;sha256=(ArtifactHash $_.FullName)}
+ }
+}
+foreach($name in @('''+','.join("'"+d+"'" for d in extras+source_files)+r''')){[ordered]@{source=$name;bytes=(Get-Item "$r\vm\$name").Length;sha256=(ArtifactHash "$r\vm\$name")}}
+);$items|ConvertTo-Json -Depth 5
+'''
+p=r/'hash-native-primary-v17.ps1';p.write_text(ps)
+subprocess.run(['scp','-q',str(p),'delta:AppData/Local/npu-render/vm/'],capture_output=True,check=True,timeout=30)
+invoke=r'''$r="$env:LOCALAPPDATA\npu-render";& ([scriptblock]::Create([IO.File]::ReadAllText("$r\vm\hash-native-primary-v17.ps1")))'''
+result=subprocess.run(['ssh','-o','BatchMode=yes','-o','ConnectTimeout=8','delta','powershell.exe -NoProfile -NonInteractive -EncodedCommand '+base64.b64encode(invoke.encode('utf-16-le')).decode()],capture_output=True,timeout=45)
+if result.returncode:print(result.stderr.decode(errors='replace')[:2000]);raise SystemExit(result.returncode)
+receipts=json.loads(result.stdout.decode('utf-8-sig'));assert 0<len(receipts)<1000
+(r/'native-primary-v17-artifact-sha256.json').write_text(json.dumps(receipts,indent=2)+'\n')
+def fetch(item):
+    name=item['source'];assert '..' not in name and not name.startswith('/');dest=r/'primary-raw-v17'/name;dest.parent.mkdir(parents=True,exist_ok=True)
+    subprocess.run(['scp','-q','-o','BatchMode=yes','delta:AppData/Local/npu-render/'+item.get('remote_source','vm/'+name),str(dest)],capture_output=True,check=True,timeout=90)
+    data=dest.read_bytes();assert len(data)==item['bytes'] and hashlib.sha256(data).hexdigest()==item['sha256'].lower()
+    if name in source_files:assert data==(r/name).read_bytes()
+    return len(data)
+with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:sizes=list(pool.map(fetch,receipts))
+print(json.dumps(dict(hash_verified_files=len(sizes),bytes=sum(sizes),source_files_matched_local=len(source_files))))

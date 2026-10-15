@@ -1,0 +1,73 @@
+"""Assemble and link the offline target probes; no NPU graph is modified."""
+from datetime import UTC,datetime
+from pathlib import Path
+import argparse,ctypes as C,hashlib,json,os,struct,subprocess,sys,time,traceback
+def obj(p):
+ b=p.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+class Buffer(C.Structure):_fields_=[('data',C.c_void_p),('size',C.c_size_t)]
+class Buffers(C.Structure):_fields_=[('items',C.POINTER(Buffer)),('count',C.c_size_t)]
+def inspect(data):
+ assert data[:7]==b'\x7fELF\x01\x01\x01' and len(data)>=52
+ h=struct.unpack_from('<16sHHIIIIIHHHHHH',data);assert h[1]==2 and h[2]==2 and h[3]==1 and h[4]==0x1d000000
+ offset,size,count,names=h[6],h[11],h[12],h[13];assert size==40 and 0<count<4096 and names<count and offset+size*count<=len(data)
+ sections=[struct.unpack_from('<10I',data,offset+i*size) for i in range(count)]
+ s=sections[names];assert s[4]+s[5]<=len(data);strings=data[s[4]:s[4]+s[5]];result=[]
+ for s in sections:
+  assert s[0]<len(strings) and (s[1]==8 or s[4]+s[5]<=len(data))
+  name=strings[s[0]:].split(b'\0',1)[0].decode('ascii');assert s[1] not in (4,9),'unresolved relocations'
+  if name=='.arg.data':assert s[5]==0,'mutable data unsupported'
+  result.append(dict(name=name,type=s[1],flags=s[2],address=s[3],bytes=s[5]))
+ text=[s for s in result if s['name']=='.text'];assert len(text)==1 and text[0]['address']==h[4] and text[0]['bytes']>0 and text[0]['flags']&4
+ return dict(elf_class=32,machine=h[2],entry=h[4],sections=result)
+p=argparse.ArgumentParser();p.add_argument('--child',choices=['3720xx','4000xx','5000xx']);p.add_argument('--root',type=Path);p.add_argument('--output',type=Path);v=p.parse_args()
+r=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=r/'vm'
+if v.child:
+ target=v.child;out=v.output;report=dict(target=target,completed=False,passed=False,npu_execution=False)
+ try:
+  compile_proof=obj(vm/('movitools-targets-v1/'+target+'.json'));assert compile_proof['passed']
+  assembly=(vm/('movitools-targets-v1/'+target+'.s')).read_bytes();assert hashlib.sha256(assembly).hexdigest()==compile_proof['assembly_sha256']
+  with os.add_dll_directory(str(v.root/'bin')):
+   lib=C.CDLL(str(v.root/'bin/moviAsm64.dll'),winmode=0x1100);main=lib.process
+   main.argtypes=[C.c_int,C.POINTER(C.c_char_p),C.c_void_p,C.c_uint32,C.POINTER(C.c_void_p),C.POINTER(C.c_size_t),C.POINTER(C.c_void_p),C.POINTER(C.c_size_t)];main.restype=C.c_int
+   cleanup=lib.freeResults;cleanup.argtypes=[];cleanup.restype=None
+   args=[b'moviAsm.dll',b'--cv',target.encode(),b'--noSPrefixing'];argv=(C.c_char_p*len(args))(*args);buf=C.create_string_buffer(assembly);data=C.c_void_p();size=C.c_size_t();diag=C.c_void_p();diag_size=C.c_size_t()
+   try:
+    code=main(len(args),argv,buf,len(assembly),C.byref(data),C.byref(size),C.byref(diag),C.byref(diag_size));assert size.value<=16*1024*1024 and diag_size.value<=1024*1024
+    diagnostic=C.string_at(diag,diag_size.value) if diag.value else b'';(out/(target+'.asm-diagnostic.txt')).write_bytes(diagnostic)
+    assert code==0 and data.value and size.value,'assembler rejected target'
+    object_bytes=C.string_at(data,size.value);(out/(target+'.o')).write_bytes(object_bytes);report['assembler_accepted']=True
+   finally:cleanup()
+   lib=C.CDLL(str(v.root/'bin/moviLLD64.dll'),winmode=0x1100);main=lib.process
+   main.argtypes=[C.c_int,C.POINTER(C.c_char_p),C.POINTER(Buffers),C.POINTER(Buffer)];main.restype=C.c_int
+   cleanup=lib.freeResults;cleanup.argtypes=[];cleanup.restype=None
+   # Minimal layout for this standalone probe. Invocation ABI is intentionally
+   # untested; the linked bytes are never inserted into a native graph here.
+   script=b'OUTPUT_FORMAT("elf32-sparc")\nOUTPUT_ARCH(sparc)\nSECTIONS { . = 0x1e000000; .arg.data : { *(.arg.data) *(.data*) . = ALIGN(16); } . = 0x1d000000; .text : { *(.text*) . = ALIGN(16); *(.rodata*) . = ALIGN(16); } }\n'
+   bufs=[C.create_string_buffer(object_bytes),C.create_string_buffer(script)];items=(Buffer*2)(*[Buffer(C.cast(b,C.c_void_p),n) for b,n in zip(bufs,[len(object_bytes),len(script)])])
+   input_storage=(Buffers*8)();input_storage[0]=Buffers(items,2);output_storage=(Buffer*8)()
+   args=[b'moviLLD.dll',b'-flavor',b'gnu',b'-EL',b'-e',b'nr_add_one',b'-z',b'max-page-size=0x10',b'--gc-sections'];argv=(C.c_char_p*len(args))(*args)
+   try:
+    code=main(len(args),argv,C.cast(input_storage,C.POINTER(Buffers)),C.cast(output_storage,C.POINTER(Buffer)));report['linker_return']=code
+    assert code==0 and output_storage[0].data and 0<output_storage[0].size<=16*1024*1024
+    data=C.string_at(output_storage[0].data,output_storage[0].size);(out/(target+'.elf')).write_bytes(data)
+    report.update(elf_sha256=hashlib.sha256(data).hexdigest(),elf_bytes=len(data),metadata=inspect(data),passed=True)
+   finally:cleanup()
+ except Exception as e:report.update(error=repr(e),traceback=traceback.format_exc())
+ report['completed']=True;(out/(target+'.json')).write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report));raise SystemExit(0)
+package=vm/'movitools-package-v2';proof=obj(package/'report.json');assert proof['passed'] and proof['installed_driver_unchanged']
+root=package/proof['compiler_root_relative']
+for item in obj(package/'compiler-files.json'):assert hashlib.sha256((root/item['path']).read_bytes()).hexdigest()==item['sha256'].lower()
+out=vm/'movitools-link-v1';out.mkdir(exist_ok=False);report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,cases=[],npu_execution_tested=False)
+try:
+ for target in ['3720xx','4000xx','5000xx']:
+  with (out/(target+'.stdout.log')).open('xb') as stdout,(out/(target+'.stderr.log')).open('xb') as stderr:
+   child=subprocess.Popen([sys.executable,__file__,'--child',target,'--root',str(root),'--output',str(out)],stdout=stdout,stderr=stderr,creationflags=subprocess.CREATE_NO_WINDOW|0x4000)
+   try:child.wait(timeout=30)
+   except subprocess.TimeoutExpired:child.kill();child.wait()
+  result=obj(out/(target+'.json')) if (out/(target+'.json')).exists() else dict(target=target,passed=False)
+  result['child_exit']=child.returncode;report['cases'].append(result)
+ report['passed']=all(x.get('passed') and x['child_exit']==0 for x in report['cases'])
+except Exception as e:report.update(error=repr(e),traceback=traceback.format_exc())
+finally:
+ report.update(completed=True,finished=datetime.now(UTC).isoformat());(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(report));raise SystemExit(0 if report['passed'] else 1)

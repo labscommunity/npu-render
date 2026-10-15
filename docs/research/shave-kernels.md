@@ -42,8 +42,10 @@ Its [limits](https://github.com/hsfzxjy/npunlock/blob/c23eded3d1d9eec88924f5709b
 matter for texture sampling: kernels operate within invocation-local tensor
 spans, with no validated graph-global addressing or cross-chunk neighborhoods.
 Its [porting plan](https://github.com/hsfzxjy/npunlock/blob/c23eded3d1d9eec88924f5709b3487640bd796d4/wiki/PORTING.md)
-treats newer generations as unverified. We inspected its source and documentation;
-we have not installed it, patched a graph, or executed its kernels on Delta.
+treats newer generations as unverified. Our initial investigation only inspected
+source. The later Panther Lake experiment below now supplies direct hardware
+evidence for our own narrowly validated kernel; it does not qualify the upstream
+parser or all of its features on this generation.
 
 The newer public compiler at commit
 [`20e7912`](https://github.com/openvinotoolkit/npu_compiler/tree/20e7912fbc230725e1ca7394762348d4f480aa65)
@@ -55,6 +57,23 @@ requires `MV_TOOLS_DIR` and `MV_TOOLS_VERSION`, invoking external Linux MoviTool
 compiler, assembler and linker paths with 5000-specific libraries. The source does
 not establish a self-contained Windows compiler switch. Availability in Delta's
 pinned compiler and execution of generated kernels remain untested.
+
+## Panther Lake execution result (2026-10-15)
+
+The [hardware evidence](../validation/2026-10-15/native-delivery-custom-kernel-v1/README.md)
+now establishes custom kernel execution on Delta with installed NPU driver 5540
+unchanged. An extracted vendor compiler accepts target `5000xx`; our own 288-byte
+identity kernel replaces only the code extent in a validated software graph.
+All six invocation spans are checked against Intel's NPU50XX definitions and
+MemRefData ABI. The upstream generic inspector rejects this graph, so its older
+layout was not assumed compatible.
+
+Original add-one, custom identity, and original add-one again each match 128
+components across changing inputs, reporting NPU execution only. This clears the
+bounded identity execution gate. Proprietary tools and graph binaries remain
+outside the repository; redistribution terms remain unresolved. The coarse
+recorded timer cannot support a latency claim. Indexed arithmetic, larger texture
+spans, fused sampling performance and provider integration remain unqualified.
 
 ## Next experiment and acceptance gates
 
@@ -70,8 +89,9 @@ establish a speedup.
 2. Characterize a tiny Panther Lake graph's kernel invocation, tensor spans and
    synchronization offline. Require generation-specific bounds checks before
    considering any replacement kernel.
-3. Execute a bounded identity/add-one kernel with changing inputs, strict device
-   reporting, an independent oracle, process timeout and known-good recovery.
+3. **Qualified for the narrow carrier:** bounded identity with changing inputs,
+   strict NPU reporting, an independent oracle, process deadline and known-good
+   original execution before and after. Extend next to indexed arithmetic.
 4. Establish arbitrary source addressing within an explicitly supplied texture
    span. Invocation-local unary success is insufficient for a sampler.
 5. Compare a fused sampler against the existing graph and GPU/Pixman baselines,

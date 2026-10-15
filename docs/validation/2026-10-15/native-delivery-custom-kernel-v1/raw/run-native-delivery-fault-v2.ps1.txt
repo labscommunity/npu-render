@@ -1,0 +1,29 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$vm="$r\vm";$out="$vm\native-delivery-fault-v2"
+if(Test-Path $out){throw 'Fault recovery qualification exists'};New-Item -ItemType Directory $out|Out-Null
+$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');completed=$false;passed=$false;fault_injection='terminate owned relay process after three verified publications';full_desktop_offload=$false;tahoma_tested=$false}
+function Save-Report{$report|ConvertTo-Json -Depth 6|Set-Content "$out\report.json"};Save-Report
+try{
+ $deadline=[DateTime]::UtcNow.AddMinutes(30)
+ do{$done=$false;try{$q=Get-Content "$vm\ptl-kernel-carriers-v2\report.json" -Raw|ConvertFrom-Json;$done=$q.completed}catch{};if($done){break};if([DateTime]::UtcNow -gt $deadline){throw 'Carrier predecessor incomplete'};Start-Sleep -Seconds 2}while($true)
+ $previous=Get-Content "$vm\native-live-v33\report.json" -Raw|ConvertFrom-Json
+ if(!$previous.completed -or !$previous.cleanup_passed -or !$previous.presenter_child_success -or !$previous.relay_passed -or !$previous.mouse_received -or !$previous.keyboard_received){throw 'Required normal delivery components unavailable'}
+ $report.previous_trial_qualified=$false;$report.previous_trial_limitation='Screen observer lifetime exceeded presenter; this trial tests early failure recovery independently'
+ if(@(Get-Process nr_registered_local_indexed_worker,nr_native_topology,nr_frame_present_probe -ErrorAction SilentlyContinue).Count){throw 'Native child process remains'}
+ $report.active_phase='native-live-v34';Save-Report
+ $ErrorActionPreference='Continue'
+ & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$vm\run-native-live-v34.ps1" > "$out\live.stdout.log" 2> "$out\live.stderr.log";$code=$LASTEXITCODE
+ $ErrorActionPreference='Stop'
+ $live=Get-Content "$vm\native-live-v34\report.json" -Raw|ConvertFrom-Json
+ if($code -ne 1 -or !$live.completed -or $live.passed -or !$live.owned_relay_fault_injected -or $live.error -ne 'Frame relay exited during presentation' -or !$live.cleanup_passed -or !$live.cursor_cleanup_passed){throw 'Injected failure not detected and recovered'}
+ $report.recovery_seconds=([DateTime]::Parse($live.finished)-[DateTime]::Parse($live.fault_injected_at)).TotalSeconds
+ if($report.recovery_seconds -gt 60){throw 'Early rollback exceeded one minute'}
+ $rows=@(Get-Content "$vm\native-topology-primary-v20\probe.log"|Where-Object {$_ -match '^\{.*\}$'}|ForEach-Object {$_|ConvertFrom-Json})
+ $topology=@($rows|Where-Object {$_.completed -and $_.topology_restored_exactly})
+ $placements=@($rows|Where-Object window_placement_recovery)
+ $bootstrap=Get-Content "$vm\native-desktop-admission-v44\bootstrap\report.json" -Raw|ConvertFrom-Json
+ if($topology.Count -ne 1 -or $placements.Count -ne 1 -or $placements[0].failed -ne 0 -or !$placements[0].cursor_restored -or !$placements[0].foreground_restored -or !$bootstrap.owned_process_acls_restored_exactly){throw 'Exact topology/window/ACL restoration incomplete'}
+ if(@(Get-Process nr_registered_local_indexed_worker,nr_native_topology,nr_frame_present_probe -ErrorAction SilentlyContinue).Count){throw 'Owned native process remains after cleanup'}
+ $report.passed=$true;$report.exact_topology_restored=$true;$report.ordinary_windows_and_cursor_restored=$true;$report.owned_acls_restored=$true;$report.no_native_children_remaining=$true
+}catch{$report.error=$_.Exception.Message;$report.error_position=$_.InvocationInfo.PositionMessage}
+finally{$report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');Save-Report}
+Get-Content "$out\report.json";if(!$report.passed){exit 1}
