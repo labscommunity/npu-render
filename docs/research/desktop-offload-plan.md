@@ -2,10 +2,11 @@
 
 Updated 2026-10-15. Target: Delta, Windows 11, Panther Lake. The repository stays
 private. **Full desktop offload is unfinished.** The latest qualified native trial
-routes Windows desktop composition through the NPU, delivers 167 matching frames
-over 2,076.05 seconds to the physical output, verifies mouse/keyboard color changes,
-and restores the machine. Its 60-second freshness gate proves sustained delivery,
-not usability. Normal application admission and a Tahoma benefit remain open.
+routes Windows desktop composition through the NPU, delivers 42 matching frames
+over a 523.93-second span to the physical output, verifies mouse/keyboard color
+changes, and restores the machine. Its 60-second freshness gate proves delivery,
+not usability. The previous renderer separately passed thirty-minute delivery.
+Normal application admission and a Tahoma benefit remain open.
 
 The primary obstacle is responsiveness. A captured cold graph takes 89.1 seconds
 to compile. The fully cached v35 worker also makes 42,760 provider calls across
@@ -14,15 +15,15 @@ calls and no compilation. These are diagnostic whole-worker counters, not a
 matched benchmark. Reducing dispatch count and rendering cost is essential in
 addition to controlling compilation.
 Our own kernels now perform the captured four-sample desktop draw across six
-compiler-owned NPU spans. Three comparisons match all 3,145,728 output components
-exactly. Complete warm draw time falls from about 9.2 seconds to 0.39 seconds,
-with 34 provider calls instead of 1,282. This is isolated replay of one retained
-request and remains too slow for ordinary desktop interaction. A separate
-96-window suite verifies changing content. Independent imported-model overlap
-caused device loss and is excluded; a fresh-process health check passed without
-reboot. The controlled thirty-minute delivery gate passes with the previous
-renderer. Per-pixel cost, live integration, broader application support and matched
-Tahoma A/B remain necessary before the switch can be called usable.
+compiler-owned NPU spans in roughly 0.37 seconds, versus about 9.2 seconds on the
+previous renderer, with exact output and 34 calls instead of 1,282. The guarded
+worker passes all 972 recorded requests, registered Direct3D qualification and
+native live v37. That finite live trial delivers 42 matching submissions over
+523.93 seconds, exercises the specialization three times, and restores ordinary
+desktop state. It remains slow: one controlled mouse response takes 27.21 seconds.
+The largest remaining shader groups and model preparation must now be addressed.
+Normal application admission and matched Tahoma A/B remain open. The earlier
+thirty-minute delivery qualification belongs to the previous renderer.
 
 The end state is one switch that moves desktop graphics work to the NPU, retains
 physical display scanout, supports normal interaction, and leaves the iGPU
@@ -35,10 +36,10 @@ renderer does not establish where every application renders.
 | Gate | Work | Acceptance evidence | Current status |
 | --- | --- | --- | --- |
 | 1. Routing | Record active physical and indirect paths before, during, and after admission; identify clone/extended configuration and actual rendering adapter. | Timestamped topology, native DWM NPU receipts, selected adapter, frame producer, exact restoration. | Automatic clone identified; v11 applies extension with the physical path preserved, produces a frame while extended, restores the clone exactly, and restores the final physical baseline. |
-| 2. Continuous rendering | Keep the native renderer alive across changing windows and content; diagnose every failed draw; distinguish model preparation from rendering and transport. | Multiple changing frames, timestamps and pixel checks, sustained operation, no hidden fallback. | V36 passes with 1,833 acknowledged NPU operations, 167 exact frame deliveries spanning 2,076.05 seconds, and four fresh owned physical observations near the end. The controlled thirty-minute delivery gate passes; production stress remains unqualified. V31 was a frozen-relay false positive and remains rejected. |
+| 2. Continuous rendering | Keep the native renderer alive across changing windows and content; diagnose every failed draw; distinguish model preparation from rendering and transport. | Multiple changing frames, timestamps and pixel checks, sustained operation, no hidden fallback. | V36 passes with 1,833 acknowledged NPU operations, 167 exact frame deliveries spanning 2,076.05 seconds, and four fresh owned physical observations near the end. The controlled thirty-minute delivery gate passes for that earlier renderer. The new six-span worker passes finite v37 integration with 42 matching submissions over 523.93 s; its thirty-minute run and production stress remain unqualified. V31 was a frozen-relay false positive and remains rejected. |
 | 3. Physical presentation | Present new NPU frames on the physical output with distinct logical desktops and no recursive mirroring. | Live sequence-to-present correlation, output identity, measured presentation mode and residual GPU work. | V36 correlates 167 exact matching submissions and verifies blue/green/red on the owned physical output. Presenter: 334 GPU copy commands including validation readback; measurement observer: 530 additional copies. Residual GPU cost and a matched baseline remain unqualified. |
 | 4. Interaction and recovery | Migrate the logical desktop, route pointer/keyboard/focus correctly, handle cursor/DPI/resolution, restore exact topology and windows. | Scripted interaction visible on physical output; emergency exit and owned-process failure recovery; ordinary login/lock path retained. | V36 passes relative motion, controlled mouse/keyboard/color changes, confinement/reacquisition and ordinary recovery. Deliberately stopping the relay in v34 triggers full owned cleanup in 25.75 seconds. Secure desktop, sleep/wake, full cursor fidelity and other faults remain open. |
-| 5. Responsiveness | Optimize resource reuse, graph compilation, dispatch granularity, transfer volume and frame pacing. | Initial target: ordinary desktop interaction at 30 fps, p95 visible response ≤100 ms, 30-minute stable run. Report cold-start time separately. | Not met. Large cold graph compilation is reproduced at 89.1 seconds. Cached replay helps but does not meet usability. A fused four-sample kernel matches all 3.15 million components of the retained slow desktop draw in three comparisons. Six compiler-owned spans reduce complete warm draw time from about 9.2 s to 0.39 s, with 34 calls. This remains far from responsiveness; per-pixel work and live integration remain open. |
+| 5. Responsiveness | Optimize resource reuse, graph compilation, dispatch granularity, transfer volume and frame pacing. | Initial target: ordinary desktop interaction at 30 fps, p95 visible response ≤100 ms, 30-minute stable run. Report cold-start time separately. | Not met. Large cold graph compilation is reproduced at 89.1 seconds. Cached replay helps but does not meet usability. A fused four-sample kernel matches all 3.15 million components of the retained slow desktop draw in three comparisons. Six compiler-owned spans reduce complete warm draw time from about 9.2 s to 0.39 s, with 34 calls. This remains far from responsiveness; Guarded live integration passes v37; responsive interaction and wider shader/geometry coverage remain open. |
 | 6. Application coverage | Admit and implement required graphics operations across browser, video and representative 3D workloads. Establish per-process adapter choice. | Capability matrix plus real hardware runs; every remaining iGPU operation accounted for. | A manually admitted default-adapter D3D11 fixture passes eight NPU operations. Unadmitted default device creation still fails in v36. Automatic admission, API coverage, browser/video/game migration remain unqualified. |
 | 7. Tahoma benefit | Run repeated baseline/offload trials under matched power, resolution and application load. | Report Tahoma throughput/latency, desktop frame times, per-engine GPU/NPU/CPU activity, memory and power; demonstrate GPU relief and no material Tahoma regression. | Earlier experiments regressed; native desktop A/B not yet run. |
 | 8. Usable switch | Integrate qualified components, install/on/off/status, recovery, documentation and CI; resolve distribution signing requirements. | Repeated clean install and enable/disable cycles, sleep/wake and failures, end-to-end test on target hardware. | Research candidates isolated; no usable full-offload product. |
@@ -55,9 +56,10 @@ role, and any GPU rendering/copy cost in the bridge must be measured.
 2. Preserve the exact six-span four-sample replay result and corrected capacity
    guard qualification. Reduce per-pixel work and broaden changing-image checks;
    independent imported-model overlap is excluded after real device loss.
-3. Expand the matched comparison to more retained requests and changing images.
-   Integrate an exact, measured improvement behind explicit shader/geometry/span
-   admission, then repeat live responsiveness and stability checks.
+3. Extend the qualified specialization to the other observed geometries and
+   prioritize the measured three-texture, two-texture and remaining slow shader
+   groups. V37 passes finite live integration; repeat responsiveness and sustained
+   stability checks after further renderer changes.
 4. Add automatic application admission and the missing graphics operations;
    establish per-process rendering devices under representative real workloads.
 5. Measure matched Tahoma baseline/offload performance and remaining GPU work.
@@ -80,6 +82,10 @@ The [six-span qualification](../validation/2026-10-15/native-six-span-rendering-
 now establishes approximately 24× improvement for that request, with exact output.
 The [scheduling investigation](../validation/2026-10-15/native-four-tap-scheduling-v1/README.md)
 retains the unsuccessful Gather layouts and concurrency failure/recovery.
+The [guarded integration checks](../validation/2026-10-15/native-six-span-integration-v1/README.md)
+and [complete replay and live trial](../validation/2026-10-15/native-six-span-live-v1/README.md)
+now pass. They also identify remaining multi-second draws and a slow controlled
+mouse response. They do not establish normal application migration or Tahoma benefit.
 These are prerequisites toward the stated
 goal, not substitutes for application migration or Tahoma improvement.
 

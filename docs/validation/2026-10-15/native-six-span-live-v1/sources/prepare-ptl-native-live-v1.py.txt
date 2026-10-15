@@ -1,0 +1,39 @@
+"""Prepare a finite native integration using qualified recovery and a pinned NPU specialization."""
+from pathlib import Path
+import hashlib,json
+r=Path('results/render-driver')
+def save(name,s):
+ p=r/name;assert not p.exists();p.write_text(s)
+s=(r/'native_desktop_bootstrap_v20.py').read_text()
+s=s.replace("p.add_argument('--memory-cache'","p.add_argument('--ptl-four-tap-blob',type=Path,required=True)\np.add_argument('--memory-cache'",1)
+s=s.replace("v=p.parse_args();assert", "v=p.parse_args();assert hashlib.sha256(v.ptl_four_tap_blob.read_bytes()).hexdigest()=='e0aca557415dba5fc651e1b47e67a33ec28cc6e20be715ba7066457f8eba4cba'\nassert",1)
+s=s.replace("env=os.environ.copy();", "env=os.environ.copy();env['NR_RENDER_PTL_FOUR_TAP_BLOB']=str(v.ptl_four_tap_blob);",1)
+s=s.replace("worker_seconds=v.monitor_seconds+45,", "ptl_four_tap_model_sha256=hashlib.sha256(v.ptl_four_tap_blob.read_bytes()).hexdigest(),worker_seconds=v.monitor_seconds+45,",1)
+save('native_desktop_bootstrap_v21.py',s)
+for prefix in ['run-native-desktop','recover-native-desktop']:
+ s=(r/(prefix+'-v45.ps1')).read_text()
+ for a,b in [('native-desktop-v45','native-desktop-v47'),('native-desktop-admission-v45','native-desktop-admission-v47'),('NativeDesktopRecovery-v45','NativeDesktopRecovery-v47')]:s=s.replace(a,b)
+ if prefix=='run-native-desktop':
+  for a,b in [('native-registration-v24','native-registration-v25'),('native-routing-v45','ptl-native-worker-v1'),('native_desktop_bootstrap_v20','native_desktop_bootstrap_v21'),('native-desktop-admission-v44','native-desktop-admission-v46')]:s=s.replace(a,b)
+  needle="'--monitor-seconds','660',";assert needle in s
+  s=s.replace(needle,needle+"'--ptl-four-tap-blob',\"$r\\vm\\ptl-six-span-quad-coordinate-v1\\patched.blob\",",1)
+  needle='$worker=';assert needle in s
+  s=s.replace(needle,'''$ptl=Get-Content "$r\\vm\\ptl-native-worker-v1-full\\report.json" -Raw|ConvertFrom-Json
+if(!$ptl.completed -or !$ptl.passed -or $ptl.specialization_accepted -lt 3){throw 'Full PTL worker replay is required'}
+'''+needle,1)
+ save(prefix+'-v47.ps1',s)
+for n in [58,59]:save(f'start-native-topology-v{n}.ps1',(r/'start-native-topology-v56.ps1').read_text().replace('v56',f'v{n}').replace('V56',f'V{n}'))
+s=(r/'dismiss-native-saver-v9.ps1').read_text().replace('native-saver-dismiss-v9','native-saver-dismiss-v10').replace('native-topology-v57','native-topology-v59');save('dismiss-native-saver-v10.ps1',s)
+s=(r/'run-native-live-v35.ps1').read_text()
+for a,b in [('native-live-v35','native-live-v37'),('NativeLiveV35','NativeLiveV37'),('native-desktop-admission-v45','native-desktop-admission-v47'),('run-native-desktop-v45','run-native-desktop-v47'),('NativeDesktopRecovery-v45','NativeDesktopRecovery-v47'),('native-topology-primary-v21','native-topology-primary-v23'),('native-topology-v54','native-topology-v58'),('InspectTopology-V54','InspectTopology-V58'),('native-registration-v24','native-registration-v25')]:s=s.replace(a,b)
+needle=" $report.active_phase='freshness-validation'";assert needle in s
+s=s.replace(needle,''' $ptlRows=@(Get-ChildItem "$r\\vm\\native-desktop-admission-v47\\bootstrap\\provider-processes\\generation-*\\worker.stdout.jsonl" -File|ForEach-Object {Read-Rows $_.FullName}|Where-Object ptl_four_tap_attempt)
+ $report.ptl_four_tap_attempts=$ptlRows.Count;$report.ptl_four_tap_accepted=@($ptlRows|Where-Object accepted).Count
+ if($report.ptl_four_tap_accepted -lt 1 -or $bootstrap.ptl_four_tap_model_sha256 -ne 'e0aca557415dba5fc651e1b47e67a33ec28cc6e20be715ba7066457f8eba4cba'){throw 'Native four-tap specialization not observed'}
+'''+needle,1)
+save('run-native-live-v37.ps1',s)
+files=list(json.loads((r/'native-desktop-v45-source.json').read_text()))
+changes={'native_desktop_bootstrap_v20.py':'native_desktop_bootstrap_v21.py','run-native-desktop-v45.ps1':'run-native-desktop-v47.ps1','recover-native-desktop-v45.ps1':'recover-native-desktop-v47.ps1','run-native-live-v35.ps1':'run-native-live-v37.ps1','start-native-topology-v54.ps1':'start-native-topology-v58.ps1'}
+files=[changes.get(f,f) for f in files];assert set(changes.values())<=set(files)
+save('native-desktop-v47-source.json',json.dumps({f:hashlib.sha256((r/f).read_bytes()).hexdigest() for f in files},indent=2)+'\n')
+print('Prepared live v37, desktop v47, bootstrap21, ten-minute topology, with unchanged recovery contracts and explicit model pin. Not yet admitted.')
