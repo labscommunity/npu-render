@@ -1,0 +1,31 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$vm="$r\vm";$out="$vm\native-stage-profile-v1"
+if(Test-Path $out){throw 'Stage profile exists'};New-Item -ItemType Directory $out|Out-Null
+$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');completed=$false;passed=$false;desktop_changed=$false;performance_comparison=$false;phases=@()}
+function Save-Report{$report|ConvertTo-Json -Depth 8|Set-Content "$out\report.json"};Save-Report
+try{
+ $deadline=[DateTime]::UtcNow.AddMinutes(120)
+ while($true){
+  $ready=$false;try{$q=Get-Content "$vm\native-combined-full-abc-v2\report.json" -Raw|ConvertFrom-Json;$ready=$q.completed}catch{}
+  if($ready){break};if([DateTime]::UtcNow -gt $deadline){throw 'Timing comparison did not finish'};Start-Sleep -Seconds 3
+ }
+ if(@(Get-Process nr_registered_local_indexed_worker -ErrorAction SilentlyContinue).Count){throw 'Another renderer is active'}
+ $qualified=Get-Content "$vm\native-combined-v3\report.json" -Raw|ConvertFrom-Json;if(!$qualified.passed){throw 'Combined renderer correctness unqualified'}
+ & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$vm\build-native-routing-v39.ps1" > "$out\build.stdout.log" 2> "$out\build.stderr.log";if($LASTEXITCODE){throw 'Profile build failed'}
+ $report.phases+=@{phase='build';passed=$true};Save-Report
+ $tickets='0,20,140,144,243,253,284,303,305,423,424,425,438,564,622,1018'
+ & "$r\toolchains\openvino-2026.4.1\Scripts\python.exe" "$vm\replay-recorded-requests-v16.py" --worker "$r\builds\native-routing-v39\Release\nr_registered_local_indexed_worker.exe" --client "$r\builds\native-routing-v20\Release\nr_registered_local_indexed_client_probe.exe" --runtime "$r\toolchains\openvino-2026.4.1\Lib\site-packages\openvino\libs" --cache "$vm\model-cache-2026-4-v209" --capture "$vm\native-desktop-admission-v37\bootstrap\requests" --output "$vm\native-stage-profile-v1-recorded" --shared-core 1 --shared-queue 1 --memory-cache 1 --memory-capacity 512 --pipeline-cache retained --quad-batch 1 --generic-batch 16384 --tickets $tickets --infer-trace 0 --compile-trace 0 --infer-profile 1 --provider-recovery 1 > "$out\replay.stdout.log" 2> "$out\replay.stderr.log"
+ if($LASTEXITCODE){throw 'Stage replay failed'}
+ $q=Get-Content "$vm\native-stage-profile-v1-recorded\report.json" -Raw|ConvertFrom-Json
+ if(!$q.passed -or $q.original_pixel_hashes_matched -ne 16 -or $q.delivery_acknowledgments -ne 16){throw 'Stage replay incomplete'}
+ $parent=@(Get-Content "$vm\native-stage-profile-v1-recorded\worker.stdout.jsonl"|ForEach-Object {$_|ConvertFrom-Json})
+ if(@($parent|Where-Object provider_process_started).Count -ne 1 -or @($parent|Where-Object provider_process_failure).Count){throw 'Provider recovery occurred during stage profile'}
+ $rows=@(Get-Content "$vm\native-stage-profile-v1-recorded\provider-processes\generation-1\worker.stdout.jsonl"|ForEach-Object {$_|ConvertFrom-Json})
+ $profiles=@($rows|Where-Object provider_draw_profile);$draws=@($rows|Where-Object {$_.passed -and $_.execution_device -eq 'NPU'})
+ if($profiles.Count -ne 16 -or $draws.Count -ne 16){throw 'Stage counters incomplete'}
+ for($i=0;$i -lt 16;++$i){$profile=$profiles[$i];$draw=$draws[$i];$calls=($profile.sites|Measure-Object calls -Sum).Sum
+  if($profile.sequence -ne $draw.sequence -or $profile.unclassified_inferences -or $calls -ne $draw.provider_requests -or @($profile.sites|Where-Object failed).Count){throw 'Stage counts do not reconcile'}
+ }
+ $report.phases+=@{phase='recorded_pixels_and_profile_counters';passed=$true;reference_outputs=16};$report.worker_binary_sha256=$q.worker_binary_sha256;$report.passed=$true
+}catch{$report.error=$_.Exception.Message}
+finally{$report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');Save-Report}
+Get-Content "$out\report.json";if(!$report.passed){exit 1}

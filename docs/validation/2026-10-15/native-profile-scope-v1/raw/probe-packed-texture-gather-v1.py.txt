@@ -1,0 +1,67 @@
+"""Compare exact normalized texture gathers with float and packed-byte inputs."""
+from pathlib import Path
+from datetime import UTC,datetime
+import gc,json,os,time,traceback
+import numpy as np
+import openvino as ov
+from openvino import opset13 as op
+root=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm/packed-texture-gather-v1';root.mkdir(exist_ok=False)
+report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,desktop_changed=False,
+    real_texture_data_used=False,renderer_integration_tested=False,models=[],phases=[],runtime=ov.get_version())
+def save():(root/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+save()
+try:
+    n=2880*1800;batch=8192;chunk=1048576
+    # The scalar normalization table exactly matches float32 UNORM decoding.
+    table=np.arange(256,dtype=np.float32)/np.float32(255)
+    raw=((np.arange(n*4,dtype=np.uint32)*17+13)%256).astype(np.uint8).reshape(n,4)
+    decoded=table[raw]
+    boundary=np.array([0,1,chunk-1,chunk,2*chunk-1,2*chunk,2*chunk+1,n-2,n-1],np.int32)
+    rng=np.random.default_rng(42)
+    positions=[np.resize(boundary,batch),np.arange(batch,dtype=np.int32),rng.integers(0,n,size=batch,dtype=np.int32)]
+    core=ov.Core();core.set_property('NPU',{'NPU_SHARED_COMMON_QUEUE':True})
+    models={}
+    for mode in ('float32','packed_u8_lut'):
+        started=time.perf_counter();indices=op.parameter([batch],np.int32,name='indices');sources=[];gather=None
+        for base in range(0,n,chunk):
+            length=min(chunk,n-base);source=op.parameter([length,4],np.float32 if mode=='float32' else np.uint8,name=f'source{base}');sources.append(source)
+            offset=op.subtract(indices,op.constant(base,np.int32));safe=op.minimum(op.maximum(offset,op.constant(0,np.int32)),op.constant(length-1,np.int32))
+            tap=op.gather(source,safe,op.constant(0,np.int32))
+            if mode!='float32':tap=op.gather(op.constant(table),op.convert(tap,np.int32),op.constant(0,np.int32))
+            bits=op.bitwise_and(op.convert(op.greater_equal(indices,op.constant(base,np.int32)),np.int32),op.convert(op.less(indices,op.constant(base+length,np.int32)),np.int32))
+            mask=op.convert(op.reshape(bits,op.constant([batch,1],np.int64),False),np.float32)
+            term=op.multiply(tap,mask);gather=term if gather is None else op.add(gather,term)
+        model=ov.Model([gather],sources+[indices])
+        for node in model.get_ops():node.set_rt_info('','precise_0')
+        ov.serialize(model,str(root/(mode+'.xml')),str(root/(mode+'.bin')))
+        model=core.read_model(str(root/(mode+'.xml')))
+        compiled=core.compile_model(model,'NPU',{'PERFORMANCE_HINT':'LATENCY','EXECUTION_MODE_HINT':'ACCURACY','NPU_SHARED_COMMON_QUEUE':True})
+        devices=compiled.get_property('EXECUTION_DEVICES');devices=[devices] if isinstance(devices,str) else list(devices)
+        assert len(devices)==1 and str(devices[0]).startswith('NPU')
+        request=compiled.create_infer_request();values=decoded if mode=='float32' else raw
+        copy_started=time.perf_counter_ns()
+        for i,base in enumerate(range(0,n,chunk)):np.copyto(request.get_input_tensor(i).data,values[base:base+chunk])
+        copy_ms=(time.perf_counter_ns()-copy_started)/1e6
+        models[mode]=(compiled,request,len(sources))
+        record=dict(mode=mode,execution_devices=devices,source_bytes=values.nbytes,initial_host_copy_ms=copy_ms,prepare_ms=(time.perf_counter()-started)*1000)
+        report['models'].append(record);save()
+        for index in positions:
+            np.copyto(request.get_input_tensor(len(sources)).data,index);request.infer()
+            assert np.array_equal(request.get_output_tensor().data,decoded[index]),f'{mode} reference mismatch'
+        record['three_index_patterns_exact']=True;save()
+    for label,mode in [('A1','float32'),('B1','packed_u8_lut'),('B2','packed_u8_lut'),('A2','float32')]:
+        _,request,input_index=models[mode];times=[];copy_times=[]
+        for iteration in range(15):
+            index=positions[iteration%len(positions)];np.copyto(request.get_input_tensor(input_index).data,index)
+            values=decoded if mode=='float32' else raw;began=time.perf_counter_ns()
+            for i,base in enumerate(range(0,n,chunk)):np.copyto(request.get_input_tensor(i).data,values[base:base+chunk])
+            copy_times.append((time.perf_counter_ns()-began)/1e6)
+            began=time.perf_counter_ns();request.infer();times.append((time.perf_counter_ns()-began)/1e6)
+            assert np.array_equal(request.get_output_tensor().data,decoded[index]),f'{mode} measured reference mismatch'
+        report['phases'].append(dict(phase=label,mode=mode,exact_components=15*batch*4,inference_ms=times,host_copy_ms=copy_times));save()
+    means={mode:float(np.mean([ms for p in report['phases'] if p['mode']==mode for ms in p['inference_ms']])) for mode in models}
+    report.update(passed=True,mean_inference_ms=means,relative_inference_reduction=1-means['packed_u8_lut']/means['float32'],input_byte_reduction=.75)
+    del models,request,compiled,model,core;gc.collect()
+except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+finally:report.update(completed=True,finished=datetime.now(UTC).isoformat());save()
+print(json.dumps(report));raise SystemExit(0 if report['passed'] else 1)

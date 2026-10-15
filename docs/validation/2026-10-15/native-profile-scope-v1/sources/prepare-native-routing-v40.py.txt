@@ -1,0 +1,44 @@
+"""Rebase previously checked scoped uploads onto the isolated, profiled worker."""
+from pathlib import Path
+import difflib,hashlib,json,shutil,subprocess,tarfile
+r=Path('results/render-driver');d=r/'native-routing-v40';shutil.copytree(r/'native-routing-v39',d);relative=Path('native/windows/registered_lab');lab=d/relative
+patch=[]
+for name in ('vertex_executor.hpp','vertex_executor.cpp','triangle_texture_draw.cpp'):
+    a=(r/'native-routing-v21'/relative/name).read_text();b=(r/'native-routing-v23'/relative/name).read_text()
+    if name=='vertex_executor.cpp':
+        a=a.replace('state->request.infer();','nr::provider::traced_infer(state->request,__FILE__,__LINE__);')
+        b=b.replace('state->request.infer();','nr::provider::traced_infer(state->request,__FILE__,__LINE__);')
+    if name=='triangle_texture_draw.cpp':
+        for old,new in [('bounded_triangle_regions(projected.triangle_bounds,clip,s.batch,s.quads)', 'bounded_triangle_regions(projected.triangle_bounds,clip,s.batch,s.quads,false,s.batch>8192)')]:a=a.replace(old,new);b=b.replace(old,new)
+    patch.extend(difflib.unified_diff(a.splitlines(keepends=True),b.splitlines(keepends=True),fromfile='a/'+str(relative/name),tofile='b/'+str(relative/name)))
+subprocess.run(['git','apply','--directory='+str(d),'-'],input=''.join(patch),text=True,check=True)
+p=lab/'vertex_executor.hpp';s=p.read_text().replace('TextureBatch bind_textures(const TexturePixels &textures);','TextureBatch bind_textures(const TexturePixels &textures,bool reuse=true);')
+s=s.replace('RegisterExecutor &owner;const TexturePixels &textures;','RegisterExecutor &owner;const TexturePixels &textures;bool reuse;').replace('TextureBatch(RegisterExecutor &executor,const TexturePixels &resources);','TextureBatch(RegisterExecutor &executor,const TexturePixels &resources,bool reuse);');p.write_text(s)
+p=lab/'vertex_executor.cpp';s=p.read_text().replace('TextureBatch::TextureBatch(RegisterExecutor &executor,const TexturePixels &resources):owner(executor),textures(resources)', 'TextureBatch::TextureBatch(RegisterExecutor &executor,const TexturePixels &resources,bool enable):owner(executor),textures(resources),reuse(enable)')
+s=s.replace('return owner.execute_internal(vertices,constants,textures,true);','return owner.execute_internal(vertices,constants,textures,reuse);')
+s=s.replace('RegisterExecutor::bind_textures(const TexturePixels &textures){return TextureBatch(*this,textures);}','RegisterExecutor::bind_textures(const TexturePixels &textures,bool reuse){return TextureBatch(*this,textures,reuse);}')
+p.write_text(s)
+p=lab/'triangle_texture_draw.cpp';s=p.read_text().replace('bool quads,component_coverage;','bool quads,component_coverage,texture_reuse=false;',1)
+needle='        validate_shader(ps);';assert s.count(needle)==1
+s=s.replace(needle,'''        char *setting=nullptr;size_t length=0;
+        if(_dupenv_s(&setting,&length,"NR_RENDER_TEXTURE_SCOPE"))throw std::runtime_error("texture scope setting unavailable");
+        if(setting){const std::string value(setting);std::free(setting);require(value=="0" || value=="1");texture_reuse=value=="1";}
+'''+needle,1)
+s=s.replace('s.pixel->bind_textures(textures);','s.pixel->bind_textures(textures,s.texture_reuse);',1);p.write_text(s)
+shutil.copy2(r/'native-routing-v23'/relative/'texture_scope_test.cpp',lab/'texture_scope_test.cpp')
+p=lab/'CMakeLists.txt';s=p.read_text();assert 'add_executable(nr_texture_scope_test' not in s
+s+='''\nadd_executable(nr_texture_scope_test texture_scope_test.cpp)
+target_compile_features(nr_texture_scope_test PRIVATE cxx_std_17)
+target_compile_options(nr_texture_scope_test PRIVATE /W4 /WX)
+target_link_libraries(nr_texture_scope_test PRIVATE nr_registered_vertex d3dcompiler)
+set_property(TARGET nr_texture_scope_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+''';p.write_text(s)
+(r/'native-routing-v40-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-routing-v40.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-native-routing-v39.ps1').read_text().replace('native-routing-v39','native-routing-v40').replace('--target nr_registered_provider_memory_cache_test','--target nr_texture_scope_test nr_registered_provider_memory_cache_test').replace("@('nr_registered_provider_memory_cache_test.exe'","@('nr_texture_scope_test.exe','nr_registered_provider_memory_cache_test.exe'")
+(r/'build-native-routing-v40.ps1').write_text(s)
+s=(r/'replay-recorded-requests-v16.py').read_text().replace("a.add_argument('--infer-profile',", "a.add_argument('--texture-scope',choices=('0','1'),default='0')\na.add_argument('--infer-profile',",1)
+s=s.replace("env['NR_RENDER_INFER_PROFILE']=v.infer_profile", "env['NR_RENDER_INFER_PROFILE']=v.infer_profile\nenv['NR_RENDER_TEXTURE_SCOPE']=v.texture_scope",1)
+s=s.replace('report.update(infer_profile=', 'report.update(texture_scope=v.texture_scope,infer_profile=',1)
+(r/'replay-recorded-requests-v17.py').write_text(s)
+print('Prepared opt-in scoped uploads with no graph changes; hardware use deferred pending profile.')

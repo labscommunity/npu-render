@@ -1,0 +1,218 @@
+{
+  "started": "2026-10-15T02:36:25.785290+00:00",
+  "completed": true,
+  "passed": true,
+  "desktop_changed": false,
+  "desktop_performance_qualified": false,
+  "tahoma_tested": false,
+  "baseline_texture_scope": "0",
+  "candidate_texture_scope": "1",
+  "generic_batch": "4096",
+  "memory_cache": "1",
+  "memory_capacity": "512",
+  "phases": [
+    {
+      "phase": "contract-CPU",
+      "passed": true,
+      "execution_device": "CPU",
+      "checked_components": 480,
+      "host_uploaded_bytes": 3072,
+      "host_recopy_bytes_avoided": 4608,
+      "invalid_scope_uses_rejected": 12,
+      "resource_generations": 6,
+      "desktop_offloaded": false
+    },
+    {
+      "phase": "contract-NPU",
+      "passed": true,
+      "execution_device": "NPU",
+      "checked_components": 480,
+      "host_uploaded_bytes": 3072,
+      "host_recopy_bytes_avoided": 4608,
+      "invalid_scope_uses_rejected": 12,
+      "resource_generations": 6,
+      "desktop_offloaded": false
+    },
+    {
+      "phase": "warm-A",
+      "texture_scope": "0",
+      "passed": true,
+      "child_totals": {
+        "draw_ms": 72147.75200000001,
+        "compile_and_draw_ms": 78139.425,
+        "provider_requests": 7103,
+        "backend_compile_calls": 30,
+        "memory_cache_hits": 15,
+        "memory_cache_evictions": 0,
+        "cache_requests": 30,
+        "cache_hits": 30
+      },
+      "before_power": {
+        "utc": "2026-10-15T02:36:26.374537+00:00",
+        "ac_online": 1,
+        "percent": 100,
+        "raw_battery_status": 1
+      },
+      "after_power": {
+        "utc": "2026-10-15T02:37:48.690258+00:00",
+        "ac_online": 1,
+        "percent": 100,
+        "raw_battery_status": 1
+      }
+    },
+    {
+      "phase": "warm-B",
+      "texture_scope": "1",
+      "passed": true,
+      "child_totals": {
+        "draw_ms": 58166.511,
+        "compile_and_draw_ms": 64613.367999999995,
+        "provider_requests": 7103,
+        "backend_compile_calls": 30,
+        "memory_cache_hits": 15,
+        "memory_cache_evictions": 0,
+        "cache_requests": 30,
+        "cache_hits": 30
+      },
+      "before_power": {
+        "utc": "2026-10-15T02:37:48.694287+00:00",
+        "ac_online": 1,
+        "percent": 100,
+        "raw_battery_status": 1
+      },
+      "after_power": {
+        "utc": "2026-10-15T02:38:57.430286+00:00",
+        "ac_online": 1,
+        "percent": 100,
+        "raw_battery_status": 1
+      }
+    },
+    {
+      "phase": "A1",
+      "texture_scope": "0",
+      "passed": true,
+      "child_totals": {
+        "draw_ms": 73157.482,
+        "compile_and_draw_ms": 79229.766,
+        "provider_requests": 7103,
+        "backend_compile_calls": 30,
+        "memory_cache_hits": 15,
+        "memory_cache_evictions": 0,
+        "cache_requests": 30,
+        "cache_hits": 30
+      },
+      "before_power": {
+        "utc": "2026-10-15T02:38:57.434285+00:00",
+        "ac_online": 1,
+        "percent": 100,
+        "raw_battery_status": 1
+      },
+      "after_power": {
+        "utc": "2026-10-15T02:40:20.783201+00:00",
+        "ac_online": 1,
+        "percent": 100,
+        "raw_battery_status": 1
+      }
+    },
+    {
+      "phase": "B1",
+      "texture_scope": "1",
+      "passed": true,
+      "child_totals": {
+        "draw_ms": 57864.943999999996,
+        "compile_and_draw_ms": 63803.431,
+        "provider_requests": 7103,
+        "backend_compile_calls": 30,
+        "memory_cache_hits": 15,
+        "memory_cache_evictions": 0,
+        "cache_requests": 30,
+        "cache_hits": 30
+      },
+      "before_power": {
+        "utc": "2026-10-15T02:40:20.785769+00:00",
+        "ac_online": 1,
+        "percent": 100,
+        "raw_battery_status": 1
+      },
+      "after_power": {
+        "utc": "2026-10-15T02:41:28.631223+00:00",
+        "ac_online": 1,
+        "percent": 100,
+        "raw_battery_status": 1
+      }
+    },
+    {
+      "phase": "B2",
+      "texture_scope": "1",
+      "passed": true,
+      "child_totals": {
+        "draw_ms": 58278.292,
+        "compile_and_draw_ms": 64447.755,
+        "provider_requests": 7103,
+        "backend_compile_calls": 30,
+        "memory_cache_hits": 15,
+        "memory_cache_evictions": 0,
+        "cache_requests": 30,
+        "cache_hits": 30
+      },
+      "before_power": {
+        "utc": "2026-10-15T02:41:28.634233+00:00",
+        "ac_online": 1,
+        "percent": 100,
+        "raw_battery_status": 1
+      },
+      "after_power": {
+        "utc": "2026-10-15T02:42:37.124416+00:00",
+        "ac_online": 1,
+        "percent": 100,
+        "raw_battery_status": 1
+      }
+    },
+    {
+      "phase": "A2",
+      "texture_scope": "0",
+      "passed": true,
+      "child_totals": {
+        "draw_ms": 72071.35399999999,
+        "compile_and_draw_ms": 78645.684,
+        "provider_requests": 7103,
+        "backend_compile_calls": 30,
+        "memory_cache_hits": 15,
+        "memory_cache_evictions": 0,
+        "cache_requests": 30,
+        "cache_hits": 30
+      },
+      "before_power": {
+        "utc": "2026-10-15T02:42:37.128449+00:00",
+        "ac_online": 1,
+        "percent": 100,
+        "raw_battery_status": 1
+      },
+      "after_power": {
+        "utc": "2026-10-15T02:43:59.988834+00:00",
+        "ac_online": 1,
+        "percent": 100,
+        "raw_battery_status": 1
+      }
+    }
+  ],
+  "binary_sha256": {
+    "nr_quad_batch_probe.exe": "2631519BB5F1C2D683FCE88BEB5382D6ABBFA8E793819590BE8D5D76191208B5",
+    "nr_registered_local_indexed_worker.exe": "A5CF61B69B3C351E2033E500A20409216E8116A0BC435CE8EBDFF3E71E2F1973",
+    "nr_registered_linear_texture_draw_test.exe": "00234062E433264B790BBF40A7A0581300EB44FDB733CFBFF9D2C6DEB4167D37",
+    "nr_registered_provider_memory_cache_test.exe": "835896750712B1C2BD00D35D6D7544985FE5B07D2AA5811EC3E181F2668658CE",
+    "nr_registered_indexed_exchange_test.exe": "109691A361A45EAB682D078E3B7DC5BC487617756782FC1250E075463C192CFE",
+    "nr_registered_derivative_test.exe": "AA4469FF5302F9014F521816F5AF37A1D1D947FC95EA8A05C4CAF1351AE42B60",
+    "nr_texture_scope_test.exe": "9CADA6F0DAC3BB925447AD9F644D308667CF39CB611C1F18AD5F2C6CBAEECF23",
+    "nr_registered_triangle_texture_draw_test.exe": "716ADA6ADC5F8103DADA3CC2ADD35B408473924F21E2CC5AF6B5CDEDC4143C7C",
+    "nr_native_probe_lease_test.exe": "6CC60086A4D33ACBDE62E562C81CB98045A80C65CE9F6FBEBD5A1D906688FF23"
+  },
+  "active_phase": "A2",
+  "mean_compile_draw_ms": {
+    "A": 78937.725,
+    "B": 64125.59299999999
+  },
+  "relative_reduction": 0.18764325929078918,
+  "at_least_ten_percent_reduction": true,
+  "finished": "2026-10-15T02:43:59.994397+00:00"
+}

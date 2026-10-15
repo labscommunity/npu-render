@@ -1,0 +1,61 @@
+"""Profile provider inference time separately from host staging and graph setup."""
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'native-routing-v39';shutil.copytree(r/'native-routing-v37',d);lab=d/'native/windows/registered_lab'
+(lab/'provider_profile.hpp').write_text(r'''#pragma once
+#include <array>
+#include <chrono>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <stdexcept>
+#include <string>
+namespace nr::provider::profile {
+inline bool enabled(){static const bool value=[](){char *text=nullptr;size_t length=0;
+    if(_dupenv_s(&text,&length,"NR_RENDER_INFER_PROFILE"))throw std::runtime_error("cannot read provider profile setting");
+    if(!text)return false;const std::string setting(text);std::free(text);
+    if(setting!="0" && setting!="1")throw std::invalid_argument("provider profile requires 0 or 1");return setting=="1";}();return value;}
+struct Site{const char *name=nullptr;uint64_t calls=0,failed=0,nanoseconds=0;};
+struct Totals{std::array<Site,32> sites{};uint64_t overflow=0;};
+inline Totals &totals(){static thread_local Totals value;return value;}
+inline void reset(){if(enabled())totals()={};}
+inline void record(const char *file,std::chrono::steady_clock::time_point began,bool failed)noexcept{
+    const auto ended=std::chrono::steady_clock::now();const char *site=std::strrchr(file,'\\');if(!site)site=std::strrchr(file,'/');site=site?site+1:file;
+    auto &value=totals();for(auto &entry:value.sites){if(!entry.name || !std::strcmp(entry.name,site)){
+        entry.name=site;++entry.calls;entry.failed+=failed?1u:0u;entry.nanoseconds+=uint64_t(std::chrono::duration_cast<std::chrono::nanoseconds>(ended-began).count());return;}}
+    ++value.overflow;
+}
+inline void emit(uint32_t sequence,uint32_t ticket,uint64_t input_bytes,uint64_t output_bytes,
+                 double shader,double projection,double coverage,double merger,double draw){
+    if(!enabled())return;const auto &value=totals();
+    std::printf("{\"provider_draw_profile\":true,\"sequence\":%u,\"dispatch_ticket\":%u,\"input_bytes\":%llu,\"output_bytes\":%llu,\"shader_ms\":%.6f,\"projection_ms\":%.6f,\"coverage_ms\":%.6f,\"merger_ms\":%.6f,\"draw_ms\":%.6f,\"unclassified_inferences\":%llu,\"sites\":[",sequence,ticket,static_cast<unsigned long long>(input_bytes),static_cast<unsigned long long>(output_bytes),shader,projection,coverage,merger,draw,static_cast<unsigned long long>(value.overflow));
+    bool comma=false;for(const auto &entry:value.sites){if(!entry.name)continue;
+        std::printf("%s{\"site\":\"%s\",\"calls\":%llu,\"failed\":%llu,\"inference_ms\":%.6f}",comma?",":"",entry.name,static_cast<unsigned long long>(entry.calls),static_cast<unsigned long long>(entry.failed),double(entry.nanoseconds)/1e6);comma=true;}
+    std::printf("]}\n");std::fflush(stdout);
+}
+}
+''')
+p=lab/'provider_infer_trace.hpp';s=p.read_text().replace('#pragma once','#pragma once\n#include "provider_profile.hpp"',1)
+needle='template<class Request> void traced_infer(Request &request,const char *file,unsigned line)'
+assert s.count(needle)==1;s=s.replace(needle,'template<class Request> void traced_infer_impl(Request &request,const char *file,unsigned line)',1)
+s=s.rstrip();assert s.endswith('}');s=s[:-1]+'''template<class Request> void traced_infer(Request &request,const char *file,unsigned line){
+ if(!profile::enabled()){traced_infer_impl(request,file,line);return;}
+ const auto began=std::chrono::steady_clock::now();
+ try{traced_infer_impl(request,file,line);profile::record(file,began,false);}
+ catch(...){profile::record(file,began,true);throw;}
+}
+}
+''';p.write_text(s)
+p=lab/'local_indexed_worker.cpp';s=p.read_text().replace('#include "provider_compile.hpp"','#include "provider_compile.hpp"\n#include "provider_profile.hpp"',1)
+needle='const auto request=ex::decode(bytes);';assert s.count(needle)==1;s=s.replace(needle,needle+'nr::provider::profile::reset();',1)
+needle='ex::require(rendered.execution_device=="NPU");';assert s.count(needle)==1
+s=s.replace(needle,needle+'''if(!provider.enabled())nr::provider::profile::emit(h.sequence,ticket,rendered.input_bytes,rendered.output_bytes,rendered.timings.shader_ms,rendered.timings.projection_ms,rendered.timings.coverage_ms,rendered.timings.merger_ms,rendered.timings.total_ms);''',1);p.write_text(s)
+(r/'native-routing-v39-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-routing-v39.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+(r/'build-native-routing-v39.ps1').write_text((r/'build-native-routing-v37.ps1').read_text().replace('native-routing-v37','native-routing-v39'))
+s=(r/'replay-recorded-requests-v15.py').read_text().replace("a.add_argument('--infer-trace',", "a.add_argument('--infer-profile',choices=('0','1'),default='0')\na.add_argument('--infer-trace',",1)
+s=s.replace("env['NR_RENDER_INFER_TRACE']=v.infer_trace", "env['NR_RENDER_INFER_TRACE']=v.infer_trace\nenv['NR_RENDER_INFER_PROFILE']=v.infer_profile",1)
+s=s.replace('report.update(memory_capacity=', 'report.update(infer_profile=v.infer_profile,memory_capacity=',1)
+(r/'replay-recorded-requests-v16.py').write_text(s)
+print('Prepared per-draw and per-provider-stage profiling; rendering unchanged, default disabled.')

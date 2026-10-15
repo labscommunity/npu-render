@@ -1,0 +1,131 @@
+"""Qualify scoped texture uploads against exact oracles and recorded desktop pixels."""
+from datetime import UTC, datetime
+from pathlib import Path
+import ctypes
+import hashlib
+import json
+import os
+import subprocess
+import sys
+import traceback
+
+root = Path(os.environ['LOCALAPPDATA']) / 'npu-render'
+vm = root / 'vm'
+out = vm / 'native-texture-scope-v1-evidence'
+out.mkdir(exist_ok=False)
+binary = root / 'builds/native-routing-v40/Release'
+runtime = root / 'toolchains/openvino-2026.4.1/Lib/site-packages/openvino/libs'
+capture = vm / 'native-desktop-admission-v37/bootstrap/requests'
+index_sha = 'b39694d8b6d66815509c5667f0203a57852d2078292a2574b29107c3136b5618'
+tickets = '0,20,140,144,243,253,284,303,305,423,424,425,438,564,622,1018'
+report = dict(started=datetime.now(UTC).isoformat(), completed=False, passed=False,
+              desktop_changed=False, desktop_performance_qualified=False, tahoma_tested=False,
+              baseline_texture_scope='0', candidate_texture_scope='1',
+              generic_batch='4096', memory_cache='1', memory_capacity='512', phases=[])
+
+
+def save():
+    (out / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
+
+
+def obj(path):
+    data = path.read_bytes()
+    return json.loads(data.decode('utf-16') if data.startswith(b'\xff\xfe') else data.decode('utf-8-sig'))
+
+
+def rows(path):
+    return [json.loads(line) for line in path.read_text(encoding='utf-8-sig').splitlines()
+            if line.startswith('{') and line.endswith('}')]
+
+
+class Power(ctypes.Structure):
+    _fields_ = [('ac', ctypes.c_ubyte), ('battery', ctypes.c_ubyte), ('percent', ctypes.c_ubyte),
+                ('reserved', ctypes.c_ubyte), ('remaining', ctypes.c_ulong), ('full', ctypes.c_ulong)]
+
+
+def power():
+    state = Power()
+    assert ctypes.windll.kernel32.GetSystemPowerStatus(ctypes.byref(state))
+    return dict(utc=datetime.now(UTC).isoformat(), ac_online=state.ac, percent=state.percent,
+                raw_battery_status=state.battery)
+
+
+def run(name, command, env, seconds):
+    report['active_phase'] = name
+    save()
+    with (out / (name + '.stdout.log')).open('xb') as stdout, (out / (name + '.stderr.log')).open('xb') as stderr:
+        result = subprocess.run(command, env=env, stdout=stdout, stderr=stderr,
+                                timeout=seconds, creationflags=subprocess.CREATE_NO_WINDOW)
+    assert result.returncode == 0, f'{name} exited {result.returncode}'
+
+
+save()
+try:
+    build = obj(binary.parent / 'registered-build-report.json')
+    assert build['clean_build']
+    for name in ('nr_registered_local_indexed_worker.exe', 'nr_texture_scope_test.exe'):
+        assert hashlib.sha256((binary / name).read_bytes()).hexdigest() == build['binary_sha256'][name].lower()
+    report['binary_sha256'] = build['binary_sha256']
+    assert hashlib.sha256((capture / 'index.jsonl').read_bytes()).hexdigest() == index_sha
+    env = {key: value for key, value in os.environ.items() if not key.startswith('NR_RENDER_')}
+    env['PATH'] = str(runtime) + os.pathsep + env.get('PATH', '')
+    env.update(NR_RENDER_NPU_CACHE=str(vm / 'model-cache-2026-4-v209'), NR_RENDER_SHARED_CORE='1',
+               NR_RENDER_SHARED_QUEUE='1', NR_RENDER_MEMORY_CACHE='1', NR_RENDER_MEMORY_CACHE_CAPACITY='512',
+               NR_RENDER_COMPILE_TRACE='0', NR_RENDER_INFER_TRACE='0', NR_RENDER_INFER_PROFILE='0')
+    for backend in ('CPU', 'NPU'):
+        name = f'contract-{backend}'
+        env['NR_RENDER_TEXTURE_SCOPE'] = '1'
+        run(name, [str(binary / 'nr_texture_scope_test.exe'), backend], env, 900)
+        proofs = [r for r in rows(out / (name + '.stdout.log')) if r.get('resource_generations')]
+        assert len(proofs) == 1 and proofs[0]['passed'] and proofs[0]['execution_device'] == backend
+        assert proofs[0]['checked_components'] == 480 and proofs[0]['resource_generations'] == 6
+        assert proofs[0]['host_uploaded_bytes'] > 0 and proofs[0]['host_recopy_bytes_avoided'] > 0
+        assert proofs[0]['invalid_scope_uses_rejected'] == 12
+        report['phases'].append(dict(phase=name, **proofs[0]))
+        save()
+    for phase, mode in [('warm-A', '0'), ('warm-B', '1'), ('A1', '0'), ('B1', '1'), ('B2', '1'), ('A2', '0')]:
+        trial = vm / ('native-texture-scope-v1-' + phase)
+        before = power()
+        assert before['ac_online'] == 1
+        command = [sys.executable, str(vm / 'replay-recorded-requests-v17.py'),
+                   '--worker', str(binary / 'nr_registered_local_indexed_worker.exe'),
+                   '--client', str(root / 'builds/native-routing-v20/Release/nr_registered_local_indexed_client_probe.exe'),
+                   '--runtime', str(runtime), '--cache', str(vm / 'model-cache-2026-4-v209'),
+                   '--capture', str(capture), '--output', str(trial), '--shared-core', '1', '--shared-queue', '1',
+                   '--memory-cache', '1', '--memory-capacity', '512', '--pipeline-cache', 'retained',
+                   '--quad-batch', '1', '--generic-batch', '4096', '--tickets', tickets,
+                   '--infer-trace', '0', '--compile-trace', '0', '--infer-profile', '0',
+                   '--provider-recovery', '1', '--texture-scope', mode]
+        # The replay owns its worker cleanup, a 1,800-second worker lease and
+        # 100-second per-request deadlines. Let its finally block reap children.
+        run(phase, command, env, None)
+        after = power()
+        assert after['ac_online'] == 1
+        proof = obj(trial / 'report.json')
+        assert proof['passed'] and proof['delivery_acknowledgments'] == proof['original_pixel_hashes_matched'] == 16
+        assert proof['capture_index_sha256'] == index_sha and proof['texture_scope'] == mode
+        parent = rows(trial / 'worker.stdout.jsonl')
+        assert sum(bool(r.get('provider_process_started')) for r in parent) == 1
+        assert not any(r.get('provider_process_failure') for r in parent)
+        draws = [r for r in rows(trial / 'provider-processes/generation-1/worker.stdout.jsonl')
+                 if r.get('passed') and r.get('execution_device') == 'NPU' and 'compile_and_draw_ms' in r]
+        assert len(draws) == 16
+        totals = {key: sum(r[key] for r in draws) for key in (
+            'draw_ms', 'compile_and_draw_ms', 'provider_requests', 'backend_compile_calls',
+            'memory_cache_hits', 'memory_cache_evictions', 'cache_requests', 'cache_hits')}
+        if not phase.startswith('warm-'):
+            assert totals['cache_requests'] == totals['cache_hits'], 'Cold model preparation invalidates timing'
+        report['phases'].append(dict(phase=phase, texture_scope=mode, passed=True,
+                                     child_totals=totals, before_power=before, after_power=after))
+        save()
+    means = {condition: sum(p['child_totals']['compile_and_draw_ms'] for p in report['phases']
+                           if p['phase'] in (condition + '1', condition + '2')) / 2 for condition in ('A', 'B')}
+    report.update(mean_compile_draw_ms=means, relative_reduction=1 - means['B'] / means['A'],
+                  at_least_ten_percent_reduction=means['B'] <= means['A'] * .9, passed=True)
+except Exception as error:
+    report.update(error=repr(error), traceback=traceback.format_exc())
+finally:
+    report.update(completed=True, finished=datetime.now(UTC).isoformat())
+    save()
+print(json.dumps(report))
+raise SystemExit(0 if report['passed'] else 1)

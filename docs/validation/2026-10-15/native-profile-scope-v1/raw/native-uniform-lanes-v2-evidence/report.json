@@ -1,0 +1,110 @@
+{
+  "started": "2026-10-15T02:30:11.696598+00:00",
+  "completed": true,
+  "passed": false,
+  "desktop_changed": false,
+  "desktop_performance_qualified": false,
+  "tahoma_tested": false,
+  "baseline_uniform_lanes": "0",
+  "candidate_uniform_lanes": "1",
+  "generic_batch": "4096",
+  "memory_cache": "1",
+  "memory_capacity": "512",
+  "phases": [
+    {
+      "phase": "contract-CPU-0",
+      "uniform_lane_contract": true,
+      "exact_components": 9442300,
+      "runtime_constants_changed": true,
+      "uniform_and_varying_indices": true,
+      "out_of_bounds_checked": true,
+      "all_shift_counts": true,
+      "execution_device": "CPU",
+      "passed": true
+    },
+    {
+      "phase": "contract-CPU-1",
+      "uniform_lane_contract": true,
+      "exact_components": 9442300,
+      "runtime_constants_changed": true,
+      "uniform_and_varying_indices": true,
+      "out_of_bounds_checked": true,
+      "all_shift_counts": true,
+      "execution_device": "CPU",
+      "passed": true
+    },
+    {
+      "phase": "contract-NPU-0",
+      "uniform_lane_contract": true,
+      "exact_components": 9442300,
+      "runtime_constants_changed": true,
+      "uniform_and_varying_indices": true,
+      "out_of_bounds_checked": true,
+      "all_shift_counts": true,
+      "execution_device": "NPU",
+      "passed": true
+    },
+    {
+      "phase": "contract-NPU-1",
+      "uniform_lane_contract": true,
+      "exact_components": 9442300,
+      "runtime_constants_changed": true,
+      "uniform_and_varying_indices": true,
+      "out_of_bounds_checked": true,
+      "all_shift_counts": true,
+      "execution_device": "NPU",
+      "passed": true
+    },
+    {
+      "phase": "warm-A",
+      "uniform_lanes": "0",
+      "passed": true,
+      "child_totals": {
+        "draw_ms": 74229.87,
+        "compile_and_draw_ms": 173788.6,
+        "provider_requests": 7103,
+        "backend_compile_calls": 30,
+        "memory_cache_hits": 15,
+        "memory_cache_evictions": 0,
+        "cache_requests": 30,
+        "cache_hits": 24
+      },
+      "before_power": {
+        "utc": "2026-10-15T02:30:33.035092+00:00",
+        "ac_online": 1,
+        "percent": 100,
+        "raw_battery_status": 1
+      },
+      "after_power": {
+        "utc": "2026-10-15T02:33:31.173460+00:00",
+        "ac_online": 1,
+        "percent": 100,
+        "raw_battery_status": 1
+      }
+    }
+  ],
+  "binary_sha256": {
+    "nr_registered_mask_test.exe": "E5E838C91A308EA11E125A5A08CB6C47A2C0F8A0A92CCF033D70D9F01D85EB91",
+    "nr_registered_typed_load_test.exe": "28F3B223A146AB3A07E6AE14FB1CA1A8B7EBC1E7008B4E740CE0314612A4F5CE",
+    "nr_registered_border_test.exe": "13509051B13A44B29EAF510CA9DFBD43B47D9FFCB57A2E4760577F9A3475E285",
+    "nr_registered_provider_memory_cache_test.exe": "71A3C87D574FF7F8C4AF95304E2A70D452536DFCB59306393B5C6A2D18A78C3A",
+    "nr_registered_local_indexed_worker.exe": "D95FB0AC51D274DD364BC92A247F5081B727CD41BE1C3C6E82978E1335E2BF3E",
+    "nr_registered_vertex_test.exe": "1207D93DEC4BA7EDCB224CCB1633703D8652BB4BDF9AFA1EBBCADB315677CBD8",
+    "nr_registered_uniform_lanes_test.exe": "80DD3089DD9C3F560EE228EF0F94F4EEA09C282F8B150C97C1E7455D83441A6E",
+    "nr_registered_linear_texture_draw_test.exe": "F42BA9214129B4F136F92EC9D31341E0F96B567519E713B38DAFEC48E3B3DF9A",
+    "nr_registered_triangle_texture_draw_test.exe": "07F906272C4021832573BFA272D5B60B98BE96F70FB9FFA4A650EFD3221BC6AA",
+    "nr_registered_uniform_draw_test.exe": "A1949BDA9CB96E2C574C7537563F0491DFCF69392377D97146E963D8DB27C393",
+    "nr_registered_texture_test.exe": "6F930893356553416202857135E739FF4964FEBFE685AA637AC005F41798E0C9",
+    "nr_registered_loop_test.exe": "5F86B1F625DE7374FA8417509FDF9D1D54F5253D7D900611E3CD52EBA38597E5",
+    "nr_native_probe_lease_test.exe": "B606EBC0965ADF045130CAA9798861F784366033C685988EE8431A4380FA9E33",
+    "nr_registered_derivative_test.exe": "68456C20B6D9C0D2EC3F188E35D63AEEC779D4EA06B79A9F2854CEC8D91664E8",
+    "nr_registered_mirror_test.exe": "691DEC21D9B4D7F8FC29A632A601A34138B26620583999947C4A820E52E85C36",
+    "nr_registered_compositor_test.exe": "EFFD13E5135E35577AC8C42B19943636423A5E34019DF817DE9846E2645CEFA1",
+    "nr_registered_indexed_exchange_test.exe": "52EC68028EFF185959BCBB19E59D4D96E132DB62F63C415C7BAB494086707A3B",
+    "nr_quad_batch_probe.exe": "794FABF41C4D2301C83598529A2AFCAEB38431881144D7BABB6C3ED0AB9A90CA"
+  },
+  "active_phase": "warm-B",
+  "error": "AssertionError('warm-B exited 1')",
+  "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\qualify-native-uniform-lanes-v2.py\", line 99, in <module>\n    run(phase, command, env, None)\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\qualify-native-uniform-lanes-v2.py\", line 59, in run\n    assert result.returncode == 0, f'{name} exited {result.returncode}'\n           ^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: warm-B exited 1\n",
+  "finished": "2026-10-15T02:34:32.825248+00:00"
+}

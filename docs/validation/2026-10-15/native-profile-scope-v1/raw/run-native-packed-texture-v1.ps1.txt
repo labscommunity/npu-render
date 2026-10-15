@@ -1,0 +1,21 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$vm="$r\vm";$out="$vm\native-packed-texture-v1"
+if(Test-Path $out){throw 'Packed texture trial exists'};New-Item -ItemType Directory $out|Out-Null
+$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');completed=$false;passed=$false;desktop_changed=$false;renderer_integrated=$false}
+function Save-Report{$report|ConvertTo-Json -Depth 5|Set-Content "$out\report.json"};Save-Report;$process=$null
+try{
+ $deadline=[DateTime]::UtcNow.AddMinutes(150)
+ while($true){
+  $ready=$false
+  try{if(Test-Path "$vm\native-stage-profile-v1\report.json"){$q=Get-Content "$vm\native-stage-profile-v1\report.json" -Raw|ConvertFrom-Json;if($q.completed -and !$q.passed){throw 'Stage profile failed'};$ready=$q.completed -and $q.passed}}catch{if($_.Exception.Message -eq 'Stage profile failed'){throw}}
+  if($ready){break};if([DateTime]::UtcNow -gt $deadline){throw 'Stage profile did not finish'};Start-Sleep -Seconds 3
+ }
+ if(@(Get-Process nr_registered_local_indexed_worker -ErrorAction SilentlyContinue).Count){throw 'Another NPU renderer is active'}
+ $process=Start-Process "$r\toolchains\openvino-2026.4.1\Scripts\python.exe" -ArgumentList @(('"'+"$vm\probe-packed-texture-gather-v1.py"+'"')) -PassThru -WindowStyle Hidden -RedirectStandardOutput "$out\probe.stdout.log" -RedirectStandardError "$out\probe.stderr.log"
+ $null=$process.Handle;$report.probe_pid=$process.Id;Save-Report
+ if(!$process.WaitForExit(600000)){throw 'Packed texture probe exceeded ten minutes'};$process.Refresh();$report.probe_exit=$process.ExitCode
+ if($process.ExitCode){throw 'Packed texture probe failed'}
+ $q=Get-Content "$vm\packed-texture-gather-v1\report.json" -Raw|ConvertFrom-Json;if(!$q.completed -or !$q.passed){throw 'Packed texture proof incomplete'}
+ $report.passed=$true
+}catch{$report.error=$_.Exception.Message}
+finally{if($process){if(!$process.HasExited){$process.Kill();[void]$process.WaitForExit(5000);$report.owned_probe_terminated=$true};$process.Dispose()};$report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');Save-Report}
+Get-Content "$out\report.json";if(!$report.passed){exit 1}

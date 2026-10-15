@@ -1,0 +1,35 @@
+--- a/native/windows/registered_lab/uniform_lanes_test.cpp
++++ b/native/windows/registered_lab/uniform_lanes_test.cpp
+@@ -94,11 +94,18 @@
+     auto lookup=reg(Register::indexable,0); lookup.relative={true,Register::temporary,0,0};
+     program.instructions={operation(Opcode::move,reg(Register::temporary,0),{reg(Register::constant,0)}),
+         operation(Opcode::move,reg(Register::output,0),{lookup})};
+-    std::vector<VertexRegisters> input(count); PixelExecutor executor(program,count,backend); uint64_t checked=0;
++    std::vector<VertexRegisters> input(count); uint64_t checked=0;
+     for(const uint32_t address:{0u,1u,2u,UINT32_MAX,0u}) {
++        PixelExecutor executor(program,count,backend);
+         VertexConstants constants;constants[0]={{address,0,0,0}};
+         if(address<2)checked+=verify(program,input,constants,executor.execute(input,constants),backend);
+-        else {bool rejected=false;try{(void)executor.execute(input,constants);}catch(const std::runtime_error&){rejected=true;}TEST(rejected);}
++        else {
++            bool rejected=false;try{(void)executor.execute(input,constants);}catch(const std::runtime_error&){rejected=true;}TEST(rejected);
++            // Failed executors are deliberately poisoned. Verify rejection,
++            // then construct a fresh executor for the next bounds case.
++            constants[0][0][0]=0;rejected=false;
++            try{(void)executor.execute(input,constants);}catch(const std::invalid_argument&){rejected=true;}TEST(rejected);
++        }
+     }
+     return checked;
+ }
+@@ -107,8 +114,11 @@
+     TEST(argc==2);const std::string backend=argv[1];TEST(backend=="CPU" || backend=="NPU");
+     uint64_t checked=0;
+     for(const unsigned count:{1u,32u,8192u}) {
++        std::printf("{\"uniform_contract_stage\":\"constant_lookups\",\"count\":%u}\n",count);std::fflush(stdout);
+         checked+=constant_lookups(backend,count);
++        std::printf("{\"uniform_contract_stage\":\"shifts_and_branches\",\"count\":%u}\n",count);std::fflush(stdout);
+         checked+=shifts_and_branches(backend,count);
++        std::printf("{\"uniform_contract_stage\":\"literal_bounds\",\"count\":%u}\n",count);std::fflush(stdout);
+         checked+=literal_bounds(backend,count);
+     }
+     std::printf("{\"uniform_lane_contract\":true,\"exact_components\":%llu,\"runtime_constants_changed\":true,\"uniform_and_varying_indices\":true,\"out_of_bounds_checked\":true,\"all_shift_counts\":true,\"execution_device\":\"%s\",\"passed\":true}\n",static_cast<unsigned long long>(checked),backend.c_str());return 0;

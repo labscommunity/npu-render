@@ -132,11 +132,18 @@ alone increase aggregate preparation plus draw time by 8.54%; adding sharing bri
 the combination to only 3.06% faster than baseline. The separate 65-draw sample
 regresses 4.25%. The candidate misses the proposed 10% gate and is not promoted.
 
-Next, measure provider inference by drawing stage and qualify keeping uniform
-shader expressions scalar until a varying operation requires expansion. The
-existing hardware trace contains repeated constant-buffer lookups across pixel
-lanes; reducing those lookups targets shader work that batching does not remove.
-Exact CPU/NPU fixtures and recorded pixel comparisons must precede promotion.
+The [stage profile and scoped-upload investigation](../validation/2026-10-15/native-profile-scope-v1/README.md)
+identifies the shared vertex/pixel shader executor as the largest measured
+inference cost in sixteen recorded draws. Scoped texture uploads reduce matched
+preparation plus drawing time by 18.76%, with all 96 outputs exact and no recovery.
+The complete-stream and native checks remain required before promotion.
+Reported binding bytes are not measured host-copy or device-bus traffic.
+
+Keeping uniform shader expressions scalar passes 9.44 million checked components
+in each CPU/NPU baseline/candidate configuration, but the recorded candidate
+differs at ticket 140. It remains excluded from desktop admission. A diagnostic
+separates each graph transformation and compares both providers on that captured
+draw before attributing the mismatch to semantics or compiler lowering.
 
 The diagnostic relay and presenter also impose fixed 100 ms waits. Those waits
 prevent a 30 fps bridge even if rendering becomes faster. An event-driven relay

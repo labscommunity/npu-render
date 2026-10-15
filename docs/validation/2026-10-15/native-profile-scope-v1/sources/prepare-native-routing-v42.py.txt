@@ -1,0 +1,62 @@
+"""Keep provably uniform shader values scalar until a varying operation needs them."""
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'native-routing-v42';shutil.copytree(r/'native-routing-v39',d);lab=d/'native/windows/registered_lab';p=lab/'vertex_executor.cpp';s=p.read_text()
+needle='        const auto batch_shape = indices({int64_t(count), 1});';assert s.count(needle)==1
+s=s.replace(needle,'''        bool uniform_lanes=false;char *uniform_setting=nullptr;size_t uniform_length=0;
+        if(_dupenv_s(&uniform_setting,&uniform_length,"NR_RENDER_UNIFORM_LANES"))throw std::runtime_error("uniform lane setting unavailable");
+        if(uniform_setting){const std::string value(uniform_setting);std::free(uniform_setting);check(value=="0" || value=="1");uniform_lanes=value=="1" && program.stage==Stage::pixel;}
+        const auto scalar=[&](const Node &value){check(bool(value));const auto shape=value->get_output_shape(0);
+            return uniform_lanes && (shape.empty() || shape==ov::Shape{1} || shape==ov::Shape{1,1});};
+'''+needle,1)
+a=s.index('        auto choose = [&]');b=s.index('        auto load = [&]',a)
+s=s[:a]+'''        auto choose = [&](const Node &condition, const Node &yes, const Node &no) -> Node {
+            // Keep the existing integer-index selection contract. A one-element
+            // condition and alternatives need one selection, not one per pixel.
+            const uint32_t selected_count=scalar(condition) && scalar(yes) && scalar(no)?1u:count;
+            const auto selected_shape=indices({int64_t(selected_count),1});
+            const auto widen=[&](const Node &value)->Node{return std::make_shared<op::Broadcast>(value,selected_shape);};
+            const auto alternate=std::make_shared<op::Reshape>(std::make_shared<op::Convert>(
+                std::make_shared<op::LogicalNot>(widen(condition)),ov::element::i32),indices({int64_t(selected_count)}),false);
+            Node selected_rows=selected_count==count?Node(rows):Node(op::Constant::create(ov::element::i32,ov::Shape{1},{0}));
+            const auto index=std::make_shared<op::Add>(selected_rows,std::make_shared<op::Multiply>(alternate,integer(int32_t(selected_count))));
+            return std::make_shared<op::Gather>(std::make_shared<op::Concat>(ov::OutputVector{widen(yes),widen(no)},0),index,integer(0));
+        };
+'''+s[b:]
+needle='                index = std::make_shared<op::Reshape>(batch(index), indices({int64_t(count)}), false);';assert s.count(needle)==1
+s=s.replace(needle,'''                const uint32_t lookup_count=scalar(index)?1u:count;
+                index=std::make_shared<op::Reshape>(lookup_count==1?index:batch(index),indices({int64_t(lookup_count)}),false);''',1)
+needle='''                if(a.kind==Register::indexable)invalid_coordinates.push_back(std::make_shared<op::Reshape>(
+                    std::make_shared<op::Convert>(std::make_shared<op::LogicalNot>(valid),ov::element::i32),batch_shape,false));'''
+assert s.count(needle)==1;s=s.replace(needle,'''                if(a.kind==Register::indexable)invalid_coordinates.push_back(batch(std::make_shared<op::Reshape>(
+                    std::make_shared<op::Convert>(std::make_shared<op::LogicalNot>(valid),ov::element::i32),indices({int64_t(lookup_count),1}),false)));''',1)
+a=s.index('        auto shift_right = [&]');b=s.index('        for (const auto &instruction : program.instructions)',a);block=s[a:b]
+needle='''                const auto index=std::make_shared<op::Reshape>(batch(chunk),indices({int64_t(count)}),false);''';assert block.count(needle)==1
+block=block.replace(needle,'''                const uint32_t lookup_count=scalar(chunk)?1u:count;
+                const auto lookup_shape=indices({int64_t(lookup_count),1});
+                const auto index=std::make_shared<op::Reshape>(lookup_count==1?chunk:batch(chunk),indices({int64_t(lookup_count)}),false);''',1)
+assert block.count('index,integer(0)),batch_shape,false)')==2
+block=block.replace('index,integer(0)),batch_shape,false)','index,integer(0)),lookup_shape,false)')
+s=s[:a]+block+s[b:];p.write_text(s)
+shutil.copyfile(r/'uniform-lanes-contract-v1.cpp',lab/'uniform_lanes_test.cpp')
+p=lab/'CMakeLists.txt';s=p.read_text();needle='add_test(NAME registered_vertex_contract COMMAND nr_registered_vertex_test)';assert s.count(needle)==1
+s=s.replace(needle,needle+'''
+add_executable(nr_registered_uniform_lanes_test uniform_lanes_test.cpp)
+target_compile_features(nr_registered_uniform_lanes_test PRIVATE cxx_std_17)
+target_compile_options(nr_registered_uniform_lanes_test PRIVATE /W4 /WX)
+target_link_libraries(nr_registered_uniform_lanes_test PRIVATE nr_registered_vertex)
+set_property(TARGET nr_registered_uniform_lanes_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+add_test(NAME registered_uniform_lanes_contract COMMAND nr_registered_uniform_lanes_test CPU)
+''',1);p.write_text(s)
+(r/'native-routing-v42-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-routing-v42.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-native-routing-v39.ps1').read_text().replace('native-routing-v39','native-routing-v42')
+tests=['uniform_lanes','vertex','texture','typed_load','loop','mask','mirror','border','compositor','uniform_draw']
+s=s.replace('--target nr_registered_provider_memory_cache_test','--target '+' '.join('nr_registered_'+t+'_test' for t in tests)+' nr_registered_provider_memory_cache_test')
+s=s.replace("@('nr_registered_provider_memory_cache_test.exe'","@("+','.join("'nr_registered_"+t+"_test.exe'" for t in tests)+",'nr_registered_provider_memory_cache_test.exe'")
+(r/'build-native-routing-v42.ps1').write_text(s)
+s=(r/'replay-recorded-requests-v16.py').read_text().replace("a.add_argument('--infer-profile',", "a.add_argument('--uniform-lanes',choices=('0','1'),default='0')\na.add_argument('--infer-profile',",1)
+s=s.replace("env['NR_RENDER_INFER_PROFILE']=v.infer_profile", "env['NR_RENDER_INFER_PROFILE']=v.infer_profile\nenv['NR_RENDER_UNIFORM_LANES']=v.uniform_lanes",1)
+s=s.replace('report.update(infer_profile=', 'report.update(uniform_lanes=v.uniform_lanes,infer_profile=',1)
+(r/'replay-recorded-requests-v18.py').write_text(s)
+print('Prepared uniform-expression candidate, default disabled. No CPU arithmetic substitution or hardware qualification.')

@@ -1,0 +1,21 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$vm="$r\vm";$out="$vm\native-texture-scope-v1"
+if(Test-Path $out){throw 'Scoped texture upload trial exists'};New-Item -ItemType Directory $out|Out-Null
+$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');completed=$false;passed=$false;desktop_changed=$false;phases=@()}
+function Save-Report{$report|ConvertTo-Json -Depth 6|Set-Content "$out\report.json"};Save-Report
+try{
+ $deadline=[DateTime]::UtcNow.AddMinutes(150)
+ while($true){
+  $ready=$false;try{$q=Get-Content "$vm\native-uniform-lanes-v2\report.json" -Raw|ConvertFrom-Json;$ready=$q.completed}catch{}
+  if($ready){break};if([DateTime]::UtcNow -gt $deadline){throw 'Earlier probe did not finish'};Start-Sleep -Seconds 3
+ }
+ if(@(Get-Process nr_registered_local_indexed_worker -ErrorAction SilentlyContinue).Count){throw 'Another renderer is active'}
+ & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$vm\build-native-routing-v40.ps1" > "$out\build.stdout.log" 2> "$out\build.stderr.log";if($LASTEXITCODE){throw 'Scoped texture upload build failed'}
+ $report.phases+=@{phase='build';passed=$true};Save-Report
+ & "$r\toolchains\openvino-2026.4.1\Scripts\python.exe" "$vm\qualify-native-texture-scope-v1.py" > "$out\qualify.stdout.log" 2> "$out\qualify.stderr.log"
+ if($LASTEXITCODE){throw 'Scoped texture upload qualification failed'}
+ $q=Get-Content "$vm\native-texture-scope-v1-evidence\report.json" -Raw|ConvertFrom-Json
+ if(!$q.completed -or !$q.passed){throw 'Scoped texture upload proof incomplete'}
+ $report.phases+=@{phase='contracts_and_recorded_comparison';passed=$true};$report.relative_reduction=$q.relative_reduction;$report.at_least_ten_percent_reduction=$q.at_least_ten_percent_reduction;$report.passed=$true
+}catch{$report.error=$_.Exception.Message}
+finally{$report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');Save-Report}
+Get-Content "$out\report.json";if(!$report.passed){exit 1}

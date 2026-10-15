@@ -1,0 +1,84 @@
+--- /dev/null
++++ b/native/windows/registered_lab/provider_profile.hpp
+@@ -0,0 +1,33 @@
++#pragma once
++#include <array>
++#include <chrono>
++#include <cstdint>
++#include <cstdio>
++#include <cstdlib>
++#include <cstring>
++#include <stdexcept>
++#include <string>
++namespace nr::provider::profile {
++inline bool enabled(){static const bool value=[](){char *text=nullptr;size_t length=0;
++    if(_dupenv_s(&text,&length,"NR_RENDER_INFER_PROFILE"))throw std::runtime_error("cannot read provider profile setting");
++    if(!text)return false;const std::string setting(text);std::free(text);
++    if(setting!="0" && setting!="1")throw std::invalid_argument("provider profile requires 0 or 1");return setting=="1";}();return value;}
++struct Site{const char *name=nullptr;uint64_t calls=0,failed=0,nanoseconds=0;};
++struct Totals{std::array<Site,32> sites{};uint64_t overflow=0;};
++inline Totals &totals(){static thread_local Totals value;return value;}
++inline void reset(){if(enabled())totals()={};}
++inline void record(const char *file,std::chrono::steady_clock::time_point began,bool failed)noexcept{
++    const auto ended=std::chrono::steady_clock::now();const char *site=std::strrchr(file,'\\');if(!site)site=std::strrchr(file,'/');site=site?site+1:file;
++    auto &value=totals();for(auto &entry:value.sites){if(!entry.name || !std::strcmp(entry.name,site)){
++        entry.name=site;++entry.calls;entry.failed+=failed?1u:0u;entry.nanoseconds+=uint64_t(std::chrono::duration_cast<std::chrono::nanoseconds>(ended-began).count());return;}}
++    ++value.overflow;
++}
++inline void emit(uint32_t sequence,uint32_t ticket,uint64_t input_bytes,uint64_t output_bytes,
++                 double shader,double projection,double coverage,double merger,double draw){
++    if(!enabled())return;const auto &value=totals();
++    std::printf("{\"provider_draw_profile\":true,\"sequence\":%u,\"dispatch_ticket\":%u,\"input_bytes\":%llu,\"output_bytes\":%llu,\"shader_ms\":%.6f,\"projection_ms\":%.6f,\"coverage_ms\":%.6f,\"merger_ms\":%.6f,\"draw_ms\":%.6f,\"unclassified_inferences\":%llu,\"sites\":[",sequence,ticket,static_cast<unsigned long long>(input_bytes),static_cast<unsigned long long>(output_bytes),shader,projection,coverage,merger,draw,static_cast<unsigned long long>(value.overflow));
++    bool comma=false;for(const auto &entry:value.sites){if(!entry.name)continue;
++        std::printf("%s{\"site\":\"%s\",\"calls\":%llu,\"failed\":%llu,\"inference_ms\":%.6f}",comma?",":"",entry.name,static_cast<unsigned long long>(entry.calls),static_cast<unsigned long long>(entry.failed),double(entry.nanoseconds)/1e6);comma=true;}
++    std::printf("]}\n");std::fflush(stdout);
++}
++}
+--- a/native/windows/registered_lab/local_indexed_worker.cpp
++++ b/native/windows/registered_lab/local_indexed_worker.cpp
+@@ -3,6 +3,7 @@
+ #include "indexed_pipeline.hpp"
+ #include "provider_process.hpp"
+ #include "provider_compile.hpp"
++#include "provider_profile.hpp"
+ #include "coverage_statistics.hpp"
+ #include "fifo_dispatch.hpp"
+ #include "request_recording.hpp"
+@@ -95,9 +96,9 @@
+                     const auto reply=dispatch.execute(ticket,turn_deadline,[&]{
+                         entered=GetTickCount64();recording.request(ticket,bytes);
+                         const auto counts=pipeline.retained_pipeline_counts();std::printf("{\"pipeline_before_request\":true,\"dispatch_ticket\":%u,\"uniform\":%zu,\"triangle\":%zu,\"clear\":%zu,\"point\":%zu,\"linear\":%zu}\n",ticket,counts[0],counts[1],counts[2],counts[3],counts[4]);std::fflush(stdout);
+-                        const auto request=ex::decode(bytes);const auto began=std::chrono::steady_clock::now();const auto before=nr::provider::compile_statistics();const auto coverage_before=nr::raster::coverage_statistics();
++                        const auto request=ex::decode(bytes);nr::provider::profile::reset();const auto began=std::chrono::steady_clock::now();const auto before=nr::provider::compile_statistics();const auto coverage_before=nr::raster::coverage_statistics();
+                         const auto rendered=[&]{try{if(provider.enabled())return provider.execute(bytes,h,request_deadline,stop_event.value);nr::registered_lab::provider_test_exception(ticket);return pipeline.execute(request);}catch(const std::exception &error){capture_failed_request(bytes,h,ticket);std::fprintf(stderr,"%s\n",error.what());std::fflush(stderr);throw;}catch(...){capture_failed_request(bytes,h,ticket);throw;}}();const auto after=nr::provider::compile_statistics();const auto coverage_after=nr::raster::coverage_statistics();const auto elapsed=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-began).count();
+-                        ex::require(rendered.execution_device=="NPU");const auto result=ex::response(h,rendered);recording.response(ticket,result);++succeeded;
++                        ex::require(rendered.execution_device=="NPU");if(!provider.enabled())nr::provider::profile::emit(h.sequence,ticket,rendered.input_bytes,rendered.output_bytes,rendered.timings.shader_ms,rendered.timings.projection_ms,rendered.timings.coverage_ms,rendered.timings.merger_ms,rendered.timings.total_ms);const auto result=ex::response(h,rendered);recording.response(ticket,result);++succeeded;
+                         std::printf("{\"client_pid\":%u,\"sequence\":%u,\"execution_device\":\"NPU\",\"server_thread_id\":%lu,\"provider_requests\":%llu,\"draw_ms\":%.3f,\"compile_and_draw_ms\":%.3f,\"compile_calls\":%llu,\"backend_compile_calls\":%llu,\"memory_cache_requests\":%llu,\"memory_cache_hits\":%llu,\"memory_cache_evictions\":%llu,\"cache_requests\":%llu,\"cache_hits\":%llu,\"provider_setup_ms\":%.3f,\"backend_compile_ms\":%.3f,\"compact_coverage_calls\":%llu,\"compact_coverage_samples\":%llu,\"wide_coverage_calls\":%llu,\"passed\":true,\"displayed_frames\":0}\n",
+                             h.client_pid,h.sequence,GetCurrentThreadId(),static_cast<unsigned long long>(rendered.provider_requests),rendered.timings.total_ms,elapsed,
+                             static_cast<unsigned long long>(after.calls-before.calls),static_cast<unsigned long long>(after.backend_calls-before.backend_calls),static_cast<unsigned long long>(after.memory_requests-before.memory_requests),static_cast<unsigned long long>(after.memory_hits-before.memory_hits),static_cast<unsigned long long>(after.memory_evictions-before.memory_evictions),static_cast<unsigned long long>(after.cache_requests-before.cache_requests),static_cast<unsigned long long>(after.cache_hits-before.cache_hits),double(after.setup_ns-before.setup_ns)/1e6,double(after.backend_ns-before.backend_ns)/1e6,static_cast<unsigned long long>(coverage_after.compact_calls-coverage_before.compact_calls),static_cast<unsigned long long>(coverage_after.compact_samples-coverage_before.compact_samples),static_cast<unsigned long long>(coverage_after.wide_calls-coverage_before.wide_calls));std::fflush(stdout);
+--- a/native/windows/registered_lab/provider_infer_trace.hpp
++++ b/native/windows/registered_lab/provider_infer_trace.hpp
+@@ -1,4 +1,5 @@
+ #pragma once
++#include "provider_profile.hpp"
+ #include <array>
+ #include <chrono>
+ #include <cstdio>
+@@ -30,10 +31,16 @@
+  }std::fflush(stdout);
+ }
+ }
+-template<class Request> void traced_infer(Request &request,const char *file,unsigned line){
++template<class Request> void traced_infer_impl(Request &request,const char *file,unsigned line){
+  if(!infer_trace::enabled()){request.infer();return;}
+  const auto began=infer_trace::Clock::now();const char *site=std::strrchr(file,'\\');if(!site)site=std::strrchr(file,'/');site=site?site+1:file;
+  infer_trace::Event event{};event.thread=std::hash<std::thread::id>{}(std::this_thread::get_id());event.request_address=uint64_t(reinterpret_cast<uintptr_t>(&request));event.utc_us=std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();event.site=site;event.line=line;
+  try{request.infer();infer_trace::save(event,began);}catch(...){event.failed=true;infer_trace::save(event,began);throw;}
+ }
++template<class Request> void traced_infer(Request &request,const char *file,unsigned line){
++ if(!profile::enabled()){traced_infer_impl(request,file,line);return;}
++ const auto began=std::chrono::steady_clock::now();
++ try{traced_infer_impl(request,file,line);profile::record(file,began,false);}
++ catch(...){profile::record(file,began,true);throw;}
+ }
++}

@@ -1,0 +1,213 @@
+--- a/native/windows/registered_lab/CMakeLists.txt
++++ b/native/windows/registered_lab/CMakeLists.txt
+@@ -62,6 +62,13 @@
+ target_link_libraries(nr_registered_vertex_test PRIVATE d3dcompiler nr_registered_vertex)
+ set_property(TARGET nr_registered_vertex_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+ add_test(NAME registered_vertex_contract COMMAND nr_registered_vertex_test)
++add_executable(nr_registered_uniform_lanes_test uniform_lanes_test.cpp)
++target_compile_features(nr_registered_uniform_lanes_test PRIVATE cxx_std_17)
++target_compile_options(nr_registered_uniform_lanes_test PRIVATE /W4 /WX)
++target_link_libraries(nr_registered_uniform_lanes_test PRIVATE nr_registered_vertex)
++set_property(TARGET nr_registered_uniform_lanes_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
++add_test(NAME registered_uniform_lanes_contract COMMAND nr_registered_uniform_lanes_test CPU)
++
+ add_executable(nr_registered_vertex_stream_probe vertex_stream_probe.cpp)
+ target_compile_features(nr_registered_vertex_stream_probe PRIVATE cxx_std_17)
+ target_compile_options(nr_registered_vertex_stream_probe PRIVATE /W4 /WX)
+--- a/native/windows/registered_lab/vertex_executor.cpp
++++ b/native/windows/registered_lab/vertex_executor.cpp
+@@ -121,6 +121,11 @@
+             literal_tables[i]={op::Constant::create(ov::element::f32,ov::Shape{size,4},floats),
+                                op::Constant::create(ov::element::i32,ov::Shape{size,4},bits)};
+         }
++        bool uniform_lanes=false;char *uniform_setting=nullptr;size_t uniform_length=0;
++        if(_dupenv_s(&uniform_setting,&uniform_length,"NR_RENDER_UNIFORM_LANES"))throw std::runtime_error("uniform lane setting unavailable");
++        if(uniform_setting){const std::string value(uniform_setting);std::free(uniform_setting);check(value=="0" || value=="1");uniform_lanes=value=="1" && program.stage==Stage::pixel;}
++        const auto scalar=[&](const Node &value){check(bool(value));const auto shape=value->get_output_shape(0);
++            return uniform_lanes && (shape.empty() || shape==ov::Shape{1} || shape==ov::Shape{1,1});};
+         const auto batch_shape = indices({int64_t(count), 1});
+         auto batch = [&](const Node &value) -> Node {
+             check(bool(value)); return std::make_shared<op::Broadcast>(value, batch_shape);
+@@ -129,13 +134,16 @@
+         for (uint32_t i = 0; i < count; ++i) row_numbers[i] = int32_t(i);
+         const auto rows = op::Constant::create(ov::element::i32, ov::Shape{count}, row_numbers);
+         auto choose = [&](const Node &condition, const Node &yes, const Node &no) -> Node {
+-            // NPU Select produced wrong elements for batched control flow.
+-            // Select rows by integer index instead, as for bounded CB reads.
+-            const auto alternate = std::make_shared<op::Reshape>(
+-                std::make_shared<op::Convert>(std::make_shared<op::LogicalNot>(batch(condition)), ov::element::i32),
+-                indices({int64_t(count)}), false);
+-            const auto index = std::make_shared<op::Add>(rows, std::make_shared<op::Multiply>(alternate, integer(int32_t(count))));
+-            return std::make_shared<op::Gather>(std::make_shared<op::Concat>(ov::OutputVector{batch(yes), batch(no)}, 0), index, integer(0));
++            // Keep the existing integer-index selection contract. A one-element
++            // condition and alternatives need one selection, not one per pixel.
++            const uint32_t selected_count=scalar(condition) && scalar(yes) && scalar(no)?1u:count;
++            const auto selected_shape=indices({int64_t(selected_count),1});
++            const auto widen=[&](const Node &value)->Node{return std::make_shared<op::Broadcast>(value,selected_shape);};
++            const auto alternate=std::make_shared<op::Reshape>(std::make_shared<op::Convert>(
++                std::make_shared<op::LogicalNot>(widen(condition)),ov::element::i32),indices({int64_t(selected_count)}),false);
++            Node selected_rows=selected_count==count?Node(rows):Node(op::Constant::create(ov::element::i32,ov::Shape{1},{0}));
++            const auto index=std::make_shared<op::Add>(selected_rows,std::make_shared<op::Multiply>(alternate,integer(int32_t(selected_count))));
++            return std::make_shared<op::Gather>(std::make_shared<op::Concat>(ov::OutputVector{widen(yes),widen(no)},0),index,integer(0));
+         };
+         auto load = [&](const Operand &a, bool integer_modifier = false) {
+             Lanes raw{};
+@@ -153,7 +161,8 @@
+                     // need another lowering and are explicitly rejected here.
+                     check(bool(relative)); index = std::make_shared<op::Add>(index, relative);
+                 }
+-                index = std::make_shared<op::Reshape>(batch(index), indices({int64_t(count)}), false);
++                const uint32_t lookup_count=scalar(index)?1u:count;
++                index=std::make_shared<op::Reshape>(lookup_count==1?index:batch(index),indices({int64_t(lookup_count)}),false);
+                 // The 2026.4 NPU compiler miscomputes LogicalAnd for these
+                 // integer-index comparisons. Combine exact 0/1 integer masks,
+                 // as in typed texture loads, and keep both bounds on device.
+@@ -161,8 +170,8 @@
+                     std::make_shared<op::Convert>(std::make_shared<op::GreaterEqual>(index,integer(0)),ov::element::i32),
+                     std::make_shared<op::Convert>(std::make_shared<op::Less>(index,integer(int32_t(size))),ov::element::i32));
+                 const auto valid=std::make_shared<op::NotEqual>(valid_bits,integer(0));
+-                if(a.kind==Register::indexable)invalid_coordinates.push_back(std::make_shared<op::Reshape>(
+-                    std::make_shared<op::Convert>(std::make_shared<op::LogicalNot>(valid),ov::element::i32),batch_shape,false));
++                if(a.kind==Register::indexable)invalid_coordinates.push_back(batch(std::make_shared<op::Reshape>(
++                    std::make_shared<op::Convert>(std::make_shared<op::LogicalNot>(valid),ov::element::i32),indices({int64_t(lookup_count),1}),false)));
+                 // Route out-of-range reads to an appended zero row. The Intel
+                 // NPU compiler miscompiled broadcast floating Select masks in
+                 // both default and precision-preserving graphs. Integer index
+@@ -436,14 +445,16 @@
+             for(unsigned step=0;step<4;++step){
+                 const auto chunk=std::make_shared<op::Minimum>(std::make_shared<op::Maximum>(
+                     std::make_shared<op::Subtract>(amount,integer(int32_t(step*8))),integer(0)),integer(8));
+-                const auto index=std::make_shared<op::Reshape>(batch(chunk),indices({int64_t(count)}),false);
++                const uint32_t lookup_count=scalar(chunk)?1u:count;
++                const auto lookup_shape=indices({int64_t(lookup_count),1});
++                const auto index=std::make_shared<op::Reshape>(lookup_count==1?chunk:batch(chunk),indices({int64_t(lookup_count)}),false);
+                 std::vector<float> scales(9);for(unsigned n=0;n<9;++n)scales[n]=std::ldexp(1.f,-int(n));
+                 const auto scale=std::make_shared<op::Reshape>(std::make_shared<op::Gather>(
+-                    op::Constant::create(ov::element::f32,ov::Shape{9},scales),index,integer(0)),batch_shape,false);
++                    op::Constant::create(ov::element::f32,ov::Shape{9},scales),index,integer(0)),lookup_shape,false);
+                 auto part=[&](bool high)->Node{
+                     std::vector<int32_t> masks(9);for(unsigned n=0;n<9;++n){const auto bits=(high?0xffffff00u:255u)&(~0u<<n);std::memcpy(&masks[n],&bits,4);}
+                     const auto mask=std::make_shared<op::Reshape>(std::make_shared<op::Gather>(
+-                        op::Constant::create(ov::element::i32,ov::Shape{9},masks),index,integer(0)),batch_shape,false);
++                        op::Constant::create(ov::element::i32,ov::Shape{9},masks),index,integer(0)),lookup_shape,false);
+                     const auto integral=std::make_shared<op::Convert>(std::make_shared<op::BitwiseAnd>(value,mask),ov::element::f32);
+                     return std::make_shared<op::Convert>(std::make_shared<op::Multiply>(integral,scale),ov::element::i32);
+                 };
+--- /dev/null
++++ b/native/windows/registered_lab/uniform_lanes_test.cpp
+@@ -0,0 +1,115 @@
++#include "vertex_executor.hpp"
++#include "shader_reference.hpp"
++#include <cstdio>
++#include <initializer_list>
++#include <limits>
++using namespace nr::shader;
++#define TEST(v) do { if (!(v)) throw std::runtime_error(#v); } while (false)
++namespace {
++Operand reg(Register kind, unsigned index, unsigned element=0) {
++    Operand value; value.kind=kind; value.index=index; value.element=element; value.mask=15; return value;
++}
++Operand scalar(Register kind, unsigned index, unsigned element=0, unsigned lane=0) {
++    auto value=reg(kind,index,element); value.lanes.fill(lane); return value;
++}
++Instruction operation(Opcode code, Operand destination, std::initializer_list<Operand> sources) {
++    Instruction value; value.opcode=code; value.destination=destination; value.source_count=unsigned(sources.size());
++    unsigned index=0; for (const auto &source:sources) value.sources[index++]=source; return value;
++}
++uint64_t verify(const Program &program, const std::vector<VertexRegisters> &input,
++                const VertexConstants &constants, const RegisterExecutor::Result &actual,
++                const std::string &backend) {
++    TEST(actual.execution_device.rfind(backend,0)==0 && actual.vertices.size()==input.size());
++    uint64_t components=0;
++    for (size_t n=0;n<input.size();++n) {
++        const auto wanted=reference_vertex(program,input[n],constants);
++        for(unsigned r=0;r<16;++r) for(unsigned c=0;c<4;++c) if(program.outputs[r]&(1u<<c)) {
++            if(actual.vertices[n][r][c]!=wanted[r][c]) {
++                std::fprintf(stderr,"uniform mismatch n=%zu output=%u component=%u actual=%08x expected=%08x\n",
++                    n,r,c,actual.vertices[n][r][c],wanted[r][c]); TEST(false);
++            }
++            ++components;
++        }
++    }
++    return components;
++}
++uint64_t constant_lookups(const std::string &backend, unsigned count) {
++    Program program; program.stage=Stage::pixel; program.inputs[0]=15; program.inputs[1]=15;
++    program.constants[0]=2; program.constants[1]=4; program.dynamic_constants[1]=true;
++    program.temporaries=1; for(unsigned n=0;n<4;++n)program.outputs[n]=15;
++    auto uniform_lookup=reg(Register::constant,1); uniform_lookup.relative={true,Register::temporary,0,0};
++    auto varying_lookup=reg(Register::constant,1); varying_lookup.relative={true,Register::input,1,0};
++    program.instructions={
++        operation(Opcode::move,reg(Register::temporary,0),{reg(Register::constant,0)}),
++        operation(Opcode::move,reg(Register::output,0),{uniform_lookup}),
++        operation(Opcode::move,reg(Register::output,1),{varying_lookup}),
++        operation(Opcode::add,reg(Register::output,2),{reg(Register::constant,0,1),reg(Register::input,0)}),
++        operation(Opcode::select,reg(Register::output,3),{scalar(Register::temporary,0,0,1),reg(Register::constant,1,0),reg(Register::constant,1,1)})};
++    std::vector<VertexRegisters> input(count);
++    for(unsigned n=0;n<count;++n) {
++        input[n][0]={as_bits(float(n%8)/8),as_bits(-float(n%4)/4),as_bits(.5f),as_bits(1.f)};
++        input[n][1][0]=n%7==6?UINT32_MAX:n%7;
++    }
++    PixelExecutor executor(program,count,backend); uint64_t checked=0;
++    for(unsigned pass=0;pass<7;++pass) {
++        VertexConstants constants; constants[0]={{pass==6?UINT32_MAX:pass,pass&1,0,0},
++            {as_bits(.125f*float(pass)),as_bits(.25f),as_bits(-.5f),as_bits(1.f)}};
++        constants[1]={{0x80000000u,0x7fc12345u,as_bits(.25f*float(pass)),0xffffffffu},
++            {0,0xffc54321u,as_bits(-.5f*float(pass)),0x80000001u},
++            {as_bits(2.f),as_bits(4.f),as_bits(8.f),as_bits(16.f)},
++            {as_bits(-2.f),as_bits(-4.f),as_bits(-8.f),as_bits(-16.f)}};
++        checked+=verify(program,input,constants,executor.execute(input,constants),backend);
++    }
++    return checked;
++}
++uint64_t shifts_and_branches(const std::string &backend, unsigned count) {
++    Program program; program.stage=Stage::pixel; program.inputs[0]=15;
++    program.constants[0]=3; program.temporaries=2;
++    for(unsigned n=0;n<4;++n)program.outputs[n]=15;
++    program.instructions={
++        operation(Opcode::shift_right,reg(Register::output,0),{reg(Register::input,0),scalar(Register::constant,0)}),
++        operation(Opcode::shift_right,reg(Register::output,1),{reg(Register::constant,0,1),scalar(Register::constant,0)}),
++        operation(Opcode::begin_if,{}, {scalar(Register::constant,0,0,1)}),
++        operation(Opcode::move,reg(Register::temporary,0),{reg(Register::constant,0,1)}),
++        operation(Opcode::otherwise,{},{}),
++        operation(Opcode::move,reg(Register::temporary,0),{reg(Register::constant,0,2)}),
++        operation(Opcode::end_if,{},{}),
++        operation(Opcode::move,reg(Register::output,2),{reg(Register::temporary,0)}),
++        operation(Opcode::select,reg(Register::output,3),{reg(Register::input,0),reg(Register::temporary,0),reg(Register::constant,0,2)})};
++    std::vector<VertexRegisters> input(count);
++    const uint32_t patterns[]{0,1,0x80000000u,0x80000001u,0xffffffffu,0x7fffffffu,0x12345678u,0xfeaa55ffu};
++    for(unsigned n=0;n<count;++n)for(unsigned c=0;c<4;++c)input[n][0][c]=patterns[(n+c)%8];
++    PixelExecutor executor(program,count,backend); uint64_t checked=0;
++    for(unsigned pass=0;pass<64;++pass) {
++        VertexConstants constants; constants[0]={{pass,pass&1,0,0},
++            {patterns[pass%8],patterns[(pass+1)%8],patterns[(pass+2)%8],patterns[(pass+3)%8]},
++            {patterns[(pass+4)%8],patterns[(pass+5)%8],patterns[(pass+6)%8],patterns[(pass+7)%8]}};
++        checked+=verify(program,input,constants,executor.execute(input,constants),backend);
++    }
++    return checked;
++}
++uint64_t literal_bounds(const std::string &backend, unsigned count) {
++    Program program; program.stage=Stage::pixel; program.constants[0]=1; program.temporaries=1;program.outputs[0]=15;
++    program.literal_tables[0]={{as_bits(.25f),0x80000000u,0x7fc12345u,0xffffffffu},{as_bits(.5f),0,0x80000001u,1}};
++    auto lookup=reg(Register::indexable,0); lookup.relative={true,Register::temporary,0,0};
++    program.instructions={operation(Opcode::move,reg(Register::temporary,0),{reg(Register::constant,0)}),
++        operation(Opcode::move,reg(Register::output,0),{lookup})};
++    std::vector<VertexRegisters> input(count); PixelExecutor executor(program,count,backend); uint64_t checked=0;
++    for(const uint32_t address:{0u,1u,2u,UINT32_MAX,0u}) {
++        VertexConstants constants;constants[0]={{address,0,0,0}};
++        if(address<2)checked+=verify(program,input,constants,executor.execute(input,constants),backend);
++        else {bool rejected=false;try{(void)executor.execute(input,constants);}catch(const std::runtime_error&){rejected=true;}TEST(rejected);}
++    }
++    return checked;
++}
++}
++int main(int argc,char **argv) try {
++    TEST(argc==2);const std::string backend=argv[1];TEST(backend=="CPU" || backend=="NPU");
++    uint64_t checked=0;
++    for(const unsigned count:{1u,32u,8192u}) {
++        checked+=constant_lookups(backend,count);
++        checked+=shifts_and_branches(backend,count);
++        checked+=literal_bounds(backend,count);
++    }
++    std::printf("{\"uniform_lane_contract\":true,\"exact_components\":%llu,\"runtime_constants_changed\":true,\"uniform_and_varying_indices\":true,\"out_of_bounds_checked\":true,\"all_shift_counts\":true,\"execution_device\":\"%s\",\"passed\":true}\n",static_cast<unsigned long long>(checked),backend.c_str());return 0;
++} catch(const std::exception &error) {std::fprintf(stderr,"uniform lane contract: %s\n",error.what());return 1;}
