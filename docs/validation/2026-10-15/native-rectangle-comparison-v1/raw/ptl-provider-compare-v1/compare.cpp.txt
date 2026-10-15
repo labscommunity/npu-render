@@ -1,0 +1,66 @@
+#include "linear_texture_draw.hpp"
+#include "linear_texture_fixture.hpp"
+#include "shader_contract.hpp"
+#include "shader_reference.hpp"
+#include <openvino/openvino.hpp>
+#include <chrono>
+#include <cstdio>
+#include <cstring>
+#include <fstream>
+#include <filesystem>
+#include <memory>
+using namespace nr::raster;
+using namespace nr::shader;
+using Clock=std::chrono::steady_clock;
+#define CHECK(v) do{if(!(v))throw std::runtime_error(#v);}while(false)
+double elapsed(Clock::time_point t){return std::chrono::duration<double,std::milli>(Clock::now()-t).count();}
+std::vector<unsigned char> read(const std::filesystem::path &path){
+    std::ifstream f(path,std::ios::binary|std::ios::ate);CHECK(bool(f));const auto size=f.tellg();CHECK(size>=0 && size<=1000000);
+    std::vector<unsigned char> data(static_cast<size_t>(size));f.seekg(0);f.read(reinterpret_cast<char *>(data.data()),size);CHECK(bool(f));return data;
+}
+uint32_t u32(const unsigned char *p){uint32_t n;std::memcpy(&n,p,4);return n;}
+int main(int argc,char **argv)try{
+    CHECK(argc==3);const std::filesystem::path root=argv[1];
+    ov::Core core;std::ifstream graph(argv[2],std::ios::binary);CHECK(bool(graph));
+    const auto imported=Clock::now();auto custom=core.import_model(graph,"NPU");const double import_ms=elapsed(imported);
+    const auto devices=custom.get_property(ov::execution_devices);CHECK(devices.size()==1 && devices[0].rfind("NPU",0)==0);
+    auto request=custom.create_infer_request();CHECK(request.get_input_tensor(0).get_byte_size()==65536 && request.get_input_tensor(1).get_size()==4096);
+    std::memset(request.get_input_tensor(1).data(),0,16384);
+    const auto words=nr::registered_lab::shader_tokens(R"(
+struct O{float4 p:SV_Position;float4 c:COLOR0;float2 uv:TEXCOORD0;};
+O main(float4 p:POSITION,float4 c:COLOR0,float2 uv:TEXCOORD0){O o;o.p=p;o.c=c;o.uv=uv;return o;})","vs_4_0");
+    const auto vs=parse_vertex(words.data(),words.size()),ps=parse_pixel(nr::registered_lab::test_fixture::linear_texture_pixel_words,std::size(nr::registered_lab::test_fixture::linear_texture_pixel_words));
+    const Viewport viewport{0,0,64,64,0,1};uint64_t mismatches=0,checked=0;
+    std::printf("{\"kind\":\"setup\",\"custom_import_ms\":%.6f,\"execution_device\":\"%s\"}\n",import_ms,devices[0].c_str());
+    for(unsigned style=0;style<4;++style){
+        const bool linear=(style&1)!=0,blend=(style&2)!=0;const auto setup=Clock::now();
+        LinearTextureDrawExecutor baseline(vs,ps,64,64,87,64,64,87,"NPU",blend,linear?TextureFilter::linear:TextureFilter::point);
+        const double setup_ms=elapsed(setup);
+        std::printf("{\"kind\":\"baseline_setup\",\"style\":%u,\"setup_ms\":%.6f}\n",style,setup_ms);std::fflush(stdout);
+        for(unsigned frame=0;frame<28;++frame){
+            const auto input=read(root/(std::to_string(style)+"-"+std::to_string(frame)+".input"));
+            const auto expected=read(root/(std::to_string(style)+"-"+std::to_string(frame)+".expected"));
+            CHECK(input.size()==65536 && expected.size()==16384 && u32(input.data()+24)==0 && u32(input.data()+28)==4096);
+            CHECK(u32(input.data()+32)==unsigned(linear) && u32(input.data()+36)==unsigned(blend) && u32(input.data()+40)==87 && u32(input.data()+44)==87 && u32(input.data()+48)==0 && u32(input.data()+52)==15);
+            std::array<float,4> color{},uv{};std::array<int32_t,4> bounds{},clip{};
+            std::memcpy(color.data(),input.data()+64,16);std::memcpy(uv.data(),input.data()+80,16);std::memcpy(bounds.data(),input.data()+96,16);std::memcpy(clip.data(),input.data()+112,16);
+            for(auto &c:clip){CHECK(c%256==0);c/=256;}
+            PackedTexture texture{64,64,87,std::vector<PackedColor>(4096)};std::memcpy(texture.pixels.data(),input.data()+128,16384);
+            std::vector<PackedColor> background(4096);std::memcpy(background.data(),input.data()+16512,16384);
+            std::vector<VertexRegisters> vertices(6);const unsigned corners[6]{0,1,2,2,3,0};
+            for(unsigned n=0;n<6;++n){const auto corner=corners[n];const bool right=corner==1||corner==2,bottom=corner>=2;
+                const float x=float(bounds[right?2:0])/256,y=float(bounds[bottom?3:1])/256;
+                vertices[n][0]={as_bits(x/32-1),as_bits(1-y/32),as_bits(.5f),as_bits(1.f)};
+                for(unsigned c=0;c<4;++c)vertices[n][1][c]=as_bits(color[c]);vertices[n][2]={as_bits(uv[right?2:0]),as_bits(uv[bottom?3:1]),0,0};}
+            double custom_ms=0;std::vector<PackedColor> candidate(4096);UniformDrawExecutor::Result ordinary{};
+            auto run_custom=[&]{const auto began=Clock::now();std::memcpy(request.get_input_tensor(0).data(),input.data(),input.size());request.infer();const auto output=request.get_output_tensor(0);CHECK(output.get_size()==16384 && output.get_element_type()==ov::element::f16);const auto *values=output.data<const ov::float16>();auto *bytes=reinterpret_cast<unsigned char *>(candidate.data());for(size_t i=0;i<16384;++i){const float value=float(values[i]);CHECK(value>=0 && value<=255);bytes[i]=static_cast<unsigned char>(value);CHECK(float(bytes[i])==value);}custom_ms=elapsed(began);};
+            auto run_baseline=[&]{ordinary=baseline.execute(vertices,{},viewport,texture,background,clip);CHECK(ordinary.execution_device.rfind("NPU",0)==0);};
+            if(frame&1){run_custom();run_baseline();}else{run_baseline();run_custom();}
+            uint64_t base_diff=0,custom_diff=0,pair_diff=0;const auto *base=reinterpret_cast<const unsigned char *>(ordinary.pixels.data()),*next=reinterpret_cast<const unsigned char *>(candidate.data());
+            for(size_t i=0;i<expected.size();++i){base_diff+=base[i]!=expected[i];custom_diff+=next[i]!=expected[i];pair_diff+=base[i]!=next[i];}
+            checked+=expected.size();mismatches+=base_diff+custom_diff+pair_diff;
+            std::printf("{\"kind\":\"pair\",\"style\":%u,\"frame\":%u,\"warmup\":%s,\"order\":\"%s\",\"baseline_total_ms\":%.6f,\"baseline_merger_ms\":%.6f,\"baseline_requests\":%llu,\"custom_pack_infer_unpack_ms\":%.6f,\"baseline_oracle_differences\":%llu,\"custom_oracle_differences\":%llu,\"pair_differences\":%llu}\n",style,frame,frame<4?"true":"false",frame&1?"custom-first":"baseline-first",ordinary.timings.total_ms,ordinary.timings.merger_ms,static_cast<unsigned long long>(ordinary.provider_requests),custom_ms,static_cast<unsigned long long>(base_diff),static_cast<unsigned long long>(custom_diff),static_cast<unsigned long long>(pair_diff));std::fflush(stdout);
+        }
+    }
+    std::printf("{\"kind\":\"complete\",\"passed\":%s,\"components_per_path\":%llu,\"mismatches\":%llu,\"desktop_tested\":false,\"tahoma_tested\":false}\n",mismatches?"false":"true",static_cast<unsigned long long>(checked),static_cast<unsigned long long>(mismatches));return mismatches?2:0;
+}catch(const std::exception &e){std::fprintf(stderr,"provider comparison: %s\n",e.what());return 1;}

@@ -1,0 +1,21 @@
+[INFO] 22:48:30.455 [dump-statistics-of-task-ops]   Input size - 528.00 KB Output size - 32.00 KB
+[INFO] 22:48:30.455 [dump-statistics-of-task-ops]   DDR heap size - 32.00 KB
+[INFO] 22:48:30.455 [dump-statistics-of-task-ops]   VPUIP tasks statistics:
+[INFO] 22:48:30.455 [dump-statistics-of-task-ops]   VPUIP Tasks - 8 ops
+[INFO] 22:48:30.455 [dump-statistics-of-task-ops]     VPUIP.NNDMA - 4 ops : Size - 592.00 KB
+[INFO] 22:48:30.455 [dump-statistics-of-task-ops]       CMX2DDR - 1 ops : Size - 32.00 KB
+[INFO] 22:48:30.455 [dump-statistics-of-task-ops]       DDR2CMX - 2 ops : Size - 528.00 KB
+[INFO] 22:48:30.455 [dump-statistics-of-task-ops]       DDR2DDR - 1 ops : Size - 32.00 KB
+[INFO] 22:48:30.455 [dump-statistics-of-task-ops]     VPUIP.SW.Kernel - 1 ops
+[INFO] 22:48:30.457 [dump-statistics-of-task-ops]       builtin_Gather - 1 ops
+[INFO] 22:48:30.457 [dump-statistics-of-task-ops]     VPUIP.BarProgDMA - 1 ops
+[INFO] 22:48:30.457 [dump-statistics-of-task-ops]     VPUIP.EnqueueDMA - 1 ops
+[INFO] 22:48:30.457 [dump-statistics-of-task-ops]     VPUIP.FetchDMA - 1 ops
+[INFO] 22:48:30.457 [dump-statistics-of-task-ops]   Barrier statistics:
+[INFO] 22:48:30.457 [dump-statistics-of-task-ops]     VPURT.ConfigureBarrierOp - 5 ops
+[INFO] 22:48:30.457 [dump-statistics-of-task-ops]   Weights statistics:
+[INFO] 22:48:30.457 [dump-statistics-of-task-ops]     Total weights - count: 0, size: 0 bytes (no compression)
+[INFO] 22:48:30.457 [dump-statistics-of-task-ops]   Const swizzling statistics:
+[INFO] 22:48:30.457 [dump-statistics-of-task-ops]     Swizzled constants     - count: 0, size: 0 bytes
+[INFO] 22:48:30.457 [dump-statistics-of-task-ops]     Not swizzled constants - count: 0, size: 0 bytes
+{"started": "2026-10-15T05:48:30.373504+00:00", "completed": true, "passed": true, "elements": 65536, "count": 4096, "custom_kernel_executed": false, "stage": "complete", "config": {"PERFORMANCE_HINT": "LATENCY", "NPU_COMPILATION_MODE": "ReferenceSW", "NPU_TILES": 1}, "compile_ms": 88.7314, "execution_devices": ["NPU"], "blob_sha256": "f8a0de96a03c771b15525edb7ed2ee0206888072cb44bf9988746fb3703c4286", "blob_bytes": 69768, "invocations": 1, "ranges": 1, "checks": [{"iteration": 0, "request_ms": 3.0959, "exact_components": 16384, "input_sha256": "7b57d04f1b43b98aa120b10a78ccd60aa49354d94b755ec41522b4307a2f8bfe", "output_sha256": "491b27117dde92198d43aa770dd1795868fa202264916b309fa0f4184c328a5d"}, {"iteration": 1, "request_ms": 1.3171, "exact_components": 16384, "input_sha256": "cd62452124a7c3c0d3fac16cfd32c7ecdc489ae9ab8b746411491ee838983b4a", "output_sha256": "cc4edf35dffdfed0ac7595be877d21e17c41ab92aaa12214fca7c5803f49ad3b"}, {"iteration": 2, "request_ms": 1.5292, "exact_components": 16384, "input_sha256": "c5c65242fafd815ea41ed97ccd1da3a92fa62eb03e0c0478803bc205c2e5ed6e", "output_sha256": "42e79075a57707b5b04761c1df4e206caaa04c4864ed861be0ec64a9f5fbe8f3"}, {"iteration": 3, "request_ms": 1.361, "exact_components": 16384, "input_sha256": "a4c7493be97876f92db8067b63c9ce830f03a49a55d424cc49b3ee5962f8c5d4", "output_sha256": "19cf58ffc4d1227c816fb385aaa0be36b53d0609a914e816405b5546a682e22e"}], "finished": "2026-10-15T05:48:30.491396+00:00"}

@@ -1,0 +1,74 @@
+{
+  "recorded": "2026-10-15T06:15:31.240830+00:00",
+  "evidence_checks_passed": true,
+  "raw_files_remotely_hash_verified": 107,
+  "raw_bytes": 1250290,
+  "failed_vector_candidates_retained": 2,
+  "corrected_vector_components": 12582912,
+  "increment_candidate_components": 12582912,
+  "comparison_pairs_per_run": 112,
+  "custom_components_per_run": 1835008,
+  "custom_oracle_differences": 0,
+  "npu_baseline_oracle_differences": 985,
+  "cpu_baseline_oracle_differences": 154,
+  "vertex_differences": 0,
+  "bit_exact_provider_replacement_qualified": false,
+  "performance_qualified": false,
+  "live_provider_integrated": false,
+  "tahoma_tested": false,
+  "full_desktop_offload": false,
+  "npu_scalar_comparison": [
+    {
+      "style": 0,
+      "warm_samples": 24,
+      "baseline_merger_ms_median": 3.9524,
+      "custom_pack_infer_unpack_ms_median": 4.599,
+      "ratio_baseline_to_custom": 0.8594042183083278,
+      "baseline_requests": [
+        3
+      ],
+      "baseline_oracle_differences": 784,
+      "custom_oracle_differences": 0,
+      "pair_differences": 784
+    },
+    {
+      "style": 1,
+      "warm_samples": 24,
+      "baseline_merger_ms_median": 5.0268999999999995,
+      "custom_pack_infer_unpack_ms_median": 4.1859,
+      "ratio_baseline_to_custom": 1.2009125874961177,
+      "baseline_requests": [
+        3
+      ],
+      "baseline_oracle_differences": 174,
+      "custom_oracle_differences": 0,
+      "pair_differences": 174
+    },
+    {
+      "style": 2,
+      "warm_samples": 24,
+      "baseline_merger_ms_median": 3.91625,
+      "custom_pack_infer_unpack_ms_median": 3.25345,
+      "ratio_baseline_to_custom": 1.2037222025849483,
+      "baseline_requests": [
+        3
+      ],
+      "baseline_oracle_differences": 6,
+      "custom_oracle_differences": 0,
+      "pair_differences": 6
+    },
+    {
+      "style": 3,
+      "warm_samples": 24,
+      "baseline_merger_ms_median": 5.505850000000001,
+      "custom_pack_infer_unpack_ms_median": 4.1813,
+      "ratio_baseline_to_custom": 1.3167794704996054,
+      "baseline_requests": [
+        3
+      ],
+      "baseline_oracle_differences": 17,
+      "custom_oracle_differences": 0,
+      "pair_differences": 17
+    }
+  ]
+}

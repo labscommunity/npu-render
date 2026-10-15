@@ -1,0 +1,22 @@
+from pathlib import Path
+import hashlib,json,struct
+from ptl_elf_v1 import Elf
+from ptl_gather_contract_v1 import inspect,patch
+r=Path(__file__).parent;cases=[]
+for elements in (256,4096):
+ blob=(r/f'ptl-sampler-carriers-local-v1/gather{elements}-sw-one-tile.blob').read_bytes();contract=inspect(blob,elements);elf=Elf(blob)
+ patched,_=patch(blob,b'\x00'*16,elements);assert len(patched)==len(blob)
+ cases.append(dict(case=f'valid-{elements}-and-bounded-patch',passed=True))
+ params=elf.by_name['shave.params'];pr=elf.relocations(params)
+ fields=[('source-span',pr[16]['addend']+4,'<i',elements+1),('indices-span',pr[56]['addend'],'<i',65),('output-span',pr[96]['addend']+4,'<i',63),('source-stride',pr[20]['addend'],'<q',32),('source-precision',24,'<I',1),('indices-precision',64,'<I',8),('source-location',36,'<I',1),('output-overlap',80,'<Q',0x40218000),('source-pointer',0,'<Q',0x40200000),('source-wide-pointer',0,'<Q',2**40),('source-rank',12,'<I',3)]
+ for name,at,fmt,value in fields:
+  data=bytearray(blob);struct.pack_into(fmt,data,params['offset']+at,value)
+  try:inspect(bytes(data),elements)
+  except (ValueError,struct.error):cases.append(dict(case=f'{elements}-{name}-rejected',passed=True))
+  else:raise AssertionError(name+' admitted')
+ for name,text in [('empty',b''),('unaligned',b'abc'),('oversized',bytes(contract['code_bytes']+16))]:
+  try:patch(blob,text,elements)
+  except ValueError:cases.append(dict(case=f'{elements}-{name}-patch-rejected',passed=True))
+  else:raise AssertionError(name+' admitted')
+report=dict(completed=True,passed=True,cases=cases,hardware_execution_tested=False,source_sha256={n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in ['ptl_elf_v1.py','ptl_gather_contract_v1.py']})
+(r/'ptl-gather-contract-v1-qualification.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(dict(passed=True,cases=len(cases))))

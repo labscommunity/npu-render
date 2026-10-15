@@ -1,0 +1,119 @@
+"""Direct packed texture sampling/modulation/blending/coverage on the NPU."""
+from datetime import UTC, datetime
+from pathlib import Path
+import argparse, hashlib, json, os, subprocess, sys, time, traceback
+from npu_render.ptl_carrier import read_kernel_text
+from ptl_wide_contract_v1 import patch, CASES
+
+ROOT = Path(os.environ['LOCALAPPDATA']) / 'npu-render'
+VM = ROOT / 'vm'
+ELF_SHA = 'e2371115e30b4a9d7bd0421966c5851b907355a1155380a7b8e7626bf5d11a1c'
+
+def obj(path):
+    raw = path.read_bytes()
+    return json.loads(raw.decode('utf-16') if raw.startswith(b'\xff\xfe') else raw.decode('utf-8-sig'))
+
+def write(path, value):
+    path.write_text(json.dumps(value, indent=2) + '\n')
+
+def child(out):
+    import numpy as np
+    import openvino as ov
+    from ptl_rectangle_wide_oracle_v1 import fixture, reference
+    report = dict(started=datetime.now(UTC).isoformat(), completed=False, passed=False, phases=[])
+    try:
+        assert ov.get_version() == '2026.4.1-22982-e213a147257-releases/2026/4'
+        core = ov.Core()
+        for elements,count in sorted(CASES):
+            for phase in ['original-before', 'custom-rectangle', 'original-after']:
+                report['active_phase'] = phase; write(out / 'child-report.json', report)
+                model = core.import_model((out / (f'{elements}-{count}-'+('patched.blob' if phase == 'custom-rectangle' else 'original.blob'))).read_bytes(), 'NPU')
+                devices = model.get_property('EXECUTION_DEVICES'); devices = [devices] if isinstance(devices, str) else list(devices)
+                assert devices in (['NPU'], ['NPU.0'])
+                request = model.create_infer_request(); checks = []; total = 0
+                for iteration in range(64 if phase == 'custom-rectangle' else 8):
+                    if phase == 'custom-rectangle':
+                        raw = fixture(iteration,elements,count); data = np.frombuffer(raw, np.float16).reshape(elements, 4).copy()
+                        indices = np.zeros(count, np.int32)
+                        expected, ideal, covered = reference(raw); _, double, _ = reference(raw, np.float64)
+                        expected = expected.astype(np.float16)
+                    else:
+                        rng = np.random.default_rng(9200 + iteration)
+                        data = rng.integers(-256, 256, (elements, 4)).astype(np.float16)
+                        indices = rng.integers(0, elements, count, dtype=np.int32); indices[:2] = [0, elements-1]
+                        expected = data[indices].copy()
+                    began = time.perf_counter_ns(); request.start_async({0: data, 1: indices})
+                    assert request.wait_for(10000), 'inference timeout'
+                    actual = request.get_output_tensor(0).data.copy(); elapsed = (time.perf_counter_ns() - began) / 1e6
+                    if actual.dtype != expected.dtype or actual.shape != expected.shape or not np.array_equal(actual, expected):
+                        where = np.argwhere(actual != expected)
+                        report['mismatch'] = dict(iteration=iteration, phase=phase, positions=where[:16].tolist(),
+                            actual=actual[actual != expected][:16].astype(float).tolist(), expected=expected[actual != expected][:16].astype(float).tolist())
+                        if phase == 'custom-rectangle':
+                            (out / 'mismatch-input.bin').write_bytes(raw)
+                            report['mismatch']['float32_ideal'] = ideal[actual != expected][:16].astype(float).tolist()
+                            report['mismatch']['double_ideal'] = double[actual != expected][:16].astype(float).tolist()
+                        raise AssertionError('independent exact pixel oracle differs')
+                    row = dict(iteration=iteration, elapsed_ms=elapsed, exact_components=int(expected.size),
+                        input_sha256=hashlib.sha256(data.tobytes()).hexdigest(), output_sha256=hashlib.sha256(actual.tobytes()).hexdigest())
+                    if phase == 'custom-rectangle':
+                        row.update(covered_pixels=covered, maximum_double_error=float(np.max(np.abs(actual.astype(np.float64) - double))))
+                    checks.append(row); total += expected.size
+                report['phases'].append(dict(elements=elements,count=count,phase=phase, passed=True, execution_devices=devices,
+                    exact_components=int(total), checks=checks, request_ms_p50=float(np.median([c['elapsed_ms'] for c in checks])),
+                    request_ms_p95=float(np.percentile([c['elapsed_ms'] for c in checks], 95))))
+                del request, model
+        report['passed'] = True
+    except Exception as error:
+        report.update(error=repr(error), traceback=traceback.format_exc())
+    finally:
+        report.update(completed=True, finished=datetime.now(UTC).isoformat()); write(out / 'child-report.json', report)
+    print(json.dumps({k:v for k,v in report.items() if k != 'phases'})); return 0 if report['passed'] else 1
+
+def main():
+    parser = argparse.ArgumentParser(); parser.add_argument('--child', type=Path); args = parser.parse_args()
+    if args.child:
+        return child(args.child)
+    out = VM / 'ptl-rectangle-wide-v1'; out.mkdir(exist_ok=False)
+    report = dict(started=datetime.now(UTC).isoformat(), completed=False, passed=False,
+        desktop_changed=False, driver_changed=False, full_desktop_offload=False, tahoma_tested=False,
+        matched_kernel_benchmark=False, sampler_component_qualified=False)
+    process = None
+    try:
+        assert obj(VM / 'ptl-wide-swizzle-v1/report.json')['passed']
+        qualification = obj(VM / 'ptl-wide-contract-v1-qualification.json')
+        assert qualification['passed'] and len(qualification['cases']) == 84
+        for name, digest in qualification['source_sha256'].items():
+            assert hashlib.sha256((VM/name).read_bytes()).hexdigest() == digest
+        build = obj(VM / 'ptl-rectangle-wide-build-v1/report.json'); assert build['passed']
+        elf = (VM / 'ptl-rectangle-wide-build-v1/kernel.elf').read_bytes()
+        assert hashlib.sha256(elf).hexdigest() == build['child_result']['elf_sha256'] == ELF_SHA
+        proof=obj(VM/'ptl-wide-carriers-v2/report.json');assert proof['passed'];report['carriers']=[]
+        for elements,count in sorted(CASES):
+            item=next(x for x in proof['cases'] if x['elements']==elements and x['count']==count);assert item['passed']
+            blob=(VM/'ptl-wide-carriers-v2'/f'{elements}-{count}'/'carrier.blob').read_bytes();assert hashlib.sha256(blob).hexdigest()==item['blob_sha256']
+            modified,contract=patch(blob,read_kernel_text(elf),elements,count)
+            (out/f'{elements}-{count}-original.blob').write_bytes(blob);(out/f'{elements}-{count}-patched.blob').write_bytes(modified)
+            write(out/f'{elements}-{count}-contract.json',contract)
+            report['carriers'].append(dict(elements=elements,count=count,source_location=contract['source_location'],original_sha256=item['blob_sha256'],patched_sha256=hashlib.sha256(modified).hexdigest()))
+        report['kernel_sha256']=ELF_SHA
+        with (out / 'child.stdout.log').open('xb') as stdout, (out / 'child.stderr.log').open('xb') as stderr:
+            process = subprocess.Popen([sys.executable, __file__, '--child', str(out)], stdout=stdout, stderr=stderr, creationflags=subprocess.CREATE_NO_WINDOW)
+            try:
+                process.wait(timeout=60)
+            except subprocess.TimeoutExpired:
+                process.kill(); process.wait(timeout=5); report['child_timeout'] = True
+        result = obj(out / 'child-report.json') if (out / 'child-report.json').exists() else {}
+        report.update(child_exit=process.returncode, child_result=result,
+                      passed=process.returncode == 0 and result.get('passed', False))
+        report['sampler_component_qualified'] = report['passed']
+    except Exception as error:
+        report.update(error=repr(error), traceback=traceback.format_exc())
+    finally:
+        if process is not None and process.poll() is None:
+            process.kill(); process.wait(timeout=5)
+        report.update(completed=True, finished=datetime.now(UTC).isoformat()); write(out / 'report.json', report)
+    print(json.dumps({k:v for k,v in report.items() if k != 'child_result'})); return 0 if report['passed'] else 1
+
+if __name__ == '__main__':
+    raise SystemExit(main())

@@ -1,0 +1,79 @@
+{
+  "started": "2026-10-15T06:08:17.915860+00:00",
+  "completed": true,
+  "passed": false,
+  "desktop_changed": false,
+  "driver_changed": false,
+  "tahoma_tested": false,
+  "full_desktop_offload": false,
+  "application_offload_tested": false,
+  "baseline_device": "NPU",
+  "custom_device": "NPU",
+  "pid": 5752,
+  "exit_code": 2,
+  "completion": {
+    "kind": "complete",
+    "passed": false,
+    "components_per_path": 1835008,
+    "mismatches": 1970,
+    "desktop_tested": false,
+    "tahoma_tested": false
+  },
+  "paired_samples": 112,
+  "styles": [
+    {
+      "style": 0,
+      "warm_samples": 24,
+      "baseline_merger_ms_median": 3.9524,
+      "custom_pack_infer_unpack_ms_median": 4.599,
+      "ratio_baseline_to_custom": 0.8594042183083278,
+      "baseline_requests": [
+        3
+      ],
+      "baseline_oracle_differences": 784,
+      "custom_oracle_differences": 0,
+      "pair_differences": 784
+    },
+    {
+      "style": 1,
+      "warm_samples": 24,
+      "baseline_merger_ms_median": 5.0268999999999995,
+      "custom_pack_infer_unpack_ms_median": 4.1859,
+      "ratio_baseline_to_custom": 1.2009125874961177,
+      "baseline_requests": [
+        3
+      ],
+      "baseline_oracle_differences": 174,
+      "custom_oracle_differences": 0,
+      "pair_differences": 174
+    },
+    {
+      "style": 2,
+      "warm_samples": 24,
+      "baseline_merger_ms_median": 3.91625,
+      "custom_pack_infer_unpack_ms_median": 3.25345,
+      "ratio_baseline_to_custom": 1.2037222025849483,
+      "baseline_requests": [
+        3
+      ],
+      "baseline_oracle_differences": 6,
+      "custom_oracle_differences": 0,
+      "pair_differences": 6
+    },
+    {
+      "style": 3,
+      "warm_samples": 24,
+      "baseline_merger_ms_median": 5.505850000000001,
+      "custom_pack_infer_unpack_ms_median": 4.1813,
+      "ratio_baseline_to_custom": 1.3167794704996054,
+      "baseline_requests": [
+        3
+      ],
+      "baseline_oracle_differences": 17,
+      "custom_oracle_differences": 0,
+      "pair_differences": 17
+    }
+  ],
+  "limitation": "64x64 rectangle component only; custom starts with projected bounds. Baseline merger timing and custom pack/infer/unpack are compared; baseline total additionally includes vertex/projection. No desktop or Tahoma speed claim.",
+  "finished": "2026-10-15T06:08:20.204214+00:00"
+}

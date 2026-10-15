@@ -1,0 +1,16 @@
+"""Generate public synthetic fixtures on Delta, with no captured desktop data."""
+import os,struct,hashlib,json
+from pathlib import Path
+from ptl_rectangle_wide_oracle_v1 import fixture,reference
+
+out=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm/ptl-provider-fixtures-v1'
+out.mkdir(exist_ok=False);rows=[]
+for style in range(4):
+ for frame in range(28):
+  data=bytearray(fixture(frame,8192,4096))
+  for offset,value in [(32,style&1),(36,(style>>1)&1),(40,87),(44,87),(48,0),(52,15)]:struct.pack_into('<I',data,offset,value)
+  expected,ideal,covered=reference(data);data=bytes(data);name=f'{style}-{frame}'
+  (out/(name+'.input')).write_bytes(data);(out/(name+'.expected')).write_bytes(expected.tobytes())
+  rows.append(dict(style=style,frame=frame,input_sha256=hashlib.sha256(data).hexdigest(),expected_sha256=hashlib.sha256(expected.tobytes()).hexdigest(),covered=covered))
+(out/'manifest.json').write_text(json.dumps(rows,indent=2)+'\n')
+print(json.dumps(dict(completed=True,fixtures=len(rows),hardware_tested=False)))

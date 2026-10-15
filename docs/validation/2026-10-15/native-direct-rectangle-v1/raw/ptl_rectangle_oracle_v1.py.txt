@@ -1,0 +1,78 @@
+"""Independent vector reference and deterministic packed rectangle fixtures."""
+import struct
+import numpy as np
+
+
+def fixture(iteration):
+    rng = np.random.default_rng(82000 + iteration)
+    sw, sh = [(64, 64), (17, 29), (1, 1), (64, 1), (1, 64)][iteration % 5]
+    w, h = [(8, 8), (16, 16), (31, 9), (128, 17)][iteration % 4]
+    first = int(rng.integers(0, w * h - 63))
+    filter_, blend, sf, df, opaque = [(iteration >> bit) & 1 for bit in range(5)]
+    sf, df = (87 if sf else 28), (87 if df else 28)
+    mask = [15, 15, 15, 7, 8, 5, 0][(iteration // 32) % 7]
+    color = np.array([[1, 1, 1, 1], [.125, .75, .375, .8125],
+                      [1, .5, .25, 0], [0, 0, 0, 0],
+                      [.25, .5, .75, 1], rng.random(4)][(iteration // 5) % 6], np.float32)
+    uv = np.array([[0, 0, 1, 1], [-.125, -.25, 1.25, 1.125],
+                   [1, 1, 0, 0], [0, 0, 1.0000001192092896, 1],
+                   rng.uniform(-.2, 1.2, 4)][(iteration // 7) % 5], np.float32)
+    bounds = np.array([0, 0, w * 256, h * 256], np.int32)
+    if iteration % 3:
+        bounds += np.array([17, 23, -31, -89], np.int32)
+    clip = np.array([0, 0, w * 256, h * 256], np.int32)
+    if iteration % 11 == 0:
+        clip = np.array([w * 128, h * 128, w * 256, h * 256], np.int32)
+    source = rng.integers(0, 256, (sh, sw, 4), dtype=np.uint8)
+    if iteration % 4 == 0:
+        source[:, :, :3] = np.minimum(source[:, :, :3], source[:, :, 3:4])
+    background = rng.integers(0, 256, (64, 4), dtype=np.uint8)
+    data = bytearray(32768)
+    struct.pack_into('<16I', data, 0, 0x4e525231, 1, sw, sh, w, h, first, 64,
+                     filter_, blend, sf, df, opaque, mask, 32768, 0)
+    data[64:80] = color.tobytes(); data[80:96] = uv.tobytes()
+    data[96:112] = bounds.tobytes(); data[112:128] = clip.tobytes()
+    data[128:128 + source.size] = source.tobytes()
+    data[16512:16768] = background.tobytes()
+    return bytes(data)
+
+
+def reference(data, dtype=np.float32):
+    fields = struct.unpack_from('<16I', data)
+    magic, version, sw, sh, w, h, first, n, filtering, blend, sf, df, opaque, mask, size, reserved = fields
+    assert magic == 0x4e525231 and version == 1 and size == 32768 and reserved == 0
+    color = np.frombuffer(data, '<f4', 4, 64).astype(dtype)
+    uv = np.frombuffer(data, '<f4', 4, 80).astype(dtype)
+    bounds = np.frombuffer(data, '<i4', 4, 96)
+    clip = np.frombuffer(data, '<i4', 4, 112)
+    source = np.frombuffer(data, np.uint8, sw * sh * 4, 128).reshape(sh, sw, 4).astype(dtype) / dtype(255)
+    bg = np.frombuffer(data, np.uint8, n * 4, 16512).reshape(n, 4)
+    linear = np.arange(first, first + n, dtype=np.int32)
+    px, py = linear % w, linear // w
+    point = np.stack([px * 256 + 128, py * 256 + 128], 1)
+    covered = np.all((point >= bounds[:2]) & (point < bounds[2:]) &
+                     (point >= clip[:2]) & (point < clip[2:]), axis=1)
+    position = np.stack([px, py], 1).astype(dtype) + dtype(.5)
+    t = (position - bounds[:2].astype(dtype) * dtype(1 / 256)) / ((bounds[2:] - bounds[:2]).astype(dtype) * dtype(1 / 256))
+    coord = np.clip(uv[:2] + t * (uv[2:] - uv[:2]), dtype(0), dtype(1))
+    coord = np.clip(coord * np.array([sw, sh], dtype=dtype) - dtype(.5 if filtering else 0), dtype(0), np.array([sw - 1, sh - 1], dtype=dtype))
+    low = coord.astype(np.int32); high = np.minimum(low + 1, [sw - 1, sh - 1])
+    lowx, lowy = low.T; highx, highy = high.T
+    sampled = source[lowy, lowx]
+    if filtering:
+        tx, ty = (coord - low.astype(dtype)).T; tx = tx[:, None]; ty = ty[:, None]
+        top = sampled * (dtype(1) - tx) + source[lowy, highx] * tx
+        bottom = source[highy, lowx] * (dtype(1) - tx) + source[highy, highx] * tx
+        sampled = top * (dtype(1) - ty) + bottom * ty
+    if opaque:
+        sampled[:, 3] = dtype(1)
+    alpha = sampled[:, 3:4] * color[3]
+    channels = [2, 1, 0, 3] if sf != df else [0, 1, 2, 3]
+    modulation = color[[2, 1, 0, 3]] if df == 87 else color
+    value = sampled[:, channels] * modulation * dtype(255)
+    if blend:
+        value = value + bg.astype(dtype) * (dtype(1) - alpha)
+    ideal = np.clip(value, dtype(0), dtype(255))
+    apply = covered[:, None] & ((np.array([1, 2, 4, 8]) & mask) != 0)
+    rounded = np.where(apply, np.rint(ideal).astype(np.uint8), bg)
+    return rounded, np.where(apply, ideal, bg), int(covered.sum())

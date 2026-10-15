@@ -1,0 +1,50 @@
+/* Bounded raw-word wide gather and channel reversal; host admission is mandatory.
+ * The host must prove full source span, dense interleaved RGBA, disjoint output,
+ * i32 index bounds, and FP16 descriptors for every NPU50XX invocation.
+ * Integer addresses are resolved by the graph loader; only 32-bit WIN addresses
+ * are accepted by this first bounded implementation.
+ */
+static __attribute__((always_inline)) inline unsigned load32(const unsigned char *p) {
+    return (unsigned)p[0] | ((unsigned)p[1] << 8) |
+           ((unsigned)p[2] << 16) | ((unsigned)p[3] << 24);
+}
+static __attribute__((always_inline)) inline unsigned count(const unsigned char *p) {
+    unsigned rank = load32(p + 12), n = 1;
+    if (!rank || rank > 4 || !load32(p + 16)) return 0;
+    const unsigned *dims = (const unsigned *)load32(p + 16);
+    #pragma clang loop unroll(disable)
+    for (unsigned i = 0; i < rank; ++i) {
+        unsigned d = dims[i];
+        if (!d || d > 4194304 || n > 4194304 / d) return 0;
+        n *= d;
+    }
+    return n;
+}
+void nr_probe_kernel(const unsigned char *params) {
+    if (!params) return;
+    for (unsigned record = 0; record < 3; ++record) {
+        const unsigned char *p = params + record * 40;
+        if (!load32(p) || load32(p + 4) || load32(p + 8) != 1 ||
+            load32(p + 24) != (record == 1 ? 9 : 2) ||
+            load32(p + 32) || load32(p + 36) != (record == 0 ? load32(params + 36) : 2)) return;
+    }
+    if (load32(params + 36) != 1 && load32(params + 36) != 2) return;
+    unsigned source_count = count(params), index_count = count(params + 40),
+             output_count = count(params + 80);
+    if ((source_count != 32768 && source_count != 262144 && source_count != 1048576 && source_count != 2097152 && source_count != 4194304) || !index_count ||
+        (index_count != 4096 && index_count != 16384) || output_count != index_count * 4) return;
+    const unsigned short *source = (const unsigned short *)load32(params);
+    const int *indices = (const int *)load32(params + 40);
+    unsigned short *output = (unsigned short *)load32(params + 80);
+    if ((unsigned)source == (unsigned)output || (unsigned)indices == (unsigned)output) return;
+    /* Host checks the actual byte extents; validate all indices before writes. */
+    #pragma clang loop unroll(disable)
+    for (unsigned i = 0; i < index_count; ++i)
+        if (indices[i] < 0 || (unsigned)indices[i] >= source_count / 4) return;
+    #pragma clang loop unroll(disable)
+    for (unsigned i = 0; i < index_count; ++i) {
+        unsigned from = (unsigned)indices[i] * 4;
+        #pragma clang loop unroll(full)
+        for (unsigned c = 0; c < 4; ++c) output[i * 4 + c] = source[from + (3 - c)];
+    }
+}

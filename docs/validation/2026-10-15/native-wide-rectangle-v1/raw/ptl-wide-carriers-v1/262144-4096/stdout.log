@@ -1,0 +1,22 @@
+[INFO] 22:46:32.452 [dump-statistics-of-task-ops]   Input size - 2.01 MB Output size - 32.00 KB
+[INFO] 22:46:32.452 [dump-statistics-of-task-ops]   DDR heap size - 2.00 MB
+[INFO] 22:46:32.452 [dump-statistics-of-task-ops]   VPUIP tasks statistics:
+[INFO] 22:46:32.452 [dump-statistics-of-task-ops]   VPUIP Tasks - 9 ops
+[INFO] 22:46:32.452 [dump-statistics-of-task-ops]     VPUIP.NNDMA - 4 ops : Size - 2.07 MB
+[INFO] 22:46:32.452 [dump-statistics-of-task-ops]       CMX2DDR - 1 ops : Size - 32.00 KB
+[INFO] 22:46:32.452 [dump-statistics-of-task-ops]       DDR2CMX - 1 ops : Size - 16.00 KB
+[INFO] 22:46:32.452 [dump-statistics-of-task-ops]       DDR2DDR - 2 ops : Size - 2.03 MB
+[INFO] 22:46:32.452 [dump-statistics-of-task-ops]     VPUIP.SW.Kernel - 2 ops
+[INFO] 22:46:32.463 [dump-statistics-of-task-ops]       builtin_Gather - 1 ops
+[INFO] 22:46:32.463 [dump-statistics-of-task-ops]       cache_flush_invalidate - 1 ops
+[INFO] 22:46:32.463 [dump-statistics-of-task-ops]     VPUIP.BarProgDMA - 1 ops
+[INFO] 22:46:32.463 [dump-statistics-of-task-ops]     VPUIP.EnqueueDMA - 1 ops
+[INFO] 22:46:32.463 [dump-statistics-of-task-ops]     VPUIP.FetchDMA - 1 ops
+[INFO] 22:46:32.463 [dump-statistics-of-task-ops]   Barrier statistics:
+[INFO] 22:46:32.463 [dump-statistics-of-task-ops]     VPURT.ConfigureBarrierOp - 6 ops
+[INFO] 22:46:32.463 [dump-statistics-of-task-ops]   Weights statistics:
+[INFO] 22:46:32.463 [dump-statistics-of-task-ops]     Total weights - count: 0, size: 0 bytes (no compression)
+[INFO] 22:46:32.463 [dump-statistics-of-task-ops]   Const swizzling statistics:
+[INFO] 22:46:32.463 [dump-statistics-of-task-ops]     Swizzled constants     - count: 0, size: 0 bytes
+[INFO] 22:46:32.463 [dump-statistics-of-task-ops]     Not swizzled constants - count: 0, size: 0 bytes
+{"started": "2026-10-15T05:46:32.365080+00:00", "completed": true, "passed": false, "elements": 262144, "count": 4096, "custom_kernel_executed": false, "stage": "export", "config": {"PERFORMANCE_HINT": "LATENCY", "NPU_COMPILATION_MODE": "ReferenceSW", "NPU_TILES": 1}, "compile_ms": 105.1645, "execution_devices": ["NPU"], "blob_sha256": "cd420a0dbc1974bee7d0c92dd5fa8c5dbf1a2c9972721249ff35b85f0b031566", "blob_bytes": 69768, "error": "ValueError('range size')", "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\create-ptl-wide-carriers-v1.py\", line 25, in child\n    metadata=Elf(blob).describe(3);write(out/'layout.json',metadata);report.update(invocations=len(metadata['invocations']),ranges=len(metadata['ranges']),stage='infer');write(out/'report.json',report)\n             ^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\ptl_elf_v1.py\", line 36, in describe\n    check(s['size']==40,'range size');kind,entry,base,size,deprecated,count,pad=struct.unpack('<B7xQQIIII',s['data'])\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\ptl_elf_v1.py\", line 6, in check\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: range size\n", "finished": "2026-10-15T05:46:32.480471+00:00"}

@@ -1,0 +1,77 @@
+{
+  "started": "2026-10-15T06:00:53.483892+00:00",
+  "completed": true,
+  "passed": false,
+  "desktop_changed": false,
+  "driver_changed": false,
+  "tahoma_tested": false,
+  "full_desktop_offload": false,
+  "application_offload_tested": false,
+  "pid": 15524,
+  "exit_code": 2,
+  "completion": {
+    "kind": "complete",
+    "passed": false,
+    "components_per_path": 1835008,
+    "mismatches": 1970,
+    "desktop_tested": false,
+    "tahoma_tested": false
+  },
+  "paired_samples": 112,
+  "styles": [
+    {
+      "style": 0,
+      "warm_samples": 24,
+      "baseline_merger_ms_median": 4.21135,
+      "custom_pack_infer_unpack_ms_median": 5.1369,
+      "ratio_baseline_to_custom": 0.8198232396970937,
+      "baseline_requests": [
+        3
+      ],
+      "baseline_oracle_differences": 784,
+      "custom_oracle_differences": 0,
+      "pair_differences": 784
+    },
+    {
+      "style": 1,
+      "warm_samples": 24,
+      "baseline_merger_ms_median": 5.1438,
+      "custom_pack_infer_unpack_ms_median": 4.32575,
+      "ratio_baseline_to_custom": 1.1891117147315493,
+      "baseline_requests": [
+        3
+      ],
+      "baseline_oracle_differences": 174,
+      "custom_oracle_differences": 0,
+      "pair_differences": 174
+    },
+    {
+      "style": 2,
+      "warm_samples": 24,
+      "baseline_merger_ms_median": 4.3367,
+      "custom_pack_infer_unpack_ms_median": 4.7369,
+      "ratio_baseline_to_custom": 0.9155143659355275,
+      "baseline_requests": [
+        3
+      ],
+      "baseline_oracle_differences": 6,
+      "custom_oracle_differences": 0,
+      "pair_differences": 6
+    },
+    {
+      "style": 3,
+      "warm_samples": 24,
+      "baseline_merger_ms_median": 5.48475,
+      "custom_pack_infer_unpack_ms_median": 4.17015,
+      "ratio_baseline_to_custom": 1.315240458976296,
+      "baseline_requests": [
+        3
+      ],
+      "baseline_oracle_differences": 17,
+      "custom_oracle_differences": 0,
+      "pair_differences": 17
+    }
+  ],
+  "limitation": "64x64 rectangle component only; custom starts with projected bounds. Baseline merger timing and custom pack/infer/unpack are compared; baseline total additionally includes vertex/projection. No desktop or Tahoma speed claim.",
+  "finished": "2026-10-15T06:01:05.613477+00:00"
+}

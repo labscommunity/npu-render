@@ -1,0 +1,98 @@
+/* Bounded experimental packed-RGBA rectangle renderer, NPU50XX.
+ * Host MUST admit the exact observed wide f16 Gather carrier and source/output spans.
+ * Input f16 storage transports raw bytes; no floating-point input conversion.
+ * One invocation shades 4096 or 16384 pixels. It does no display or driver management.
+ */
+#pragma STDC FP_CONTRACT OFF
+#define INLINE static __attribute__((always_inline)) inline
+INLINE unsigned u32(const unsigned char *p) {
+    return (unsigned)p[0] | ((unsigned)p[1]<<8) |
+           ((unsigned)p[2]<<16) | ((unsigned)p[3]<<24);
+}
+INLINE float f32(const unsigned char *p) {
+    union { unsigned u; float f; } value; value.u=u32(p); return value.f;
+}
+INLINE float clamp(float v,float lo,float hi) { return v<lo?lo:(v>hi?hi:v); }
+INLINE unsigned rounded(float v) {
+    v=clamp(v,0.0f,255.0f); unsigned base=(unsigned)v;
+    float fraction=v-(float)base;
+    return base+(fraction>0.5f || (fraction==0.5f && (base&1)));
+}
+INLINE float texel(const unsigned char *source,unsigned at,unsigned c) {
+    return (float)source[at*4+c]/255.0f;
+}
+INLINE float mix(float a,float b,float t) { return a*(1.0f-t)+b*t; }
+void nr_probe_kernel(const unsigned char *params) {
+    if(!params) return;
+    for(unsigned i=0;i<3;++i) {
+        const unsigned char *p=params+i*40;
+        if(!u32(p) || u32(p+4) || u32(p+8)!=1 || u32(p+24)!=(i==1?9:2) ||
+           u32(p+32) || u32(p+36)!=(i==0?u32(params+36):2)) return;
+    }
+    unsigned source_location=u32(params+36);
+    if(source_location!=1 && source_location!=2) return;
+    if(u32(params+12)!=2 || !u32(params+16) || u32(params+52)!=1 || !u32(params+56)) return;
+    const unsigned *source_dims=(const unsigned *)u32(params+16);
+    const unsigned *index_dims=(const unsigned *)u32(params+56);
+    unsigned elements=source_dims[1],count=index_dims[0];
+    if(source_dims[0]!=4 || (elements!=8192 && elements!=65536 && elements!=262144 &&
+       elements!=524288 && elements!=1048576) || (count!=4096 && count!=16384)) return;
+    unsigned source_bytes=elements*8;
+    const unsigned char *data=(const unsigned char *)u32(params);
+    __fp16 *output=(__fp16 *)u32(params+80);
+    unsigned sw=u32(data+8),sh=u32(data+12),w=u32(data+16),h=u32(data+20);
+    unsigned first=u32(data+24),filter=u32(data+32),blend=u32(data+36);
+    unsigned sf=u32(data+40),df=u32(data+44),opaque=u32(data+48),mask=u32(data+52);
+    if(u32(data)!=0x4e525231 || u32(data+4)!=1 || !sw || sw>4096 || !sh || sh>4096 ||
+       !w || w>4096 || !h || h>8192 || first>w*h || w*h-first<count ||
+       u32(data+28)!=count || filter>1 || blend>1 ||
+       (sf!=28 && sf!=87) || (df!=28 && df!=87) || opaque>1 || mask>15 ||
+       u32(data+56)!=source_bytes || u32(data+60)) return;
+    if(source_bytes<128+count*4 || sw*sh>(source_bytes-128-count*4)/4) return;
+    float color[4],uv[4]; int bounds[4],clip[4];
+    for(unsigned c=0;c<4;++c) {
+        color[c]=f32(data+64+c*4); uv[c]=f32(data+80+c*4);
+        bounds[c]=(int)u32(data+96+c*4);clip[c]=(int)u32(data+112+c*4);
+        if(!(color[c]>=0 && color[c]<=1) || !(uv[c]>=-16 && uv[c]<=16) ||
+           bounds[c]<-1048576 || bounds[c]>1048576 || clip[c]<0 || clip[c]>2097152) return;
+    }
+    if(bounds[0]>=bounds[2] || bounds[1]>=bounds[3] || clip[0]>clip[2] || clip[1]>clip[3]) return;
+    const unsigned char *source=data+128,*background=data+128+sw*sh*4;
+    unsigned px=first%w,py=first/w;
+    #pragma clang loop unroll(disable)
+    for(unsigned i=0;i<count;++i) {
+        int sx=(int)px*256+128,sy=(int)py*256+128;
+        int covered=sx>=bounds[0] && sx<bounds[2] && sy>=bounds[1] && sy<bounds[3] &&
+                    sx>=clip[0] && sx<clip[2] && sy>=clip[1] && sy<clip[3];
+        float sampled[4];
+        if(covered) {
+            float x=((float)px+0.5f-(float)bounds[0]*(1.0f/256.0f))/((float)(bounds[2]-bounds[0])*(1.0f/256.0f));
+            float y=((float)py+0.5f-(float)bounds[1]*(1.0f/256.0f))/((float)(bounds[3]-bounds[1])*(1.0f/256.0f));
+            x=clamp(uv[0]+x*(uv[2]-uv[0]),0,1);
+            y=clamp(uv[1]+y*(uv[3]-uv[1]),0,1);
+            x=clamp(x*(float)sw-(filter?0.5f:0.0f),0,(float)(sw-1));
+            y=clamp(y*(float)sh-(filter?0.5f:0.0f),0,(float)(sh-1));
+            unsigned ix=(unsigned)x,iy=(unsigned)y,jx=ix+1<sw?ix+1:ix,jy=iy+1<sh?iy+1:iy;
+            float tx=x-(float)ix,ty=y-(float)iy;
+            for(unsigned c=0;c<4;++c) {
+                float a=texel(source,iy*sw+ix,c);
+                if(filter) a=mix(mix(a,texel(source,iy*sw+jx,c),tx),
+                                 mix(texel(source,jy*sw+ix,c),texel(source,jy*sw+jx,c),tx),ty);
+                sampled[c]=a;
+            }
+        }
+        float alpha=covered?(opaque?color[3]:sampled[3]*color[3]):0;
+        for(unsigned c=0;c<4;++c) {
+            unsigned result=background[i*4+c];
+            if(covered && (mask&(1u<<c))) {
+                unsigned source_lane=sf!=df && c<3?2-c:c,color_lane=df==87 && c<3?2-c:c;
+                float fg=opaque && c==3?color[3]:sampled[source_lane]*color[color_lane];
+                float value=fg*255.0f;
+                if(blend) value=value+(float)background[i*4+c]*(1.0f-alpha);
+                result=rounded(value);
+            }
+            output[i*4+c]=(__fp16)(float)result;
+        }
+        ++px;if(px==w){px=0;++py;}
+    }
+}

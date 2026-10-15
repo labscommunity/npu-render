@@ -1,0 +1,23 @@
+{
+  "started": "2026-10-15T05:46:32.365080+00:00",
+  "completed": true,
+  "passed": false,
+  "elements": 262144,
+  "count": 4096,
+  "custom_kernel_executed": false,
+  "stage": "export",
+  "config": {
+    "PERFORMANCE_HINT": "LATENCY",
+    "NPU_COMPILATION_MODE": "ReferenceSW",
+    "NPU_TILES": 1
+  },
+  "compile_ms": 105.1645,
+  "execution_devices": [
+    "NPU"
+  ],
+  "blob_sha256": "cd420a0dbc1974bee7d0c92dd5fa8c5dbf1a2c9972721249ff35b85f0b031566",
+  "blob_bytes": 69768,
+  "error": "ValueError('range size')",
+  "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\create-ptl-wide-carriers-v1.py\", line 25, in child\n    metadata=Elf(blob).describe(3);write(out/'layout.json',metadata);report.update(invocations=len(metadata['invocations']),ranges=len(metadata['ranges']),stage='infer');write(out/'report.json',report)\n             ^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\ptl_elf_v1.py\", line 36, in describe\n    check(s['size']==40,'range size');kind,entry,base,size,deprecated,count,pad=struct.unpack('<B7xQQIIII',s['data'])\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\ptl_elf_v1.py\", line 6, in check\n    if not ok:raise ValueError(message)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: range size\n",
+  "finished": "2026-10-15T05:46:32.480471+00:00"
+}

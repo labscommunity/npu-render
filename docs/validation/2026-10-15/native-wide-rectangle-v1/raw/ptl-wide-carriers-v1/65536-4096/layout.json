@@ -1,0 +1,92 @@
+{
+  "blob_sha256": "f8a0de96a03c771b15525edb7ed2ee0206888072cb44bf9988746fb3703c4286",
+  "blob_bytes": 69768,
+  "replacement_admitted": false,
+  "ranges": [
+    {
+      "name": "task.shave.range.0.0",
+      "kind": 0,
+      "entry": 486539264,
+      "base": 0,
+      "code_bytes": 13568,
+      "relocations": {
+        "16": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        }
+      }
+    }
+  ],
+  "invocations": [
+    {
+      "name": "task.shave.invocation.0.0",
+      "tile": 0,
+      "range_address": 1075854936,
+      "relocations": {
+        "16": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "8": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 0
+        }
+      },
+      "tensors": [
+        {
+          "descriptor_offset": 0,
+          "address": 1075937280,
+          "address_relocation": null,
+          "rank": 2,
+          "dims": [
+            4,
+            65536
+          ],
+          "strides_bits": [
+            16,
+            64
+          ],
+          "dtype": 2,
+          "order": 33,
+          "location": 2
+        },
+        {
+          "descriptor_offset": 40,
+          "address": 1076461568,
+          "address_relocation": null,
+          "rank": 1,
+          "dims": [
+            4096
+          ],
+          "strides_bits": [
+            32
+          ],
+          "dtype": 9,
+          "order": 1,
+          "location": 2
+        },
+        {
+          "descriptor_offset": 80,
+          "address": 1076477952,
+          "address_relocation": null,
+          "rank": 2,
+          "dims": [
+            4,
+            4096
+          ],
+          "strides_bits": [
+            16,
+            64
+          ],
+          "dtype": 2,
+          "order": 33,
+          "location": 2
+        }
+      ],
+      "tensor_count_explicit": 3
+    }
+  ]
+}

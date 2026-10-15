@@ -1,0 +1,39 @@
+"""Alternating-order comparison with the unchanged qualified native provider."""
+from pathlib import Path
+from datetime import UTC,datetime
+import hashlib,json,os,subprocess,time,traceback,statistics
+root=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=root/'vm';out=vm/'ptl-provider-comparison-v3';out.mkdir(exist_ok=False)
+def obj(path):
+ b=path.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,desktop_changed=False,driver_changed=False,tahoma_tested=False,full_desktop_offload=False,application_offload_tested=False,baseline_device="NPU",custom_device="NPU");process=None
+try:
+ proof=obj(vm/'ptl-rectangle-wide-v1/report.json');assert proof['passed'];model=vm/'ptl-rectangle-wide-v1/8192-4096-patched.blob';assert hashlib.sha256(model.read_bytes()).hexdigest()=='a37c7de23d9d9952f172c5d1b4f39847f09351ec6ff4a5afeb294f0a44296d7a'
+ executable=root/'builds/ptl-provider-compare-v3/Release/nr_ptl_provider_compare.exe';assert hashlib.sha256(executable.read_bytes()).hexdigest()=='49772b82067c0f3a64aed8eb93793c3a142d5de6c084a787a927099848730085'
+ fixtures=vm/'ptl-provider-fixtures-v1';manifest=obj(fixtures/'manifest.json');assert len(manifest)==112
+ for row in manifest:
+  for suffix,key in [('input','input_sha256'),('expected','expected_sha256')]:assert hashlib.sha256((fixtures/f"{row['style']}-{row['frame']}.{suffix}").read_bytes()).hexdigest()==row[key]
+ env=os.environ.copy();env['PATH']=str(root/'toolchains/openvino-2026.4.1/Lib/site-packages/openvino/libs')+os.pathsep+env['PATH']
+ env.update(NR_RENDER_NPU_CACHE=str(vm/'model-cache-2026-4-v209'),NR_RENDER_SHARED_QUEUE='1',NR_RENDER_MEMORY_CACHE='1',NR_RENDER_MEMORY_CACHE_CAPACITY='512',NR_RENDER_SHARED_CORE='1',NR_RENDER_OPAQUE_CROP='1',NR_RENDER_QUAD_BATCH='1',NR_RENDER_COMPACT_COVERAGE='0',NR_RENDER_INFER_TRACE='0',NR_RENDER_COMPILE_TRACE='0',NR_RENDER_INFER_PROFILE='0')
+ env.pop('NR_RENDER_AFFINE_BATCH',None)
+ with (out/'stdout.jsonl').open('xb') as stdout,(out/'stderr.log').open('xb') as stderr:
+  process=subprocess.Popen([str(executable),str(fixtures),str(model),"NPU"],env=env,stdout=stdout,stderr=stderr,creationflags=subprocess.CREATE_NO_WINDOW)
+  report['pid']=process.pid;(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+  try:process.wait(timeout=180)
+  except subprocess.TimeoutExpired:process.kill();process.wait(timeout=5);report['child_timeout']=True
+ report['exit_code']=process.returncode;rows=[]
+ for line in (out/'stdout.jsonl').read_text(encoding='utf-8-sig').splitlines():
+  if line.startswith('{'):rows.append(json.loads(line))
+ pairs=[x for x in rows if x.get('kind')=='pair'];final=[x for x in rows if x.get('kind')=='complete'];report['completion']=final[-1] if final else None
+ report['paired_samples']=len(pairs);report['styles']=[]
+ for style in range(4):
+  warm=[x for x in pairs if x['style']==style and not x['warmup']]
+  if warm:
+   base=statistics.median(x['baseline_merger_ms'] for x in warm);custom=statistics.median(x['custom_pack_infer_unpack_ms'] for x in warm)
+   report['styles'].append(dict(style=style,warm_samples=len(warm),baseline_merger_ms_median=base,custom_pack_infer_unpack_ms_median=custom,ratio_baseline_to_custom=base/custom,baseline_requests=sorted(set(x['baseline_requests'] for x in warm)),baseline_oracle_differences=sum(x['baseline_oracle_differences'] for x in warm),custom_oracle_differences=sum(x['custom_oracle_differences'] for x in warm),pair_differences=sum(x['pair_differences'] for x in warm)))
+ report['passed']=process.returncode==0 and len(pairs)==112 and bool(final) and final[-1]['passed']
+ report['limitation']='64x64 rectangle component only; custom starts with projected bounds. Baseline merger timing and custom pack/infer/unpack are compared; baseline total additionally includes vertex/projection. No desktop or Tahoma speed claim.'
+except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+finally:
+ if process is not None and process.poll() is None:process.kill();process.wait(timeout=5)
+ report.update(completed=True,finished=datetime.now(UTC).isoformat());(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(report));raise SystemExit(0 if report['passed'] else 1)

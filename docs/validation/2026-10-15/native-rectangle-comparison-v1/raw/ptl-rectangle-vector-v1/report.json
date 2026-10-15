@@ -1,0 +1,281 @@
+{
+  "started": "2026-10-15T06:03:21.289559+00:00",
+  "completed": true,
+  "passed": false,
+  "desktop_changed": false,
+  "driver_changed": false,
+  "full_desktop_offload": false,
+  "tahoma_tested": false,
+  "matched_kernel_benchmark": false,
+  "sampler_component_qualified": false,
+  "carriers": [
+    {
+      "elements": 8192,
+      "count": 4096,
+      "source_location": "CMX",
+      "original_sha256": "edb1bcdad9605c90955ef6efc406f1a4f60f77a5b0d22122defec4367c829a2b",
+      "patched_sha256": "43c9cc1bfd3b8b9ce60cf0b57407b2fff53449eece4878d65a7f8c8a03813c13"
+    },
+    {
+      "elements": 65536,
+      "count": 4096,
+      "source_location": "CMX",
+      "original_sha256": "f8a0de96a03c771b15525edb7ed2ee0206888072cb44bf9988746fb3703c4286",
+      "patched_sha256": "924a59b2a9d27765150edee10ddd06bfbe14fccec3cf08f22e981aa6adf10a0c"
+    },
+    {
+      "elements": 262144,
+      "count": 4096,
+      "source_location": "DDR",
+      "original_sha256": "cd420a0dbc1974bee7d0c92dd5fa8c5dbf1a2c9972721249ff35b85f0b031566",
+      "patched_sha256": "70340ec8eddeb9f447d2f00b5be64105ef28ab84f8a27491b4d9c9019c6dc6d8"
+    },
+    {
+      "elements": 524288,
+      "count": 4096,
+      "source_location": "DDR",
+      "original_sha256": "d5ddb5bde20016c8b09b656ea90f893c494939059cedf8b4224292d59ece7446",
+      "patched_sha256": "f59dd687e5356451fa9ff30e69fce3e1a8521df7151389ed266488b71915a5b7"
+    },
+    {
+      "elements": 524288,
+      "count": 16384,
+      "source_location": "DDR",
+      "original_sha256": "d06a8726b1788fe54761a7971cc76f091ba1dba8e49333ce14f7b378dddedfc6",
+      "patched_sha256": "f1ba9c4cc5a058b3741296c1ad5b2995730ebd3d4e064cb6d4a6d7922599a7c5"
+    },
+    {
+      "elements": 1048576,
+      "count": 16384,
+      "source_location": "DDR",
+      "original_sha256": "469ee6c0d6c6bd35311cbb94b441fce27a3011d168947ffe4b2c1f0a0209e051",
+      "patched_sha256": "48f5c851f139a53fe3baa96fb1f437cb2cdbe2265bfae7f2465d67727478db09"
+    }
+  ],
+  "kernel_sha256": "cc8cb8d367560a7a5bf9e51cb805306bf6a42b2a1cf91df7236749fb03b51987",
+  "child_exit": 1,
+  "child_result": {
+    "started": "2026-10-15T06:03:21.654429+00:00",
+    "completed": true,
+    "passed": false,
+    "phases": [
+      {
+        "elements": 8192,
+        "count": 4096,
+        "phase": "original-before",
+        "passed": true,
+        "execution_devices": [
+          "NPU"
+        ],
+        "exact_components": 131072,
+        "checks": [
+          {
+            "iteration": 0,
+            "elapsed_ms": 3.1101,
+            "exact_components": 16384,
+            "input_sha256": "4591e35fed8a971402c3f389d2c0e7cc5777b67fe94ebd7c6e379f7f8b04c460",
+            "output_sha256": "a29e9205e3c84c63b0bbb2bf7c467d94eb331b8bd90238b8774a1b70b59ea5ff"
+          },
+          {
+            "iteration": 1,
+            "elapsed_ms": 1.3024,
+            "exact_components": 16384,
+            "input_sha256": "3b9c5d74afe18f47a07e0054e133b73d14d1fdd9d08cd9eb613f70ec69854be4",
+            "output_sha256": "a7c7a78ca976c3fdd8a20f66fbe78e0504e2133a0d0a827a7cc4ab831a1aec43"
+          },
+          {
+            "iteration": 2,
+            "elapsed_ms": 1.5078,
+            "exact_components": 16384,
+            "input_sha256": "33112e26517b089d413375a2b984fe71b2b6d5669bca5dc69b5a7a90d04e82eb",
+            "output_sha256": "90c7beea7077874f1e9bbe51c5d72d22881f738a0068780404fede1fe02c89a2"
+          },
+          {
+            "iteration": 3,
+            "elapsed_ms": 1.2564,
+            "exact_components": 16384,
+            "input_sha256": "1bd52adc2abd8efa6803c900bf745394721707ab7365b260d17ae55ba7f6dc61",
+            "output_sha256": "37aed9901155c94a23cefef00005ec3a0d44b6aa41f7cb3f76b298ab2b03859c"
+          },
+          {
+            "iteration": 4,
+            "elapsed_ms": 1.1912,
+            "exact_components": 16384,
+            "input_sha256": "f3944aa786b62c3edb1d0818a1429d1c78ee99ccc4d07f72e290b6c88aa26b34",
+            "output_sha256": "ff04de93f4ad09a561b42f964383376c4f811b35313108f01b2eefe52963654f"
+          },
+          {
+            "iteration": 5,
+            "elapsed_ms": 1.1529,
+            "exact_components": 16384,
+            "input_sha256": "4320e854f0fd3453d99b6e49c7b92bc7402ff8d7dc738edfa6d19b007bead564",
+            "output_sha256": "1cfd64223a465fb9da118be5df596235a0d26071de86961eae5260b28b8aea74"
+          },
+          {
+            "iteration": 6,
+            "elapsed_ms": 1.1625,
+            "exact_components": 16384,
+            "input_sha256": "35c956cb007185fdd8f990b12ffa3a2098e93432d428d9d757cbc255a4e45995",
+            "output_sha256": "c21c3a0b418f8dbe6314bb8dbadb769b63660d6570f6bb0782285acfb31c154a"
+          },
+          {
+            "iteration": 7,
+            "elapsed_ms": 1.1506,
+            "exact_components": 16384,
+            "input_sha256": "822be189e6ea8552b9b686664f61b68c7ea983a0216f203626087a97baa08ad0",
+            "output_sha256": "435e8edc21556e890346de7eb15485187ecd7646de40b4e4aca1022a1d27452c"
+          }
+        ],
+        "request_ms_p50": 1.2238,
+        "request_ms_p95": 2.549294999999999
+      }
+    ],
+    "active_phase": "custom-rectangle",
+    "mismatch": {
+      "iteration": 0,
+      "phase": "custom-rectangle",
+      "positions": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          2,
+          0
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          2,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          0
+        ],
+        [
+          3,
+          1
+        ],
+        [
+          3,
+          2
+        ],
+        [
+          3,
+          3
+        ]
+      ],
+      "actual": [
+        3.2782554626464844e-06,
+        5.304813385009766e-06,
+        4.172325134277344e-06,
+        1.4901161193847656e-05,
+        1.4781951904296875e-05,
+        2.384185791015625e-07,
+        5.125999450683594e-06,
+        5.125999450683594e-06,
+        1.3470649719238281e-05,
+        1.4185905456542969e-05,
+        8.463859558105469e-06,
+        1.0907649993896484e-05,
+        9.715557098388672e-06,
+        5.125999450683594e-06,
+        1.1324882507324219e-06,
+        7.331371307373047e-06
+      ],
+      "expected": [
+        55.0,
+        89.0,
+        70.0,
+        250.0,
+        248.0,
+        4.0,
+        86.0,
+        86.0,
+        226.0,
+        238.0,
+        142.0,
+        183.0,
+        163.0,
+        86.0,
+        19.0,
+        123.0
+      ],
+      "float32_ideal": [
+        55.0,
+        89.0,
+        70.0,
+        250.0,
+        248.0,
+        4.0,
+        86.0,
+        86.0,
+        226.0,
+        238.0,
+        142.0,
+        183.0,
+        163.0,
+        86.0,
+        19.0,
+        123.0
+      ],
+      "double_ideal": [
+        55.0,
+        89.0,
+        70.0,
+        250.0,
+        248.0,
+        4.0,
+        86.0,
+        86.0,
+        226.0,
+        238.0,
+        142.0,
+        183.0,
+        163.0,
+        86.0,
+        19.0,
+        123.0
+      ]
+    },
+    "error": "AssertionError('independent exact pixel oracle differs')",
+    "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\qualify-ptl-rectangle-vector-v1.py\", line 56, in child\n    raise AssertionError('independent exact pixel oracle differs')\nAssertionError: independent exact pixel oracle differs\n",
+    "finished": "2026-10-15T06:03:21.710070+00:00"
+  },
+  "finished": "2026-10-15T06:03:21.791899+00:00"
+}

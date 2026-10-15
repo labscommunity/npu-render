@@ -1,0 +1,52 @@
+"""Isolated full-source indexed copy/channel-reversal qualification on PTL."""
+from pathlib import Path
+from datetime import UTC,datetime
+import argparse,hashlib,json,os,subprocess,sys,time,traceback
+from ptl_wide_contract_v1 import patch,CASES
+from npu_render.ptl_carrier import read_kernel_text
+p=argparse.ArgumentParser();p.add_argument('--child',type=Path);a=p.parse_args();r=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=r/'vm'
+def obj(p):
+ b=p.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+if a.child:
+ import openvino as ov
+ import numpy as np
+ out=a.child;report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,phases=[])
+ def save():(out/'child-report.json').write_text(json.dumps(report,indent=2)+'\n')
+ try:
+  assert ov.get_version()=='2026.4.1-22982-e213a147257-releases/2026/4';core=ov.Core()
+  for elements,count in sorted(CASES):
+   for phase in ['original-before','custom-swizzle','original-after']:
+    report.update(active_elements=elements,active_phase=phase);save();file=f'{elements}-{count}-'+('patched' if phase=='custom-swizzle' else 'original')+'.blob';model=core.import_model((out/file).read_bytes(),'NPU')
+    raw=model.get_property('EXECUTION_DEVICES');devices=[raw] if isinstance(raw,str) else list(raw);assert devices in (['NPU'],['NPU.0']);request=model.create_infer_request();checks=[]
+    for iteration in range(16):
+     rng=np.random.default_rng(3100+iteration);source=(rng.integers(0,65536,(elements,4),dtype=np.uint16).view(np.float16) if phase=='custom-swizzle' else rng.integers(-256,256,(elements,4)).astype(np.float16));indices=rng.integers(0,elements,count,dtype=np.int32);indices[:4]=[0,elements-1,elements//2,elements//2-1]
+     selected=source[indices];expected=selected[:,::-1].copy() if phase=='custom-swizzle' else selected.copy()
+     assert phase!='custom-swizzle' or not np.array_equal(selected.view(np.uint16),expected.view(np.uint16))
+     began=time.perf_counter_ns();request.start_async({0:source,1:indices});assert request.wait_for(10000),'inference deadline';actual=request.get_output_tensor(0).data.copy();elapsed=(time.perf_counter_ns()-began)/1e6
+     if actual.dtype!=expected.dtype or actual.shape!=expected.shape or not np.array_equal(actual.view(np.uint16),expected.view(np.uint16)):
+      report['mismatch']=dict(elements=elements,phase=phase,iteration=iteration,actual=actual.flatten().tolist()[:32],expected=expected.flatten().tolist()[:32]);raise AssertionError('indexed channel reversal differs from independent oracle')
+     checks.append(dict(iteration=iteration,elapsed_ms=elapsed,source_sha256=hashlib.sha256(source.tobytes()).hexdigest(),indices_sha256=hashlib.sha256(indices.tobytes()).hexdigest(),output_sha256=hashlib.sha256(actual.tobytes()).hexdigest(),boundary_indices=indices[:4].tolist()))
+    report['phases'].append(dict(elements=elements,count=count,phase=phase,passed=True,execution_devices=devices,exact_components=16*count*4,checks=checks));del request,model;save()
+  report['passed']=True
+ except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+ finally:report.update(completed=True,finished=datetime.now(UTC).isoformat());save()
+ print(json.dumps({k:v for k,v in report.items() if k!='phases'}));raise SystemExit(0 if report['passed'] else 1)
+out=vm/'ptl-wide-swizzle-v1';out.mkdir(exist_ok=False);report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,desktop_changed=False,driver_changed=False,full_desktop_offload=False,tahoma_tested=False,custom_full_source_gather_qualified=False,carriers=[]);child=None
+try:
+ q=obj(vm/'ptl-raw-identity-v1/report.json');assert q['completed'] and q['passed'];proof=obj(vm/'ptl-wide-carriers-v2/report.json');assert proof['passed']
+ q=obj(vm/'ptl-wide-contract-v1-qualification.json');assert q['passed'] and len(q['cases'])==84
+ for name,expected in q['source_sha256'].items():assert hashlib.sha256((vm/name).read_bytes()).hexdigest()==expected
+ q=obj(vm/'ptl-wide-swizzle-build-v1/report.json');assert q['passed'];elf=(vm/'ptl-wide-swizzle-build-v1/kernel.elf').read_bytes();assert hashlib.sha256(elf).hexdigest()==q['child_result']['elf_sha256']=='950d3095d6a423fe05182b9bf319654569ba83bfd3cccf2825754b31379e2f9c';text=read_kernel_text(elf);assert 0<len(text)<=13568
+ for elements,count in sorted(CASES):
+  q=next(x for x in proof['cases'] if x['elements']==elements and x['count']==count);assert q['passed'];blob=(vm/'ptl-wide-carriers-v2'/f'{elements}-{count}'/'carrier.blob').read_bytes();expected=q['blob_sha256'];assert hashlib.sha256(blob).hexdigest()==expected
+  modified,contract=patch(blob,text,elements,count);(out/f'{elements}-{count}-original.blob').write_bytes(blob);(out/f'{elements}-{count}-patched.blob').write_bytes(modified);(out/f'{elements}-{count}-contract.json').write_text(json.dumps(contract,indent=2)+'\n');report['carriers'].append(dict(elements=elements,count=count,source_location=contract['source_location'],original_sha256=expected,patched_sha256=hashlib.sha256(modified).hexdigest(),non_code_bytes_preserved=True))
+ with (out/'child.stdout.log').open('xb') as stdout,(out/'child.stderr.log').open('xb') as stderr:
+  child=subprocess.Popen([sys.executable,__file__,'--child',str(out)],stdout=stdout,stderr=stderr,creationflags=subprocess.CREATE_NO_WINDOW)
+  try:child.wait(timeout=60)
+  except subprocess.TimeoutExpired:child.kill();child.wait(timeout=5);report['child_timeout']=True
+ report['child_exit']=child.returncode;q=obj(out/'child-report.json') if (out/'child-report.json').exists() else {};report['child_summary']={k:v for k,v in q.items() if k!='phases'};report['passed']=child.returncode==0 and q.get('passed',False);report['custom_full_source_gather_qualified']=report['passed'];report['exact_components']=sum(x['exact_components'] for x in q.get('phases',[]))
+except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+finally:
+ if child is not None and child.poll() is None:child.kill();child.wait(timeout=5)
+ report.update(completed=True,finished=datetime.now(UTC).isoformat());(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(report));raise SystemExit(0 if report['passed'] else 1)
