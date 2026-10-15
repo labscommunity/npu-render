@@ -1,0 +1,888 @@
+{
+  "recorded": "2026-10-15T00:58:49.061939+00:00",
+  "evidence_checks_passed": true,
+  "raw_files_remotely_hash_verified": 143,
+  "raw_bytes": 12524952,
+  "soak": {
+    "started": "2026-10-15T00:15:40.980913+00:00",
+    "completed": true,
+    "passed": true,
+    "desktop_changed": false,
+    "driver_installed": false,
+    "desktop_offloaded": false,
+    "recorded_requests": 3291,
+    "first_original_ticket": 0,
+    "verification_scope": "consistency_with_original_successful_outputs_only",
+    "capture_index_sha256": "7f472687ec66920087435b68ad5310470273ce36489ade43aac51d5f730bb219",
+    "affine_batch": "default",
+    "pipeline_cache": "retained",
+    "shared_core": "1",
+    "shared_queue": "1",
+    "memory_cache": "0",
+    "successful_replays": 3291,
+    "original_pixel_hashes_matched": 3288,
+    "unreferenced_successes": 3,
+    "test_exception_ticket": -1,
+    "provider_recovery": "1",
+    "test_kill_ticket": -1,
+    "compile_trace": "1",
+    "repetitions": 3,
+    "infer_trace": "1",
+    "quad_batch": "1",
+    "worker_binary_sha256": "565f0c866168039a2064429ae7ced721b78acbdf9ac5406ed1254905150a308f",
+    "worker_pid": 15168,
+    "current_ticket": 1096,
+    "current_iteration": 3290,
+    "delivery_acknowledgments": 3291,
+    "worker_exit": 0,
+    "original_failure_reproduced": false,
+    "finished": "2026-10-15T00:36:13.930783+00:00"
+  },
+  "real_device_loss_recovery_demonstrated": true,
+  "provider_generations": [
+    {
+      "provider_process_started": true,
+      "generation": 1,
+      "pid": 22444,
+      "kill_on_owner_exit": true,
+      "execution_device": "NPU"
+    },
+    {
+      "provider_process_started": true,
+      "generation": 2,
+      "pid": 20940,
+      "kill_on_owner_exit": true,
+      "execution_device": "NPU"
+    }
+  ],
+  "provider_failures": [
+    {
+      "provider_process_failure": true,
+      "dispatch_ticket": 719,
+      "generation": 1,
+      "retry_on_npu": true,
+      "fallback_backend": "none"
+    }
+  ],
+  "successful_retries": [
+    {
+      "provider_process_response": true,
+      "dispatch_ticket": 719,
+      "generation": 2,
+      "attempt": 1,
+      "elapsed_ms": 62906,
+      "timing_scope": "child_roundtrip_including_compilation_and_recovery",
+      "execution_device": "NPU"
+    }
+  ],
+  "failed_inference": {
+    "inference_history": true,
+    "index": 28295,
+    "thread_id_hash": 12683652641629324687,
+    "request_address": 2555815750936,
+    "utc_us": 1792023670481374,
+    "duration_us": 60880063,
+    "gap_us": 91985,
+    "site": "vertex_executor.cpp",
+    "line": 993,
+    "failed": true
+  },
+  "registered": {
+    "started": "2026-10-15T00:36:21.8174658Z",
+    "mode": "render",
+    "completed": true,
+    "passed": true,
+    "controller_pid": 19740,
+    "memory_integrity_before": true,
+    "boot_settings_changed": false,
+    "physical_display_before": [
+      {
+        "instance": "PCI\\VEN_8086&DEV_B080&SUBSYS_14641043&REV_04\\3&11583659&0&10",
+        "status": "OK",
+        "hardware_ids": [
+          "PCI\\VEN_8086&DEV_B080&SUBSYS_14641043&REV_04",
+          "PCI\\VEN_8086&DEV_B080&SUBSYS_14641043",
+          "PCI\\VEN_8086&DEV_B080&CC_030000",
+          "PCI\\VEN_8086&DEV_B080&CC_0300"
+        ]
+      }
+    ],
+    "desktop_offloaded": false,
+    "recovery_task_armed": true,
+    "stage_exit": 0,
+    "published_inf": "oem19.inf",
+    "install_exit": 0,
+    "instance": "ROOT\\DISPLAY\\0000",
+    "installed_umd_sha256": "091878DA1B2A944CDAA2B41FC98F2477160C2E0EEE0B7782C6CC1DDA83275FE6",
+    "qualification_exit": 0,
+    "registered_npu_qualified": true,
+    "operations_passed": true,
+    "recovery_exit": 0,
+    "cleanup_passed": true,
+    "memory_integrity_after": true,
+    "finished": "2026-10-15T00:36:34.4195571Z"
+  },
+  "registered_qualification": {
+    "dll_sha256": "091878da1b2a944cdaa2b41fc98f2477160c2e0eee0b7782c6cc1dda83275fe6",
+    "started": "2026-10-15T00:36:26.531360+00:00",
+    "completed": true,
+    "passed": true,
+    "controller_pid": 5920,
+    "driver_installed": true,
+    "registered_adapter_tested": true,
+    "desktop_offloaded": false,
+    "quad_batch": "1",
+    "unleased_rejection_passed": true,
+    "worker_pid": 9592,
+    "consumer_pid": 15356,
+    "lease_scope": "one-owned-consumer-protocol-3-session-0-120-seconds",
+    "lease_sha256": "5699ad79e114efb0ab11331b1d402a805f426c7707c2037e624f140d2e52939d",
+    "admission_protocol": 3,
+    "consumer_exit_code": 0,
+    "isolated_provider": true,
+    "hardware_child_receipts": 8,
+    "provider_generations": 1,
+    "device_loss_recovery_tested": false,
+    "component": {
+      "native_registered_component": true,
+      "passed": true,
+      "npu_local_executions": 8,
+      "clears": 6,
+      "draws": 2,
+      "cpu_executions": 0,
+      "gpu_executions": 0,
+      "registered_adapter_tested": true,
+      "normal_d3d11_runtime": true,
+      "allocation_callbacks_emulated": false,
+      "desktop_offloaded": false
+    },
+    "npu_operation_receipts": 8,
+    "delivery_acknowledgments": 8,
+    "worker_exit_code": 0,
+    "finished": "2026-10-15T00:36:26.949387+00:00"
+  },
+  "trace_summary": {
+    "trace_sha256": "DFF5BC684F0C186E67AD0F0E70D2BC74A39CF5C04ADAC329A9154A41BD8D4F02",
+    "trace_bytes": 128974848,
+    "trace_stopped": true,
+    "event_loss_checked": false,
+    "owned_process_ids": [
+      15168,
+      22444,
+      20940
+    ],
+    "provider_generations": [
+      {
+        "provider_process_started": true,
+        "generation": 1,
+        "pid": 22444,
+        "kill_on_owner_exit": true,
+        "execution_device": "NPU"
+      },
+      {
+        "provider_process_started": true,
+        "generation": 2,
+        "pid": 20940,
+        "kill_on_owner_exit": true,
+        "execution_device": "NPU"
+      }
+    ],
+    "selected_event_count": 135573,
+    "selection": "Level Zero model/queue/context/fence lifetime and host waits; both provider warnings/errors",
+    "worker_events": 135573,
+    "first": "2026-10-15T00:15:41.0814282Z",
+    "last": "2026-10-15T00:36:10.5963906Z",
+    "counts": {
+      "Intel-NPU-LevelZero:2307": 1036,
+      "Intel-NPU-LevelZero:257": 2,
+      "Intel-NPU-LevelZero:1537": 2431,
+      "Intel-NPU-LevelZero:1539": 1037,
+      "Intel-NPU-LevelZero:2305": 2561,
+      "Intel-NPU-LevelZero:1541": 128504,
+      "Intel-NPU-LevelZero:513": 2
+    },
+    "successful_create_calls": {
+      "context": 2,
+      "queue": 2,
+      "fence": 2431,
+      "graph": 2561
+    },
+    "successful_destroy_calls": {
+      "context": 0,
+      "queue": 0,
+      "fence": 1037,
+      "graph": 1036
+    },
+    "maximum_create_minus_destroy": {
+      "context": 2,
+      "queue": 2,
+      "fence": 1394,
+      "graph": 1525
+    },
+    "final_create_minus_destroy": {
+      "context": 2,
+      "queue": 2,
+      "fence": 1394,
+      "graph": 1525
+    },
+    "hardware_resource_count_independently_verified": false,
+    "warning_error_events": 1,
+    "tail": [
+      {
+        "time": "2026-10-15T00:36:09.9480441Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 2307,
+        "level": 4,
+        "task": 10,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 3440
+      },
+      {
+        "time": "2026-10-15T00:36:09.9483696Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1539,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 3440
+      },
+      {
+        "time": "2026-10-15T00:36:09.9490458Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 2307,
+        "level": 4,
+        "task": 10,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 3440
+      },
+      {
+        "time": "2026-10-15T00:36:09.9492456Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1539,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 3440
+      },
+      {
+        "time": "2026-10-15T00:36:09.9499415Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 2307,
+        "level": 4,
+        "task": 10,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 3440
+      },
+      {
+        "time": "2026-10-15T00:36:09.9696176Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 2305,
+        "level": 4,
+        "task": 10,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 3440
+      },
+      {
+        "time": "2026-10-15T00:36:10.0228835Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 2305,
+        "level": 4,
+        "task": 10,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 3440
+      },
+      {
+        "time": "2026-10-15T00:36:10.0321861Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1537,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 3440
+      },
+      {
+        "time": "2026-10-15T00:36:10.0338651Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1541,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 3440
+      },
+      {
+        "time": "2026-10-15T00:36:10.0348298Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1537,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 3440
+      },
+      {
+        "time": "2026-10-15T00:36:10.0375438Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1541,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 3440
+      },
+      {
+        "time": "2026-10-15T00:36:10.0787164Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 2305,
+        "level": 4,
+        "task": 10,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 3440
+      },
+      {
+        "time": "2026-10-15T00:36:10.0844982Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1537,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 3440
+      },
+      {
+        "time": "2026-10-15T00:36:10.0960910Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1541,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 3440
+      },
+      {
+        "time": "2026-10-15T00:36:10.1065177Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1541,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 3440
+      },
+      {
+        "time": "2026-10-15T00:36:10.1432626Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 2305,
+        "level": 4,
+        "task": 10,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 3440
+      },
+      {
+        "time": "2026-10-15T00:36:10.1493203Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1537,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 3440
+      },
+      {
+        "time": "2026-10-15T00:36:10.1523364Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1541,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 3440
+      },
+      {
+        "time": "2026-10-15T00:36:10.2333224Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1541,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 2548
+      },
+      {
+        "time": "2026-10-15T00:36:10.2716247Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1541,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 13708
+      },
+      {
+        "time": "2026-10-15T00:36:10.2730069Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1541,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 13708
+      },
+      {
+        "time": "2026-10-15T00:36:10.2787656Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1541,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 13708
+      },
+      {
+        "time": "2026-10-15T00:36:10.2811646Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1541,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 13708
+      },
+      {
+        "time": "2026-10-15T00:36:10.2980134Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1541,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 13708
+      },
+      {
+        "time": "2026-10-15T00:36:10.3029755Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1541,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 13708
+      },
+      {
+        "time": "2026-10-15T00:36:10.3098468Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1541,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 13708
+      },
+      {
+        "time": "2026-10-15T00:36:10.3135184Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1541,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 13708
+      },
+      {
+        "time": "2026-10-15T00:36:10.3306739Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1541,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 13708
+      },
+      {
+        "time": "2026-10-15T00:36:10.3361240Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1541,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 13708
+      },
+      {
+        "time": "2026-10-15T00:36:10.3934484Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1541,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 19944
+      },
+      {
+        "time": "2026-10-15T00:36:10.4327188Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1541,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 3440
+      },
+      {
+        "time": "2026-10-15T00:36:10.4339395Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1541,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 3440
+      },
+      {
+        "time": "2026-10-15T00:36:10.4388387Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1541,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 3440
+      },
+      {
+        "time": "2026-10-15T00:36:10.4408536Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1541,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 3440
+      },
+      {
+        "time": "2026-10-15T00:36:10.5176664Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1541,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 3440
+      },
+      {
+        "time": "2026-10-15T00:36:10.5208376Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1541,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 3440
+      },
+      {
+        "time": "2026-10-15T00:36:10.5257465Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1541,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 3440
+      },
+      {
+        "time": "2026-10-15T00:36:10.5281449Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1541,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 3440
+      },
+      {
+        "time": "2026-10-15T00:36:10.5935481Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1541,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 3440
+      },
+      {
+        "time": "2026-10-15T00:36:10.5963906Z",
+        "provider": "Intel-NPU-LevelZero",
+        "id": 1541,
+        "level": 4,
+        "task": 8,
+        "opcode": 2,
+        "worker_process": true,
+        "thread_id": 3440
+      }
+    ],
+    "raw_trace_committed": false,
+    "desktop_offloaded": false
+  },
+  "trace_events_lost": 0,
+  "trace_lifetime_counts_exhaustive": false,
+  "successful_request_totals": {
+    "draw_ms": 713038.993,
+    "compile_and_draw_ms": 896353.944,
+    "provider_requests": 128503,
+    "compile_calls": 2561,
+    "backend_compile_calls": 2561,
+    "backend_compile_ms": 98944.792,
+    "provider_setup_ms": 133600.271
+  },
+  "native_startup_rejected_before_admission": [
+    25,
+    26
+  ],
+  "native_live": {
+    "started": "2026-10-15T00:41:08.8954743Z",
+    "completed": true,
+    "passed": true,
+    "native_trial": "native-desktop-admission-v37",
+    "topology_trial": "native-topology-primary-v13",
+    "desktop_offloaded": false,
+    "input_forwarding_tested": false,
+    "tahoma_tested": false,
+    "controller_pid": 15524,
+    "first_relay": {
+      "sequence": 1,
+      "qpc": 2332756420975,
+      "producer_pid": 11000,
+      "width": 1024,
+      "height": 768,
+      "format": 87,
+      "pixel_bytes": 3145728,
+      "pixel_sha256": "66d31bb799061c8f31cf46dbfc5951589cc3674f8d192c34e19704b209bc5cd3",
+      "packet_sha256": "8f917e245e32ed759099f14336b9279328476f3c14988ef3f63ed107996138d7",
+      "observed": "2026-10-15T00:42:45.552386+00:00",
+      "npu_receipts_observed": 145,
+      "known_stimulus_pixel": [
+        62,
+        55,
+        44,
+        255
+      ]
+    },
+    "presentation_seconds": 506,
+    "cursor_cued_at": "2026-10-15T00:42:49.4392012Z",
+    "click_cued_at": "2026-10-15T00:45:25.8291783Z",
+    "key_cued_at": "2026-10-15T00:46:00.2006582Z",
+    "presenter_task_result": 0,
+    "topology_exit": 0,
+    "native_exit": 0,
+    "cleanup_passed": true,
+    "physically_submitted_frames": 35,
+    "matching_source_frames": 35,
+    "backbuffer_copies_exact": true,
+    "distinct_source_pixel_hashes": 16,
+    "stimulus_task_result": 0,
+    "presenter_child_success": true,
+    "stimulus_child_success": true,
+    "controlled_color_submitted": true,
+    "mouse_received": true,
+    "keyboard_received": true,
+    "physical_blue_green_red_observed": true,
+    "screen_observer": "DXGI physical-output duplication; two-pixel GPU readback; ownership before and after",
+    "screen_observer_result": {
+      "completed": true,
+      "passed": true,
+      "physical_output_observer": true,
+      "rows": 110,
+      "blue": 172,
+      "green": 2,
+      "red": 2,
+      "gpu_copy_commands": 220,
+      "timeouts": 813,
+      "physical_panel_observed": false,
+      "desktop_offloaded": false
+    },
+    "primary_topology_restored": true,
+    "ordinary_windows_restored": true,
+    "pointer_confined_and_restored": true,
+    "pointer_reacquisitions": 2,
+    "relative_mouse_received": true,
+    "normal_windows_input_tested": true,
+    "isolated_provider": true,
+    "provider_generations": 1,
+    "provider_faults": 0,
+    "provider_retries": 0,
+    "hardware_child_receipts": 1107,
+    "cursor_cleanup_passed": true,
+    "finished": "2026-10-15T00:52:49.5113764Z"
+  },
+  "controlled_input_latency": [
+    {
+      "event": "mouse_received",
+      "first_owned_physical_read_seconds": 20.6445145,
+      "qpc_frequency": 10000000,
+      "screen_read_completion_used": true,
+      "performance_qualification": false
+    },
+    {
+      "event": "key_received",
+      "first_owned_physical_read_seconds": 0.5668906,
+      "qpc_frequency": 10000000,
+      "screen_read_completion_used": true,
+      "performance_qualification": false
+    }
+  ],
+  "native_bootstrap": {
+    "started": "2026-10-15T00:41:26.458771+00:00",
+    "passed": true,
+    "completed": true,
+    "desktop_offloaded": false,
+    "physical_frame_presented": false,
+    "display_topology_requested": false,
+    "actual_dwm_npu_execution": true,
+    "actual_umdf_npu_execution": false,
+    "controller_pid": 10956,
+    "frame_io_statistics": {
+      "sharing_retries": 1,
+      "sharing_timeouts": 0
+    },
+    "session_gate": {
+      "session_inspection": true,
+      "console_session": 1,
+      "signed_in_and_unlocked": true,
+      "controller_matches_console_user": true,
+      "ready_for_interactive_task": true,
+      "desktop_changed": false
+    },
+    "compositor": {
+      "pid": 16980,
+      "session": 1,
+      "creation_filetime": 134364673055826287,
+      "image_name": "dwm.exe",
+      "sid": "S-1-5-90-0-1"
+    },
+    "indirect_host": {
+      "pid": 11000,
+      "session": 0,
+      "creation_filetime": 134364984866446080,
+      "image_name": "WUDFHost.exe",
+      "sid": "S-1-5-19"
+    },
+    "host_found_after_ms": 127.66609998652712,
+    "provider_isolated": true,
+    "provider_fault_injected": false,
+    "provider_timing_scope": "Child roundtrip includes compilation, transport and any recovery.",
+    "request_recording_enabled": true,
+    "recording_byte_budget": 17179869184,
+    "performance_measurement_valid": false,
+    "affine_batch": "default",
+    "memory_cache": "0",
+    "pipeline_cache": "retained",
+    "monitor_seconds": 660,
+    "quad_batch": "1",
+    "worker_pid": 19112,
+    "admission_published": true,
+    "admission_publication_ms": 98.00630001700483,
+    "npu_receipts": 1107,
+    "delivery_acknowledgments": 1107,
+    "hardware_child_receipts": 1107,
+    "provider_generations": 1,
+    "provider_faults": 0,
+    "provider_retries": 0,
+    "native_driver_entry": true,
+    "preferred_adapter_selected": true,
+    "successful_frame_readback": true,
+    "latest_frame": {
+      "sequence": 37,
+      "width": 1024,
+      "height": 768,
+      "format": 87,
+      "pixel_bytes": 3145728,
+      "producer_pid": 11000,
+      "qpc": 2338059484810,
+      "pixel_sha256": "e9e4340f89bc1c8fb4240c80c4311bcaf0d9bb6aa58bb5c954fcb0f638b63c8d"
+    },
+    "observed_frame_count": 37,
+    "distinct_pixel_hashes": 17,
+    "native_indirect_frame_produced": true,
+    "multiple_frames_observed": true,
+    "sustained_rendering_qualified": false,
+    "indirect_remove_exit": 0,
+    "owned_process_acls_restored_exactly": true,
+    "installer_exit_code": 0,
+    "worker_terminated_after_device_removal": true,
+    "worker_exit_code": 1,
+    "finished": "2026-10-15T00:52:27.070523+00:00"
+  },
+  "exact_reuse_weighted_cost": [
+    {
+      "capacity_mib": 64,
+      "hits": 196,
+      "diagnostic_compile_draw_ms": 28094.021,
+      "diagnostic_cost_fraction": 0.03134255300381654,
+      "performance_prediction": false,
+      "new_cache_implemented": false
+    },
+    {
+      "capacity_mib": 256,
+      "hits": 215,
+      "diagnostic_compile_draw_ms": 33163.246,
+      "diagnostic_cost_fraction": 0.03699793616348499,
+      "performance_prediction": false,
+      "new_cache_implemented": false
+    }
+  ],
+  "exact_reuse_analysis": {
+    "started": "2026-10-15T00:52:49.908882+00:00",
+    "completed": true,
+    "passed": true,
+    "read_only": true,
+    "pixels_exported": false,
+    "new_npu_execution": false,
+    "performance_qualification": false,
+    "requests": 1097,
+    "reference_outputs": 1096,
+    "distinct_referenced_requests": 604,
+    "canonical_header_exclusions": [
+      "nonce[0]",
+      "nonce[1]",
+      "sequence",
+      "client_pid"
+    ],
+    "conflicting_reference_outputs": [],
+    "cache_estimates": [
+      {
+        "capacity_mib": 64,
+        "hits": 196,
+        "misses": 900,
+        "retained_bytes": 61584980,
+        "retained_entries": 8
+      },
+      {
+        "capacity_mib": 256,
+        "hits": 215,
+        "misses": 881,
+        "retained_bytes": 262929244,
+        "retained_entries": 55
+      }
+    ],
+    "capture_index_sha256": "7f472687ec66920087435b68ad5310470273ce36489ade43aac51d5f730bb219",
+    "upper_bound_only": true,
+    "finished": "2026-10-15T00:53:02.935424+00:00"
+  },
+  "full_desktop_offload": false,
+  "performance_qualified": false,
+  "tahoma_tested": false,
+  "confounders": [
+    "ETW and request diagnostics enabled.",
+    "CPU builds and analysis overlapped portions of the replay.",
+    "Parent roundtrip includes child transport, model preparation and recovery; child timings have a different scope."
+  ]
+}

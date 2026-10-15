@@ -1,0 +1,66 @@
+from pathlib import Path
+import hashlib
+import json
+
+r=Path('results/render-driver')
+s=(r/'qualify-native-registered-v21.py').read_text()
+s=s.replace("env.pop('NR_RENDER_AFFINE_BATCH',None)", """env.pop('NR_RENDER_AFFINE_BATCH',None)
+for key in ('NR_RENDER_RECOVERY_TEST_KILL_TICKET','NR_RENDER_RECOVERY_TEST_EXCEPTION_TICKET','NR_RENDER_PROVIDER_TEST_INFER_EXCEPTION_TICKET'):env.pop(key,None)
+provider_root=out/'provider-processes';provider_root.mkdir(exist_ok=False)
+env.update(NR_RENDER_PROVIDER_RECOVERY='1',NR_RENDER_PROVIDER_RECOVERY_DIR=str(provider_root),NR_RENDER_INFER_TRACE='1',NR_RENDER_COMPILE_TRACE='1')""")
+s=s.replace("renders=[x for x in logs if x.get('passed')]", "renders=[x for x in logs if x.get('passed') and x.get('execution_device')=='NPU']")
+needle="  report.update(passed=True,registered_adapter_tested=True"
+assert s.count(needle)==1
+s=s.replace(needle,"""  child_logs=[x for path in provider_root.glob('generation-*/worker.stdout.jsonl') for x in rows(path)]
+  child_renders=[x for x in child_logs if x.get('passed') and x.get('execution_device')=='NPU']
+  assert len(child_renders)==8 and all(x['client_pid']==worker.pid for x in child_renders)
+  report.update(isolated_provider=True,hardware_child_receipts=8,provider_generations=len(list(provider_root.glob('generation-*'))),device_loss_recovery_tested=False)
+"""+needle)
+(r/'qualify-native-registered-v22.py').write_text(s)
+for kind in ['run','recover']:
+ s=(r/f'{kind}-native-registration-v21.ps1').read_text().replace('v21','v22').replace('native-routing-v28','native-routing-v34')
+ if kind=='run':
+  marker="$principal=[Security.Principal.WindowsPrincipal]"
+  assert s.count(marker)==1
+  s=s.replace(marker,"foreach($path in @('native-provider-process-v2','native-ordered-replay-v39-provider-soak')){$q=Get-Content \"$r\\vm\\$path\\report.json\" -Raw|ConvertFrom-Json;if(!$q.completed -or !$q.passed){throw 'Provider promotion prerequisites failed'}}\n"+marker)
+ (r/f'{kind}-native-registration-v22.ps1').write_text(s)
+names=['run-native-registration-v22.ps1','recover-native-registration-v22.ps1','qualify-native-registered-v22.py','native_session_broker_v1.py']
+(r/'native-registration-v22-source.json').write_text(json.dumps({name:hashlib.sha256((r/name).read_bytes()).hexdigest() for name in names},indent=2)+'\n')
+
+s=(r/'native_desktop_bootstrap_v16.py').read_text()
+needle="    capture=out/'requests';capture.mkdir(exist_ok=False);"
+assert s.count(needle)==1
+s=s.replace(needle,"""    provider_root=out/'provider-processes';provider_root.mkdir(exist_ok=False)
+    for key in ('NR_RENDER_RECOVERY_TEST_KILL_TICKET','NR_RENDER_RECOVERY_TEST_EXCEPTION_TICKET','NR_RENDER_PROVIDER_TEST_INFER_EXCEPTION_TICKET'):env.pop(key,None)
+    env.update(NR_RENDER_PROVIDER_RECOVERY='1',NR_RENDER_PROVIDER_RECOVERY_DIR=str(provider_root),NR_RENDER_INFER_TRACE='1',NR_RENDER_COMPILE_TRACE='1')
+    report.update(provider_isolated=True,provider_fault_injected=False,provider_timing_scope='Child roundtrip includes compilation, transport and any recovery.')
+"""+needle)
+needle="        report['npu_receipts']=len(renders);report['delivery_acknowledgments']=len(acks)"
+assert s.count(needle)==1
+s=s.replace(needle,needle+"""
+        child_entries=[x for path in provider_root.glob('generation-*/worker.stdout.jsonl') for x in logs(path)]
+        report['hardware_child_receipts']=len([x for x in child_entries if x.get('passed') and x.get('execution_device')=='NPU'])
+        report['provider_generations']=len([x for x in entries if x.get('provider_process_started')])
+        report['provider_faults']=len([x for x in entries if x.get('provider_process_failure')])
+        report['provider_retries']=len([x for x in entries if x.get('provider_process_response') and x.get('attempt')==1])
+""")
+(r/'native_desktop_bootstrap_v17.py').write_text(s)
+for kind in ['run','recover']:
+ s=(r/f'{kind}-native-desktop-v35.ps1').read_text().replace('v35','v36').replace('native-routing-v28','native-routing-v34').replace('native-registration-v21','native-registration-v22').replace('native_desktop_bootstrap_v16.py','native_desktop_bootstrap_v17.py')
+ (r/f'{kind}-native-desktop-v36.ps1').write_text(s)
+s=(r/'start-native-topology-v36.ps1').read_text().replace('native-topology-v36','native-topology-v37').replace('InspectTopology-V36','InspectTopology-V37')
+(r/'start-native-topology-v37.ps1').write_text(s)
+s=(r/'run-native-live-v24.ps1').read_text()
+for a,b in [('native-live-v24','native-live-v25'),('NativeLiveV24','NativeLiveV25'),('native-desktop-admission-v35','native-desktop-admission-v36'),('run-native-desktop-v35.ps1','run-native-desktop-v36.ps1'),('start-native-topology-v36.ps1','start-native-topology-v37.ps1'),('native-topology-v36','native-topology-v37'),('native-topology-primary-v11','native-topology-primary-v12')]:s=s.replace(a,b)
+# The last trial failed, but its rollback must have completed before the next one.
+s=s.replace('native-desktop-admission-v33','native-desktop-admission-v35')
+needle="$report.passed=($report.pointer_reacquisitions"
+assert s.count(needle)==1
+s=s.replace(needle,"$bootstrap=Get-Content \"$r\\vm\\native-desktop-admission-v36\\bootstrap\\report.json\" -Raw|ConvertFrom-Json;$report.isolated_provider=$bootstrap.provider_isolated;$report.provider_generations=$bootstrap.provider_generations;$report.provider_faults=$bootstrap.provider_faults;$report.provider_retries=$bootstrap.provider_retries;$report.hardware_child_receipts=$bootstrap.hardware_child_receipts\n "+needle)
+s=s.replace("'native-registration-v21'","'native-registration-v22','native-provider-process-v2','native-ordered-replay-v39-provider-soak'")
+(r/'run-native-live-v25.ps1').write_text(s)
+names=list(json.loads((r/'native-desktop-v35-source.json').read_text()))
+mapping={'native_desktop_bootstrap_v16.py':'native_desktop_bootstrap_v17.py','run-native-desktop-v35.ps1':'run-native-desktop-v36.ps1','recover-native-desktop-v35.ps1':'recover-native-desktop-v36.ps1','run-native-live-v24.ps1':'run-native-live-v25.ps1','start-native-topology-v36.ps1':'start-native-topology-v37.ps1'}
+names=[mapping.get(name,name) for name in names]
+(r/'native-desktop-v36-source.json').write_text(json.dumps({name:hashlib.sha256((r/name).read_bytes()).hexdigest() for name in names},indent=2)+'\n')
+print('Prepared registered v22 and native v25 provider integration; prerequisite-gated, not yet executed.')

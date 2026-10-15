@@ -1,0 +1,44 @@
+from pathlib import Path
+import hashlib,json,ast
+r=Path('results/render-driver')
+s=(r/'observe_native_topology_v6.py').read_text()
+needle="    assert input_state()['input_name']=='Default','Unlocked Default desktop required'"
+assert s.count(needle)==1
+s=s.replace(needle,"""    if input_state()['input_name']=='Screen-saver' and report['screen_saver_settings'].get('secure') is False:
+        # Request ordinary closure only on the non-secure screen-saver desktop.
+        # Never switch desktops, change lock settings, or close Default windows.
+        u.OpenDesktopW.argtypes=[W.LPCWSTR,W.DWORD,W.BOOL,W.DWORD];u.OpenDesktopW.restype=W.HANDLE
+        callback_type=C.WINFUNCTYPE(W.BOOL,W.HWND,W.LPARAM)
+        u.EnumDesktopWindows.argtypes=[W.HANDLE,callback_type,W.LPARAM];u.EnumDesktopWindows.restype=W.BOOL
+        u.PostMessageW.argtypes=[W.HWND,W.UINT,W.WPARAM,W.LPARAM];u.PostMessageW.restype=W.BOOL
+        desk=u.OpenDesktopW('Screen-saver',0,False,0x81)
+        report['screen_saver_close_requests']=[]
+        if desk:
+            @callback_type
+            def close_saver(hwnd,param):
+                report['screen_saver_close_requests'].append(dict(hwnd=int(hwnd),posted=bool(u.PostMessageW(hwnd,0x10,0,0))))
+                return True
+            try:
+                report['screen_saver_enumerated']=bool(u.EnumDesktopWindows(desk,close_saver,0))
+            finally:u.CloseDesktop(desk)
+            end=time.monotonic()+5
+            while input_state()['input_name']=='Screen-saver' and time.monotonic()<end:time.sleep(.1)
+        report['after_screen_saver_close']=input_state()
+"""+needle)
+ast.parse(s);(r/'observe_native_topology_v7.py').write_text(s)
+s=(r/'start-native-topology-v37.ps1').read_text().replace('native-topology-v37','native-topology-v38').replace('InspectTopology-V37','InspectTopology-V38').replace('observe_native_topology_v6.py','observe_native_topology_v7.py')
+(r/'start-native-topology-v38.ps1').write_text(s)
+for kind in ['run','recover']:
+ s=(r/f'{kind}-native-desktop-v36.ps1').read_text().replace('v36','v37')
+ (r/f'{kind}-native-desktop-v37.ps1').write_text(s)
+s=(r/'run-native-live-v25.ps1').read_text()
+for a,b in [('native-live-v25','native-live-v26'),('NativeLiveV25','NativeLiveV26'),('native-desktop-admission-v36','native-desktop-admission-v37'),('run-native-desktop-v36.ps1','run-native-desktop-v37.ps1'),('start-native-topology-v37.ps1','start-native-topology-v38.ps1'),('native-topology-v37','native-topology-v38'),('native-topology-primary-v12','native-topology-primary-v13'),('NativeDesktopRecovery-v35','NativeDesktopRecovery-v37')]:s=s.replace(a,b)
+(r/'run-native-live-v26.ps1').write_text(s)
+names=list(json.loads((r/'native-desktop-v36-source.json').read_text()))
+mapping={'run-native-desktop-v36.ps1':'run-native-desktop-v37.ps1','recover-native-desktop-v36.ps1':'recover-native-desktop-v37.ps1','run-native-live-v25.ps1':'run-native-live-v26.ps1','start-native-topology-v37.ps1':'start-native-topology-v38.ps1','observe_native_topology_v6.py':'observe_native_topology_v7.py'}
+names=[mapping.get(name,name) for name in names]
+names += [name for name in ('observe_native_topology_v7.py','start-native-topology-v38.ps1','run-native-live-v26.ps1') if name not in names]
+(r/'native-desktop-v37-source.json').write_text(json.dumps({name:hashlib.sha256((r/name).read_bytes()).hexdigest() for name in names},indent=2)+'\n')
+s=(r/'run-native-generic-recorded-v1.ps1').read_text().replace('native-generic-recorded-v1','native-generic-recorded-v2').replace('native-live-v25','native-live-v26')
+(r/'run-native-generic-recorded-v2.ps1').write_text(s)
+print('Prepared live26/admission37/observer38 and gated generic2; all prior evidence unchanged.')

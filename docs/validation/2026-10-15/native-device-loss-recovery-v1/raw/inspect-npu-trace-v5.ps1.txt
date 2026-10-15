@@ -1,0 +1,38 @@
+param([Parameter(Mandatory=$true)][ValidatePattern('^[a-z0-9-]+$')][string]$Trial)
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$root="$r\vm\$Trial-control";$out="$root\trace-summary-v5";$trace="$root\npu.etl"
+if(Test-Path $out){throw 'Trace summary exists'};$control=Get-Content "$root\report.json" -Raw|ConvertFrom-Json;$replay=Get-Content "$r\vm\$Trial\report.json" -Raw|ConvertFrom-Json
+if(!$control.completed -or !$control.trace_stopped -or !$replay.completed){throw 'Trace is still active'}
+New-Item -ItemType Directory $out|Out-Null
+# Account for isolated NPU children as well as an in-process renderer.
+$ownedPids=@([int]$replay.worker_pid);$workerLog="$r\vm\$Trial\worker.stdout.jsonl"
+$generations=@(Get-Content $workerLog|ForEach-Object {$_|ConvertFrom-Json}|Where-Object provider_process_started)
+foreach($generation in $generations){$ownedPids+=([int]$generation.pid)}
+$counts=@{};$live=@{graph=0;queue=0;context=0;fence=0};$peak=@{graph=0;queue=0;context=0;fence=0};$created=@{graph=0;queue=0;context=0;fence=0};$destroyed=@{graph=0;queue=0;context=0;fence=0};$counterEvents=@{2305=@('graph',1);2307=@('graph',-1);257=@('queue',1);259=@('queue',-1);513=@('context',1);515=@('context',-1);1537=@('fence',1);1539=@('fence',-1)};$first=$null;$last=$null;$total=0;$owned=0;$bad=@();$tail=[Collections.Generic.Queue[object]]::new();$eventsFile="$out\selected-events.jsonl";$writer=[IO.StreamWriter]::new($eventsFile,$false,[Text.UTF8Encoding]::new($false))
+try{
+ $filter='*[System[(Provider[@Name="Intel-NPU-LevelZero"] and (EventID=2305 or EventID=2307 or EventID=257 or EventID=259 or EventID=513 or EventID=515 or EventID=1537 or EventID=1539 or EventID=1541 or Level=1 or Level=2 or Level=3)) or (Provider[@Name="Intel-NPU-Kmd"] and (Level=1 or Level=2 or Level=3))]]'
+ Get-WinEvent -Path $trace -FilterXPath $filter -Oldest -ErrorAction Stop|ForEach-Object {
+  $event=$_;++$total;if($total -gt 3000000){throw 'Event budget exceeded'}
+  if($event.ProviderName -in @('Intel-NPU-LevelZero','Intel-NPU-Kmd')){
+   $key="$($event.ProviderName):$($event.Id)";if(!$counts.ContainsKey($key)){$counts[$key]=0};++$counts[$key]
+   $time=$event.TimeCreated.ToUniversalTime().ToString('o');if(!$first){$first=$time};$last=$time
+   if($event.ProcessId -in $ownedPids){++$owned}
+   $row=[ordered]@{time=$time;provider=$event.ProviderName;id=$event.Id;level=$event.Level;task=$event.Task;opcode=$event.Opcode;worker_process=($event.ProcessId -in $ownedPids);thread_id=$event.ThreadId}
+   $tail.Enqueue($row);if($tail.Count -gt 40){[void]$tail.Dequeue()}
+   $badResult=$false;$xml=$null
+   if($event.ProviderName -eq 'Intel-NPU-LevelZero' -and $event.Opcode -eq 2){
+    $xml=[xml]$event.ToXml();$result=@($xml.Event.EventData.Data|Where-Object Name -eq 'ze_result_t')
+    if($result.Count -eq 1){$resultText=[string]$result[0].'#text';$resultValue=if($resultText.StartsWith('0x')){[Convert]::ToUInt64($resultText.Substring(2),16)}else{[Convert]::ToUInt64($resultText,10)};$badResult=$resultValue -ne 0
+     if(!$badResult -and $event.ProcessId -in $ownedPids -and $counterEvents.ContainsKey([int]$event.Id)){$counter=$counterEvents[[int]$event.Id];$name=$counter[0];$amount=$counter[1];$live[$name]+=$amount;$peak[$name]=[Math]::Max($peak[$name],$live[$name]);if($amount -gt 0){++$created[$name]}else{++$destroyed[$name]}}
+    }
+   }
+   if($event.Level -in @(1,2,3) -or $badResult){
+    if(!$xml){$xml=[xml]$event.ToXml()};$fields=[ordered]@{};foreach($data in $xml.Event.EventData.Data){$name=[string]$data.Name;$value=[string]$data.'#text';if($name -match '(?i)handle|address|ptr|^h[A-Z]'){$value='<pointer omitted>'};$fields[$name]=$value};$row.fields=$fields
+    $writer.WriteLine(($row|ConvertTo-Json -Depth 6 -Compress));$bad+=$row
+   }
+  }
+ }
+}finally{$writer.Dispose()}
+$manifest=@(foreach($provider in @('Intel-NPU-LevelZero','Intel-NPU-Kmd')){(Get-WinEvent -ListProvider $provider).Events|Where-Object {$counts.ContainsKey("${provider}:$($_.Id)")}|ForEach-Object {[ordered]@{provider=$provider;id=$_.Id;description=$_.Description;level=[string]$_.Level;task=[string]$_.Task;opcode=[string]$_.Opcode}}})
+$manifest|ConvertTo-Json -Depth 5|Set-Content "$out\event-types.json"
+[ordered]@{trace_sha256=(Get-FileHash $trace).Hash;trace_bytes=(Get-Item $trace).Length;trace_stopped=$true;event_loss_checked=$false;owned_process_ids=$ownedPids;provider_generations=$generations;selected_event_count=$total;selection='Level Zero model/queue/context/fence lifetime and host waits; both provider warnings/errors';worker_events=$owned;first=$first;last=$last;counts=$counts;successful_create_calls=$created;successful_destroy_calls=$destroyed;maximum_create_minus_destroy=$peak;final_create_minus_destroy=$live;hardware_resource_count_independently_verified=$false;warning_error_events=$bad.Count;tail=@($tail.ToArray());raw_trace_committed=$false;desktop_offloaded=$false}|ConvertTo-Json -Depth 6|Set-Content "$out\report.json"
+[ordered]@{selected_event_count=$total;selection='Level Zero model/queue/context/fence lifetime and host waits; both provider warnings/errors';worker_events=$owned;warning_error_events=$bad.Count;first=$first;last=$last}|ConvertTo-Json

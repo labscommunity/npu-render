@@ -1,0 +1,70 @@
+from pathlib import Path
+from datetime import UTC,datetime
+import hashlib,json,re
+from collections import OrderedDict
+r=Path('results/render-driver');raw=r/'primary-raw-v9';out=Path('docs/validation/2026-10-15/native-device-loss-recovery-v1')
+def obj(p):
+ b=p.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+def rows(p):return [json.loads(x) for x in p.read_text(encoding='utf-8-sig').splitlines() if x.startswith('{') and x.endswith('}')]
+manifest=obj(r/'native-primary-v9-artifact-sha256.json')
+soak=obj(raw/'native-ordered-replay-v39-provider-soak/report.json');parent=rows(raw/'native-ordered-replay-v39-provider-soak/worker.stdout.jsonl')
+assert soak['completed'] and soak['passed'] and soak['successful_replays']==soak['delivery_acknowledgments']==3291
+assert soak['original_pixel_hashes_matched']==3288 and soak['unreferenced_successes']==3
+assert soak['test_exception_ticket']==soak['test_kill_ticket']==-1
+starts=[x for x in parent if x.get('provider_process_started')];faults=[x for x in parent if x.get('provider_process_failure')];retries=[x for x in parent if x.get('provider_process_response') and x['attempt']==1]
+assert len(starts)==2 and len(faults)==len(retries)==1 and faults[0]['retry_on_npu'] and faults[0]['fallback_backend']=='none'
+assert faults[0]['dispatch_ticket']==retries[0]['dispatch_ticket']==719 and retries[0]['elapsed_ms']==62906
+child_dir=raw/'native-ordered-replay-v39-provider-soak/provider-processes'
+children=[rows(child_dir/f'generation-{i}/worker.stdout.jsonl') for i in (1,2)]
+assert all(not x.get('provider_fault_injected') and not x.get('provider_device_loss_injected') for x in parent+children[0]+children[1])
+assert 'ZE_RESULT_ERROR_DEVICE_LOST' in (child_dir/'generation-1/worker.stderr.log').read_text()
+assert (child_dir/'generation-2/worker.stderr.log').read_bytes()==b''
+failed=[x for x in children[0] if x.get('inference_history') and x.get('failed')];assert len(failed)==1 and failed[0]['site']=='vertex_executor.cpp' and failed[0]['duration_us']==60880063
+successful=[x for logs in children for x in logs if x.get('passed') and x.get('execution_device')=='NPU' and 'compile_and_draw_ms' in x];assert len(successful)==3291
+registered=obj(raw/'native-registration-v22/report.json');qualification=obj(raw/'native-registration-v22/qualification/report.json')
+assert registered['passed'] and registered['cleanup_passed'] and registered['memory_integrity_before'] and registered['memory_integrity_after']
+assert qualification['passed'] and qualification['isolated_provider'] and qualification['hardware_child_receipts']==8
+for v in (25,26):
+ q=obj(raw/f'native-live-v{v}/report.json');assert q['completed'] and not q['passed'] and q['error']=='Observer failed' and not q.get('controller_pid')
+live=obj(raw/'native-live-v27/report.json');bootstrap=obj(raw/'native-desktop-admission-v37/bootstrap/report.json')
+assert live['passed'] and live['cleanup_passed'] and live['cursor_cleanup_passed'] and live['primary_topology_restored'] and live['ordinary_windows_restored']
+assert live['normal_windows_input_tested'] and live['physical_blue_green_red_observed'] and live['matching_source_frames']==live['physically_submitted_frames']==35
+assert live['hardware_child_receipts']==bootstrap['npu_receipts']==bootstrap['delivery_acknowledgments']==1107
+assert live['provider_generations']==1 and live['provider_faults']==live['provider_retries']==0
+trace=obj(raw/'native-ordered-replay-v39-provider-soak-control/trace-summary-v5/report.json')
+b=(raw/'native-ordered-replay-v39-provider-soak-control/trace-loss-v1/summary.txt').read_bytes();summary=b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig');lost=int(re.search(r'Total Events\s+Lost\s+(\d+)',summary)[1])
+out.mkdir(parents=True,exist_ok=False)
+for item in manifest:
+ p=raw/item['source'];b=p.read_bytes();assert len(b)==item['bytes'] and hashlib.sha256(b).hexdigest()==item['sha256'].lower()
+ dest=out/'raw'/item['source']
+ if dest.suffix in ('.py','.ps1'):dest=dest.with_suffix(dest.suffix+'.txt')
+ dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(b);item['archive_path']=dest.relative_to(out).as_posix()
+(out/'raw-manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
+sources=[]
+for name in ['prepare-native-provider-live-v1.py','prepare-native-provider-live-v2.py','prepare-native-provider-live-v3.py','collect-native-primary-v9.py','archive-native-primary-v9.py']:
+ p=r/name;dest=out/'sources'/(name+'.txt');dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(p.read_bytes());sources.append(dict(path=dest.relative_to(out).as_posix(),sha256=hashlib.sha256(dest.read_bytes()).hexdigest()))
+(out/'source-manifest.json').write_text(json.dumps(sources,indent=2)+'\n')
+reuse=obj(raw/'native-exact-reuse-v1/identities.json');assert len(reuse)==1097
+reuse_cost=[]
+for cap in (64,256):
+ cache=OrderedDict();used=0;hit_tickets=[]
+ for item in reuse:
+  if not item['reference_available']:continue
+  key=item['canonical_request_sha256'];size=item['request_bytes']+item['reply_pixel_bytes']+128
+  if key in cache:hit_tickets.append(item['ticket']);cache.move_to_end(key)
+  elif size<=cap*1024*1024:
+   while used+size>cap*1024*1024:_,old=cache.popitem(last=False);used-=old
+   cache[key]=size;used+=size
+ eligible=[x for i,x in enumerate(successful) if i%1097 in hit_tickets]
+ reuse_cost.append(dict(capacity_mib=cap,hits=len(hit_tickets),diagnostic_compile_draw_ms=sum(x['compile_and_draw_ms'] for x in eligible),diagnostic_cost_fraction=sum(x['compile_and_draw_ms'] for x in eligible)/sum(x['compile_and_draw_ms'] for x in successful),performance_prediction=False,new_cache_implemented=False))
+present=rows(raw/'native-live-v27/present/probe.log');stimulus=rows(raw/'native-live-v27/stimulus/probe.log');screen=rows(raw/'native-live-v27/screen/probe.log')
+frequencies={x['qpc_frequency'] for x in present if x.get('live_frame_presented')};assert len(frequencies)==1;frequency=frequencies.pop()
+input_latency=[]
+for event,color in [('mouse_received','green'),('key_received','red')]:
+ start=next(x['qpc'] for x in stimulus if x.get('input_event')==event)
+ observed=next(x for x in screen if x.get('qpc',0)>=start and x.get('ownership_verified_before_and_after') and any(pt.get('owned_presenter_at_point') and pt.get('known_'+color) for pt in x.get('points',[])))
+ input_latency.append(dict(event=event,first_owned_physical_read_seconds=(observed['read_completed_qpc']-start)/frequency,qpc_frequency=frequency,screen_read_completion_used=True,performance_qualification=False))
+soak.pop('selected_tickets',None)
+report=dict(recorded=datetime.now(UTC).isoformat(),evidence_checks_passed=True,raw_files_remotely_hash_verified=len(manifest),raw_bytes=sum(x['bytes'] for x in manifest),soak=soak,real_device_loss_recovery_demonstrated=True,provider_generations=starts,provider_failures=faults,successful_retries=retries,failed_inference=failed[0],registered=registered,registered_qualification=qualification,trace_summary=trace,trace_events_lost=lost,trace_lifetime_counts_exhaustive=False,successful_request_totals={k:round(sum(x[k] for x in successful),3) for k in ('draw_ms','compile_and_draw_ms','provider_requests','compile_calls','backend_compile_calls','backend_compile_ms','provider_setup_ms')},native_startup_rejected_before_admission=[25,26],native_live=live,controlled_input_latency=input_latency,native_bootstrap=bootstrap,exact_reuse_weighted_cost=reuse_cost,exact_reuse_analysis=obj(raw/'native-exact-reuse-v1/report.json'),full_desktop_offload=False,performance_qualified=False,tahoma_tested=False,confounders=['ETW and request diagnostics enabled.','CPU builds and analysis overlapped portions of the replay.','Parent roundtrip includes child transport, model preparation and recovery; child timings have a different scope.'])
+(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(dict(archive=str(out),files=len(manifest),bytes=report['raw_bytes'],lost_events=lost)))

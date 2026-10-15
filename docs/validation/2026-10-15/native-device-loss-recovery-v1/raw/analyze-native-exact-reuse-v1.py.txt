@@ -1,0 +1,51 @@
+"""Read-only estimate of exact request reuse; no rendering or pixel export."""
+from pathlib import Path
+from collections import OrderedDict
+from datetime import datetime, UTC
+import hashlib,json,os,struct,time
+r=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm';deadline=time.monotonic()+1500
+while True:
+    try:
+        live=json.loads((r/'native-live-v27/report.json').read_text(encoding='utf-8-sig'))
+        if live['completed']:
+            assert live.get('cleanup_passed'),'Native cleanup incomplete'
+            break
+    except (FileNotFoundError,json.JSONDecodeError):pass
+    assert time.monotonic()<deadline,'Native trial not finished'
+    time.sleep(2)
+out=r/'native-exact-reuse-v1';out.mkdir(exist_ok=False)
+report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,read_only=True,pixels_exported=False,new_npu_execution=False,performance_qualification=False)
+try:
+    capture=r/'native-desktop-admission-v35/bootstrap/requests';index=(capture/'index.jsonl').read_bytes();rows=[json.loads(x) for x in index.decode('utf-8-sig').splitlines() if x.startswith('{')]
+    requests=[x for x in rows if x.get('request_recorded')];responses={x['ticket']:x for x in rows if x.get('provider_response_recorded')}
+    assert len(requests)==1097 and len(responses)==1096
+    hstruct=struct.Struct('<3Q14I');seen={};keys=[];conflicts=[]
+    caches={capacity:OrderedDict() for capacity in [64,256]};used={c:0 for c in caches};hits={c:0 for c in caches};saved_bytes={c:0 for c in caches}
+    for ticket,entry in enumerate(requests):
+        assert entry['ticket']==ticket and entry['file']==f'request-{ticket:08d}.bin'
+        packet=bytearray((capture/entry['file']).read_bytes());assert len(packet)==entry['bytes'] and hashlib.sha256(packet).hexdigest()==entry['sha256'].lower()
+        h=list(hstruct.unpack_from(packet));assert h[12]+80==len(packet)
+        h[1]=h[2]=h[11]=h[13]=0 # Only nonce, sequence and authenticated client PID.
+        packet[:80]=hstruct.pack(*h);key=hashlib.sha256(packet).hexdigest();ref=responses.get(ticket)
+        if key in seen and ref and seen[key][1]!=ref['pixels_sha256']:conflicts.append(ticket)
+        prior=seen.get(key);record=dict(ticket=ticket,canonical_request_sha256=key,previous_identical_ticket=prior[0] if prior else None,reference_available=ref is not None,request_bytes=len(packet),reply_pixel_bytes=h[4]*h[5]*4)
+        if ref:
+            seen[key]=(ticket,ref['pixels_sha256'])
+            # Include both exact request bytes and copied output in the bound.
+            size=len(packet)+record['reply_pixel_bytes']+128
+            for capacity,cache in caches.items():
+                if key in cache:
+                    hits[capacity]+=1;saved_bytes[capacity]+=size;cache.move_to_end(key)
+                elif size<=capacity*1024*1024:
+                    while used[capacity]+size>capacity*1024*1024:
+                        _,evicted=cache.popitem(last=False);used[capacity]-=evicted
+                    cache[key]=size;used[capacity]+=size
+        keys.append(record)
+    assert not conflicts,'Identical complete requests have conflicting recorded outputs'
+    assert (capture/'index.jsonl').read_bytes()==index
+    (out/'identities.json').write_text(json.dumps(keys,indent=2)+'\n')
+    report.update(passed=True,requests=len(requests),reference_outputs=len(responses),distinct_referenced_requests=len(seen),canonical_header_exclusions=['nonce[0]','nonce[1]','sequence','client_pid'],conflicting_reference_outputs=conflicts,cache_estimates=[dict(capacity_mib=c,hits=hits[c],misses=len(responses)-hits[c],retained_bytes=used[c],retained_entries=len(caches[c])) for c in caches],capture_index_sha256=hashlib.sha256(index).hexdigest(),upper_bound_only=True)
+except Exception as error:report['error']=repr(error)
+finally:
+    report.update(completed=True,finished=datetime.now(UTC).isoformat());(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(report));raise SystemExit(0 if report['passed'] else 1)

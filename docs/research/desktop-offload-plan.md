@@ -13,7 +13,10 @@ A matched worker comparison cuts thirteen expensive draw operations from about
 121 seconds to 3.1 seconds with exact pixels. A responsive usable switch,
 application coverage and a Tahoma benefit remain unqualified. The optimized v24
 live trial subsequently fails: one new model exceeds the client deadline, and a
-later request loses the NPU device. Ordinary physical desktop recovery passes.
+later request loses the NPU device. Ordinary physical desktop recovery passes. The isolated provider subsequently
+recovers a real device loss during a complete recorded stream. Native v27 passes
+1,107 acknowledged NPU operations, 35 matching physical submissions, controlled
+input and exact ordinary recovery; response remains too slow.
 
 The end state is one switch that moves desktop graphics work to the NPU, retains
 physical display scanout, supports normal interaction, and leaves the iGPU
@@ -26,7 +29,7 @@ renderer does not establish where every application renders.
 | Gate | Work | Acceptance evidence | Current status |
 | --- | --- | --- | --- |
 | 1. Routing | Record active physical and indirect paths before, during, and after admission; identify clone/extended configuration and actual rendering adapter. | Timestamped topology, native DWM NPU receipts, selected adapter, frame producer, exact restoration. | Automatic clone identified; v11 applies extension with the physical path preserved, produces a frame while extended, restores the clone exactly, and restores the final physical baseline. |
-| 2. Continuous rendering | Keep the native renderer alive across changing windows and content; diagnose every failed draw; distinguish model preparation from rendering and transport. | Multiple changing frames, timestamps and pixel checks, sustained operation, no hidden fallback. | Finite v23 passes with 1,559 acknowledged NPU operations. Optimized v24 later loses the NPU after 1,096 completed operations and 1,095 acknowledgments. A 93-second cold compilation precedes a client departure. Thirty-minute stability is unqualified; retained models alone do not resolve all failures. |
+| 2. Continuous rendering | Keep the native renderer alive across changing windows and content; diagnose every failed draw; distinguish model preparation from rendering and transport. | Multiple changing frames, timestamps and pixel checks, sustained operation, no hidden fallback. | Finite v23 passes with 1,559 acknowledged NPU operations. Optimized v24 later loses the NPU after 1,096 completed operations and 1,095 acknowledgments. A 93-second cold compilation precedes a client departure. Isolated-provider v27 subsequently passes 1,107 acknowledged operations; recorded recovery from a real loss takes 62.9 seconds. Thirty-minute stability remains unqualified. |
 | 3. Physical presentation | Present new NPU frames on the physical output with distinct logical desktops and no recursive mirroring. | Live sequence-to-present correlation, output identity, measured presentation mode and residual GPU work. | Live v13 submits 13 matching frames. Direct statistics reach 13 displayed frames and report both composed and overlay modes; a separate screen reader verifies both controlled colors beneath the owned presenter. GPU residual cost remains unmeasured. Updates remain slow. |
 | 4. Interaction and recovery | Migrate the logical desktop, route pointer/keyboard/focus correctly, handle cursor/DPI/resolution, restore exact topology and windows. | Scripted interaction visible on physical output; emergency exit and owned-process failure recovery; ordinary login/lock path retained. | V23 passes relative motion, blue → mouse → green → keyboard → red, two foreground confinement reacquisitions, and exact ordinary recovery. A static standard arrow matches the NPU frame exactly. Secure desktop, sleep/wake, full cursor fidelity and all fault cases remain open. |
 | 5. Responsiveness | Optimize resource reuse, graph compilation, dispatch granularity, transfer volume and frame pacing. | Initial target: ordinary desktop interaction at 30 fps, p95 visible response ≤100 ms, 30-minute stable run. Report cold-start time separately. | Not met. Matched v27/v28 replay reduces thirteen expensive operations' mean compile-plus-draw total from 120,944 to 3,100 ms with exact pixels. Complete desktop performance remains unqualified. |
@@ -114,13 +117,23 @@ qualify recovery from an actual device loss or native desktop use. A cached repl
 reduces the formerly 93-second request to 1.3 seconds; general preparation remains
 unfinished.
 
-Next, finish the isolated provider's full-stream soak, then qualify its registered
-and native desktop paths. Continue driver/inference diagnosis and prepare
-expensive models before admission while preserving the active desktop if
-preparation fails. Require sustained rendering and reliable recovery before
-another promotion. Then establish responsive long-duration operation,
-application coverage, residual GPU cost and matched Tahoma benefit. Component
-passes do not complete those later gates.
+The [real device-loss and native integration qualification](../validation/2026-10-15/native-device-loss-recovery-v1/README.md)
+completes 3,291 recorded requests despite one real device loss, without fallback.
+The 62.9-second recovery is correct but too slow. Its trace reports zero lost
+events. Registered v22 and native v27 pass; the latter restores topology, ordinary
+windows and pointer state after 1,107 acknowledged NPU operations and 35 matching
+physical submissions. Controlled input responses are 20.645 seconds and 0.567
+seconds in an instrumented trial. Neither is a responsiveness qualification.
+
+Next, qualify enlarged generic batches and compiled-model sharing independently,
+then replay their combination against the complete latest native recording.
+Measure any benefit with matched trials before promotion. Exact-output memoization
+covers only about 3% of recorded cost at 64 MiB and is lower priority. Keep model
+preparation and fault-recovery latency visible. The current desktop authorization
+is bounded to fifteen minutes; the thirty-minute gate requires a reviewed bounded
+extension with corresponding recovery deadlines and lease checks. Continue with
+responsive long-duration operation, broader application coverage, residual GPU
+cost and matched Tahoma benefit. Component passes do not complete those gates.
 
 ## Architecture constraints from primary documentation
 

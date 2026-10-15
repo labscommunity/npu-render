@@ -1,0 +1,16 @@
+from pathlib import Path
+import hashlib,json
+r=Path('results/render-driver')
+# Continue v2 without modifying its failed startup reports. Admission37 had
+# never started; the same unused admission identity is retained for live27.
+s=(r/'start-native-topology-v38.ps1').read_text().replace('native-topology-v38','native-topology-v39').replace('InspectTopology-V38','InspectTopology-V39')
+(r/'start-native-topology-v39.ps1').write_text(s)
+s=(r/'run-native-live-v26.ps1').read_text().replace('native-live-v26','native-live-v27').replace('NativeLiveV26','NativeLiveV27').replace('start-native-topology-v38.ps1','start-native-topology-v39.ps1').replace('native-topology-v38','native-topology-v39')
+(r/'run-native-live-v27.ps1').write_text(s)
+names=list(json.loads((r/'native-desktop-v36-source.json').read_text()))
+mapping={'run-native-desktop-v36.ps1':'run-native-desktop-v37.ps1','recover-native-desktop-v36.ps1':'recover-native-desktop-v37.ps1','run-native-live-v25.ps1':'run-native-live-v27.ps1','start-native-topology-v37.ps1':'start-native-topology-v39.ps1','observe_native_topology_v6.py':'observe_native_topology_v7.py'}
+names=[mapping.get(name,name) for name in names]
+names += [name for name in ('observe_native_topology_v7.py','start-native-topology-v39.ps1','run-native-live-v27.ps1') if name not in names]
+(r/'native-desktop-v37-source.json').write_text(json.dumps({name:hashlib.sha256((r/name).read_bytes()).hexdigest() for name in names},indent=2)+'\n')
+s=(r/'run-native-generic-recorded-v2.ps1').read_text().replace('native-generic-recorded-v2','native-generic-recorded-v3').replace('native-live-v26','native-live-v27')
+(r/'run-native-generic-recorded-v3.ps1').write_text(s)

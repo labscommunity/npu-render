@@ -25,11 +25,14 @@ delivers fourteen matching physical submissions but fails after a 93-second cold
 compilation, client departure and later NPU device loss. Ordinary desktop recovery
 passes. Reliable sustained rendering and model preparation are the immediate gates.
 
-The [provider recovery candidate](docs/validation/2026-10-15/native-provider-recovery-v1/README.md)
-preserves exact outputs across controlled NPU-worker termination and a simulated
-device-loss error, and cleans up the child when its owner exits. A separate
-3,291-request diagnostic replay passes. Recovery from a real NPU failure and
-desktop integration of the isolated provider remain unqualified.
+The [isolated provider now recovers from an actual NPU device loss](docs/validation/2026-10-15/native-device-loss-recovery-v1/README.md)
+and completes a 3,291-request replay with every available reference hash matching.
+Recovery takes about 63 seconds. Its subsequent native desktop trial passes
+1,107 acknowledged NPU operations, 35 matching physical submissions, controlled
+mouse/keyboard input and exact ordinary recovery. Mouse-to-visible response is
+about 20.6 seconds and keyboard-to-visible response about 0.57 seconds in that
+instrumented trial. Responsiveness, long-duration stability, application coverage
+and a Tahoma benefit remain unqualified.
 
 The goal remains a single switch that moves graphics work to the NPU and frees
 iGPU capacity for Tahoma. The
