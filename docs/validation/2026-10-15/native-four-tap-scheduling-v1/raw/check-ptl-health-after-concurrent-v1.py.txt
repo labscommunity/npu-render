@@ -1,0 +1,33 @@
+"""Fresh-process known-good health after the retained concurrency failure."""
+from pathlib import Path
+from datetime import UTC,datetime
+import argparse,hashlib,json,os,subprocess,sys,time,traceback
+vm=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm'
+def write(p,v):p.write_text(json.dumps(v,indent=2)+'\n')
+def main():
+ p=argparse.ArgumentParser();p.add_argument('--child',type=Path);a=p.parse_args()
+ if a.child:
+  report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,checks=[])
+  try:
+   import openvino as ov
+   import numpy as np
+   assert ov.get_version()=='2026.4.1-22982-e213a147257-releases/2026/4';blob=(vm/'ptl-crop-carrier-v1/131072-16384/carrier.blob').read_bytes();assert hashlib.sha256(blob).hexdigest()=='21449fdc8700c8b8684436ee1db05d66382bdbc2ad809ea24c5a31214b086e80';core=ov.Core();model=core.import_model(blob,'NPU');raw=model.get_property('EXECUTION_DEVICES');devices=[raw] if isinstance(raw,str) else list(raw);assert devices in (['NPU'],['NPU.0']);request=model.create_infer_request()
+   for i in range(16):
+    rng=np.random.default_rng(181000+i);data=rng.integers(-128,128,(131072,4)).astype(np.float16);indices=rng.integers(0,131072,16384,dtype=np.int32);indices[:2]=[0,131071];began=time.perf_counter_ns();request.start_async({0:data,1:indices});assert request.wait_for(10000);actual=request.get_output_tensor().data.copy();assert np.array_equal(actual,data[indices]);report['checks'].append(dict(iteration=i,request_ms=(time.perf_counter_ns()-began)/1e6,exact_components=65536,output_sha256=hashlib.sha256(actual.tobytes()).hexdigest()))
+   report.update(passed=True,execution_devices=devices)
+  except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+  finally:report.update(completed=True,finished=datetime.now(UTC).isoformat());write(a.child/'child-report.json',report)
+  return 0 if report['passed'] else 1
+ out=vm/'ptl-health-after-concurrent-v1';out.mkdir(exist_ok=False);process=None;report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,custom_kernel_executed=False,desktop_changed=False,driver_reset=False)
+ try:
+  with (out/'stdout.log').open('xb') as stdout,(out/'stderr.log').open('xb') as stderr:
+   process=subprocess.Popen([sys.executable,__file__,'--child',str(out)],stdout=stdout,stderr=stderr,creationflags=subprocess.CREATE_NO_WINDOW)
+   try:process.wait(timeout=30)
+   except subprocess.TimeoutExpired:process.kill();process.wait(timeout=5);report['child_timeout']=True
+  result=json.loads((out/'child-report.json').read_text());report.update(exit_code=process.returncode,child_result=result,passed=process.returncode==0 and result['passed'])
+ except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+ finally:
+  if process is not None and process.poll() is None:process.kill();process.wait(timeout=5)
+  report.update(completed=True,finished=datetime.now(UTC).isoformat());write(out/'report.json',report)
+ print(json.dumps({k:v for k,v in report.items() if k!='child_result'}));return 0 if report['passed'] else 1
+if __name__=='__main__':raise SystemExit(main())

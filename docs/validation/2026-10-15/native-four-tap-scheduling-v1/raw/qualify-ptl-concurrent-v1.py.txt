@@ -1,0 +1,59 @@
+"""Compare serial and overlapping requests using only previously admitted kernels."""
+from pathlib import Path
+from datetime import UTC,datetime
+import argparse,hashlib,json,os,subprocess,sys,time,traceback
+vm=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm'
+def write(p,v):p.write_text(json.dumps(v,indent=2)+'\n')
+def obj(p):return json.loads(p.read_text(encoding='utf-8-sig'))
+def child(out):
+ import openvino as ov
+ import numpy as np
+ from ptl_crop_fixture_v1 import crop_fixture,reference
+ report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,checks=[],health=[])
+ try:
+  assert ov.get_version()=='2026.4.1-22982-e213a147257-releases/2026/4';core=ov.Core()
+  def imported(name):
+   model=core.import_model((vm/'ptl-four-tap-crop-v3'/(name+'.blob')).read_bytes(),'NPU');raw=model.get_property('EXECUTION_DEVICES');devices=[raw] if isinstance(raw,str) else list(raw);assert devices in (['NPU'],['NPU.0']);return model
+  def health(phase):
+   model=imported('original');request=model.create_infer_request()
+   for i in range(4):
+    rng=np.random.default_rng(19000+i);data=rng.integers(-128,128,(131072,4)).astype(np.float16);ix=rng.integers(0,131072,16384,dtype=np.int32);request.start_async({0:data,1:ix});assert request.wait_for(10000);assert np.array_equal(request.get_output_tensor().data,data[ix])
+   report['health'].append(dict(phase=phase,passed=True))
+  health('before');shared=imported('patched');models=[imported('patched') for _ in range(6)];requests={'shared':[shared.create_infer_request() for _ in range(6)],'separate':[m.create_infer_request() for m in models]}
+  indices=np.zeros(16384,np.int32)
+  for group in range(6):
+   sources=[];expected=[];input_hashes=[]
+   for b in range(6):
+    iteration=group*7*6+b*7+1;raw,full=crop_fixture(iteration);e,_,covered=reference(full);assert covered==16384;sources.append(np.frombuffer(raw,np.float16).reshape(131072,4).copy());expected.append(e.astype(np.float16));input_hashes.append(hashlib.sha256(raw).hexdigest())
+   for mode in (['serial','shared-overlap','separate-overlap'] if group%2==0 else ['separate-overlap','shared-overlap','serial']):
+    rs=requests['separate' if mode=='separate-overlap' else 'shared'];actual=[];began=time.perf_counter_ns()
+    if mode=='serial':
+     for b,q in enumerate(rs):q.start_async({0:sources[b],1:indices});assert q.wait_for(10000);actual.append(q.get_output_tensor().data.copy())
+    else:
+     for b,q in enumerate(rs):q.start_async({0:sources[b],1:indices})
+     for q in rs:assert q.wait_for(10000);actual.append(q.get_output_tensor().data.copy())
+    elapsed=(time.perf_counter_ns()-began)/1e6;assert all(np.array_equal(a,e) for a,e in zip(actual,expected)),mode+' output mismatch'
+    report['checks'].append(dict(group=group,warmup=group==0,mode=mode,batch_request_output_ms=elapsed,exact_components=6*65536,input_sha256=input_hashes,output_sha256=[hashlib.sha256(a.tobytes()).hexdigest() for a in actual]))
+   write(out/'child-report.json',report)
+  del requests,models,shared,rs,q;health('after');report['passed']=True
+ except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+ finally:report.update(completed=True,finished=datetime.now(UTC).isoformat());write(out/'child-report.json',report)
+ print(json.dumps({k:v for k,v in report.items() if k!='checks'}));return 0 if report['passed'] else 1
+
+def main():
+ p=argparse.ArgumentParser();p.add_argument('--child',type=Path);a=p.parse_args()
+ if a.child:return child(a.child)
+ out=vm/'ptl-concurrent-v1';out.mkdir(exist_ok=False);process=None;report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,desktop_changed=False,tahoma_tested=False)
+ try:
+  assert obj(vm/'ptl-four-tap-crop-v3/report.json')['passed'];assert hashlib.sha256((vm/'ptl-four-tap-crop-v3/patched.blob').read_bytes()).hexdigest()=='1b5c26b0a63b93d5ce9a4588b40938cf4e660bd5e6550a0cd92c0fd5913147b9'
+  with (out/'stdout.log').open('xb') as stdout,(out/'stderr.log').open('xb') as stderr:
+   process=subprocess.Popen([sys.executable,__file__,'--child',str(out)],stdout=stdout,stderr=stderr,creationflags=subprocess.CREATE_NO_WINDOW)
+   try:process.wait(timeout=90)
+   except subprocess.TimeoutExpired:process.kill();process.wait(timeout=5);report['child_timeout']=True
+  result=obj(out/'child-report.json');report.update(exit_code=process.returncode,child_result=result,passed=process.returncode==0 and result.get('passed',False))
+ except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+ finally:
+  if process is not None and process.poll() is None:process.kill();process.wait(timeout=5)
+  report.update(completed=True,finished=datetime.now(UTC).isoformat());write(out/'report.json',report)
+ print(json.dumps({k:v for k,v in report.items() if k!='child_result'}));return 0 if report['passed'] else 1
+if __name__=='__main__':raise SystemExit(main())

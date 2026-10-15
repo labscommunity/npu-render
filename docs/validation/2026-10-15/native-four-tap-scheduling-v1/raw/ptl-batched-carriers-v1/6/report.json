@@ -1,0 +1,816 @@
+{
+  "started": "2026-10-15T06:59:07.351828+00:00",
+  "completed": true,
+  "passed": true,
+  "branches": 6,
+  "custom_kernel_executed": false,
+  "checks": [
+    {
+      "iteration": 0,
+      "request_ms": 14.2192,
+      "exact_components": 393216,
+      "output_sha256": "0c18d95caf8147ba4e1340a48b46e34f1ca18be1623489b8aa257dd9c30464cb"
+    },
+    {
+      "iteration": 1,
+      "request_ms": 12.309,
+      "exact_components": 393216,
+      "output_sha256": "f812b9f8988812de6dbbe2d8b727523ae09937e3cf65f6fef36bab88a03c5ccd"
+    },
+    {
+      "iteration": 2,
+      "request_ms": 12.1101,
+      "exact_components": 393216,
+      "output_sha256": "1cc50bcc483d61e8fe9baff4804da4521b24ccd5ad01f0045f9762b6d735ae79"
+    },
+    {
+      "iteration": 3,
+      "request_ms": 12.3618,
+      "exact_components": 393216,
+      "output_sha256": "629a49b6fa030b84746015c3d82da9225ed0414d9c6a1a6a39f4861531b5f8b1"
+    },
+    {
+      "iteration": 4,
+      "request_ms": 12.2085,
+      "exact_components": 393216,
+      "output_sha256": "19e01da8e02b9fd47280c18dbecab4939958b9af6a081a145833987520f432b3"
+    },
+    {
+      "iteration": 5,
+      "request_ms": 12.2961,
+      "exact_components": 393216,
+      "output_sha256": "4ae4080fe491f2b4bda4ffd0aed4994cc3fa6a1b731ce4173e8347aea5dbc925"
+    },
+    {
+      "iteration": 6,
+      "request_ms": 12.4996,
+      "exact_components": 393216,
+      "output_sha256": "8603c3ba721bb63b63eb92d368930667d5a513b6884893000364a86fc54c60c0"
+    },
+    {
+      "iteration": 7,
+      "request_ms": 12.4326,
+      "exact_components": 393216,
+      "output_sha256": "3c43301251d52b22b361a2f231d7937cf1a00092b9d96da95c0d53800e1be311"
+    }
+  ],
+  "stage": "complete",
+  "config": {
+    "PERFORMANCE_HINT": "LATENCY",
+    "NPU_COMPILATION_MODE": "DefaultHW",
+    "NPU_TILES": 3
+  },
+  "compile_ms": 141.9957,
+  "execution_devices": [
+    "NPU"
+  ],
+  "blob_sha256": "cda61bdce914ae4b05ee12e40d759134a80b10a918370722fe00ea523772e6fb",
+  "blob_bytes": 106632,
+  "shave_layout": [
+    {
+      "index": 9,
+      "name": "task.shave.range.0.0",
+      "type": 1,
+      "flags": 536870918,
+      "offset": 64384,
+      "size": 240,
+      "link": 0,
+      "info": 0,
+      "entry": 1,
+      "relocations": {
+        "16": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "56": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "96": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "136": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "176": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "216": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        }
+      }
+    },
+    {
+      "index": 10,
+      "name": "task.shave.range.1.0",
+      "type": 1,
+      "flags": 536870918,
+      "offset": 64640,
+      "size": 240,
+      "link": 0,
+      "info": 0,
+      "entry": 1,
+      "relocations": {
+        "16": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "56": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "96": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "136": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "176": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "216": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        }
+      }
+    },
+    {
+      "index": 11,
+      "name": "task.shave.range.2.0",
+      "type": 1,
+      "flags": 536870918,
+      "offset": 64896,
+      "size": 240,
+      "link": 0,
+      "info": 0,
+      "entry": 1,
+      "relocations": {
+        "16": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "56": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "96": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "136": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "176": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "216": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        }
+      }
+    },
+    {
+      "index": 12,
+      "name": "task.shave.range.0.1",
+      "type": 1,
+      "flags": 536870918,
+      "offset": 65152,
+      "size": 240,
+      "link": 0,
+      "info": 0,
+      "entry": 1,
+      "relocations": {
+        "16": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "56": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "96": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "136": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "176": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "216": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        }
+      }
+    },
+    {
+      "index": 13,
+      "name": "task.shave.range.1.1",
+      "type": 1,
+      "flags": 536870918,
+      "offset": 65408,
+      "size": 240,
+      "link": 0,
+      "info": 0,
+      "entry": 1,
+      "relocations": {
+        "16": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "56": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "96": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "136": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "176": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "216": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        }
+      }
+    },
+    {
+      "index": 14,
+      "name": "task.shave.range.2.1",
+      "type": 1,
+      "flags": 536870918,
+      "offset": 65664,
+      "size": 240,
+      "link": 0,
+      "info": 0,
+      "entry": 1,
+      "relocations": {
+        "16": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "56": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "96": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "136": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "176": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "216": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        }
+      }
+    },
+    {
+      "index": 15,
+      "name": "task.shave.invocation.0.0",
+      "type": 1,
+      "flags": 536870918,
+      "offset": 65920,
+      "size": 576,
+      "link": 0,
+      "info": 0,
+      "entry": 1,
+      "relocations": {
+        "16": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "8": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 0
+        },
+        "112": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "104": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 1920
+        },
+        "208": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "200": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 3840
+        },
+        "304": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "296": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 5760
+        },
+        "400": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "392": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 7680
+        },
+        "496": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "488": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 9600
+        }
+      },
+      "tiles": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "index": 16,
+      "name": "task.shave.invocation.1.0",
+      "type": 1,
+      "flags": 536870918,
+      "offset": 66496,
+      "size": 576,
+      "link": 0,
+      "info": 0,
+      "entry": 1,
+      "relocations": {
+        "16": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "8": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 320
+        },
+        "112": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "104": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 2240
+        },
+        "208": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "200": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 4160
+        },
+        "304": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "296": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 6080
+        },
+        "400": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "392": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 8000
+        },
+        "496": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "488": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 9920
+        }
+      },
+      "tiles": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "index": 17,
+      "name": "task.shave.invocation.2.0",
+      "type": 1,
+      "flags": 536870918,
+      "offset": 67072,
+      "size": 576,
+      "link": 0,
+      "info": 0,
+      "entry": 1,
+      "relocations": {
+        "16": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "8": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 640
+        },
+        "112": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "104": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 2560
+        },
+        "208": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "200": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 4480
+        },
+        "304": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "296": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 6400
+        },
+        "400": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "392": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 8320
+        },
+        "496": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "488": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 10240
+        }
+      },
+      "tiles": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ]
+    },
+    {
+      "index": 18,
+      "name": "task.shave.invocation.0.1",
+      "type": 1,
+      "flags": 536870918,
+      "offset": 67648,
+      "size": 576,
+      "link": 0,
+      "info": 0,
+      "entry": 1,
+      "relocations": {
+        "16": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "8": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 960
+        },
+        "112": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "104": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 2880
+        },
+        "208": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "200": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 4800
+        },
+        "304": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "296": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 6720
+        },
+        "400": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "392": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 8640
+        },
+        "496": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "488": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 10560
+        }
+      },
+      "tiles": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "index": 19,
+      "name": "task.shave.invocation.1.1",
+      "type": 1,
+      "flags": 536870918,
+      "offset": 68224,
+      "size": 576,
+      "link": 0,
+      "info": 0,
+      "entry": 1,
+      "relocations": {
+        "16": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "8": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 1280
+        },
+        "112": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "104": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 3200
+        },
+        "208": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "200": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 5120
+        },
+        "304": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "296": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 7040
+        },
+        "400": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "392": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 8960
+        },
+        "496": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "488": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 10880
+        }
+      },
+      "tiles": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "index": 20,
+      "name": "task.shave.invocation.2.1",
+      "type": 1,
+      "flags": 536870918,
+      "offset": 68800,
+      "size": 576,
+      "link": 0,
+      "info": 0,
+      "entry": 1,
+      "relocations": {
+        "16": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "8": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 1600
+        },
+        "112": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "104": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 3520
+        },
+        "208": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "200": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 5440
+        },
+        "304": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "296": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 7360
+        },
+        "400": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "392": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 9280
+        },
+        "496": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "488": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 11200
+        }
+      },
+      "tiles": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ]
+    }
+  ],
+  "finished": "2026-10-15T06:59:07.737782+00:00"
+}

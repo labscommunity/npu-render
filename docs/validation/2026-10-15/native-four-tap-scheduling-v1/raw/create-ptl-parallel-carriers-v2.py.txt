@@ -1,0 +1,58 @@
+"""Original independent Gather graphs to inspect compiler-owned parallel scheduling."""
+from pathlib import Path
+from datetime import UTC,datetime
+import argparse,hashlib,json,os,subprocess,sys,time,traceback,struct
+from ptl_elf_v1 import Elf
+vm=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm'
+def write(p,v):p.write_text(json.dumps(v,indent=2)+'\n')
+def obj(p):return json.loads(p.read_text(encoding='utf-8-sig'))
+def child(out,branches):
+ import openvino as ov
+ from openvino import opset13 as op
+ import numpy as np
+ report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,branches=branches,custom_kernel_executed=False,checks=[])
+ try:
+  assert ov.get_version()=='2026.4.1-22982-e213a147257-releases/2026/4';core=ov.Core();parameters=[];outputs=[]
+  for b in range(branches):
+   src=op.parameter([131072,4],ov.Type.f16,name=f'source_{b}');ix=op.parameter([16384],ov.Type.i32,name=f'indices_{b}');parameters.extend([src,ix]);outputs.append(op.gather(src,ix,op.constant(np.int64(0))))
+  config=dict(PERFORMANCE_HINT='LATENCY',NPU_COMPILATION_MODE='DefaultHW',NPU_TILES=3);report.update(stage='compile',config=config);write(out/'report.json',report)
+  began=time.perf_counter_ns();model=core.compile_model(ov.Model(outputs,parameters),'NPU',config);report['compile_ms']=(time.perf_counter_ns()-began)/1e6
+  devices=model.get_property('EXECUTION_DEVICES');devices=[devices] if isinstance(devices,str) else list(devices);assert devices in (['NPU'],['NPU.0']);report['execution_devices']=devices
+  blob=model.export_model().getvalue();(out/'carrier.blob').write_bytes(blob);report.update(blob_sha256=hashlib.sha256(blob).hexdigest(),blob_bytes=len(blob));elf=Elf(blob);metadata=[]
+  for s in elf.sections:
+   if s['name'].startswith('task.shave.'):
+    row={k:v for k,v in s.items() if k!='data'};row['relocations']={str(k):v for k,v in elf.relocations(s).items()}
+    if 'invocation' in s['name']:row['tiles']=[struct.unpack_from('<I',s['data'],i+84)[0] for i in range(0,s['size'],96)]
+    metadata.append(row)
+  write(out/'shave-layout.json',metadata);report['stage']='infer';write(out/'report.json',report);request=model.create_infer_request()
+  for i in range(8):
+   values={};expected=[]
+   for b in range(branches):
+    rng=np.random.default_rng(160000+i*branches+b);data=rng.integers(-256,256,(131072,4)).astype(np.float16);ix=rng.integers(0,131072,16384,dtype=np.int32);ix[:2]=[0,131071];values[2*b]=data;values[2*b+1]=ix;expected.append(data[ix].copy())
+   began=time.perf_counter_ns();request.start_async(values);assert request.wait_for(10000);actual=[request.get_output_tensor(b).data.copy() for b in range(branches)];elapsed=(time.perf_counter_ns()-began)/1e6
+   assert all(np.array_equal(a,e) for a,e in zip(actual,expected));report['checks'].append(dict(iteration=i,request_ms=elapsed,exact_components=branches*65536,output_sha256=[hashlib.sha256(x.tobytes()).hexdigest() for x in actual]))
+  report.update(passed=True,stage='complete',shave_layout=metadata)
+ except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+ finally:report.update(completed=True,finished=datetime.now(UTC).isoformat());write(out/'report.json',report)
+ print(json.dumps(report));return 0 if report['passed'] else 1
+
+def main():
+ p=argparse.ArgumentParser();p.add_argument('--child',type=Path);p.add_argument('--branches',type=int);a=p.parse_args()
+ if a.child:return child(a.child,a.branches)
+ out=vm/'ptl-parallel-carriers-v2';out.mkdir(exist_ok=False);process=None;report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,desktop_changed=False,custom_kernel_executed=False,cases=[])
+ try:
+  assert obj(vm/'ptl-four-tap-crop-comparison-v1/report.json')['passed']
+  for branches in [3,6]:
+   dest=out/str(branches);dest.mkdir()
+   with (dest/'stdout.log').open('xb') as stdout,(dest/'stderr.log').open('xb') as stderr:
+    process=subprocess.Popen([sys.executable,__file__,'--child',str(dest),'--branches',str(branches)],stdout=stdout,stderr=stderr,creationflags=subprocess.CREATE_NO_WINDOW)
+    try:process.wait(timeout=90)
+    except subprocess.TimeoutExpired:process.kill();process.wait(timeout=5);report['child_timeout']=True
+   result=obj(dest/'report.json');report['cases'].append(result);write(out/'report.json',report);assert process.returncode==0 and result['passed']
+  report['passed']=True
+ except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+ finally:
+  if process is not None and process.poll() is None:process.kill();process.wait(timeout=5)
+  report.update(completed=True,finished=datetime.now(UTC).isoformat());write(out/'report.json',report)
+ print(json.dumps({k:v for k,v in report.items() if k!='cases'}));return 0 if report['passed'] else 1
+if __name__=='__main__':raise SystemExit(main())

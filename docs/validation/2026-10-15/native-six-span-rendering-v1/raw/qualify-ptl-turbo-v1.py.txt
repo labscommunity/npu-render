@@ -1,0 +1,53 @@
+"""Paired, strictly serial tests of the documented process-scoped NPU turbo hint."""
+from pathlib import Path
+from datetime import UTC,datetime
+import argparse,hashlib,json,os,subprocess,sys,time,traceback
+vm=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm'
+def write(p,v):p.write_text(json.dumps(v,indent=2)+'\n')
+def obj(p):return json.loads(p.read_text(encoding='utf-8-sig'))
+def child(out):
+ import openvino as ov
+ import numpy as np
+ from ptl_six_span_fixture_v1 import fixture,reference
+ report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,checks=[],health=[])
+ try:
+  assert ov.get_version()=='2026.4.1-22982-e213a147257-releases/2026/4';core=ov.Core()
+  def imported(p,config):
+   m=core.import_model(p.read_bytes(),'NPU',config);raw=m.get_property('EXECUTION_DEVICES');dev=[raw] if isinstance(raw,str) else list(raw);assert dev in (['NPU'],['NPU.0']);return m
+  def health(phase):
+   m=imported(vm/'ptl-six-span-identity-v1/original.blob',{});q=m.create_infer_request()
+   for i in range(4):
+    x=np.full((6,131072),-np.inf,np.float16);expected=np.zeros_like(x);x[:,i*1024:(i+1)*1024]=np.float16(i);expected[:,i*1024:(i+1)*1024]=np.float16(1/1024);q.start_async({0:x});assert q.wait_for(10000);assert np.array_equal(q.get_output_tensor().data,expected)
+   report['health'].append(dict(phase=phase,passed=True))
+  health('before');models={name:imported(vm/'ptl-six-span-four-tap-v1/patched.blob',{'NPU_TURBO':flag}) for name,flag in [('default',False),('turbo',True)]}
+  report['turbo_readback']={name:m.get_property('NPU_TURBO') for name,m in models.items()};assert report['turbo_readback']=={'default':False,'turbo':True};requests={name:m.create_infer_request() for name,m in models.items()}
+  for i in range(16):
+   x=np.zeros((6,131072),np.float16);expected=np.zeros_like(x)
+   for b,seed in enumerate([1,2,3,4,6,7]):
+    raw,full=fixture(i*192+seed);e,_,covered=reference(full);assert covered==4096;x[b]=np.frombuffer(raw,np.float16);expected[b,:16384]=e.astype(np.float16).reshape(-1)
+   for mode in (['default','turbo'] if i%2==0 else ['turbo','default']):
+    q=requests[mode];began=time.perf_counter_ns();q.start_async({0:x});assert q.wait_for(10000);actual=q.get_output_tensor().data.copy();elapsed=(time.perf_counter_ns()-began)/1e6;assert np.array_equal(actual,expected),mode+' pixel mismatch'
+    report['checks'].append(dict(iteration=i,warmup=i<2,mode=mode,request_output_ms=elapsed,exact_output_components=int(expected.size),pixel_components=6*16384,input_sha256=hashlib.sha256(x.tobytes()).hexdigest(),output_sha256=hashlib.sha256(actual.tobytes()).hexdigest()))
+   write(out/'child-report.json',report)
+  del q,requests,models;health('after');report['passed']=True
+ except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+ finally:report.update(completed=True,finished=datetime.now(UTC).isoformat());write(out/'child-report.json',report)
+ print(json.dumps({k:v for k,v in report.items() if k!='checks'}));return 0 if report['passed'] else 1
+
+def main():
+ p=argparse.ArgumentParser();p.add_argument('--child',type=Path);a=p.parse_args()
+ if a.child:return child(a.child)
+ out=vm/'ptl-turbo-v1';out.mkdir(exist_ok=False);process=None;report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,desktop_changed=False,tahoma_tested=False,global_power_policy_changed=False,clock_frequency_measured=False)
+ try:
+  assert obj(vm/'ptl-six-span-comparison-v1/report.json')['passed'];assert hashlib.sha256((vm/'ptl-six-span-four-tap-v1/patched.blob').read_bytes()).hexdigest()=='2ba8be287194237f06d6fa33b82bd2a5df9bd22af461fa94c1d764b2b12caf80'
+  with (out/'stdout.log').open('xb') as stdout,(out/'stderr.log').open('xb') as stderr:
+   process=subprocess.Popen([sys.executable,__file__,'--child',str(out)],stdout=stdout,stderr=stderr,creationflags=subprocess.CREATE_NO_WINDOW)
+   try:process.wait(timeout=90)
+   except subprocess.TimeoutExpired:process.kill();process.wait(timeout=5);report['child_timeout']=True
+  result=obj(out/'child-report.json');report.update(exit_code=process.returncode,child_result=result,passed=process.returncode==0 and result['passed'])
+ except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+ finally:
+  if process is not None and process.poll() is None:process.kill();process.wait(timeout=5)
+  report.update(completed=True,finished=datetime.now(UTC).isoformat());write(out/'report.json',report)
+ print(json.dumps({k:v for k,v in report.items() if k!='child_result'}));return 0 if report['passed'] else 1
+if __name__=='__main__':raise SystemExit(main())

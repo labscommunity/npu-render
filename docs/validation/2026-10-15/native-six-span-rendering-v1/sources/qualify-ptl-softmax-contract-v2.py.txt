@@ -1,0 +1,24 @@
+"""Offline shape, scheduling, address and kernel-span rejection cases."""
+from pathlib import Path
+import json,hashlib,struct
+from ptl_softmax_contract_v2 import inspect,patch
+from ptl_elf_v1 import Elf
+r=Path('results/render-driver');blob=(r/'ptl-softmax-carriers-local-v1/6/carrier.blob').read_bytes();e=Elf(blob);proof=inspect(blob);rows=[dict(case='exact-six-spans',passed=True)]
+for tile in range(3):
+ for slot in range(2):
+  call=e.by_name[f'task.shave.invocation.{tile}.{slot}'];bad=bytearray(blob);struct.pack_into('<I',bad,call['offset']+84,(tile+1)%3)
+  try:inspect(bytes(bad))
+  except ValueError:rows.append(dict(case=f'reject-tile-{tile}-{slot}',passed=True))
+  else:raise AssertionError('tile admitted')
+for n in range(6):
+ for i in range(2):
+  bad=bytearray(blob);struct.pack_into('<I',bad,e.by_name['shave.params']['offset']+n*256+i*40,0)
+  try:inspect(bytes(bad))
+  except ValueError:rows.append(dict(case=f'reject-address-{n}-{i}',passed=True))
+  else:raise AssertionError('address admitted')
+for size in [0,1,18257,18272]:
+ try:patch(blob,bytes(size))
+ except ValueError:rows.append(dict(case=f'reject-code-{size}',passed=True))
+ else:raise AssertionError('code extent admitted')
+modified,_=patch(blob,bytes(16));inspect(modified);rows.append(dict(case='preserve-all-non-code',passed=True))
+out=dict(passed=True,hardware_executed=False,checks=rows,contract=proof,source_sha256={name:hashlib.sha256((r/name).read_bytes()).hexdigest() for name in ['ptl_softmax_contract_v2.py','ptl_elf_v1.py']});(r/'ptl-softmax-contract-v2-qualification.json').write_text(json.dumps(out,indent=2)+'\n');print('offline checks',len(rows))

@@ -1,0 +1,33 @@
+"""Exact six-span carrier admission; all compiler-owned scheduling stays unchanged."""
+import hashlib,struct
+from ptl_elf_v1 import Elf,check
+ORIGINAL_SHA='04574cdd9d52105e7414d3c5560a778812b7259743825c63c8bb0aa47f3fd182'
+
+def inspect(blob):
+ e=Elf(blob);check(not any('dpu' in s['name'].lower() for s in e.sections),'no DPU tasks')
+ keys=[(tile,slot) for slot in range(2) for tile in range(3)];expected={f'task.shave.{kind}.{tile}.{slot}' for kind in ['range','invocation'] for tile,slot in keys}
+ check({s['name'] for s in e.sections if s['name'].startswith('task.shave.')}==expected,'six explicit task pairs')
+ params=e.by_name['shave.params'];code=e.by_name['shave.text'];data=e.by_name['shave.data'];pr=e.relocations(params)
+ check(params['size']==1648 and code['size']==18384 and data['size']==128 and all(x['type']==1 for x in [params,code,data]) and not e.relocations(code),'bounded file-backed code and metadata')
+ check(set(pr)=={n*256+i*40+field for n in range(6) for i in range(2) for field in [16,20]},'exact parameter relocations');calls=[]
+ for n,(tile,slot) in enumerate(keys):
+  ranges=e.by_name[f'task.shave.range.{tile}.{slot}'];call=e.by_name[f'task.shave.invocation.{tile}.{slot}'];base=n*256
+  check(ranges['size']==40 and call['size']==96 and ranges['type']==call['type']==1,'one bounded task per engine')
+  check(struct.unpack_from('<B7xQQIIII',ranges['data'])==(0,0x1d000000,0,18256,0,0,0),'owned executable extent')
+  check(e.relocations(ranges)=={16:dict(kind=0,section='shave.text',addend=0)},'one shared code reference')
+  check(e.relocations(call)=={8:dict(kind=0,section='shave.params',addend=base),16:dict(kind=0,section='shave.data',addend=0)},'exact invocation windows')
+  check(struct.unpack_from('<I',call['data'],84)[0]==tile,'correct physical tile id')
+  tile_base=0x40000000|(1<<(21+tile));addresses=[]
+  for i in range(2):
+   at=base+i*40;address,static,rank,dp,sp,dtype,order,location=struct.unpack_from('<QIIIIIQI',params['data'],at)
+   check((static,rank,dp,sp,dtype,order,location)==(1,4,0,0,2,0x4321,2),'static dense f16 tensor')
+   for field,addend,fmt,wanted in [(16,base+144+i*48,'<4i',(131072,1,1,1)),(20,base+160+i*48,'<4q',(16,2097152,2097152,2097152))]:
+    check(pr[at+field]==dict(kind=4,section='shave.params',addend=addend),'exact shape reference');check(struct.unpack_from(fmt,params['data'],addend)==wanted,'complete shape and strides')
+   want=tile_base+0x18000+slot*262144+i*524288;check(address==want,'explicit non-overlapping input/output plane');addresses.append(address)
+  memory=e.by_name[f'buffer.CMX_NN.{tile}'];check(memory['type']==0x8aaaaaad and memory['offset']==0 and memory['size']==1409024,'declared local memory allocation')
+  check(addresses[1]+262144<=tile_base+memory['size'],'output within allocation')
+  calls.append(dict(tile=tile,engine=slot,parameter_offset=base,input_address=addresses[0],output_address=addresses[1],bytes_per_plane=262144))
+ return dict(accepted=True,sha256=hashlib.sha256(blob).hexdigest(),code_offset=code['offset'],code_bytes=18256,invocations=calls,hardware_custom_execution_qualified=False)
+
+def patch(blob,text):
+ check(hashlib.sha256(blob).hexdigest()==ORIGINAL_SHA,'pinned unmodified compiler output');proof=inspect(blob);check(0<len(text)<=proof['code_bytes'] and len(text)%16==0,'bounded replacement code');at=proof['code_offset'];size=proof['code_bytes'];modified=blob[:at]+text+bytes(size-len(text))+blob[at+size:];check(len(modified)==len(blob) and modified[:at]==blob[:at] and modified[at+size:]==blob[at+size:],'all non-code bytes preserved');inspect(modified);return modified,proof

@@ -1,0 +1,62 @@
+{
+  "started": "2026-10-15T07:08:36.176645+00:00",
+  "completed": true,
+  "passed": false,
+  "checks": [
+    {
+      "group": 0,
+      "warmup": true,
+      "mode": "serial",
+      "batch_request_output_ms": 383.4511,
+      "exact_components": 393216,
+      "input_sha256": [
+        "d06461834869358983ff73545d6d49d9c4dbcb3c0a0911db265ded6a84f32662",
+        "abde7609f35ef2d1795c9eb33a2cf2ba7bdb38287b96bb3de9d165a1acef602d",
+        "38ca9681bf4cfe5602d29545bf3950a43d6fa1031475b1e199617dd5a1e82c5e",
+        "f54724538341c9917626a946d6352d3f98e863eeccbf46ccf1f777543ce2ce04",
+        "152a192f649cdc70d139b3df32407a97639e36b2f63b04057753b38608f7ab57",
+        "b43cf2b03235549dcedf8973448067ab9f48e99291a190e122aa67542eba8665"
+      ],
+      "output_sha256": [
+        "3b10fa7c83c21b1cab20bdc7f0e79bae5d9861d22c88d2b2f64bfc7b70622f7a",
+        "c0d1868683d49c2c61627206024a177c6c3b6d33e27a5fb5240e5dfca701809d",
+        "b313e9d9fda51dbf948a3ee5eea0d7801eff81740174e85e48332d2e62260a8b",
+        "7d2d7e59f0823bdc9110676de5c650ae7dbeedcf2bb8bb9b1e3ca2d833d225e0",
+        "bde923a9abf8866a0f943ce4b9272b5ad53e5d06a787e45de56a83f73a773073",
+        "c9838b1677825e8b42e1809f4b99531184981cc5b06798442010e94e5f99ff94"
+      ]
+    },
+    {
+      "group": 0,
+      "warmup": true,
+      "mode": "shared-overlap",
+      "batch_request_output_ms": 890.9898,
+      "exact_components": 393216,
+      "input_sha256": [
+        "d06461834869358983ff73545d6d49d9c4dbcb3c0a0911db265ded6a84f32662",
+        "abde7609f35ef2d1795c9eb33a2cf2ba7bdb38287b96bb3de9d165a1acef602d",
+        "38ca9681bf4cfe5602d29545bf3950a43d6fa1031475b1e199617dd5a1e82c5e",
+        "f54724538341c9917626a946d6352d3f98e863eeccbf46ccf1f777543ce2ce04",
+        "152a192f649cdc70d139b3df32407a97639e36b2f63b04057753b38608f7ab57",
+        "b43cf2b03235549dcedf8973448067ab9f48e99291a190e122aa67542eba8665"
+      ],
+      "output_sha256": [
+        "3b10fa7c83c21b1cab20bdc7f0e79bae5d9861d22c88d2b2f64bfc7b70622f7a",
+        "c0d1868683d49c2c61627206024a177c6c3b6d33e27a5fb5240e5dfca701809d",
+        "b313e9d9fda51dbf948a3ee5eea0d7801eff81740174e85e48332d2e62260a8b",
+        "7d2d7e59f0823bdc9110676de5c650ae7dbeedcf2bb8bb9b1e3ca2d833d225e0",
+        "bde923a9abf8866a0f943ce4b9272b5ad53e5d06a787e45de56a83f73a773073",
+        "c9838b1677825e8b42e1809f4b99531184981cc5b06798442010e94e5f99ff94"
+      ]
+    }
+  ],
+  "health": [
+    {
+      "phase": "before",
+      "passed": true
+    }
+  ],
+  "error": "RuntimeError('Exception from src\\\\inference\\\\src\\\\cpp\\\\infer_request.cpp:259:\\nException from core/infer_request.hpp:55:\\nCaught exception: Exception from src\\\\plugins\\\\intel_npu\\\\src\\\\utils\\\\src\\\\zero\\\\zero_wrappers.cpp:382:\\nL0 zeFenceHostSynchronize result: ZE_RESULT_ERROR_DEVICE_LOST, code 0x70000001 - device hung, reset, was removed, or driver update occurred\\n\\n\\n')",
+  "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\qualify-ptl-concurrent-v1.py\", line 34, in child\n    for q in rs:assert q.wait_for(10000);actual.append(q.get_output_tensor().data.copy())\n                       ^^^^^^^^^^^^^^^^^\nRuntimeError: Exception from src\\inference\\src\\cpp\\infer_request.cpp:259:\nException from core/infer_request.hpp:55:\nCaught exception: Exception from src\\plugins\\intel_npu\\src\\utils\\src\\zero\\zero_wrappers.cpp:382:\nL0 zeFenceHostSynchronize result: ZE_RESULT_ERROR_DEVICE_LOST, code 0x70000001 - device hung, reset, was removed, or driver update occurred\n\n\n\n",
+  "finished": "2026-10-15T07:08:38.354640+00:00"
+}
