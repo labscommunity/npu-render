@@ -52,3 +52,7 @@ responsiveness, remaining GPU work, Tahoma A/B and a usable switch remain open.
 pixels, toolchain DLLs, compiled kernels and device graph binaries are excluded.
 The harness links the unchanged `native-routing-v45` static libraries; their
 hashes and each clean build are retained.
+
+Archived Python sources use `.py.txt` to preserve their original bytes without
+treating measurement scripts as maintained runtime modules. Remove the final
+`.txt` suffix when reconstructing a retained experiment.

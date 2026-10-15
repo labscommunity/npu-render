@@ -53,3 +53,7 @@ required to use those resources with the custom renderer.
 `artifact-sha256.json` authenticates 80 retained evidence/source files. Source
 windows, captured pixels, toolchain DLLs, kernels and compiled graphs remain
 excluded from the repository. The live renderer and ordinary desktop are unchanged.
+
+Archived Python sources use `.py.txt` to preserve their original bytes without
+treating measurement scripts as maintained runtime modules. Remove the final
+`.txt` suffix when reconstructing a retained experiment.

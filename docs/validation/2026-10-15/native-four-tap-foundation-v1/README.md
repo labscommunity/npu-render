@@ -45,3 +45,7 @@ artifacts were hashed before download and verified locally. Profiling models and
 compiled kernels are excluded. Source provenance points to the pinned OpenVINO
 revision `e213a147257`; the model-profiling wrapper alone does not explain the
 observed stale query data.
+
+Archived Python sources use `.py.txt` to preserve their original bytes without
+treating measurement scripts as maintained runtime modules. Remove the final
+`.txt` suffix when reconstructing a retained experiment.
