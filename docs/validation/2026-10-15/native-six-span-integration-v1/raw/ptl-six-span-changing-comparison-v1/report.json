@@ -1,0 +1,127 @@
+{
+  "started": "2026-10-15T07:43:45.534330+00:00",
+  "completed": true,
+  "passed": true,
+  "desktop_changed": false,
+  "tahoma_tested": false,
+  "pixel_fixture": "six changing deterministic premultiplied source/background images; CPU input generation only",
+  "packet_sha256": "75d41f0b2edb0ed4a2edd095303d7655dd7c428c12f3dd5098281e81d3acbfeb",
+  "model_sha256": "e0aca557415dba5fc651e1b47e67a33ec28cc6e20be715ba7066457f8eba4cba",
+  "executable_sha256": "ff42760534d3a6a27bb4427f0efdadea60da1fc631688d82e4d2aa644cbd43c1",
+  "pid": 9540,
+  "exit_code": 0,
+  "pairs": [
+    {
+      "kind": "pair",
+      "iteration": 0,
+      "order": "baseline-first",
+      "baseline_full_ms": 9353.9076,
+      "candidate_full_ms": 407.638,
+      "candidate_prepare_ms": 11.9005,
+      "candidate_raster_ms": 395.737,
+      "baseline_calls": 1282,
+      "candidate_calls": 34,
+      "components": 3145728,
+      "different_components": 0,
+      "maximum_byte_error": 0,
+      "exact": true
+    },
+    {
+      "kind": "pair",
+      "iteration": 1,
+      "order": "custom-first",
+      "baseline_full_ms": 9120.3175,
+      "candidate_full_ms": 363.8641,
+      "candidate_prepare_ms": 2.9742,
+      "candidate_raster_ms": 360.8897,
+      "baseline_calls": 1282,
+      "candidate_calls": 34,
+      "components": 3145728,
+      "different_components": 0,
+      "maximum_byte_error": 0,
+      "exact": true
+    },
+    {
+      "kind": "pair",
+      "iteration": 2,
+      "order": "baseline-first",
+      "baseline_full_ms": 9265.3391,
+      "candidate_full_ms": 374.0862,
+      "candidate_prepare_ms": 2.2593,
+      "candidate_raster_ms": 371.8263,
+      "baseline_calls": 1282,
+      "candidate_calls": 34,
+      "components": 3145728,
+      "different_components": 0,
+      "maximum_byte_error": 0,
+      "exact": true
+    },
+    {
+      "kind": "pair",
+      "iteration": 3,
+      "order": "custom-first",
+      "baseline_full_ms": 9225.5213,
+      "candidate_full_ms": 371.7033,
+      "candidate_prepare_ms": 2.9681,
+      "candidate_raster_ms": 368.7349,
+      "baseline_calls": 1282,
+      "candidate_calls": 34,
+      "components": 3145728,
+      "different_components": 0,
+      "maximum_byte_error": 0,
+      "exact": true
+    },
+    {
+      "kind": "pair",
+      "iteration": 4,
+      "order": "baseline-first",
+      "baseline_full_ms": 9278.5675,
+      "candidate_full_ms": 366.4761,
+      "candidate_prepare_ms": 1.9851,
+      "candidate_raster_ms": 364.4907,
+      "baseline_calls": 1282,
+      "candidate_calls": 34,
+      "components": 3145728,
+      "different_components": 0,
+      "maximum_byte_error": 0,
+      "exact": true
+    },
+    {
+      "kind": "pair",
+      "iteration": 5,
+      "order": "custom-first",
+      "baseline_full_ms": 9391.5101,
+      "candidate_full_ms": 375.8402,
+      "candidate_prepare_ms": 2.5495,
+      "candidate_raster_ms": 373.2901,
+      "baseline_calls": 1282,
+      "candidate_calls": 34,
+      "components": 3145728,
+      "different_components": 0,
+      "maximum_byte_error": 0,
+      "exact": true
+    }
+  ],
+  "completion": {
+    "kind": "complete",
+    "passed": true,
+    "desktop_tested": false,
+    "tahoma_tested": false
+  },
+  "retained_pixel_artifacts": {
+    "actual-input.bin": {
+      "bytes": 1572864,
+      "sha256": "bbacc8ab703eacdcca7dcc72f4e910acd7db31a0c1b05e7f16d37788286a9a97"
+    },
+    "baseline.rgba": {
+      "bytes": 3145728,
+      "sha256": "cc7b943f3686a3d66321ab3e627fa78b81cd11af789906a22f475835fe59f68e"
+    },
+    "candidate.rgba": {
+      "bytes": 3145728,
+      "sha256": "cc7b943f3686a3d66321ab3e627fa78b81cd11af789906a22f475835fe59f68e"
+    }
+  },
+  "timing_limitations": "Iteration 0 includes lazy baseline setup and one candidate fixture/pixel artifact write; exclude from steady-state comparisons. No display, input latency, GPU load or Tahoma test.",
+  "finished": "2026-10-15T07:44:44.770568+00:00"
+}
