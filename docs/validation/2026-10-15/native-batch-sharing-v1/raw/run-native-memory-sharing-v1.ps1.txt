@@ -1,0 +1,43 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$vm="$r\vm";$out="$vm\native-memory-sharing-recorded-v1";$b="$r\builds\native-routing-v36"
+if(Test-Path $out){throw 'Memory sharing qualification exists'};New-Item -ItemType Directory $out|Out-Null
+$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');completed=$false;passed=$false;desktop_changed=$false;cases=@();matched_performance_test=$false}
+function Save-Report{$report|ConvertTo-Json -Depth 7|Set-Content "$out\report.json"}
+Save-Report
+try{
+ $deadline=[DateTime]::UtcNow.AddMinutes(75)
+ while($true){
+  $done=$false
+  if(Test-Path "$vm\native-generic-recorded-v3\report.json"){
+   $prior=Get-Content "$vm\native-generic-recorded-v3\report.json" -Raw|ConvertFrom-Json
+   if($prior.completed -and !$prior.passed){throw 'Prior generic qualification failed'}
+   $done=$prior.completed -and $prior.passed
+  }
+  if($done){break};if([DateTime]::UtcNow -gt $deadline){throw 'Prior qualification not finished'};Start-Sleep -Seconds 2
+ }
+ $native=Get-Content "$vm\native-live-v27\report.json" -Raw|ConvertFrom-Json
+ if(!$native.completed -or !$native.passed -or !$native.cleanup_passed -or !$native.cursor_cleanup_passed){throw 'Native cleanup not qualified'}
+ if(@(Get-Process nr_registered_local_indexed_worker -ErrorAction SilentlyContinue).Count){throw 'Another renderer is active'}
+ $cpu=Get-Content "$vm\native-memory-sharing-v1-CPU\report.json" -Raw|ConvertFrom-Json
+ $proof=Get-Content "$b\registered-build-report.json" -Raw|ConvertFrom-Json;$exe="$b\Release\nr_registered_provider_memory_cache_test.exe"
+ if(!$cpu.passed -or !$cpu.completed -or !$proof.clean_build -or (Get-FileHash $exe).Hash -ne $cpu.binary_sha256 -or $cpu.binary_sha256 -ne $proof.binary_sha256.'nr_registered_provider_memory_cache_test.exe'){throw 'Memory contract identity not qualified'}
+ $env:PATH="$r\toolchains\openvino-2026.4.1\Lib\site-packages\openvino\libs;"+$env:PATH
+ $p=Start-Process $exe -ArgumentList NPU -PassThru -NoNewWindow -RedirectStandardOutput "$out\npu-contract.stdout.jsonl" -RedirectStandardError "$out\npu-contract.stderr.log";[void]$p.Handle
+ try{if(!$p.WaitForExit(180000)){$p.Kill();$p.WaitForExit();throw 'Memory contract timed out'};$p.Refresh();if($p.ExitCode){throw 'NPU memory contract failed'}}finally{$p.Dispose()}
+ $contract=Get-Content "$out\npu-contract.stdout.jsonl" -Raw|ConvertFrom-Json
+ if(!$contract.passed -or $contract.execution_device -ne 'NPU' -or $contract.verified_values -ne 2368 -or $contract.backend_calls -ne 4 -or $contract.memory_hits -ne 2 -or $contract.evictions -ne 3){throw 'NPU memory contract evidence incomplete'}
+ $report.npu_contract=$contract;Save-Report
+ foreach($case in @(@{trial='native-ordered-replay-v42-memory-old256';native='native-desktop-admission-v18';count=256;references=255},@{trial='native-ordered-replay-v43-memory-old117';native='native-desktop-admission-v19';count=117;references=116},@{trial='native-ordered-replay-v44-memory-live24';native='native-desktop-admission-v35';count=1097;references=1096})){
+  if(@(Get-Process nr_registered_local_indexed_worker -ErrorAction SilentlyContinue).Count){throw 'Another NPU renderer is active'}
+  $old=Get-Content "$vm\$($case.native)\report.json" -Raw|ConvertFrom-Json;if(!$old.completed -or !$old.cleanup_passed){throw 'Capture source not cleaned up'}
+  & "$r\toolchains\openvino-2026.4.1\Scripts\python.exe" "$vm\replay-recorded-requests-v14.py" --worker "$b\Release\nr_registered_local_indexed_worker.exe" --client "$r\builds\native-routing-v20\Release\nr_registered_local_indexed_client_probe.exe" --runtime "$r\toolchains\openvino-2026.4.1\Lib\site-packages\openvino\libs" --cache "$vm\model-cache-2026-4-v209" --capture "$vm\$($case.native)\bootstrap\requests" --output "$vm\$($case.trial)" --shared-core 1 --shared-queue 1 --memory-cache 1 --memory-capacity 512 --pipeline-cache retained --quad-batch 1 --infer-trace 1 --compile-trace 1 --provider-recovery 1 > "$out\$($case.trial).stdout.log" 2> "$out\$($case.trial).stderr.log"
+  if($LASTEXITCODE){throw "Memory stream failed: $($case.trial)"}
+  $q=Get-Content "$vm\$($case.trial)\report.json" -Raw|ConvertFrom-Json
+  if(!$q.passed -or $q.successful_replays -ne $case.count -or $q.original_pixel_hashes_matched -ne $case.references -or $q.delivery_acknowledgments -ne $case.count){throw 'Recorded memory pixel qualification incomplete'}
+  $events=@(Get-Content "$vm\$($case.trial)\worker.stdout.jsonl"|ForEach-Object {$_|ConvertFrom-Json})
+  $report.cases+=@{trial=$case.trial;passed=$true;requests=$case.count;reference_hashes_matched=$case.references;provider_recoveries=@($events|Where-Object provider_process_failure).Count}
+  Save-Report
+ }
+ $report.passed=$true
+}catch{$report.error=$_.Exception.Message}
+finally{$report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');Save-Report}
+Get-Content "$out\report.json";if(!$report.passed){exit 1}

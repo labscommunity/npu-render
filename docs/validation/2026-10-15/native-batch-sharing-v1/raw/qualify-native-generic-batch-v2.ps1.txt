@@ -1,0 +1,29 @@
+param([ValidateSet('CPU','NPU')][string]$Backend='CPU')
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$b="$r\builds\native-routing-v35";$out="$r\vm\native-generic-batch-v2-$Backend";$deadline=[DateTime]::UtcNow.AddMinutes(10)
+while(!(Test-Path "$b\registered-build-report.json")){if([DateTime]::UtcNow -gt $deadline){throw 'Generic candidate build not ready'};Start-Sleep -Seconds 2}
+if(Test-Path $out){throw 'Generic qualification exists'}
+if($Backend -eq 'NPU' -and @(Get-Process nr_registered_local_indexed_worker -ErrorAction SilentlyContinue).Count){throw 'Another NPU experiment is active'}
+New-Item -ItemType Directory $out|Out-Null
+$proof=Get-Content "$b\registered-build-report.json" -Raw|ConvertFrom-Json
+foreach($name in @('nr_registered_triangle_texture_draw_test.exe','nr_registered_derivative_test.exe')){if((Get-FileHash "$b\Release\$name").Hash -ne $proof.binary_sha256.$name){throw 'Candidate binary mismatch'}}
+$env:PATH="$r\toolchains\openvino-2026.4.1\Lib\site-packages\openvino\libs;"+$env:PATH
+$env:NR_RENDER_NPU_CACHE="$r\vm\model-cache-2026-4-v209";$env:NR_RENDER_SHARED_CORE='1';$env:NR_RENDER_SHARED_QUEUE='1';$env:NR_RENDER_MEMORY_CACHE='0';$env:NR_RENDER_INFER_TRACE='1';$env:NR_RENDER_COMPILE_TRACE='0'
+$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');completed=$false;passed=$false;backend=$Backend;desktop_changed=$false;cases=@()}
+try{
+ foreach($capacity in @('4096','8192','16384')){
+  $env:NR_RENDER_GENERIC_BATCH=$capacity
+  foreach($test in @('nr_registered_triangle_texture_draw_test','nr_registered_derivative_test')){
+   $prefix="$capacity-$test";$process=Start-Process "$b\Release\$test.exe" -ArgumentList @($Backend) -PassThru -NoNewWindow -RedirectStandardOutput "$out\$prefix.stdout.jsonl" -RedirectStandardError "$out\$prefix.stderr.log";[void]$process.Handle
+   if(!$process.WaitForExit(300000)){$process.Kill();$process.WaitForExit();throw 'Generic contract timeout'};$process.Refresh();$code=$process.ExitCode;$process.Dispose()
+   if($code){throw "Generic contract failed: $prefix"}
+   $rows=@(Get-Content "$out\$prefix.stdout.jsonl"|Where-Object {$_ -match '^\{.*\}$'}|ForEach-Object {$_|ConvertFrom-Json})
+   $finished=if($test -eq 'nr_registered_triangle_texture_draw_test'){@($rows|Where-Object coverage_exact)}else{@($rows|Where-Object {$_.PSObject.Properties.Name -contains 'derivative_shader_components'})}
+   if($finished.Count -ne 1 -or $finished[0].execution_device -ne $Backend){throw 'Generic backend contract evidence absent'}
+   if($test -eq 'nr_registered_triangle_texture_draw_test' -and @($rows|Where-Object {$_.mixed_interpolation_components -eq 4096 -and $_.batch -eq [int]$capacity}).Count -ne 1){throw 'Enlarged interpolation oracle evidence absent'}
+   $report.cases+=@{capacity=$capacity;test=$test;passed=$true;result=$finished[0]}
+  }
+ }
+ $report.passed=$true
+}catch{$report.error=$_.Exception.Message}
+finally{$report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');$report|ConvertTo-Json -Depth 6|Set-Content "$out\report.json"}
+Get-Content "$out\report.json";if(!$report.passed){exit 1}

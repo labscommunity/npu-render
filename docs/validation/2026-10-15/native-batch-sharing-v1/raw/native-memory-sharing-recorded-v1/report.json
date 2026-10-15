@@ -1,0 +1,45 @@
+{
+    "started":  "2026-10-15T00:43:17.6682405Z",
+    "completed":  true,
+    "passed":  true,
+    "desktop_changed":  false,
+    "cases":  [
+                  {
+                      "reference_hashes_matched":  255,
+                      "trial":  "native-ordered-replay-v42-memory-old256",
+                      "requests":  256,
+                      "provider_recoveries":  0,
+                      "passed":  true
+                  },
+                  {
+                      "reference_hashes_matched":  116,
+                      "trial":  "native-ordered-replay-v43-memory-old117",
+                      "requests":  117,
+                      "provider_recoveries":  0,
+                      "passed":  true
+                  },
+                  {
+                      "reference_hashes_matched":  1096,
+                      "trial":  "native-ordered-replay-v44-memory-live24",
+                      "requests":  1097,
+                      "provider_recoveries":  0,
+                      "passed":  true
+                  }
+              ],
+    "matched_performance_test":  false,
+    "npu_contract":  {
+                         "execution_device":  "NPU",
+                         "passed":  true,
+                         "verified_values":  2368,
+                         "backend_calls":  4,
+                         "memory_hits":  2,
+                         "evictions":  3,
+                         "binding_identity_isolated":  true,
+                         "properties_isolated":  true,
+                         "independent_mutable_inputs":  true,
+                         "creator_core_lifetime":  true,
+                         "eviction_preserves_active_requests":  true,
+                         "compile_failure_poisoned":  true
+                     },
+    "finished":  "2026-10-15T01:08:49.2785337Z"
+}

@@ -125,8 +125,14 @@ windows and pointer state after 1,107 acknowledged NPU operations and 35 matchin
 physical submissions. Controlled input responses are 20.645 seconds and 0.567
 seconds in an instrumented trial. Neither is a responsiveness qualification.
 
-Next, qualify enlarged generic batches and compiled-model sharing independently,
-then replay their combination against the complete latest native recording.
+The [independent batching and sharing checks](../validation/2026-10-15/native-batch-sharing-v1/README.md)
+now pass. Both enlarged batches match 65 recorded outputs, and sharing passes
+three complete streams totaling 1,470 requests without recovery. These establish
+correctness, not speed. The combined candidate is undergoing the latest native
+recording's full replay.
+
+Next, finish that combined replay and measure batching alone against batching
+plus sharing on the same complete recording.
 Measure any benefit with matched trials before promotion. Exact-output memoization
 covers only about 3% of recorded cost at 64 MiB and is lower priority. Keep model
 preparation and fault-recovery latency visible. The current desktop authorization

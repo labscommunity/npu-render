@@ -1,0 +1,31 @@
+from pathlib import Path
+import hashlib
+import json
+import shutil
+import tarfile
+
+r=Path('results/render-driver');d=r/'native-routing-v36'
+shutil.copytree(r/'native-routing-v34',d);lab=d/'native/windows/registered_lab'
+p=lab/'provider_compile.hpp';s=p.read_text();needle='inline CompiledMemoryCache &compiled_memory_cache(){static CompiledMemoryCache cache(64);return cache;}'
+assert s.count(needle)==1
+s=s.replace(needle,'''inline size_t memory_cache_capacity(){
+    char *text=nullptr;size_t length=0;if(_dupenv_s(&text,&length,"NR_RENDER_MEMORY_CACHE_CAPACITY"))throw std::runtime_error("cannot read memory cache capacity");
+    const std::unique_ptr<char,decltype(&std::free)> owner(text,&std::free);
+    if(!text || !*text || !std::strcmp(text,"64"))return 64;
+    if(!std::strcmp(text,"512"))return 512;
+    throw std::invalid_argument("memory cache capacity requires 64 or 512");
+}
+inline CompiledMemoryCache &compiled_memory_cache(){static CompiledMemoryCache cache(memory_cache_capacity());return cache;}''');p.write_text(s)
+p=lab/'provider_memory_cache.hpp';s=p.read_text();assert 'if(!count || count>64)' in s;p.write_text(s.replace('if(!count || count>64)','if(!count || count>512)'))
+p=lab/'provider_memory_cache_test.cpp';s=p.read_text();needle='    nr::provider::CompiledMemoryCache cache(2);size_t backend_calls=0;';assert s.count(needle)==1;s=s.replace(needle,'''    {nr::provider::CompiledMemoryCache largest(512);require(largest.size()==0);}
+    for(const size_t invalid:{size_t(0),size_t(513)}){bool bad=false;try{nr::provider::CompiledMemoryCache rejected_capacity(invalid);}catch(const std::invalid_argument &){bad=true;}require(bad);}
+'''+needle);p.write_text(s)
+(r/'native-routing-v36-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-routing-v36.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-native-routing-v34.ps1').read_text().replace('native-routing-v34','native-routing-v36')
+s=s.replace('--target nr_quad_batch_probe','--target nr_registered_provider_memory_cache_test nr_quad_batch_probe').replace("@('nr_quad_batch_probe.exe'", "@('nr_registered_provider_memory_cache_test.exe','nr_quad_batch_probe.exe'")
+(r/'build-native-routing-v36.ps1').write_text(s)
+s=(r/'replay-recorded-requests-v12.py').read_text().replace("a.add_argument('--quad-batch'", "a.add_argument('--memory-capacity',choices=('64','512'),default='64')\na.add_argument('--quad-batch'")
+s=s.replace("env['NR_RENDER_COMPILE_TRACE']=v.compile_trace", "env['NR_RENDER_MEMORY_CACHE_CAPACITY']=v.memory_capacity\nenv['NR_RENDER_COMPILE_TRACE']=v.compile_trace").replace('report.update(test_exception_ticket=', 'report.update(memory_capacity=v.memory_capacity,test_exception_ticket=')
+(r/'replay-recorded-requests-v14.py').write_text(s)
+print('Prepared optional retained compiled-model sharing; default capacity and live policy unchanged.')

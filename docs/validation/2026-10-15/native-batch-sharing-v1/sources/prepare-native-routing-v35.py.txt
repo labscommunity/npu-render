@@ -1,0 +1,24 @@
+from pathlib import Path
+import hashlib
+import json
+import shutil
+import subprocess
+import tarfile
+
+r=Path('results/render-driver');d=r/'native-routing-v35'
+shutil.copytree(r/'native-routing-v34',d)
+patch=Path('docs/validation/2026-10-14/native-quad-live-v1/native-routing-v30.patch')
+subprocess.run(['git','apply','--check','--directory='+str(d),str(patch)],check=True)
+subprocess.run(['git','apply','--directory='+str(d),str(patch)],check=True)
+lab=d/'native/windows/registered_lab'
+p=lab/'indexed_exchange_test.cpp';s=p.read_text();s=s.replace('for(const auto capacity:{4096u,8192u})','for(const auto capacity:{4096u,8192u,16384u})').replace('for(const auto invalid:{0u,512u,8193u,16384u})','for(const auto invalid:{0u,512u,8193u,16385u,32768u})');p.write_text(s)
+p=lab/'vertex_executor.cpp';s=p.read_text().replace('// Preserve existing scheduling for all other programs and older runtimes.','// Preserve captured compositor scheduling; generic enlargement is opt-in.');p.write_text(s)
+p=lab/'triangle_texture_draw_test.cpp';s=p.read_text().replace('for(const auto attribute_batch : {256u,4096u})','for(const auto attribute_batch : {256u,4096u,8192u,16384u})');needle='const auto mixed_vs=parse_vertex(mixed_vw.data(),mixed_vw.size()),mixed_ps=parse_pixel(mixed_pw.data(),mixed_pw.size());';assert s.count(needle)==1;s=s.replace(needle,needle+'\n        if(attribute_batch>RegisterExecutor::preferred_raster_batch(mixed_ps))continue;');p.write_text(s)
+p=lab/'derivative_test.cpp';s=p.read_text().replace('for(const uint32_t batch:{16u,64u})','for(const uint32_t batch:{16u,64u,8192u,16384u})');needle='        const std::array<std::array<float,2>,3> positions=tiny?';assert s.count(needle)==1;s=s.replace(needle,'        if(batch>RegisterExecutor::preferred_raster_batch(ps))continue;\n'+needle);p.write_text(s)
+(r/'native-routing-v35-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-routing-v35.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+(r/'build-native-routing-v35.ps1').write_text((r/'build-native-routing-v30.ps1').read_text().replace('native-routing-v30','native-routing-v35'))
+s=(r/'replay-recorded-requests-v12.py').read_text().replace("a.add_argument('--quad-batch'", "a.add_argument('--generic-batch',choices=('default','4096','8192','16384'),default='default')\na.add_argument('--quad-batch'")
+s=s.replace("env.pop('NR_RENDER_QUAD_BATCH',None)", "env.pop('NR_RENDER_GENERIC_BATCH',None)\nif v.generic_batch!='default':env['NR_RENDER_GENERIC_BATCH']=v.generic_batch\nenv.pop('NR_RENDER_QUAD_BATCH',None)").replace('report.update(test_exception_ticket=', 'report.update(generic_batch=v.generic_batch,test_exception_ticket=')
+(r/'replay-recorded-requests-v13.py').write_text(s)
+print('Prepared generic batching candidate with corrected packet bounds and independent interpolation/derivative pixel checks.')
