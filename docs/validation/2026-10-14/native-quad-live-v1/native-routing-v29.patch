@@ -1,0 +1,31 @@
+--- a/native/windows/registered_lab/opaque_affine_crop.hpp
++++ b/native/windows/registered_lab/opaque_affine_crop.hpp
+@@ -13,7 +13,7 @@
+ class OpaqueAffineCrop {
+     using Range=std::array<double,2>;
+     using Key=std::array<uint32_t,6>; // output x/y/w/h, source x/y
+-    uint32_t sw,sh,w,h;bool swap,opaque,source_over,failed=false;std::string backend;ov::Core core;
++    uint32_t sw,sh,w,h,band_pixels=65535;bool swap,opaque,source_over,failed=false;std::string backend;ov::Core core;
+     // Tile keys: rows, output x, width, source x, reserved, reserved.
+     struct Entry {ov::CompiledModel model;ov::InferRequest request;std::string device;bool needs_background;};
+     std::map<Key,Entry> entries;
+@@ -78,6 +78,10 @@
+ 
+ public:
+     OpaqueAffineCrop(uint32_t source_w,uint32_t source_h,uint32_t width,uint32_t height,bool exchange,std::string selected,bool replace_alpha=true,bool blend=false):sw(source_w),sh(source_h),w(width),h(height),swap(exchange),opaque(replace_alpha),source_over(blend),backend(std::move(selected)){
++        char *setting=nullptr;size_t length=0;
++        if(_dupenv_s(&setting,&length,"NR_RENDER_CROP_BAND"))throw std::runtime_error("cannot read crop band experiment");
++        if(setting){const std::string value(setting);std::free(setting);
++            if(value=="65535")band_pixels=65535;else if(value=="262143")band_pixels=262143;else if(value=="1048575")band_pixels=1048575;else throw std::invalid_argument("invalid crop band experiment");}
+         if(!sw || sw>8192 || !sh || sh>8192 || uint64_t(sw)*sh>8388608 || !w || w>4096 || !h || h>8192 || uint64_t(w)*h>8388576 || (backend!="CPU" && backend!="NPU" && backend!="GPU"))throw std::invalid_argument("invalid crop dimensions/backend");
+     }
+     struct Result {std::vector<PackedColor> pixels;std::string device;uint64_t covered;double maximum_byte_error;Key mapping;uint32_t provider_calls=0;uint64_t input_bytes=0,output_bytes=0;};
+@@ -104,7 +108,7 @@
+         // Every changed row is produced by NPU/CPU backend inference. Host work
+         // moves complete input/output bands and does not compute changed pixels.
+         Result result{background,backend,uint64_t(right-x)*uint64_t(bottom-y),error,key};
+-        const auto band=(std::max)(1u,65535u/(std::max)(sw,w));
++        const auto band=(std::max)(1u,band_pixels/(std::max)(sw,w));
+         for(uint32_t row=uint32_t(y);row<uint32_t(bottom);row+=band){
+             const auto rows=(std::min)(band,uint32_t(bottom)-row);
+             const Key tile{rows,uint32_t(x),uint32_t(right-x),uint32_t(x+ax->offset),0,0};

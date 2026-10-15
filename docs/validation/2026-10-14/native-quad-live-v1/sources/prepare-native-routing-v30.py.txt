@@ -1,0 +1,36 @@
+from pathlib import Path
+import json,hashlib,shutil,tarfile
+r=Path('results/render-driver');d=r/'native-routing-v30';shutil.copytree(r/'native-routing-v28',d);lab=d/'native/windows/registered_lab'
+p=lab/'provider_compile.hpp';s=p.read_text();a='inline std::string model_cache_directory(){';assert s.count(a)==1
+s=s.replace(a,'''// Opt-in graph-shape experiment, independent of shader/transport contracts.
+inline uint32_t generic_raster_capacity(){
+    char *text=nullptr;size_t length=0;if(_dupenv_s(&text,&length,"NR_RENDER_GENERIC_BATCH"))throw std::runtime_error("cannot read generic batch experiment");
+    if(!text)return 4096;const std::string value(text);std::free(text);
+    if(value=="4096")return 4096;if(value=="8192")return 8192;if(value=="16384")return 16384;
+    throw std::invalid_argument("invalid generic batch experiment");
+}
+'''+a);p.write_text(s)
+p=lab/'vertex_executor.cpp';s=p.read_text();a='return captured_compositor_program(p)?(std::max)(4096u,nr::provider::compositor_batch_capacity()):4096u;';assert s.count(a)==1
+s=s.replace(a,'''if(captured_compositor_program(p))return (std::max)(4096u,nr::provider::compositor_batch_capacity());
+    auto batch=nr::provider::generic_raster_capacity();std::array<uint32_t,2> attributes{};
+    for(unsigned r=0;r<16;++r)if(p.inputs[r] && r!=p.position_input){if(p.interpolation[r]==2)++attributes[0];if(p.interpolation[r]==4)++attributes[1];}
+    // Interpolators pack equal-mode attributes; their graph limit is 65,536.
+    const auto count=(std::max)({1u,attributes[0],attributes[1]});while(batch>4096 && uint64_t(batch)*count>65536)batch/=2;
+    return batch;''');p.write_text(s)
+p=lab/'indexed_exchange_protocol.hpp';s=p.read_text();a='require(capacity==4096 || capacity==8192);';assert s.count(a)==1;p.write_text(s.replace(a,'require(capacity==4096 || capacity==8192 || capacity==16384);'))
+p=lab/'triangle_regions.hpp';s=p.read_text().replace('bool large_affine=false){','bool large_affine=false,bool large_generic=false){').replace('batch>(large_affine?262144u:8192u)', 'batch>(large_affine?262144u:(large_generic?16384u:8192u)) || (large_affine && large_generic)');p.write_text(s)
+p=lab/'triangle_texture_draw.cpp';s=p.read_text();a='bounded_triangle_regions(projected.triangle_bounds,clip,s.batch,s.quads)';assert s.count(a)==1;p.write_text(s.replace(a,'bounded_triangle_regions(projected.triangle_bounds,clip,s.batch,s.quads,false,s.batch>8192)'))
+# Keep old default rejection tests and add explicit enlarged scheduling checks.
+p=lab/'triangle_texture_draw_test.cpp';s=p.read_text();a='    TEST(bounded_triangle_regions({full},full,262144,false,true).size()==1);';assert s.count(a)==1
+s=s.replace(a,'''    TEST(bounded_triangle_regions(std::vector<std::array<int32_t,4>>(64,full),full,16384,true,false,true).size()==64);
+    rejected=false;try{bounded_triangle_regions(std::vector<std::array<int32_t,4>>(65,full),full,16384,true,false,true);}catch(const std::invalid_argument &){rejected=true;}TEST(rejected);
+    rejected=false;try{bounded_triangle_regions({full},full,16385,false,false,true);}catch(const std::invalid_argument &){rejected=true;}TEST(rejected);
+'''+a);p.write_text(s)
+(r/'native-routing-v30-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-routing-v30.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-native-routing-v28.ps1').read_text().replace('native-routing-v28','native-routing-v30').replace('--target nr_quad_batch_probe','--target nr_registered_triangle_texture_draw_test nr_registered_derivative_test nr_quad_batch_probe').replace("@('nr_quad_batch_probe.exe'", "@('nr_registered_triangle_texture_draw_test.exe','nr_registered_derivative_test.exe','nr_quad_batch_probe.exe'")
+(r/'build-native-routing-v30.ps1').write_text(s)
+s=(r/'replay-recorded-requests-v7.py').read_text().replace("a.add_argument('--quad-batch'", "a.add_argument('--generic-batch',choices=('default','4096','8192','16384'),default='default')\na.add_argument('--quad-batch'")
+s=s.replace("env.pop('NR_RENDER_QUAD_BATCH',None)", "env.pop('NR_RENDER_GENERIC_BATCH',None)\nif v.generic_batch!='default':env['NR_RENDER_GENERIC_BATCH']=v.generic_batch\nenv.pop('NR_RENDER_QUAD_BATCH',None)").replace('report.update(quad_batch=v.quad_batch,','report.update(generic_batch=v.generic_batch,quad_batch=v.quad_batch,')
+(r/'replay-recorded-requests-v8.py').write_text(s)
+print('Prepared generic raster batch experiment; no hardware qualification or default change.')

@@ -10,30 +10,31 @@ RGBA composition and an explicit backend switch. The packaged runtime passed
 GPU → NPU → CPU → GPU → NPU switching on Panther Lake. It supports CPU/GPU/NPU through
 its first OpenVINO provider; other providers can implement the same contracts.
 
-**Full desktop offload is unfinished.** A [live bridge trial](docs/validation/2026-10-14/native-live-bridge-v1/README.md)
-submitted two changing NPU-composed frames to the physical output, 62 seconds
-apart, before an NPU device-loss error. Recovery restored the physical baseline.
-Input, sustained responsiveness, physical scanout mode and Tahoma benefit remain
-unqualified. A [follow-up trial](docs/validation/2026-10-14/native-resource-progress-v1/README.md)
-restores topology without observed NPU device loss, but is still too slow for
-continuous delivery and exposes another unsupported draw.
+**Full desktop offload is unfinished.** The current Windows/Panther Lake path
+executes real DWM rendering on the NPU, delivers changing desktop frames to the
+physical presenter, and supports a controlled mouse/keyboard sequence. The
+[finite pointer trial](docs/validation/2026-10-14/native-quad-integration-v1/README.md)
+passes foreground confinement recovery and restores the original desktop.
+The same investigation compares thirteen expensive drawing operations in A/B/B/A
+order: mean compile-plus-draw time drops from 121 seconds to 3.1 seconds, with
+all 52 output hashes matching. This is a component result; desktop responsiveness
+and a Tahoma benefit remain unqualified.
 
-The preceding
-[native desktop trial](docs/validation/2026-10-14/native-large-surface-v1/README.md)
-produces three different 1024×768 Windows desktop frames with 457 acknowledged
-NPU operations. It produces a frame while the displays are extended, survives
-restoration, and cleans up successfully. The first frame takes 69.5 seconds;
-subsequent frames arrive 93.7 and 115.4 seconds apart. Delta's physical desktop
-remains on its ordinary path. This earlier trial established extended-topology
-rendering; the live bridge above adds limited physical delivery. Input integration,
-interactive performance and a measured Tahoma benefit remain outstanding.
-The [desktop offload execution plan](docs/research/desktop-offload-plan.md)
-defines the ordered acceptance gates through a usable switch and matched Tahoma
-measurements, including application graphics coverage.
-The [topology investigation](docs/validation/2026-10-14/native-topology-progress-v1/README.md)
-established automatic cloning and exposed earlier compositor failures. The latest
-candidate qualifies larger clears and the captured full-resolution textured draw;
-its extended layout preserves the physical output and restores the clone exactly.
+The optimized worker's [next live trial](docs/validation/2026-10-14/native-quad-live-v1/README.md)
+delivers fourteen matching physical submissions but fails after a 93-second cold
+compilation, client departure and later NPU device loss. Ordinary desktop recovery
+passes. Reliable sustained rendering and model preparation are the immediate gates.
+
+The goal remains a single switch that moves graphics work to the NPU and frees
+iGPU capacity for Tahoma. The
+[execution plan](docs/research/desktop-offload-plan.md) tracks stability,
+responsiveness, application/browser/video coverage, remaining GPU work, matched
+Tahoma performance, and installation/recovery. The switch in the packaged runtime
+currently affects participating integrations. A composed NPU desktop frame does
+not establish where every application's own rendering executes.
+
+Earlier milestones below retain their original qualification scope and limitations.
+The linked execution plan and newest validation reports describe current progress.
 
 The [native registered-adapter trial](docs/validation/2026-10-13/native-windows-adapter-v1/README.md)
 now passes six clears and two indexed draws through Delta's ordinary Direct3D 11

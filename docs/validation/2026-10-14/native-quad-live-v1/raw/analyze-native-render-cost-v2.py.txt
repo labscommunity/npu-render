@@ -1,0 +1,28 @@
+"""Analyze an existing diagnostic recording; no new performance benchmark."""
+from pathlib import Path
+import json,hashlib,collections,statistics,os
+r=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm';raw=r/'native-ordered-replay-v29-quad-rollback'
+out=r/'native-render-cost-v2-analysis';out.mkdir(exist_ok=False)
+worker=raw/'worker.stdout.jsonl';metadata=r/'native-render-cost-v2-metadata/shaders.json'
+rows=[json.loads(x) for x in worker.read_text().splitlines() if x.startswith('{')]
+meta={x['ticket']:x for x in json.loads(metadata.read_text())}
+acks={(x['client_pid'],x['sequence']):x for x in rows if x.get('worker_success')}
+draws=[x for x in rows if 'compile_and_draw_ms' in x]
+assert len(draws)==len(acks)==972 and len(meta)==972
+joined=[];groups=collections.defaultdict(list)
+for draw in draws:
+ assert draw['execution_device']=='NPU' and draw['passed']
+ ack=acks[draw['client_pid'],draw['sequence']];m=meta[ack['dispatch_ticket']]
+ row={**m,**draw,**ack};joined.append(row);groups[(m.get('pixel_shader_sha256'),m.get('pixel_fixture'))].append(row)
+def totals(values):
+ return {k:round(sum(x[k] for x in values),3) for k in ('draw_ms','compile_and_draw_ms','backend_compile_ms','provider_requests','worker_ms','queue_wait_ms','roundtrip_ms','request_bytes','reply_bytes')}
+def compact(x):
+ return {k:x[k] for k in ('ticket','abi','width','height','vertices','flags','provider_requests','draw_ms','compile_and_draw_ms','compile_calls','backend_compile_calls','worker_ms','queue_wait_ms','roundtrip_ms')}
+report=dict(recording='native-desktop-admission-v33',replay='native-ordered-replay-v29-quad-rollback',new_hardware_run=False,performance_qualification=False,recording_enabled=False,screen_observer_active=False,concurrent_builds=True,tahoma_tested=False,worker_sha256=hashlib.sha256(worker.read_bytes()).hexdigest(),metadata_sha256=hashlib.sha256(metadata.read_bytes()).hexdigest(),draws=len(draws),acknowledgments=len(acks),recorded_requests=len(meta),request_without_successful_receipt=[t for t in meta if t not in {x['ticket'] for x in joined}],totals=totals(joined),groups=[])
+report['worker_minus_compile_draw_ms']=round(sum(x['worker_ms']-x['compile_and_draw_ms'] for x in joined),3)
+report['roundtrip_minus_worker_and_queue_ms']=sum(x['roundtrip_ms']-x['worker_ms']-x['queue_wait_ms'] for x in joined)
+for (sha,fixture),group in sorted(groups.items(),key=lambda kv:sum(x['compile_and_draw_ms'] for x in kv[1]),reverse=True):
+ report['groups'].append(dict(pixel_shader_sha256=sha,fixture=fixture,draws=len(group),totals=totals(group),median_draw_ms=statistics.median(x['draw_ms'] for x in group),maximum_draw_ms=max(x['draw_ms'] for x in group),top_draws=[compact(x) for x in sorted(group,key=lambda x:x['draw_ms'],reverse=True)[:3]]))
+(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+(out/'joined.json').write_text(json.dumps(joined,indent=2)+'\n')
+print(json.dumps(dict(draws=len(draws),totals=report['totals'],largest_shader_fraction=report['groups'][0]['totals']['compile_and_draw_ms']/report['totals']['compile_and_draw_ms'])))

@@ -1,0 +1,33 @@
+"""Finite offline quad candidate; outputs stay private on the test host."""
+from pathlib import Path
+from datetime import datetime,UTC
+import argparse,hashlib,json,os,subprocess,time,traceback
+p=argparse.ArgumentParser();p.add_argument('--backend',choices=('CPU','NPU'),required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--band',choices=('65535','262143','1048575'),required=True);p.add_argument('--tickets',required=True);v=p.parse_args()
+r=Path(os.environ['LOCALAPPDATA'])/'npu-render';capture=r/'vm/native-desktop-admission-v32/bootstrap/requests';binary=r/'builds/native-routing-v29/Release/nr_quad_batch_probe.exe'
+def obj(path):
+ b=path.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+proof=obj(binary.parent.parent/'registered-build-report.json');assert proof['clean_build'] and hashlib.sha256(binary.read_bytes()).hexdigest()==proof['binary_sha256'][binary.name].lower()
+if v.backend=='NPU':
+ prior=obj(r/'vm/native-desktop-admission-v34/report.json');assert prior['completed'] and prior['cleanup_passed']
+ active=subprocess.run(['powershell.exe','-NoProfile','-NonInteractive','-Command',"if(@(Get-Process nr_registered*,nr_native_topology,nr_frame_present_probe -ErrorAction SilentlyContinue).Count){exit 1}"],capture_output=True,timeout=15);assert active.returncode==0
+index=capture/'index.jsonl';index_bytes=index.read_bytes();rows=[json.loads(x) for x in index_bytes.decode('utf-8-sig').splitlines()];requests={x['ticket']:x for x in rows if x.get('request_recorded')};responses={x['ticket']:x for x in rows if x.get('provider_response_recorded')}
+tickets=[int(x) for x in v.tickets.split(',')];assert 1<=len(tickets)<=200 and len(set(tickets))==len(tickets) and all(t in requests and t in responses for t in tickets)
+v.output.mkdir(exist_ok=False);out=v.output;report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,backend=v.backend,desktop_changed=False,tahoma_tested=False,live_performance_qualified=False,crop_band=v.band,binary_sha256=proof['binary_sha256'][binary.name],capture_index_sha256=hashlib.sha256(index_bytes).hexdigest(),cases=[])
+def save():(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+env=os.environ.copy();env['PATH']=str(r/'toolchains/openvino-2026.4.1/Lib/site-packages/openvino/libs')+os.pathsep+env.get('PATH','');env.update(NR_RENDER_OPAQUE_CROP='1',NR_RENDER_CROP_BAND=v.band,NR_RENDER_SHARED_CORE='1',NR_RENDER_SHARED_QUEUE='1',NR_RENDER_MEMORY_CACHE='0',NR_RENDER_NPU_CACHE=str(r/'vm/model-cache-2026-4-v209'));env.pop('NR_RENDER_CAPTURE_DIRECTORY',None);env.pop('NR_RENDER_AFFINE_BATCH',None)
+save()
+try:
+ for ticket in tickets:
+  entry=requests[ticket];request=capture/entry['file'];assert hashlib.sha256(request.read_bytes()).hexdigest()==entry['sha256'].lower();dest=out/f'pixels-{ticket}.bin';began=time.perf_counter()
+  result=subprocess.run([str(binary),'--render',str(request),v.backend,str(dest)],env=env,capture_output=True,timeout=180)
+  (out/f'{ticket}.stdout.jsonl').write_bytes(result.stdout);(out/f'{ticket}.stderr.log').write_bytes(result.stderr)
+  case=dict(ticket=ticket,exit_code=result.returncode,elapsed_ms=(time.perf_counter()-began)*1000);report['cases'].append(case);save()
+  assert result.returncode==0 and not result.stderr,f'Candidate failed at {ticket}'
+  records=[json.loads(x) for x in result.stdout.decode().splitlines() if x.startswith('{')];renders=[x for x in records if x.get('quad_rendered')];assert len(renders)==2 and all(x['execution_device']==v.backend and x['geometry_qualified'] for x in renders)
+  pixels=dest.read_bytes();expected=responses[ticket];case.update(renders=renders,pixel_bytes=len(pixels),pixel_sha256=hashlib.sha256(pixels).hexdigest(),exact_original_pixels=len(pixels)==expected['pixel_bytes'] and hashlib.sha256(pixels).hexdigest()==expected['pixels_sha256']);save()
+  assert case['exact_original_pixels'],f'Pixels differ at {ticket}'
+  dest.unlink();case['private_output_removed_after_hash']=True;save()
+ assert index.read_bytes()==index_bytes;report['passed']=True
+except Exception as e:report.update(error=repr(e),traceback=traceback.format_exc())
+finally:report.update(completed=True,finished=datetime.now(UTC).isoformat());save()
+print(json.dumps(report));raise SystemExit(0 if report['passed'] else 1)

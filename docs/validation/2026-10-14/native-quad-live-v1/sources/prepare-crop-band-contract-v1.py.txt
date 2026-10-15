@@ -1,0 +1,47 @@
+from pathlib import Path
+import json,hashlib,tarfile
+r=Path('results/render-driver');d=r/'crop-band-contract-v1';d.mkdir(exist_ok=False)
+(d/'contract.cpp').write_text(r'''#include "linear_texture_draw.hpp"
+#include "opaque_affine_crop.hpp"
+#include <cstdio>
+#include <chrono>
+using namespace nr::raster;
+#define TEST(v) do{if(!(v))throw std::runtime_error(#v);}while(false)
+int main(int argc,char **argv)try{
+ TEST(argc==2);const std::string backend(argv[1]);TEST(backend=="CPU" || backend=="NPU");
+ uint64_t checked=0,calls=0;unsigned cases=0;uint32_t random=719;
+ auto byte=[&](){random^=random<<13;random^=random>>17;random^=random<<5;return uint8_t(random);};
+ for(const auto shape:{std::array<uint32_t,4>{64,65,96,96},{1024,768,3904,800},{2880,1800,2912,1824}}){
+  const auto w=shape[0],h=shape[1],sw=shape[2],sh=shape[3];
+  PackedTexture source{sw,sh,87,std::vector<PackedColor>(size_t(sw)*sh)};std::vector<PackedColor> bg(size_t(w)*h);
+  for(auto &p:source.pixels)for(auto &c:p)c=byte();for(auto &p:bg)for(auto &c:p)c=byte();
+  // Include alpha endpoints and exact half-rounding neighbours in every band.
+  for(size_t n=0;n<source.pixels.size();++n)source.pixels[n][3]=n%4==0?0:n%4==1?255:n%4==2?127:128;
+  const std::array<int32_t,4> bounds{0,0,int32_t(w*256),int32_t(h*256)};
+  const std::array<float,4> uv{2.f/sw,1.f/sh,float(w+2)/sw,float(h+1)/sh},color{1,1,1,1};
+  for(unsigned mode=0;mode<3;++mode)for(const bool swap:{false,true}){
+   OpaqueAffineCrop candidate(sw,sh,w,h,swap,backend,mode==0,mode==2);
+   for(unsigned frame=0;frame<2;++frame){
+    const std::array<int32_t,4> clip=frame?std::array<int32_t,4>{3,5,int32_t(w)-7,int32_t(h)-11}:std::array<int32_t,4>{0,0,int32_t(w),int32_t(h)};
+    const auto began=std::chrono::steady_clock::now();const auto result=candidate.execute(bounds,clip,uv,color,source,bg,true);
+    TEST(result && result->device==backend);calls+=result->provider_calls;
+    for(uint32_t y=0;y<h;++y)for(uint32_t x=0;x<w;++x)for(unsigned c=0;c<4;++c){
+     const auto at=size_t(y)*w+x;uint32_t expected=bg[at][c];
+     if(int32_t(x)>=clip[0] && int32_t(y)>=clip[1] && int32_t(x)<clip[2] && int32_t(y)<clip[3]){
+      const auto &src=source.pixels[size_t(y+1)*sw+x+2];expected=mode==0 && c==3?255u:src[swap && c<3?2-c:c];
+      // Independent integer division oracle; production uses shift/add.
+      if(mode==2)expected=(std::min)(255u,expected+(uint32_t(bg[at][c])*(255u-src[3])+127u)/255u);
+     }
+     TEST(result->pixels[at][c]==expected);++checked;
+    }
+    ++cases;std::printf("{\"crop_band_case\":true,\"width\":%u,\"height\":%u,\"mode\":%u,\"swap\":%s,\"clipped\":%s,\"provider_calls\":%u,\"milliseconds\":%.3f,\"execution_device\":\"%s\",\"exact_integer_reference\":true}\n",w,h,mode,swap?"true":"false",frame?"true":"false",result->provider_calls,std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-began).count(),result->device.c_str());std::fflush(stdout);
+   }
+  }
+ }
+ std::printf("{\"completed\":true,\"passed\":true,\"backend\":\"%s\",\"cases\":%u,\"checked_components\":%llu,\"provider_calls\":%llu,\"desktop_changed\":false}\n",backend.c_str(),cases,static_cast<unsigned long long>(checked),static_cast<unsigned long long>(calls));return 0;
+}catch(const std::exception &e){std::fprintf(stderr,"%s\n",e.what());return 1;}
+''')
+(d/'CMakeLists.txt').write_text((r/'quad-contract-v2/CMakeLists.txt').read_text().replace('quad_contract','crop_band_contract').replace('nr_quad_pipeline pipeline.cpp','nr_crop_band_contract contract.cpp').replace('nr_quad_pipeline','nr_crop_band_contract'))
+(r/'crop-band-contract-v1-source.json').write_text(json.dumps({p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir()},indent=2)+'\n')
+with tarfile.open(r/'crop-band-contract-v1.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-quad-contract-v2.ps1').read_text().replace('quad-contract-v2','crop-band-contract-v1').replace('native-routing-v28','native-routing-v29').replace('nr_quad_pipeline','nr_crop_band_contract');(r/'build-crop-band-contract-v1.ps1').write_text(s)

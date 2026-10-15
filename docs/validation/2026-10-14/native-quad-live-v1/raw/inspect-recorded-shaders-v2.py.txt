@@ -1,0 +1,26 @@
+from pathlib import Path
+import argparse,re,struct,json,hashlib,collections
+p=argparse.ArgumentParser();p.add_argument('--capture',type=Path,required=True);p.add_argument('--source',type=Path,required=True);p.add_argument('--output',type=Path,required=True);v=p.parse_args();v.output.mkdir(exist_ok=False)
+fixtures={}
+for f in v.source.glob('*fixture*.hpp'):
+ for name,body in re.findall(r'(\w+)\s*\[\]\s*\{([^}]+)\}',f.read_text()):
+  tokens=re.findall(r'0x([0-9a-fA-F]+)(?:u)?',body)
+  if tokens:
+   raw=struct.pack('<'+'I'*len(tokens),*[int(t,16) for t in tokens]);fixtures[hashlib.sha256(raw).hexdigest()]=name
+H=struct.Struct('<3Q14I');records=[]
+for entry in [json.loads(x) for x in (v.capture/'index.jsonl').read_text(encoding='utf-8-sig').splitlines() if x.startswith('{')]:
+ if not entry.get('request_recorded'):continue
+ with (v.capture/entry['file']).open('rb') as f:
+  h=H.unpack(f.read(80));abi,w,height,vertices,fmt,flags,vlen,plen=h[3:11];legacy=h[-1] if abi>=16 else abi
+  record=dict(ticket=entry['ticket'],abi=abi,width=w,height=height,vertices=vertices,format=fmt,flags=flags)
+  if flags!=0x200000:
+   f.seek(80+24+(16 if legacy==15 else 0)+(16 if flags&4 else 0));vs=f.read(vlen*4);ps=f.read(plen*4)
+   assert len(vs)==vlen*4 and len(ps)==plen*4
+   for kind,data in [('vertex',vs),('pixel',ps)]:
+    digest=hashlib.sha256(data).hexdigest();record[kind+'_shader_sha256']=digest;record[kind+'_fixture']=fixtures.get(digest);record[kind+'_words']=len(data)//4
+ records.append(record)
+(v.output/'shaders.json').write_text(json.dumps(records,indent=2)+'\n')
+summary=dict(requests=len(records),pixel_data_exported=False,groups=[])
+for key,group in __import__('itertools').groupby(sorted([x for x in records if 'pixel_shader_sha256' in x],key=lambda x:x['pixel_shader_sha256']),key=lambda x:x['pixel_shader_sha256']):
+ group=list(group);summary['groups'].append(dict(shader_sha256=key,fixture=group[0]['pixel_fixture'],words=group[0]['pixel_words'],requests=len(group),tickets=[x['ticket'] for x in group]))
+(v.output/'report.json').write_text(json.dumps(summary,indent=2)+'\n');print(json.dumps(dict(requests=len(records),groups=len(summary['groups']),pixel_data_exported=False)))

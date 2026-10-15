@@ -1,0 +1,33 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$out="$r\vm\native-crop-band-v1";$py="$r\toolchains\openvino-2026.4.1\Scripts\python.exe"
+if(Test-Path $out){throw 'Crop-band qualification already exists'}
+$deadline=[DateTime]::UtcNow.AddMinutes(16);$ready=$false
+while([DateTime]::UtcNow -lt $deadline){try{$live=Get-Content "$r\vm\native-live-v24\report.json" -Raw|ConvertFrom-Json;$native=Get-Content "$r\vm\native-desktop-admission-v35\report.json" -Raw|ConvertFrom-Json;$ready=$live.completed -and $live.cleanup_passed -and $live.cursor_cleanup_passed -and $native.completed -and $native.cleanup_passed}catch{};if($ready){break};Start-Sleep -Seconds 2}
+if(!$ready){throw 'Live desktop cleanup is not confirmed'}
+if(@(Get-Process nr_registered*,nr_native_topology,nr_quad_batch_probe,nr_crop_band_contract,nr_frame_present_probe -ErrorAction SilentlyContinue).Count){throw 'Another experiment remains active'}
+$build="$r\builds\crop-band-contract-v1";$proof=Get-Content "$build\build-report.json" -Raw|ConvertFrom-Json;$binary="$build\Release\nr_crop_band_contract.exe"
+if(!$proof.clean_build -or (Get-FileHash $binary).Hash -ne $proof.binary_sha256){throw 'Crop-band contract identity mismatch'}
+New-Item -ItemType Directory $out|Out-Null;Copy-Item "$build\build-report.json" "$out\contract-build-report.json";Copy-Item "$r\builds\native-routing-v29\registered-build-report.json" "$out\worker-build-report.json"
+$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');completed=$false;passed=$false;desktop_changed=$false;tahoma_tested=$false;live24_passed=[bool]$live.passed;contract_binary_sha256=$proof.binary_sha256;cases=@()}
+function Save{$report|ConvertTo-Json -Depth 7|Set-Content "$out\report.json"};Save
+$env:PATH="$r\toolchains\openvino-2026.4.1\Lib\site-packages\openvino\libs;"+$env:PATH;$env:NR_RENDER_OPAQUE_CROP='1';$env:NR_RENDER_SHARED_CORE='1';$env:NR_RENDER_SHARED_QUEUE='1';$env:NR_RENDER_MEMORY_CACHE='0';$env:NR_RENDER_NPU_CACHE="$r\vm\model-cache-2026-4-v209"
+try{
+ foreach($band in @('262143','1048575')){foreach($backend in @('CPU','NPU')){
+  $name="$band-$backend";$case=[ordered]@{band=$band;backend=$backend;passed=$false;started=[DateTime]::UtcNow.ToString('o')};$report.current_case=$name;Save;$env:NR_RENDER_CROP_BAND=$band
+  try{
+   $process=Start-Process $binary -ArgumentList $backend -NoNewWindow -PassThru -RedirectStandardOutput "$out\$name.stdout.jsonl" -RedirectStandardError "$out\$name.stderr.log"
+   try{[void]$process.Handle;if(!$process.WaitForExit(300000)){$process.Kill();$process.WaitForExit();throw 'Crop-band contract timed out'};$process.Refresh();$case.exit_code=$process.ExitCode;if($process.ExitCode){throw 'Crop-band contract failed'}}finally{$process.Dispose()}
+   $done=@(Get-Content "$out\$name.stdout.jsonl"|Where-Object {$_ -match '^\{.*\}$'}|ForEach-Object {$_|ConvertFrom-Json}|Where-Object completed)
+   if($done.Count -ne 1 -or !$done[0].passed -or $done[0].cases -ne 36 -or $done[0].backend -ne $backend -or (Get-Item "$out\$name.stderr.log").Length){throw 'Crop-band contract evidence incomplete'}
+   $case.contract=$done[0];$case.contract_passed=$true;Save
+   & $py "$r\vm\qualify-native-crop-band-v1.py" --backend $backend --band $band --tickets 454,574,629,695,750,805,871,926,981,1047,1102,1157,1227 --output "$r\vm\native-crop-band-v1-$name" > "$out\$name-recorded.stdout.log" 2> "$out\$name-recorded.stderr.log"
+   if($LASTEXITCODE){throw 'Crop-band captured-pixel qualification failed'}
+   $recorded=Get-Content "$r\vm\native-crop-band-v1-$name\report.json" -Raw|ConvertFrom-Json
+   if(!$recorded.completed -or !$recorded.passed -or $recorded.cases.Count -ne 13){throw 'Crop-band captured evidence incomplete'}
+   $case.recorded_pixels_passed=$true;$case.passed=$true
+  }catch{$case.error=$_.Exception.Message}
+  finally{$case.finished=[DateTime]::UtcNow.ToString('o');$report.cases+=$case;Save}
+ }}
+ $report.passed=$report.cases.Count -eq 4 -and @($report.cases|Where-Object {!$_.passed}).Count -eq 0
+}catch{$report.error=$_.Exception.Message}
+finally{$report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');Save}
+$report|ConvertTo-Json -Depth 7;if(!$report.passed){exit 1}

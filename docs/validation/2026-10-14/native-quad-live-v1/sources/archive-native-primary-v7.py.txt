@@ -1,0 +1,51 @@
+from pathlib import Path
+from datetime import datetime,UTC
+import json,hashlib,difflib,statistics
+r=Path('results/render-driver');raw=r/'primary-raw-v7';out=Path('docs/validation/2026-10-14/native-quad-live-v1');out.mkdir(exist_ok=False)
+def obj(p):
+ b=p.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+manifest=obj(r/'native-primary-v7-artifact-sha256.json')
+for item in manifest:
+ p=raw/item['source'];b=p.read_bytes();assert len(b)==item['bytes'] and hashlib.sha256(b).hexdigest()==item['sha256'].lower()
+ dest=out/'raw'/item['source'];dest=dest.with_suffix(dest.suffix+'.txt') if dest.suffix in ('.py','.ps1') else dest;dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(b);item['archive_path']=dest.relative_to(out).as_posix()
+(out/'raw-manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
+source_manifest=[]
+for name in ['crop-band-contract-v1']:
+ for name_in,sha in obj(raw/(name+'-source.json')).items():
+  p=r/name/name_in;b=p.read_bytes();assert hashlib.sha256(b).hexdigest()==sha
+  dest=out/'sources'/name/(name_in+'.txt');dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(b);source_manifest.append(dict(path=dest.relative_to(out).as_posix(),sha256=sha,remote_manifest=name+'-source.json'))
+for version in [29,30]:
+ base=r/'native-routing-v28';new=r/f'native-routing-v{version}';patch=[]
+ for name,sha in obj(raw/f'native-routing-v{version}-source.json').items():
+  p=new/name;assert hashlib.sha256(p.read_bytes()).hexdigest()==sha
+  old=base/name
+  if not old.exists() or old.read_bytes()!=p.read_bytes():patch.extend(difflib.unified_diff(old.read_text().splitlines(keepends=True) if old.exists() else [],p.read_text().splitlines(keepends=True),fromfile='a/'+name if old.exists() else '/dev/null',tofile='b/'+name))
+ (out/f'native-routing-v{version}.patch').write_text(''.join(patch))
+for name in ['prepare-native-routing-v29.py','prepare-native-routing-v30.py','prepare-crop-band-contract-v1.py','collect-native-primary-v7.py','archive-native-primary-v7.py']:
+ p=r/name;dest=out/'sources'/(name+'.txt');dest.write_bytes(p.read_bytes());source_manifest.append(dict(path=dest.relative_to(out).as_posix(),sha256=hashlib.sha256(p.read_bytes()).hexdigest(),origin='local-experiment-script'))
+(out/'source-manifest.json').write_text(json.dumps(source_manifest,indent=2)+'\n')
+root=obj(raw/'native-live-v24/report.json');native=obj(raw/'native-desktop-admission-v35/bootstrap/report.json');registered=obj(raw/'native-registration-v21/report.json');replay=obj(raw/'native-ordered-replay-v29-quad-rollback/report.json');single=obj(raw/'native-ordered-replay-v30-live24-failure/report.json');band=obj(raw/'native-crop-band-v1/report.json');events=obj(raw/'native-live-v24-events-v2/report.json')
+assert root['completed'] and not root['passed'] and root['cleanup_passed'] and root['cursor_cleanup_passed'] and root['ordinary_windows_restored'] and root['normal_windows_input_tested']
+assert root['physically_submitted_frames']==root['matching_source_frames']==14 and root['pointer_reacquisitions']==3 and root['physical_blue_green_red_observed']
+assert native['completed'] and not native['passed'] and native['npu_receipts']==1096 and native['delivery_acknowledgments']==1095 and native['observed_frame_count']==14
+assert 'DEVICE_LOST' in (raw/'native-desktop-admission-v35/bootstrap/worker.stderr.log').read_text()
+assert registered['passed'] and registered['cleanup_passed'] and registered['registered_npu_qualified']
+assert replay['passed'] and replay['successful_replays']==972 and replay['original_pixel_hashes_matched']==971 and replay['unreferenced_successes']==1
+assert single['passed'] and single['first_original_ticket']==1096 and single['unreferenced_successes']==1
+assert band['passed'] and len(band['cases'])==4 and all(c['passed'] and c['contract']['cases']==36 and c['contract']['checked_components']==286780416 for c in band['cases'])
+assert events['passed'] and events['selected_events']==0 and len(events['queries'])==2
+assert 'Failed' in (raw/'native-routing-v30-contract.log').read_bytes().decode('utf-16')
+timings={}
+for capacity in ['262143','1048575']:
+ q=obj(raw/f'native-crop-band-v1-{capacity}-NPU/report.json');assert q['passed'] and len(q['cases'])==13
+ warm=[c['renders'][1]['draw_ms'] for c in q['cases']]
+ timings[capacity]=dict(min=min(warm),median=statistics.median(warm),max=max(warm),mean=statistics.mean(warm),provider_calls=sorted({c['renders'][1]['provider_requests'] for c in q['cases']}),matched_baseline=False,desktop_performance_qualified=False)
+report=dict(recorded=datetime.now(UTC).isoformat(),evidence_checks_passed=True,raw_files_remotely_hash_verified=len(manifest),raw_bytes=sum(x['bytes'] for x in manifest),live=root,native=native,registered=registered,previous_rollback_stream_replay=replay,isolated_failed_request=single,crop_band_contracts=band,crop_band_warm_ms=timings,event_query=events,generic_batch_candidate_qualified=False,generic_batch_contract_failure='The packet contract still lists the newly accepted 16384 capacity as invalid; source v30 was not admitted to inference.',full_desktop_offload=False,tahoma_tested=False,device_loss_resolved=False,live24_timing_confounders=['Private request recording and physical-output diagnostics enabled.','A CPU build of the separate generic-batch candidate overlapped the diagnostic trial.'],next_traced_replay_and_stage_diagnostics_separate=True)
+worker_rows=[json.loads(line) for line in (raw/'native-desktop-admission-v35/bootstrap/worker.stdout.jsonl').read_text().splitlines() if line.startswith('{')]
+departure=next(row for row in worker_rows if row.get('kind')=='client_departure' and row.get('dispatch_ticket')==1053)
+draw=next(row for row in worker_rows if row.get('passed') and row.get('client_pid')==departure['client_pid'] and row.get('sequence')==departure['sequence'])
+assert draw['compile_and_draw_ms']>90000 and draw['cache_requests']==6 and draw['cache_hits']==5 and not departure['delivery_acknowledged']
+report['preceding_client_timeout']=dict(dispatch_ticket=1053,draw=draw,departure=departure,later_device_loss_root_cause_proven=False)
+(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+(out/'research.json').write_text(json.dumps(dict(reviewed=datetime.now(UTC).isoformat(),sources=[dict(url='https://github.com/openvinotoolkit/openvino/issues/38403',observation='A separate Lunar Lake user reports intermittent multi-model device loss on driver 5540. Later tests invalidate the initial claim that turbo, disabling pruning, or keepalive prevent all failures. This is a hypothesis source, not a root-cause identification or fix for Panther Lake.'),dict(url='https://www.intel.com/content/www/us/en/download/794734/intel-npu-driver-windows.html',observation='The reviewed Intel download page still lists 32.0.100.5540, matching the installed NPU driver.'),dict(url='https://github.com/hsfzxjy/npunlock',observation='The October 12 update remains validated on Meteor Lake/NPU3720; it does not establish Panther Lake custom-kernel compatibility.')]),indent=2)+'\n')
+print(json.dumps(dict(archive=str(out),files=len(manifest),bytes=report['raw_bytes'])))

@@ -1,0 +1,17 @@
+{
+  "reviewed": "2026-10-14T23:58:01.835956+00:00",
+  "sources": [
+    {
+      "url": "https://github.com/openvinotoolkit/openvino/issues/38403",
+      "observation": "A separate Lunar Lake user reports intermittent multi-model device loss on driver 5540. Later tests invalidate the initial claim that turbo, disabling pruning, or keepalive prevent all failures. This is a hypothesis source, not a root-cause identification or fix for Panther Lake."
+    },
+    {
+      "url": "https://www.intel.com/content/www/us/en/download/794734/intel-npu-driver-windows.html",
+      "observation": "The reviewed Intel download page still lists 32.0.100.5540, matching the installed NPU driver."
+    },
+    {
+      "url": "https://github.com/hsfzxjy/npunlock",
+      "observation": "The October 12 update remains validated on Meteor Lake/NPU3720; it does not establish Panther Lake custom-kernel compatibility."
+    }
+  ]
+}
