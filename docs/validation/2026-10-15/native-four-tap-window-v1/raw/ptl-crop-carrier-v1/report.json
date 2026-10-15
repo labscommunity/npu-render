@@ -1,0 +1,65 @@
+{
+  "started": "2026-10-15T06:43:34.382105+00:00",
+  "completed": true,
+  "passed": true,
+  "custom_kernel_executed": false,
+  "desktop_changed": false,
+  "cases": [
+    {
+      "started": "2026-10-15T06:43:34.725994+00:00",
+      "completed": true,
+      "passed": true,
+      "elements": 131072,
+      "count": 16384,
+      "custom_kernel_executed": false,
+      "stage": "complete",
+      "config": {
+        "PERFORMANCE_HINT": "LATENCY",
+        "NPU_COMPILATION_MODE": "ReferenceSW",
+        "NPU_TILES": 1
+      },
+      "compile_ms": 117.021,
+      "execution_devices": [
+        "NPU"
+      ],
+      "blob_sha256": "21449fdc8700c8b8684436ee1db05d66382bdbc2ad809ea24c5a31214b086e80",
+      "blob_bytes": 69768,
+      "invocations": 1,
+      "ranges": 1,
+      "checks": [
+        {
+          "iteration": 0,
+          "request_ms": 5.8275,
+          "exact_components": 65536,
+          "input_sha256": "07448c391b4497c630bb06742d385934246966a61bf6c38d44e2a530d6bd1d6e",
+          "output_sha256": "64e1a6d1ccf7a6c05c992dc99da949a7ff38995ade84821369ba6f8709f6b0ae"
+        },
+        {
+          "iteration": 1,
+          "request_ms": 4.1759,
+          "exact_components": 65536,
+          "input_sha256": "1b105585790ba06fddad8cac2631c02c6718394b0ceb55f66c58852ec1f20c7e",
+          "output_sha256": "49213b4650b2f1a3c067ae395617053749f54355d3378f674047b5ad885a12c4"
+        },
+        {
+          "iteration": 2,
+          "request_ms": 4.3376,
+          "exact_components": 65536,
+          "input_sha256": "28300743e3afd6d77fb55c95cb565d2f50b5fcea7efa311b74c44c853a54ea0d",
+          "output_sha256": "cc97983b73a6276b54c488050f1409fe6c77a631643ae5fafc9041cfcca8a5d9"
+        },
+        {
+          "iteration": 3,
+          "request_ms": 4.4614,
+          "exact_components": 65536,
+          "input_sha256": "7f9f300a6e7de146411d343b3fdfb9da267572e4066c97f7aac2494f212c67ea",
+          "output_sha256": "878623ee3aa1ed78f2afa047236e8cfafe8379d22361f7619c80ce55fd33cbac"
+        }
+      ],
+      "max_tiles": "3",
+      "finished": "2026-10-15T06:43:34.895989+00:00",
+      "child_exit": 0
+    }
+  ],
+  "finished": "2026-10-15T06:43:34.961398+00:00"
+}

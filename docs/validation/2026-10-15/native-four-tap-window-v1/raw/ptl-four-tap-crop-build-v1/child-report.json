@@ -1,0 +1,17 @@
+{
+  "started": "2026-10-15T06:44:22.920575+00:00",
+  "completed": true,
+  "passed": false,
+  "target": "5000xx",
+  "npu_execution_tested": false,
+  "driver_changed": false,
+  "toolchain_sha256": {
+    "moviCompile64.dll": "f5e164f0d9e02574ff94676f6bb799597640602ccdbb685724f241a8ed170c2e",
+    "moviAsm64.dll": "4f29b3e3a2b9ea5bffd6748494df2efc748af6b181fd4563bbe31cfa709a4fa8",
+    "moviLLD64.dll": "7294c2c00727fef46f2a42c896eb409da2ed3bbf5eab89418ac52dcb749af9ef"
+  },
+  "source_sha256": "8974eee7161ecfae911e92c06b5903836c4efce2dd1da21381b71a795c38bd37",
+  "error": "RuntimeError('moviCompile64.dll returned 1; see retained diagnostics')",
+  "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\ptl-reusable-harness-v1\\tools\\build_ptl_kernel.py\", line 195, in main\n    assembly = transform(root, source, args.output)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\ptl-reusable-harness-v1\\tools\\build_ptl_kernel.py\", line 100, in transform\n    raise RuntimeError(f\"{name} returned {code}; see retained diagnostics\")\nRuntimeError: moviCompile64.dll returned 1; see retained diagnostics\n",
+  "finished": "2026-10-15T06:44:22.986701+00:00"
+}

@@ -1,0 +1,2215 @@
+{
+  "started": "2026-10-15T06:19:18.533458+00:00",
+  "completed": true,
+  "passed": true,
+  "desktop_changed": false,
+  "tahoma_tested": false,
+  "variants": [
+    {
+      "name": "scalar",
+      "kernel_sha256": "e2371115e30b4a9d7bd0421966c5851b907355a1155380a7b8e7626bf5d11a1c",
+      "patched_sha256": "e98efa90d5299469dcfbc016fb89b06ff4c87578cdf983159d20e6343588c1a4"
+    },
+    {
+      "name": "vector",
+      "kernel_sha256": "2ce1cb2271f50a77c1a8f5a0d20434b4af16cb02086539cdfe822d1d6358ede9",
+      "patched_sha256": "304bd1bfce6474033d4ba73a79524073b6f67adc82939967d22b80dc031183d7"
+    }
+  ],
+  "exit_code": 0,
+  "child_result": {
+    "started": "2026-10-15T06:19:18.904199+00:00",
+    "completed": true,
+    "passed": true,
+    "checks": [
+      {
+        "iteration": 0,
+        "variant": "scalar",
+        "host_request_output_ms": 4.544,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "314bb38980c4e09bdaa03603c7d18af52d9c44d7c9c89def2751d7e79c1be8dc",
+        "output_sha256": "08e6d5729da25eade65871196ef50013883cc50e8d02953a6640aa7f1f5c01f5"
+      },
+      {
+        "iteration": 0,
+        "variant": "vector",
+        "host_request_output_ms": 4.0938,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "314bb38980c4e09bdaa03603c7d18af52d9c44d7c9c89def2751d7e79c1be8dc",
+        "output_sha256": "08e6d5729da25eade65871196ef50013883cc50e8d02953a6640aa7f1f5c01f5"
+      },
+      {
+        "iteration": 1,
+        "variant": "vector",
+        "host_request_output_ms": 6.5383,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "12d26d1364b9d7986fb861d8787592301a9b4230cab73c240bffd25a091fe161",
+        "output_sha256": "7072e9438c363ddfe6e16426b3311a0e5ce8598723dc89c370e1acdebdcea016"
+      },
+      {
+        "iteration": 1,
+        "variant": "scalar",
+        "host_request_output_ms": 10.3841,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "12d26d1364b9d7986fb861d8787592301a9b4230cab73c240bffd25a091fe161",
+        "output_sha256": "7072e9438c363ddfe6e16426b3311a0e5ce8598723dc89c370e1acdebdcea016"
+      },
+      {
+        "iteration": 2,
+        "variant": "scalar",
+        "host_request_output_ms": 7.0786,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "0f4850478ff7a931f75a132c035ce923b0be0db7307bdd25e8994b91e9b1895a",
+        "output_sha256": "794bde755b34f09b25a7df1a867d54943d2e85efac28b2bf871529c94f729f68"
+      },
+      {
+        "iteration": 2,
+        "variant": "vector",
+        "host_request_output_ms": 6.0151,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "0f4850478ff7a931f75a132c035ce923b0be0db7307bdd25e8994b91e9b1895a",
+        "output_sha256": "794bde755b34f09b25a7df1a867d54943d2e85efac28b2bf871529c94f729f68"
+      },
+      {
+        "iteration": 3,
+        "variant": "vector",
+        "host_request_output_ms": 6.5859,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "0748a6635aae70956daf960741823813e1acbbd35171354aef47a2c2603cb23d",
+        "output_sha256": "04b893da61ec79744e69f8d28d303e16293e29a41ce43cf7a72c677bd7e055ab"
+      },
+      {
+        "iteration": 3,
+        "variant": "scalar",
+        "host_request_output_ms": 10.2068,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "0748a6635aae70956daf960741823813e1acbbd35171354aef47a2c2603cb23d",
+        "output_sha256": "04b893da61ec79744e69f8d28d303e16293e29a41ce43cf7a72c677bd7e055ab"
+      },
+      {
+        "iteration": 4,
+        "variant": "scalar",
+        "host_request_output_ms": 6.9674,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "9d154c077efbe4967af5228435eb87d498921a8cd57954967236b83335aa9a39",
+        "output_sha256": "426a6bd59d434b54b928454a66db41f8d306c614deb08475f9d39bb035cd4514"
+      },
+      {
+        "iteration": 4,
+        "variant": "vector",
+        "host_request_output_ms": 5.9368,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "9d154c077efbe4967af5228435eb87d498921a8cd57954967236b83335aa9a39",
+        "output_sha256": "426a6bd59d434b54b928454a66db41f8d306c614deb08475f9d39bb035cd4514"
+      },
+      {
+        "iteration": 5,
+        "variant": "vector",
+        "host_request_output_ms": 6.3192,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "2eb4ef3e340520822916b23d0222e902eac5447e57d4a37608fce9d9a175d7c7",
+        "output_sha256": "5bd19f074d237ddc88c879d1c9f4e6c0973e13e1d44b9c70ab7aacbd020bad50"
+      },
+      {
+        "iteration": 5,
+        "variant": "scalar",
+        "host_request_output_ms": 9.855,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "2eb4ef3e340520822916b23d0222e902eac5447e57d4a37608fce9d9a175d7c7",
+        "output_sha256": "5bd19f074d237ddc88c879d1c9f4e6c0973e13e1d44b9c70ab7aacbd020bad50"
+      },
+      {
+        "iteration": 6,
+        "variant": "scalar",
+        "host_request_output_ms": 7.058,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "4183326434de7f7d8464908657fdb4e45c2824f4be7ac4aa24e043699d45ccdb",
+        "output_sha256": "d7d809b02ad9b13dfdeb30a45bfd92802433310fd7f8c05a294e41efc3ce322a"
+      },
+      {
+        "iteration": 6,
+        "variant": "vector",
+        "host_request_output_ms": 6.1499,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "4183326434de7f7d8464908657fdb4e45c2824f4be7ac4aa24e043699d45ccdb",
+        "output_sha256": "d7d809b02ad9b13dfdeb30a45bfd92802433310fd7f8c05a294e41efc3ce322a"
+      },
+      {
+        "iteration": 7,
+        "variant": "vector",
+        "host_request_output_ms": 6.3251,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "9eecd904fa79dc002f28a19526eb8f697584894a16a3f84ae41ea974b7fbe8e8",
+        "output_sha256": "699d89fe8ba8e4e3482911e932f66a7f313477c4b0b1a677687a7953b7ed86d9"
+      },
+      {
+        "iteration": 7,
+        "variant": "scalar",
+        "host_request_output_ms": 8.0782,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "9eecd904fa79dc002f28a19526eb8f697584894a16a3f84ae41ea974b7fbe8e8",
+        "output_sha256": "699d89fe8ba8e4e3482911e932f66a7f313477c4b0b1a677687a7953b7ed86d9"
+      },
+      {
+        "iteration": 8,
+        "variant": "scalar",
+        "host_request_output_ms": 6.9798,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "c47c263aad712c7040f1917671fb65b0aff40c525a419963a2b6a044b3a1a931",
+        "output_sha256": "da6153bec12419cb25623c00b5821ff6de06b991928eb8cec2955d39ce061234"
+      },
+      {
+        "iteration": 8,
+        "variant": "vector",
+        "host_request_output_ms": 6.0692,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "c47c263aad712c7040f1917671fb65b0aff40c525a419963a2b6a044b3a1a931",
+        "output_sha256": "da6153bec12419cb25623c00b5821ff6de06b991928eb8cec2955d39ce061234"
+      },
+      {
+        "iteration": 9,
+        "variant": "vector",
+        "host_request_output_ms": 6.387,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "44c11514233f62680cf2c13455e7596e1fea7c2a2c069604435f09aef8d036ab",
+        "output_sha256": "ba2030757b91ae99de9a04d834ae1e0dd0b4c6c3c80932303cdeb09a36f88b0c"
+      },
+      {
+        "iteration": 9,
+        "variant": "scalar",
+        "host_request_output_ms": 10.4062,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "44c11514233f62680cf2c13455e7596e1fea7c2a2c069604435f09aef8d036ab",
+        "output_sha256": "ba2030757b91ae99de9a04d834ae1e0dd0b4c6c3c80932303cdeb09a36f88b0c"
+      },
+      {
+        "iteration": 10,
+        "variant": "scalar",
+        "host_request_output_ms": 7.0012,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "6dc3666f83e202ce207a2e8cfb42398531b4ffc1ed477182562f0e57c891224d",
+        "output_sha256": "8d8a9ed2c861eda4a3ab85076f2eaa15344436b34b7dae81ce5d377d1530029f"
+      },
+      {
+        "iteration": 10,
+        "variant": "vector",
+        "host_request_output_ms": 5.7342,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "6dc3666f83e202ce207a2e8cfb42398531b4ffc1ed477182562f0e57c891224d",
+        "output_sha256": "8d8a9ed2c861eda4a3ab85076f2eaa15344436b34b7dae81ce5d377d1530029f"
+      },
+      {
+        "iteration": 11,
+        "variant": "vector",
+        "host_request_output_ms": 2.0913,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "81830e1b734a94cf5dd78c0c5ba9d8b3a544a80ca7c89b65619efe817f269262",
+        "output_sha256": "310408011e8834f69f3b07bdee87963c9ea922951b4f0865e38c1184afe2f6b4"
+      },
+      {
+        "iteration": 11,
+        "variant": "scalar",
+        "host_request_output_ms": 2.9498,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "81830e1b734a94cf5dd78c0c5ba9d8b3a544a80ca7c89b65619efe817f269262",
+        "output_sha256": "310408011e8834f69f3b07bdee87963c9ea922951b4f0865e38c1184afe2f6b4"
+      },
+      {
+        "iteration": 12,
+        "variant": "scalar",
+        "host_request_output_ms": 7.1881,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "5f1ade1c43c2b75e3e056e4963450959210d1126c34078284edd11f2f2c6a948",
+        "output_sha256": "7b00e22cb7291c89780a4b6ef36cb36246d8f07804757e68aa0cc4786c8ee81a"
+      },
+      {
+        "iteration": 12,
+        "variant": "vector",
+        "host_request_output_ms": 6.1608,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "5f1ade1c43c2b75e3e056e4963450959210d1126c34078284edd11f2f2c6a948",
+        "output_sha256": "7b00e22cb7291c89780a4b6ef36cb36246d8f07804757e68aa0cc4786c8ee81a"
+      },
+      {
+        "iteration": 13,
+        "variant": "vector",
+        "host_request_output_ms": 6.3035,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "c3c96263277114be63baac99e6f9b6461ae5462c185a7de6208fb56357ca8fb0",
+        "output_sha256": "59ef0639dd048995bdbb33a4cd596fa7551d98389df720d7be040557672dcf08"
+      },
+      {
+        "iteration": 13,
+        "variant": "scalar",
+        "host_request_output_ms": 7.8344,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "c3c96263277114be63baac99e6f9b6461ae5462c185a7de6208fb56357ca8fb0",
+        "output_sha256": "59ef0639dd048995bdbb33a4cd596fa7551d98389df720d7be040557672dcf08"
+      },
+      {
+        "iteration": 14,
+        "variant": "scalar",
+        "host_request_output_ms": 6.9707,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "477d727567b43c9c7e5e958a19da2ef2ad05d6c0c39c450f50aa6d60b23970b6",
+        "output_sha256": "4e6931c2c7e2eb3608ab73245255e12ee7f4b40121b9d8e14622bbf5366d20a8"
+      },
+      {
+        "iteration": 14,
+        "variant": "vector",
+        "host_request_output_ms": 5.704,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "477d727567b43c9c7e5e958a19da2ef2ad05d6c0c39c450f50aa6d60b23970b6",
+        "output_sha256": "4e6931c2c7e2eb3608ab73245255e12ee7f4b40121b9d8e14622bbf5366d20a8"
+      },
+      {
+        "iteration": 15,
+        "variant": "vector",
+        "host_request_output_ms": 6.7087,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "b28256f929a3adb5638faf70f0bc2cd426e510fb8735d482e8fffb3b3e91aef3",
+        "output_sha256": "d4e2bc2ef115249f46d9b59fc99aa745e0469284ecd5b86100e1eefe586cceec"
+      },
+      {
+        "iteration": 15,
+        "variant": "scalar",
+        "host_request_output_ms": 9.9029,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "b28256f929a3adb5638faf70f0bc2cd426e510fb8735d482e8fffb3b3e91aef3",
+        "output_sha256": "d4e2bc2ef115249f46d9b59fc99aa745e0469284ecd5b86100e1eefe586cceec"
+      },
+      {
+        "iteration": 16,
+        "variant": "scalar",
+        "host_request_output_ms": 7.0855,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "cd4f57ca81a0c05e706fb5d02872c2e7457b35e30abb463f3476dfac89e28eee",
+        "output_sha256": "c35020473aed1b4642cd726cad727b63fff2824ad68cedd7ffb73c7cbd890479"
+      },
+      {
+        "iteration": 16,
+        "variant": "vector",
+        "host_request_output_ms": 5.6119,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "cd4f57ca81a0c05e706fb5d02872c2e7457b35e30abb463f3476dfac89e28eee",
+        "output_sha256": "c35020473aed1b4642cd726cad727b63fff2824ad68cedd7ffb73c7cbd890479"
+      },
+      {
+        "iteration": 17,
+        "variant": "vector",
+        "host_request_output_ms": 6.552,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "d0737bf8bb826d873d6d0548c7bbef9691326c11a2cdaa17ae3258a3e595390f",
+        "output_sha256": "c35020473aed1b4642cd726cad727b63fff2824ad68cedd7ffb73c7cbd890479"
+      },
+      {
+        "iteration": 17,
+        "variant": "scalar",
+        "host_request_output_ms": 10.1021,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "d0737bf8bb826d873d6d0548c7bbef9691326c11a2cdaa17ae3258a3e595390f",
+        "output_sha256": "c35020473aed1b4642cd726cad727b63fff2824ad68cedd7ffb73c7cbd890479"
+      },
+      {
+        "iteration": 18,
+        "variant": "scalar",
+        "host_request_output_ms": 7.1103,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "224b54033edae70a455b4229eef71e518ae8618823e8d38eaaa817809d2dd1e6",
+        "output_sha256": "fede0194bd385866699a081bdf412ad8b9e176cc1bd45745de9f164f80d1719e"
+      },
+      {
+        "iteration": 18,
+        "variant": "vector",
+        "host_request_output_ms": 6.1344,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "224b54033edae70a455b4229eef71e518ae8618823e8d38eaaa817809d2dd1e6",
+        "output_sha256": "fede0194bd385866699a081bdf412ad8b9e176cc1bd45745de9f164f80d1719e"
+      },
+      {
+        "iteration": 19,
+        "variant": "vector",
+        "host_request_output_ms": 6.7443,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "a73c8c55299325369ffd498d8701e3469d242b739c85359672ee9c34649b2c86",
+        "output_sha256": "8ddd5a88063ec343f95bffeeb9c579cdf96d42f33f8710434dc1cd901c688c14"
+      },
+      {
+        "iteration": 19,
+        "variant": "scalar",
+        "host_request_output_ms": 10.2287,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "a73c8c55299325369ffd498d8701e3469d242b739c85359672ee9c34649b2c86",
+        "output_sha256": "8ddd5a88063ec343f95bffeeb9c579cdf96d42f33f8710434dc1cd901c688c14"
+      },
+      {
+        "iteration": 20,
+        "variant": "scalar",
+        "host_request_output_ms": 7.4177,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "0bf2f4aad14a2f6be0ff4c3dc40795bfacca7762492573fc5061618cc2bd2ab9",
+        "output_sha256": "44a9a4d0cc449eb35c213d377fa21de39a1753b5d31b2e7c22670269ae007030"
+      },
+      {
+        "iteration": 20,
+        "variant": "vector",
+        "host_request_output_ms": 6.0318,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "0bf2f4aad14a2f6be0ff4c3dc40795bfacca7762492573fc5061618cc2bd2ab9",
+        "output_sha256": "44a9a4d0cc449eb35c213d377fa21de39a1753b5d31b2e7c22670269ae007030"
+      },
+      {
+        "iteration": 21,
+        "variant": "vector",
+        "host_request_output_ms": 6.6551,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "ff7c506d99d31962ce5c975d30a1c36ab836dbce8a0ea601173120021967fcb9",
+        "output_sha256": "7ae2579c5ca5d6274b6ccaac2aef38221ea5b6b5451192a886eb4d10da3a3b86"
+      },
+      {
+        "iteration": 21,
+        "variant": "scalar",
+        "host_request_output_ms": 10.4993,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "ff7c506d99d31962ce5c975d30a1c36ab836dbce8a0ea601173120021967fcb9",
+        "output_sha256": "7ae2579c5ca5d6274b6ccaac2aef38221ea5b6b5451192a886eb4d10da3a3b86"
+      },
+      {
+        "iteration": 22,
+        "variant": "scalar",
+        "host_request_output_ms": 3.0489,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "9123e84a01c9eb20c682849fffcec20f9d24eff0c73007477ac2c044c32c9c37",
+        "output_sha256": "9a7c6fd1537e5fc7e80f6589e14585739f953ca6202ab209ab7fb189548177f2"
+      },
+      {
+        "iteration": 22,
+        "variant": "vector",
+        "host_request_output_ms": 2.2523,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "9123e84a01c9eb20c682849fffcec20f9d24eff0c73007477ac2c044c32c9c37",
+        "output_sha256": "9a7c6fd1537e5fc7e80f6589e14585739f953ca6202ab209ab7fb189548177f2"
+      },
+      {
+        "iteration": 23,
+        "variant": "vector",
+        "host_request_output_ms": 6.7499,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "9eecdf133c0fd7f9e8619509a5d7a48486165f15ebcd92ae2dd5155e952cacfa",
+        "output_sha256": "55791edb306222ef4bf69d5101f0f0da409fbecfef4cae6c3f257582e00f5c4b"
+      },
+      {
+        "iteration": 23,
+        "variant": "scalar",
+        "host_request_output_ms": 9.8082,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "9eecdf133c0fd7f9e8619509a5d7a48486165f15ebcd92ae2dd5155e952cacfa",
+        "output_sha256": "55791edb306222ef4bf69d5101f0f0da409fbecfef4cae6c3f257582e00f5c4b"
+      },
+      {
+        "iteration": 24,
+        "variant": "scalar",
+        "host_request_output_ms": 7.4353,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "f05ff8189a317985bdc7f899adf7e6b8386058419af1584df053884b5c481a71",
+        "output_sha256": "86f63afdcc2432dd6ef53f1b20f3f754e9c937da887e3a545d6f9d58bfaa38c1"
+      },
+      {
+        "iteration": 24,
+        "variant": "vector",
+        "host_request_output_ms": 6.0621,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "f05ff8189a317985bdc7f899adf7e6b8386058419af1584df053884b5c481a71",
+        "output_sha256": "86f63afdcc2432dd6ef53f1b20f3f754e9c937da887e3a545d6f9d58bfaa38c1"
+      },
+      {
+        "iteration": 25,
+        "variant": "vector",
+        "host_request_output_ms": 6.4359,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "8252763b346168a0dc2f68f9653082942bca92d23907ada46c1fac33a863e87a",
+        "output_sha256": "c4292d3a0eee4ba1d3b8f57bc345d3e43bffc5b6be126bbea0842edaac71b094"
+      },
+      {
+        "iteration": 25,
+        "variant": "scalar",
+        "host_request_output_ms": 9.7885,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "8252763b346168a0dc2f68f9653082942bca92d23907ada46c1fac33a863e87a",
+        "output_sha256": "c4292d3a0eee4ba1d3b8f57bc345d3e43bffc5b6be126bbea0842edaac71b094"
+      },
+      {
+        "iteration": 26,
+        "variant": "scalar",
+        "host_request_output_ms": 7.109,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "97b24d4b0d99ce17e63fe31aa4bdc356726bd56ba343b9451dafe129cb353e57",
+        "output_sha256": "6333f75f7b5febacc502bcb88a191a260f913191080f35352b04e3697a85324c"
+      },
+      {
+        "iteration": 26,
+        "variant": "vector",
+        "host_request_output_ms": 5.9291,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "97b24d4b0d99ce17e63fe31aa4bdc356726bd56ba343b9451dafe129cb353e57",
+        "output_sha256": "6333f75f7b5febacc502bcb88a191a260f913191080f35352b04e3697a85324c"
+      },
+      {
+        "iteration": 27,
+        "variant": "vector",
+        "host_request_output_ms": 6.6144,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "105f7ed396b244feef010708ae290878b7d16b90c74911371f926ccb9860f427",
+        "output_sha256": "e6392c795d3bcea03e35931d4d4b691435215d3b3da89cd2533b12ad5253f9f0"
+      },
+      {
+        "iteration": 27,
+        "variant": "scalar",
+        "host_request_output_ms": 10.009,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "105f7ed396b244feef010708ae290878b7d16b90c74911371f926ccb9860f427",
+        "output_sha256": "e6392c795d3bcea03e35931d4d4b691435215d3b3da89cd2533b12ad5253f9f0"
+      },
+      {
+        "iteration": 28,
+        "variant": "scalar",
+        "host_request_output_ms": 7.094,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "cfe7201eba4fc3697e1c536ac6d8f26719164f8b8376d4589e7135668551345b",
+        "output_sha256": "2b62d2dbb2b9f39ee672295bb2514e5e6b7b29e8d1c3a5aab60fbcaa15a45a78"
+      },
+      {
+        "iteration": 28,
+        "variant": "vector",
+        "host_request_output_ms": 5.4767,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "cfe7201eba4fc3697e1c536ac6d8f26719164f8b8376d4589e7135668551345b",
+        "output_sha256": "2b62d2dbb2b9f39ee672295bb2514e5e6b7b29e8d1c3a5aab60fbcaa15a45a78"
+      },
+      {
+        "iteration": 29,
+        "variant": "vector",
+        "host_request_output_ms": 6.2703,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "f2f083bf196783cd5f0e1e078e32376892fab1efd894049d84000daf4b540daf",
+        "output_sha256": "605b33f735be80f50c44c724347bc5000d18323e2bdc80fa50f0ea8ce9503df0"
+      },
+      {
+        "iteration": 29,
+        "variant": "scalar",
+        "host_request_output_ms": 9.4687,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "f2f083bf196783cd5f0e1e078e32376892fab1efd894049d84000daf4b540daf",
+        "output_sha256": "605b33f735be80f50c44c724347bc5000d18323e2bdc80fa50f0ea8ce9503df0"
+      },
+      {
+        "iteration": 30,
+        "variant": "scalar",
+        "host_request_output_ms": 7.4521,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "3c063cdfb1f2a2c9ffde51a7751ba87162ce9ad5e1e7298ed1f98434f016b5a7",
+        "output_sha256": "3eceef3b79bc7995bebccb3c471b3f994ed7c11ed003cac6bbd89e26ccf9e13c"
+      },
+      {
+        "iteration": 30,
+        "variant": "vector",
+        "host_request_output_ms": 5.7722,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "3c063cdfb1f2a2c9ffde51a7751ba87162ce9ad5e1e7298ed1f98434f016b5a7",
+        "output_sha256": "3eceef3b79bc7995bebccb3c471b3f994ed7c11ed003cac6bbd89e26ccf9e13c"
+      },
+      {
+        "iteration": 31,
+        "variant": "vector",
+        "host_request_output_ms": 6.7639,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "edfda20c9a03d77da6a9bd5eb98823bd79f33cb15b6f56ab749bb9248ab1410e",
+        "output_sha256": "7d313c804d04db7d4ebd0305cbe86d74ac23f3ad0d4d173f787b62caf22d0cd6"
+      },
+      {
+        "iteration": 31,
+        "variant": "scalar",
+        "host_request_output_ms": 10.1244,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "edfda20c9a03d77da6a9bd5eb98823bd79f33cb15b6f56ab749bb9248ab1410e",
+        "output_sha256": "7d313c804d04db7d4ebd0305cbe86d74ac23f3ad0d4d173f787b62caf22d0cd6"
+      },
+      {
+        "iteration": 32,
+        "variant": "scalar",
+        "host_request_output_ms": 7.1632,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "82678def1057d71c516eb4666ea1efe6ff82cd5583d7db1d8db19f53fe036518",
+        "output_sha256": "950e62ccc490753b1c93edc612f89f7bafdddcae2bb06342b325f05a91e0153a"
+      },
+      {
+        "iteration": 32,
+        "variant": "vector",
+        "host_request_output_ms": 5.7205,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "82678def1057d71c516eb4666ea1efe6ff82cd5583d7db1d8db19f53fe036518",
+        "output_sha256": "950e62ccc490753b1c93edc612f89f7bafdddcae2bb06342b325f05a91e0153a"
+      },
+      {
+        "iteration": 33,
+        "variant": "vector",
+        "host_request_output_ms": 4.3326,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "9a1b9599dcd7d0a3f40b2459cfb782f2c0912c4037ad04d70a03037dd3bc9a90",
+        "output_sha256": "c3c767a6ade5a258f90fb92faad36fd743accfd5566c6e10e0f999b528645c68"
+      },
+      {
+        "iteration": 33,
+        "variant": "scalar",
+        "host_request_output_ms": 6.3557,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "9a1b9599dcd7d0a3f40b2459cfb782f2c0912c4037ad04d70a03037dd3bc9a90",
+        "output_sha256": "c3c767a6ade5a258f90fb92faad36fd743accfd5566c6e10e0f999b528645c68"
+      },
+      {
+        "iteration": 34,
+        "variant": "scalar",
+        "host_request_output_ms": 7.0738,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "d1d6215082f72a50ded94dd8b50053591955759e78e864f61c0313f771b65202",
+        "output_sha256": "365ec3e3424f22a9289e5a6f7f32c395ddc4b0aff2b7687028cc9a7dcc89db3a"
+      },
+      {
+        "iteration": 34,
+        "variant": "vector",
+        "host_request_output_ms": 5.9785,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "d1d6215082f72a50ded94dd8b50053591955759e78e864f61c0313f771b65202",
+        "output_sha256": "365ec3e3424f22a9289e5a6f7f32c395ddc4b0aff2b7687028cc9a7dcc89db3a"
+      },
+      {
+        "iteration": 35,
+        "variant": "vector",
+        "host_request_output_ms": 6.6617,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "cea2c123fe9d835e8bec7c2075ac86fa15ad587752834ce155dac7b849c5b5cf",
+        "output_sha256": "71d6d30b4a87dc256f3a5b3e191614afa7ebe562c531e5920e4c5e0bb34fb422"
+      },
+      {
+        "iteration": 35,
+        "variant": "scalar",
+        "host_request_output_ms": 9.8022,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "cea2c123fe9d835e8bec7c2075ac86fa15ad587752834ce155dac7b849c5b5cf",
+        "output_sha256": "71d6d30b4a87dc256f3a5b3e191614afa7ebe562c531e5920e4c5e0bb34fb422"
+      },
+      {
+        "iteration": 36,
+        "variant": "scalar",
+        "host_request_output_ms": 6.8685,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "c2a1bbafc886072f1345b47f0a7aea469c708b72dce4d0801e723ebb41d7a36c",
+        "output_sha256": "620b519e4b9bd90f6c53e44f9c1e54355235b3926dfbc43f93c39360803867b9"
+      },
+      {
+        "iteration": 36,
+        "variant": "vector",
+        "host_request_output_ms": 5.6264,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "c2a1bbafc886072f1345b47f0a7aea469c708b72dce4d0801e723ebb41d7a36c",
+        "output_sha256": "620b519e4b9bd90f6c53e44f9c1e54355235b3926dfbc43f93c39360803867b9"
+      },
+      {
+        "iteration": 37,
+        "variant": "vector",
+        "host_request_output_ms": 6.6749,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "3dcd523bbdb512fc5c9a4ff2a9e93dda99ebe2eedfebdcad6ffdc2b57a7db02e",
+        "output_sha256": "bb2f4f9a02826247d855e208253f90edc7ae003a366f286931914667875caee0"
+      },
+      {
+        "iteration": 37,
+        "variant": "scalar",
+        "host_request_output_ms": 10.3643,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "3dcd523bbdb512fc5c9a4ff2a9e93dda99ebe2eedfebdcad6ffdc2b57a7db02e",
+        "output_sha256": "bb2f4f9a02826247d855e208253f90edc7ae003a366f286931914667875caee0"
+      },
+      {
+        "iteration": 38,
+        "variant": "scalar",
+        "host_request_output_ms": 7.4244,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "2bebff6acfe387563c160032cf0f2ffeb553c570a1cb6b2f398530a68c0deb1c",
+        "output_sha256": "6f4566ac2b05e006a10d32e3fc7b82fab4b7bb76131543b7f80ac02798594185"
+      },
+      {
+        "iteration": 38,
+        "variant": "vector",
+        "host_request_output_ms": 6.2376,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "2bebff6acfe387563c160032cf0f2ffeb553c570a1cb6b2f398530a68c0deb1c",
+        "output_sha256": "6f4566ac2b05e006a10d32e3fc7b82fab4b7bb76131543b7f80ac02798594185"
+      },
+      {
+        "iteration": 39,
+        "variant": "vector",
+        "host_request_output_ms": 6.8623,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "b125ba2d58389c3f0136d8c7ff61db2aa0bd977386caefd5f71318d24f66a4b6",
+        "output_sha256": "53f58c6cde18f81c5a6c848c98bd156e16e8c9b35c2249b153343543dd46e014"
+      },
+      {
+        "iteration": 39,
+        "variant": "scalar",
+        "host_request_output_ms": 10.0604,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "b125ba2d58389c3f0136d8c7ff61db2aa0bd977386caefd5f71318d24f66a4b6",
+        "output_sha256": "53f58c6cde18f81c5a6c848c98bd156e16e8c9b35c2249b153343543dd46e014"
+      },
+      {
+        "iteration": 40,
+        "variant": "scalar",
+        "host_request_output_ms": 7.6223,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "d1fa9dedc50531f7b5d9cf834e68984c7d7d27bda06396f555415c0bb7b670cd",
+        "output_sha256": "3cbcab0fcd9e64539629a8a88f0e3974beef5cdfa9c0dd5127f80d2e4a4f7b0a"
+      },
+      {
+        "iteration": 40,
+        "variant": "vector",
+        "host_request_output_ms": 6.1464,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "d1fa9dedc50531f7b5d9cf834e68984c7d7d27bda06396f555415c0bb7b670cd",
+        "output_sha256": "3cbcab0fcd9e64539629a8a88f0e3974beef5cdfa9c0dd5127f80d2e4a4f7b0a"
+      },
+      {
+        "iteration": 41,
+        "variant": "vector",
+        "host_request_output_ms": 6.5632,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "8fbc0a481dae89048c92b9ccc120fa19043b1acc5a2c536bcd1d7864271e236a",
+        "output_sha256": "7f09381dbbd88c0ee37f5b03e384384fec12e0449a7b2964ef75457bd0d9a96f"
+      },
+      {
+        "iteration": 41,
+        "variant": "scalar",
+        "host_request_output_ms": 10.4787,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "8fbc0a481dae89048c92b9ccc120fa19043b1acc5a2c536bcd1d7864271e236a",
+        "output_sha256": "7f09381dbbd88c0ee37f5b03e384384fec12e0449a7b2964ef75457bd0d9a96f"
+      },
+      {
+        "iteration": 42,
+        "variant": "scalar",
+        "host_request_output_ms": 6.9752,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "ed1e2512be75af30b6b146849c58a0faf7506e6e39fb2b06770d86b13361f2cf",
+        "output_sha256": "df5ad2f20ff5f3f06dc3100fdfe2b20f442cd8b6ed18a9f22717219121253382"
+      },
+      {
+        "iteration": 42,
+        "variant": "vector",
+        "host_request_output_ms": 6.1228,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "ed1e2512be75af30b6b146849c58a0faf7506e6e39fb2b06770d86b13361f2cf",
+        "output_sha256": "df5ad2f20ff5f3f06dc3100fdfe2b20f442cd8b6ed18a9f22717219121253382"
+      },
+      {
+        "iteration": 43,
+        "variant": "vector",
+        "host_request_output_ms": 6.6018,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "90f008b602e13c9eee617d28720064b772971be6985a65c9a34a9a129b2094db",
+        "output_sha256": "9f99c4010f3580adaf2ac0db802fb28e6729eff0d194997a9a09595dc309776e"
+      },
+      {
+        "iteration": 43,
+        "variant": "scalar",
+        "host_request_output_ms": 9.9013,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "90f008b602e13c9eee617d28720064b772971be6985a65c9a34a9a129b2094db",
+        "output_sha256": "9f99c4010f3580adaf2ac0db802fb28e6729eff0d194997a9a09595dc309776e"
+      },
+      {
+        "iteration": 44,
+        "variant": "scalar",
+        "host_request_output_ms": 5.107,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "64c6ddfd8e81f572e08f54dfc37a2a6f3b073c6893b27e98a0d224322169273d",
+        "output_sha256": "f128c6b66e2f0bbefc641d90937def607d5b43a2bcf08e3b9f6d7091304df265"
+      },
+      {
+        "iteration": 44,
+        "variant": "vector",
+        "host_request_output_ms": 3.8154,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "64c6ddfd8e81f572e08f54dfc37a2a6f3b073c6893b27e98a0d224322169273d",
+        "output_sha256": "f128c6b66e2f0bbefc641d90937def607d5b43a2bcf08e3b9f6d7091304df265"
+      },
+      {
+        "iteration": 45,
+        "variant": "vector",
+        "host_request_output_ms": 6.6715,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "71f8b7ac53ff4876d742d4ba47d372e510aa17134a2010964228a31bd10baf80",
+        "output_sha256": "c35020473aed1b4642cd726cad727b63fff2824ad68cedd7ffb73c7cbd890479"
+      },
+      {
+        "iteration": 45,
+        "variant": "scalar",
+        "host_request_output_ms": 10.211,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "71f8b7ac53ff4876d742d4ba47d372e510aa17134a2010964228a31bd10baf80",
+        "output_sha256": "c35020473aed1b4642cd726cad727b63fff2824ad68cedd7ffb73c7cbd890479"
+      },
+      {
+        "iteration": 46,
+        "variant": "scalar",
+        "host_request_output_ms": 7.2074,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "4f92fca4902d9be26e57fa059030d4f84f0f0b05a766bc5352c4647fb393a35d",
+        "output_sha256": "b47a5c53a8417e00dd68fb1db355bc6496325970073db2646eab9fb5c9048782"
+      },
+      {
+        "iteration": 46,
+        "variant": "vector",
+        "host_request_output_ms": 6.1999,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "4f92fca4902d9be26e57fa059030d4f84f0f0b05a766bc5352c4647fb393a35d",
+        "output_sha256": "b47a5c53a8417e00dd68fb1db355bc6496325970073db2646eab9fb5c9048782"
+      },
+      {
+        "iteration": 47,
+        "variant": "vector",
+        "host_request_output_ms": 6.5406,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "2a776f6dd569d28df5dac9cda3904a5bec0a7bfce08309e5b6236a4cf95f2d14",
+        "output_sha256": "e499ca8c611bb139727a97d3708dca0f5482263fb8d07066e89ccf6799f3549a"
+      },
+      {
+        "iteration": 47,
+        "variant": "scalar",
+        "host_request_output_ms": 8.1827,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "2a776f6dd569d28df5dac9cda3904a5bec0a7bfce08309e5b6236a4cf95f2d14",
+        "output_sha256": "e499ca8c611bb139727a97d3708dca0f5482263fb8d07066e89ccf6799f3549a"
+      },
+      {
+        "iteration": 48,
+        "variant": "scalar",
+        "host_request_output_ms": 6.9453,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "08745b88c17626dfbca8a802af63f21b3e54e17d68bd36f8e88824230d206833",
+        "output_sha256": "c35020473aed1b4642cd726cad727b63fff2824ad68cedd7ffb73c7cbd890479"
+      },
+      {
+        "iteration": 48,
+        "variant": "vector",
+        "host_request_output_ms": 6.0491,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "08745b88c17626dfbca8a802af63f21b3e54e17d68bd36f8e88824230d206833",
+        "output_sha256": "c35020473aed1b4642cd726cad727b63fff2824ad68cedd7ffb73c7cbd890479"
+      },
+      {
+        "iteration": 49,
+        "variant": "vector",
+        "host_request_output_ms": 6.5098,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "d2c810de9155bd779fbf3da9b3c64f9bfe02fbfbb63b8874a9965e44ebbed76c",
+        "output_sha256": "c35020473aed1b4642cd726cad727b63fff2824ad68cedd7ffb73c7cbd890479"
+      },
+      {
+        "iteration": 49,
+        "variant": "scalar",
+        "host_request_output_ms": 10.4009,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "d2c810de9155bd779fbf3da9b3c64f9bfe02fbfbb63b8874a9965e44ebbed76c",
+        "output_sha256": "c35020473aed1b4642cd726cad727b63fff2824ad68cedd7ffb73c7cbd890479"
+      },
+      {
+        "iteration": 50,
+        "variant": "scalar",
+        "host_request_output_ms": 7.1074,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "ba020a9465eea4d4369b7a29281b434d33f9849340d1a0e3c9504269eeb4eec5",
+        "output_sha256": "3e672465d737fed037d44a482ce3f01f6f17e3a687d4d21eced4aa10b7e6b36f"
+      },
+      {
+        "iteration": 50,
+        "variant": "vector",
+        "host_request_output_ms": 5.717,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "ba020a9465eea4d4369b7a29281b434d33f9849340d1a0e3c9504269eeb4eec5",
+        "output_sha256": "3e672465d737fed037d44a482ce3f01f6f17e3a687d4d21eced4aa10b7e6b36f"
+      },
+      {
+        "iteration": 51,
+        "variant": "vector",
+        "host_request_output_ms": 6.8446,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "0771759ecefed5602e5b43f27a676c31423c72de73fc0b6079a4b67d325f3342",
+        "output_sha256": "7ebc81a28a128b5e4531dd42900481cb2f91906b00a31e1ec77ac7953f38d68a"
+      },
+      {
+        "iteration": 51,
+        "variant": "scalar",
+        "host_request_output_ms": 9.8365,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "0771759ecefed5602e5b43f27a676c31423c72de73fc0b6079a4b67d325f3342",
+        "output_sha256": "7ebc81a28a128b5e4531dd42900481cb2f91906b00a31e1ec77ac7953f38d68a"
+      },
+      {
+        "iteration": 52,
+        "variant": "scalar",
+        "host_request_output_ms": 7.4099,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "75cc303bc9490ee190805983910985f7ed6e9260e8f78128eb2f6737572ab49e",
+        "output_sha256": "92800257439f0b1a9de21996537371039d97a51151f55875fb46d55762c05209"
+      },
+      {
+        "iteration": 52,
+        "variant": "vector",
+        "host_request_output_ms": 6.0362,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "75cc303bc9490ee190805983910985f7ed6e9260e8f78128eb2f6737572ab49e",
+        "output_sha256": "92800257439f0b1a9de21996537371039d97a51151f55875fb46d55762c05209"
+      },
+      {
+        "iteration": 53,
+        "variant": "vector",
+        "host_request_output_ms": 6.3925,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "034f29840bcf757642f52ec89b25606ab65d4e285871a518c2ec95c355d61b27",
+        "output_sha256": "2312e9d055598f9603611fd5edcc555dfb09e80db3daa15af870bac23a288649"
+      },
+      {
+        "iteration": 53,
+        "variant": "scalar",
+        "host_request_output_ms": 9.8353,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "034f29840bcf757642f52ec89b25606ab65d4e285871a518c2ec95c355d61b27",
+        "output_sha256": "2312e9d055598f9603611fd5edcc555dfb09e80db3daa15af870bac23a288649"
+      },
+      {
+        "iteration": 54,
+        "variant": "scalar",
+        "host_request_output_ms": 7.3821,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "ad68f2139c9ac570c05fcf5523fd00e3081e952e45c1b3e52750e4477de7b5ba",
+        "output_sha256": "68ddf36f38081cc678cac59343bcee8ecf5fae1ab366ca2e58a0d00ec9dae114"
+      },
+      {
+        "iteration": 54,
+        "variant": "vector",
+        "host_request_output_ms": 6.075,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "ad68f2139c9ac570c05fcf5523fd00e3081e952e45c1b3e52750e4477de7b5ba",
+        "output_sha256": "68ddf36f38081cc678cac59343bcee8ecf5fae1ab366ca2e58a0d00ec9dae114"
+      },
+      {
+        "iteration": 55,
+        "variant": "vector",
+        "host_request_output_ms": 4.462,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "40075b4fa1ceaac47af1eed1afa6f5f9750f61f1f8d05eb4a9748dc97017589f",
+        "output_sha256": "1680bd44708aaa9399eee1fc6301972139f46f4384465121d831065505d21c9e"
+      },
+      {
+        "iteration": 55,
+        "variant": "scalar",
+        "host_request_output_ms": 6.2374,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "40075b4fa1ceaac47af1eed1afa6f5f9750f61f1f8d05eb4a9748dc97017589f",
+        "output_sha256": "1680bd44708aaa9399eee1fc6301972139f46f4384465121d831065505d21c9e"
+      },
+      {
+        "iteration": 56,
+        "variant": "scalar",
+        "host_request_output_ms": 7.5782,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "5d09f3692c15cf3473c8477e317334e9f4117d08ab5f0dfe8762e704ac7ed176",
+        "output_sha256": "7f12a5420581ba50d010bf3aa5970f0ca70eef7be78e4aa4d2ef478a3b7c5547"
+      },
+      {
+        "iteration": 56,
+        "variant": "vector",
+        "host_request_output_ms": 6.3393,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "5d09f3692c15cf3473c8477e317334e9f4117d08ab5f0dfe8762e704ac7ed176",
+        "output_sha256": "7f12a5420581ba50d010bf3aa5970f0ca70eef7be78e4aa4d2ef478a3b7c5547"
+      },
+      {
+        "iteration": 57,
+        "variant": "vector",
+        "host_request_output_ms": 6.6749,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "8ae4b8e7d4745143af5daed031194d474263e8328f75be55b3b89dfc5db405a2",
+        "output_sha256": "0d0e17b229e4ccf19afa7cf31991bcb43e8ffd1651b87577b98f9b3ff4332bef"
+      },
+      {
+        "iteration": 57,
+        "variant": "scalar",
+        "host_request_output_ms": 10.2589,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "8ae4b8e7d4745143af5daed031194d474263e8328f75be55b3b89dfc5db405a2",
+        "output_sha256": "0d0e17b229e4ccf19afa7cf31991bcb43e8ffd1651b87577b98f9b3ff4332bef"
+      },
+      {
+        "iteration": 58,
+        "variant": "scalar",
+        "host_request_output_ms": 7.1153,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "18d48bdd61e29374697fd2d40b03a1bb9748f25f0507c9bf3467b9e409b71eeb",
+        "output_sha256": "91493db3d50914e7a724fd6209930fcc78c1ad2b12917e31a0f80fe33ee61b3a"
+      },
+      {
+        "iteration": 58,
+        "variant": "vector",
+        "host_request_output_ms": 6.0959,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "18d48bdd61e29374697fd2d40b03a1bb9748f25f0507c9bf3467b9e409b71eeb",
+        "output_sha256": "91493db3d50914e7a724fd6209930fcc78c1ad2b12917e31a0f80fe33ee61b3a"
+      },
+      {
+        "iteration": 59,
+        "variant": "vector",
+        "host_request_output_ms": 6.8849,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "b3643333f555d447a3d2595d1ac0da47901209a336ba5dfe8103ad9887652710",
+        "output_sha256": "4e2edd9d3d9f000059eed716db269aaec71d5876dc611011c16f06f738e715e2"
+      },
+      {
+        "iteration": 59,
+        "variant": "scalar",
+        "host_request_output_ms": 9.9495,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "b3643333f555d447a3d2595d1ac0da47901209a336ba5dfe8103ad9887652710",
+        "output_sha256": "4e2edd9d3d9f000059eed716db269aaec71d5876dc611011c16f06f738e715e2"
+      },
+      {
+        "iteration": 60,
+        "variant": "scalar",
+        "host_request_output_ms": 7.1648,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "cc790e99da0283cedffe4250b5972e35584fd88ccb541d73d9a3f786fa511948",
+        "output_sha256": "85dbe8ac592f088be29c66254c709eaa9871449010ec1d5006e8d6a6d47fd6ae"
+      },
+      {
+        "iteration": 60,
+        "variant": "vector",
+        "host_request_output_ms": 5.8323,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "cc790e99da0283cedffe4250b5972e35584fd88ccb541d73d9a3f786fa511948",
+        "output_sha256": "85dbe8ac592f088be29c66254c709eaa9871449010ec1d5006e8d6a6d47fd6ae"
+      },
+      {
+        "iteration": 61,
+        "variant": "vector",
+        "host_request_output_ms": 6.5117,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "11290bf1f36f93a9a16c5cd5eeebd221b8573648d6317d00f82a7afde4ae034f",
+        "output_sha256": "5551402236c4836de39e9332f70b0ee646d0e85b966fc7c39ffe1107eadfdba5"
+      },
+      {
+        "iteration": 61,
+        "variant": "scalar",
+        "host_request_output_ms": 10.2104,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "11290bf1f36f93a9a16c5cd5eeebd221b8573648d6317d00f82a7afde4ae034f",
+        "output_sha256": "5551402236c4836de39e9332f70b0ee646d0e85b966fc7c39ffe1107eadfdba5"
+      },
+      {
+        "iteration": 62,
+        "variant": "scalar",
+        "host_request_output_ms": 7.2543,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "7eef199785ed84fafddcde4df481f556368e75c8ed57125dc5e3a07c422ce96c",
+        "output_sha256": "b488d2ddc092ffa1189d49445d7b5ff2db1c4ba05a86869a6b7dfdcd5f07cbf5"
+      },
+      {
+        "iteration": 62,
+        "variant": "vector",
+        "host_request_output_ms": 6.0896,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "7eef199785ed84fafddcde4df481f556368e75c8ed57125dc5e3a07c422ce96c",
+        "output_sha256": "b488d2ddc092ffa1189d49445d7b5ff2db1c4ba05a86869a6b7dfdcd5f07cbf5"
+      },
+      {
+        "iteration": 63,
+        "variant": "vector",
+        "host_request_output_ms": 6.666,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.183
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "38cd6f6a57b89430749a7cecf3156775d76b82285d68ecf16b6a46c9c5bb5b9f",
+        "output_sha256": "c13588b634cf8183b52d25be297dc2710e8f64795bd48bf600ed2487c8da592e"
+      },
+      {
+        "iteration": 63,
+        "variant": "scalar",
+        "host_request_output_ms": 9.7583,
+        "profile": [
+          {
+            "name": "Gather_5",
+            "kind": "Gather",
+            "engine": "Shave",
+            "status": "Status.EXECUTED",
+            "task_ms": 1.942
+          }
+        ],
+        "exact_components": 16384,
+        "input_sha256": "38cd6f6a57b89430749a7cecf3156775d76b82285d68ecf16b6a46c9c5bb5b9f",
+        "output_sha256": "c13588b634cf8183b52d25be297dc2710e8f64795bd48bf600ed2487c8da592e"
+      }
+    ],
+    "health": [
+      {
+        "phase": "original-before",
+        "passed": true
+      },
+      {
+        "phase": "original-after",
+        "passed": true
+      }
+    ],
+    "finished": "2026-10-15T06:19:21.349567+00:00"
+  },
+  "finished": "2026-10-15T06:19:21.402162+00:00"
+}

@@ -1,0 +1,55 @@
+from pathlib import Path
+r=Path('results/render-driver');s=(r/'ptl-rectangle-vector-v3.c').read_text()
+s=s.replace('One invocation shades 4096 or 16384 pixels.', 'One invocation shades 4096 or 16384 four-tap rectangle pixels.')
+s=s.replace('elements!=1048576)', 'elements!=1048576 && elements!=4194304)')
+s=s.replace('u32(data+4)!=1','u32(data+4)!=2').replace('128+count*4','160+count*4').replace('source=data+128,*background=data+128+sw*sh*4','source=data+160,*background=data+160+sw*sh*4')
+s=s.replace('float color[4],uv[4]; int bounds[4],clip[4];','float color[4],uv[4],screen[4]; int bounds[4],clip[4];')
+s=s.replace('color[c]=f32(data+64+c*4); uv[c]=f32(data+80+c*4);','color[c]=f32(data+64+c*4); uv[c]=f32(data+80+c*4); screen[c]=f32(data+128+c*4);\n        if(!(screen[c]>=-4096 && screen[c]<=4096))return;')
+s=s.replace('const unsigned char *source=data+160', 'if(screen[0]>=screen[2] || screen[1]>=screen[3] || u32(data+144)>1 || u32(data+148) || u32(data+152) || u32(data+156))return;\n    unsigned barycentric=u32(data+144);\n    const unsigned char *source=data+160')
+start=s.index('            float x=((float)px')
+end=s.index('            if(opaque)sampled.w=1.0f;',start)
+s=s[:start]+'''            unsigned triangle=((float)(sx-bounds[0])*(float)(bounds[3]-bounds[1]) >= (float)(sy-bounds[1])*(float)(bounds[2]-bounds[0]))?0:1;
+            float4 pos=coordinate((float)px+.5f,(float)py+.5f,screen,uv,triangle,barycentric);
+            float4 left=coordinate((float)(px&~1u)+.5f,(float)py+.5f,screen,uv,triangle,barycentric);
+            float4 right=coordinate((float)(px|1u)+.5f,(float)py+.5f,screen,uv,triangle,barycentric);
+            float4 top=coordinate((float)px+.5f,(float)(py&~1u)+.5f,screen,uv,triangle,barycentric);
+            float4 bottom=coordinate((float)px+.5f,(float)(py|1u)+.5f,screen,uv,triangle,barycentric);
+            float4 dx=right-left,dy=bottom-top;
+            float4 a=(dx*.375f+pos)+dy*(-.125f);
+            float4 b=(dx*(-.125f)+pos)+dy*(-.375f);
+            float4 c=(dx*(-.375f)+pos)+dy*.125f;
+            float4 d=(dx*.125f+pos)+dy*.375f;
+            float4 va=sample4(source,sw,sh,a.x,a.y,filter),vb=sample4(source,sw,sh,b.x,b.y,filter);
+            float4 vc=sample4(source,sw,sh,c.x,c.y,filter),vd=sample4(source,sw,sh,d.x,d.y,filter);
+            float4 sampled=(vd+((vb+va)+vc))*.25f;
+''' +s[end:]
+helpers='''
+INLINE float edge(float ax,float ay,float bx,float by,float x,float y) {
+    return (bx-ax)*(y-ay)-(by-ay)*(x-ax);
+}
+INLINE float4 coordinate(float x,float y,const float *s,const float *uv,unsigned triangle,unsigned barycentric) {
+    float u,v;
+    if(barycentric){
+        float ax=triangle?s[2]:s[0],ay=triangle?s[3]:s[1];
+        float bx=triangle?s[0]:s[2],by=triangle?s[3]:s[1];
+        float cx=triangle?s[0]:s[2],cy=triangle?s[1]:s[3];
+        float w0=edge(bx,by,cx,cy,x,y),w1=edge(cx,cy,ax,ay,x,y),w2=edge(ax,ay,bx,by,x,y);
+        float den=(w0+w1)+w2;
+        float ua=uv[triangle?2:0],ub=uv[triangle?0:2],uc=uv[triangle?0:2];
+        float va=uv[triangle?3:1],vb=uv[triangle?3:1],vc=uv[triangle?1:3];
+        u=((w0*ua+w1*ub)+w2*uc)/den;v=((w0*va+w1*vb)+w2*vc)/den;
+    }else {u=uv[0]+((x-s[0])/(s[2]-s[0]))*(uv[2]-uv[0]);v=uv[1]+((y-s[1])/(s[3]-s[1]))*(uv[3]-uv[1]);}
+    return (float4){u,v,0,0};
+}
+INLINE float4 sample4(const unsigned char *source,unsigned sw,unsigned sh,float u,float v,unsigned filter) {
+    float x=clamp(clamp(u,0,1)*(float)sw-(filter?.5f:0.0f),0,(float)(sw-1));
+    float y=clamp(clamp(v,0,1)*(float)sh-(filter?.5f:0.0f),0,(float)(sh-1));
+    unsigned ix=(unsigned)x,iy=(unsigned)y,jx=ix+1<sw?ix+1:ix,jy=iy+1<sh?iy+1:iy;
+    float tx=x-(float)ix,ty=y-(float)iy;
+    float4 value=texel4(source,iy*sw+ix);
+    if(filter)value=mix4(mix4(value,texel4(source,iy*sw+jx),tx),mix4(texel4(source,jy*sw+ix),texel4(source,jy*sw+jx),tx),ty);
+    return value;
+}
+'''
+s=s.replace('void nr_probe_kernel(',helpers+'\nvoid nr_probe_kernel(')
+(r/'ptl-four-tap-v1.c').write_text(s)

@@ -1,0 +1,81 @@
+{
+  "started": "2026-10-15T06:49:39.081278+00:00",
+  "completed": true,
+  "passed": true,
+  "desktop_changed": false,
+  "tahoma_tested": false,
+  "packet_sha256": "75d41f0b2edb0ed4a2edd095303d7655dd7c428c12f3dd5098281e81d3acbfeb",
+  "model_sha256": "1b5c26b0a63b93d5ce9a4588b40938cf4e660bd5e6550a0cd92c0fd5913147b9",
+  "executable_sha256": "04f1220e95b75ca8543ae7506e149be0dde80e2e1d3a402751ab7a1c9ccbff40",
+  "pid": 3716,
+  "exit_code": 0,
+  "pairs": [
+    {
+      "kind": "pair",
+      "iteration": 0,
+      "order": "baseline-first",
+      "baseline_full_ms": 9442.2893,
+      "candidate_full_ms": 2111.542,
+      "candidate_prepare_ms": 24.7814,
+      "candidate_raster_ms": 2086.7603,
+      "baseline_calls": 1282,
+      "candidate_calls": 50,
+      "components": 3145728,
+      "different_components": 0,
+      "maximum_byte_error": 0,
+      "exact": true
+    },
+    {
+      "kind": "pair",
+      "iteration": 1,
+      "order": "custom-first",
+      "baseline_full_ms": 9038.2882,
+      "candidate_full_ms": 2065.6709,
+      "candidate_prepare_ms": 2.1045,
+      "candidate_raster_ms": 2063.566,
+      "baseline_calls": 1282,
+      "candidate_calls": 50,
+      "components": 3145728,
+      "different_components": 0,
+      "maximum_byte_error": 0,
+      "exact": true
+    },
+    {
+      "kind": "pair",
+      "iteration": 2,
+      "order": "baseline-first",
+      "baseline_full_ms": 9172.2157,
+      "candidate_full_ms": 2069.6885,
+      "candidate_prepare_ms": 1.9623,
+      "candidate_raster_ms": 2067.7257,
+      "baseline_calls": 1282,
+      "candidate_calls": 50,
+      "components": 3145728,
+      "different_components": 0,
+      "maximum_byte_error": 0,
+      "exact": true
+    }
+  ],
+  "completion": {
+    "kind": "complete",
+    "passed": true,
+    "desktop_tested": false,
+    "tahoma_tested": false
+  },
+  "retained_pixel_artifacts": {
+    "actual-input.bin": {
+      "bytes": 1048576,
+      "sha256": "9bd048103098deb5dcdf0eb01bd897786e5e867821b034331d47e5ddfe5e838c"
+    },
+    "baseline.rgba": {
+      "bytes": 3145728,
+      "sha256": "c600b795e5f9684f98ceb2b1376c94456ca978355aa53323993c8a4842da644c"
+    },
+    "candidate.rgba": {
+      "bytes": 3145728,
+      "sha256": "c600b795e5f9684f98ceb2b1376c94456ca978355aa53323993c8a4842da644c"
+    }
+  },
+  "timing_limitations": "Iteration 0 includes lazy baseline setup and one candidate fixture/pixel artifact write; exclude from steady-state comparisons. No display, input latency, GPU load or Tahoma test.",
+  "finished": "2026-10-15T06:50:13.868231+00:00"
+}

@@ -1,0 +1,16 @@
+from pathlib import Path
+r=Path('results/render-driver');s=(r/'ptl-four-tap-v1.c').read_text().replace('elements!=8192 &&','elements!=131072 && elements!=8192 &&').replace('u32(data+4)!=2','u32(data+4)!=3')
+s=s.replace('float u,float v,unsigned filter) {','float u,float v,unsigned filter,const unsigned *crop,unsigned *valid) {')
+s=s.replace('    float tx=x-(float)ix,ty=y-(float)iy;\n    float4 value=', '''    float tx=x-(float)ix,ty=y-(float)iy;
+    if(ix<crop[0] || iy<crop[1] || (filter?jx:ix)>=crop[0]+crop[2] || (filter?jy:iy)>=crop[1]+crop[3]){*valid=0;return (float4)0;}
+    ix-=crop[0];jx-=crop[0];iy-=crop[1];jy-=crop[1];sw=crop[2];
+    float4 value=''')
+s=s.replace('    if(source_bytes<160+count*4 || sw*sh>(source_bytes-160-count*4)/4) return;', '''    unsigned crop[4];for(unsigned c=0;c<4;++c)crop[c]=u32(data+160+c*4);
+    if(!crop[2] || !crop[3] || crop[0]>sw || crop[1]>sh || crop[2]>sw-crop[0] || crop[3]>sh-crop[1] ||
+       source_bytes<192+count*4 || crop[2]*crop[3]>(source_bytes-192-count*4)/4 ||
+       u32(data+176) || u32(data+180) || u32(data+184) || u32(data+188)) return;''')
+s=s.replace('source=data+160,*background=data+160+sw*sh*4','source=data+192,*background=data+192+crop[2]*crop[3]*4')
+s=s.replace('uint4 bg=packed(background+i*4);float4 value=(float4)0;','uint4 bg=packed(background+i*4);float4 value=(float4)0;unsigned valid=1;')
+for v in ['a','b','c','d']:s=s.replace(f'{v}.x,{v}.y,filter)',f'{v}.x,{v}.y,filter,crop,&valid)')
+s=s.replace('output[i*4+c]=(__fp16)(float)result;','output[i*4+c]=valid?(__fp16)(float)result:(__fp16)-1.0f;')
+(r/'ptl-four-tap-crop-v1.c').write_text(s)

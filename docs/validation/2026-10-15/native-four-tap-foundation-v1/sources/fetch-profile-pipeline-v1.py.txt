@@ -1,0 +1,11 @@
+from pathlib import Path
+import urllib.request,json,hashlib
+root=Path('results/render-driver/ptl-profile-primary-v2');root.mkdir(exist_ok=False)
+paths=['src/plugins/intel_npu/src/backend/src/zero_pipeline.cpp','src/plugins/intel_npu/src/backend/include/zero_pipeline.hpp','src/plugins/intel_npu/src/backend/src/zero_profiling.cpp']
+records=[]
+for name in paths:
+ url='https://raw.githubusercontent.com/openvinotoolkit/openvino/e213a147257/'+name
+ try:
+  data=urllib.request.urlopen(url,timeout=20).read();p=root/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data);records.append(dict(url=url,path=name,bytes=len(data),sha256=hashlib.sha256(data).hexdigest()))
+ except Exception as error:records.append(dict(url=url,error=str(error)))
+(root/'sources.json').write_text(json.dumps(records,indent=2)+'\n');print(json.dumps(records))

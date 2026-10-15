@@ -68,12 +68,21 @@ All six invocation spans are checked against Intel's NPU50XX definitions and
 MemRefData ABI. The upstream generic inspector rejects this graph, so its older
 layout was not assumed compatible.
 
-Original add-one, custom identity, and original add-one again each match 128
-components across changing inputs, reporting NPU execution only. This clears the
-bounded identity execution gate. Proprietary tools and graph binaries remain
-outside the repository; redistribution terms remain unresolved. The coarse
-recorded timer cannot support a latency claim. Indexed arithmetic, larger texture
-spans, fused sampling performance and provider integration remain unqualified.
+Original add-one, custom identity, and original add-one again initially matched
+128 components across changing inputs. Subsequent
+[full-source qualification](../validation/2026-10-15/native-wide-rectangle-v1/README.md)
+extends indexed raw-byte access through 8 MiB sources and combines coverage,
+sampling, modulation and blending in custom kernels. Scalar and corrected vector
+rectangle versions each pass 12.6 million exact components. The
+[provider comparison](../validation/2026-10-15/native-rectangle-comparison-v1/README.md)
+has pixel differences and mixed timing; no custom renderer has been promoted.
+
+[Fresh-request profiling and captured geometry](../validation/2026-10-15/native-four-tap-foundation-v1/README.md)
+identify stale profiling results on reused requests and confirm a modest vector
+improvement with fresh requests. The slow desktop operation is a four-sample
+filter over a 2880×1800 source, so the one-sample rectangle is an implementation
+building block, not its qualified replacement. Proprietary tools and graph
+binaries remain outside the repository; redistribution terms remain unresolved.
 
 ## Next experiment and acceptance gates
 
@@ -91,9 +100,10 @@ establish a speedup.
    considering any replacement kernel.
 3. **Qualified for the narrow carrier:** bounded identity with changing inputs,
    strict NPU reporting, an independent oracle, process deadline and known-good
-   original execution before and after. Extend next to indexed arithmetic.
-4. Establish arbitrary source addressing within an explicitly supplied texture
-   span. Invocation-local unary success is insufficient for a sampler.
+   original execution before and after. Indexed arithmetic and full-source
+   rectangle checks now also pass; live integration remains unqualified.
+4. **Qualified through 8 MiB:** arbitrary source addressing within an explicitly
+   supplied texture span. Extend to the actual desktop source and shader.
 5. Compare a fused sampler against the existing graph and GPU/Pixman baselines,
    including source preparation, transfers, output conversion and damage commit.
    Only then connect it to the provider behind the existing switch.

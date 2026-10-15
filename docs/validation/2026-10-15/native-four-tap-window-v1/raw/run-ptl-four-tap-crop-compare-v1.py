@@ -1,0 +1,32 @@
+"""Bounded comparison of the retained slow DWM draw on the physical NPU."""
+from pathlib import Path
+from datetime import UTC,datetime
+import hashlib,json,os,subprocess,traceback
+root=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=root/'vm';out=vm/'ptl-four-tap-crop-comparison-v1';out.mkdir(exist_ok=False)
+def obj(p):
+ b=p.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,desktop_changed=False,tahoma_tested=False);process=None
+try:
+ assert obj(vm/'ptl-four-tap-crop-v3/report.json')['passed']
+ packet=vm/'native-desktop-admission-v33/bootstrap/requests/request-00000041.bin';assert sha(packet)=='75d41f0b2edb0ed4a2edd095303d7655dd7c428c12f3dd5098281e81d3acbfeb'
+ model=vm/'ptl-four-tap-crop-v3/patched.blob';assert sha(model)=='1b5c26b0a63b93d5ce9a4588b40938cf4e660bd5e6550a0cd92c0fd5913147b9'
+ exe=root/'builds/ptl-four-tap-crop-compare-v1/Release/nr_ptl_four_tap_compare.exe';assert sha(exe)=='04f1220e95b75ca8543ae7506e149be0dde80e2e1d3a402751ab7a1c9ccbff40'
+ env=os.environ.copy();env['PATH']=str(root/'toolchains/openvino-2026.4.1/Lib/site-packages/openvino/libs')+os.pathsep+env['PATH']
+ env.update(NR_RENDER_NPU_CACHE=str(vm/'model-cache-2026-4-v209'),NR_RENDER_SHARED_QUEUE='1',NR_RENDER_MEMORY_CACHE='1',NR_RENDER_MEMORY_CACHE_CAPACITY='512',NR_RENDER_SHARED_CORE='1',NR_RENDER_OPAQUE_CROP='1',NR_RENDER_TEXTURE_SCOPE='1',NR_RENDER_QUAD_BATCH='1',NR_RENDER_COMPACT_COVERAGE='0',NR_RENDER_INFER_TRACE='0',NR_RENDER_COMPILE_TRACE='0',NR_RENDER_INFER_PROFILE='0')
+ env.pop('NR_RENDER_AFFINE_BATCH',None)
+ report.update(packet_sha256=sha(packet),model_sha256=sha(model),executable_sha256=sha(exe))
+ with (out/'stdout.jsonl').open('xb') as stdout,(out/'stderr.log').open('xb') as stderr:
+  process=subprocess.Popen([str(exe),str(packet),str(model),str(out)],env=env,stdout=stdout,stderr=stderr,creationflags=subprocess.CREATE_NO_WINDOW)
+  report['pid']=process.pid;(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+  try:process.wait(timeout=180)
+  except subprocess.TimeoutExpired:process.kill();process.wait(timeout=5);report['child_timeout']=True
+ rows=[json.loads(line) for line in (out/'stdout.jsonl').read_text(encoding='utf-8-sig').splitlines() if line.startswith('{')];pairs=[x for x in rows if x.get('kind')=='pair'];final=[x for x in rows if x.get('kind')=='complete']
+ report.update(exit_code=process.returncode,pairs=pairs,completion=final[-1] if final else None,passed=process.returncode==0 and len(pairs)==3 and bool(final) and final[-1]['passed'])
+ report['retained_pixel_artifacts']={p.name:dict(bytes=p.stat().st_size,sha256=sha(p)) for p in out.iterdir() if p.suffix in ('.bin','.rgba')}
+ report['timing_limitations']='Iteration 0 includes lazy baseline setup and one candidate fixture/pixel artifact write; exclude from steady-state comparisons. No display, input latency, GPU load or Tahoma test.'
+except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+finally:
+ if process is not None and process.poll() is None:process.kill();process.wait(timeout=5)
+ report.update(completed=True,finished=datetime.now(UTC).isoformat());(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(report));raise SystemExit(0 if report['passed'] else 1)

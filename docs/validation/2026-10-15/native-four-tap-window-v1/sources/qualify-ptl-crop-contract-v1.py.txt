@@ -1,0 +1,25 @@
+"""Offline rejection tests for the extended, bounded desktop input carrier."""
+from pathlib import Path
+import struct,json,hashlib
+from ptl_crop_contract_v1 import inspect,patch
+from ptl_elf_v1 import Elf
+r=Path('results/render-driver');p=r/'ptl-crop-carrier-local-v1/carrier.blob';blob=p.read_bytes();elf=Elf(blob);rows=[]
+assert hashlib.sha256(blob).hexdigest()=='21449fdc8700c8b8684436ee1db05d66382bdbc2ad809ea24c5a31214b086e80'
+inspect(blob,131072,16384);rows.append(dict(case='exact-shape',passed=True))
+for elements,count in [(131072,4096),(8388608,16384),(131072,32768)]:
+ try:inspect(blob,elements,count)
+ except ValueError:rows.append(dict(case=f'reject-shape-{elements}-{count}',passed=True))
+ else:raise AssertionError('shape accepted')
+params=elf.by_name['shave.params'];ranges=elf.by_name['task.shave.range.0.0'];calls=elf.by_name['task.shave.invocation.0.0']
+for name,offset,value in [('source-address',params['offset'],0),('source-location',params['offset']+36,1),('source-dtype',params['offset']+24,9),('index-location',params['offset']+76,1),('output-address',params['offset']+80,0x40218000),('entry',ranges['offset']+8,0),('code-extent',ranges['offset']+24,0),('tile',calls['offset']+84,1)]:
+ bad=bytearray(blob);struct.pack_into('<I',bad,offset,value)
+ try:inspect(bytes(bad),131072,16384)
+ except ValueError:rows.append(dict(case=name,passed=True))
+ else:raise AssertionError(name+' accepted')
+for n in [0,1,13569,13584]:
+ try:patch(blob,bytes(n),131072,16384)
+ except ValueError:rows.append(dict(case=f'reject-code-size-{n}',passed=True))
+ else:raise AssertionError('code size accepted')
+modified,contract=patch(blob,b'\x00'*16,131072,16384);a=contract['code_offset'];n=contract['code_bytes'];assert modified[:a]==blob[:a] and modified[a+n:]==blob[a+n:];rows.append(dict(case='all-non-code-bytes-preserved',passed=True))
+out=dict(passed=True,hardware_executed=False,checks=rows,source_sha256={name:hashlib.sha256((r/name).read_bytes()).hexdigest() for name in ['ptl_crop_contract_v1.py','ptl_elf_v1.py']},blob_sha256=hashlib.sha256(blob).hexdigest())
+(r/'ptl-crop-contract-v1-qualification.json').write_text(json.dumps(out,indent=2)+'\n');print(json.dumps(out))

@@ -1,0 +1,23 @@
+[INFO] 23:14:38.429 [dump-statistics-of-task-ops]   Input size - 4.01 MB Output size - 32.12 KB
+[INFO] 23:14:38.429 [dump-statistics-of-task-ops]   DDR heap size - 4.00 MB
+[INFO] 23:14:38.429 [dump-statistics-of-task-ops]   VPUIP tasks statistics:
+[INFO] 23:14:38.429 [dump-statistics-of-task-ops]   VPUIP Tasks - 10 ops
+[INFO] 23:14:38.429 [dump-statistics-of-task-ops]     VPUIP.NNDMA - 5 ops : Size - 4.07 MB
+[INFO] 23:14:38.429 [dump-statistics-of-task-ops]       CMX2DDR - 2 ops : Size - 32.03 KB
+[INFO] 23:14:38.429 [dump-statistics-of-task-ops]         Profiling buffer management - 1 ops
+[INFO] 23:14:38.429 [dump-statistics-of-task-ops]       DDR2CMX - 1 ops : Size - 16.00 KB
+[INFO] 23:14:38.429 [dump-statistics-of-task-ops]       DDR2DDR - 2 ops : Size - 4.03 MB
+[INFO] 23:14:38.429 [dump-statistics-of-task-ops]     VPUIP.SW.Kernel - 2 ops
+[INFO] 23:14:38.429 [dump-statistics-of-task-ops]       builtin_Gather - 1 ops
+[INFO] 23:14:38.429 [dump-statistics-of-task-ops]       cache_flush_invalidate - 1 ops
+[INFO] 23:14:38.429 [dump-statistics-of-task-ops]     VPUIP.BarProgDMA - 1 ops
+[INFO] 23:14:38.429 [dump-statistics-of-task-ops]     VPUIP.EnqueueDMA - 1 ops
+[INFO] 23:14:38.429 [dump-statistics-of-task-ops]     VPUIP.FetchDMA - 1 ops
+[INFO] 23:14:38.429 [dump-statistics-of-task-ops]   Barrier statistics:
+[INFO] 23:14:38.429 [dump-statistics-of-task-ops]     VPURT.ConfigureBarrierOp - 7 ops
+[INFO] 23:14:38.429 [dump-statistics-of-task-ops]   Weights statistics:
+[INFO] 23:14:38.429 [dump-statistics-of-task-ops]     Total weights - count: 0, size: 0 bytes (no compression)
+[INFO] 23:14:38.429 [dump-statistics-of-task-ops]   Const swizzling statistics:
+[INFO] 23:14:38.429 [dump-statistics-of-task-ops]     Swizzled constants     - count: 0, size: 0 bytes
+[INFO] 23:14:38.429 [dump-statistics-of-task-ops]     Not swizzled constants - count: 0, size: 0 bytes
+{"started": "2026-10-15T06:14:38.300819+00:00", "completed": true, "passed": true, "elements": 524288, "count": 4096, "custom_kernel_executed": false, "stage": "complete", "config": {"PERFORMANCE_HINT": "LATENCY", "NPU_COMPILATION_MODE": "ReferenceSW", "NPU_TILES": 1, "PERF_COUNT": true}, "compile_ms": 136.3421, "execution_devices": ["NPU"], "blob_sha256": "85a88de5bf9e350ec8b68f7ff3902d1e652f1962296e37011cb9743db3e005d5", "blob_bytes": 69768, "narrow_inspector_rejected": "range size", "checks": [{"iteration": 0, "request_ms": 7.3121, "exact_components": 16384, "input_sha256": "28c004ace082ea2bc0f6de8e8c5ad5315b3d0bbb564d175cd458fd59dd3bddd1", "output_sha256": "e3ab181879f607e139e880737da4e48426e8494b8055fbcc7b160d5d48d98792"}, {"iteration": 1, "request_ms": 3.4524, "exact_components": 16384, "input_sha256": "cf5cdaed2310852e3c8671bd7abd8612b85f85dcd0d5bc1b5eb6f2f7fb1de44e", "output_sha256": "d32b30ba64f7f645a7f6c8f98d25220f4a445b9467a7889020361d350105fd91"}, {"iteration": 2, "request_ms": 3.6744, "exact_components": 16384, "input_sha256": "8992ea05c7c5744237bfb8c229c5f81494d593e5b288c73b12df82885ce6924f", "output_sha256": "87250eac4ee87a846e230f5e825ae00ef2923803ba02d1e14e64621d5dde54db"}, {"iteration": 3, "request_ms": 3.5321, "exact_components": 16384, "input_sha256": "4178b82f1dbf85b48b8f1373e529bb8c21db8f0689a6785caa30fb777853639c", "output_sha256": "803cfedbf23a34d0ab0058031107132158d024479275280009b873d16b64613b"}], "profiling": [{"node_name": "Gather_5", "node_type": "Gather", "exec_type": "Shave", "status": "Status.EXECUTED", "real_time_ms": 2.604, "cpu_time_ms": 2.604}], "max_tiles": "3", "finished": "2026-10-15T06:14:38.524487+00:00"}

@@ -1,0 +1,63 @@
+{
+  "accepted": true,
+  "blob_sha256": "cd420a0dbc1974bee7d0c92dd5fa8c5dbf1a2c9972721249ff35b85f0b031566",
+  "elements": 262144,
+  "count": 4096,
+  "source_bytes": 2097152,
+  "output_bytes": 32768,
+  "source_location": "DDR",
+  "cache_maintenance_preserved": true,
+  "parameter_offset": 64,
+  "code_offset": 34816,
+  "code_bytes": 13568,
+  "tensors": [
+    {
+      "descriptor_offset": 64,
+      "address": 2097152,
+      "location": 1,
+      "dims": [
+        4,
+        262144
+      ],
+      "strides_bits": [
+        16,
+        64
+      ],
+      "dtype": 2,
+      "address_relocation": {
+        "kind": 4,
+        "section": "buffer.DDR.0",
+        "addend": 0
+      }
+    },
+    {
+      "descriptor_offset": 104,
+      "address": 1075937280,
+      "location": 2,
+      "dims": [
+        4096
+      ],
+      "strides_bits": [
+        32
+      ],
+      "dtype": 9,
+      "address_relocation": null
+    },
+    {
+      "descriptor_offset": 144,
+      "address": 1075953664,
+      "location": 2,
+      "dims": [
+        4,
+        4096
+      ],
+      "strides_bits": [
+        16,
+        64
+      ],
+      "dtype": 2,
+      "address_relocation": null
+    }
+  ],
+  "hardware_execution_qualified": false
+}

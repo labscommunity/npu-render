@@ -13,20 +13,17 @@ to compile. The fully cached v35 worker also makes 42,760 provider calls across
 calls and no compilation. These are diagnostic whole-worker counters, not a
 matched benchmark. Reducing dispatch count and rendering cost is essential in
 addition to controlling compilation.
-Our own kernels now perform full-source indexed reads and combined rectangle
-rendering on Panther Lake's NPU. The larger rectangle test passes 12.6 million
-components, including 1920×1080 source textures, shared-memory source buffers up
-to 8 MiB, and 16,384 output pixels per call. Original-graph health checks pass
-afterward. The controlled thirty-minute delivery gate also passes.
-The first direct comparison with the current provider does not qualify a
-replacement: scalar timing is mixed, and the old provider has some different
-quantized pixels. The custom kernel matches its independent float32 oracle;
-the CPU provider also differs near some rounding boundaries. The corrected vector
-kernel passes the same 12.6-million-component suite after two retained failed
-candidates. Numerical diagnosis, a fused implementation of the captured four-sample
-shader and task-level timing are next, followed by live integration.
-General application support and Tahoma A/B remain required before calling the
-switch usable.
+Our own kernels now perform the captured four-sample desktop draw on Panther
+Lake's NPU. Three comparisons match all 3,145,728 output components exactly.
+Complete warm draw time falls from about 9.17 seconds to 1.94 seconds, with 50
+provider calls instead of 1,282. This is isolated replay of one retained request;
+it is still much too slow for ordinary desktop interaction. A local-memory source
+window is also exact but slightly slower. The corrected full-source capacity
+guard passes the 4.2-million-component independent suite; its direct replay and
+live integration remain pending. The controlled thirty-minute delivery gate
+passes with the previous renderer. Parallel scheduling, per-pixel cost, broader
+application support and matched Tahoma A/B remain necessary before the switch
+can be called usable.
 
 The end state is one switch that moves desktop graphics work to the NPU, retains
 physical display scanout, supports normal interaction, and leaves the iGPU
@@ -42,7 +39,7 @@ renderer does not establish where every application renders.
 | 2. Continuous rendering | Keep the native renderer alive across changing windows and content; diagnose every failed draw; distinguish model preparation from rendering and transport. | Multiple changing frames, timestamps and pixel checks, sustained operation, no hidden fallback. | V36 passes with 1,833 acknowledged NPU operations, 167 exact frame deliveries spanning 2,076.05 seconds, and four fresh owned physical observations near the end. The controlled thirty-minute delivery gate passes; production stress remains unqualified. V31 was a frozen-relay false positive and remains rejected. |
 | 3. Physical presentation | Present new NPU frames on the physical output with distinct logical desktops and no recursive mirroring. | Live sequence-to-present correlation, output identity, measured presentation mode and residual GPU work. | V36 correlates 167 exact matching submissions and verifies blue/green/red on the owned physical output. Presenter: 334 GPU copy commands including validation readback; measurement observer: 530 additional copies. Residual GPU cost and a matched baseline remain unqualified. |
 | 4. Interaction and recovery | Migrate the logical desktop, route pointer/keyboard/focus correctly, handle cursor/DPI/resolution, restore exact topology and windows. | Scripted interaction visible on physical output; emergency exit and owned-process failure recovery; ordinary login/lock path retained. | V36 passes relative motion, controlled mouse/keyboard/color changes, confinement/reacquisition and ordinary recovery. Deliberately stopping the relay in v34 triggers full owned cleanup in 25.75 seconds. Secure desktop, sleep/wake, full cursor fidelity and other faults remain open. |
-| 5. Responsiveness | Optimize resource reuse, graph compilation, dispatch granularity, transfer volume and frame pacing. | Initial target: ordinary desktop interaction at 30 fps, p95 visible response ≤100 ms, 30-minute stable run. Report cold-start time separately. | Not met. Large cold graph compilation is reproduced at 89.1 seconds. Cached replay helps but does not meet usability. Direct combined rectangle kernels pass 12.6 million components with full-source shared-memory access. The scalar provider comparison has mixed timing and pixel differences; no replacement is qualified. The captured expensive shader also requires four samples and derivative handling. End-to-end timing and live integration remain open. |
+| 5. Responsiveness | Optimize resource reuse, graph compilation, dispatch granularity, transfer volume and frame pacing. | Initial target: ordinary desktop interaction at 30 fps, p95 visible response ≤100 ms, 30-minute stable run. Report cold-start time separately. | Not met. Large cold graph compilation is reproduced at 89.1 seconds. Cached replay helps but does not meet usability. A fused four-sample kernel matches all 3.15 million components of the retained slow desktop draw in three comparisons. Complete warm draw time falls from about 9.17 s to 1.94 s. This remains far from responsiveness. A source-window version is also exact but slightly slower. Parallel execution and live integration remain open. |
 | 6. Application coverage | Admit and implement required graphics operations across browser, video and representative 3D workloads. Establish per-process adapter choice. | Capability matrix plus real hardware runs; every remaining iGPU operation accounted for. | A manually admitted default-adapter D3D11 fixture passes eight NPU operations. Unadmitted default device creation still fails in v36. Automatic admission, API coverage, browser/video/game migration remain unqualified. |
 | 7. Tahoma benefit | Run repeated baseline/offload trials under matched power, resolution and application load. | Report Tahoma throughput/latency, desktop frame times, per-engine GPU/NPU/CPU activity, memory and power; demonstrate GPU relief and no material Tahoma regression. | Earlier experiments regressed; native desktop A/B not yet run. |
 | 8. Usable switch | Integrate qualified components, install/on/off/status, recovery, documentation and CI; resolve distribution signing requirements. | Repeated clean install and enable/disable cycles, sleep/wake and failures, end-to-end test on target hardware. | Research candidates isolated; no usable full-offload product. |
@@ -56,13 +53,12 @@ role, and any GPU rendering/copy cost in the bridge must be measured.
 
 1. Retain the successful thirty-minute native delivery qualification and recovery
    as the integration baseline. Repeat it after meaningful renderer changes.
-2. Preserve the qualified full-source rectangle path. Diagnose compiler/vector
-   conversion and existing-provider rounding differences without changing the
-   acceptance criteria to hide failures. Implement the actual captured four-sample
-   shader, preserving derivative, coverage, blending and source-span semantics.
-3. Compare the fused implementation against the current provider with identical pixels and
-   complete transfer/preparation/commit timing. Promote only an exact, measured
-   improvement, then repeat live responsiveness and stability checks.
+2. Preserve the exact fused four-sample replay result. Qualify the corrected
+   capacity guard before promotion. Investigate compiler-owned parallel scheduling
+   and reduce per-pixel work; source-window reduction alone did not improve timing.
+3. Expand the matched comparison to more retained requests and changing images.
+   Integrate an exact, measured improvement behind explicit shader/geometry/span
+   admission, then repeat live responsiveness and stability checks.
 4. Add automatic application admission and the missing graphics operations;
    establish per-process rendering devices under representative real workloads.
 5. Measure matched Tahoma baseline/offload performance and remaining GPU work.
@@ -75,6 +71,12 @@ qualifies controlled thirty-minute delivery and ordinary restoration. The
 qualify custom rendering components. The
 [direct comparison and vector checks](../validation/2026-10-15/native-rectangle-comparison-v1/README.md)
 retain the exact-comparison failures and corrected vector component pass.
+The [captured four-sample replay](../validation/2026-10-15/native-four-tap-rendering-v1/README.md)
+now establishes exact output and a roughly 4.72× warm draw improvement for one
+retained request. The [source-window investigation](../validation/2026-10-15/native-four-tap-window-v1/README.md)
+qualifies explicit sampling bounds and the corrected full-source capacity guard,
+but does not improve that draw time. No live provider change or Tahoma benefit
+follows yet.
 These are prerequisites toward the stated
 goal, not substitutes for application migration or Tahoma improvement.
 
