@@ -1,0 +1,35 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$vm="$r\vm";$out="$vm\native-duration-long-app-v2"
+if(Test-Path $out){throw 'Long application trial exists'};New-Item -ItemType Directory $out|Out-Null
+$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');completed=$false;passed=$false;full_desktop_offload=$false;tahoma_tested=$false;phases=@()}
+function Save-Report{$report|ConvertTo-Json -Depth 5|Set-Content "$out\report.json"};Save-Report
+try{
+ $deadline=[DateTime]::UtcNow.AddMinutes(120)
+ while($true){$ready=$false;try{$q=Get-Content "$vm\native-texture-full-v1\report.json" -Raw|ConvertFrom-Json;$ready=$q.completed}catch{};if($ready){break};if([DateTime]::UtcNow -gt $deadline){throw 'Recorded comparison did not finish'};Start-Sleep -Seconds 3}
+ $q=Get-Content "$vm\native-live-v31\report.json" -Raw|ConvertFrom-Json;if(!$q.completed -or !$q.passed -or !$q.cleanup_passed){throw 'Short duration prerequisite failed'}
+ if(@(Get-Process nr_registered_local_indexed_worker,nr_uniform_draw_diagnostic,nr_native_topology,nr_frame_present_probe -ErrorAction SilentlyContinue).Count){throw 'Another graphics experiment active'}
+ $appBuild=Get-Content "$r\builds\native-default-app-v1\registered-build-report.json" -Raw|ConvertFrom-Json
+ if(!$appBuild.clean_build -or (Get-FileHash "$r\builds\native-default-app-v1\Release\nr_native_registered_probe.exe").Hash -ne $appBuild.binary_sha256.'nr_native_registered_probe.exe'){throw 'Existing default application build identity changed'}
+ $report.phases+=@{phase='verified-existing-default-app';passed=$true};Save-Report
+ $report.active_phase='interactive-readiness';Save-Report
+ $ErrorActionPreference='Continue'
+ & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$vm\start-native-topology-v49.ps1" > "$out\observer49.stdout.log" 2> "$out\observer49.stderr.log";$observerExit=$LASTEXITCODE
+ $ErrorActionPreference='Stop'
+ if($observerExit){
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$vm\dismiss-native-saver-v6.ps1" > "$out\saver.stdout.log" 2> "$out\saver.stderr.log"
+  if($LASTEXITCODE){throw 'Unlocked desktop readiness failed'}
+ }
+ if(Test-Path "$vm\native-topology-v49"){New-Item -ItemType File "$vm\native-topology-v49\stop" -Force|Out-Null}
+ $report.active_phase='native-live-v32';Save-Report
+ & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$vm\run-native-live-v32.ps1" > "$out\live.stdout.log" 2> "$out\live.stderr.log"
+ if($LASTEXITCODE){throw 'Long native desktop/application trial failed'}
+ $q=Get-Content "$vm\native-live-v32\report.json" -Raw|ConvertFrom-Json
+ if(!$q.completed -or !$q.passed -or !$q.cleanup_passed -or !$q.duration_gate_passed -or !$q.default_application_component_qualified){throw 'Long native evidence incomplete'}
+ $report.phases+=@{phase='native-live-v32';passed=$true;cleanup_passed=$true};$report.passed=$true
+}catch{$report.error=$_.Exception.Message}
+finally{
+ if(Test-Path "$vm\native-topology-v49"){New-Item -ItemType File "$vm\native-topology-v49\stop" -Force|Out-Null}
+ $task=Get-ScheduledTask -TaskName T8-NpuRender-InspectTopology-V49 -ErrorAction SilentlyContinue
+ if($task){$deadline=[DateTime]::UtcNow.AddSeconds(15);while((Get-ScheduledTask -TaskName $task.TaskName).State -eq 'Running' -and [DateTime]::UtcNow -lt $deadline){Start-Sleep -Milliseconds 200};Stop-ScheduledTask -TaskName $task.TaskName -ErrorAction SilentlyContinue;Unregister-ScheduledTask -TaskName $task.TaskName -Confirm:$false}
+ $report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');Save-Report
+}
+Get-Content "$out\report.json";if(!$report.passed){exit 1}

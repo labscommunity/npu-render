@@ -1,0 +1,25 @@
+"""Diagnose multiple adapter identities while testing ordinary default routing."""
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'native-default-app-v2';shutil.copytree(r/'native-default-app-v1',d)
+p=d/'probe.cpp';s=p.read_text();needle='    UINT matches = 0;\n    LUID selected{};';assert needle in s
+s=s.replace(needle,'''    ComPtr<IDXGIFactory1> default_factory;check(CreateDXGIFactory1(IID_PPV_ARGS(&default_factory)),"identity_factory");
+    ComPtr<IDXGIAdapter1> default_adapter;check(default_factory->EnumAdapters1(0,&default_adapter),"identity_default_adapter");
+    DXGI_ADAPTER_DESC1 default_description{};check(default_adapter->GetDesc1(&default_description),"identity_default_description");
+    const auto default_luid=default_description.AdapterLuid;
+    UINT matches = 0, paired_adapters = 0;
+    LUID selected{};''',1)
+needle='        const nr::kernel_contract::AdapterInfo expected{};';assert needle in s
+s=s.replace(needle,needle+'''
+        const bool is_default=a.AdapterLuid.LowPart==default_luid.LowPart && a.AdapterLuid.HighPart==default_luid.HighPart;
+        std::printf("{\\"kernel_adapter_identity\\":true,\\"luid_low\\":%lu,\\"luid_high\\":%ld,\\"default_adapter\\":%s,\\"query_status\\":\\"%08lx\\",\\"signature\\":%u,\\"abi\\":%u,\\"bytes\\":%u,\\"ready\\":%u}\\n",a.AdapterLuid.LowPart,a.AdapterLuid.HighPart,is_default?"true":"false",static_cast<ULONG>(status),info.signature,info.abi,info.bytes,info.ready);
+''',1)
+needle='            ++matches; selected = a.AdapterLuid;';assert needle in s
+s=s.replace(needle,'            ++paired_adapters;if(!is_default)continue;\n'+needle,1)
+s=s.replace('    require(matches == 1, "expected exactly one paired laboratory adapter");','    std::printf("{\\"paired_adapters\\":%u,\\"paired_default_matches\\":%u}\\n",paired_adapters,matches);\n    require(matches == 1, "ordinary default must be the paired native renderer");',1)
+p.write_text(s)
+(r/'native-default-app-v2-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-default-app-v2.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+for name in ['build-native-default-app-v1.ps1','run-native-default-app-v1.ps1','qualify-native-default-app-v1.py']:
+ (r/name.replace('v1','v2')).write_text((r/name).read_text().replace('native-default-app-v1','native-default-app-v2'))
+print('Prepared default-app v2: diagnose all kernel identities and require the ordinary default native match.')

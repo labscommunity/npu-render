@@ -1,0 +1,9 @@
+"""Repair missing direct OpenVINO dependency in isolated fusion diagnostic."""
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'native-routing-v47';shutil.copytree(r/'native-routing-v46',d)
+p=d/'native/windows/registered_lab/CMakeLists.txt';s=p.read_text();a='target_link_libraries(nr_pixel_merger_fusion PRIVATE nr_registered_vertex d3dcompiler)';assert a in s;p.write_text(s.replace(a,a[:-1]+' openvino::runtime)'))
+(r/'native-routing-v47-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-routing-v47.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+(r/'build-native-routing-v47.ps1').write_text((r/'build-native-routing-v46.ps1').read_text().replace('native-routing-v46','native-routing-v47'))
+print('Prepared fusion diagnostic v47; worker routing unchanged.')

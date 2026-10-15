@@ -194,6 +194,24 @@ trial requires advancing presentation timestamps and an independent physical-out
 color observation after thirty minutes, followed by exact ordinary restoration.
 Prepared code and parser checks do not satisfy the duration gate.
 
+The [delivery repair investigation](../validation/2026-10-15/native-delivery-repair-v1/README.md)
+now proves the corrected IDD accepts the longer lease, but the retry ends early.
+The controller encounters a file-not-found error whose call site was not saved;
+later the NPU worker times out. The captured request independently reproduces the
+timeout: a 17,057-node graph needs 89.09 seconds of compilation. Cached repetition
+completes in 1.62 seconds. Both failures and ordinary recovery are retained.
+Continuous delivery therefore remains open, and shader preparation must stay
+outside the ordinary frame deadline without concealing fallback or frozen frames.
+Bounded atomic-publication retries now pass real Windows sharing tests; a stricter
+validator rejects frozen delivery and missing late physical observation.
+
+The same investigation establishes eight exact NPU operations from an owned
+application using the ordinary default D3D11 adapter. That is progress on routing,
+but admission still requires a manually issued finite lease. Automatic per-process
+admission, lease renewal and representative application API coverage remain open.
+An isolated shader/blending fusion experiment passes exact CPU/NPU pixel checks;
+it is not part of the live renderer and has no qualified desktop speedup.
+
 Continue with responsive sustained operation, application coverage, residual GPU
 cost and matched Tahoma benefit. New applications' adapter selection must be
 observed independently of DWM routing. Exact-output memoization covers only about

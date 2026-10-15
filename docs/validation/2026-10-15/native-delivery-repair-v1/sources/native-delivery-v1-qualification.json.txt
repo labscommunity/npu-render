@@ -1,0 +1,93 @@
+{
+  "completed": true,
+  "passed": true,
+  "synthetic_checks_are_not_hardware_evidence": true,
+  "cases": [
+    {
+      "case": "fresh-complete-synthetic",
+      "passed": true,
+      "accepted": true,
+      "result": {
+        "passed": true,
+        "matching_submissions": 21,
+        "first_to_last_seconds": 600.0,
+        "last_delivery_age_seconds": 1.0,
+        "fresh_physical_observations": 1,
+        "liveness_bound_seconds": 60,
+        "responsiveness_qualified": false,
+        "full_desktop_offload": false,
+        "tahoma_tested": false
+      }
+    },
+    {
+      "case": "failed-relay",
+      "passed": true,
+      "accepted": false,
+      "result": {
+        "error": "relay did not complete successfully"
+      }
+    },
+    {
+      "case": "incomplete-relay",
+      "passed": true,
+      "accepted": false,
+      "result": {
+        "error": "relay did not complete successfully"
+      }
+    },
+    {
+      "case": "frozen-last-frame",
+      "passed": true,
+      "accepted": false,
+      "result": {
+        "error": "delivery ceased before the requested interval ended"
+      }
+    },
+    {
+      "case": "missing-physical-tail",
+      "passed": true,
+      "accepted": false,
+      "result": {
+        "error": "fresh independently observed physical color absent"
+      }
+    },
+    {
+      "case": "inexact-copy",
+      "passed": true,
+      "accepted": false,
+      "result": {
+        "error": "inexact backbuffer"
+      }
+    },
+    {
+      "case": "wrong-producer",
+      "passed": true,
+      "accepted": false,
+      "result": {
+        "error": "source/presentation identity mismatch"
+      }
+    },
+    {
+      "case": "duplicate-sequence",
+      "passed": true,
+      "accepted": false,
+      "result": {
+        "error": "nonmonotonic presentation"
+      }
+    },
+    {
+      "case": "nonzero-presenter-exit",
+      "passed": true,
+      "accepted": false,
+      "result": {
+        "error": "presenter did not complete successfully"
+      }
+    },
+    {
+      "case": "captured-live-v31-false-positive-rejected",
+      "passed": true,
+      "error": "relay did not complete successfully"
+    }
+  ],
+  "validator_sha256": "981996829811a71526c3542cd94659b87bbdb09c1a16e1002feebe30ef9ae9e2"
+}

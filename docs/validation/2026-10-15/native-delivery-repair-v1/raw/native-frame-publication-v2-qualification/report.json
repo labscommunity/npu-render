@@ -1,0 +1,45 @@
+{
+  "started": "2026-10-15T04:12:39.360859+00:00",
+  "completed": true,
+  "passed": true,
+  "cases": [
+    {
+      "case": "initial-publication",
+      "passed": true
+    },
+    {
+      "case": "deny-delete-reader-released",
+      "passed": true,
+      "elapsed_seconds": 0.21900000001187436,
+      "retries": 17
+    },
+    {
+      "case": "persistent-conflict-preserves-old-frame",
+      "passed": true,
+      "elapsed_seconds": 0.15599999998812564
+    },
+    {
+      "case": "shared-delete-reader-release-publication",
+      "passed": true,
+      "elapsed_seconds": 0.21900000001187436,
+      "retries": 18
+    },
+    {
+      "case": "invalid-bounds-rejected",
+      "passed": true
+    }
+  ],
+  "finished": "2026-10-15T04:12:39.942595+00:00",
+  "statistics": {
+    "publications": 3,
+    "retries": 48,
+    "timeouts": 1,
+    "errors": {
+      "5": 49
+    }
+  },
+  "source_sha256": {
+    "qualify-native-frame-publish-v2.py": "69c573e60bda4eb430ff56e9aecffd4334027542b8af2378e2bf74d52b4817ec",
+    "native_frame_publish_v1.py": "a0d449cb0470b959cb2b96810935c5667b516249174ee93811ac165d891e3a6f"
+  }
+}

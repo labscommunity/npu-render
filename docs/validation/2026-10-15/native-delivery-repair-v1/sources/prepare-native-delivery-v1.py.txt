@@ -1,0 +1,71 @@
+"""Repair delivery supervision and add cooperative rollback of a finite trial."""
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver')
+def write(name,s):
+    assert not (r/name).exists(),name
+    (r/name).write_text(s)
+def replace(s,a,b):
+    assert a in s,a
+    return s.replace(a,b)
+d=r/'native-topology-control-v13';shutil.copytree(r/'native-topology-control-v12',d)
+p=d/'topology.cpp';s=p.read_text()
+s=replace(s,'require(!escape.requested(),"primary trial emergency exit requested");', 'require(!escape.requested(),"primary trial emergency exit requested");if(pointer){const std::wstring stop=std::wstring(argv[3])+L".stop";require(GetFileAttributesW(stop.c_str())==INVALID_FILE_ATTRIBUTES,"controller requested topology restoration");}')
+p.write_text(s)
+write('native-topology-control-v13-source.json',json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-topology-control-v13.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+write('build-native-topology-control-v13.ps1',(r/'build-native-topology-control-v12.ps1').read_text().replace('native-topology-control-v12','native-topology-control-v13'))
+write('run-native-topology-helper-v13.ps1',(r/'run-native-topology-helper-v12.ps1').read_text().replace('native-topology-control-v12','native-topology-control-v13'))
+write('qualify-native-cursor-v5.ps1',(r/'qualify-native-cursor-v4.ps1').read_text().replace('native-cursor-guard-v4','native-cursor-guard-v5').replace('CursorGuardV4','CursorGuardV5').replace('native-topology-control-v12','native-topology-control-v13').replace('native-desktop-admission-v40','native-desktop-admission-v42'))
+s=(r/'native_desktop_bootstrap_v19.py').read_text()
+s=replace(s,'    while time.perf_counter()<deadline:\n        compositor.verify();host.verify()',"    while time.perf_counter()<deadline:\n        assert not (v.transaction/'stop').exists(),'Controller requested native restoration'\n        compositor.verify();host.verify()")
+write('native_desktop_bootstrap_v20.py',s)
+for prefix in ('run-native-desktop','recover-native-desktop'):
+    s=(r/(prefix+'-v42.ps1')).read_text().replace('desktop-v42','desktop-v43').replace('admission-v42','admission-v43').replace('Recovery-v42','Recovery-v43')
+    if prefix=='run-native-desktop':
+        s=s.replace('bootstrap_v19','bootstrap_v20').replace("'--monitor-seconds','2220'","'--monitor-seconds','660'")
+        a=s.index('$short=Get-Content');b=s.index('$worker=',a)
+        s=s[:a]+'''$previous=Get-Content "$r\\vm\\native-desktop-admission-v42\\report.json" -Raw|ConvertFrom-Json
+if(!$previous.completed -or !$previous.cleanup_passed){throw 'Previous native cleanup incomplete'}
+$publication=Get-Content "$r\\vm\\native-frame-publication-v2-qualification\\report.json" -Raw|ConvertFrom-Json
+if(!$publication.completed -or !$publication.passed -or $publication.source_sha256.'native_frame_publish_v1.py' -ne (Get-FileHash "$r\\vm\\native_frame_publish_v1.py").Hash){throw 'Atomic publication not qualified'}
+'''+s[b:]
+    write(prefix+'-v43.ps1',s)
+for n in (50,51):
+    write(f'start-native-topology-v{n}.ps1',(r/'start-native-topology-v48.ps1').read_text().replace('v48',f'v{n}').replace('V48',f'V{n}'))
+write('dismiss-native-saver-v7.ps1',(r/'dismiss-native-saver-v6.ps1').read_text().replace('dismiss-v6','dismiss-v7').replace('native-topology-v49','native-topology-v51'))
+s=(r/'run-native-live-v31.ps1').read_text()
+for a,b in [('native-live-v31','native-live-v33'),('NativeLiveV31','NativeLiveV33'),('native-desktop-admission-v41','native-desktop-admission-v43'),('run-native-desktop-v41','run-native-desktop-v43'),('NativeDesktopRecovery-v41','NativeDesktopRecovery-v43'),('native-topology-primary-v17','native-topology-primary-v19'),('native-topology-v46','native-topology-v50'),('native-topology-control-v12','native-topology-control-v13'),('run-native-topology-helper-v12','run-native-topology-helper-v13'),('native-cursor-guard-v4','native-cursor-guard-v5'),('relay_native_frames_v7','relay_native_frames_v8')]:s=replace(s,a,b)
+s=replace(s,"do{\n  Start-Sleep -Milliseconds 250;",'''do{
+  $report.active_phase='presentation-health';
+  if($relay.HasExited){throw 'Frame relay exited during presentation'}
+  if($native.HasExited -or $topology.HasExited){throw 'Native renderer or topology ended during presentation'}
+  Start-Sleep -Milliseconds 250;''')
+s=replace(s,"  if($screenStarted -and $blueObserved -and $greenObserved -and $redObserved -and !(Test-Path \"$out\\screen\\stop\")){New-Item -ItemType File \"$out\\screen\\stop\"|Out-Null}","  # Keep the independent physical observer running for the complete presentation interval.")
+needle=" $presentInfo=Get-ScheduledTaskInfo"
+s=replace(s,needle,''' New-Item -ItemType File "$out\\relay\\stop" -Force|Out-Null
+ if(!$relay.WaitForExit(5000)){throw 'Relay failed to stop after presentation'}
+ $relay.Refresh();$relayResult=Get-Content "$out\\relay\\report.json" -Raw|ConvertFrom-Json
+ $report.relay_exit=$relay.ExitCode;$report.relay_completed=$relayResult.completed;$report.relay_passed=$relayResult.passed
+ if($relay.ExitCode -ne 0 -or !$relayResult.completed -or !$relayResult.passed -or $relayResult.error){throw 'Relay final evidence failed'}
+ $report.active_phase='finite-topology-completion';Save-Report
+'''+needle)
+needle=' $report.passed=('
+s=replace(s,needle,''' $report.active_phase='freshness-validation';Save-Report
+ & "$r\\toolchains\\openvino-2026.4.1\\Scripts\\python.exe" "$r\\vm\\validate-native-delivery-v1.py" --trial $out --output "$out\\delivery-validation.json" > "$out\\delivery-validation.stdout.log" 2> "$out\\delivery-validation.stderr.log"
+ if($LASTEXITCODE){throw 'Continued delivery and fresh physical observation not qualified'}
+ $report.continuous_delivery_gate_passed=$true
+'''+needle)
+s=replace(s,"}catch{$report.error=$_.Exception.Message}","}catch{$report.error=$_.Exception.Message;$report.error_position=$_.InvocationInfo.PositionMessage;$report.error_stack=$_.ScriptStackTrace;$report.error_type=$_.Exception.GetType().FullName;Save-Report}")
+needle=' if($topology -and !$topology.HasExited){[void]$topology.WaitForExit(640000)}'
+s=replace(s,needle,''' if($report.error -and (Test-Path "$out\\cues")){New-Item -ItemType File "$out\\cues\\cursor.stop" -Force|Out-Null}
+ if($topology -and !$topology.HasExited){[void]$topology.WaitForExit($(if($report.error){15000}else{640000}))}
+ if($report.error -and (Test-Path "$r\\vm\\native-desktop-admission-v43")){New-Item -ItemType File "$r\\vm\\native-desktop-admission-v43\\stop" -Force|Out-Null}
+''')
+s=replace(s,'if($native -and !$native.HasExited){[void]$native.WaitForExit(780000)}','if($native -and !$native.HasExited){[void]$native.WaitForExit($(if($report.error){90000}else{780000}))}')
+write('run-native-live-v33.ps1',s)
+files=list(json.loads((r/'native-desktop-v42-source.json').read_text()))
+files=[f.replace('desktop-v42','desktop-v43').replace('live-v32','live-v33').replace('topology-v48','topology-v50').replace('bootstrap_v19','bootstrap_v20') for f in files if 'default-app' not in f]
+files+=['relay_native_frames_v8.py','native_frame_publish_v1.py','validate-native-delivery-v1.py','run-native-topology-helper-v13.ps1']
+write('native-desktop-v43-source.json',json.dumps({f:hashlib.sha256((r/f).read_bytes()).hexdigest() for f in files},indent=2)+'\n')
+print('Prepared bounded delivery retry and cooperative rollback; no native trial started.')

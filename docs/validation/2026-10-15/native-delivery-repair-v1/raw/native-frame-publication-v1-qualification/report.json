@@ -1,0 +1,37 @@
+{
+  "started": "2026-10-15T04:12:13.937186+00:00",
+  "completed": true,
+  "passed": false,
+  "cases": [
+    {
+      "case": "initial-publication",
+      "passed": true
+    },
+    {
+      "case": "deny-delete-reader-released",
+      "passed": true,
+      "elapsed_seconds": 0.21799999999348074,
+      "retries": 18
+    },
+    {
+      "case": "persistent-conflict-preserves-old-frame",
+      "passed": true,
+      "elapsed_seconds": 0.15700000000651926
+    }
+  ],
+  "error": "PermissionError(13, 'Access is denied')",
+  "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\qualify-native-frame-publish-v1.py\", line 64, in <module>\n    publish_frame(p,new);buffer=C.create_string_buffer(len(old));count=W.DWORD()\n    ^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\native_frame_publish_v1.py\", line 21, in publish_frame\n    temporary.replace(path)\n  File \"C:\\Users\\tatef\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\pathlib.py\", line 1376, in replace\n    os.replace(self, target)\nPermissionError: [WinError 5] Access is denied: 'C:\\\\Users\\\\tatef\\\\AppData\\\\Local\\\\npu-render\\\\vm\\\\native-frame-publication-v1-qualification\\\\shared-delete.bin.publish-11432.tmp' -> 'C:\\\\Users\\\\tatef\\\\AppData\\\\Local\\\\npu-render\\\\vm\\\\native-frame-publication-v1-qualification\\\\shared-delete.bin'\n",
+  "finished": "2026-10-15T04:12:15.349646+00:00",
+  "statistics": {
+    "publications": 2,
+    "retries": 117,
+    "timeouts": 2,
+    "errors": {
+      "5": 119
+    }
+  },
+  "source_sha256": {
+    "qualify-native-frame-publish-v1.py": "4c0372a066e0b4ea277ec97d572c6fa18700e6906eb829d5fd9843520da58ddf",
+    "native_frame_publish_v1.py": "a0d449cb0470b959cb2b96810935c5667b516249174ee93811ac165d891e3a6f"
+  }
+}

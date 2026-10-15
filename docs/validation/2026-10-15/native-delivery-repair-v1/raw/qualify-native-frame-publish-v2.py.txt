@@ -1,0 +1,87 @@
+"""Real Windows handles exercise transient and persistent rename conflicts."""
+import ctypes as C
+from ctypes import wintypes as W
+from datetime import UTC, datetime
+import hashlib
+import json
+from pathlib import Path
+import sys
+import threading
+import time
+import traceback
+from native_frame_publish_v1 import publish_frame, statistics
+
+k = C.WinDLL('kernel32', use_last_error=True)
+k.CreateFileW.argtypes = [W.LPCWSTR,W.DWORD,W.DWORD,W.LPVOID,W.DWORD,W.DWORD,W.HANDLE]
+k.CreateFileW.restype = W.HANDLE
+k.CloseHandle.argtypes = [W.HANDLE]
+k.CloseHandle.restype = W.BOOL
+k.ReadFile.argtypes = [W.HANDLE,W.LPVOID,W.DWORD,C.POINTER(W.DWORD),W.LPVOID]
+k.ReadFile.restype = W.BOOL
+out = Path(sys.argv[1]); out.mkdir(exist_ok=False)
+report = dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,cases=[])
+old = bytes(range(256))*4096
+new = old[::-1] + b'complete-new-frame'
+handles = []
+
+
+def hold(path, share):
+    h = k.CreateFileW(str(path),0x80000000,share,None,3,0,None)
+    if h == C.c_void_p(-1).value: raise C.WinError(C.get_last_error())
+    handles.append(h)
+    return h
+
+
+def close(h):
+    assert k.CloseHandle(h)
+    handles.remove(h)
+
+
+try:
+    p = out/'initial.bin'
+    publish_frame(p,old)
+    assert p.read_bytes() == old
+    report['cases'].append(dict(case='initial-publication',passed=True))
+    p = out/'transient.bin';p.write_bytes(old);h = hold(p,3)
+    released = threading.Event()
+    def release():
+        time.sleep(.2);close(h);released.set()
+    t = threading.Thread(target=release);t.start()
+    before = statistics['retries'];start=time.monotonic()
+    publish_frame(p,new);elapsed=time.monotonic()-start;t.join()
+    assert released.is_set() and statistics['retries']>before and p.read_bytes()==new and elapsed<2
+    report['cases'].append(dict(case='deny-delete-reader-released',passed=True,elapsed_seconds=elapsed,retries=statistics['retries']-before))
+    p = out/'persistent.bin';p.write_bytes(old);h=hold(p,3);start=time.monotonic()
+    try: publish_frame(p,new,150)
+    except OSError as e: assert e.winerror in (5,32,33)
+    else: raise AssertionError('persistent reader must prevent publication')
+    elapsed=time.monotonic()-start
+    assert .14 <= elapsed < 2 and p.read_bytes()==old
+    assert p.with_name(p.name+'.publish-'+str(__import__('os').getpid())+'.tmp').read_bytes()==new
+    close(h)
+    report['cases'].append(dict(case='persistent-conflict-preserves-old-frame',passed=True,elapsed_seconds=elapsed))
+    p=out/'shared-delete.bin';p.write_bytes(old);h=hold(p,7)
+    buffer=C.create_string_buffer(len(old));count=W.DWORD()
+    assert k.ReadFile(h,buffer,len(old),C.byref(count),None)
+    assert count.value==len(old) and buffer.raw==old
+    # MoveFileEx used by Path.replace can still return ACCESS_DENIED while a
+    # shared-delete reader is open on this machine; do not assume POSIX rename.
+    released.clear();t=threading.Thread(target=release);t.start()
+    before=statistics['retries'];start=time.monotonic();publish_frame(p,new)
+    elapsed=time.monotonic()-start;t.join()
+    assert released.is_set() and p.read_bytes()==new and elapsed<2
+    report['cases'].append(dict(case='shared-delete-reader-release-publication',passed=True,elapsed_seconds=elapsed,retries=statistics['retries']-before))
+    for value in (0,1001,True,1.5):
+        try: publish_frame(out/'invalid.bin',new,value)
+        except ValueError: pass
+        else: raise AssertionError('unbounded timeout accepted')
+    assert not (out/'invalid.bin').exists()
+    report['cases'].append(dict(case='invalid-bounds-rejected',passed=True))
+    report['passed']=True
+except Exception as e:
+    report.update(error=repr(e),traceback=traceback.format_exc())
+finally:
+    for h in handles[:]: close(h)
+    report.update(completed=True,finished=datetime.now(UTC).isoformat(),statistics=statistics,source_sha256={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in (Path(__file__),Path(__file__).with_name('native_frame_publish_v1.py'))})
+    (out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(report));raise SystemExit(0 if report['passed'] else 1)

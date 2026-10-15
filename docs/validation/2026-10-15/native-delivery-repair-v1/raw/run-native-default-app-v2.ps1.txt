@@ -1,0 +1,15 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$vm="$r\vm";$package="$vm\native-driver-package-v17"
+$principal=[Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())
+if(!$principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator) -or [Diagnostics.Process]::GetCurrentProcess().SessionId -le 0){throw 'Owned interactive elevated controller required'}
+$meta=Get-Content "$package\report.json" -Raw|ConvertFrom-Json
+if(!$meta.prepared -or $meta.version -ne '0.0.1317.0' -or $meta.hardware_id -ne 'ROOT\NPURENDER_NATIVE_PROBE'){throw 'Native package identity mismatch'}
+$devices=@(Get-PnpDevice -PresentOnly -Class Display|Where-Object {@(($_|Get-PnpDeviceProperty -KeyName DEVPKEY_Device_HardwareIds).Data) -contains $meta.hardware_id})
+if($devices.Count -ne 1 -or $devices[0].Status -ne 'OK'){throw 'Native default adapter unavailable'}
+$key=($devices[0]|Get-PnpDeviceProperty -KeyName DEVPKEY_Device_Driver).Data
+if($key -notmatch '^\{4d36e968-e325-11ce-bfc1-08002be10318\}\\\d{4}$'){throw 'Unexpected adapter class registration'}
+$registration=Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\Class\$key"
+$modules=@($registration.UserModeDriverName|Select-Object -Unique);$dll=$modules[0]
+$expected=($meta.files|Where-Object name -eq 'nr_native_probe_umd.dll').sha256
+if($modules.Count -ne 1 -or $registration.DriverVersion -ne $meta.version -or !$dll.StartsWith("$env:windir\System32\DriverStore\FileRepository\",[StringComparison]::OrdinalIgnoreCase) -or [IO.Path]::GetFileName($dll) -ne 'nr_native_probe_umd.dll' -or (Get-FileHash $dll).Hash -ne $expected){throw 'Installed adapter identity mismatch'}
+& "$r\toolchains\openvino-2026.4.1\Scripts\python.exe" "$vm\qualify-native-default-app-v2.py" --worker "$r\builds\native-routing-v41\Release\nr_registered_local_indexed_worker.exe" --client "$r\builds\native-default-app-v2\Release\nr_native_registered_probe.exe" --dll $dll --package $package --runtime "$r\toolchains\openvino-2026.4.1\Lib\site-packages\openvino\libs" --cache "$vm\model-cache-2026-4-v209" --output "$vm\native-default-app-v2-qualification"
+if($LASTEXITCODE){throw 'Default adapter component qualification failed'}

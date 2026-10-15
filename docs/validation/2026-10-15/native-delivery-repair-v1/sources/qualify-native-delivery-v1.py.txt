@@ -1,0 +1,43 @@
+"""Synthetic acceptance negatives plus rejection of the captured frozen trial."""
+from pathlib import Path
+import copy,hashlib,importlib.util,json,tempfile
+r=Path(__file__).parent
+spec=importlib.util.spec_from_file_location('delivery',r/'validate-native-delivery-v1.py')
+m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+base={
+ 'report.json':{'presentation_seconds':600},
+ 'relay/report.json':{'completed':True,'passed':True,'published':21},
+ 'relay/frames.jsonl':[{'sequence':i+1,'qpc':100+i*3000,'producer_pid':77,'pixel_sha256':str(i%3)} for i in range(21)],
+ 'present/probe.log':[{'live_frame_presented':True,'source_sequence':i+1,'source_qpc':100+i*3000,'accepted_qpc':200+i*3000,'producer_pid':77,'qpc_frequency':100,'backbuffer_exact':True} for i in range(21)]+[{'display_observation':True,'observed_qpc':60300},{'live_bridge_tested':True,'completed':True,'elapsed_ms':600000,'submitted_presents':21},{'exit_code':0}],
+ 'screen/probe.log':[{'qpc':60250,'last_present_qpc':60201,'ownership_verified_before_and_after':True,'points':[{'owned_presenter_at_point':True,'known_red':True}]},{'physical_output_observer':True,'completed':True,'passed':True},{'exit_code':0}],
+}
+results=[]
+with tempfile.TemporaryDirectory(prefix='nr-delivery-') as name:
+ d=Path(name)
+ def run(case,data,expected):
+  for path,value in data.items():
+   p=d/path;p.parent.mkdir(parents=True,exist_ok=True)
+   p.write_text(''.join(json.dumps(v)+'\n' for v in value) if path.endswith(('.log','.jsonl')) else json.dumps(value))
+  try: result=m.validate(d);accepted=True
+  except AssertionError as e: accepted=False;result={'error':str(e)}
+  assert accepted==expected,(case,result)
+  results.append(dict(case=case,passed=True,accepted=accepted,result=result))
+ run('fresh-complete-synthetic',base,True)
+ for case in ('failed-relay','incomplete-relay','frozen-last-frame','missing-physical-tail','inexact-copy','wrong-producer','duplicate-sequence','nonzero-presenter-exit'):
+  data=copy.deepcopy(base)
+  if case=='failed-relay':data['relay/report.json']['passed']=False
+  elif case=='incomplete-relay':data['relay/report.json']['completed']=False
+  elif case=='frozen-last-frame':
+   data['present/probe.log']=data['present/probe.log'][:15]+data['present/probe.log'][-3:];data['present/probe.log'][-2]['submitted_presents']=15
+  elif case=='missing-physical-tail':data['screen/probe.log'][0]['qpc']=200;data['screen/probe.log'][0]['last_present_qpc']=100
+  elif case=='inexact-copy':data['present/probe.log'][0]['backbuffer_exact']=False
+  elif case=='wrong-producer':data['present/probe.log'][0]['producer_pid']=999
+  elif case=='duplicate-sequence':data['present/probe.log'][1]['source_sequence']=1
+  elif case=='nonzero-presenter-exit':data['present/probe.log'][-1]['exit_code']=1
+  run(case,data,False)
+real=Path('docs/validation/2026-10-15/native-scoped-desktop-v1/raw/native-live-v31')
+try:m.validate(real)
+except AssertionError as e:assert str(e)=='relay did not complete successfully';results.append(dict(case='captured-live-v31-false-positive-rejected',passed=True,error=str(e)))
+else:raise AssertionError('captured frozen trial accepted')
+report=dict(completed=True,passed=True,synthetic_checks_are_not_hardware_evidence=True,cases=results,validator_sha256=hashlib.sha256((r/'validate-native-delivery-v1.py').read_bytes()).hexdigest())
+(r/'native-delivery-v1-qualification.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report))

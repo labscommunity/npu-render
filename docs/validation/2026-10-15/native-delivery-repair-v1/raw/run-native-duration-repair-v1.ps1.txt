@@ -1,0 +1,23 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$vm="$r\vm";$out="$vm\native-duration-repair-v1"
+if(Test-Path $out){throw 'Duration repair trial exists'};New-Item -ItemType Directory $out|Out-Null
+$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');completed=$false;passed=$false;full_desktop_offload=$false;tahoma_tested=$false;phases=@()}
+function Save-Report{$report|ConvertTo-Json -Depth 5|Set-Content "$out\report.json"};Save-Report
+try{
+ $deadline=[DateTime]::UtcNow.AddMinutes(30)
+ while($true){$ready=$false;try{$q=Get-Content "$vm\native-scoped-live-v2\report.json" -Raw|ConvertFrom-Json;$ready=$q.completed}catch{};if($ready){break};if([DateTime]::UtcNow -gt $deadline){throw 'Scoped live predecessor not complete'};Start-Sleep -Seconds 3}
+ if(Test-Path "$vm\native-desktop-admission-v41\report.json"){$q=Get-Content "$vm\native-desktop-admission-v41\report.json" -Raw|ConvertFrom-Json;if(!$q.completed -or !$q.cleanup_passed){throw 'Scoped predecessor not restored'}}
+ if(@(Get-Process nr_registered_local_indexed_worker,nr_pixel_merger_fusion,nr_native_topology,nr_frame_present_probe -ErrorAction SilentlyContinue).Count){throw 'Graphics predecessor still active'}
+ foreach($name in @('build-native-idd-v2','package-native-idd-v2')){
+  $report.active_phase=$name;Save-Report
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$vm\$name.ps1" > "$out\$name.stdout.log" 2> "$out\$name.stderr.log"
+  if($LASTEXITCODE){throw "Duration repair failed: $name"};$report.phases+=@{phase=$name;passed=$true};Save-Report
+ }
+ $q=Get-Content "$vm\native-scoped-live-v2\report.json" -Raw|ConvertFrom-Json;if(!$q.passed){throw 'Short scoped integration did not pass; repaired driver is prepared only'}
+ $report.active_phase='long-native-application-trial';Save-Report
+ & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$vm\run-native-duration-long-app-v2.ps1" > "$out\long.stdout.log" 2> "$out\long.stderr.log"
+ if($LASTEXITCODE){throw 'Long native application retry failed'}
+ $q=Get-Content "$vm\native-duration-long-app-v2\report.json" -Raw|ConvertFrom-Json;if(!$q.completed -or !$q.passed){throw 'Long retry evidence incomplete'}
+ $report.phases+=@{phase='long-native-application-trial';passed=$true};$report.passed=$true
+}catch{$report.error=$_.Exception.Message}
+finally{$report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');Save-Report}
+Get-Content "$out\report.json";if(!$report.passed){exit 1}

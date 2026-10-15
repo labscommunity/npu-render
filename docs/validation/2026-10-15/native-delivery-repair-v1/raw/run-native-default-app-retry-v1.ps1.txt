@@ -1,0 +1,22 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$vm="$r\vm";$source="$env:LOCALAPPDATA\Temp\npu-graphics-probe-0146a2388f25";$out="$vm\native-default-app-retry-v1";$task='T8-NpuRender-DefaultAppRetry-V1'
+if(Test-Path $out){throw 'Application retry exists'};New-Item -ItemType Directory $out|Out-Null
+$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');completed=$false;passed=$false;native_trial='native-live-v32';additional_cpu_build_during_stability_run=$true;matched_performance_trial=$false;driver_changed=$false}
+function Save-Report{$report|ConvertTo-Json -Depth 5|Set-Content "$out\report.json"};Save-Report
+try{
+ $prior=Get-Content "$vm\native-default-app-v1-qualification\report.json" -Raw|ConvertFrom-Json;if(!$prior.completed -or $prior.passed){throw 'Expected failed first application trial'}
+ $native=Get-Content "$vm\native-desktop-admission-v42\bootstrap\report.json" -Raw|ConvertFrom-Json;if($native.completed -or !$native.admission_published -or $native.error){throw 'Long native admission unavailable'}
+ & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$vm\build-native-default-app-v2.ps1" > "$out\build.stdout.log" 2> "$out\build.stderr.log"
+ if($LASTEXITCODE){throw 'Application diagnosis build failed'}
+ $command=@("$env:windir\System32\WindowsPowerShell\v1.0\powershell.exe",'-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',"$vm\run-native-default-app-v2.ps1")
+ @{command=$command;log="$out\probe.log"}|ConvertTo-Json -Depth 4|Set-Content -Encoding UTF8 "$out\job.json"
+ $action=New-ScheduledTaskAction -Execute "$source\venv\Scripts\pythonw.exe" -Argument ('"'+$source+'\native_runner.py" "'+$out+'\job.json"')
+ $principal=New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value) -LogonType Interactive -RunLevel Highest
+ $settings=New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 4) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+ Register-ScheduledTask -TaskName $task -Action $action -Principal $principal -Settings $settings|Out-Null;Start-ScheduledTask -TaskName $task
+ $deadline=[DateTime]::UtcNow.AddSeconds(200)
+ do{$rows=@();if(Test-Path "$out\probe.log"){$rows=@(Get-Content "$out\probe.log"|Where-Object {$_ -match '^\{.*\}$'}|ForEach-Object {$_|ConvertFrom-Json}|Where-Object {$_.PSObject.Properties.Name -contains 'exit_code'})};if($rows.Count){break};Start-Sleep -Milliseconds 250}while([DateTime]::UtcNow -lt $deadline)
+ if($rows.Count -ne 1 -or $rows[0].exit_code -ne 0){throw 'Retried default application failed'}
+ $q=Get-Content "$vm\native-default-app-v2-qualification\report.json" -Raw|ConvertFrom-Json;if(!$q.completed -or !$q.passed){throw 'Retried application evidence incomplete'};$report.passed=$true
+}catch{$report.error=$_.Exception.Message}
+finally{if(Get-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue){Stop-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue;Unregister-ScheduledTask -TaskName $task -Confirm:$false};$report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');Save-Report}
+Get-Content "$out\report.json";if(!$report.passed){exit 1}

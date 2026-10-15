@@ -1,0 +1,51 @@
+"""Expose validated graph lowering for an isolated pixel/merger fusion experiment."""
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'native-routing-v46';shutil.copytree(r/'native-routing-v45',d);lab=d/'native/windows/registered_lab'
+p=lab/'vertex_executor.hpp';s=p.read_text().replace('namespace nr::shader {','namespace ov { class Model; }\nnamespace nr::shader {',1)
+needle='    static void validate(const Program &program);';assert needle in s
+s=s.replace(needle,needle+'''
+    // Isolated composition experiment. Restricted to one fully floating pixel
+    // output; exact bit outputs and dynamic tap specializations are rejected.
+    static std::shared_ptr<ov::Model> lower_float_pixel_graph(const Program &program,
+        uint32_t samples,const std::string &backend,const TextureShapes &textures={},const TextureSamplers &samplers={});
+''',1);p.write_text(s)
+p=lab/'vertex_executor.cpp';s=p.read_text().replace('    ov::CompiledModel compiled;','    std::shared_ptr<ov::Model> exported_graph;\n    uint32_t floating_pixel_mask=0;\n    ov::CompiledModel compiled;',1)
+needle='                components.push_back(batch((program.outputs[i] & (1u << c))';assert needle in s
+s=s.replace(needle,'                if(i==0 && (program.outputs[i] & (1u<<c)) && output[i][c].floating)floating_pixel_mask|=1u<<c;\n'+needle,1)
+s=s.replace('        if(defer_compile)return;','        if(defer_compile){exported_graph=model;return;}',1)
+needle='void RegisterExecutor::validate(const Program &original) {';assert needle in s
+s=s.replace(needle,'''std::shared_ptr<ov::Model> RegisterExecutor::lower_float_pixel_graph(const Program &p,uint32_t count,
+    const std::string &backend,const TextureShapes &textures,const TextureSamplers &samplers){
+    check(p.stage==Stage::pixel && p.outputs[0]==15 && !mirrored_loop_shader(p));
+    for(unsigned i=1;i<16;++i)check(!p.outputs[i]);
+    State lowered(p,count,backend,textures,samplers,128,true);
+    check(lowered.exported_graph && lowered.floating_pixel_mask==15 && !lowered.output_bit_masks[0]);
+    return lowered.exported_graph;
+}
+'''+needle,1);p.write_text(s)
+p=lab/'output_merger.hpp';s=p.read_text().replace('namespace nr::raster {','namespace ov { class Model; }\nnamespace nr::raster {',1)
+needle='    ~OutputMerger();';assert needle in s
+s=s.replace(needle,'''    static std::shared_ptr<ov::Model> lower_graph(uint32_t samples,const std::string &backend,
+        BlendMode blend,bool bgra,uint8_t write_mask=15);
+'''+needle,1);p.write_text(s)
+p=lab/'output_merger.cpp';s=p.read_text().replace('    ov::CompiledModel compiled;','    std::shared_ptr<ov::Model> exported_graph;\n    ov::CompiledModel compiled;',1)
+needle='bool bgra, uint8_t mask) : count(size)';assert needle in s;s=s.replace(needle,'bool bgra, uint8_t mask,bool defer_compile=false) : count(size)',1)
+needle='        compiled = nr::provider::compile_model';assert needle in s;s=s.replace(needle,'        if(defer_compile){exported_graph=model;return;}\n'+needle,1)
+needle='OutputMerger::~OutputMerger() = default;';assert needle in s;s=s.replace(needle,'''std::shared_ptr<ov::Model> OutputMerger::lower_graph(uint32_t samples,const std::string &backend,BlendMode blend,bool bgra,uint8_t mask){
+    State lowered(samples,backend,blend,bgra,mask,true);return lowered.exported_graph;
+}
+'''+needle,1);p.write_text(s)
+shutil.copyfile(r/'pixel-merger-fusion-v1.cpp',lab/'pixel_merger_fusion.cpp')
+p=lab/'CMakeLists.txt';p.write_text(p.read_text()+'''
+add_executable(nr_pixel_merger_fusion pixel_merger_fusion.cpp)
+target_compile_features(nr_pixel_merger_fusion PRIVATE cxx_std_17)
+target_compile_options(nr_pixel_merger_fusion PRIVATE /W4 /WX)
+target_link_libraries(nr_pixel_merger_fusion PRIVATE nr_registered_vertex d3dcompiler)
+set_property(TARGET nr_pixel_merger_fusion PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+''')
+(r/'native-routing-v46-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-routing-v46.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-native-routing-v45.ps1').read_text().replace('native-routing-v45','native-routing-v46').replace('--target nr_texture_scope_test','--target nr_pixel_merger_fusion nr_texture_scope_test').replace("@('nr_texture_scope_test.exe'","@('nr_pixel_merger_fusion.exe','nr_texture_scope_test.exe'")
+(r/'build-native-routing-v46.ps1').write_text(s)
+print('Prepared isolated float-pixel/merger graph fusion. Worker routing is unchanged.')

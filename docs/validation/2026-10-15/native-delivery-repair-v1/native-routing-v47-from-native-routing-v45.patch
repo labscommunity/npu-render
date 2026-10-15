@@ -1,0 +1,241 @@
+--- a/native/windows/registered_lab/CMakeLists.txt
++++ b/native/windows/registered_lab/CMakeLists.txt
+@@ -379,3 +379,9 @@
+ target_compile_options(nr_texture_scope_test PRIVATE /W4 /WX)
+ target_link_libraries(nr_texture_scope_test PRIVATE nr_registered_vertex d3dcompiler)
+ set_property(TARGET nr_texture_scope_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
++
++add_executable(nr_pixel_merger_fusion pixel_merger_fusion.cpp)
++target_compile_features(nr_pixel_merger_fusion PRIVATE cxx_std_17)
++target_compile_options(nr_pixel_merger_fusion PRIVATE /W4 /WX)
++target_link_libraries(nr_pixel_merger_fusion PRIVATE nr_registered_vertex d3dcompiler openvino::runtime)
++set_property(TARGET nr_pixel_merger_fusion PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+--- a/native/windows/registered_lab/output_merger.hpp
++++ b/native/windows/registered_lab/output_merger.hpp
+@@ -4,6 +4,7 @@
+ #include <memory>
+ #include <string>
+ #include <vector>
++namespace ov { class Model; }
+ namespace nr::raster {
+ using Color = std::array<float, 4>;
+ using PackedColor = std::array<uint8_t, 4>;
+@@ -34,6 +35,8 @@
+ public:
+     OutputMerger(uint32_t samples, const std::string &backend, bool blend, bool bgra, uint8_t write_mask = 15);
+     OutputMerger(uint32_t samples, const std::string &backend, BlendMode blend, bool bgra, uint8_t write_mask = 15);
++    static std::shared_ptr<ov::Model> lower_graph(uint32_t samples,const std::string &backend,
++        BlendMode blend,bool bgra,uint8_t write_mask=15);
+     ~OutputMerger();
+     OutputMerger(const OutputMerger &) = delete;
+     OutputMerger &operator=(const OutputMerger &) = delete;
+--- a/native/windows/registered_lab/vertex_executor.hpp
++++ b/native/windows/registered_lab/vertex_executor.hpp
+@@ -3,6 +3,7 @@
+ #include "shader_texture.hpp"
+ #include <memory>
+ #include <string>
++namespace ov { class Model; }
+ namespace nr::shader {
+ using VertexBits = std::array<uint32_t, 4>;
+ using VertexRegisters = std::array<VertexBits, 16>;
+@@ -25,6 +26,11 @@
+     // Validate lowering constraints after parse_vertex/parse_pixel, without choosing a
+     // device or claiming that a complete graphics pipeline can execute.
+     static void validate(const Program &program);
++    // Isolated composition experiment. Restricted to one fully floating pixel
++    // output; exact bit outputs and dynamic tap specializations are rejected.
++    static std::shared_ptr<ov::Model> lower_float_pixel_graph(const Program &program,
++        uint32_t samples,const std::string &backend,const TextureShapes &textures={},const TextureSamplers &samplers={});
++
+     // Bounded internal expansion for qualified shader specializations.
+     static uint32_t maximum_batch(const Program &program);
+     // Preferred packed raster shape, independently of the arithmetic ceiling.
+--- /dev/null
++++ b/native/windows/registered_lab/pixel_merger_fusion.cpp
+@@ -0,0 +1,108 @@
++#define NOMINMAX
++#include "vertex_executor.hpp"
++#include "output_merger.hpp"
++#include "shader_contract.hpp"
++#include "shader_reference.hpp"
++#include "blend_reference.hpp"
++#include "provider_compile.hpp"
++#include <openvino/openvino.hpp>
++#include <algorithm>
++#include <chrono>
++#include <cmath>
++#include <cstdio>
++#include <cstring>
++using namespace nr::shader;
++using namespace nr::raster;
++#define CHECK(v) do {if(!(v))throw std::runtime_error(#v);}while(false)
++using Clock=std::chrono::steady_clock;
++double elapsed(Clock::time_point start){return std::chrono::duration<double,std::milli>(Clock::now()-start).count();}
++uint32_t bits(float x){uint32_t y;std::memcpy(&y,&x,4);return y;}
++ov::Output<ov::Node> data_output(ov::Output<ov::Node> port){
++    return port.get_node()->get_type_name()==std::string("Result")?port.get_node()->input_value(0):port;
++}
++std::shared_ptr<ov::Model> fuse(const Program &p,uint32_t count,const std::string &backend,const TextureShapes &shapes,const TextureSamplers &samplers,BlendMode blend,bool bgra,uint8_t mask){
++    auto shader=RegisterExecutor::lower_float_pixel_graph(p,count,backend,shapes,samplers);
++    auto merger=OutputMerger::lower_graph(count,backend,blend,bgra,mask);
++    const auto colors=data_output(shader->output("vs_output_0"));
++    auto parameters=shader->get_parameters();
++    for(const auto &parameter:merger->get_parameters()){
++        if(parameter->output(0).get_names().count("colors")){
++            const auto consumers=parameter->output(0).get_target_inputs();
++            for(auto input:consumers)input.replace_source_output(colors);
++        }else parameters.push_back(parameter);
++    }
++    auto pixels=data_output(merger->output(0));pixels.get_tensor().set_names({"fused_pixels"});
++    ov::OutputVector outputs{pixels,colors};
++    for(const auto &output:shader->outputs())if(output.get_names().count("invalid_sample_coordinates"))outputs.push_back(data_output(output));
++    auto model=std::make_shared<ov::Model>(outputs,parameters,"pixel_merger_fusion_diagnostic");
++    for(const auto &node:model->get_ops())if(backend=="NPU")CHECK(nr::provider::precision_preserved(node) || node->get_type_name()==std::string("Result"));
++    return model;
++}
++int main(int argc,char **argv)try{
++    CHECK(argc==2);const std::string backend=argv[1];CHECK(backend=="CPU" || backend=="NPU");
++    const auto code=nr::registered_lab::shader_tokens(R"(Texture2D<float4> image:register(t0);SamplerState sampler0:register(s0);cbuffer Params:register(b0){float4 scale;}float4 main(float2 uv:TEXCOORD0):SV_Target{return image.Sample(sampler0,uv)*scale;})","ps_4_0");
++    const auto program=parse_pixel(code.data(),code.size());uint64_t checked=0;unsigned cases=0;
++    TextureShapes shapes{};shapes[0]={128,128,15};
++    for(const uint32_t count:{32u,8192u})for(unsigned scenario=0;scenario<3;++scenario){
++        TextureSamplers samplers{};samplers[0].filter=scenario==1?TextureFilter::linear:TextureFilter::point;
++        const auto blend=scenario==0?BlendMode::source_copy:scenario==1?BlendMode::source_over:BlendMode::component_coverage;
++        const bool bgra=scenario!=0;const uint8_t mask=scenario==2?5:15;
++        PixelExecutor separate_shader(program,count,backend,shapes,samplers);OutputMerger separate_merger(count,backend,blend,bgra,mask);
++        ov::Core core;auto graph=fuse(program,count,backend,shapes,samplers,blend,bgra,mask);
++        ov::AnyMap properties{ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY)};
++        if(backend=="NPU")properties.emplace(ov::hint::execution_mode(ov::hint::ExecutionMode::ACCURACY));
++        const auto preparation=Clock::now();auto compiled=nr::provider::compile_model(core,graph,backend,properties);const auto compile_ms=elapsed(preparation);
++        const auto devices=compiled.get_property(ov::execution_devices);CHECK(devices.size()==1 && (devices[0]==backend || devices[0].rfind(backend+".",0)==0));
++        auto request=compiled.create_infer_request();TexturePixels textures{};textures[0].resize(128*128);
++        std::vector<VertexRegisters> inputs(count);VertexConstants constants{};constants[0].resize(1);
++        std::vector<PackedColor> background(count);std::vector<uint8_t> coverage(count);
++        const Color blend_constant{.25f,.5f,.75f,1};double separate_ms=0,fused_ms=0;uint64_t measured=0;
++        for(unsigned pass=0;pass<8;++pass){
++            for(unsigned n=0;n<128*128;++n)for(unsigned c=0;c<4;++c)textures[0][n][c]=float((n+c*3+pass*7)%17)/16;
++            for(unsigned c=0;c<4;++c)constants[0][0][c]=bits(float((pass+c)%5)/4);
++            for(unsigned n=0;n<count;++n){
++                // Exact texel centers exercise point and linear graphs without
++                // introducing an oracle's independent interpolation rounding.
++                inputs[n][0]={bits((float((n*3+pass)%128)+.5f)/128),bits((float((n/128+pass)%128)+.5f)/128),0,0};
++                coverage[n]=uint8_t((n+pass)%3!=0);for(unsigned c=0;c<4;++c)background[n][c]=uint8_t(n*13+c*17+pass*29);
++            }
++            const auto start_separate=Clock::now();const auto shaded=separate_shader.execute(inputs,constants,textures);std::vector<Color> colors(count);
++            CHECK(shaded.execution_device.rfind(backend,0)==0);
++            for(unsigned n=0;n<count;++n)std::memcpy(colors[n].data(),shaded.vertices[n][0].data(),sizeof(Color));
++            const auto packed=separate_merger.execute(colors,background,coverage,blend_constant);const auto separate_time=elapsed(start_separate);
++            const auto start_fused=Clock::now();
++            for(const auto &port:compiled.inputs()){
++                const auto name=port.get_any_name();auto tensor=request.get_tensor(port);
++                if(name=="v0_float" || name=="v0_bits")for(unsigned n=0;n<count;++n)std::memcpy(static_cast<uint8_t*>(tensor.data())+n*16,inputs[n][0].data(),16);
++                else if(name=="cb0_float" || name=="cb0_bits")std::memcpy(tensor.data(),constants[0][0].data(),16);
++                else if(name=="texture_0")std::memcpy(tensor.data(),textures[0].data(),textures[0].size()*sizeof(Color));
++                else if(name=="texture_half_texel")*tensor.data<float>()=.5f;
++                else if(name=="background")std::memcpy(tensor.data(),background.data(),background.size()*sizeof(PackedColor));
++                else if(name=="coverage")for(unsigned n=0;n<count;++n)tensor.data<int32_t>()[n]=coverage[n];
++                else if(name=="blend_constant")std::memcpy(tensor.data(),blend_constant.data(),sizeof(Color));
++                else throw std::runtime_error("unexpected fused input: "+name);
++            }
++            request.infer();const auto fused_time=elapsed(start_fused);
++            const auto actual=request.get_tensor("fused_pixels"),raw_colors=request.get_tensor("vs_output_0");
++            CHECK(actual.get_byte_size()==count*sizeof(PackedColor) && raw_colors.get_byte_size()==count*sizeof(Color));
++            if(std::memcmp(actual.data(),packed.pixels.data(),actual.get_byte_size()) || std::memcmp(raw_colors.data(),colors.data(),raw_colors.get_byte_size())){
++                std::fprintf(stderr,"fused mismatch count=%u scenario=%u pass=%u\n",count,scenario,pass);CHECK(false);
++            }
++            for(const auto &port:compiled.outputs())if(port.get_names().count("invalid_sample_coordinates"))CHECK(*request.get_tensor(port).data<int32_t>()==0);
++            for(unsigned n=0;n<count;++n){
++                const auto expected=reference_vertex(program,inputs[n],constants,shapes,samplers,textures);CHECK(expected[0]==shaded.vertices[n][0]);
++                for(unsigned c=0;c<4;++c){
++                    const auto source=bgra && c<3?2-c:c;uint8_t wanted=background[n][c];
++                    if(coverage[n] && (mask&(1u<<source))){
++                        const auto terms=reference_blend_terms(blend,std::clamp(colors[n][source],0.f,1.f),std::clamp(colors[n][3],0.f,1.f),float(background[n][c]),float(background[n][3]),blend_constant[source]);
++                        volatile float first=terms[0],second=terms[1];volatile float combined=first+second;wanted=uint8_t(std::nearbyint(std::clamp(float(combined),0.f,255.f)));
++                    }
++                    CHECK(actual.data<const uint8_t>()[n*4+c]==wanted);++checked;
++                }
++            }
++            if(pass){separate_ms+=separate_time;fused_ms+=fused_time;++measured;}
++        }
++        ++cases;std::printf("{\"pixel_merger_fusion\":true,\"passed\":true,\"count\":%u,\"scenario\":%u,\"execution_device\":\"%s\",\"compile_ms\":%.6f,\"measured_repetitions\":%llu,\"separate_total_ms\":%.6f,\"fused_total_ms\":%.6f,\"shader_output_retained_for_verification\":true,\"separate_inferences_per_iteration\":2,\"fused_inferences_per_iteration\":1,\"matched_order_comparison\":false,\"desktop_offloaded\":false}\n",count,scenario,backend.c_str(),compile_ms,static_cast<unsigned long long>(measured),separate_ms,fused_ms);std::fflush(stdout);
++    }
++    std::printf("{\"completed\":true,\"passed\":true,\"cases\":%u,\"exact_packed_components\":%llu,\"execution_device\":\"%s\",\"candidate_promoted\":false}\n",cases,static_cast<unsigned long long>(checked),backend.c_str());return 0;
++}catch(const std::exception &e){std::fprintf(stderr,"pixel/merger fusion: %s\n",e.what());return 1;}
+--- a/native/windows/registered_lab/vertex_executor.cpp
++++ b/native/windows/registered_lab/vertex_executor.cpp
+@@ -67,6 +67,8 @@
+     std::vector<unsigned> outputs;
+     std::array<uint32_t, 16> output_bit_masks{};
+     ov::Core core;
++    std::shared_ptr<ov::Model> exported_graph;
++    uint32_t floating_pixel_mask=0;
+     ov::CompiledModel compiled;
+     ov::InferRequest request;
+     std::string execution_device;
+@@ -729,6 +731,7 @@
+             ov::OutputVector components;
+             for (unsigned c = 0; c < 4; ++c) {
+                 if (program.outputs[i] & (1u << c)) check(bool(output[i][c].floating) || bool(output[i][c].integer));
++                if(i==0 && (program.outputs[i] & (1u<<c)) && output[i][c].floating)floating_pixel_mask|=1u<<c;
+                 components.push_back(batch((program.outputs[i] & (1u << c)) && output[i][c].floating ? output[i][c].floating : floating(0)));
+             }
+             Node result = std::make_shared<op::Concat>(components, 1);
+@@ -804,7 +807,7 @@
+                 if (!nr::provider::precision_preserved(node)) throw std::runtime_error("vertex precision marker was lost");
+             properties.emplace(ov::hint::execution_mode(ov::hint::ExecutionMode::ACCURACY));
+         }
+-        if(defer_compile)return;
++        if(defer_compile){exported_graph=model;return;}
+         compiled = nr::provider::compile_model(core, model, backend, properties);
+         check(compiled.inputs().size() == bindings.size() && compiled.outputs().size() == results.size());
+         const auto devices = compiled.get_property(ov::execution_devices);
+@@ -813,6 +816,14 @@
+         execution_device = devices[0]; request = compiled.create_infer_request();ready=true;
+     }
+ };
++std::shared_ptr<ov::Model> RegisterExecutor::lower_float_pixel_graph(const Program &p,uint32_t count,
++    const std::string &backend,const TextureShapes &textures,const TextureSamplers &samplers){
++    check(p.stage==Stage::pixel && p.outputs[0]==15 && !mirrored_loop_shader(p));
++    for(unsigned i=1;i<16;++i)check(!p.outputs[i]);
++    State lowered(p,count,backend,textures,samplers,128,true);
++    check(lowered.exported_graph && lowered.floating_pixel_mask==15 && !lowered.output_bit_masks[0]);
++    return lowered.exported_graph;
++}
+ void RegisterExecutor::validate(const Program &original) {
+     const auto program=lower_bounded_loops(original);
+     // Type views are properties of each SSA value, not permanent register
+--- a/native/windows/registered_lab/output_merger.cpp
++++ b/native/windows/registered_lab/output_merger.cpp
+@@ -28,11 +28,12 @@
+     uint32_t count;
+     BlendMode blend;
+     ov::Core core;
++    std::shared_ptr<ov::Model> exported_graph;
+     ov::CompiledModel compiled;
+     ov::InferRequest request;
+     std::string execution_device;
+     bool failed = false;
+-    State(uint32_t size, const std::string &backend, BlendMode blending, bool bgra, uint8_t mask) : count(size), blend(blending) {
++    State(uint32_t size, const std::string &backend, BlendMode blending, bool bgra, uint8_t mask,bool defer_compile=false) : count(size), blend(blending) {
+         require(valid_blend(blend));
+         require(count && count <= 65536 && mask && mask <= 15 && (backend == "NPU" || backend == "CPU" || backend == "GPU"));
+         auto colors = std::make_shared<op::Parameter>(ov::element::f32, ov::Shape{count, 4});
+@@ -127,6 +128,7 @@
+                 if (!nr::provider::precision_preserved(node)) throw std::runtime_error("output precision marker lost");
+             properties.emplace(ov::hint::execution_mode(ov::hint::ExecutionMode::ACCURACY));
+         }
++        if(defer_compile){exported_graph=model;return;}
+         compiled = nr::provider::compile_model(core, model, backend, properties);
+         const auto devices = compiled.get_property(ov::execution_devices);
+         require(devices.size() == 1 && (devices[0] == backend || devices[0].rfind(backend + ".", 0) == 0));
+@@ -137,6 +139,9 @@
+     : OutputMerger(samples, backend, source_blend(blend), bgra, mask) {}
+ OutputMerger::OutputMerger(uint32_t samples, const std::string &backend, BlendMode blend, bool bgra, uint8_t mask)
+     : state(std::make_unique<State>(samples, backend, blend, bgra, mask)) {}
++std::shared_ptr<ov::Model> OutputMerger::lower_graph(uint32_t samples,const std::string &backend,BlendMode blend,bool bgra,uint8_t mask){
++    State lowered(samples,backend,blend,bgra,mask,true);return lowered.exported_graph;
++}
+ OutputMerger::~OutputMerger() = default;
+ OutputMerger::Result OutputMerger::execute(const std::vector<Color> &colors, const std::vector<PackedColor> &background,
+                                          const std::vector<uint8_t> &coverage,const Color &blend_constant) {

@@ -1,0 +1,9 @@
+{"worker_binary_sha256": "15c717b2d91f4866c5b698e7f8d851ab29ac6c8c2ed4ee171c5b5ec87cf26be9", "dll_sha256": "ad67c65bbcfb0712f9499a0fde0679c55ae294f3f5a094b1d180cb2655f797a8", "started": "2026-10-15T03:59:37.494023+00:00", "completed": true, "passed": false, "controller_pid": 3336, "driver_installed": true, "registered_adapter_tested": false, "desktop_offloaded": false, "quad_batch": "1", "error": "AssertionError()", "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\qualify-native-default-app-v1.py\", line 21, in <module>\n    assert negative.returncode==0 and any(x.get('unleased_native_adapter_rejected') and x.get('passed') for x in rows(out/'unleased.stdout.jsonl'));report['unleased_rejection_passed']=True;save()\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n", "finished": "2026-10-15T03:59:37.950089+00:00"}
+Default adapter component qualification failed
+At C:\Users\tatef\AppData\Local\npu-render\vm\run-native-default-app-v1.ps1:15 char:19
++ ... LASTEXITCODE){throw 'Default adapter component qualification failed'}
++                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (Default adapter...fication failed:String) [], RuntimeException
+    + FullyQualifiedErrorId : Default adapter component qualification failed
+ 
+{"exit_code": 1}

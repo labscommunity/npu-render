@@ -1,0 +1,44 @@
+"""Retry long integration with the missing IDD duration consumer corrected."""
+from pathlib import Path
+import hashlib,json
+r=Path('results/render-driver')
+def change(name,pairs):
+ s=(r/name).read_text()
+ for a,b in pairs:assert a in s,(name,a);s=s.replace(a,b)
+ return s
+for prefix in ('run-native-desktop','recover-native-desktop'):
+ s=change(prefix+'-v40.ps1',[('v40','v42'),('0.0.1301.0','0.0.1502.0')])
+ if prefix=='run-native-desktop':
+  s=s.replace('native-idd-package-v1','native-idd-package-v2').replace('native-registration-v23','native-registration-v24').replace('native-routing-v41','native-routing-v45').replace('native_desktop_bootstrap_v18','native_desktop_bootstrap_v19').replace('native-live-v28','native-live-v31')
+  needle="'--monitor-seconds','2220',";assert needle in s;s=s.replace(needle,needle+"'--memory-cache','1','--texture-scope','1',",1)
+  needle='$packages=@(';assert needle in s
+  s=s.replace(needle,'''$iddProof=Get-Content "$r\\vm\\native-idd-package-v2\\report.json" -Raw|ConvertFrom-Json
+if(!$iddProof.prepared -or $iddProof.desktop_lease_max_ms -ne 2400000 -or $iddProof.owned_app_lease_max_ms -ne 120000){throw 'Indirect duration contract not qualified'}
+'''+needle,1)
+ (r/(prefix+'-v42.ps1')).write_text(s)
+for n in (48,49):(r/f'start-native-topology-v{n}.ps1').write_text(change('start-native-topology-v41.ps1',[('v41',f'v{n}'),('V41',f'V{n}')]))
+(r/'dismiss-native-saver-v6.ps1').write_text(change('dismiss-native-saver-v3.ps1',[('native-saver-dismiss-v3','native-saver-dismiss-v6'),('native-topology-v42','native-topology-v49')]))
+s=change('run-native-live-v30.ps1',[
+ ('native-live-v30','native-live-v32'),('NativeLiveV30','NativeLiveV32'),('native-present-v20','native-present-v21'),('live-frame-reader-v11','live-frame-reader-v12'),
+ ('native-cursor-guard-v3','native-cursor-guard-v4'),('native-registration-v23','native-registration-v24'),('native-desktop-admission-v40','native-desktop-admission-v42'),
+ ('run-native-desktop-v40','run-native-desktop-v42'),('NativeDesktopRecovery-v40','NativeDesktopRecovery-v42'),('native-topology-primary-v16','native-topology-primary-v18'),('native-topology-v44','native-topology-v48')])
+needle="  if(!$clickCued -and $cursorCued";assert needle in s
+s=s.replace(needle,'''  if($keyCued -and $redObserved -and !(Test-Path "$out\\cues\\animate")){New-Item -ItemType File "$out\\cues\\animate"|Out-Null;$report.initial_response_held_until_observed=$true;Save-Report}
+'''+needle,1)
+needle='$report.isolated_provider=$bootstrap.provider_isolated;';assert needle in s
+s=s.replace(needle,"$report.texture_scope=$bootstrap.texture_scope;$report.memory_cache=$bootstrap.memory_cache;if($bootstrap.texture_scope -ne '1' -or $bootstrap.memory_cache -ne '1'){throw 'Qualified provider settings absent'};"+needle,1)
+(r/'run-native-live-v32.ps1').write_text(s)
+files=list(json.loads((r/'native-desktop-v41-source.json').read_text()))
+files=[f.replace('desktop-v41','desktop-v42').replace('live-v31','live-v32').replace('topology-v46','topology-v48') for f in files]
+files+=['run-native-default-app-v1.ps1','qualify-native-default-app-v1.py']
+(r/'native-desktop-v42-source.json').write_text(json.dumps({f:hashlib.sha256((r/f).read_bytes()).hexdigest() for f in files},indent=2)+'\n')
+s=change('run-native-duration-long-app-v1.ps1',[
+ ('native-duration-long-app-v1','native-duration-long-app-v2'),('native-live-v28','native-live-v31'),('native-live-v30','native-live-v32'),
+ ('native-topology-v45','native-topology-v49'),('InspectTopology-V45','InspectTopology-V49'),('observer45','observer49'),('dismiss-native-saver-v4','dismiss-native-saver-v6')])
+a=s.index(" $report.active_phase='build-default-app'");b=s.index(" $report.active_phase='interactive-readiness'",a)
+s=s[:a]+''' $appBuild=Get-Content "$r\\builds\\native-default-app-v1\\registered-build-report.json" -Raw|ConvertFrom-Json
+ if(!$appBuild.clean_build -or (Get-FileHash "$r\\builds\\native-default-app-v1\\Release\\nr_native_registered_probe.exe").Hash -ne $appBuild.binary_sha256.'nr_native_registered_probe.exe'){throw 'Existing default application build identity changed'}
+ $report.phases+=@{phase='verified-existing-default-app';passed=$true};Save-Report
+'''+s[b:]
+(r/'run-native-duration-long-app-v2.ps1').write_text(s)
+print('Prepared native long retry v32 with scoped worker45, presenter21 and IDD2; no admission yet.')
