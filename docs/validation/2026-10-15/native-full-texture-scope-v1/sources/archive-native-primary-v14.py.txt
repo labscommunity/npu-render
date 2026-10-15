@@ -1,0 +1,49 @@
+"""Verify and preserve the complete-stream scoped-texture comparison."""
+from pathlib import Path
+from datetime import UTC,datetime
+import difflib,hashlib,json,math
+r=Path('results/render-driver');raw=r/'primary-raw-v14';out=Path('docs/validation/2026-10-15/native-full-texture-scope-v1')
+def obj(p):
+ b=p.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+def rows(p):return [json.loads(s) for s in p.read_text(encoding='utf-8-sig').splitlines() if s.startswith('{') and s.endswith('}')]
+e=obj(raw/'native-texture-full-v1-evidence/report.json');assert e['completed'] and e['passed'] and e['at_least_ten_percent_reduction']
+phases={p['phase']:p for p in e['phases']};totals={};acks=references=unreferenced=0
+for name in ('A1','B1','B2','A2'):
+ d=raw/('native-texture-full-v1-'+name);q=obj(d/'report.json');p=phases[name]
+ assert q['completed'] and q['passed'] and q['successful_replays']==q['delivery_acknowledgments']==1109
+ assert q['original_pixel_hashes_matched']==1108 and q['unreferenced_successes']==1
+ assert q['selected_tickets']==list(range(1109)) and q['generic_batch']=='4096'
+ assert q['memory_cache']==q['texture_scope']==('0' if name.startswith('A') else '1')
+ rr=rows(d/'replays.jsonl');assert len(rr)==1109
+ assert sum(bool(x.get('original_reference_available') and x.get('exact_recorded_pixels')) for x in rr)==1108
+ parent=rows(d/'worker.stdout.jsonl');assert sum(bool(x.get('worker_success')) for x in parent)==1109
+ assert sum(bool(x.get('provider_process_started')) for x in parent)==1
+ assert not any(x.get('provider_process_failure') or (x.get('provider_process_response') and x.get('attempt',0)) for x in parent)
+ children=list((d/'provider-processes').glob('generation-*/worker.stdout.jsonl'));assert len(children)==1
+ child=[x for x in rows(children[0]) if x.get('passed') and 'compile_and_draw_ms' in x]
+ assert len(child)==1109 and all(x['execution_device']=='NPU' for x in child)
+ assert sum(x['provider_requests'] for x in child)==39065
+ totals[name]=sum(x['compile_and_draw_ms'] for x in child)
+ assert math.isclose(totals[name],p['child_totals']['compile_and_draw_ms'],abs_tol=1e-5)
+ assert p['before_power']['ac_online']==p['after_power']['ac_online']==1
+ acks+=q['delivery_acknowledgments'];references+=q['original_pixel_hashes_matched'];unreferenced+=q['unreferenced_successes']
+reduction=1-(totals['B1']+totals['B2'])/(totals['A1']+totals['A2']);assert math.isclose(reduction,e['relative_reduction'],abs_tol=1e-12) and reduction>=.1
+for backend in ('CPU','NPU'):
+ p=phases['contract-'+backend];assert p['passed'] and p['execution_device']==backend and p['checked_components']==480 and p['invalid_scope_uses_rejected']==12 and p['resource_generations']==6
+manifest=obj(r/'native-primary-v14-artifact-sha256.json');out.mkdir(parents=True,exist_ok=False)
+for item in manifest:
+ data=(raw/item['source']).read_bytes();assert len(data)==item['bytes'] and hashlib.sha256(data).hexdigest()==item['sha256'].lower()
+ dest=out/'raw'/item['source']
+ if dest.suffix in ('.py','.ps1'):dest=dest.with_suffix(dest.suffix+'.txt')
+ dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(data);item['archive_path']=dest.relative_to(out).as_posix()
+(out/'raw-manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
+patch=[]
+for name,checksum in obj(raw/'native-routing-v45-source.json').items():
+ new=r/'native-routing-v45'/name;old=r/'native-routing-v41'/name;assert hashlib.sha256(new.read_bytes()).hexdigest()==checksum
+ if not old.exists() or old.read_bytes()!=new.read_bytes():patch.extend(difflib.unified_diff(old.read_text().splitlines(keepends=True) if old.exists() else [],new.read_text().splitlines(keepends=True),fromfile='a/'+name if old.exists() else '/dev/null',tofile='b/'+name))
+dest=out/'native-routing-v45-from-v41.patch';dest.write_text(''.join(patch));sources=[dict(path=dest.name,sha256=hashlib.sha256(dest.read_bytes()).hexdigest(),base='native-routing-v41')]
+for name in ('prepare-native-routing-v45.py','collect-native-primary-v14.py','archive-native-primary-v14.py'):
+ dest=out/'sources'/(name+'.txt');dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes((r/name).read_bytes());sources.append(dict(path=dest.relative_to(out).as_posix(),sha256=hashlib.sha256(dest.read_bytes()).hexdigest()))
+(out/'source-manifest.json').write_text(json.dumps(sources,indent=2)+'\n')
+report=dict(recorded=datetime.now(UTC).isoformat(),evidence_checks_passed=True,raw_files_remotely_hash_verified=len(manifest),raw_bytes=sum(x['bytes'] for x in manifest),acknowledged_npu_requests=acks,reference_hash_matches=references,unreferenced_successes=unreferenced,provider_faults=0,compile_and_draw_ms=totals,relative_reduction=reduction,candidate='scoped texture uploads plus memory model cache',comparison='A1 B1 B2 A2; same 1109 recorded requests; existing disk cache',desktop_offloaded=False,live_native_qualified=False,full_desktop_offload=False,tahoma_tested=False)
+(out/'report.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report))

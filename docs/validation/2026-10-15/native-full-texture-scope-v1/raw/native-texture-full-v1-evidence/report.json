@@ -1,0 +1,169 @@
+{
+  "started": "2026-10-15T03:04:48.051534+00:00",
+  "completed": true,
+  "passed": true,
+  "desktop_changed": false,
+  "desktop_performance_qualified": false,
+  "tahoma_tested": false,
+  "baseline_texture_scope": "0",
+  "candidate_texture_scope": "1",
+  "generic_batch": "4096",
+  "baseline_memory_cache": "0",
+  "candidate_memory_cache": "1",
+  "memory_capacity": "512",
+  "phases": [
+    {
+      "phase": "contract-CPU",
+      "passed": true,
+      "execution_device": "CPU",
+      "checked_components": 480,
+      "host_uploaded_bytes": 3072,
+      "host_recopy_bytes_avoided": 4608,
+      "invalid_scope_uses_rejected": 12,
+      "resource_generations": 6,
+      "desktop_offloaded": false
+    },
+    {
+      "phase": "contract-NPU",
+      "passed": true,
+      "execution_device": "NPU",
+      "checked_components": 480,
+      "host_uploaded_bytes": 3072,
+      "host_recopy_bytes_avoided": 4608,
+      "invalid_scope_uses_rejected": 12,
+      "resource_generations": 6,
+      "desktop_offloaded": false
+    },
+    {
+      "phase": "A1",
+      "texture_scope": "0",
+      "memory_cache": "0",
+      "passed": true,
+      "child_totals": {
+        "draw_ms": 250903.227,
+        "compile_and_draw_ms": 351681.673,
+        "provider_requests": 39065,
+        "backend_compile_calls": 1352,
+        "memory_cache_hits": 0,
+        "memory_cache_evictions": 0,
+        "cache_requests": 1352,
+        "cache_hits": 1352
+      },
+      "before_power": {
+        "utc": "2026-10-15T03:04:48.611165+00:00",
+        "ac_online": 1,
+        "percent": 100,
+        "raw_battery_status": 1
+      },
+      "after_power": {
+        "utc": "2026-10-15T03:12:28.629737+00:00",
+        "ac_online": 1,
+        "percent": 100,
+        "raw_battery_status": 1
+      }
+    },
+    {
+      "phase": "B1",
+      "texture_scope": "1",
+      "memory_cache": "1",
+      "passed": true,
+      "child_totals": {
+        "draw_ms": 225544.854,
+        "compile_and_draw_ms": 290802.627,
+        "provider_requests": 39065,
+        "backend_compile_calls": 280,
+        "memory_cache_hits": 1072,
+        "memory_cache_evictions": 0,
+        "cache_requests": 280,
+        "cache_hits": 280
+      },
+      "before_power": {
+        "utc": "2026-10-15T03:12:28.696809+00:00",
+        "ac_online": 1,
+        "percent": 100,
+        "raw_battery_status": 1
+      },
+      "after_power": {
+        "utc": "2026-10-15T03:19:15.419215+00:00",
+        "ac_online": 1,
+        "percent": 100,
+        "raw_battery_status": 1
+      }
+    },
+    {
+      "phase": "B2",
+      "texture_scope": "1",
+      "memory_cache": "1",
+      "passed": true,
+      "child_totals": {
+        "draw_ms": 235412.524,
+        "compile_and_draw_ms": 303190.06,
+        "provider_requests": 39065,
+        "backend_compile_calls": 280,
+        "memory_cache_hits": 1072,
+        "memory_cache_evictions": 0,
+        "cache_requests": 280,
+        "cache_hits": 280
+      },
+      "before_power": {
+        "utc": "2026-10-15T03:19:15.483373+00:00",
+        "ac_online": 1,
+        "percent": 100,
+        "raw_battery_status": 1
+      },
+      "after_power": {
+        "utc": "2026-10-15T03:26:15.837845+00:00",
+        "ac_online": 1,
+        "percent": 100,
+        "raw_battery_status": 1
+      }
+    },
+    {
+      "phase": "A2",
+      "texture_scope": "0",
+      "memory_cache": "0",
+      "passed": true,
+      "child_totals": {
+        "draw_ms": 242031.436,
+        "compile_and_draw_ms": 343234.522,
+        "provider_requests": 39065,
+        "backend_compile_calls": 1352,
+        "memory_cache_hits": 0,
+        "memory_cache_evictions": 0,
+        "cache_requests": 1352,
+        "cache_hits": 1352
+      },
+      "before_power": {
+        "utc": "2026-10-15T03:26:15.910347+00:00",
+        "ac_online": 1,
+        "percent": 100,
+        "raw_battery_status": 1
+      },
+      "after_power": {
+        "utc": "2026-10-15T03:33:50.906396+00:00",
+        "ac_online": 1,
+        "percent": 100,
+        "raw_battery_status": 1
+      }
+    }
+  ],
+  "binary_sha256": {
+    "nr_quad_batch_probe.exe": "561F416DF8DFBF29F1F31D4316231B69DAC76ACC7F932488C14D09458C65A745",
+    "nr_registered_local_indexed_worker.exe": "946AD3E87483D85CBDC08CAAF4EEE4CEB2C2D3CA413AB0AC8A9455AF6E2CBE87",
+    "nr_registered_linear_texture_draw_test.exe": "46C8CBB7A8DB21835A5DE7FF9E18E86FEB72E344D1F47366A3F330BB3CFC2BB8",
+    "nr_registered_provider_memory_cache_test.exe": "DBE1B600A49E4657B991F4585236EA43D2F933E458D240F7F27B8CC2584D4EE4",
+    "nr_registered_indexed_exchange_test.exe": "B8D80DFCCDDFF56AB0EFE5FE321E85A5F6D191062FF058F13653D449152A224C",
+    "nr_registered_derivative_test.exe": "004C89095C420A11BE1D29EA4D9AD20D4A18BBEFA8DC6F106BE7C7C175F5D818",
+    "nr_texture_scope_test.exe": "89A0CF35BB8897B6A53A69B8FBF79FD3B3F4DFE075E8F04F3CFFDCE3D351DEE7",
+    "nr_registered_triangle_texture_draw_test.exe": "82A120A7E47C1994C1FD3EC79C39B18A319DF3D38B2820FE1D599C5223091A04",
+    "nr_native_probe_lease_test.exe": "4E8B1CB3A75CF0976D99D6BCB31A9DD9C335E9701F8E83D6EAD39B17373448DB"
+  },
+  "active_phase": "A2",
+  "mean_compile_draw_ms": {
+    "A": 347458.09750000003,
+    "B": 296996.34349999996
+  },
+  "relative_reduction": 0.14523119294982056,
+  "at_least_ten_percent_reduction": true,
+  "finished": "2026-10-15T03:33:50.977712+00:00"
+}

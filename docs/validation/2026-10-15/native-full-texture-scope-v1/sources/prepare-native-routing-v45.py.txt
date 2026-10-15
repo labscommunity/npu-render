@@ -1,0 +1,29 @@
+"""Combine qualified scoped-upload source with the finite duration worker."""
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'native-routing-v45';shutil.copytree(r/'native-routing-v41',d);relative=Path('native/windows/registered_lab');lab=d/relative
+for name in ['vertex_executor.hpp','vertex_executor.cpp','triangle_texture_draw.cpp','texture_scope_test.cpp']:
+ shutil.copyfile(r/'native-routing-v40'/relative/name,lab/name)
+p=lab/'CMakeLists.txt';s=p.read_text();s+='''
+add_executable(nr_texture_scope_test texture_scope_test.cpp)
+target_compile_features(nr_texture_scope_test PRIVATE cxx_std_17)
+target_compile_options(nr_texture_scope_test PRIVATE /W4 /WX)
+target_link_libraries(nr_texture_scope_test PRIVATE nr_registered_vertex d3dcompiler)
+set_property(TARGET nr_texture_scope_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+''';p.write_text(s)
+(r/'native-routing-v45-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-routing-v45.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-native-routing-v41.ps1').read_text().replace('native-routing-v41','native-routing-v45').replace('--target nr_registered_provider_memory_cache_test','--target nr_texture_scope_test nr_registered_provider_memory_cache_test').replace("@('nr_registered_provider_memory_cache_test.exe'","@('nr_texture_scope_test.exe','nr_registered_provider_memory_cache_test.exe'")
+(r/'build-native-routing-v45.ps1').write_text(s)
+s=(r/'qualify-native-texture-scope-v1.py').read_text().replace('native-routing-v40','native-routing-v45').replace('native-texture-scope-v1','native-texture-full-v1')
+s=s.replace("memory_cache='1'", "baseline_memory_cache='0', candidate_memory_cache='1'")
+s=s.replace("[('warm-A', '0'), ('warm-B', '1'), ('A1', '0'), ('B1', '1'), ('B2', '1'), ('A2', '0')]", "[('A1', '0'), ('B1', '1'), ('B2', '1'), ('A2', '0')]")
+s=s.replace("'--memory-cache', '1',", "'--memory-cache', mode,")
+s=s.replace("'--generic-batch', '4096', '--tickets', tickets,", "'--generic-batch', '4096',")
+needle="proof['delivery_acknowledgments'] == proof['original_pixel_hashes_matched'] == 16";assert needle in s
+s=s.replace(needle,"proof['delivery_acknowledgments'] == 1109 and proof['original_pixel_hashes_matched'] == 1108 and proof['unreferenced_successes'] == 1")
+s=s.replace('assert len(draws) == 16','assert len(draws) == 1109')
+s=s.replace("texture_scope=mode, passed=True,", "texture_scope=mode, memory_cache=mode, passed=True,")
+s=s.replace('"""Qualify scalar shader lowering against exact oracles and recorded desktop pixels."""', '"""Compare complete streams: existing desktop settings versus sharing plus scoped uploads."""')
+(r/'qualify-native-texture-full-v1.py').write_text(s)
+print('Prepared full-stream ABBA on finite-duration worker; no native promotion.')

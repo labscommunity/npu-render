@@ -147,7 +147,12 @@ The [stage profile and scoped-upload investigation](../validation/2026-10-15/nat
 identifies the shared vertex/pixel shader executor as the largest measured
 inference cost in sixteen recorded draws. Scoped texture uploads reduce matched
 preparation plus drawing time by 18.76%, with all 96 outputs exact and no recovery.
-The complete-stream and native checks remain required before promotion.
+The [complete-stream comparison](../validation/2026-10-15/native-full-texture-scope-v1/README.md)
+now passes: scoped uploads plus memory model reuse reduce preparation and drawing
+time by 14.52% in A/B/B/A order across 4,436 acknowledged requests, with all 4,432
+available reference hashes exact and no provider faults. Native qualification
+remains required before promotion. This combined comparison does not isolate
+the contribution of either setting.
 Reported binding bytes are not measured host-copy or device-bus traffic.
 
 Keeping uniform shader expressions scalar passes 9.44 million checked components
@@ -169,9 +174,12 @@ identity, completeness and monotonicity checks remain required.
 [Microsoft: directory notifications](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-findfirstchangenotificationw),
 [rearming notification waits](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-findnextchangenotification).
 
-The bounded forty-minute lease ceiling, incremental evidence collection and
-matching recovery deadlines now pass component and short native integration.
-The long
+The bounded forty-minute worker and UMD lease ceilings, incremental evidence
+collection and matching recovery deadlines pass component and short native
+integration. The first long attempt exposes an omitted consumer: the indirect
+display host still rejects leases exceeding fifteen minutes. Its 38-minute
+admission exits before rendering; ordinary recovery passes. A matching indirect
+host contract and boundary tests are prepared for the retry. The long
 trial requires advancing presentation timestamps and an independent physical-output
 color observation after thirty minutes, followed by exact ordinary restoration.
 Prepared code and parser checks do not satisfy the duration gate.

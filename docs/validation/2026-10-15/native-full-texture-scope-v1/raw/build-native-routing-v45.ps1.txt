@@ -1,0 +1,17 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$name='native-routing-v45';$source="$r\vm\$name";$b="$r\builds\$name";$sdk="$r\toolchains\openvino-2026.4.1\Lib\site-packages\openvino";$log="$r\vm\build-$name.log"
+if((Test-Path $source) -or (Test-Path $b)){throw 'Promoted experiment already exists'}
+# Fresh isolated build directory; only packet/lease contracts run here. No NPU inference.
+& tar -xf "$r\vm\$name.tar.gz" -C "$r\vm";if($LASTEXITCODE){throw 'Archive extraction failed'}
+$expected=Get-Content "$r\vm\$name-source.json" -Raw|ConvertFrom-Json
+foreach($f in $expected.psobject.Properties){if((Get-FileHash "$source\$($f.Name)").Hash -ne $f.Value){throw 'Source mismatch'}}
+$env:CMAKE_BUILD_PARALLEL_LEVEL='4';$ErrorActionPreference='Continue'
+& cmake -S "$source\native\windows\registered_lab" -B $b -A x64 "-DOpenVINO_DIR=$sdk\cmake" "-DNR_WDK_INCLUDE_ROOT=$r\dependencies\wdk-26100.6584-headers" *> $log;$code=$LASTEXITCODE
+if(!$code){& cmake --build $b --config Release --clean-first --target nr_texture_scope_test nr_registered_provider_memory_cache_test nr_registered_triangle_texture_draw_test nr_registered_derivative_test nr_quad_batch_probe nr_registered_linear_texture_draw_test nr_registered_local_indexed_worker nr_registered_indexed_exchange_test nr_native_probe_lease_test *>> $log;$code=$LASTEXITCODE}
+$ErrorActionPreference='Stop';Get-Content $log -Tail 8;if($code){throw 'Promoted client build failed'}
+$env:PATH="$sdk\libs;"+$env:PATH
+& "$b\Release\nr_native_probe_lease_test.exe" 1> "$r\vm\native-routing-v45-admission.stdout.jsonl" 2> "$r\vm\native-routing-v45-admission.stderr.log"
+if($LASTEXITCODE){throw 'Native routing admission contract failed'}
+& ctest --test-dir $b -C Release -R "^registered_indexed_exchange_contract$" --output-on-failure *> "$r\vm\native-routing-v45-contract.log"
+if($LASTEXITCODE){throw 'Indexed exchange or large uniform contract failed'}
+$hashes=@{};foreach($n in @('nr_texture_scope_test.exe','nr_registered_provider_memory_cache_test.exe','nr_registered_triangle_texture_draw_test.exe','nr_registered_derivative_test.exe','nr_quad_batch_probe.exe','nr_registered_linear_texture_draw_test.exe','nr_registered_local_indexed_worker.exe','nr_registered_indexed_exchange_test.exe','nr_native_probe_lease_test.exe')){$hashes[$n]=(Get-FileHash "$b\Release\$n").Hash}
+[ordered]@{clean_build=$true;source_sha256=$expected;binary_sha256=$hashes;admission_contract_passed=$true;desktop_admission_performed=$false}|ConvertTo-Json -Depth 6|Set-Content "$b\registered-build-report.json"
