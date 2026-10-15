@@ -33,8 +33,14 @@ The scoped-upload and scalar-expression candidates are not enabled.
 | Presenter GPU work | 31 source uploads, 62 copy commands including 31 diagnostic readbacks |
 | Restoration | Exact topology, ordinary windows, foreground and pointer; two confinement reacquisitions |
 
-Intervals use QPC and nearest-rank p95 over 30 successive submissions. Input
-latencies are two controlled observations, not a response-time distribution.
+Intervals use QPC and nearest-rank p95 over 30 successive submissions. The
+stimulus repaints every 15 seconds, so these intervals are not a saturated frame
+rate measurement. Input timings are two controlled observations, not a
+response-time distribution. After the key event, the stimulus cycles colors;
+the first observed red can correspond to a later red repaint. Its 105.508-second
+interval is therefore an observation delay, not a uniquely identified frame's
+input latency. A future stimulus must hold the initial response until observed
+before starting animation.
 Output duplication verifies controlled colors with presenter ownership checked
 before and after the read; it is not an external measurement of panel photons.
 The observer also performs GPU copies. These counts do not establish GPU time,
