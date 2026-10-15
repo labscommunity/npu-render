@@ -1,0 +1,167 @@
+--- a/native/windows/registered_lab/indexed_exchange_test.cpp
++++ b/native/windows/registered_lab/indexed_exchange_test.cpp
+@@ -220,13 +220,13 @@
+     }
+     // Scheduling accepts the renderer's bounded preference without importing
+     // provider APIs into the standalone packet helper.
+-    for(const auto capacity:{4096u,8192u}){
++    for(const auto capacity:{4096u,8192u,16384u}){
+         auto sized=desktop_clipped;sized.scissor=full_clip;
+         test(ex::triangle_batch(sized,capacity)==capacity);
+         sized.scissor=std::array<int32_t,4>{429,0,430,768};
+         test(ex::triangle_batch(sized,capacity)==1024);
+     }
+-    for(const auto invalid:{0u,512u,8193u,16384u}){
++    for(const auto invalid:{0u,512u,8193u,16385u,32768u}){
+         bool rejected=false;try{(void)ex::triangle_batch(desktop_clipped,invalid);}catch(const std::invalid_argument &){rejected=true;}test(rejected);
+     }
+     auto resources=r;resources.header.abi=8;resources.header.flags=0x2f42;
+--- a/native/windows/registered_lab/indexed_exchange_protocol.hpp
++++ b/native/windows/registered_lab/indexed_exchange_protocol.hpp
+@@ -247,7 +247,7 @@
+ }
+ inline uint32_t triangle_batch(const Request &r,uint32_t capacity=4096){
+     // The renderer supplies its qualified capacity; transport has no provider dependency.
+-    require(capacity==4096 || capacity==8192);
++    require(capacity==4096 || capacity==8192 || capacity==16384);
+     const auto &h=r.header;require(shape_valid(h) && (h.flags&0x3000));
+     const auto clip=r.scissor.value_or(std::array<int32_t,4>{0,0,int32_t(h.width),int32_t(h.height)});
+     require(scissor_valid(clip,h));
+--- a/native/windows/registered_lab/triangle_texture_draw_test.cpp
++++ b/native/windows/registered_lab/triangle_texture_draw_test.cpp
+@@ -17,6 +17,9 @@
+     TEST(bounded_triangle_regions(std::vector<std::array<int32_t,4>>(32,full),full,8192).size()==32);
+     rejected=false;try{bounded_triangle_regions(std::vector<std::array<int32_t,4>>(33,full),full,8192);}catch(const std::invalid_argument &){rejected=true;}TEST(rejected);
+     rejected=false;try{bounded_triangle_regions({full},full,16384);}catch(const std::invalid_argument &){rejected=true;}TEST(rejected);
++    TEST(bounded_triangle_regions(std::vector<std::array<int32_t,4>>(64,full),full,16384,true,false,true).size()==64);
++    rejected=false;try{bounded_triangle_regions(std::vector<std::array<int32_t,4>>(65,full),full,16384,true,false,true);}catch(const std::invalid_argument &){rejected=true;}TEST(rejected);
++    rejected=false;try{bounded_triangle_regions({full},full,16385,false,false,true);}catch(const std::invalid_argument &){rejected=true;}TEST(rejected);
+     TEST(bounded_triangle_regions({full},full,262144,false,true).size()==1);
+     for(const auto batch:{262145u,UINT32_MAX}){
+         rejected=false;try{bounded_triangle_regions({full},full,batch,false,true);}catch(const std::invalid_argument &){rejected=true;}TEST(rejected);
+@@ -135,7 +138,7 @@
+     TEST(collated_components==32768);
+     // Multiple affine and perspective attributes plus a flat attribute must
+     // retain their own values and interpolation modes when sharing a request.
+-    for(const auto attribute_batch : {256u,4096u}){
++    for(const auto attribute_batch : {256u,4096u,8192u,16384u}){
+         const auto mixed_vw=nr::registered_lab::shader_tokens(R"(
+ struct O{float4 p:SV_Position;noperspective float4 a:TEXCOORD0;noperspective float4 b:TEXCOORD1;float4 c:TEXCOORD2;float4 d:TEXCOORD3;nointerpolation float4 e:TEXCOORD4;};
+ O main(float4 p:POSITION,float4 a:TEXCOORD0,float4 b:TEXCOORD1,float4 c:TEXCOORD2,float4 d:TEXCOORD3,float4 e:TEXCOORD4){O o;o.p=p;o.a=a;o.b=b;o.c=c;o.d=d;o.e=e;return o;})","vs_4_0");
+@@ -143,6 +146,7 @@
+ Texture2D t:register(t0);SamplerState s:register(s0);
+ float4 main(float4 p:SV_Position,noperspective float4 a:TEXCOORD0,noperspective float4 b:TEXCOORD1,float4 c:TEXCOORD2,float4 d:TEXCOORD3,nointerpolation float4 e:TEXCOORD4):SV_Target{return t.Sample(s,float2(.5,.5))*(a*.25+b*.125+c*.25+d*.125+e*.125);})","ps_4_0");
+         const auto mixed_vs=parse_vertex(mixed_vw.data(),mixed_vw.size()),mixed_ps=parse_pixel(mixed_pw.data(),mixed_pw.size());
++        if(attribute_batch>RegisterExecutor::preferred_raster_batch(mixed_ps))continue;
+         const float xy[3][2]{{2,2},{30,2},{2,30}},w[3]{1,2,4};
+         std::vector<VertexRegisters> input(3);
+         for(unsigned v=0;v<3;++v){
+--- a/native/windows/registered_lab/derivative_test.cpp
++++ b/native/windows/registered_lab/derivative_test.cpp
+@@ -61,7 +61,8 @@
+ O main(float4 p:POSITION,float4 uv:TEXCOORD){O o;o.p=p;o.uv=uv;return o;})","vs_4_0");
+     const auto vs=parse_vertex(vw.data(),vw.size());constexpr unsigned width=31,height=29;
+     const auto edge=[](Point a,Point b,Point p){return int64_t(b[0]-a[0])*(p[1]-a[1])-int64_t(b[1]-a[1])*(p[0]-a[0]);};
+-    for(const bool tiny:{false,true})for(const uint32_t format:{28u,87u})for(const uint32_t batch:{16u,64u}){
++    for(const bool tiny:{false,true})for(const uint32_t format:{28u,87u})for(const uint32_t batch:{16u,64u,8192u,16384u}){
++        if(batch>RegisterExecutor::preferred_raster_batch(ps))continue;
+         const std::array<std::array<float,2>,3> positions=tiny?
+             std::array<std::array<float,2>,3>{{{3.25f,5.25f},{4.25f,5.25f},{3.25f,6.25f}}}:
+             std::array<std::array<float,2>,3>{{{0,0},{31,0},{0,29}}};
+--- a/native/windows/registered_lab/triangle_texture_draw.cpp
++++ b/native/windows/registered_lab/triangle_texture_draw.cpp
+@@ -113,7 +113,7 @@
+     // Vertex count and shader graphs are bounded before compilation. Once the
+     // device establishes geometry bounds, admit at most 4096 raster tiles.
+     // Reject the whole draw before coverage or destination modification.
+-    const auto regions=bounded_triangle_regions(projected.triangle_bounds,clip,s.batch,s.quads);
++    const auto regions=bounded_triangle_regions(projected.triangle_bounds,clip,s.batch,s.quads,false,s.batch>8192);
+     const auto layers=triangle_region_layers(regions);
+     const auto textures=decode_resources(s.ps,resources);
+     result.pixels=background;std::vector<Sample> samples(s.batch);std::vector<Point> points(s.batch);
+--- a/native/windows/registered_lab/vertex_executor.cpp
++++ b/native/windows/registered_lab/vertex_executor.cpp
+@@ -929,9 +929,14 @@
+     return 65536u;
+ }
+ uint32_t RegisterExecutor::preferred_raster_batch(const Program &p){
+-    // Preserve existing scheduling for all other programs and older runtimes.
++    // Preserve captured compositor scheduling; generic enlargement is opt-in.
+     // The executor still applies maximum_batch to the selected raster shape.
+-    return captured_compositor_program(p)?(std::max)(4096u,nr::provider::compositor_batch_capacity()):4096u;
++    if(captured_compositor_program(p))return (std::max)(4096u,nr::provider::compositor_batch_capacity());
++    auto batch=nr::provider::generic_raster_capacity();std::array<uint32_t,2> attributes{};
++    for(unsigned r=0;r<16;++r)if(p.inputs[r] && r!=p.position_input){if(p.interpolation[r]==2)++attributes[0];if(p.interpolation[r]==4)++attributes[1];}
++    // Interpolators pack equal-mode attributes; their graph limit is 65,536.
++    const auto count=(std::max)({1u,attributes[0],attributes[1]});while(batch>4096 && uint64_t(batch)*count>65536)batch/=2;
++    return batch;
+ }
+ struct RegisterExecutor::Configuration {
+     Program program;
+--- a/native/windows/registered_lab/triangle_regions.hpp
++++ b/native/windows/registered_lab/triangle_regions.hpp
+@@ -8,8 +8,8 @@
+ // Address scheduling over bounds already computed by the selected device.
+ // This does not evaluate vertex shaders, triangle edges or sample coverage.
+ inline std::vector<std::array<int32_t,4>> bounded_triangle_regions(
+-    const std::vector<std::array<int32_t,4>> &bounds,const std::array<int32_t,4> &clip,uint32_t batch,bool quads=false,bool large_affine=false){
+-    if(!batch || batch>(large_affine?262144u:8192u) || (large_affine && quads) || (quads && batch%4) || clip[0]<0 || clip[1]<0 || clip[0]>clip[2] || clip[1]>clip[3] || clip[2]>8192 || clip[3]>8192)
++    const std::vector<std::array<int32_t,4>> &bounds,const std::array<int32_t,4> &clip,uint32_t batch,bool quads=false,bool large_affine=false,bool large_generic=false){
++    if(!batch || batch>(large_affine?262144u:(large_generic?16384u:8192u)) || (large_affine && large_generic) || (large_affine && quads) || (quads && batch%4) || clip[0]<0 || clip[1]<0 || clip[0]>clip[2] || clip[1]>clip[3] || clip[2]>8192 || clip[3]>8192)
+         throw std::invalid_argument("invalid triangle region parameters");
+     std::vector<std::array<int32_t,4>> regions;regions.reserve(bounds.size());uint64_t tiles=0;
+     for(const auto &b:bounds){
+--- a/native/windows/registered_lab/provider_memory_cache_test.cpp
++++ b/native/windows/registered_lab/provider_memory_cache_test.cpp
+@@ -44,6 +44,8 @@
+     bool rejected=false;auto unsupported=properties;unsupported["TEST_KEY"]=std::vector<int>{1,2};
+     try{(void)identity(graph(),unsupported);}catch(const std::invalid_argument &){rejected=true;}require(rejected);
+     auto alias=graph();alias->output(0).get_tensor().set_names({"output","second_alias"});require(key!=identity(alias,properties));
++    {nr::provider::CompiledMemoryCache largest(512);require(largest.size()==0);}
++    for(const size_t invalid:{size_t(0),size_t(513)}){bool bad=false;try{nr::provider::CompiledMemoryCache rejected_capacity(invalid);}catch(const std::invalid_argument &){bad=true;}require(bad);}
+     nr::provider::CompiledMemoryCache cache(2);size_t backend_calls=0;
+     auto load=[&](ov::Core &core,const std::shared_ptr<ov::Model> &model){
+         return cache.get(core,model,backend,properties,"",[&](){++backend_calls;require(nr::provider::compile_statistics().memory_evictions==(backend_calls>2?backend_calls-2:0));return core.compile_model(model,backend,properties);});
+--- a/native/windows/registered_lab/provider_memory_cache.hpp
++++ b/native/windows/registered_lab/provider_memory_cache.hpp
+@@ -43,7 +43,7 @@
+     bool failed=false;
+ public:
+     explicit CompiledMemoryCache(size_t count):capacity(count){
+-        if(!count || count>64)throw std::invalid_argument("compiled memory cache capacity out of range");
++        if(!count || count>512)throw std::invalid_argument("compiled memory cache capacity out of range");
+     }
+     template<class Compile>
+     ov::CompiledModel get(ov::Core &core,const std::shared_ptr<ov::Model> &model,
+--- a/native/windows/registered_lab/provider_compile.hpp
++++ b/native/windows/registered_lab/provider_compile.hpp
+@@ -14,6 +14,13 @@
+ #include <cstdio>
+ #include <cstring>
+ namespace nr::provider {
++// Opt-in graph-shape experiment, independent of shader/transport contracts.
++inline uint32_t generic_raster_capacity(){
++    char *text=nullptr;size_t length=0;if(_dupenv_s(&text,&length,"NR_RENDER_GENERIC_BATCH"))throw std::runtime_error("cannot read generic batch experiment");
++    if(!text)return 4096;const std::string value(text);std::free(text);
++    if(value=="4096")return 4096;if(value=="8192")return 8192;if(value=="16384")return 16384;
++    throw std::invalid_argument("invalid generic batch experiment");
++}
+ inline std::string model_cache_directory(){
+ #ifdef _MSC_VER
+     char *value=nullptr;size_t length=0;
+@@ -52,7 +59,14 @@
+     if(std::strcmp(ov::get_openvino_version().buildNumber,"2026.4.1-22982-e213a147257-releases/2026/4"))throw std::invalid_argument("model memory cache requires the pinned runtime");
+     return true;
+ }
+-inline CompiledMemoryCache &compiled_memory_cache(){static CompiledMemoryCache cache(64);return cache;}
++inline size_t memory_cache_capacity(){
++    char *text=nullptr;size_t length=0;if(_dupenv_s(&text,&length,"NR_RENDER_MEMORY_CACHE_CAPACITY"))throw std::runtime_error("cannot read memory cache capacity");
++    const std::unique_ptr<char,decltype(&std::free)> owner(text,&std::free);
++    if(!text || !*text || !std::strcmp(text,"64"))return 64;
++    if(!std::strcmp(text,"512"))return 512;
++    throw std::invalid_argument("memory cache capacity requires 64 or 512");
++}
++inline CompiledMemoryCache &compiled_memory_cache(){static CompiledMemoryCache cache(memory_cache_capacity());return cache;}
+ inline void poison_compiled_memory_cache(){compiled_memory_cache().poison();}
+ inline bool shared_core_experiment(){
+     char *text=nullptr;size_t length=0;if(_dupenv_s(&text,&length,"NR_RENDER_SHARED_CORE"))throw std::runtime_error("cannot read shared core experiment");

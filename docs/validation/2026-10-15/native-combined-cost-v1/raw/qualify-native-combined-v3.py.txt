@@ -1,0 +1,71 @@
+"""Validate the completed combined replay against the finalized capture index."""
+import hashlib
+import json
+import os
+from datetime import UTC, datetime
+from pathlib import Path
+
+root = Path(os.environ['LOCALAPPDATA']) / 'npu-render'
+vm = root / 'vm'
+out = vm / 'native-combined-v3'
+out.mkdir(exist_ok=False)
+report = dict(started=datetime.now(UTC).isoformat(), completed=False, passed=False,
+              desktop_changed=False, performance_qualified=False,
+              prior_controller_error='v1 expected the live checkpoint count, not the finalized capture')
+def obj(path):
+    data = path.read_bytes()
+    return json.loads(data.decode('utf-16') if data.startswith(b'\xff\xfe') else data.decode('utf-8-sig'))
+def rows(path):
+    return [json.loads(line) for line in path.read_text(encoding='utf-8-sig').splitlines() if line.startswith('{') and line.endswith('}')]
+try:
+    for name in ['native-generic-recorded-v3', 'native-generic-batch-v3-NPU',
+                 'native-memory-sharing-recorded-v1', 'native-live-v27', 'native-generic-batch-v4-CPU']:
+        q = obj(vm / name / 'report.json')
+        assert q['completed'] and q['passed'], name
+    build = obj(root / 'builds/native-routing-v37/registered-build-report.json')
+    worker = root / 'builds/native-routing-v37/Release/nr_registered_local_indexed_worker.exe'
+    worker_hash = hashlib.sha256(worker.read_bytes()).hexdigest()
+    assert build['clean_build'] and worker_hash == build['binary_sha256'][worker.name].lower()
+    capture = vm / 'native-desktop-admission-v37/bootstrap/requests/index.jsonl'
+    index_hash = hashlib.sha256(capture.read_bytes()).hexdigest()
+    assert index_hash == 'b39694d8b6d66815509c5667f0203a57852d2078292a2574b29107c3136b5618'
+    entries = rows(capture)
+    requests = [x for x in entries if x.get('request_recorded')]
+    references = {x['ticket']: x for x in entries if x.get('provider_response_recorded')}
+    assert len(requests) == 1109 and len(references) == 1108
+    assert [x['ticket'] for x in requests] == list(range(len(requests)))
+    replay = vm / 'native-ordered-replay-v45-combined-live27'
+    q = obj(replay / 'report.json')
+    assert q['completed'] and q['passed'] and q['capture_index_sha256'] == index_hash
+    assert q['worker_binary_sha256'] == worker_hash
+    assert q['successful_replays'] == q['delivery_acknowledgments'] == len(requests)
+    assert q['original_pixel_hashes_matched'] == len(references) and q['unreferenced_successes'] == 1
+    actual = rows(replay / 'replays.jsonl')
+    assert len(actual) == len(requests)
+    for n, result in enumerate(actual):
+        assert result['ticket'] == n and result['client_exit'] == 0
+        assert result['original_reference_available'] == (n in references)
+        if n in references:
+            assert result['exact_recorded_pixels'] and result['pixels_sha256'] == references[n]['pixels_sha256']
+    parent = rows(replay / 'worker.stdout.jsonl')
+    assert len([x for x in parent if x.get('worker_success')]) == len(requests)
+    assert len([x for x in parent if x.get('provider_process_started')]) == 1
+    assert not any(x.get('provider_process_failure') for x in parent)
+    child = rows(replay / 'provider-processes/generation-1/worker.stdout.jsonl')
+    draws = [x for x in child if x.get('passed') and x.get('execution_device') == 'NPU']
+    assert len(draws) == len(requests)
+    report.update(passed=True, successful_replays=len(requests), reference_outputs=len(references),
+                  original_response_index_written_before_delivery_ack=True,
+                  replay_delivery_acknowledgments=q['delivery_acknowledgments'], unreferenced_successes=1,
+                  capture_index_sha256=index_hash, worker_binary_sha256=worker_hash,
+                  evidence_reused_without_rerunning_hardware=True,
+                  child_totals={key: sum(x.get(key, 0) for x in draws) for key in
+                  ['draw_ms', 'compile_and_draw_ms', 'provider_requests', 'backend_compile_calls',
+                   'memory_cache_hits', 'memory_cache_evictions', 'cache_requests', 'cache_hits']})
+except Exception as error:
+    report['error'] = repr(error)
+finally:
+    report.update(completed=True, finished=datetime.now(UTC).isoformat())
+    (out / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
+print(json.dumps(report))
+raise SystemExit(0 if report['passed'] else 1)

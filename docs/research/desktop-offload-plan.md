@@ -126,20 +126,38 @@ physical submissions. Controlled input responses are 20.645 seconds and 0.567
 seconds in an instrumented trial. Neither is a responsiveness qualification.
 
 The [independent batching and sharing checks](../validation/2026-10-15/native-batch-sharing-v1/README.md)
-now pass. Both enlarged batches match 65 recorded outputs, and sharing passes
-three complete streams totaling 1,470 requests without recovery. These establish
-correctness, not speed. The combined candidate is undergoing the latest native
-recording's full replay.
+pass, and the [combined correctness and matched cost investigation](../validation/2026-10-15/native-combined-cost-v1/README.md)
+is complete. All available references match across six full replays. Larger batches
+alone increase aggregate preparation plus draw time by 8.54%; adding sharing brings
+the combination to only 3.06% faster than baseline. The separate 65-draw sample
+regresses 4.25%. The candidate misses the proposed 10% gate and is not promoted.
 
-Next, finish that combined replay and measure batching alone against batching
-plus sharing on the same complete recording.
-Measure any benefit with matched trials before promotion. Exact-output memoization
-covers only about 3% of recorded cost at 64 MiB and is lower priority. Keep model
-preparation and fault-recovery latency visible. The current desktop authorization
-is bounded to fifteen minutes; the thirty-minute gate requires a reviewed bounded
-extension with corresponding recovery deadlines and lease checks. Continue with
-responsive long-duration operation, broader application coverage, residual GPU
-cost and matched Tahoma benefit. Component passes do not complete those gates.
+Next, measure provider inference by drawing stage and qualify keeping uniform
+shader expressions scalar until a varying operation requires expansion. The
+existing hardware trace contains repeated constant-buffer lookups across pixel
+lanes; reducing those lookups targets shader work that batching does not remove.
+Exact CPU/NPU fixtures and recorded pixel comparisons must precede promotion.
+
+The diagnostic relay and presenter also impose fixed 100 ms waits. Those waits
+prevent a 30 fps bridge even if rendering becomes faster. An event-driven relay
+and a presenter without the fixed post-present wait are prepared, but their live
+behavior remains unqualified. Directory notifications are wake-up hints; frame
+identity, completeness and monotonicity checks remain required.
+[Microsoft: directory notifications](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-findfirstchangenotificationw),
+[rearming notification waits](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-findnextchangenotification).
+
+The tested native lease implementation caps desktop admission at fifteen minutes.
+A bounded forty-minute ceiling, incremental evidence collection, matching recovery
+deadlines, and short/long controllers are prepared for qualification. The long
+trial requires advancing presentation timestamps and an independent physical-output
+color observation after thirty minutes, followed by exact ordinary restoration.
+Prepared code and parser checks do not satisfy the duration gate.
+
+Continue with responsive sustained operation, application coverage, residual GPU
+cost and matched Tahoma benefit. New applications' adapter selection must be
+observed independently of DWM routing. Exact-output memoization covers only about
+3% of recorded cost at 64 MiB and remains lower priority. Component passes do not
+complete the overall goal.
 
 ## Architecture constraints from primary documentation
 

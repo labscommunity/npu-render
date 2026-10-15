@@ -1,0 +1,28 @@
+"""Combine independently gated batch and model-sharing candidates, default off."""
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'native-routing-v37';shutil.copytree(r/'native-routing-v36',d)
+changes=[]
+for p in (r/'native-routing-v35').rglob('*'):
+ if not p.is_file():continue
+ name=p.relative_to(r/'native-routing-v35');base=r/'native-routing-v34'/name
+ if not base.exists() or p.read_bytes()!=base.read_bytes():
+  target=d/name
+  if target.exists() and base.exists() and target.read_bytes()!=base.read_bytes():
+   assert name.as_posix()=='native/windows/registered_lab/provider_compile.hpp',f'Unexpected overlapping change: {name}'
+   text=p.read_text();begin=text.index('// Opt-in graph-shape experiment');end=text.index('inline std::string model_cache_directory()',begin);insertion=text[begin:end]
+   assert text.replace(insertion,'',1)==base.read_text()
+   combined=target.read_text();anchor='inline std::string model_cache_directory()';assert combined.count(anchor)==1
+   target.write_text(combined.replace(anchor,insertion+anchor,1))
+  else:
+   target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(p.read_bytes())
+  changes.append(str(name))
+assert len(changes)>0
+(r/'native-routing-v37-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-routing-v37.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-native-routing-v35.ps1').read_text().replace('native-routing-v35','native-routing-v37').replace('--target nr_registered_triangle_texture_draw_test','--target nr_registered_provider_memory_cache_test nr_registered_triangle_texture_draw_test').replace("@('nr_registered_triangle_texture_draw_test.exe'","@('nr_registered_provider_memory_cache_test.exe','nr_registered_triangle_texture_draw_test.exe'")
+(r/'build-native-routing-v37.ps1').write_text(s)
+s=(r/'replay-recorded-requests-v13.py').read_text().replace("a.add_argument('--quad-batch'", "a.add_argument('--memory-capacity',choices=('64','512'),default='64')\na.add_argument('--quad-batch'")
+s=s.replace("env['NR_RENDER_COMPILE_TRACE']=v.compile_trace", "env['NR_RENDER_MEMORY_CACHE_CAPACITY']=v.memory_capacity\nenv['NR_RENDER_COMPILE_TRACE']=v.compile_trace").replace('report.update(generic_batch=', 'report.update(memory_capacity=v.memory_capacity,generic_batch=')
+(r/'replay-recorded-requests-v15.py').write_text(s)
+print(json.dumps(dict(prepared='native-routing-v37',base='native-routing-v36',merged_files=changes,hardware_executed=False,desktop_admitted=False)))

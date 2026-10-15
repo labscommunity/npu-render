@@ -1,0 +1,27 @@
+"""Append the separately stored clean-build receipt to the comparison archive."""
+from pathlib import Path
+import base64
+import hashlib
+import json
+import subprocess
+
+r = Path('results/render-driver')
+relative = 'builds/native-routing-v37/registered-build-report.json'
+script = r'''$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$path="$env:LOCALAPPDATA\npu-render\builds\native-routing-v37\registered-build-report.json";[ordered]@{bytes=(Get-Item $path).Length;sha256=(Get-FileHash $path).Hash}|ConvertTo-Json'''
+result = subprocess.run(['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8', 'delta',
+                         'powershell.exe -NoProfile -NonInteractive -EncodedCommand ' + base64.b64encode(script.encode('utf-16-le')).decode()],
+                        capture_output=True, timeout=30, check=True)
+receipt = json.loads(result.stdout.decode('utf-8-sig'))
+name = 'native-combined-build-v1/registered-build-report.json'
+destination = r / 'primary-raw-v11' / name
+destination.parent.mkdir(parents=True, exist_ok=True)
+subprocess.run(['scp', '-q', '-o', 'BatchMode=yes', 'delta:AppData/Local/npu-render/' + relative, str(destination)],
+               capture_output=True, timeout=30, check=True)
+data = destination.read_bytes()
+assert len(data) == receipt['bytes'] and hashlib.sha256(data).hexdigest() == receipt['sha256'].lower()
+manifest = r / 'native-primary-v11-artifact-sha256.json'
+entries = json.loads(manifest.read_text())
+assert not any(item['source'] == name for item in entries)
+entries.append(dict(source=name, remote_source=relative, **receipt))
+manifest.write_text(json.dumps(entries, indent=2) + '\n')
+print(json.dumps(dict(build_receipt_verified=True, bytes=len(data))))

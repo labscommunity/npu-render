@@ -1,0 +1,118 @@
+"""Archive finalized correctness evidence and counterbalanced NPU cost comparisons."""
+from pathlib import Path
+from datetime import UTC, datetime
+import difflib
+import hashlib
+import json
+import math
+
+r = Path('results/render-driver')
+raw = r / 'primary-raw-v11'
+out = Path('docs/validation/2026-10-15/native-combined-cost-v1')
+
+
+def obj(path):
+    data = path.read_bytes()
+    return json.loads(data.decode('utf-16') if data.startswith(b'\xff\xfe') else data.decode('utf-8-sig'))
+
+
+def rows(path):
+    return [json.loads(line) for line in path.read_text(encoding='utf-8-sig').splitlines()
+            if line.startswith('{') and line.endswith('}')]
+
+
+manifest = obj(r / 'native-primary-v11-artifact-sha256.json')
+failed = obj(raw / 'native-combined-v1/report.json')
+assert failed['completed'] and not failed['passed'] and failed['error'] == 'Combined recorded pixels incomplete'
+corrected = obj(raw / 'native-combined-v3/report.json')
+build = obj(raw / 'native-combined-build-v1/registered-build-report.json')
+assert build['clean_build'] and build['admission_contract_passed']
+assert build['source_sha256'] == obj(raw / 'native-routing-v37-source.json')
+assert build['binary_sha256']['nr_registered_local_indexed_worker.exe'].lower() == corrected['worker_binary_sha256']
+assert corrected['passed'] and corrected['successful_replays'] == corrected['replay_delivery_acknowledgments'] == 1109
+assert corrected['reference_outputs'] == 1108 and corrected['unreferenced_successes'] == 1
+assert corrected['original_response_index_written_before_delivery_ack']
+combined = obj(raw / 'native-ordered-replay-v45-combined-live27/report.json')
+assert combined['passed'] and combined['successful_replays'] == combined['delivery_acknowledgments'] == 1109
+assert combined['original_pixel_hashes_matched'] == 1108 and combined['unreferenced_successes'] == 1
+combined.pop('selected_tickets', None)
+comparisons = {}
+for name, count, references, order in [
+    ('native-combined-abba-v2', 65, 65, ['warm-A', 'warm-B', 'A1', 'B1', 'B2', 'A2']),
+    ('native-combined-full-abc-v2', 1109, 1108, ['A1', 'B1', 'C1', 'C2', 'B2', 'A2']),
+]:
+    comparison = obj(raw / name / 'report.json')
+    assert comparison['passed'] and comparison['completed'] and [p['phase'] for p in comparison['phases']] == order
+    for phase in comparison['phases']:
+        trial = raw / (name + '-' + phase['phase'])
+        proof = obj(trial / 'report.json')
+        assert proof['passed'] and proof['original_pixel_hashes_matched'] == references
+        assert proof['successful_replays'] == proof['delivery_acknowledgments'] == count
+        assert proof['worker_binary_sha256'] == corrected['worker_binary_sha256']
+        parent = rows(trial / 'worker.stdout.jsonl')
+        assert sum(bool(row.get('provider_process_started')) for row in parent) == 1
+        assert not any(row.get('provider_process_failure') for row in parent)
+        draws = [row for row in rows(trial / 'provider-processes/generation-1/worker.stdout.jsonl')
+                 if row.get('passed') and row.get('execution_device') == 'NPU' and 'compile_and_draw_ms' in row]
+        assert len(draws) == count
+        for field, value in phase['child_totals'].items():
+            assert math.isclose(sum(draw[field] for draw in draws), value, abs_tol=.00001)
+        assert phase['before_power']['ac_online'] == phase['after_power']['ac_online'] == 1
+        replay = rows(trial / 'replays.jsonl')
+        assert len(replay) == count and sum(bool(row.get('exact_recorded_pixels')) for row in replay) == references
+        if count == 1109:
+            assert proof['capture_index_sha256'] == corrected['capture_index_sha256']
+            assert phase['child_totals']['cache_requests'] == phase['child_totals']['cache_hits']
+        elif not phase['warmup']:
+            # Reconstruct warm-hit evidence omitted from the small controller's totals.
+            assert sum(row['cache_requests'] for row in draws) == sum(row['cache_hits'] for row in draws)
+    comparisons[name] = comparison
+
+sample = comparisons['native-combined-abba-v2']
+sample_means = {condition: sum(phase['child_totals']['compile_and_draw_ms'] for phase in sample['phases']
+                               if phase['phase'] in [condition + '1', condition + '2']) / 2 for condition in 'AB'}
+assert math.isclose(sample_means['A'], sample['baseline_mean_compile_draw_ms'])
+assert math.isclose(sample_means['B'], sample['candidate_mean_compile_draw_ms'])
+full = comparisons['native-combined-full-abc-v2']
+for condition in 'ABC':
+    mean = sum(phase['child_totals']['compile_and_draw_ms'] for phase in full['phases'] if phase['condition'] == condition) / 2
+    assert math.isclose(mean, full['mean_compile_draw_ms'][condition])
+
+out.mkdir(parents=True, exist_ok=False)
+for item in manifest:
+    data = (raw / item['source']).read_bytes()
+    assert len(data) == item['bytes'] and hashlib.sha256(data).hexdigest() == item['sha256'].lower()
+    destination = out / 'raw' / item['source']
+    if destination.suffix in ('.py', '.ps1'):
+        destination = destination.with_suffix(destination.suffix + '.txt')
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_bytes(data)
+    item['archive_path'] = destination.relative_to(out).as_posix()
+(out / 'raw-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+base, new = r / 'native-routing-v34', r / 'native-routing-v37'
+patch = []
+for name, checksum in obj(raw / 'native-routing-v37-source.json').items():
+    path, old = new / name, base / name
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == checksum
+    if not old.exists() or old.read_bytes() != path.read_bytes():
+        patch.extend(difflib.unified_diff(old.read_text().splitlines(keepends=True) if old.exists() else [],
+                                        path.read_text().splitlines(keepends=True),
+                                        fromfile='a/' + name if old.exists() else '/dev/null', tofile='b/' + name))
+destination = out / 'native-routing-v37-from-v34.patch'
+destination.write_text(''.join(patch))
+sources = [dict(path=destination.name, sha256=hashlib.sha256(destination.read_bytes()).hexdigest(), base='native-routing-v34')]
+for name in ['prepare-native-routing-v37.py', 'collect-native-primary-v11.py', 'collect-native-combined-build-v1.py', 'archive-native-primary-v11.py']:
+    destination = out / 'sources' / (name + '.txt')
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_bytes((r / name).read_bytes())
+    sources.append(dict(path=destination.relative_to(out).as_posix(), sha256=hashlib.sha256(destination.read_bytes()).hexdigest()))
+(out / 'source-manifest.json').write_text(json.dumps(sources, indent=2) + '\n')
+report = dict(recorded=datetime.now(UTC).isoformat(), evidence_checks_passed=True,
+              raw_files_remotely_hash_verified=len(manifest), raw_bytes=sum(item['bytes'] for item in manifest),
+              corrected_finalized_capture=corrected, combined_correctness=combined,
+              sample_comparison=sample, full_stream_comparison=full,
+              original_live_checkpoint_acknowledgments=1107,
+              version_two_ack_label_incorrect=True, version_three_corrects_that_label=True,
+              native_candidate_promoted=False, full_desktop_offload=False, tahoma_tested=False)
+(out / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
+print(json.dumps(dict(archive=str(out), files=len(manifest), sample_means=sample_means, full_means=full['mean_compile_draw_ms'])))

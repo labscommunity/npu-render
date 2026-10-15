@@ -1,0 +1,514 @@
+{
+  "recorded": "2026-10-15T02:20:47.479160+00:00",
+  "evidence_checks_passed": true,
+  "raw_files_remotely_hash_verified": 144,
+  "raw_bytes": 17804016,
+  "corrected_finalized_capture": {
+    "started": "2026-10-15T01:22:04.316512+00:00",
+    "completed": true,
+    "passed": true,
+    "desktop_changed": false,
+    "performance_qualified": false,
+    "prior_controller_error": "v1 expected the live checkpoint count, not the finalized capture",
+    "successful_replays": 1109,
+    "reference_outputs": 1108,
+    "original_response_index_written_before_delivery_ack": true,
+    "replay_delivery_acknowledgments": 1109,
+    "unreferenced_successes": 1,
+    "capture_index_sha256": "b39694d8b6d66815509c5667f0203a57852d2078292a2574b29107c3136b5618",
+    "worker_binary_sha256": "2621039a005fbb704d84e2034badd271a41c87b51e3103726d08fc71f67eed19",
+    "evidence_reused_without_rerunning_hardware": true,
+    "child_totals": {
+      "draw_ms": 269367.376,
+      "compile_and_draw_ms": 415502.673,
+      "provider_requests": 33538,
+      "backend_compile_calls": 289,
+      "memory_cache_hits": 1063,
+      "memory_cache_evictions": 0,
+      "cache_requests": 289,
+      "cache_hits": 267
+    },
+    "finished": "2026-10-15T01:22:04.348048+00:00"
+  },
+  "combined_correctness": {
+    "started": "2026-10-15T01:11:51.242121+00:00",
+    "completed": true,
+    "passed": true,
+    "desktop_changed": false,
+    "driver_installed": false,
+    "desktop_offloaded": false,
+    "recorded_requests": 1109,
+    "first_original_ticket": 0,
+    "verification_scope": "consistency_with_original_successful_outputs_only",
+    "capture_index_sha256": "b39694d8b6d66815509c5667f0203a57852d2078292a2574b29107c3136b5618",
+    "affine_batch": "default",
+    "pipeline_cache": "retained",
+    "shared_core": "1",
+    "shared_queue": "1",
+    "memory_cache": "1",
+    "successful_replays": 1109,
+    "original_pixel_hashes_matched": 1108,
+    "unreferenced_successes": 1,
+    "memory_capacity": "512",
+    "generic_batch": "16384",
+    "test_exception_ticket": -1,
+    "provider_recovery": "1",
+    "test_kill_ticket": -1,
+    "compile_trace": "1",
+    "repetitions": 1,
+    "infer_trace": "1",
+    "quad_batch": "1",
+    "worker_binary_sha256": "2621039a005fbb704d84e2034badd271a41c87b51e3103726d08fc71f67eed19",
+    "worker_pid": 1604,
+    "current_ticket": 1108,
+    "current_iteration": 1108,
+    "delivery_acknowledgments": 1109,
+    "worker_exit": 0,
+    "original_failure_reproduced": false,
+    "finished": "2026-10-15T01:20:35.519998+00:00"
+  },
+  "sample_comparison": {
+    "started": "2026-10-15T01:22:04.6070270Z",
+    "completed": true,
+    "passed": true,
+    "desktop_changed": false,
+    "tahoma_tested": false,
+    "desktop_performance_qualified": false,
+    "phases": [
+      {
+        "after_power": {
+          "charging": false,
+          "utc": "2026-10-15T01:23:47.8653262Z",
+          "percent": 100,
+          "ac_online": 1,
+          "raw_battery_status": 1
+        },
+        "warmup": true,
+        "passed": true,
+        "capture_index_sha256": "0f22ee6a6f4184e06a4338562abc24b843ad7b3882fec6c189bdaa9983237d9d",
+        "worker_binary_sha256": "2621039a005fbb704d84e2034badd271a41c87b51e3103726d08fc71f67eed19",
+        "phase": "warm-A",
+        "before_power": {
+          "charging": false,
+          "utc": "2026-10-15T01:22:04.7995097Z",
+          "percent": 100,
+          "ac_online": 1,
+          "raw_battery_status": 1
+        },
+        "reference_hashes_matched": 65,
+        "child_totals": {
+          "backend_compile_calls": 66,
+          "memory_cache_hits": 0,
+          "compile_and_draw_ms": 94557.23699999998,
+          "provider_requests": 10644,
+          "draw_ms": 87997.16300000003,
+          "memory_cache_evictions": 0
+        },
+        "candidate": false
+      },
+      {
+        "after_power": {
+          "charging": false,
+          "utc": "2026-10-15T01:25:34.6685316Z",
+          "percent": 100,
+          "ac_online": 1,
+          "raw_battery_status": 1
+        },
+        "warmup": true,
+        "passed": true,
+        "capture_index_sha256": "0f22ee6a6f4184e06a4338562abc24b843ad7b3882fec6c189bdaa9983237d9d",
+        "worker_binary_sha256": "2621039a005fbb704d84e2034badd271a41c87b51e3103726d08fc71f67eed19",
+        "phase": "warm-B",
+        "before_power": {
+          "charging": false,
+          "utc": "2026-10-15T01:23:48.3100111Z",
+          "percent": 100,
+          "ac_online": 1,
+          "raw_battery_status": 1
+        },
+        "reference_hashes_matched": 65,
+        "child_totals": {
+          "backend_compile_calls": 23,
+          "memory_cache_hits": 43,
+          "compile_and_draw_ms": 97195.094,
+          "provider_requests": 5272,
+          "draw_ms": 91994.87699999998,
+          "memory_cache_evictions": 0
+        },
+        "candidate": true
+      },
+      {
+        "after_power": {
+          "charging": false,
+          "utc": "2026-10-15T01:27:19.3149544Z",
+          "percent": 100,
+          "ac_online": 1,
+          "raw_battery_status": 1
+        },
+        "warmup": false,
+        "passed": true,
+        "capture_index_sha256": "0f22ee6a6f4184e06a4338562abc24b843ad7b3882fec6c189bdaa9983237d9d",
+        "worker_binary_sha256": "2621039a005fbb704d84e2034badd271a41c87b51e3103726d08fc71f67eed19",
+        "phase": "A1",
+        "before_power": {
+          "charging": false,
+          "utc": "2026-10-15T01:25:34.8454448Z",
+          "percent": 100,
+          "ac_online": 1,
+          "raw_battery_status": 1
+        },
+        "reference_hashes_matched": 65,
+        "child_totals": {
+          "backend_compile_calls": 66,
+          "memory_cache_hits": 0,
+          "compile_and_draw_ms": 95918.014,
+          "provider_requests": 10644,
+          "draw_ms": 89284.26400000001,
+          "memory_cache_evictions": 0
+        },
+        "candidate": false
+      },
+      {
+        "after_power": {
+          "charging": false,
+          "utc": "2026-10-15T01:29:09.7191635Z",
+          "percent": 100,
+          "ac_online": 1,
+          "raw_battery_status": 1
+        },
+        "warmup": false,
+        "passed": true,
+        "capture_index_sha256": "0f22ee6a6f4184e06a4338562abc24b843ad7b3882fec6c189bdaa9983237d9d",
+        "worker_binary_sha256": "2621039a005fbb704d84e2034badd271a41c87b51e3103726d08fc71f67eed19",
+        "phase": "B1",
+        "before_power": {
+          "charging": false,
+          "utc": "2026-10-15T01:27:19.5042014Z",
+          "percent": 100,
+          "ac_online": 1,
+          "raw_battery_status": 1
+        },
+        "reference_hashes_matched": 65,
+        "child_totals": {
+          "backend_compile_calls": 23,
+          "memory_cache_hits": 43,
+          "compile_and_draw_ms": 99936.45199999999,
+          "provider_requests": 5272,
+          "draw_ms": 94700.20199999999,
+          "memory_cache_evictions": 0
+        },
+        "candidate": true
+      },
+      {
+        "after_power": {
+          "charging": false,
+          "utc": "2026-10-15T01:30:58.9457893Z",
+          "percent": 100,
+          "ac_online": 1,
+          "raw_battery_status": 1
+        },
+        "warmup": false,
+        "passed": true,
+        "capture_index_sha256": "0f22ee6a6f4184e06a4338562abc24b843ad7b3882fec6c189bdaa9983237d9d",
+        "worker_binary_sha256": "2621039a005fbb704d84e2034badd271a41c87b51e3103726d08fc71f67eed19",
+        "phase": "B2",
+        "before_power": {
+          "charging": false,
+          "utc": "2026-10-15T01:29:09.8980129Z",
+          "percent": 100,
+          "ac_online": 1,
+          "raw_battery_status": 1
+        },
+        "reference_hashes_matched": 65,
+        "child_totals": {
+          "backend_compile_calls": 23,
+          "memory_cache_hits": 43,
+          "compile_and_draw_ms": 98734.20800000001,
+          "provider_requests": 5272,
+          "draw_ms": 93637.50599999998,
+          "memory_cache_evictions": 0
+        },
+        "candidate": true
+      },
+      {
+        "after_power": {
+          "charging": false,
+          "utc": "2026-10-15T01:32:42.4191383Z",
+          "percent": 100,
+          "ac_online": 1,
+          "raw_battery_status": 1
+        },
+        "warmup": false,
+        "passed": true,
+        "capture_index_sha256": "0f22ee6a6f4184e06a4338562abc24b843ad7b3882fec6c189bdaa9983237d9d",
+        "worker_binary_sha256": "2621039a005fbb704d84e2034badd271a41c87b51e3103726d08fc71f67eed19",
+        "phase": "A2",
+        "before_power": {
+          "charging": false,
+          "utc": "2026-10-15T01:30:59.1042361Z",
+          "percent": 100,
+          "ac_online": 1,
+          "raw_battery_status": 1
+        },
+        "reference_hashes_matched": 65,
+        "child_totals": {
+          "backend_compile_calls": 66,
+          "memory_cache_hits": 0,
+          "compile_and_draw_ms": 94645.97699999997,
+          "provider_requests": 10644,
+          "draw_ms": 88015.414,
+          "memory_cache_evictions": 0
+        },
+        "candidate": false
+      }
+    ],
+    "comparison": "Same worker37, A=generic4096/memory-off, B=generic16384/memory512; warmed A/B/B/A; 65 identical recorded requests.",
+    "baseline_mean_compile_draw_ms": 95281.99549999999,
+    "candidate_mean_compile_draw_ms": 99335.33,
+    "baseline_over_candidate": 0.9591954393265718,
+    "relative_reduction": -0.042540403134189386,
+    "at_least_ten_percent_component_reduction": false,
+    "matched_component_comparison_passed": true,
+    "finished": "2026-10-15T01:32:42.6906101Z"
+  },
+  "full_stream_comparison": {
+    "started": "2026-10-15T01:22:04.7654124Z",
+    "completed": true,
+    "passed": true,
+    "desktop_changed": false,
+    "tahoma_tested": false,
+    "desktop_performance_qualified": false,
+    "phases": [
+      {
+        "after_power": {
+          "charging": false,
+          "utc": "2026-10-15T01:40:17.2035176Z",
+          "percent": 100,
+          "ac_online": 1,
+          "raw_battery_status": 1
+        },
+        "warmup": false,
+        "passed": true,
+        "capture_index_sha256": "b39694d8b6d66815509c5667f0203a57852d2078292a2574b29107c3136b5618",
+        "worker_binary_sha256": "2621039a005fbb704d84e2034badd271a41c87b51e3103726d08fc71f67eed19",
+        "phase": "A1",
+        "condition": "A",
+        "unreferenced_successes": 1,
+        "reference_hashes_matched": 1108,
+        "child_totals": {
+          "backend_compile_calls": 1352,
+          "memory_cache_hits": 0,
+          "cache_hits": 1352,
+          "compile_and_draw_ms": 343982.42900000035,
+          "provider_requests": 39065,
+          "draw_ms": 242492.77799999976,
+          "cache_requests": 1352,
+          "memory_cache_evictions": 0
+        },
+        "before_power": {
+          "charging": false,
+          "utc": "2026-10-15T01:32:44.6803445Z",
+          "percent": 100,
+          "ac_online": 1,
+          "raw_battery_status": 1
+        },
+        "candidate": false
+      },
+      {
+        "after_power": {
+          "charging": false,
+          "utc": "2026-10-15T01:48:22.6378172Z",
+          "percent": 100,
+          "ac_online": 1,
+          "raw_battery_status": 1
+        },
+        "warmup": false,
+        "passed": true,
+        "capture_index_sha256": "b39694d8b6d66815509c5667f0203a57852d2078292a2574b29107c3136b5618",
+        "worker_binary_sha256": "2621039a005fbb704d84e2034badd271a41c87b51e3103726d08fc71f67eed19",
+        "phase": "B1",
+        "condition": "B",
+        "unreferenced_successes": 1,
+        "reference_hashes_matched": 1108,
+        "child_totals": {
+          "backend_compile_calls": 1352,
+          "memory_cache_hits": 0,
+          "cache_hits": 1352,
+          "compile_and_draw_ms": 373022.3219999996,
+          "provider_requests": 33538,
+          "draw_ms": 270993.23600000003,
+          "cache_requests": 1352,
+          "memory_cache_evictions": 0
+        },
+        "before_power": {
+          "charging": false,
+          "utc": "2026-10-15T01:40:20.0915827Z",
+          "percent": 100,
+          "ac_online": 1,
+          "raw_battery_status": 1
+        },
+        "candidate": true
+      },
+      {
+        "after_power": {
+          "charging": false,
+          "utc": "2026-10-15T01:55:47.9069176Z",
+          "percent": 100,
+          "ac_online": 1,
+          "raw_battery_status": 1
+        },
+        "warmup": false,
+        "passed": true,
+        "capture_index_sha256": "b39694d8b6d66815509c5667f0203a57852d2078292a2574b29107c3136b5618",
+        "worker_binary_sha256": "2621039a005fbb704d84e2034badd271a41c87b51e3103726d08fc71f67eed19",
+        "phase": "C1",
+        "condition": "C",
+        "unreferenced_successes": 1,
+        "reference_hashes_matched": 1108,
+        "child_totals": {
+          "backend_compile_calls": 289,
+          "memory_cache_hits": 1063,
+          "cache_hits": 289,
+          "compile_and_draw_ms": 334033.2850000005,
+          "provider_requests": 33538,
+          "draw_ms": 265494.9080000001,
+          "cache_requests": 289,
+          "memory_cache_evictions": 0
+        },
+        "before_power": {
+          "charging": false,
+          "utc": "2026-10-15T01:48:25.2457245Z",
+          "percent": 100,
+          "ac_online": 1,
+          "raw_battery_status": 1
+        },
+        "candidate": true
+      },
+      {
+        "after_power": {
+          "charging": false,
+          "utc": "2026-10-15T02:03:13.3640737Z",
+          "percent": 100,
+          "ac_online": 1,
+          "raw_battery_status": 1
+        },
+        "warmup": false,
+        "passed": true,
+        "capture_index_sha256": "b39694d8b6d66815509c5667f0203a57852d2078292a2574b29107c3136b5618",
+        "worker_binary_sha256": "2621039a005fbb704d84e2034badd271a41c87b51e3103726d08fc71f67eed19",
+        "phase": "C2",
+        "condition": "C",
+        "unreferenced_successes": 1,
+        "reference_hashes_matched": 1108,
+        "child_totals": {
+          "backend_compile_calls": 289,
+          "memory_cache_hits": 1063,
+          "cache_hits": 289,
+          "compile_and_draw_ms": 333618.88300000015,
+          "provider_requests": 33538,
+          "draw_ms": 265508.60800000036,
+          "cache_requests": 289,
+          "memory_cache_evictions": 0
+        },
+        "before_power": {
+          "charging": false,
+          "utc": "2026-10-15T01:55:50.4771999Z",
+          "percent": 100,
+          "ac_online": 1,
+          "raw_battery_status": 1
+        },
+        "candidate": true
+      },
+      {
+        "after_power": {
+          "charging": false,
+          "utc": "2026-10-15T02:11:21.0020086Z",
+          "percent": 100,
+          "ac_online": 1,
+          "raw_battery_status": 1
+        },
+        "warmup": false,
+        "passed": true,
+        "capture_index_sha256": "b39694d8b6d66815509c5667f0203a57852d2078292a2574b29107c3136b5618",
+        "worker_binary_sha256": "2621039a005fbb704d84e2034badd271a41c87b51e3103726d08fc71f67eed19",
+        "phase": "B2",
+        "condition": "B",
+        "unreferenced_successes": 1,
+        "reference_hashes_matched": 1108,
+        "child_totals": {
+          "backend_compile_calls": 1352,
+          "memory_cache_hits": 0,
+          "cache_hits": 1352,
+          "compile_and_draw_ms": 374502.6240000002,
+          "provider_requests": 33538,
+          "draw_ms": 272075.53100000037,
+          "cache_requests": 1352,
+          "memory_cache_evictions": 0
+        },
+        "before_power": {
+          "charging": false,
+          "utc": "2026-10-15T02:03:15.8786576Z",
+          "percent": 100,
+          "ac_online": 1,
+          "raw_battery_status": 1
+        },
+        "candidate": true
+      },
+      {
+        "after_power": {
+          "charging": false,
+          "utc": "2026-10-15T02:18:58.0911489Z",
+          "percent": 100,
+          "ac_online": 1,
+          "raw_battery_status": 1
+        },
+        "warmup": false,
+        "passed": true,
+        "capture_index_sha256": "b39694d8b6d66815509c5667f0203a57852d2078292a2574b29107c3136b5618",
+        "worker_binary_sha256": "2621039a005fbb704d84e2034badd271a41c87b51e3103726d08fc71f67eed19",
+        "phase": "A2",
+        "condition": "A",
+        "unreferenced_successes": 1,
+        "reference_hashes_matched": 1108,
+        "child_totals": {
+          "backend_compile_calls": 1352,
+          "memory_cache_hits": 0,
+          "cache_hits": 1352,
+          "compile_and_draw_ms": 344749.118,
+          "provider_requests": 39065,
+          "draw_ms": 243160.74899999952,
+          "cache_requests": 1352,
+          "memory_cache_evictions": 0
+        },
+        "before_power": {
+          "charging": false,
+          "utc": "2026-10-15T02:11:23.7156806Z",
+          "percent": 100,
+          "ac_online": 1,
+          "raw_battery_status": 1
+        },
+        "candidate": false
+      }
+    ],
+    "comparison": "Same worker37, full 1109-request stream (1108 reference outputs, one unreferenced shutdown request); A=4096/memory-off, B=16384/memory-off, C=16384/memory512; A/B/C/C/B/A; disk cache hits required.",
+    "mean_compile_draw_ms": {
+      "C": 333826.0840000003,
+      "A": 344365.7735000002,
+      "B": 373762.4729999999
+    },
+    "batching_relative_reduction": -0.08536475388138332,
+    "combined_relative_reduction": 0.03060608896429673,
+    "sharing_relative_reduction_at_same_batch": 0.1068496488677706,
+    "best_condition": "C",
+    "best_condition_memory_cache": "1",
+    "at_least_ten_percent_full_stream_reduction": false,
+    "matched_full_stream_comparison_passed": true,
+    "finished": "2026-10-15T02:19:00.6167837Z"
+  },
+  "original_live_checkpoint_acknowledgments": 1107,
+  "version_two_ack_label_incorrect": true,
+  "version_three_corrects_that_label": true,
+  "native_candidate_promoted": false,
+  "full_desktop_offload": false,
+  "tahoma_tested": false
+}

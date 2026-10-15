@@ -34,6 +34,12 @@ about 20.6 seconds and keyboard-to-visible response about 0.57 seconds in that
 instrumented trial. Responsiveness, long-duration stability, application coverage
 and a Tahoma benefit remain unqualified.
 
+The [matched batching and model-sharing comparison](docs/validation/2026-10-15/native-combined-cost-v1/README.md)
+preserves every available reference pixel across six complete recordings.
+Larger batches alone are 8.5% slower; adding model sharing yields only a 3.1%
+overall improvement. The combination also regresses on the separate expensive-draw
+sample. It is not promoted as a responsiveness fix.
+
 The goal remains a single switch that moves graphics work to the NPU and frees
 iGPU capacity for Tahoma. The
 [execution plan](docs/research/desktop-offload-plan.md) tracks stability,

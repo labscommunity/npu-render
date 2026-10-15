@@ -1,0 +1,42 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$vm="$r\vm";$out="$vm\native-combined-full-abc-v2"
+if(Test-Path $out){throw 'Combined comparison exists'};New-Item -ItemType Directory $out|Out-Null
+$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');completed=$false;passed=$false;desktop_changed=$false;tahoma_tested=$false;desktop_performance_qualified=$false;phases=@();comparison='Same worker37, full 1109-request stream (1108 reference outputs, one unreferenced shutdown request); A=4096/memory-off, B=16384/memory-off, C=16384/memory512; A/B/C/C/B/A; disk cache hits required.'}
+function Save-Report{$report|ConvertTo-Json -Depth 7|Set-Content "$out\report.json"};Save-Report
+Add-Type -TypeDefinition @'
+using System;using System.Runtime.InteropServices;
+public static class NpuRenderFullComparisonPowerV2 {
+ [StructLayout(LayoutKind.Sequential)] public struct Status {public byte ac,battery,percent,reserved;public uint remaining,full;}
+ [DllImport("kernel32.dll",SetLastError=true)] public static extern bool GetSystemPowerStatus(out Status status);
+}
+'@
+function Power-State{$s=New-Object NpuRenderFullComparisonPowerV2+Status;if(![NpuRenderFullComparisonPowerV2]::GetSystemPowerStatus([ref]$s)){throw 'Power state unavailable'};return @{utc=[DateTime]::UtcNow.ToString('o');ac_online=$s.ac;percent=$s.percent;charging=([bool]($s.battery -band 8));raw_battery_status=$s.battery}}
+try{
+ $deadline=[DateTime]::UtcNow.AddMinutes(85)
+ while($true){
+  $done=$false
+  try{if(Test-Path "$vm\native-combined-abba-v2\report.json"){$q=Get-Content "$vm\native-combined-abba-v2\report.json" -Raw|ConvertFrom-Json;if($q.completed -and !$q.passed){throw 'Combined correctness qualification failed'};$done=$q.completed -and $q.passed}}catch{if($_.Exception.Message -eq 'Combined correctness qualification failed'){throw}}
+  if($done){break};if([DateTime]::UtcNow -gt $deadline){throw 'Combined correctness qualification not finished'};Start-Sleep -Seconds 2
+ }
+
+ foreach($phase in @('A1','B1','C1','C2','B2','A2')){
+  if(@(Get-Process nr_registered_local_indexed_worker -ErrorAction SilentlyContinue).Count){throw 'Another NPU renderer is active'}
+  $condition=$phase.Substring(0,1);$candidate=$condition -ne 'A';$batch=if($candidate){'16384'}else{'4096'};$memory=if($condition -eq 'C'){'1'}else{'0'};$trial="native-combined-full-abc-v2-$phase";$before=Power-State
+  if($before.ac_online -ne 1){throw 'AC power required for comparison'}
+  & "$r\toolchains\openvino-2026.4.1\Scripts\python.exe" "$vm\replay-recorded-requests-v15.py" --worker "$r\builds\native-routing-v37\Release\nr_registered_local_indexed_worker.exe" --client "$r\builds\native-routing-v20\Release\nr_registered_local_indexed_client_probe.exe" --runtime "$r\toolchains\openvino-2026.4.1\Lib\site-packages\openvino\libs" --cache "$vm\model-cache-2026-4-v209" --capture "$vm\native-desktop-admission-v37\bootstrap\requests" --output "$vm\$trial" --shared-core 1 --shared-queue 1 --memory-cache $memory --memory-capacity 512 --pipeline-cache retained --quad-batch 1 --generic-batch $batch --infer-trace 0 --compile-trace 0 --provider-recovery 1 > "$out\$phase.stdout.log" 2> "$out\$phase.stderr.log"
+  if($LASTEXITCODE){throw "Comparison replay failed: $phase"};$after=Power-State;if($after.ac_online -ne 1){throw 'AC power changed during comparison'}
+  $q=Get-Content "$vm\$trial\report.json" -Raw|ConvertFrom-Json;if(!$q.passed -or $q.original_pixel_hashes_matched -ne 1108 -or $q.unreferenced_successes -ne 1 -or $q.delivery_acknowledgments -ne 1109 -or $q.capture_index_sha256 -ne 'b39694d8b6d66815509c5667f0203a57852d2078292a2574b29107c3136b5618'){throw 'Comparison pixels incomplete'}
+  $parent=@(Get-Content "$vm\$trial\worker.stdout.jsonl"|ForEach-Object {$_|ConvertFrom-Json})
+  if(@($parent|Where-Object provider_process_started).Count -ne 1 -or @($parent|Where-Object provider_process_failure).Count){throw 'Provider recovery invalidates performance comparison'}
+  $draws=@(Get-Content "$vm\$trial\provider-processes\generation-1\worker.stdout.jsonl"|ForEach-Object {$_|ConvertFrom-Json}|Where-Object {$_.execution_device -eq 'NPU' -and $_.passed -and $_.PSObject.Properties.Name -contains 'compile_and_draw_ms'})
+  if($draws.Count -ne 1109){throw 'Child timing evidence incomplete'}
+  $totals=@{};foreach($key in @('draw_ms','compile_and_draw_ms','provider_requests','backend_compile_calls','memory_cache_hits','memory_cache_evictions','cache_requests','cache_hits')){$totals[$key]=($draws|Measure-Object -Property $key -Sum).Sum}
+  if($totals.cache_requests -ne $totals.cache_hits){throw 'Cold graph preparation invalidates full-stream timing comparison'}
+  $report.phases+=@{phase=$phase;condition=$condition;candidate=$candidate;warmup=$phase.StartsWith('warm-');passed=$true;reference_hashes_matched=1108;unreferenced_successes=1;child_totals=$totals;before_power=$before;after_power=$after;worker_binary_sha256=$q.worker_binary_sha256;capture_index_sha256=$q.capture_index_sha256};Save-Report
+ }
+ $means=@{};foreach($condition in @('A','B','C')){$sum=0.;$phases=@($report.phases|Where-Object {$_.condition -eq $condition});if($phases.Count -ne 2){throw 'Counterbalanced timing evidence incomplete'};foreach($phase in $phases){$sum+=$phase.child_totals.compile_and_draw_ms};$means[$condition]=$sum/2}
+ $report.mean_compile_draw_ms=$means;$report.batching_relative_reduction=1-$means.B/$means.A;$report.combined_relative_reduction=1-$means.C/$means.A;$report.sharing_relative_reduction_at_same_batch=1-$means.C/$means.B
+ $best=if($means.C -lt $means.B){'C'}else{'B'};$report.best_condition=$best;$report.best_condition_memory_cache=if($best -eq 'C'){'1'}else{'0'};$report.at_least_ten_percent_full_stream_reduction=$means[$best] -le $means.A*.9;$report.matched_full_stream_comparison_passed=$true;$report.passed=$true
+
+}catch{$report.error=$_.Exception.Message}
+finally{$report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');Save-Report}
+Get-Content "$out\report.json";if(!$report.passed){exit 1}
