@@ -1,0 +1,46 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$vm="$r\vm";$out="$vm\native-scoped-live-v1"
+if(Test-Path $out){throw 'Scoped native trial exists'};New-Item -ItemType Directory $out|Out-Null
+$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');completed=$false;passed=$false;full_desktop_offload=$false;tahoma_tested=$false;phases=@()}
+function Save-Report{$report|ConvertTo-Json -Depth 5|Set-Content "$out\report.json"};Save-Report
+function Stop-Readiness{
+ if(Test-Path "$vm\native-topology-v47"){New-Item -ItemType File "$vm\native-topology-v47\stop" -Force|Out-Null}
+ $task=Get-ScheduledTask -TaskName T8-NpuRender-InspectTopology-V47 -ErrorAction SilentlyContinue
+ if($task){$deadline=[DateTime]::UtcNow.AddSeconds(15);while((Get-ScheduledTask -TaskName $task.TaskName).State -eq 'Running' -and [DateTime]::UtcNow -lt $deadline){Start-Sleep -Milliseconds 200};Stop-ScheduledTask -TaskName $task.TaskName -ErrorAction SilentlyContinue;Unregister-ScheduledTask -TaskName $task.TaskName -Confirm:$false}
+}
+try{
+ $deadline=[DateTime]::UtcNow.AddMinutes(150)
+ while($true){$ready=$false;try{$q=Get-Content "$vm\native-next-components-v1\report.json" -Raw|ConvertFrom-Json;$ready=$q.completed}catch{};if($ready){break};if([DateTime]::UtcNow -gt $deadline){throw 'Component predecessor did not finish'};Start-Sleep -Seconds 3}
+ $full=Get-Content "$vm\native-texture-full-v1-evidence\report.json" -Raw|ConvertFrom-Json
+ if(!$full.completed -or !$full.passed -or !$full.at_least_ten_percent_reduction){throw 'Complete scoped timing gate failed'}
+ $wait=Get-Content "$r\builds\native-present-v21\wait-report.json" -Raw|ConvertFrom-Json;$reader=Get-Content "$vm\live-frame-reader-v12\report.json" -Raw|ConvertFrom-Json
+ if(!$wait.passed -or !$reader.passed){throw 'Presenter wait/reader not qualified'}
+ $presentBuild=Get-Content "$r\builds\native-present-v21\build-report.json" -Raw|ConvertFrom-Json
+ if(!$presentBuild.clean_build -or $reader.binary_sha256 -ne $presentBuild.binary_sha256 -or (Get-FileHash "$r\builds\native-present-v21\Release\nr_frame_present_probe.exe").Hash -ne $presentBuild.binary_sha256){throw 'Presenter reader binary identity mismatch'}
+
+ $long=Get-Content "$vm\native-duration-long-app-v1\report.json" -Raw|ConvertFrom-Json;if(!$long.completed){throw 'Long desktop trial still active'}
+ if(Test-Path "$vm\native-desktop-admission-v40\report.json"){$q=Get-Content "$vm\native-desktop-admission-v40\report.json" -Raw|ConvertFrom-Json;if(!$q.completed -or !$q.cleanup_passed){throw 'Long desktop restoration incomplete'}}
+ if(@(Get-Process nr_registered_local_indexed_worker,nr_pixel_merger_fusion,nr_uniform_draw_diagnostic,nr_native_topology,nr_frame_present_probe -ErrorAction SilentlyContinue).Count){throw 'Another graphics experiment active'}
+ $report.active_phase='interactive-readiness';Save-Report
+ $ErrorActionPreference='Continue'
+ & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$vm\start-native-topology-v47.ps1" > "$out\observer47.stdout.log" 2> "$out\observer47.stderr.log";$observerExit=$LASTEXITCODE
+ $ErrorActionPreference='Stop'
+ if($observerExit){& powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$vm\dismiss-native-saver-v5.ps1" > "$out\saver.stdout.log" 2> "$out\saver.stderr.log";if($LASTEXITCODE){throw 'Unlocked desktop readiness failed'}}
+ Stop-Readiness
+ foreach($name in @('qualify-native-input-v21','qualify-native-cursor-v4')){
+  $report.active_phase=$name;Save-Report
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$vm\$name.ps1" > "$out\$name.stdout.log" 2> "$out\$name.stderr.log"
+  if($LASTEXITCODE){throw "Interactive helper failed: $name"};$report.phases+=@{phase=$name;passed=$true};Save-Report
+ }
+ $report.active_phase='registered-scoped-renderer';Save-Report
+ & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$vm\run-native-registration-v24.ps1" -Mode render > "$out\registered.stdout.log" 2> "$out\registered.stderr.log"
+ if($LASTEXITCODE){throw 'Scoped renderer registration failed'}
+ $q=Get-Content "$vm\native-registration-v24\report.json" -Raw|ConvertFrom-Json;if(!$q.completed -or !$q.passed -or !$q.cleanup_passed){throw 'Registration cleanup incomplete'}
+ $report.phases+=@{phase='registered-scoped-renderer';passed=$true};$report.active_phase='native-live-v31';Save-Report
+ & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$vm\run-native-live-v31.ps1" > "$out\live.stdout.log" 2> "$out\live.stderr.log"
+ if($LASTEXITCODE){throw 'Scoped native integration failed'}
+ $q=Get-Content "$vm\native-live-v31\report.json" -Raw|ConvertFrom-Json
+ if(!$q.completed -or !$q.passed -or !$q.cleanup_passed -or !$q.initial_response_held_until_observed -or $q.texture_scope -ne '1' -or $q.memory_cache -ne '1'){throw 'Scoped live evidence incomplete'}
+ $report.phases+=@{phase='native-live-v31';passed=$true;cleanup_passed=$true};$report.passed=$true
+}catch{$report.error=$_.Exception.Message}
+finally{Stop-Readiness;$report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');Save-Report}
+Get-Content "$out\report.json";if(!$report.passed){exit 1}

@@ -1,0 +1,152 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -9,3 +9,10 @@
+ target_compile_options(nr_frame_present_probe PRIVATE /W4 /WX)
+ target_link_libraries(nr_frame_present_probe PRIVATE d3d11 dxgi user32 gdi32 wtsapi32 advapi32)
+ set_property(TARGET nr_frame_present_probe PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
++
++add_executable(nr_frame_wait_test frame_wait_test.cpp)
++target_compile_features(nr_frame_wait_test PRIVATE cxx_std_17)
++target_compile_definitions(nr_frame_wait_test PRIVATE UNICODE _UNICODE)
++target_compile_options(nr_frame_wait_test PRIVATE /W4 /WX)
++target_link_libraries(nr_frame_wait_test PRIVATE user32)
++set_property(TARGET nr_frame_wait_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+--- a/input_stimulus.hpp
++++ b/input_stimulus.hpp
+@@ -61,7 +61,7 @@
+     std::printf("{\"input_ready\":true,\"pid\":%lu,\"indirect_primary\":true,\"cursor_confined\":false}\n",GetCurrentProcessId());std::fflush(stdout);
+     while(!window.stopped && GetTickCount64()-start<uint64_t(seconds)*1000){MSG message{};while(PeekMessageW(&message,nullptr,0,0,PM_REMOVE)){if(message.message==WM_QUIT)window.stopped=true;TranslateMessage(&message);DispatchMessageW(&message);}
+         require(nr::present::current_console_default() && nr::live::same(route,nr::live::separated()),"input desktop changed");
+-        require(!window.paint_failed,"owned GDI batch flush failed");const auto tick=unsigned((GetTickCount64()-start)/15000);if(tick!=refresh){refresh=tick;if(window.step==2)++window.animation;InvalidateRect(window.window,nullptr,FALSE);UpdateWindow(window.window);}
++        require(!window.paint_failed,"owned GDI batch flush failed");const auto tick=unsigned((GetTickCount64()-start)/15000);if(tick!=refresh){refresh=tick;if(window.step==2 && cue(L"animate"))++window.animation;InvalidateRect(window.window,nullptr,FALSE);UpdateWindow(window.window);}
+         if(!click_sent && cue(L"click")){window.click();click_sent=true;}
+         window.continue_relative_click();
+         if(!key_sent && window.step==1 && cue(L"key")){window.key();key_sent=true;}
+--- a/frame_present_probe.cpp
++++ b/frame_present_probe.cpp
+@@ -14,6 +14,7 @@
+ #include <vector>
+ #include <string>
+ #include "session_gate.hpp"
++#include "frame_wait.hpp"
+ using Microsoft::WRL::ComPtr;
+ namespace {
+ void require(bool value,const char *message){if(!value)throw std::runtime_error(message);}
+@@ -91,6 +92,7 @@
+ int live(const wchar_t *path,const wchar_t *duration,const wchar_t *producer){
+     wchar_t *end=nullptr;const auto seconds=std::wcstoul(duration,&end,10);require(end!=duration && !*end && seconds>=1 && seconds<=2100,"live duration rejected");
+     const auto expected_producer=std::wcstoul(producer,&end,10);require(end!=producer && !*end && expected_producer,"live producer rejected");
++    nr::present::FrameWait frame_wait(path);
+     auto frame=read_frame(path);const auto h=frame.header;auto last_header=h;require(h.producer_pid==expected_producer,"live producer mismatch");
+     const auto initial=nr::live::separated();
+     require(nr::present::current_console_default(),"signed-in unlocked Default console desktop required");
+@@ -128,7 +130,7 @@
+         auto next=first?std::move(frame):read_frame(path,&last_header);const auto &n=next.header;
+         require(n.producer_pid==expected_producer && n.width==h.width && n.height==h.height && n.format==h.format && n.pixel_bytes==h.pixel_bytes,"live frame identity changed");
+         require(n.sequence>=sequence && n.qpc>=qpc,"live frame sequence regressed");
+-        if(!first && n.sequence==sequence){require(n.qpc==qpc,"live sequence reused");Sleep(1);continue;}
++        if(!first && n.sequence==sequence){require(n.qpc==qpc,"live sequence reused");frame_wait.wait(250);continue;}
+         require(first || n.qpc>qpc,"live timestamp did not advance");
+         if(!first){context->UpdateSubresource(source.Get(),0,nullptr,next.pixels.data(),n.row_bytes,UINT(next.pixels.size()));++uploads;}
+         check(swapchain->GetBuffer(0,IID_PPV_ARGS(&back)));if(!first)context->CopyResource(back.Get(),source.Get());
+@@ -144,6 +146,7 @@
+         observe_display(swapchain.Get(),media.Get(),n.sequence,submitted_count,count_status);last_observation=GetTickCount64();
+         sequence=n.sequence;qpc=n.qpc;last_header=n;first=false;
+     }
++    std::printf("{\"frame_wait_summary\":true,\"notifications\":%llu,\"message_wakes\":%llu,\"timeout_wakes\":%llu,\"maximum_health_check_wait_ms\":250}\n",static_cast<unsigned long long>(frame_wait.notifications),static_cast<unsigned long long>(frame_wait.messages),static_cast<unsigned long long>(frame_wait.timeouts));
+     ShowWindow(window.handle,SW_HIDE);std::printf("{\"completed\":true,\"live_bridge_tested\":true,\"submitted_presents\":%llu,\"source_uploads\":%llu,\"gpu_copy_commands\":%llu,\"readback_copies\":%llu,\"shader_dispatches\":0,\"elapsed_ms\":%llu,\"topology_preserved\":true,\"input_forwarding_tested\":false,\"scanout_mode_verified\":false,\"desktop_offloaded\":false}\n",static_cast<unsigned long long>(presents),static_cast<unsigned long long>(uploads),static_cast<unsigned long long>(presents+readbacks),static_cast<unsigned long long>(readbacks),static_cast<unsigned long long>(GetTickCount64()-start));return 0;
+ 
+ }
+--- /dev/null
++++ b/frame_wait_test.cpp
+@@ -0,0 +1,43 @@
++#define WIN32_LEAN_AND_MEAN
++#define NOMINMAX
++#include "frame_wait.hpp"
++#include <cstdio>
++#include <thread>
++namespace fs=std::filesystem;
++void require(bool value){if(!value)throw std::runtime_error("frame wait contract failed");}
++void messages(){MSG m{};while(PeekMessageW(&m,nullptr,0,0,PM_REMOVE)){};}
++void write(const fs::path &path,DWORD value){
++    const auto f=CreateFileW(path.c_str(),GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_DELETE,nullptr,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,nullptr);
++    require(f!=INVALID_HANDLE_VALUE);DWORD n=0;const auto ok=WriteFile(f,&value,sizeof(value),&n,nullptr);const auto closed=CloseHandle(f);require(ok && n==sizeof(value) && closed);
++}
++DWORD read(const fs::path &path){
++    const auto f=CreateFileW(path.c_str(),GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,nullptr,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,nullptr);
++    require(f!=INVALID_HANDLE_VALUE);DWORD n=0,value=0;const auto ok=ReadFile(f,&value,sizeof(value),&n,nullptr);const auto closed=CloseHandle(f);require(ok && n==sizeof(value) && closed);return value;
++}
++void changed(nr::present::FrameWait &wait){
++    const auto end=GetTickCount64()+3000;
++    while(GetTickCount64()<end){const auto wake=wait.wait(250);if(wake==nr::present::FrameWait::Wake::changed)return;messages();}
++    throw std::runtime_error("change notification was lost");
++}
++void drain(nr::present::FrameWait &wait){
++    for(unsigned n=0;n<64;++n){messages();if(wait.wait(0)==nr::present::FrameWait::Wake::timeout)return;}
++    throw std::runtime_error("notification did not settle");
++}
++int wmain(int argc,wchar_t **argv){
++    try{
++        require(argc==2);const fs::path dir=argv[1];require(fs::create_directory(dir));
++        struct Cleanup {fs::path path;~Cleanup(){std::error_code error;fs::remove_all(path,error);}} cleanup{dir};
++        const auto frame=dir/L"latest.bin",temporary=dir/L"next.bin";write(frame,1);
++        nr::present::FrameWait wait(frame.c_str());messages();drain(wait);
++        const auto began=GetTickCount64();require(wait.wait(30)==nr::present::FrameWait::Wake::timeout);require(GetTickCount64()-began>=20);
++        write(temporary,2);require(MoveFileExW(temporary.c_str(),frame.c_str(),MOVEFILE_REPLACE_EXISTING));changed(wait);require(read(frame)==2);drain(wait);
++        for(DWORD value=3;value<=10;++value){write(temporary,value);require(MoveFileExW(temporary.c_str(),frame.c_str(),MOVEFILE_REPLACE_EXISTING));}
++        changed(wait);require(read(frame)==10);drain(wait);
++        MSG message{};PeekMessageW(&message,nullptr,0,0,PM_NOREMOVE);
++        require(PostThreadMessageW(GetCurrentThreadId(),WM_APP+7,0,0));
++        require(PeekMessageW(&message,nullptr,WM_APP+7,WM_APP+7,PM_NOREMOVE));
++        require(wait.wait(250)==nr::present::FrameWait::Wake::message);messages();drain(wait);
++        wait.close();bool rejected=false;try{wait.wait(0);}catch(const std::invalid_argument &){rejected=true;}require(rejected);
++        std::printf("{\"passed\":true,\"atomic_replacement_exact\":true,\"coalesced_latest_exact\":true,\"seen_message_interrupts_wait\":true,\"bounded_timeout\":true,\"closed_wait_rejected\":true,\"notifications\":%llu,\"messages\":%llu,\"timeouts\":%llu,\"gpu_used\":false,\"desktop_changed\":false}\n",static_cast<unsigned long long>(wait.notifications),static_cast<unsigned long long>(wait.messages),static_cast<unsigned long long>(wait.timeouts));return 0;
++    }catch(const std::exception &e){std::fprintf(stderr,"%s\n",e.what());return 1;}
++}
+--- /dev/null
++++ b/frame_wait.hpp
+@@ -0,0 +1,44 @@
++#pragma once
++#include <windows.h>
++#include <cstdint>
++#include <filesystem>
++#include <stdexcept>
++namespace nr::present {
++// Notifications are hints. The caller must still validate the complete frame,
++// identity and monotonic sequence after every wakeup, including timeouts.
++class FrameWait {
++    HANDLE change=INVALID_HANDLE_VALUE;
++public:
++    uint64_t notifications=0,messages=0,timeouts=0;
++    enum class Wake {changed,message,timeout};
++    explicit FrameWait(const wchar_t *frame){
++        const auto directory=std::filesystem::path(frame).parent_path();
++        if(directory.empty())throw std::invalid_argument("frame wait requires an explicit directory");
++        change=FindFirstChangeNotificationW(directory.c_str(),FALSE,
++            FILE_NOTIFY_CHANGE_FILE_NAME|FILE_NOTIFY_CHANGE_SIZE|FILE_NOTIFY_CHANGE_LAST_WRITE);
++        if(change==INVALID_HANDLE_VALUE)throw std::runtime_error("frame notification creation failed");
++    }
++    FrameWait(const FrameWait &)=delete;
++    FrameWait &operator=(const FrameWait &)=delete;
++    ~FrameWait(){if(change!=INVALID_HANDLE_VALUE)FindCloseChangeNotification(change);}
++    void close(){
++        if(change!=INVALID_HANDLE_VALUE){
++            if(!FindCloseChangeNotification(change))throw std::runtime_error("frame notification close failed");
++            change=INVALID_HANDLE_VALUE;
++        }
++    }
++    Wake wait(DWORD milliseconds){
++        if(change==INVALID_HANDLE_VALUE || milliseconds>250)throw std::invalid_argument("invalid frame notification wait");
++        const auto status=MsgWaitForMultipleObjectsEx(1,&change,milliseconds,QS_ALLINPUT,MWMO_INPUTAVAILABLE);
++        if(status==WAIT_OBJECT_0){
++            // Rearm only after this handle is signaled, never after a timeout
++            // or a message. Events coalesce; they are not a frame counter.
++            if(!FindNextChangeNotification(change))throw std::runtime_error("frame notification rearm failed");
++            ++notifications;return Wake::changed;
++        }
++        if(status==WAIT_OBJECT_0+1){++messages;return Wake::message;}
++        if(status==WAIT_TIMEOUT){++timeouts;return Wake::timeout;}
++        throw std::runtime_error("frame notification/message wait failed");
++    }
++};
++}

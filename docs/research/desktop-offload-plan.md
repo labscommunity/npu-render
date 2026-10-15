@@ -155,6 +155,16 @@ remains required before promotion. This combined comparison does not isolate
 the contribution of either setting.
 Reported binding bytes are not measured host-copy or device-bus traffic.
 
+The [scoped native trial audit](../validation/2026-10-15/native-scoped-desktop-v1/README.md)
+rejects a controller false positive. Live v31 delivers 31 matching physical frames
+and completes 1,403 acknowledged NPU operations, but its frame relay exits on a
+Windows file-replacement error. The controller continues showing the last frame
+and incorrectly reports success. The derived qualification is false; the raw
+reports are preserved. Most residual counter samples overlap the frozen display
+and cannot quantify capacity freed for Tahoma. The next trial requires relay
+health, successful relay termination and fresh independently observed delivery
+near the end of its interval. Controlled visible responses remain 25–29 seconds.
+
 Keeping uniform shader expressions scalar passes 9.44 million checked components
 in each CPU/NPU baseline/candidate configuration, but the recorded candidate
 differs at ticket 140. It remains excluded from desktop admission. A diagnostic

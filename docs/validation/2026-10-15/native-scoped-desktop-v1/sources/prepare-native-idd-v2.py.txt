@@ -1,0 +1,31 @@
+"""Repair the omitted indirect-host duration consumer; preserve v1 evidence."""
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'native-idd-v2'
+shutil.copytree(r/'native-idd-v1',d)
+reg=d/'native/windows/registered_lab';lab=d/'native/windows/indirect_lab'
+old=(reg/'native_probe_lease.hpp').read_bytes()
+new=(r/'native-routing-v45/native/windows/registered_lab/native_probe_lease.hpp').read_bytes()
+assert old.replace(b'r.scope?900000u:120000u',b'r.scope?2400000u:120000u')==new
+assert new==(r/'native-trace-v19/native/windows/registered_lab/native_probe_lease.hpp').read_bytes()
+(reg/'native_probe_lease.hpp').write_bytes(new)
+shutil.copyfile(r/'native-routing-v41/native/windows/registered_lab/native_probe_lease_test.cpp',reg/'native_probe_lease_test.cpp')
+p=lab/'CMakeLists.txt';p.write_text(p.read_text()+'''
+add_executable(nr_idd_lease_contract ../registered_lab/native_probe_lease_test.cpp)
+target_compile_features(nr_idd_lease_contract PRIVATE cxx_std_17)
+target_compile_options(nr_idd_lease_contract PRIVATE /W4 /WX)
+target_link_libraries(nr_idd_lease_contract PRIVATE advapi32 user32 wtsapi32)
+set_property(TARGET nr_idd_lease_contract PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+add_test(NAME native_indirect_duration_lease COMMAND nr_idd_lease_contract)
+set_tests_properties(native_indirect_duration_lease PROPERTIES TIMEOUT 30)
+''')
+p=lab/'nr_native_indirect_probe.inf';s=p.read_text();assert '10/13/2026,0.0.1301.0' in s;p.write_text(s.replace('10/13/2026,0.0.1301.0','10/15/2026,0.0.1502.0'))
+(r/'native-idd-v2-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-idd-v2.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-native-idd-v1.ps1').read_text().replace('native-idd-v1','native-idd-v2').replace('cpu_contract_suites=3','cpu_contract_suites=4;desktop_lease_max_ms=2400000;owned_app_lease_max_ms=120000')
+s=s.replace("'nr_native_indirect_admission_test.exe'=(Get-FileHash", "'nr_idd_lease_contract.exe'=(Get-FileHash \"$b\\Release\\nr_idd_lease_contract.exe\").Hash;'nr_native_indirect_admission_test.exe'=(Get-FileHash")
+(r/'build-native-idd-v2.ps1').write_text(s)
+s=(r/'package-native-idd-v1.ps1').read_text().replace('native-idd-v1','native-idd-v2').replace('native-idd-package-v1','native-idd-package-v2').replace('cpu_contract_suites -ne 3','cpu_contract_suites -ne 4 -or $report.desktop_lease_max_ms -ne 2400000 -or $report.owned_app_lease_max_ms -ne 120000').replace("version='0.0.1301.0'","version='0.0.1502.0';desktop_lease_max_ms=2400000;owned_app_lease_max_ms=120000")
+(r/'package-native-idd-v2.ps1').write_text(s)
+(r/'native-idd-duration-consistency-v1.json').write_text(json.dumps(dict(old_indirect_limit_ms=900000,requested_failed_trial_ms=2280000,new_desktop_limit_ms=2400000,owned_app_limit_ms=120000,worker_trace_indirect_header_identical=True,lease_header_sha256=hashlib.sha256(new).hexdigest(),hardware_execution_proven=False),indent=2)+'\n')
+print('Prepared IDD v2: identical bounded lease contract in worker, UMD and indirect host; process identity and ACL checks retained.')

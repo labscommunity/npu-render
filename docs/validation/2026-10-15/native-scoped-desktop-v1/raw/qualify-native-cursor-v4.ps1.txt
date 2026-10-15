@@ -1,0 +1,56 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$out="$r\vm\native-cursor-guard-v4-qualification";$source="$env:LOCALAPPDATA\Temp\npu-graphics-probe-0146a2388f25";$tasks=@()
+if(Test-Path $out){throw 'Cursor qualification already exists'}
+$prior=Get-Content "$r\vm\native-desktop-admission-v40\report.json" -Raw|ConvertFrom-Json;if(!$prior.completed -or !$prior.cleanup_passed){throw 'Prior native cleanup incomplete'}
+if(@(Get-Process nr_registered*,nr_native_topology,nr_frame_present_probe -ErrorAction SilentlyContinue).Count){throw 'Another desktop experiment active'}
+$proof=Get-Content "$r\builds\native-topology-control-v12\build-report.json" -Raw|ConvertFrom-Json;$binary="$r\builds\native-topology-control-v12\Release\nr_native_topology.exe"
+if(!$proof.clean_build -or (Get-FileHash $binary).Hash -ne $proof.binary_sha256){throw 'Cursor helper identity mismatch'}
+New-Item -ItemType Directory $out|Out-Null;Copy-Item "$r\builds\native-topology-control-v12\build-report.json" "$out\build-report.json"
+$report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');completed=$false;passed=$false;cases=@();topology_changed=$false;npu_tested=$false}
+function Rows([string]$path){if(!(Test-Path $path)){return @()};return @(Get-Content $path|Where-Object {$_ -match '^\{.*\}$'}|ForEach-Object {$_|ConvertFrom-Json})}
+function Interactive([string]$name,[string]$dir,[string[]]$command){
+ New-Item -ItemType Directory $dir|Out-Null;@{command=$command;log="$dir\probe.log"}|ConvertTo-Json -Depth 5|Set-Content -Encoding UTF8 "$dir\job.json"
+ $task="T8-NpuRender-CursorGuardV4-$name";$action=New-ScheduledTaskAction -Execute "$source\venv\Scripts\pythonw.exe" -Argument ('"'+$source+'\native_runner.py" "'+$dir+'\job.json"')
+ $principal=New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value) -LogonType Interactive -RunLevel Limited
+ $settings=New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 2) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+ Register-ScheduledTask -TaskName $task -Action $action -Principal $principal -Settings $settings|Out-Null;$script:tasks+=$task;Start-ScheduledTask -TaskName $task
+}
+try{
+ foreach($case in @('normal','owner-terminated')){
+  $dir="$out\$case";New-Item -ItemType Directory $dir|Out-Null;$cue="$dir\confine-cue"
+  Interactive "$case-helper" "$dir\helper" @($binary,'--cursor-contract','30',$cue)
+  Interactive "$case-watchdog" "$dir\watchdog" @("$source\venv\Scripts\python.exe","$r\vm\cursor_recovery_watchdog_v2.py",'--log',"$dir\helper\probe.log",'--binary-sha256',$proof.binary_sha256,'--output',"$dir\watchdog\recovery",'--seconds','45','--restore-position')
+  $deadline=[DateTime]::UtcNow.AddSeconds(15);while(!(Test-Path "$dir\watchdog\recovery\ready.json") -and [DateTime]::UtcNow -lt $deadline){Start-Sleep -Milliseconds 100}
+  if(!(Test-Path "$dir\watchdog\recovery\ready.json")){throw 'Independent cursor recovery did not arm'}
+  $ready=Get-Content "$dir\watchdog\recovery\ready.json" -Raw|ConvertFrom-Json;if(!$ready.armed){throw 'Recovery not ready'}
+  New-Item -ItemType File $cue|Out-Null
+  $deadline=[DateTime]::UtcNow.AddSeconds(10);$contract=@();do{$contract=@(Rows "$dir\helper\probe.log"|Where-Object cursor_confinement_contract);if($contract.Count -eq 1 -and (Test-Path "$dir\watchdog\recovery\confined.json")){break};Start-Sleep -Milliseconds 100}while([DateTime]::UtcNow -lt $deadline)
+  if($contract.Count -ne 1 -or !$contract[0].four_boundaries_verified -or !$contract[0].relative_pointer_moved -or !(Test-Path "$dir\watchdog\recovery\confined.json")){throw 'Pointer movement or confinement not confirmed'}
+  if($case -eq 'normal'){
+   $inputProof=Get-Content "$r\builds\native-present-v21\build-report.json" -Raw|ConvertFrom-Json;$inputBinary="$r\builds\native-present-v21\Release\nr_frame_present_probe.exe"
+   if(!$inputProof.clean_build -or (Get-FileHash $inputBinary).Hash -ne $inputProof.binary_sha256){throw 'Input fixture identity mismatch'}
+   Interactive "$case-input" "$dir\input" @($inputBinary,'--input-contract')
+   $inputDeadline=[DateTime]::UtcNow.AddSeconds(20);$inputDone=@();do{$inputDone=@(Rows "$dir\input\probe.log"|Where-Object {$_.completed -and $_.input_contract});if($inputDone.Count){break};Start-Sleep -Milliseconds 100}while([DateTime]::UtcNow -lt $inputDeadline)
+   if($inputDone.Count -ne 1 -or !$inputDone[0].passed){throw 'Foreground input did not pass'}
+   $reacquisition=@(Rows "$dir\helper\probe.log"|Where-Object cursor_reacquired_after_release)
+   if(!$reacquisition.Count){throw 'Foreground transition did not exercise reacquisition'}
+   $report.foreground_input_passed=$true;$report.foreground_release_reacquired=$true
+  }
+  if($case -eq 'owner-terminated'){
+   $owner=Get-Process -Id $ready.owner.pid;try{[void]$owner.Handle;if($owner.HasExited -or $owner.Path -ne $binary -or $owner.StartTime.ToUniversalTime().ToFileTimeUtc() -ne $ready.owner.creation_filetime){throw 'Owned termination identity mismatch'};$owner.Kill();$owner.WaitForExit();$terminationConfirmed=$owner.HasExited}finally{$owner.Dispose()}
+   if(!$terminationConfirmed){throw 'Owned cursor helper termination failed'}
+  }
+  $deadline=[DateTime]::UtcNow.AddSeconds(50);$recovery=$null;do{try{$recovery=Get-Content "$dir\watchdog\recovery\report.json" -Raw|ConvertFrom-Json;if($recovery.completed){break}}catch{};Start-Sleep -Milliseconds 100}while([DateTime]::UtcNow -lt $deadline)
+  if(!$recovery.completed -or !$recovery.passed -or !$recovery.owned_confinement_observed -or !$recovery.original_unconfined_restored -or !$recovery.original_cursor_position_restored -or $recovery.trigger -ne 'owner-exited'){throw 'Independent cursor recovery did not pass'}
+  if($case -eq 'owner-terminated' -and !$recovery.recovery_released_owned_clip){throw 'Forced termination did not exercise recovery'}
+  if($case -eq 'normal'){$normal=@(Rows "$dir\helper\probe.log"|Where-Object {$_.completed -and $_.cursor_contract});if($normal.Count -ne 1 -or !$normal[0].passed){throw 'Normal cursor release failed'}}
+  $report.cases+=@{case=$case;passed=$true;recovery=$recovery};$report|ConvertTo-Json -Depth 8|Set-Content "$out\report.json"
+ }
+ $report.passed=$report.cases.Count -eq 2 -and $report.foreground_input_passed -and $report.foreground_release_reacquired
+}catch{$report.error=$_.Exception.Message}
+finally{
+ foreach($case in @('normal','owner-terminated')){$recoveryDir="$out\$case\watchdog\recovery";if(Test-Path $recoveryDir){New-Item -ItemType File "$recoveryDir\stop" -Force|Out-Null}}
+ $deadline=[DateTime]::UtcNow.AddSeconds(5);do{$running=@($tasks|Where-Object {$_ -like '*watchdog' -and (Get-ScheduledTask -TaskName $_ -ErrorAction SilentlyContinue).State -eq 'Running'});if(!$running.Count){break};Start-Sleep -Milliseconds 100}while([DateTime]::UtcNow -lt $deadline)
+ foreach($task in $tasks){Stop-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue;Unregister-ScheduledTask -TaskName $task -Confirm:$false -ErrorAction SilentlyContinue}
+ $report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');$report|ConvertTo-Json -Depth 8|Set-Content "$out\report.json"
+}
+$report|ConvertTo-Json -Depth 8;if(!$report.passed){exit 1}

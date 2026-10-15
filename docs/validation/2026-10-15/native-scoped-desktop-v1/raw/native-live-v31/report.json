@@ -1,0 +1,176 @@
+{
+    "started":  "2026-10-15T03:43:15.7458175Z",
+    "completed":  true,
+    "passed":  true,
+    "native_trial":  "native-desktop-admission-v41",
+    "topology_trial":  "native-topology-primary-v17",
+    "desktop_offloaded":  false,
+    "input_forwarding_tested":  false,
+    "tahoma_tested":  false,
+    "controller_pid":  13972,
+    "first_relay":  {
+                        "sequence":  1,
+                        "qpc":  2441823037861,
+                        "producer_pid":  21384,
+                        "width":  1024,
+                        "height":  768,
+                        "format":  87,
+                        "pixel_bytes":  3145728,
+                        "pixel_sha256":  "3c40207fa6ed9267e9fab4a58b44065612257ee117a80267bca5b8b162476b7d",
+                        "packet_sha256":  "abf9f6f007c8cfb85731e1ea2bd089e5caeb220a90f460064d1e3c7cb2f32e9b",
+                        "observed":  "2026-10-15T03:44:32.109269+00:00",
+                        "npu_receipts_observed":  178,
+                        "known_stimulus_pixel":  [
+                                                     62,
+                                                     55,
+                                                     44,
+                                                     255
+                                                 ]
+                    },
+    "presentation_seconds":  525,
+    "cursor_cued_at":  "2026-10-15T03:44:36.0568548Z",
+    "click_cued_at":  "2026-10-15T03:46:43.3356666Z",
+    "key_cued_at":  "2026-10-15T03:47:13.7627464Z",
+    "initial_response_held_until_observed":  true,
+    "presenter_task_result":  0,
+    "topology_exit":  0,
+    "native_exit":  0,
+    "cleanup_passed":  true,
+    "application_adapter_observation":  [
+                                            {
+                                                "adapter_probe_started":  true,
+                                                "pid":  6180,
+                                                "session":  1,
+                                                "explicit_native_lease":  false
+                                            },
+                                            {
+                                                "adapter_observation":  "enumerated",
+                                                "index":  0,
+                                                "luid_low":  2030613112,
+                                                "luid_high":  0,
+                                                "vendor_id":  0,
+                                                "device_id":  0,
+                                                "software":  false
+                                            },
+                                            {
+                                                "adapter_observation":  "enumerated",
+                                                "index":  1,
+                                                "luid_low":  59527,
+                                                "luid_high":  0,
+                                                "vendor_id":  32902,
+                                                "device_id":  45184,
+                                                "software":  false
+                                            },
+                                            {
+                                                "adapter_observation":  "enumerated",
+                                                "index":  2,
+                                                "luid_low":  2030712288,
+                                                "luid_high":  0,
+                                                "vendor_id":  0,
+                                                "device_id":  0,
+                                                "software":  false
+                                            },
+                                            {
+                                                "adapter_observation":  "enumerated",
+                                                "index":  3,
+                                                "luid_low":  65098,
+                                                "luid_high":  0,
+                                                "vendor_id":  5140,
+                                                "device_id":  140,
+                                                "software":  true
+                                            },
+                                            {
+                                                "default_device_request":  true,
+                                                "feature_level_10_only":  false,
+                                                "hresult":  "887a0004",
+                                                "device_created":  false,
+                                                "feature_level":  0
+                                            },
+                                            {
+                                                "default_device_request":  true,
+                                                "feature_level_10_only":  true,
+                                                "hresult":  "887a0004",
+                                                "device_created":  false,
+                                                "feature_level":  0
+                                            }
+                                        ],
+    "application_adapter_baseline":  [
+                                         {
+                                             "adapter_observation":  "enumerated",
+                                             "index":  0,
+                                             "luid_low":  59527,
+                                             "luid_high":  0,
+                                             "vendor_id":  32902,
+                                             "device_id":  45184,
+                                             "software":  false
+                                         },
+                                         {
+                                             "adapter_observation":  "enumerated",
+                                             "index":  1,
+                                             "luid_low":  65098,
+                                             "luid_high":  0,
+                                             "vendor_id":  5140,
+                                             "device_id":  140,
+                                             "software":  true
+                                         },
+                                         {
+                                             "adapter_observation":  "default-feature-list",
+                                             "index":  0,
+                                             "luid_low":  59527,
+                                             "luid_high":  0,
+                                             "vendor_id":  32902,
+                                             "device_id":  45184,
+                                             "software":  false
+                                         },
+                                         {
+                                             "adapter_observation":  "default-feature-10",
+                                             "index":  0,
+                                             "luid_low":  59527,
+                                             "luid_high":  0,
+                                             "vendor_id":  32902,
+                                             "device_id":  45184,
+                                             "software":  false
+                                         }
+                                     ],
+    "application_graphics_offload_qualified":  false,
+    "physically_submitted_frames":  31,
+    "matching_source_frames":  31,
+    "backbuffer_copies_exact":  true,
+    "distinct_source_pixel_hashes":  21,
+    "stimulus_task_result":  0,
+    "presenter_child_success":  true,
+    "stimulus_child_success":  true,
+    "controlled_color_submitted":  true,
+    "mouse_received":  true,
+    "keyboard_received":  true,
+    "physical_blue_green_red_observed":  true,
+    "screen_observer":  "DXGI physical-output duplication; two-pixel GPU readback; ownership before and after",
+    "screen_observer_result":  {
+                                   "completed":  true,
+                                   "passed":  true,
+                                   "physical_output_observer":  true,
+                                   "rows":  96,
+                                   "blue":  140,
+                                   "green":  6,
+                                   "red":  2,
+                                   "gpu_copy_commands":  192,
+                                   "timeouts":  779,
+                                   "physical_panel_observed":  false,
+                                   "desktop_offloaded":  false
+                               },
+    "primary_topology_restored":  true,
+    "ordinary_windows_restored":  true,
+    "pointer_confined_and_restored":  true,
+    "pointer_reacquisitions":  2,
+    "relative_mouse_received":  true,
+    "normal_windows_input_tested":  true,
+    "texture_scope":  "1",
+    "memory_cache":  "1",
+    "isolated_provider":  true,
+    "provider_generations":  1,
+    "provider_faults":  0,
+    "provider_retries":  0,
+    "hardware_child_receipts":  1398,
+    "cursor_cleanup_passed":  true,
+    "finished":  "2026-10-15T03:54:56.3389792Z"
+}

@@ -1,0 +1,35 @@
+"""Replace unchanged-frame polling with notification and Windows-message waits."""
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'native-present-v21';shutil.copytree(r/'native-present-v20',d)
+shutil.copyfile(r/'frame_wait_v1.hpp',d/'frame_wait.hpp');shutil.copyfile(r/'frame_wait_test_v1.cpp',d/'frame_wait_test.cpp')
+p=d/'frame_present_probe.cpp';s=p.read_text().replace('#include "session_gate.hpp"','#include "session_gate.hpp"\n#include "frame_wait.hpp"',1)
+needle='    auto frame=read_frame(path);const auto h=frame.header;auto last_header=h;';assert s.count(needle)==1
+s=s.replace(needle,'    nr::present::FrameWait frame_wait(path);\n'+needle,1)
+needle='Sleep(1);continue;';assert s.count(needle)==1;s=s.replace(needle,'frame_wait.wait(250);continue;',1)
+needle='    ShowWindow(window.handle,SW_HIDE);std::printf("{\\"completed\\":true,\\"live_bridge_tested\\":true';assert s.count(needle)==1
+s=s.replace(needle,'''    std::printf("{\\"frame_wait_summary\\":true,\\"notifications\\":%llu,\\"message_wakes\\":%llu,\\"timeout_wakes\\":%llu,\\"maximum_health_check_wait_ms\\":250}\\n",static_cast<unsigned long long>(frame_wait.notifications),static_cast<unsigned long long>(frame_wait.messages),static_cast<unsigned long long>(frame_wait.timeouts));
+'''+needle,1);p.write_text(s)
+p=d/'CMakeLists.txt';p.write_text(p.read_text()+'''
+add_executable(nr_frame_wait_test frame_wait_test.cpp)
+target_compile_features(nr_frame_wait_test PRIVATE cxx_std_17)
+target_compile_definitions(nr_frame_wait_test PRIVATE UNICODE _UNICODE)
+target_compile_options(nr_frame_wait_test PRIVATE /W4 /WX)
+target_link_libraries(nr_frame_wait_test PRIVATE user32)
+set_property(TARGET nr_frame_wait_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+''')
+p=d/'input_stimulus.hpp';s=p.read_text();needle='if(window.step==2)++window.animation;';assert s.count(needle)==1
+s=s.replace(needle,'if(window.step==2 && cue(L"animate"))++window.animation;',1);p.write_text(s)
+(r/'native-present-v21-source.json').write_text(json.dumps({p.relative_to(d).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()},indent=2)+'\n')
+with tarfile.open(r/'native-present-v21.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-native-present-v20.ps1').read_text().replace('native-present-v20','native-present-v21')
+s=s[:s.index('& "$r\\toolchains\\openvino-2026.4.1\\Scripts\\python.exe"')]
+s+='''& "$b\\Release\\nr_frame_wait_test.exe" "$b\\owned-wait-fixture" > "$b\\wait.stdout.log" 2> "$b\\wait.stderr.log"
+if($LASTEXITCODE){throw 'Presenter notification/message contract failed'}
+$q=Get-Content "$b\\wait.stdout.log" -Raw|ConvertFrom-Json
+if(!$q.passed -or !$q.atomic_replacement_exact -or !$q.coalesced_latest_exact -or !$q.seen_message_interrupts_wait -or !$q.bounded_timeout -or !$q.closed_wait_rejected){throw 'Presenter wait evidence incomplete'}
+$q|Add-Member -NotePropertyName binary_sha256 -NotePropertyValue (Get-FileHash "$b\\Release\\nr_frame_wait_test.exe").Hash
+$q|ConvertTo-Json|Set-Content "$b\\wait-report.json"
+'''
+(r/'build-native-present-v21.ps1').write_text(s)
+print('Prepared message-aware presenter wait; no live performance claim.')

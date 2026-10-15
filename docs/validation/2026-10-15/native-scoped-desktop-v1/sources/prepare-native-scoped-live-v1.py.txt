@@ -1,0 +1,54 @@
+"""Bind exact full-stream-qualified scoped uploads to a separate short native trial."""
+from pathlib import Path
+import hashlib,json
+r=Path('results/render-driver')
+def change(name,pairs):
+ s=(r/name).read_text()
+ for a,b in pairs:assert a in s,(name,a);s=s.replace(a,b)
+ return s
+def manifest(name,files):(r/name).write_text(json.dumps({f:hashlib.sha256((r/f).read_bytes()).hexdigest() for f in files},indent=2)+'\n')
+for prefix in ('run-native-registration','recover-native-registration'):
+ s=change(prefix+'-v23.ps1',[('v23','v24')])
+ if prefix=='run-native-registration':
+  s=s.replace('native-routing-v41','native-routing-v45')
+  needle='$principal=[Security.Principal.WindowsPrincipal]';assert needle in s
+  s=s.replace(needle,'''$full=Get-Content "$r\\vm\\native-texture-full-v1-evidence\\report.json" -Raw|ConvertFrom-Json
+if(!$full.completed -or !$full.passed -or !$full.at_least_ten_percent_reduction){throw 'Complete scoped comparison not qualified'}
+'''+needle,1)
+ (r/(prefix+'-v24.ps1')).write_text(s)
+s=(r/'qualify-native-registered-v23.py').read_text().replace("NR_RENDER_MEMORY_CACHE='0'","NR_RENDER_MEMORY_CACHE='1',NR_RENDER_MEMORY_CACHE_CAPACITY='512',NR_RENDER_TEXTURE_SCOPE='1',NR_RENDER_GENERIC_BATCH='4096',NR_RENDER_UNIFORM_LANES='0'")
+s=s.replace("quad_batch='1')","quad_batch='1',texture_scope='1',memory_cache='1',generic_batch='4096')")
+(r/'qualify-native-registered-v24.py').write_text(s)
+manifest('native-registration-v24-source.json',['run-native-registration-v24.ps1','recover-native-registration-v24.ps1','qualify-native-registered-v24.py','native_session_broker_v1.py'])
+s=(r/'native_desktop_bootstrap_v18.py').read_text();needle="p.add_argument('--uniform-lanes',choices=('0','1'),default='0')";assert needle in s
+s=s.replace(needle,needle+"\np.add_argument('--texture-scope',choices=('0','1'),default='0')",1)
+s=s.replace('NR_RENDER_UNIFORM_LANES=v.uniform_lanes,','NR_RENDER_UNIFORM_LANES=v.uniform_lanes,NR_RENDER_TEXTURE_SCOPE=v.texture_scope,',1)
+needle='uniform_lanes=v.uniform_lanes';assert needle in s;s=s.replace(needle,needle+',texture_scope=v.texture_scope',1)
+(r/'native_desktop_bootstrap_v19.py').write_text(s)
+for prefix in ('run-native-desktop','recover-native-desktop'):
+ s=change(prefix+'-v38.ps1',[('v38','v41')])
+ if prefix=='run-native-desktop':
+  s=s.replace('native-registration-v23','native-registration-v24').replace('native-routing-v41','native-routing-v45').replace('native_desktop_bootstrap_v18','native_desktop_bootstrap_v19')
+  needle="'--monitor-seconds','660',";assert needle in s;s=s.replace(needle,"'--monitor-seconds','660','--memory-cache','1','--texture-scope','1',",1)
+ (r/(prefix+'-v41.ps1')).write_text(s)
+for n in (46,47):(r/f'start-native-topology-v{n}.ps1').write_text(change('start-native-topology-v41.ps1',[('v41',f'v{n}'),('V41',f'V{n}')]))
+(r/'dismiss-native-saver-v5.ps1').write_text(change('dismiss-native-saver-v3.ps1',[('native-saver-dismiss-v3','native-saver-dismiss-v5'),('native-topology-v42','native-topology-v47')]))
+(r/'qualify-native-input-v21.ps1').write_text(change('qualify-native-input-v20.ps1',[('v20','v21'),('V20','V21'),('native-desktop-admission-v37','native-desktop-admission-v40')]))
+(r/'qualify-native-cursor-v4.ps1').write_text(change('qualify-native-cursor-v3.ps1',[('native-cursor-guard-v3','native-cursor-guard-v4'),('CursorGuardV3','CursorGuardV4'),('native-present-v20','native-present-v21'),('native-desktop-admission-v37','native-desktop-admission-v40')]))
+s=change('run-native-live-v28.ps1',[
+ ('native-live-v28','native-live-v31'),('NativeLiveV28','NativeLiveV31'),('native-present-v20','native-present-v21'),('live-frame-reader-v11','live-frame-reader-v12'),
+ ('native-cursor-guard-v3','native-cursor-guard-v4'),('native-registration-v23','native-registration-v24'),('native-desktop-admission-v38','native-desktop-admission-v41'),
+ ('run-native-desktop-v38','run-native-desktop-v41'),('NativeDesktopRecovery-v38','NativeDesktopRecovery-v41'),('native-topology-primary-v14','native-topology-primary-v17'),('native-topology-v40','native-topology-v46')])
+needle="  if(!$clickCued -and $cursorCued";assert needle in s
+s=s.replace(needle,'''  if($keyCued -and $redObserved -and !(Test-Path "$out\\cues\\animate")){New-Item -ItemType File "$out\\cues\\animate"|Out-Null;$report.initial_response_held_until_observed=$true;Save-Report}
+'''+needle,1)
+needle=' $report.isolated_provider=$bootstrap.provider_isolated;'
+# This field currently shares its line with the read, so match without spacing.
+needle='$report.isolated_provider=$bootstrap.provider_isolated;';assert needle in s
+s=s.replace(needle,"$report.texture_scope=$bootstrap.texture_scope;$report.memory_cache=$bootstrap.memory_cache;if($bootstrap.texture_scope -ne '1' -or $bootstrap.memory_cache -ne '1'){throw 'Native provider did not use qualified scoped settings'};"+needle,1)
+(r/'run-native-live-v31.ps1').write_text(s)
+files=list(json.loads((r/'native-desktop-v38-source.json').read_text()))
+files=[f.replace('desktop-v38','desktop-v41').replace('bootstrap_v18','bootstrap_v19').replace('live-v28','live-v31').replace('topology-v40','topology-v46') for f in files]
+manifest('native-desktop-v41-source.json',files)
+for name in ['native_desktop_bootstrap_v19.py','qualify-native-registered-v24.py']:compile((r/name).read_text(),name,'exec')
+print('Prepared scoped native v31. Full-stream gate, registered proof and presenter qualification are required before admission.')
