@@ -1,5 +1,18 @@
 # Moving the operating system's rendering
 
+**Current result, October 16:** the [native v54 trial](../validation/2026-10-16/native-filled-program-live-v1/README.md)
+runs actual DWM drawing through the registered adapter and NPU worker, delivers
+57 exact physical submissions, accepts controlled input and restores the ordinary
+desktop. A normally started non-admin default-adapter fixture shares that worker.
+This establishes the tested native path. It does not establish a usable continuous
+switch, arbitrary application coverage, removal of physical GPU copies, or a
+Tahoma benefit. The first mouse response still takes 2.17 seconds.
+
+The [current acceptance plan](desktop-offload-plan.md) tracks the remaining work.
+The dated investigations below retain their original scope and describe how the
+integration boundaries were established; their earlier unresolved findings are
+not the latest project status.
+
 The target includes Windows' existing desktop composition. Rendering another
 application window on the NPU does not establish that this workload moved.
 The October 7 [desktop measurements](../validation/2026-10-07/desktop/README.md)
