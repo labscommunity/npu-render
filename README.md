@@ -10,15 +10,18 @@ RGBA composition and an explicit backend switch. The packaged runtime passed
 GPU → NPU → CPU → GPU → NPU switching on Panther Lake. It supports CPU/GPU/NPU through
 its first OpenVINO provider; other providers can implement the same contracts.
 
-**Latest results, October 16:** a [bounded NPU implementation of the shader that
-stopped the last desktop run](docs/validation/2026-10-16/native-long-shader-v1/README.md)
-passes 120 device fixtures and complete image comparisons against two independent
-references, including the failed request and all six earlier captures. The
-previous [live desktop trial still fails](docs/validation/2026-10-16/native-program-live-v1/README.md)
-after 44 submitted frames. [The integrated worker passes all 972 requests and registered D3D11](docs/validation/2026-10-16/native-long-shader-worker-v1/README.md);
-its new live desktop trial remains a separate gate. Responsive sustained operation and a Tahoma benefit remain unqualified.
+**Latest results, October 16:** the [new finite native desktop trial passes](docs/validation/2026-10-16/native-long-shader-live-v1/README.md)
+with 1,112 acknowledged NPU operations, 51 matching physical submissions,
+controlled mouse/keyboard input and exact ordinary restoration. It executes the
+repaired long shader four times. Responsiveness remains unqualified: the controlled
+mouse response takes 4.54 seconds to confirm through physical-output pixel readback,
+and the keyboard response takes 173 ms. Two shader groups account for 2.21 seconds
+of the mouse delay before publication. The [integrated worker also passes all 972
+retained requests and registered D3D11](docs/validation/2026-10-16/native-long-shader-worker-v1/README.md).
 [Automatic admission of non-admin interactive clients](docs/validation/2026-10-16/native-interactive-admission-v1/README.md)
 passes component checks; real interactive graphics integration remains open.
+Sustained responsiveness, broad application coverage and a Tahoma benefit remain
+unqualified.
 See the [current acceptance plan](docs/research/desktop-offload-plan.md).
 
 **Full desktop offload is unfinished.** The current Windows/Panther Lake path

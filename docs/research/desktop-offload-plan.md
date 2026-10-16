@@ -1,23 +1,24 @@
 # Full desktop offload: acceptance and execution plan
 
 Updated 2026-10-16. Target: Delta, Windows 11, Panther Lake. The repository stays
-private. **Full desktop offload is unfinished.** Worker v8 passes all 972 retained
-requests and registered D3D11. Its [live v43 trial](../validation/2026-10-16/native-program-live-v1/README.md)
-fails after 44 submitted frames and 767 acknowledged NPU operations: an existing
-181-instruction shader path times out. Ordinary cleanup and memory integrity
-pass. Producing the controlled mouse-response frame takes 2.93 seconds;
-independent pixel confirmation completes at 5.87 seconds. Neither responsiveness
-nor sustained use is qualified. Interactive application coverage and a Tahoma
-benefit also remain open.
+private. **Full desktop offload is unfinished.** Worker v9 passes all 972 retained
+requests and registered D3D11. Its [finite live v44 trial](../validation/2026-10-16/native-long-shader-live-v1/README.md)
+passes 1,112 acknowledged NPU operations, 51 exact physical submissions, controlled
+mouse/keyboard input and ordinary restoration. Memory integrity remains enabled.
+The mouse-response frame takes 4,409.902 ms to publish and 4,541.028 ms to confirm
+through independent physical-output readback. Keyboard confirmation takes 172.758 ms.
+These two events do not qualify responsiveness or sustained use. Interactive
+application coverage and a Tahoma benefit also remain open.
 
 The [long-shader component](../validation/2026-10-16/native-long-shader-v1/README.md)
-now passes 120 independent NPU fixtures and exact complete-image comparisons for
-the failed request and all six earlier uses of the shader. It removes that
-request's large pixel graph from the candidate path; the old graph takes 94.210
-seconds to compile in an offline comparison. [Worker v9 passes all 972 requests and registered D3D11](../validation/2026-10-16/native-long-shader-worker-v1/README.md),
-with identical outputs to v8 and one shared long-shader import. A new live run
-and broader responsiveness measurements remain required. This shader-specific
-fix does not complete the reusable runtime compiler or application coverage.
+passes 120 independent NPU fixtures and exact complete-image comparisons for
+the failed v43 request and all six earlier uses of the shader. [Worker v9](../validation/2026-10-16/native-long-shader-worker-v1/README.md)
+preserves all 972 outputs from v8 and shares one long-shader import. Live v44
+executes this path four times. The remaining mouse event includes 3,482.198 ms
+inside child rendering requests before publication and 927.704 ms outside them.
+Two shader groups, `595296ba…` and `c71638aa…`, account for 2,207.444 ms inside
+those requests. They are the next measured rendering targets. This repair does
+not complete the reusable compiler, thirty-minute qualification or application coverage.
 
 The [live causal timing](../validation/2026-10-16/native-timing-live-v1/README.md)
 places 8,167.77 ms of the mouse response before frame publication and 70.81 ms
@@ -157,9 +158,9 @@ role, and any GPU rendering/copy cost in the bridge must be measured.
    Repeat responsiveness and sustained stability checks after renderer changes.
 4. Reproduce live v43's captured timeout and remove the remaining cold graph
    preparation from that rendering path. The reusable worker passes its 972-request
-   replay and registered D3D, but live stability fails. Preserve explicit routing
-   declines and original evidence. Repeat finite and sustained desktop tests after
-   the reliability repair.
+   replay, registered D3D and finite live v44. Preserve explicit routing declines
+   and original evidence. Target the two dominant remaining shader groups from
+   v44, then repeat finite and sustained desktop tests after rendering changes.
 5. Integrate the qualified interactive admission component with the serialized
    desktop worker. Two ordinary non-elevated clients and five spoof rejections
    now pass, with exact process/token access-list restoration. Graphics routing,
