@@ -1,0 +1,15 @@
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'ptl-native-worker-v12';shutil.copytree(r/'ptl-native-worker-v11',d)
+for name in ('ptl_complex_shader.hpp','ptl_complex_shaders.hpp','ptl_complex_triangle_draw.cpp','ptl_complex_triangle_draw.hpp'):
+ shutil.copyfile(r/'ptl-complex-reference-v2'/name,d/name)
+p=d/'CMakeLists.txt';s=p.read_text().replace('ptl_long_triangle_draw.cpp)','ptl_long_triangle_draw.cpp ptl_complex_triangle_draw.cpp)');p.write_text(s)
+p=d/'indexed_pipeline.hpp';s=p.read_text().replace('#include "ptl_long_triangle_draw.hpp"','#include "ptl_long_triangle_draw.hpp"\n#include "ptl_complex_shader.hpp"\n#include "ptl_complex_triangle_draw.hpp"')
+a=s.index('    bool ptl_long_enabled=false;');b=s.index('    static shader::Program precision_program',a);part=s[a:b];s=s[:b]+part.replace('ptl_long','ptl_complex').replace('PtlLong','PtlComplex')+s[b:]
+a=s.index('        wchar_t *long_shader=');b=s.index('        wchar_t *program=',a);part=s[a:b];s=s[:b]+part.replace('long_shader','complex_shader').replace('long_length','complex_length').replace('long_owner','complex_owner').replace('long shader','complex shader').replace('ptl_long','ptl_complex').replace('PTL_LONG','PTL_COMPLEX')+s[b:]
+a=s.index('            if(ptl_long_enabled&&');b=s.index('            if(ptl_texture_enabled&&',a);part=s[a:b];s=s[:a]+part.replace('ptl_long','ptl_complex').replace('PtlLong','PtlComplex')+s[a:];p.write_text(s)
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};baseline=json.loads((r/'ptl-native-worker-v11-source.json').read_text());changed=[k for k in baseline if manifest[k]!=baseline[k]];assert sorted(changed)==['CMakeLists.txt','indexed_pipeline.hpp'];assert not any('reference' in n for n in manifest)
+(r/'ptl-native-worker-v12-source.json').write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/'ptl-native-worker-v12.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-ptl-native-worker-v11.ps1').read_text().replace('ptl-native-worker-v11','ptl-native-worker-v12');(r/'build-ptl-native-worker-v12.ps1').write_text(s)
+print(json.dumps(dict(files=len(manifest),changed=changed,added=[k for k in manifest if k not in baseline],cpu_reference_in_runtime=False)))

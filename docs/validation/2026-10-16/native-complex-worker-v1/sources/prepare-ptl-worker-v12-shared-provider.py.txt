@@ -1,0 +1,12 @@
+from pathlib import Path
+import hashlib,json,tarfile
+r=Path('results/render-driver');d=r/'ptl-native-worker-v12';p=d/'ptl_complex_shader.hpp';s=p.read_text();old=(r/'ptl-native-worker-v11/ptl_long_shader.hpp').read_text();provider=old[old.index(' struct Provider {'):old.index(' raster::PackedResources layout;')].replace('ptl_long_provider_created','ptl_complex_provider_created')
+s=s.replace('#include <sstream>','#include <sstream>\n#include <mutex>\n#include <cstdio>')
+s=s.replace(' ov::Core core;ov::CompiledModel model;ov::InferRequest inference;\n',provider)
+s=s.replace('raster::PackedResources layout;std::string device;unsigned count=0,address_u[2]{},address_v[2]{},filters[2]{};bool failed=false;','raster::PackedResources layout;unsigned count=0,address_u[2]{},address_v[2]{},filters[2]{};')
+a=s.index('  const auto bytes=verified_blob(path);');b=s.index('\n }\n Result execute',a);s=s[:a]+'  provider=acquire(verified_blob(path));'+s[b:]
+s=s.replace('  require(!failed&&!vertices.empty()', '  std::lock_guard<std::mutex> lock(provider->mutex);auto &inference=provider->inference;const auto &device=provider->device;\n  require(!provider->failed&&!vertices.empty()').replace('));failed=true;', '));provider->failed=true;').replace('  failed=false;return result;','  provider->failed=false;return result;')
+assert '));failed=true;' not in s and s.count('ptl_complex_provider_created')==1;p.write_text(s)
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};(r/'ptl-native-worker-v12-source.json').write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/'ptl-native-worker-v12.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+print(json.dumps(dict(shared_provider=True,header_sha256=manifest['ptl_complex_shader.hpp'])))

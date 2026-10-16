@@ -41,6 +41,15 @@ five-sample shader work still contribute 1,248.446 ms before the mouse frame is
 published. The failed screen-saver interruption is preserved separately; it caused
 no native admission. Full offload and Tahoma benefit remain unqualified.
 
+The [five-sample worker v12](../validation/2026-10-16/native-complex-worker-v1/README.md)
+passes all 972 requests: 967 outputs unchanged from v11 and five exact explicit
+FP32-profile outputs. Ten complex-shader draws share one model import. Forty
+paired comparisons against the old NPU renderer preserve all independent FP32
+reference outputs; thirty warm pairs sum to 34.591 seconds old and 15.641 seconds
+new. Twenty-five variants differ from the old renderer by at most one byte per
+component, as explicitly recorded. Registered graphics and live integration are
+separate gates; this does not demonstrate desktop or Tahoma performance.
+
 The [long-shader component](../validation/2026-10-16/native-long-shader-v1/README.md)
 passes 120 independent NPU fixtures and exact complete-image comparisons for
 the failed v43 request and all six earlier uses of the shader. [Worker v9](../validation/2026-10-16/native-long-shader-worker-v1/README.md)

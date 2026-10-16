@@ -1,0 +1,28 @@
+"""Bind new exact replay references to independently qualified arithmetic, without changing capture."""
+from pathlib import Path
+from datetime import UTC,datetime
+import hashlib,json,os
+r=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=r/'vm'
+def obj(p):return json.loads(p.read_text(encoding='utf-8-sig'))
+def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+def rows(p):return [json.loads(x) for x in p.read_text().splitlines() if x.startswith('{')]
+out=vm/'ptl-qualified-precision-profiles-v2.json';assert not out.exists()
+qualified=obj(vm/'ptl-complex-shader-capture-v2/report.json');original=obj(vm/'ptl-complex-original-timing-v1/report.json');phases=obj(vm/'ptl-complex-span-analysis-v1/report.json')
+assert qualified['passed'] and original['passed'] and phases['passed'] and len(phases['checks'])==180 and all(x['exact'] for x in phases['checks'])
+assert len(qualified['cases'])==len(original['cases'])==10
+old={x['ticket']:x for x in original['cases']};cases=[]
+for c in qualified['cases']:
+ ticket=c['ticket'];o=old[ticket];assert c['passed'] and len(c['pairs'])==4 and all(x['exact'] for x in c['pairs']);assert o['passed'] and o['independent_fp32_agreement'] and o['original_reference_preserved'] and o['packet_sha256']==c['packet_sha256']
+ if c['original_pixel_hash_preserved']:continue
+ image=c['pixel_artifacts']['candidate.rgba'];reference=c['pixel_artifacts']['baseline.rgba'];assert image==reference
+ cases.append(dict(ticket=ticket,request_sha256=c['packet_sha256'],legacy_pixel_sha256=c['original_worker_pixel_sha256'],corrected_pixel_sha256=image['sha256'],independent_graph_pixel_sha256=reference['sha256'],pixel_bytes=image['bytes'],exact_comparisons=4,legacy_reference_verified=True,independent_phase_analysis_exact=True,profile='explicit-fp32-sampler-staging',claimed_old_renderer_bug_fixed=False))
+prior=vm/'ptl-qualified-precision-corrections-v1.json';assert sha(prior)=='5afd2995cb49f64f3bb6d7d3ce75e30b1fb7d6f989261027425cd76768d70c48'
+assert {x['ticket'] for x in cases}=={58,196,302,363,820}
+report=dict(schema=2,qualified=True,original_capture_unchanged=True,reason='explicit-fp32-sampler-profile-exact-independent-reference',prior_manifest_hex=prior.read_bytes().hex(),prior_manifest_sha256=sha(prior),cases=cases,source_report_sha256={n:sha(vm/n/'report.json') for n in ('ptl-complex-shader-capture-v2','ptl-complex-original-timing-v1','ptl-complex-span-analysis-v1')},created=datetime.now(UTC).isoformat())
+data=(json.dumps(report,indent=2)+'\n').encode()
+from precision_corrections_v2 import validate
+requests=rows(vm/'native-desktop-admission-v33/bootstrap/requests/index.jsonl');requests=[x for x in requests if x.get('request_recorded')]
+responses={x['ticket']:x for x in rows(vm/'native-desktop-admission-v33/bootstrap/requests/index.jsonl') if x.get('provider_response_recorded')}
+# The original replay loader establishes the response layout; use that same immutable index.
+assert len(validate(data,hashlib.sha256(data).hexdigest(),requests,responses))==14
+out.write_bytes(data);print(json.dumps(dict(qualified=True,sha256=sha(out),profiles=14,new_profiles=5)))

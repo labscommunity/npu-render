@@ -25,7 +25,9 @@ preserves all 348 changed-image comparisons for 87 newly supported draws.
 The [five-sample shader component](docs/validation/2026-10-16/native-complex-shader-v1/README.md)
 matches an explicit FP32 reference on all 40 tested images. Five recorded images
 differ from the old renderer; those numerical differences remain explicit.
-It has not yet been integrated into a qualified desktop worker.
+The [next worker passes all 972 requests](docs/validation/2026-10-16/native-complex-worker-v1/README.md),
+preserving 967 prior outputs and exactly matching the five explicit new-profile
+references. Its registered graphics and live desktop checks remain open.
 See the [current acceptance plan](docs/research/desktop-offload-plan.md).
 
 **Full desktop offload is unfinished.** The current Windows/Panther Lake path

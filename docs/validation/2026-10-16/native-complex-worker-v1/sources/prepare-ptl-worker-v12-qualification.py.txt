@@ -1,0 +1,26 @@
+from pathlib import Path
+import ast,hashlib
+r=Path('results/render-driver')
+p=r/'qualify-complex-precision-profile-v1.py';s=p.read_text().replace("responses={x['ticket']:x for x in rows(vm/'native-desktop-admission-v33/bootstrap/responses.jsonl') if x.get('response_recorded')}","responses={x['ticket']:x for x in rows(vm/'native-desktop-admission-v33/bootstrap/requests/index.jsonl') if x.get('provider_response_recorded')}");p.write_text(s)
+s=(r/'replay-recorded-requests-v18.py').read_text().replace('from precision_corrections_v1 import','from precision_corrections_v2 import');(r/'replay-recorded-requests-v19.py').write_text(s)
+s=(r/'qualify-ptl-native-worker-v11-v2.py').read_text()
+s=s.replace("out=vm/('ptl-native-worker-v11-validation-v2-selected' if a.stage=='selected' else 'ptl-native-worker-v11-full');out.mkdir(exist_ok=False);trial=(vm/'ptl-native-worker-v11-selected/replay') if a.stage=='selected' else out/'replay';process=None", "out=vm/('ptl-native-worker-v12-'+a.stage);out.mkdir(exist_ok=False);trial=out/'replay';process=None")
+s=s.replace(" assert obj(vm/'ptl-program-point-comparison-v1-full/report.json')['passed']", " assert obj(vm/'ptl-program-point-comparison-v1-full/report.json')['passed'];assert obj(vm/'ptl-complex-original-timing-v1/report.json')['passed'];assert obj(vm/'native-desktop-admission-v58/report.json')['cleanup_passed']\n complex_model=vm/'ptl-six-span-complex-shader-v1/patched.blob';assert sha(complex_model)=='47f69b5861732a03014b58160116ebbb928fd6e818a11b7f553e423a4cf3c43a'\n complex_tickets={58,196,302,363,482,602,668,723,790,820}")
+s=s.replace("corrections=vm/'ptl-qualified-precision-corrections-v1.json';assert sha(corrections)=='5afd2995cb49f64f3bb6d7d3ce75e30b1fb7d6f989261027425cd76768d70c48'", "corrections=vm/'ptl-qualified-precision-profiles-v2.json';assert obj(corrections)['qualified'] and len(obj(corrections)['cases'])==5")
+s=s.replace("builds/ptl-native-worker-v11/", "builds/ptl-native-worker-v12/").replace("ptl-native-worker-v11-validation-v2-selected/report.json","ptl-native-worker-v12-selected/report.json")
+a=s.index(' for source,digest in {');b=s.index('\n env=',a)
+manifest={n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in ('replay-recorded-requests-v19.py','precision_corrections_v2.py','precision_corrections_v1.py')}
+s=s[:a]+" for source,digest in "+repr(manifest)+".items():assert sha(vm/source)==digest"+s[b:]
+s=s.replace("env=os.environ.copy();", "env=os.environ.copy();env['NR_RENDER_PTL_COMPLEX_BLOB']=str(complex_model);")
+s=s.replace('replay-recorded-requests-v18.py','replay-recorded-requests-v19.py').replace("35,160']","35,160,58,363,482,602,668,723,790,820']")
+a=s.index(" if a.stage=='selected':\n  prior=");b=s.index(" proof=obj(trial/'report.json')",a)
+s=s[:a]+''' with (out/'stdout.log').open('xb') as stdout,(out/'stderr.log').open('xb') as stderr:
+  process=subprocess.Popen(command,env=env,stdout=stdout,stderr=stderr,creationflags=subprocess.CREATE_NO_WINDOW)
+  try:process.wait(timeout=1950)
+  except subprocess.TimeoutExpired:process.kill();process.wait(timeout=5);report['replay_timeout']=True
+ replay_exit=process.returncode
+'''+s[b:]
+s=s.replace('expected_geometry=(prior_geometry&selected)-expected_tickets','expected_geometry=(prior_geometry&selected)-expected_tickets-complex_tickets')
+s=s.replace(" assert proof['qualified_correction_hashes_matched']==9", " complex_events=[];complex_imports=[]\n for log in (trial/'provider-processes').glob('generation-*/worker.stdout.jsonl'):\n  events=rows(log);complex_events += [x for x in events if x.get('ptl_complex_draw')];complex_imports += [x for x in events if x.get('ptl_complex_provider_created')]\n actual_complex=routed_tickets(trial,'ptl_complex_draw');assert actual_complex==complex_tickets and len(complex_events)==10 and len(complex_imports)==1\n assert all(x['accepted'] and x['coverage_compacted'] and x['fallback_backend']=='none' for x in complex_events)\n report.update(complex_accepted=10,complex_imports=1,complex_tickets_matched=True,complex_model_sha256=sha(complex_model))\n assert proof['qualified_correction_hashes_matched']==14")
+ast.parse(s);(r/'qualify-ptl-native-worker-v12.py').write_text(s)
+print('Prepared new worker qualification with explicit exact references for five changed images.')
