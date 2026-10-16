@@ -1,0 +1,28 @@
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'ptl-point-rectangle-integration-v2';shutil.copytree(r/'ptl-point-rectangle-integration-v1',d)
+p=d/'ptl_point_rectangle.hpp';s=p.read_text().replace('#include "linear_texture_draw.hpp"','#include "linear_texture_draw.hpp"\n#include "opaque_affine_crop.hpp"');s=s.replace(' shader::VertexExecutor vertex;ProjectionExecutor projection;std::string device;', ' shader::VertexExecutor vertex;ProjectionExecutor projection;std::string device;std::unique_ptr<OpaqueAffineCrop> crop;')
+s=s.replace('  provider=acquire(verified_blob(blob));device=provider->device;', '  crop=std::make_unique<OpaqueAffineCrop>(sw,sh,w,h,format!=sf,"NPU",opaque,blend);\n  provider=acquire(verified_blob(blob));device=provider->device;')
+needle='    for(const auto v:bounds)require(v>=-8388608&&v<=8388608);'
+insert='''    // Preserve the existing qualified NPU crop whenever its own mapping proof succeeds.
+    // Unsupported mappings fall through to the direct NPU rectangle kernel.
+    began=Clock::now();
+    try{auto cropped=crop->execute(bounds,clip,uv,color,source,background,true);if(cropped){
+     require(cropped->device==device);result.timings.merger_ms=elapsed(began);result.pixels=std::move(cropped->pixels);result.covered_samples=cropped->covered;
+     result.input_bytes+=cropped->input_bytes;result.output_bytes+=cropped->output_bytes;result.provider_requests+=cropped->provider_calls;result.tile_executions=cropped->provider_calls;result.used_rectangle=true;result.vertices=std::move(shaded.vertices);result.timings.total_ms=elapsed(start);
+     std::printf("{\\"ptl_rectangle_preserved_crop\\":true,\\"provider_calls\\":%llu,\\"execution_device\\":\\"NPU\\"}\\n",static_cast<unsigned long long>(cropped->provider_calls));std::fflush(stdout);return result;
+    }}catch(...){failed=true;throw;}
+'''
+assert s.count(needle)==1;s=s.replace(needle,insert+needle)
+s=s.replace('provider->failed=false;failed=false;return result;', 'provider->failed=false;failed=false;std::printf("{\\"ptl_rectangle_kernel_executed\\":true,\\"provider_calls\\":%llu,\\"execution_device\\":\\"NPU\\"}\\n",static_cast<unsigned long long>(result.provider_requests-2));std::fflush(stdout);return result;')
+p.write_text(s)
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};(r/'ptl-point-rectangle-integration-v2-source.json').write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/'ptl-point-rectangle-integration-v2.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-ptl-point-rectangle-integration-v1.ps1').read_text().replace('ptl-point-rectangle-integration-v1','ptl-point-rectangle-integration-v2');(r/'build-ptl-point-rectangle-integration-v2.ps1').write_text(s)
+s=(r/'inspect-ptl-point-rectangle-captures-v1.py').read_text().replace('ptl-point-rectangle-integration-v1','ptl-point-rectangle-integration-v2').replace('ptl-point-rectangle-admission-v1','ptl-point-rectangle-admission-v2');(r/'inspect-ptl-point-rectangle-captures-v2.py').write_text(s)
+s=(r/'run-ptl-point-rectangle-compare-v1.py').read_text().replace('ptl-point-rectangle-integration-v1','ptl-point-rectangle-integration-v2').replace('ptl-point-rectangle-admission-v1','ptl-point-rectangle-admission-v2').replace('ptl-point-rectangle-comparison-v1','ptl-point-rectangle-comparison-v2')
+s=s.replace("if (case/'baseline.rgba').exists():", "result['preserved_crop_variants']=sum(bool(x.get('ptl_rectangle_preserved_crop')) for x in events);result['direct_kernel_variants']=sum(bool(x.get('ptl_rectangle_kernel_executed')) for x in events)\n  if (case/'baseline.rgba').exists():")
+(r/'run-ptl-point-rectangle-compare-v2.py').write_text(s)
+s=(r/'run-ptl-rectangle-captures-after-worker-v2.ps1').read_text().replace('ptl-rectangle-captures-after-worker-v2','ptl-rectangle-capture-v2-qualification').replace('ptl-worker-v12-qualification-v2','ptl-rectangle-captures-after-worker-v2').replace('build-ptl-point-rectangle-integration-v1','build-ptl-point-rectangle-integration-v2').replace('inspect-ptl-point-rectangle-captures-v1','inspect-ptl-point-rectangle-captures-v2').replace('run-ptl-point-rectangle-compare-v1','run-ptl-point-rectangle-compare-v2').replace('ptl-point-rectangle-comparison-v1','ptl-point-rectangle-comparison-v2')
+(r/'run-ptl-rectangle-capture-v2-qualification.ps1').write_text(s)
+print(json.dumps(dict(prepared=True,header_sha256=manifest['ptl_point_rectangle.hpp'],kernel_unchanged=True,preserves_qualified_npu_crop=True)))

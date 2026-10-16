@@ -1,0 +1,22 @@
+{"shared_provider_core_experiment":true,"single_core_for_npu_compilation":true,"hardware_context_count_measured":false}
+{"kind":"private_shared_queue_experiment","enabled":true,"property_readback_verified":true,"hardware_queue_count_measured":false}
+{"ptl_rectangle_provider_created":true,"single_import_shared":true}
+{"kind":"pipeline_cache_policy","uniform_capacity":8,"triangle_capacity":24,"clear_capacity":4,"replacement":"FIFO","hardware_queue_count_measured":false}
+{"kind":"setup","candidate_setup_ms":181.946700,"negative_checks":2,"cpu_reference_test_only":true,"desktop_changed":false}
+{"affine_crop":true,"alpha_replaced":false,"source_over":true,"point_sampling":true,"maximum_byte_error_bound":0,"source_x":64,"source_y":0,"width":960,"height":48}
+{"kind":"pair","iteration":0,"order":"baseline-first","baseline_full_ms":80.895500,"candidate_full_ms":31.017000,"candidate_shader_and_projection_ms":6.483500,"candidate_merger_ms":23.169500,"baseline_calls":5,"candidate_calls":4,"components":3145728,"different_components":0,"maximum_byte_error":0,"exact":true}
+{"affine_crop":true,"alpha_replaced":false,"source_over":true,"point_sampling":true,"maximum_byte_error_bound":0,"source_x":64,"source_y":0,"width":960,"height":48}
+{"kind":"reference_check","iteration":0,"reference":"original rectangle graph on CPU","cpu_test_reference_only":true,"candidate_rendering_device":"NPU","different_components":0,"exact":true}
+{"affine_crop":true,"alpha_replaced":false,"source_over":true,"point_sampling":true,"maximum_byte_error_bound":0,"source_x":64,"source_y":0,"width":960,"height":48}
+{"kind":"pair","iteration":1,"order":"custom-first","baseline_full_ms":27.226000,"candidate_full_ms":25.453700,"candidate_shader_and_projection_ms":2.634000,"candidate_merger_ms":21.475800,"baseline_calls":5,"candidate_calls":4,"components":3145728,"different_components":0,"maximum_byte_error":0,"exact":true}
+{"affine_crop":true,"alpha_replaced":false,"source_over":true,"point_sampling":true,"maximum_byte_error_bound":0,"source_x":64,"source_y":0,"width":960,"height":48}
+{"kind":"reference_check","iteration":1,"reference":"original rectangle graph on CPU","cpu_test_reference_only":true,"candidate_rendering_device":"NPU","different_components":0,"exact":true}
+{"affine_crop":true,"alpha_replaced":false,"source_over":true,"point_sampling":true,"maximum_byte_error_bound":0,"source_x":64,"source_y":0,"width":960,"height":48}
+{"kind":"pair","iteration":2,"order":"baseline-first","baseline_full_ms":24.921100,"candidate_full_ms":22.850200,"candidate_shader_and_projection_ms":2.626500,"candidate_merger_ms":18.771300,"baseline_calls":5,"candidate_calls":4,"components":3145728,"different_components":0,"maximum_byte_error":0,"exact":true}
+{"affine_crop":true,"alpha_replaced":false,"source_over":true,"point_sampling":true,"maximum_byte_error_bound":0,"source_x":64,"source_y":0,"width":960,"height":48}
+{"kind":"reference_check","iteration":2,"reference":"original rectangle graph on CPU","cpu_test_reference_only":true,"candidate_rendering_device":"NPU","different_components":0,"exact":true}
+{"affine_crop":true,"alpha_replaced":false,"source_over":true,"point_sampling":true,"maximum_byte_error_bound":0,"source_x":64,"source_y":0,"width":960,"height":48}
+{"kind":"pair","iteration":3,"order":"custom-first","baseline_full_ms":23.250700,"candidate_full_ms":21.185000,"candidate_shader_and_projection_ms":1.760500,"candidate_merger_ms":18.088100,"baseline_calls":5,"candidate_calls":4,"components":3145728,"different_components":0,"maximum_byte_error":0,"exact":true}
+{"affine_crop":true,"alpha_replaced":false,"source_over":true,"point_sampling":true,"maximum_byte_error_bound":0,"source_x":64,"source_y":0,"width":960,"height":48}
+{"kind":"reference_check","iteration":3,"reference":"original rectangle graph on CPU","cpu_test_reference_only":true,"candidate_rendering_device":"NPU","different_components":0,"exact":true}
+{"kind":"complete","passed":true,"desktop_tested":false,"tahoma_tested":false}

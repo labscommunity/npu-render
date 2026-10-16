@@ -1,0 +1,9 @@
+from pathlib import Path
+import ctypes,hashlib,json
+from ptl_point_rectangle_fixtures_v2 import fixture,MUTATIONS
+r=Path(__file__).parent;lib=ctypes.CDLL(str((r/'ptl-point-rectangle-v1-local.dylib').resolve()));fn=lib.nr_rectangle_local;fn.argtypes=[ctypes.c_void_p,ctypes.c_void_p];checks=[]
+for index in range(192+len(MUTATIONS)):
+ data,expected=fixture(index);source=ctypes.create_string_buffer(data);target=ctypes.create_string_buffer(262144);fn(source,target);actual=target.raw;different=[n for n,(a,b) in enumerate(zip(actual,expected)) if a!=b]
+ checks.append(dict(index=index,exact=not different,different_bytes=len(different),first_differences=different[:16],input_sha256=hashlib.sha256(data).hexdigest(),output_sha256=hashlib.sha256(actual).hexdigest(),expected_sha256=hashlib.sha256(expected).hexdigest()))
+report=dict(completed=True,passed=all(x['exact'] for x in checks),cpu_only=True,npu_tested=False,fixtures=len(checks),valid=192,invalid=len(MUTATIONS),source_sha256={name:hashlib.sha256((r/name).read_bytes()).hexdigest() for name in ['ptl-six-span-point-rectangle-v1.c','ptl-point-rectangle-v1-local.c','ptl_point_rectangle_fixtures_v2.py']},checks=checks)
+(r/'ptl-point-rectangle-v2-local-comparison.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps({k:v for k,v in report.items() if k!='checks'}));print(json.dumps([x for x in checks if not x['exact']][:8]));raise SystemExit(0 if report['passed'] else 1)

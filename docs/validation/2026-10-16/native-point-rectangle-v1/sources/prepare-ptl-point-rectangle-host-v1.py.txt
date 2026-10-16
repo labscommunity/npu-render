@@ -1,0 +1,107 @@
+from pathlib import Path
+import argparse,hashlib,json,re,tarfile
+p=argparse.ArgumentParser();p.add_argument('--model-sha256',required=True);args=p.parse_args();assert re.fullmatch('[0-9a-f]{64}',args.model_sha256)
+r=Path('results/render-driver');d=r/'ptl-point-rectangle-integration-v1';d.mkdir(exist_ok=False)
+old=(r/'native-routing-v45/native/windows/registered_lab/linear_texture_draw.cpp').read_text()
+geometry=old[old.index('    auto &s=*state;const auto start=Clock::now();',old.index('UniformDrawExecutor::Result LinearTextureDrawExecutor::execute')):old.index('    if(s.crop){',old.index('UniformDrawExecutor::Result LinearTextureDrawExecutor::execute'))]
+geometry=geometry.replace('auto &s=*state;','auto &s=*this;').replace('pixel.color','color_slot').replace('pixel.uv','uv_slot').replace('s.count,false,s.count>8192','130992,false,true')
+provider=(r/'ptl-program-point-integration-v1/ptl_program.hpp').read_text();provider=provider[provider.index(' struct Provider {'):provider.index(' shader::PtlProgram program;')].replace('ptl_program_provider_created','ptl_rectangle_provider_created')
+verified=(r/'ptl-program-point-integration-v1/ptl_program.hpp').read_text();verified=verified[verified.index(' static std::string verified_blob'):verified.index(' PtlProgramRaster(')];a=verified.index('  constexpr unsigned char expected[]{');b=verified.index(';',a);verified=verified[:a]+'  constexpr unsigned char expected[]{'+','.join('0x'+args.model_sha256[n:n+2] for n in range(0,64,2))+'}'+verified[b:]
+header='''#pragma once
+#include "linear_texture_draw.hpp"
+#include "triangle_regions.hpp"
+#include "projection_executor.hpp"
+#include "vertex_executor.hpp"
+#include <openvino/openvino.hpp>
+#include <windows.h>
+#include <bcrypt.h>
+#include <cmath>
+#include <chrono>
+#include <filesystem>
+#include <fstream>
+#include <sstream>
+#include <mutex>
+#include <cstdio>
+namespace nr::raster {
+class PtlPointRectangle {
+ static void require(bool v){if(!v)throw std::invalid_argument("PTL point rectangle contract");}
+ static void put(unsigned char *p,unsigned v){std::memcpy(p,&v,4);}
+ static unsigned get(const unsigned char *p){unsigned v;std::memcpy(&v,p,4);return v;}
+ using Clock=std::chrono::steady_clock;
+ static double elapsed(Clock::time_point t){return std::chrono::duration<double,std::milli>(Clock::now()-t).count();}
+'''+provider+'''
+ shader::Program vs;unsigned width,height,sw,sh,sf,target_format,color_slot,uv_slot;bool opaque,blend,failed=false;
+ shader::VertexExecutor vertex;ProjectionExecutor projection;std::string device;
+public:
+'''+verified+'''
+ static bool eligible(const shader::Program &ps){try{LinearTextureDrawExecutor::validate_shader(ps);return true;}catch(const std::invalid_argument &){return false;}}
+ PtlPointRectangle(const shader::Program &v,const shader::Program &p,unsigned w,unsigned h,unsigned format,const PackedTexture &source,bool source_over,const std::filesystem::path &blob):
+  vs(v),width(w),height(h),sw(source.width),sh(source.height),sf(source.format),target_format(format),color_slot(0),uv_slot(0),opaque(false),blend(source_over),vertex(v,6,"NPU"),projection(6,"NPU"){
+  require(eligible(p)&&w&&w<=8192&&h&&h<=8192&&uint64_t(w)*h<=8388576&&sw&&sw<=8192&&sh&&sh<=8192&&uint64_t(sw)*sh<=8388608&&(format==28||format==87)&&(sf==28||sf==87));
+  color_slot=p.instructions.back().sources[1].index;uv_slot=p.instructions.front().sources[0].index;opaque=p.instructions.size()==3;
+  require(vs.stage==shader::Stage::vertex&&vs.position_output<16&&(vs.outputs[color_slot]&15)==15&&(vs.outputs[uv_slot]&3)==3);
+  provider=acquire(verified_blob(blob));device=provider->device;
+ }
+ UniformDrawExecutor::Result execute(const std::vector<shader::VertexRegisters> &inputs,const shader::VertexConstants &constants,const Viewport &viewport,const PackedTexture &source,const std::vector<PackedColor> &background,const std::optional<std::array<int32_t,4>> &scissor){
+'''+geometry+'''
+    for(const auto v:bounds)require(v>=-8388608&&v<=8388608);
+    for(auto &v:clip)v*=256;
+    std::lock_guard<std::mutex> lock(provider->mutex);require(!provider->failed);provider->failed=true;failed=true;
+    auto &request=provider->inference;auto *data=static_cast<unsigned char*>(request.get_input_tensor().data());
+    const auto initialize=[&](unsigned char *p,unsigned phase,unsigned count,unsigned first){
+     put(p,0x4e525231);put(p+4,1);put(p+8,phase);put(p+12,count);put(p+16,262144);put(p+20,first);put(p+24,width);put(p+28,height);put(p+32,sw);put(p+36,sh);put(p+40,target_format);put(p+44,sf);put(p+48,blend?1u:0u);put(p+52,opaque?1u:0u);
+     std::memcpy(p+64,bounds.data(),16);std::memcpy(p+80,clip.data(),16);std::memcpy(p+96,uv.data(),16);std::memcpy(p+112,color.data(),16);
+    };
+    const auto invoke=[&]{request.start_async();if(!request.wait_for(std::chrono::milliseconds(10000)))throw std::runtime_error("PTL rectangle timeout");++result.provider_requests;++result.tile_executions;result.input_bytes+=1572864;result.output_bytes+=1572864;};
+    began=Clock::now();const unsigned end=end_row*width;
+    for(unsigned first=first_row*width;first<end;first+=130992){
+     unsigned counts[6]{},begins[6]{},hits[6]{};std::memset(data,0,1572864);
+     for(unsigned plane=0;plane<6;++plane){begins[plane]=(std::min)(end,first+plane*21832);counts[plane]=(std::min)(21832u,end-begins[plane]);initialize(data+plane*262144,0,counts[plane],begins[plane]);}
+     invoke();const auto *plan=static_cast<const unsigned char*>(request.get_output_tensor().data());std::memset(data,0,1572864);unsigned total_hits=0;
+     for(unsigned plane=0;plane<6;++plane){const auto *o=plan+plane*262144;auto *p=data+plane*262144;require(get(o)==0x4e52524f&&get(o+4)==0&&get(o+8)==counts[plane]&&get(o+12)<=counts[plane]);initialize(p,1,counts[plane],begins[plane]);
+      for(unsigned n=0;n<counts[plane];++n){const auto coverage=get(o+16+n*8),index=get(o+20+n*8);require(coverage<=1);auto *record=p+128+n*12;std::memcpy(record,background[begins[plane]+n].data(),4);put(record+8,coverage);hits[plane]+=coverage;
+       if(coverage){require(index<source.pixels.size());std::memcpy(record+4,source.pixels[index].data(),4);}else require(index==0);
+      }require(hits[plane]==get(o+12));total_hits+=hits[plane];
+     }
+     result.covered_samples+=total_hits;if(!total_hits)continue;
+     invoke();const auto *pixels=static_cast<const unsigned char*>(request.get_output_tensor().data());
+     for(unsigned plane=0;plane<6;++plane){const auto *o=pixels+plane*262144;require(get(o)==0x4e52524f&&get(o+4)==1&&get(o+8)==counts[plane]&&get(o+12)==hits[plane]);std::memcpy(result.pixels.data()+begins[plane],o+16,size_t(counts[plane])*4);}
+    }
+    result.timings.merger_ms=elapsed(began);result.timings.total_ms=elapsed(start);result.used_rectangle=true;result.vertices=std::move(shaded.vertices);provider->failed=false;failed=false;return result;
+ }
+};
+}
+'''
+(d/'ptl_point_rectangle.hpp').write_text(header)
+s=(r/'ptl-program-point-integration-v1/compare.cpp').read_text();s=s.replace('#include "ptl_program.hpp"\n#include "ptl_program_triangle_draw.hpp"\n#include "reference_triangle.hpp"','#include "ptl_point_rectangle.hpp"')
+a=s.index('    const auto reason=');b=s.index('    for(unsigned iteration=0;',a)
+s=s[:a]+'''    const auto reason=[&]() -> const char* {
+     if(r.header.flags&0x3000)return "generic_pipeline";
+     if(!(r.header.flags&16)||ex::payload_abi(r.header)!=5||!ex::shape_valid(r.header))return "point_rectangle_only";
+     if(!PtlPointRectangle::eligible(r.pixel))return "shader";
+     return "accepted";
+    };
+    if(argc==5){ex::require(std::string(argv[4])=="--inspect");const auto why=reason();std::printf("{\\"inspection_only\\":true,\\"accepted\\":%s,\\"reason\\":\\"%s\\",\\"flags\\":%u,\\"vertices\\":%u,\\"npu_executed\\":false}\\n",std::strcmp(why,"accepted")==0?"true":"false",why,r.header.flags,r.header.vertices);return 0;}
+    ex::require(std::strcmp(reason(),"accepted")==0);
+    auto blob=PtlPointRectangle::verified_blob(argv[2]);blob[35000]^=1;save(out/"tampered.blob",blob.data(),blob.size());bool rejected=false;try{PtlPointRectangle::verified_blob(out/"tampered.blob");}catch(const std::invalid_argument &){rejected=true;}ex::require(rejected);std::filesystem::remove(out/"tampered.blob");
+    auto wrong=r.pixel;wrong.instructions[0].saturate=true;ex::require(!PtlPointRectangle::eligible(wrong));
+    const auto setup=Clock::now();
+    PtlPointRectangle custom(r.vertex,r.pixel,r.header.width,r.header.height,r.header.format,r.texture,(r.header.flags&1)!=0,argv[2]);
+    PtlPointRectangle shared(r.vertex,r.pixel,r.header.width,r.header.height,r.header.format,r.texture,(r.header.flags&1)!=0,argv[2]);
+    ex::Pipeline baseline;
+    LinearTextureDrawExecutor reference(r.vertex,r.pixel,r.header.width,r.header.height,r.header.format,r.texture.width,r.texture.height,r.texture.format,"CPU",(r.header.flags&1)!=0,TextureFilter::point);
+    std::printf("{\\"kind\\":\\"setup\\",\\"candidate_setup_ms\\":%.6f,\\"negative_checks\\":2,\\"cpu_reference_test_only\\":true,\\"desktop_changed\\":false}\\n",ms(setup));std::fflush(stdout);
+'''+s[b:]
+s=s.replace('custom.execute(r.inputs,r.vertex_constants,r.pixel_constants,r.viewport,r.resources,r.background,r.scissor,r.blend_constant)','custom.execute(r.inputs,r.vertex_constants,r.viewport,r.texture,r.background,r.scissor)')
+a=s.index('        uint64_t reference_differences=');b=s.index('        if(different||reference_differences)',a)
+s=s[:a]+'''        const auto expected=reference.execute(r.inputs,r.vertex_constants,r.viewport,r.texture,r.background,r.scissor);const auto *p=reinterpret_cast<const unsigned char*>(expected.pixels.data());uint64_t reference_differences=0;
+        for(size_t i=0;i<candidate.size()*4;++i)reference_differences+=p[i]!=next[i];
+        save(out/("reference-"+std::to_string(iteration)+".rgba"),expected.pixels.data(),expected.pixels.size()*4);
+        std::printf("{\\"kind\\":\\"reference_check\\",\\"iteration\\":%u,\\"reference\\":\\"original rectangle graph on CPU\\",\\"cpu_test_reference_only\\":true,\\"candidate_rendering_device\\":\\"NPU\\",\\"different_components\\":%llu,\\"exact\\":%s}\\n",iteration,static_cast<unsigned long long>(reference_differences),reference_differences?"false":"true");std::fflush(stdout);
+'''+s[b:]
+s=s.replace('bounded program comparison','point rectangle comparison');(d/'compare.cpp').write_text(s)
+s=(r/'ptl-program-point-integration-v1/CMakeLists.txt').read_text().replace('nr_ptl_program_point_compare','nr_ptl_point_rectangle_compare').replace(' compare.cpp ptl_program_triangle_draw.cpp reference_triangle.cpp',' compare.cpp');s=s[:s.index('set_source_files_properties')];(d/'CMakeLists.txt').write_text(s)
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir()};(r/'ptl-point-rectangle-integration-v1-source.json').write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/'ptl-point-rectangle-integration-v1.tar.gz','w:gz') as archive:archive.add(d,arcname=d.name)
+s=(r/'build-ptl-program-point-integration-v1.ps1').read_text().replace('ptl-program-point-integration-v1','ptl-point-rectangle-integration-v1').replace('nr_ptl_program_point_compare','nr_ptl_point_rectangle_compare');(r/'build-ptl-point-rectangle-integration-v1.ps1').write_text(s)
+print(json.dumps(dict(prepared=True,model_sha256=args.model_sha256,files=len(manifest))))

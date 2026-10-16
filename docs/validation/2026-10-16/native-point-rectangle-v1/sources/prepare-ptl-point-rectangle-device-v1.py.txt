@@ -1,0 +1,12 @@
+from pathlib import Path
+import ast,hashlib,json
+r=Path('results/render-driver')
+s=(r/'qualify-ptl-six-span-program-point-v1.py').read_text().replace('ptl_program_point_fixtures_v1','ptl_point_rectangle_fixtures_v2').replace('424','233').replace('duplicate_padding_fixtures=2','duplicate_padding_fixtures=1').replace('range(71 if','range(39 if').replace('custom-program','custom-rectangle').replace('ptl-six-span-program-point','ptl-six-span-point-rectangle')
+s=s.replace("assert obj(vm/'native-desktop-admission-v56/report.json')['cleanup_passed'];assert obj(vm/'ptl-complex-after-desktop-v1/report.json')['passed']", "assert obj(vm/'native-desktop-admission-v58/report.json')['cleanup_passed'];assert obj(vm/'ptl-native-live-v12/report.json')['passed']")
+a=s.index('  for name,digest in {');b=s.index('\n  assert obj',a)
+files=['ptl-six-span-point-rectangle-v1.c','ptl_point_rectangle_fixtures_v2.py'];manifest={f:hashlib.sha256((r/f).read_bytes()).hexdigest() for f in files}
+s=s[:a]+'  for name,digest in '+repr(manifest)+".items():assert hashlib.sha256((vm/name).read_bytes()).hexdigest()==digest"+s[b:]
+ast.parse(s);(r/'qualify-ptl-six-span-point-rectangle-v1.py').write_text(s)
+s=(r/'run-ptl-point-after-complex-v1.ps1').read_text().replace('ptl-point-after-complex-v1','ptl-rectangle-after-desktop-v1').replace('ptl-complex-after-desktop-v1','ptl-native-live-v12').replace('native-desktop-admission-v56','native-desktop-admission-v58').replace('ptl-six-span-program-point','ptl-six-span-point-rectangle').replace('unique_npu_fixtures=424','unique_npu_fixtures=233')
+(r/'run-ptl-rectangle-after-desktop-v1.ps1').write_text(s)
+(r/'ptl-point-rectangle-v1-source.json').write_text(json.dumps(manifest,indent=2)+'\n')

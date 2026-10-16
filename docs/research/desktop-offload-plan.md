@@ -50,6 +50,13 @@ new. Twenty-five variants differ from the old renderer by at most one byte per
 component, as explicitly recorded. Registered graphics and live integration are
 separate gates; this does not demonstrate desktop or Tahoma performance.
 
+The [direct rectangle component](../validation/2026-10-16/native-point-rectangle-v1/README.md)
+passes 233 independent NPU fixtures and 148 complete image variants for 37 legacy
+point-rectangle draws. Both the direct-only and crop-preserving adapters retain
+all original hashes. The comparisons expose distinct costs for plain and blended
+copies; the subsequent route policy uses those semantics and row-batch count.
+These are component findings, not proof of live responsiveness or GPU relief.
+
 The [long-shader component](../validation/2026-10-16/native-long-shader-v1/README.md)
 passes 120 independent NPU fixtures and exact complete-image comparisons for
 the failed v43 request and all six earlier uses of the shader. [Worker v9](../validation/2026-10-16/native-long-shader-worker-v1/README.md)

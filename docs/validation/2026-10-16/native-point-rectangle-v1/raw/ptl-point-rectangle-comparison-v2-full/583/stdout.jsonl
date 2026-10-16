@@ -1,0 +1,18 @@
+{"shared_provider_core_experiment":true,"single_core_for_npu_compilation":true,"hardware_context_count_measured":false}
+{"kind":"private_shared_queue_experiment","enabled":true,"property_readback_verified":true,"hardware_queue_count_measured":false}
+{"ptl_rectangle_provider_created":true,"single_import_shared":true}
+{"kind":"pipeline_cache_policy","uniform_capacity":8,"triangle_capacity":24,"clear_capacity":4,"replacement":"FIFO","hardware_queue_count_measured":false}
+{"kind":"setup","candidate_setup_ms":180.776400,"negative_checks":2,"cpu_reference_test_only":true,"desktop_changed":false}
+{"ptl_rectangle_kernel_executed":true,"provider_calls":4,"execution_device":"NPU"}
+{"kind":"pair","iteration":0,"order":"baseline-first","baseline_full_ms":293.902800,"candidate_full_ms":26.594000,"candidate_shader_and_projection_ms":11.594500,"candidate_merger_ms":12.924600,"baseline_calls":50,"candidate_calls":6,"components":3145728,"different_components":0,"maximum_byte_error":0,"exact":true}
+{"kind":"reference_check","iteration":0,"reference":"original rectangle graph on CPU","cpu_test_reference_only":true,"candidate_rendering_device":"NPU","different_components":0,"exact":true}
+{"ptl_rectangle_kernel_executed":true,"provider_calls":4,"execution_device":"NPU"}
+{"kind":"pair","iteration":1,"order":"custom-first","baseline_full_ms":235.943100,"candidate_full_ms":21.541000,"candidate_shader_and_projection_ms":1.871700,"candidate_merger_ms":18.540700,"baseline_calls":50,"candidate_calls":6,"components":3145728,"different_components":0,"maximum_byte_error":0,"exact":true}
+{"kind":"reference_check","iteration":1,"reference":"original rectangle graph on CPU","cpu_test_reference_only":true,"candidate_rendering_device":"NPU","different_components":0,"exact":true}
+{"ptl_rectangle_kernel_executed":true,"provider_calls":4,"execution_device":"NPU"}
+{"kind":"pair","iteration":2,"order":"baseline-first","baseline_full_ms":202.070000,"candidate_full_ms":12.049300,"candidate_shader_and_projection_ms":1.437300,"candidate_merger_ms":9.418500,"baseline_calls":50,"candidate_calls":6,"components":3145728,"different_components":0,"maximum_byte_error":0,"exact":true}
+{"kind":"reference_check","iteration":2,"reference":"original rectangle graph on CPU","cpu_test_reference_only":true,"candidate_rendering_device":"NPU","different_components":0,"exact":true}
+{"ptl_rectangle_kernel_executed":true,"provider_calls":4,"execution_device":"NPU"}
+{"kind":"pair","iteration":3,"order":"custom-first","baseline_full_ms":203.259300,"candidate_full_ms":12.910300,"candidate_shader_and_projection_ms":1.592600,"candidate_merger_ms":10.347700,"baseline_calls":50,"candidate_calls":6,"components":3145728,"different_components":0,"maximum_byte_error":0,"exact":true}
+{"kind":"reference_check","iteration":3,"reference":"original rectangle graph on CPU","cpu_test_reference_only":true,"candidate_rendering_device":"NPU","different_components":0,"exact":true}
+{"kind":"complete","passed":true,"desktop_tested":false,"tahoma_tested":false}

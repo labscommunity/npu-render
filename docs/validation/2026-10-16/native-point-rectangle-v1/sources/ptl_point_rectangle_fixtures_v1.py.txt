@@ -1,0 +1,51 @@
+"""Independent vectorized affine rectangle contract oracle; CPU fixtures only."""
+import json,struct
+import numpy as np
+F=np.float32;U=np.uint32;SPAN=262144
+MUTATIONS=[(0,0),(4,2),(8,2),(12,21833),(16,0),(20,0xffffffff),(24,0),(28,0),(24,8193),(28,8193),(24,8192),(28,8192),(32,0),(36,0),(32,8193),(36,8193),(32,8192),(36,8192),(40,0),(44,0),(48,2),(52,2),(56,1),(60,1),(64,0x7fffffff),(68,0x80000000),(72,0x80000000),(76,0x80000000),(80,0xffffffff),(84,0xffffffff),(88,0x7fffffff),(92,0x7fffffff),(96,0x7fc00000),(100,0x7f800000),(104,0xff800000),(108,0x41880000),(112,0xbf800000),(116,0x40000000),(120,0x7fc00000),(124,0x7f800000),(136,2)]
+def fixture(index):
+ if index>=192:
+  data,_=fixture(101);data=bytearray(data);offset,value=MUTATIONS[index-192];struct.pack_into('<I',data,offset,value);return bytes(data),bytes(SPAN)
+ phase=index//96;seed=index%96;rng=np.random.default_rng(980000+seed)
+ w,h=[(17,13),(64,64),(1024,768),(2880,1800),(8192,1),(512,512)][seed%6];tw,th=[(1,1),(3,5),(127,63),(2880,1800)][seed//6%4]
+ count=min([0,1,7,511,4096,21832][seed//4%6],w*h);first=min([0,w-1,w+3,w*h-count][seed//6%4],w*h-count)
+ target=28 if seed&1 else 87;source=28 if seed&2 else 87;blend=int(bool(seed&4));opaque=int(bool(seed&8))
+ rect=np.array([-256,-384,w*256+128,h*256+32],np.int32)
+ if seed%4==1:rect=np.array([129,128,max(130,w*256-128),max(129,h*256-128)],np.int32)
+ clip=np.array([0,0,w*256,h*256],np.int32)
+ if seed%7==1:clip[2]=w*128
+ if seed%7==2:clip[3]=0
+ uv=rng.uniform(-2,2,4).astype(F)
+ if seed%8==0:uv=np.array([0,0,1,1],F)
+ if seed%8==1:uv=np.array([1,1,0,0],F)
+ if seed%8==2:uv=np.array([-16,16,16,-16],F)
+ color=rng.uniform(0,1,4).astype(F)
+ if seed%9==0:color[:]=0
+ if seed%9==1:color[:]=1
+ if seed%9==2:color[:]=F(.5)
+ data=bytearray(SPAN);expected=bytearray(SPAN)
+ struct.pack_into('<16I',data,0,0x4e525231,1,phase,count,SPAN,first,w,h,tw,th,target,source,blend,opaque,0,0);data[64:80]=rect.tobytes();data[80:96]=clip.tobytes();data[96:112]=uv.tobytes();data[112:128]=color.tobytes()
+ if not phase:
+  absolute=np.arange(first,first+count,dtype=np.int64);x=absolute%w;y=absolute//w;sx=x*256+128;sy=y*256+128
+  covered=(sx>=rect[0])&(sx<rect[2])&(sy>=rect[1])&(sy<rect[3])&(sx>=clip[0])&(sx<clip[2])&(sy>=clip[1])&(sy<clip[3]);hits=int(np.sum(covered))
+  low=F(rect[:2])*F(1/256);span=F(rect[2:]-rect[:2])*F(1/256);xy=np.stack([x,y],axis=1).astype(F)
+  t=F(F(F(xy+F(.5))-low)/span);normalized=F(uv[:2]+F(t*F(uv[2:]-uv[:2])));address=np.minimum(F(np.clip(normalized,F(0),F(1))*np.array([tw,th],F)),np.array([tw-1,th-1],F)).astype(U)
+  result=np.zeros((count,2),U);result[:,0]=covered.astype(U);result[covered,1]=address[covered,1]*U(tw)+address[covered,0];expected[16:16+count*8]=result.tobytes()
+ else:
+  background=rng.integers(0,2**32,count,dtype=U);texels=rng.integers(0,2**32,count,dtype=U);covered=rng.integers(0,2,count,dtype=U)
+  if seed%5==0:texels[:]=0
+  if seed%5==1:texels[:]=U(0xffffffff)
+  values=np.stack([background,texels,covered],axis=1);data[128:128+count*12]=values.tobytes();shifts=np.array([0,8,16,24],U)
+  sample=F((texels[:,None]>>shifts)&U(255))/F(255)
+  if source==87:sample=sample[:,[2,1,0,3]]
+  if opaque:sample[:,3]=F(1)
+  shaded=F(sample*color);alpha=shaded[:,3,None].copy()
+  if target==87:shaded=shaded[:,[2,1,0,3]]
+  values=F(shaded*F(255))
+  if blend:values=F(values+F(F((background[:,None]>>shifts)&U(255))*F(1-alpha)))
+  quantized=np.rint(np.clip(values,F(0),F(255))).astype(U);packed=np.bitwise_or.reduce(quantized<<shifts,axis=1);result=np.where(covered,packed,background).astype(U);expected[16:16+count*4]=result.tobytes();hits=int(np.sum(covered))
+ struct.pack_into('<4I',expected,0,0x4e52524f,phase,count,hits)
+ return bytes(data),bytes(expected)
+if __name__=='__main__':
+ for n in range(192+len(MUTATIONS)):a,b=fixture(n);assert len(a)==len(b)==SPAN
+ print(json.dumps(dict(cpu_only=True,fixtures=192+len(MUTATIONS))))
