@@ -1,0 +1,14 @@
+from pathlib import Path
+import json
+p=Path(__file__).parent;ir=json.loads((p/'report.json').read_text())['pixel'];state={};samples=[]
+for at,i in enumerate(ir['instructions']):
+ deps=set()
+ for src in i['sources']:
+  if src['kind'] in (0,2):deps.update(state.get((src['kind'],src['index']),set()))
+ if i['opcode']==69:
+  coord=i['sources'][0];prior=sorted(state.get((coord['kind'],coord['index']),set())) if coord['kind'] in (0,2) else []
+  samples.append(dict(instruction=at,sample=len(samples),texture=i['sources'][1]['index'],sampler=i['sources'][2]['index'],prior_sample_dependencies=prior))
+  deps.add(len(samples)-1)
+ d=i['destination'];key=(d['kind'],d['index']);state[key]=deps if d['mask']==15 else state.get(key,set())|deps
+report=dict(cpu_ir_analysis_only=True,samples=samples,all_sample_coordinates_independent=all(not s['prior_sample_dependencies'] for s in samples),limitation='Conservative register-level propagation can retain dependencies overwritten in unused lanes; independent means no sampled-value dependency under this propagation.')
+(p/'dependency-report.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report))

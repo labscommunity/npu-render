@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.20)
+project(nr_ptl_texture_oracle LANGUAGES CXX)
+add_executable(nr_ptl_texture_oracle fixture.cpp)
+target_compile_features(nr_ptl_texture_oracle PRIVATE cxx_std_17)
+target_compile_options(nr_ptl_texture_oracle PRIVATE /fp:strict /O2)

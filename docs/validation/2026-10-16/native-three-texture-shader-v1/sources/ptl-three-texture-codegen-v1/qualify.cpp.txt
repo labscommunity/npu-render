@@ -1,0 +1,43 @@
+#include "shader_reference.hpp"
+#include "captured.hpp"
+#include "shader.h"
+#include <cstdio>
+#include <iterator>
+using namespace nr::shader;
+static uint32_t state=0x35af8127;
+float random_value(){state=1664525*state+1013904223;return float(state>>8)/16777216.0f;}
+int main(){
+ auto p=parse_program(pixel,std::size(pixel),Stage::pixel);
+ auto replace=p;replace.constants[1]=6;
+ std::vector<Program> prefixes;
+ unsigned sample=0;
+ for(size_t n=0;n<p.instructions.size();++n){
+  const auto &i=p.instructions[n];
+  if(i.opcode!=Opcode::sample)continue;
+  auto prefix=replace;prefix.instructions.resize(n);
+  Instruction read{};read.opcode=Opcode::move;read.source_count=1;read.sources[0]=i.sources[0];
+  read.destination.kind=Register::output;read.destination.index=0;read.destination.mask=3;
+  prefix.instructions.push_back(read);prefixes.push_back(prefix);
+  auto &replacement=replace.instructions[n];replacement.opcode=Opcode::move;replacement.source_count=1;
+  replacement.sources[0]={};replacement.sources[0].kind=Register::constant;replacement.sources[0].index=1;replacement.sources[0].element=sample++;
+ }
+ uint64_t compared=0;
+ for(unsigned iteration=0;iteration<12000;++iteration){
+  Registers inputs{};Constants constants{};constants[0].resize(6);constants[1].resize(6);
+  for(unsigned n=0;n<5;++n)for(unsigned c=0;c<4;++c)inputs[n][c]=as_bits(.03125f+random_value()*1.96875f);
+  for(unsigned n=0;n<6;++n)for(unsigned c=0;c<4;++c){constants[0][n][c]=as_bits(.03125f+random_value()*1.96875f);constants[1][n][c]=as_bits(random_value());}
+  if(iteration%3==0)for(unsigned c=0;c<4;++c){constants[0][2][c]=as_bits(c<2?0.0f:1.0f);constants[0][4][c]=as_bits(c<2?0.0f:1.0f);}
+  if(iteration%7==0)for(unsigned n=0;n<5;++n)for(unsigned c=0;c<2;++c)inputs[n][c]=as_bits(-as_float(inputs[n][c]));
+  unsigned actual[4]{},coords[12]{};
+  nr_color(inputs[0].data(),constants[0][0].data(),constants[1][0].data(),actual);
+  auto expected=reference_vertex(replace,inputs,constants);
+  for(unsigned c=0;c<4;++c){++compared;if(actual[c]!=expected[0][c]){
+   std::printf("{\"passed\":false,\"iteration\":%u,\"lane\":%u,\"actual\":%u,\"expected\":%u}\n",iteration,c,actual[c],expected[0][c]);return 1;
+  }}
+  nr_coordinates(inputs[0].data(),constants[0][0].data(),nullptr,coords);
+  for(unsigned n=0;n<6;++n){auto e=reference_vertex(prefixes[n],inputs,constants);for(unsigned c=0;c<2;++c){++compared;if(coords[n*2+c]!=e[0][c]){
+   std::printf("{\"passed\":false,\"iteration\":%u,\"sample\":%u,\"lane\":%u,\"actual\":%u,\"expected\":%u}\n",iteration,n,c,coords[n*2+c],e[0][c]);return 1;
+  }}}
+ }
+ std::printf("{\"passed\":true,\"cpu_only\":true,\"fixtures\":12000,\"exact_components\":%llu,\"limitation\":\"Sample results injected independently; texture gathering and NPU execution still require qualification.\"}\n",(unsigned long long)compared);
+}

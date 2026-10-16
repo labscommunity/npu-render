@@ -1,0 +1,61 @@
+/* Six-span texture gather experiment. shader.h is concatenated before this file.
+ * Phase 0: NPU shader coordinates -> integer texel offsets and filter fractions.
+ * Phase 1: transported texel bytes -> NPU filtering and complete pixel shader.
+ * No host texture addressing, filtering or shader arithmetic is required.
+ */
+typedef unsigned uint4 __attribute__((ext_vector_type(4)));
+typedef float float4 __attribute__((ext_vector_type(4)));
+INLINE unsigned u32(const unsigned char *p){return (unsigned)p[0]|((unsigned)p[1]<<8)|((unsigned)p[2]<<16)|((unsigned)p[3]<<24);}
+INLINE float bounded(float v,float hi){return v<0?0:(v>hi?hi:v);}
+INLINE float4 texel(const unsigned char *p,unsigned format){
+ uint4 raw=((uint4)u32(p)>>(uint4){0,8,16,24})&(uint4)255;
+ float4 value=__builtin_convertvector(raw,float4)/255.0f;
+ return format==87?value.zyxw:value;
+}
+INLINE float4 mix4(float4 a,float4 b,float t){return a*(1.0f-t)+b*t;}
+void nr_probe_kernel(const unsigned char *params){
+ if(!params)return;
+ for(unsigned n=0;n<2;++n){const unsigned char *p=params+n*40;
+  if(!u32(p)||u32(p+4)||u32(p+8)!=1||u32(p+12)!=4||!u32(p+16)||!u32(p+20)||u32(p+24)!=2||u32(p+28)!=0x4321||u32(p+32)||u32(p+36)!=2)return;
+  const unsigned *dims=(const unsigned*)u32(p+16);if(dims[0]!=131072||dims[1]!=1||dims[2]!=1||dims[3]!=1)return;
+ }
+ const unsigned char *data=(const unsigned char*)u32(params);unsigned char *output=(unsigned char*)u32(params+40);
+ uint4 *words=(uint4*)output;for(unsigned n=0;n<16384;++n)words[n]=(uint4)0;
+ unsigned phase=u32(data+8),count=u32(data+12);
+ if(u32(data)!=0x4e525433||u32(data+4)!=1||phase>1||count>1024||u32(data+16)!=262144||u32(data+20)||u32(data+24)||u32(data+28))return;
+ unsigned width[3],height[3],format[3];
+ for(unsigned n=0;n<3;++n){width[n]=u32(data+160+n*12);height[n]=u32(data+164+n*12);format[n]=u32(data+168+n*12);
+  if(!width[n]||width[n]>8192||!height[n]||height[n]>8192||(format[n]!=28&&format[n]!=87))return;
+ }
+ const unsigned *constant=(const unsigned*)(data+64);
+ for(unsigned n=0;n<24;++n)if((constant[n]&0x7f800000u)==0x7f800000u)return;
+ #pragma clang loop unroll(disable)
+ for(unsigned pixel=0;pixel<count;++pixel){
+  const unsigned char *record=data+256+pixel*224;const unsigned *input=(const unsigned*)record;
+  for(unsigned n=0;n<20;++n)if((input[n]&0x7f800000u)==0x7f800000u)return;
+  if(!phase){
+   unsigned coordinates[12];nr_coordinates(input,constant,(const unsigned*)0,coordinates);
+   unsigned *result=(unsigned*)(output+16+pixel*144);
+   for(unsigned sample=0;sample<6;++sample){unsigned slot=sample==0?0:(sample==5?2:1),w=width[slot],h=height[slot];
+    float u=nr_float(coordinates[sample*2]),v=nr_float(coordinates[sample*2+1]);
+    if((nr_bits(u)&0x7f800000u)==0x7f800000u||(nr_bits(v)&0x7f800000u)==0x7f800000u)return;
+    float x=bounded(bounded(u,1.0f)*(float)w-0.5f,(float)(w-1));
+    float y=bounded(bounded(v,1.0f)*(float)h-0.5f,(float)(h-1));
+    unsigned ix=(unsigned)x,iy=(unsigned)y,jx=ix+1<w?ix+1:ix,jy=iy+1<h?iy+1:iy;
+    result[sample*4]=iy*w+ix;result[sample*4+1]=iy*w+jx;result[sample*4+2]=jy*w+ix;result[sample*4+3]=jy*w+jx;
+    result[24+sample*2]=nr_bits(x-(float)ix);result[25+sample*2]=nr_bits(y-(float)iy);
+   }
+  }else{
+   unsigned sampled[24];
+   for(unsigned sample=0;sample<6;++sample){unsigned slot=sample==0?0:(sample==5?2:1);
+    float tx=nr_float(u32(record+80+sample*8)),ty=nr_float(u32(record+84+sample*8));
+    if(!(tx>=0&&tx<1&&ty>=0&&ty<1))return;
+    const unsigned char *p=record+128+sample*16;
+    float4 value=mix4(mix4(texel(p,format[slot]),texel(p+4,format[slot]),tx),mix4(texel(p+8,format[slot]),texel(p+12,format[slot]),tx),ty);
+    for(unsigned c=0;c<4;++c)sampled[sample*4+c]=nr_bits(value[c]);
+   }
+   nr_color(input,constant,sampled,(unsigned*)(output+16+pixel*16));
+  }
+ }
+ unsigned *header=(unsigned*)output;header[1]=phase;header[2]=count;header[3]=0;header[0]=0x4e52544f;
+}

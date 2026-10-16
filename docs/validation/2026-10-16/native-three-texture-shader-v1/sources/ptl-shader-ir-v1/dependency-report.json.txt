@@ -1,0 +1,49 @@
+{
+  "cpu_ir_analysis_only": true,
+  "samples": [
+    {
+      "instruction": 8,
+      "sample": 0,
+      "texture": 0,
+      "sampler": 0,
+      "prior_sample_dependencies": []
+    },
+    {
+      "instruction": 35,
+      "sample": 1,
+      "texture": 1,
+      "sampler": 1,
+      "prior_sample_dependencies": []
+    },
+    {
+      "instruction": 36,
+      "sample": 2,
+      "texture": 1,
+      "sampler": 1,
+      "prior_sample_dependencies": []
+    },
+    {
+      "instruction": 39,
+      "sample": 3,
+      "texture": 1,
+      "sampler": 1,
+      "prior_sample_dependencies": []
+    },
+    {
+      "instruction": 40,
+      "sample": 4,
+      "texture": 1,
+      "sampler": 1,
+      "prior_sample_dependencies": []
+    },
+    {
+      "instruction": 46,
+      "sample": 5,
+      "texture": 2,
+      "sampler": 2,
+      "prior_sample_dependencies": []
+    }
+  ],
+  "all_sample_coordinates_independent": true,
+  "limitation": "Conservative register-level propagation can retain dependencies overwritten in unused lanes; independent means no sampled-value dependency under this propagation."
+}

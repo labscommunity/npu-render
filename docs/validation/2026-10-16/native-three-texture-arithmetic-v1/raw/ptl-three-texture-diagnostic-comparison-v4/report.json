@@ -1,0 +1,49 @@
+{
+  "started": "2026-10-16T16:24:20.756841+00:00",
+  "completed": true,
+  "passed": false,
+  "desktop_changed": false,
+  "tahoma_tested": false,
+  "cases": [
+    {
+      "ticket": 172,
+      "packet_sha256": "71f128dbed13648185d294027c8c7c63e5895350ddc2e1eace72ceb68e94417e",
+      "exit_code": 2,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 2739.1168,
+          "candidate_full_ms": 31482.9592,
+          "candidate_prepare_ms": 1148.1407,
+          "candidate_raster_ms": 212.7027,
+          "baseline_calls": 146,
+          "candidate_calls": 254,
+          "components": 3145728,
+          "different_components": 15,
+          "maximum_byte_error": 1,
+          "exact": false
+        }
+      ],
+      "passed": false,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 3145728,
+          "sha256": "0864c544cf5589c490315b62e8531e9e1a70a98af2bd0c332aac270a28cf49d8"
+        },
+        "candidate.rgba": {
+          "bytes": 3145728,
+          "sha256": "90383b480446d4635d03254f29af52df085d242c393c6a9a1e81df5f9d347d91"
+        }
+      }
+    }
+  ],
+  "model_sha256": "481765dd51d8d9b051b87db8be7e62ae7931245fe051b33b6457be77816c2e87",
+  "executable_sha256": "a74d19199e5ffc5009d435ca4149185fa607107dd0f04654cc0c31ee55fc4f65",
+  "pixel_fixture": "recorded pixels and three generated texture/background images per case; CPU fixture generation only",
+  "active_ticket": 172,
+  "error": "AssertionError('case 172 failed')",
+  "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\run-ptl-three-texture-diagnostic-v4.py\", line 31, in <module>\n    report['cases'].append(result);write();print(json.dumps(result),flush=True);assert passed,f'case {ticket} failed'\n                                                                                       ^^^^^^\nAssertionError: case 172 failed\n",
+  "finished": "2026-10-16T16:24:56.459305+00:00"
+}

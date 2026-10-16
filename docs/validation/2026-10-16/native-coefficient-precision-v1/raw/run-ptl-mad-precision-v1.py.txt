@@ -1,0 +1,14 @@
+from pathlib import Path
+from datetime import UTC,datetime
+import hashlib,json,os,subprocess,traceback
+root=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=root/'vm';out=vm/'ptl-mad-precision-qualification-v1';out.mkdir(exist_ok=False)
+report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,desktop_changed=False,tahoma_tested=False)
+try:
+ exe=root/'builds/ptl-mad-precision-v1/Release/nr_ptl_four_tap_compare.exe';assert hashlib.sha256(exe.read_bytes()).hexdigest()=='e8349449524b3f0e7a902572650f9cf1dc2ff91fa1e122871c66b6eecd6e45cc'
+ env=os.environ.copy();env['PATH']=str(root/'toolchains/openvino-2026.4.1/Lib/site-packages/openvino/libs')+os.pathsep+env['PATH'];env.update(NR_RENDER_NPU_CACHE=str(vm/'model-cache-2026-4-v209'),NR_RENDER_SHARED_QUEUE='1',NR_RENDER_MEMORY_CACHE='1',NR_RENDER_MEMORY_CACHE_CAPACITY='512',NR_RENDER_SHARED_CORE='1')
+ with (out/'stdout.jsonl').open('xb') as stdout,(out/'stderr.log').open('xb') as stderr:
+  result=subprocess.run([str(exe)],env=env,stdout=stdout,stderr=stderr,timeout=90,creationflags=subprocess.CREATE_NO_WINDOW)
+ rows=[json.loads(l) for l in (out/'stdout.jsonl').read_text().splitlines() if l.startswith('{')];variants=[x for x in rows if x.get('kind')=='variant'];report.update(exit_code=result.returncode,variants=variants,passed=result.returncode==0 and len(variants)==4 and all(x['cpu_rewrite_differences']==0 for x in variants));assert report['passed']
+except Exception as e:report.update(error=repr(e),traceback=traceback.format_exc())
+finally:report.update(completed=True,finished=datetime.now(UTC).isoformat());(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(report));raise SystemExit(0 if report['passed'] else 1)
