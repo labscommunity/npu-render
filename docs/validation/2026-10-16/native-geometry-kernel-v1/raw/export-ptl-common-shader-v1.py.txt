@@ -1,0 +1,12 @@
+from pathlib import Path
+import os,struct,json,hashlib
+vm=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm';capture=vm/'native-desktop-admission-v33/bootstrap/requests';out=vm/'ptl-common-shader-ir-v1';out.mkdir(exist_ok=False)
+ticket=59
+path=capture/f'request-{ticket:08d}.bin'
+with path.open('rb') as f:
+ h=struct.unpack('<3Q14I',f.read(80));abi=h[3];flags=h[8];vs_count,ps_count=h[9:11];legacy=h[-1] if abi>=16 else abi;f.seek(80+24+(16 if legacy==15 else 0)+(16 if flags&4 else 0));vs=f.read(vs_count*4);ps=f.read(ps_count*4)
+assert hashlib.sha256(ps).hexdigest()=='d8e0b49792a47247020c5b93508846b0b0954403359f83d18e02544d338e8480'
+def words(data):return ','.join(f'0x{x:08x}u' for x in struct.unpack('<'+'I'*(len(data)//4),data))
+(out/'captured.hpp').write_text('#pragma once\n#include <cstdint>\ninline constexpr uint32_t vertex[]{'+words(vs)+'};\ninline constexpr uint32_t pixel[]{'+words(ps)+'};\n')
+report=dict(completed=True,passed=True,read_only=True,pixel_data_exported=False,ticket=ticket,vertex_words=vs_count,pixel_words=ps_count,vertex_sha256=hashlib.sha256(vs).hexdigest(),pixel_sha256=hashlib.sha256(ps).hexdigest(),header_sha256=hashlib.sha256((out/'captured.hpp').read_bytes()).hexdigest())
+(out/'export-report.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report))

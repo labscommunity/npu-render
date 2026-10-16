@@ -1,0 +1,36 @@
+from pathlib import Path
+import json,hashlib
+r=Path('results/render-driver');texture='481765dd51d8d9b051b87db8be7e62ae7931245fe051b33b6457be77816c2e87'
+def save(name,data):
+ p=r/name;assert not p.exists();p.write_text(data)
+for prefix in ['run-native-registration','recover-native-registration','qualify-native-registered']:
+ ext='.py' if prefix.startswith('qualify') else '.ps1';s=(r/(prefix+'-v26'+ext)).read_text()
+ for a,b in [('native-registration-v26','native-registration-v27'),('native-registered-v26','native-registered-v27'),('NativeRecovery-v26','NativeRecovery-v27'),('ptl-native-worker-v3','ptl-native-worker-v4')]:s=s.replace(a,b)
+ if prefix=='run-native-registration':s=s.replace('$ptl.solid_accepted -ne 5','$ptl.solid_accepted -ne 5 -or $ptl.texture_accepted -ne 9')
+ if prefix=='qualify-native-registered':
+  needle="env['NR_RENDER_PTL_SOLID_BLOB']=str(solid)";assert needle in s;s=s.replace(needle,needle+"\ntexture=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm/ptl-six-span-three-texture-v1/patched.blob'\nassert hashlib.sha256(texture.read_bytes()).hexdigest()=='"+texture+"'\nenv['NR_RENDER_PTL_TEXTURE_BLOB']=str(texture)")
+ save(prefix+'-v27'+ext,s)
+files=['run-native-registration-v27.ps1','recover-native-registration-v27.ps1','qualify-native-registered-v27.py','native_session_broker_v1.py'];save('native-registration-v27-source.json',json.dumps({f:hashlib.sha256((r/f).read_bytes()).hexdigest() for f in files},indent=2)+'\n')
+s=(r/'native_desktop_bootstrap_v22.py').read_text();s=s.replace("p.add_argument('--ptl-solid-blob'", "p.add_argument('--ptl-texture-blob',type=Path,required=True)\np.add_argument('--ptl-solid-blob'",1)
+s=s.replace("v=p.parse_args();assert", "v=p.parse_args();assert hashlib.sha256(v.ptl_texture_blob.read_bytes()).hexdigest()=='"+texture+"'\nassert",1)
+s=s.replace('env=os.environ.copy();',"env=os.environ.copy();env['NR_RENDER_PTL_TEXTURE_BLOB']=str(v.ptl_texture_blob);",1)
+s=s.replace('ptl_solid_model_sha256=', 'ptl_texture_model_sha256=hashlib.sha256(v.ptl_texture_blob.read_bytes()).hexdigest(),ptl_solid_model_sha256=',1);save('native_desktop_bootstrap_v23.py',s)
+for prefix in ['run-native-desktop','recover-native-desktop']:
+ s=(r/(prefix+'-v48.ps1')).read_text()
+ for a,b in [('native-desktop-v48','native-desktop-v49'),('native-desktop-admission-v48','native-desktop-admission-v49'),('NativeDesktopRecovery-v48','NativeDesktopRecovery-v49')]:s=s.replace(a,b)
+ if prefix=='run-native-desktop':
+  for a,b in [('native-registration-v26','native-registration-v27'),('ptl-native-worker-v3','ptl-native-worker-v4'),('native_desktop_bootstrap_v22','native_desktop_bootstrap_v23'),('native-desktop-admission-v47','native-desktop-admission-v48')]:s=s.replace(a,b)
+  s=s.replace('$ptl.solid_accepted -ne 5','$ptl.solid_accepted -ne 5 -or $ptl.texture_accepted -ne 9')
+  s=s.replace("'--monitor-seconds','660',", "'--monitor-seconds','660','--ptl-texture-blob',\"$r\\vm\\ptl-six-span-three-texture-v1\\patched.blob\",")
+ save(prefix+'-v49.ps1',s)
+for old,new in [(60,62),(61,63)]:save(f'start-native-topology-v{new}.ps1',(r/f'start-native-topology-v{old}.ps1').read_text().replace(f'v{old}',f'v{new}').replace(f'V{old}',f'V{new}'))
+save('dismiss-native-saver-v12.ps1',(r/'dismiss-native-saver-v11.ps1').read_text().replace('dismiss-v11','dismiss-v12').replace('native-topology-v61','native-topology-v63'))
+s=(r/'run-native-live-v38.ps1').read_text()
+for a,b in [('native-live-v38','native-live-v39'),('NativeLiveV38','NativeLiveV39'),('native-desktop-admission-v48','native-desktop-admission-v49'),('run-native-desktop-v48','run-native-desktop-v49'),('NativeDesktopRecovery-v48','NativeDesktopRecovery-v49'),('native-topology-primary-v24','native-topology-primary-v25'),('native-topology-v60','native-topology-v62'),('InspectTopology-V60','InspectTopology-V62'),('native-registration-v26','native-registration-v27')]:s=s.replace(a,b)
+needle=" $report.active_phase='freshness-validation'";assert needle in s
+s=s.replace(needle,' $textureRows=@(Get-ChildItem "$r\\vm\\native-desktop-admission-v49\\bootstrap\\provider-processes\\generation-*\\worker.stdout.jsonl" -File|ForEach-Object {Read-Rows $_.FullName}|Where-Object ptl_texture_draw)\n $report.ptl_texture_accepted=@($textureRows|Where-Object accepted).Count\n if($report.ptl_texture_accepted -lt 1 -or $bootstrap.ptl_texture_model_sha256 -ne \'REPLACE_TEXTURE\'){throw \'Native texture specialization not observed\'}\n'.replace('REPLACE_TEXTURE',texture)+needle,1);save('run-native-live-v39.ps1',s)
+files=list(json.loads((r/'native-desktop-v48-source.json').read_text()));changes={'native_desktop_bootstrap_v22.py':'native_desktop_bootstrap_v23.py','run-native-desktop-v48.ps1':'run-native-desktop-v49.ps1','recover-native-desktop-v48.ps1':'recover-native-desktop-v49.ps1','run-native-live-v38.ps1':'run-native-live-v39.ps1','start-native-topology-v60.ps1':'start-native-topology-v62.ps1'};files=[changes.get(f,f) for f in files];assert set(changes.values())<=set(files);save('native-desktop-v49-source.json',json.dumps({f:hashlib.sha256((r/f).read_bytes()).hexdigest() for f in files},indent=2)+'\n')
+s=(r/'run-ptl-native-live-v2.ps1').read_text()
+for a,b in [('ptl-native-live-v2','ptl-native-live-v3'),('ptl-native-worker-v3','ptl-native-worker-v4'),('native-desktop-admission-v47','native-desktop-admission-v48'),('native-topology-v61','native-topology-v63'),('InspectTopology-V61','InspectTopology-V63'),('start-native-topology-v61','start-native-topology-v63'),('observer61','observer63'),('dismiss-native-saver-v11','dismiss-native-saver-v12'),('native-live-v38','native-live-v39')]:s=s.replace(a,b)
+s=s.replace('$q.ptl_solid_accepted -lt 1)', '$q.ptl_solid_accepted -lt 1 -or $q.ptl_texture_accepted -lt 1)');save('run-ptl-native-live-v3.ps1',s)
+print('Prepared registration27, bootstrap23, desktop49, live39; no target changes.')
