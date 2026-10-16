@@ -1,0 +1,29 @@
+"""Explicit replay references for the qualified coefficient correction only."""
+import hashlib
+import json
+
+TICKETS = {172, 292, 333, 455, 580, 646, 712, 767, 964}
+
+def validate(data, digest, requests, responses):
+    assert hashlib.sha256(data).hexdigest() == digest
+    report = json.loads(data)
+    assert report['schema'] == 1 and report['qualified'] is True
+    assert report['reason'] == 'exact-fp32-coefficient-preserved-at-instruction-112'
+    assert report['original_capture_unchanged'] is True
+    cases = report['cases']
+    assert len(cases) == 9 and {c['ticket'] for c in cases} == TICKETS
+    by_ticket = {r['ticket']: r for r in requests}
+    result = {}
+    for case in cases:
+        ticket = case['ticket']
+        assert ticket in by_ticket and ticket in responses
+        assert case['request_sha256'] == by_ticket[ticket]['sha256'].lower()
+        assert case['legacy_pixel_sha256'] == responses[ticket]['pixels_sha256'].lower()
+        assert case['pixel_bytes'] == responses[ticket]['pixel_bytes']
+        assert case['corrected_pixel_sha256'] == case['independent_graph_pixel_sha256']
+        assert case['corrected_pixel_sha256'] != case['legacy_pixel_sha256']
+        assert case['exact_comparisons'] == 4 and case['legacy_reference_verified'] is True
+        for key in ['request_sha256','legacy_pixel_sha256','corrected_pixel_sha256','independent_graph_pixel_sha256']:
+            assert len(case[key]) == 64 and all(c in '0123456789abcdef' for c in case[key])
+        result[ticket] = case
+    return result

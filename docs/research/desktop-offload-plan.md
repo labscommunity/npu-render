@@ -45,6 +45,16 @@ three custom paths, 52 matching submissions, controlled input and restoration.
 Its observed mouse response is 11.59 seconds; responsiveness and this revision's
 thirty-minute duration gate remain open.
 
+Shared NPU geometry now passes 204 exact component comparisons across 51 draws
+from two further shader groups. Summed component time falls by 23.69% and 14.76%
+respectively, with some individual comparisons slower. Worker v5 then passes all
+972 requests with pixels identical to v4, admits 460 shared geometry draws using
+one model import, and passes registered Direct3D v28 plus restoration. These are
+component and replay results; the new live trial remains a separate gate.
+Evidence is retained in the
+[shared geometry comparison](../validation/2026-10-16/native-general-geometry-v1/README.md)
+and [worker qualification](../validation/2026-10-16/native-geometry-worker-v1/README.md).
+
 The end state is one switch that moves desktop graphics work to the NPU, retains
 physical display scanout, supports normal interaction, and leaves the iGPU
 available for Tahoma. Composition, application rendering, video processing, and
