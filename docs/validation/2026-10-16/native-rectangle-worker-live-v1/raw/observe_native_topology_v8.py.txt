@@ -1,0 +1,70 @@
+import ctypes as C,json,subprocess,time,sys,hashlib,traceback
+from ctypes import wintypes as W
+from pathlib import Path
+from datetime import datetime,timezone
+root=Path(sys.argv[1]);probe=Path(sys.argv[2]);proof=Path(sys.argv[3]);k=C.WinDLL('kernel32',use_last_error=True);u=C.WinDLL('user32',use_last_error=True)
+def now():return datetime.now(timezone.utc).isoformat()
+def input_state():
+    k.WTSGetActiveConsoleSessionId.restype=W.DWORD
+    session=W.DWORD();k.ProcessIdToSessionId(k.GetCurrentProcessId(),C.byref(session))
+    u.OpenInputDesktop.argtypes=[W.DWORD,W.BOOL,W.DWORD];u.OpenInputDesktop.restype=W.HANDLE
+    u.GetUserObjectInformationW.argtypes=[W.HANDLE,C.c_int,W.LPVOID,W.DWORD,C.POINTER(W.DWORD)];u.GetUserObjectInformationW.restype=W.BOOL
+    u.CloseDesktop.argtypes=[W.HANDLE];u.CloseDesktop.restype=W.BOOL
+    handle=u.OpenInputDesktop(0,False,1);error=C.get_last_error();name=C.create_unicode_buffer(128);needed=W.DWORD();read=False
+    if handle:
+        read=bool(u.GetUserObjectInformationW(handle,2,name,C.sizeof(name),C.byref(needed)));u.CloseDesktop(handle)
+    return dict(session=session.value,console_session=k.WTSGetActiveConsoleSessionId(),input_open=bool(handle),input_open_error=error,input_name=name.value if read else None)
+report=dict(started=now(),completed=False,passed=False,display_changed=False,samples=0,failed_samples=0)
+try:
+    expected=json.loads(proof.read_text(encoding='utf-8-sig'));assert expected['clean_build'];assert hashlib.sha256(probe.read_bytes()).hexdigest()==expected['binary_sha256'].lower()
+    report['probe_sha256']=expected['binary_sha256'];report['interactive_state']=input_state()
+    gate=subprocess.run([str(probe),'--inspect-session'],capture_output=True,timeout=10,creationflags=subprocess.CREATE_NO_WINDOW)
+    assert gate.returncode==0 and json.loads(gate.stdout)['ready_for_interactive_task']
+    if report['interactive_state']['input_name']=='Screen-saver':
+        # Ordinary input dismisses an unlocked screen saver. The subsequent
+        # Default-desktop check still fails closed if Windows requires login.
+        u.mouse_event.argtypes=[W.DWORD,W.DWORD,W.DWORD,W.DWORD,C.c_size_t]
+        u.mouse_event(1,100,0,0,0);time.sleep(1);u.mouse_event(1,0xffffff9c,0,0,0);time.sleep(2)
+        report['screen_saver_input_sent']=True
+    report['after_input_state']=input_state()
+    report['screen_saver_settings']={}
+    for label,code in [('running',0x72),('secure',0x76),('blocks_simulated_resets',0x1026)]:
+        value=W.BOOL();ok=u.SystemParametersInfoW(code,0,C.byref(value),0);report['screen_saver_settings'][label]=bool(value.value) if ok else None
+    if input_state()['input_name']=='Screen-saver' and report['screen_saver_settings'].get('secure') is False:
+        # Request ordinary closure only on the non-secure screen-saver desktop.
+        # Never switch desktops, change lock settings, or close Default windows.
+        u.OpenDesktopW.argtypes=[W.LPCWSTR,W.DWORD,W.BOOL,W.DWORD];u.OpenDesktopW.restype=W.HANDLE
+        callback_type=C.WINFUNCTYPE(W.BOOL,W.HWND,W.LPARAM)
+        u.EnumDesktopWindows.argtypes=[W.HANDLE,callback_type,W.LPARAM];u.EnumDesktopWindows.restype=W.BOOL
+        u.PostMessageW.argtypes=[W.HWND,W.UINT,W.WPARAM,W.LPARAM];u.PostMessageW.restype=W.BOOL
+        desk=u.OpenDesktopW('Screen-saver',0,False,0x81)
+        report['screen_saver_close_requests']=[]
+        if desk:
+            @callback_type
+            def close_saver(hwnd,param):
+                report['screen_saver_close_requests'].append(dict(hwnd=int(hwnd),posted=bool(u.PostMessageW(hwnd,0x10,0,0))))
+                return True
+            try:
+                report['screen_saver_enumerated']=bool(u.EnumDesktopWindows(desk,close_saver,0))
+            finally:u.CloseDesktop(desk)
+            end=time.monotonic()+5
+            while input_state()['input_name']=='Screen-saver' and time.monotonic()<end:time.sleep(.1)
+        report['after_screen_saver_close']=input_state()
+    assert input_state()['input_name']=='Default','Unlocked Default desktop required'
+    k.SetThreadExecutionState.argtypes=[W.DWORD];k.SetThreadExecutionState.restype=W.DWORD
+    report['display_awake_requested']=bool(k.SetThreadExecutionState(0x80000003));assert report['display_awake_requested']
+    deadline=time.monotonic()+2340
+    with (root/'samples.jsonl').open('x',buffering=1) as stream:
+        while time.monotonic()<deadline and not (root/'stop').exists():
+            result=subprocess.run([str(probe),'--inspect-topology'],capture_output=True,timeout=10,creationflags=subprocess.CREATE_NO_WINDOW)
+            entries=[json.loads(line) for line in result.stdout.decode('utf-8-sig').splitlines() if line.startswith('{')]
+            sample=dict(observed=now(),exit_code=result.returncode,entries=entries,stderr=result.stderr.decode(errors='replace'))
+            stream.write(json.dumps(sample)+'\n');report['samples']+=1
+            if result.returncode:report['failed_samples']+=1;report['interactive_state']=input_state();break
+            time.sleep(2)
+    report['passed']=report['samples']>0 and report['failed_samples']==0
+except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+finally:
+    if report.get('display_awake_requested'):k.SetThreadExecutionState(0x80000000)
+    report.update(completed=True,finished=now());(root/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+sys.exit(0 if report['passed'] else 1)

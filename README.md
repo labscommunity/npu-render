@@ -10,13 +10,13 @@ RGBA composition and an explicit backend switch. The packaged runtime passed
 GPU → NPU → CPU → GPU → NPU switching on Panther Lake. It supports CPU/GPU/NPU through
 its first OpenVINO provider; other providers can implement the same contracts.
 
-**Latest results, October 16:** the [point-sampling worker passes all 972
-recorded requests and a finite Windows desktop trial](docs/validation/2026-10-16/native-point-worker-live-v1/README.md).
-The desktop trial passes 1,223 acknowledged NPU operations, 56 exact physical
-submissions, controlled input, an ordinary default-adapter test application and
-complete restoration. The point-program path executes 99 times, with no provider
-faults or retries. Mouse confirmation takes 3.09 seconds and keyboard confirmation
-252 ms in this run. Responsiveness remains inadequate; these two events are not
+**Latest results, October 16:** the [combined rectangle and complex-shader worker
+passes a finite Windows desktop trial](docs/validation/2026-10-16/native-rectangle-worker-live-v1/README.md).
+It completes 1,214 acknowledged NPU operations, 56 exact physical submissions,
+controlled input, an ordinary default-adapter test application and full restoration.
+The new paths execute 25 complex-shader draws and 149 rectangle draws, with no
+provider faults or retries. Mouse confirmation takes 2.49 seconds and keyboard
+confirmation 176 ms. Responsiveness remains inadequate; these two events are not
 a matched performance comparison. Continuous arbitrary-application admission,
 sustained responsiveness and a Tahoma benefit remain unqualified.
 

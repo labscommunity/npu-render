@@ -1,0 +1,38 @@
+from pathlib import Path
+import re,ast,hashlib,json
+r=Path('results/render-driver')
+changes={'native-registration-v38':'native-registration-v39','native-registered-v38':'native-registered-v39','NativeRecovery-v38':'NativeRecovery-v39','native_shared_app_v5':'native_shared_app_v6','native_desktop_bootstrap_v33':'native_desktop_bootstrap_v34','native-desktop-v59':'native-desktop-v60','native-desktop-admission-v59':'native-desktop-admission-v60','NativeDesktopRecovery-v59':'NativeDesktopRecovery-v60','native-live-v49':'native-live-v50','NativeLiveV49':'NativeLiveV50','native-topology-primary-v35':'native-topology-primary-v36','native-topology-v82':'native-topology-v84','native-topology-v83':'native-topology-v85','InspectTopology-V82':'InspectTopology-V84','InspectTopology-V83':'InspectTopology-V85','observer83':'observer85','dismiss-native-saver-v23':'dismiss-native-saver-v24','dismiss-v23':'dismiss-v24','ptl-native-live-v13':'ptl-native-live-v14','native-latency-v11-analysis':'native-latency-v12-analysis','native-presentation-v6-analysis':'native-presentation-v7-analysis','ptl-combined-desktop-v1':'ptl-combined-desktop-v2','analyze-native-latency-v9.py':'analyze-native-latency-v10.py','analyze-native-presentation-v6.py':'analyze-native-presentation-v7.py'}
+pat=re.compile('|'.join(re.escape(x) for x in sorted(changes,key=len,reverse=True)))
+def rename(s):return pat.sub(lambda m:changes[m[0]],s)
+files=json.loads((r/'ptl-combined-live-v1-upload.json').read_text())
+files=[f for f in files if not f.endswith('-source.json')]+['run-ptl-combined-desktop-v1.ps1']
+for f in files:
+ s=rename((r/f).read_text())
+ if f=='run-ptl-native-live-v13.ps1':
+  start=s.index(" $ErrorActionPreference='Continue'\n")
+  end=s.index(' # Keep the readiness',start)
+  s=s[:start]+''' $task=Get-ScheduledTask -TaskName T8-NpuRender-InspectTopology-V85 -ErrorAction Stop
+ if($task.State -ne 'Running' -or !(Test-Path "$vm\\native-topology-v85\\samples.jsonl")){throw 'Pre-registration readiness is not active'}
+ $last=Get-Content "$vm\\native-topology-v85\\samples.jsonl" -Tail 1|ConvertFrom-Json
+ if($last.exit_code -ne 0 -or ([DateTime]::UtcNow-([DateTimeOffset]::Parse($last.observed)).UtcDateTime).TotalSeconds -gt 15){throw 'Pre-registration readiness sample stale'}
+'''+s[end:]
+ if f=='run-ptl-combined-desktop-v1.ps1':
+  needle=" $report.active_phase='registered-d3d';Save-Report"
+  s=s.replace(needle,''' $prior=Get-Content "$vm\\native-registration-v38\\report.json" -Raw|ConvertFrom-Json
+ if(!$prior.completed -or !$prior.cleanup_passed -or !$prior.memory_integrity_after){throw 'Previous registration cleanup incomplete'}
+ $report.active_phase='pre-registration-readiness';Save-Report
+ Controller 'start-native-topology-v85.ps1' 'readiness'
+ $report.phases+=@{phase='pre-registration-readiness';passed=$true}
+'''+needle)
+  s=s.replace('finally{$report.completed=', '''finally{
+ if(Test-Path "$vm\\native-topology-v85"){New-Item -ItemType File "$vm\\native-topology-v85\\stop" -Force|Out-Null}
+ $task=Get-ScheduledTask -TaskName T8-NpuRender-InspectTopology-V85 -ErrorAction SilentlyContinue
+ if($task){if($task.Actions.Arguments -notlike '*native-topology-v85*'){throw 'Readiness task identity differs'};Stop-ScheduledTask -TaskName $task.TaskName -ErrorAction SilentlyContinue;Unregister-ScheduledTask -TaskName $task.TaskName -Confirm:$false}
+ $report.completed=''')
+ p=r/rename(f);assert not p.exists();p.write_text(s)
+ if f.endswith('.py'):ast.parse(s)
+for old in ('native-registration-v38-source.json','native-desktop-v59-source.json'):
+ names=[rename(f) for f in json.loads((r/old).read_text())];(r/rename(old)).write_text(json.dumps({f:hashlib.sha256((r/f).read_bytes()).hexdigest() for f in names},indent=2)+'\n')
+files=[rename(f) for f in files]+['native-registration-v39-source.json','native-desktop-v60-source.json']
+(r/'ptl-combined-live-v2-upload.json').write_text(json.dumps(files,indent=2)+'\n')
+print(json.dumps(dict(files=len(files),graphics_binaries_unchanged=True,readiness_before_registration=True)))

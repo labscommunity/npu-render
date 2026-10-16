@@ -1,0 +1,77 @@
+"""Separate publication, presentation statistics, and completed pixel reads."""
+from pathlib import Path
+import argparse
+import hashlib
+import json
+
+p = argparse.ArgumentParser()
+p.add_argument('--root', type=Path, required=True)
+p.add_argument('--timing', type=Path)
+p.add_argument('--output', type=Path, required=True)
+a = p.parse_args()
+if a.timing is None:
+    a.timing = a.root / 'native-latency-v11-analysis/report.json'
+timing = json.loads(a.timing.read_text(encoding='utf-8-sig'))
+present_path = a.root / 'native-live-v49/present/probe.log'
+screen_path = a.root / 'native-live-v49/screen/probe.log'
+def rows(path):
+    return [json.loads(line) for line in path.read_text(encoding='utf-8-sig').splitlines()
+            if line.startswith('{') and line.endswith('}')]
+present, screen = rows(present_path), rows(screen_path)
+frequency = timing['qpc_frequency']
+events = []
+for event in timing['controlled_events']:
+    start = event['input_qpc']
+    publication = event['first_matching_publication']
+    submission = event['first_matching_submission']
+    assert publication and submission and submission['backbuffer_exact']
+    assert submission['source_qpc'] == publication['qpc']
+    assert start <= publication['qpc'] <= submission['submitted_qpc'] <= submission['accepted_qpc']
+    sequence = publication['sequence']
+    displays = [x for x in present if x.get('display_observation')
+                and x.get('source_sequence') == sequence
+                and x.get('submitted_count_status') == x.get('statistics_status') == x.get('media_status') == 0
+                and x.get('submitted_present_count') == x.get('displayed_present_count') == x.get('media_present_count')
+                and x.get('present_refresh_count') == x.get('sync_refresh_count')
+                and x.get('sync_qpc') == x.get('media_sync_qpc')
+                and submission['accepted_qpc'] <= x['sync_qpc'] <= x['observed_qpc']]
+    assert displays
+    display = displays[0]
+    reads = [x for x in screen if x.get('qpc', 0) >= start
+             and x.get('ownership_verified_before_and_after')
+             and all(point.get('owned_presenter_at_point') and point.get('known_' + event['color'])
+                     for point in x.get('points', [])) and len(x.get('points', [])) == 2]
+    assert reads
+    read = reads[0]
+    assert read['qpc'] <= read['read_completed_qpc'] and 0 < read['last_present_qpc'] <= read['read_completed_qpc']
+    by_shader = {}
+    for draw in event['overlapping_draws']:
+        elapsed = max(0, min(publication['qpc'], draw['finished_qpc']) - max(start, draw['entered_qpc'])) * 1000 / frequency
+        if elapsed:
+            entry = by_shader.setdefault(draw['pixel_sha256'], {'overlap_ms': 0, 'requests': 0})
+            entry['overlap_ms'] += elapsed
+            entry['requests'] += 1
+    busy = sum(x['overlap_ms'] for x in by_shader.values())
+    before = (publication['qpc'] - start) * 1000 / frequency
+    assert busy <= before
+    events.append(dict(event=event['event'], source_sequence=sequence,
+        input_to_publication_ms=before,
+        input_to_present_acceptance_ms=(submission['accepted_qpc']-start)*1000/frequency,
+        input_to_matching_display_statistics_ms=(display['sync_qpc']-start)*1000/frequency,
+        publication_to_matching_display_statistics_ms=(display['sync_qpc']-publication['qpc'])*1000/frequency,
+        input_to_pixel_read_started_ms=(read['qpc']-start)*1000/frequency,
+        input_to_pixel_read_completed_ms=(read['read_completed_qpc']-start)*1000/frequency,
+        input_to_observed_desktop_update_ms=(read['last_present_qpc']-start)*1000/frequency,
+        serialized_child_before_publication_ms=busy,
+        other_before_publication_ms=before-busy, by_shader_before_publication=by_shader,
+        matching_display_statistics=display, first_matching_pixel_read=read))
+report = dict(completed=True, passed=True, active_snapshot=timing['active_snapshot'],
+    events=events, full_desktop_offload=False, tahoma_tested=False,
+    source_sha256={str(path.relative_to(a.root)) if path.is_relative_to(a.root) else path.name:
+        hashlib.sha256(path.read_bytes()).hexdigest() for path in [a.timing, present_path, screen_path]},
+    limitations='Two controlled events, no matched A/B or p95. Presentation statistics and independent pixel reads are distinct observations; neither measures panel photons. Pixel-read begin is not read completion. Child overlap after publication is excluded from attribution to producing that frame. Display statistics do not establish that the independent observer saw the same surface update.',
+    primary_sources=['https://learn.microsoft.com/en-us/windows/win32/api/dxgi/ns-dxgi-dxgi_frame_statistics',
+                     'https://learn.microsoft.com/en-us/windows/win32/api/dxgi1_2/ns-dxgi1_2-dxgi_outdupl_frame_info'])
+a.output.mkdir(exist_ok=False, parents=True)
+(a.output/'report.json').write_text(json.dumps(report, indent=2)+'\n')
+print(json.dumps([{k:v for k,v in event.items() if k not in ('by_shader_before_publication', 'matching_display_statistics', 'first_matching_pixel_read')} for event in events]))

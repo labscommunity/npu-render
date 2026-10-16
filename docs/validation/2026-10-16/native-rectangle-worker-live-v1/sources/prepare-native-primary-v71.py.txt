@@ -1,0 +1,17 @@
+from pathlib import Path
+import json,re
+r=Path('results/render-driver');target='native-rectangle-worker-live-v1';assert not (Path('docs/validation/2026-10-16')/target).exists()
+directories=['ptl-combined-desktop-v1','native-registration-v38','native-topology-v83','native-saver-dismiss-v23','ptl-combined-desktop-v2','native-registration-v39','ptl-native-live-v14','native-live-v50','native-desktop-admission-v60','native-topology-primary-v36','native-topology-v84','native-topology-v85','native-latency-v12-analysis','native-presentation-v7-analysis']
+files=[]
+for v in (1,2):files+=json.loads((r/f'ptl-combined-live-v{v}-upload.json').read_text())
+files+=['run-ptl-combined-desktop-v1.ps1','observe_native_topology_v8.py'];files=list(dict.fromkeys(files));extras=[x for x in files if x.endswith('.json')];sources=[x for x in files if not x.endswith('.json')]
+s=(r/'collect-native-primary-v67.py').read_text()
+for name,value in [('directories',directories),('extras',extras),('source_files',sources)]:s=re.sub('^'+name+'=.*$',lambda m:name+'='+repr(value),s,flags=re.M)
+s=s.replace("'ptl-native-live-v12','native-desktop-admission-v58'","'ptl-combined-desktop-v2','native-desktop-admission-v60'")
+s=s.replace("foreach($name in @('ptl-native-worker-v11'))", "foreach($name in @('ptl-native-worker-v14'))").replace('v67','v71')
+(r/'collect-native-primary-v71.py').write_text(s)
+s=(r/'curate-native-primary-v67.py').read_text().replace('v67','v71').replace('native-point-worker-live-v1',target)
+a=s.index('for name in [');b=s.index(':\n p=r/name',a)
+s=s[:a]+'for name in '+repr(['prepare-ptl-combined-live-v1.py','prepare-ptl-combined-live-v2.py','collect-native-primary-v71.py','prepare-native-primary-v71.py'])+s[b:]
+(r/'curate-native-primary-v71.py').write_text(s)
+print('Prepared immutable live archive collector; run only after final cleanup and analysis')

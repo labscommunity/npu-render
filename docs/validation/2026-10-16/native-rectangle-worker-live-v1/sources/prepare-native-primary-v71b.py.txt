@@ -1,0 +1,6 @@
+from pathlib import Path
+import re
+r=Path('results/render-driver');s=(r/'collect-native-primary-v70.py').read_text()
+for name,value in [('directories',['ptl-live50-analysis-diagnostic-v1','ptl-live50-analysis-diagnostic-v2','native-presentation-v8-analysis']),('extras',[]),('source_files',['presentation_counter_match_v1.py','analyze-native-presentation-v8.py'])]:s=re.sub('^'+name+'=.*$',lambda m:name+'='+repr(value),s,flags=re.M)
+s=s.replace("'ptl-worker-v14-qualification','ptl-native-worker-v14-full'","'native-live-v50','ptl-live50-analysis-diagnostic-v2'").replace("foreach($name in @('ptl-point-rectangle-integration-v3','ptl-native-worker-v13','ptl-native-worker-v14'))",'foreach($name in @())').replace('v70','v71b')
+(r/'collect-native-primary-v71b.py').write_text(s)

@@ -1,0 +1,50 @@
+from pathlib import Path
+import argparse,ast,hashlib,json,re
+p=argparse.ArgumentParser();p.add_argument('--worker-sha256',required=True);a=p.parse_args();assert re.fullmatch('[0-9a-f]{64}',a.worker_sha256)
+r=Path('results/render-driver')
+changes={'native-registration-v37':'native-registration-v38','native-registered-v37':'native-registered-v38','NativeRecovery-v37':'NativeRecovery-v38','ptl-native-worker-v11':'ptl-native-worker-v14','native_shared_app_v4':'native_shared_app_v5','native_desktop_bootstrap_v32':'native_desktop_bootstrap_v33','native-desktop-v58':'native-desktop-v59','native-desktop-admission-v58':'native-desktop-admission-v59','native-desktop-admission-v56':'native-desktop-admission-v58','NativeDesktopRecovery-v58':'NativeDesktopRecovery-v59','native-live-v48':'native-live-v49','NativeLiveV48':'NativeLiveV49','native-topology-primary-v34':'native-topology-primary-v35','native-topology-v80':'native-topology-v82','native-topology-v81':'native-topology-v83','InspectTopology-V80':'InspectTopology-V82','InspectTopology-V81':'InspectTopology-V83','observer81':'observer83','dismiss-native-saver-v22':'dismiss-native-saver-v23','dismiss-v22':'dismiss-v23','ptl-native-live-v12':'ptl-native-live-v13','native-latency-v10-analysis':'native-latency-v11-analysis','native-presentation-v5-analysis':'native-presentation-v6-analysis'}
+pattern=re.compile('|'.join(re.escape(x) for x in sorted(changes,key=len,reverse=True)))
+def rename(s):return pattern.sub(lambda m:changes[m[0]],s)
+files=['run-native-registration-v37.ps1','recover-native-registration-v37.ps1','qualify-native-registered-v37.py','native_shared_app_v4.py','native_desktop_bootstrap_v32.py','run-native-desktop-v58.ps1','recover-native-desktop-v58.ps1','run-native-live-v48.ps1','start-native-topology-v80.ps1','start-native-topology-v81.ps1','dismiss-native-saver-v22.ps1','run-ptl-native-live-v12.ps1']
+manifest=json.loads((r/'ptl-native-worker-v14-source.json').read_text())
+for name in files:
+ s=rename((r/name).read_text())
+ if name=='qualify-native-registered-v37.py':
+  s=s.replace("builds/ptl-native-worker-v10/registered-build-report.json","builds/ptl-native-worker-v12/registered-build-report.json")
+  s=s.replace("assert set(candidate['source_sha256'])==set(qualified['source_sha256'])", "assert set(candidate['source_sha256'])==set(qualified['source_sha256'])|{'ptl_point_rectangle.hpp'}")
+  s=s.replace("if n!='ptl_program.hpp'","if n!='indexed_pipeline.hpp'")
+  needle="assert candidate['source_sha256']['ptl_program.hpp']=='254df03e82359eb130daa7b82edc6b45569613e72dfc7be6bea9847b36f8c3ba'"
+  s=s.replace(needle,needle+"\nassert candidate['source_sha256']['indexed_pipeline.hpp']=='"+manifest['indexed_pipeline.hpp']+"'\nassert candidate['source_sha256']['ptl_point_rectangle.hpp']=='"+manifest['ptl_point_rectangle.hpp']+"'")
+  s=s.replace('c445ff2bb154e879609933508187af886100062ee60ee29fd1467f776316f12f',a.worker_sha256)
+  needle="env['NR_RENDER_PTL_LONG_BLOB']=str(long_model)"
+  s=s.replace(needle,needle+"\ncomplex_model=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm/ptl-six-span-complex-shader-v1/patched.blob'\nassert hashlib.sha256(complex_model.read_bytes()).hexdigest()=='47f69b5861732a03014b58160116ebbb928fd6e818a11b7f553e423a4cf3c43a'\nenv['NR_RENDER_PTL_COMPLEX_BLOB']=str(complex_model)\nrectangle_model=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm/ptl-six-span-point-rectangle-v1/patched.blob'\nassert hashlib.sha256(rectangle_model.read_bytes()).hexdigest()=='b7caa092d2581fec8cec075815ab40057a9f3f5a654b5f0abbe7893c11a74908'\nenv['NR_RENDER_PTL_RECTANGLE_BLOB']=str(rectangle_model)")
+ if name in ('run-native-registration-v37.ps1','run-native-desktop-v58.ps1'):
+  s=s.replace("-or !$ptl.shader_identities_matched)","-or !$ptl.shader_identities_matched -or $ptl.complex_accepted -ne 10 -or $ptl.complex_imports -ne 1 -or !$ptl.complex_tickets_matched -or $ptl.rectangle_accepted -ne 37 -or $ptl.rectangle_imports -ne 1 -or !$ptl.rectangle_tickets_matched -or !$ptl.all_prior_worker_v13_outputs_preserved)")
+ if name=='native_desktop_bootstrap_v32.py':
+  s=s.replace("p.add_argument('--ptl-long-blob',type=Path,required=True)","p.add_argument('--ptl-long-blob',type=Path,required=True)\np.add_argument('--ptl-complex-blob',type=Path,required=True)\np.add_argument('--ptl-rectangle-blob',type=Path,required=True)")
+  s=s.replace('v=p.parse_args();',"v=p.parse_args();assert hashlib.sha256(v.ptl_complex_blob.read_bytes()).hexdigest()=='47f69b5861732a03014b58160116ebbb928fd6e818a11b7f553e423a4cf3c43a';assert hashlib.sha256(v.ptl_rectangle_blob.read_bytes()).hexdigest()=='b7caa092d2581fec8cec075815ab40057a9f3f5a654b5f0abbe7893c11a74908';")
+  s=s.replace("env['NR_RENDER_PTL_LONG_BLOB']=str(v.ptl_long_blob);","env['NR_RENDER_PTL_COMPLEX_BLOB']=str(v.ptl_complex_blob);env['NR_RENDER_PTL_RECTANGLE_BLOB']=str(v.ptl_rectangle_blob);env['NR_RENDER_PTL_LONG_BLOB']=str(v.ptl_long_blob);")
+  s=s.replace('ptl_long_model_sha256=', 'ptl_complex_model_sha256=hashlib.sha256(v.ptl_complex_blob.read_bytes()).hexdigest(),ptl_rectangle_model_sha256=hashlib.sha256(v.ptl_rectangle_blob.read_bytes()).hexdigest(),ptl_long_model_sha256=')
+ if name=='run-native-desktop-v58.ps1':
+  s=s.replace("'--ptl-long-blob',", "'--ptl-complex-blob',\"$r\\vm\\ptl-six-span-complex-shader-v1\\patched.blob\",'--ptl-rectangle-blob',\"$r\\vm\\ptl-six-span-point-rectangle-v1\\patched.blob\",'--ptl-long-blob',")
+ if name=='run-native-live-v48.ps1':
+  needle=" $report.active_phase='freshness-validation';Save-Report"
+  extra=''' $report.ptl_complex_accepted=@($geometryRows|Where-Object {$_.ptl_complex_draw -and $_.accepted}).Count
+ $report.ptl_complex_imports=@($geometryRows|Where-Object ptl_complex_provider_created).Count
+ $report.ptl_rectangle_accepted=@($geometryRows|Where-Object {$_.ptl_rectangle_draw -and $_.accepted}).Count
+ $report.ptl_rectangle_imports=@($geometryRows|Where-Object ptl_rectangle_provider_created).Count
+ $report.ptl_rectangle_kernel_draws=@($geometryRows|Where-Object ptl_rectangle_kernel_executed).Count
+ $report.ptl_rectangle_preserved_crops=@($geometryRows|Where-Object ptl_rectangle_preserved_crop).Count
+ if($report.ptl_complex_accepted -lt 1 -or $report.ptl_complex_imports -ne 1 -or $bootstrap.ptl_complex_model_sha256 -ne '47f69b5861732a03014b58160116ebbb928fd6e818a11b7f553e423a4cf3c43a' -or $report.ptl_rectangle_accepted -lt 1 -or $report.ptl_rectangle_imports -ne 1 -or $report.ptl_rectangle_kernel_draws -lt 1 -or $bootstrap.ptl_rectangle_model_sha256 -ne 'b7caa092d2581fec8cec075815ab40057a9f3f5a654b5f0abbe7893c11a74908'){throw 'New complex and rectangle NPU routes not observed'}
+'''
+  assert needle in s;s=s.replace(needle,extra+needle)
+ if name=='run-ptl-native-live-v12.ps1':
+  s=s.replace('-or $q.ptl_long_imports -ne 1)', '-or $q.ptl_long_imports -ne 1 -or $q.ptl_complex_accepted -lt 1 -or $q.ptl_complex_imports -ne 1 -or $q.ptl_rectangle_accepted -lt 1 -or $q.ptl_rectangle_imports -ne 1 -or $q.ptl_rectangle_kernel_draws -lt 1)')
+ if name.endswith('.py'):ast.parse(s)
+ p=r/rename(name);assert not p.exists();p.write_text(s)
+for old in ('native-registration-v37-source.json','native-desktop-v58-source.json'):
+ names=[rename(f) for f in json.loads((r/old).read_text())];(r/rename(old)).write_text(json.dumps({f:hashlib.sha256((r/f).read_bytes()).hexdigest() for f in names},indent=2)+'\n')
+for old,new in [('analyze-native-latency-v8.py','analyze-native-latency-v9.py'),('analyze-native-presentation-v5.py','analyze-native-presentation-v6.py')]:
+ p=r/new;assert not p.exists();p.write_text(rename((r/old).read_text()))
+(r/'ptl-combined-live-v1-upload.json').write_text(json.dumps([rename(f) for f in files]+['native-registration-v38-source.json','native-desktop-v59-source.json','analyze-native-latency-v9.py','analyze-native-presentation-v6.py'],indent=2)+'\n')
+print(json.dumps(dict(prepared=True,worker_sha256=a.worker_sha256,driver_package_unchanged=True)))

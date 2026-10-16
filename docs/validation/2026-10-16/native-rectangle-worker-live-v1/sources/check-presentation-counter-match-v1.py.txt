@@ -1,0 +1,13 @@
+from pathlib import Path
+import hashlib,json
+from presentation_counter_match_v1 import match_display_observation
+base=dict(display_observation=True,source_sequence=9,observed_qpc=110,submitted_count_status=0,submitted_present_count=9,statistics_status=0,displayed_present_count=8,media_status=0,media_present_count=8,present_refresh_count=10,sync_refresh_count=10,sync_qpc=90,media_sync_qpc=90)
+next_=dict(base,source_sequence=10,observed_qpc=130,submitted_present_count=10,displayed_present_count=9,media_present_count=9,sync_qpc=120,media_sync_qpc=120)
+s=dict(accepted_qpc=100);checks=[]
+assert match_display_observation([base,next_],9,s)==(9,next_);checks.append('lagging_display_correlates_by_counter')
+same=dict(next_,source_sequence=9,submitted_present_count=9);assert match_display_observation([base,same],9,s)==(9,same);checks.append('same_source_still_matches')
+for name,rows in [('missing',[base]),('wrong_count',[base,dict(next_,displayed_present_count=10,media_present_count=10)]),('disagreeing_media',[base,dict(next_,media_present_count=8)]),('status_failure',[base,dict(next_,statistics_status=1)]),('different_sync',[base,dict(next_,media_sync_qpc=121)]),('old_sync',[base,dict(next_,sync_qpc=90,media_sync_qpc=90)]),('future_sync',[base,dict(next_,sync_qpc=140,media_sync_qpc=140)]),('different_refresh',[base,dict(next_,present_refresh_count=11)]),('counter_reused',[base,dict(next_,submitted_present_count=9)]),('ambiguous_source_count',[base,next_,dict(base,submitted_present_count=11)])]:
+ try:match_display_observation(rows,9,s)
+ except AssertionError:checks.append(name)
+ else:raise AssertionError(name)
+r=Path(__file__).parent;report=dict(completed=True,passed=True,cases=checks,graphics_executed=False,source_sha256=hashlib.sha256((r/'presentation_counter_match_v1.py').read_bytes()).hexdigest());(r/'presentation-counter-match-v1-local.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report))

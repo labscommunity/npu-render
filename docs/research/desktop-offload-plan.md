@@ -1,7 +1,20 @@
 # Full desktop offload: acceptance and execution plan
 
 Updated 2026-10-16. Target: Delta, Windows 11, Panther Lake. The repository stays
-private. **Full desktop offload is unfinished.** Worker v9 passes all 972 retained
+private. **Full desktop offload is unfinished.** The latest
+[combined-worker live v50 trial](../validation/2026-10-16/native-rectangle-worker-live-v1/README.md)
+passes 1,214 acknowledged NPU operations, 56 exact physical submissions, a shared
+default-adapter application and restoration. Mouse readback completes in 2,488.121 ms
+and keyboard readback in 175.981 ms. The new routes execute 25 complex-shader draws
+and 149 rectangles, including 57 direct kernels. No provider fault or retry occurs.
+These two events do not establish matched improvement, p95, GPU relief or Tahoma
+benefit. The first analysis incorrectly joined asynchronous display statistics
+to the latest submitted-source label; a counter-based join passes twelve local
+cases and the retained live evidence. Both the initial failure and correction are
+preserved. Responsiveness remains the immediate gate, followed by sustained use,
+application coverage and matched Tahoma performance.
+
+Earlier milestones retain their original qualification scope. Worker v9 passes all 972 retained
 requests and registered D3D11. Its [finite live v44 trial](../validation/2026-10-16/native-long-shader-live-v1/README.md)
 passes 1,112 acknowledged NPU operations, 51 exact physical submissions, controlled
 mouse/keyboard input and ordinary restoration. Memory integrity remains enabled.
