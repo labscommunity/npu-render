@@ -86,6 +86,11 @@ images. An alternating-order comparison against the preceding rectangle kernel
 reduces summed warm time from 5.864 to 4.517 seconds across 111 pairs. The candidate
 still requires full worker and desktop integration; this is not a Tahoma result.
 
+The [integer worker v15](../validation/2026-10-16/native-integer-rectangle-worker-v1/README.md)
+now passes 106 selected requests and all 972 retained requests. Every v14 output
+is preserved, with no new profile exception, one rectangle import and no provider
+failure. Live desktop responsiveness remains a separate qualification.
+
 The [long-shader component](../validation/2026-10-16/native-long-shader-v1/README.md)
 passes 120 independent NPU fixtures and exact complete-image comparisons for
 the failed v43 request and all six earlier uses of the shader. [Worker v9](../validation/2026-10-16/native-long-shader-worker-v1/README.md)

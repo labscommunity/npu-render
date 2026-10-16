@@ -1,0 +1,8 @@
+from pathlib import Path
+import re
+r=Path('results/render-driver');target='native-integer-rectangle-worker-v1';assert not (Path('docs/validation/2026-10-16')/target).exists()
+dirs=['ptl-native-worker-v15','ptl-native-worker-v15-selected','ptl-native-worker-v15-full','ptl-worker-v15-qualification','ptl-worker-v15-qualification-v2'];extras=['ptl-native-worker-v15-source.json','build-ptl-native-worker-v15.log'];sources=['build-ptl-native-worker-v15.ps1','qualify-ptl-native-worker-v15.py','run-ptl-worker-v15-qualification.ps1','run-ptl-worker-v15-qualification-v2.ps1']
+s=(r/'collect-native-primary-v70.py').read_text()
+for name,value in [('directories',dirs),('extras',extras),('source_files',sources)]:s=re.sub('^'+name+'=.*$',lambda m:name+'='+repr(value),s,flags=re.M)
+s=s.replace("'ptl-worker-v14-qualification','ptl-native-worker-v14-full'","'ptl-worker-v15-qualification-v2','ptl-native-worker-v15-full'").replace("'ptl-point-rectangle-integration-v3','ptl-native-worker-v13','ptl-native-worker-v14'","'ptl-native-worker-v15'").replace('v70','v73');(r/'collect-native-primary-v73.py').write_text(s)
+s=(r/'curate-native-primary-v70.py').read_text().replace('v70','v73').replace('native-point-rectangle-worker-v1',target);a=s.index('for name in [');b=s.index(':\n p=r/name',a);s=s[:a]+'for name in '+repr(['prepare-ptl-native-worker-v15.py','collect-native-primary-v73.py','prepare-native-primary-v73.py'])+s[b:];(r/'curate-native-primary-v73.py').write_text(s)

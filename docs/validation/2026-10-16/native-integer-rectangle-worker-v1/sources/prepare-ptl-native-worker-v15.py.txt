@@ -1,0 +1,14 @@
+from pathlib import Path
+import ast,hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'ptl-native-worker-v15';shutil.copytree(r/'ptl-native-worker-v14',d);shutil.copyfile(r/'ptl-point-rectangle-integration-v4/ptl_point_rectangle.hpp',d/'ptl_point_rectangle.hpp')
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};before=json.loads((r/'ptl-native-worker-v14-source.json').read_text());assert [k for k in before if manifest[k]!=before[k]]==['ptl_point_rectangle.hpp'];(r/'ptl-native-worker-v15-source.json').write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/'ptl-native-worker-v15.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-ptl-native-worker-v14.ps1').read_text().replace('ptl-native-worker-v14','ptl-native-worker-v15');(r/'build-ptl-native-worker-v15.ps1').write_text(s)
+s=(r/'qualify-ptl-native-worker-v14.py').read_text().replace('ptl-native-worker-v14','ptl-native-worker-v15').replace('ptl-rectangle-capture-v3-qualification','ptl-rectangle-capture-v4-qualification').replace('ptl-point-rectangle-admission-v3','ptl-point-rectangle-admission-v4').replace('ptl-six-span-point-rectangle-v1','ptl-six-span-point-rectangle-v2').replace('b7caa092d2581fec8cec075815ab40057a9f3f5a654b5f0abbe7893c11a74908','d651d6101dbccc5796873dc2016ec9e23d262cd955e9bc4bee6d56b86756eb2d')
+needle="  report['all_prior_worker_v13_outputs_preserved']=True"
+s=s.replace(needle,needle+"\n  previous=rows(vm/'ptl-native-worker-v14-full/replay/replays.jsonl');assert len(previous)==972\n  assert all(old['ticket']==new['ticket'] and old['pixels_sha256']==new['pixels_sha256'] and old['pixel_bytes']==new['pixel_bytes'] for old,new in zip(previous,current,strict=True))\n  report['all_prior_worker_v14_outputs_preserved']=True")
+ast.parse(s);(r/'qualify-ptl-native-worker-v15.py').write_text(s)
+s=(r/'run-ptl-worker-v14-qualification.ps1').read_text().replace('ptl-worker-v14-qualification','ptl-worker-v15-qualification').replace('ptl-native-worker-v14','ptl-native-worker-v15').replace('ptl-rectangle-capture-v3-qualification','ptl-rectangle-integer-paired-v1-qualification').replace('ptl-point-rectangle-comparison-v3','ptl-rectangle-integer-paired-v1').replace('all_prior_worker_v13_outputs_preserved','all_prior_worker_v14_outputs_preserved').replace('native-desktop-admission-v58','native-desktop-admission-v60')
+# The new gate compares the preceding direct rectangle with the integer candidate.
+s=s.replace('$new -ge $old*.8','$new -ge $old*.95');(r/'run-ptl-worker-v15-qualification.ps1').write_text(s)
+print(json.dumps(dict(prepared=True,source_files=len(manifest),changed=['ptl_point_rectangle.hpp'],performance_gate='at least 5% less summed warm paired draw time')))
