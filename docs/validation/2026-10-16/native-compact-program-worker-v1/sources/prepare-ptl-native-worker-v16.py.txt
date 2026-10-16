@@ -1,0 +1,43 @@
+from pathlib import Path
+import hashlib,json,re,shutil,tarfile
+r=Path(__file__).parent;name='ptl-native-worker-v16';d=r/name;shutil.copytree(r/'ptl-native-worker-v15',d)
+p=d/'ptl_program.hpp';s=p.read_text();digest='92e04a6734dc6e70ffed15b67fddba02892c66168aa0d47a6cf4bcc65a6a585d'
+s=re.sub(r'constexpr unsigned char expected\[\]\{[^}]+\}', 'constexpr unsigned char expected[]{'+','.join('0x'+digest[i:i+2] for i in range(0,64,2))+'}',s)
+needle='public:\n struct Result'
+packing=''' struct Packing {unsigned live=0,stride=4;std::array<unsigned,3> attributes{};std::array<unsigned,2> samples{};};
+ static Packing packing(const shader::PtlProgram &program,const unsigned *filters){
+  Packing p;for(const auto &instruction:program.instructions){if(instruction[0]==3)continue;for(unsigned n=2;n<(instruction[0]?4u:3u);++n){const auto code=instruction[n];if((code&3u)==0)p.live|=1u<<((code>>4)&15u);}}
+  for(unsigned n=0;n<3;++n)if(p.live&(1u<<n)){p.attributes[n]=p.stride;p.stride+=16;}
+  for(unsigned n=0;n<program.samples.size();++n){p.samples[n]=p.stride;p.stride+=filters[n]?4:24;}return p;
+ }
+ static unsigned span_capacity(const Packing &p,unsigned vertices){require(vertices&&vertices<=2046&&vertices%3==0);return (std::min)({16384u,(262144u-16u)/p.stride,(262144u-2048u)/(p.stride+4u),(262144u-2048u-vertices*96u)/12u});}
+public:
+ static unsigned maximum_batch(const shader::Program &ps,const shader::TextureSamplers &samplers,unsigned vertices){const auto lowered=shader::PtlProgram::lower(ps);unsigned f[2]{};for(unsigned n=0;n<lowered.samples.size();++n)f[n]=samplers[lowered.samples[n].sampler].filter==shader::TextureFilter::point?1u:0u;return 6*span_capacity(packing(lowered,f),vertices);}
+ struct Result'''
+assert needle in s;s=s.replace(needle,packing)
+s=s.replace('points.size()<=12288','points.size()<=6*span_capacity(packing(program,filters),unsigned(vertices.size()))')
+s=s.replace('const unsigned total=unsigned(points.size());','const auto packed=packing(program,filters);const unsigned total=unsigned(points.size()),per_span=(total+5)/6,task_offset=2048+unsigned(vertices.size())*96;')
+s=s.replace('put(p+4,2);','put(p+4,3);').replace('const unsigned begin=plane*2048;','const unsigned begin=plane*per_span;').replace('(std::min)(2048u,total-begin)','(std::min)(per_span,total-begin)').replace('p+200704+n*12','p+task_offset+n*12')
+a=s.index('   for(unsigned n=0;n<counts[plane];++n){const auto *q=o+16+n*112;');b=s.index('   }require(hits==get(o+12));',a)
+s=s[:a]+'''   for(unsigned n=0;n<counts[plane];++n){const auto *q=o+16+n*packed.stride;auto *record=p+2048+n*(packed.stride+4);const auto coverage=get(q);require(coverage<=1);put(record,coverage);hits+=coverage;std::memcpy(record+4,background[plane*per_span+n].data(),4);if(!coverage)continue;
+    for(unsigned a=0;a<3;++a)if(packed.live&(1u<<a))std::memcpy(record+4+packed.attributes[a],q+packed.attributes[a],16);
+    for(unsigned sample=0;sample<program.samples.size();++sample){const auto offset=packed.samples[sample];for(unsigned tap=0;tap<(filters[sample]?1u:4u);++tap){const auto resource=program.samples[sample].texture;const auto index=get(q+offset+tap*4);require(index<resources[resource].pixels.size());std::memcpy(record+4+offset+tap*4,resources[resource].pixels[index].data(),4);}if(!filters[sample])std::memcpy(record+4+offset+16,q+offset+16,8);}
+'''+s[b:]
+s=s.replace('result.pixels[plane*2048+n]','result.pixels[plane*per_span+n]');assert 'n*112' not in s and 'plane*2048' not in s;p.write_text(s)
+p=d/'ptl_program_triangle_draw.cpp';s=p.read_text().replace('b && b<=12288','b && b<=PtlProgramRaster::maximum_batch(p,samplers,n)').replace('require(!quads&&n<=4096&&batch<=12288);','require(!quads&&n<=2046);');p.write_text(s)
+p=d/'indexed_pipeline.hpp';s=p.read_text().replace('static uint32_t program_batch(const Request &request){','static uint32_t program_batch(const Request &request,const shader::TextureSamplers &samplers){')
+s=s.replace('unsigned batch=12288;while','unsigned batch=raster::PtlProgramRaster::maximum_batch(request.pixel,samplers,vertex_capacity(h.vertices));while').replace('const auto batch=program_batch(request),capacity=','const auto batch=program_batch(request,samplers),capacity=');p.write_text(s)
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};before=json.loads((r/'ptl-native-worker-v15-source.json').read_text());changed=[k for k in before if before[k]!=manifest[k]];assert set(changed)=={'ptl_program.hpp','ptl_program_triangle_draw.cpp','indexed_pipeline.hpp'}
+(r/(name+'-source.json')).write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/(name+'.tar.gz'),'w:gz') as t:t.add(d,arcname=d.name)
+(r/('build-'+name+'.ps1')).write_text((r/'build-ptl-native-worker-v15.ps1').read_text().replace('ptl-native-worker-v15',name))
+s=(r/'qualify-ptl-native-worker-v15.py').read_text().replace('ptl-native-worker-v15',name).replace('ptl-six-span-program-point-v1/patched.blob','ptl-six-span-program-compact-v1/patched.blob').replace('0902c8addc03d08e008582394060e80978ed34082bb82b2687fcdff381eef216',digest)
+s=s.replace("try:\n", "try:\n assert obj(vm/'ptl-program-compact-v1-qualification/report.json')['passed']\n",1)
+# The preceding full worker uses the same pixels and numerical profiles.
+s=s.replace('ptl-native-worker-v14-full/replay/replays.jsonl','ptl-native-worker-v15-full/replay/replays.jsonl').replace('all_prior_worker_v14_outputs_preserved','all_prior_worker_v15_outputs_preserved')
+(r/('qualify-'+name+'.py')).write_text(s)
+s=(r/'run-ptl-worker-v15-qualification-v2.ps1').read_text().replace('ptl-worker-v15-qualification-v2','ptl-worker-v16-qualification').replace('ptl-rectangle-integer-paired-v2-qualification','ptl-program-compact-v1-qualification').replace('native-desktop-admission-v60','native-desktop-admission-v61').replace('ptl-native-worker-v15',name)
+a=s.index(' $component=Get-Content');b=s.index(" $report.active_phase='worker-build'",a);s=s[:a]+s[b:]
+s=s.replace('all_prior_worker_v14_outputs_preserved','all_prior_worker_v15_outputs_preserved')
+(r/'run-ptl-worker-v16-qualification.ps1').write_text(s)
+print(json.dumps({'prepared':name,'changed':changed,'model_sha256':digest,'desktop_changed':False}))

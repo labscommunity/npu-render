@@ -1,0 +1,12 @@
+from pathlib import Path
+import shutil,json,hashlib,tarfile
+r=Path(__file__).parent;name='ptl-native-worker-v17';d=r/name;shutil.copytree(r/'ptl-native-worker-v16',d)
+p=d/'ptl_program_triangle_draw.cpp';s=p.read_text();old='const auto regions=bounded_triangle_regions(projected.triangle_bounds,clip,s.batch,s.quads,false,s.batch>8192);';new='''// Keep the scheduler's existing tile-budget contract. Region addresses do not
+    // depend on this conservative budget size; transport uses the separately
+    // validated compact-provider batch capacity.
+    const auto scheduling_batch=(std::min)(s.batch,16384u);
+    const auto regions=bounded_triangle_regions(projected.triangle_bounds,clip,scheduling_batch,s.quads,false,scheduling_batch>8192);''';assert old in s;s=s.replace(old,new);p.write_text(s)
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};before=json.loads((r/'ptl-native-worker-v16-source.json').read_text());assert [k for k in before if before[k]!=manifest[k]]==['ptl_program_triangle_draw.cpp'];(r/(name+'-source.json')).write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/(name+'.tar.gz'),'w:gz') as t:t.add(d,arcname=name)
+for old,new in [('build-ptl-native-worker-v16.ps1','build-ptl-native-worker-v17.ps1'),('qualify-ptl-native-worker-v16.py','qualify-ptl-native-worker-v17.py'),('run-ptl-worker-v16-qualification.ps1','run-ptl-worker-v17-qualification.ps1')]:
+ s=(r/old).read_text().replace('ptl-native-worker-v16',name).replace('ptl-worker-v16-qualification','ptl-worker-v17-qualification');(r/new).write_text(s)

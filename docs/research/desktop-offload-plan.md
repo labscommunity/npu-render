@@ -19,8 +19,9 @@ application coverage and matched Tahoma performance.
 The [compact generic-program component](../validation/2026-10-16/native-compact-program-v1/README.md)
 passes 448 NPU fixtures within the existing code allocation. Profiling 586 batches
 places 4,313.479 of 4,626.834 ms in NPU request waits, motivating a smaller payload
-and larger batches. Worker integration and paired complete-image timing remain
-separate gates; capacity alone is not evidence of a desktop improvement.
+and larger batches. The [integrated worker](../validation/2026-10-16/native-compact-program-worker-v1/README.md)
+preserves all 972 recorded outputs. Paired complete-image timing remains a
+separate gate; capacity alone is not evidence of a desktop improvement.
 
 Earlier milestones retain their original qualification scope. Worker v9 passes all 972 retained
 requests and registered D3D11. Its [finite live v44 trial](../validation/2026-10-16/native-long-shader-live-v1/README.md)

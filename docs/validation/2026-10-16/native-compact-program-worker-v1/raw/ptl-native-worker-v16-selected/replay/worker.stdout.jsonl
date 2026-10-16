@@ -1,0 +1,14 @@
+{"kind":"pipeline_cache_policy","uniform_capacity":64,"triangle_capacity":128,"clear_capacity":16,"replacement":"FIFO","hardware_queue_count_measured":false}
+{"local_worker_ready":true,"pid":13932,"concurrent_clients":4,"provider_concurrency":1,"client_pid_verified":true,"private_user_acl":true,"network_listener":false}
+{"pipeline_before_request":true,"dispatch_ticket":0,"uniform":0,"triangle":0,"clear":0,"point":0,"linear":0}
+{"kind":"request_identity","pid":13932,"dispatch_ticket":0,"client_pid":12232,"sequence":1,"abi":13,"flags":2097152,"width":2048,"height":69,"vertices":0,"pixel_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","provider_parent":true}
+{"provider_process_started":true,"generation":1,"pid":22448,"kill_on_owner_exit":true,"execution_device":"NPU"}
+{"provider_process_response":true,"dispatch_ticket":0,"generation":1,"attempt":0,"elapsed_ms":94,"timing_scope":"child_roundtrip_including_compilation_and_recovery","execution_device":"NPU"}
+{"client_pid":12232,"sequence":1,"execution_device":"NPU","server_thread_id":11956,"provider_requests":1,"draw_ms":94.000,"compile_and_draw_ms":97.714,"compile_calls":0,"backend_compile_calls":0,"memory_cache_requests":0,"memory_cache_hits":0,"memory_cache_evictions":0,"cache_requests":0,"cache_hits":0,"provider_setup_ms":0.000,"backend_compile_ms":0.000,"compact_coverage_calls":0,"compact_coverage_samples":0,"wide_coverage_calls":0,"passed":true,"displayed_frames":0}
+{"kind":"request_timeline","pid":13932,"dispatch_ticket":0,"client_pid":12232,"sequence":1,"provider_parent":true,"qpc_frequency":10000000,"connected_qpc":3990406011192,"received_qpc":3990406011329,"queued_qpc":3990406011422,"entered_qpc":3990406011473,"finished_qpc":3990407000735,"reply_qpc":3990407003500,"acknowledged_qpc":3990407006626}
+{"sequence":1,"client_pid":12232,"dispatch_ticket":0,"request_bytes":96,"reply_bytes":565376,"queue_wait_ms":0,"worker_ms":94,"roundtrip_ms":94,"worker_success":true,"displayed_frames":0}
+{"pipeline_before_request":true,"dispatch_ticket":1,"uniform":0,"triangle":0,"clear":0,"point":0,"linear":0}
+{"kind":"request_identity","pid":13932,"dispatch_ticket":1,"client_pid":20568,"sequence":2,"abi":1,"flags":3840,"width":2048,"height":69,"vertices":6,"pixel_sha256":"95b1c4fbb5f9bf0f34ad7b76eca5ae122d956a9570e1796e1bd4aecf43ca7dbe","provider_parent":true}
+{"provider_process_failure":true,"dispatch_ticket":1,"generation":1,"retry_on_npu":false,"fallback_backend":"none"}
+{"provider_request_failed":true,"dispatch_ticket":1,"client_pid":20568,"sequence":2,"abi":1,"width":2048,"height":69,"vertices":6,"flags":3840,"request_bytes":567336,"failure_packet_captured":true}
+{"kind":"client_departure","phase":"provider","win32_error":233,"client_pid":20568,"sequence":2,"dispatch_ticket":1,"provider_response_received":false,"delivery_acknowledged":false}
