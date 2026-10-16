@@ -1,0 +1,25 @@
+from pathlib import Path
+import hashlib,json
+r=Path('results/render-driver');p=r/'ptl-six-span-program-point-v1.c';s=(r/'ptl-six-span-program-v2.c').read_text().replace('u32(data+4)!=1','u32(data+4)!=2')
+s=s.replace('unsigned mode[4]=','unsigned filters[2]={u32(data+144),u32(data+148)};if(filters[0]>1||filters[1]>1||u32(data+152)||u32(data+156))return;\n unsigned mode[4]=')
+s=s.replace('const unsigned char *q=p+64+sample*16;samples[sample]=mix4', 'if(filters[sample]&&(tx!=0||ty!=0))return;\n    const unsigned char *q=p+64+sample*16;samples[sample]=filters[sample]?texel(q,format[sample]):mix4')
+s=s.replace('float x=clamp(clamp(uvx,1.0f)*(float)w-0.5f,(float)(w-1));float y=clamp(clamp(uvy,1.0f)*(float)h-0.5f,(float)(h-1));','float offset=filters[sample]?0.0f:0.5f;float x=clamp(clamp(uvx,1.0f)*(float)w-offset,(float)(w-1));float y=clamp(clamp(uvy,1.0f)*(float)h-offset,(float)(h-1));')
+s=s.replace('jx=ix+1<w?ix+1:ix,jy=iy+1<h?iy+1:iy;','jx=!filters[sample]&&ix+1<w?ix+1:ix,jy=!filters[sample]&&iy+1<h?iy+1:iy;')
+s=s.replace('result[24+sample*2]=bits(x-(float)ix);result[25+sample*2]=bits(y-(float)iy);','result[24+sample*2]=filters[sample]?0:bits(x-(float)ix);result[25+sample*2]=filters[sample]?0:bits(y-(float)iy);')
+p.write_text(s)
+# Local ABI shim changes only pointer handling, preserving kernel body/math.
+a=s.index('void nr_probe_kernel(');b=s.index(' uint4 *words=',a);local=s[:a]+'void nr_program_local(const unsigned char *data,unsigned char *output){\n'+s[b:];(r/'ptl-program-point-v1-local.c').write_text(local)
+s=(r/'ptl_program_fixtures_v2.py').read_text().replace('if index>=192:','if index>=384:').replace('fixture(97)','fixture(289)').replace('(4,2)','(4,1)').replace('(52,16)]','(52,16),(144,2),(148,2),(152,1),(156,1)]').replace('mutations[index-192]','mutations[index-384]')
+s=s.replace(' seed=index%96;', ' point=index>=192;index=index%192\n seed=index%96;')
+s=s.replace(' resources=[', ' filters=[int(point),int(point and seed%2==0)]\n resources=[')
+s=s.replace('F(.5))))) for v,size', 'F(0 if filters[sample] else .5))))) for v,size')
+s=s.replace('x1=min(width-1,x+1);y1=min(height-1,y+1)','x1=x if filters[sample] else min(width-1,x+1);y1=y if filters[sample] else min(height-1,y+1)')
+s=s.replace('F(xy[0]-F(x)),F(xy[1]-F(y))','F(0) if filters[sample] else F(xy[0]-F(x)),F(0) if filters[sample] else F(xy[1]-F(y))')
+needle='   if n%11==0:';i=s.index(needle);s=s[:i]+'''   for sample in range(sample_count):
+    if filters[sample]:fractions[sample*2:sample*2+2]=0
+'''+s[i:]
+s=s.replace('      upper=F(', '      if filters[sample]:channels.append(values[0]);continue\n      upper=F(')
+s=s.replace('0x4e525031,1,phase','0x4e525031,2,phase');s=s.replace(" struct.pack_into('<16f',data,160", " struct.pack_into('<2I',data,144,*filters)\n struct.pack_into('<16f',data,160")
+(r/'ptl_program_point_fixtures_v1.py').write_text(s)
+s=(r/'compare-ptl-program-local-v3.py').read_text().replace('ptl_program_fixtures_v2','ptl_program_point_fixtures_v1').replace('ptl-program-v2-local.dylib','ptl-program-point-v1-local.dylib').replace('range(228)','range(424)').replace('ptl-program-v3-local-comparison.json','ptl-program-point-v1-local-comparison.json');(r/'compare-ptl-program-point-local-v1.py').write_text(s)
+(r/'ptl-six-span-program-point-v1-source.json').write_text(json.dumps({p.name:hashlib.sha256(p.read_bytes()).hexdigest()},indent=2)+'\n')

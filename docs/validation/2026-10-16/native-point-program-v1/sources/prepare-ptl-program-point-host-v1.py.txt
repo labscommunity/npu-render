@@ -1,0 +1,28 @@
+from pathlib import Path
+import hashlib,json,re,shutil,tarfile
+r=Path('results/render-driver');d=r/'ptl-program-point-integration-v1';shutil.copytree(r/'ptl-program-integration-v5',d)
+for name in ['reference_triangle.hpp','reference_triangle.cpp','long_shader_reference.hpp']:
+ shutil.copyfile(r/'ptl-long-shader-integration-v4'/name,d/name)
+p=d/'ptl_program.hpp';s=p.read_text().replace('blend=0;', 'blend=0;unsigned filters[2]{};')
+s=s.replace('s.filter!=shader::TextureFilter::linear','(s.filter!=shader::TextureFilter::linear&&s.filter!=shader::TextureFilter::point)')
+digest='0902c8addc03d08e008582394060e80978ed34082bb82b2687fcdff381eef216'
+s=re.sub(r'constexpr unsigned char expected\[\]\{[^}]+\}', 'constexpr unsigned char expected[]{'+','.join('0x'+digest[i:i+2] for i in range(0,64,2))+'}',s)
+s=s.replace('  provider=acquire(verified_blob(path));','  for(unsigned n=0;n<program.samples.size();++n)filters[n]=samplers[program.samples[n].sampler].filter==shader::TextureFilter::point?1u:0u;\n  provider=acquire(verified_blob(path));')
+s=s.replace('put(p+4,1);','put(p+4,2);').replace('put(p+56,blend);','put(p+56,blend);put(p+144,filters[0]);put(p+148,filters[1]);')
+p.write_text(s)
+p=d/'compare.cpp';s=p.read_text().replace('#include "shader_reference.hpp"','')
+s=s.replace('if(a.filter!=TextureFilter::linear)', 'if(a.filter!=TextureFilter::linear&&a.filter!=TextureFilter::point)')
+s=s.replace('wrong_samplers[sample.sampler].filter=TextureFilter::point','wrong_samplers[sample.sampler].filter=static_cast<TextureFilter>(255)')
+a=s.index('    const auto alpha_reference=');b=s.index('    const auto setup=',a);s=s[:a]+s[b:]
+s=s.replace('    if(alpha_reference)reference=', '    reference=')
+s=s.replace('independent FP32 alpha filter with original NPU geometry and merger','independent FP32 shader with original NPU geometry and merger')
+# Preserve original and reference matches separately, requiring both for this new path.
+s=s.replace('if(reference_differences)return 2;', 'if(different||reference_differences)return 2;')
+p.write_text(s)
+for p in d.iterdir():
+ if p.suffix in ('.txt','.cpp'):
+  s=p.read_text().replace('nr_ptl_four_tap_compare','nr_ptl_program_point_compare');p.write_text(s)
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};(r/'ptl-program-point-integration-v1-source.json').write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/'ptl-program-point-integration-v1.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-ptl-program-integration-v5.ps1').read_text().replace('ptl-program-integration-v5','ptl-program-point-integration-v1').replace('nr_ptl_four_tap_compare','nr_ptl_program_point_compare');(r/'build-ptl-program-point-integration-v1.ps1').write_text(s)
+print(json.dumps(dict(files=len(manifest),model_sha256=digest)))

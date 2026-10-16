@@ -19,6 +19,13 @@ these observations are not matched comparisons with v44. An unadmitted observer
 still fails device creation. Continuous admission, multiple clients and broad
 graphics coverage remain open.
 
+The [point-sampling program extension](../validation/2026-10-16/native-point-program-v1/README.md)
+passes 424 independent NPU fixtures and all 348 image variants for 87 newly admitted
+recorded draws. Every original image is preserved. Summed warm component time falls
+from 13.587 to 4.091 seconds with no slower pairs. Existing rectangle exclusions
+remain intact. This component result requires worker replay and live qualification
+before any desktop-performance conclusion.
+
 The [long-shader component](../validation/2026-10-16/native-long-shader-v1/README.md)
 passes 120 independent NPU fixtures and exact complete-image comparisons for
 the failed v43 request and all six earlier uses of the shader. [Worker v9](../validation/2026-10-16/native-long-shader-worker-v1/README.md)

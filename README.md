@@ -24,6 +24,10 @@ The [integrated renderer also passes all 972 retained requests and registered
 D3D11](docs/validation/2026-10-16/native-long-shader-worker-v1/README.md).
 Sustained responsiveness, broad application coverage and a Tahoma benefit remain
 unqualified.
+The next [point-sampling component](docs/validation/2026-10-16/native-point-program-v1/README.md)
+adds 87 recorded draws to the reusable kernel. All 348 changed-image variants match
+both references exactly; summed warm draw time falls from 13.587 to 4.091 seconds.
+Its worker and desktop integration are separate qualification gates.
 See the [current acceptance plan](docs/research/desktop-offload-plan.md).
 
 **Full desktop offload is unfinished.** The current Windows/Panther Lake path
