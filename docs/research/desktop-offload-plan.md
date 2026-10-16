@@ -232,14 +232,14 @@ renderer does not establish where every application renders.
 
 | Gate | Work | Acceptance evidence | Current status |
 | --- | --- | --- | --- |
-| 1. Routing | Record active physical and indirect paths before, during, and after admission; identify clone/extended configuration and actual rendering adapter. | Timestamped topology, native DWM NPU receipts, selected adapter, frame producer, exact restoration. | Automatic clone identified; v11 applies extension with the physical path preserved, produces a frame while extended, restores the clone exactly, and restores the final physical baseline. |
-| 2. Continuous rendering | Keep the native renderer alive across changing windows and content; diagnose every failed draw; distinguish model preparation from rendering and transport. | Multiple changing frames, timestamps and pixel checks, sustained operation, no hidden fallback. | V36 passes with 1,833 acknowledged NPU operations, 167 exact frame deliveries spanning 2,076.05 seconds, and four fresh owned physical observations near the end. The controlled thirty-minute delivery gate passes for that earlier renderer. The timing-instrumented worker passes finite v42 integration with 48 matching submissions over 538.23 s; its thirty-minute run and production stress remain unqualified. V31 was a frozen-relay false positive and remains rejected. |
-| 3. Physical presentation | Present new NPU frames on the physical output with distinct logical desktops and no recursive mirroring. | Live sequence-to-present correlation, output identity, measured presentation mode and residual GPU work. | V42 correlates 48 exact matching submissions and verifies blue/green/red on the owned physical output. Presenter: 96 GPU copy commands including validation readback; measurement observer: 142 additional copies. Residual GPU cost and a matched baseline remain unqualified. |
-| 4. Interaction and recovery | Migrate the logical desktop, route pointer/keyboard/focus correctly, handle cursor/DPI/resolution, restore exact topology and windows. | Scripted interaction visible on physical output; emergency exit and owned-process failure recovery; ordinary login/lock path retained. | V42 passes relative motion, controlled mouse/keyboard/color changes, confinement, two reacquisitions and ordinary recovery. Deliberately stopping the relay in v34 triggers full owned cleanup in 25.75 seconds. Secure desktop, sleep/wake, full cursor fidelity and other faults remain open. |
-| 5. Responsiveness | Optimize resource reuse, graph compilation, dispatch granularity, transfer volume and frame pacing. | Initial target: ordinary desktop interaction at 30 fps, p95 visible response ≤100 ms, 30-minute stable run. Report cold-start time separately. | Not met. Large cold graph compilation is reproduced at 89.1 seconds. Cached replay helps but does not meet usability. A fused four-sample kernel matches all 3.15 million components of the retained slow desktop draw in three comparisons. Six compiler-owned spans reduce complete warm draw time from about 9.2 s to 0.39 s, with 34 calls. The live v42 trial observes an 8.24 s controlled mouse response and 187.8 ms keyboard response. Causal timestamps attribute most of the mouse delay to frame production. Responsive interaction and wider shader/geometry coverage remain open. |
-| 6. Application coverage | Admit and implement required graphics operations across browser, video and representative 3D workloads. Establish per-process adapter choice. | Capability matrix plus real hardware runs; every remaining iGPU operation accounted for. | A manually admitted default-adapter D3D11 fixture passes eight NPU operations. Unadmitted default device creation still fails in v41. A broker component passes normal-start lease, spoof rejection, timeout and cleanup checks. Registered D3D v32 then passes a normally started same-session fixture with eight exact NPU operations and cleanup. Registered v36 passes a normally started non-admin session-1 fixture, with automatic admission and eight NPU operations. Live v46 passes a bounded default-adapter fixture sharing DWM’s worker. Continuous admission, multiple applications, general API coverage and browser/video/game migration remain unqualified. |
-| 7. Tahoma benefit | Run repeated baseline/offload trials under matched power, resolution and application load. | Report Tahoma throughput/latency, desktop frame times, per-engine GPU/NPU/CPU activity, memory and power; demonstrate GPU relief and no material Tahoma regression. | Earlier experiments regressed; native desktop A/B not yet run. |
-| 8. Usable switch | Integrate qualified components, install/on/off/status, recovery, documentation and CI; resolve distribution signing requirements. | Repeated clean install and enable/disable cycles, sleep/wake and failures, end-to-end test on target hardware. | Research candidates isolated; no usable full-offload product. |
+| 1. Routing | Identify physical/indirect paths and the actual renderer before, during and after admission. | Timestamped topology, DWM NPU receipts, frame producer, exact restoration. | Finite v51 passes native routing and restoration. The physical output remains available. |
+| 2. Continuous rendering | Render changing content without hidden fallback; handle failed draws and preparation. | Fresh frames, pixel checks, provider receipts, sustained operation. | V51 passes 1,163 acknowledged operations and 56 matching physical submissions. The earlier v36 thirty-minute result does not qualify the current renderer. |
+| 3. Physical presentation | Deliver fresh NPU frames to the physical output without recursive mirroring; quantify remaining GPU work. | Sequence-to-present correlation, output identity, display statistics, residual GPU activity. | V51 correlates 56 exact submissions and controlled colors. GPU presentation copies and scanout remain; their cost is unmeasured against a matched baseline. |
+| 4. Interaction and recovery | Route pointer, keyboard and focus; handle cursor, DPI and resolution; restore topology and windows. | Physical input observations, owned-process fault recovery, ordinary lock/login path retained. | V51 passes controlled input, confinement/reacquisition and ordinary restoration with memory integrity enabled. Current sleep/wake, secure-desktop and broader fault qualification remain open. |
+| 5. Responsiveness | Reduce rendering, request, copy and scheduling costs; report cold start separately. | Ordinary animated desktop at 30 fps, p95 visible response ≤100 ms, thirty-minute stable run. | Not met. V51 observes mouse pixel-read completion at 2,544.636 ms and keyboard at 125.073 ms. These are two events, not p95. Compact-program replay preserves 972 outputs; paired image and live performance are separate gates. |
+| 6. Application coverage | Admit ordinary applications and implement required browser, video and 3D operations; verify per-process renderer. | Capability matrix and hardware runs accounting for every remaining iGPU operation. | V51 passes a normally started non-admin default-adapter fixture sharing DWM's NPU worker. Continuous admission, renewal/revocation, multiple applications and broad browser/video/game coverage remain unqualified. |
+| 7. Tahoma benefit | Repeat baseline/offload trials with matched power, resolution, content and work rate. | Tahoma throughput/latency, desktop frame times, per-engine activity, memory and power; measurable GPU relief without material regression. | Earlier experiments regressed. No native-desktop Tahoma A/B or GPU-relief result is established. |
+| 8. Usable switch | Integrate qualified components into install/on/off/status/recovery; complete distribution and CI work. | Clean install and repeated enable/disable cycles, failures and target-hardware end-to-end tests. | Private research prototype. No usable full-offload product or complete application migration. |
 
 These are engineering acceptance targets, not measured results or an estimated
 completion date. Gate 6 remains open if any requested application graphics class
@@ -248,30 +248,32 @@ role, and any GPU rendering/copy cost in the bridge must be measured.
 
 ## Immediate work and decision gates
 
-1. Retain the successful thirty-minute native delivery qualification and recovery
-   as the integration baseline. Repeat it after meaningful renderer changes.
-2. Preserve the exact six-span four-sample replay result and corrected capacity
-   guard qualification. Reduce per-pixel work and broaden changing-image checks;
-   independent imported-model overlap is excluded after real device loss.
-3. Retain the qualified three-texture worker and live v39 result. Its complete
-   replay attributes 4,996 calls and 22.29 seconds to the largest remaining shader
-   group. Reduce shared geometry and dispatch costs across shader groups. The solid
-   component clears five expensive draws but does not establish desktop usability.
-   Repeat responsiveness and sustained stability checks after renderer changes.
-4. Reproduce live v43's captured timeout and remove the remaining cold graph
-   preparation from that rendering path. The reusable worker passes its 972-request
-   replay, registered D3D and finite live v44. Preserve explicit routing declines
-   and original evidence. Target the two dominant remaining shader groups from
-   v44, then repeat finite and sustained desktop tests after rendering changes.
-5. Integrate the qualified interactive admission component with the serialized
-   desktop worker. Two ordinary non-elevated clients and five spoof rejections
-   now pass, with exact process/token access-list restoration. Registered interactive
-   graphics also passes eight real NPU operations. Live v46 qualifies a bounded
-   default-adapter fixture sharing DWM's worker. Extend this to continuous admission,
-   multiple clients, bounded renewal and revocation before browsers, video and
-   representative 3D workloads.
-6. Measure matched Tahoma baseline/offload performance and remaining GPU work.
-   Finish install/on/off/recovery only after these functional and benefit gates.
+1. Finish the compact-program comparison. Require exact preservation of the
+   preceding NPU images across all affected recorded draws and varied pixels.
+   Keep independent-reference disagreements explicit. Submit filled samples only
+   to avoid wasting time on larger synthetic padding regions. Use paired timing;
+   greater batch capacity alone does not qualify an improvement.
+2. Run registered graphics and the finite desktop trial only after the replay and
+   comparison gates pass. Reattribute input delay from that trial. The current v51
+   mouse interval includes 1,685.570 ms in child rendering and 770.841 ms outside
+   those intervals before publication.
+3. Measure and reduce redundant response copies without changing packet checks,
+   process ownership, recovery or rendering arithmetic. Compare validator behavior
+   on valid and malformed packets, then require full replay, fault recovery and
+   paired/live timing for the integrated worker.
+4. Once the finite path is responsive, run a repeated-input latency distribution,
+   continuous animation, the current renderer's thirty-minute soak, and sleep/wake,
+   secure-desktop and owned-failure recovery. A two-event trial cannot pass p95.
+5. Extend automatic admission to continuous leases, renewal/revocation and multiple
+   ordinary clients. Establish a real browser/video/3D capability matrix. Account
+   for every operation still using the iGPU; a successful DWM trial does not prove
+   application migration.
+6. Measure native-desktop GPU relief and Tahoma with matched display geometry,
+   content, work rate, power and model settings. Keep this benefit gate separate
+   from API coverage, and do not infer it from NPU execution or faster components.
+7. Integrate the passing components into the user-facing switch, installer,
+   status and recovery paths, then repeat the complete target-hardware acceptance
+   sequence. Preserve all rejected trials and keep the repository private.
 
 The [sustained delivery evidence](../validation/2026-10-15/native-long-kernel-v1/README.md)
 qualifies controlled thirty-minute delivery and ordinary restoration. The
