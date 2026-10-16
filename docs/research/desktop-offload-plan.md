@@ -29,7 +29,8 @@ before any desktop-performance conclusion.
 The [five-sample shader component](../validation/2026-10-16/native-complex-shader-v1/README.md)
 now matches an explicit FP32 reference on all 40 tested images. Five recorded
 images differ from the old renderer; those numerical differences remain explicit.
-It has not yet been integrated into the desktop worker.
+Worker integration is recorded below; its component timing does not establish
+live desktop responsiveness.
 
 The [point-worker live v48 trial](../validation/2026-10-16/native-point-worker-live-v1/README.md)
 now passes all 972 retained worker outputs, registered graphics, 1,223 live NPU
@@ -56,6 +57,14 @@ point-rectangle draws. Both the direct-only and crop-preserving adapters retain
 all original hashes. The comparisons expose distinct costs for plain and blended
 copies; the subsequent route policy uses those semantics and row-batch count.
 These are component findings, not proof of live responsiveness or GPU relief.
+
+The [combined worker v14](../validation/2026-10-16/native-point-rectangle-worker-v1/README.md)
+passes all 972 requests with every v12/v13 output preserved. Its rectangle policy
+uses blend semantics and row count: 28 direct kernel draws and nine existing NPU
+crops. All 148 image comparisons pass. Summed warm draw time falls from 12.483 to
+5.525 seconds across 111 pairs, with 16 slower pairs. The worker also retains ten
+complex-shader draws, one import per component, and zero provider failures.
+Registered graphics and live integration remain separate from this replay gate.
 
 The [long-shader component](../validation/2026-10-16/native-long-shader-v1/README.md)
 passes 120 independent NPU fixtures and exact complete-image comparisons for

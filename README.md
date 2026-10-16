@@ -27,7 +27,11 @@ matches an explicit FP32 reference on all 40 tested images. Five recorded images
 differ from the old renderer; those numerical differences remain explicit.
 The [next worker passes all 972 requests](docs/validation/2026-10-16/native-complex-worker-v1/README.md),
 preserving 967 prior outputs and exactly matching the five explicit new-profile
-references. Its registered graphics and live desktop checks remain open.
+references. The [combined rectangle worker](docs/validation/2026-10-16/native-point-rectangle-worker-v1/README.md)
+also passes all 972 requests, preserving every preceding output. Its rectangle
+policy passes 148 complete-image comparisons; 111 warm component pairs total
+5.53 seconds versus 12.48 seconds on the old renderer. Live responsiveness and
+a Tahoma benefit require separate qualification.
 See the [current acceptance plan](docs/research/desktop-offload-plan.md).
 
 **Full desktop offload is unfinished.** The current Windows/Panther Lake path

@@ -1,0 +1,34 @@
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'ptl-native-worker-v13';shutil.copytree(r/'ptl-native-worker-v12',d);shutil.copyfile(r/'ptl-point-rectangle-integration-v2/ptl_point_rectangle.hpp',d/'ptl_point_rectangle.hpp')
+p=d/'indexed_pipeline.hpp';s=p.read_text().replace('#include "ptl_complex_triangle_draw.hpp"','#include "ptl_complex_triangle_draw.hpp"\n#include "ptl_point_rectangle.hpp"');needle='    bool ptl_long_enabled=false;'
+s=s.replace(needle,'''    std::filesystem::path ptl_rectangle_blob;
+    struct PtlRectangleEntry {Header header;raster::PackedTexture layout;std::vector<uint32_t> vertex,pixel;std::unique_ptr<raster::PtlPointRectangle> executor;};
+    std::vector<PtlRectangleEntry> ptl_rectangles;
+'''+needle,1)
+needle='    Pipeline(){';s=s.replace(needle,needle+'''
+        wchar_t *rectangle=nullptr;size_t rectangle_length=0;
+        if(_wdupenv_s(&rectangle,&rectangle_length,L"NR_RENDER_PTL_RECTANGLE_BLOB"))throw std::runtime_error("cannot read rectangle provider setting");
+        const std::unique_ptr<wchar_t,decltype(&std::free)> rectangle_owner(rectangle,&std::free);
+        if(rectangle&&*rectangle){ptl_rectangle_blob=rectangle;require(ptl_rectangle_blob.is_absolute());}
+''',1)
+needle='            require(shape_valid(h) && payload_abi(h)==((h.flags&16)?5u:4u));'
+insert='''
+            if(!ptl_rectangle_blob.empty()&&(h.flags&16)&&raster::PtlPointRectangle::eligible(request.pixel)){
+                raster::PtlPointRectangle *executor=nullptr;
+                for(auto &entry:ptl_rectangles){const auto &key=entry.header;
+                    if(key.width==h.width&&key.height==h.height&&key.format==h.format&&(key.flags&~4u)==(h.flags&~4u)&&entry.layout.width==t.width&&entry.layout.height==t.height&&entry.layout.format==t.format&&entry.vertex==request.vertex.bytecode&&entry.pixel==request.pixel.bytecode){executor=entry.executor.get();break;}
+                }
+                if(!executor&&ptl_rectangles.size()<16){auto candidate=std::make_unique<raster::PtlPointRectangle>(request.vertex,request.pixel,h.width,h.height,h.format,t,(h.flags&1)!=0,ptl_rectangle_blob);executor=candidate.get();ptl_rectangles.push_back({h,{t.width,t.height,t.format,{}},request.vertex.bytecode,request.pixel.bytecode,std::move(candidate)});}
+                if(executor){auto result=executor->execute(request.inputs,request.vertex_constants,request.viewport,t,request.background,request.scissor);
+                    std::printf("{\\"ptl_rectangle_draw\\":true,\\"accepted\\":true,\\"sequence\\":%u,\\"provider_requests\\":%llu,\\"covered_samples\\":%llu,\\"structural_admission\\":true,\\"fallback_backend\\":\\"none\\"}\\n",h.sequence,static_cast<unsigned long long>(result.provider_requests),static_cast<unsigned long long>(result.covered_samples));std::fflush(stdout);return result;
+                }
+                std::printf("{\\"ptl_rectangle_capacity_declined\\":true,\\"fallback_backend\\":\\"NPU\\"}\\n");std::fflush(stdout);
+            }
+'''
+assert s.count(needle)==1;s=s.replace(needle,needle+insert);p.write_text(s)
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};before=json.loads((r/'ptl-native-worker-v12-source.json').read_text());assert [k for k in before if manifest[k]!=before[k]]==['indexed_pipeline.hpp'];assert set(manifest)-set(before)=={'ptl_point_rectangle.hpp'}
+(r/'ptl-native-worker-v13-source.json').write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/'ptl-native-worker-v13.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-ptl-native-worker-v12.ps1').read_text().replace('ptl-native-worker-v12','ptl-native-worker-v13');(r/'build-ptl-native-worker-v13.ps1').write_text(s)
+print(json.dumps(dict(source_files=len(manifest),changed=['indexed_pipeline.hpp'],added=['ptl_point_rectangle.hpp'],new_kernel_enabled_only_by_explicit_setting=True)))

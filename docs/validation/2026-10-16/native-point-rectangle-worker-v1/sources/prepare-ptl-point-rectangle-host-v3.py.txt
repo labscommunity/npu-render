@@ -1,0 +1,16 @@
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'ptl-point-rectangle-integration-v3';shutil.copytree(r/'ptl-point-rectangle-integration-v2',d)
+p=d/'ptl_point_rectangle.hpp';s=p.read_text();old='    try{auto cropped=crop->execute(bounds,clip,uv,color,source,background,true);if(cropped){'
+new='''    const unsigned crop_rows=(std::max)(1u,65535u/(std::max)(sw,width));
+    const bool prefer_crop=!blend||opaque||(end_row-first_row<=crop_rows);
+    std::printf("{\\"ptl_rectangle_route_policy\\":true,\\"blend\\":%s,\\"opaque_alpha\\":%s,\\"bounded_rows\\":%u,\\"crop_rows_per_request\\":%u,\\"prefer_crop\\":%s}\\n",blend?"true":"false",opaque?"true":"false",end_row-first_row,crop_rows,prefer_crop?"true":"false");std::fflush(stdout);
+    try{auto cropped=prefer_crop?crop->execute(bounds,clip,uv,color,source,background,true):std::optional<OpaqueAffineCrop::Result>{};if(cropped){'''
+assert s.count(old)==1;s=s.replace(old,new);p.write_text(s)
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};(r/'ptl-point-rectangle-integration-v3-source.json').write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/'ptl-point-rectangle-integration-v3.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+for old,new in [('build-ptl-point-rectangle-integration-v2.ps1','build-ptl-point-rectangle-integration-v3.ps1'),('inspect-ptl-point-rectangle-captures-v2.py','inspect-ptl-point-rectangle-captures-v3.py'),('run-ptl-point-rectangle-compare-v2.py','run-ptl-point-rectangle-compare-v3.py')]:
+ s=(r/old).read_text().replace('ptl-point-rectangle-integration-v2','ptl-point-rectangle-integration-v3').replace('ptl-point-rectangle-admission-v2','ptl-point-rectangle-admission-v3').replace('ptl-point-rectangle-comparison-v2','ptl-point-rectangle-comparison-v3');(r/new).write_text(s)
+s=(r/'run-ptl-rectangle-capture-v2-qualification.ps1').read_text().replace('ptl-rectangle-capture-v2-qualification','ptl-rectangle-capture-v3-qualification').replace('ptl-rectangle-captures-after-worker-v2','ptl-worker-v13-qualification').replace('build-ptl-point-rectangle-integration-v2','build-ptl-point-rectangle-integration-v3').replace('inspect-ptl-point-rectangle-captures-v2','inspect-ptl-point-rectangle-captures-v3').replace('run-ptl-point-rectangle-compare-v2','run-ptl-point-rectangle-compare-v3').replace('ptl-point-rectangle-comparison-v2','ptl-point-rectangle-comparison-v3')
+(r/'run-ptl-rectangle-capture-v3-qualification.ps1').write_text(s)
+print(json.dumps(dict(prepared=True,header_sha256=manifest['ptl_point_rectangle.hpp'],selection='plain copy, opaque alpha, or at most one crop batch',kernel_unchanged=True)))

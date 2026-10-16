@@ -1,0 +1,13 @@
+from pathlib import Path
+import ast,hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'ptl-native-worker-v14';shutil.copytree(r/'ptl-native-worker-v13',d);shutil.copyfile(r/'ptl-point-rectangle-integration-v3/ptl_point_rectangle.hpp',d/'ptl_point_rectangle.hpp')
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};before=json.loads((r/'ptl-native-worker-v13-source.json').read_text());assert [k for k in before if manifest[k]!=before[k]]==['ptl_point_rectangle.hpp']
+(r/'ptl-native-worker-v14-source.json').write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/'ptl-native-worker-v14.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-ptl-native-worker-v13.ps1').read_text().replace('ptl-native-worker-v13','ptl-native-worker-v14');(r/'build-ptl-native-worker-v14.ps1').write_text(s)
+s=(r/'qualify-ptl-native-worker-v13.py').read_text().replace('ptl-native-worker-v13','ptl-native-worker-v14').replace('ptl-rectangle-capture-v2-qualification','ptl-rectangle-capture-v3-qualification').replace('ptl-point-rectangle-admission-v2','ptl-point-rectangle-admission-v3');s=s.replace("assert obj(vm/'ptl-rectangle-capture-v3-qualification/report.json')['passed']", "assert obj(vm/'ptl-native-worker-v13-full/report.json')['passed'];assert obj(vm/'ptl-rectangle-capture-v3-qualification/report.json')['passed']")
+needle="  report['all_prior_worker_v12_outputs_preserved']=True"
+s=s.replace(needle,needle+"\n  previous=rows(vm/'ptl-native-worker-v13-full/replay/replays.jsonl');assert len(previous)==972\n  assert all(old['ticket']==new['ticket'] and old['pixels_sha256']==new['pixels_sha256'] and old['pixel_bytes']==new['pixel_bytes'] for old,new in zip(previous,current,strict=True))\n  report['all_prior_worker_v13_outputs_preserved']=True")
+ast.parse(s);(r/'qualify-ptl-native-worker-v14.py').write_text(s)
+s=(r/'run-ptl-worker-v13-qualification.ps1').read_text().replace('ptl-worker-v13-qualification','ptl-worker-v14-qualification').replace('ptl-native-worker-v13','ptl-native-worker-v14').replace('ptl-rectangle-capture-v2-qualification','ptl-rectangle-capture-v3-qualification').replace('ptl-point-rectangle-comparison-v2','ptl-point-rectangle-comparison-v3').replace('all_prior_worker_v12_outputs_preserved','all_prior_worker_v13_outputs_preserved');(r/'run-ptl-worker-v14-qualification.ps1').write_text(s)
+print(json.dumps(dict(prepared=True,changed=['ptl_point_rectangle.hpp'],source_files=len(manifest))))

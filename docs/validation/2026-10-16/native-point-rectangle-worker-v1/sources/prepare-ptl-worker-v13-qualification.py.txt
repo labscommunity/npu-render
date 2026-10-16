@@ -1,0 +1,39 @@
+from pathlib import Path
+import ast
+r=Path('results/render-driver');s=(r/'qualify-ptl-native-worker-v12-v2.py').read_text()
+s=s.replace("out=vm/('ptl-native-worker-v12-validation-v2-selected' if a.stage=='selected' else 'ptl-native-worker-v12-full');out.mkdir(exist_ok=False);trial=vm/'ptl-native-worker-v12-selected/replay' if a.stage=='selected' else out/'replay';process=None", "out=vm/('ptl-native-worker-v13-'+a.stage);out.mkdir(exist_ok=False);trial=out/'replay';process=None")
+s=s.replace("builds/ptl-native-worker-v12/", "builds/ptl-native-worker-v13/").replace("ptl-native-worker-v12-validation-v2-selected/report.json", "ptl-native-worker-v13-selected/report.json")
+needle=" complex_tickets={58,196,302,363,482,602,668,723,790,820}"
+s=s.replace(needle,needle+"\n assert obj(vm/'ptl-rectangle-capture-v2-qualification/report.json')['passed'] and obj(vm/'ptl-native-worker-v12-full/report.json')['passed']\n rectangle_model=vm/'ptl-six-span-point-rectangle-v1/patched.blob';assert sha(rectangle_model)=='b7caa092d2581fec8cec075815ab40057a9f3f5a654b5f0abbe7893c11a74908'\n rectangle_tickets=set(obj(vm/'ptl-point-rectangle-admission-v2/report.json')['accepted_tickets']);assert len(rectangle_tickets)==37")
+s=s.replace("env=os.environ.copy();", "env=os.environ.copy();env['NR_RENDER_PTL_RECTANGLE_BLOB']=str(rectangle_model);")
+needle=' report.update(long_model_sha256='
+a=s.index(needle);s=s[:a]+" if a.stage=='selected':command[-1]=','.join(str(x) for x in sorted({int(x) for x in command[-1].split(',')}|rectangle_tickets))\n"+s[a:]
+a=s.index(" if a.stage=='selected':\n  prior=");b=s.index(" proof=obj(trial/'report.json')",a)
+s=s[:a]+''' with (out/'stdout.log').open('xb') as stdout,(out/'stderr.log').open('xb') as stderr:
+  process=subprocess.Popen(command,env=env,stdout=stdout,stderr=stderr,creationflags=subprocess.CREATE_NO_WINDOW)
+  try:process.wait(timeout=1950)
+  except subprocess.TimeoutExpired:process.kill();process.wait(timeout=5);report['replay_timeout']=True
+ replay_exit=process.returncode
+'''+s[b:]
+needle=" assert proof['qualified_correction_hashes_matched']==14"
+insert=""" rectangle_events=[];rectangle_imports=[];rectangle_kernels=[];rectangle_crops=[]
+ for log in (trial/'provider-processes').glob('generation-*/worker.stdout.jsonl'):
+  events=rows(log);rectangle_events += [x for x in events if x.get('ptl_rectangle_draw')];rectangle_imports += [x for x in events if x.get('ptl_rectangle_provider_created')];rectangle_kernels += [x for x in events if x.get('ptl_rectangle_kernel_executed')];rectangle_crops += [x for x in events if x.get('ptl_rectangle_preserved_crop')]
+ actual_rectangles=routed_tickets(trial,'ptl_rectangle_draw');assert actual_rectangles==rectangle_tickets and len(rectangle_events)==37 and len(rectangle_imports)==1
+ assert all(x['accepted'] and x['structural_admission'] and x['fallback_backend']=='none' for x in rectangle_events)
+ assert rectangle_kernels and rectangle_crops and len(rectangle_kernels)+len(rectangle_crops)<=37
+ report.update(rectangle_accepted=37,rectangle_imports=1,rectangle_tickets_matched=True,rectangle_kernel_draws=len(rectangle_kernels),rectangle_preserved_crops=len(rectangle_crops),rectangle_model_sha256=sha(rectangle_model))
+"""
+assert s.count(needle)==1;s=s.replace(needle,insert+needle)
+needle="  report.update(independent_full_replay_audit=True,unchanged_prior_outputs=unchanged,explicit_new_profile_outputs=changed,matched_tahoma_performance=False)"
+s=s.replace(needle,needle+"\n  last=rows(vm/'ptl-native-worker-v12-full/replay/replays.jsonl');assert len(last)==972\n  assert all(old['ticket']==new['ticket'] and old['pixels_sha256']==new['pixels_sha256'] and old['pixel_bytes']==new['pixel_bytes'] for old,new in zip(last,current,strict=True))\n  report['all_prior_worker_v12_outputs_preserved']=True")
+ast.parse(s);(r/'qualify-ptl-native-worker-v13.py').write_text(s)
+s=(r/'run-ptl-worker-v12-qualification.ps1').read_text().replace('ptl-worker-v12-qualification','ptl-worker-v13-qualification').replace('ptl-complex-after-rectangle-v1','ptl-rectangle-capture-v2-qualification').replace('build-ptl-native-worker-v12','build-ptl-native-worker-v13').replace('qualify-ptl-native-worker-v12','qualify-ptl-native-worker-v13').replace('ptl-native-worker-v12','ptl-native-worker-v13')
+a=s.index(" $report.active_phase='reference-profile-validation'");b=s.index(" $report.active_phase='worker-build'",a)
+s=s[:a]+''' $component=Get-Content "$vm\\ptl-point-rectangle-comparison-v2-full\\report.json" -Raw|ConvertFrom-Json
+ $pairs=@($component.cases|ForEach-Object {$_.pairs|Where-Object iteration -gt 0});$old=($pairs|Measure-Object baseline_full_ms -Sum).Sum;$new=($pairs|Measure-Object candidate_full_ms -Sum).Sum
+ if(!$component.passed -or @($component.cases).Count -ne 37 -or $pairs.Count -ne 111 -or $new -ge $old*.8){throw 'Rectangle improvement gate not met'}
+ $report.rectangle_warm_old_ms=$old;$report.rectangle_warm_new_ms=$new
+'''+s[b:]
+s=s.replace(' $report.passed=$true', ' $q=Get-Content "$vm\\ptl-native-worker-v13-full\\report.json" -Raw|ConvertFrom-Json;if(!$q.all_prior_worker_v12_outputs_preserved){throw \'Prior worker output audit failed\'}\n $report.passed=$true')
+(r/'run-ptl-worker-v13-qualification.ps1').write_text(s)

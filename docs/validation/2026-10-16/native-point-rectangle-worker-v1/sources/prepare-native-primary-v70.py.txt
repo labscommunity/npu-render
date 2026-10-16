@@ -1,0 +1,18 @@
+from pathlib import Path
+import re
+r=Path('results/render-driver')
+directories=['ptl-point-rectangle-integration-v3','ptl-point-rectangle-admission-v3','ptl-point-rectangle-comparison-v3-selected','ptl-point-rectangle-comparison-v3-full','ptl-rectangle-capture-v3-qualification']
+for v in (13,14):directories += [f'ptl-native-worker-v{v}',f'ptl-native-worker-v{v}-selected',f'ptl-native-worker-v{v}-full',f'ptl-worker-v{v}-qualification']
+extras=['ptl-point-rectangle-integration-v3-source.json','build-ptl-point-rectangle-integration-v3.log']
+for v in (13,14):extras += [f'ptl-native-worker-v{v}-source.json',f'build-ptl-native-worker-v{v}.log']
+sources=['build-ptl-point-rectangle-integration-v3.ps1','inspect-ptl-point-rectangle-captures-v3.py','run-ptl-point-rectangle-compare-v3.py','run-ptl-rectangle-capture-v3-qualification.ps1']
+for v in (13,14):sources += [f'build-ptl-native-worker-v{v}.ps1',f'qualify-ptl-native-worker-v{v}.py',f'run-ptl-worker-v{v}-qualification.ps1']
+s=(r/'collect-native-primary-v69-expanded.py').read_text()
+for name,value in [('directories',directories),('extras',extras),('source_files',sources)]:s=re.sub('^'+name+'=.*$',lambda m:name+'='+repr(value),s,flags=re.M)
+s=s.replace("'ptl-worker-v12-qualification-v2','ptl-native-worker-v12-full'","'ptl-worker-v14-qualification','ptl-native-worker-v14-full'")
+s=s.replace("'ptl-complex-original-comparison-v1','ptl-native-worker-v12'","'ptl-point-rectangle-integration-v3','ptl-native-worker-v13','ptl-native-worker-v14'").replace('v69','v70')
+(r/'collect-native-primary-v70.py').write_text(s)
+s=(r/'curate-native-primary-v69.py').read_text().replace('v69','v70').replace('native-complex-worker-v1','native-point-rectangle-worker-v1')
+a=s.index('for name in [');b=s.index(':\n p=r/name',a)
+s=s[:a]+'for name in '+repr(['prepare-ptl-point-rectangle-host-v3.py','prepare-ptl-native-worker-v13.py','prepare-ptl-worker-v13-qualification.py','prepare-ptl-native-worker-v14.py','collect-native-primary-v70.py','prepare-native-primary-v70.py'])+s[b:]
+(r/'curate-native-primary-v70.py').write_text(s)
