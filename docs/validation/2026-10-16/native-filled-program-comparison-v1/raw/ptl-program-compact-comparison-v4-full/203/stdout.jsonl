@@ -1,0 +1,24 @@
+{"shared_provider_core_experiment":true,"single_core_for_npu_compilation":true,"hardware_context_count_measured":false}
+{"kind":"private_shared_queue_experiment","enabled":true,"property_readback_verified":true,"hardware_queue_count_measured":false}
+{"ptl_program_provider_created":true,"single_import_shared":true}
+{"ptl_program_previous_provider_created":true,"single_import_shared":true}
+{"kind":"admission","passed":true,"negative_checks":9,"bounded_program":true,"instructions":4,"samples":2}
+{"kind":"setup","candidate_setup_ms":230.026600,"batch":21672,"desktop_changed":false}
+{"kind":"pair","iteration":0,"order":"baseline-first","baseline_full_ms":279.042900,"candidate_full_ms":179.719600,"candidate_shader_and_projection_ms":13.229400,"candidate_merger_ms":153.534000,"baseline_calls":52,"candidate_calls":44,"components":20736000,"different_components":0,"maximum_byte_error":0,"exact":true}
+{"kind":"reference_check","iteration":0,"reference":"independent FP32 shader with original NPU geometry and merger","cpu_test_reference_only":true,"candidate_rendering_device":"NPU","different_components":0,"exact":true}
+{"kind":"reference_compatibility","iteration":0,"previous_reference_differences":0,"candidate_reference_differences":0,"same_difference_positions_and_values":true,"maximum_byte_error":0,"reference_exact":true}
+{"kind":"pair","iteration":1,"order":"custom-first","baseline_full_ms":198.378900,"candidate_full_ms":249.223400,"candidate_shader_and_projection_ms":2.899800,"candidate_merger_ms":233.475700,"baseline_calls":52,"candidate_calls":44,"components":20736000,"different_components":0,"maximum_byte_error":0,"exact":true}
+{"kind":"reference_check","iteration":1,"reference":"independent FP32 shader with original NPU geometry and merger","cpu_test_reference_only":true,"candidate_rendering_device":"NPU","different_components":0,"exact":true}
+{"kind":"reference_compatibility","iteration":1,"previous_reference_differences":0,"candidate_reference_differences":0,"same_difference_positions_and_values":true,"maximum_byte_error":0,"reference_exact":true}
+{"kind":"pair","iteration":2,"order":"baseline-first","baseline_full_ms":201.884200,"candidate_full_ms":179.658300,"candidate_shader_and_projection_ms":1.579700,"candidate_merger_ms":156.758900,"baseline_calls":52,"candidate_calls":44,"components":20736000,"different_components":0,"maximum_byte_error":0,"exact":true}
+{"kind":"reference_check","iteration":2,"reference":"independent FP32 shader with original NPU geometry and merger","cpu_test_reference_only":true,"candidate_rendering_device":"NPU","different_components":0,"exact":true}
+{"kind":"reference_compatibility","iteration":2,"previous_reference_differences":0,"candidate_reference_differences":0,"same_difference_positions_and_values":true,"maximum_byte_error":0,"reference_exact":true}
+{"kind":"pair","iteration":3,"order":"custom-first","baseline_full_ms":213.785500,"candidate_full_ms":262.015900,"candidate_shader_and_projection_ms":2.446100,"candidate_merger_ms":235.390000,"baseline_calls":52,"candidate_calls":44,"components":20736000,"different_components":0,"maximum_byte_error":0,"exact":true}
+{"kind":"reference_difference","iteration":3,"pixel":4997764,"channel":0,"previous":45,"candidate":45,"reference":44}
+{"kind":"reference_difference","iteration":3,"pixel":5035531,"channel":1,"previous":15,"candidate":15,"reference":16}
+{"kind":"reference_difference","iteration":3,"pixel":5081312,"channel":2,"previous":39,"candidate":39,"reference":38}
+{"kind":"reference_difference","iteration":3,"pixel":5115914,"channel":1,"previous":38,"candidate":38,"reference":39}
+{"kind":"reference_difference","iteration":3,"pixel":5116053,"channel":0,"previous":30,"candidate":30,"reference":29}
+{"kind":"reference_check","iteration":3,"reference":"independent FP32 shader with original NPU geometry and merger","cpu_test_reference_only":true,"candidate_rendering_device":"NPU","different_components":5,"exact":false}
+{"kind":"reference_compatibility","iteration":3,"previous_reference_differences":5,"candidate_reference_differences":5,"same_difference_positions_and_values":true,"maximum_byte_error":1,"reference_exact":false}
+{"kind":"complete","passed":true,"desktop_tested":false,"tahoma_tested":false}

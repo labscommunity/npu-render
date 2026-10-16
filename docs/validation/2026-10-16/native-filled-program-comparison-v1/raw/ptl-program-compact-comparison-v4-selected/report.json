@@ -1,0 +1,2295 @@
+{
+  "started": "2026-10-16T23:02:15.946901+00:00",
+  "completed": true,
+  "passed": true,
+  "desktop_changed": false,
+  "tahoma_tested": false,
+  "cases": [
+    {
+      "ticket": 14,
+      "packet_sha256": "5c3a81b27f93d48a72817f60e2b6a780d582737fd7f2cce69504fa391236ed74",
+      "pixel_shader_sha256": "7c5bc4d830ee9593b7f2a8a59c35ae629122a0b657bf7e2b7a2c1bb462b04f8f",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 64.7013,
+          "candidate_full_ms": 33.9161,
+          "candidate_shader_and_projection_ms": 8.672,
+          "candidate_merger_ms": 24.8316,
+          "baseline_calls": 18,
+          "candidate_calls": 18,
+          "components": 65536,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 39.9081,
+          "candidate_full_ms": 21.4526,
+          "candidate_shader_and_projection_ms": 1.6829,
+          "candidate_merger_ms": 19.4242,
+          "baseline_calls": 18,
+          "candidate_calls": 18,
+          "components": 65536,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 32.3306,
+          "candidate_full_ms": 18.1839,
+          "candidate_shader_and_projection_ms": 1.5609,
+          "candidate_merger_ms": 16.3068,
+          "baseline_calls": 18,
+          "candidate_calls": 18,
+          "components": 65536,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 34.0783,
+          "candidate_full_ms": 17.9701,
+          "candidate_shader_and_projection_ms": 1.7189,
+          "candidate_merger_ms": 15.782,
+          "baseline_calls": 18,
+          "candidate_calls": 18,
+          "components": 65536,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "references": [
+        {
+          "kind": "reference_check",
+          "iteration": 0,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 1,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 2,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 3,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        }
+      ],
+      "reference_compatibility": [
+        {
+          "kind": "reference_compatibility",
+          "iteration": 0,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 1,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 2,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 3,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 65536,
+          "sha256": "96302cd01f078f7034c976a2e39660d16adf39e832260348a5ff190202a1b6b1"
+        },
+        "candidate.rgba": {
+          "bytes": 65536,
+          "sha256": "96302cd01f078f7034c976a2e39660d16adf39e832260348a5ff190202a1b6b1"
+        },
+        "reference-0.rgba": {
+          "bytes": 65536,
+          "sha256": "96302cd01f078f7034c976a2e39660d16adf39e832260348a5ff190202a1b6b1"
+        },
+        "reference-1.rgba": {
+          "bytes": 65536,
+          "sha256": "96302cd01f078f7034c976a2e39660d16adf39e832260348a5ff190202a1b6b1"
+        },
+        "reference-2.rgba": {
+          "bytes": 65536,
+          "sha256": "c316c1e6cd62c4f414b0d2afedef40b2d4228fcb6290f69b3dd96b2cc0c2bf3b"
+        },
+        "reference-3.rgba": {
+          "bytes": 65536,
+          "sha256": "8e51ad236020eef8b7959526cabbaf218119c89eb03bee161c98bcb46df845f6"
+        }
+      },
+      "shared_program_imports": 1,
+      "original_pixels_match_qualified_worker": true,
+      "previous_program_imports": 1
+    },
+    {
+      "ticket": 17,
+      "packet_sha256": "aea4a150893aa9bbe2f23d06f6c0a4aca2563708bee2352f29e30ab680b8c467",
+      "pixel_shader_sha256": "7823741aa26b80ab1d183a947f93575665d4dd6a334aba98427ae3a142b25ae4",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 19.8768,
+          "candidate_full_ms": 11.9064,
+          "candidate_shader_and_projection_ms": 4.598,
+          "candidate_merger_ms": 5.8503,
+          "baseline_calls": 6,
+          "candidate_calls": 6,
+          "components": 1048576,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 16.0014,
+          "candidate_full_ms": 7.6305,
+          "candidate_shader_and_projection_ms": 1.6132,
+          "candidate_merger_ms": 4.9008,
+          "baseline_calls": 6,
+          "candidate_calls": 6,
+          "components": 1048576,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 14.2357,
+          "candidate_full_ms": 8.0691,
+          "candidate_shader_and_projection_ms": 1.6467,
+          "candidate_merger_ms": 4.4202,
+          "baseline_calls": 6,
+          "candidate_calls": 6,
+          "components": 1048576,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 12.7389,
+          "candidate_full_ms": 6.7884,
+          "candidate_shader_and_projection_ms": 1.4723,
+          "candidate_merger_ms": 4.0603,
+          "baseline_calls": 6,
+          "candidate_calls": 6,
+          "components": 1048576,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "references": [
+        {
+          "kind": "reference_check",
+          "iteration": 0,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 1,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 2,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 3,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        }
+      ],
+      "reference_compatibility": [
+        {
+          "kind": "reference_compatibility",
+          "iteration": 0,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 1,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 2,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 3,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 1048576,
+          "sha256": "30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58"
+        },
+        "candidate.rgba": {
+          "bytes": 1048576,
+          "sha256": "30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58"
+        },
+        "reference-0.rgba": {
+          "bytes": 1048576,
+          "sha256": "30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58"
+        },
+        "reference-1.rgba": {
+          "bytes": 1048576,
+          "sha256": "30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58"
+        },
+        "reference-2.rgba": {
+          "bytes": 1048576,
+          "sha256": "6e838e79ce52c6d76c21c3799600e2b9c67dbe252deddbda9333b0db42198331"
+        },
+        "reference-3.rgba": {
+          "bytes": 1048576,
+          "sha256": "fc6d3f8a5fcfb03429a3a100efb8f7050067dca3ee23b3fa1714743bc0148a44"
+        }
+      },
+      "shared_program_imports": 1,
+      "original_pixels_match_qualified_worker": true,
+      "previous_program_imports": 1
+    },
+    {
+      "ticket": 18,
+      "packet_sha256": "a9df18ae2086e390cab7190d2b5e69856af9483a8775e82506b33f16402be659",
+      "pixel_shader_sha256": "0daddc2311bec2f92d461ec657f6ed418b6b250c89041234548c546a40eaaf36",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 50.3532,
+          "candidate_full_ms": 51.137,
+          "candidate_shader_and_projection_ms": 8.1773,
+          "candidate_merger_ms": 41.5126,
+          "baseline_calls": 6,
+          "candidate_calls": 6,
+          "components": 1048576,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 29.1642,
+          "candidate_full_ms": 33.3856,
+          "candidate_shader_and_projection_ms": 1.7144,
+          "candidate_merger_ms": 30.8555,
+          "baseline_calls": 6,
+          "candidate_calls": 6,
+          "components": 1048576,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 24.617,
+          "candidate_full_ms": 24.7628,
+          "candidate_shader_and_projection_ms": 1.9439,
+          "candidate_merger_ms": 21.2655,
+          "baseline_calls": 6,
+          "candidate_calls": 6,
+          "components": 1048576,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 23.7113,
+          "candidate_full_ms": 23.4647,
+          "candidate_shader_and_projection_ms": 1.3027,
+          "candidate_merger_ms": 21.043,
+          "baseline_calls": 6,
+          "candidate_calls": 6,
+          "components": 1048576,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "references": [
+        {
+          "kind": "reference_check",
+          "iteration": 0,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 1,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 2,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 3,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 8,
+          "exact": false
+        }
+      ],
+      "reference_compatibility": [
+        {
+          "kind": "reference_compatibility",
+          "iteration": 0,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 1,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 2,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 3,
+          "previous_reference_differences": 8,
+          "candidate_reference_differences": 8,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 1,
+          "reference_exact": false
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 1048576,
+          "sha256": "c012dbde45744a8a84c216e871e7b3eddf16aab7c0b60e3194d5010e405fe5ea"
+        },
+        "candidate.rgba": {
+          "bytes": 1048576,
+          "sha256": "c012dbde45744a8a84c216e871e7b3eddf16aab7c0b60e3194d5010e405fe5ea"
+        },
+        "reference-0.rgba": {
+          "bytes": 1048576,
+          "sha256": "c012dbde45744a8a84c216e871e7b3eddf16aab7c0b60e3194d5010e405fe5ea"
+        },
+        "reference-1.rgba": {
+          "bytes": 1048576,
+          "sha256": "30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58"
+        },
+        "reference-2.rgba": {
+          "bytes": 1048576,
+          "sha256": "821655299b6f6908a008aa2fbfde1e7c45cfa03d5035cf07d20ac1e25add69e9"
+        },
+        "reference-3.rgba": {
+          "bytes": 1048576,
+          "sha256": "4e712f9a69e61e8db37812d85604a771e5b5a201135b105f249203cf2afcbf0e"
+        }
+      },
+      "shared_program_imports": 1,
+      "original_pixels_match_qualified_worker": true,
+      "previous_program_imports": 1
+    },
+    {
+      "ticket": 35,
+      "packet_sha256": "667b2fa35f4d15979fa10e557db8b57daf06f37aeac2ae05e4a259d5e02d5fb8",
+      "pixel_shader_sha256": "3e6229d456bf2f15688551a8ce0024ef8ee019b7a4a496929eac9bedc9c373e3",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 71.9191,
+          "candidate_full_ms": 33.5578,
+          "candidate_shader_and_projection_ms": 7.2622,
+          "candidate_merger_ms": 25.9103,
+          "baseline_calls": 18,
+          "candidate_calls": 18,
+          "components": 40000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 49.5943,
+          "candidate_full_ms": 24.5131,
+          "candidate_shader_and_projection_ms": 1.8272,
+          "candidate_merger_ms": 22.2633,
+          "baseline_calls": 18,
+          "candidate_calls": 18,
+          "components": 40000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 39.2988,
+          "candidate_full_ms": 19.2812,
+          "candidate_shader_and_projection_ms": 1.703,
+          "candidate_merger_ms": 16.9659,
+          "baseline_calls": 18,
+          "candidate_calls": 18,
+          "components": 40000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 39.3603,
+          "candidate_full_ms": 16.6361,
+          "candidate_shader_and_projection_ms": 1.5336,
+          "candidate_merger_ms": 14.6301,
+          "baseline_calls": 18,
+          "candidate_calls": 18,
+          "components": 40000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "references": [
+        {
+          "kind": "reference_check",
+          "iteration": 0,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 1,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 2,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 3,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        }
+      ],
+      "reference_compatibility": [
+        {
+          "kind": "reference_compatibility",
+          "iteration": 0,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 1,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 2,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 3,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 40000,
+          "sha256": "5eace02ae997fc3c7ed79264e88e0ccd15643e8323c15c8b3c8c24f13516de5a"
+        },
+        "candidate.rgba": {
+          "bytes": 40000,
+          "sha256": "5eace02ae997fc3c7ed79264e88e0ccd15643e8323c15c8b3c8c24f13516de5a"
+        },
+        "reference-0.rgba": {
+          "bytes": 40000,
+          "sha256": "5eace02ae997fc3c7ed79264e88e0ccd15643e8323c15c8b3c8c24f13516de5a"
+        },
+        "reference-1.rgba": {
+          "bytes": 40000,
+          "sha256": "e7e2dcff542de95352682dc186432e98f0188084896773f1973276b0577d5305"
+        },
+        "reference-2.rgba": {
+          "bytes": 40000,
+          "sha256": "d548291f0c42403709d587f9126fa265dd151d106a35e2a87599dfb423da8939"
+        },
+        "reference-3.rgba": {
+          "bytes": 40000,
+          "sha256": "e77be26ca673e64838125ad20b90db4afbaf0e1bbdbe76ffe36135d1670e1f3e"
+        }
+      },
+      "shared_program_imports": 1,
+      "original_pixels_match_qualified_worker": true,
+      "previous_program_imports": 1
+    },
+    {
+      "ticket": 78,
+      "packet_sha256": "0021d94ba3a1d1939b14667dd3fc3fbb36a9cce859ce9d1b04d3875f5da2c328",
+      "pixel_shader_sha256": "4e5ed0f81f4172324fd21bccde5309aff541f82c95c0f51b0690b9441d599932",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 59.0651,
+          "candidate_full_ms": 26.2201,
+          "candidate_shader_and_projection_ms": 6.9353,
+          "candidate_merger_ms": 17.7503,
+          "baseline_calls": 22,
+          "candidate_calls": 22,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 36.6955,
+          "candidate_full_ms": 15.1269,
+          "candidate_shader_and_projection_ms": 1.8387,
+          "candidate_merger_ms": 11.8597,
+          "baseline_calls": 22,
+          "candidate_calls": 22,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 29.367,
+          "candidate_full_ms": 14.7969,
+          "candidate_shader_and_projection_ms": 1.5472,
+          "candidate_merger_ms": 11.0901,
+          "baseline_calls": 22,
+          "candidate_calls": 22,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 32.5315,
+          "candidate_full_ms": 13.5084,
+          "candidate_shader_and_projection_ms": 1.3533,
+          "candidate_merger_ms": 10.8143,
+          "baseline_calls": 22,
+          "candidate_calls": 22,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "references": [
+        {
+          "kind": "reference_check",
+          "iteration": 0,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 1,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 2,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 3,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        }
+      ],
+      "reference_compatibility": [
+        {
+          "kind": "reference_compatibility",
+          "iteration": 0,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 1,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 2,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 3,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 3145728,
+          "sha256": "747a1fd02c6b932773c30dbc9a91bf31f270654dac2b6657682a621aec05c7f9"
+        },
+        "candidate.rgba": {
+          "bytes": 3145728,
+          "sha256": "747a1fd02c6b932773c30dbc9a91bf31f270654dac2b6657682a621aec05c7f9"
+        },
+        "reference-0.rgba": {
+          "bytes": 3145728,
+          "sha256": "747a1fd02c6b932773c30dbc9a91bf31f270654dac2b6657682a621aec05c7f9"
+        },
+        "reference-1.rgba": {
+          "bytes": 3145728,
+          "sha256": "bbd05cf6097ac9b1f89ea29d2542c1b7b67ee46848393895f5a9e43fa1f621e5"
+        },
+        "reference-2.rgba": {
+          "bytes": 3145728,
+          "sha256": "7c25fb9dfb77ab3afa4b1913e6d6f82e1eb4073abeb20c76f670db3eac54df5f"
+        },
+        "reference-3.rgba": {
+          "bytes": 3145728,
+          "sha256": "cc634609d920c9c62b295ae037a800e8006890587009171262ae10535eb4e100"
+        }
+      },
+      "shared_program_imports": 1,
+      "original_pixels_match_qualified_worker": true,
+      "previous_program_imports": 1
+    },
+    {
+      "ticket": 127,
+      "packet_sha256": "b84040b1b6467f26132c23ae5d11de5b3e12f4569b77f744f5c79ee8a28bf21d",
+      "pixel_shader_sha256": "5a764502f81741e8cf27e849025854eea948cbfe1a193695cd40e43089577e78",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 18.879,
+          "candidate_full_ms": 12.5927,
+          "candidate_shader_and_projection_ms": 6.3972,
+          "candidate_merger_ms": 4.7846,
+          "baseline_calls": 6,
+          "candidate_calls": 6,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 14.8612,
+          "candidate_full_ms": 8.216,
+          "candidate_shader_and_projection_ms": 2.5351,
+          "candidate_merger_ms": 4.1053,
+          "baseline_calls": 6,
+          "candidate_calls": 6,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 13.5277,
+          "candidate_full_ms": 6.6461,
+          "candidate_shader_and_projection_ms": 1.354,
+          "candidate_merger_ms": 3.7327,
+          "baseline_calls": 6,
+          "candidate_calls": 6,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 12.2886,
+          "candidate_full_ms": 7.4153,
+          "candidate_shader_and_projection_ms": 2.4,
+          "candidate_merger_ms": 3.5752,
+          "baseline_calls": 6,
+          "candidate_calls": 6,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "references": [
+        {
+          "kind": "reference_check",
+          "iteration": 0,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 1,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 2,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 3,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        }
+      ],
+      "reference_compatibility": [
+        {
+          "kind": "reference_compatibility",
+          "iteration": 0,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 1,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 2,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 3,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 3145728,
+          "sha256": "520fa0ea4ef2378dabed0bee3ad769fc4f02f1424322c67fb2be62008320d155"
+        },
+        "candidate.rgba": {
+          "bytes": 3145728,
+          "sha256": "520fa0ea4ef2378dabed0bee3ad769fc4f02f1424322c67fb2be62008320d155"
+        },
+        "reference-0.rgba": {
+          "bytes": 3145728,
+          "sha256": "520fa0ea4ef2378dabed0bee3ad769fc4f02f1424322c67fb2be62008320d155"
+        },
+        "reference-1.rgba": {
+          "bytes": 3145728,
+          "sha256": "bbd05cf6097ac9b1f89ea29d2542c1b7b67ee46848393895f5a9e43fa1f621e5"
+        },
+        "reference-2.rgba": {
+          "bytes": 3145728,
+          "sha256": "d9a45c44648b57d4f4d0d832556775fc33cd234279e363c28315f93a93c7d126"
+        },
+        "reference-3.rgba": {
+          "bytes": 3145728,
+          "sha256": "7cdf442975941f075fa6b10ffbbe4733cec2141be2457cd227cc94775d1786af"
+        }
+      },
+      "shared_program_imports": 1,
+      "original_pixels_match_qualified_worker": true,
+      "previous_program_imports": 1
+    },
+    {
+      "ticket": 160,
+      "packet_sha256": "94accf756f3b5f1540394dd67ac3121458d91aa82ad79f16f0564be97b571360",
+      "pixel_shader_sha256": "d056c6dcba0a34d02c9f01218f22c4db02daf7082789276afc0c166cb1553772",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 82.5884,
+          "candidate_full_ms": 54.8721,
+          "candidate_shader_and_projection_ms": 5.9374,
+          "candidate_merger_ms": 44.3827,
+          "baseline_calls": 25,
+          "candidate_calls": 11,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 44.3327,
+          "candidate_full_ms": 29.5503,
+          "candidate_shader_and_projection_ms": 1.6711,
+          "candidate_merger_ms": 24.8847,
+          "baseline_calls": 25,
+          "candidate_calls": 11,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 44.8969,
+          "candidate_full_ms": 35.5468,
+          "candidate_shader_and_projection_ms": 1.1685,
+          "candidate_merger_ms": 27.8132,
+          "baseline_calls": 25,
+          "candidate_calls": 11,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 51.0888,
+          "candidate_full_ms": 30.4277,
+          "candidate_shader_and_projection_ms": 1.4619,
+          "candidate_merger_ms": 25.878,
+          "baseline_calls": 25,
+          "candidate_calls": 11,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "references": [
+        {
+          "kind": "reference_check",
+          "iteration": 0,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 1,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 2,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 3,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        }
+      ],
+      "reference_compatibility": [
+        {
+          "kind": "reference_compatibility",
+          "iteration": 0,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 1,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 2,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 3,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 3145728,
+          "sha256": "df46407ecfc32f3f2ead31cd9cb7af56416688256f8e3a6bedfcb143b521069b"
+        },
+        "candidate.rgba": {
+          "bytes": 3145728,
+          "sha256": "df46407ecfc32f3f2ead31cd9cb7af56416688256f8e3a6bedfcb143b521069b"
+        },
+        "reference-0.rgba": {
+          "bytes": 3145728,
+          "sha256": "df46407ecfc32f3f2ead31cd9cb7af56416688256f8e3a6bedfcb143b521069b"
+        },
+        "reference-1.rgba": {
+          "bytes": 3145728,
+          "sha256": "68d774d46ea7f75014df563cae8e4f45e5dd1c6f7b2c99af5c7fa2dd52b5ecb7"
+        },
+        "reference-2.rgba": {
+          "bytes": 3145728,
+          "sha256": "6923ae32f4ec141d72eb284c837b0109db837589d4f931310f687e1902f61f2a"
+        },
+        "reference-3.rgba": {
+          "bytes": 3145728,
+          "sha256": "56de0462c7ab09a192459dd72f28fc98f6060bf094bf0ac53cf393f8adac7d11"
+        }
+      },
+      "shared_program_imports": 1,
+      "original_pixels_match_qualified_worker": true,
+      "previous_program_imports": 1
+    },
+    {
+      "ticket": 182,
+      "packet_sha256": "9e32ad0eecdac5a4287f82bec8f033e6077cc7f9695370fb198aef425edf7dc2",
+      "pixel_shader_sha256": "95b1c4fbb5f9bf0f34ad7b76eca5ae122d956a9570e1796e1bd4aecf43ca7dbe",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 448.9535,
+          "candidate_full_ms": 361.4083,
+          "candidate_shader_and_projection_ms": 12.3417,
+          "candidate_merger_ms": 329.3141,
+          "baseline_calls": 94,
+          "candidate_calls": 22,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 386.2078,
+          "candidate_full_ms": 347.7754,
+          "candidate_shader_and_projection_ms": 1.689,
+          "candidate_merger_ms": 328.3336,
+          "baseline_calls": 94,
+          "candidate_calls": 22,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 390.8426,
+          "candidate_full_ms": 351.2458,
+          "candidate_shader_and_projection_ms": 1.793,
+          "candidate_merger_ms": 328.6805,
+          "baseline_calls": 94,
+          "candidate_calls": 22,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 374.6799,
+          "candidate_full_ms": 364.1401,
+          "candidate_shader_and_projection_ms": 2.545,
+          "candidate_merger_ms": 336.1446,
+          "baseline_calls": 94,
+          "candidate_calls": 22,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "references": [
+        {
+          "kind": "reference_check",
+          "iteration": 0,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 1,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 2,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 3,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        }
+      ],
+      "reference_compatibility": [
+        {
+          "kind": "reference_compatibility",
+          "iteration": 0,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 1,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 2,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 3,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 20736000,
+          "sha256": "e2f0b38b4a8d79b7198b3068520dbcae23c5ab09e021a9f7caee7788d2aceb6f"
+        },
+        "candidate.rgba": {
+          "bytes": 20736000,
+          "sha256": "e2f0b38b4a8d79b7198b3068520dbcae23c5ab09e021a9f7caee7788d2aceb6f"
+        },
+        "reference-0.rgba": {
+          "bytes": 20736000,
+          "sha256": "e2f0b38b4a8d79b7198b3068520dbcae23c5ab09e021a9f7caee7788d2aceb6f"
+        },
+        "reference-1.rgba": {
+          "bytes": 20736000,
+          "sha256": "1e2ffcb8a2d4d221a435eff8c516970a06d2548e9d5a67d8169c26d5de4f27d3"
+        },
+        "reference-2.rgba": {
+          "bytes": 20736000,
+          "sha256": "038b16ea624c52ec57ac46531343ef097b3eaa605fecc6f96b82e824b61d5e03"
+        },
+        "reference-3.rgba": {
+          "bytes": 20736000,
+          "sha256": "8aa80e676a6df332d3b39f8c38a0737e8815248ec16e06ebbdb5dcf8a714bad5"
+        }
+      },
+      "shared_program_imports": 1,
+      "original_pixels_match_qualified_worker": true,
+      "previous_program_imports": 1
+    },
+    {
+      "ticket": 256,
+      "packet_sha256": "273310989a24d1e2e151bcbb76068a5a8257642d269ddea7ab5d30d99a67a630",
+      "pixel_shader_sha256": "fbe68f57c834b0adb911c186b19a28bb833bdfe10ea91385708ebe228012561c",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 86.8733,
+          "candidate_full_ms": 40.5179,
+          "candidate_shader_and_projection_ms": 7.1664,
+          "candidate_merger_ms": 26.2586,
+          "baseline_calls": 32,
+          "candidate_calls": 32,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 82.334,
+          "candidate_full_ms": 37.1549,
+          "candidate_shader_and_projection_ms": 2.3174,
+          "candidate_merger_ms": 28.3472,
+          "baseline_calls": 32,
+          "candidate_calls": 32,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 55.2496,
+          "candidate_full_ms": 30.9242,
+          "candidate_shader_and_projection_ms": 2.017,
+          "candidate_merger_ms": 20.4723,
+          "baseline_calls": 32,
+          "candidate_calls": 32,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 52.125,
+          "candidate_full_ms": 28.4088,
+          "candidate_shader_and_projection_ms": 1.9541,
+          "candidate_merger_ms": 19.6746,
+          "baseline_calls": 32,
+          "candidate_calls": 32,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "references": [
+        {
+          "kind": "reference_check",
+          "iteration": 0,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 1,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 2,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 3,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        }
+      ],
+      "reference_compatibility": [
+        {
+          "kind": "reference_compatibility",
+          "iteration": 0,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 1,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 2,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 3,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 20736000,
+          "sha256": "e4389da16981c6034e72dad95743bac8316d67ea9b5ef75b2e93da63c5527205"
+        },
+        "candidate.rgba": {
+          "bytes": 20736000,
+          "sha256": "e4389da16981c6034e72dad95743bac8316d67ea9b5ef75b2e93da63c5527205"
+        },
+        "reference-0.rgba": {
+          "bytes": 20736000,
+          "sha256": "e4389da16981c6034e72dad95743bac8316d67ea9b5ef75b2e93da63c5527205"
+        },
+        "reference-1.rgba": {
+          "bytes": 20736000,
+          "sha256": "1e2ffcb8a2d4d221a435eff8c516970a06d2548e9d5a67d8169c26d5de4f27d3"
+        },
+        "reference-2.rgba": {
+          "bytes": 20736000,
+          "sha256": "e785dbdf7842b42646925ec06b96a353922e9ce756c380182cb36e8efe598a96"
+        },
+        "reference-3.rgba": {
+          "bytes": 20736000,
+          "sha256": "9dbe30b7370fdfd2ccd6096208c7b116e12b118eb0da670d22ad47582b22bc2d"
+        }
+      },
+      "shared_program_imports": 1,
+      "original_pixels_match_qualified_worker": true,
+      "previous_program_imports": 1
+    },
+    {
+      "ticket": 262,
+      "packet_sha256": "60ca44325e9c747296ea689f073416330c4855592f66be058a05a3289efc1bb8",
+      "pixel_shader_sha256": "b92ae2a7745b2cc0a94ec294a23dba3b6f34a1035d78c9751cc28b9bdf038b15",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 49.5794,
+          "candidate_full_ms": 26.2348,
+          "candidate_shader_and_projection_ms": 6.8948,
+          "candidate_merger_ms": 19.2118,
+          "baseline_calls": 20,
+          "candidate_calls": 20,
+          "components": 9216,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 33.2817,
+          "candidate_full_ms": 18.161,
+          "candidate_shader_and_projection_ms": 2.374,
+          "candidate_merger_ms": 15.5943,
+          "baseline_calls": 20,
+          "candidate_calls": 20,
+          "components": 9216,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 26.2345,
+          "candidate_full_ms": 15.6805,
+          "candidate_shader_and_projection_ms": 1.9615,
+          "candidate_merger_ms": 13.5576,
+          "baseline_calls": 20,
+          "candidate_calls": 20,
+          "components": 9216,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 27.6336,
+          "candidate_full_ms": 17.2518,
+          "candidate_shader_and_projection_ms": 2.1964,
+          "candidate_merger_ms": 14.7487,
+          "baseline_calls": 20,
+          "candidate_calls": 20,
+          "components": 9216,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "references": [
+        {
+          "kind": "reference_check",
+          "iteration": 0,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 1,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 2,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 3,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        }
+      ],
+      "reference_compatibility": [
+        {
+          "kind": "reference_compatibility",
+          "iteration": 0,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 1,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 2,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 3,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 9216,
+          "sha256": "d2258537fd8aaf602fe8a5bf766d1a0e3be096ac3c7f627cae24b7765d4afc9e"
+        },
+        "candidate.rgba": {
+          "bytes": 9216,
+          "sha256": "d2258537fd8aaf602fe8a5bf766d1a0e3be096ac3c7f627cae24b7765d4afc9e"
+        },
+        "reference-0.rgba": {
+          "bytes": 9216,
+          "sha256": "d2258537fd8aaf602fe8a5bf766d1a0e3be096ac3c7f627cae24b7765d4afc9e"
+        },
+        "reference-1.rgba": {
+          "bytes": 9216,
+          "sha256": "d2258537fd8aaf602fe8a5bf766d1a0e3be096ac3c7f627cae24b7765d4afc9e"
+        },
+        "reference-2.rgba": {
+          "bytes": 9216,
+          "sha256": "0b5f1bf157cdcef2bb78f3a4ec382dbbb1cd412920c870229bf62390188ff747"
+        },
+        "reference-3.rgba": {
+          "bytes": 9216,
+          "sha256": "c1ace87b140af0bcfa7d7d2e15ad1dcf10781ced1ec1b946f8a8897073dc8cc1"
+        }
+      },
+      "shared_program_imports": 1,
+      "original_pixels_match_qualified_worker": true,
+      "previous_program_imports": 1
+    },
+    {
+      "ticket": 280,
+      "packet_sha256": "aad5479e7c6897da6911f9f2b5519b346b06ea45d07958736d0c6f20b44953a4",
+      "pixel_shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 318.7822,
+          "candidate_full_ms": 243.6691,
+          "candidate_shader_and_projection_ms": 11.5482,
+          "candidate_merger_ms": 218.5808,
+          "baseline_calls": 52,
+          "candidate_calls": 24,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 232.8166,
+          "candidate_full_ms": 231.4016,
+          "candidate_shader_and_projection_ms": 1.5817,
+          "candidate_merger_ms": 216.5917,
+          "baseline_calls": 52,
+          "candidate_calls": 24,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 306.8157,
+          "candidate_full_ms": 242.5012,
+          "candidate_shader_and_projection_ms": 1.9238,
+          "candidate_merger_ms": 220.9397,
+          "baseline_calls": 52,
+          "candidate_calls": 24,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 245.1657,
+          "candidate_full_ms": 325.3252,
+          "candidate_shader_and_projection_ms": 3.1854,
+          "candidate_merger_ms": 304.5463,
+          "baseline_calls": 52,
+          "candidate_calls": 24,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "references": [
+        {
+          "kind": "reference_check",
+          "iteration": 0,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 5,
+          "exact": false
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 1,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 2,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 18,
+          "exact": false
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 3,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 32,
+          "exact": false
+        }
+      ],
+      "reference_compatibility": [
+        {
+          "kind": "reference_compatibility",
+          "iteration": 0,
+          "previous_reference_differences": 5,
+          "candidate_reference_differences": 5,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 1,
+          "reference_exact": false
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 1,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 2,
+          "previous_reference_differences": 18,
+          "candidate_reference_differences": 18,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 1,
+          "reference_exact": false
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 3,
+          "previous_reference_differences": 32,
+          "candidate_reference_differences": 32,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 1,
+          "reference_exact": false
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 20736000,
+          "sha256": "7500e3b7c96ebeb339473a87e632a24d6049441b9c23d7c04cd921cd5df4fa2b"
+        },
+        "candidate.rgba": {
+          "bytes": 20736000,
+          "sha256": "7500e3b7c96ebeb339473a87e632a24d6049441b9c23d7c04cd921cd5df4fa2b"
+        },
+        "reference-0.rgba": {
+          "bytes": 20736000,
+          "sha256": "e0cd02d2627bb8b399cc217b6a601979c41ae1ba0d398d9075f512dd157cb7e9"
+        },
+        "reference-1.rgba": {
+          "bytes": 20736000,
+          "sha256": "1e2ffcb8a2d4d221a435eff8c516970a06d2548e9d5a67d8169c26d5de4f27d3"
+        },
+        "reference-2.rgba": {
+          "bytes": 20736000,
+          "sha256": "253c36e8f1b0d5d0819c7cf9539affac8d4310e212f2b0b5ae73d1575a14dae3"
+        },
+        "reference-3.rgba": {
+          "bytes": 20736000,
+          "sha256": "884a434ef055b238bc0ab8d2406431335bc2e432056b99d60b315fda63d03111"
+        }
+      },
+      "shared_program_imports": 1,
+      "original_pixels_match_qualified_worker": true,
+      "previous_program_imports": 1
+    },
+    {
+      "ticket": 334,
+      "packet_sha256": "0c522ca7933a862768a9baa68e28bd478670df95c52c9d78085c785d73e0d32d",
+      "pixel_shader_sha256": "d8e0b49792a47247020c5b93508846b0b0954403359f83d18e02544d338e8480",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 555.9851,
+          "candidate_full_ms": 481.471,
+          "candidate_shader_and_projection_ms": 11.568,
+          "candidate_merger_ms": 452.3972,
+          "baseline_calls": 87,
+          "candidate_calls": 63,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 440.3217,
+          "candidate_full_ms": 442.3514,
+          "candidate_shader_and_projection_ms": 1.6529,
+          "candidate_merger_ms": 430.0468,
+          "baseline_calls": 87,
+          "candidate_calls": 63,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 565.8362,
+          "candidate_full_ms": 478.0952,
+          "candidate_shader_and_projection_ms": 1.6241,
+          "candidate_merger_ms": 456.7305,
+          "baseline_calls": 87,
+          "candidate_calls": 63,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 477.4719,
+          "candidate_full_ms": 565.4805,
+          "candidate_shader_and_projection_ms": 3.6482,
+          "candidate_merger_ms": 542.2903,
+          "baseline_calls": 87,
+          "candidate_calls": 63,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "references": [
+        {
+          "kind": "reference_check",
+          "iteration": 0,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 44,
+          "exact": false
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 1,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 2,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 3,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 56,
+          "exact": false
+        }
+      ],
+      "reference_compatibility": [
+        {
+          "kind": "reference_compatibility",
+          "iteration": 0,
+          "previous_reference_differences": 44,
+          "candidate_reference_differences": 44,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 1,
+          "reference_exact": false
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 1,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 2,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 3,
+          "previous_reference_differences": 56,
+          "candidate_reference_differences": 56,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 1,
+          "reference_exact": false
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 20736000,
+          "sha256": "9e6758d0947ed2519d33d8fe7c8c5121e3eeb7308ca088a36821f83140c8a2e7"
+        },
+        "candidate.rgba": {
+          "bytes": 20736000,
+          "sha256": "9e6758d0947ed2519d33d8fe7c8c5121e3eeb7308ca088a36821f83140c8a2e7"
+        },
+        "reference-0.rgba": {
+          "bytes": 20736000,
+          "sha256": "4f0b36923596d92f2ef1f7066d610f1bf20f88048192520aa352b1529bdfd576"
+        },
+        "reference-1.rgba": {
+          "bytes": 20736000,
+          "sha256": "1e2ffcb8a2d4d221a435eff8c516970a06d2548e9d5a67d8169c26d5de4f27d3"
+        },
+        "reference-2.rgba": {
+          "bytes": 20736000,
+          "sha256": "c0a88fe8b681cfff9ac67405eba040bbf920acf2d621ea9858b6d49dcea5fc64"
+        },
+        "reference-3.rgba": {
+          "bytes": 20736000,
+          "sha256": "afed9c65530e46de24030a268a6a4299c4021e395bffe2b0d6e72b921c8735e0"
+        }
+      },
+      "shared_program_imports": 1,
+      "original_pixels_match_qualified_worker": true,
+      "previous_program_imports": 1
+    },
+    {
+      "ticket": 512,
+      "packet_sha256": "cb17154326a1b9e522dcf0c5ba963da0debc0cbab69abe54bed3ea6240a3f7c2",
+      "pixel_shader_sha256": "20e56de0447ed62eeb48ce9d442b806d3afb2d3c6fb6a2674aad53d98bd03c69",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 41.9504,
+          "candidate_full_ms": 30.9311,
+          "candidate_shader_and_projection_ms": 8.753,
+          "candidate_merger_ms": 21.0776,
+          "baseline_calls": 24,
+          "candidate_calls": 24,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 27.7629,
+          "candidate_full_ms": 20.1121,
+          "candidate_shader_and_projection_ms": 2.3075,
+          "candidate_merger_ms": 16.513,
+          "baseline_calls": 24,
+          "candidate_calls": 24,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 23.4491,
+          "candidate_full_ms": 16.8905,
+          "candidate_shader_and_projection_ms": 1.7148,
+          "candidate_merger_ms": 13.9922,
+          "baseline_calls": 24,
+          "candidate_calls": 24,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 21.7156,
+          "candidate_full_ms": 16.4894,
+          "candidate_shader_and_projection_ms": 1.653,
+          "candidate_merger_ms": 13.802,
+          "baseline_calls": 24,
+          "candidate_calls": 24,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "references": [
+        {
+          "kind": "reference_check",
+          "iteration": 0,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 1,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 2,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 3,
+          "reference": "independent FP32 shader with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        }
+      ],
+      "reference_compatibility": [
+        {
+          "kind": "reference_compatibility",
+          "iteration": 0,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 1,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 2,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        },
+        {
+          "kind": "reference_compatibility",
+          "iteration": 3,
+          "previous_reference_differences": 0,
+          "candidate_reference_differences": 0,
+          "same_difference_positions_and_values": true,
+          "maximum_byte_error": 0,
+          "reference_exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 3145728,
+          "sha256": "d7cb42d99dfcfc46d56427b60eb4adc015da4e5315a36e84cab330ab8f151f67"
+        },
+        "candidate.rgba": {
+          "bytes": 3145728,
+          "sha256": "d7cb42d99dfcfc46d56427b60eb4adc015da4e5315a36e84cab330ab8f151f67"
+        },
+        "reference-0.rgba": {
+          "bytes": 3145728,
+          "sha256": "d7cb42d99dfcfc46d56427b60eb4adc015da4e5315a36e84cab330ab8f151f67"
+        },
+        "reference-1.rgba": {
+          "bytes": 3145728,
+          "sha256": "bbd05cf6097ac9b1f89ea29d2542c1b7b67ee46848393895f5a9e43fa1f621e5"
+        },
+        "reference-2.rgba": {
+          "bytes": 3145728,
+          "sha256": "62215259c24b8df6a81f5ee7e9f777012e02aa131cd3ed519f964a9558f4a4cd"
+        },
+        "reference-3.rgba": {
+          "bytes": 3145728,
+          "sha256": "95a5cb9540968f840a2eec083d5f79a2cb3e4614e45945f52f8d0632c9cd4d9e"
+        }
+      },
+      "shared_program_imports": 1,
+      "original_pixels_match_qualified_worker": true,
+      "previous_program_imports": 1
+    }
+  ],
+  "model_sha256": "92e04a6734dc6e70ffed15b67fddba02892c66168aa0d47a6cf4bcc65a6a585d",
+  "executable_sha256": "bd803c31d34b809fb1d07f4fec9bda3b4c7abad77be71fd93f056581566c680e",
+  "stage": "selected",
+  "planned_cases": 13,
+  "planned_tickets": [
+    14,
+    17,
+    18,
+    35,
+    78,
+    127,
+    160,
+    182,
+    256,
+    262,
+    280,
+    334,
+    512
+  ],
+  "planned_comparisons": 52,
+  "cpu_reference_test_only": true,
+  "qualification_scope": "strict prior NPU image preservation; independent FP32 reference discrepancies retained and required unchanged",
+  "active_ticket": 512,
+  "finished": "2026-10-16T23:02:54.397152+00:00"
+}

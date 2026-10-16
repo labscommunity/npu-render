@@ -1,0 +1,43 @@
+{"shared_provider_core_experiment":true,"single_core_for_npu_compilation":true,"hardware_context_count_measured":false}
+{"kind":"private_shared_queue_experiment","enabled":true,"property_readback_verified":true,"hardware_queue_count_measured":false}
+{"ptl_program_provider_created":true,"single_import_shared":true}
+{"ptl_program_previous_provider_created":true,"single_import_shared":true}
+{"kind":"admission","passed":true,"negative_checks":9,"bounded_program":true,"instructions":2,"samples":1}
+{"kind":"setup","candidate_setup_ms":229.910300,"batch":32508,"desktop_changed":false}
+{"kind":"pair","iteration":0,"order":"baseline-first","baseline_full_ms":175.635100,"candidate_full_ms":106.891400,"candidate_shader_and_projection_ms":6.580600,"candidate_merger_ms":97.681000,"baseline_calls":27,"candidate_calls":20,"components":1237600,"different_components":0,"maximum_byte_error":0,"exact":true}
+{"kind":"reference_check","iteration":0,"reference":"independent FP32 shader with original NPU geometry and merger","cpu_test_reference_only":true,"candidate_rendering_device":"NPU","different_components":0,"exact":true}
+{"kind":"reference_compatibility","iteration":0,"previous_reference_differences":0,"candidate_reference_differences":0,"same_difference_positions_and_values":true,"maximum_byte_error":0,"reference_exact":true}
+{"kind":"pair","iteration":1,"order":"custom-first","baseline_full_ms":110.660300,"candidate_full_ms":88.428400,"candidate_shader_and_projection_ms":1.304100,"candidate_merger_ms":84.754600,"baseline_calls":27,"candidate_calls":20,"components":1237600,"different_components":0,"maximum_byte_error":0,"exact":true}
+{"kind":"reference_check","iteration":1,"reference":"independent FP32 shader with original NPU geometry and merger","cpu_test_reference_only":true,"candidate_rendering_device":"NPU","different_components":0,"exact":true}
+{"kind":"reference_compatibility","iteration":1,"previous_reference_differences":0,"candidate_reference_differences":0,"same_difference_positions_and_values":true,"maximum_byte_error":0,"reference_exact":true}
+{"kind":"pair","iteration":2,"order":"baseline-first","baseline_full_ms":105.649900,"candidate_full_ms":93.840200,"candidate_shader_and_projection_ms":1.446200,"candidate_merger_ms":87.624500,"baseline_calls":27,"candidate_calls":20,"components":1237600,"different_components":0,"maximum_byte_error":0,"exact":true}
+{"kind":"reference_difference","iteration":2,"pixel":6782,"channel":0,"previous":92,"candidate":92,"reference":91}
+{"kind":"reference_difference","iteration":2,"pixel":11495,"channel":2,"previous":94,"candidate":94,"reference":95}
+{"kind":"reference_difference","iteration":2,"pixel":205295,"channel":0,"previous":123,"candidate":123,"reference":122}
+{"kind":"reference_difference","iteration":2,"pixel":206736,"channel":1,"previous":33,"candidate":33,"reference":32}
+{"kind":"reference_difference","iteration":2,"pixel":300652,"channel":1,"previous":30,"candidate":30,"reference":31}
+{"kind":"reference_difference","iteration":2,"pixel":302236,"channel":2,"previous":30,"candidate":30,"reference":29}
+{"kind":"reference_difference","iteration":2,"pixel":303427,"channel":1,"previous":122,"candidate":122,"reference":123}
+{"kind":"reference_difference","iteration":2,"pixel":308010,"channel":2,"previous":82,"candidate":82,"reference":83}
+{"kind":"reference_check","iteration":2,"reference":"independent FP32 shader with original NPU geometry and merger","cpu_test_reference_only":true,"candidate_rendering_device":"NPU","different_components":8,"exact":false}
+{"kind":"reference_compatibility","iteration":2,"previous_reference_differences":8,"candidate_reference_differences":8,"same_difference_positions_and_values":true,"maximum_byte_error":1,"reference_exact":false}
+{"kind":"pair","iteration":3,"order":"custom-first","baseline_full_ms":110.417800,"candidate_full_ms":90.542200,"candidate_shader_and_projection_ms":1.353300,"candidate_merger_ms":86.198500,"baseline_calls":27,"candidate_calls":20,"components":1237600,"different_components":0,"maximum_byte_error":0,"exact":true}
+{"kind":"reference_difference","iteration":3,"pixel":1254,"channel":0,"previous":64,"candidate":64,"reference":65}
+{"kind":"reference_difference","iteration":3,"pixel":1438,"channel":2,"previous":36,"candidate":36,"reference":35}
+{"kind":"reference_difference","iteration":3,"pixel":3555,"channel":0,"previous":83,"candidate":83,"reference":84}
+{"kind":"reference_difference","iteration":3,"pixel":4513,"channel":2,"previous":185,"candidate":185,"reference":186}
+{"kind":"reference_difference","iteration":3,"pixel":5032,"channel":3,"previous":129,"candidate":129,"reference":128}
+{"kind":"reference_difference","iteration":3,"pixel":10319,"channel":0,"previous":125,"candidate":125,"reference":124}
+{"kind":"reference_difference","iteration":3,"pixel":11072,"channel":2,"previous":88,"candidate":88,"reference":89}
+{"kind":"reference_difference","iteration":3,"pixel":12261,"channel":3,"previous":187,"candidate":187,"reference":186}
+{"kind":"reference_difference","iteration":3,"pixel":58225,"channel":0,"previous":78,"candidate":78,"reference":77}
+{"kind":"reference_difference","iteration":3,"pixel":176169,"channel":1,"previous":75,"candidate":75,"reference":76}
+{"kind":"reference_difference","iteration":3,"pixel":187098,"channel":2,"previous":86,"candidate":86,"reference":87}
+{"kind":"reference_difference","iteration":3,"pixel":199484,"channel":0,"previous":132,"candidate":132,"reference":133}
+{"kind":"reference_difference","iteration":3,"pixel":259178,"channel":0,"previous":81,"candidate":81,"reference":80}
+{"kind":"reference_difference","iteration":3,"pixel":297300,"channel":0,"previous":83,"candidate":83,"reference":82}
+{"kind":"reference_difference","iteration":3,"pixel":297391,"channel":0,"previous":44,"candidate":44,"reference":43}
+{"kind":"reference_difference","iteration":3,"pixel":302994,"channel":2,"previous":58,"candidate":58,"reference":57}
+{"kind":"reference_check","iteration":3,"reference":"independent FP32 shader with original NPU geometry and merger","cpu_test_reference_only":true,"candidate_rendering_device":"NPU","different_components":21,"exact":false}
+{"kind":"reference_compatibility","iteration":3,"previous_reference_differences":21,"candidate_reference_differences":21,"same_difference_positions_and_values":true,"maximum_byte_error":1,"reference_exact":false}
+{"kind":"complete","passed":true,"desktop_tested":false,"tahoma_tested":false}

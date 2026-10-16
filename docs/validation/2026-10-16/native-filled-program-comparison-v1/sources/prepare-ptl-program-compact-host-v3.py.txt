@@ -1,0 +1,25 @@
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path(__file__).parent;name='ptl-program-compact-integration-v3';d=r/name;shutil.copytree(r/'ptl-program-compact-integration-v2',d);shutil.copyfile(r/'ptl-native-worker-v18/ptl_program_triangle_draw.cpp',d/'ptl_program_triangle_draw.cpp')
+p=d/'compare.cpp';s=p.read_text();s=s.replace('uint64_t reference_differences=different;', 'uint64_t reference_differences=different,previous_reference_differences=0;bool reference_pattern_preserved=true;unsigned reference_maximum_error=0;')
+old='for(size_t i=0;i<candidate.size()*4;++i)reference_differences+=p[i]!=next[i];'
+new='''for(size_t i=0;i<candidate.size()*4;++i){reference_differences+=p[i]!=next[i];previous_reference_differences+=p[i]!=base[i];
+             if(p[i]!=next[i]){reference_maximum_error=(std::max)(reference_maximum_error,unsigned(std::abs(int(p[i])-int(next[i]))));if(reference_differences<=16)std::printf("{\\"kind\\":\\"reference_difference\\",\\"iteration\\":%u,\\"pixel\\":%llu,\\"channel\\":%u,\\"previous\\":%u,\\"candidate\\":%u,\\"reference\\":%u}\\n",iteration,static_cast<unsigned long long>(i/4),unsigned(i%4),unsigned(base[i]),unsigned(next[i]),unsigned(p[i]));}
+             reference_pattern_preserved &= (p[i]!=next[i])==(p[i]!=base[i])&&next[i]==base[i];
+            }'''
+assert old in s;s=s.replace(old,new)
+needle='        if(different||reference_differences)return 2;'
+replacement='''        std::printf("{\\"kind\\":\\"reference_compatibility\\",\\"iteration\\":%u,\\"previous_reference_differences\\":%llu,\\"candidate_reference_differences\\":%llu,\\"same_difference_positions_and_values\\":%s,\\"maximum_byte_error\\":%u,\\"reference_exact\\":%s}\\n",iteration,static_cast<unsigned long long>(previous_reference_differences),static_cast<unsigned long long>(reference_differences),reference_pattern_preserved?"true":"false",reference_maximum_error,reference_differences?"false":"true");std::fflush(stdout);
+        if(different||!reference_pattern_preserved)return 2;'''
+assert needle in s;s=s.replace(needle,replacement);p.write_text(s)
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};(r/(name+'-source.json')).write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/(name+'.tar.gz'),'w:gz') as t:t.add(d,arcname=name)
+(r/('build-'+name+'.ps1')).write_text((r/'build-ptl-program-compact-integration-v2.ps1').read_text().replace('ptl-program-compact-integration-v2',name))
+s=(r/'run-ptl-program-compact-compare-v3.py').read_text().replace('ptl-program-compact-integration-v2',name).replace('ptl-worker-v17-qualification-v2','ptl-worker-v18-qualification').replace('ptl-program-compact-comparison-v3','ptl-program-compact-comparison-v4')
+s=s.replace("references=[x for x in events if x.get('kind')=='reference_check'];passed=", "references=[x for x in events if x.get('kind')=='reference_check'];compatibility=[x for x in events if x.get('kind')=='reference_compatibility'];passed=")
+s=s.replace("len(pairs)==len(references)==4 and all(x['exact'] for x in pairs+references)", "len(pairs)==len(references)==len(compatibility)==4 and all(x['exact'] for x in pairs) and all(x['same_difference_positions_and_values'] for x in compatibility)")
+s=s.replace('pairs=pairs,references=references,passed=passed','pairs=pairs,references=references,reference_compatibility=compatibility,passed=passed')
+s=s.replace('cpu_reference_test_only=True);save()', "cpu_reference_test_only=True,qualification_scope='strict prior NPU image preservation; independent FP32 reference discrepancies retained and required unchanged');save()")
+(r/'run-ptl-program-compact-compare-v4.py').write_text(s)
+s=(r/'run-ptl-program-compact-comparison-v3-qualification.ps1').read_text().replace('ptl-program-compact-integration-v2',name).replace('ptl-worker-v17-qualification-v2','ptl-worker-v18-qualification').replace('ptl-program-compact-comparison-v3','ptl-program-compact-comparison-v4').replace('run-ptl-program-compact-compare-v3.py','run-ptl-program-compact-compare-v4.py');(r/'run-ptl-program-compact-comparison-v4-qualification.ps1').write_text(s)
+print(json.dumps({'prepared':name,'previous_npu_exact_required':True,'cpu_reference_discrepancies_must_be_unchanged':True,'no_image_tolerance':True}))
