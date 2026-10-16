@@ -1,0 +1,31 @@
+from pathlib import Path
+import os, json, hashlib
+
+vm = Path(os.environ['LOCALAPPDATA']) / 'npu-render/vm'
+out = vm / 'ptl-native-worker-v4-audit'
+out.mkdir(exist_ok=False)
+manifest = vm / 'ptl-qualified-precision-corrections-v1.json'
+assert hashlib.sha256(manifest.read_bytes()).hexdigest() == '5afd2995cb49f64f3bb6d7d3ce75e30b1fb7d6f989261027425cd76768d70c48'
+corrections = {r['ticket']: r for r in json.loads(manifest.read_text())['cases']}
+assert set(corrections) == {172, 292, 333, 455, 580, 646, 712, 767, 964}
+paths = [vm / f'ptl-native-worker-v{n}-full/replay' for n in (3, 4)]
+proof = [json.loads((p / 'report.json').read_text()) for p in paths]
+assert all(p['completed'] and p['passed'] and p['delivery_acknowledgments'] == 972 for p in proof)
+assert proof[0]['capture_index_sha256'] == proof[1]['capture_index_sha256']
+records = [[json.loads(x) for x in (p / 'replays.jsonl').read_text(encoding='utf-8-sig').splitlines()] for p in paths]
+assert all(len(r) == 972 and [x['ticket'] for x in r] == list(range(972)) for r in records)
+checks = []
+for a, b in zip(*records, strict=True):
+    ticket = a['ticket']
+    same = a['pixels_sha256'] == b['pixels_sha256']
+    correction = corrections.get(ticket)
+    valid = a['pixel_bytes'] == b['pixel_bytes'] and a['original_reference_available'] == b['original_reference_available']
+    if correction:
+        valid = valid and not same and a['pixels_sha256'] == correction['legacy_pixel_sha256'] and b['pixels_sha256'] == correction['corrected_pixel_sha256'] == correction['independent_graph_pixel_sha256'] and b['pixel_bytes'] == correction['pixel_bytes'] and b['original_reference_available'] and not b['exact_recorded_pixels'] and b['qualified_precision_correction_applied']
+    else:
+        valid = valid and same and not b.get('qualified_precision_correction_applied', False)
+    checks.append(dict(ticket=ticket, passed=bool(valid), same_prior_pixels=same, qualified_precision_correction=bool(correction), pixels_sha256=b['pixels_sha256']))
+report = dict(completed=True, passed=all(x['passed'] for x in checks) and proof[1]['original_pixel_hashes_matched'] == 962 and proof[1]['qualified_correction_hashes_matched'] == 9 and proof[1]['unreferenced_successes'] == 1, read_only=True, comparisons=972, unchanged_prior_pixels=sum(x['same_prior_pixels'] for x in checks), qualified_precision_corrections=sum(x['qualified_precision_correction'] for x in checks), original_reference_matches=proof[1]['original_pixel_hashes_matched'], original_reference_missing=[r['ticket'] for r in records[1] if not r['original_reference_available']], matched_performance_comparison=False, source_sha256={str(p.relative_to(vm) / 'replays.jsonl'): hashlib.sha256((p / 'replays.jsonl').read_bytes()).hexdigest() for p in paths}, checks=checks)
+(out / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
+print(json.dumps({k: v for k, v in report.items() if k != 'checks'}))
+assert report['passed']

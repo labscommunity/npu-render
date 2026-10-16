@@ -35,6 +35,14 @@ normal application admission still require work.
 Normal application admission and matched Tahoma A/B remain open. The earlier
 thirty-minute delivery qualification belongs to the previous renderer.
 
+The three-texture specialization now passes 36 complete comparisons against an
+independently qualified, precision-preserving NPU graph. Its integrated worker
+passes all 972 requests: 962 original references, nine explicitly qualified
+coefficient corrections and one request without an original reference. An
+independent audit confirms the other 963 outputs match the previous worker.
+Registered Direct3D v27 and recovery pass. Live v39 is running; this revision's
+desktop interaction and duration gates remain pending.
+
 The end state is one switch that moves desktop graphics work to the NPU, retains
 physical display scanout, supports normal interaction, and leaves the iGPU
 available for Tahoma. Composition, application rendering, video processing, and
@@ -66,8 +74,9 @@ role, and any GPU rendering/copy cost in the bridge must be measured.
 2. Preserve the exact six-span four-sample replay result and corrected capacity
    guard qualification. Reduce per-pixel work and broaden changing-image checks;
    independent imported-model overlap is excluded after real device loss.
-3. Retain the now-qualified combined four-sample/solid worker and live v38 result.
-   Reduce the measured three-texture and two-texture shader costs. The solid
+3. Retain the combined four-sample/solid worker and live v38 result while qualifying
+   the three-texture worker in live v39. Attribute remaining cost from its complete
+   replay before choosing the next shader or geometry optimization. The solid
    component clears five expensive draws but does not establish desktop usability.
    Repeat responsiveness and sustained stability checks after renderer changes.
 4. Add automatic application admission and the missing graphics operations;
@@ -113,10 +122,14 @@ differs in 15 byte components and is retained as rejected. Subsequent
 [arithmetic tracing](../validation/2026-10-16/native-three-texture-arithmetic-v1/README.md)
 and the [coefficient investigation](../validation/2026-10-16/native-coefficient-precision-v1/README.md)
 identify precision loss in the old graph's negative multiply-add expression.
-Two equivalent rewrites pass 16,384 independent NPU components each. Complete
-draw comparisons against the corrected graph are under qualification; original
-output hashes remain separate. Historical equality to the old renderer does not
-establish that this coefficient arithmetic was correct.
+Two equivalent rewrites pass 16,384 independent NPU components each. The
+[corrected full-draw comparison](../validation/2026-10-16/native-three-texture-correction-v1/README.md)
+and [coverage compaction](../validation/2026-10-16/native-three-texture-compaction-v1/README.md)
+each pass all 36 comparisons. The
+[integrated texture worker](../validation/2026-10-16/native-texture-worker-v1/README.md)
+passes the complete replay, independent correction audit and registered Direct3D
+qualification. Original output hashes remain separate. Historical equality to the
+old renderer does not establish that this coefficient arithmetic was correct.
 These are prerequisites toward the stated
 goal, not substitutes for application migration or Tahoma improvement.
 

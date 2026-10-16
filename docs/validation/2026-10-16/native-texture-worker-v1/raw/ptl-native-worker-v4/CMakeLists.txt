@@ -1,0 +1,11 @@
+cmake_minimum_required(VERSION 3.25)
+project(nr_registered_local_indexed_worker LANGUAGES CXX)
+find_package(OpenVINO 2026.1 REQUIRED COMPONENTS Runtime)
+add_executable(nr_registered_local_indexed_worker local_indexed_worker.cpp ptl_triangle_texture_draw.cpp)
+target_include_directories(nr_registered_local_indexed_worker PRIVATE "${NR_QUALIFIED_SOURCE}")
+target_compile_features(nr_registered_local_indexed_worker PRIVATE cxx_std_17)
+target_compile_options(nr_registered_local_indexed_worker PRIVATE /W4 /WX)
+target_link_libraries(nr_registered_local_indexed_worker PRIVATE "${NR_QUALIFIED_BUILD}/Release/nr_registered_vertex.lib" "${NR_QUALIFIED_BUILD}/Release/nr_registered_provider_cache.lib" openvino::runtime bcrypt d3dcompiler advapi32)
+set_property(TARGET nr_registered_local_indexed_worker PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
+target_compile_definitions(nr_registered_local_indexed_worker PRIVATE NOMINMAX)

@@ -1,0 +1,55 @@
+from pathlib import Path
+import hashlib,json,tarfile,shutil
+r=Path('results/render-driver');o=r/'ptl-native-worker-v4';shutil.copytree(r/'ptl-native-worker-v3',o)
+for name in ['ptl_texture_shader.hpp','ptl_texture_shaders.hpp','ptl_triangle_texture_draw.hpp','ptl_triangle_texture_draw.cpp']:
+ (o/name).write_bytes((r/'ptl-three-texture-integration-v5'/name).read_bytes())
+p=o/'CMakeLists.txt';s=p.read_text().replace('local_indexed_worker.cpp)','local_indexed_worker.cpp ptl_triangle_texture_draw.cpp)');p.write_text(s)
+p=o/'indexed_pipeline.hpp';s=p.read_text().replace('#include "ptl_solid.hpp"','#include "ptl_solid.hpp"\n#include "ptl_texture_shader.hpp"\n#include "ptl_triangle_texture_draw.hpp"')
+s=s.replace('    bool quad_enabled=false;',r'''    bool ptl_texture_enabled=false;
+    struct PtlTextureEntry {
+        Header header;uint32_t batch;std::vector<uint32_t> vertex,pixel;
+        raster::PackedResources layout;shader::TextureSamplers samplers;
+        std::unique_ptr<raster::PtlTriangleTextureDrawExecutor> executor;
+    };
+    std::vector<PtlTextureEntry> ptl_textures;
+    static shader::Program precision_program(const shader::Program &original){
+        auto p=original;
+        if(p.bytecode.size()==shader::ptl_texture_fixture::pixel.size()&&std::equal(p.bytecode.begin(),p.bytecode.end(),shader::ptl_texture_fixture::pixel.begin())){
+            auto &i=p.instructions.at(112);require(i.opcode==shader::Opcode::mad&&i.sources[0].modifier==shader::Modifier::negate&&i.sources[1].kind==shader::Register::immediate);
+            i.sources[0].modifier=shader::Modifier::none;
+            for(auto &word:i.sources[1].literal){require(word==1017370378u);word^=0x80000000u;}
+            std::printf("{\"ptl_texture_precision_correction\":true,\"instruction\":112,\"exact_immediate_preserved\":true}\n");std::fflush(stdout);
+        }
+        return p;
+    }
+    bool quad_enabled=false;''')
+s=s.replace('    Pipeline(){',r'''    Pipeline(){
+        wchar_t *texture=nullptr;size_t texture_length=0;
+        if(_wdupenv_s(&texture,&texture_length,L"NR_RENDER_PTL_TEXTURE_BLOB"))throw std::runtime_error("cannot read texture provider setting");
+        const std::unique_ptr<wchar_t,decltype(&std::free)> texture_owner(texture,&std::free);
+        if(texture&&*texture){require(std::filesystem::path(texture).is_absolute());ptl_texture_enabled=true;}
+''')
+needle='            for(auto &entry:triangle_cache){const auto &old=entry.header;'
+assert needle in s
+s=s.replace(needle,r'''            if(ptl_texture_enabled&&shader::PtlTextureShader::eligible(request.pixel,resources,samplers)){
+                raster::PtlTriangleTextureDrawExecutor *executor=nullptr;
+                for(auto &entry:ptl_textures){const auto &old=entry.header;
+                    if(entry.batch==batch&&old.vertices==capacity&&old.format==h.format&&(old.flags&~4u)==(h.flags&~4u)&&raster::resource_layout_equal(resources,entry.layout)&&raster::sampler_layout_equal(samplers,entry.samplers)&&entry.vertex==request.vertex.bytecode&&entry.pixel==request.pixel.bytecode){executor=entry.executor.get();break;}
+                }
+                if(!executor&&ptl_textures.size()<8){auto candidate=std::make_unique<raster::PtlTriangleTextureDrawExecutor>(request.vertex,request.pixel,capacity,h.width,h.height,h.format,resources,samplers,"NPU",blend_mode(h),uint8_t((h.flags>>8)&15),static_cast<raster::CullMode>((h.flags>>5)&3),(h.flags&128)!=0,batch);auto key=h;key.vertices=capacity;executor=candidate.get();ptl_textures.push_back({key,batch,request.vertex.bytecode,request.pixel.bytecode,raster::resource_layout(resources),samplers,std::move(candidate)});}
+                if(executor){auto result=executor->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,resources,request.background,request.scissor,request.blend_constant);
+                    std::printf("{\"ptl_texture_draw\":true,\"accepted\":true,\"provider_requests\":%llu,\"coverage_compacted\":true,\"fallback_backend\":\"none\"}\n",static_cast<unsigned long long>(result.provider_requests));std::fflush(stdout);return result;
+                }
+                std::printf("{\"ptl_texture_capacity_declined\":true,\"fallback_backend\":\"NPU\",\"precision_correction_retained\":true}\n");std::fflush(stdout);
+            }
+'''+needle)
+needle='auto candidate=std::make_unique<raster::TriangleTextureDrawExecutor>(request.vertex,request.pixel,capacity'
+assert needle in s
+s=s.replace(needle,'const auto corrected_pixel=precision_program(request.pixel);\n            auto candidate=std::make_unique<raster::TriangleTextureDrawExecutor>(request.vertex,corrected_pixel,capacity')
+p.write_text(s)
+(r/'ptl-native-worker-v4-source.json').write_text(json.dumps({p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in o.iterdir()},indent=2)+'\n')
+with tarfile.open(r/'ptl-native-worker-v4.tar.gz','w:gz') as t:
+ for p in o.iterdir():t.add(p,arcname=o.name+'/'+p.name)
+s=(r/'build-ptl-native-worker-v3.ps1').read_text().replace('ptl-native-worker-v3','ptl-native-worker-v4').replace('general four-tap and solid candidates','general four-tap, solid and texture candidates with pinned precision correction')
+(r/'build-ptl-native-worker-v4.ps1').write_text(s)
+print('Prepared worker v4 locally; qualification remains required.')

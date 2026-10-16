@@ -1,0 +1,26 @@
+from pathlib import Path
+r=Path('results/render-driver')
+s=(r/'replay-recorded-requests-v17.py').read_text()
+s=s.replace('from pathlib import Path','from pathlib import Path\nfrom precision_corrections_v1 import validate as validate_corrections')
+s=s.replace('v=a.parse_args();',"a.add_argument('--precision-corrections',type=Path)\na.add_argument('--precision-corrections-sha256')\nv=a.parse_args();")
+needle='assert 0<=v.start<len(requests)'
+s=s.replace(needle,"""corrections={}
+assert bool(v.precision_corrections)==bool(v.precision_corrections_sha256)
+if v.precision_corrections:corrections=validate_corrections(v.precision_corrections.read_bytes(),v.precision_corrections_sha256,requests,responses)
+"""+needle)
+s=s.replace('unreferenced_successes=0)','unreferenced_successes=0,qualified_correction_hashes_matched=0)')
+needle='def save():'
+s=s.replace(needle,"""if corrections:report.update(verification_scope='original_references_plus_explicitly_qualified_precision_corrections',precision_corrections_sha256=v.precision_corrections_sha256,qualified_correction_tickets=sorted(corrections))
+"""+needle)
+needle="    if record['exact_recorded_pixels']:report['original_pixel_hashes_matched']+=1"
+s=s.replace(needle,needle+"""
+    if n in corrections:
+     correction=corrections[n];record['qualified_precision_correction_applied']=checksum==correction['corrected_pixel_sha256'] and expected_pixel_bytes==correction['pixel_bytes']
+     record['original_pixel_sha256']=expected['pixels_sha256'];record['qualified_pixel_sha256']=correction['corrected_pixel_sha256']
+     assert not record['exact_recorded_pixels'] and record['qualified_precision_correction_applied'],f'Qualified correction differs at ticket {n}'
+     report['qualified_correction_hashes_matched']+=1
+""")
+s=s.replace("assert n not in responses or record['exact_recorded_pixels'],", "assert n not in responses or record['exact_recorded_pixels'] or record.get('qualified_precision_correction_applied',False),")
+(r/'replay-recorded-requests-v18.py').write_text(s)
+compile(s,'replay-recorded-requests-v18.py','exec')
+print('Prepared explicit correction-aware replay; no original capture is edited.')

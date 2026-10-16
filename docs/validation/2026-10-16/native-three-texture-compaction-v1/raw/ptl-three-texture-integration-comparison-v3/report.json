@@ -1,0 +1,842 @@
+{
+  "started": "2026-10-16T16:41:04.272004+00:00",
+  "completed": true,
+  "passed": true,
+  "desktop_changed": false,
+  "tahoma_tested": false,
+  "cases": [
+    {
+      "ticket": 172,
+      "packet_sha256": "71f128dbed13648185d294027c8c7c63e5895350ddc2e1eace72ceb68e94417e",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 2469.2235,
+          "candidate_full_ms": 993.4348,
+          "candidate_prepare_ms": 580.8871,
+          "candidate_raster_ms": 150.6097,
+          "baseline_calls": 146,
+          "candidate_calls": 186,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 2358.1991,
+          "candidate_full_ms": 1111.6646,
+          "candidate_prepare_ms": 642.2889,
+          "candidate_raster_ms": 174.9326,
+          "baseline_calls": 146,
+          "candidate_calls": 186,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 2323.1101,
+          "candidate_full_ms": 1182.6639,
+          "candidate_prepare_ms": 689.4769,
+          "candidate_raster_ms": 181.1043,
+          "baseline_calls": 146,
+          "candidate_calls": 186,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 2277.852,
+          "candidate_full_ms": 1144.0412,
+          "candidate_prepare_ms": 675.0024,
+          "candidate_raster_ms": 173.5654,
+          "baseline_calls": 146,
+          "candidate_calls": 186,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 3145728,
+          "sha256": "90383b480446d4635d03254f29af52df085d242c393c6a9a1e81df5f9d347d91"
+        },
+        "candidate.rgba": {
+          "bytes": 3145728,
+          "sha256": "90383b480446d4635d03254f29af52df085d242c393c6a9a1e81df5f9d347d91"
+        },
+        "legacy.rgba": {
+          "bytes": 3145728,
+          "sha256": "0864c544cf5589c490315b62e8531e9e1a70a98af2bd0c332aac270a28cf49d8"
+        }
+      },
+      "legacy_pixels_match_qualified_worker": true,
+      "comparison_reference": "algebraically equivalent precision-preserving NPU graph, instruction 112 negation moved to exact immediate",
+      "legacy_change": [
+        {
+          "kind": "legacy_reference_change",
+          "different_components": 15,
+          "old_output_retained": true,
+          "corrected_graph_is_comparison_reference": true
+        }
+      ]
+    },
+    {
+      "ticket": 292,
+      "packet_sha256": "c98838f31036d11b8e8f67e4a0cd841940d72ce735a631bc93b034a1d0107050",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 5357.6542,
+          "candidate_full_ms": 3131.0844,
+          "candidate_prepare_ms": 1943.961,
+          "candidate_raster_ms": 438.8368,
+          "baseline_calls": 322,
+          "candidate_calls": 434,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 4965.3801,
+          "candidate_full_ms": 3140.3791,
+          "candidate_prepare_ms": 1979.2114,
+          "candidate_raster_ms": 427.6358,
+          "baseline_calls": 322,
+          "candidate_calls": 434,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 4934.0867,
+          "candidate_full_ms": 3003.2248,
+          "candidate_prepare_ms": 1866.0444,
+          "candidate_raster_ms": 436.3205,
+          "baseline_calls": 322,
+          "candidate_calls": 434,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 4867.3944,
+          "candidate_full_ms": 2892.7998,
+          "candidate_prepare_ms": 1812.2448,
+          "candidate_raster_ms": 397.3496,
+          "baseline_calls": 322,
+          "candidate_calls": 434,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 20736000,
+          "sha256": "8e71ae1edfd45f1d7f51a52d7164bf6e75a7fa615a19720bccedffbb4633d263"
+        },
+        "candidate.rgba": {
+          "bytes": 20736000,
+          "sha256": "8e71ae1edfd45f1d7f51a52d7164bf6e75a7fa615a19720bccedffbb4633d263"
+        },
+        "legacy.rgba": {
+          "bytes": 20736000,
+          "sha256": "2a8ad2c88ef8f4d3779279a9dc41c8a78b776f153ed775710f27219edb254fbc"
+        }
+      },
+      "legacy_pixels_match_qualified_worker": true,
+      "comparison_reference": "algebraically equivalent precision-preserving NPU graph, instruction 112 negation moved to exact immediate",
+      "legacy_change": [
+        {
+          "kind": "legacy_reference_change",
+          "different_components": 128,
+          "old_output_retained": true,
+          "corrected_graph_is_comparison_reference": true
+        }
+      ]
+    },
+    {
+      "ticket": 333,
+      "packet_sha256": "cdc1303b105b6e3f4ef117ce19c171eac785eeaab4aca876334ab5ebbb9d66a0",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 5314.4408,
+          "candidate_full_ms": 3114.4868,
+          "candidate_prepare_ms": 1942.2956,
+          "candidate_raster_ms": 440.8603,
+          "baseline_calls": 322,
+          "candidate_calls": 434,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 4767.228,
+          "candidate_full_ms": 2990.6302,
+          "candidate_prepare_ms": 1874.134,
+          "candidate_raster_ms": 420.3357,
+          "baseline_calls": 322,
+          "candidate_calls": 434,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 5004.7217,
+          "candidate_full_ms": 3074.8032,
+          "candidate_prepare_ms": 1920.092,
+          "candidate_raster_ms": 439.6731,
+          "baseline_calls": 322,
+          "candidate_calls": 434,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 4903.064,
+          "candidate_full_ms": 3016.9556,
+          "candidate_prepare_ms": 1878.357,
+          "candidate_raster_ms": 438.8183,
+          "baseline_calls": 322,
+          "candidate_calls": 434,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 20736000,
+          "sha256": "8e71ae1edfd45f1d7f51a52d7164bf6e75a7fa615a19720bccedffbb4633d263"
+        },
+        "candidate.rgba": {
+          "bytes": 20736000,
+          "sha256": "8e71ae1edfd45f1d7f51a52d7164bf6e75a7fa615a19720bccedffbb4633d263"
+        },
+        "legacy.rgba": {
+          "bytes": 20736000,
+          "sha256": "2a8ad2c88ef8f4d3779279a9dc41c8a78b776f153ed775710f27219edb254fbc"
+        }
+      },
+      "legacy_pixels_match_qualified_worker": true,
+      "comparison_reference": "algebraically equivalent precision-preserving NPU graph, instruction 112 negation moved to exact immediate",
+      "legacy_change": [
+        {
+          "kind": "legacy_reference_change",
+          "different_components": 128,
+          "old_output_retained": true,
+          "corrected_graph_is_comparison_reference": true
+        }
+      ]
+    },
+    {
+      "ticket": 455,
+      "packet_sha256": "0d0099711761e2f51072ada466f41a2c0437b3974e87d65ff26cd4d1649113e3",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 2870.7484,
+          "candidate_full_ms": 1226.9934,
+          "candidate_prepare_ms": 714.0976,
+          "candidate_raster_ms": 189.8253,
+          "baseline_calls": 146,
+          "candidate_calls": 186,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 2182.9637,
+          "candidate_full_ms": 1078.5914,
+          "candidate_prepare_ms": 624.152,
+          "candidate_raster_ms": 175.0953,
+          "baseline_calls": 146,
+          "candidate_calls": 186,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 2306.3174,
+          "candidate_full_ms": 1200.9932,
+          "candidate_prepare_ms": 710.5721,
+          "candidate_raster_ms": 180.4404,
+          "baseline_calls": 146,
+          "candidate_calls": 186,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 2296.5003,
+          "candidate_full_ms": 1179.5628,
+          "candidate_prepare_ms": 696.2563,
+          "candidate_raster_ms": 180.5244,
+          "baseline_calls": 146,
+          "candidate_calls": 186,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 3145728,
+          "sha256": "1657232553b2de2e8501fb67188c4e4db947bf7d7699af0bafbadf7086ec3370"
+        },
+        "candidate.rgba": {
+          "bytes": 3145728,
+          "sha256": "1657232553b2de2e8501fb67188c4e4db947bf7d7699af0bafbadf7086ec3370"
+        },
+        "legacy.rgba": {
+          "bytes": 3145728,
+          "sha256": "07889dea13879f4e9138fc1f9eab554074da46d7c72b071b688ae47edda1eb65"
+        }
+      },
+      "legacy_pixels_match_qualified_worker": true,
+      "comparison_reference": "algebraically equivalent precision-preserving NPU graph, instruction 112 negation moved to exact immediate",
+      "legacy_change": [
+        {
+          "kind": "legacy_reference_change",
+          "different_components": 15,
+          "old_output_retained": true,
+          "corrected_graph_is_comparison_reference": true
+        }
+      ]
+    },
+    {
+      "ticket": 580,
+      "packet_sha256": "bcf0e15fe36595059f4906324ab8563d5d03c197ba51618f4e82a0e52aa3c803",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 1852.6244,
+          "candidate_full_ms": 787.4329,
+          "candidate_prepare_ms": 481.4934,
+          "candidate_raster_ms": 116.7288,
+          "baseline_calls": 91,
+          "candidate_calls": 121,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 1433.3082,
+          "candidate_full_ms": 810.8874,
+          "candidate_prepare_ms": 489.0034,
+          "candidate_raster_ms": 117.8522,
+          "baseline_calls": 91,
+          "candidate_calls": 121,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 1396.3786,
+          "candidate_full_ms": 875.4679,
+          "candidate_prepare_ms": 531.5212,
+          "candidate_raster_ms": 123.6833,
+          "baseline_calls": 91,
+          "candidate_calls": 121,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 1375.9022,
+          "candidate_full_ms": 857.9454,
+          "candidate_prepare_ms": 527.4342,
+          "candidate_raster_ms": 119.9363,
+          "baseline_calls": 91,
+          "candidate_calls": 121,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 3145728,
+          "sha256": "4ef534ff64be104b2e12966b3f09bfabfabf44aed4cfc18d160d2ed32f39e1ae"
+        },
+        "candidate.rgba": {
+          "bytes": 3145728,
+          "sha256": "4ef534ff64be104b2e12966b3f09bfabfabf44aed4cfc18d160d2ed32f39e1ae"
+        },
+        "legacy.rgba": {
+          "bytes": 3145728,
+          "sha256": "7736e793b0ad9490622ac8d16dcfe69e9a6d44c324f09ec205ab49a7f0856672"
+        }
+      },
+      "legacy_pixels_match_qualified_worker": true,
+      "comparison_reference": "algebraically equivalent precision-preserving NPU graph, instruction 112 negation moved to exact immediate",
+      "legacy_change": [
+        {
+          "kind": "legacy_reference_change",
+          "different_components": 9,
+          "old_output_retained": true,
+          "corrected_graph_is_comparison_reference": true
+        }
+      ]
+    },
+    {
+      "ticket": 646,
+      "packet_sha256": "8103d512d4b1f8ca4ce6802295a7dd90d405f1f58c92a446d2960056373996f3",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 1760.8865,
+          "candidate_full_ms": 577.5821,
+          "candidate_prepare_ms": 354.319,
+          "candidate_raster_ms": 82.0385,
+          "baseline_calls": 91,
+          "candidate_calls": 121,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 1347.3957,
+          "candidate_full_ms": 777.4484,
+          "candidate_prepare_ms": 477.1142,
+          "candidate_raster_ms": 117.1326,
+          "baseline_calls": 91,
+          "candidate_calls": 121,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 1352.9425,
+          "candidate_full_ms": 758.7205,
+          "candidate_prepare_ms": 467.0033,
+          "candidate_raster_ms": 107.4934,
+          "baseline_calls": 91,
+          "candidate_calls": 121,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 1453.8417,
+          "candidate_full_ms": 809.706,
+          "candidate_prepare_ms": 495.4131,
+          "candidate_raster_ms": 115.3822,
+          "baseline_calls": 91,
+          "candidate_calls": 121,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 3145728,
+          "sha256": "652c2c1b3020ba06689e1b52fe1f1cc041b2a580b7d55f2530dcd4c452dbd539"
+        },
+        "candidate.rgba": {
+          "bytes": 3145728,
+          "sha256": "652c2c1b3020ba06689e1b52fe1f1cc041b2a580b7d55f2530dcd4c452dbd539"
+        },
+        "legacy.rgba": {
+          "bytes": 3145728,
+          "sha256": "134a905249c93f03b1adea41070a9770115f9f1cd0a324f6910d74bfb5082096"
+        }
+      },
+      "legacy_pixels_match_qualified_worker": true,
+      "comparison_reference": "algebraically equivalent precision-preserving NPU graph, instruction 112 negation moved to exact immediate",
+      "legacy_change": [
+        {
+          "kind": "legacy_reference_change",
+          "different_components": 9,
+          "old_output_retained": true,
+          "corrected_graph_is_comparison_reference": true
+        }
+      ]
+    },
+    {
+      "ticket": 712,
+      "packet_sha256": "e9d02f26150eeebd361b86d166b3e37cd45c6d8c4f025b4cd30b2affb9ea788c",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 1814.0437,
+          "candidate_full_ms": 594.8643,
+          "candidate_prepare_ms": 353.8972,
+          "candidate_raster_ms": 92.6625,
+          "baseline_calls": 91,
+          "candidate_calls": 121,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 1407.971,
+          "candidate_full_ms": 769.0199,
+          "candidate_prepare_ms": 473.8021,
+          "candidate_raster_ms": 105.3369,
+          "baseline_calls": 91,
+          "candidate_calls": 121,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 1464.9407,
+          "candidate_full_ms": 901.3769,
+          "candidate_prepare_ms": 551.0843,
+          "candidate_raster_ms": 124.1928,
+          "baseline_calls": 91,
+          "candidate_calls": 121,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 1343.779,
+          "candidate_full_ms": 850.6282,
+          "candidate_prepare_ms": 523.1064,
+          "candidate_raster_ms": 118.7142,
+          "baseline_calls": 91,
+          "candidate_calls": 121,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 3145728,
+          "sha256": "4e89806967ccb7ddf411c9e60911bd64858edcf48361fd8f46b5fbd52d9e7fd5"
+        },
+        "candidate.rgba": {
+          "bytes": 3145728,
+          "sha256": "4e89806967ccb7ddf411c9e60911bd64858edcf48361fd8f46b5fbd52d9e7fd5"
+        },
+        "legacy.rgba": {
+          "bytes": 3145728,
+          "sha256": "4c8ddeb79a7bcc5c79750cc2935d809843494e0d799380f5851eb2fed278c005"
+        }
+      },
+      "legacy_pixels_match_qualified_worker": true,
+      "comparison_reference": "algebraically equivalent precision-preserving NPU graph, instruction 112 negation moved to exact immediate",
+      "legacy_change": [
+        {
+          "kind": "legacy_reference_change",
+          "different_components": 9,
+          "old_output_retained": true,
+          "corrected_graph_is_comparison_reference": true
+        }
+      ]
+    },
+    {
+      "ticket": 767,
+      "packet_sha256": "54bb03b2228ab9af133cf903219c11d04954985ef9d4e7eecef7fdf3b4e0e860",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 1728.6388,
+          "candidate_full_ms": 584.0289,
+          "candidate_prepare_ms": 356.5439,
+          "candidate_raster_ms": 79.6088,
+          "baseline_calls": 91,
+          "candidate_calls": 121,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 1377.0278,
+          "candidate_full_ms": 801.7431,
+          "candidate_prepare_ms": 491.3993,
+          "candidate_raster_ms": 109.5996,
+          "baseline_calls": 91,
+          "candidate_calls": 121,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 1386.3361,
+          "candidate_full_ms": 761.1316,
+          "candidate_prepare_ms": 465.7003,
+          "candidate_raster_ms": 103.4786,
+          "baseline_calls": 91,
+          "candidate_calls": 121,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 1376.3869,
+          "candidate_full_ms": 791.0739,
+          "candidate_prepare_ms": 486.0945,
+          "candidate_raster_ms": 109.0042,
+          "baseline_calls": 91,
+          "candidate_calls": 121,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 3145728,
+          "sha256": "06bd4b46c7d735aad6c3d5fd54bd04be05ac5c52bc6aab56895488262ef29619"
+        },
+        "candidate.rgba": {
+          "bytes": 3145728,
+          "sha256": "06bd4b46c7d735aad6c3d5fd54bd04be05ac5c52bc6aab56895488262ef29619"
+        },
+        "legacy.rgba": {
+          "bytes": 3145728,
+          "sha256": "8be3e68e5b49fc864e512d2b2ef7e8364adc82fdd2ca7a503ee05dcd3d9a9ee3"
+        }
+      },
+      "legacy_pixels_match_qualified_worker": true,
+      "comparison_reference": "algebraically equivalent precision-preserving NPU graph, instruction 112 negation moved to exact immediate",
+      "legacy_change": [
+        {
+          "kind": "legacy_reference_change",
+          "different_components": 9,
+          "old_output_retained": true,
+          "corrected_graph_is_comparison_reference": true
+        }
+      ]
+    },
+    {
+      "ticket": 964,
+      "packet_sha256": "ace0dabb6c26fbfee099b02a478c6a9389dea3c92593c6f4ae593d9eed671a2c",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 2529.9836,
+          "candidate_full_ms": 893.3349,
+          "candidate_prepare_ms": 515.0636,
+          "candidate_raster_ms": 140.5764,
+          "baseline_calls": 146,
+          "candidate_calls": 186,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 2255.1281,
+          "candidate_full_ms": 1094.213,
+          "candidate_prepare_ms": 625.3558,
+          "candidate_raster_ms": 171.6248,
+          "baseline_calls": 146,
+          "candidate_calls": 186,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 2353.9611,
+          "candidate_full_ms": 1187.0462,
+          "candidate_prepare_ms": 698.0558,
+          "candidate_raster_ms": 177.8271,
+          "baseline_calls": 146,
+          "candidate_calls": 186,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 2247.9967,
+          "candidate_full_ms": 1174.2825,
+          "candidate_prepare_ms": 698.1244,
+          "candidate_raster_ms": 175.6351,
+          "baseline_calls": 146,
+          "candidate_calls": 186,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 3145728,
+          "sha256": "ba146e8e5c3a488a477e95b38f5f8745b7672e71c15d19dd60a9bca867f962bd"
+        },
+        "candidate.rgba": {
+          "bytes": 3145728,
+          "sha256": "ba146e8e5c3a488a477e95b38f5f8745b7672e71c15d19dd60a9bca867f962bd"
+        },
+        "legacy.rgba": {
+          "bytes": 3145728,
+          "sha256": "438f5089d5a43b97bd4996174f66fcf7ac1a82750281b8fc103d6877d70329d6"
+        }
+      },
+      "legacy_pixels_match_qualified_worker": true,
+      "comparison_reference": "algebraically equivalent precision-preserving NPU graph, instruction 112 negation moved to exact immediate",
+      "legacy_change": [
+        {
+          "kind": "legacy_reference_change",
+          "different_components": 15,
+          "old_output_retained": true,
+          "corrected_graph_is_comparison_reference": true
+        }
+      ]
+    }
+  ],
+  "model_sha256": "481765dd51d8d9b051b87db8be7e62ae7931245fe051b33b6457be77816c2e87",
+  "executable_sha256": "827d2e0eaeb07b5a17568029d00279f686d61eb03e4bc008f5167bcbc513c15f",
+  "pixel_fixture": "recorded pixels and three generated texture/background images per case; CPU fixture generation only",
+  "active_ticket": 964,
+  "finished": "2026-10-16T16:44:08.018944+00:00"
+}
