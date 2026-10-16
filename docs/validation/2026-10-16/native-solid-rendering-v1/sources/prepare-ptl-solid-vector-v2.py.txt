@@ -1,0 +1,28 @@
+from pathlib import Path
+r=Path('results/render-driver');s=(r/'ptl-six-span-solid-v1.c').read_text()
+s=s.replace('typedef unsigned uint4 __attribute__((ext_vector_type(4)));','typedef unsigned uint4 __attribute__((ext_vector_type(4)));\ntypedef int int4 __attribute__((ext_vector_type(4)));')
+a=' unsigned px=first%w,py=first/w,hits=0;'
+b=''' unsigned quantized[28],channel_mask=0;
+ for(unsigned c=0;c<4;++c){unsigned logical=format==87&&c<3?2-c:c;if(mask&(1u<<logical))channel_mask|=255u<<(c*8);}
+ for(unsigned n=0;n<rectangles;++n){const unsigned char *p=data+64+n*32;unsigned word=0;
+  for(unsigned c=0;c<4;++c){unsigned logical=format==87&&c<3?2-c:c;word|=rounded(f32(p+16+logical*4)*255.0f)<<(c*8);}quantized[n]=word;
+ }
+ unsigned px=first%w,py=first/w,hits=0;'''
+assert a in s;s=s.replace(a,b)
+a='''  int sx=(int)px*256+128,sy=(int)py*256+128;uint4 bg=packed(data+1024+i*4);'''
+b='''  if(!blend && i+4<=count && px+4<=w){
+   int4 sx=((int4)(int)px+(int4){0,1,2,3})*256+128;int sy=(int)py*256+128;
+   uint4 value=*(const uint4*)(data+1024+i*4);
+   if(sy>=clip[1] && sy<clip[3]){
+    for(unsigned n=0;n<rectangles;++n){const unsigned char *p=data+64+n*32;
+     if(sy>=(int)u32(p+4) && sy<(int)u32(p+12)){
+      uint4 covered=(uint4)((sx>=clip[0])&(sx<clip[2])&(sx>=(int)u32(p))&(sx<(int)u32(p+8)));
+      hits+=(covered.x&1)+(covered.y&1)+(covered.z&1)+(covered.w&1);
+      uint4 write_mask=covered&(uint4)channel_mask;value=(value&~write_mask)|((uint4)quantized[n]&write_mask);
+     }
+    }
+   }
+   *(uint4*)(output+16+i*4)=value;i+=3;px+=4;if(px==w){px=0;++py;}continue;
+  }
+  int sx=(int)px*256+128,sy=(int)py*256+128;uint4 bg=packed(data+1024+i*4);'''
+assert a in s;s=s.replace(a,b);(r/'ptl-six-span-solid-v2.c').write_text(s)

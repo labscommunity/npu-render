@@ -1,0 +1,39 @@
+from pathlib import Path
+import json,hashlib
+r=Path('results/render-driver');four='710f6e5586da59f4040213435c5ecc13bb669e6b1be668f838edd00bca5dd697';solid='21360321c21d4a0253b260ce62420ffef47ec03daae8b89e6cf05bd4c541ee8f';old='e0aca557415dba5fc651e1b47e67a33ec28cc6e20be715ba7066457f8eba4cba'
+def save(n,s):p=r/n;assert not p.exists();p.write_text(s)
+for prefix in ['run-native-registration','recover-native-registration','qualify-native-registered']:
+ ext='.py' if prefix.startswith('qualify') else '.ps1';s=(r/(prefix+'-v25'+ext)).read_text().replace('native-registration-v25','native-registration-v26').replace('native-registered-v25','native-registered-v26').replace('NativeRecovery-v25','NativeRecovery-v26').replace('ptl-native-worker-v1','ptl-native-worker-v3').replace('ptl-six-span-quad-coordinate-v1','ptl-six-span-general-v1').replace(old,four)
+ if prefix=='run-native-registration':s=s.replace('$ptl.specialization_accepted -lt 3','$ptl.specialization_accepted -ne 24 -or $ptl.solid_accepted -ne 5')
+ if prefix=='qualify-native-registered':
+  needle="env['NR_RENDER_PTL_FOUR_TAP_BLOB']=str(model)";assert needle in s
+  s=s.replace(needle,needle+"\nsolid=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm/ptl-six-span-solid-v3/patched.blob'\nassert hashlib.sha256(solid.read_bytes()).hexdigest()=='"+solid+"'\nenv['NR_RENDER_PTL_SOLID_BLOB']=str(solid)")
+ save(prefix+'-v26'+ext,s)
+files=['run-native-registration-v26.ps1','recover-native-registration-v26.ps1','qualify-native-registered-v26.py','native_session_broker_v1.py'];save('native-registration-v26-source.json',json.dumps({f:hashlib.sha256((r/f).read_bytes()).hexdigest() for f in files},indent=2)+'\n')
+s=(r/'native_desktop_bootstrap_v21.py').read_text().replace(old,four)
+s=s.replace("p.add_argument('--ptl-four-tap-blob'", "p.add_argument('--ptl-solid-blob',type=Path,required=True)\np.add_argument('--ptl-four-tap-blob'",1)
+s=s.replace("v=p.parse_args();assert", "v=p.parse_args();assert hashlib.sha256(v.ptl_solid_blob.read_bytes()).hexdigest()=='"+solid+"'\nassert",1)
+s=s.replace("env=os.environ.copy();", "env=os.environ.copy();env['NR_RENDER_PTL_SOLID_BLOB']=str(v.ptl_solid_blob);",1)
+s=s.replace('ptl_four_tap_model_sha256=', 'ptl_solid_model_sha256=hashlib.sha256(v.ptl_solid_blob.read_bytes()).hexdigest(),ptl_four_tap_model_sha256=',1);save('native_desktop_bootstrap_v22.py',s)
+for prefix in ['run-native-desktop','recover-native-desktop']:
+ s=(r/(prefix+'-v47.ps1')).read_text()
+ for a,b in [('native-desktop-v47','native-desktop-v48'),('native-desktop-admission-v47','native-desktop-admission-v48'),('NativeDesktopRecovery-v47','NativeDesktopRecovery-v48')]:s=s.replace(a,b)
+ if prefix=='run-native-desktop':
+  for a,b in [('native-registration-v25','native-registration-v26'),('ptl-native-worker-v1','ptl-native-worker-v3'),('native_desktop_bootstrap_v21','native_desktop_bootstrap_v22'),('native-desktop-admission-v46','native-desktop-admission-v47'),('ptl-six-span-quad-coordinate-v1','ptl-six-span-general-v1')]:s=s.replace(a,b)
+  s=s.replace('$ptl.specialization_accepted -lt 3','$ptl.specialization_accepted -ne 24 -or $ptl.solid_accepted -ne 5')
+  s=s.replace("'--monitor-seconds','660',", "'--monitor-seconds','660','--ptl-solid-blob',\"$r\\vm\\ptl-six-span-solid-v3\\patched.blob\",")
+ save(prefix+'-v48.ps1',s)
+for oldn,newn in [(58,60),(59,61)]:save(f'start-native-topology-v{newn}.ps1',(r/f'start-native-topology-v{oldn}.ps1').read_text().replace(f'v{oldn}',f'v{newn}').replace(f'V{oldn}',f'V{newn}'))
+save('dismiss-native-saver-v11.ps1',(r/'dismiss-native-saver-v10.ps1').read_text().replace('dismiss-v10','dismiss-v11').replace('native-topology-v59','native-topology-v61'))
+s=(r/'run-native-live-v37.ps1').read_text()
+for a,b in [('native-live-v37','native-live-v38'),('NativeLiveV37','NativeLiveV38'),('native-desktop-admission-v47','native-desktop-admission-v48'),('run-native-desktop-v47','run-native-desktop-v48'),('NativeDesktopRecovery-v47','NativeDesktopRecovery-v48'),('native-topology-primary-v23','native-topology-primary-v24'),('native-topology-v58','native-topology-v60'),('InspectTopology-V58','InspectTopology-V60'),('native-registration-v25','native-registration-v26'),(old,four)]:s=s.replace(a,b)
+needle=" $report.active_phase='freshness-validation'";assert needle in s
+s=s.replace(needle,''' $solidRows=@(Get-ChildItem "$r\\vm\\native-desktop-admission-v48\\bootstrap\\provider-processes\\generation-*\\worker.stdout.jsonl" -File|ForEach-Object {Read-Rows $_.FullName}|Where-Object ptl_solid_attempt)
+ $report.ptl_solid_attempts=$solidRows.Count;$report.ptl_solid_accepted=@($solidRows|Where-Object accepted).Count
+ if($report.ptl_solid_accepted -lt 1 -or $bootstrap.ptl_solid_model_sha256 -ne 'REPLACE_SOLID'){throw 'Native solid specialization not observed'}
+'''.replace('REPLACE_SOLID',solid)+needle,1);save('run-native-live-v38.ps1',s)
+files=list(json.loads((r/'native-desktop-v47-source.json').read_text()));changes={'native_desktop_bootstrap_v21.py':'native_desktop_bootstrap_v22.py','run-native-desktop-v47.ps1':'run-native-desktop-v48.ps1','recover-native-desktop-v47.ps1':'recover-native-desktop-v48.ps1','run-native-live-v37.ps1':'run-native-live-v38.ps1','start-native-topology-v58.ps1':'start-native-topology-v60.ps1'};files=[changes.get(f,f) for f in files];assert set(changes.values())<=set(files);save('native-desktop-v48-source.json',json.dumps({f:hashlib.sha256((r/f).read_bytes()).hexdigest() for f in files},indent=2)+'\n')
+s=(r/'run-ptl-native-live-v1.ps1').read_text()
+for a,b in [('ptl-native-live-v1','ptl-native-live-v2'),('ptl-native-worker-v1','ptl-native-worker-v3'),('native-desktop-admission-v46','native-desktop-admission-v47'),('native-topology-v59','native-topology-v61'),('InspectTopology-V59','InspectTopology-V61'),('start-native-topology-v59','start-native-topology-v61'),('observer59','observer61'),('dismiss-native-saver-v10','dismiss-native-saver-v11'),('native-live-v37','native-live-v38')]:s=s.replace(a,b)
+s=s.replace('$q.ptl_four_tap_accepted -lt 1)', '$q.ptl_four_tap_accepted -lt 1 -or $q.ptl_solid_accepted -lt 1)');save('run-ptl-native-live-v2.ps1',s)
+print('Prepared registered26, bootstrap22, desktop48, live38; no driver or desktop changes made.')

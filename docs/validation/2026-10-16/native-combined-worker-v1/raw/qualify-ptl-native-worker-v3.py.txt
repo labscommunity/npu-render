@@ -1,0 +1,45 @@
+"""Replay the real named-pipe worker, with pinned NPU specialization and inherited recovery."""
+from pathlib import Path
+from datetime import UTC,datetime
+import argparse,hashlib,json,os,subprocess,sys,traceback
+root=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=root/'vm'
+def obj(p):
+ b=p.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+def rows(p):return [json.loads(x) for x in p.read_text(encoding='utf-8-sig').splitlines() if x.startswith('{') and x.endswith('}')]
+def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+p=argparse.ArgumentParser();p.add_argument('stage',choices=['selected','full']);a=p.parse_args()
+out=vm/('ptl-native-worker-v3-'+a.stage);out.mkdir(exist_ok=False);trial=out/'replay';process=None
+report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,desktop_changed=False,tahoma_tested=False,stage=a.stage)
+def save():(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+try:
+ assert obj(vm/'ptl-four-tap-general-comparison-v3/report.json')['passed']
+ assert obj(vm/'ptl-solid-integration-comparison-v2/report.json')['passed']
+ solid=vm/'ptl-six-span-solid-v3/patched.blob';assert sha(solid)=='21360321c21d4a0253b260ce62420ffef47ec03daae8b89e6cf05bd4c541ee8f'
+ worker=root/'builds/ptl-native-worker-v3/Release/nr_registered_local_indexed_worker.exe';assert sha(worker)=='0abd7d73a67e40274e82f0ec2d50b545898a18d434075f86ab619fb60760949f'
+ model=vm/'ptl-six-span-general-v1/patched.blob';assert sha(model)=='710f6e5586da59f4040213435c5ecc13bb669e6b1be668f838edd00bca5dd697'
+ if a.stage=='full':assert obj(vm/'ptl-native-worker-v3-selected/report.json')['passed']
+ env=os.environ.copy();env['NR_RENDER_PTL_FOUR_TAP_BLOB']=str(model);env['NR_RENDER_PTL_SOLID_BLOB']=str(solid)
+ command=[sys.executable,str(vm/'replay-recorded-requests-v17.py'),'--worker',str(worker),'--client',str(root/'builds/native-routing-v20/Release/nr_registered_local_indexed_client_probe.exe'),'--runtime',str(root/'toolchains/openvino-2026.4.1/Lib/site-packages/openvino/libs'),'--cache',str(vm/'model-cache-2026-4-v209'),'--capture',str(vm/'native-desktop-admission-v33/bootstrap/requests'),'--output',str(trial),'--shared-core','1','--shared-queue','1','--memory-cache','1','--memory-capacity','512','--pipeline-cache','retained','--quad-batch','1','--generic-batch','4096','--infer-trace','0','--compile-trace','0','--infer-profile','0','--provider-recovery','1','--texture-scope','1']
+ if a.stage=='selected':command+=['--tickets','0,1,5,7,20,41,43,140,177,354,465,474,476,585,651,717,773,803,970']
+ report.update(worker_sha256=sha(worker),solid_model_sha256=sha(solid),model_sha256=sha(model),command=command);save()
+ with (out/'stdout.log').open('xb') as stdout,(out/'stderr.log').open('xb') as stderr:
+  process=subprocess.Popen(command,env=env,stdout=stdout,stderr=stderr,creationflags=subprocess.CREATE_NO_WINDOW)
+  try:process.wait(timeout=1950)
+  except subprocess.TimeoutExpired:process.kill();process.wait(timeout=5);report['replay_timeout']=True
+ proof=obj(trial/'report.json');report.update(replay_exit=process.returncode,replay=proof)
+ assert process.returncode==0 and proof['passed'];assert proof['original_pixel_hashes_matched']+proof['unreferenced_successes']==proof['delivery_acknowledgments']
+ parent=rows(trial/'worker.stdout.jsonl');report['provider_generations']=sum(bool(x.get('provider_process_started')) for x in parent);report['provider_failures']=sum(bool(x.get('provider_process_failure')) for x in parent)
+ attempts=[]
+ for log in (trial/'provider-processes').glob('generation-*/worker.stdout.jsonl'):attempts += [x for x in rows(log) if x.get('ptl_four_tap_attempt')]
+ report.update(specialization_attempts=len(attempts),specialization_accepted=sum(bool(x['accepted']) for x in attempts),specialization_declined=sum(not x['accepted'] for x in attempts))
+ assert len(attempts)>=3 and all(x['provider_requests']>=2 for x in attempts if x['accepted']);assert report['specialization_accepted']==(10 if a.stage=='selected' else 24)
+ solid_attempts=[]
+ for log in (trial/'provider-processes').glob('generation-*/worker.stdout.jsonl'):solid_attempts += [x for x in rows(log) if x.get('ptl_solid_attempt')]
+ report.update(solid_attempts=len(solid_attempts),solid_accepted=sum(bool(x['accepted']) for x in solid_attempts),solid_declined=sum(not x['accepted'] for x in solid_attempts))
+ assert report['solid_accepted']==5 and all(x['provider_requests']==5 for x in solid_attempts if x['accepted'])
+ report['passed']=True
+except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+finally:
+ if process is not None and process.poll() is None:process.kill();process.wait(timeout=5)
+ report.update(completed=True,finished=datetime.now(UTC).isoformat());save()
+print(json.dumps({k:v for k,v in report.items() if k not in ('command','replay')}));raise SystemExit(0 if report['passed'] else 1)

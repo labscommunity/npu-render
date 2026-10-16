@@ -1,0 +1,10 @@
+from pathlib import Path
+import hashlib,json,tarfile,shutil
+r=Path('results/render-driver');o=r/'ptl-geometry-inspect-v2';shutil.copytree(r/'ptl-four-tap-inspect-v1',o)
+p=o/'inspect.cpp';s=p.read_text().replace('r.inputs.size()==6','!r.inputs.empty() && r.inputs.size()<=4095')
+s=s.replace('const float x=(as_float(pos[0])/w+1)*r.viewport.width*.5f,y=(1-as_float(pos[1])/w)*r.viewport.height*.5f;', 'const float x=r.viewport.x+(as_float(pos[0])/w+1)*r.viewport.width*.5f,y=r.viewport.y+(1-as_float(pos[1])/w)*r.viewport.height*.5f;')
+p.write_text(s)
+(r/'ptl-geometry-inspect-v2-source.json').write_text(json.dumps({p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in o.iterdir()},indent=2)+'\n')
+with tarfile.open(r/'ptl-geometry-inspect-v2.tar.gz','w:gz') as t:
+ for p in o.iterdir():t.add(p,arcname=o.name+'/'+p.name)
+s=(r/'build-ptl-four-tap-inspect-v1.ps1').read_text().replace('ptl-four-tap-inspect-v1','ptl-geometry-inspect-v2');(r/'build-ptl-geometry-inspect-v2.ps1').write_text(s)

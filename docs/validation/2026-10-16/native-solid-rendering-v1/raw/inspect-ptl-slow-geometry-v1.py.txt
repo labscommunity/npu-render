@@ -1,0 +1,16 @@
+from pathlib import Path
+import hashlib,json,os,subprocess,struct
+root=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=root/'vm';out=vm/'ptl-slow-geometry-v1';out.mkdir(exist_ok=False)
+exe=root/'builds/ptl-geometry-inspect-v2/Release/nr_ptl_four_tap_inspect.exe';assert hashlib.sha256(exe.read_bytes()).hexdigest()=='aae8cf4e921abb5566bc974e0e7c7526be7310ebc922cb5f6a60f2c005abc9f0'
+selected=[r for r in json.loads((vm/'ptl-worker-cost-analysis-v1/draws.json').read_text()) if r['pixel_shader_sha256'].startswith(('95b1c4fb','d8e0b497'))];cases=[];summaries=[];shaders={}
+for row in selected:
+ packet=vm/f"native-desktop-admission-v33/bootstrap/requests/request-{row['ticket']:08d}.bin";data=packet.read_bytes();assert hashlib.sha256(data).hexdigest()==row['original_request_sha256']
+ result=subprocess.run([str(exe),str(packet)],capture_output=True,timeout=10,creationflags=subprocess.CREATE_NO_WINDOW);assert result.returncode==0 and not result.stderr
+ geometry=json.loads(result.stdout);cases.append(dict(cost=row,geometry=geometry))
+ vertices=geometry['vertices'];uniform_triangles=all(vertices[i]['color']==vertices[i+1]['color']==vertices[i+2]['color'] for i in range(0,len(vertices),3))
+ summaries.append(dict(ticket=row['ticket'],shader=row['pixel_shader_sha256'],target=[row['width'],row['height']],vertices=len(vertices),uniform_triangles=uniform_triangles,distinct_colors=len({tuple(v['color']) for v in vertices}),draw_ms=row['draw_ms']))
+ if row['pixel_shader_sha256'] not in shaders:
+  h=struct.unpack_from('<3Q14I',data);abi,flags,vlen,plen=h[3],h[8],h[9],h[10];legacy=h[-1] if abi>=16 else abi;at=80+24+(16 if legacy==15 else 0)+(16 if flags&4 else 0)
+  shaders[row['pixel_shader_sha256']]=dict(vertex=list(struct.unpack_from('<'+str(vlen)+'I',data,at)),pixel=list(struct.unpack_from('<'+str(plen)+'I',data,at+vlen*4)))
+report=dict(completed=True,passed=True,pixel_data_exported=False,cpu_reference_only=True,cases=cases);(out/'report.json').write_text(json.dumps(report,indent=2)+'\n');(out/'summary.json').write_text(json.dumps(summaries,indent=2)+'\n');(out/'shaders.json').write_text(json.dumps(shaders,indent=2)+'\n')
+print(json.dumps(dict(cases=len(cases),slowest=sorted(summaries,key=lambda r:r['draw_ms'],reverse=True)[:8])))

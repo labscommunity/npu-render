@@ -1,0 +1,12 @@
+from pathlib import Path
+r=Path('results/render-driver');s=(r/'qualify-ptl-native-worker-v2b.py').read_text().replace('ptl-native-worker-v2-retry','ptl-native-worker-v3').replace('ptl-native-worker-v2','ptl-native-worker-v3').replace('6f49045ccbb56f8d27eae6b363eea7d44eb1eb4ba564f99a2c822a9ecf1ff115','0abd7d73a67e40274e82f0ec2d50b545898a18d434075f86ab619fb60760949f')
+s=s.replace("assert obj(vm/'ptl-four-tap-general-comparison-v3/report.json')['passed']", "assert obj(vm/'ptl-four-tap-general-comparison-v3/report.json')['passed']\n assert obj(vm/'ptl-solid-integration-comparison-v2/report.json')['passed']\n solid=vm/'ptl-six-span-solid-v3/patched.blob';assert sha(solid)=='21360321c21d4a0253b260ce62420ffef47ec03daae8b89e6cf05bd4c541ee8f'")
+s=s.replace("env['NR_RENDER_PTL_FOUR_TAP_BLOB']=str(model)","env['NR_RENDER_PTL_FOUR_TAP_BLOB']=str(model);env['NR_RENDER_PTL_SOLID_BLOB']=str(solid)")
+s=s.replace('0,1,5,7,20,41,43,140,177,354,474,476,803,970','0,1,5,7,20,41,43,140,177,354,465,474,476,585,651,717,773,803,970')
+s=s.replace('report.update(worker_sha256=sha(worker),model_sha256=sha(model),','report.update(worker_sha256=sha(worker),solid_model_sha256=sha(solid),model_sha256=sha(model),')
+s=s.replace(" report['passed']=True",''' solid_attempts=[]
+ for log in (trial/'provider-processes').glob('generation-*/worker.stdout.jsonl'):solid_attempts += [x for x in rows(log) if x.get('ptl_solid_attempt')]
+ report.update(solid_attempts=len(solid_attempts),solid_accepted=sum(bool(x['accepted']) for x in solid_attempts),solid_declined=sum(not x['accepted'] for x in solid_attempts))
+ assert report['solid_accepted']==5 and all(x['provider_requests']==5 for x in solid_attempts if x['accepted'])
+ report['passed']=True''')
+(r/'qualify-ptl-native-worker-v3.py').write_text(s)

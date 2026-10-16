@@ -1,0 +1,77 @@
+from pathlib import Path
+import json,hashlib,tarfile
+r=Path('results/render-driver');o=r/'ptl-solid-integration-v1';o.mkdir(exist_ok=False)
+shaders=json.loads((r/'ptl-slow-shaders-v1.json').read_text())['95b1c4fbb5f9bf0f34ad7b76eca5ae122d956a9570e1796e1bd4aecf43ca7dbe']
+h='#pragma once\n#include <array>\n#include <cstdint>\nnamespace nr::registered_lab::indexed_exchange::ptl_solid_fixture {\n'
+for k,v in shaders.items():h+='inline constexpr std::array<uint32_t,'+str(len(v))+'> '+k+'{'+','.join(f'0x{x:08x}u' for x in v)+'};\n'
+h+='}\n';(o/'ptl_solid_shaders.hpp').write_text(h)
+s=(r/'ptl-four-tap-general-v3/ptl_four_tap.hpp').read_text().replace('ptl_four_tap_shaders.hpp','ptl_solid_shaders.hpp').replace('PtlFourTap','PtlSolid').replace('ptl_fixture::','ptl_solid_fixture::')
+s=s.replace('    bool failed=false;', '    bool failed=false;\n    unsigned vertices=0;')
+a=s.index('        const auto &t=r.resources[0];');b=s.index('        if(!std::equal',a)
+s=s[:a]+'''        if((h.abi!=1 && h.abi!=3) || (h.flags!=3840 && h.flags!=3841 && h.flags!=3844 && h.flags!=3845) ||
+           !h.width || h.width>8192 || !h.height || h.height>8192 || h.format!=87 ||
+           h.vertices<=6 || h.vertices>168 || h.vertices%6 || r.inputs.size()!=h.vertices ||
+           r.background.size()!=size_t(h.width)*h.height ||
+           r.viewport.x!=0 || r.viewport.y!=0 || r.viewport.width!=float(h.width) ||
+           r.viewport.height!=float(h.height) || r.viewport.min_depth!=0 || r.viewport.max_depth!=1 ||
+           r.vertex.bytecode.size()!=ptl_solid_fixture::vertex.size() || r.pixel.bytecode.size()!=ptl_solid_fixture::pixel.size()) return false;
+        const auto sc=r.scissor.value_or(std::array<int32_t,4>{0,0,int32_t(h.width),int32_t(h.height)});
+        if(sc[0]<0 || sc[1]<0 || sc[2]<sc[0] || sc[3]<sc[1] || sc[2]>int(h.width) || sc[3]>int(h.height))return false;
+''' +s[b:]
+s=s.replace('for(unsigned n=1;n<16;++n)', 'for(unsigned n=0;n<16;++n)')
+a=s.index('        constexpr unsigned char expected[]');b=s.index(';',a)+1
+sha='800da3f17007e682f05cff3724655d3567049abc718c9082cf631da3251f2e3f';s=s[:a]+'        constexpr unsigned char expected[]{'+','.join('0x'+sha[i:i+2] for i in range(0,64,2))+'};'+s[b:]
+s=s.replace('vertex=std::make_unique<shader::VertexExecutor>(r.vertex,6,"NPU");','vertices=r.header.vertices;vertex=std::make_unique<shader::VertexExecutor>(r.vertex,vertices,"NPU");').replace('projection=std::make_unique<raster::ProjectionExecutor>(6,"NPU");','projection=std::make_unique<raster::ProjectionExecutor>(vertices,"NPU");')
+s=s.replace('require(!failed && eligible(r));','require(!failed && eligible(r) && r.header.vertices==vertices);').replace('clips(6)','clips(vertices)').replace('n<6;++n) std::memcpy','n<vertices;++n) std::memcpy').replace('result.input_bytes+=6*16+24; result.output_bytes+=6*16+6*8+2*16;','result.input_bytes+=uint64_t(vertices)*16+24; result.output_bytes+=uint64_t(vertices)*24+uint64_t(vertices/3)*16;')
+a=s.index('        const auto &a=projected.vertices[0]');b=s.index('        return attempt;',a)
+# First return attempt occurs at function end because inline decline statements are on same line with preceding text.
+b=s.rindex('        return attempt;')
+s=s[:a]+'''        const auto color=shaded.vertices[0][1];float color_f[4];std::memcpy(color_f,color.data(),16);
+        bool admitted=true;for(float f:color_f)admitted=admitted && f>=0 && f<=1;
+        for(unsigned base=0;base<vertices;base+=6){
+            const auto &a=projected.vertices[base],&c=projected.vertices[base+2];
+            const unsigned order0[6]{0,1,2,2,3,0},order1[6]{0,1,2,0,2,3};
+            const unsigned *order=projected.vertices[base+3].snapped==a.snapped?order1:order0;
+            admitted=admitted && a.snapped[0]<c.snapped[0] && a.snapped[1]<c.snapped[1];
+            for(unsigned n=0;n<6;++n){const auto &v=projected.vertices[base+n];const unsigned k=order[n];
+                admitted=admitted && v.snapped==raster::Point{k==1||k==2?c.snapped[0]:a.snapped[0],k>=2?c.snapped[1]:a.snapped[1]} &&
+                    v.inverse_w==1 && shaded.vertices[base+n][1]==color;
+                for(int coordinate:v.snapped)admitted=admitted && coordinate>=-8388608 && coordinate<=8388608;
+            }
+        }
+        if(!admitted){result.timings.total_ms=elapsed(start);failed=false;return attempt;}
+        const unsigned w=r.header.width,h=r.header.height,total=w*h;
+        const auto sc=r.scissor.value_or(std::array<int32_t,4>{0,0,int32_t(w),int32_t(h)});
+        result.vertices=std::move(shaded.vertices);result.fragment=color;result.pixels.resize(total);
+        auto *data=static_cast<unsigned char*>(inference.get_input_tensor().data());std::memset(data,0,1572864);
+        const unsigned fields[]{0x4e525332,1,w,h,0,0,vertices/6,r.header.flags&1,87,15,unsigned(sc[0]*256),unsigned(sc[1]*256),unsigned(sc[2]*256),unsigned(sc[3]*256),0,262144};
+        std::memcpy(data,fields,64);
+        for(unsigned base=0;base<vertices;base+=6){auto *p=data+64+(base/6)*32;const auto &a=projected.vertices[base],&c=projected.vertices[base+2];
+            const int bounds[]{a.snapped[0],a.snapped[1],c.snapped[0],c.snapped[1]};std::memcpy(p,bounds,16);std::memcpy(p+16,color.data(),16);
+        }
+        const auto raster_start=Clock::now();
+        for(unsigned group=0;group<total;group+=6*65280){
+            for(unsigned plane=0;plane<6;++plane){auto *payload=data+plane*262144;if(plane)std::memcpy(payload,data,1024);
+                const unsigned first=std::min(total,group+plane*65280),count=std::min(65280u,total-first);put(payload+16,first);put(payload+20,count);
+                std::memcpy(payload+1024,r.background.data()+first,size_t(count)*4);
+            }
+            inference.infer();++result.provider_requests;++result.tile_executions;result.input_bytes+=1572864;result.output_bytes+=1572864;
+            const auto tensor=inference.get_output_tensor();const auto *output=static_cast<const unsigned char*>(tensor.data());
+            for(unsigned plane=0;plane<6;++plane){const unsigned first=std::min(total,group+plane*65280),count=std::min(65280u,total-first);const auto *p=output+plane*262144;
+                unsigned header[4];std::memcpy(header,p,16);require(header[0]==0x4e52534f && header[1]==count && header[2]<=count*(vertices/6) && header[3]==0);
+                result.covered_samples+=header[2];std::memcpy(result.pixels.data()+first,p+16,size_t(count)*4);
+            }
+        }
+        result.timings.merger_ms=elapsed(raster_start);result.timings.total_ms=elapsed(start);
+        result.used_rectangle=true;attempt.accepted=true;failed=false;
+''' +s[b:]
+(o/'ptl_solid.hpp').write_text(s)
+c=(r/'ptl-four-tap-general-v3/compare.cpp').read_text().replace('ptl_four_tap.hpp','ptl_solid.hpp').replace('PtlFourTap','PtlSolid').replace('r.pixel.bytecode[40]','r.pixel.bytecode[10]')
+c=c.replace('r.header.flags^=1','r.header.flags^=16').replace('r.inputs[0][1][0]=as_bits(.5f)','r.inputs[0][1][0]=as_bits(.5f)')
+c=c.replace('if(iteration){fill(r.resources[0].pixels);fill(r.background);}', '''if(iteration){fill(r.background);for(auto &v:r.inputs){v[1]=VertexBits{as_bits(.25f),as_bits(.5f),as_bits(.75f),as_bits(iteration==1?0.f:iteration==2?.5f:1.f)};}}''')
+c=c.replace('iteration<4?((at+c*71u)', 'iteration<3?((at+c*71u)')
+(o/'compare.cpp').write_text(c);(o/'CMakeLists.txt').write_bytes((r/'ptl-four-tap-general-v3/CMakeLists.txt').read_bytes())
+(r/'ptl-solid-integration-v1-source.json').write_text(json.dumps({p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in o.iterdir()},indent=2)+'\n')
+with tarfile.open(r/'ptl-solid-integration-v1.tar.gz','w:gz') as t:
+ for p in o.iterdir():t.add(p,arcname=o.name+'/'+p.name)
+s=(r/'build-ptl-four-tap-general-v3.ps1').read_text().replace('ptl-four-tap-general-v3','ptl-solid-integration-v1');(r/'build-ptl-solid-integration-v1.ps1').write_text(s)

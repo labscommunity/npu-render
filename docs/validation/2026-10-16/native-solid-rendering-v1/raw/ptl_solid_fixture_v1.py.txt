@@ -1,0 +1,42 @@
+"""Independent CPU oracle for packed solid-rectangle NPU transport fixtures."""
+import struct
+import numpy as np
+
+def fixture(index):
+ rng=np.random.default_rng(970000+index)
+ w,h=257,512;count=[0,1,17,4096,32768,65280][index%6];first=(index*73)%1000
+ rectangles=0 if index%17==0 else 1+index%28;blend=index%2;fmt=87 if index%3 else 28;mask=1+index%15
+ data=bytearray(262144);clip=[0,0,w*256,h*256] if index%3 else [3*256,7*256,249*256,501*256]
+ struct.pack_into('<10I4i2I',data,0,0x4e525332,1,w,h,first,count,rectangles,blend,fmt,mask,*clip,0,262144)
+ bg=rng.integers(0,256,(count,4),dtype=np.uint8);data[1024:1024+count*4]=bg.tobytes();result=bg.copy()
+ at=np.arange(first,first+count,dtype=np.int64);sx=(at%w)*256+128;sy=(at//w)*256+128;in_clip=(sx>=clip[0])&(sx<clip[2])&(sy>=clip[1])&(sy<clip[3]);hits=0
+ for n in range(rectangles):
+  x0=int(rng.integers(-10,w//2))*256+([0,127,128,129][n%4]);y0=int(rng.integers(-10,h//2))*256+([0,127,128,129][index%4]);x1=int(rng.integers(w//2,w+10))*256;y1=int(rng.integers(h//2,h+10))*256
+  color=rng.choice(np.array([0,.5,1/255,128/255,1],np.float32),4).astype(np.float32)
+  struct.pack_into('<4i4f',data,64+n*32,x0,y0,x1,y1,*color.tolist())
+  covered=in_clip&(sx>=x0)&(sx<x1)&(sy>=y0)&(sy<y1);hits+=int(covered.sum())
+  if fmt==87:color=color[[2,1,0,3]]
+  value=np.broadcast_to(color*np.float32(255),(count,4)).copy()
+  if blend:value=value+result.astype(np.float32)*(np.float32(1)-color[3])
+  value=np.rint(np.clip(value,0,255)).astype(np.uint8)
+  for c in range(4):
+   logical=2-c if fmt==87 and c<3 else c
+   if mask&(1<<logical):result[covered,c]=value[covered,c]
+ expected=bytearray(262144);struct.pack_into('<4I',expected,0,0x4e52534f,count,hits,0);expected[16:16+count*4]=result.tobytes()
+ if index>=96:
+  # Malformed metadata must clear the output and decline before writing pixels.
+  case=(index-96)%12
+  if case==0:struct.pack_into('<I',data,0,0)
+  elif case==1:struct.pack_into('<I',data,8,0)
+  elif case==2:struct.pack_into('<I',data,20,65281)
+  elif case==3:struct.pack_into('<I',data,24,29)
+  elif case==4:struct.pack_into('<I',data,28,2)
+  elif case==5:struct.pack_into('<I',data,32,0)
+  elif case==6:struct.pack_into('<I',data,36,0)
+  elif case==7:struct.pack_into('<i',data,40,-1)
+  elif case==8:struct.pack_into('<I',data,56,1)
+  elif case==9:struct.pack_into('<I',data,60,0)
+  elif case==10:struct.pack_into('<I',data,24,1);struct.pack_into('<f',data,80,float('nan'))
+  else:struct.pack_into('<I',data,16,w*h+1)
+  expected=bytearray(262144)
+ return data,expected

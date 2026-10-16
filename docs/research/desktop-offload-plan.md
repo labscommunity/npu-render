@@ -2,8 +2,8 @@
 
 Updated 2026-10-16. Target: Delta, Windows 11, Panther Lake. The repository stays
 private. **Full desktop offload is unfinished.** The latest qualified native trial
-routes Windows desktop composition through the NPU, delivers 42 matching frames
-over a 523.93-second span to the physical output, verifies mouse/keyboard color
+routes Windows desktop composition through the NPU, delivers 46 matching frames
+over a 548.34-second span to the physical output, verifies mouse/keyboard color
 changes, and restores the machine. Its 60-second freshness gate proves delivery,
 not usability. The previous renderer separately passed thirty-minute delivery.
 Normal application admission and a Tahoma benefit remain open.
@@ -24,8 +24,14 @@ desktop state. It remains slow: one controlled mouse response takes 27.21 second
 A broader revision now covers all 24 recorded uses of that four-sample shader,
 with 96 exact component comparisons. Its integrated worker passes all 972 requests,
 matches all 971 original references, and matches all 972 outputs from the prior
-worker. This revision has not yet repeated the live trial. The largest remaining
-shader groups and model preparation must now be addressed.
+worker. A direct solid-rectangle kernel also matches five costly captured draws
+using five calls each, down from 595–643, with roughly 13–23 ms component times.
+The combined worker passes all 972 requests, registered Direct3D v26 and live v38.
+V38 admits eleven four-sample and four solid draws, presents 46 matching frames,
+and restores the machine. Its controlled mouse response takes 10.25 seconds and
+keyboard response 127 ms. These two observations are not a latency distribution
+or a matched comparison with v37. Other shader groups, model preparation and
+normal application admission still require work.
 Normal application admission and matched Tahoma A/B remain open. The earlier
 thirty-minute delivery qualification belongs to the previous renderer.
 
@@ -60,11 +66,10 @@ role, and any GPU rendering/copy cost in the bridge must be measured.
 2. Preserve the exact six-span four-sample replay result and corrected capacity
    guard qualification. Reduce per-pixel work and broaden changing-image checks;
    independent imported-model overlap is excluded after real device loss.
-3. Retain the now-qualified 24-draw specialization and complete its live integration.
-   Reduce the measured solid-color, three-texture and two-texture shader costs.
-   The five slow solid-color draws alone account for about 10.8 s in the diagnostic
-   replay; a direct multi-rectangle kernel is under qualification. V37 passes finite live integration; repeat responsiveness and sustained
-   stability checks after further renderer changes.
+3. Retain the now-qualified combined four-sample/solid worker and live v38 result.
+   Reduce the measured three-texture and two-texture shader costs. The solid
+   component clears five expensive draws but does not establish desktop usability.
+   Repeat responsiveness and sustained stability checks after renderer changes.
 4. Add automatic application admission and the missing graphics operations;
    establish per-process rendering devices under representative real workloads.
 5. Measure matched Tahoma baseline/offload performance and remaining GPU work.
@@ -96,6 +101,11 @@ and [integrated worker replay](../validation/2026-10-16/native-general-worker-v1
 now cover all 24 observed uses of the four-sample shader. The
 [normalization experiments](../validation/2026-10-15/native-byte-normalization-v1/README.md)
 are exact but do not resolve the overall performance gap.
+The [solid-rectangle component](../validation/2026-10-16/native-solid-rendering-v1/README.md),
+[combined worker replay](../validation/2026-10-16/native-combined-worker-v1/README.md)
+and [combined live trial](../validation/2026-10-16/native-combined-live-v1/README.md)
+now pass. The live result confirms integration and recovery, while the measured
+10.25-second mouse response still fails the responsiveness goal.
 These are prerequisites toward the stated
 goal, not substitutes for application migration or Tahoma improvement.
 

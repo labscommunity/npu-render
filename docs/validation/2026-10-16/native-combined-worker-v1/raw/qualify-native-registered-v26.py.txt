@@ -1,0 +1,65 @@
+"""Qualify the protocol-3 DLL with real registered D3D11 allocations."""
+from native_session_broker_v1 import *
+import _winapi,traceback
+a=argparse.ArgumentParser()
+for name in ('worker','client','dll','package','runtime','cache','output'):a.add_argument('--'+name,type=Path,required=True)
+v=a.parse_args();v.output.mkdir(exist_ok=False);out=v.output
+for path in (v.worker,v.client):
+ b=obj(path.parent.parent/'registered-build-report.json');assert b['clean_build'] and hashlib.sha256(path.read_bytes()).hexdigest()==b['binary_sha256'][path.name].lower()
+package=obj(v.package/'report.json');entry=next(x for x in package['files'] if x['name']=='nr_native_probe_umd.dll')
+assert package['prepared'] and package['version']=='0.0.1317.0' and package['admission_protocol']==3 and package['hardware_id']=='ROOT\\NPURENDER_NATIVE_PROBE' and hashlib.sha256(v.dll.read_bytes()).hexdigest()==entry['sha256'].lower()
+env=os.environ.copy();env['PATH']=str(v.runtime)+os.pathsep+env.get('PATH','');env.update(NR_RENDER_NPU_CACHE=str(v.cache),NR_RENDER_SHARED_QUEUE='1',NR_RENDER_PIPELINE_CACHE='retained',NR_RENDER_MEMORY_CACHE='1',NR_RENDER_MEMORY_CACHE_CAPACITY='512',NR_RENDER_TEXTURE_SCOPE='1',NR_RENDER_GENERIC_BATCH='4096',NR_RENDER_UNIFORM_LANES='0',NR_RENDER_COMPACT_COVERAGE='0',NR_RENDER_SHARED_CORE='1',NR_RENDER_OPAQUE_CROP='1',NR_RENDER_QUAD_BATCH='1')
+model=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm/ptl-six-span-general-v1/patched.blob'
+assert hashlib.sha256(model.read_bytes()).hexdigest()=='710f6e5586da59f4040213435c5ecc13bb669e6b1be668f838edd00bca5dd697'
+env['NR_RENDER_PTL_FOUR_TAP_BLOB']=str(model)
+solid=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm/ptl-six-span-solid-v3/patched.blob'
+assert hashlib.sha256(solid.read_bytes()).hexdigest()=='21360321c21d4a0253b260ce62420ffef47ec03daae8b89e6cf05bd4c541ee8f'
+env['NR_RENDER_PTL_SOLID_BLOB']=str(solid)
+env.pop('NR_RENDER_AFFINE_BATCH',None)
+for key in ('NR_RENDER_RECOVERY_TEST_KILL_TICKET','NR_RENDER_RECOVERY_TEST_EXCEPTION_TICKET','NR_RENDER_PROVIDER_TEST_INFER_EXCEPTION_TICKET'):env.pop(key,None)
+provider_root=out/'provider-processes';provider_root.mkdir(exist_ok=False)
+env.update(NR_RENDER_PROVIDER_RECOVERY='1',NR_RENDER_PROVIDER_RECOVERY_DIR=str(provider_root),NR_RENDER_INFER_TRACE='1',NR_RENDER_COMPILE_TRACE='1')
+report=dict(worker_binary_sha256=hashlib.sha256(v.worker.read_bytes()).hexdigest(),dll_sha256=hashlib.sha256(v.dll.read_bytes()).hexdigest(),started=datetime.now(UTC).isoformat(),completed=False,passed=False,controller_pid=os.getpid(),driver_installed=True,registered_adapter_tested=False,desktop_offloaded=False,quad_batch='1',texture_scope='1',memory_cache='1',generic_batch='4096')
+def save():(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+save();worker=None;hp=ht=None;lease=None
+try:
+ negative=subprocess.run([str(v.client),str(v.dll),'--reject-unleased'],env=env,capture_output=True,timeout=15);(out/'unleased.stdout.jsonl').write_bytes(negative.stdout);(out/'unleased.stderr.log').write_bytes(negative.stderr)
+ assert negative.returncode==0 and any(x.get('unleased_native_adapter_rejected') and x.get('passed') for x in rows(out/'unleased.stdout.jsonl'));report['unleased_rejection_passed']=True;save()
+ suffix=secrets.token_hex(16);pipe=r'\\.\pipe\npu-render-indexed-'+suffix
+ with (out/'worker.stdout.jsonl').open('xb') as ws,(out/'worker.stderr.log').open('xb') as we,(out/'consumer.stdout.jsonl').open('xb') as cs,(out/'consumer.stderr.log').open('xb') as ce,open(os.devnull,'rb') as null:
+  worker=subprocess.Popen([str(v.worker),pipe,'8','120'],env=env,stdin=subprocess.DEVNULL,stdout=ws,stderr=we,creationflags=subprocess.CREATE_NO_WINDOW);report['worker_pid']=worker.pid
+  until=time.perf_counter()+15
+  while not any(x.get('local_worker_ready') for x in rows(out/'worker.stdout.jsonl')):
+   assert time.perf_counter()<until and worker.poll() is None;time.sleep(.02)
+  info=subprocess.STARTUPINFO();info.dwFlags|=subprocess.STARTF_USESTDHANDLES
+  handles=[msvcrt.get_osfhandle(f.fileno()) for f in (null,cs,ce)];info.hStdInput,info.hStdOutput,info.hStdError=handles;info.lpAttributeList={'handle_list':handles}
+  for handle in handles:os.set_handle_inheritable(handle,True)
+  try:hp,ht,pid,tid=_winapi.CreateProcess(str(v.client),subprocess.list2cmdline([str(v.client),str(v.dll)]),None,None,True,subprocess.CREATE_NO_WINDOW|0x4,env,None,info)
+  finally:
+   for handle in handles:os.set_handle_inheritable(handle,False)
+  report['consumer_pid']=pid;save()
+  lease=LeaseGrant(int(worker._handle),hp,suffix)
+  report['lease_scope']='one-owned-consumer-protocol-3-session-0-120-seconds';report['lease_sha256']=hashlib.sha256(bytes(lease.record)).hexdigest();report['admission_protocol']=3;save()
+  assert k.ResumeThread(ht)!=0xffffffff;_winapi.CloseHandle(ht);ht=None
+  assert _winapi.WaitForSingleObject(hp,110000)==0,'Native DDI consumer timed out';code=_winapi.GetExitCodeProcess(hp);report['consumer_exit_code']=code;save();assert code==0,'Native DDI consumer failed'
+  evidence=rows(out/'consumer.stdout.jsonl');done=[x for x in evidence if x.get('native_registered_component')]
+  assert len(done)==1 and done[0]['passed'] and done[0]['npu_local_executions']==8 and done[0]['clears']==6 and done[0]['draws']==2 and done[0]['normal_d3d11_runtime'] and done[0]['registered_adapter_tested'] and not done[0]['allocation_callbacks_emulated'] and done[0]['cpu_executions']==done[0]['gpu_executions']==0
+  worker.wait(timeout=10);logs=rows(out/'worker.stdout.jsonl');renders=[x for x in logs if x.get('passed') and x.get('execution_device')=='NPU'];acks=[x for x in logs if x.get('worker_success')];finish=[x for x in logs if x.get('local_worker_finished')]
+  assert worker.returncode==0 and len(renders)==len(acks)==8 and all(x['execution_device']=='NPU' and x['client_pid']==pid for x in renders)
+  assert len(finish)==1 and finish[0]['succeeded']==finish[0]['settled']==8 and not (out/'worker.stderr.log').read_bytes()
+  child_logs=[x for path in provider_root.glob('generation-*/worker.stdout.jsonl') for x in rows(path)]
+  child_renders=[x for x in child_logs if x.get('passed') and x.get('execution_device')=='NPU']
+  assert len(child_renders)==8 and all(x['client_pid']==worker.pid for x in child_renders)
+  report.update(isolated_provider=True,hardware_child_receipts=8,provider_generations=len(list(provider_root.glob('generation-*'))),device_loss_recovery_tested=False)
+  report.update(passed=True,registered_adapter_tested=True,component=done[0],npu_operation_receipts=8,delivery_acknowledgments=8,worker_exit_code=worker.returncode)
+except Exception as e:report.update(error=repr(e),traceback=traceback.format_exc())
+finally:
+ if hp is not None:
+  if _winapi.WaitForSingleObject(hp,0)!=0:_winapi.TerminateProcess(hp,1);_winapi.WaitForSingleObject(hp,5000);report['owned_consumer_terminated']=True
+  _winapi.CloseHandle(hp)
+ if ht is not None:_winapi.CloseHandle(ht)
+ if worker is not None and worker.poll() is None:worker.kill();worker.wait(timeout=5);report['owned_worker_terminated']=True
+ if lease:lease.close()
+ report.update(completed=True,finished=datetime.now(UTC).isoformat());save()
+print(json.dumps(report))
+if not report['passed']:raise SystemExit(1)
