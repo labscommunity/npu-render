@@ -1,0 +1,15 @@
+from pathlib import Path
+import ctypes,hashlib,json,time
+from ptl_point_unit_fixtures_v1 import fixture,PER_SPAN,CASES
+r=Path(__file__).parent;start=time.perf_counter();checks=[];total=0
+functions=[]
+for name in ('ptl-point-rectangle-v1-local.dylib','ptl-point-rectangle-v2-local.dylib'):
+ lib=ctypes.CDLL(str((r/name).resolve()));fn=lib.nr_rectangle_local;fn.argtypes=[ctypes.c_void_p,ctypes.c_void_p];functions.append((lib,fn))
+for i in range((CASES+PER_SPAN-1)//PER_SPAN):
+ payload,expected,count=fixture(i);source=ctypes.create_string_buffer(payload);out=[]
+ for lib,fn in functions:
+  target=ctypes.create_string_buffer(262144);fn(source,target);out.append(target.raw)
+ exact=out[0]==out[1]==expected;checks.append(dict(index=i,cases=count,exact=exact,input_sha256=hashlib.sha256(payload).hexdigest(),output_sha256=hashlib.sha256(out[1]).hexdigest()));total+=count
+ if not exact:break
+report=dict(completed=True,passed=total==CASES and all(x['exact'] for x in checks),cpu_only=True,npu_tested=False,cases=total,compiled_old_new_oracle_exact=True,elapsed_seconds=time.perf_counter()-start,source_sha256={p:hashlib.sha256((r/p).read_bytes()).hexdigest() for p in ('ptl-point-rectangle-v1-local.c','ptl-point-rectangle-v2-local.c','ptl_point_unit_fixtures_v1.py')},checks=checks)
+p=r/'ptl-point-unit-local-v1.json';assert not p.exists();p.write_text(json.dumps(report,indent=2)+'\n');print(json.dumps({k:v for k,v in report.items() if k!='checks'}));raise SystemExit(0 if report['passed'] else 1)

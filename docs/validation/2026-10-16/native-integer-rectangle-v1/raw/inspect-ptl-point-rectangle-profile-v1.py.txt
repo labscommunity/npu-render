@@ -1,0 +1,23 @@
+from pathlib import Path
+from datetime import UTC,datetime
+import hashlib,json,os,subprocess,traceback
+r=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=r/'vm';out=vm/'ptl-point-rectangle-profile-admission-v1';out.mkdir(exist_ok=False)
+def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+exe=r/'builds/ptl-point-rectangle-profile-v1/Release/nr_ptl_point_rectangle_compare.exe';proof=json.loads((r/'builds/ptl-point-rectangle-profile-v1/build-report.json').read_text(encoding='utf-8-sig'));assert proof['clean_build'] and sha(exe)==proof['binary_sha256'].lower()
+cases=json.loads((vm/'ptl-program-capture-tickets-v1.json').read_text());assert len(cases)==605
+env=os.environ.copy();env['PATH']=str(r/'toolchains/openvino-2026.4.1/Lib/site-packages/openvino/libs')+os.pathsep+env['PATH']
+report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,npu_tested=False,desktop_changed=False,executable_sha256=sha(exe),capture_manifest_sha256=sha(vm/'ptl-program-capture-tickets-v1.json'),cases=[])
+def save():(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+save()
+try:
+ for item in cases:
+  ticket=item['ticket'];packet=vm/f'native-desktop-admission-v33/bootstrap/requests/request-{ticket:08d}.bin';assert sha(packet)==item['original_request_sha256']
+  p=subprocess.run([str(exe),str(packet),str(vm/'ptl-six-span-point-rectangle-v1/patched.blob'),str(out),'--inspect'],env=env,capture_output=True,timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
+  assert p.returncode==0 and not p.stderr,(ticket,p.returncode,p.stderr.decode(errors='replace'))
+  records=[json.loads(x) for x in p.stdout.decode().splitlines() if x.startswith('{')];assert len(records)==1 and records[0]['inspection_only'] and not records[0]['npu_executed']
+  report['cases'].append(dict(**item,accepted=records[0]['accepted'],reason=records[0]['reason']));save()
+ report['accepted_tickets']=sorted(x['ticket'] for x in report['cases'] if x['accepted']);assert report['accepted_tickets']
+ report.update(passed=True,accepted=sum(x['accepted'] for x in report['cases']),declined=sum(not x['accepted'] for x in report['cases']))
+except Exception as e:report.update(error=repr(e),traceback=traceback.format_exc())
+finally:report.update(completed=True,finished=datetime.now(UTC).isoformat());save()
+print(json.dumps({k:v for k,v in report.items() if k!='cases'}));raise SystemExit(0 if report['passed'] else 1)

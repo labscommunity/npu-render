@@ -79,6 +79,13 @@ crops. All 148 image comparisons pass. Summed warm draw time falls from 12.483 t
 complex-shader draws, one import per component, and zero provider failures.
 Registered graphics and live integration remain separate from this replay gate.
 
+The [integer rectangle candidate](../validation/2026-10-16/native-integer-rectangle-v1/README.md)
+targets the measured color-request cost. It preserves all 233 device fixtures,
+all 16,777,216 exhaustive source/background/alpha combinations, and 148 complete
+images. An alternating-order comparison against the preceding rectangle kernel
+reduces summed warm time from 5.864 to 4.517 seconds across 111 pairs. The candidate
+still requires full worker and desktop integration; this is not a Tahoma result.
+
 The [long-shader component](../validation/2026-10-16/native-long-shader-v1/README.md)
 passes 120 independent NPU fixtures and exact complete-image comparisons for
 the failed v43 request and all six earlier uses of the shader. [Worker v9](../validation/2026-10-16/native-long-shader-worker-v1/README.md)

@@ -1,0 +1,17 @@
+"""Exhaustive CPU arithmetic check, not NPU execution or desktop evidence."""
+from pathlib import Path
+import hashlib,json,time
+import numpy as np
+start=time.perf_counter();s=np.arange(256,dtype=np.uint32)[:,None];b=np.arange(256,dtype=np.uint32)[None,:];bad=[];checked=0;maxerr=0
+for alpha in range(256):
+ source=s.astype(np.float32)/np.float32(255); source=source*np.float32(255)
+ inverse=np.float32(1)-(np.float32(alpha)/np.float32(255))
+ value=source+b.astype(np.float32)*inverse
+ reference=np.rint(np.clip(value,0,255)).astype(np.uint32)
+ numerator=np.minimum(s*255+b*(255-alpha),65025)
+ integer=(numerator+127)//255
+ diff=reference!=integer;count=int(diff.sum());checked+=diff.size
+ if count:bad.append(dict(alpha=alpha,differences=count,first=np.argwhere(diff)[:3].tolist()));maxerr=max(maxerr,int(np.max(np.abs(reference.astype(np.int32)-integer.astype(np.int32)))))
+y=np.arange(0,65153,dtype=np.uint32);reciprocal=(y*32897)>>23
+report=dict(completed=True,passed=not bad and bool(np.array_equal(reciprocal,y//255)),source='explicit FP32 unit modulation then source-over channel formula',cases=checked,all_src_background_alpha_combinations=True,nonpremultiplied_included=True,different_components=sum(x['differences'] for x in bad),maximum_byte_error=maxerr,differences=bad,reciprocal_cases=len(y),reciprocal_exact=bool(np.array_equal(reciprocal,y//255)),npu_executed=False,desktop_tested=False,tahoma_tested=False,elapsed_seconds=time.perf_counter()-start,source_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest())
+p=Path('results/render-driver/point-unit-blend-integer-v1.json');assert not p.exists();p.write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report))

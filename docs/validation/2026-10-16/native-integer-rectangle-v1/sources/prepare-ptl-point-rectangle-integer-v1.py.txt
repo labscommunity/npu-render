@@ -1,0 +1,26 @@
+from pathlib import Path
+import hashlib,json,subprocess
+r=Path('results/render-driver');s=(r/'ptl-six-span-point-rectangle-v1.c').read_text()
+needle=' }else{\n  #pragma clang loop unroll(disable)'
+extra=''' }else if(color.x==1.0f&&color.y==1.0f&&color.z==1.0f&&color.w==1.0f){
+  /* Exact unit modulation. Odd denominator 255 has no half-integer ties.
+   * Exhaustively compare every source/background/alpha byte on the device. */
+  #pragma clang loop unroll(disable)
+  for(unsigned n=0;n<count;++n){const unsigned char *p=data+128+n*12;unsigned bg=u32(p),texel=u32(p+4),covered=u32(p+8);if(covered>1)return;
+   if(covered){++hits;uint4 channels=((uint4)texel>>(uint4){0,8,16,24})&(uint4)255;
+    if(source!=target)channels=channels.zyxw;if(opaque)channels.w=255;
+    if(blend){uint4 background=((uint4)bg>>(uint4){0,8,16,24})&(uint4)255;
+     uint4 numerator=channels*(uint4)255+background*(uint4)(255-channels.w);
+     numerator=numerator>(uint4)65025?(uint4)65025:numerator;
+     channels=((numerator+(uint4)127)*(uint4)32897)>>(uint4)23;
+    }
+    bg=channels.x|(channels.y<<8)|(channels.z<<16)|(channels.w<<24);
+   }((unsigned*)(output+16))[n]=bg;
+  }
+ }else{
+  #pragma clang loop unroll(disable)'''
+assert s.count(needle)==1;s=s.replace(needle,extra);p=r/'ptl-six-span-point-rectangle-v2.c';assert not p.exists();p.write_text(s)
+a=s.index('void nr_probe_kernel(');b=s.index(' uint4 *words=',a);local=s[:a]+'void nr_rectangle_local(const unsigned char *data,unsigned char *output){\n'+s[b:];(r/'ptl-point-rectangle-v2-local.c').write_text(local)
+subprocess.run(['clang','-shared','-fPIC','-O2','-ffp-contract=off',str(r/'ptl-point-rectangle-v2-local.c'),'-o',str(r/'ptl-point-rectangle-v2-local.dylib')],check=True)
+s=(r/'compare-ptl-point-rectangle-local-v2.py').read_text().replace('ptl-point-rectangle-v1-local','ptl-point-rectangle-v2-local').replace('ptl-six-span-point-rectangle-v1.c','ptl-six-span-point-rectangle-v2.c').replace('ptl-point-rectangle-v2-local-comparison','ptl-point-rectangle-integer-v1-local-comparison');(r/'compare-ptl-point-rectangle-integer-local-v1.py').write_text(s)
+print(json.dumps(dict(prepared=True,source_sha256=hashlib.sha256(p.read_bytes()).hexdigest(),npu_tested=False)))

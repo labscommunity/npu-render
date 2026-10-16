@@ -1,0 +1,18 @@
+"""Exhaustive unit-modulation source-over inputs; independent FP32 oracle."""
+import numpy as np
+import struct
+SPAN=262144;PER_SPAN=21832;CASES=1<<24;BATCHES=(CASES+6*PER_SPAN-1)//(6*PER_SPAN)
+def fixture(index):
+ first=index*PER_SPAN;count=max(0,min(PER_SPAN,CASES-first));u=np.uint32;f=np.float32
+ values=np.arange(first,first+count,dtype=u);alpha=values>>16;source=(values>>8)&u(255);background=values&u(255)
+ texels=np.stack([source,source^u(85),u(255)-source,alpha],axis=1);backs=np.broadcast_to(background[:,None],(count,4))
+ shifts=np.array([0,8,16,24],u);packed_source=np.bitwise_or.reduce(texels<<shifts,axis=1);packed_background=np.bitwise_or.reduce(backs<<shifts,axis=1)
+ data=bytearray(SPAN);expected=bytearray(SPAN)
+ struct.pack_into('<16I',data,0,0x4e525231,1,1,count,SPAN,0,1024,768,1024,768,28,28,1,0,0,0)
+ struct.pack_into('<8i',data,64,0,0,1024*256,768*256,0,0,1024*256,768*256);struct.pack_into('<8f',data,96,0,0,1,1,1,1,1,1)
+ records=np.stack([packed_background,packed_source,np.ones(count,u)],axis=1);data[128:128+count*12]=records.tobytes()
+ sampled=texels.astype(f)/f(255);shaded=sampled*f(1);alpha_f=shaded[:,3,None].copy();output=shaded*f(255)+backs.astype(f)*(f(1)-alpha_f)
+ quantized=np.rint(np.clip(output,f(0),f(255))).astype(u);packed=np.bitwise_or.reduce(quantized<<shifts,axis=1)
+ struct.pack_into('<4I',expected,0,0x4e52524f,1,count,count);expected[16:16+count*4]=packed.tobytes()
+ assert len(data)==len(expected)==SPAN
+ return bytes(data),bytes(expected),count

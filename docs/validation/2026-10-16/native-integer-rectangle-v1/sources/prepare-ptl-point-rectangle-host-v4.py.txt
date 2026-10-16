@@ -1,0 +1,16 @@
+from pathlib import Path
+import ast,hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'ptl-point-rectangle-integration-v4';shutil.copytree(r/'ptl-point-rectangle-integration-v3',d)
+p=d/'ptl_point_rectangle.hpp';s=p.read_text();old='b7caa092d2581fec8cec075815ab40057a9f3f5a654b5f0abbe7893c11a74908';new='d651d6101dbccc5796873dc2016ec9e23d262cd955e9bc4bee6d56b86756eb2d'
+bytes_text=lambda h:','.join('0x'+h[i:i+2] for i in range(0,64,2))
+assert s.count(bytes_text(old))==1;s=s.replace(bytes_text(old),bytes_text(new));p.write_text(s)
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};(r/'ptl-point-rectangle-integration-v4-source.json').write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/'ptl-point-rectangle-integration-v4.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+for name in ['build-ptl-point-rectangle-integration-v3.ps1','inspect-ptl-point-rectangle-captures-v3.py','run-ptl-point-rectangle-compare-v3.py']:
+ s=(r/name).read_text().replace('ptl-point-rectangle-integration-v3','ptl-point-rectangle-integration-v4').replace('ptl-point-rectangle-admission-v3','ptl-point-rectangle-admission-v4').replace('ptl-point-rectangle-comparison-v3','ptl-point-rectangle-comparison-v4')
+ if name.startswith('run-'):
+  s=s.replace('ptl-six-span-point-rectangle-v1','ptl-six-span-point-rectangle-v2');s=s.replace("assert obj(vm/'native-desktop-admission-v58/report.json')['cleanup_passed']", "assert obj(vm/'native-desktop-admission-v60/report.json')['cleanup_passed'];assert obj(vm/'ptl-rectangle-integer-v2-qualification/report.json')['passed'];assert obj(vm/'native-desktop-admission-v58/report.json')['cleanup_passed']")
+ if name.endswith('.py'):ast.parse(s)
+ (r/name.replace('-v3.','-v4.')).write_text(s)
+s=(r/'run-ptl-rectangle-capture-v3-qualification.ps1').read_text().replace('ptl-rectangle-capture-v3-qualification','ptl-rectangle-capture-v4-qualification').replace('ptl-worker-v13-qualification','ptl-rectangle-integer-v2-qualification').replace('build-ptl-point-rectangle-integration-v3','build-ptl-point-rectangle-integration-v4').replace('inspect-ptl-point-rectangle-captures-v3','inspect-ptl-point-rectangle-captures-v4').replace('run-ptl-point-rectangle-compare-v3','run-ptl-point-rectangle-compare-v4').replace('ptl-point-rectangle-comparison-v3','ptl-point-rectangle-comparison-v4');(r/'run-ptl-rectangle-capture-v4-qualification.ps1').write_text(s)
+print(json.dumps(dict(prepared=True,model_sha256=new,only_header_change='model digest pin')))

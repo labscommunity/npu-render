@@ -1,0 +1,28 @@
+from pathlib import Path
+import ast,hashlib,json
+r=Path('results/render-driver')
+s=(r/'qualify-ptl-six-span-point-rectangle-v1.py').read_text().replace('ptl-six-span-point-rectangle-v1','ptl-six-span-point-rectangle-v2').replace('ptl-six-span-point-rectangle-build-v1','ptl-six-span-point-rectangle-build-v2').replace("vm/'native-desktop-admission-v58/report.json'","vm/'native-desktop-admission-v60/report.json'").replace("vm/'ptl-native-live-v12/report.json'","vm/'ptl-rectangle-profile-v1-qualification/report.json'")
+a=s.index('  for name,digest in {');b=s.index('\n  assert obj',a)
+manifest={f:hashlib.sha256((r/f).read_bytes()).hexdigest() for f in ['ptl-six-span-point-rectangle-v2.c','ptl_point_rectangle_fixtures_v2.py','ptl_point_unit_fixtures_v1.py']}
+s=s[:a]+'  for name,digest in '+repr(manifest)+".items():assert hashlib.sha256((vm/name).read_bytes()).hexdigest()==digest"+s[b:]
+s=s.replace("['original-before','custom-rectangle','original-after']", "['original-before','custom-rectangle','unit-old','unit-new','original-after']")
+s=s.replace("model=core.import_model((out/('patched.blob' if phase=='custom-rectangle' else 'original.blob')).read_bytes(),'NPU');", "model_path=(vm/'ptl-six-span-point-rectangle-v1/patched.blob') if phase=='unit-old' else out/('patched.blob' if phase in ('custom-rectangle','unit-new') else 'original.blob');model=core.import_model(model_path.read_bytes(),'NPU');")
+s=s.replace(' from ptl_point_rectangle_fixtures_v2 import fixture', ' from ptl_point_rectangle_fixtures_v2 import fixture\n from ptl_point_unit_fixtures_v1 import fixture as unit_fixture,BATCHES,CASES\n unit_cases=0;unit_hashes=[]')
+s=s.replace("range(39 if phase=='custom-rectangle' else 8)", "range(BATCHES if phase.startswith('unit-') else 39 if phase=='custom-rectangle' else 8)")
+needle="    if phase=='custom-rectangle':"
+replacement="""    if phase.startswith('unit-'):
+     data=np.zeros((6,131072),np.float16);target=np.zeros_like(data)
+     for plane in range(6):
+      payload,target_bytes,count=unit_fixture(i*6+plane);data[plane]=np.frombuffer(payload,np.float16);target[plane]=np.frombuffer(target_bytes,np.float16)
+      if phase=='unit-new':unit_cases+=count
+     expected=target.view(np.uint16)
+    elif phase=='custom-rectangle':"""
+assert s.count(needle)==1;s=s.replace(needle,replacement)
+needle="    checks.append(dict(iteration=i,request_ms=elapsed,exact_components=int(expected.size),input_sha256=hashlib.sha256(data.tobytes()).hexdigest(),output_sha256=hashlib.sha256(actual.tobytes()).hexdigest()))"
+s=s.replace(needle,needle+"\n    if phase=='unit-old':unit_hashes.append(checks[-1]['output_sha256'])\n    if phase=='unit-new':assert checks[-1]['output_sha256']==unit_hashes[i]")
+s=s.replace("  report['passed']=True", "  assert unit_cases==CASES and len(unit_hashes)==BATCHES\n  report.update(exhaustive_unit_cases=unit_cases,unit_old_new_batches=BATCHES,all_unit_outputs_preserved=True)\n  report['passed']=True")
+ast.parse(s);(r/'qualify-ptl-six-span-point-rectangle-v2.py').write_text(s)
+s=(r/'run-ptl-rectangle-after-desktop-v1.ps1').read_text().replace('ptl-rectangle-after-desktop-v1','ptl-rectangle-integer-v1-qualification').replace('ptl-native-live-v12','ptl-rectangle-profile-v1-qualification').replace('native-desktop-admission-v58','native-desktop-admission-v60').replace('ptl-six-span-point-rectangle-v1','ptl-six-span-point-rectangle-v2').replace('ptl-six-span-point-rectangle-build-v1','ptl-six-span-point-rectangle-build-v2')
+s=s.replace("$report.passed=$true;$report.unique_npu_fixtures=233;", "if($q.child_result.exhaustive_unit_cases -ne 16777216 -or !$q.child_result.all_unit_outputs_preserved){throw 'Exhaustive device proof missing'}\n $report.exhaustive_unit_cases=$q.child_result.exhaustive_unit_cases;$report.passed=$true;$report.unique_npu_fixtures=233;")
+(r/'run-ptl-rectangle-integer-v1-qualification.ps1').write_text(s)
+print(json.dumps(dict(prepared=True,expected_unit_cases=16777216)))

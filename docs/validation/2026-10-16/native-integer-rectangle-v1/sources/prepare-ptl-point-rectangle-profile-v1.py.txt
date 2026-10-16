@@ -1,0 +1,24 @@
+from pathlib import Path
+import ast,hashlib,json,shutil,tarfile
+r=Path('results/render-driver');name='ptl-point-rectangle-profile-v1';d=r/name;shutil.copytree(r/'ptl-point-rectangle-integration-v3',d)
+p=d/'ptl_point_rectangle.hpp';s=p.read_text()
+old='const auto invoke=[&]{request.start_async();if(!request.wait_for(std::chrono::milliseconds(10000)))throw std::runtime_error("PTL rectangle timeout");++result.provider_requests;++result.tile_executions;result.input_bytes+=1572864;result.output_bytes+=1572864;};'
+new='double phase_wait_ms[2]{};unsigned phase_calls[2]{};const auto invoke=[&](unsigned phase){const auto issued=Clock::now();request.start_async();if(!request.wait_for(std::chrono::milliseconds(10000)))throw std::runtime_error("PTL rectangle timeout");phase_wait_ms[phase]+=elapsed(issued);++phase_calls[phase];++result.provider_requests;++result.tile_executions;result.input_bytes+=1572864;result.output_bytes+=1572864;};'
+assert s.count(old)==1;s=s.replace(old,new).replace('invoke();const auto *plan=','invoke(0);const auto *plan=').replace('invoke();const auto *pixels=','invoke(1);const auto *pixels=')
+needle='result.timings.merger_ms=elapsed(began);result.timings.total_ms=elapsed(start);'
+extra='''result.timings.merger_ms=elapsed(began);std::printf("{\\"ptl_rectangle_phase_profile\\":true,\\"coordinate_request_wait_ms\\":%.6f,\\"color_request_wait_ms\\":%.6f,\\"coordinate_calls\\":%u,\\"color_calls\\":%u,\\"merger_ms\\":%.6f,\\"host_and_other_merger_ms\\":%.6f,\\"shader_ms\\":%.6f,\\"projection_ms\\":%.6f,\\"unit_modulation\\":%s,\\"covered_samples\\":%llu}\\n",phase_wait_ms[0],phase_wait_ms[1],phase_calls[0],phase_calls[1],result.timings.merger_ms,result.timings.merger_ms-phase_wait_ms[0]-phase_wait_ms[1],result.timings.shader_ms,result.timings.projection_ms,(color==std::array<float,4>{1,1,1,1})?"true":"false",static_cast<unsigned long long>(result.covered_samples));std::fflush(stdout);result.timings.total_ms=elapsed(start);'''
+assert s.count(needle)==1;s=s.replace(needle,extra);p.write_text(s)
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};old=json.loads((r/'ptl-point-rectangle-integration-v3-source.json').read_text());assert [k for k in old if old[k]!=manifest[k]]==['ptl_point_rectangle.hpp']
+(r/(name+'-source.json')).write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/(name+'.tar.gz'),'w:gz') as t:t.add(d,arcname=name)
+s=(r/'build-ptl-point-rectangle-integration-v3.ps1').read_text().replace('ptl-point-rectangle-integration-v3',name);(r/('build-'+name+'.ps1')).write_text(s)
+s=(r/'inspect-ptl-point-rectangle-captures-v3.py').read_text().replace('ptl-point-rectangle-integration-v3',name).replace('ptl-point-rectangle-admission-v3','ptl-point-rectangle-profile-admission-v1');(r/'inspect-ptl-point-rectangle-profile-v1.py').write_text(s);ast.parse(s)
+s=(r/'run-ptl-point-rectangle-compare-v3.py').read_text().replace('ptl-point-rectangle-integration-v3',name).replace('ptl-point-rectangle-admission-v3','ptl-point-rectangle-profile-admission-v1').replace('ptl-point-rectangle-comparison-v3','ptl-point-rectangle-profile-results-v1')
+a=s.index(" if args.stage=='selected':");b=s.index(' env=os.environ.copy();',a)
+s=s[:a]+" cases=[x for x in cases if x['ticket'] in (11,181,468)];assert len(cases)==3\n assert obj(vm/'ptl-combined-desktop-v2/report.json')['completed'] and obj(vm/'native-desktop-admission-v60/report.json')['cleanup_passed']\n"+s[b:]
+needle="  result['preserved_crop_variants']="
+s=s.replace(needle,"  result['phase_profiles']=[x for x in events if x.get('ptl_rectangle_phase_profile')]\n"+needle)
+ast.parse(s);(r/'run-ptl-point-rectangle-profile-v1.py').write_text(s)
+s=(r/'run-ptl-rectangle-capture-v3-qualification.ps1').read_text().replace('ptl-rectangle-capture-v3-qualification','ptl-rectangle-profile-v1-qualification').replace('ptl-worker-v13-qualification','ptl-combined-desktop-v2').replace('build-ptl-point-rectangle-integration-v3','build-'+name).replace('inspect-ptl-point-rectangle-captures-v3','inspect-ptl-point-rectangle-profile-v1').replace('run-ptl-point-rectangle-compare-v3','run-ptl-point-rectangle-profile-v1').replace('ptl-point-rectangle-comparison-v3','ptl-point-rectangle-profile-results-v1').replace("foreach($stage in @('selected','full'))", "foreach($stage in @('selected'))")
+(r/'run-ptl-rectangle-profile-v1-qualification.ps1').write_text(s)
+print(json.dumps(dict(prepared=True,arithmetic_unchanged=True,kernel_unchanged=True,cases=[11,181,468])))

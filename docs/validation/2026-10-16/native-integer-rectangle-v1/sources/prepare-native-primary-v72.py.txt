@@ -1,0 +1,18 @@
+from pathlib import Path
+import re
+r=Path('results/render-driver');target='native-integer-rectangle-v1';assert not (Path('docs/validation/2026-10-16')/target).exists()
+dirs=['ptl-rectangle-profile-v1-qualification','ptl-rectangle-profile-v2-qualification','ptl-point-rectangle-profile-v1','ptl-point-rectangle-profile-admission-v1','ptl-point-rectangle-profile-results-v1-selected','ptl-rectangle-integer-v2-qualification','ptl-six-span-point-rectangle-build-v2','ptl-six-span-point-rectangle-v2','ptl-point-rectangle-integration-v4','ptl-point-rectangle-admission-v4','ptl-point-rectangle-comparison-v4-selected','ptl-point-rectangle-comparison-v4-full','ptl-rectangle-capture-v4-qualification','ptl-rectangle-integer-paired-v1','ptl-rectangle-integer-paired-v1-qualification','ptl-rectangle-integer-paired-v2','ptl-rectangle-integer-paired-v2-selected','ptl-rectangle-integer-paired-v2-full','ptl-rectangle-integer-paired-v2-qualification']
+extras=[]
+for n in ['ptl-point-rectangle-profile-v1','ptl-point-rectangle-integration-v4','ptl-rectangle-integer-paired-v1','ptl-rectangle-integer-paired-v2']:extras += [n+'-source.json','build-'+n+'.log']
+sources=['ptl-six-span-point-rectangle-v2.c','ptl_point_unit_fixtures_v1.py','qualify-ptl-six-span-point-rectangle-v2.py','qualify-ptl-six-span-point-rectangle-v3.py','run-ptl-rectangle-integer-v1-qualification.ps1','run-ptl-rectangle-integer-v2-qualification.ps1','run-ptl-rectangle-profile-v1-qualification.ps1','run-ptl-rectangle-profile-v2-qualification.ps1','build-ptl-point-rectangle-profile-v1.ps1','inspect-ptl-point-rectangle-profile-v1.py','run-ptl-point-rectangle-profile-v1.py','build-ptl-point-rectangle-integration-v4.ps1','inspect-ptl-point-rectangle-captures-v4.py','run-ptl-point-rectangle-compare-v4.py','run-ptl-rectangle-capture-v4-qualification.ps1']
+for v in (1,2):sources += [f'build-ptl-rectangle-integer-paired-v{v}.ps1',f'run-ptl-rectangle-integer-paired-v{v}.py',f'run-ptl-rectangle-integer-paired-v{v}-qualification.ps1']
+s=(r/'collect-native-primary-v70.py').read_text()
+for name,value in [('directories',dirs),('extras',extras),('source_files',sources)]:s=re.sub('^'+name+'=.*$',lambda m:name+'='+repr(value),s,flags=re.M)
+s=s.replace("'ptl-worker-v14-qualification','ptl-native-worker-v14-full'","'ptl-rectangle-integer-paired-v2-qualification','ptl-six-span-point-rectangle-v2'").replace("'ptl-point-rectangle-integration-v3','ptl-native-worker-v13','ptl-native-worker-v14'","'ptl-point-rectangle-profile-v1','ptl-point-rectangle-integration-v4','ptl-rectangle-integer-paired-v2'").replace('v70','v72')
+(r/'collect-native-primary-v72.py').write_text(s)
+s=(r/'curate-native-primary-v70.py').read_text().replace('v70','v72').replace('native-point-rectangle-worker-v1',target)
+a=s.index('for name in [');b=s.index(':\n p=r/name',a)
+local=['prepare-ptl-point-rectangle-profile-v1.py','prepare-ptl-point-rectangle-integer-v1.py','prepare-ptl-point-rectangle-integer-device-v1.py','prepare-ptl-point-rectangle-host-v4.py','prepare-ptl-rectangle-integer-paired-v1.py','prepare-ptl-rectangle-integer-paired-v2.py','check-point-unit-blend-integer-v1.py','point-unit-blend-integer-v1.json','compare-ptl-point-rectangle-integer-local-v1.py','ptl-point-rectangle-integer-v1-local-comparison.json','compare-ptl-point-unit-local-v1.py','ptl-point-unit-local-v1.json','ptl-point-rectangle-v2-local.c','collect-native-primary-v72.py','prepare-native-primary-v72.py']
+s=s[:a]+'for name in '+repr(local)+s[b:]
+s=s.replace("target=d/'sources'/(name+'.txt');", "target=d/'sources'/(name+'.txt' if name.endswith('.py') else name);")
+(r/'curate-native-primary-v72.py').write_text(s)

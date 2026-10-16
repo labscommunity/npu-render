@@ -1,0 +1,9 @@
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'ptl-rectangle-integer-paired-v2';shutil.copytree(r/'ptl-rectangle-integer-paired-v1',d)
+p=d/'compare.cpp';s=p.read_text();old='const auto *previous_blob=std::getenv("NR_RENDER_PTL_RECTANGLE_PREVIOUS_BLOB");ex::require(previous_blob!=nullptr);';new='wchar_t previous_blob[32768]{};const auto previous_size=GetEnvironmentVariableW(L"NR_RENDER_PTL_RECTANGLE_PREVIOUS_BLOB",previous_blob,32768);ex::require(previous_size>0&&previous_size<32768);';assert s.count(old)==1;p.write_text(s.replace(old,new))
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};(r/'ptl-rectangle-integer-paired-v2-source.json').write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/'ptl-rectangle-integer-paired-v2.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+for name in ['build-ptl-rectangle-integer-paired-v1.ps1','run-ptl-rectangle-integer-paired-v1.py','run-ptl-rectangle-integer-paired-v1-qualification.ps1']:
+ (r/name.replace('paired-v1','paired-v2')).write_text((r/name).read_text().replace('ptl-rectangle-integer-paired-v1','ptl-rectangle-integer-paired-v2'))
+s=(r/'run-ptl-worker-v15-qualification.ps1').read_text().replace('ptl-worker-v15-qualification','ptl-worker-v15-qualification-v2').replace('ptl-rectangle-integer-paired-v1','ptl-rectangle-integer-paired-v2');(r/'run-ptl-worker-v15-qualification-v2.ps1').write_text(s)
