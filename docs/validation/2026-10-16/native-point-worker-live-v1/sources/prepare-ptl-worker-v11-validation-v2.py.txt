@@ -1,0 +1,38 @@
+from pathlib import Path
+import ast
+r=Path('results/render-driver');s=(r/'qualify-ptl-native-worker-v11.py').read_text()
+s=s.replace("out=vm/('ptl-native-worker-v11-'+a.stage);out.mkdir(exist_ok=False);trial=out/'replay';process=None", "out=vm/('ptl-native-worker-v11-validation-v2-selected' if a.stage=='selected' else 'ptl-native-worker-v11-full');out.mkdir(exist_ok=False);trial=(vm/'ptl-native-worker-v11-selected/replay') if a.stage=='selected' else out/'replay';process=None")
+s=s.replace("if a.stage=='full':assert obj(vm/'ptl-native-worker-v11-selected/report.json')['passed']", "if a.stage=='full':assert obj(vm/'ptl-native-worker-v11-validation-v2-selected/report.json')['passed']")
+a=s.index(" with (out/'stdout.log').open");b=s.index(" assert process.returncode==0 and proof['passed']",a)
+block=s[a:b].replace(" proof=obj(trial/'report.json');report.update(replay_exit=process.returncode,replay=proof)"," replay_exit=process.returncode")
+s=s[:a]+" if a.stage=='selected':\n  prior=obj(vm/'ptl-native-worker-v11-selected/report.json');assert prior['completed'] and prior['replay_exit']==0 and prior['worker_sha256']==a.worker_sha256\n  replay_exit=prior['replay_exit'];report['read_only_existing_replay']=True\n else:\n"+'\n'.join(' '+line if line else '' for line in block.splitlines())+"\n proof=obj(trial/'report.json');assert proof['worker_binary_sha256']==a.worker_sha256;report.update(replay_exit=replay_exit,replay=proof)\n"+s[b:]
+s=s.replace("assert process.returncode==0 and proof['passed']", "assert replay_exit==0 and proof['passed']")
+a=s.index(' # Independently account');b=s.index(" assert all(x['accepted'] and x['structural_admission']",a)
+s=s[:a]+''' # Request sequences can repeat across original clients. Join each serialized
+ # dispatch ticket to its retained replay iteration and original packet ticket.
+ def routed_tickets(directory,key):
+  mapping={x['iteration']:x['ticket'] for x in rows(directory/'replays.jsonl')};assert len(mapping)==len(rows(directory/'replays.jsonl'))
+  dispatch=None;result=set()
+  for event in rows(directory/'provider-processes/generation-1/worker.stdout.jsonl'):
+   if event.get('kind')=='request_identity':dispatch=event['dispatch_ticket'];assert dispatch in mapping
+   if event.get(key) and event['accepted']:
+    assert dispatch is not None;ticket=mapping[dispatch];assert ticket not in result;result.add(ticket)
+  return result
+ prior_geometry=routed_tickets(vm/'ptl-native-worker-v9-full/replay','ptl_geometry_draw')
+ actual_geometry=routed_tickets(trial,'ptl_geometry_draw');expected_geometry=(prior_geometry&selected)-expected_tickets
+ actual_program=routed_tickets(trial,'ptl_program_draw')
+ report.update(geometry_tickets_matched=actual_geometry==expected_geometry,expected_geometry_draws=len(expected_geometry),program_tickets_matched=actual_program==expected_tickets)
+ assert actual_geometry==expected_geometry and len(actual_geometry)==report['geometry_accepted']
+ assert actual_program==expected_tickets and len(actual_program)==report['program_accepted']
+'''+s[b:]
+p=r/'qualify-ptl-native-worker-v11-v2.py';ast.parse(s);p.write_text(s)
+s=(r/'run-ptl-worker-v11-qualification.ps1').read_text().replace('ptl-worker-v11-qualification','ptl-worker-v11-qualification-v2').replace('qualify-ptl-native-worker-v11.py','qualify-ptl-native-worker-v11-v2.py')
+s=s.replace('$q=Get-Content "$vm\\ptl-native-worker-v11-$stage\\report.json" -Raw|ConvertFrom-Json', '$proofPath=if($stage -eq \'selected\'){"$vm\\ptl-native-worker-v11-validation-v2-selected\\report.json"}else{"$vm\\ptl-native-worker-v11-full\\report.json"};$q=Get-Content $proofPath -Raw|ConvertFrom-Json')
+(r/'run-ptl-worker-v11-qualification-v2.ps1').write_text(s)
+# These fresh controllers have never run; update the stronger ticket audit gate.
+for name in ['run-native-registration-v37.ps1','run-native-desktop-v57.ps1']:
+ p=r/name;s=p.read_text().replace('geometry_sequences_matched','geometry_tickets_matched').replace('-or !$ptl.program_sequences_matched','-or !$ptl.program_sequences_matched -or !$ptl.program_tickets_matched');p.write_text(s)
+import hashlib,json
+for name in ['native-registration-v37-source.json','native-desktop-v57-source.json']:
+ p=r/name;names=json.loads(p.read_text());p.write_text(json.dumps({f:hashlib.sha256((r/f).read_bytes()).hexdigest() for f in names},indent=2)+'\n')
+print('Prepared read-only selected revalidation plus new full replay with ticket correlation.')

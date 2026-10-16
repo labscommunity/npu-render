@@ -1,0 +1,11 @@
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'ptl-native-worker-v11';shutil.copytree(r/'ptl-native-worker-v10',d)
+for name in ['ptl_program_ir.hpp','ptl_program_triangle_draw.hpp','ptl_program_triangle_draw.cpp']:
+ assert (d/name).read_bytes()==(r/'ptl-program-point-integration-v1'/name).read_bytes()
+shutil.copyfile(r/'ptl-program-point-integration-v1/ptl_program.hpp',d/'ptl_program.hpp')
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};baseline=json.loads((r/'ptl-native-worker-v10-source.json').read_text());changed=[k for k in manifest if manifest[k]!=baseline[k]];assert changed==['ptl_program.hpp']
+(r/'ptl-native-worker-v11-source.json').write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/'ptl-native-worker-v11.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-ptl-native-worker-v10.ps1').read_text().replace('ptl-native-worker-v10','ptl-native-worker-v11');(r/'build-ptl-native-worker-v11.ps1').write_text(s)
+print(json.dumps(dict(files=len(manifest),changed=changed,cpu_test_reference_in_runtime=False)))

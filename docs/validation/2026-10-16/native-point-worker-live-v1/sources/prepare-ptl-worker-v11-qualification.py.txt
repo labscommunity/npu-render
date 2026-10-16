@@ -1,0 +1,30 @@
+from pathlib import Path
+import ast,re
+r=Path('results/render-driver');s=(r/'qualify-ptl-native-worker-v9.py').read_text().replace('ptl-native-worker-v9','ptl-native-worker-v11')
+s=s.replace("a=p.parse_args()", "p.add_argument('--worker-sha256',required=True);a=p.parse_args()")
+s=s.replace("assert obj(vm/'ptl-long-shader-capture-v2/report.json')['passed']", "assert obj(vm/'ptl-program-point-comparison-v1-full/report.json')['passed']\n assert obj(vm/'ptl-native-worker-v9-full/report.json')['passed']\n assert obj(vm/'ptl-long-shader-capture-v2/report.json')['passed']")
+s=s.replace('ptl-six-span-program-v3','ptl-six-span-program-point-v1').replace('49894f9e468e3e0374740bceb2f12c8854806da2856f82c3b2ff8c1fd6e88da0','0902c8addc03d08e008582394060e80978ed34082bb82b2687fcdff381eef216')
+s=s.replace("sha(worker)=='14c978f8e97c41814969fc3285b83b2f74d9df55cbcae2e088847cefcdea485c'",'sha(worker)==a.worker_sha256')
+s=s.replace('479,481,599,601,665,667\']','479,481,599,601,665,667,35,160\']')
+s=s.replace("assert report['geometry_accepted'] >= (1 if a.stage=='selected' else 200) and report['geometry_imports']==1", "assert report['geometry_accepted'] >= 1 and report['geometry_imports']==1")
+s=s.replace("expected_tickets=set(expected['expected_program_tickets'])&selected", "point_admission=obj(vm/'ptl-program-point-admission-v1/report.json');assert point_admission['passed'];point_tickets=set(point_admission['newly_accepted_tickets']);assert len(point_tickets)==87\n expected_tickets=(set(expected['expected_program_tickets'])|point_tickets)&selected")
+s=s.replace("len(program_events)==len(expected_tickets)==(24 if a.stage=='selected' else 376)", "len(program_events)==len(expected_tickets)==(26 if a.stage=='selected' else 463)")
+needle=" assert all(x['accepted'] and x['structural_admission']";at=s.index(needle)
+s=s[:at]+''' # Independently account for shared-geometry draws displaced by the new program route.
+ def geometry_sequences(log):
+  sequence=None;result=set()
+  for event in rows(log):
+   if event.get('kind')=='request_identity':sequence=event['sequence']
+   if event.get('ptl_geometry_draw') and event['accepted']:
+    assert sequence is not None;assert sequence not in result;result.add(sequence)
+  return result
+ prior_geometry=geometry_sequences(vm/'ptl-native-worker-v9-full/replay/provider-processes/generation-1/worker.stdout.jsonl')
+ selected_sequences={struct.unpack_from('<20I',(vm/f'native-desktop-admission-v33/bootstrap/requests/request-{ticket:08d}.bin').read_bytes())[14] for ticket in selected}
+ actual_geometry=geometry_sequences(trial/'provider-processes/generation-1/worker.stdout.jsonl')
+ expected_geometry=(prior_geometry&selected_sequences)-expected_sequences
+ report.update(geometry_sequences_matched=actual_geometry==expected_geometry,expected_geometry_draws=len(expected_geometry))
+ assert actual_geometry==expected_geometry and len(actual_geometry)==report['geometry_accepted']
+'''+s[at:]
+ast.parse(s);(r/'qualify-ptl-native-worker-v11.py').write_text(s)
+s=(r/'audit-ptl-worker-v9-replay.py').read_text().replace("out=vm/'ptl-native-worker-v9-audit'","out=vm/'ptl-native-worker-v11-audit'").replace("paths=[vm/'ptl-native-worker-v8-full/replay',vm/'ptl-native-worker-v9-full/replay']","paths=[vm/'ptl-native-worker-v9-full/replay',vm/'ptl-native-worker-v11-full/replay']");ast.parse(s);(r/'audit-ptl-worker-v11-replay.py').write_text(s)
+print('Prepared exact replay, routing and independent output audit.')

@@ -1,0 +1,9 @@
+from pathlib import Path
+import os,json,hashlib
+vm=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm';out=vm/'ptl-native-worker-v11-audit';out.mkdir(exist_ok=False)
+def rows(p):return [json.loads(x) for x in p.read_text(encoding='utf-8-sig').splitlines() if x.startswith('{') and x.endswith('}')]
+paths=[vm/'ptl-native-worker-v9-full/replay',vm/'ptl-native-worker-v11-full/replay'];proof=[json.loads((p/'report.json').read_text()) for p in paths];assert all(p['passed'] and p['delivery_acknowledgments']==972 for p in proof)
+records=[rows(p/'replays.jsonl') for p in paths];assert all(len(r)==972 for r in records)
+checks=[dict(ticket=a['ticket'],exact_prior_replay=a['ticket']==b['ticket'] and a['pixels_sha256']==b['pixels_sha256'] and a['pixel_bytes']==b['pixel_bytes'],original_reference_available=b['original_reference_available'],pixels_sha256=b['pixels_sha256']) for a,b in zip(*records,strict=True)]
+report=dict(completed=True,passed=all(x['exact_prior_replay'] for x in checks),read_only=True,comparisons=972,qualified_correction_matches=proof[1]['qualified_correction_hashes_matched'],original_reference_matches=proof[1]['original_pixel_hashes_matched'],original_reference_missing=[x['ticket'] for x in checks if not x['original_reference_available']],matched_performance_comparison=False,source_sha256={str(p.relative_to(vm)/'replays.jsonl'):hashlib.sha256((p/'replays.jsonl').read_bytes()).hexdigest() for p in paths},checks=checks)
+(out/'report.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps({k:v for k,v in report.items() if k!='checks'}));assert report['passed']

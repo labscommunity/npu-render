@@ -10,29 +10,22 @@ RGBA composition and an explicit backend switch. The packaged runtime passed
 GPU → NPU → CPU → GPU → NPU switching on Panther Lake. It supports CPU/GPU/NPU through
 its first OpenVINO provider; other providers can implement the same contracts.
 
-**Latest results, October 16:** a [normally started, non-admin default-adapter
-application now shares the NPU renderer with DWM](docs/validation/2026-10-16/native-shared-default-graphics-v1/README.md).
-The fixture passes six clears and two draws through ordinary D3D11; DWM continues
-afterward. The finite desktop trial passes 1,209 acknowledged NPU operations,
-53 matching physical submissions, controlled input and exact ordinary restoration.
-Continuous admission for arbitrary applications remains open; a separate
-unadmitted observer still fails device creation.
-Responsiveness remains inadequate: this run's controlled mouse response takes
-6.60 seconds to confirm through physical-output readback, and keyboard response
-takes 237 ms. These events are not a matched performance comparison.
-The [integrated renderer also passes all 972 retained requests and registered
-D3D11](docs/validation/2026-10-16/native-long-shader-worker-v1/README.md).
-Sustained responsiveness, broad application coverage and a Tahoma benefit remain
-unqualified.
-The next [point-sampling component](docs/validation/2026-10-16/native-point-program-v1/README.md)
-adds 87 recorded draws to the reusable kernel. All 348 changed-image variants match
-both references exactly; summed warm draw time falls from 13.587 to 4.091 seconds.
-Its worker and desktop integration are separate qualification gates.
-The [five-sample shader component](docs/validation/2026-10-16/native-complex-shader-v1/README.md)
-now matches an explicit FP32 reference on all 40 tested images. Five recorded
-images differ from the old renderer; those numerical differences remain explicit.
-It has not yet been integrated into the desktop worker.
+**Latest results, October 16:** the [point-sampling worker passes all 972
+recorded requests and a finite Windows desktop trial](docs/validation/2026-10-16/native-point-worker-live-v1/README.md).
+The desktop trial passes 1,223 acknowledged NPU operations, 56 exact physical
+submissions, controlled input, an ordinary default-adapter test application and
+complete restoration. The point-program path executes 99 times, with no provider
+faults or retries. Mouse confirmation takes 3.09 seconds and keyboard confirmation
+252 ms in this run. Responsiveness remains inadequate; these two events are not
+a matched performance comparison. Continuous arbitrary-application admission,
+sustained responsiveness and a Tahoma benefit remain unqualified.
 
+The [point-sampling component](docs/validation/2026-10-16/native-point-program-v1/README.md)
+preserves all 348 changed-image comparisons for 87 newly supported draws.
+The [five-sample shader component](docs/validation/2026-10-16/native-complex-shader-v1/README.md)
+matches an explicit FP32 reference on all 40 tested images. Five recorded images
+differ from the old renderer; those numerical differences remain explicit.
+It has not yet been integrated into a qualified desktop worker.
 See the [current acceptance plan](docs/research/desktop-offload-plan.md).
 
 **Full desktop offload is unfinished.** The current Windows/Panther Lake path

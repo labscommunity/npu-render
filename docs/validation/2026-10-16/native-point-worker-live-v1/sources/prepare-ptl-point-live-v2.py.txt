@@ -1,0 +1,36 @@
+from pathlib import Path
+import ast, hashlib, json, re
+r=Path('results/render-driver')
+changes={'native_shared_app_v3':'native_shared_app_v4','native_desktop_bootstrap_v31':'native_desktop_bootstrap_v32','native-desktop-v57':'native-desktop-v58','native-desktop-admission-v57':'native-desktop-admission-v58','NativeDesktopRecovery-v57':'NativeDesktopRecovery-v58','native-live-v47':'native-live-v48','NativeLiveV47':'NativeLiveV48','native-topology-primary-v33':'native-topology-primary-v34','native-topology-v78':'native-topology-v80','native-topology-v79':'native-topology-v81','InspectTopology-V78':'InspectTopology-V80','InspectTopology-V79':'InspectTopology-V81','observer79':'observer81','dismiss-native-saver-v20':'dismiss-native-saver-v22','dismiss-v20':'dismiss-v22','ptl-native-live-v11':'ptl-native-live-v12','native-latency-v9-analysis':'native-latency-v10-analysis','native-presentation-v4-analysis':'native-presentation-v5-analysis'}
+pattern=re.compile('|'.join(re.escape(x) for x in sorted(changes,key=len,reverse=True)))
+def rename(s): return pattern.sub(lambda m:changes[m[0]],s)
+files=['native_shared_app_v3.py','native_desktop_bootstrap_v31.py','run-native-desktop-v57.ps1','recover-native-desktop-v57.ps1','run-native-live-v47.ps1','start-native-topology-v78.ps1','start-native-topology-v79.ps1','dismiss-native-saver-v20.ps1','run-ptl-native-live-v11.ps1']
+for name in files:
+ s=rename((r/name).read_text())
+ if name=='run-ptl-native-live-v11.ps1':
+  s=s.replace(' Stop-Readiness\n $report.active_phase', ' # Keep the readiness display-awake request alive until the live controller exits.\n $report.active_phase')
+  old=' & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$vm\\run-native-live-v48.ps1" > "$out\\live.stdout.log" 2> "$out\\live.stderr.log"\n if($LASTEXITCODE){throw \'Scoped native integration failed\'}'
+  new=' $child=Start-Process powershell.exe -ArgumentList @(\'-NoProfile\',\'-NonInteractive\',\'-ExecutionPolicy\',\'Bypass\',\'-File\',(\'"\'+$vm+\'\\run-native-live-v48.ps1"\')) -Wait -PassThru -NoNewWindow -RedirectStandardOutput "$out\\live.stdout.log" -RedirectStandardError "$out\\live.stderr.log"\n try{$report.live_exit=$child.ExitCode;if($child.ExitCode){throw \'Scoped native integration failed\'}}finally{$child.Dispose()}'
+  assert old in s;s=s.replace(old,new)
+ if name=='run-native-live-v47.ps1':
+  old=' & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File "$r\\vm\\start-native-topology-v80.ps1" > "$out\\observer-start.log";if($LASTEXITCODE){throw \'Observer failed\'}'
+  new=' $observerStart=Start-Process powershell.exe -ArgumentList @(\'-NoProfile\',\'-NonInteractive\',\'-ExecutionPolicy\',\'Bypass\',\'-File\',(\'"\'+$r+\'\\vm\\start-native-topology-v80.ps1"\')) -Wait -PassThru -NoNewWindow -RedirectStandardOutput "$out\\observer-start.log" -RedirectStandardError "$out\\observer-start.stderr.log"\n try{$report.observer_start_exit=$observerStart.ExitCode;if($observerStart.ExitCode){throw \'Observer failed before native admission\'}}finally{$observerStart.Dispose()}'
+  assert old in s;s=s.replace(old,new)
+  needle=' if($native -and $native.HasExited){$native.Refresh();$report.native_exit=$native.ExitCode}'
+  cleanup=''' $observerTask=Get-ScheduledTask -TaskName T8-NpuRender-InspectTopology-V80 -ErrorAction SilentlyContinue
+ if($observerTask){
+  $expectedObserverArgument='"'+$source+'\\native_runner.py" "'+$r+'\\vm\\native-topology-v80\\job.json"'
+  if(@($observerTask.Actions).Count -eq 1 -and $observerTask.Actions[0].Execute -eq "$source\\venv\\Scripts\\pythonw.exe" -and $observerTask.Actions[0].Arguments -eq $expectedObserverArgument){
+   $observerDeadline=[DateTime]::UtcNow.AddSeconds(15);while((Get-ScheduledTask -TaskName $observerTask.TaskName).State -eq 'Running' -and [DateTime]::UtcNow -lt $observerDeadline){Start-Sleep -Milliseconds 200}
+   if((Get-ScheduledTask -TaskName $observerTask.TaskName).State -ne 'Running'){Unregister-ScheduledTask -TaskName $observerTask.TaskName -Confirm:$false;$report.observer_cleanup_passed=$true}else{$report.observer_cleanup_passed=$false;$report.passed=$false}
+  }else{$report.observer_cleanup_passed=$false;$report.passed=$false}
+ }
+'''
+  assert needle in s;s=s.replace(needle,cleanup+needle)
+ if name.endswith('.py'):ast.parse(s)
+ p=r/rename(name);assert not p.exists();p.write_text(s)
+old='native-desktop-v57-source.json';names=[rename(f) for f in json.loads((r/old).read_text())];(r/rename(old)).write_text(json.dumps({f:hashlib.sha256((r/f).read_bytes()).hexdigest() for f in names},indent=2)+'\n')
+for old,new in [('analyze-native-latency-v7.py','analyze-native-latency-v8.py'),('analyze-native-presentation-v4.py','analyze-native-presentation-v5.py')]:
+ p=r/new;assert not p.exists();p.write_text(rename((r/old).read_text()))
+(r/'ptl-point-live-v2-upload.json').write_text(json.dumps([rename(f) for f in files]+['native-desktop-v58-source.json','analyze-native-latency-v8.py','analyze-native-presentation-v5.py'],indent=2)+'\n')
+print('Prepared fresh retry with continuous readiness ownership and captured child exit codes.')

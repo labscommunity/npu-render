@@ -31,6 +31,16 @@ now matches an explicit FP32 reference on all 40 tested images. Five recorded
 images differ from the old renderer; those numerical differences remain explicit.
 It has not yet been integrated into the desktop worker.
 
+The [point-worker live v48 trial](../validation/2026-10-16/native-point-worker-live-v1/README.md)
+now passes all 972 retained worker outputs, registered graphics, 1,223 live NPU
+operations, 56 exact physical submissions and restoration. Its 99 point-program
+draws confirm native use of the new route. Mouse physical-read completion is
+3,087.583 ms and keyboard completion 251.850 ms. These remain two uncontrolled
+cross-run observations, not a matched performance comparison. Rectangle and
+five-sample shader work still contribute 1,248.446 ms before the mouse frame is
+published. The failed screen-saver interruption is preserved separately; it caused
+no native admission. Full offload and Tahoma benefit remain unqualified.
+
 The [long-shader component](../validation/2026-10-16/native-long-shader-v1/README.md)
 passes 120 independent NPU fixtures and exact complete-image comparisons for
 the failed v43 request and all six earlier uses of the shader. [Worker v9](../validation/2026-10-16/native-long-shader-worker-v1/README.md)

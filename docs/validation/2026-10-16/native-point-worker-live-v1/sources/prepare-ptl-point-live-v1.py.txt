@@ -1,0 +1,23 @@
+from pathlib import Path
+import ast,hashlib,json,re
+r=Path('results/render-driver')
+changes={'native-registration-v36':'native-registration-v37','native-registered-v36':'native-registered-v37','NativeRecovery-v36':'NativeRecovery-v37','ptl-native-worker-v10':'ptl-native-worker-v11','ptl-native-worker-v9':'ptl-native-worker-v11','native_shared_app_v2':'native_shared_app_v3','native_desktop_bootstrap_v30':'native_desktop_bootstrap_v31','native-desktop-v56':'native-desktop-v57','native-desktop-admission-v56':'native-desktop-admission-v57','native-desktop-admission-v55':'native-desktop-admission-v56','NativeDesktopRecovery-v56':'NativeDesktopRecovery-v57','native-live-v46':'native-live-v47','NativeLiveV46':'NativeLiveV47','native-topology-primary-v32':'native-topology-primary-v33','native-topology-v76':'native-topology-v78','native-topology-v77':'native-topology-v79','InspectTopology-V76':'InspectTopology-V78','InspectTopology-V77':'InspectTopology-V79','observer77':'observer79','dismiss-native-saver-v19':'dismiss-native-saver-v20','dismiss-v19':'dismiss-v20','ptl-native-live-v10':'ptl-native-live-v11','ptl-six-span-program-v3':'ptl-six-span-program-point-v1','49894f9e468e3e0374740bceb2f12c8854806da2856f82c3b2ff8c1fd6e88da0':'0902c8addc03d08e008582394060e80978ed34082bb82b2687fcdff381eef216'}
+pattern=re.compile('|'.join(re.escape(x) for x in sorted(changes,key=len,reverse=True)))
+def rename(s):return pattern.sub(lambda m:changes[m[0]],s)
+files=['run-native-registration-v36.ps1','recover-native-registration-v36.ps1','qualify-native-registered-v36.py','native_shared_app_v2.py','native_desktop_bootstrap_v30.py','run-native-desktop-v56.ps1','recover-native-desktop-v56.ps1','run-native-live-v46.ps1','start-native-topology-v76.ps1','start-native-topology-v77.ps1','dismiss-native-saver-v19.ps1','run-ptl-native-live-v10.ps1']
+for name in files:
+ s=rename((r/name).read_text()).replace('$ptl.program_accepted -ne 376','$ptl.program_accepted -ne 463').replace('-or !$ptl.program_sequences_matched','-or !$ptl.program_sequences_matched -or !$ptl.geometry_sequences_matched')
+ if name=='qualify-native-registered-v36.py':
+  s=s.replace("qualified=obj(root/'builds/ptl-native-worker-v11/registered-build-report.json')","qualified=obj(root/'builds/ptl-native-worker-v10/registered-build-report.json')")
+  s=s.replace("if n!='local_indexed_worker.cpp'", "if n!='ptl_program.hpp'")
+  s=s.replace("assert obj(vm/'interactive-pipe-diagnostic-v2/report.json')['passed']", "assert candidate['source_sha256']['ptl_program.hpp']=='254df03e82359eb130daa7b82edc6b45569613e72dfc7be6bea9847b36f8c3ba'\nassert report['worker_binary_sha256']==obj(vm/'ptl-native-worker-v11-full/report.json')['worker_sha256']=='c445ff2bb154e879609933508187af886100062ee60ee29fd1467f776316f12f'\nassert obj(vm/'interactive-pipe-diagnostic-v2/report.json')['passed']")
+ if name=='start-native-topology-v76.ps1':s=s.replace('V76','V78').replace('v76','v78')
+ if name=='start-native-topology-v77.ps1':s=s.replace('V77','V79').replace('v77','v79')
+ if name.endswith('.py'):ast.parse(s)
+ p=r/rename(name);assert not p.exists();p.write_text(s)
+for old in ['native-registration-v36-source.json','native-desktop-v56-source.json']:
+ names=[rename(f) for f in json.loads((r/old).read_text())];p=r/rename(old);assert not p.exists();p.write_text(json.dumps({f:hashlib.sha256((r/f).read_bytes()).hexdigest() for f in names},indent=2)+'\n')
+for old,new in [('analyze-native-latency-v6.py','analyze-native-latency-v7.py'),('analyze-native-presentation-v3.py','analyze-native-presentation-v4.py')]:
+ s=rename((r/old).read_text()).replace('native-latency-v8-analysis','native-latency-v9-analysis');(r/new).write_text(s)
+(r/'ptl-point-live-v1-upload.json').write_text(json.dumps([rename(f) for f in files]+['native-registration-v37-source.json','native-desktop-v57-source.json','analyze-native-latency-v7.py','analyze-native-presentation-v4.py'],indent=2)+'\n')
+print('Prepared fresh finite controllers; driver package unchanged; no desktop mutation.')
