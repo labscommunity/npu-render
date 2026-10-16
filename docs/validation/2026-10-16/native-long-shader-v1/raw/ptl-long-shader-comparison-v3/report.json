@@ -1,0 +1,87 @@
+{
+  "started": "2026-10-16T19:55:35.675195+00:00",
+  "completed": true,
+  "passed": true,
+  "desktop_changed": false,
+  "tahoma_tested": false,
+  "original_successful_reference_available": false,
+  "model_sha256": "895831be2695bc151454833249996608f38d35880c635900bb731515bc2bcda1",
+  "executable_sha256": "fcf74aa0a7a78bc89273da808815559a1d03ed3a7d76ca9d32e4d497c077524d",
+  "packet_sha256": "46caf6546bcde449d3829a05aaedfcefc719686f25264cec6786065df7a628c3",
+  "offline_deadline_seconds": 300,
+  "desktop_deadline_changed": false,
+  "exit_code": 0,
+  "pairs": [
+    {
+      "kind": "pair",
+      "iteration": 0,
+      "order": "baseline-first",
+      "baseline_full_ms": 95711.5872,
+      "candidate_full_ms": 64.8115,
+      "candidate_shader_and_projection_ms": 43.2798,
+      "candidate_merger_ms": 9.8401,
+      "baseline_calls": 10,
+      "candidate_calls": 10,
+      "components": 49152,
+      "different_components": 0,
+      "maximum_byte_error": 0,
+      "exact": true
+    },
+    {
+      "kind": "pair",
+      "iteration": 1,
+      "order": "custom-first",
+      "baseline_full_ms": 148.8278,
+      "candidate_full_ms": 32.4052,
+      "candidate_shader_and_projection_ms": 20.4297,
+      "candidate_merger_ms": 4.4628,
+      "baseline_calls": 10,
+      "candidate_calls": 10,
+      "components": 49152,
+      "different_components": 0,
+      "maximum_byte_error": 0,
+      "exact": true
+    },
+    {
+      "kind": "pair",
+      "iteration": 2,
+      "order": "baseline-first",
+      "baseline_full_ms": 132.9359,
+      "candidate_full_ms": 30.0673,
+      "candidate_shader_and_projection_ms": 18.0718,
+      "candidate_merger_ms": 4.4645,
+      "baseline_calls": 10,
+      "candidate_calls": 10,
+      "components": 49152,
+      "different_components": 0,
+      "maximum_byte_error": 0,
+      "exact": true
+    },
+    {
+      "kind": "pair",
+      "iteration": 3,
+      "order": "custom-first",
+      "baseline_full_ms": 107.7242,
+      "candidate_full_ms": 30.4156,
+      "candidate_shader_and_projection_ms": 18.2345,
+      "candidate_merger_ms": 4.5017,
+      "baseline_calls": 10,
+      "candidate_calls": 10,
+      "components": 49152,
+      "different_components": 0,
+      "maximum_byte_error": 0,
+      "exact": true
+    }
+  ],
+  "pixel_artifacts": {
+    "baseline.rgba": {
+      "bytes": 49152,
+      "sha256": "61da2570eecf77357d3ed52b454df91c3b46b734613a192f777407a2bdb54b43"
+    },
+    "candidate.rgba": {
+      "bytes": 49152,
+      "sha256": "61da2570eecf77357d3ed52b454df91c3b46b734613a192f777407a2bdb54b43"
+    }
+  },
+  "finished": "2026-10-16T19:57:12.766114+00:00"
+}

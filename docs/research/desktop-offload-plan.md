@@ -10,6 +10,14 @@ independent pixel confirmation completes at 5.87 seconds. Neither responsiveness
 nor sustained use is qualified. Interactive application coverage and a Tahoma
 benefit also remain open.
 
+The [long-shader component](../validation/2026-10-16/native-long-shader-v1/README.md)
+now passes 120 independent NPU fixtures and exact complete-image comparisons for
+the failed request and all six earlier uses of the shader. It removes that
+request's large pixel graph from the candidate path; the old graph takes 94.210
+seconds to compile in an offline comparison. Full worker integration, a new live
+run and broader responsiveness measurements remain required. This shader-specific
+fix does not complete the reusable runtime compiler or application coverage.
+
 The [live causal timing](../validation/2026-10-16/native-timing-live-v1/README.md)
 places 8,167.77 ms of the mouse response before frame publication and 70.81 ms
 between publication and observation. Eighty-one child rendering requests occupy

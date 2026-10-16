@@ -1,0 +1,157 @@
+"""Independent vectorized DXBC-IR oracle for the 16-sample long-shader component."""
+from pathlib import Path
+import hashlib
+import json
+import struct
+import numpy as np
+
+IR = json.loads(Path(__file__).with_name('ptl-long-shader-v1-ir.json').read_text())['pixel']
+F = np.float32
+U = np.uint32
+SPAN = 262144
+
+def execute(inputs, constants, samples):
+    count = len(inputs)
+    registers = np.zeros((count, 16, 4), U)
+    output = np.zeros((count, 4), U)
+    coordinates = []
+    def source(o):
+        assert not o['relative']
+        if o['kind'] == 0:
+            value = registers[:, o['index'], :]
+        elif o['kind'] == 1:
+            value = inputs[:, o['index'], :].view(U)
+        elif o['kind'] == 2:
+            assert o['index'] == 0
+            value = output
+        elif o['kind'] == 8:
+            assert o['index'] == 0
+            value = np.broadcast_to(constants[o['element']].view(U), (count, 4))
+        elif o['kind'] == 4:
+            value = np.broadcast_to(np.array(o['literal'], U), (count, 4))
+        else:
+            raise AssertionError(o)
+        value = value[:, o['lanes']].copy()
+        if o['modifier'] in (2, 3):
+            value &= U(0x7fffffff)
+        if o['modifier'] in (1, 3):
+            value ^= U(0x80000000)
+        return value
+    with np.errstate(all='raise'):
+        for instruction in IR['instructions']:
+            op = instruction['opcode']
+            dest = instruction['destination']
+            assert not instruction['saturate']
+            if op == 69:
+                operands = instruction['sources']
+                coordinates.append(source(operands[0]).view(F)[:, :2])
+                value = samples[:, len(coordinates)-1, operands[1]['lanes']].copy().view(U)
+            else:
+                raw = [source(o) for o in instruction['sources']]
+                values = [x.view(F) for x in raw]
+                if op == 54:
+                    value = raw[0]
+                elif op == 55:
+                    value = np.where(raw[0] != 0, raw[1], raw[2]).astype(U)
+                elif op == 29:
+                    values = [np.where((x & U(0x7f800000)) == 0, U(0), x).view(F) for x in raw]
+                    value = np.where(values[0] >= values[1], U(0xffffffff), U(0))
+                else:
+                    if op == 0:
+                        value = F(values[0] + values[1])
+                    elif op == 14:
+                        value = F(values[0] / values[1])
+                    elif op == 26:
+                        value = F(values[0] - np.floor(values[0]))
+                        value = np.where((raw[0] & U(0x7fffffff)) < U(0x00800000), F(0), value)
+                    elif op == 50:
+                        value = F(F(values[0] * values[1]) + values[2])
+                    elif op == 56:
+                        value = F(values[0] * values[1])
+                    else:
+                        raise AssertionError(op)
+                    value = value.view(U)
+            target = registers[:, dest['index'], :] if dest['kind'] == 0 else output
+            for c in range(4):
+                if dest['mask'] & (1 << c):
+                    target[:, c] = value[:, c]
+    return np.stack(coordinates, axis=1), output.view(F)
+
+def fixture(index):
+    if index >= 96:
+        data, _ = fixture(49)
+        data = bytearray(data)
+        mutations = [(0, 0), (4, 1), (8, 2), (12, 513), (16, 0),
+                     (20, 1), (24, 1), (28, 1), (256, 0), (260, 0),
+                     (256, 8193), (260, 8193), (264, 0), (64, 0x7fc00000),
+                     (512, 0x7f800000), (512+48, 0x3f800000),
+                     (512+52, 0xbf800000), (512+48, 0x7fc00000), (32, 2), (36, 2), (40, 1), (44, 1), (256, 0xffffffff), (260, 0xffffffff)]
+        offset, value = mutations[index-96]
+        struct.pack_into('<I', data, offset, value)
+        return bytes(data), bytes(SPAN)
+    phase = index // 48
+    seed = index % 48
+    rng = np.random.default_rng(781300 + seed)
+    count = [0, 1, 7, 16, 31, 64, 127, 512][seed % 8]
+    width, height = [(1, 1), (3, 5), (127, 63), (4096, 1024)][seed // 4 % 4]
+    fmt = 87 if seed % 2 else 28
+    inputs = rng.uniform(-2, 2, (count, 3, 4)).astype(F)
+    inputs[:, 2, 2] = rng.uniform(.5, 2, count).astype(F)
+    constants = rng.uniform(-.2, .2, (10, 4)).astype(F)
+    constants[8] = [-.25, -.5, .75, .5]
+    constants[9] = [.125, .75, 1.25, .625]
+    zero_samples = np.zeros((count, 16, 4), F)
+    uv, _ = execute(inputs, constants, zero_samples)
+    unrelated_samples = rng.uniform(0, 1, (count, 16, 4)).astype(F)
+    changed_uv, _ = execute(inputs, constants, unrelated_samples)
+    assert np.array_equal(uv.view(U), changed_uv.view(U))
+    data = bytearray(SPAN)
+    expected = bytearray(SPAN)
+    struct.pack_into('<8I', data, 0, 0x4e524c31, 2, phase, count, SPAN, 0, 0, 0)
+    address_u, address_v = seed & 1, (seed >> 1) & 1
+    struct.pack_into('<2I', data, 32, address_u, address_v)
+    data[64:224] = constants.tobytes()
+    struct.pack_into('<3I', data, 256, width, height, fmt)
+    struct.pack_into('<4I', expected, 0, 0x4e524c4f, phase, count, 0)
+    for pixel in range(count):
+        data[512+pixel*432:560+pixel*432] = inputs[pixel].tobytes()
+    if not phase:
+        # Independent mirror reference uses remainder rather than the kernel's floor subtraction.
+        for axis, mode in enumerate([address_u, address_v]):
+            if mode:
+                folded=np.remainder(np.abs(uv[...,axis]).astype(np.float64),2.0)
+                uv[...,axis]=np.where(folded>1,2.0-folded,folded).astype(F)
+        xy = F(np.clip(F(F(np.clip(uv, F(0), F(1)) * np.array([width, height], F)) - F(.5)), F(0), np.array([width-1, height-1], F)))
+        integer = xy.astype(U)
+        fractions = F(xy - integer.astype(F))
+        for pixel in range(count):
+            target = 16 + pixel*384
+            for sample in range(16):
+                x, y = map(int, integer[pixel, sample])
+                right, lower = min(x+1, width-1), min(y+1, height-1)
+                struct.pack_into('<4I', expected, target+sample*16, y*width+x, y*width+right, lower*width+x, lower*width+right)
+            expected[target+256:target+384] = fractions[pixel].tobytes()
+    else:
+        fractions = rng.uniform(0, 1, (count, 16, 2)).astype(F)
+        packed = rng.integers(0, 2**32, (count, 16, 4), dtype=U)
+        texels = F((packed[..., None] >> np.array([0, 8, 16, 24], U)) & U(255)) / F(255)
+        if fmt == 87:
+            texels = texels[..., [2, 1, 0, 3]]
+        tx, ty = fractions[..., 0, None], fractions[..., 1, None]
+        upper = F(F(texels[:, :, 0] * F(1-tx)) + F(texels[:, :, 1] * tx))
+        lower = F(F(texels[:, :, 2] * F(1-tx)) + F(texels[:, :, 3] * tx))
+        samples = F(F(upper * F(1-ty)) + F(lower * ty))
+        _, colors = execute(inputs, constants, samples)
+        expected[16:16+count*16] = colors.tobytes()
+        for pixel in range(count):
+            base = 512 + pixel*432
+            data[base+48:base+176] = fractions[pixel].tobytes()
+            data[base+176:base+432] = packed[pixel].tobytes()
+    return bytes(data), bytes(expected)
+
+if __name__ == '__main__':
+    for n in range(120):
+        data, expected = fixture(n)
+        assert len(data) == len(expected) == SPAN
+    print(json.dumps(dict(cpu_only=True, fixtures=120, independent_ir_oracle=True,
+        ir_sha256=hashlib.sha256(Path(__file__).with_name('ptl-long-shader-v1-ir.json').read_bytes()).hexdigest())))

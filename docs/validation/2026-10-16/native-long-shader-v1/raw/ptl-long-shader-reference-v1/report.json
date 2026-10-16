@@ -1,0 +1,105 @@
+{
+  "started": "2026-10-16T19:58:08.178822+00:00",
+  "completed": true,
+  "passed": true,
+  "desktop_changed": false,
+  "tahoma_tested": false,
+  "original_successful_reference_available": false,
+  "cpu_shader_test_oracle": true,
+  "reference_timing_not_npu_rendering_performance": true,
+  "model_sha256": "895831be2695bc151454833249996608f38d35880c635900bb731515bc2bcda1",
+  "executable_sha256": "e586063fbb737ff49c452755fec20d205382b68f82c54693328eea47f08f9709",
+  "packet_sha256": "46caf6546bcde449d3829a05aaedfcefc719686f25264cec6786065df7a628c3",
+  "offline_deadline_seconds": 300,
+  "desktop_deadline_changed": false,
+  "exit_code": 0,
+  "pairs": [
+    {
+      "kind": "pair",
+      "iteration": 0,
+      "order": "custom-first",
+      "baseline_full_ms": 126.4665,
+      "candidate_full_ms": 55.9742,
+      "candidate_shader_and_projection_ms": 37.3665,
+      "candidate_merger_ms": 6.4618,
+      "baseline_calls": 8,
+      "candidate_calls": 10,
+      "components": 49152,
+      "different_components": 0,
+      "maximum_byte_error": 0,
+      "exact": true
+    },
+    {
+      "kind": "pair",
+      "iteration": 1,
+      "order": "baseline-first",
+      "baseline_full_ms": 82.2008,
+      "candidate_full_ms": 54.0707,
+      "candidate_shader_and_projection_ms": 35.051,
+      "candidate_merger_ms": 5.8256,
+      "baseline_calls": 8,
+      "candidate_calls": 10,
+      "components": 49152,
+      "different_components": 0,
+      "maximum_byte_error": 0,
+      "exact": true
+    },
+    {
+      "kind": "pair",
+      "iteration": 2,
+      "order": "custom-first",
+      "baseline_full_ms": 58.1052,
+      "candidate_full_ms": 45.4961,
+      "candidate_shader_and_projection_ms": 29.8612,
+      "candidate_merger_ms": 4.8721,
+      "baseline_calls": 8,
+      "candidate_calls": 10,
+      "components": 49152,
+      "different_components": 0,
+      "maximum_byte_error": 0,
+      "exact": true
+    },
+    {
+      "kind": "pair",
+      "iteration": 3,
+      "order": "baseline-first",
+      "baseline_full_ms": 73.1225,
+      "candidate_full_ms": 44.2516,
+      "candidate_shader_and_projection_ms": 28.5323,
+      "candidate_merger_ms": 5.6036,
+      "baseline_calls": 8,
+      "candidate_calls": 10,
+      "components": 49152,
+      "different_components": 0,
+      "maximum_byte_error": 0,
+      "exact": true
+    }
+  ],
+  "pixel_artifacts": {
+    "baseline.rgba": {
+      "bytes": 49152,
+      "sha256": "61da2570eecf77357d3ed52b454df91c3b46b734613a192f777407a2bdb54b43"
+    },
+    "candidate-0.rgba": {
+      "bytes": 49152,
+      "sha256": "61da2570eecf77357d3ed52b454df91c3b46b734613a192f777407a2bdb54b43"
+    },
+    "candidate-1.rgba": {
+      "bytes": 49152,
+      "sha256": "2aae7dc846aaf25f1cadf55f1666862046c6db9d65d84bdc07fa039dac405606"
+    },
+    "candidate-2.rgba": {
+      "bytes": 49152,
+      "sha256": "f299101826158842840c901557befb8a5cf64112ebeaac9b2e9aac451b4cee64"
+    },
+    "candidate-3.rgba": {
+      "bytes": 49152,
+      "sha256": "7fb43fa5ed427969a5bc41a4a0345edee0f97ee833f31d3855c217dea8b793f6"
+    },
+    "candidate.rgba": {
+      "bytes": 49152,
+      "sha256": "61da2570eecf77357d3ed52b454df91c3b46b734613a192f777407a2bdb54b43"
+    }
+  },
+  "finished": "2026-10-16T19:58:09.801990+00:00"
+}

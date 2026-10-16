@@ -1,0 +1,45 @@
+"""Qualify every recorded long-shader draw against original NPU and independent CPU shader oracle."""
+from pathlib import Path
+from datetime import UTC, datetime
+import hashlib,json,os,subprocess,traceback
+r=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=r/'vm';out=vm/'ptl-long-shader-capture-v1';out.mkdir(exist_ok=False)
+def obj(p):
+ b=p.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+def rows(p):return [json.loads(x) for x in p.read_text(encoding='utf-8-sig').splitlines() if x.startswith('{') and x.endswith('}')]
+def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,desktop_changed=False,tahoma_tested=False,cases=[]);process=None
+def save():(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+save()
+try:
+ assert obj(vm/'ptl-long-shader-comparison-v3/report.json')['passed'] and obj(vm/'ptl-long-shader-reference-v1/report.json')['passed']
+ assert obj(vm/'ptl-native-worker-v8-full/report.json')['passed']
+ model=vm/'ptl-six-span-long-shader-v2/patched.blob';assert sha(model)=='895831be2695bc151454833249996608f38d35880c635900bb731515bc2bcda1'
+ geometry=vm/'ptl-six-span-geometry-v2/patched.blob';assert sha(geometry)=='ea4432abd7b548396b86665c1b318353e0d2f3ec847bcd3e6f56c10bd1336dfa'
+ exe=r/'builds/ptl-long-shader-integration-v4/Release/nr_ptl_four_tap_compare.exe';assert sha(exe)=='e586063fbb737ff49c452755fec20d205382b68f82c54693328eea47f08f9709'
+ capture=vm/'native-desktop-admission-v33/bootstrap/requests';assert sha(capture/'index.jsonl')=='0f22ee6a6f4184e06a4338562abc24b843ad7b3882fec6c189bdaa9983237d9d'
+ entries={x['ticket']:x for x in rows(capture/'index.jsonl') if x.get('request_recorded')}
+ expected={x['ticket']:x for x in rows(vm/'ptl-native-worker-v8-full/replay/replays.jsonl')}
+ metadata=obj(vm/'ptl-worker-cost-analysis-v3/draws.json');tickets=sorted(x['ticket'] for x in metadata if x.get('pixel_shader_sha256')=='ec1e65f6664c9faf5af829eebdc7799cdde111ce4bad9f730ea5b13878546804');assert tickets==[479,481,599,601,665,667]
+ env=os.environ.copy();env['PATH']=str(r/'toolchains/openvino-2026.4.1/Lib/site-packages/openvino/libs')+os.pathsep+env['PATH']
+ env.update(NR_RENDER_NPU_CACHE=str(vm/'model-cache-2026-4-v209'),NR_RENDER_SHARED_QUEUE='1',NR_RENDER_MEMORY_CACHE='1',NR_RENDER_MEMORY_CACHE_CAPACITY='512',NR_RENDER_SHARED_CORE='1',NR_RENDER_OPAQUE_CROP='1',NR_RENDER_TEXTURE_SCOPE='1',NR_RENDER_QUAD_BATCH='1',NR_RENDER_COMPACT_COVERAGE='0',NR_RENDER_INFER_TRACE='0',NR_RENDER_COMPILE_TRACE='1',NR_RENDER_INFER_PROFILE='0',NR_RENDER_PTL_LONG_BLOB=str(model),NR_RENDER_PTL_GEOMETRY_BLOB=str(geometry))
+ env.pop('NR_RENDER_AFFINE_BATCH',None)
+ report.update(model_sha256=sha(model),executable_sha256=sha(exe),planned_tickets=tickets,planned_comparisons=48,desktop_deadline_changed=False,cpu_reference_only_in_test_harness=True);save()
+ for ticket in tickets:
+  packet=capture/entries[ticket]['file'];assert sha(packet)==entries[ticket]['sha256']
+  for reference in ['original-npu','independent-cpu-shader']:
+   case=out/f'{ticket}-{reference}';case.mkdir(exist_ok=False);report.update(active_ticket=ticket,active_reference=reference);save()
+   with (case/'stdout.jsonl').open('wb') as stdout,(case/'stderr.log').open('wb') as stderr:
+    process=subprocess.Popen([str(exe),str(packet),str(model),str(case)]+(['--cpu-reference'] if reference=='independent-cpu-shader' else []),env=env,stdout=stdout,stderr=stderr,creationflags=subprocess.CREATE_NO_WINDOW)
+    try:process.wait(timeout=240)
+    except subprocess.TimeoutExpired:process.kill();process.wait(timeout=5);report['child_timeout']=True
+   events=rows(case/'stdout.jsonl');pairs=[x for x in events if x.get('kind')=='pair'];passed=process.returncode==0 and len(pairs)==4 and all(x['exact'] for x in pairs) and any(x.get('kind')=='complete' and x.get('passed') for x in events)
+   item=dict(ticket=ticket,reference=reference,packet_sha256=sha(packet),exit_code=process.returncode,pairs=pairs,passed=passed,pixel_artifacts={p.name:dict(bytes=p.stat().st_size,sha256=sha(p)) for p in case.glob('*.rgba')})
+   if passed:item['original_pixel_hash_preserved']=sha(case/'candidate.rgba')==expected[ticket]['pixels_sha256'];passed=item['original_pixel_hash_preserved'];item['passed']=passed
+   report['cases'].append(item);save();print(json.dumps(dict(ticket=ticket,reference=reference,passed=passed,pairs=pairs)),flush=True)
+   assert passed,(ticket,reference)
+ report['passed']=len(report['cases'])==12 and all(x['passed'] for x in report['cases'])
+except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+finally:
+ if process and process.poll() is None:process.kill();process.wait(timeout=5)
+ report.update(completed=True,finished=datetime.now(UTC).isoformat());save()
+print(json.dumps({k:v for k,v in report.items() if k!='cases'}));raise SystemExit(0 if report['passed'] else 1)

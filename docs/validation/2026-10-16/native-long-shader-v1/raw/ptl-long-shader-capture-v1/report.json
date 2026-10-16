@@ -1,0 +1,11 @@
+{
+  "started": "2026-10-16T19:58:58.632970+00:00",
+  "completed": true,
+  "passed": false,
+  "desktop_changed": false,
+  "tahoma_tested": false,
+  "cases": [],
+  "error": "FileNotFoundError(2, 'No such file or directory')",
+  "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\run-ptl-long-shader-capture-v1.py\", line 22, in <module>\n    metadata=obj(vm/'ptl-worker-cost-analysis-v3/draws.json');tickets=sorted(x['ticket'] for x in metadata if x.get('pixel_shader_sha256')=='ec1e65f6664c9faf5af829eebdc7799cdde111ce4bad9f730ea5b13878546804');assert tickets==[479,481,599,601,665,667]\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\run-ptl-long-shader-capture-v1.py\", line 7, in obj\n    b=p.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\\xff\\xfe') else b.decode('utf-8-sig'))\n      ^^^^^^^^^^^^^^\n  File \"C:\\Users\\tatef\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\pathlib.py\", line 1019, in read_bytes\n    with self.open(mode='rb') as f:\n         ^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\tatef\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\pathlib.py\", line 1013, in open\n    return io.open(self, mode, buffering, encoding, errors, newline)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nFileNotFoundError: [Errno 2] No such file or directory: 'C:\\\\Users\\\\tatef\\\\AppData\\\\Local\\\\npu-render\\\\vm\\\\ptl-worker-cost-analysis-v3\\\\draws.json'\n",
+  "finished": "2026-10-16T19:58:58.649164+00:00"
+}

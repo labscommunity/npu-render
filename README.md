@@ -10,17 +10,16 @@ RGBA composition and an explicit backend switch. The packaged runtime passed
 GPU → NPU → CPU → GPU → NPU switching on Panther Lake. It supports CPU/GPU/NPU through
 its first OpenVINO provider; other providers can implement the same contracts.
 
-**Latest results, October 16:** the reusable shader path passes
-[1,524 complete image comparisons](docs/validation/2026-10-16/native-program-comparison-v1/README.md),
-then [all 972 recorded worker requests and registered D3D11](docs/validation/2026-10-16/native-program-worker-v1/README.md).
-Its [live desktop trial fails](docs/validation/2026-10-16/native-program-live-v1/README.md)
-after 44 submitted frames when another shader's existing NPU graph times out.
-Ordinary cleanup passes. Producing one controlled mouse-response frame takes
-2.93 seconds; independent pixel confirmation takes 5.87 seconds. Responsive,
-sustained desktop operation and a Tahoma benefit remain unqualified.
-Automatic admission passes a [normally started same-session D3D11 fixture](docs/validation/2026-10-16/native-automatic-graphics-v1/README.md);
-interactive applications remain a separate gate. See the
-[current acceptance plan](docs/research/desktop-offload-plan.md).
+**Latest results, October 16:** a [bounded NPU implementation of the shader that
+stopped the last desktop run](docs/validation/2026-10-16/native-long-shader-v1/README.md)
+passes 120 device fixtures and complete image comparisons against two independent
+references, including the failed request and all six earlier captures. The
+previous [live desktop trial still fails](docs/validation/2026-10-16/native-program-live-v1/README.md)
+after 44 submitted frames. Full worker and live integration of the fix are separate
+gates. Responsive sustained operation and a Tahoma benefit remain unqualified.
+[Automatic admission of non-admin interactive clients](docs/validation/2026-10-16/native-interactive-admission-v1/README.md)
+passes component checks; real interactive graphics integration remains open.
+See the [current acceptance plan](docs/research/desktop-offload-plan.md).
 
 **Full desktop offload is unfinished.** The current Windows/Panther Lake path
 executes real DWM rendering on the NPU, delivers changing desktop frames to the

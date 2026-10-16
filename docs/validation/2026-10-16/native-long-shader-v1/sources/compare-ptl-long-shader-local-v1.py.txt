@@ -1,0 +1,11 @@
+from pathlib import Path
+import ctypes,hashlib,json
+import numpy as np
+from ptl_long_shader_fixtures_v1 import fixture
+r=Path(__file__).parent;lib=ctypes.CDLL(str((r/'ptl-long-shader-v2-local.dylib').resolve()));fn=lib.nr_long_shader_local;fn.argtypes=[ctypes.c_void_p,ctypes.c_void_p];checks=[]
+for index in range(114):
+ data,expected=fixture(index);input=ctypes.create_string_buffer(data);output=ctypes.create_string_buffer(262144);fn(input,output);actual=output.raw
+ if actual!=expected:
+  a=np.frombuffer(actual,np.uint32);e=np.frombuffer(expected,np.uint32);positions=np.flatnonzero(a!=e);print(json.dumps(dict(index=index,different_components=len(positions),positions=positions[:12].tolist(),actual=a[positions[:12]].tolist(),expected=e[positions[:12]].tolist())));raise SystemExit(1)
+ checks.append(dict(index=index,input_sha256=hashlib.sha256(data).hexdigest(),output_sha256=hashlib.sha256(actual).hexdigest()))
+report=dict(completed=True,passed=True,cpu_only=True,fixtures=len(checks),checks=checks);(r/'ptl-long-shader-v2-local-comparison.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps({k:v for k,v in report.items() if k!='checks'}))

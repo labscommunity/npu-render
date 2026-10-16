@@ -1,0 +1,38 @@
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'ptl-long-shader-integration-v4';shutil.copytree(r/'ptl-long-shader-integration-v3',d)
+for name in ['reference_triangle.hpp','reference_triangle.cpp']:shutil.copyfile(r/'ptl-program-integration-v5'/name,d/name)
+shutil.copyfile(Path('native/windows/registered_lab/shader_reference.hpp'),d/'long_shader_reference.hpp')
+p=d/'reference_triangle.hpp';s=p.read_text();start=s.index('// General triangle-list');end=s.index('class ReferenceTriangleDrawExecutor');s=s[:start]+'// OFFLINE TEST ORACLE ONLY: original NPU geometry/merger plus CPU shader interpreter.\n// Never compiled into or called from the desktop worker.\n'+s[end:];p.write_text(s)
+p=d/'reference_triangle.cpp';s=p.read_text().replace('#include "ptl_program_ir.hpp"','#include "long_shader_reference.hpp"').replace('    std::unique_ptr<shader::PixelExecutor> pixel;','    shader::TextureSamplers samplers;')
+s=s.replace('const auto shapes=resource_shapes(ps,resources);\n        pixel=std::make_unique<shader::PixelExecutor>(ps,batch,backend,shapes,samplers);','this->samplers=samplers;\n        require(!quads);')
+s=s.replace('    auto texture_batch=s.pixel->bind_textures(textures,s.texture_reuse);uint64_t texture_upload_bytes=0,texture_reused_bytes=0;','    const auto shapes=resource_shapes(s.ps,resources);')
+start=s.index('        began=Clock::now();const auto pixels=texture_batch.execute');end=s.index('        for(size_t n=0;n<s.batch;++n)tile[n]=',start)
+s=s[:start]+'''        // OFFLINE TEST ORACLE ONLY. The independent instruction interpreter
+        // evaluates every pixel instruction, including integer-tap mirrored sampling.
+        // No pixel graph is compiled here, and no CPU oracle is used in production.
+        began=Clock::now();
+        for(size_t n=0;n<s.batch;++n){
+            const auto expected=shader::reference_vertex(s.ps,fragments[n],pc,shapes,s.samplers,textures);
+            std::memcpy(colors[n].data(),expected[0].data(),16);
+        }
+        result.timings.shader_ms+=ms(began);
+'''+s[end:]
+start=s.index('    std::printf("{\\"texture_upload_scope');end=s.index('    result.vertices=',start);s=s[:start]+s[end:];p.write_text(s)
+p=d/'compare.cpp';s=p.read_text().replace('#include "shader_reference.hpp"','#include "reference_triangle.hpp"')
+s=s.replace('ex::require(argc==4);','ex::require(argc==4||argc==5);const bool cpu_reference=argc==5;ex::require(!cpu_reference||std::string(argv[4])=="--cpu-reference");')
+needle='    std::printf("{\\"kind\\":\\"admission'
+i=s.index(needle);s=s[:i]+'''    std::unique_ptr<ReferenceTriangleDrawExecutor> reference;
+    if(cpu_reference)reference=std::make_unique<ReferenceTriangleDrawExecutor>(r.vertex,r.pixel,capacity,r.header.width,r.header.height,r.header.format,r.resources,r.samplers,"NPU",ex::blend_mode(r.header),uint8_t((r.header.flags>>8)&15),static_cast<CullMode>((r.header.flags>>5)&3),(r.header.flags&128)!=0,batch);
+    std::printf("{\\"kind\\":\\"comparison_reference\\",\\"cpu_shader_test_oracle\\":%s,\\"candidate_shader_backend\\":\\"NPU\\",\\"cpu_fallback_in_candidate\\":false}\\n",cpu_reference?"true":"false");
+'''+s[i:]
+s=s.replace('raster_ms=result.timings.merger_ms;};','raster_ms=result.timings.merger_ms;save(out/("candidate-"+std::to_string(iteration)+".rgba"),candidate.data(),candidate.size()*4);std::printf("{\\"kind\\":\\"candidate_completed\\",\\"iteration\\":%u,\\"elapsed_ms\\":%.6f,\\"provider_requests\\":%u}\\n",iteration,candidate_ms,calls);std::fflush(stdout);};')
+s=s.replace('ordinary=baseline.execute(r);','ordinary=reference?reference->execute(r.inputs,r.vertex_constants,r.pixel_constants,r.viewport,r.resources,r.background,r.scissor,r.blend_constant):baseline.execute(r);')
+s=s.replace('if(iteration&1){run_custom();run_base();}else{run_base();run_custom();}','if(!(iteration&1)){run_custom();run_base();}else{run_base();run_custom();}')
+s=s.replace('iteration&1?"custom-first":"baseline-first"','iteration&1?"baseline-first":"custom-first"')
+p.write_text(s)
+p=d/'CMakeLists.txt';s=p.read_text().replace('compare.cpp ptl_long_triangle_draw.cpp)','compare.cpp ptl_long_triangle_draw.cpp reference_triangle.cpp)');s+='\nset_source_files_properties(reference_triangle.cpp PROPERTIES COMPILE_OPTIONS "/fp:strict")\n';p.write_text(s)
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};(r/'ptl-long-shader-integration-v4-source.json').write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/'ptl-long-shader-integration-v4.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+(r/'build-ptl-long-shader-integration-v4.ps1').write_text((r/'build-ptl-long-shader-integration-v3.ps1').read_text().replace('ptl-long-shader-integration-v3','ptl-long-shader-integration-v4'))
+print(json.dumps(manifest))
