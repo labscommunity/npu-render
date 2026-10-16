@@ -1,0 +1,17 @@
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'ptl-complex-diagnostic-v1';shutil.copytree(r/'ptl-complex-integration-v1',d)
+p=d/'ptl_complex_shader.hpp';s=p.read_text();s=s.replace('bool failed=false;','bool failed=false;std::filesystem::path capture_directory;unsigned capture_index=0;')
+s=s.replace('  const auto bytes=verified_blob(path);', '''  wchar_t *capture=nullptr;size_t capture_length=0;require(!_wdupenv_s(&capture,&capture_length,L"NR_COMPLEX_DIAGNOSTIC_CAPTURE"));const std::unique_ptr<wchar_t,decltype(&std::free)> capture_owner(capture,&std::free);require(capture&&*capture);capture_directory=capture;require(std::filesystem::is_directory(capture_directory));
+  const auto bytes=verified_blob(path);''')
+s=s.replace('auto invoke=[&]{inference.start_async();', '''auto invoke=[&]{
+    const auto record=[&](const char *kind,const void *value){std::ofstream f(capture_directory/(std::to_string(capture_index)+"-"+kind+".bin"),std::ios::binary);require(bool(f));f.write(static_cast<const char*>(value),1572864);require(bool(f));};
+    record("input",inference.get_input_tensor().data());inference.start_async();''')
+s=s.replace('++result.provider_requests;', 'record("output",inference.get_output_tensor().data());++capture_index;++result.provider_requests;')
+p.write_text(s)
+p=d/'compare.cpp';s=p.read_text().replace('iteration<4','iteration<1');p.write_text(s)
+p=d/'CMakeLists.txt';p.write_text(p.read_text().replace('nr_ptl_complex_compare','nr_ptl_complex_diagnostic'))
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};(r/'ptl-complex-diagnostic-v1-source.json').write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/'ptl-complex-diagnostic-v1.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-ptl-complex-integration-v1.ps1').read_text().replace('ptl-complex-integration-v1','ptl-complex-diagnostic-v1').replace('nr_ptl_complex_compare','nr_ptl_complex_diagnostic');(r/'build-ptl-complex-diagnostic-v1.ps1').write_text(s)
+print(json.dumps(dict(files=len(manifest),private_device_payload_capture=True)))

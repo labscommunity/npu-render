@@ -1,0 +1,69 @@
+{
+  "started": "2026-10-16T20:49:08.104718+00:00",
+  "completed": true,
+  "passed": false,
+  "desktop_changed": false,
+  "tahoma_tested": false,
+  "cases": [
+    {
+      "ticket": 58,
+      "reference": "original-npu",
+      "packet_sha256": "570c66b7cbcf08170117bdb36f9a70548e9e528ee0e5d87ca86c583bd14ace5d",
+      "exit_code": 2,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "custom-first",
+          "baseline_full_ms": 1098.5959,
+          "candidate_full_ms": 294.5215,
+          "candidate_shader_and_projection_ms": 132.4284,
+          "candidate_merger_ms": 39.9733,
+          "baseline_calls": 59,
+          "candidate_calls": 63,
+          "components": 3145728,
+          "different_components": 10,
+          "maximum_byte_error": 1,
+          "exact": false
+        }
+      ],
+      "passed": false,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 3145728,
+          "sha256": "1909d4bf3d890a623c01db9512364929b99aa8217dfa554edae32a97c93a8d9e"
+        },
+        "candidate-0.rgba": {
+          "bytes": 3145728,
+          "sha256": "c49baeebae9fbc78036d26881913326169ff3eb5bc0a257e29780dfb05cbf6a7"
+        },
+        "candidate.rgba": {
+          "bytes": 3145728,
+          "sha256": "c49baeebae9fbc78036d26881913326169ff3eb5bc0a257e29780dfb05cbf6a7"
+        }
+      }
+    }
+  ],
+  "model_sha256": "47f69b5861732a03014b58160116ebbb928fd6e818a11b7f553e423a4cf3c43a",
+  "executable_sha256": "4fb3892a47f5972434d6f942f4685e33c27f8a33386825bcc6243310bec67b6d",
+  "planned_tickets": [
+    58,
+    196,
+    302,
+    363,
+    482,
+    602,
+    668,
+    723,
+    790,
+    820
+  ],
+  "planned_comparisons": 80,
+  "desktop_deadline_changed": false,
+  "cpu_reference_only_in_test_harness": true,
+  "active_ticket": 58,
+  "active_reference": "original-npu",
+  "error": "AssertionError((58, 'original-npu'))",
+  "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\run-ptl-complex-shader-capture-v1.py\", line 42, in <module>\n    assert passed,(ticket,reference)\n           ^^^^^^\nAssertionError: (58, 'original-npu')\n",
+  "finished": "2026-10-16T20:49:10.269450+00:00"
+}

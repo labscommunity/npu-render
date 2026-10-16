@@ -1,0 +1,27 @@
+"""Two-stage shader lowering with two textures and five independent samples."""
+from pathlib import Path
+import hashlib,json
+r=Path('results/render-driver');header=(r/'ptl-complex-shader-codegen-v1/shader.h').read_text().replace('INLINE float nr_floor','static __attribute__((noinline)) float nr_floor')
+s=(r/'ptl-six-span-long-shader-v3.c').read_text();s=s[s.index('typedef unsigned uint4'):]
+s=s.replace('0x4e524c31','0x4e524331').replace('0x4e524c4f','0x4e52434f').replace('u32(data+4)!=2','u32(data+4)!=1').replace('count>512','count>1024')
+a=s.index(' unsigned address_u=');b=s.index(' const unsigned *constant=',a)
+s=s[:a]+''' unsigned width[2],height[2],format[2],address_u[2],address_v[2],filter[2];
+ if(u32(data+56)||u32(data+60))return;
+ for(unsigned n=0;n<2;++n){width[n]=u32(data+256+n*12);height[n]=u32(data+260+n*12);format[n]=u32(data+264+n*12);
+  address_u[n]=u32(data+32+n*8);address_v[n]=u32(data+36+n*8);filter[n]=u32(data+48+n*4);
+  if(!width[n]||width[n]>8192||!height[n]||height[n]>8192||(format[n]!=28&&format[n]!=87)||width[n]*height[n]>4194304||address_u[n]>1||address_v[n]>1||filter[n]>1)return;
+ }
+'''+s[b:]
+s=s.replace('n<40','n<24').replace('pixel*432','pixel*192').replace('n<12','n<16').replace('unsigned coordinates[32]','unsigned coordinates[10]').replace('pixel*384','pixel*128').replace('sample<16','sample<5').replace('unsigned slot=0','unsigned slot=sample?1:0').replace('if(address_u)','if(address_u[slot])').replace('if(address_v)','if(address_v[slot])').replace('result[64+sample*2]','result[20+sample*2]').replace('result[65+sample*2]','result[21+sample*2]').replace('unsigned sampled[64]','unsigned sampled[20]').replace('record+48+sample*8','record+64+sample*8').replace('record+52+sample*8','record+68+sample*8').replace('record+176+sample*16','record+104+sample*16')
+needle='    result[sample*4]=iy*w+ix;';assert needle in s
+s=s.replace(needle,'''    if(filter[slot]){ix=(unsigned)bounded(bounded(u,1.0f)*(float)w,(float)(w-1));iy=(unsigned)bounded(bounded(v,1.0f)*(float)h,(float)(h-1));jx=ix;jy=iy;x=(float)ix;y=(float)iy;}
+'''+needle)
+s=s.replace('float4 value=mix4(', 'float4 value=filter[slot]?texel(p,format[slot]):mix4(')
+s=header+'\n'+s
+(r/'ptl-six-span-complex-shader-v1.c').write_text(s)
+a=s.index('void nr_probe_kernel(');b=s.index(' uint4 *words=',a)
+local=s[:a]+'void nr_complex_shader_local(const unsigned char *data,unsigned char *output){\n'+s[b:]
+local=local[:local.index('\nvoid *memset')]
+(r/'ptl-complex-shader-v1-local.c').write_text(local)
+(r/'ptl-six-span-complex-shader-v1-source.json').write_text(json.dumps({'ptl-six-span-complex-shader-v1.c':hashlib.sha256(s.encode()).hexdigest()},indent=2)+'\n')
+print('Prepared bounded candidate; no execution proof')

@@ -1,0 +1,44 @@
+{
+  "started": "2026-10-16T20:50:23.626563+00:00",
+  "completed": true,
+  "passed": false,
+  "desktop_changed": false,
+  "tahoma_tested": false,
+  "original_comparison_passed": false,
+  "executable_sha256": "4fb3892a47f5972434d6f942f4685e33c27f8a33386825bcc6243310bec67b6d",
+  "model_sha256": "47f69b5861732a03014b58160116ebbb928fd6e818a11b7f553e423a4cf3c43a",
+  "packet_sha256": "570c66b7cbcf08170117bdb36f9a70548e9e528ee0e5d87ca86c583bd14ace5d",
+  "exit_code": 2,
+  "pairs": [
+    {
+      "kind": "pair",
+      "iteration": 0,
+      "order": "custom-first",
+      "baseline_full_ms": 678.1985,
+      "candidate_full_ms": 356.4454,
+      "candidate_shader_and_projection_ms": 143.0665,
+      "candidate_merger_ms": 75.2553,
+      "baseline_calls": 46,
+      "candidate_calls": 63,
+      "components": 3145728,
+      "different_components": 2,
+      "maximum_byte_error": 1,
+      "exact": false
+    }
+  ],
+  "pixel_artifacts": {
+    "baseline.rgba": {
+      "bytes": 3145728,
+      "sha256": "af42a981f4ced07ccf2dc5a3dcb71868b3254e39667a640d175771dd4834d08e"
+    },
+    "candidate-0.rgba": {
+      "bytes": 3145728,
+      "sha256": "c49baeebae9fbc78036d26881913326169ff3eb5bc0a257e29780dfb05cbf6a7"
+    },
+    "candidate.rgba": {
+      "bytes": 3145728,
+      "sha256": "c49baeebae9fbc78036d26881913326169ff3eb5bc0a257e29780dfb05cbf6a7"
+    }
+  },
+  "finished": "2026-10-16T20:50:25.056223+00:00"
+}

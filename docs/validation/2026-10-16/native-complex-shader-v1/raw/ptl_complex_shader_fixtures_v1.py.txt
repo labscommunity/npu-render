@@ -1,0 +1,100 @@
+"""Independent vectorized IR oracle for two-resource/five-sample shader ABI."""
+from pathlib import Path
+import hashlib,json,struct
+import numpy as np
+IR=json.loads(Path(__file__).with_name('ptl-complex-shader-v1-ir.json').read_text())['pixel']
+F=np.float32;U=np.uint32;SPAN=262144
+
+def execute(inputs,constants,samples):
+ count=len(inputs);registers=np.zeros((count,16,4),U);output=np.zeros((count,4),U);coordinates=[]
+ def source(o,integer=False):
+  assert not o['relative']
+  if o['kind']==0:value=registers[:,o['index'],:]
+  elif o['kind']==1:value=inputs[:,o['index'],:].view(U)
+  elif o['kind']==2:assert o['index']==0;value=output
+  elif o['kind']==8:assert o['index']==0;value=np.broadcast_to(constants[o['element']].view(U),(count,4))
+  elif o['kind']==4:value=np.broadcast_to(np.array(o['literal'],U),(count,4))
+  else:raise AssertionError(o)
+  value=value[:,o['lanes']].copy()
+  if o['modifier'] in (2,3):value &= U(0x7fffffff)
+  if o['modifier'] in (1,3):value=U(0)-value if integer else value^U(0x80000000)
+  return value
+ with np.errstate(all='ignore'):
+  for instruction in IR['instructions']:
+   op=instruction['opcode'];dest=instruction['destination']
+   if op==69:
+    operands=instruction['sources'];coordinates.append(source(operands[0]).view(F)[:,:2]);value=samples[:,len(coordinates)-1,operands[1]['lanes']].copy().view(U)
+   else:
+    raw=[source(o,op==30) for o in instruction['sources']];values=[x.view(F) for x in raw]
+    if op==54:value=raw[0]
+    elif op==55:value=np.where(raw[0]!=0,raw[1],raw[2]).astype(U)
+    elif op==1:value=raw[0]&raw[1]
+    elif op==30:value=raw[0]+raw[1]
+    elif op==43:value=raw[0].view(np.int32).astype(F).view(U)
+    elif op in (29,49,24):
+     if op!=49:values=[np.where((x&U(0x7f800000))==0,U(0),x).view(F) for x in raw]
+     condition=values[0]>=values[1] if op==29 else values[0]<values[1] if op==49 else values[0]==values[1]
+     value=np.where(condition,U(0xffffffff),U(0))
+    else:
+     if op==0:value=F(values[0]+values[1])
+     elif op==14:value=F(values[0]/values[1])
+     elif op in (26,65):
+      flushed=np.where((raw[0]&U(0x7fffffff))<U(0x00800000),np.copysign(F(0),values[0]),values[0]);floor=np.floor(flushed)
+      value=F(flushed-floor) if op==26 else floor
+     elif op==50:value=F(F(values[0]*values[1])+values[2])
+     elif op==56:value=F(values[0]*values[1])
+     elif op==51:value=np.fmin(values[0],values[1])
+     elif op==52:value=np.fmax(values[0],values[1])
+     elif op==16:
+      products=F(values[0][:,:3]*values[1][:,:3]);dot=F(F(products[:,0]+products[:,1])+products[:,2]);value=np.repeat(dot[:,None],4,axis=1)
+     else:raise AssertionError(op)
+     value=value.view(U)
+   if instruction['saturate']:
+    flushed=np.where((value&U(0x7f800000))==0,U(0),value).view(F);value=np.clip(np.nan_to_num(flushed,nan=0),F(0),F(1)).astype(F).view(U)
+   target=registers[:,dest['index'],:] if dest['kind']==0 else output
+   for c in range(4):
+    if dest['mask']&(1<<c):target[:,c]=value[:,c]
+ return np.stack(coordinates,axis=1),output.view(F)
+
+MUTATIONS=[(0,0),(4,2),(8,2),(12,1025),(16,0),(20,1),(24,1),(28,1),(32,2),(36,2),(40,2),(44,2),(48,2),(52,2),(56,1),(60,1),(256,0),(260,0),(264,0),(268,0),(272,0),(276,0),(256,8193),(272,8193),(256,0xffffffff),(260,0xffffffff),(268,0xffffffff),(272,0xffffffff),(64,0x7fc00000),(64+92,0x7f800000),(512,0x7f800000),(512+60,0x7fc00000),(512+64,0x3f800000),(512+68,0xbf800000),(512+64,0x7fc00000),(512+68,0x7f800000)]
+def fixture(index):
+ if index>=128:
+  data,_=fixture(65);data=bytearray(data);offset,value=MUTATIONS[index-128];struct.pack_into('<I',data,offset,value);return bytes(data),bytes(SPAN)
+ phase=index//64;seed=index%64;rng=np.random.default_rng(810300+seed);count=[0,1,7,16,31,64,127,1024][seed%8]
+ widths=[1,3,127,4096];heights=[1,5,63,1024];shape=[(widths[seed//4%4],heights[seed//4%4]),(widths[(seed//4+1)%4],heights[(seed//4+1)%4])]
+ formats=[87 if seed%2 else 28,28 if seed%2 else 87];address=[(seed&1,(seed>>1)&1),((seed>>2)&1,(seed>>3)&1)];filters=[(seed>>4)&1,(seed>>5)&1]
+ inputs=rng.uniform(.5,2,(count,4,4)).astype(F);inputs[:,:,0:2]=rng.uniform(-2,2,(count,4,2)).astype(F)
+ constants=rng.uniform(.1,1,(6,4)).astype(F);constants[0,3]=F(seed%2);constants[1,3]=F((seed//2)%2)
+ zeros=np.zeros((count,5,4),F);uv,_=execute(inputs,constants,zeros);changed,_=execute(inputs,constants,rng.uniform(.1,1,(count,5,4)).astype(F));assert np.array_equal(uv.view(U),changed.view(U));assert np.isfinite(uv).all()
+ data=bytearray(SPAN);expected=bytearray(SPAN);struct.pack_into('<8I',data,0,0x4e524331,1,phase,count,SPAN,0,0,0);data[64:160]=constants.tobytes()
+ for slot in range(2):struct.pack_into('<2I',data,32+slot*8,*address[slot]);struct.pack_into('<I',data,48+slot*4,filters[slot]);struct.pack_into('<3I',data,256+slot*12,*shape[slot],formats[slot])
+ struct.pack_into('<4I',expected,0,0x4e52434f,phase,count,0)
+ for pixel in range(count):data[512+pixel*192:576+pixel*192]=inputs[pixel].tobytes()
+ if not phase:
+  for sample in range(5):
+   slot=0 if sample==0 else 1;width,height=shape[slot];coords=uv[:,sample,:].copy()
+   for axis,mode in enumerate(address[slot]):
+    if mode:
+     folded=np.remainder(np.abs(coords[:,axis]).astype(np.float64),2.0);coords[:,axis]=np.where(folded>1,2.0-folded,folded).astype(F)
+   xy=F(np.clip(F(F(np.clip(coords,F(0),F(1))*np.array([width,height],F))-F(0 if filters[slot] else .5)),F(0),np.array([width-1,height-1],F)))
+   integer=xy.astype(U);fraction=np.zeros_like(xy) if filters[slot] else F(xy-integer.astype(F))
+   for pixel in range(count):
+    x,y=map(int,integer[pixel]);right,lower=(x,y) if filters[slot] else (min(x+1,width-1),min(y+1,height-1));target=16+pixel*128
+    struct.pack_into('<4I',expected,target+sample*16,y*width+x,y*width+right,lower*width+x,lower*width+right);expected[target+80+sample*8:target+88+sample*8]=fraction[pixel].tobytes()
+ else:
+  fractions=rng.uniform(0,1,(count,5,2)).astype(F);packed=rng.integers(0,2**32,(count,5,4),dtype=U);texels=F((packed[...,None]>>np.array([0,8,16,24],U))&U(255))/F(255)
+  for sample in range(5):
+   slot=0 if sample==0 else 1
+   if formats[slot]==87:texels[:,sample]=texels[:,sample,:,[2,1,0,3]].transpose(1,2,0)
+  tx,ty=fractions[...,0,None],fractions[...,1,None];upper=F(F(texels[:,:,0]*F(1-tx))+F(texels[:,:,1]*tx));lower=F(F(texels[:,:,2]*F(1-tx))+F(texels[:,:,3]*tx));samples=F(F(upper*F(1-ty))+F(lower*ty))
+  for sample in range(5):
+   if filters[0 if sample==0 else 1]:samples[:,sample]=texels[:,sample,0]
+  _,colors=execute(inputs,constants,samples);assert np.isfinite(colors).all();expected[16:16+count*16]=colors.tobytes()
+  for pixel in range(count):
+   base=512+pixel*192;data[base+64:base+104]=fractions[pixel].tobytes();data[base+104:base+184]=packed[pixel].tobytes()
+ return bytes(data),bytes(expected)
+
+if __name__=='__main__':
+ for n in range(128+len(MUTATIONS)):
+  a,b=fixture(n);assert len(a)==len(b)==SPAN
+ print(json.dumps(dict(cpu_only=True,fixtures=128+len(MUTATIONS),independent_ir_oracle=True)))

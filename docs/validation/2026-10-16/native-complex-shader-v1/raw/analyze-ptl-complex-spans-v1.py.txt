@@ -1,0 +1,51 @@
+"""Independent numpy oracle for actual private NPU phase payloads; never renders desktop pixels."""
+from pathlib import Path
+from datetime import UTC,datetime
+import hashlib,json,os,struct,traceback
+import numpy as np
+from ptl_complex_shader_fixtures_v1 import execute
+F=np.float32;U=np.uint32;SPAN=262144
+r=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=r/'vm';source=vm/'ptl-complex-span-capture-v1';out=vm/'ptl-complex-span-analysis-v1';out.mkdir(exist_ok=False)
+def sha(b):return hashlib.sha256(b).hexdigest()
+def oracle(data):
+ magic,version,phase,count,span=struct.unpack_from('<5I',data);assert magic==0x4e524331 and version==1 and phase in (0,1) and count<=1024 and span==SPAN
+ constants=np.frombuffer(data,dtype='<f4',count=24,offset=64).reshape(6,4)
+ inputs=np.ndarray((count,4,4),dtype='<f4',buffer=data,offset=512,strides=(192,16,4)).copy()
+ shape=[struct.unpack_from('<3I',data,256+n*12) for n in range(2)];address=[struct.unpack_from('<2I',data,32+n*8) for n in range(2)];filters=struct.unpack_from('<2I',data,48)
+ expected=bytearray(SPAN);struct.pack_into('<4I',expected,0,0x4e52434f,phase,count,0)
+ if not phase:
+  uv,_=execute(inputs,constants,np.zeros((count,5,4),F));assert np.isfinite(uv).all()
+  for sample in range(5):
+   slot=int(sample!=0);width,height,_=shape[slot];coords=uv[:,sample,:].copy()
+   for axis,mode in enumerate(address[slot]):
+    if mode:
+     folded=np.remainder(np.abs(coords[:,axis]).astype(np.float64),2.0);coords[:,axis]=np.where(folded>1,2.0-folded,folded).astype(F)
+   xy=F(np.clip(F(F(np.clip(coords,F(0),F(1))*np.array([width,height],F))-F(0 if filters[slot] else .5)),F(0),np.array([width-1,height-1],F)))
+   integer=xy.astype(U);fraction=np.zeros_like(xy) if filters[slot] else F(xy-integer.astype(F))
+   for pixel in range(count):
+    x,y=map(int,integer[pixel]);right,lower=(x,y) if filters[slot] else (min(x+1,width-1),min(y+1,height-1));target=16+pixel*128
+    struct.pack_into('<4I',expected,target+sample*16,y*width+x,y*width+right,lower*width+x,lower*width+right);expected[target+80+sample*8:target+88+sample*8]=fraction[pixel].tobytes()
+ else:
+  fractions=np.ndarray((count,5,2),dtype='<f4',buffer=data,offset=576,strides=(192,8,4)).copy()
+  packed=np.ndarray((count,5,4),dtype='<u4',buffer=data,offset=616,strides=(192,16,4)).copy()
+  texels=F((packed[...,None]>>np.array([0,8,16,24],U))&U(255))/F(255)
+  for sample in range(5):
+   if shape[int(sample!=0)][2]==87:texels[:,sample]=texels[:,sample][:,:,[2,1,0,3]]
+  tx,ty=fractions[...,0,None],fractions[...,1,None];upper=F(F(texels[:,:,0]*F(1-tx))+F(texels[:,:,1]*tx));lower=F(F(texels[:,:,2]*F(1-tx))+F(texels[:,:,3]*tx));samples=F(F(upper*F(1-ty))+F(lower*ty))
+  for sample in range(5):
+   if filters[int(sample!=0)]:samples[:,sample]=texels[:,sample,0]
+  _,colors=execute(inputs,constants,samples);assert np.isfinite(colors).all();expected[16:16+count*16]=colors.tobytes()
+ return bytes(expected),phase,count
+report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,cpu_analysis_only=True,desktop_changed=False,tahoma_tested=False,checks=[])
+try:
+ files=sorted((source/'spans').glob('*-input.bin'),key=lambda p:int(p.name.split('-')[0]));assert files
+ for p in files:
+  data=p.read_bytes();actual=p.with_name(p.name.replace('-input','-output')).read_bytes();assert len(data)==len(actual)==6*SPAN
+  for plane in range(6):
+   expected,phase,count=oracle(data[plane*SPAN:(plane+1)*SPAN]);a=actual[plane*SPAN:(plane+1)*SPAN];left=np.frombuffer(a,'<u4');right=np.frombuffer(expected,'<u4');different=np.flatnonzero(left!=right)
+   report['checks'].append(dict(file=p.name,plane=plane,phase=phase,pixels=count,exact=len(different)==0,different_words=len(different),first_differences=[dict(byte=int(k)*4,actual=int(left[k]),expected=int(right[k])) for k in different[:12]],input_sha256=sha(data[plane*SPAN:(plane+1)*SPAN]),actual_sha256=sha(a),expected_sha256=sha(expected)))
+ report.update(passed=all(x['exact'] for x in report['checks']),npu_phase_invocations=len(files),spans=len(report['checks']),phase_pixels={str(i):sum(x['pixels'] for x in report['checks'] if x['phase']==i) for i in (0,1)})
+except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+finally:
+ report.update(completed=True,finished=datetime.now(UTC).isoformat());(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps({k:v for k,v in report.items() if k!='checks'}));print(json.dumps([x for x in report['checks'] if not x['exact']][:4]));raise SystemExit(0 if report['passed'] else 1)

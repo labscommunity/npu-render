@@ -1,0 +1,11 @@
+from pathlib import Path
+import ctypes,hashlib,json
+import numpy as np
+from ptl_complex_shader_fixtures_v1 import fixture,MUTATIONS
+r=Path(__file__).parent;lib=ctypes.CDLL(str((r/'ptl-complex-shader-v1-local.dylib').resolve()));fn=lib.nr_complex_shader_local;fn.argtypes=[ctypes.c_void_p,ctypes.c_void_p];checks=[]
+for index in range(128+len(MUTATIONS)):
+ data,expected=fixture(index);input=ctypes.create_string_buffer(data);output=ctypes.create_string_buffer(262144);fn(input,output);actual=output.raw
+ if actual!=expected:
+  a=np.frombuffer(actual,np.uint32);e=np.frombuffer(expected,np.uint32);positions=np.flatnonzero(a!=e);report=dict(completed=True,passed=False,cpu_only=True,index=index,different_components=len(positions),positions=positions[:12].tolist(),actual=a[positions[:12]].tolist(),expected=e[positions[:12]].tolist());(r/'ptl-complex-shader-v1-local-comparison.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report));raise SystemExit(1)
+ checks.append(dict(index=index,input_sha256=hashlib.sha256(data).hexdigest(),output_sha256=hashlib.sha256(actual).hexdigest()))
+report=dict(completed=True,passed=True,cpu_only=True,fixtures=len(checks),checks=checks);(r/'ptl-complex-shader-v1-local-comparison.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps({k:v for k,v in report.items() if k!='checks'}))

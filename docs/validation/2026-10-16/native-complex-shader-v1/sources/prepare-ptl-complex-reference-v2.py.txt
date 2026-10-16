@@ -1,0 +1,16 @@
+"""Isolate FP32 sampler staging from the earlier higher-precision scalar oracle."""
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'ptl-complex-reference-v2';shutil.copytree(r/'ptl-complex-integration-v1',d)
+p=d/'long_shader_reference.hpp';s=p.read_text();s=s.replace('const double x = coordinate(u,sampler.u) * shape.width - (filter == TextureFilter::linear ? .5 : 0);','const float scaled_x = float(coordinate(u,sampler.u)) * float(shape.width);\n                const float x = scaled_x - (filter == TextureFilter::linear ? .5f : 0.f);').replace('const double y = coordinate(v,sampler.v) * shape.height - (filter == TextureFilter::linear ? .5 : 0);','const float scaled_y = float(coordinate(v,sampler.v)) * float(shape.height);\n                const float y = scaled_y - (filter == TextureFilter::linear ? .5f : 0.f);')
+s=s.replace('const auto tx = x - ix, ty = y - iy;', 'const float tx = x - float(ix), ty = y - float(iy);')
+s=s.replace('sampled = (fetch(0, 0) * (1 - tx) + fetch(1, 0) * tx) * (1 - ty) +\n                              (fetch(0, 1) * (1 - tx) + fetch(1, 1) * tx) * ty;', '''// Explicit independent FP32 operations; /fp:strict prevents contraction.
+                    const auto interpolate = [](float a,float b,float t) { volatile float left=a*(1.f-t),right=b*t; return left+right; };
+                    sampled = interpolate(interpolate(float(fetch(0,0)),float(fetch(1,0)),tx),interpolate(float(fetch(0,1)),float(fetch(1,1)),tx),ty);''')
+assert 'const double x =' not in s and 'const auto interpolate =' in s
+p.write_text(s)
+p=d/'CMakeLists.txt';p.write_text(p.read_text().replace('nr_ptl_complex_compare','nr_ptl_complex_reference'))
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};(r/'ptl-complex-reference-v2-source.json').write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/'ptl-complex-reference-v2.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-ptl-complex-integration-v1.ps1').read_text().replace('ptl-complex-integration-v1','ptl-complex-reference-v2').replace('nr_ptl_complex_compare','nr_ptl_complex_reference');(r/'build-ptl-complex-reference-v2.ps1').write_text(s)
+print(json.dumps(dict(files=len(manifest),candidate_unchanged=True,reference_fp32_sampler=True)))

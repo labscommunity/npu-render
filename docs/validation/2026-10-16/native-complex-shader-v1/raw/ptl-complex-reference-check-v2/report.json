@@ -1,0 +1,102 @@
+{
+  "started": "2026-10-16T20:59:12.246925+00:00",
+  "completed": true,
+  "passed": true,
+  "desktop_changed": false,
+  "tahoma_tested": false,
+  "original_comparison_passed": false,
+  "reference_fp32_sampler": true,
+  "executable_sha256": "44add80f829c52577bb113cbc03d03facedc3223196566d3efbbb20e35607d38",
+  "model_sha256": "47f69b5861732a03014b58160116ebbb928fd6e818a11b7f553e423a4cf3c43a",
+  "packet_sha256": "570c66b7cbcf08170117bdb36f9a70548e9e528ee0e5d87ca86c583bd14ace5d",
+  "exit_code": 0,
+  "pairs": [
+    {
+      "kind": "pair",
+      "iteration": 0,
+      "order": "custom-first",
+      "baseline_full_ms": 675.7095,
+      "candidate_full_ms": 360.4267,
+      "candidate_shader_and_projection_ms": 142.3349,
+      "candidate_merger_ms": 79.0801,
+      "baseline_calls": 46,
+      "candidate_calls": 63,
+      "components": 3145728,
+      "different_components": 0,
+      "maximum_byte_error": 0,
+      "exact": true
+    },
+    {
+      "kind": "pair",
+      "iteration": 1,
+      "order": "baseline-first",
+      "baseline_full_ms": 667.2056,
+      "candidate_full_ms": 329.123,
+      "candidate_shader_and_projection_ms": 127.4988,
+      "candidate_merger_ms": 72.4656,
+      "baseline_calls": 46,
+      "candidate_calls": 63,
+      "components": 3145728,
+      "different_components": 0,
+      "maximum_byte_error": 0,
+      "exact": true
+    },
+    {
+      "kind": "pair",
+      "iteration": 2,
+      "order": "custom-first",
+      "baseline_full_ms": 925.3343,
+      "candidate_full_ms": 295.3762,
+      "candidate_shader_and_projection_ms": 110.5284,
+      "candidate_merger_ms": 69.4706,
+      "baseline_calls": 46,
+      "candidate_calls": 63,
+      "components": 3145728,
+      "different_components": 0,
+      "maximum_byte_error": 0,
+      "exact": true
+    },
+    {
+      "kind": "pair",
+      "iteration": 3,
+      "order": "baseline-first",
+      "baseline_full_ms": 1426.2624,
+      "candidate_full_ms": 356.5535,
+      "candidate_shader_and_projection_ms": 132.3127,
+      "candidate_merger_ms": 72.6697,
+      "baseline_calls": 46,
+      "candidate_calls": 63,
+      "components": 3145728,
+      "different_components": 0,
+      "maximum_byte_error": 0,
+      "exact": true
+    }
+  ],
+  "pixel_artifacts": {
+    "baseline.rgba": {
+      "bytes": 3145728,
+      "sha256": "c49baeebae9fbc78036d26881913326169ff3eb5bc0a257e29780dfb05cbf6a7"
+    },
+    "candidate-0.rgba": {
+      "bytes": 3145728,
+      "sha256": "c49baeebae9fbc78036d26881913326169ff3eb5bc0a257e29780dfb05cbf6a7"
+    },
+    "candidate-1.rgba": {
+      "bytes": 3145728,
+      "sha256": "0f53238715e56cbd170db5f2d9fc00bffd43066f99c6c5e47a4233e0d8dec251"
+    },
+    "candidate-2.rgba": {
+      "bytes": 3145728,
+      "sha256": "e23ab904d2f9467453f3094a99ca62a84a875e74ec1252b94a6226c7a33e34bd"
+    },
+    "candidate-3.rgba": {
+      "bytes": 3145728,
+      "sha256": "4fd2a943320918d9e0fba22f49a806755a9316890fc78c3bef1f18cdbcf43cce"
+    },
+    "candidate.rgba": {
+      "bytes": 3145728,
+      "sha256": "c49baeebae9fbc78036d26881913326169ff3eb5bc0a257e29780dfb05cbf6a7"
+    }
+  },
+  "finished": "2026-10-16T20:59:18.278372+00:00"
+}

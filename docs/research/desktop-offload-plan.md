@@ -26,6 +26,11 @@ from 13.587 to 4.091 seconds with no slower pairs. Existing rectangle exclusions
 remain intact. This component result requires worker replay and live qualification
 before any desktop-performance conclusion.
 
+The [five-sample shader component](../validation/2026-10-16/native-complex-shader-v1/README.md)
+now matches an explicit FP32 reference on all 40 tested images. Five recorded
+images differ from the old renderer; those numerical differences remain explicit.
+It has not yet been integrated into the desktop worker.
+
 The [long-shader component](../validation/2026-10-16/native-long-shader-v1/README.md)
 passes 120 independent NPU fixtures and exact complete-image comparisons for
 the failed v43 request and all six earlier uses of the shader. [Worker v9](../validation/2026-10-16/native-long-shader-worker-v1/README.md)

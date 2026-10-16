@@ -28,6 +28,11 @@ The next [point-sampling component](docs/validation/2026-10-16/native-point-prog
 adds 87 recorded draws to the reusable kernel. All 348 changed-image variants match
 both references exactly; summed warm draw time falls from 13.587 to 4.091 seconds.
 Its worker and desktop integration are separate qualification gates.
+The [five-sample shader component](docs/validation/2026-10-16/native-complex-shader-v1/README.md)
+now matches an explicit FP32 reference on all 40 tested images. Five recorded
+images differ from the old renderer; those numerical differences remain explicit.
+It has not yet been integrated into the desktop worker.
+
 See the [current acceptance plan](docs/research/desktop-offload-plan.md).
 
 **Full desktop offload is unfinished.** The current Windows/Panther Lake path

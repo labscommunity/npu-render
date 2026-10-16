@@ -1,0 +1,28 @@
+"""Diagnose the retained original-graph mismatch against an independent shader oracle."""
+from pathlib import Path
+from datetime import UTC,datetime
+import hashlib,json,os,subprocess,traceback
+r=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=r/'vm';out=vm/'ptl-complex-reference-check-v2';out.mkdir(exist_ok=False)
+def obj(p):return json.loads(p.read_text(encoding='utf-8-sig'))
+def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,desktop_changed=False,tahoma_tested=False,original_comparison_passed=False,reference_fp32_sampler=True);process=None
+try:
+ assert obj(vm/'ptl-program-point-comparison-v1-full/report.json')['passed']
+ original=obj(vm/'ptl-complex-shader-capture-v1/report.json');assert original['completed'] and not original['passed'] and original['active_ticket']==58
+ exe=r/'builds/ptl-complex-reference-v2/Release/nr_ptl_complex_reference.exe';assert sha(exe)=='44add80f829c52577bb113cbc03d03facedc3223196566d3efbbb20e35607d38'
+ model=vm/'ptl-six-span-complex-shader-v1/patched.blob';assert sha(model)=='47f69b5861732a03014b58160116ebbb928fd6e818a11b7f553e423a4cf3c43a'
+ packet=vm/'native-desktop-admission-v33/bootstrap/requests/request-00000058.bin';assert sha(packet)==original['cases'][0]['packet_sha256']
+ env=os.environ.copy();env['PATH']=str(r/'toolchains/openvino-2026.4.1/Lib/site-packages/openvino/libs')+os.pathsep+env['PATH']
+ env.update(NR_RENDER_NPU_CACHE=str(vm/'model-cache-2026-4-v209'),NR_RENDER_SHARED_QUEUE='1',NR_RENDER_MEMORY_CACHE='1',NR_RENDER_MEMORY_CACHE_CAPACITY='512',NR_RENDER_SHARED_CORE='1',NR_RENDER_OPAQUE_CROP='1',NR_RENDER_TEXTURE_SCOPE='1',NR_RENDER_QUAD_BATCH='1',NR_RENDER_COMPACT_COVERAGE='0',NR_RENDER_INFER_TRACE='0',NR_RENDER_COMPILE_TRACE='1',NR_RENDER_INFER_PROFILE='0',NR_RENDER_PTL_COMPLEX_BLOB=str(model),NR_RENDER_PTL_GEOMETRY_BLOB=str(vm/'ptl-six-span-geometry-v2/patched.blob'))
+ env.pop('NR_RENDER_AFFINE_BATCH',None)
+ with (out/'stdout.jsonl').open('xb') as stdout,(out/'stderr.log').open('xb') as stderr:
+  process=subprocess.Popen([str(exe),str(packet),str(model),str(out),'--cpu-reference'],env=env,stdout=stdout,stderr=stderr,creationflags=subprocess.CREATE_NO_WINDOW)
+  try:process.wait(timeout=240)
+  except subprocess.TimeoutExpired:process.kill();process.wait(timeout=5);report['child_timeout']=True
+ rows=[json.loads(x) for x in (out/'stdout.jsonl').read_text().splitlines() if x.startswith('{')];pairs=[x for x in rows if x.get('kind')=='pair']
+ report.update(executable_sha256=sha(exe),model_sha256=sha(model),packet_sha256=sha(packet),exit_code=process.returncode,pairs=pairs,passed=process.returncode==0 and len(pairs)==4 and all(x['exact'] for x in pairs),pixel_artifacts={p.name:dict(bytes=p.stat().st_size,sha256=sha(p)) for p in out.glob('*.rgba')})
+except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+finally:
+ if process is not None and process.poll() is None:process.kill();process.wait(timeout=5)
+ report.update(completed=True,finished=datetime.now(UTC).isoformat());(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(report));raise SystemExit(0 if report['passed'] else 1)

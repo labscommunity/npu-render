@@ -1,0 +1,11 @@
+cmake_minimum_required(VERSION 3.25)
+project(nr_ptl_complex_reference LANGUAGES CXX)
+find_package(OpenVINO 2026.1 REQUIRED COMPONENTS Runtime)
+add_executable(nr_ptl_complex_reference compare.cpp ptl_complex_triangle_draw.cpp reference_triangle.cpp)
+target_include_directories(nr_ptl_complex_reference PRIVATE "${NR_QUALIFIED_SOURCE}")
+target_compile_features(nr_ptl_complex_reference PRIVATE cxx_std_17)
+target_compile_options(nr_ptl_complex_reference PRIVATE /W4 /WX)
+target_link_libraries(nr_ptl_complex_reference PRIVATE "${NR_QUALIFIED_BUILD}/Release/nr_registered_vertex.lib" "${NR_QUALIFIED_BUILD}/Release/nr_registered_provider_cache.lib" openvino::runtime bcrypt d3dcompiler)
+set_property(TARGET nr_ptl_complex_reference PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
+set_source_files_properties(reference_triangle.cpp PROPERTIES COMPILE_OPTIONS "/fp:strict")
