@@ -1,0 +1,61 @@
+"""Pack independent FP32 oracle fixtures into ABI three, without new pixel math."""
+import struct
+from ptl_program_point_fixtures_v1 import fixture as original_fixture
+SPAN=262144
+def word(data,offset):return struct.unpack_from('<I',data,offset)[0]
+def layout(data):
+ live=set()
+ for n in range(word(data,104)):
+  offset=256+n*32;op=word(data,offset)
+  if op==3:continue
+  for k in range(2 if op else 1):
+   code=word(data,offset+8+k*4)
+   if code&3==0:live.add((code>>4)&15)
+ attrs={};samples=[];stride=4
+ for a in sorted(live):attrs[a]=stride;stride+=16
+ for a in range(word(data,100)):
+  point=word(data,144+a*4)==1;samples.append((stride,point));stride+=4 if point else 24
+ return attrs,samples,stride
+def convert(data,expected,count=None):
+ phase,old_count,vertices=struct.unpack_from('<3I',data,8);attrs,samples,stride=layout(data)
+ count=old_count if count is None else count
+ assert count==0 or old_count>0
+ payload=bytearray(SPAN);answer=bytearray(SPAN);payload[:2048]=data[:2048]
+ struct.pack_into('<I',payload,4,3);struct.pack_into('<I',payload,12,count)
+ if phase==0:payload[2048:2048+vertices*96]=data[2048:2048+vertices*96]
+ hits=0
+ for n in range(count):
+  m=n%old_count
+  if phase==0:
+   start=2048+vertices*96+n*12;payload[start:start+12]=data[200704+m*12:200704+(m+1)*12]
+   old=16+m*112;new=16+n*stride;hit=word(expected,old);hits+=hit
+   if not hit:continue
+   struct.pack_into('<I',answer,new,hit)
+   for a,offset in attrs.items():answer[new+offset:new+offset+16]=expected[old+16+a*16:old+32+a*16]
+   for a,(offset,point) in enumerate(samples):
+    taps=4 if point else 16;answer[new+offset:new+offset+taps]=expected[old+64+a*16:old+64+a*16+taps]
+    if not point:answer[new+offset+16:new+offset+24]=expected[old+96+a*8:old+104+a*8]
+  else:
+   old=2048+m*112;new=2048+n*(stride+4);hit=word(data,old+100);hits+=hit
+   struct.pack_into('<2I',payload,new,hit,word(data,old+96))
+   for a,offset in attrs.items():payload[new+4+offset:new+20+offset]=data[old+a*16:old+(a+1)*16]
+   for a,(offset,point) in enumerate(samples):
+    taps=4 if point else 16;payload[new+4+offset:new+4+offset+taps]=data[old+64+a*16:old+64+a*16+taps]
+    if not point:payload[new+20+offset:new+28+offset]=data[old+48+a*8:old+56+a*8]
+   answer[16+n*4:20+n*4]=expected[16+m*4:20+m*4]
+ struct.pack_into('<4I',answer,0,0x4e52504f,phase,count,hits)
+ assert len(payload)==SPAN and len(answer)==SPAN
+ return bytes(payload),bytes(answer)
+LARGE=[9,10,11,12,15,17,201,202,203,204,207,209,105,106,107,108,111,113,297,298,299,300,303,305]
+MUTATIONS=[(0,0),(4,2),(8,2),(12,16385),(28,SPAN-1),(48,0),(52,0),(56,2),(60,1),(88,3),(100,3),(104,0),(104,9),(108,1),(112,3),(116,4),(124,5),(160,0x7fc00000),(256,4),(260,0),(260,0xf5),(264,2),(268,1),(272,1),(288,4),(292,0),(296,0xe441),(296,0xe43c),(92,0),(64,0),(68,8193),(72,0),(20,1),(16,3),(24,1),(52,16),(144,2),(148,2),(152,1),(156,1)]
+TOTAL=384+len(LARGE)+len(MUTATIONS)
+def fixture(index):
+ if index<384:return convert(*original_fixture(index))
+ if index<384+len(LARGE):
+  data,expected=original_fixture(LARGE[index-384]);attrs,samples,stride=layout(data)
+  cap=min(16384,(SPAN-16)//stride,(SPAN-2048)//(stride+4))
+  if word(data,8)==0:cap=min(cap,(SPAN-2048-word(data,16)*96)//12)
+  return convert(data,expected,cap)
+ data,_=convert(*original_fixture(289));data=bytearray(data)
+ offset,value=MUTATIONS[index-384-len(LARGE)];struct.pack_into('<I',data,offset,value)
+ return bytes(data),bytes(SPAN)

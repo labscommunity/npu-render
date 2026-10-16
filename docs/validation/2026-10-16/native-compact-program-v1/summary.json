@@ -1,0 +1,39 @@
+{
+  "full_desktop_offload": false,
+  "tahoma_tested": false,
+  "profile_selected_requests": 106,
+  "profile_program_draws": 26,
+  "profile_batches": 586,
+  "profile_totals": {
+    "batches": 586,
+    "points": 6746880,
+    "covered_samples": 979272,
+    "geometry_wait_ms": 2370.2914,
+    "color_wait_ms": 1943.1878,
+    "host_and_other_ms": 313.3550000000002,
+    "batch_ms": 4626.834200000001
+  },
+  "kernel_model_sha256": "92e04a6734dc6e70ffed15b67fddba02892c66168aa0d47a6cf4bcc65a6a585d",
+  "kernel_text_bytes": 18048,
+  "code_span_limit": 18256,
+  "valid_fixtures": 408,
+  "invalid_fixtures": 40,
+  "unique_npu_fixtures": 448,
+  "independent_spans": 6,
+  "device_phases": [
+    {
+      "phase": "original-before",
+      "checks": 8
+    },
+    {
+      "phase": "custom-program",
+      "checks": 75
+    },
+    {
+      "phase": "original-after",
+      "checks": 8
+    }
+  ],
+  "worker_integration_qualified": false,
+  "matched_performance_comparison": false
+}

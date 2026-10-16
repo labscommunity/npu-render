@@ -1,0 +1,21 @@
+from pathlib import Path
+import argparse,hashlib,json
+p=argparse.ArgumentParser();p.add_argument('--root',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
+trial=a.root/'ptl-program-profile-worker-v1-selected'
+report=json.loads((trial/'report.json').read_text(encoding='utf-8-sig'));assert report['completed'] and report['passed']
+path=trial/'replay/provider-processes/generation-1/worker.stdout.jsonl'
+groups={};draws=[];current=None
+for line in path.read_text(encoding='utf-8-sig').splitlines():
+ if not line.startswith('{'):continue
+ row=json.loads(line)
+ if row.get('kind')=='request_identity':current=row
+ if not row.get('ptl_program_batch_profile'):continue
+ assert current
+ key=(current['pixel_sha256'],row['samples'],row['filter0'],row['filter1'],row['color_varying_mask'])
+ g=groups.setdefault(key,dict(shader_sha256=key[0],samples=key[1],filter0=key[2],filter1=key[3],color_varying_mask=key[4],batches=0,points=0,covered_samples=0,geometry_wait_ms=0.,color_wait_ms=0.,host_and_other_ms=0.,batch_ms=0.,max_vertices=0))
+ g['batches']+=1;g['points']+=row['points'];g['covered_samples']+=row['covered_samples'];g['max_vertices']=max(g['max_vertices'],row['vertices'])
+ for old,new in [('geometry_request_wait_ms','geometry_wait_ms'),('color_request_wait_ms','color_wait_ms'),('host_and_other_ms','host_and_other_ms'),('batch_ms','batch_ms')]:g[new]+=row[old]
+draws=sorted(groups.values(),key=lambda x:x['batch_ms'],reverse=True)
+assert sum(x['batches'] for x in draws)==report['program_profile_batches']
+summary=dict(completed=True,passed=True,desktop_changed=False,tahoma_tested=False,source_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),worker_sha256=report['worker_sha256'],profile_batches=report['program_profile_batches'],groups=draws,totals={k:sum(x[k] for x in draws) for k in ['batches','points','covered_samples','geometry_wait_ms','color_wait_ms','host_and_other_ms','batch_ms']},limitation='Selected recorded draws; runtime request waits include driver overhead, not hardware utilization or live frame latency. No matched comparison.')
+a.output.mkdir(exist_ok=False,parents=True);(a.output/'report.json').write_text(json.dumps(summary,indent=2)+'\n');print(json.dumps(summary))

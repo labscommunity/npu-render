@@ -1,0 +1,26 @@
+from pathlib import Path
+import ast,hashlib,json
+r=Path(__file__).parent
+s=(r/'qualify-ptl-six-span-program-point-v1.py').read_text()
+s=s.replace('ptl_program_point_fixtures_v1 import fixture','ptl_program_compact_fixtures_v1 import fixture,TOTAL')
+s=s.replace('unique_component_fixtures=424,duplicate_padding_fixtures=2','unique_component_fixtures=TOTAL,duplicate_padding_fixtures=(-TOTAL)%6')
+s=s.replace('range(71 if','range((TOTAL+5)//6 if').replace('i*6+plane<424','i*6+plane<TOTAL')
+s=s.replace('ptl-six-span-program-point-v1','ptl-six-span-program-compact-v1').replace('ptl-six-span-program-point-build-v1','ptl-six-span-program-compact-build-v1')
+a=s.index("  assert obj(vm/'native-desktop-admission-v56/");b=s.index("  assert obj(vm/'native-automatic-registration-v2/",a)
+sources=['ptl-six-span-program-compact-v1.c','ptl_program_compact_fixtures_v1.py','ptl_program_point_fixtures_v1.py','ptl_geometry_fixtures_v2.py']
+pins={name:hashlib.sha256((r/name).read_bytes()).hexdigest() for name in sources}
+s=s[:a]+"  assert obj(vm/'native-desktop-admission-v61/report.json')['cleanup_passed'];assert obj(vm/'ptl-program-profile-worker-v1-qualification/report.json')['passed']\n  for name,digest in "+repr(pins)+".items():assert hashlib.sha256((vm/name).read_bytes()).hexdigest()==digest\n"+s[b:]
+ast.parse(s);(r/'qualify-ptl-six-span-program-compact-v1.py').write_text(s)
+s=(r/'run-ptl-rectangle-integer-v2-qualification.ps1').read_text()
+s=s.replace('ptl-rectangle-integer-v2-qualification','ptl-program-compact-v1-qualification').replace('ptl-rectangle-profile-v2-qualification','ptl-program-profile-worker-v1-qualification').replace('native-desktop-admission-v60','native-desktop-admission-v61')
+a=s.index(' $profile=Get-Content');b=s.index(" $report.active_phase='target-compile'",a)
+s=s[:a]+''' $profile=Get-Content "$vm\\ptl-program-profile-analysis-v2\\report.json" -Raw|ConvertFrom-Json
+ if(!$profile.passed -or $profile.profile_batches -ne 586 -or ($profile.totals.geometry_wait_ms+$profile.totals.color_wait_ms) -lt .8*$profile.totals.batch_ms){throw 'Batch optimization lacks measured support'}
+'''+s[b:]
+s=s.replace('ptl-six-span-point-rectangle-v2','ptl-six-span-program-compact-v1').replace('ptl-six-span-point-rectangle-build-v2','ptl-six-span-program-compact-build-v1').replace('qualify-ptl-six-span-point-rectangle-v3.py','qualify-ptl-six-span-program-compact-v1.py')
+a=s.index(' if($q.child_result.exhaustive_unit_cases');b=s.index('\n}catch',a)
+s=s[:a]+''' if($q.child_result.unique_component_fixtures -ne 448){throw 'Device fixture count mismatch'}
+ $report.passed=$true;$report.unique_npu_fixtures=$q.child_result.unique_component_fixtures;$report.model_sha256=$q.patched_sha256'''+s[b:]
+(r/'run-ptl-program-compact-v1-qualification.ps1').write_text(s)
+(r/'ptl-program-compact-v1-upload.json').write_text(json.dumps(sources+['qualify-ptl-six-span-program-compact-v1.py','run-ptl-program-compact-v1-qualification.ps1'],indent=2)+'\n')
+print(json.dumps({'prepared':True,'source_pins':pins,'kernel_must_fit_existing_code_span':True,'fixtures':448}))

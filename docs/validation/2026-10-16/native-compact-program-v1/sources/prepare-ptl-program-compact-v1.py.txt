@@ -1,0 +1,46 @@
+"""Prepare an explicit ABI-three program payload; preserve FP32 operation order."""
+from pathlib import Path
+import hashlib,json
+r=Path(__file__).parent
+s=(r/'ptl-six-span-program-point-v1.c').read_text()
+s=s.replace('u32(data+4)!=2','u32(data+4)!=3').replace('count>2048','count>16384')
+s=s.replace('unsigned initialized[5]={0,0,0,0,0};','unsigned initialized[5]={0,0,0,0,0},live=0;')
+needle='  initialized[reg]|=write;'
+assert needle in s
+s=s.replace(needle,'  if(op!=3){for(unsigned source=0;source<(op?2u:1u);++source){unsigned code=u32(ins+8+source*4);if((code&3u)==0)live|=1u<<((code>>4)&15u);}}\n'+needle)
+needle=' if(initialized[4]!=15)return;'
+layout='''
+ unsigned offsets[3]={0,0,0},sample_offsets[2]={0,0},stride=4;
+ for(unsigned a=0;a<3;++a)if(live&(1u<<a)){offsets[a]=stride;stride+=16;}
+ for(unsigned a=0;a<samples_count;++a){sample_offsets[a]=stride;stride+=filters[a]?4:24;}
+ if(count>(262144u-16u)/stride||count>(262144u-2048u)/(stride+4u))return;
+'''
+assert needle in s;s=s.replace(needle,needle+layout)
+old='for(unsigned n=0;n<count;++n){const unsigned char *p=data+2048+n*112;unsigned covered=u32(p+100),background=u32(p+96);if(covered>1||u32(p+104)||u32(p+108))return;'
+new='for(unsigned n=0;n<count;++n){const unsigned char *p=data+2048+n*(stride+4);unsigned covered=u32(p),background=u32(p+4);if(covered>1)return;'
+assert old in s;s=s.replace(old,new)
+s=s.replace('varyings[3],registers[5]','varyings[3]={(float4)0,(float4)0,(float4)0},registers[5]')
+old='for(unsigned a=0;a<3;++a)for(unsigned c=0;c<4;++c){float v=f32(p+a*16+c*4);'
+new='for(unsigned a=0;a<3;++a)if(live&(1u<<a))for(unsigned c=0;c<4;++c){float v=f32(p+4+offsets[a]+c*4);'
+assert old in s;s=s.replace(old,new)
+old='for(unsigned sample=0;sample<samples_count;++sample){float tx=f32(p+48+sample*8),ty=f32(p+52+sample*8);if(!(tx>=0&&tx<1&&ty>=0&&ty<1))return;\n    if(filters[sample]&&(tx!=0||ty!=0))return;\n    const unsigned char *q=p+64+sample*16;'
+new='for(unsigned sample=0;sample<samples_count;++sample){const unsigned char *q=p+4+sample_offsets[sample];float tx=filters[sample]?0:f32(q+16),ty=filters[sample]?0:f32(q+20);if(!(tx>=0&&tx<1&&ty>=0&&ty<1))return;\n    '
+assert old in s;s=s.replace(old,new)
+needle=' if(!vertices||vertices>2046||vertices%3||cull>2||ccw>1)return;'
+assert needle in s;s=s.replace(needle,needle+'\n const unsigned task_offset=2048+vertices*96;if(count>(262144u-task_offset)/12u)return;')
+s=s.replace('task=data+200704+n*12','task=data+task_offset+n*12')
+old='unsigned *result=(unsigned*)(output+16+n*112);result[0]=1;++hits;'
+new='unsigned values[28]={0};unsigned *result=values;result[0]=1;++hits;'
+assert old in s;s=s.replace(old,new)
+needle='   result[24+sample*2]=filters[sample]?0:bits(x-(float)ix);result[25+sample*2]=filters[sample]?0:bits(y-(float)iy);\n  }'
+extra='''
+  unsigned *packed=(unsigned*)(output+16+n*stride);packed[0]=1;
+  for(unsigned a=0;a<3;++a)if(live&(1u<<a))for(unsigned c=0;c<4;++c)packed[offsets[a]/4+c]=result[4+a*4+c];
+  for(unsigned a=0;a<samples_count;++a){unsigned offset=sample_offsets[a]/4;for(unsigned tap=0;tap<(filters[a]?1u:4u);++tap)packed[offset+tap]=result[16+a*4+tap];if(!filters[a]){packed[offset+4]=result[24+a*2];packed[offset+5]=result[25+a*2];}}
+'''
+assert needle in s;s=s.replace(needle,needle+extra)
+p=r/'ptl-six-span-program-compact-v1.c';p.write_text(s)
+a=s.index('void nr_probe_kernel(');b=s.index(' uint4 *words=',a)
+local=s[:a]+'void nr_program_local(const unsigned char *data,unsigned char *output){\n'+s[b:]
+(r/'ptl-program-compact-v1-local.c').write_text(local)
+print(json.dumps({'source':str(p),'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'abi':3,'desktop_changed':False}))

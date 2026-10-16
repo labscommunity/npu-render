@@ -1,0 +1,33 @@
+from pathlib import Path
+import ast,hashlib,json,shutil,tarfile
+r=Path('results/render-driver');name='ptl-program-profile-worker-v1';d=r/name;shutil.copytree(r/'ptl-native-worker-v15',d)
+p=d/'ptl_program.hpp';s=p.read_text();needle='  const unsigned total=unsigned(points.size());';assert needle in s;s=s.replace(needle,'  const auto profile_start=std::chrono::steady_clock::now();double phase_wait_ms[2]{};unsigned phase_calls[2]{};\n'+needle)
+old='auto invoke=[&]{inference.start_async();if(!inference.wait_for(std::chrono::milliseconds(10000)))throw std::runtime_error("PTL program timeout");++result.provider_requests;result.input_bytes+=1572864;result.output_bytes+=1572864;};'
+new='auto invoke=[&](unsigned phase){const auto issued=std::chrono::steady_clock::now();inference.start_async();if(!inference.wait_for(std::chrono::milliseconds(10000)))throw std::runtime_error("PTL program timeout");phase_wait_ms[phase]+=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-issued).count();++phase_calls[phase];++result.provider_requests;result.input_bytes+=1572864;result.output_bytes+=1572864;};'
+assert old in s;s=s.replace(old,new).replace('  invoke();const auto *plan=','  invoke(0);const auto *plan=').replace('if(result.covered_samples){invoke();','if(result.covered_samples){invoke(1);')
+needle='  provider->failed=false;return result;'
+extra='''  unsigned live_mask=0;for(const auto &instruction:program.instructions){if(instruction[0]==3)continue;for(unsigned n=2;n<(instruction[0]?4u:3u);++n){const auto code=instruction[n];if((code&3u)==0)live_mask|=1u<<((code>>4)&15u);}}
+  const auto profile_ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-profile_start).count();
+  std::printf("{\\"ptl_program_batch_profile\\":true,\\"points\\":%u,\\"vertices\\":%llu,\\"covered_samples\\":%llu,\\"samples\\":%llu,\\"instructions\\":%llu,\\"filter0\\":%u,\\"filter1\\":%u,\\"color_varying_mask\\":%u,\\"geometry_request_wait_ms\\":%.6f,\\"color_request_wait_ms\\":%.6f,\\"geometry_calls\\":%u,\\"color_calls\\":%u,\\"batch_ms\\":%.6f,\\"host_and_other_ms\\":%.6f}\\n",total,static_cast<unsigned long long>(vertices.size()),static_cast<unsigned long long>(result.covered_samples),static_cast<unsigned long long>(program.samples.size()),static_cast<unsigned long long>(program.instructions.size()),filters[0],filters[1],live_mask,phase_wait_ms[0],phase_wait_ms[1],phase_calls[0],phase_calls[1],profile_ms,profile_ms-phase_wait_ms[0]-phase_wait_ms[1]);std::fflush(stdout);
+'''
+assert s.count(needle)==1;s=s.replace(needle,extra+needle);p.write_text(s)
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};before=json.loads((r/'ptl-native-worker-v15-source.json').read_text());assert [k for k in before if before[k]!=manifest[k]]==['ptl_program.hpp'];(r/(name+'-source.json')).write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/(name+'.tar.gz'),'w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-ptl-native-worker-v15.ps1').read_text().replace('ptl-native-worker-v15',name);(r/('build-'+name+'.ps1')).write_text(s)
+s=(r/'qualify-ptl-native-worker-v15.py').read_text().replace('ptl-native-worker-v15',name)
+s=s.replace(" choices=['selected','full']", " choices=['selected']")
+needle=" report.update(completed=True,finished="
+# Preserve original selected replay checks. Add a timing-specific audit before success.
+needle=" report['passed']=True"
+assert needle in s
+extra=""" profiles=[row for path in (trial/'provider-processes').glob('generation-*/worker.stdout.jsonl') for row in rows(path) if row.get('ptl_program_batch_profile')]
+ assert profiles and all(x['geometry_calls']==1 and x['geometry_request_wait_ms']>0 and x['color_calls'] in (0,1) and x['color_request_wait_ms']>=0 for x in profiles)
+ report['program_profile_batches']=len(profiles)
+"""
+s=s.replace(needle,extra+needle);ast.parse(s);(r/('qualify-'+name+'.py')).write_text(s)
+s=(r/'run-ptl-worker-v15-qualification-v2.ps1').read_text().replace('ptl-worker-v15-qualification-v2','ptl-program-profile-worker-v1-qualification').replace('ptl-rectangle-integer-paired-v2-qualification','ptl-native-live-v15').replace('native-desktop-admission-v60','native-desktop-admission-v61').replace('ptl-native-worker-v15',name)
+a=s.index(' $component=Get-Content');b=s.index(" $report.active_phase='worker-build'",a);s=s[:a]+s[b:]
+s=s.replace("foreach($stage in @('selected','full'))", "foreach($stage in @('selected'))")
+a=s.index(' $q=Get-Content "$vm\\'+name+'-full');b=s.index(' $report.passed=$true',a);s=s[:a]+s[b:]
+(r/('run-'+name+'-qualification.ps1')).write_text(s)
+print(json.dumps(dict(prepared=True,changed=['ptl_program.hpp'],kernel_unchanged=True,selected_replay=True,desktop_changed=False)))
