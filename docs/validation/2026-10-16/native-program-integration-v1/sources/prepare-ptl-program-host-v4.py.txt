@@ -1,0 +1,32 @@
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'ptl-program-integration-v4';shutil.copytree(r/'ptl-program-integration-v3',d)
+p=d/'ptl_program_triangle_draw.cpp';s=p.read_text();s=s.replace('batch(b<=shader::RegisterExecutor::maximum_batch(p)?b:std::gcd(b,shader::RegisterExecutor::maximum_batch(p)))','batch(b)');s=s.replace('b && b<=shader::RegisterExecutor::preferred_raster_batch(p)','b && b<=12288');p.write_text(s)
+p=d/'compare.cpp';s=p.read_text();start=s.index('    if(argc==5){');end=s.index('\n    auto blob=',start)
+s=s[:start]+r'''
+    const auto reason=[&]() -> const char* {
+     if(r.header.vertices>2046)return "vertex_capacity";
+     if(unsigned(ex::blend_mode(r.header))>1)return "blend_mode";
+     // Preserve the existing NPU rectangle path. Replacing it with generic
+     // triangles increased requests and changed its interpolation arithmetic.
+     if(!(r.header.flags&0x3000)&&(r.header.flags&24))return "existing_rectangle_path";
+     PtlProgram p;try{p=PtlProgram::lower(r.pixel);}catch(const std::invalid_argument &){return "program";}
+     for(const auto &sample:p.samples){const auto &t=r.resources[sample.texture];const auto &a=r.samplers[sample.sampler];
+      if(!t.width||!t.height||t.width>8192||t.height>8192||uint64_t(t.width)*t.height>4194304)return "texture_extent";
+      if(t.format!=28&&t.format!=87)return "texture_format";
+      if(a.filter!=TextureFilter::linear)return "filter";
+      if(a.u!=TextureAddress::clamp||a.v!=TextureAddress::clamp)return "address_mode";
+     }
+     return "accepted";
+    };
+    if(argc==5){ex::require(std::string(argv[4])=="--inspect");const auto why=reason();std::printf("{\"inspection_only\":true,\"accepted\":%s,\"reason\":\"%s\",\"flags\":%u,\"vertices\":%u,\"npu_executed\":false}\n",std::strcmp(why,"accepted")==0?"true":"false",why,r.header.flags,r.header.vertices);return 0;}
+    ex::require(std::strcmp(reason(),"accepted")==0);
+'''+s[end:]
+start=s.index('    unsigned batch=');end=s.index('    PtlProgramTriangleDrawExecutor custom',start)
+s=s[:start]+'''    unsigned batch=12288;
+    const auto clip=r.scissor.value_or(std::array<int32_t,4>{0,0,int32_t(r.header.width),int32_t(r.header.height)});
+    const auto area=uint64_t(clip[2]-clip[0])*uint64_t(clip[3]-clip[1]);while(batch>384&&area<=batch/2)batch/=2;
+'''+s[end:];p.write_text(s)
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};(r/'ptl-program-integration-v4-source.json').write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/'ptl-program-integration-v4.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+(r/'build-ptl-program-integration-v4.ps1').write_text((r/'build-ptl-program-integration-v3.ps1').read_text().replace('ptl-program-integration-v3','ptl-program-integration-v4'))

@@ -1,0 +1,8 @@
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'ptl-program-diagnostic-v5';shutil.copytree(r/'ptl-program-diagnostic-v4',d)
+p=d/'compare.cpp';s=p.read_text().replace('        if(iteration==0){save', '        if(iteration==3){save(out/"baseline-synthetic.rgba",ordinary.pixels.data(),ordinary.pixels.size()*4);save(out/"candidate-synthetic.rgba",candidate.data(),candidate.size()*4);}\n        if(iteration==0){save');p.write_text(s)
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};(r/'ptl-program-diagnostic-v5-source.json').write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/'ptl-program-diagnostic-v5.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+(r/'build-ptl-program-diagnostic-v5.ps1').write_text((r/'build-ptl-program-diagnostic-v4.ps1').read_text().replace('ptl-program-diagnostic-v4','ptl-program-diagnostic-v5'))
+(r/'run-ptl-program-rounding-v5.py').write_text((r/'run-ptl-program-rounding-v4.py').read_text().replace('ptl-program-rounding-v4','ptl-program-rounding-v5').replace('ptl-program-diagnostic-v4','ptl-program-diagnostic-v5'))

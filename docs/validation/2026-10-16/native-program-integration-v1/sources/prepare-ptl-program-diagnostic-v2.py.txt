@@ -1,0 +1,19 @@
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'ptl-program-diagnostic-v2';shutil.copytree(r/'ptl-program-diagnostic-v1',d)
+p=d/'CMakeLists.txt';s=p.read_text().replace('compare.cpp ptl_program_triangle_draw.cpp','compare.cpp ptl_program_triangle_draw.cpp baseline_triangle.cpp');p.write_text(s)
+s=(r/'native-routing-v45/native/windows/registered_lab/triangle_texture_draw.cpp').read_text();needle='        for(size_t n=0;n<s.batch;++n)tile[n]=stored_pixel[n]?result.pixels[pixel_index[n]]:PackedColor{};';assert needle in s
+s=s.replace(needle,r'''
+        char *diagnostic=nullptr;size_t diagnostic_size=0;require(!_dupenv_s(&diagnostic,&diagnostic_size,"NR_RENDER_PTL_PROGRAM_DIAGNOSTIC"));const bool enabled=diagnostic&&*diagnostic=='1';std::free(diagnostic);
+        if(enabled)for(size_t n=0;n<valid;++n)if(stored_pixel[n]&&covered.covered[n]&&pixel_index[n]==108){
+            const auto bits=[](float v){unsigned out;std::memcpy(&out,&v,4);return out;};
+            std::printf("{\"kind\":\"baseline_rounding_input\",\"pixel\":108,\"input2_bits\":[");
+            for(unsigned c=0;c<4;++c)std::printf("%s%u",c?",":"",bits(fragments[n][2][c]));
+            std::printf("],\"color_bits\":[");for(unsigned c=0;c<4;++c)std::printf("%s%u",c?",":"",bits(colors[n][c]));
+            std::printf("],\"triangle\":%zu,\"texture_width\":%u,\"texture_height\":%u}\n",triangle_base[n],resources[0].width,resources[0].height);std::fflush(stdout);
+        }
+'''+needle);(d/'baseline_triangle.cpp').write_text(s)
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};(r/'ptl-program-diagnostic-v2-source.json').write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/'ptl-program-diagnostic-v2.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+(r/'build-ptl-program-diagnostic-v2.ps1').write_text((r/'build-ptl-program-diagnostic-v1.ps1').read_text().replace('ptl-program-diagnostic-v1','ptl-program-diagnostic-v2'))
+(r/'run-ptl-program-rounding-v2.py').write_text((r/'run-ptl-program-rounding-v1.py').read_text().replace('ptl-program-rounding-v1','ptl-program-rounding-v2').replace('ptl-program-diagnostic-v1','ptl-program-diagnostic-v2'))

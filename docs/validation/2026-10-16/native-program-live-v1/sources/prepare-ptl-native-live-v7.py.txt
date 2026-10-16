@@ -1,0 +1,36 @@
+from pathlib import Path
+import ast,hashlib,json,re
+r=Path('results/render-driver')
+changes={'native-registration-v30':'native-registration-v33','native-registered-v30':'native-registered-v33','NativeRecovery-v30':'NativeRecovery-v33','ptl-native-worker-v7':'ptl-native-worker-v8','native_desktop_bootstrap_v26':'native_desktop_bootstrap_v27','native-desktop-v52':'native-desktop-v53','native-desktop-admission-v52':'native-desktop-admission-v53','native-desktop-admission-v51':'native-desktop-admission-v52','NativeDesktopRecovery-v52':'NativeDesktopRecovery-v53','native-live-v42':'native-live-v43','NativeLiveV42':'NativeLiveV43','native-topology-primary-v28':'native-topology-primary-v29','native-topology-v68':'native-topology-v70','native-topology-v69':'native-topology-v71','InspectTopology-V68':'InspectTopology-V70','InspectTopology-V69':'InspectTopology-V71','observer69':'observer71','dismiss-native-saver-v15':'dismiss-native-saver-v16','dismiss-v15':'dismiss-v16','ptl-native-live-v6':'ptl-native-live-v7'}
+pattern=re.compile('|'.join(re.escape(x) for x in sorted(changes,key=len,reverse=True)))
+def rename(s):return pattern.sub(lambda m:changes[m[0]],s)
+def save(name,text):
+ p=r/name;assert not p.exists();p.write_text(text)
+files=['run-native-registration-v30.ps1','recover-native-registration-v30.ps1','qualify-native-registered-v30.py','native_desktop_bootstrap_v26.py','run-native-desktop-v52.ps1','recover-native-desktop-v52.ps1','start-native-topology-v68.ps1','start-native-topology-v69.ps1','dismiss-native-saver-v15.ps1','run-native-live-v42.ps1','run-ptl-native-live-v6.ps1']
+for f in files:
+ s=rename((r/f).read_text())
+ if f=='start-native-topology-v68.ps1':s=s.replace('V68','V70').replace('v68','v70')
+ if f=='start-native-topology-v69.ps1':s=s.replace('V69','V71').replace('v69','v71')
+ if f.startswith('run-native-registration') or f.startswith('run-native-desktop'):
+  needle='$ptl.masked_accepted -ne 41 -or $ptl.masked_imports -ne 1';assert needle in s;s=s.replace(needle,'$ptl.masked_accepted -ne 0 -or $ptl.masked_imports -ne 0 -or $ptl.program_accepted -ne 376 -or $ptl.program_imports -ne 1 -or !$ptl.program_sequences_matched')
+ if f=='run-native-desktop-v52.ps1':
+  s=s.replace("'--monitor-seconds','660',", "'--monitor-seconds','660','--ptl-program-blob',\"$r\\vm\\ptl-six-span-program-v3\\patched.blob\",")
+ if f=='qualify-native-registered-v30.py':
+  needle="env.pop('NR_RENDER_AFFINE_BATCH',None)";assert needle in s;s=s.replace(needle,"program=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm/ptl-six-span-program-v3/patched.blob'\nassert hashlib.sha256(program.read_bytes()).hexdigest()=='49894f9e468e3e0374740bceb2f12c8854806da2856f82c3b2ff8c1fd6e88da0'\nenv['NR_RENDER_PTL_PROGRAM_BLOB']=str(program)\n"+needle)
+ if f=='native_desktop_bootstrap_v26.py':
+  s=s.replace("p.add_argument('--ptl-masked-blob'", "p.add_argument('--ptl-program-blob',type=Path,required=True)\np.add_argument('--ptl-masked-blob'")
+  s=s.replace('v=p.parse_args();',"v=p.parse_args();assert hashlib.sha256(v.ptl_program_blob.read_bytes()).hexdigest()=='49894f9e468e3e0374740bceb2f12c8854806da2856f82c3b2ff8c1fd6e88da0'\n")
+  s=s.replace("env=os.environ.copy();","env=os.environ.copy();env['NR_RENDER_PTL_PROGRAM_BLOB']=str(v.ptl_program_blob);")
+  s=s.replace('ptl_masked_model_sha256=', 'ptl_program_model_sha256=hashlib.sha256(v.ptl_program_blob.read_bytes()).hexdigest(),ptl_masked_model_sha256=')
+ if f=='run-native-live-v42.ps1':
+  start=s.index(' if($report.ptl_masked_accepted -lt 1');end=s.index('\n',start)
+  s=s[:start]+''' $report.ptl_program_accepted=@($geometryRows|Where-Object {$_.ptl_program_draw -and $_.accepted}).Count
+ $report.ptl_program_imports=@($geometryRows|Where-Object ptl_program_provider_created).Count
+ if($report.ptl_program_accepted -lt 1 -or $report.ptl_program_imports -ne 1 -or $bootstrap.ptl_program_model_sha256 -ne '49894f9e468e3e0374740bceb2f12c8854806da2856f82c3b2ff8c1fd6e88da0'){throw 'Native bounded program rendering not observed'}'''+s[end:]
+ if f=='run-ptl-native-live-v6.ps1':s=s.replace('$q.ptl_masked_accepted -lt 1 -or $q.ptl_masked_imports -ne 1','$q.ptl_program_accepted -lt 1 -or $q.ptl_program_imports -ne 1')
+ if f.endswith('.py'):ast.parse(s)
+ save(rename(f),s)
+for old in ['native-registration-v30-source.json','native-desktop-v52-source.json']:
+ names=[rename(f) for f in json.loads((r/old).read_text())];save(rename(old),json.dumps({f:hashlib.sha256((r/f).read_bytes()).hexdigest() for f in names},indent=2)+'\n')
+save('ptl-native-live-v7-upload.json',json.dumps([rename(f) for f in files]+['native-registration-v33-source.json','native-desktop-v53-source.json'],indent=2)+'\n')
+print('Prepared eleven controllers plus two source manifests; requires worker replay and registration')

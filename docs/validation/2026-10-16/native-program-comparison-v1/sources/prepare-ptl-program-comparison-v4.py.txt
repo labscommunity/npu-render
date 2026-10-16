@@ -1,0 +1,12 @@
+from pathlib import Path
+r=Path('results/render-driver');s=(r/'run-ptl-program-compare-v3.py').read_text().replace('ptl-program-comparison-v3-','ptl-program-comparison-v4-').replace('ptl-program-integration-v3','ptl-program-integration-v5').replace('1eac56316f7d3f72f5cb2c5300446f5a0ec1e1a3cf90191c0016bf73a88e8f97','e41be8f14e6af0ebf3dfc7e6f95df5cf79ea033ea3cbd1264168f13f1951bc71').replace('ptl-program-capture-admission-v1','ptl-program-capture-admission-v2').replace('eaadce92f1ae2dc8ed520c3c017cc087f456759b7cb7dfe76a1a9bc98a2e09db','ebf1b26f2cd3af6e4df3287de5ef817eeefe135b89e51f104be5bdd9ef0379de')
+s=s.replace("  passed=process.returncode", "  references=[x for x in rows if x.get('kind')=='reference_check']\n  passed=process.returncode")
+s=s.replace("and all(x['exact'] for x in pairs)","and len(references)==4 and all(x['exact'] and x['candidate_rendering_device']=='NPU' for x in references)")
+s=s.replace('pairs=pairs,passed=passed','pairs=pairs,reference_checks=references,passed=passed')
+s=s.replace("result['comparison_reference']='original qualified NPU graph'", "result['comparison_reference']=[x['reference'] for x in references];result['original_graph_exact']=all(x['exact'] for x in pairs)")
+needle="result['shared_program_imports']=sum"
+s=s.replace(needle,"result['independent_reference_used']=any(x['cpu_test_reference_only'] for x in references);"+needle)
+s=s.replace(" report['passed']=len(report['cases'])", " report['independent_reference_cases']=sum(x.get('independent_reference_used',False) for x in report['cases'])\n report['original_graph_different_cases']=sum(not x.get('original_graph_exact',True) for x in report['cases'])\n report['passed']=len(report['cases'])")
+# Require the separate, unchanged diagnostic to pass before using its arithmetic reference.
+s=s.replace(" assert obj(vm/'ptl-six-span-program-v3/report.json')['passed']", " assert obj(vm/'ptl-program-rounding-analysis-v1/report.json')['passed']\n assert obj(vm/'ptl-six-span-program-v3/report.json')['passed']")
+(r/'run-ptl-program-compare-v4.py').write_text(s)

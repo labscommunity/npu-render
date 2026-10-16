@@ -1,0 +1,263 @@
+{
+  "started": "2026-10-16T18:44:47.910982+00:00",
+  "completed": true,
+  "passed": false,
+  "desktop_changed": false,
+  "tahoma_tested": false,
+  "cases": [
+    {
+      "ticket": 14,
+      "packet_sha256": "5c3a81b27f93d48a72817f60e2b6a780d582737fd7f2cce69504fa391236ed74",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 352.769,
+          "candidate_full_ms": 48.7272,
+          "candidate_shader_and_projection_ms": 6.2147,
+          "candidate_merger_ms": 41.8421,
+          "baseline_calls": 39,
+          "candidate_calls": 18,
+          "components": 65536,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 117.4247,
+          "candidate_full_ms": 39.4757,
+          "candidate_shader_and_projection_ms": 2.2363,
+          "candidate_merger_ms": 36.5697,
+          "baseline_calls": 39,
+          "candidate_calls": 18,
+          "components": 65536,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 111.8939,
+          "candidate_full_ms": 36.5102,
+          "candidate_shader_and_projection_ms": 1.9322,
+          "candidate_merger_ms": 34.195,
+          "baseline_calls": 39,
+          "candidate_calls": 18,
+          "components": 65536,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 147.9856,
+          "candidate_full_ms": 37.3383,
+          "candidate_shader_and_projection_ms": 1.603,
+          "candidate_merger_ms": 35.3208,
+          "baseline_calls": 39,
+          "candidate_calls": 18,
+          "components": 65536,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 65536,
+          "sha256": "96302cd01f078f7034c976a2e39660d16adf39e832260348a5ff190202a1b6b1"
+        },
+        "candidate.rgba": {
+          "bytes": 65536,
+          "sha256": "96302cd01f078f7034c976a2e39660d16adf39e832260348a5ff190202a1b6b1"
+        }
+      },
+      "original_pixels_match_qualified_worker": true,
+      "comparison_reference": "original qualified NPU graph",
+      "pixel_shader_sha256": "7c5bc4d830ee9593b7f2a8a59c35ae629122a0b657bf7e2b7a2c1bb462b04f8f",
+      "shared_program_imports": 1
+    },
+    {
+      "ticket": 17,
+      "packet_sha256": "aea4a150893aa9bbe2f23d06f6c0a4aca2563708bee2352f29e30ab680b8c467",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 169.1317,
+          "candidate_full_ms": 20.2677,
+          "candidate_shader_and_projection_ms": 5.5082,
+          "candidate_merger_ms": 14.2664,
+          "baseline_calls": 7,
+          "candidate_calls": 6,
+          "components": 1048576,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 22.7451,
+          "candidate_full_ms": 15.8735,
+          "candidate_shader_and_projection_ms": 1.8912,
+          "candidate_merger_ms": 13.2246,
+          "baseline_calls": 7,
+          "candidate_calls": 6,
+          "components": 1048576,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 20.9891,
+          "candidate_full_ms": 14.2851,
+          "candidate_shader_and_projection_ms": 1.8842,
+          "candidate_merger_ms": 11.5276,
+          "baseline_calls": 7,
+          "candidate_calls": 6,
+          "components": 1048576,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 21.2819,
+          "candidate_full_ms": 12.8109,
+          "candidate_shader_and_projection_ms": 1.6947,
+          "candidate_merger_ms": 10.2604,
+          "baseline_calls": 7,
+          "candidate_calls": 6,
+          "components": 1048576,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 1048576,
+          "sha256": "30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58"
+        },
+        "candidate.rgba": {
+          "bytes": 1048576,
+          "sha256": "30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58"
+        }
+      },
+      "original_pixels_match_qualified_worker": true,
+      "comparison_reference": "original qualified NPU graph",
+      "pixel_shader_sha256": "7823741aa26b80ab1d183a947f93575665d4dd6a334aba98427ae3a142b25ae4",
+      "shared_program_imports": 1
+    },
+    {
+      "ticket": 18,
+      "packet_sha256": "a9df18ae2086e390cab7190d2b5e69856af9483a8775e82506b33f16402be659",
+      "exit_code": 2,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 275.199,
+          "candidate_full_ms": 74.31,
+          "candidate_shader_and_projection_ms": 8.1461,
+          "candidate_merger_ms": 65.0099,
+          "baseline_calls": 26,
+          "candidate_calls": 14,
+          "components": 1048576,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 84.224,
+          "candidate_full_ms": 54.8648,
+          "candidate_shader_and_projection_ms": 1.6395,
+          "candidate_merger_ms": 52.2153,
+          "baseline_calls": 26,
+          "candidate_calls": 14,
+          "components": 1048576,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 88.6239,
+          "candidate_full_ms": 46.9883,
+          "candidate_shader_and_projection_ms": 1.9098,
+          "candidate_merger_ms": 43.0114,
+          "baseline_calls": 26,
+          "candidate_calls": 14,
+          "components": 1048576,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 91.2362,
+          "candidate_full_ms": 48.333,
+          "candidate_shader_and_projection_ms": 2.0405,
+          "candidate_merger_ms": 44.5566,
+          "baseline_calls": 26,
+          "candidate_calls": 14,
+          "components": 1048576,
+          "different_components": 856,
+          "maximum_byte_error": 1,
+          "exact": false
+        }
+      ],
+      "passed": false,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 1048576,
+          "sha256": "c012dbde45744a8a84c216e871e7b3eddf16aab7c0b60e3194d5010e405fe5ea"
+        },
+        "candidate.rgba": {
+          "bytes": 1048576,
+          "sha256": "c012dbde45744a8a84c216e871e7b3eddf16aab7c0b60e3194d5010e405fe5ea"
+        }
+      },
+      "stderr": ""
+    }
+  ],
+  "model_sha256": "49894f9e468e3e0374740bceb2f12c8854806da2856f82c3b2ff8c1fd6e88da0",
+  "executable_sha256": "1eac56316f7d3f72f5cb2c5300446f5a0ec1e1a3cf90191c0016bf73a88e8f97",
+  "pixel_fixture": "recorded pixels and three generated texture/background images per case; CPU fixture generation only",
+  "stage": "selected",
+  "planned_cases": 12,
+  "planned_shader_groups": 12,
+  "structurally_declined": 215,
+  "active_ticket": 18,
+  "error": "AssertionError('candidate case 18 failed with exit 2')",
+  "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\run-ptl-program-compare-v2.py\", line 45, in <module>\n    result['stderr']=(case/'stderr.log').read_text(errors='replace')[:2000];report['cases'].append(result);write();raise AssertionError(f'candidate case {ticket} failed with exit {process.returncode}')\n                                                                                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: candidate case 18 failed with exit 2\n",
+  "finished": "2026-10-16T18:44:51.250814+00:00"
+}

@@ -1,0 +1,27 @@
+from pathlib import Path
+import json,hashlib
+r=Path('results/render-driver');s=(r/'qualify-ptl-native-worker-v7.py').read_text().replace('ptl-native-worker-v7','ptl-native-worker-v8')
+s=s.replace(" assert obj(vm/'ptl-masked-comparison-v1/report.json')['passed']", " assert obj(vm/'ptl-program-comparison-v4-full/report.json')['passed']\n program=vm/'ptl-six-span-program-v3/patched.blob';assert sha(program)=='49894f9e468e3e0374740bceb2f12c8854806da2856f82c3b2ff8c1fd6e88da0'\n assert obj(vm/'ptl-masked-comparison-v1/report.json')['passed']")
+s=s.replace('152179ba36ac436e5a9b42ae5fa40ae89dd9989d68b8aa04b32f060f3309f31a','WORKER_SHA256_TO_PIN')
+s=s.replace("env=os.environ.copy();", "env=os.environ.copy();env['NR_RENDER_PTL_PROGRAM_BLOB']=str(program);")
+s=s.replace(",965,970']",",965,970,14,17,18,78,127,182,256,262,280,512']")
+s=s.replace("report.update(masked_model_sha256", "report.update(program_model_sha256=sha(program),masked_model_sha256")
+s=s.replace("assert report['geometry_accepted'] >= (1 if a.stage=='selected' else 400)","assert report['geometry_accepted'] >= (1 if a.stage=='selected' else 200)")
+s=s.replace("assert report['masked_accepted']==(13 if a.stage=='selected' else 41) and report['masked_imports']==1","assert report['masked_accepted']==0 and report['masked_imports']==0")
+needle=" assert proof['qualified_correction_hashes_matched']==9";i=s.index(needle)
+s=s[:i]+''' program_events=[];program_imports=[]
+ for log in (trial/'provider-processes').glob('generation-*/worker.stdout.jsonl'):
+  events=rows(log);program_events += [x for x in events if x.get('ptl_program_draw')];program_imports += [x for x in events if x.get('ptl_program_provider_created')]
+ selected=set(proof['selected_tickets']);expected=obj(vm/'ptl-program-worker-v8-expected.json');expected_tickets=set(expected['expected_program_tickets'])&selected
+ # Each original packet's sequence is checked rather than inferred from its ticket.
+ import struct
+ expected_sequences={struct.unpack_from('<20I',(vm/f'native-desktop-admission-v33/bootstrap/requests/request-{ticket:08d}.bin').read_bytes())[14] for ticket in expected_tickets}
+ actual_sequences={x['sequence'] for x in program_events}
+ report.update(program_accepted=len(program_events),program_imports=len(program_imports),expected_program_draws=len(expected_tickets),program_sequences_matched=actual_sequences==expected_sequences)
+ assert len(program_events)==len(expected_tickets)==(24 if a.stage=='selected' else 376) and len(program_imports)==1 and actual_sequences==expected_sequences
+ assert all(x['accepted'] and x['structural_admission'] and x['fallback_backend']=='none' and x['batch']<=12288 for x in program_events)
+'''+s[i:]
+# Header sequence field offset confirmed below before upload.
+(r/'qualify-ptl-native-worker-v8.template.py').write_text(s)
+s=(r/'audit-ptl-worker-v7-replay.py').read_text().replace('ptl-native-worker-v7','ptl-native-worker-v8').replace('ptl-native-worker-v6','ptl-native-worker-v7');(r/'audit-ptl-worker-v8-replay.py').write_text(s)
+print('Qualification template prepared; binary and packet sequence offset must be pinned before execution')

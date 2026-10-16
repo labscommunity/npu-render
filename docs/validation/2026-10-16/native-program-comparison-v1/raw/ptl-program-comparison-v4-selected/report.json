@@ -1,0 +1,1433 @@
+{
+  "started": "2026-10-16T19:03:44.942130+00:00",
+  "completed": true,
+  "passed": true,
+  "desktop_changed": false,
+  "tahoma_tested": false,
+  "cases": [
+    {
+      "ticket": 14,
+      "packet_sha256": "5c3a81b27f93d48a72817f60e2b6a780d582737fd7f2cce69504fa391236ed74",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 349.1264,
+          "candidate_full_ms": 53.8686,
+          "candidate_shader_and_projection_ms": 4.6087,
+          "candidate_merger_ms": 48.5049,
+          "baseline_calls": 39,
+          "candidate_calls": 18,
+          "components": 65536,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 133.3989,
+          "candidate_full_ms": 42.5386,
+          "candidate_shader_and_projection_ms": 2.4541,
+          "candidate_merger_ms": 39.365,
+          "baseline_calls": 39,
+          "candidate_calls": 18,
+          "components": 65536,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 150.3454,
+          "candidate_full_ms": 39.2944,
+          "candidate_shader_and_projection_ms": 2.5305,
+          "candidate_merger_ms": 36.029,
+          "baseline_calls": 39,
+          "candidate_calls": 18,
+          "components": 65536,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 145.2209,
+          "candidate_full_ms": 40.1033,
+          "candidate_shader_and_projection_ms": 1.9398,
+          "candidate_merger_ms": 37.3541,
+          "baseline_calls": 39,
+          "candidate_calls": 18,
+          "components": 65536,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "reference_checks": [
+        {
+          "kind": "reference_check",
+          "iteration": 0,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 1,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 2,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 3,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 65536,
+          "sha256": "96302cd01f078f7034c976a2e39660d16adf39e832260348a5ff190202a1b6b1"
+        },
+        "candidate.rgba": {
+          "bytes": 65536,
+          "sha256": "96302cd01f078f7034c976a2e39660d16adf39e832260348a5ff190202a1b6b1"
+        }
+      },
+      "original_pixels_match_qualified_worker": true,
+      "comparison_reference": [
+        "original NPU graph",
+        "original NPU graph",
+        "original NPU graph",
+        "original NPU graph"
+      ],
+      "original_graph_exact": true,
+      "pixel_shader_sha256": "7c5bc4d830ee9593b7f2a8a59c35ae629122a0b657bf7e2b7a2c1bb462b04f8f",
+      "independent_reference_used": false,
+      "shared_program_imports": 1
+    },
+    {
+      "ticket": 17,
+      "packet_sha256": "aea4a150893aa9bbe2f23d06f6c0a4aca2563708bee2352f29e30ab680b8c467",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 172.9128,
+          "candidate_full_ms": 21.5944,
+          "candidate_shader_and_projection_ms": 5.569,
+          "candidate_merger_ms": 15.0329,
+          "baseline_calls": 7,
+          "candidate_calls": 6,
+          "components": 1048576,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 23.2922,
+          "candidate_full_ms": 15.6307,
+          "candidate_shader_and_projection_ms": 1.5173,
+          "candidate_merger_ms": 13.3865,
+          "baseline_calls": 7,
+          "candidate_calls": 6,
+          "components": 1048576,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 21.4384,
+          "candidate_full_ms": 14.7185,
+          "candidate_shader_and_projection_ms": 1.8054,
+          "candidate_merger_ms": 11.3757,
+          "baseline_calls": 7,
+          "candidate_calls": 6,
+          "components": 1048576,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 20.7125,
+          "candidate_full_ms": 13.1751,
+          "candidate_shader_and_projection_ms": 1.5565,
+          "candidate_merger_ms": 10.539,
+          "baseline_calls": 7,
+          "candidate_calls": 6,
+          "components": 1048576,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "reference_checks": [
+        {
+          "kind": "reference_check",
+          "iteration": 0,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 1,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 2,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 3,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 1048576,
+          "sha256": "30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58"
+        },
+        "candidate.rgba": {
+          "bytes": 1048576,
+          "sha256": "30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58"
+        }
+      },
+      "original_pixels_match_qualified_worker": true,
+      "comparison_reference": [
+        "original NPU graph",
+        "original NPU graph",
+        "original NPU graph",
+        "original NPU graph"
+      ],
+      "original_graph_exact": true,
+      "pixel_shader_sha256": "7823741aa26b80ab1d183a947f93575665d4dd6a334aba98427ae3a142b25ae4",
+      "independent_reference_used": false,
+      "shared_program_imports": 1
+    },
+    {
+      "ticket": 18,
+      "packet_sha256": "a9df18ae2086e390cab7190d2b5e69856af9483a8775e82506b33f16402be659",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 190.032,
+          "candidate_full_ms": 41.583,
+          "candidate_shader_and_projection_ms": 8.0996,
+          "candidate_merger_ms": 31.9149,
+          "baseline_calls": 26,
+          "candidate_calls": 6,
+          "components": 1048576,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 85.8438,
+          "candidate_full_ms": 26.1598,
+          "candidate_shader_and_projection_ms": 1.4368,
+          "candidate_merger_ms": 23.3701,
+          "baseline_calls": 26,
+          "candidate_calls": 6,
+          "components": 1048576,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 94.3981,
+          "candidate_full_ms": 25.8349,
+          "candidate_shader_and_projection_ms": 2.6095,
+          "candidate_merger_ms": 20.4346,
+          "baseline_calls": 26,
+          "candidate_calls": 6,
+          "components": 1048576,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 63.4445,
+          "candidate_full_ms": 23.1505,
+          "candidate_shader_and_projection_ms": 1.5711,
+          "candidate_merger_ms": 19.9887,
+          "baseline_calls": 26,
+          "candidate_calls": 6,
+          "components": 1048576,
+          "different_components": 856,
+          "maximum_byte_error": 1,
+          "exact": false
+        }
+      ],
+      "reference_checks": [
+        {
+          "kind": "reference_check",
+          "iteration": 0,
+          "reference": "independent FP32 alpha filter with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 1,
+          "reference": "independent FP32 alpha filter with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 2,
+          "reference": "independent FP32 alpha filter with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 3,
+          "reference": "independent FP32 alpha filter with original NPU geometry and merger",
+          "cpu_test_reference_only": true,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 1048576,
+          "sha256": "c012dbde45744a8a84c216e871e7b3eddf16aab7c0b60e3194d5010e405fe5ea"
+        },
+        "candidate.rgba": {
+          "bytes": 1048576,
+          "sha256": "c012dbde45744a8a84c216e871e7b3eddf16aab7c0b60e3194d5010e405fe5ea"
+        },
+        "reference-0.rgba": {
+          "bytes": 1048576,
+          "sha256": "c012dbde45744a8a84c216e871e7b3eddf16aab7c0b60e3194d5010e405fe5ea"
+        },
+        "reference-1.rgba": {
+          "bytes": 1048576,
+          "sha256": "30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58"
+        },
+        "reference-2.rgba": {
+          "bytes": 1048576,
+          "sha256": "821655299b6f6908a008aa2fbfde1e7c45cfa03d5035cf07d20ac1e25add69e9"
+        },
+        "reference-3.rgba": {
+          "bytes": 1048576,
+          "sha256": "e673cdb2d5961cb5fb292d4951124f96d720f512a5b15400a2cc347612e0b77f"
+        }
+      },
+      "original_pixels_match_qualified_worker": true,
+      "comparison_reference": [
+        "independent FP32 alpha filter with original NPU geometry and merger",
+        "independent FP32 alpha filter with original NPU geometry and merger",
+        "independent FP32 alpha filter with original NPU geometry and merger",
+        "independent FP32 alpha filter with original NPU geometry and merger"
+      ],
+      "original_graph_exact": false,
+      "pixel_shader_sha256": "0daddc2311bec2f92d461ec657f6ed418b6b250c89041234548c546a40eaaf36",
+      "independent_reference_used": true,
+      "shared_program_imports": 1
+    },
+    {
+      "ticket": 78,
+      "packet_sha256": "0021d94ba3a1d1939b14667dd3fc3fbb36a9cce859ce9d1b04d3875f5da2c328",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 404.8507,
+          "candidate_full_ms": 42.1405,
+          "candidate_shader_and_projection_ms": 6.2029,
+          "candidate_merger_ms": 32.9865,
+          "baseline_calls": 42,
+          "candidate_calls": 22,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 151.0171,
+          "candidate_full_ms": 34.969,
+          "candidate_shader_and_projection_ms": 2.2515,
+          "candidate_merger_ms": 29.3467,
+          "baseline_calls": 42,
+          "candidate_calls": 22,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 133.6633,
+          "candidate_full_ms": 35.4447,
+          "candidate_shader_and_projection_ms": 1.4083,
+          "candidate_merger_ms": 29.8422,
+          "baseline_calls": 42,
+          "candidate_calls": 22,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 158.1917,
+          "candidate_full_ms": 33.7761,
+          "candidate_shader_and_projection_ms": 1.6998,
+          "candidate_merger_ms": 28.8283,
+          "baseline_calls": 42,
+          "candidate_calls": 22,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "reference_checks": [
+        {
+          "kind": "reference_check",
+          "iteration": 0,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 1,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 2,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 3,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 3145728,
+          "sha256": "747a1fd02c6b932773c30dbc9a91bf31f270654dac2b6657682a621aec05c7f9"
+        },
+        "candidate.rgba": {
+          "bytes": 3145728,
+          "sha256": "747a1fd02c6b932773c30dbc9a91bf31f270654dac2b6657682a621aec05c7f9"
+        }
+      },
+      "original_pixels_match_qualified_worker": true,
+      "comparison_reference": [
+        "original NPU graph",
+        "original NPU graph",
+        "original NPU graph",
+        "original NPU graph"
+      ],
+      "original_graph_exact": true,
+      "pixel_shader_sha256": "4e5ed0f81f4172324fd21bccde5309aff541f82c95c0f51b0690b9441d599932",
+      "independent_reference_used": false,
+      "shared_program_imports": 1
+    },
+    {
+      "ticket": 127,
+      "packet_sha256": "b84040b1b6467f26132c23ae5d11de5b3e12f4569b77f744f5c79ee8a28bf21d",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 217.0531,
+          "candidate_full_ms": 20.6001,
+          "candidate_shader_and_projection_ms": 6.7402,
+          "candidate_merger_ms": 12.4931,
+          "baseline_calls": 10,
+          "candidate_calls": 6,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 41.8788,
+          "candidate_full_ms": 14.6347,
+          "candidate_shader_and_projection_ms": 2.2706,
+          "candidate_merger_ms": 10.8684,
+          "baseline_calls": 10,
+          "candidate_calls": 6,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 35.343,
+          "candidate_full_ms": 12.5376,
+          "candidate_shader_and_projection_ms": 1.9984,
+          "candidate_merger_ms": 9.0672,
+          "baseline_calls": 10,
+          "candidate_calls": 6,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 34.4345,
+          "candidate_full_ms": 12.0211,
+          "candidate_shader_and_projection_ms": 1.8919,
+          "candidate_merger_ms": 8.7551,
+          "baseline_calls": 10,
+          "candidate_calls": 6,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "reference_checks": [
+        {
+          "kind": "reference_check",
+          "iteration": 0,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 1,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 2,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 3,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 3145728,
+          "sha256": "520fa0ea4ef2378dabed0bee3ad769fc4f02f1424322c67fb2be62008320d155"
+        },
+        "candidate.rgba": {
+          "bytes": 3145728,
+          "sha256": "520fa0ea4ef2378dabed0bee3ad769fc4f02f1424322c67fb2be62008320d155"
+        }
+      },
+      "original_pixels_match_qualified_worker": true,
+      "comparison_reference": [
+        "original NPU graph",
+        "original NPU graph",
+        "original NPU graph",
+        "original NPU graph"
+      ],
+      "original_graph_exact": true,
+      "pixel_shader_sha256": "5a764502f81741e8cf27e849025854eea948cbfe1a193695cd40e43089577e78",
+      "independent_reference_used": false,
+      "shared_program_imports": 1
+    },
+    {
+      "ticket": 182,
+      "packet_sha256": "9e32ad0eecdac5a4287f82bec8f033e6077cc7f9695370fb198aef425edf7dc2",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 1256.0746,
+          "candidate_full_ms": 404.0138,
+          "candidate_shader_and_projection_ms": 11.7768,
+          "candidate_merger_ms": 360.3836,
+          "baseline_calls": 275,
+          "candidate_calls": 94,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 1084.2079,
+          "candidate_full_ms": 375.0443,
+          "candidate_shader_and_projection_ms": 2.102,
+          "candidate_merger_ms": 347.49,
+          "baseline_calls": 275,
+          "candidate_calls": 94,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 1075.445,
+          "candidate_full_ms": 401.1546,
+          "candidate_shader_and_projection_ms": 1.747,
+          "candidate_merger_ms": 369.8998,
+          "baseline_calls": 275,
+          "candidate_calls": 94,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 1081.6758,
+          "candidate_full_ms": 424.8378,
+          "candidate_shader_and_projection_ms": 2.9305,
+          "candidate_merger_ms": 389.4803,
+          "baseline_calls": 275,
+          "candidate_calls": 94,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "reference_checks": [
+        {
+          "kind": "reference_check",
+          "iteration": 0,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 1,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 2,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 3,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 20736000,
+          "sha256": "e2f0b38b4a8d79b7198b3068520dbcae23c5ab09e021a9f7caee7788d2aceb6f"
+        },
+        "candidate.rgba": {
+          "bytes": 20736000,
+          "sha256": "e2f0b38b4a8d79b7198b3068520dbcae23c5ab09e021a9f7caee7788d2aceb6f"
+        }
+      },
+      "original_pixels_match_qualified_worker": true,
+      "comparison_reference": [
+        "original NPU graph",
+        "original NPU graph",
+        "original NPU graph",
+        "original NPU graph"
+      ],
+      "original_graph_exact": true,
+      "pixel_shader_sha256": "95b1c4fbb5f9bf0f34ad7b76eca5ae122d956a9570e1796e1bd4aecf43ca7dbe",
+      "independent_reference_used": false,
+      "shared_program_imports": 1
+    },
+    {
+      "ticket": 256,
+      "packet_sha256": "273310989a24d1e2e151bcbb76068a5a8257642d269ddea7ab5d30d99a67a630",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 440.2983,
+          "candidate_full_ms": 58.5493,
+          "candidate_shader_and_projection_ms": 6.3955,
+          "candidate_merger_ms": 47.2096,
+          "baseline_calls": 62,
+          "candidate_calls": 32,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 226.776,
+          "candidate_full_ms": 50.1572,
+          "candidate_shader_and_projection_ms": 1.9496,
+          "candidate_merger_ms": 43.2744,
+          "baseline_calls": 62,
+          "candidate_calls": 32,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 200.9962,
+          "candidate_full_ms": 59.688,
+          "candidate_shader_and_projection_ms": 1.7496,
+          "candidate_merger_ms": 51.478,
+          "baseline_calls": 62,
+          "candidate_calls": 32,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 201.7625,
+          "candidate_full_ms": 65.9169,
+          "candidate_shader_and_projection_ms": 2.2774,
+          "candidate_merger_ms": 56.898,
+          "baseline_calls": 62,
+          "candidate_calls": 32,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "reference_checks": [
+        {
+          "kind": "reference_check",
+          "iteration": 0,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 1,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 2,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 3,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 20736000,
+          "sha256": "e4389da16981c6034e72dad95743bac8316d67ea9b5ef75b2e93da63c5527205"
+        },
+        "candidate.rgba": {
+          "bytes": 20736000,
+          "sha256": "e4389da16981c6034e72dad95743bac8316d67ea9b5ef75b2e93da63c5527205"
+        }
+      },
+      "original_pixels_match_qualified_worker": true,
+      "comparison_reference": [
+        "original NPU graph",
+        "original NPU graph",
+        "original NPU graph",
+        "original NPU graph"
+      ],
+      "original_graph_exact": true,
+      "pixel_shader_sha256": "fbe68f57c834b0adb911c186b19a28bb833bdfe10ea91385708ebe228012561c",
+      "independent_reference_used": false,
+      "shared_program_imports": 1
+    },
+    {
+      "ticket": 262,
+      "packet_sha256": "60ca44325e9c747296ea689f073416330c4855592f66be058a05a3289efc1bb8",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 625.3288,
+          "candidate_full_ms": 28.6925,
+          "candidate_shader_and_projection_ms": 4.4109,
+          "candidate_merger_ms": 24.0494,
+          "baseline_calls": 142,
+          "candidate_calls": 20,
+          "components": 9216,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 388.0722,
+          "candidate_full_ms": 22.7218,
+          "candidate_shader_and_projection_ms": 1.2702,
+          "candidate_merger_ms": 21.3073,
+          "baseline_calls": 142,
+          "candidate_calls": 20,
+          "components": 9216,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 469.9903,
+          "candidate_full_ms": 28.4611,
+          "candidate_shader_and_projection_ms": 2.0337,
+          "candidate_merger_ms": 25.9766,
+          "baseline_calls": 142,
+          "candidate_calls": 20,
+          "components": 9216,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 480.1023,
+          "candidate_full_ms": 26.6883,
+          "candidate_shader_and_projection_ms": 2.2469,
+          "candidate_merger_ms": 23.9937,
+          "baseline_calls": 142,
+          "candidate_calls": 20,
+          "components": 9216,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "reference_checks": [
+        {
+          "kind": "reference_check",
+          "iteration": 0,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 1,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 2,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 3,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 9216,
+          "sha256": "d2258537fd8aaf602fe8a5bf766d1a0e3be096ac3c7f627cae24b7765d4afc9e"
+        },
+        "candidate.rgba": {
+          "bytes": 9216,
+          "sha256": "d2258537fd8aaf602fe8a5bf766d1a0e3be096ac3c7f627cae24b7765d4afc9e"
+        }
+      },
+      "original_pixels_match_qualified_worker": true,
+      "comparison_reference": [
+        "original NPU graph",
+        "original NPU graph",
+        "original NPU graph",
+        "original NPU graph"
+      ],
+      "original_graph_exact": true,
+      "pixel_shader_sha256": "b92ae2a7745b2cc0a94ec294a23dba3b6f34a1035d78c9751cc28b9bdf038b15",
+      "independent_reference_used": false,
+      "shared_program_imports": 1
+    },
+    {
+      "ticket": 280,
+      "packet_sha256": "aad5479e7c6897da6911f9f2b5519b346b06ea45d07958736d0c6f20b44953a4",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 998.565,
+          "candidate_full_ms": 238.7053,
+          "candidate_shader_and_projection_ms": 7.204,
+          "candidate_merger_ms": 215.4994,
+          "baseline_calls": 236,
+          "candidate_calls": 52,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 763.5303,
+          "candidate_full_ms": 235.5329,
+          "candidate_shader_and_projection_ms": 2.2753,
+          "candidate_merger_ms": 218.0352,
+          "baseline_calls": 236,
+          "candidate_calls": 52,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 766.634,
+          "candidate_full_ms": 249.3208,
+          "candidate_shader_and_projection_ms": 1.2306,
+          "candidate_merger_ms": 225.2803,
+          "baseline_calls": 236,
+          "candidate_calls": 52,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 782.7734,
+          "candidate_full_ms": 253.5329,
+          "candidate_shader_and_projection_ms": 2.4126,
+          "candidate_merger_ms": 230.0774,
+          "baseline_calls": 236,
+          "candidate_calls": 52,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "reference_checks": [
+        {
+          "kind": "reference_check",
+          "iteration": 0,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 1,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 2,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 3,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 20736000,
+          "sha256": "7500e3b7c96ebeb339473a87e632a24d6049441b9c23d7c04cd921cd5df4fa2b"
+        },
+        "candidate.rgba": {
+          "bytes": 20736000,
+          "sha256": "7500e3b7c96ebeb339473a87e632a24d6049441b9c23d7c04cd921cd5df4fa2b"
+        }
+      },
+      "original_pixels_match_qualified_worker": true,
+      "comparison_reference": [
+        "original NPU graph",
+        "original NPU graph",
+        "original NPU graph",
+        "original NPU graph"
+      ],
+      "original_graph_exact": true,
+      "pixel_shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+      "independent_reference_used": false,
+      "shared_program_imports": 1
+    },
+    {
+      "ticket": 334,
+      "packet_sha256": "0c522ca7933a862768a9baa68e28bd478670df95c52c9d78085c785d73e0d32d",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 1945.1576,
+          "candidate_full_ms": 472.0029,
+          "candidate_shader_and_projection_ms": 7.1273,
+          "candidate_merger_ms": 440.0998,
+          "baseline_calls": 411,
+          "candidate_calls": 87,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 1617.4408,
+          "candidate_full_ms": 569.465,
+          "candidate_shader_and_projection_ms": 2.8544,
+          "candidate_merger_ms": 536.3594,
+          "baseline_calls": 411,
+          "candidate_calls": 87,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 1308.6747,
+          "candidate_full_ms": 434.2103,
+          "candidate_shader_and_projection_ms": 1.9437,
+          "candidate_merger_ms": 409.9764,
+          "baseline_calls": 411,
+          "candidate_calls": 87,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 1335.0064,
+          "candidate_full_ms": 447.7642,
+          "candidate_shader_and_projection_ms": 2.4065,
+          "candidate_merger_ms": 422.2664,
+          "baseline_calls": 411,
+          "candidate_calls": 87,
+          "components": 20736000,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "reference_checks": [
+        {
+          "kind": "reference_check",
+          "iteration": 0,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 1,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 2,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 3,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 20736000,
+          "sha256": "9e6758d0947ed2519d33d8fe7c8c5121e3eeb7308ca088a36821f83140c8a2e7"
+        },
+        "candidate.rgba": {
+          "bytes": 20736000,
+          "sha256": "9e6758d0947ed2519d33d8fe7c8c5121e3eeb7308ca088a36821f83140c8a2e7"
+        }
+      },
+      "original_pixels_match_qualified_worker": true,
+      "comparison_reference": [
+        "original NPU graph",
+        "original NPU graph",
+        "original NPU graph",
+        "original NPU graph"
+      ],
+      "original_graph_exact": true,
+      "pixel_shader_sha256": "d8e0b49792a47247020c5b93508846b0b0954403359f83d18e02544d338e8480",
+      "independent_reference_used": false,
+      "shared_program_imports": 1
+    },
+    {
+      "ticket": 512,
+      "packet_sha256": "cb17154326a1b9e522dcf0c5ba963da0debc0cbab69abe54bed3ea6240a3f7c2",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 292.9516,
+          "candidate_full_ms": 33.5266,
+          "candidate_shader_and_projection_ms": 6.1392,
+          "candidate_merger_ms": 26.2761,
+          "baseline_calls": 46,
+          "candidate_calls": 24,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 80.8393,
+          "candidate_full_ms": 28.3437,
+          "candidate_shader_and_projection_ms": 2.0281,
+          "candidate_merger_ms": 25.0616,
+          "baseline_calls": 46,
+          "candidate_calls": 24,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 70.3446,
+          "candidate_full_ms": 19.8581,
+          "candidate_shader_and_projection_ms": 1.3316,
+          "candidate_merger_ms": 17.3641,
+          "baseline_calls": 46,
+          "candidate_calls": 24,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 62.5563,
+          "candidate_full_ms": 19.8186,
+          "candidate_shader_and_projection_ms": 1.398,
+          "candidate_merger_ms": 17.3013,
+          "baseline_calls": 46,
+          "candidate_calls": 24,
+          "components": 3145728,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "reference_checks": [
+        {
+          "kind": "reference_check",
+          "iteration": 0,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 1,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 2,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        },
+        {
+          "kind": "reference_check",
+          "iteration": 3,
+          "reference": "original NPU graph",
+          "cpu_test_reference_only": false,
+          "candidate_rendering_device": "NPU",
+          "different_components": 0,
+          "exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 3145728,
+          "sha256": "d7cb42d99dfcfc46d56427b60eb4adc015da4e5315a36e84cab330ab8f151f67"
+        },
+        "candidate.rgba": {
+          "bytes": 3145728,
+          "sha256": "d7cb42d99dfcfc46d56427b60eb4adc015da4e5315a36e84cab330ab8f151f67"
+        }
+      },
+      "original_pixels_match_qualified_worker": true,
+      "comparison_reference": [
+        "original NPU graph",
+        "original NPU graph",
+        "original NPU graph",
+        "original NPU graph"
+      ],
+      "original_graph_exact": true,
+      "pixel_shader_sha256": "20e56de0447ed62eeb48ce9d442b806d3afb2d3c6fb6a2674aad53d98bd03c69",
+      "independent_reference_used": false,
+      "shared_program_imports": 1
+    }
+  ],
+  "model_sha256": "49894f9e468e3e0374740bceb2f12c8854806da2856f82c3b2ff8c1fd6e88da0",
+  "executable_sha256": "e41be8f14e6af0ebf3dfc7e6f95df5cf79ea033ea3cbd1264168f13f1951bc71",
+  "pixel_fixture": "recorded pixels and three generated texture/background images per case; CPU fixture generation only",
+  "stage": "selected",
+  "planned_cases": 11,
+  "planned_shader_groups": 11,
+  "structurally_declined": 224,
+  "active_ticket": 512,
+  "independent_reference_cases": 1,
+  "original_graph_different_cases": 1,
+  "finished": "2026-10-16T19:04:16.008491+00:00"
+}

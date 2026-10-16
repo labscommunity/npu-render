@@ -1,0 +1,30 @@
+from pathlib import Path
+import datetime,hashlib,json,os,traceback
+import numpy as np
+r=Path(os.environ['LOCALAPPDATA'])/'npu-render';d=r/'vm/ptl-program-rounding-v5';o=r/'vm/ptl-program-rounding-analysis-v1';o.mkdir(exist_ok=False)
+report={'started':datetime.datetime.now(datetime.UTC).isoformat(),'passed':False,'completed':False,'diagnostic_only':True,'desktop_changed':False,'tahoma_tested':False,'reference':'Independent vectorized FP32 normalization, bilinear filtering and ties-to-even UNORM conversion; uses NPU-produced addressing inputs; does not independently qualify geometry'}
+try:
+ files=['report.json','stdout.jsonl','synthetic-phase1-inputs.bin','synthetic-baseline-inputs.bin','baseline-synthetic.rgba','candidate-synthetic.rgba'];report['inputs']={name:dict(bytes=(d/name).stat().st_size,sha256=hashlib.sha256((d/name).read_bytes()).hexdigest()) for name in files}
+ custom=np.frombuffer((d/files[2]).read_bytes(),dtype='<u4').reshape(-1,30);base=np.frombuffer((d/files[3]).read_bytes(),dtype='<u4').reshape(-1,10)
+ ci=np.lexsort((custom[:,0],custom[:,1]));bi=np.lexsort((base[:,0],base[:,1]));custom=custom[ci];base=base[bi]
+ assert np.array_equal(custom[:,:2],base[:,:2]);assert len(np.unique(custom[:,:2],axis=0))==len(custom)
+ attrs=custom[:,2:14].view('<f4');fracs=custom[:,14:18].view('<f4');texels=custom[:,18:26];background=custom[:,26];assert np.all(custom[:,27]==1)
+ assert np.array_equal(custom[:,2:4],base[:,2:4]);report['identical_xy_input_components']=len(custom)*2
+ # Baseline uses only xy from input2. Remaining components are not declared.
+ F=np.float32;normalized=(texels[:,:4]>>24).astype(np.float32)/F(255);tx=fracs[:,0];ty=fracs[:,1]
+ top=normalized[:,0]*(F(1)-tx)+normalized[:,1]*tx;bottom=normalized[:,2]*(F(1)-tx)+normalized[:,3]*tx;filtered=top*(F(1)-ty)+bottom*ty
+ half=filtered.astype(np.float16).astype(np.float32);base_colors=base[:,6:10].view('<f4');assert np.all(base_colors==base_colors[:,0:1])
+ expected=np.rint(np.clip(filtered*F(255),F(0),F(255))).astype(np.uint8);demoted=np.rint(half*F(255)).astype(np.uint8)
+ baseline=np.frombuffer((d/files[4]).read_bytes(),np.uint8).reshape(-1,4);candidate=np.frombuffer((d/files[5]).read_bytes(),np.uint8).reshape(-1,4)
+ xy=(custom[:,:2].astype(np.int64)-128)//256;index=xy[:,1]*512+xy[:,0];assert np.all((index>=0)&(index<len(candidate)))
+ active=np.zeros(len(candidate),bool);active[index]=True
+ report.update(covered_pixels=len(custom),numpy_version=np.__version__,baseline_color_matches_fp32=int(np.count_nonzero(base_colors[:,0]==filtered)),baseline_color_matches_demoted_fp16=int(np.count_nonzero(base_colors[:,0]==half)),baseline_fp16_max_abs_error=float(np.max(np.abs(base_colors[:,0]-half))),candidate_byte_differences_from_independent_fp32=int(np.count_nonzero(candidate[index]!=expected[:,None])),baseline_byte_differences_from_independent_fp32=int(np.count_nonzero(baseline[index]!=expected[:,None])),baseline_byte_differences_from_demoted_fp16=int(np.count_nonzero(baseline[index]!=demoted[:,None])),outside_covered_pixels_different_components=int(np.count_nonzero(baseline[~active]!=candidate[~active])),total_different_components=int(np.count_nonzero(baseline!=candidate)))
+ examples=[]
+ for at in np.flatnonzero(np.any(baseline[index]!=candidate[index],axis=1))[:8]:
+  examples.append(dict(pixel=int(index[at]),texture_alpha=list(map(int,texels[at,:4]>>24)),fractions=list(map(float,fracs[at,:2])),filtered_fp32=float(filtered[at]),filtered_fp16=float(half[at]),baseline_color=float(base_colors[at,0]),expected=int(expected[at]),baseline=int(baseline[index[at],0]),candidate=int(candidate[index[at],0])))
+ report['examples']=examples
+ assert report['candidate_byte_differences_from_independent_fp32']==0 and report['outside_covered_pixels_different_components']==0
+ report['passed']=True
+except Exception as e:report.update(error=repr(e),traceback=traceback.format_exc())
+finally:report.update(completed=True,finished=datetime.datetime.now(datetime.UTC).isoformat());(o/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(report));raise SystemExit(0 if report['passed'] else 1)

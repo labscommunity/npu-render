@@ -1,0 +1,15 @@
+{"shared_provider_core_experiment":true,"single_core_for_npu_compilation":true,"hardware_context_count_measured":false}
+{"kind":"private_shared_queue_experiment","enabled":true,"property_readback_verified":true,"hardware_queue_count_measured":false}
+{"ptl_program_provider_created":true,"single_import_shared":true}
+{"kind":"pipeline_cache_policy","uniform_capacity":8,"triangle_capacity":24,"clear_capacity":4,"replacement":"FIFO","hardware_queue_count_measured":false}
+{"kind":"admission","passed":true,"negative_checks":6,"bounded_program":true,"instructions":1,"samples":0}
+{"kind":"setup","candidate_setup_ms":66.478300,"batch":12288,"desktop_changed":false}
+{"kind":"pair","iteration":0,"order":"baseline-first","baseline_full_ms":214.347500,"candidate_full_ms":237.009800,"candidate_shader_and_projection_ms":8.178600,"candidate_merger_ms":218.719700,"baseline_calls":4,"candidate_calls":50,"components":565248,"different_components":0,"maximum_byte_error":0,"exact":true}
+{"kind":"reference_check","iteration":0,"reference":"original NPU graph","cpu_test_reference_only":false,"candidate_rendering_device":"NPU","different_components":0,"exact":true}
+{"kind":"pair","iteration":1,"order":"custom-first","baseline_full_ms":25.746900,"candidate_full_ms":181.414900,"candidate_shader_and_projection_ms":1.803500,"candidate_merger_ms":167.474100,"baseline_calls":4,"candidate_calls":50,"components":565248,"different_components":0,"maximum_byte_error":0,"exact":true}
+{"kind":"reference_check","iteration":1,"reference":"original NPU graph","cpu_test_reference_only":false,"candidate_rendering_device":"NPU","different_components":0,"exact":true}
+{"kind":"pair","iteration":2,"order":"baseline-first","baseline_full_ms":23.258200,"candidate_full_ms":167.014100,"candidate_shader_and_projection_ms":1.666300,"candidate_merger_ms":157.000900,"baseline_calls":4,"candidate_calls":50,"components":565248,"different_components":0,"maximum_byte_error":0,"exact":true}
+{"kind":"reference_check","iteration":2,"reference":"original NPU graph","cpu_test_reference_only":false,"candidate_rendering_device":"NPU","different_components":0,"exact":true}
+{"kind":"pair","iteration":3,"order":"custom-first","baseline_full_ms":26.864300,"candidate_full_ms":181.825400,"candidate_shader_and_projection_ms":2.118200,"candidate_merger_ms":166.805400,"baseline_calls":4,"candidate_calls":50,"components":565248,"different_components":0,"maximum_byte_error":0,"exact":true}
+{"kind":"reference_check","iteration":3,"reference":"original NPU graph","cpu_test_reference_only":false,"candidate_rendering_device":"NPU","different_components":0,"exact":true}
+{"kind":"complete","passed":true,"desktop_tested":false,"tahoma_tested":false}

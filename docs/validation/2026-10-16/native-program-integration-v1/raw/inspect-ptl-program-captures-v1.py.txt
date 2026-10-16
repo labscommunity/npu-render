@@ -1,0 +1,22 @@
+from pathlib import Path
+from datetime import UTC,datetime
+import hashlib,json,os,subprocess,traceback
+r=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=r/'vm';out=vm/'ptl-program-capture-admission-v1';out.mkdir(exist_ok=False)
+def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+exe=r/'builds/ptl-program-integration-v2/Release/nr_ptl_four_tap_compare.exe';assert sha(exe)=='eaadce92f1ae2dc8ed520c3c017cc087f456759b7cb7dfe76a1a9bc98a2e09db'
+cases=json.loads((vm/'ptl-program-capture-tickets-v1.json').read_text());assert len(cases)==605
+env=os.environ.copy();env['PATH']=str(r/'toolchains/openvino-2026.4.1/Lib/site-packages/openvino/libs')+os.pathsep+env['PATH']
+report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,npu_tested=False,desktop_changed=False,executable_sha256=sha(exe),capture_manifest_sha256=sha(vm/'ptl-program-capture-tickets-v1.json'),cases=[])
+def save():(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+save()
+try:
+ for item in cases:
+  ticket=item['ticket'];packet=vm/f'native-desktop-admission-v33/bootstrap/requests/request-{ticket:08d}.bin';assert sha(packet)==item['original_request_sha256']
+  p=subprocess.run([str(exe),str(packet),str(vm/'ptl-six-span-program-v3/patched.blob'),str(out),'--inspect'],env=env,capture_output=True,timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
+  assert p.returncode==0 and not p.stderr,(ticket,p.returncode,p.stderr.decode(errors='replace'))
+  records=[json.loads(x) for x in p.stdout.decode().splitlines() if x.startswith('{')];assert len(records)==1 and records[0]['inspection_only'] and not records[0]['npu_executed']
+  report['cases'].append(dict(**item,accepted=records[0]['accepted']));save()
+ report.update(passed=True,accepted=sum(x['accepted'] for x in report['cases']),declined=sum(not x['accepted'] for x in report['cases']))
+except Exception as e:report.update(error=repr(e),traceback=traceback.format_exc())
+finally:report.update(completed=True,finished=datetime.now(UTC).isoformat());save()
+print(json.dumps({k:v for k,v in report.items() if k!='cases'}));raise SystemExit(0 if report['passed'] else 1)

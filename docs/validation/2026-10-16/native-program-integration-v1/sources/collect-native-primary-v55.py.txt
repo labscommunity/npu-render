@@ -1,0 +1,39 @@
+from pathlib import Path
+import base64,subprocess,json,hashlib,concurrent.futures
+r=Path("results/render-driver")
+directories=['ptl-program-integration-v1', 'ptl-program-integration-v2', 'ptl-program-integration-v3', 'ptl-program-integration-v4', 'ptl-program-integration-v5', 'ptl-program-diagnostic-v1', 'ptl-program-diagnostic-v2', 'ptl-program-diagnostic-v3', 'ptl-program-diagnostic-v4', 'ptl-program-diagnostic-v5', 'ptl-program-rounding-v1', 'ptl-program-rounding-v3', 'ptl-program-rounding-v4', 'ptl-program-rounding-v5', 'ptl-program-rounding-analysis-v1', 'ptl-program-capture-admission-v1', 'ptl-program-capture-admission-v2', 'ptl-program-comparison-v1-selected', 'ptl-program-comparison-v2-selected', 'ptl-program-comparison-v3-selected']
+extras=['ptl-program-integration-v1-source.json', 'ptl-program-integration-v2-source.json', 'ptl-program-integration-v3-source.json', 'ptl-program-integration-v4-source.json', 'ptl-program-integration-v5-source.json', 'ptl-program-diagnostic-v1-source.json', 'ptl-program-diagnostic-v2-source.json', 'ptl-program-diagnostic-v3-source.json', 'ptl-program-diagnostic-v4-source.json', 'ptl-program-diagnostic-v5-source.json', 'build-ptl-program-integration-v1.log', 'build-ptl-program-integration-v2.log', 'build-ptl-program-integration-v3.log', 'build-ptl-program-integration-v4.log', 'build-ptl-program-integration-v5.log', 'build-ptl-program-diagnostic-v1.log', 'build-ptl-program-diagnostic-v2.log', 'build-ptl-program-diagnostic-v3.log', 'build-ptl-program-diagnostic-v4.log', 'build-ptl-program-diagnostic-v5.log', 'ptl-program-capture-tickets-v1.json']
+source_files=['build-ptl-program-integration-v1.ps1', 'build-ptl-program-integration-v2.ps1', 'build-ptl-program-integration-v3.ps1', 'build-ptl-program-integration-v4.ps1', 'build-ptl-program-integration-v5.ps1', 'build-ptl-program-diagnostic-v1.ps1', 'build-ptl-program-diagnostic-v2.ps1', 'build-ptl-program-diagnostic-v3.ps1', 'build-ptl-program-diagnostic-v4.ps1', 'build-ptl-program-diagnostic-v5.ps1', 'run-ptl-program-rounding-v1.py', 'run-ptl-program-rounding-v2.py', 'run-ptl-program-rounding-v3.py', 'run-ptl-program-rounding-v4.py', 'run-ptl-program-rounding-v5.py', 'analyze-ptl-program-rounding-v1.py', 'run-ptl-program-compare-v1.py', 'run-ptl-program-compare-v2.py', 'run-ptl-program-compare-v3.py', 'inspect-ptl-program-captures-v1.py', 'inspect-ptl-program-captures-v2.py']
+ps=r'''$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render"
+foreach($trial in @('ptl-program-rounding-analysis-v1','ptl-program-comparison-v3-selected','ptl-program-capture-admission-v2')){$q=Get-Content "$r\vm\$trial\report.json" -Raw|ConvertFrom-Json;if(!$q.completed){throw 'Cannot archive active comparison'}}
+function ArtifactHash([string]$path){$stream=[IO.File]::Open($path,[IO.FileMode]::Open,[IO.FileAccess]::Read,([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete));try{return (Get-FileHash -InputStream $stream -Algorithm SHA256).Hash}finally{$stream.Dispose()}}
+$items=@(foreach($name in @('''+','.join("'"+d+"'" for d in directories)+r''')){
+ Get-ChildItem "$r\vm\$name" -File -Recurse|Where-Object {($_.Extension -in @('.json','.jsonl','.log','.txt','.inf','.ps1','.py','.c','.cpp','.hpp')) -and ($_.Name -notlike 'client-*' -or ($_.Name -like '*.stderr.log' -and $_.Length -gt 0))}|ForEach-Object {
+ if($_.Length -gt 18000000){throw 'Unexpected artifact size'}
+ [ordered]@{source=$_.FullName.Substring(("$r\vm\").Length).Replace('\','/');bytes=$_.Length;sha256=(ArtifactHash $_.FullName)}
+ }
+}
+foreach($name in @('''+','.join("'"+d+"'" for d in extras+source_files)+r''')){[ordered]@{source=$name;bytes=(Get-Item "$r\vm\$name").Length;sha256=(ArtifactHash "$r\vm\$name")}}
+
+foreach($name in @('ptl-program-integration-v1','ptl-program-integration-v2','ptl-program-integration-v3','ptl-program-integration-v4','ptl-program-integration-v5','ptl-program-diagnostic-v1','ptl-program-diagnostic-v3','ptl-program-diagnostic-v4','ptl-program-diagnostic-v5')){
+ $file="$r\builds\$name\build-report.json"
+ [ordered]@{source="build-$name/build-report.json";remote_source="builds/$name/build-report.json";bytes=(Get-Item $file).Length;sha256=(ArtifactHash $file)}
+}
+
+);$items|ConvertTo-Json -Depth 5
+'''
+p=r/'hash-native-primary-v55.ps1';p.write_text(ps)
+subprocess.run(['scp','-q',str(p),'delta:AppData/Local/npu-render/vm/'],capture_output=True,check=True,timeout=30)
+invoke=r'''$r="$env:LOCALAPPDATA\npu-render";& ([scriptblock]::Create([IO.File]::ReadAllText("$r\vm\hash-native-primary-v55.ps1")))'''
+result=subprocess.run(['ssh','-o','BatchMode=yes','-o','ConnectTimeout=8','delta','powershell.exe -NoProfile -NonInteractive -EncodedCommand '+base64.b64encode(invoke.encode('utf-16-le')).decode()],capture_output=True,timeout=45)
+if result.returncode:print(result.stderr.decode(errors='replace')[:2000]);raise SystemExit(result.returncode)
+receipts=json.loads(result.stdout.decode('utf-8-sig'));assert 0<len(receipts)<1000
+(r/'native-primary-v55-artifact-sha256.json').write_text(json.dumps(receipts,indent=2)+'\n')
+def fetch(item):
+    name=item['source'];assert '..' not in name and not name.startswith('/');dest=r/'primary-raw-v55'/name;dest.parent.mkdir(parents=True,exist_ok=True)
+    subprocess.run(['scp','-q','-o','BatchMode=yes','delta:AppData/Local/npu-render/'+item.get('remote_source','vm/'+name),str(dest)],capture_output=True,check=True,timeout=90)
+    data=dest.read_bytes();assert len(data)==item['bytes'] and hashlib.sha256(data).hexdigest()==item['sha256'].lower()
+    if name in source_files:assert data==(r/name).read_bytes()
+    return len(data)
+with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:sizes=list(pool.map(fetch,receipts))
+print(json.dumps(dict(hash_verified_files=len(sizes),bytes=sum(sizes),source_files_matched_local=len(source_files))))

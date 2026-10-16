@@ -10,15 +10,17 @@ RGBA composition and an explicit backend switch. The packaged runtime passed
 GPU → NPU → CPU → GPU → NPU switching on Panther Lake. It supports CPU/GPU/NPU through
 its first OpenVINO provider; other providers can implement the same contracts.
 
-**Latest qualification, October 16:** the [instrumented desktop run](docs/validation/2026-10-16/native-timing-live-v1/README.md)
-passes 1,190 acknowledged NPU operations, 48 matching physical submissions and
-ordinary recovery. Its controlled mouse response takes 8.24 seconds; causal timing
-locates most of that delay in frame production. A normally started, same-session
-application now passes [automatic registered D3D11 admission](docs/validation/2026-10-16/native-automatic-graphics-v1/README.md)
-and eight exact NPU operations. Interactive applications and Tahoma benefit are
-still unqualified. The reusable shader candidate passes its independent kernel
-suite but has an unresolved changed-image comparison and remains outside the
-live worker. See the [current acceptance plan](docs/research/desktop-offload-plan.md).
+**Latest results, October 16:** the reusable shader path passes
+[1,524 complete image comparisons](docs/validation/2026-10-16/native-program-comparison-v1/README.md),
+then [all 972 recorded worker requests and registered D3D11](docs/validation/2026-10-16/native-program-worker-v1/README.md).
+Its [live desktop trial fails](docs/validation/2026-10-16/native-program-live-v1/README.md)
+after 44 submitted frames when another shader's existing NPU graph times out.
+Ordinary cleanup passes. Producing one controlled mouse-response frame takes
+2.93 seconds; independent pixel confirmation takes 5.87 seconds. Responsive,
+sustained desktop operation and a Tahoma benefit remain unqualified.
+Automatic admission passes a [normally started same-session D3D11 fixture](docs/validation/2026-10-16/native-automatic-graphics-v1/README.md);
+interactive applications remain a separate gate. See the
+[current acceptance plan](docs/research/desktop-offload-plan.md).
 
 **Full desktop offload is unfinished.** The current Windows/Panther Lake path
 executes real DWM rendering on the NPU, delivers changing desktop frames to the

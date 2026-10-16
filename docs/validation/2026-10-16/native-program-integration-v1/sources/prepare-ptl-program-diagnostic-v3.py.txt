@@ -1,0 +1,8 @@
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'ptl-program-diagnostic-v3';shutil.copytree(r/'ptl-program-diagnostic-v2',d)
+p=d/'baseline_triangle.cpp';s=p.read_text().replace('bits(fragments[n][2][c])','fragments[n][2][c]');p.write_text(s)
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};(r/'ptl-program-diagnostic-v3-source.json').write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/'ptl-program-diagnostic-v3.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+(r/'build-ptl-program-diagnostic-v3.ps1').write_text((r/'build-ptl-program-diagnostic-v2.ps1').read_text().replace('ptl-program-diagnostic-v2','ptl-program-diagnostic-v3'))
+(r/'run-ptl-program-rounding-v3.py').write_text((r/'run-ptl-program-rounding-v2.py').read_text().replace('ptl-program-rounding-v2','ptl-program-rounding-v3').replace('ptl-program-diagnostic-v2','ptl-program-diagnostic-v3'))

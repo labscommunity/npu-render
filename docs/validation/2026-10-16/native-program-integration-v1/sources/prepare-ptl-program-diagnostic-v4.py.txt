@@ -1,0 +1,21 @@
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'ptl-program-diagnostic-v4';shutil.copytree(r/'ptl-program-diagnostic-v3',d)
+p=d/'compare.cpp';s=p.read_text().replace('auto blob=PtlProgramRaster::verified_blob(argv[2]);','ex::require(_putenv_s("NR_RENDER_PTL_PROGRAM_DIAGNOSTIC_DIR",out.string().c_str())==0);\n    auto blob=PtlProgramRaster::verified_blob(argv[2]);');p.write_text(s)
+p=d/'ptl_program.hpp';s=p.read_text();needle='    const auto point=points[plane*2048+n];';assert needle in s;s=s.replace(needle,needle+r'''
+    if(enabled){
+     char *directory=nullptr;size_t directory_size=0;require(!_dupenv_s(&directory,&directory_size,"NR_RENDER_PTL_PROGRAM_DIAGNOSTIC_DIR"));require(directory&&*directory);const std::filesystem::path path(directory);std::free(directory);
+     std::ofstream stream(path/"synthetic-phase1-inputs.bin",std::ios::binary|std::ios::app);require(bool(stream));stream.write(reinterpret_cast<const char*>(point.data()),8);stream.write(reinterpret_cast<const char*>(record),112);require(bool(stream));
+    }
+''');p.write_text(s)
+p=d/'baseline_triangle.cpp';s=p.read_text().replace('#include <numeric>','#include <numeric>\n#include <filesystem>\n#include <fstream>');needle='        if(enabled)for(size_t n=0;n<valid;++n)';assert needle in s;s=s.replace(needle,r'''
+        if(enabled){
+         char *directory=nullptr;size_t directory_size=0;require(!_dupenv_s(&directory,&directory_size,"NR_RENDER_PTL_PROGRAM_DIAGNOSTIC_DIR"));require(directory&&*directory);const std::filesystem::path path(directory);std::free(directory);
+         std::ofstream stream(path/"synthetic-baseline-inputs.bin",std::ios::binary|std::ios::app);require(bool(stream));
+         for(size_t n=0;n<valid;++n)if(stored_pixel[n]&&covered.covered[n]){stream.write(reinterpret_cast<const char*>(points[n].data()),8);stream.write(reinterpret_cast<const char*>(fragments[n][2].data()),16);stream.write(reinterpret_cast<const char*>(colors[n].data()),16);}require(bool(stream));
+        }
+'''+needle);p.write_text(s)
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};(r/'ptl-program-diagnostic-v4-source.json').write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/'ptl-program-diagnostic-v4.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+(r/'build-ptl-program-diagnostic-v4.ps1').write_text((r/'build-ptl-program-diagnostic-v3.ps1').read_text().replace('ptl-program-diagnostic-v3','ptl-program-diagnostic-v4'))
+(r/'run-ptl-program-rounding-v4.py').write_text((r/'run-ptl-program-rounding-v3.py').read_text().replace('ptl-program-rounding-v3','ptl-program-rounding-v4').replace('ptl-program-diagnostic-v3','ptl-program-diagnostic-v4'))

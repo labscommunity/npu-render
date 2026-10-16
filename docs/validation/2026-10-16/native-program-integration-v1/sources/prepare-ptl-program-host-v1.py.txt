@@ -1,0 +1,63 @@
+from pathlib import Path
+import hashlib,json,re,shutil,tarfile
+r=Path('results/render-driver');d=r/'ptl-program-integration-v1';d.mkdir()
+shutil.copyfile(r/'ptl-program-lowering-v1/ptl_program_ir.hpp',d/'ptl_program_ir.hpp')
+s=(r/'ptl-masked-integration-v1/ptl_masked.hpp').read_text().replace('ptl_masked_shaders.hpp','ptl_program_ir.hpp').replace('PtlMasked','PtlProgramRaster').replace('ptl_masked','ptl_program').replace('PTL masked','PTL program').replace('NR_RENDER_PTL_MASKED_BLOB','NR_RENDER_PTL_PROGRAM_BLOB')
+s=s.replace(' PackedResources layout;', ' shader::PtlProgram program;PackedResources layout;',1)
+a=s.index('  if(p.bytecode.size()');b=s.index(' static std::string verified_blob',a)
+s=s[:a]+'''  try{const auto program=shader::PtlProgram::lower(p);
+   for(const auto &sample:program.samples){const auto &r=resources[sample.texture];const auto &s=samplers[sample.sampler];
+    if(!r.width||r.width>8192||!r.height||r.height>8192||(r.format!=28&&r.format!=87)||uint64_t(r.width)*r.height>4194304||s.filter!=shader::TextureFilter::linear||s.u!=shader::TextureAddress::clamp||s.v!=shader::TextureAddress::clamp)return false;
+   }return true;
+  }catch(const std::invalid_argument &){return false;}
+ }
+'''+s[b:]
+digest='49894f9e468e3e0374740bceb2f12c8854806da2856f82c3b2ff8c1fd6e88da0'
+s=re.sub(r'constexpr unsigned char expected\[\]\{[^}]+\}', 'constexpr unsigned char expected[]{'+','.join('0x'+digest[i:i+2] for i in range(0,64,2))+'}',s)
+s=s.replace(':layout(resource_layout(resources))', ':program(shader::PtlProgram::lower(ps)),layout(resource_layout(resources))')
+s=s.replace('points.size()<=18432','points.size()<=12288')
+s=s.replace('for(unsigned sample=0;sample<2;++sample)require(resources[sample].pixels.size()==size_t(layout[sample].width)*layout[sample].height);', 'for(const auto &sample:program.samples){const auto index=sample.texture;require(resources[index].pixels.size()==size_t(layout[index].width)*layout[index].height);}')
+a=s.index('  const auto initialize=');b=s.index('\n  for(unsigned plane=',a)
+s=s[:a]+'''  const auto initialize=[&](unsigned char *p,unsigned phase,unsigned count){put(p,0x4e525031);put(p+4,1);put(p+8,phase);put(p+12,count);put(p+28,262144);put(p+48,target);put(p+52,mask);put(p+56,blend);
+   for(unsigned a=0;a<3;++a)put(p+88+a*4,program.modes[a]);put(p+100,unsigned(program.samples.size()));put(p+104,unsigned(program.instructions.size()));
+   for(unsigned sample=0;sample<program.samples.size();++sample){const auto &plan=program.samples[sample];const auto &r=layout[plan.texture];put(p+64+sample*12,r.width);put(p+68+sample*12,r.height);put(p+72+sample*12,r.format);put(p+112+sample*16,plan.slot);put(p+116+sample*16,plan.x);put(p+120+sample*16,plan.y);put(p+124+sample*16,plan.divide);}
+   for(unsigned i=0;i<program.immediates.size();++i)std::memcpy(p+160+i*16,program.immediates[i].data(),16);
+   for(unsigned i=0;i<program.instructions.size();++i)std::memcpy(p+256+i*32,program.instructions[i].data(),32);
+  };'''+s[b:]
+s=s.replace('plane*3072','plane*2048').replace('(3072u,','(2048u,').replace('p+256+n*96','p+2048+n*96').replace('p+196864+n*12','p+200704+n*12')
+s=s.replace('for(unsigned a=0;a<3;++a)std::memcpy(v+32+a*16,shaded[n][a+1].data(),16);', 'for(unsigned a=0;a<3;++a)if(program.inputs[a]<16)std::memcpy(v+32+a*16,shaded[n][program.inputs[a]].data(),16);')
+s=s.replace('0x4e524d4f','0x4e52504f').replace('o+16+n*80','o+16+n*112').replace('p+256+n*80','p+2048+n*112').replace('put(record+68,coverage)','put(record+100,coverage)').replace('record+64,background','record+96,background')
+s=s.replace('std::memcpy(record,q+16,16);std::memcpy(record+16,q+64,16);', 'std::memcpy(record,q+16,48);std::memcpy(record+48,q+96,16);')
+s=s.replace('for(unsigned sample=0;sample<2;++sample)for(unsigned tap=0;tap<4;++tap){const auto index=get(q+32+sample*16+tap*4);require(index<resources[sample].pixels.size());std::memcpy(record+32+sample*16+tap*4,resources[sample].pixels[index].data(),4);}', 'for(unsigned sample=0;sample<program.samples.size();++sample)for(unsigned tap=0;tap<4;++tap){const auto resource=program.samples[sample].texture;const auto index=get(q+64+sample*16+tap*4);require(index<resources[resource].pixels.size());std::memcpy(record+64+sample*16+tap*4,resources[resource].pixels[index].data(),4);}')
+(d/'ptl_program.hpp').write_text(s)
+for name in ['ptl_masked_triangle_draw.hpp','ptl_masked_triangle_draw.cpp']:
+ s=(r/'ptl-masked-integration-v1'/name).read_text().replace('PtlMaskedTriangleDrawExecutor','PtlProgramTriangleDrawExecutor').replace('ptl_masked','ptl_program').replace('PtlMasked masked','PtlProgramRaster program').replace('masked(p,','program(p,').replace('s.masked.execute','s.program.execute').replace('batch<=18432','batch<=12288')
+ (d/name.replace('masked','program')).write_text(s)
+s=(r/'ptl-masked-integration-v1/compare.cpp').read_text().replace('PtlMaskedTriangleDrawExecutor','PtlProgramTriangleDrawExecutor').replace('PtlMasked','PtlProgramRaster').replace('ptl_masked','ptl_program').replace('masked texture','bounded program')
+a=s.index('    auto wrong_shader=');b=s.index('    const auto setup=',a)
+s=s[:a]+'''    unsigned negative_checks=1;
+    auto wrong_shader=r.pixel;wrong_shader.instructions[0].opcode=Opcode::add;ex::require(!PtlProgramRaster::eligible(wrong_shader,r.resources,r.samplers));++negative_checks;
+    wrong_shader=r.pixel;wrong_shader.instructions[0].destination.mask=0;ex::require(!PtlProgramRaster::eligible(wrong_shader,r.resources,r.samplers));++negative_checks;
+    wrong_shader=r.pixel;wrong_shader.instructions[0].sources[0].modifier=Modifier::negate;ex::require(!PtlProgramRaster::eligible(wrong_shader,r.resources,r.samplers));++negative_checks;
+    wrong_shader=r.pixel;wrong_shader.outputs[1]=15;ex::require(!PtlProgramRaster::eligible(wrong_shader,r.resources,r.samplers));++negative_checks;
+    wrong_shader=r.pixel;wrong_shader.instructions.resize(9);ex::require(!PtlProgramRaster::eligible(wrong_shader,r.resources,r.samplers));++negative_checks;
+    const auto lowered=PtlProgram::lower(r.pixel);
+    if(!lowered.samples.empty()){
+     const auto &sample=lowered.samples[0];auto wrong_resources=r.resources;wrong_resources[sample.texture].format=0;ex::require(!PtlProgramRaster::eligible(r.pixel,wrong_resources,r.samplers));++negative_checks;
+     auto wrong_samplers=r.samplers;wrong_samplers[sample.sampler].filter=TextureFilter::point;ex::require(!PtlProgramRaster::eligible(r.pixel,r.resources,wrong_samplers));++negative_checks;
+     wrong_samplers=r.samplers;wrong_samplers[sample.sampler].u=TextureAddress::mirror;ex::require(!PtlProgramRaster::eligible(r.pixel,r.resources,wrong_samplers));++negative_checks;
+    }
+'''+s[b:]
+s=s.replace('const auto batch=ex::triangle_batch(r,RegisterExecutor::preferred_raster_batch(r.pixel));','const auto batch=(std::min)(12288u,ex::triangle_batch(r,RegisterExecutor::preferred_raster_batch(r.pixel)));')
+s=s.replace('std::printf("{\\"kind\\":\\"admission\\",\\"passed\\":true,\\"negative_checks\\":6,\\"masked_texture\\":true}\\n");', 'std::printf("{\\"kind\\":\\"admission\\",\\"passed\\":true,\\"negative_checks\\":%u,\\"bounded_program\\":true,\\"instructions\\":%zu,\\"samples\\":%zu}\\n",negative_checks,lowered.instructions.size(),lowered.samples.size());')
+# An inspection mode reports real resource/sampler admission without importing a model.
+s=s.replace('ex::require(argc==4);','ex::require(argc==4||argc==5);',1)
+needle='    auto blob=PtlProgramRaster::verified_blob';at=s.index(needle)
+s=s[:at]+'''    if(argc==5){ex::require(std::string(argv[4])=="--inspect");std::printf("{\\"inspection_only\\":true,\\"accepted\\":%s,\\"npu_executed\\":false}\\n",PtlProgramRaster::eligible(r.pixel,r.resources,r.samplers)?"true":"false");return 0;}
+'''+s[at:]
+(d/'compare.cpp').write_text(s)
+(d/'CMakeLists.txt').write_text((r/'ptl-masked-integration-v1/CMakeLists.txt').read_text().replace('ptl_masked_triangle','ptl_program_triangle'))
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};(r/'ptl-program-integration-v1-source.json').write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/'ptl-program-integration-v1.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+(r/'build-ptl-program-integration-v1.ps1').write_text((r/'build-ptl-masked-integration-v1.ps1').read_text().replace('ptl-masked-integration-v1','ptl-program-integration-v1'))
+print(json.dumps(dict(source_files=len(manifest),candidate_only=True)))

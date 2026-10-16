@@ -1,0 +1,51 @@
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'ptl-native-worker-v8';shutil.copytree(r/'ptl-native-worker-v7',d)
+for name in ['ptl_program.hpp','ptl_program_ir.hpp','ptl_program_triangle_draw.hpp','ptl_program_triangle_draw.cpp']:shutil.copyfile(r/'ptl-program-integration-v5'/name,d/name)
+p=d/'CMakeLists.txt';s=p.read_text().replace('ptl_masked_triangle_draw.cpp)','ptl_masked_triangle_draw.cpp ptl_program_triangle_draw.cpp)');p.write_text(s)
+p=d/'indexed_pipeline.hpp';s=p.read_text().replace('#include "ptl_adaptive_triangle.hpp"','#include "ptl_adaptive_triangle.hpp"\n#include "ptl_program.hpp"\n#include "ptl_program_triangle_draw.hpp"')
+needle='    bool quad_enabled=false;';assert needle in s
+s=s.replace(needle,r'''
+    bool ptl_program_enabled=false;
+    struct ProgramEntry {Header header;uint32_t batch;std::vector<uint32_t> vertex,pixel;raster::PackedResources layout;shader::TextureSamplers samplers;std::unique_ptr<raster::PtlProgramTriangleDrawExecutor> executor;};
+    std::vector<ProgramEntry> ptl_programs;
+    static uint32_t program_batch(const Request &request){
+        const auto &h=request.header;const auto clip=request.scissor.value_or(std::array<int32_t,4>{0,0,int32_t(h.width),int32_t(h.height)});require(scissor_valid(clip,h));
+        const auto area=uint64_t(clip[2]-clip[0])*uint64_t(clip[3]-clip[1]);unsigned batch=12288;while(batch>384&&area<=batch/2)batch/=2;return batch;
+    }
+    static bool program_shape(const Request &request){
+        const auto &h=request.header;
+        return !color_clear(h)&&shape_valid(h)&&h.vertices<=2046&&vertex_capacity(h.vertices)<=2046&&unsigned(blend_mode(h))<=1&&!(!(h.flags&0x3000)&&(h.flags&24));
+    }
+    std::optional<raster::UniformDrawExecutor::Result> try_program(const Request &request){
+        if(!ptl_program_enabled||!program_shape(request))return {};
+        const auto &h=request.header;raster::PackedResources legacy;shader::TextureSamplers samplers=request.samplers;
+        if(!(h.flags&0x2000)){legacy[0]=request.texture;samplers[0].filter=(h.flags&16)?shader::TextureFilter::point:shader::TextureFilter::linear;}
+        const auto &resources=(h.flags&0x2000)?request.resources:legacy;
+        if(!raster::PtlProgramRaster::eligible(request.pixel,resources,samplers))return {};
+        const auto batch=program_batch(request),capacity=vertex_capacity(h.vertices);raster::PtlProgramTriangleDrawExecutor *executor=nullptr;
+        for(auto &entry:ptl_programs){const auto &old=entry.header;
+            if(entry.batch==batch&&old.vertices==capacity&&old.format==h.format&&(old.flags&~4u)==(h.flags&~4u)&&raster::resource_layout_equal(resources,entry.layout)&&raster::sampler_layout_equal(samplers,entry.samplers)&&entry.vertex==request.vertex.bytecode&&entry.pixel==request.pixel.bytecode){executor=entry.executor.get();break;}
+        }
+        if(!executor){
+            if(ptl_programs.size()==128)ptl_programs.erase(ptl_programs.begin());
+            auto candidate=std::make_unique<raster::PtlProgramTriangleDrawExecutor>(request.vertex,request.pixel,capacity,h.width,h.height,h.format,resources,samplers,"NPU",blend_mode(h),uint8_t((h.flags>>8)&15),static_cast<raster::CullMode>((h.flags>>5)&3),(h.flags&128)!=0,batch);
+            executor=candidate.get();auto key=h;key.vertices=capacity;ptl_programs.push_back({key,batch,request.vertex.bytecode,request.pixel.bytecode,raster::resource_layout(resources),samplers,std::move(candidate)});
+        }
+        auto result=executor->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,resources,request.background,request.scissor,request.blend_constant);
+        std::printf("{\"ptl_program_draw\":true,\"accepted\":true,\"sequence\":%u,\"batch\":%u,\"provider_requests\":%llu,\"pipeline_count\":%zu,\"structural_admission\":true,\"fallback_backend\":\"none\"}\n",h.sequence,batch,static_cast<unsigned long long>(result.provider_requests),ptl_programs.size());std::fflush(stdout);return result;
+    }
+'''+needle)
+needle='    Pipeline(){';s=s.replace(needle,needle+r'''
+        wchar_t *program=nullptr;size_t program_length=0;
+        if(_wdupenv_s(&program,&program_length,L"NR_RENDER_PTL_PROGRAM_BLOB"))throw std::runtime_error("cannot read bounded program provider setting");
+        const std::unique_ptr<wchar_t,decltype(&std::free)> program_owner(program,&std::free);
+        if(program&&*program){require(std::filesystem::path(program).is_absolute());ptl_program_enabled=true;}
+''')
+needle='    raster::UniformDrawExecutor::Result execute_without_ptl(const Request &request) {';assert needle in s;s=s.replace(needle,needle+r'''
+        if(auto result=try_program(request))return std::move(*result);
+''');p.write_text(s)
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};(r/'ptl-native-worker-v8-source.json').write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/'ptl-native-worker-v8.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+(r/'build-ptl-native-worker-v8.ps1').write_text((r/'build-ptl-native-worker-v7.ps1').read_text().replace('ptl-native-worker-v7','ptl-native-worker-v8'))
+print(json.dumps(dict(files=len(manifest),test_reference_in_runtime=any('reference_triangle' in name for name in manifest))))

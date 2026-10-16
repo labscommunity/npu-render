@@ -1,0 +1,19 @@
+{
+  "started": "2026-10-16T18:41:47.848331+00:00",
+  "completed": true,
+  "passed": false,
+  "desktop_changed": false,
+  "tahoma_tested": false,
+  "cases": [],
+  "model_sha256": "49894f9e468e3e0374740bceb2f12c8854806da2856f82c3b2ff8c1fd6e88da0",
+  "executable_sha256": "eaadce92f1ae2dc8ed520c3c017cc087f456759b7cb7dfe76a1a9bc98a2e09db",
+  "pixel_fixture": "recorded pixels and three generated texture/background images per case; CPU fixture generation only",
+  "stage": "selected",
+  "planned_cases": 12,
+  "planned_shader_groups": 12,
+  "structurally_declined": 215,
+  "active_ticket": 14,
+  "error": "FileNotFoundError(2, 'No such file or directory')",
+  "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\run-ptl-program-compare-v1.py\", line 44, in <module>\n    expected=qualified_replays[ticket];assert sha(case/'baseline.rgba')==expected['pixels_sha256'];result['original_pixels_match_qualified_worker']=True;result['comparison_reference']='original qualified NPU graph';result['pixel_shader_sha256']=row['pixel_shader_sha256'];result['shared_program_imports']=sum(bool(x.get('ptl_program_provider_created')) for x in rows);assert result['shared_program_imports']==1;report['cases'].append(result);write();print(json.dumps(result),flush=True);assert passed,f'case {ticket} failed'\n                                              ^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\run-ptl-program-compare-v1.py\", line 8, in sha\n    def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()\n                                     ^^^^^^^^^^^^^^\n  File \"C:\\Users\\tatef\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\pathlib.py\", line 1019, in read_bytes\n    with self.open(mode='rb') as f:\n         ^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\tatef\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\pathlib.py\", line 1013, in open\n    return io.open(self, mode, buffering, encoding, errors, newline)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nFileNotFoundError: [Errno 2] No such file or directory: 'C:\\\\Users\\\\tatef\\\\AppData\\\\Local\\\\npu-render\\\\vm\\\\ptl-program-comparison-v1-selected\\\\14\\\\baseline.rgba'\n",
+  "finished": "2026-10-16T18:41:47.911762+00:00"
+}

@@ -1,0 +1,201 @@
+{
+  "started": "2026-10-16T18:59:47.069460+00:00",
+  "passed": true,
+  "completed": true,
+  "diagnostic_only": true,
+  "desktop_changed": false,
+  "tahoma_tested": false,
+  "reference": "Independent vectorized FP32 normalization, bilinear filtering and ties-to-even UNORM conversion; uses NPU-produced addressing inputs; does not independently qualify geometry",
+  "inputs": {
+    "report.json": {
+      "bytes": 498,
+      "sha256": "71eed3a98763c86231c01eebbf3e8983032e45c00154a7e2d988e832c6259c43"
+    },
+    "stdout.jsonl": {
+      "bytes": 4422,
+      "sha256": "bc21e51e6f99952d3454feb95fe662a399093798f80d3e8acd8105cf1c24533f"
+    },
+    "synthetic-phase1-inputs.bin": {
+      "bytes": 1224000,
+      "sha256": "c3f02a8beee9f09dfafde667ea33015a4b25efbb6c821cfe6e80c3adaafa42cf"
+    },
+    "synthetic-baseline-inputs.bin": {
+      "bytes": 408000,
+      "sha256": "ab02a43afb207f30398c10686c5655be7a0745eb0dcd06b4160d428ad24f6990"
+    },
+    "baseline-synthetic.rgba": {
+      "bytes": 1048576,
+      "sha256": "13225752ae8c0aeb0479122b926a809f4f02b27471760bf7c125e642170c7b46"
+    },
+    "candidate-synthetic.rgba": {
+      "bytes": 1048576,
+      "sha256": "e673cdb2d5961cb5fb292d4951124f96d720f512a5b15400a2cc347612e0b77f"
+    }
+  },
+  "identical_xy_input_components": 20400,
+  "covered_pixels": 10200,
+  "numpy_version": "2.5.4",
+  "baseline_color_matches_fp32": 8,
+  "baseline_color_matches_demoted_fp16": 10200,
+  "baseline_fp16_max_abs_error": 0.0,
+  "candidate_byte_differences_from_independent_fp32": 0,
+  "baseline_byte_differences_from_independent_fp32": 856,
+  "baseline_byte_differences_from_demoted_fp16": 0,
+  "outside_covered_pixels_different_components": 0,
+  "total_different_components": 856,
+  "examples": [
+    {
+      "pixel": 108,
+      "texture_alpha": [
+        79,
+        29,
+        5,
+        63
+      ],
+      "fractions": [
+        0.22916412353515625,
+        0.020833313465118408
+      ],
+      "filtered_fp32": 0.2608461081981659,
+      "filtered_fp16": 0.2607421875,
+      "baseline_color": 0.2607421875,
+      "expected": 67,
+      "baseline": 66,
+      "candidate": 67
+    },
+    {
+      "pixel": 1116,
+      "texture_alpha": [
+        176,
+        202,
+        55,
+        242
+      ],
+      "fractions": [
+        0.5625,
+        0.10416674613952637
+      ],
+      "filtered_fp32": 0.7351154088973999,
+      "filtered_fp16": 0.7353515625,
+      "baseline_color": 0.7353515625,
+      "expected": 187,
+      "baseline": 188,
+      "candidate": 187
+    },
+    {
+      "pixel": 2088,
+      "texture_alpha": [
+        252,
+        176,
+        184,
+        220
+      ],
+      "fractions": [
+        0.3958320617675781,
+        0.1875
+      ],
+      "filtered_fp32": 0.8528597354888916,
+      "filtered_fp16": 0.85302734375,
+      "baseline_color": 0.85302734375,
+      "expected": 217,
+      "baseline": 218,
+      "candidate": 217
+    },
+    {
+      "pixel": 2091,
+      "texture_alpha": [
+        185,
+        172,
+        173,
+        2
+      ],
+      "fractions": [
+        0.5208320617675781,
+        0.1875
+      ],
+      "filtered_fp32": 0.6296060085296631,
+      "filtered_fp16": 0.62939453125,
+      "baseline_color": 0.62939453125,
+      "expected": 161,
+      "baseline": 160,
+      "candidate": 161
+    },
+    {
+      "pixel": 2128,
+      "texture_alpha": [
+        177,
+        235,
+        38,
+        173
+      ],
+      "fractions": [
+        0.0625,
+        0.1875
+      ],
+      "filtered_fp32": 0.609666109085083,
+      "filtered_fp16": 0.60986328125,
+      "baseline_color": 0.60986328125,
+      "expected": 155,
+      "baseline": 156,
+      "candidate": 155
+    },
+    {
+      "pixel": 2141,
+      "texture_alpha": [
+        39,
+        167,
+        234,
+        32
+      ],
+      "fractions": [
+        0.6041641235351562,
+        0.1875
+      ],
+      "filtered_fp32": 0.4529915750026703,
+      "filtered_fp16": 0.452880859375,
+      "baseline_color": 0.452880859375,
+      "expected": 116,
+      "baseline": 115,
+      "candidate": 116
+    },
+    {
+      "pixel": 2155,
+      "texture_alpha": [
+        190,
+        219,
+        160,
+        9
+      ],
+      "fractions": [
+        0.1875,
+        0.1875
+      ],
+      "filtered_fp32": 0.7195465564727783,
+      "filtered_fp16": 0.7197265625,
+      "baseline_color": 0.7197265625,
+      "expected": 183,
+      "baseline": 184,
+      "candidate": 183
+    },
+    {
+      "pixel": 2571,
+      "texture_alpha": [
+        216,
+        250,
+        54,
+        117
+      ],
+      "fractions": [
+        0.1875,
+        0.22916650772094727
+      ],
+      "filtered_fp32": 0.7313572764396667,
+      "filtered_fp16": 0.7314453125,
+      "baseline_color": 0.7314453125,
+      "expected": 186,
+      "baseline": 187,
+      "candidate": 186
+    }
+  ],
+  "finished": "2026-10-16T18:59:47.085189+00:00"
+}

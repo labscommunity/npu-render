@@ -9,8 +9,8 @@ bounded kernel, not complete draw or desktop correctness.
 The structural lowerer accepts MOV, MUL, DIV and SAMPLE with explicit masks,
 swizzles, temporaries and finite immediates. It selects by program semantics,
 without a shader-hash allowlist. Fourteen captured programs representing 605 draws
-lower successfully; 390 draws also pass the initial linear-clamp resource and
-sampler gate. Point sampling remains unimplemented in this candidate.
+lower successfully; 381 draws pass the revised linear-clamp resource, sampler and routing gate,
+which preserves the existing NPU rectangle path. Point sampling remains unimplemented in this candidate.
 
 The host adapter preserves NPU vertex/projection, then combines coverage,
 interpolation and sample addressing in phase zero. The host transports addressed
@@ -20,16 +20,25 @@ uses six 262,144-byte spans, three varying vectors, up to two texture samples,
 eight instructions, four temporary vectors, four immediate vectors and one
 output. Each span accepts 2,048 samples; the draw admits up to 2,046 vertices.
 
-Complete-draw qualification remains open. The first two selected captures pass
-four original/changed-image comparisons each. The third matches the recorded
-image and two variants but differs by one byte in 856 components of its randomized
-variant. The comparison remains failed. Arithmetic tracing must identify which
-path meets the independent contract; preserving historical output alone cannot
-settle a precision discrepancy. No live worker uses this candidate yet.
+[Complete-draw qualification now passes](../validation/2026-10-16/native-program-comparison-v1/README.md)
+all 381 admitted captures and four image variants each. Every original captured
+image matches the qualified worker. Four alpha-replication cases also use a
+separate FP32 filtering reference: all 856 differing bytes in the first synthetic
+capture are explained by the old graph's FP16 reduction. The candidate matches
+the independent FP32 arithmetic, with no tolerance. Original failed comparisons
+remain retained in the [integration investigation](../validation/2026-10-16/native-program-integration-v1/README.md).
 
-Remaining gates are explicit rejection-reason coverage, independent arithmetic
-attribution, every admitted capture with changed images, full worker replay,
-registered Direct3D, then live interaction, recovery and sustained operation.
+The candidate now batches up to 12,288 samples independently of the old graph's
+batch limit. Summed warm component time falls from 193.982 to 84.852 seconds;
+114 individual comparisons are slower. This is not a desktop or Tahoma result.
+The worker integration retains the existing rectangle path, solid and four-sample
+priority, and older NPU paths for unsupported program/resource combinations.
+The independent scalar test reference is excluded from that worker.
+
+The integrated worker passes all 972 retained requests and registered Direct3D.
+Live v43 executes 309 program draws, then fails on a separate 181-instruction
+shader in the existing NPU graph path. Its cleanup passes. Remaining gates
+include eliminating that timeout, responsiveness and sustained desktop operation.
 More instructions, filtering modes, derivatives and loops require their own
 semantic and performance checks. Unsupported programs keep the qualified NPU
 graph path. Neither component timing nor parser admission proves desktop speed,

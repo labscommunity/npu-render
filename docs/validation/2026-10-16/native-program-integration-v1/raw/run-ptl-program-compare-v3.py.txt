@@ -1,0 +1,52 @@
+"""Owned sequential NPU comparisons for every observed two-texture multiply request."""
+from pathlib import Path
+from datetime import UTC,datetime
+import argparse,hashlib,json,os,subprocess,traceback
+root=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=root/'vm';parser=argparse.ArgumentParser();parser.add_argument('stage',choices=['selected','full']);args=parser.parse_args();out=vm/('ptl-program-comparison-v3-'+args.stage);out.mkdir(exist_ok=False)
+def obj(p):
+ b=p.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+def write(): (out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,desktop_changed=False,tahoma_tested=False,cases=[]);process=None
+try:
+ assert obj(vm/'ptl-six-span-program-v3/report.json')['passed']
+ model=vm/'ptl-six-span-program-v3/patched.blob';assert sha(model)=='49894f9e468e3e0374740bceb2f12c8854806da2856f82c3b2ff8c1fd6e88da0'
+ qualified_replays={x['ticket']:x for x in [json.loads(l) for l in (vm/'ptl-native-worker-v7-full/replay/replays.jsonl').read_text().splitlines() if l.startswith('{')]}
+ exe=root/'builds/ptl-program-integration-v3/Release/nr_ptl_four_tap_compare.exe';assert sha(exe)=='1eac56316f7d3f72f5cb2c5300446f5a0ec1e1a3cf90191c0016bf73a88e8f97'
+ env=os.environ.copy();env['PATH']=str(root/'toolchains/openvino-2026.4.1/Lib/site-packages/openvino/libs')+os.pathsep+env['PATH']
+ env.update(NR_RENDER_NPU_CACHE=str(vm/'model-cache-2026-4-v209'),NR_RENDER_SHARED_QUEUE='1',NR_RENDER_MEMORY_CACHE='1',NR_RENDER_MEMORY_CACHE_CAPACITY='512',NR_RENDER_SHARED_CORE='1',NR_RENDER_OPAQUE_CROP='1',NR_RENDER_TEXTURE_SCOPE='1',NR_RENDER_QUAD_BATCH='1',NR_RENDER_COMPACT_COVERAGE='0',NR_RENDER_INFER_TRACE='0',NR_RENDER_COMPILE_TRACE='0',NR_RENDER_INFER_PROFILE='0')
+ env.pop('NR_RENDER_AFFINE_BATCH',None);env.pop('NR_RENDER_PTL_FOUR_TAP_BLOB',None);env.pop('NR_RENDER_PTL_SOLID_BLOB',None);env.pop('NR_RENDER_PTL_TEXTURE_BLOB',None);env.pop('NR_RENDER_PTL_MASKED_BLOB',None);env.pop('NR_RENDER_PTL_GEOMETRY_BLOB',None);env['NR_RENDER_PTL_PROGRAM_BLOB']=str(model)
+ report.update(model_sha256=sha(model),executable_sha256=sha(exe),pixel_fixture='recorded pixels and three generated texture/background images per case; CPU fixture generation only')
+ admission=obj(vm/'ptl-program-capture-admission-v1/report.json');assert admission['passed'] and admission['executable_sha256']=='eaadce92f1ae2dc8ed520c3c017cc087f456759b7cb7dfe76a1a9bc98a2e09db' and admission['capture_manifest_sha256']=='f24c42c38f62a7590313be3e7e23ff4d9d8d13c7888f4b7dad53d93e9f9e581e'
+ metadata={x['ticket']:x for x in obj(vm/'ptl-worker-cost-analysis-v2/draws.json')}
+ admitted=[x for x in admission['cases'] if x['accepted']];assert len(admitted)==admission['accepted']
+ if args.stage=='selected':
+  groups={}
+  for item in admitted:
+   key=item['pixel_shader_sha256']
+   if key not in groups or metadata[item['ticket']]['draw_ms']>metadata[groups[key]['ticket']]['draw_ms']:groups[key]=item
+  cases=sorted(groups.values(),key=lambda x:x['ticket'])
+ else:
+  assert obj(vm/'ptl-program-comparison-v3-selected/report.json')['passed'];cases=admitted
+ report.update(stage=args.stage,planned_cases=len(cases),planned_shader_groups=len({x['pixel_shader_sha256'] for x in cases}),structurally_declined=admission['declined']);write()
+
+ for item in cases:
+  row=item;ticket=row['ticket'];packet=vm/f'native-desktop-admission-v33/bootstrap/requests/request-{ticket:08d}.bin';assert sha(packet)==row['original_request_sha256']
+  case=out/str(ticket);case.mkdir(exist_ok=False);report['active_ticket']=ticket;write()
+  with (case/'stdout.jsonl').open('xb') as stdout,(case/'stderr.log').open('xb') as stderr:
+   process=subprocess.Popen([str(exe),str(packet),str(model),str(case)],env=env,stdout=stdout,stderr=stderr,creationflags=subprocess.CREATE_NO_WINDOW)
+   try:process.wait(timeout=240)
+   except subprocess.TimeoutExpired:process.kill();process.wait(timeout=5);report['child_timeout']=True
+  rows=[json.loads(line) for line in (case/'stdout.jsonl').read_text(encoding='utf-8-sig').splitlines() if line.startswith('{')]
+  pairs=[x for x in rows if x.get('kind')=='pair'];final=[x for x in rows if x.get('kind')=='complete'];admission=[x for x in rows if x.get('kind')=='admission']
+  passed=process.returncode==0 and len(pairs)==4 and bool(final) and final[-1]['passed'] and bool(admission) and admission[-1]['passed'] and all(x['exact'] for x in pairs)
+  result=dict(ticket=ticket,packet_sha256=sha(packet),exit_code=process.returncode,pairs=pairs,passed=passed,pixel_artifacts={p.name:dict(bytes=p.stat().st_size,sha256=sha(p)) for p in case.iterdir() if p.suffix=='.rgba'})
+  if not passed:
+   result['stderr']=(case/'stderr.log').read_text(errors='replace')[:2000];report['cases'].append(result);write();print(json.dumps(result),flush=True);continue
+  expected=qualified_replays[ticket];assert sha(case/'baseline.rgba')==expected['pixels_sha256'];result['original_pixels_match_qualified_worker']=True;result['comparison_reference']='original qualified NPU graph';result['pixel_shader_sha256']=row['pixel_shader_sha256'];result['shared_program_imports']=sum(bool(x.get('ptl_program_provider_created')) for x in rows);assert result['shared_program_imports']==1;report['cases'].append(result);write();print(json.dumps(result),flush=True);assert passed,f'case {ticket} failed'
+ report['passed']=len(report['cases'])==len(cases) and all(x['passed'] for x in report['cases'])
+except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+finally:
+ if process is not None and process.poll() is None:process.kill();process.wait(timeout=5)
+ report.update(completed=True,finished=datetime.now(UTC).isoformat());write()
+print(json.dumps({k:v for k,v in report.items() if k!='cases'}));raise SystemExit(0 if report['passed'] else 1)

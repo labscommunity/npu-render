@@ -1,0 +1,12 @@
+from pathlib import Path
+import datetime,hashlib,json,os,subprocess,sys
+vm=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm';names=['native-live-v43/relay/frames.jsonl','native-live-v43/stimulus/probe.log','native-live-v43/screen/probe.log','native-live-v43/present/probe.log','native-desktop-admission-v53/bootstrap/frames.jsonl','native-desktop-admission-v53/bootstrap/worker.stdout.jsonl','native-desktop-admission-v53/bootstrap/provider-processes/generation-1/worker.stdout.jsonl']
+stimulus=(vm/names[1]).read_text();assert 'mouse_received' in stimulus and 'key_received' in stimulus
+out=vm/'native-live-v43-timing-snapshot-v1';out.mkdir(exist_ok=False);items=[]
+for name in names:
+ data=(vm/name).read_bytes();p=out/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data);items.append(dict(source=name,bytes=len(data),sha256=hashlib.sha256(data).hexdigest(),copied_utc=datetime.datetime.now(datetime.UTC).isoformat()))
+(out/'snapshot.json').write_text(json.dumps(dict(active_snapshot=True,atomic_across_files=False,source_files=items),indent=2)+'\n')
+with (out/'analysis.stdout.log').open('xb') as stdout,(out/'analysis.stderr.log').open('xb') as stderr:
+ p=subprocess.run([sys.executable,str(vm/'analyze-native-latency-v4.py'),'--root',str(out),'--output',str(out/'analysis'),'--active-snapshot'],stdout=stdout,stderr=stderr,timeout=30)
+assert p.returncode==0,(out/'analysis.stderr.log').read_text()
+q=json.loads((out/'analysis/report.json').read_text());print(json.dumps(dict(active_snapshot=True,passed=q['passed'],events=[{k:x[k] for k in ['event','response_ms','input_to_publication_ms','publication_to_observation_ms','serialized_child_busy_ms','draw_count']} for x in q['controlled_events']])))

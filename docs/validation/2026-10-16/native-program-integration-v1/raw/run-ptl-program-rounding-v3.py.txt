@@ -1,0 +1,21 @@
+from pathlib import Path
+import datetime,hashlib,json,os,subprocess,traceback
+root=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=root/'vm';out=vm/'ptl-program-rounding-v3';out.mkdir(exist_ok=False)
+report={'started':datetime.datetime.now(datetime.UTC).isoformat(),'diagnostic_only':True,'desktop_changed':False,'tahoma_tested':False};p=None
+try:
+ exe=root/'builds/ptl-program-diagnostic-v3/Release/nr_ptl_four_tap_compare.exe';model=vm/'ptl-six-span-program-v3/patched.blob';packet=vm/'native-desktop-admission-v33/bootstrap/requests/request-00000018.bin'
+ sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+ report.update(executable_sha256=sha(exe),packet_sha256=sha(packet),model_sha256=sha(model))
+ assert sha(model)=='49894f9e468e3e0374740bceb2f12c8854806da2856f82c3b2ff8c1fd6e88da0'
+ assert sha(packet)=='a9df18ae2086e390cab7190d2b5e69856af9483a8775e82506b33f16402be659'
+ env=os.environ.copy();env['PATH']=str(root/'toolchains/openvino-2026.4.1/Lib/site-packages/openvino/libs')+os.pathsep+env['PATH']
+ env.update(NR_RENDER_NPU_CACHE=str(vm/'model-cache-2026-4-v209'),NR_RENDER_SHARED_QUEUE='1',NR_RENDER_MEMORY_CACHE='1',NR_RENDER_MEMORY_CACHE_CAPACITY='512',NR_RENDER_SHARED_CORE='1',NR_RENDER_OPAQUE_CROP='1',NR_RENDER_TEXTURE_SCOPE='1',NR_RENDER_QUAD_BATCH='1',NR_RENDER_COMPACT_COVERAGE='0',NR_RENDER_INFER_TRACE='0',NR_RENDER_COMPILE_TRACE='0',NR_RENDER_INFER_PROFILE='0',NR_RENDER_PTL_PROGRAM_BLOB=str(model))
+ for k in ['NR_RENDER_AFFINE_BATCH','NR_RENDER_PTL_FOUR_TAP_BLOB','NR_RENDER_PTL_SOLID_BLOB','NR_RENDER_PTL_TEXTURE_BLOB','NR_RENDER_PTL_MASKED_BLOB','NR_RENDER_PTL_GEOMETRY_BLOB']:env.pop(k,None)
+ with (out/'stdout.jsonl').open('xb') as stdout,(out/'stderr.log').open('xb') as stderr:
+  p=subprocess.Popen([str(exe),str(packet),str(model),str(out)],env=env,stdout=stdout,stderr=stderr,creationflags=subprocess.CREATE_NO_WINDOW);p.wait(timeout=240)
+ report['exit_code']=p.returncode
+except Exception as e:report.update(error=repr(e),traceback=traceback.format_exc())
+finally:
+ if p is not None and p.poll() is None:p.kill();p.wait(timeout=5)
+ report.update(completed=True,finished=datetime.datetime.now(datetime.UTC).isoformat());(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(report));print((out/'stdout.jsonl').read_text());print((out/'stderr.log').read_text())

@@ -1,12 +1,14 @@
 # Full desktop offload: acceptance and execution plan
 
 Updated 2026-10-16. Target: Delta, Windows 11, Panther Lake. The repository stays
-private. **Full desktop offload is unfinished.** Worker v7 passes all 972 retained
-requests and native live v42, which delivers 48 matching physical submissions
-over 538.23 seconds and restores ordinary Windows state. Its observed mouse
-response is 8.24 seconds; this is not a usable desktop. Automatic admission now
-passes a normally started, same-session registered D3D11 fixture. Interactive
-application coverage, a responsive desktop and a Tahoma benefit remain open.
+private. **Full desktop offload is unfinished.** Worker v8 passes all 972 retained
+requests and registered D3D11. Its [live v43 trial](../validation/2026-10-16/native-program-live-v1/README.md)
+fails after 44 submitted frames and 767 acknowledged NPU operations: an existing
+181-instruction shader path times out. Ordinary cleanup and memory integrity
+pass. Producing the controlled mouse-response frame takes 2.93 seconds;
+independent pixel confirmation completes at 5.87 seconds. Neither responsiveness
+nor sustained use is qualified. Interactive application coverage and a Tahoma
+benefit also remain open.
 
 The [live causal timing](../validation/2026-10-16/native-timing-live-v1/README.md)
 places 8,167.77 ms of the mouse response before frame publication and 70.81 ms
@@ -18,12 +20,15 @@ shader path; it is one controlled event, not a latency distribution.
 
 The [bounded program kernel](../validation/2026-10-16/native-program-kernel-v1/README.md)
 passes 228 independent NPU fixtures. Its structural parser accepts 14 observed
-programs representing 605 draws; current resource and sampler constraints admit
-390 of those draws. Complete renderer comparisons are still in progress: the
-first two selected cases pass four image variants each, while the third differs
-by one byte in 856 components of its randomized variant. It is not integrated
-into the live worker. The strict comparison remains failed pending arithmetic
-attribution and independent qualification.
+programs representing 605 draws. Revised routing/resource constraints admit 381;
+all pass [1,524 complete image comparisons](../validation/2026-10-16/native-program-comparison-v1/README.md).
+Every original image is preserved. Four generated-image cases use an independently
+qualified FP32 alpha-filter reference after attributing the old graph's FP16
+precision reduction. Original failures remain recorded, without a tolerance.
+Summed warm component time falls from 193.982 to 84.852 seconds, with 114 individual
+comparisons slower. Worker replay and registered D3D integration pass, but the live trial fails on a
+different shader path. These component results do not establish a responsive
+desktop or a Tahoma benefit.
 
 The [automatic graphics qualification](../validation/2026-10-16/native-automatic-graphics-v1/README.md)
 passes eight real NPU operations from a normally started application through the
@@ -135,10 +140,11 @@ role, and any GPU rendering/copy cost in the bridge must be measured.
    group. Reduce shared geometry and dispatch costs across shader groups. The solid
    component clears five expensive draws but does not establish desktop usability.
    Repeat responsiveness and sustained stability checks after renderer changes.
-4. Resolve the reusable shader candidate's changed-image mismatch against
-   independent arithmetic, then complete every admitted draw, the full 972-request
-   worker replay, registered D3D and a finite live test. Attribute the 215 resource
-   and sampler declines explicitly; preserve the qualified NPU graph for them.
+4. Reproduce live v43's captured timeout and remove the remaining cold graph
+   preparation from that rendering path. The reusable worker passes its 972-request
+   replay and registered D3D, but live stability fails. Preserve explicit routing
+   declines and original evidence. Repeat finite and sustained desktop tests after
+   the reliability repair.
 5. Extend automatic admission to interactive processes sharing the serialized
    desktop worker, with negative identity/session tests, bounded renewal and
    revocation. Qualify ordinary default-adapter applications before browsers,

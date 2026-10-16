@@ -1,0 +1,20 @@
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'ptl-program-diagnostic-v1';shutil.copytree(r/'ptl-program-integration-v3',d)
+p=d/'compare.cpp';s=p.read_text().replace('auto run_custom=[&]{const auto began=Clock::now();', 'auto run_custom=[&]{ex::require(_putenv_s("NR_RENDER_PTL_PROGRAM_DIAGNOSTIC",iteration==3?"1":"0")==0);const auto began=Clock::now();');p.write_text(s)
+p=d/'ptl_program.hpp';s=p.read_text();needle='   }require(hits==get(o+12));';assert needle in s
+s=s.replace(needle,r'''
+    char *diagnostic=nullptr;size_t diagnostic_size=0;require(!_dupenv_s(&diagnostic,&diagnostic_size,"NR_RENDER_PTL_PROGRAM_DIAGNOSTIC"));const bool enabled=diagnostic&&*diagnostic=='1';std::free(diagnostic);
+    const auto point=points[plane*2048+n];
+    if(enabled&&point[0]==108*256+128&&point[1]==128){
+     std::printf("{\"kind\":\"synthetic_rounding_input\",\"point\":[108,0],\"attributes_bits\":[");
+     for(unsigned k=0;k<12;++k)std::printf("%s%u",k?",":"",get(record+k*4));
+     std::printf("],\"fraction_bits\":[");for(unsigned k=0;k<4;++k)std::printf("%s%u",k?",":"",get(record+48+k*4));
+     std::printf("],\"packed_texels\":[");for(unsigned k=0;k<8;++k)std::printf("%s%u",k?",":"",get(record+64+k*4));
+     std::printf("],\"cpu_alpha_normalization_bits\":[");for(unsigned k=0;k<4;++k){const auto word=get(record+64+k*4);const float normalized=float(word>>24)/255.f;unsigned bits;std::memcpy(&bits,&normalized,4);std::printf("%s%u",k?",":"",bits);}
+     std::printf("],\"background\":%u,\"sample_count\":%zu}\n",get(record+96),program.samples.size());std::fflush(stdout);
+    }
+'''+needle,1);p.write_text(s)
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};(r/'ptl-program-diagnostic-v1-source.json').write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/'ptl-program-diagnostic-v1.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+(r/'build-ptl-program-diagnostic-v1.ps1').write_text((r/'build-ptl-program-integration-v3.ps1').read_text().replace('ptl-program-integration-v3','ptl-program-diagnostic-v1'))
