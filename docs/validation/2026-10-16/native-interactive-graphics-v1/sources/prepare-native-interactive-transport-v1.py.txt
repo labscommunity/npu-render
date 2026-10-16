@@ -1,0 +1,24 @@
+"""Prepare restricted interactive graphics transport; no installation or execution."""
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'ptl-native-worker-v10';shutil.copytree(r/'ptl-native-worker-v9',d)
+p=d/'local_indexed_worker.cpp';s=p.read_text();needle='    const auto acl=L"D:P(A;;GA;;;SY)(A;;GA;;;"+worker_user+L")"+(compositor?L"(A;;GA;;;"+compositor->sid()+L")":L"")+(indirect?L"(A;;GA;;;"+indirect->sid()+L")":L"");';assert needle in s
+s=s.replace(needle,'''    char *interactive_setting=nullptr;size_t interactive_length=0;bool interactive_pipe=false;
+    ex::require(!_dupenv_s(&interactive_setting,&interactive_length,"NR_RENDER_INTERACTIVE_PIPE"));
+    if(interactive_setting){const std::string value(interactive_setting);std::free(interactive_setting);ex::require(value=="0"||value=="1");interactive_pipe=value=="1";}
+    // Explicit opt-in for same-account interactive clients. Administrators own
+    // the pipe. Ordinary clients receive data/attribute/synchronization rights,
+    // never permission to create a server instance or alter its access policy.
+    const auto prefix=interactive_pipe?L"O:BAG:BAD:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;0x00100083;;;":L"D:P(A;;GA;;;SY)(A;;GA;;;";
+    const auto acl=prefix+worker_user+L")"+(compositor?L"(A;;GA;;;"+compositor->sid()+L")":L"")+(indirect?L"(A;;GA;;;"+indirect->sid()+L")":L"")+(interactive_pipe?L"S:(ML;;NW;;;ME)":L"");''')
+needle='    LocalFree(descriptor);\n    stream::Handle stop_event';assert needle in s;s=s.replace(needle,'    LocalFree(descriptor);\n    if(interactive_pipe){std::printf("{\\"interactive_pipe_policy\\":true,\\"enabled\\":true,\\"ordinary_client_access_mask\\":1048707,\\"ordinary_client_server_creation_allowed\\":false}\\n");std::fflush(stdout);}\n    stream::Handle stop_event')
+p.write_text(s)
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};(r/'ptl-native-worker-v10-source.json').write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/'ptl-native-worker-v10.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+(r/'build-ptl-native-worker-v10.ps1').write_text((r/'build-ptl-native-worker-v9.ps1').read_text().replace('ptl-native-worker-v9','ptl-native-worker-v10'))
+# Existing unbuilt UMD candidate: narrow the authenticated client's access mask.
+d=r/'native-auto-umd-v2';p=d/'native/windows/registered_lab/local_indexed_client.hpp';s=p.read_text();assert s.count('GENERIC_READ | GENERIC_WRITE')==1;s=s.replace('GENERIC_READ | GENERIC_WRITE','FILE_READ_DATA | FILE_WRITE_DATA | FILE_READ_ATTRIBUTES | SYNCHRONIZE');p.write_text(s)
+manifest={str(p.relative_to(d)):hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()};(r/'native-auto-umd-v2-source.json').write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/'native-auto-umd-v2.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+prior=json.loads((r/'native-auto-umd-v1-source.json').read_text());changed=[n for n in manifest if manifest[n]!=prior.get(n)];(r/'native-auto-umd-v2-change.json').write_text(json.dumps(dict(changed=changed,prepared=True,build_performed=False,driver_installed=False),indent=2)+'\n')
+print(json.dumps(dict(umd_changes=changed,worker_graphics_algorithms_changed=False,prepared_only=True)))

@@ -1,0 +1,33 @@
+{
+  "worker_binary_sha256": "6d53376847d257c8ffa05bdc73b9319be87acf8ffb33a2f984f62dca9a1954b0",
+  "dll_sha256": "5f69fc41501fce6bde16ac4be3c91b4c7e689eb511985593d4b8d414c42f122c",
+  "started": "2026-10-16T20:21:19.302012+00:00",
+  "completed": true,
+  "passed": false,
+  "controller_pid": 14620,
+  "driver_installed": true,
+  "registered_adapter_tested": false,
+  "desktop_offloaded": false,
+  "quad_batch": "1",
+  "texture_scope": "1",
+  "memory_cache": "1",
+  "generic_batch": "4096",
+  "unleased_rejection_passed": true,
+  "worker_pid": 10420,
+  "interactive_consumer": {
+    "started": "2026-10-16T20:21:22.018947+00:00",
+    "completed": true,
+    "passed": false,
+    "consumer_started_suspended": false,
+    "preauthorized_consumer_pid": false,
+    "error": "AssertionError((588, 0))",
+    "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\run-native-interactive-graphics-v1.py\", line 14, in <module>\n    assert handle==ctypes.c_void_p(-1).value and error==5,(handle,error)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: (588, 0)\n",
+    "finished": "2026-10-16T20:21:22.026547+00:00"
+  },
+  "error": "AssertionError()",
+  "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\qualify-native-registered-v35.py\", line 93, in <module>\n    consumer=obj(case/'consumer-report.json');report['interactive_consumer']=consumer;save();assert consumer['completed'] and consumer['passed'] and not consumer['elevated'] and consumer['session']==session\n                                                                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n",
+  "owned_process_and_token_acls_restored_exactly": true,
+  "interactive_task_removed": true,
+  "owned_worker_terminated": true,
+  "finished": "2026-10-16T20:21:25.351355+00:00"
+}

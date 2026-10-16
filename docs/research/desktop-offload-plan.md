@@ -48,10 +48,14 @@ not qualify interactive default-adapter applications, existing-device migration,
 browsers, video or games.
 
 The [interactive admission component](../validation/2026-10-16/native-interactive-admission-v1/README.md)
-now passes normally started non-elevated clients across the session boundary,
-identity-spoof rejection and exact access-list restoration. It has not yet been
-integrated into the graphics driver or the shared desktop worker. The same archive
-retains an isolated reproduction of live v43's 17,057-node graph timeout.
+passes normally started non-elevated clients across the session boundary,
+identity-spoof rejection and exact access-list restoration. [Registered interactive
+graphics v36](../validation/2026-10-16/native-interactive-graphics-v1/README.md) now
+passes eight real NPU operations from session 1 with automatic scope-three admission
+to the session-zero worker. Exact permissions, mapping, task and driver cleanup
+pass. Its fixture explicitly selects the adapter. Sharing DWM's worker and automatic
+default-adapter graphics remain the next application gates. The earlier component
+archive retains an isolated reproduction of live v43's 17,057-node graph timeout.
 
 The primary obstacle is responsiveness. A captured cold graph takes 89.1 seconds
 to compile. The fully cached v35 worker also makes 42,760 provider calls across
@@ -135,7 +139,7 @@ renderer does not establish where every application renders.
 | 3. Physical presentation | Present new NPU frames on the physical output with distinct logical desktops and no recursive mirroring. | Live sequence-to-present correlation, output identity, measured presentation mode and residual GPU work. | V42 correlates 48 exact matching submissions and verifies blue/green/red on the owned physical output. Presenter: 96 GPU copy commands including validation readback; measurement observer: 142 additional copies. Residual GPU cost and a matched baseline remain unqualified. |
 | 4. Interaction and recovery | Migrate the logical desktop, route pointer/keyboard/focus correctly, handle cursor/DPI/resolution, restore exact topology and windows. | Scripted interaction visible on physical output; emergency exit and owned-process failure recovery; ordinary login/lock path retained. | V42 passes relative motion, controlled mouse/keyboard/color changes, confinement, two reacquisitions and ordinary recovery. Deliberately stopping the relay in v34 triggers full owned cleanup in 25.75 seconds. Secure desktop, sleep/wake, full cursor fidelity and other faults remain open. |
 | 5. Responsiveness | Optimize resource reuse, graph compilation, dispatch granularity, transfer volume and frame pacing. | Initial target: ordinary desktop interaction at 30 fps, p95 visible response ≤100 ms, 30-minute stable run. Report cold-start time separately. | Not met. Large cold graph compilation is reproduced at 89.1 seconds. Cached replay helps but does not meet usability. A fused four-sample kernel matches all 3.15 million components of the retained slow desktop draw in three comparisons. Six compiler-owned spans reduce complete warm draw time from about 9.2 s to 0.39 s, with 34 calls. The live v42 trial observes an 8.24 s controlled mouse response and 187.8 ms keyboard response. Causal timestamps attribute most of the mouse delay to frame production. Responsive interaction and wider shader/geometry coverage remain open. |
-| 6. Application coverage | Admit and implement required graphics operations across browser, video and representative 3D workloads. Establish per-process adapter choice. | Capability matrix plus real hardware runs; every remaining iGPU operation accounted for. | A manually admitted default-adapter D3D11 fixture passes eight NPU operations. Unadmitted default device creation still fails in v41. A broker component passes normal-start lease, spoof rejection, timeout and cleanup checks. Registered D3D v32 then passes a normally started same-session fixture with eight exact NPU operations and cleanup. Interactive automatic admission, general API coverage and browser/video/game migration remain unqualified. |
+| 6. Application coverage | Admit and implement required graphics operations across browser, video and representative 3D workloads. Establish per-process adapter choice. | Capability matrix plus real hardware runs; every remaining iGPU operation accounted for. | A manually admitted default-adapter D3D11 fixture passes eight NPU operations. Unadmitted default device creation still fails in v41. A broker component passes normal-start lease, spoof rejection, timeout and cleanup checks. Registered D3D v32 then passes a normally started same-session fixture with eight exact NPU operations and cleanup. Registered v36 passes a normally started non-admin session-1 fixture, with automatic admission and eight NPU operations. Shared desktop/default-adapter routing, general API coverage and browser/video/game migration remain unqualified. |
 | 7. Tahoma benefit | Run repeated baseline/offload trials under matched power, resolution and application load. | Report Tahoma throughput/latency, desktop frame times, per-engine GPU/NPU/CPU activity, memory and power; demonstrate GPU relief and no material Tahoma regression. | Earlier experiments regressed; native desktop A/B not yet run. |
 | 8. Usable switch | Integrate qualified components, install/on/off/status, recovery, documentation and CI; resolve distribution signing requirements. | Repeated clean install and enable/disable cycles, sleep/wake and failures, end-to-end test on target hardware. | Research candidates isolated; no usable full-offload product. |
 
@@ -163,7 +167,8 @@ role, and any GPU rendering/copy cost in the bridge must be measured.
    v44, then repeat finite and sustained desktop tests after rendering changes.
 5. Integrate the qualified interactive admission component with the serialized
    desktop worker. Two ordinary non-elevated clients and five spoof rejections
-   now pass, with exact process/token access-list restoration. Graphics routing,
+   now pass, with exact process/token access-list restoration. Registered interactive
+   graphics also passes eight real NPU operations. Shared-worker/default-adapter routing,
    bounded renewal and revocation remain open. Qualify ordinary default-adapter
    applications before browsers, video and representative 3D workloads.
 6. Measure matched Tahoma baseline/offload performance and remaining GPU work.

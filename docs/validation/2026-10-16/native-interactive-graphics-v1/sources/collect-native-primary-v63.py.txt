@@ -1,0 +1,41 @@
+from pathlib import Path
+import base64,subprocess,json,hashlib,concurrent.futures
+r=Path("results/render-driver")
+directories=['ptl-native-worker-v10','native-interactive-graphics-v1','native-registration-stage-v19','native-registration-v35','native-registration-v36','interactive-pipe-diagnostic-v1','interactive-pipe-diagnostic-v2']
+extras=['ptl-native-worker-v10-source.json','build-ptl-native-worker-v10.log','build-native-auto-umd-v2.log','native-auto-umd-v2-source.json','native-driver-package-v19/report.json','native-driver-package-v19/sha256.json','native-driver-package-v19/nr_native_probe.inf']
+source_files=['build-ptl-native-worker-v10.ps1','build-native-auto-umd-v2.ps1','package-native-driver-v19.ps1','run-native-interactive-graphics-v1.ps1','run-native-interactive-graphics-v1.py','run-native-interactive-graphics-v2.py','diagnose-interactive-pipe-v1.py','diagnose-interactive-pipe-v2.py','qualify-native-registered-v35.py','qualify-native-registered-v36.py','run-native-registration-v35.ps1','run-native-registration-v36.ps1','recover-native-registration-v35.ps1','recover-native-registration-v36.ps1','native-registration-v35-source.json','native-registration-v36-source.json']
+source_files += ['native-auto-umd-v2/native/windows/registered_lab/'+n for n in ['native_probe_lease.hpp','native_auto_admission.hpp','local_indexed_client.hpp']]
+ps=r'''$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render"
+foreach($trial in @('native-registration-v35','native-registration-v36')){$q=Get-Content "$r\vm\$trial\report.json" -Raw|ConvertFrom-Json;if(!$q.completed){throw 'Cannot archive active comparison'}}
+function ArtifactHash([string]$path){$stream=[IO.File]::Open($path,[IO.FileMode]::Open,[IO.FileAccess]::Read,([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete));try{return (Get-FileHash -InputStream $stream -Algorithm SHA256).Hash}finally{$stream.Dispose()}}
+$items=@(foreach($name in @('''+','.join("'"+d+"'" for d in directories)+r''')){
+ Get-ChildItem "$r\vm\$name" -File -Recurse|Where-Object {($_.Extension -in @('.json','.jsonl','.log','.txt','.inf','.ps1','.py','.c','.cpp','.hpp')) -and ($_.Name -notlike 'client-*' -or ($_.Name -like '*.stderr.log' -and $_.Length -gt 0))}|ForEach-Object {
+ if($_.Length -gt 18000000){throw 'Unexpected artifact size'}
+ [ordered]@{source=$_.FullName.Substring(("$r\vm\").Length).Replace('\','/');bytes=$_.Length;sha256=(ArtifactHash $_.FullName)}
+ }
+}
+foreach($name in @('''+','.join("'"+d+"'" for d in extras+source_files)+r''')){[ordered]@{source=$name;bytes=(Get-Item "$r\vm\$name").Length;sha256=(ArtifactHash "$r\vm\$name")}}
+
+foreach($name in @('ptl-native-worker-v10','native-auto-umd-v2')){foreach($artifact in @('build-report.json','registered-build-report.json')){
+ $file="$r\builds\$name\$artifact";if(!(Test-Path $file)){continue}
+ [ordered]@{source="build-$name/$artifact";remote_source="builds/$name/$artifact";bytes=(Get-Item $file).Length;sha256=(ArtifactHash $file)}
+}}
+
+
+);$items|ConvertTo-Json -Depth 5
+'''
+p=r/'hash-native-primary-v63.ps1';p.write_text(ps)
+subprocess.run(['scp','-q',str(p),'delta:AppData/Local/npu-render/vm/'],capture_output=True,check=True,timeout=30)
+invoke=r'''$r="$env:LOCALAPPDATA\npu-render";& ([scriptblock]::Create([IO.File]::ReadAllText("$r\vm\hash-native-primary-v63.ps1")))'''
+result=subprocess.run(['ssh','-o','BatchMode=yes','-o','ConnectTimeout=8','delta','powershell.exe -NoProfile -NonInteractive -EncodedCommand '+base64.b64encode(invoke.encode('utf-16-le')).decode()],capture_output=True,timeout=45)
+if result.returncode:print(result.stderr.decode(errors='replace')[:2000]);raise SystemExit(result.returncode)
+receipts=json.loads(result.stdout.decode('utf-8-sig'));assert 0<len(receipts)<1000
+(r/'native-primary-v63-artifact-sha256.json').write_text(json.dumps(receipts,indent=2)+'\n')
+def fetch(item):
+    name=item['source'];assert '..' not in name and not name.startswith('/');dest=r/'primary-raw-v63'/name;dest.parent.mkdir(parents=True,exist_ok=True)
+    subprocess.run(['scp','-q','-o','BatchMode=yes','delta:AppData/Local/npu-render/'+item.get('remote_source','vm/'+name),str(dest)],capture_output=True,check=True,timeout=90)
+    data=dest.read_bytes();assert len(data)==item['bytes'] and hashlib.sha256(data).hexdigest()==item['sha256'].lower()
+    if name in source_files:assert data==(r/name).read_bytes()
+    return len(data)
+with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:sizes=list(pool.map(fetch,receipts))
+print(json.dumps(dict(hash_verified_files=len(sizes),bytes=sum(sizes),source_files_matched_local=len(source_files))))

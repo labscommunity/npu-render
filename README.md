@@ -18,8 +18,10 @@ mouse response takes 4.54 seconds to confirm through physical-output pixel readb
 and the keyboard response takes 173 ms. Two shader groups account for 2.21 seconds
 of the mouse delay before publication. The [integrated worker also passes all 972
 retained requests and registered D3D11](docs/validation/2026-10-16/native-long-shader-worker-v1/README.md).
-[Automatic admission of non-admin interactive clients](docs/validation/2026-10-16/native-interactive-admission-v1/README.md)
-passes component checks; real interactive graphics integration remains open.
+[Automatic non-admin interactive graphics](docs/validation/2026-10-16/native-interactive-graphics-v1/README.md)
+now passes six clears and two draws through registered Direct3D, with exact cleanup.
+The fixture explicitly selects the adapter; sharing the desktop worker and ordinary
+default-adapter routing remain separate gates.
 Sustained responsiveness, broad application coverage and a Tahoma benefit remain
 unqualified.
 See the [current acceptance plan](docs/research/desktop-offload-plan.md).

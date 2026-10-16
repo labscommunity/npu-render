@@ -1,0 +1,70 @@
+"""Compare client opens with actual server creation on owned, empty pipes."""
+from pathlib import Path
+from datetime import UTC, datetime
+import base64, ctypes, json, os, secrets, subprocess, sys, time, traceback
+from ctypes import wintypes as W
+from native_session_broker_v3 import process_sid, k as broker_kernel
+k = ctypes.WinDLL('kernel32', use_last_error=True)
+adv = ctypes.WinDLL('advapi32', use_last_error=True)
+k.CreateFileW.argtypes = [W.LPCWSTR,W.DWORD,W.DWORD,W.LPVOID,W.DWORD,W.DWORD,W.HANDLE]
+k.CreateFileW.restype = W.HANDLE
+k.CreateNamedPipeW.argtypes = [W.LPCWSTR,W.DWORD,W.DWORD,W.DWORD,W.DWORD,W.DWORD,W.DWORD,W.LPVOID]
+k.CreateNamedPipeW.restype = W.HANDLE
+k.CloseHandle.argtypes = [W.HANDLE]
+k.LocalFree.argtypes = [W.HLOCAL]
+adv.ConvertStringSecurityDescriptorToSecurityDescriptorW.argtypes = [W.LPCWSTR,W.DWORD,ctypes.POINTER(W.LPVOID),ctypes.POINTER(W.DWORD)]
+class SA(ctypes.Structure):
+    _fields_ = [('length',W.DWORD),('descriptor',W.LPVOID),('inherit',W.BOOL)]
+invalid = ctypes.c_void_p(-1).value
+def attempt(function, *arguments):
+    ctypes.set_last_error(0); h=function(*arguments); error=ctypes.get_last_error()
+    valid=h not in (None,invalid)
+    if valid:k.CloseHandle(h)
+    return dict(allowed=valid,win32_error=error)
+def quote(value):return "'"+str(value).replace("'","''")+"'"
+def ps(script):
+    p=subprocess.run(['powershell.exe','-NoProfile','-NonInteractive','-EncodedCommand',base64.b64encode(script.encode('utf-16-le')).decode()],capture_output=True,timeout=30)
+    assert p.returncode==0,(p.stdout.decode(errors='replace'),p.stderr.decode(errors='replace'))
+if len(sys.argv)>1:
+    job=json.loads(Path(sys.argv[1]).read_text());out=Path(job['output']);report={}
+    try:
+        session=W.DWORD();assert k.ProcessIdToSessionId(k.GetCurrentProcessId(),ctypes.byref(session))
+        assert session.value>0 and not ctypes.windll.shell32.IsUserAnAdmin()
+        report.update(session=session.value,elevated=False,results={})
+        for key,name in job['pipes'].items():
+            report['results'][key]={
+                'client_mask_four':attempt(k.CreateFileW,name,0x100004,0,None,3,0x40000000,None),
+                'server_inbound':attempt(k.CreateNamedPipeW,name,1|0x40000000,8,2,4096,4096,1000,None),
+                'server_duplex':attempt(k.CreateNamedPipeW,name,3|0x40000000,8,2,4096,4096,1000,None),
+            }
+        limited=report['results']['restricted'];control=report['results']['full_control']
+        assert all(not limited[n]['allowed'] and limited[n]['win32_error']==5 for n in ['server_inbound','server_duplex'])
+        assert all(control[n]['allowed'] for n in ['server_inbound','server_duplex'])
+        report['passed']=True
+    except Exception as error:report.update(passed=False,error=repr(error),traceback=traceback.format_exc())
+    report['completed']=True;(out/'consumer.json').write_text(json.dumps(report,indent=2)+'\n')
+    raise SystemExit(0 if report.get('passed') else 1)
+root=Path(os.environ['LOCALAPPDATA'])/'npu-render';out=root/'vm/interactive-pipe-diagnostic-v1';out.mkdir(exist_ok=False)
+report=dict(started=datetime.now(UTC).isoformat(),passed=False,completed=False,driver_installed=False,npu_executed=False)
+sid=process_sid(broker_kernel.GetCurrentProcess())[1];pipes={};handles=[];task='T8-NpuRender-PipeDiagnosticV1';registered=False
+try:
+    for key,access in [('restricted','0x00100083'),('full_control','GA')]:
+        name=r'\\.\pipe\npu-render-diagnostic-'+secrets.token_hex(16);descriptor=W.LPVOID()
+        sddl='O:BAG:BAD:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;'+access+';;;'+sid+')S:(ML;;NW;;;ME)'
+        assert adv.ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl,1,ctypes.byref(descriptor),None)
+        try:
+            sa=SA(ctypes.sizeof(SA),descriptor,False);h=k.CreateNamedPipeW(name,3|0x40000000|0x80000,8,2,4096,4096,1000,ctypes.byref(sa))
+            assert h not in (None,invalid),ctypes.get_last_error();handles.append(h);pipes[key]=name
+        finally:k.LocalFree(descriptor)
+    job=out/'job.json';job.write_text(json.dumps(dict(output=str(out),pipes=pipes),indent=2)+'\n')
+    arguments=subprocess.list2cmdline([str(Path(__file__)),str(job)])
+    ps("$ErrorActionPreference='Stop';if(Get-ScheduledTask -TaskName "+quote(task)+" -ErrorAction SilentlyContinue){throw 'Task exists'};$a=New-ScheduledTaskAction -Execute "+quote(root/'toolchains/openvino-2026.4.1/Scripts/pythonw.exe')+" -Argument "+quote(arguments)+";$p=New-ScheduledTaskPrincipal -UserId "+quote(sid)+" -LogonType Interactive -RunLevel Limited;$s=New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 1) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries;Register-ScheduledTask -TaskName "+quote(task)+" -Action $a -Principal $p -Settings $s|Out-Null;Start-ScheduledTask -TaskName "+quote(task))
+    registered=True;deadline=time.perf_counter()+40
+    while not (out/'consumer.json').exists():assert time.perf_counter()<deadline;time.sleep(.1)
+    report['consumer']=json.loads((out/'consumer.json').read_text());assert report['consumer']['passed'];report['passed']=True
+except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+finally:
+    for h in handles:k.CloseHandle(h)
+    if registered:ps('Stop-ScheduledTask -TaskName '+quote(task)+' -ErrorAction SilentlyContinue;Unregister-ScheduledTask -TaskName '+quote(task)+' -Confirm:$false')
+    report.update(completed=True,owned_pipes_closed=True,finished=datetime.now(UTC).isoformat());(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(report));raise SystemExit(0 if report['passed'] else 1)

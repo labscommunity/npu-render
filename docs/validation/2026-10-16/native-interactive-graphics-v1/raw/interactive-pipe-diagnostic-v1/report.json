@@ -1,0 +1,49 @@
+{
+  "started": "2026-10-16T20:25:02.666681+00:00",
+  "passed": false,
+  "completed": true,
+  "driver_installed": false,
+  "npu_executed": false,
+  "consumer": {
+    "session": 1,
+    "elevated": false,
+    "results": {
+      "restricted": {
+        "client_mask_four": {
+          "allowed": true,
+          "win32_error": 0
+        },
+        "server_inbound": {
+          "allowed": false,
+          "win32_error": 5
+        },
+        "server_duplex": {
+          "allowed": false,
+          "win32_error": 5
+        }
+      },
+      "full_control": {
+        "client_mask_four": {
+          "allowed": true,
+          "win32_error": 0
+        },
+        "server_inbound": {
+          "allowed": false,
+          "win32_error": 5
+        },
+        "server_duplex": {
+          "allowed": true,
+          "win32_error": 183
+        }
+      }
+    },
+    "passed": false,
+    "error": "AssertionError()",
+    "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\diagnose-interactive-pipe-v1.py\", line 42, in <module>\n    assert all(control[n]['allowed'] for n in ['server_inbound','server_duplex'])\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n",
+    "completed": true
+  },
+  "error": "AssertionError()",
+  "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\diagnose-interactive-pipe-v1.py\", line 64, in <module>\n    report['consumer']=json.loads((out/'consumer.json').read_text());assert report['consumer']['passed'];report['passed']=True\n                                                                            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^\nAssertionError\n",
+  "owned_pipes_closed": true,
+  "finished": "2026-10-16T20:25:06.806737+00:00"
+}
