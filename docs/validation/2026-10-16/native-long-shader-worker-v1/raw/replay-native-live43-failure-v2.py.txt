@@ -1,0 +1,23 @@
+"""Isolate the captured live43 timeout without changing the desktop."""
+from pathlib import Path
+import hashlib,json,os,subprocess,sys
+r=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=r/'vm'
+def obj(p):
+ b=p.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+previous=obj(vm/'native-desktop-admission-v53/report.json');assert previous['completed'] and previous['cleanup_passed']
+capture=vm/'native-live43-failure-capture-v1'
+assert hashlib.sha256((capture/'index.jsonl').read_bytes()).hexdigest()=='7cbb4c9ec2ab9dd06e05600671d378aa497cbcdf689cc9dd8e9c853318e40f74'
+assert hashlib.sha256((capture/'request-00000000.bin').read_bytes()).hexdigest()=='46caf6546bcde449d3829a05aaedfcefc719686f25264cec6786065df7a628c3'
+assert obj(vm/'ptl-native-worker-v9-selected/report.json')['passed']
+command=[sys.executable,str(vm/'replay-recorded-requests-v18.py'),'--worker',str(r/'builds/ptl-native-worker-v9/Release/nr_registered_local_indexed_worker.exe'),'--client',str(r/'builds/native-routing-v20/Release/nr_registered_local_indexed_client_probe.exe'),'--runtime',str(r/'toolchains/openvino-2026.4.1/Lib/site-packages/openvino/libs'),'--cache',str(vm/'model-cache-2026-4-v209'),'--capture',str(capture),'--output',str(vm/'native-live43-failure-replay-v2'),'--shared-core','1','--shared-queue','1','--memory-cache','1','--memory-capacity','512','--pipeline-cache','retained','--quad-batch','1','--generic-batch','4096','--infer-trace','1','--compile-trace','1','--infer-profile','0','--provider-recovery','1','--texture-scope','1']
+env=os.environ.copy()
+for key,directory in [('LONG','ptl-six-span-long-shader-v2'),('PROGRAM','ptl-six-span-program-v3'),('FOUR_TAP','ptl-six-span-general-v1'),('SOLID','ptl-six-span-solid-v3'),('TEXTURE','ptl-six-span-three-texture-v1'),('GEOMETRY','ptl-six-span-geometry-v2'),('MASKED','ptl-six-span-masked-v1')]:env['NR_RENDER_PTL_'+key+'_BLOB']=str(vm/directory/'patched.blob')
+result=subprocess.run(command,env=env,creationflags=subprocess.CREATE_NO_WINDOW)
+assert result.returncode==0
+proof=obj(vm/'native-live43-failure-replay-v2/report.json');assert proof['passed'] and proof['delivery_acknowledgments']==1
+records=[json.loads(x) for x in (vm/'native-live43-failure-replay-v2/replays.jsonl').read_text().splitlines() if x.startswith('{')]
+assert len(records)==1 and records[0]['pixels_sha256']=='61da2570eecf77357d3ed52b454df91c3b46b734613a192f777407a2bdb54b43'
+events=[json.loads(x) for x in (vm/'native-live43-failure-replay-v2/provider-processes/generation-1/worker.stdout.jsonl').read_text().splitlines() if x.startswith('{') and x.endswith('}')]
+assert sum(bool(x.get('ptl_long_draw')) for x in events)==1 and sum(bool(x.get('ptl_long_provider_created')) for x in events)==1
+verification=dict(completed=True,passed=True,request_sha256='46caf6546bcde449d3829a05aaedfcefc719686f25264cec6786065df7a628c3',pixels_sha256=records[0]['pixels_sha256'],reference='qualified complete original NPU and independent shader comparisons',elapsed_ms=records[0]['elapsed_ms'],full_desktop_offload=False)
+(vm/'native-live43-failure-replay-v2/verification.json').write_text(json.dumps(verification,indent=2)+'\n');print(json.dumps(verification))

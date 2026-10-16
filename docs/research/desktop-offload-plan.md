@@ -14,8 +14,9 @@ The [long-shader component](../validation/2026-10-16/native-long-shader-v1/READM
 now passes 120 independent NPU fixtures and exact complete-image comparisons for
 the failed request and all six earlier uses of the shader. It removes that
 request's large pixel graph from the candidate path; the old graph takes 94.210
-seconds to compile in an offline comparison. Full worker integration, a new live
-run and broader responsiveness measurements remain required. This shader-specific
+seconds to compile in an offline comparison. [Worker v9 passes all 972 requests and registered D3D11](../validation/2026-10-16/native-long-shader-worker-v1/README.md),
+with identical outputs to v8 and one shared long-shader import. A new live run
+and broader responsiveness measurements remain required. This shader-specific
 fix does not complete the reusable runtime compiler or application coverage.
 
 The [live causal timing](../validation/2026-10-16/native-timing-live-v1/README.md)

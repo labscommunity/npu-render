@@ -1,0 +1,46 @@
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'ptl-native-worker-v9';shutil.copytree(r/'ptl-native-worker-v8',d)
+for name in ['ptl_long_shader.hpp','ptl_long_shaders.hpp','ptl_long_triangle_draw.hpp','ptl_long_triangle_draw.cpp']:shutil.copyfile(r/'ptl-long-shader-integration-v3'/name,d/name)
+p=d/'ptl_long_shader.hpp';s=p.read_text().replace('#include <sstream>','#include <sstream>\n#include <mutex>\n#include <cstdio>')
+start=s.index(' ov::Core core;');end=s.index(' static void require',start)
+init_start=s.index('  const auto bytes=verified_blob(path);');init_end=s.index('\n }\n Result execute',init_start)
+constructor=s[init_start:init_end].replace('  const auto bytes=verified_blob(path);','  ')
+s=s[:start]+''' struct Provider {
+  ov::Core core;ov::CompiledModel model;ov::InferRequest inference;std::string device;std::mutex mutex;bool failed=false;
+  explicit Provider(const std::string &bytes){
+'''+constructor+'''
+   std::printf("{\\"ptl_long_provider_created\\":true,\\"single_import_shared\\":true}\\n");std::fflush(stdout);
+  }
+ };
+ static std::shared_ptr<Provider> acquire(const std::string &bytes){
+  static std::mutex mutex;static std::weak_ptr<Provider> cached;std::lock_guard<std::mutex> lock(mutex);
+  auto p=cached.lock();if(!p){p=std::make_shared<Provider>(bytes);cached=p;}return p;
+ }
+ std::shared_ptr<Provider> provider;
+ raster::PackedResources layout;unsigned count=0,address_u=0,address_v=0;
+'''+s[end:]
+start=s.index('  const auto bytes=verified_blob(path);');end=s.index('\n }\n Result execute',start);s=s[:start]+'  provider=acquire(verified_blob(path));'+s[end:]
+s=s.replace('  require(!failed&&!vertices.empty()', '  std::lock_guard<std::mutex> lock(provider->mutex);auto &inference=provider->inference;const auto &device=provider->device;\n  require(!provider->failed&&!vertices.empty()').replace('));failed=true;', '));provider->failed=true;').replace('  failed=false;return result;','  provider->failed=false;return result;')
+p.write_text(s)
+p=d/'CMakeLists.txt';s=p.read_text().replace('ptl_program_triangle_draw.cpp)','ptl_program_triangle_draw.cpp ptl_long_triangle_draw.cpp)');p.write_text(s)
+p=d/'indexed_pipeline.hpp';s=p.read_text().replace('#include "ptl_texture_shader.hpp"','#include "ptl_texture_shader.hpp"\n#include "ptl_long_shader.hpp"\n#include "ptl_long_triangle_draw.hpp"')
+start=s.index('    struct PtlTextureEntry {');end=s.index('    static shader::Program precision_program',start)
+block=s[start:end].replace('PtlTextureEntry','PtlLongEntry').replace('PtlTriangleTextureDrawExecutor','PtlLongTriangleDrawExecutor').replace('ptl_textures','ptl_longs')
+s=s[:end]+ '    bool ptl_long_enabled=false;\n'+block+s[end:]
+needle='    Pipeline(){';s=s.replace(needle,needle+'''
+        wchar_t *long_shader=nullptr;size_t long_length=0;
+        if(_wdupenv_s(&long_shader,&long_length,L"NR_RENDER_PTL_LONG_BLOB"))throw std::runtime_error("cannot read long shader provider setting");
+        const std::unique_ptr<wchar_t,decltype(&std::free)> long_owner(long_shader,&std::free);
+        if(long_shader&&*long_shader){require(std::filesystem::path(long_shader).is_absolute());ptl_long_enabled=true;}
+''')
+start=s.index('            if(ptl_texture_enabled&&ptl_geometry_enabled');end=s.index('            if(ptl_texture_enabled&&shader::PtlTextureShader',start)
+block=s[start:end].replace('ptl_texture_enabled','ptl_long_enabled').replace('PtlTextureShader','PtlLongShader').replace('PtlTriangleTextureDrawExecutor','PtlLongTriangleDrawExecutor').replace('ptl_textures','ptl_longs').replace('ptl_texture_draw','ptl_long_draw').replace('ptl_texture_capacity_declined','ptl_long_capacity_declined')
+block=block.replace('ptl_longs.size()<8','ptl_longs.size()<16').replace('\\"precision_correction_retained\\":true','\\"shader_exactly_pinned\\":true')
+block=block.replace('\\"coverage_compacted\\":true,','\\"sequence\\":%u,\\"coverage_compacted\\":true,').replace('static_cast<unsigned long long>(result.provider_requests));std::fflush(stdout);return result;', 'static_cast<unsigned long long>(result.provider_requests),h.sequence);std::fflush(stdout);return result;')
+s=s[:start]+block+s[start:];p.write_text(s)
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};(r/'ptl-native-worker-v9-source.json').write_text(json.dumps(manifest,indent=2)+'\n')
+assert not any('reference_triangle' in name or 'long_shader_reference' in name for name in manifest)
+with tarfile.open(r/'ptl-native-worker-v9.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+(r/'build-ptl-native-worker-v9.ps1').write_text((r/'build-ptl-native-worker-v8.ps1').read_text().replace('ptl-native-worker-v8','ptl-native-worker-v9').replace('native-routing-v45 with general four-tap, solid and texture candidates with pinned precision correction','native-routing-v45 with qualified reusable program and long shader NPU paths'))
+print(json.dumps(dict(files=len(manifest),cpu_test_reference_in_runtime=False)))

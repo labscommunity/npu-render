@@ -15,8 +15,8 @@ stopped the last desktop run](docs/validation/2026-10-16/native-long-shader-v1/R
 passes 120 device fixtures and complete image comparisons against two independent
 references, including the failed request and all six earlier captures. The
 previous [live desktop trial still fails](docs/validation/2026-10-16/native-program-live-v1/README.md)
-after 44 submitted frames. Full worker and live integration of the fix are separate
-gates. Responsive sustained operation and a Tahoma benefit remain unqualified.
+after 44 submitted frames. [The integrated worker passes all 972 requests and registered D3D11](docs/validation/2026-10-16/native-long-shader-worker-v1/README.md);
+its new live desktop trial remains a separate gate. Responsive sustained operation and a Tahoma benefit remain unqualified.
 [Automatic admission of non-admin interactive clients](docs/validation/2026-10-16/native-interactive-admission-v1/README.md)
 passes component checks; real interactive graphics integration remains open.
 See the [current acceptance plan](docs/research/desktop-offload-plan.md).
