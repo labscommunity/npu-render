@@ -1,0 +1,45 @@
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path(__file__).parent;name='ptl-program-compact-integration-v1';d=r/name;shutil.copytree(r/'ptl-program-point-integration-v1',d)
+for name in ['ptl_program.hpp','ptl_program_triangle_draw.cpp','ptl_program_triangle_draw.hpp']:
+ shutil.copyfile(r/'ptl-native-worker-v16'/name,d/name)
+for name in ['ptl_program.hpp','ptl_program_triangle_draw.cpp','ptl_program_triangle_draw.hpp']:
+ s=(r/'ptl-native-worker-v15'/name).read_text().replace('PtlProgramTriangleDrawExecutor','PtlProgramTriangleDrawExecutorPrevious').replace('PtlProgramRaster','PtlProgramRasterPrevious').replace('ptl_program_triangle_draw.hpp','ptl_program_triangle_draw_previous.hpp').replace('ptl_program.hpp','ptl_program_previous.hpp').replace('NR_RENDER_PTL_PROGRAM_BLOB','NR_RENDER_PTL_PROGRAM_PREVIOUS_BLOB').replace('ptl_program_provider_created','ptl_program_previous_provider_created')
+ target=name.replace('ptl_program_triangle_draw','ptl_program_triangle_draw_previous') if 'triangle_draw' in name else 'ptl_program_previous.hpp';(d/target).write_text(s)
+p=d/'compare.cpp';s=p.read_text().replace('#include "ptl_program_triangle_draw.hpp"','#include "ptl_program_triangle_draw.hpp"\n#include "ptl_program_triangle_draw_previous.hpp"')
+s=s.replace('unsigned batch=12288;','unsigned batch=PtlProgramRaster::maximum_batch(r.pixel,r.samplers,capacity),previous_batch=12288;')
+needle='while(batch>384&&area<=batch/2)batch/=2;';s=s.replace(needle,needle+'while(previous_batch>384&&area<=previous_batch/2)previous_batch/=2;')
+s=s.replace('ex::Pipeline baseline;', 'PtlProgramTriangleDrawExecutorPrevious baseline(r.vertex,r.pixel,capacity,r.header.width,r.header.height,r.header.format,r.resources,r.samplers,"NPU",ex::blend_mode(r.header),uint8_t((r.header.flags>>8)&15),static_cast<CullMode>((r.header.flags>>5)&3),(r.header.flags&128)!=0,previous_batch);')
+s=s.replace('ordinary=baseline.execute(r);','ordinary=baseline.execute(r.inputs,r.vertex_constants,r.pixel_constants,r.viewport,r.resources,r.background,r.scissor,r.blend_constant);')
+p.write_text(s)
+for p in d.iterdir():
+ if p.suffix in ('.txt','.cpp'):
+  s=p.read_text().replace('nr_ptl_program_point_compare','nr_ptl_program_compact_compare')
+  if p.name=='CMakeLists.txt':s=s.replace('compare.cpp ptl_program_triangle_draw.cpp reference_triangle.cpp','compare.cpp ptl_program_triangle_draw.cpp ptl_program_triangle_draw_previous.cpp reference_triangle.cpp')
+  p.write_text(s)
+name=d.name;manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};(r/(name+'-source.json')).write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/(name+'.tar.gz'),'w:gz') as t:t.add(d,arcname=d.name)
+(r/('build-'+name+'.ps1')).write_text((r/'build-ptl-program-point-integration-v1.ps1').read_text().replace('ptl-program-point-integration-v1',name).replace('nr_ptl_program_point_compare','nr_ptl_program_compact_compare'))
+s=(r/'run-ptl-program-point-compare-v1.py').read_text().replace('ptl-program-point-comparison-v1','ptl-program-compact-comparison-v1').replace('ptl-program-point-integration-v1',name).replace('nr_ptl_program_point_compare','nr_ptl_program_compact_compare').replace('ptl-six-span-program-point-v1','ptl-six-span-program-compact-v1').replace('0902c8addc03d08e008582394060e80978ed34082bb82b2687fcdff381eef216','92e04a6734dc6e70ffed15b67fddba02892c66168aa0d47a6cf4bcc65a6a585d')
+s=s.replace("args=parser.parse_args();", "parser.add_argument('--executable-sha256',required=True);args=parser.parse_args();")
+s=s.replace("assert sha(exe)=='b12d41a7509969ca221d7075337166d5bec83109887c2d1a03c9f2c04f56462e'", "assert sha(exe)==args.executable_sha256")
+a=s.index(' admission=obj(');b=s.index(" if args.stage=='selected':",a)
+s=s[:a]+''' assert obj(vm/'ptl-worker-v16-qualification/report.json')['passed']
+ metadata={x['ticket']:x for x in obj(vm/'ptl-worker-cost-analysis-v2/draws.json')}
+ previous=rows(vm/'ptl-native-worker-v15-full/replay/replays.jsonl');expected={x['ticket']:x for x in previous};assert len(previous)==972
+ tickets=[];current=None
+ for x in rows(vm/'ptl-native-worker-v15-full/replay/provider-processes/generation-1/worker.stdout.jsonl'):
+  if x.get('kind')=='request_identity':current=x
+  if x.get('ptl_program_draw') and x.get('accepted'):
+   assert current is not None;tickets.append(previous[current['dispatch_ticket']]['ticket'])
+ assert len(tickets)==len(set(tickets))==463
+ cases=[]
+ for ticket in sorted(tickets):
+  packet=vm/f'native-desktop-admission-v33/bootstrap/requests/request-{ticket:08d}.bin'
+  cases.append(dict(ticket=ticket,pixel_shader_sha256=metadata[ticket]['pixel_shader_sha256'],original_request_sha256=metadata[ticket]['original_request_sha256']))
+'''+s[b:]
+s=s.replace("NR_RENDER_PTL_PROGRAM_BLOB=str(model))", "NR_RENDER_PTL_PROGRAM_BLOB=str(model),NR_RENDER_PTL_PROGRAM_PREVIOUS_BLOB=str(vm/'ptl-six-span-program-point-v1/patched.blob'))")
+s=s.replace("expected={x['ticket']:x for x in rows(vm/'ptl-native-worker-v9-full/replay/replays.jsonl')}", "expected={x['ticket']:x for x in rows(vm/'ptl-native-worker-v15-full/replay/replays.jsonl')}")
+s=s.replace("  result['passed'] &= result['shared_program_imports']==1", "  result['previous_program_imports']=sum(bool(x.get('ptl_program_previous_provider_created')) for x in events)\n  result['passed'] &= result['shared_program_imports']==result['previous_program_imports']==1")
+(r/'run-ptl-program-compact-compare-v1.py').write_text(s)
+print(json.dumps({'prepared':name,'files':len(manifest),'old_and_new_npu_comparison':True,'independent_cpu_reference':True}))

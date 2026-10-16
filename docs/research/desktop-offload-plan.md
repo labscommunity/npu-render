@@ -22,6 +22,11 @@ places 4,313.479 of 4,626.834 ms in NPU request waits, motivating a smaller payl
 and larger batches. The [integrated worker](../validation/2026-10-16/native-compact-program-worker-v1/README.md)
 preserves all 972 recorded outputs. Paired complete-image timing remains a
 separate gate; capacity alone is not evidence of a desktop improvement.
+The [first selected image comparison is rejected](../validation/2026-10-16/native-compact-program-comparison-rejected-v1/README.md):
+the candidate preserves every observed preceding NPU output, but three cases
+disagree with the additional CPU shader reference and some small draws regress.
+No desktop admission follows. The next candidate removes synthetic padding;
+reference disagreements remain explicit and require separate attribution.
 
 Earlier milestones retain their original qualification scope. Worker v9 passes all 972 retained
 requests and registered D3D11. Its [finite live v44 trial](../validation/2026-10-16/native-long-shader-live-v1/README.md)

@@ -1,0 +1,7 @@
+from pathlib import Path
+import shutil,json,hashlib,tarfile
+r=Path(__file__).parent;name='ptl-program-compact-integration-v2';d=r/name;shutil.copytree(r/'ptl-program-compact-integration-v1',d);shutil.copyfile(r/'ptl-native-worker-v17/ptl_program_triangle_draw.cpp',d/'ptl_program_triangle_draw.cpp')
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};before=json.loads((r/'ptl-program-compact-integration-v1-source.json').read_text());assert [k for k in before if before[k]!=manifest[k]]==['ptl_program_triangle_draw.cpp'];(r/(name+'-source.json')).write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/(name+'.tar.gz'),'w:gz') as t:t.add(d,arcname=name)
+for old,new in [('build-ptl-program-compact-integration-v1.ps1','build-ptl-program-compact-integration-v2.ps1'),('run-ptl-program-compact-compare-v1.py','run-ptl-program-compact-compare-v2.py'),('run-ptl-program-compact-comparison-v1-qualification.ps1','run-ptl-program-compact-comparison-v2-qualification.ps1')]:
+ s=(r/old).read_text().replace('ptl-program-compact-integration-v1',name).replace('ptl-worker-v16-qualification','ptl-worker-v17-qualification').replace('ptl-program-compact-comparison-v1','ptl-program-compact-comparison-v2').replace('run-ptl-program-compact-compare-v1.py','run-ptl-program-compact-compare-v2.py');(r/new).write_text(s)

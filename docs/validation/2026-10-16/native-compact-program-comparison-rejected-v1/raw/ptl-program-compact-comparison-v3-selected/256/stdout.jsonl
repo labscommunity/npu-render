@@ -1,0 +1,15 @@
+{"shared_provider_core_experiment":true,"single_core_for_npu_compilation":true,"hardware_context_count_measured":false}
+{"kind":"private_shared_queue_experiment","enabled":true,"property_readback_verified":true,"hardware_queue_count_measured":false}
+{"ptl_program_provider_created":true,"single_import_shared":true}
+{"ptl_program_previous_provider_created":true,"single_import_shared":true}
+{"kind":"admission","passed":true,"negative_checks":9,"bounded_program":true,"instructions":2,"samples":1}
+{"kind":"setup","candidate_setup_ms":251.905800,"batch":4063,"desktop_changed":false}
+{"kind":"pair","iteration":0,"order":"baseline-first","baseline_full_ms":85.979200,"candidate_full_ms":50.655500,"candidate_shader_and_projection_ms":5.195700,"candidate_merger_ms":38.476900,"baseline_calls":32,"candidate_calls":32,"components":20736000,"different_components":0,"maximum_byte_error":0,"exact":true}
+{"kind":"reference_check","iteration":0,"reference":"independent FP32 shader with original NPU geometry and merger","cpu_test_reference_only":true,"candidate_rendering_device":"NPU","different_components":0,"exact":true}
+{"kind":"pair","iteration":1,"order":"custom-first","baseline_full_ms":54.462100,"candidate_full_ms":36.584000,"candidate_shader_and_projection_ms":1.441400,"candidate_merger_ms":31.359200,"baseline_calls":32,"candidate_calls":32,"components":20736000,"different_components":0,"maximum_byte_error":0,"exact":true}
+{"kind":"reference_check","iteration":1,"reference":"independent FP32 shader with original NPU geometry and merger","cpu_test_reference_only":true,"candidate_rendering_device":"NPU","different_components":0,"exact":true}
+{"kind":"pair","iteration":2,"order":"baseline-first","baseline_full_ms":49.740500,"candidate_full_ms":36.166800,"candidate_shader_and_projection_ms":1.292000,"candidate_merger_ms":27.919700,"baseline_calls":32,"candidate_calls":32,"components":20736000,"different_components":0,"maximum_byte_error":0,"exact":true}
+{"kind":"reference_check","iteration":2,"reference":"independent FP32 shader with original NPU geometry and merger","cpu_test_reference_only":true,"candidate_rendering_device":"NPU","different_components":0,"exact":true}
+{"kind":"pair","iteration":3,"order":"custom-first","baseline_full_ms":48.926100,"candidate_full_ms":37.682100,"candidate_shader_and_projection_ms":1.390300,"candidate_merger_ms":28.840500,"baseline_calls":32,"candidate_calls":32,"components":20736000,"different_components":0,"maximum_byte_error":0,"exact":true}
+{"kind":"reference_check","iteration":3,"reference":"independent FP32 shader with original NPU geometry and merger","cpu_test_reference_only":true,"candidate_rendering_device":"NPU","different_components":0,"exact":true}
+{"kind":"complete","passed":true,"desktop_tested":false,"tahoma_tested":false}

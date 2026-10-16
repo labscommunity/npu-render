@@ -1,0 +1,8 @@
+{"shared_provider_core_experiment":true,"single_core_for_npu_compilation":true,"hardware_context_count_measured":false}
+{"kind":"private_shared_queue_experiment","enabled":true,"property_readback_verified":true,"hardware_queue_count_measured":false}
+{"ptl_program_provider_created":true,"single_import_shared":true}
+{"ptl_program_previous_provider_created":true,"single_import_shared":true}
+{"kind":"admission","passed":true,"negative_checks":9,"bounded_program":true,"instructions":4,"samples":2}
+{"kind":"setup","candidate_setup_ms":256.843200,"batch":21672,"desktop_changed":false}
+{"kind":"pair","iteration":0,"order":"baseline-first","baseline_full_ms":515.480400,"candidate_full_ms":552.590900,"candidate_shader_and_projection_ms":6.612000,"candidate_merger_ms":533.336100,"baseline_calls":87,"candidate_calls":63,"components":20736000,"different_components":0,"maximum_byte_error":0,"exact":true}
+{"kind":"reference_check","iteration":0,"reference":"independent FP32 shader with original NPU geometry and merger","cpu_test_reference_only":true,"candidate_rendering_device":"NPU","different_components":44,"exact":false}

@@ -1,0 +1,37 @@
+from pathlib import Path
+import re,ast,hashlib,json
+r=Path(__file__).parent
+changes={'native-registration-v40':'native-registration-v41','native-registration-v39':'native-registration-v40','native-registered-v40':'native-registered-v41','NativeRecovery-v40':'NativeRecovery-v41','ptl-native-worker-v15-full':'ptl-native-worker-v17-v2-full','ptl-native-worker-v15':'ptl-native-worker-v17','native_shared_app_v7':'native_shared_app_v8','native_desktop_bootstrap_v35':'native_desktop_bootstrap_v36','native-desktop-v61':'native-desktop-v62','native-desktop-admission-v61':'native-desktop-admission-v62','native-desktop-admission-v60':'native-desktop-admission-v61','NativeDesktopRecovery-v61':'NativeDesktopRecovery-v62','native-live-v51':'native-live-v52','NativeLiveV51':'NativeLiveV52','native-topology-primary-v37':'native-topology-primary-v38','native-topology-v86':'native-topology-v90','native-topology-v87':'native-topology-v91','native-topology-v89':'native-topology-v92','InspectTopology-V86':'InspectTopology-V90','InspectTopology-V87':'InspectTopology-V91','InspectTopology-V89':'InspectTopology-V92','observer89':'observer92','dismiss-native-saver-v25':'dismiss-native-saver-v26','dismiss-v25':'dismiss-v26','ptl-native-live-v15':'ptl-native-live-v16','native-latency-v13-analysis':'native-latency-v14-analysis','native-presentation-v9-analysis':'native-presentation-v10-analysis','ptl-combined-desktop-v3':'ptl-combined-desktop-v4','analyze-native-latency-v11.py':'analyze-native-latency-v12.py','analyze-native-presentation-v9.py':'analyze-native-presentation-v10.py','ptl-worker-v15-qualification-v2':'ptl-worker-v17-qualification-v2','ptl-six-span-program-point-v1':'ptl-six-span-program-compact-v1','0902c8addc03d08e008582394060e80978ed34082bb82b2687fcdff381eef216':'92e04a6734dc6e70ffed15b67fddba02892c66168aa0d47a6cf4bcc65a6a585d','f055699f18c06d4ee437859741c453ba6bbfe5e17646b67646e52db84503dc9a':'b275962727eadefa5d1444dace22673b1832e598c8ae74421d0a6d189993b000','all_prior_worker_v14_outputs_preserved':'all_prior_worker_v15_outputs_preserved'}
+pat=re.compile('|'.join(re.escape(x) for x in sorted(changes,key=len,reverse=True)))
+def rename(s):return pat.sub(lambda m:changes[m[0]],s)
+files=[x for x in json.loads((r/'ptl-combined-live-v3-upload.json').read_text()) if not x.endswith('-source.json')]
+for f in files:
+ s=rename((r/f).read_text())
+ if f=='run-ptl-combined-desktop-v3.ps1':
+  needle=" if(@(Get-Process nr_registered*,nr_native*,nr_ptl*,nr_frame_present_probe -ErrorAction SilentlyContinue).Count){throw 'Another graphics experiment active'}"
+  extra=''' $report.active_phase='waiting-for-paired-program-comparison';Save-Report
+ $deadline=[DateTime]::UtcNow.AddMinutes(40)
+ while($true){$q=Get-Content "$vm\\ptl-program-compact-comparison-v3-qualification\\report.json" -Raw|ConvertFrom-Json;if($q.completed){break};if([DateTime]::UtcNow -gt $deadline){throw 'Paired comparison deadline'};Start-Sleep -Seconds 2}
+ if(!$q.passed){throw 'Paired program comparison incomplete'}
+ $pairs=Get-Content "$vm\\ptl-program-compact-comparison-v3-full\\report.json" -Raw|ConvertFrom-Json
+ if(!$pairs.passed -or @($pairs.cases).Count -ne 463 -or @($pairs.cases|Where-Object {!$_.passed}).Count){throw 'Complete image qualification missing'}
+ $warm=@($pairs.cases|ForEach-Object {$_.pairs|Where-Object iteration -gt 0})
+ if($warm.Count -ne 1389 -or @($warm|Where-Object {!$_.exact}).Count){throw 'Warm paired evidence incomplete'}
+ $old=($warm|Measure-Object baseline_full_ms -Sum).Sum;$new=($warm|Measure-Object candidate_full_ms -Sum).Sum
+ $report.warm_program_previous_ms=$old;$report.warm_program_compact_ms=$new
+ if($new -ge .95*$old){throw 'Compact batches lack five percent paired improvement'}
+'''
+  assert needle in s;s=s.replace(needle,extra+needle)
+  # Preserve Python stderr even when analysis fails; do not let native stderr
+  # turn the first traceback line into the entire PowerShell exception.
+  for tag,script,output in [('analysis','analyze-native-latency-v12.py','native-latency-v14-analysis'),('presentation','analyze-native-presentation-v10.py','native-presentation-v10-analysis')]:
+   lines=s.splitlines();matches=[line for line in lines if line.startswith(' & "$r\\toolchains') and script in line];assert len(matches)==1
+   replacement=''' $analysis=Start-Process "$r\\toolchains\\openvino-2026.4.1\\Scripts\\python.exe" -ArgumentList @(('"'+$vm+'\\SCRIPT"'),'--root',('"'+$vm+'"'),'--output',('"'+$vm+'\\OUTPUT"')) -Wait -PassThru -NoNewWindow -RedirectStandardOutput "$out\\TAG.stdout.log" -RedirectStandardError "$out\\TAG.stderr.log"
+ try{if($analysis.ExitCode){throw 'TAG failed; full stderr retained'}}finally{$analysis.Dispose()}'''.replace('SCRIPT',script).replace('OUTPUT',output).replace('TAG',tag)
+   s=s.replace(matches[0],replacement)
+ if f.endswith('.py'):ast.parse(s)
+ path=r/rename(f);assert not path.exists();path.write_text(s)
+for old in ('native-registration-v40-source.json','native-desktop-v61-source.json'):
+ names=[rename(f) for f in json.loads((r/old).read_text())];(r/rename(old)).write_text(json.dumps({f:hashlib.sha256((r/f).read_bytes()).hexdigest() for f in names},indent=2)+'\n')
+(r/'ptl-combined-live-v4-upload.json').write_text(json.dumps([rename(f) for f in files]+['native-registration-v41-source.json','native-desktop-v62-source.json'],indent=2)+'\n')
+print(json.dumps({'prepared':True,'worker':'v17','kernel':'compact-v1','requires_paired_full_comparison':True,'driver_package_unchanged':True}))
