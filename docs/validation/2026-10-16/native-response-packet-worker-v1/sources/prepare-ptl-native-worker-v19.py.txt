@@ -1,0 +1,38 @@
+from pathlib import Path
+import shutil,json,hashlib,tarfile
+r=Path(__file__).parent;name='ptl-native-worker-v19';d=r/name;shutil.copytree(r/'ptl-native-worker-v18',d)
+qualified=r/'native-routing-v45/native/windows/registered_lab'
+shutil.copyfile(r/'native-response-envelope-v1/response_envelope_v1.hpp',d/'response_envelope_v1.hpp')
+s=(qualified/'local_indexed_client.hpp').read_text().replace('LocalIndexedClient','LocalIndexedValidatedClient').replace('#include "indexed_pipe.hpp"','#include "indexed_pipe.hpp"\n#include "response_envelope_v1.hpp"').replace('(void)indexed_exchange::decode_response(reply, request);','(void)indexed_exchange::validate_response_envelope(reply, request);')
+(d/'local_indexed_validated_client.hpp').write_text(s)
+s=(qualified/'provider_process.hpp').read_text().replace('ProviderProcess','PacketProviderProcess').replace('LocalIndexedClient','LocalIndexedValidatedClient').replace('local_indexed_client.hpp','local_indexed_validated_client.hpp')
+s=s.replace('public:\n    PacketProviderProcess(){','public:\n    struct PacketResult {raster::UniformDrawExecutor::Result metadata;std::vector<uint8_t> packet;};\n    PacketProviderProcess(){')
+s=s.replace('raster::UniformDrawExecutor::Result execute(', 'PacketResult execute_packet(')
+old='''auto reply=client.exchange(forwarded,cancel);auto result=indexed_exchange::decode_response(reply,header);
+                require(result.execution_device=="NPU (remote lab indexed)","provider response device rejected");
+                result.execution_device="NPU";result.timings.total_ms=double(GetTickCount64()-began);'''
+new='''auto reply=client.exchange(forwarded,cancel);const auto receipt=indexed_exchange::validate_response_envelope(reply,header);
+                auto delivered=indexed_exchange::Reader(reply).value<indexed_exchange::Header>();delivered.client_pid=original.client_pid;std::memcpy(reply.data(),&delivered,sizeof(delivered));
+                (void)indexed_exchange::validate_response_envelope(reply,original);
+                PacketResult result;auto &metadata=result.metadata;metadata.execution_device="NPU";metadata.timings.total_ms=double(GetTickCount64()-began);
+                metadata.input_bytes=receipt.input_bytes;metadata.output_bytes=receipt.output_bytes;metadata.provider_requests=receipt.provider_requests;metadata.covered_samples=receipt.covered_samples;metadata.tile_executions=receipt.tile_executions;metadata.used_rectangle=receipt.used_rectangle!=0;result.packet=std::move(reply);'''
+assert old in s;s=s.replace(old,new);(d/'packet_provider_process.hpp').write_text(s)
+p=d/'local_indexed_worker.cpp';s=p.read_text().replace('#include "provider_process.hpp"','#include "packet_provider_process.hpp"').replace('nr::registered_lab::ProviderProcess provider;','nr::registered_lab::PacketProviderProcess provider;')
+old='if(provider.enabled())return provider.execute(bytes,h,request_deadline,stop_event.value);'
+new='if(provider.enabled()){auto transported=provider.execute_packet(bytes,h,request_deadline,stop_event.value);provider_packet=std::move(transported.packet);return std::move(transported.metadata);}'
+assert old in s;s=s.replace(old,new);needle='                        const auto rendered=[&]';assert needle in s;s=s.replace(needle,'                        std::vector<uint8_t> provider_packet;\n'+needle)
+s=s.replace('const auto result=ex::response(h,rendered);', 'const auto result=provider.enabled()?std::move(provider_packet):ex::response(h,rendered);');p.write_text(s)
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};before=json.loads((r/'ptl-native-worker-v18-source.json').read_text());assert [k for k in before if before[k]!=manifest[k]]==['local_indexed_worker.cpp'];assert set(manifest)-set(before)=={'response_envelope_v1.hpp','local_indexed_validated_client.hpp','packet_provider_process.hpp'}
+(r/(name+'-source.json')).write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/(name+'.tar.gz'),'w:gz') as t:t.add(d,arcname=name)
+(r/('build-'+name+'.ps1')).write_text((r/'build-ptl-native-worker-v18.ps1').read_text().replace('ptl-native-worker-v18',name))
+s=(r/'qualify-ptl-native-worker-v18.py').read_text().replace('ptl-native-worker-v18',name);s=s.replace("try:\n", "try:\n assert obj(vm/'native-response-envelope-v1-qualification/report.json')['passed']\n",1)
+needle=" report['passed']=True";extra=""" if a.stage=='full':
+  previous=rows(vm/'ptl-native-worker-v18-full/replay/replays.jsonl');assert len(previous)==972
+  assert all(old['ticket']==new['ticket'] and old['pixels_sha256']==new['pixels_sha256'] and old['pixel_bytes']==new['pixel_bytes'] for old,new in zip(previous,current,strict=True))
+  report['all_prior_worker_v18_outputs_preserved']=True
+""";assert needle in s;s=s.replace(needle,extra+needle);(r/('qualify-'+name+'.py')).write_text(s)
+s=(r/'run-ptl-worker-v18-qualification.ps1').read_text().replace('ptl-worker-v18-qualification','ptl-worker-v19-qualification').replace('ptl-native-worker-v18',name).replace('ptl-program-compact-v1-qualification','native-response-envelope-v1-qualification')
+needle=' $q=Get-Content "$vm\\native-desktop-admission-v61\\report.json" -Raw|ConvertFrom-Json;';replacement=' $desktop=if(Test-Path "$vm\\native-desktop-admission-v63\\report.json"){\'native-desktop-admission-v63\'}else{\'native-desktop-admission-v61\'}\n $q=Get-Content "$vm\\$desktop\\report.json" -Raw|ConvertFrom-Json;';assert needle in s;s=s.replace(needle,replacement)
+(r/'run-ptl-worker-v19-qualification.ps1').write_text(s)
+print(json.dumps({'prepared':name,'files':len(manifest),'rendering_kernels_unchanged':True,'response_payload_moved_without_reencoding':True,'requires_cpu_validation_equivalence':True}))
