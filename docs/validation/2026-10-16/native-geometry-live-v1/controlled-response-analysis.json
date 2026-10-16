@@ -1,0 +1,23 @@
+{
+  "passed": true,
+  "derived_from_preserved_raw": true,
+  "qpc_frequency": 10000000,
+  "controlled_observations": [
+    {
+      "event": "mouse_received",
+      "color": "green",
+      "event_qpc": 3802428124617,
+      "observation_qpc": 3802486034533,
+      "seconds_to_first_observed_color": 5.7909916
+    },
+    {
+      "event": "key_received",
+      "color": "red",
+      "event_qpc": 3802497993916,
+      "observation_qpc": 3802500352055,
+      "seconds_to_first_observed_color": 0.2358139
+    }
+  ],
+  "continuous_latency_distribution": false,
+  "limitation": "First known-color physical-output duplication sample after receipt; includes observation cadence. Two controlled events, not p95 latency or panel photon timing. Separately staged trials are not a matched performance comparison."
+}
