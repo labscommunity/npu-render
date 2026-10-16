@@ -2,16 +2,18 @@
 
 Updated 2026-10-16. Target: Delta, Windows 11, Panther Lake. The repository stays
 private. **Full desktop offload is unfinished.** The latest
-[combined-worker live v50 trial](../validation/2026-10-16/native-rectangle-worker-live-v1/README.md)
-passes 1,214 acknowledged NPU operations, 56 exact physical submissions, a shared
-default-adapter application and restoration. Mouse readback completes in 2,488.121 ms
-and keyboard readback in 175.981 ms. The new routes execute 25 complex-shader draws
-and 149 rectangles, including 57 direct kernels. No provider fault or retry occurs.
+[integer-worker live v51 trial](../validation/2026-10-16/native-integer-rectangle-live-v1/README.md)
+passes 1,163 acknowledged NPU operations, 56 exact physical submissions, a shared
+default-adapter application and restoration. Mouse readback completes in 2,544.636 ms
+and keyboard readback in 125.073 ms. The new routes execute 26 complex-shader draws
+and 147 rectangles, including 59 direct kernels. No provider fault or retry occurs.
 These two events do not establish matched improvement, p95, GPU relief or Tahoma
-benefit. The first analysis incorrectly joined asynchronous display statistics
-to the latest submitted-source label; a counter-based join passes twelve local
-cases and the retained live evidence. Both the initial failure and correction are
-preserved. Responsiveness remains the immediate gate, followed by sustained use,
+benefit. The preceding v50 trial exposed an incorrect join of asynchronous display
+statistics to the latest submitted-source label. The corrected counter-based join
+passes twelve local cases and both trials. Its initial failure remains preserved.
+The current mouse event still includes 1,685.570 ms in child rendering intervals
+and 770.841 ms outside them before publication. Responsiveness remains the
+immediate gate, followed by sustained use,
 application coverage and matched Tahoma performance.
 
 Earlier milestones retain their original qualification scope. Worker v9 passes all 972 retained
@@ -84,12 +86,14 @@ targets the measured color-request cost. It preserves all 233 device fixtures,
 all 16,777,216 exhaustive source/background/alpha combinations, and 148 complete
 images. An alternating-order comparison against the preceding rectangle kernel
 reduces summed warm time from 5.864 to 4.517 seconds across 111 pairs. The candidate
-still requires full worker and desktop integration; this is not a Tahoma result.
+now passes the worker and finite desktop gates below; this is not a Tahoma result.
 
 The [integer worker v15](../validation/2026-10-16/native-integer-rectangle-worker-v1/README.md)
 now passes 106 selected requests and all 972 retained requests. Every v14 output
 is preserved, with no new profile exception, one rectangle import and no provider
-failure. Live desktop responsiveness remains a separate qualification.
+failure. Its live v51 trial passes rendering and restoration but leaves desktop
+responsiveness inadequate. The paired component gain does not establish a
+whole-desktop improvement.
 
 The [long-shader component](../validation/2026-10-16/native-long-shader-v1/README.md)
 passes 120 independent NPU fixtures and exact complete-image comparisons for

@@ -1,0 +1,8 @@
+from pathlib import Path
+import json,re
+r=Path('results/render-driver');target='native-integer-rectangle-live-v1';assert not (Path('docs/validation/2026-10-16')/target).exists()
+dirs=['ptl-combined-desktop-v3','native-registration-v40','ptl-native-live-v15','native-live-v51','native-desktop-admission-v61','native-topology-primary-v37','native-topology-v86','native-topology-v87','native-topology-v89','native-saver-dismiss-v25','native-latency-v13-analysis','native-presentation-v9-analysis'];files=json.loads((r/'ptl-combined-live-v3-upload.json').read_text())+['presentation_counter_match_v1.py','observe_native_topology_v8.py'];extras=[x for x in files if x.endswith('.json')];sources=[x for x in files if not x.endswith('.json')]
+s=(r/'collect-native-primary-v71.py').read_text()
+for name,value in [('directories',dirs),('extras',extras),('source_files',sources)]:s=re.sub('^'+name+'=.*$',lambda m:name+'='+repr(value),s,flags=re.M)
+s=s.replace("'ptl-combined-desktop-v2','native-desktop-admission-v60'","'ptl-combined-desktop-v3','native-desktop-admission-v61'").replace("foreach($name in @('ptl-native-worker-v14'))", "foreach($name in @('ptl-native-worker-v15'))").replace('v71','v74');(r/'collect-native-primary-v74.py').write_text(s)
+s=(r/'curate-native-primary-v71.py').read_text().replace('v71','v74').replace('native-rectangle-worker-live-v1',target);a=s.index('for name in [');b=s.index(':\n p=r/name',a);s=s[:a]+'for name in '+repr(['prepare-ptl-combined-live-v3.py','collect-native-primary-v74.py','prepare-native-primary-v74.py'])+s[b:];(r/'curate-native-primary-v74.py').write_text(s)

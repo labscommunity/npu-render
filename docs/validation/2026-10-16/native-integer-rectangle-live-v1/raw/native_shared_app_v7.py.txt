@@ -1,0 +1,76 @@
+"""Finite default-adapter client admitted onto an existing native desktop worker."""
+from native_session_broker_v3 import *
+from native_shared_correlation_v1 import complete_rows,correlate
+from native_token_query_grant_v1 import TokenQueryGrant
+
+class SharedInteractiveApp:
+ def __init__(self,transaction,worker,suffix,session,dll,env,own_process):
+  self.transaction=transaction;self.worker=worker;self.suffix=suffix;self.session=session;self.dll=dll;self.env=env;self.own_process=own_process
+  self.root=Path(os.environ['LOCALAPPDATA'])/'npu-render';self.vm=self.root/'vm';self.out=transaction/'bootstrap/interactive'
+  self.broker=None;self.streams=[];self.grants=[];self.tokens=[];self.started=False;self.checked=False;self.passed=False;self.dwm_after=None
+  self.report=dict(completed=False,passed=False,shared_desktop_worker=True,ordinary_default_adapter=False,full_desktop_offload=False,tahoma_tested=False)
+  assert obj(self.vm/'native-shared-correlation-v1/report.json')['passed']
+  q=obj(self.vm/'native-registration-v40/qualification/report.json');assert q['passed'] and q['automatic_admission'] and q['owned_process_and_token_acls_restored_exactly']
+  assert hashlib.sha256(Path(worker.args[0]).read_bytes()).hexdigest()==q['worker_binary_sha256']
+  assert hashlib.sha256(dll.read_bytes()).hexdigest()==q['dll_sha256']
+  self.binary=self.root/'builds/native-default-app-v2/Release/nr_native_registered_probe.exe'
+  build=obj(self.binary.parent.parent/'registered-build-report.json');assert build['clean_build']
+  assert hashlib.sha256(self.binary.read_bytes()).hexdigest()==build['binary_sha256'][self.binary.name].lower()
+  self.broker_binary=self.root/'builds/native-auto-interactive-v7/Release/nr_auto_interactive_broker.exe'
+  assert hashlib.sha256(self.broker_binary.read_bytes()).hexdigest()=='3d64a9136af00050dd3b8ed7c452f8ccd994cf5307962ebfa74d7f0b4d4bb41c'
+ def save(self):
+  if self.out.exists():
+   temp=self.out/'shared-report.tmp';temp.write_text(json.dumps(self.report,indent=2)+'\n');temp.replace(self.out/'shared-report.json')
+ def grant(self,process,sid):
+  self.grants.append(ProcessGrant(int(process._handle),sid));token=W.HANDLE();require(adv.OpenProcessToken(int(process._handle),8|0x20000|0x40000,C.byref(token)))
+  self.tokens.append(token);self.grants.append(TokenQueryGrant(token,sid))
+ def poll(self,evidence,dwm):
+  if not self.started:
+   if not (self.transaction/'interactive-admission-start').exists():return
+   self.started=True;self.begin=time.perf_counter();self.dwm_before=evidence.render_pids[dwm];assert self.dwm_before>0
+   self.out.mkdir(exist_ok=False);self.report.update(started=datetime.now(UTC).isoformat(),dwm_receipts_before=self.dwm_before,worker_pid=self.worker.pid)
+   sid=process_sid(k.GetCurrentProcess())[1];self.grant(self.worker,sid)
+   acl=subprocess.run(['icacls.exe',str(self.out),'/grant','*'+sid+':(OI)(CI)M'],capture_output=True,timeout=10);(self.out/'directory-acl.log').write_bytes(acl.stdout+acl.stderr);assert acl.returncode==0
+   for name in ['broker.stdout.jsonl','broker.stderr.log']:self.streams.append((self.out/name).open('xb'))
+   self.broker=subprocess.Popen([str(self.broker_binary),str(self.worker.pid),self.suffix,str(self.session)],env=self.env,stdin=subprocess.DEVNULL,stdout=self.streams[0],stderr=self.streams[1],creationflags=subprocess.CREATE_NO_WINDOW)
+   self.own_process(int(self.broker._handle),'interactive-broker');self.grant(self.broker,sid)
+   deadline=time.perf_counter()+5
+   while not any(x.get('automatic_broker_ready') for x in rows(self.out/'broker.stdout.jsonl')):assert time.perf_counter()<deadline and self.broker.poll() is None;time.sleep(.01)
+   job=dict(output=str(self.out),binary=str(self.binary),binary_sha256=hashlib.sha256(self.binary.read_bytes()).hexdigest(),dll=str(self.dll),dll_sha256=hashlib.sha256(self.dll.read_bytes()).hexdigest(),session=self.session,worker_pipe=r'\\.\pipe\npu-render-indexed-'+self.suffix)
+   temporary=self.out/'job.tmp';temporary.write_text(json.dumps(job,indent=2)+'\n');temporary.replace(self.out/'job.json');self.save()
+  if self.passed:return
+  assert time.perf_counter()-self.begin<115,'Shared application admission deadline'
+  consumer_path=self.out/'consumer-report.json'
+  if not consumer_path.exists():
+   assert self.broker.poll() is None,'Broker exited before consumer evidence';return
+  consumer=obj(consumer_path);self.report['consumer']=consumer;self.save();assert consumer['completed'] and consumer['passed'] and not consumer['elevated'] and consumer['session']==self.session
+  if self.broker.poll() is None:return
+  assert self.broker.returncode==0
+  if not self.checked:
+   pid=consumer['consumer_pid'];component=consumer['component'];assert component['ordinary_default_adapter'] and not component['configure_export_used']
+   broker=rows(self.out/'broker.stdout.jsonl');admitted=[x for x in broker if x.get('automatic_consumer_admitted')];received=[x for x in broker if x.get('automatic_request_received')];closed=[x for x in broker if x.get('automatic_broker_completed')]
+   assert len(admitted)==len(received)==len(closed)==1
+   assert admitted[0]['client_pid']==pid and admitted[0]['session']==self.session and admitted[0]['worker_pid']==self.worker.pid and admitted[0]['actual_pipe_client_verified']
+   assert received[0]['actual_client_pid']==pid and received[0]['actual_session']==self.session and all(received[0][n] for n in ['creation_matches','sid_matches','signature_matches','nonce_matches'])
+   assert closed[0]['passed'] and closed[0]['owned_mappings_removed']
+   parent=complete_rows(self.transaction/'bootstrap/worker.stdout.jsonl');identities=[x for x in parent if x.get('kind')=='request_identity' and x['client_pid']==pid]
+   receipts=[x for x in parent if x.get('passed') and x.get('execution_device')=='NPU' and x['client_pid']==pid];acks=[x for x in parent if x.get('worker_success') and x['client_pid']==pid]
+   children=list((self.transaction/'bootstrap/provider-processes').glob('generation-*/worker.stdout.jsonl'));assert len(children)==1
+   child=complete_rows(children[0]);assert len(identities)==len(receipts)==len(acks)==8
+   assert {(x['client_pid'],x['sequence']) for x in identities}=={(x['client_pid'],x['sequence']) for x in receipts}=={(x['client_pid'],x['sequence']) for x in acks}
+   self.report['correlation']=correlate(parent,child,pid,self.worker.pid)
+   self.dwm_after=evidence.render_pids[dwm];self.checked=True
+   self.report.update(consumer_pid=pid,broker_pid=self.broker.pid,automatic_admission=True,ordinary_default_adapter=True,npu_operation_receipts=8,delivery_acknowledgments=8,correlated_child_receipts=8,broker_cleanup_passed=True,dwm_receipts_at_consumer_completion=self.dwm_after)
+  if evidence.render_pids[dwm]>self.dwm_after:
+   self.passed=True;self.report.update(passed=True,dwm_receipts_after_consumer=evidence.render_pids[dwm],dwm_continued_after_consumer=True);self.save()
+ def close(self):
+  restored=[]
+  for grant in reversed(self.grants):
+   try:grant.restore();restored.append(grant.restored)
+   except Exception as error:restored.append(False);self.report.setdefault('restore_errors',[]).append(repr(error))
+  for token in self.tokens:k.CloseHandle(token)
+  if self.broker is not None and self.broker.poll() is None:self.broker.kill();self.broker.wait(timeout=5)
+  for stream in self.streams:stream.close()
+  self.report.update(completed=True,owned_process_and_token_acls_restored_exactly=bool(self.grants) and all(restored),finished=datetime.now(UTC).isoformat())
+  self.report['passed']=self.passed and self.report['owned_process_and_token_acls_restored_exactly'];self.save()
+  assert self.report['passed'],'Shared default application proof or restoration incomplete'

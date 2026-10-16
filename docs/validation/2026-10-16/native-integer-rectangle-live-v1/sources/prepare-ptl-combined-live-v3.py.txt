@@ -1,0 +1,39 @@
+from pathlib import Path
+import re,ast,hashlib,json,argparse
+p=argparse.ArgumentParser();p.add_argument('--worker-sha256',required=True);a=p.parse_args();assert re.fullmatch('[0-9a-f]{64}',a.worker_sha256)
+r=Path('results/render-driver');header=json.loads((r/'ptl-native-worker-v15-source.json').read_text())['ptl_point_rectangle.hpp']
+changes={'native-registration-v39':'native-registration-v40','native-registered-v39':'native-registered-v40','NativeRecovery-v39':'NativeRecovery-v40','ptl-native-worker-v14':'ptl-native-worker-v15','native_shared_app_v6':'native_shared_app_v7','native_desktop_bootstrap_v34':'native_desktop_bootstrap_v35','native-desktop-v60':'native-desktop-v61','native-desktop-admission-v60':'native-desktop-admission-v61','native-desktop-admission-v58':'native-desktop-admission-v60','NativeDesktopRecovery-v60':'NativeDesktopRecovery-v61','native-live-v50':'native-live-v51','NativeLiveV50':'NativeLiveV51','native-topology-primary-v36':'native-topology-primary-v37','native-topology-v84':'native-topology-v86','native-topology-v85':'native-topology-v89','InspectTopology-V84':'InspectTopology-V86','InspectTopology-V85':'InspectTopology-V89','observer85':'observer89','dismiss-native-saver-v24':'dismiss-native-saver-v25','dismiss-v24':'dismiss-v25','ptl-native-live-v14':'ptl-native-live-v15','native-latency-v12-analysis':'native-latency-v13-analysis','native-presentation-v7-analysis':'native-presentation-v9-analysis','ptl-combined-desktop-v2':'ptl-combined-desktop-v3','analyze-native-latency-v10.py':'analyze-native-latency-v11.py','analyze-native-presentation-v7.py':'analyze-native-presentation-v9.py','ptl-worker-v14-qualification':'ptl-worker-v15-qualification-v2','ptl-six-span-point-rectangle-v1':'ptl-six-span-point-rectangle-v2','b7caa092d2581fec8cec075815ab40057a9f3f5a654b5f0abbe7893c11a74908':'d651d6101dbccc5796873dc2016ec9e23d262cd955e9bc4bee6d56b86756eb2d','c3f1501128673998939248f0663f2f16e7450e10d7e4f1d69aacc47799a04a47':a.worker_sha256,'546e9b74c883f020595356b099955a7c7746394112e2e035268ab935cc7d6e79':header,'all_prior_worker_v13_outputs_preserved':'all_prior_worker_v14_outputs_preserved'}
+pat=re.compile('|'.join(re.escape(x) for x in sorted(changes,key=len,reverse=True)))
+def rename(s):return pat.sub(lambda m:changes[m[0]],s)
+files=[x for x in json.loads((r/'ptl-combined-live-v2-upload.json').read_text()) if not x.endswith('-source.json')]
+for f in files:
+ source='analyze-native-presentation-v8.py' if f=='analyze-native-presentation-v7.py' else f
+ s=rename((r/source).read_text())
+ if f=='dismiss-native-saver-v24.ps1':s=s.replace('native-topology-v89','native-topology-v87')
+ if f=='run-ptl-combined-desktop-v2.ps1':
+  s=s.replace("$vm\\native-registration-v38\\report.json", "$vm\\native-registration-v39\\report.json")
+  needle=" Controller 'start-native-topology-v89.ps1' 'readiness'"
+  extra=""" try{Controller 'start-native-topology-v87.ps1' 'preflight'}catch{
+  $state=Get-Content "$vm\\native-topology-v87\\report.json" -Raw|ConvertFrom-Json
+  if(!$state.completed -or $state.screen_saver_settings.secure -ne $false -or $state.after_screen_saver_close.input_name -ne 'Screen-saver'){throw}
+  Controller 'dismiss-native-saver-v25.ps1' 'nonsecure-saver'
+ }
+"""
+  assert needle in s;s=s.replace(needle,extra+needle)
+  needle=" if(Test-Path \"$vm\\native-topology-v89\"){"
+  # The preflight observer is distinct; preserve its output and remove only its owned task.
+  pos=s.index(needle,s.index('finally{\n'))
+  extra=""" if(Test-Path "$vm\\native-topology-v87"){New-Item -ItemType File "$vm\\native-topology-v87\\stop" -Force|Out-Null}
+ $preflight=Get-ScheduledTask -TaskName T8-NpuRender-InspectTopology-V87 -ErrorAction SilentlyContinue
+ if($preflight){if($preflight.Actions.Arguments -notlike '*native-topology-v87*'){throw 'Preflight task identity differs'};$until=[DateTime]::UtcNow.AddSeconds(15);while((Get-ScheduledTask -TaskName $preflight.TaskName).State -eq 'Running' -and [DateTime]::UtcNow -lt $until){Start-Sleep -Milliseconds 200};Stop-ScheduledTask -TaskName $preflight.TaskName -ErrorAction SilentlyContinue;Unregister-ScheduledTask -TaskName $preflight.TaskName -Confirm:$false}
+"""
+  s=s[:pos]+" Stop-Preflight\n"+s[pos:]
+  s=s.replace("try{\n $deadline", "function Stop-Preflight{\n"+extra+"}\ntry{\n $deadline")
+  s=s.replace(needle if False else " Controller 'start-native-topology-v89.ps1' 'readiness'", " Controller 'start-native-topology-v89.ps1' 'readiness'\n Stop-Preflight")
+ if f.endswith('.py'):ast.parse(s)
+ path=r/rename(f);assert not path.exists();path.write_text(s)
+preflight=(r/'start-native-topology-v85.ps1').read_text().replace('native-topology-v85','native-topology-v87').replace('InspectTopology-V85','InspectTopology-V87');(r/'start-native-topology-v87.ps1').write_text(preflight)
+for old in ('native-registration-v39-source.json','native-desktop-v60-source.json'):
+ names=[rename(f) for f in json.loads((r/old).read_text())];(r/rename(old)).write_text(json.dumps({f:hashlib.sha256((r/f).read_bytes()).hexdigest() for f in names},indent=2)+'\n')
+(r/'ptl-combined-live-v3-upload.json').write_text(json.dumps([rename(f) for f in files]+['native-registration-v40-source.json','native-desktop-v61-source.json','start-native-topology-v87.ps1'],indent=2)+'\n')
+print(json.dumps(dict(prepared=True,worker_sha256=a.worker_sha256,header_sha256=header,driver_package_unchanged=True)))

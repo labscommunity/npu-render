@@ -1,0 +1,211 @@
+{
+  "started": "2026-10-16T22:28:03.267543+00:00",
+  "passed": true,
+  "completed": true,
+  "desktop_offloaded": false,
+  "physical_frame_presented": false,
+  "display_topology_requested": false,
+  "actual_dwm_npu_execution": true,
+  "actual_umdf_npu_execution": false,
+  "controller_pid": 20436,
+  "frame_io_statistics": {
+    "sharing_retries": 3,
+    "sharing_timeouts": 0
+  },
+  "session_gate": {
+    "session_inspection": true,
+    "console_session": 1,
+    "signed_in_and_unlocked": true,
+    "controller_matches_console_user": true,
+    "ready_for_interactive_task": true,
+    "desktop_changed": false
+  },
+  "compositor": {
+    "pid": 16980,
+    "session": 1,
+    "creation_filetime": 134364673055826287,
+    "image_name": "dwm.exe",
+    "sid": "S-1-5-90-0-1"
+  },
+  "indirect_host": {
+    "pid": 11908,
+    "session": 0,
+    "creation_filetime": 134366632835115007,
+    "image_name": "WUDFHost.exe",
+    "sid": "S-1-5-19"
+  },
+  "host_found_after_ms": 154.13179999450222,
+  "provider_isolated": true,
+  "provider_fault_injected": false,
+  "provider_timing_scope": "Child roundtrip includes compilation, transport and any recovery.",
+  "request_recording_enabled": false,
+  "recording_byte_budget": 0,
+  "performance_measurement_valid": false,
+  "affine_batch": "default",
+  "memory_cache": "1",
+  "memory_capacity": "512",
+  "generic_batch": "4096",
+  "uniform_lanes": "0",
+  "texture_scope": "1",
+  "pipeline_cache": "retained",
+  "monitor_seconds": 660,
+  "quad_batch": "1",
+  "ptl_complex_model_sha256": "47f69b5861732a03014b58160116ebbb928fd6e818a11b7f553e423a4cf3c43a",
+  "ptl_rectangle_model_sha256": "d651d6101dbccc5796873dc2016ec9e23d262cd955e9bc4bee6d56b86756eb2d",
+  "ptl_long_model_sha256": "895831be2695bc151454833249996608f38d35880c635900bb731515bc2bcda1",
+  "ptl_program_model_sha256": "0902c8addc03d08e008582394060e80978ed34082bb82b2687fcdff381eef216",
+  "ptl_masked_model_sha256": "81104c9ea8760bbeb7cc028ea2a9c81e8605482af219f57c082c737b9662d1e0",
+  "ptl_geometry_model_sha256": "ea4432abd7b548396b86665c1b318353e0d2f3ec847bcd3e6f56c10bd1336dfa",
+  "ptl_texture_model_sha256": "481765dd51d8d9b051b87db8be7e62ae7931245fe051b33b6457be77816c2e87",
+  "ptl_solid_model_sha256": "21360321c21d4a0253b260ce62420ffef47ec03daae8b89e6cf05bd4c541ee8f",
+  "ptl_four_tap_model_sha256": "710f6e5586da59f4040213435c5ecc13bb669e6b1be668f838edd00bca5dd697",
+  "worker_seconds": 705,
+  "lease_milliseconds": 720000,
+  "incremental_evidence": true,
+  "worker_pid": 10796,
+  "admission_published": true,
+  "admission_publication_ms": 172.6502000237815,
+  "npu_receipts": 1163,
+  "delivery_acknowledgments": 1163,
+  "hardware_child_receipts": 1163,
+  "provider_generations": 1,
+  "provider_faults": 0,
+  "provider_retries": 0,
+  "native_driver_entry": true,
+  "preferred_adapter_selected": true,
+  "successful_frame_readback": true,
+  "evidence_bytes_read": 3671107,
+  "evidence_backlog": false,
+  "shared_application_qualified": true,
+  "latest_frame": {
+    "sequence": 66,
+    "width": 1024,
+    "height": 768,
+    "format": 87,
+    "pixel_bytes": 3145728,
+    "producer_pid": 11908,
+    "qpc": 3986517565510,
+    "pixel_sha256": "87b3598198612adcf9adf2a7863af8668a1f644bc02205169d93227c3c447b36"
+  },
+  "observed_frame_count": 65,
+  "distinct_pixel_hashes": 44,
+  "native_indirect_frame_produced": true,
+  "multiple_frames_observed": true,
+  "sustained_rendering_qualified": false,
+  "indirect_remove_exit": 0,
+  "shared_application": {
+    "completed": true,
+    "passed": true,
+    "shared_desktop_worker": true,
+    "ordinary_default_adapter": true,
+    "full_desktop_offload": false,
+    "tahoma_tested": false,
+    "started": "2026-10-16T22:29:12.133452+00:00",
+    "dwm_receipts_before": 576,
+    "worker_pid": 10796,
+    "consumer": {
+      "started": "2026-10-16T22:29:14.005711+00:00",
+      "completed": true,
+      "passed": true,
+      "consumer_started_suspended": false,
+      "preauthorized_consumer_pid": false,
+      "session": 1,
+      "elevated": false,
+      "server_creation_probe": {
+        "allowed": false,
+        "win32_error": 5
+      },
+      "pipe_server_creation_access_denied": true,
+      "consumer_pid": 19076,
+      "consumer_exit_code": 0,
+      "component": {
+        "native_registered_component": true,
+        "ordinary_default_adapter": true,
+        "configure_export_used": false,
+        "passed": true,
+        "npu_local_executions": 8,
+        "clears": 6,
+        "draws": 2,
+        "cpu_executions": 0,
+        "gpu_executions": 0,
+        "registered_adapter_tested": true,
+        "normal_d3d11_runtime": true,
+        "allocation_callbacks_emulated": false,
+        "desktop_offloaded": false
+      },
+      "finished": "2026-10-16T22:29:14.611416+00:00"
+    },
+    "correlation": {
+      "passed": true,
+      "operations": 8,
+      "checks": [
+        {
+          "ticket": 580,
+          "application_sequence": 1,
+          "child_sequence": 1,
+          "pixel_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "ticket": 582,
+          "application_sequence": 2,
+          "child_sequence": 2,
+          "pixel_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "ticket": 583,
+          "application_sequence": 3,
+          "child_sequence": 3,
+          "pixel_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "ticket": 584,
+          "application_sequence": 4,
+          "child_sequence": 4,
+          "pixel_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "ticket": 586,
+          "application_sequence": 5,
+          "child_sequence": 5,
+          "pixel_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "ticket": 587,
+          "application_sequence": 6,
+          "child_sequence": 6,
+          "pixel_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "ticket": 588,
+          "application_sequence": 7,
+          "child_sequence": 7,
+          "pixel_sha256": "0324b34c350b9458d02dfaff7f326e712324af3783b96012525ab6c1b667a8c0"
+        },
+        {
+          "ticket": 590,
+          "application_sequence": 8,
+          "child_sequence": 8,
+          "pixel_sha256": "0324b34c350b9458d02dfaff7f326e712324af3783b96012525ab6c1b667a8c0"
+        }
+      ],
+      "correlation": "single provider generation, shared queue ticket, preserved client-local sequence, identity, receipts, acknowledgments and nested QPC interval"
+    },
+    "consumer_pid": 19076,
+    "broker_pid": 21056,
+    "automatic_admission": true,
+    "npu_operation_receipts": 8,
+    "delivery_acknowledgments": 8,
+    "correlated_child_receipts": 8,
+    "broker_cleanup_passed": true,
+    "dwm_receipts_at_consumer_completion": 586,
+    "dwm_receipts_after_consumer": 589,
+    "dwm_continued_after_consumer": true,
+    "owned_process_and_token_acls_restored_exactly": true,
+    "finished": "2026-10-16T22:39:04.013143+00:00"
+  },
+  "owned_process_acls_restored_exactly": true,
+  "installer_exit_code": 0,
+  "worker_terminated_after_device_removal": true,
+  "worker_exit_code": 1,
+  "finished": "2026-10-16T22:39:04.078953+00:00"
+}
