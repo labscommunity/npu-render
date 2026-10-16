@@ -1,0 +1,51 @@
+"""Derive isolated registration/live controllers with a pinned masked NPU path."""
+from pathlib import Path
+import hashlib
+import json
+import re
+
+r=Path('results/render-driver')
+masked='81104c9ea8760bbeb7cc028ea2a9c81e8605482af219f57c082c737b9662d1e0'
+changes={
+ 'native-registration-v28':'native-registration-v29','native-registered-v28':'native-registered-v29','NativeRecovery-v28':'NativeRecovery-v29','ptl-native-worker-v5':'ptl-native-worker-v6',
+ 'native_desktop_bootstrap_v24':'native_desktop_bootstrap_v25','native-desktop-v50':'native-desktop-v51','native-desktop-admission-v50':'native-desktop-admission-v51','native-desktop-admission-v49':'native-desktop-admission-v50','NativeDesktopRecovery-v50':'NativeDesktopRecovery-v51',
+ 'native-live-v40':'native-live-v41','NativeLiveV40':'NativeLiveV41','native-topology-primary-v26':'native-topology-primary-v27','native-topology-v64':'native-topology-v66','native-topology-v65':'native-topology-v67','InspectTopology-V64':'InspectTopology-V66','InspectTopology-V65':'InspectTopology-V67',
+ 'observer65':'observer67','dismiss-native-saver-v13':'dismiss-native-saver-v14','dismiss-v13':'dismiss-v14','ptl-native-live-v4':'ptl-native-live-v5',
+}
+pattern=re.compile('|'.join(re.escape(x) for x in sorted(changes,key=len,reverse=True)))
+def rename(s):return pattern.sub(lambda m:changes[m[0]],s)
+def save(name,text):
+ p=r/name;assert not p.exists();p.write_text(text)
+for prefix in ['run-native-registration','recover-native-registration','qualify-native-registered']:
+ ext='.py' if prefix.startswith('qualify') else '.ps1';old=prefix+'-v28'+ext;s=rename((r/old).read_text())
+ if prefix=='run-native-registration':s=s.replace('$ptl.geometry_imports -ne 1)', '$ptl.geometry_imports -ne 1 -or $ptl.masked_accepted -ne 41 -or $ptl.masked_imports -ne 1)')
+ if prefix=='qualify-native-registered':
+  needle="env['NR_RENDER_PTL_GEOMETRY_BLOB']=str(geometry)";assert needle in s
+  s=s.replace(needle,needle+"\nmasked=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm/ptl-six-span-masked-v1/patched.blob'\nassert hashlib.sha256(masked.read_bytes()).hexdigest()=='"+masked+"'\nenv['NR_RENDER_PTL_MASKED_BLOB']=str(masked)")
+ save(rename(old),s)
+files=[rename(f) for f in json.loads((r/'native-registration-v28-source.json').read_text())]
+save('native-registration-v29-source.json',json.dumps({f:hashlib.sha256((r/f).read_bytes()).hexdigest() for f in files},indent=2)+'\n')
+s=rename((r/'native_desktop_bootstrap_v24.py').read_text())
+s=s.replace("p.add_argument('--ptl-geometry-blob'","p.add_argument('--ptl-masked-blob',type=Path,required=True)\np.add_argument('--ptl-geometry-blob'",1)
+s=s.replace('v=p.parse_args();assert',"v=p.parse_args();assert hashlib.sha256(v.ptl_masked_blob.read_bytes()).hexdigest()=='"+masked+"'\nassert",1)
+s=s.replace('env=os.environ.copy();',"env=os.environ.copy();env['NR_RENDER_PTL_MASKED_BLOB']=str(v.ptl_masked_blob);",1)
+s=s.replace('ptl_geometry_model_sha256=','ptl_masked_model_sha256=hashlib.sha256(v.ptl_masked_blob.read_bytes()).hexdigest(),ptl_geometry_model_sha256=',1)
+save('native_desktop_bootstrap_v25.py',s)
+for prefix in ['run-native-desktop','recover-native-desktop']:
+ old=prefix+'-v50.ps1';s=rename((r/old).read_text())
+ if prefix=='run-native-desktop':
+  s=s.replace('$ptl.geometry_imports -ne 1)', '$ptl.geometry_imports -ne 1 -or $ptl.masked_accepted -ne 41 -or $ptl.masked_imports -ne 1)')
+  s=s.replace("'--monitor-seconds','660',", "'--monitor-seconds','660','--ptl-masked-blob',\"$r\\vm\\ptl-six-span-masked-v1\\patched.blob\",")
+ save(rename(old),s)
+for old,new in [(64,66),(65,67)]:save(f'start-native-topology-v{new}.ps1',(r/f'start-native-topology-v{old}.ps1').read_text().replace(f'v{old}',f'v{new}').replace(f'V{old}',f'V{new}'))
+save('dismiss-native-saver-v14.ps1',rename((r/'dismiss-native-saver-v13.ps1').read_text()))
+s=rename((r/'run-native-live-v40.ps1').read_text());needle=" $report.active_phase='freshness-validation'";assert needle in s
+addition=r''' $report.ptl_masked_accepted=@($geometryRows|Where-Object {$_.ptl_masked_draw -and $_.accepted}).Count
+ $report.ptl_masked_imports=@($geometryRows|Where-Object ptl_masked_provider_created).Count
+ if($report.ptl_masked_accepted -lt 1 -or $report.ptl_masked_imports -ne 1 -or $bootstrap.ptl_masked_model_sha256 -ne 'REPLACE_MASKED'){throw 'Native masked specialization not observed'}
+'''.replace('REPLACE_MASKED',masked)
+s=s.replace(needle,addition+needle,1);save('run-native-live-v41.ps1',s)
+files=[rename(f) for f in json.loads((r/'native-desktop-v50-source.json').read_text())]
+save('native-desktop-v51-source.json',json.dumps({f:hashlib.sha256((r/f).read_bytes()).hexdigest() for f in files},indent=2)+'\n')
+s=rename((r/'run-ptl-native-live-v4.ps1').read_text());s=s.replace('$q.ptl_geometry_imports -ne 1)', '$q.ptl_geometry_imports -ne 1 -or $q.ptl_masked_accepted -lt 1 -or $q.ptl_masked_imports -ne 1)');save('run-ptl-native-live-v5.ps1',s)
+print('Prepared registration29, bootstrap25, desktop51, live41; target unchanged.')

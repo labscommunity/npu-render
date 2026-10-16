@@ -1,0 +1,35 @@
+"""Read-only export of shader code; no pixels, device execution or desktop changes."""
+from pathlib import Path
+import hashlib
+import json
+import os
+import struct
+
+vm=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm'
+out=vm/'native-shader-inventory-v1'
+out.mkdir(exist_ok=False)
+capture=vm/'native-desktop-admission-v33/bootstrap/requests'
+groups=json.loads((vm/'ptl-worker-cost-analysis-v2/report.json').read_text())['groups']
+draws=json.loads((vm/'ptl-worker-cost-analysis-v2/draws.json').read_text())
+by_ticket={x['ticket']:x for x in draws}
+code=[]
+for group in groups:
+    if group['pixel_shader_sha256']=='clear':
+        continue
+    ticket=group['tickets'][0]
+    with (capture/f'request-{ticket:08d}.bin').open('rb') as stream:
+        raw=stream.read(80)
+        h=struct.unpack('<3Q14I',raw)
+        abi,_,_,_,_,flags,vlen,plen=h[3:11]
+        legacy=h[-1] if abi>=16 else abi
+        stream.seek(80+24+(16 if legacy==15 else 0)+(16 if flags&4 else 0))
+        vs,ps=stream.read(vlen*4),stream.read(plen*4)
+    assert hashlib.sha256(ps).hexdigest()==group['pixel_shader_sha256']
+    assert hashlib.sha256(vs).hexdigest()==by_ticket[ticket]['vertex_shader_sha256']
+    code.append(dict(ticket=ticket,draw_count=group['count'],pixel_sha256=group['pixel_shader_sha256'],
+                     vertex_sha256=by_ticket[ticket]['vertex_shader_sha256'],
+                     vertex=list(struct.unpack('<'+'I'*vlen,vs)),pixel=list(struct.unpack('<'+'I'*plen,ps))))
+report=dict(completed=True,passed=True,read_only=True,pixels_exported=False,npu_tested=False,
+            shader_groups=len(code),retained_draws=sum(x['draw_count'] for x in code),programs=code)
+(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps({k:v for k,v in report.items() if k!='programs'}))

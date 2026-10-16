@@ -1,0 +1,45 @@
+"""Qualify the admission component with an authoritative child exit code."""
+from pathlib import Path
+from datetime import UTC, datetime
+import hashlib
+import json
+import os
+import subprocess
+import traceback
+
+r=Path(os.environ['LOCALAPPDATA'])/'npu-render'
+exe=r/'builds/native-auto-admission-v2/Release/nr_auto_admission_probe.exe'
+assert hashlib.sha256(exe.read_bytes()).hexdigest()=='53d466b49265f83853281e7ff94d2e8cd2bc94f3e7bb6daf5911aaca385bb556'
+out=r/'vm/native-auto-admission-v3-qualification'
+out.mkdir(exist_ok=False)
+report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,
+            graphics_tested=False,npu_tested=False,driver_changed=False,
+            binary_sha256=hashlib.sha256(exe.read_bytes()).hexdigest())
+child=None
+try:
+    with (out/'stdout.jsonl').open('xb') as stdout, (out/'stderr.log').open('xb') as stderr:
+        child=subprocess.Popen([str(exe)],stdout=stdout,stderr=stderr,creationflags=subprocess.CREATE_NO_WINDOW)
+        child.wait(timeout=60)
+    report['exit_code']=child.returncode
+    rows=[json.loads(line) for line in (out/'stdout.jsonl').read_text().splitlines() if line.startswith('{')]
+    cases=[x for x in rows if x.get('broker_case_passed')]
+    final=[x for x in rows if x.get('completed')]
+    timeout=[x for x in rows if x.get('unresponsive_broker_rejected')]
+    assert child.returncode==0 and not (out/'stderr.log').read_bytes()
+    assert len(cases)==6 and len({x['actual_client_pid'] for x in cases})==6
+    assert sum(x['accepted'] for x in cases)==2 and all(x['lease_removed'] for x in cases)
+    assert sorted(x['mutation'] for x in cases if not x['accepted'])==[1,2,3,4]
+    assert len(timeout)==1 and 2000<=timeout[0]['wait_ms']<=5000
+    assert len(final)==1 and final[0]['passed'] and final[0]['automatic_lease_consumers']==2
+    assert final[0]['rejected_spoofs']==4 and final[0]['stopped_broker_rejected'] and final[0]['owned_mappings_removed']
+    report.update(passed=True,component=final[0],unresponsive_broker_wait_ms=timeout[0]['wait_ms'],
+                  scope='same-session elevated owned component; dummy worker; no graphics calls')
+except Exception as error:
+    report.update(error=repr(error),traceback=traceback.format_exc())
+finally:
+    if child is not None and child.poll() is None:
+        child.kill();child.wait(timeout=5)
+    report.update(completed=True,finished=datetime.now(UTC).isoformat())
+    (out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(report))
+raise SystemExit(0 if report['passed'] else 1)

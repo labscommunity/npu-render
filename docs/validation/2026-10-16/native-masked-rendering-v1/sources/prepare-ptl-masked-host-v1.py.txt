@@ -1,0 +1,95 @@
+"""Prepare an isolated, exact-shader-gated two-phase draw comparison."""
+from pathlib import Path
+import re
+
+r = Path('results/render-driver')
+out = r/'ptl-masked-integration-v1'
+out.mkdir(exist_ok=False)
+base = r/'ptl-general-geometry-v2'
+header = (base/'ptl_geometry.hpp').read_text()
+header = header.replace('PtlGeometry', 'PtlMasked').replace('ptl_geometry_provider_created', 'ptl_masked_provider_created').replace('PTL geometry', 'PTL masked')
+header = header.replace('#include "vertex_executor.hpp"', '#include "vertex_executor.hpp"\n#include "packed_resources.hpp"\n#include "ptl_masked_shaders.hpp"')
+header = header.replace('std::array<unsigned,4> registers{},modes{};unsigned cull=0,ccw=0;', 'PackedResources layout;unsigned cull=0,ccw=0,target=0,mask=0,blend=0;')
+header = re.sub(r'constexpr unsigned char expected\[\]\{[^}]+\};', 'constexpr unsigned char expected[]{MASKED_MODEL_SHA256_BYTES};', header)
+a = header.index(' struct Result {');b = header.index(' static std::string verified_blob', a)
+header = header[:a]+''' struct Result {std::vector<PackedColor> pixels;uint64_t covered_samples=0;std::string execution_device;uint64_t provider_requests=0,input_bytes=0,output_bytes=0;};
+ static bool eligible(const shader::Program &p,const PackedResources &resources,const shader::TextureSamplers &samplers){
+  if(p.bytecode.size()!=std::size(ptl_masked_fixture::pixel)||!std::equal(p.bytecode.begin(),p.bytecode.end(),std::begin(ptl_masked_fixture::pixel)))return false;
+  for(unsigned n=0;n<16;++n){const auto &r=resources[n];const auto &s=samplers[n];
+   if(n<2){if(!r.width||r.width>8192||!r.height||r.height>8192||(r.format!=28&&r.format!=87)||uint64_t(r.width)*r.height>4194304||s.filter!=shader::TextureFilter::linear||s.u!=shader::TextureAddress::clamp||s.v!=shader::TextureAddress::clamp)return false;}
+   else if(r.width||r.height||r.format||!r.pixels.empty())return false;
+  }return true;
+ }
+'''+header[b:]
+a = header.index(' PtlMasked(const shader::Program');b = header.index('  wchar_t *value=',a)
+header = header[:a]+''' PtlMasked(const shader::Program &ps,const PackedResources &resources,const shader::TextureSamplers &samplers,CullMode c,bool front_ccw,unsigned format,BlendMode mode,unsigned write_mask,const std::string &backend):layout(resource_layout(resources)),cull(unsigned(c)),ccw(front_ccw?1u:0u),target(format),mask(write_mask),blend(unsigned(mode)){
+  require(backend=="NPU"&&cull<=2&&(target==28||target==87)&&mask&&mask<=15&&blend<=1&&eligible(ps,resources,samplers));
+'''+header[b:]
+header = header.replace('NR_RENDER_PTL_GEOMETRY_BLOB', 'NR_RENDER_PTL_MASKED_BLOB')
+a = header.index(' Result execute(')
+header = header[:a]+r''' Result execute(const std::vector<ProjectedVertex> &vertices,const std::vector<shader::VertexRegisters> &shaded,const std::vector<Point> &points,const std::vector<size_t> &triangle_base,const std::array<int32_t,4> &clip,const PackedResources &resources,const std::vector<PackedColor> &background){
+  std::lock_guard<std::mutex> lock(provider->mutex);auto &inference=provider->inference;const auto &device=provider->device;
+  require(!provider->failed&&!vertices.empty()&&vertices.size()<=2046&&vertices.size()%3==0&&shaded.size()==vertices.size()&&!points.empty()&&points.size()<=18432&&points.size()==triangle_base.size()&&background.size()==points.size()&&resource_layout_equal(resources,layout));provider->failed=true;
+  for(unsigned sample=0;sample<2;++sample)require(resources[sample].pixels.size()==size_t(layout[sample].width)*layout[sample].height);
+  const unsigned total=unsigned(points.size());Result result;result.execution_device=device;result.pixels=background;
+  auto *data=static_cast<unsigned char*>(inference.get_input_tensor().data());std::memset(data,0,1572864);unsigned counts[6]{};
+  const auto initialize=[&](unsigned char *p,unsigned phase,unsigned count){put(p,0x4e524d31);put(p+4,1);put(p+8,phase);put(p+12,count);put(p+28,262144);put(p+48,target);put(p+52,mask);put(p+56,blend);for(unsigned sample=0;sample<2;++sample){put(p+64+sample*12,layout[sample].width);put(p+68+sample*12,layout[sample].height);put(p+72+sample*12,layout[sample].format);}};
+  for(unsigned plane=0;plane<6;++plane){auto *p=data+plane*262144;const unsigned begin=plane*3072;counts[plane]=begin<total?(std::min)(3072u,total-begin):0;
+   initialize(p,0,counts[plane]);put(p+16,unsigned(vertices.size()));put(p+20,cull);put(p+24,ccw);std::memcpy(p+32,clip.data(),16);
+   for(unsigned n=0;n<vertices.size();++n){auto *v=p+256+n*96;std::memcpy(v,vertices[n].snapped.data(),8);std::memcpy(v+8,vertices[n].screen.data(),8);std::memcpy(v+16,&vertices[n].inverse_w,4);for(unsigned a=0;a<3;++a)std::memcpy(v+32+a*16,shaded[n][a+1].data(),16);}
+   for(unsigned n=0;n<counts[plane];++n){const unsigned index=begin+n;require(triangle_base[index]<=vertices.size()-3&&triangle_base[index]%3==0);auto *task=p+196864+n*12;put(task,unsigned(triangle_base[index]));std::memcpy(task+4,points[index].data(),8);}
+  }
+  auto invoke=[&]{inference.start_async();if(!inference.wait_for(std::chrono::milliseconds(10000)))throw std::runtime_error("PTL masked timeout");++result.provider_requests;result.input_bytes+=1572864;result.output_bytes+=1572864;};
+  invoke();const auto *plan=static_cast<const unsigned char*>(inference.get_output_tensor().data());
+  // The NPU owns coverage, interpolation, filtering coordinates and color math.
+  // The host validates addresses and transports only the addressed packed texels.
+  std::memset(data,0,1572864);unsigned expected_hits[6]{};
+  for(unsigned plane=0;plane<6;++plane){const auto *o=plan+plane*262144;auto *p=data+plane*262144;require(get(o)==0x4e524d4f&&get(o+4)==0&&get(o+8)==counts[plane]&&get(o+12)<=counts[plane]);initialize(p,1,counts[plane]);unsigned hits=0;
+   for(unsigned n=0;n<counts[plane];++n){const auto *q=o+16+n*80;auto *record=p+256+n*80;const auto coverage=get(q);require(coverage<=1&&get(q+4)==0&&get(q+8)==0&&get(q+12)==0);put(record+68,coverage);hits+=coverage;std::memcpy(record+64,background[plane*3072+n].data(),4);if(!coverage)continue;
+    std::memcpy(record,q+16,16);std::memcpy(record+16,q+64,16);
+    for(unsigned sample=0;sample<2;++sample)for(unsigned tap=0;tap<4;++tap){const auto index=get(q+32+sample*16+tap*4);require(index<resources[sample].pixels.size());std::memcpy(record+32+sample*16+tap*4,resources[sample].pixels[index].data(),4);}
+   }require(hits==get(o+12));expected_hits[plane]=hits;result.covered_samples+=hits;
+  }
+  if(result.covered_samples){invoke();const auto *pixels=static_cast<const unsigned char*>(inference.get_output_tensor().data());
+   for(unsigned plane=0;plane<6;++plane){const auto *p=pixels+plane*262144;require(get(p)==0x4e524d4f&&get(p+4)==1&&get(p+8)==counts[plane]&&get(p+12)==expected_hits[plane]);for(unsigned n=0;n<counts[plane];++n)std::memcpy(result.pixels[plane*3072+n].data(),p+16+n*4,4);}
+  }
+  provider->failed=false;return result;
+ }
+};
+}
+'''
+(out/'ptl_masked.hpp').write_text(header)
+fixture = (r/'ptl-common-shader-ir-v1/captured.hpp').read_text()
+fixture = fixture.replace('inline constexpr uint32_t vertex[]', 'namespace ptl_masked_fixture {\ninline constexpr uint32_t vertex[]')+'\n}\n'
+(out/'ptl_masked_shaders.hpp').write_text(fixture)
+s = (base/'ptl_geometry_triangle_draw.cpp').read_text().replace('PtlGeometryTriangleDrawExecutor','PtlMaskedTriangleDrawExecutor').replace('ptl_geometry_triangle_draw.hpp','ptl_masked_triangle_draw.hpp').replace('ptl_geometry.hpp','ptl_masked.hpp')
+s = s.replace('bool quads,component_coverage,texture_reuse=false;','bool quads;')
+s = s.replace('    std::unique_ptr<shader::PixelExecutor> pixel;\n    PtlGeometry geometry;\n    OutputMerger merger;', '    PtlMasked masked;')
+s = s.replace(',component_coverage(blend==BlendMode::component_coverage)','')
+s = s.replace('geometry(p,cull,ccw,backend),merger(batch,backend,blend,f==87,mask)', 'masked(p,resources,samplers,cull,ccw,f,blend,mask,backend)')
+a = s.index('        char *setting=');b = s.index('        validate_shader(ps);',a);s = s[:a]+s[b:]
+s = s.replace('        const auto shapes=resource_shapes(ps,resources);\n        pixel=std::make_unique<shader::PixelExecutor>(ps,batch,backend,shapes,samplers);\n','')
+s = s.replace('    auto &s=*state;const auto start=Clock::now();','    (void)pc;(void)blend_constant;auto &s=*state;const auto start=Clock::now();')
+a = s.index('    const auto textures=');b = s.index('    result.pixels=background;',a);s = s[:a]+s[b:]
+s = s.replace('std::vector<PackedColor> tile(s.batch);std::vector<Color> colors(s.batch);std::vector<shader::VertexRegisters> fragments(s.batch);','std::vector<PackedColor> tile(s.batch);')
+a = s.index('        began=Clock::now();const auto covered=');b = s.index('        ++result.tile_executions;',a)
+s = s[:a]+'''        for(size_t n=0;n<s.batch;++n)tile[n]=stored_pixel[n]?result.pixels[pixel_index[n]]:PackedColor{};
+        began=Clock::now();const auto merged=s.masked.execute(projected.vertices,shaded.vertices,points,triangle_base,fixed_clip,resources,tile);require(merged.execution_device==result.execution_device);
+        result.timings.merger_ms+=ms(began);result.input_bytes+=merged.input_bytes;result.output_bytes+=merged.output_bytes;result.provider_requests+=merged.provider_requests;result.covered_samples+=merged.covered_samples;
+        for(size_t n=0;n<valid;++n)if(stored_pixel[n])result.pixels[pixel_index[n]]=merged.pixels[n];
+'''+s[b:]
+s = '\n'.join(line for line in s.split('\n') if 'texture_upload_scope' not in line)
+(out/'ptl_masked_triangle_draw.cpp').write_text(s)
+(out/'ptl_masked_triangle_draw.hpp').write_text((base/'ptl_geometry_triangle_draw.hpp').read_text().replace('PtlGeometryTriangleDrawExecutor','PtlMaskedTriangleDrawExecutor'))
+s = (base/'compare.cpp').read_text().replace('ptl_geometry','ptl_masked').replace('PtlGeometry','PtlMasked').replace('general_geometry','masked_texture').replace('general geometry','masked texture')
+s = s.replace('PtlMasked shared_check(r.pixel,static_cast<CullMode>((r.header.flags>>5)&3),(r.header.flags&128)!=0,"NPU");','PtlMasked shared_check(r.pixel,r.resources,r.samplers,static_cast<CullMode>((r.header.flags>>5)&3),(r.header.flags&128)!=0,r.header.format,ex::blend_mode(r.header),uint8_t((r.header.flags>>8)&15),"NPU");')
+s = s.replace('    const auto setup=Clock::now();', '''    ex::require(PtlMasked::eligible(r.pixel,r.resources,r.samplers));
+    auto wrong_shader=r.pixel;wrong_shader.bytecode[0]^=1;ex::require(!PtlMasked::eligible(wrong_shader,r.resources,r.samplers));
+    auto wrong_resources=r.resources;wrong_resources[0].format=0;ex::require(!PtlMasked::eligible(r.pixel,wrong_resources,r.samplers));
+    wrong_resources=r.resources;wrong_resources[2].width=1;ex::require(!PtlMasked::eligible(r.pixel,wrong_resources,r.samplers));
+    auto wrong_samplers=r.samplers;wrong_samplers[0].filter=TextureFilter::point;ex::require(!PtlMasked::eligible(r.pixel,r.resources,wrong_samplers));
+    wrong_samplers=r.samplers;wrong_samplers[1].u=TextureAddress::mirror;ex::require(!PtlMasked::eligible(r.pixel,r.resources,wrong_samplers));
+    const auto setup=Clock::now();''').replace('negative_checks\\\":1', 'negative_checks\\\":6')
+(out/'compare.cpp').write_text(s)
+(out/'CMakeLists.txt').write_text((base/'CMakeLists.txt').read_text().replace('ptl_geometry','ptl_masked'))
+print('Prepared masked-texture host template; exact qualified model hash required before build.')

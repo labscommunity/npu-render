@@ -1,0 +1,38 @@
+"""Integrate the qualified bounded masked shader into the existing triangle cache."""
+from pathlib import Path
+import hashlib
+import json
+import shutil
+import tarfile
+
+r = Path('results/render-driver')
+d = r/'ptl-native-worker-v6'
+shutil.copytree(r/'ptl-native-worker-v5', d)
+for name in ['ptl_masked.hpp','ptl_masked_shaders.hpp','ptl_masked_triangle_draw.hpp','ptl_masked_triangle_draw.cpp']:
+    shutil.copyfile(r/'ptl-masked-integration-v1'/name, d/name)
+p = d/'ptl_adaptive_triangle.hpp'
+s = p.read_text().replace('#include "ptl_geometry_triangle_draw.hpp"', '#include "ptl_geometry_triangle_draw.hpp"\n#include "ptl_masked.hpp"\n#include "ptl_masked_triangle_draw.hpp"')
+s = s.replace(' std::unique_ptr<PtlGeometryTriangleDrawExecutor> geometry;', ' std::unique_ptr<PtlMaskedTriangleDrawExecutor> masked;\n std::unique_ptr<PtlGeometryTriangleDrawExecutor> geometry;')
+s = s.replace('uint32_t batch,bool enabled){', 'uint32_t batch,bool enabled,bool masked_enabled){')
+s = s.replace('  if(enabled&&geometry_supported(p,n,batch))', '  if(masked_enabled&&geometry_supported(p,n,batch)&&unsigned(blend)<=1&&PtlMasked::eligible(p,resources,samplers))masked=std::make_unique<PtlMaskedTriangleDrawExecutor>(v,p,n,w,h,f,resources,samplers,backend,blend,mask,cull,ccw,batch);\n  else if(enabled&&geometry_supported(p,n,batch))')
+needle='  auto result=geometry?'
+assert needle in s
+s=s.replace(needle,r'''  if(masked){auto result=masked->execute(inputs,vc,pc,viewport,resources,background,scissor,blend_constant);
+   std::printf("{\"ptl_masked_draw\":true,\"accepted\":true,\"provider_requests\":%llu,\"fallback_backend\":\"none\"}\n",static_cast<unsigned long long>(result.provider_requests));std::fflush(stdout);return result;
+  }
+'''+needle)
+p.write_text(s)
+p=d/'indexed_pipeline.hpp';s=p.read_text().replace('bool ptl_geometry_enabled=false;', 'bool ptl_masked_enabled=false;bool ptl_geometry_enabled=false;')
+needle='        wchar_t *geometry=';at=s.index(needle)
+s=s[:at]+'''        wchar_t *masked=nullptr;size_t masked_length=0;
+        if(_wdupenv_s(&masked,&masked_length,L"NR_RENDER_PTL_MASKED_BLOB"))throw std::runtime_error("cannot read masked provider setting");
+        const std::unique_ptr<wchar_t,decltype(&std::free)> masked_owner(masked,&std::free);
+        if(masked&&*masked){require(std::filesystem::path(masked).is_absolute());ptl_masked_enabled=true;}
+'''+s[at:]
+s=s.replace('batch,ptl_geometry_enabled);','batch,ptl_geometry_enabled,ptl_masked_enabled);');p.write_text(s)
+p=d/'CMakeLists.txt';p.write_text(p.read_text().replace('ptl_geometry_triangle_draw.cpp)', 'ptl_geometry_triangle_draw.cpp ptl_masked_triangle_draw.cpp)'))
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()}
+(r/'ptl-native-worker-v6-source.json').write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/'ptl-native-worker-v6.tar.gz','w:gz') as tar:tar.add(d,arcname=d.name)
+(r/'build-ptl-native-worker-v6.ps1').write_text((r/'build-ptl-native-worker-v5.ps1').read_text().replace('ptl-native-worker-v5','ptl-native-worker-v6'))
+print('Prepared worker v6 with explicitly selected NPU masked-texture path.')
