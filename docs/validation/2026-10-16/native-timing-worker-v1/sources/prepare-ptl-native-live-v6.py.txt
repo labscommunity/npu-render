@@ -1,0 +1,29 @@
+"""Derive isolated live controllers for the timing-only worker revision."""
+from pathlib import Path
+import ast,hashlib,json,re
+r=Path('results/render-driver')
+changes={
+ 'native-registration-v29':'native-registration-v30','native-registered-v29':'native-registered-v30','NativeRecovery-v29':'NativeRecovery-v30','ptl-native-worker-v6':'ptl-native-worker-v7',
+ 'native_desktop_bootstrap_v25':'native_desktop_bootstrap_v26','native-desktop-v51':'native-desktop-v52','native-desktop-admission-v51':'native-desktop-admission-v52','native-desktop-admission-v50':'native-desktop-admission-v51','NativeDesktopRecovery-v51':'NativeDesktopRecovery-v52',
+ 'native-live-v41':'native-live-v42','NativeLiveV41':'NativeLiveV42','native-topology-primary-v27':'native-topology-primary-v28','native-topology-v66':'native-topology-v68','native-topology-v67':'native-topology-v69','InspectTopology-V66':'InspectTopology-V68','InspectTopology-V67':'InspectTopology-V69',
+ 'observer67':'observer69','dismiss-native-saver-v14':'dismiss-native-saver-v15','dismiss-v14':'dismiss-v15','ptl-native-live-v5':'ptl-native-live-v6',
+}
+pattern=re.compile('|'.join(re.escape(x) for x in sorted(changes,key=len,reverse=True)))
+def rename(s):return pattern.sub(lambda m:changes[m[0]],s)
+def save(name,text):
+ p=r/name;assert not p.exists();p.write_text(text)
+oldfiles=['run-native-registration-v29.ps1','recover-native-registration-v29.ps1','qualify-native-registered-v29.py','native_desktop_bootstrap_v25.py','run-native-desktop-v51.ps1','recover-native-desktop-v51.ps1','start-native-topology-v66.ps1','start-native-topology-v67.ps1','dismiss-native-saver-v14.ps1','run-native-live-v41.ps1','run-ptl-native-live-v5.ps1']
+for f in oldfiles:
+ s=rename((r/f).read_text())
+ if f=='start-native-topology-v66.ps1':s=s.replace('V66','V68').replace('v66','v68')
+ if f=='start-native-topology-v67.ps1':s=s.replace('V67','V69').replace('v67','v69')
+ if f.startswith('run-native-registration') or f.startswith('run-native-desktop'):
+  needle="$ptl.masked_imports -ne 1)";assert needle in s;s=s.replace(needle,"$ptl.masked_imports -ne 1 -or $ptl.timeline_records -ne 1944 -or !$ptl.timeline_monotonic -or !$ptl.parent_child_correlated -or !$ptl.shader_identities_matched)",1)
+ if f.endswith('.py'):ast.parse(s)
+ save(rename(f),s)
+for old in ['native-registration-v29-source.json','native-desktop-v51-source.json']:
+ files=[rename(f) for f in json.loads((r/old).read_text())]
+ save(rename(old),json.dumps({f:hashlib.sha256((r/f).read_bytes()).hexdigest() for f in files},indent=2)+'\n')
+files=[rename(x) for x in oldfiles]+['native-registration-v30-source.json','native-desktop-v52-source.json']
+save('ptl-native-live-v6-upload.json',json.dumps(files,indent=2)+'\n')
+print(json.dumps(dict(controller_files=len(files),python_ast_valid=2,new_renderer=False)))

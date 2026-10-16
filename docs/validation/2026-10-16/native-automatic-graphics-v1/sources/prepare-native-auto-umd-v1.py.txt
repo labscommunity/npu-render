@@ -1,0 +1,28 @@
+"""Connect the qualified on-demand handshake to the native device admission gate."""
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'native-auto-umd-v1';shutil.copytree(r/'native-trace-v19',d)
+lab=d/'native/windows/registered_lab'
+assert (lab/'native_probe_lease.hpp').read_bytes()==(r/'native-auto-admission-v2/native_probe_lease.hpp').read_bytes()
+s=(r/'native-auto-admission-v2/admission.hpp').read_text().replace('#include <memory>','#include <memory>\n#include <mutex>')
+end=s.rfind('\n}');assert end>0
+s=s[:end]+r'''
+inline nr::native_probe::Lease read_or_request(){
+ // A malformed or inaccessible existing lease must never be overwritten by discovery.
+ static std::mutex mutex;const std::lock_guard<std::mutex> lock(mutex);
+ const auto name=nr::native_probe::mapping_name(GetCurrentProcessId());
+ const auto existing=OpenFileMappingW(FILE_MAP_READ,FALSE,name.c_str());
+ if(existing){CloseHandle(existing);return nr::native_probe::read_mapping();}
+ const auto error=GetLastError();require(error==ERROR_FILE_NOT_FOUND);
+ return request();
+}
+'''+s[end:]
+(lab/'native_auto_admission.hpp').write_text(s)
+p=lab/'indexed_exchange.hpp';s=p.read_text().replace('#include "native_probe_lease.hpp"','#include "native_probe_lease.hpp"\n#include "native_auto_admission.hpp"',1)
+s=s.replace('nr::native_probe::Admission admission(nr::native_probe::read_mapping());','nr::native_probe::Admission admission(nr::auto_admission::read_or_request());',1);p.write_text(s)
+# Preserve the qualified transport and all admission checks after device creation.
+manifest={str(p.relative_to(d)):hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()}
+(r/'native-auto-umd-v1-source.json').write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/'native-auto-umd-v1.tar.gz','w:gz') as tar:tar.add(d,arcname=d.name)
+(r/'build-native-auto-umd-v1.ps1').write_text((r/'build-native-trace-v19.ps1').read_text().replace('native-trace-v19','native-auto-umd-v1'))
+print(json.dumps(dict(source_files=len(manifest),driver_installed=False,changed=['indexed_exchange.hpp','native_auto_admission.hpp'])))

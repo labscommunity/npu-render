@@ -41,9 +41,21 @@ broker deadline and cleanup. This uses elevated same-session owned processes
 and a dummy worker; it makes no graphics or NPU calls. The initial compilation
 and exit-code harness failures are retained alongside the successful qualification.
 
-The handshake alone does not qualify general graphics. Subsequent gates are UMD
-integration, a normally started application's real registered D3D rendering,
-bounded lease renewal/revocation, and shared scheduling with the desktop worker.
+The [UMD integration and registered graphics qualification](../validation/2026-10-16/native-automatic-graphics-v1/README.md)
+now pass. The fixture starts normally, without suspended-process lease injection,
+and performs six clears and two draws through D3D11. All eight operations have
+exact NPU results and acknowledgements, one provider generation, and successful
+broker and driver cleanup. The first registration attempt failed on missing stage
+evidence before rendering; both that failure and the corrected run are retained.
+
+This test explicitly selects the registered adapter and uses elevated same-session
+processes in session zero. It does not qualify ordinary interactive applications.
+The next boundary is an explicit interactive-consumer lease scope: verify the
+consumer's actual SID, session and process creation time while controller and
+worker remain in session zero. Reuse the central desktop worker rather than
+creating independent application providers. Qualify standard-user process access,
+negative session/identity checks, finite renewal/revocation and cleanup before a
+normally started default-adapter application runs on the live desktop.
 The final scheduler must serialize NPU submissions rather than independently
 importing and running per-application providers. Browser sandbox tokens, child
 processes, graphics capabilities, application restart/device recreation and

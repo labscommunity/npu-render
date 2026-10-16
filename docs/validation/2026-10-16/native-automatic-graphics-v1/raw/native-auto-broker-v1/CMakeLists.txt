@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.25)
+project(nr_auto_admission_broker LANGUAGES CXX)
+add_executable(nr_auto_admission_broker broker.cpp)
+target_compile_features(nr_auto_admission_broker PRIVATE cxx_std_17)
+target_compile_options(nr_auto_admission_broker PRIVATE /W4 /WX)
+target_link_libraries(nr_auto_admission_broker PRIVATE advapi32 bcrypt wtsapi32)
+set_property(TARGET nr_auto_admission_broker PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")

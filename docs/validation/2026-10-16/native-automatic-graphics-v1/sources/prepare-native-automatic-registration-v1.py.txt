@@ -1,0 +1,33 @@
+from pathlib import Path
+import ast,hashlib,json
+r=Path('results/render-driver')
+s=(r/'package-native-driver-v17.ps1').read_text().replace('native-driver-package-v17','native-driver-package-v18').replace('native-trace-v19','native-auto-umd-v1').replace('0.0.1317.0','0.0.1318.0').replace('10/14/2026','10/16/2026')
+(r/'package-native-driver-v18.ps1').write_text(s)
+s=(r/'qualify-native-registered-v30.py').read_text().replace("'0.0.1317.0'","'0.0.1318.0'")
+s=s.replace('save();worker=None;hp=ht=None;lease=None', "save();worker=None;hp=ht=None;lease=None;broker_process=None;client_process=None\nbroker=Path(os.environ['LOCALAPPDATA'])/'npu-render/builds/native-auto-broker-v1/Release/nr_auto_admission_broker.exe'\nassert hashlib.sha256(broker.read_bytes()).hexdigest()=='63396fcda5330b0590b038c8bd9d6ab8a31f0ee2887716fc4f4ec1af1f89ea6f'")
+start=s.index('  info=subprocess.STARTUPINFO()');end=s.index("  evidence=rows(out/'consumer.stdout.jsonl')",start)
+s=s[:start]+'''  with (out/'broker.stdout.jsonl').open('xb') as bs,(out/'broker.stderr.log').open('xb') as be:
+   broker_process=subprocess.Popen([str(broker),str(worker.pid),suffix],env=env,stdin=subprocess.DEVNULL,stdout=bs,stderr=be,creationflags=subprocess.CREATE_NO_WINDOW)
+   until=time.perf_counter()+5
+   while not any(x.get('automatic_broker_ready') for x in rows(out/'broker.stdout.jsonl')):
+    assert time.perf_counter()<until and broker_process.poll() is None;time.sleep(.01)
+   # Normal process startup. No suspended child, ResumeThread or pre-created PID lease.
+   client_process=subprocess.Popen([str(v.client),str(v.dll)],env=env,stdin=subprocess.DEVNULL,stdout=cs,stderr=ce,creationflags=subprocess.CREATE_NO_WINDOW)
+   pid=client_process.pid;report.update(consumer_pid=pid,consumer_started_suspended=False,automatic_admission=True,preauthorized_consumer_pid=False,broker_pid=broker_process.pid);save()
+   client_process.wait(timeout=110);report['consumer_exit_code']=client_process.returncode;save();assert client_process.returncode==0,'Automatic native consumer failed'
+   broker_process.wait(timeout=5);assert broker_process.returncode==0 and not (out/'broker.stderr.log').read_bytes()
+  broker_records=rows(out/'broker.stdout.jsonl');admitted=[x for x in broker_records if x.get('automatic_consumer_admitted')];closed=[x for x in broker_records if x.get('automatic_broker_completed')]
+  assert len(admitted)==len(closed)==1 and admitted[0]['client_pid']==pid and admitted[0]['worker_pid']==worker.pid and admitted[0]['actual_pipe_client_verified'] and closed[0]['owned_mappings_removed'] and closed[0]['passed']
+  report.update(automatic_broker_receipts=1,automatic_broker_cleanup_passed=True,admission_protocol=3,lease_scope='normally started same-session owned consumer; finite lease')
+'''+s[end:]
+needle='finally:\n if hp is not None:';assert needle in s
+s=s.replace(needle,"finally:\n for process in [client_process,broker_process]:\n  if process is not None and process.poll() is None:process.kill();process.wait(timeout=5)\n if hp is not None:",1)
+ast.parse(s);(r/'qualify-native-registered-v31.py').write_text(s)
+for prefix in ['run-native-registration','recover-native-registration']:
+ p=r/(prefix+'-v30.ps1');s=p.read_text().replace('native-registration-v30','native-registration-v31').replace('native-registered-v30','native-registered-v31').replace('NativeRecovery-v30','NativeRecovery-v31').replace('native-driver-package-v17','native-driver-package-v18').replace('native-registration-stage-v17','native-registration-stage-v18').replace('0.0.1317.0','0.0.1318.0')
+ if prefix=='run-native-registration':
+  needle="$report.registered_npu_qualified=$true";assert needle in s;s=s.replace(needle,"if(!$q.automatic_admission -or $q.consumer_started_suspended -or !$q.automatic_broker_cleanup_passed){throw 'Automatic graphics admission not established'}\n  "+needle,1)
+ (r/(prefix+'-v31.ps1')).write_text(s)
+files=['run-native-registration-v31.ps1','recover-native-registration-v31.ps1','qualify-native-registered-v31.py','native_session_broker_v1.py']
+(r/'native-registration-v31-source.json').write_text(json.dumps({f:hashlib.sha256((r/f).read_bytes()).hexdigest() for f in files},indent=2)+'\n')
+print('Prepared candidate package and automatic real-D3D registration test; not installed.')

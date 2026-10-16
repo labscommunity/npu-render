@@ -1,12 +1,36 @@
 # Full desktop offload: acceptance and execution plan
 
 Updated 2026-10-16. Target: Delta, Windows 11, Panther Lake. The repository stays
-private. **Full desktop offload is unfinished.** The latest qualified native trial
-routes Windows desktop composition through the NPU, delivers 49 matching frames
-over a 537.68-second span to the physical output, verifies mouse/keyboard color
-changes, and restores the machine. Its 60-second freshness gate proves delivery,
-not usability. The previous renderer separately passed thirty-minute delivery.
-Normal application admission and a Tahoma benefit remain open.
+private. **Full desktop offload is unfinished.** Worker v7 passes all 972 retained
+requests and native live v42, which delivers 48 matching physical submissions
+over 538.23 seconds and restores ordinary Windows state. Its observed mouse
+response is 8.24 seconds; this is not a usable desktop. Automatic admission now
+passes a normally started, same-session registered D3D11 fixture. Interactive
+application coverage, a responsive desktop and a Tahoma benefit remain open.
+
+The [live causal timing](../validation/2026-10-16/native-timing-live-v1/README.md)
+places 8,167.77 ms of the mouse response before frame publication and 70.81 ms
+between publication and observation. Eighty-one child rendering requests occupy
+6,859.29 ms, including compilation and host orchestration. The masked-texture
+path contributes only 143.08 ms, so another isolated improvement to that shader
+would leave most of this delay intact. This attribution guides the reusable
+shader path; it is one controlled event, not a latency distribution.
+
+The [bounded program kernel](../validation/2026-10-16/native-program-kernel-v1/README.md)
+passes 228 independent NPU fixtures. Its structural parser accepts 14 observed
+programs representing 605 draws; current resource and sampler constraints admit
+390 of those draws. Complete renderer comparisons are still in progress: the
+first two selected cases pass four image variants each, while the third differs
+by one byte in 856 components of its randomized variant. It is not integrated
+into the live worker. The strict comparison remains failed pending arithmetic
+attribution and independent qualification.
+
+The [automatic graphics qualification](../validation/2026-10-16/native-automatic-graphics-v1/README.md)
+passes eight real NPU operations from a normally started application through the
+registered D3D11 runtime, with automatic lease creation and cleanup. This fixture
+explicitly selects the adapter and shares session zero with its worker. It does
+not qualify interactive default-adapter applications, existing-device migration,
+browsers, video or games.
 
 The primary obstacle is responsiveness. A captured cold graph takes 89.1 seconds
 to compile. The fully cached v35 worker also makes 42,760 provider calls across
@@ -86,11 +110,11 @@ renderer does not establish where every application renders.
 | Gate | Work | Acceptance evidence | Current status |
 | --- | --- | --- | --- |
 | 1. Routing | Record active physical and indirect paths before, during, and after admission; identify clone/extended configuration and actual rendering adapter. | Timestamped topology, native DWM NPU receipts, selected adapter, frame producer, exact restoration. | Automatic clone identified; v11 applies extension with the physical path preserved, produces a frame while extended, restores the clone exactly, and restores the final physical baseline. |
-| 2. Continuous rendering | Keep the native renderer alive across changing windows and content; diagnose every failed draw; distinguish model preparation from rendering and transport. | Multiple changing frames, timestamps and pixel checks, sustained operation, no hidden fallback. | V36 passes with 1,833 acknowledged NPU operations, 167 exact frame deliveries spanning 2,076.05 seconds, and four fresh owned physical observations near the end. The controlled thirty-minute delivery gate passes for that earlier renderer. The masked-texture worker passes finite v41 integration with 49 matching submissions over 537.68 s; its thirty-minute run and production stress remain unqualified. V31 was a frozen-relay false positive and remains rejected. |
-| 3. Physical presentation | Present new NPU frames on the physical output with distinct logical desktops and no recursive mirroring. | Live sequence-to-present correlation, output identity, measured presentation mode and residual GPU work. | V41 correlates 49 exact matching submissions and verifies blue/green/red on the owned physical output. Presenter: 98 GPU copy commands including validation readback; measurement observer: 146 additional copies. Residual GPU cost and a matched baseline remain unqualified. |
-| 4. Interaction and recovery | Migrate the logical desktop, route pointer/keyboard/focus correctly, handle cursor/DPI/resolution, restore exact topology and windows. | Scripted interaction visible on physical output; emergency exit and owned-process failure recovery; ordinary login/lock path retained. | V41 passes relative motion, controlled mouse/keyboard/color changes, confinement, two reacquisitions and ordinary recovery. Deliberately stopping the relay in v34 triggers full owned cleanup in 25.75 seconds. Secure desktop, sleep/wake, full cursor fidelity and other faults remain open. |
-| 5. Responsiveness | Optimize resource reuse, graph compilation, dispatch granularity, transfer volume and frame pacing. | Initial target: ordinary desktop interaction at 30 fps, p95 visible response ≤100 ms, 30-minute stable run. Report cold-start time separately. | Not met. Large cold graph compilation is reproduced at 89.1 seconds. Cached replay helps but does not meet usability. A fused four-sample kernel matches all 3.15 million components of the retained slow desktop draw in three comparisons. Six compiler-owned spans reduce complete warm draw time from about 9.2 s to 0.39 s, with 34 calls. The live v41 trial observes an 8.41 s controlled mouse response and 45.3 ms keyboard response. Responsive interaction and wider shader/geometry coverage remain open. |
-| 6. Application coverage | Admit and implement required graphics operations across browser, video and representative 3D workloads. Establish per-process adapter choice. | Capability matrix plus real hardware runs; every remaining iGPU operation accounted for. | A manually admitted default-adapter D3D11 fixture passes eight NPU operations. Unadmitted default device creation still fails in v41. A separate broker component passes normal-start lease, spoof rejection, timeout and cleanup checks; real automatic graphics admission, API coverage, browser/video/game migration remain unqualified. |
+| 2. Continuous rendering | Keep the native renderer alive across changing windows and content; diagnose every failed draw; distinguish model preparation from rendering and transport. | Multiple changing frames, timestamps and pixel checks, sustained operation, no hidden fallback. | V36 passes with 1,833 acknowledged NPU operations, 167 exact frame deliveries spanning 2,076.05 seconds, and four fresh owned physical observations near the end. The controlled thirty-minute delivery gate passes for that earlier renderer. The timing-instrumented worker passes finite v42 integration with 48 matching submissions over 538.23 s; its thirty-minute run and production stress remain unqualified. V31 was a frozen-relay false positive and remains rejected. |
+| 3. Physical presentation | Present new NPU frames on the physical output with distinct logical desktops and no recursive mirroring. | Live sequence-to-present correlation, output identity, measured presentation mode and residual GPU work. | V42 correlates 48 exact matching submissions and verifies blue/green/red on the owned physical output. Presenter: 96 GPU copy commands including validation readback; measurement observer: 142 additional copies. Residual GPU cost and a matched baseline remain unqualified. |
+| 4. Interaction and recovery | Migrate the logical desktop, route pointer/keyboard/focus correctly, handle cursor/DPI/resolution, restore exact topology and windows. | Scripted interaction visible on physical output; emergency exit and owned-process failure recovery; ordinary login/lock path retained. | V42 passes relative motion, controlled mouse/keyboard/color changes, confinement, two reacquisitions and ordinary recovery. Deliberately stopping the relay in v34 triggers full owned cleanup in 25.75 seconds. Secure desktop, sleep/wake, full cursor fidelity and other faults remain open. |
+| 5. Responsiveness | Optimize resource reuse, graph compilation, dispatch granularity, transfer volume and frame pacing. | Initial target: ordinary desktop interaction at 30 fps, p95 visible response ≤100 ms, 30-minute stable run. Report cold-start time separately. | Not met. Large cold graph compilation is reproduced at 89.1 seconds. Cached replay helps but does not meet usability. A fused four-sample kernel matches all 3.15 million components of the retained slow desktop draw in three comparisons. Six compiler-owned spans reduce complete warm draw time from about 9.2 s to 0.39 s, with 34 calls. The live v42 trial observes an 8.24 s controlled mouse response and 187.8 ms keyboard response. Causal timestamps attribute most of the mouse delay to frame production. Responsive interaction and wider shader/geometry coverage remain open. |
+| 6. Application coverage | Admit and implement required graphics operations across browser, video and representative 3D workloads. Establish per-process adapter choice. | Capability matrix plus real hardware runs; every remaining iGPU operation accounted for. | A manually admitted default-adapter D3D11 fixture passes eight NPU operations. Unadmitted default device creation still fails in v41. A broker component passes normal-start lease, spoof rejection, timeout and cleanup checks. Registered D3D v32 then passes a normally started same-session fixture with eight exact NPU operations and cleanup. Interactive automatic admission, general API coverage and browser/video/game migration remain unqualified. |
 | 7. Tahoma benefit | Run repeated baseline/offload trials under matched power, resolution and application load. | Report Tahoma throughput/latency, desktop frame times, per-engine GPU/NPU/CPU activity, memory and power; demonstrate GPU relief and no material Tahoma regression. | Earlier experiments regressed; native desktop A/B not yet run. |
 | 8. Usable switch | Integrate qualified components, install/on/off/status, recovery, documentation and CI; resolve distribution signing requirements. | Repeated clean install and enable/disable cycles, sleep/wake and failures, end-to-end test on target hardware. | Research candidates isolated; no usable full-offload product. |
 
@@ -111,9 +135,15 @@ role, and any GPU rendering/copy cost in the bridge must be measured.
    group. Reduce shared geometry and dispatch costs across shader groups. The solid
    component clears five expensive draws but does not establish desktop usability.
    Repeat responsiveness and sustained stability checks after renderer changes.
-4. Add automatic application admission and the missing graphics operations;
-   establish per-process rendering devices under representative real workloads.
-5. Measure matched Tahoma baseline/offload performance and remaining GPU work.
+4. Resolve the reusable shader candidate's changed-image mismatch against
+   independent arithmetic, then complete every admitted draw, the full 972-request
+   worker replay, registered D3D and a finite live test. Attribute the 215 resource
+   and sampler declines explicitly; preserve the qualified NPU graph for them.
+5. Extend automatic admission to interactive processes sharing the serialized
+   desktop worker, with negative identity/session tests, bounded renewal and
+   revocation. Qualify ordinary default-adapter applications before browsers,
+   video and representative 3D workloads.
+6. Measure matched Tahoma baseline/offload performance and remaining GPU work.
    Finish install/on/off/recovery only after these functional and benefit gates.
 
 The [sustained delivery evidence](../validation/2026-10-15/native-long-kernel-v1/README.md)

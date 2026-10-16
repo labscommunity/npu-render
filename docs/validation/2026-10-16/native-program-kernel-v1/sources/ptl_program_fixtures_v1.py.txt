@@ -1,0 +1,102 @@
+"""Independent geometry oracle plus scalar FP32 bounded-program reference."""
+import struct
+import numpy as np
+from ptl_geometry_fixtures_v2 import fixture as geometry_fixture
+SPAN=262144
+F=np.float32
+IDENTITY=(0,1,2,3)
+def source(kind,index,swizzle=IDENTITY):return (kind,index,swizzle)
+def encode_source(s):
+ kind,index,swizzle=s
+ return {'input':0,'temp':1,'immediate':2}[kind]|index<<4|sum(v<<(8+2*c) for c,v in enumerate(swizzle))
+def programs(which):
+ i=source('input',0);t=source('temp',0);imm=source('immediate',0)
+ return [
+  [('mov',4,15,i,None)],
+  [('sample',0,15,0,None),('mul',4,15,i,t)],
+  [('sample',0,15,0,None),('mov',0,8,source('immediate',1,(0,0,0,0)),None),('mul',4,15,i,t)],
+  [('sample',0,15,0,None),('sample',1,15,1,None),('mul',0,15,i,t),('mul',4,15,t,source('temp',1,(3,3,3,3)))],
+  [('div',0,15,source('input',1),source('immediate',2)),('mul',4,15,t,imm)],
+  [('mov',4,7,source('input',0,(2,0,1,3)),None),('mov',4,8,source('immediate',1,(1,1,1,1)),None)],
+  [('mul',0,15,i,imm),('div',4,15,t,source('immediate',2))],
+  [('sample',0,15,0,None),('mov',4,15,source('temp',0,(3,3,3,3)),None)],
+ ][which]
+def fixture(index):
+ if index>=192:
+  data,_=fixture(97);data=bytearray(data)
+  mutations=[(0,0),(4,2),(8,2),(12,2049),(28,SPAN-1),(48,0),(52,0),(56,2),(60,1),(88,3),(100,3),(104,0),(104,9),(108,1),(112,3),(116,4),(124,5),(160,0x7fc00000),(256,4),(260,0),(260,0xf5),(264,2),(268,1),(272,1),(288,4),(292,0),(296,0xe441),(296,0xe43c),(96,0),(64,0),(68,8193),(72,0)]
+  offset,value=mutations[index-192];struct.pack_into('<I',data,offset,value);return bytes(data),bytes(SPAN)
+ seed=index%96;phase=index//96;data=bytearray(SPAN);expected=bytearray(SPAN);rng=np.random.default_rng(1010000+index)
+ which=seed%8;program=programs(which);sample_count=[0,1,1,2,0,0,0,1][which]
+ resources=[([1,2,2048,1024,704,8192][seed%6],[1,3,8,1056,704,1][seed%6],[28,87][seed%2]),(704,704,[87,28][seed%2])]
+ immediates=np.array([[.5,2,.75,.25],[1,.5,0,-.5],[.25,.5,2,4],[0,0,0,0]],np.float32)
+ if phase==0:
+  geometry,coverage=geometry_fixture(seed)
+  original_count,vertices,cull,ccw=struct.unpack_from('<4I',geometry,8);count=min(2048,original_count);modes=struct.unpack_from('<3I',geometry,48)
+  data[32:48]=geometry[32:48];data[2048:2048+vertices*96]=geometry[256:256+vertices*96];data[200704:200704+count*12]=geometry[196864:196864+count*12]
+  attributes=[];covered=[]
+  for n in range(count):
+   covered.append(struct.unpack_from('<I',coverage,16+n*80)[0]);attributes.append(np.array(struct.unpack_from('<12f',coverage,32+n*80),np.float32).reshape(3,4))
+  descriptors=[]
+  for sample in range(sample_count):
+   slot=(seed+sample)%3;cx=(seed+sample)%4;cy=(seed+sample+1)%4;divide=3 if seed%2 else 0
+   if divide and any(hit and attrs[slot,divide-1]==0 for hit,attrs in zip(covered,attributes)):divide=0
+   descriptors.append((slot,cx,cy,divide))
+  hits=sum(covered)
+  for n,(hit,attrs) in enumerate(zip(covered,attributes)):
+   if not hit:continue
+   base=16+n*112;struct.pack_into('<I',expected,base,1);struct.pack_into('<12f',expected,base+16,*attrs.reshape(-1))
+   for sample,(slot,cx,cy,divide) in enumerate(descriptors):
+    width,height,_=resources[sample];uv=attrs[slot,[cx,cy]].copy()
+    if divide:uv=np.array([F(v/attrs[slot,divide-1]) for v in uv],np.float32)
+    xy=[F(min(size-1,max(0,F(F(F(min(1,max(0,v)))*F(size))-F(.5))))) for v,size in zip(uv,(width,height))]
+    x,y=map(int,xy);x1=min(width-1,x+1);y1=min(height-1,y+1)
+    struct.pack_into('<4I',expected,base+64+sample*16,y*width+x,y*width+x1,y1*width+x,y1*width+x1);struct.pack_into('<2f',expected,base+96+sample*8,F(xy[0]-F(x)),F(xy[1]-F(y)))
+ else:
+  count=[0,1,6,31,127,511,1024,2048][(seed//8)%8];vertices=cull=ccw=hits=0;modes=[1,2,4];descriptors=[(1,0,1,0),(2,1,0,0)][:sample_count]
+  target=[28,87][seed%2];mask=1+seed%15;blend=(seed//2)%2
+  for n in range(count):
+   base=2048+n*112;covered=int(n%7!=1);attrs=rng.integers(-32,513,(3,4)).astype(np.float32)/F(256);fractions=rng.integers(0,4096,4).astype(np.float32)/F(4096);texels=rng.integers(0,2**32,(2,4),dtype=np.uint32);background=int(rng.integers(0,2**32,dtype=np.uint32))
+   if n%11==0:attrs[0]=np.array([.5/255,1.5/255,2.5/255,(n//11)%2],np.float32);texels.fill(0xffffffff)
+   struct.pack_into('<12f4f8I4I',data,base,*attrs.reshape(-1),*fractions,*map(int,texels.reshape(-1)),background,covered,0,0)
+   result=background
+   if covered:
+    hits+=1;samples=[]
+    for sample in range(sample_count):
+     tx,ty=fractions[sample*2:sample*2+2];channels=[]
+     for channel in range(4):
+      byte=2-channel if resources[sample][2]==87 and channel<3 else channel
+      values=[F(F((int(v)>>(8*byte))&255)/F(255)) for v in texels[sample]]
+      upper=F(F(values[0]*F(F(1)-tx))+F(values[1]*tx));lower=F(F(values[2]*F(F(1)-tx))+F(values[3]*tx));channels.append(F(F(upper*F(F(1)-ty))+F(lower*ty)))
+     samples.append(channels)
+    registers=np.zeros((5,4),np.float32)
+    def read(s,c):
+     kind,index,swizzle=s
+     return {'input':attrs,'temp':registers,'immediate':immediates}[kind][index][swizzle[c]]
+    for op,dest,write,left,right in program:
+     values=[]
+     for c in range(4):
+      if not write&(1<<c):values.append(registers[dest,c]);continue
+      if op=='sample':v=samples[left][c]
+      elif op=='mov':v=read(left,c)
+      elif op=='mul':v=F(read(left,c)*read(right,c))
+      else:v=F(read(left,c)/read(right,c))
+      values.append(v)
+     registers[dest]=values
+    shaded=[F(min(1,max(0,v))) for v in registers[4]]
+    for byte in range(4):
+     channel=2-byte if target==87 and byte<3 else byte
+     if not mask&(1<<channel):continue
+     v=F(shaded[channel]*F(255))
+     if blend:v=F(v+F(F((background>>(8*byte))&255)*F(F(1)-shaded[3])))
+     packed=int(np.rint(F(min(255,max(0,v)))));result=(result&~(255<<(8*byte)))|(packed<<(8*byte))
+   struct.pack_into('<I',expected,16+n*4,result)
+ target=[28,87][seed%2];mask=1+seed%15;blend=(seed//2)%2
+ struct.pack_into('<8I',data,0,0x4e525031,1,phase,count,vertices,cull,ccw,SPAN);struct.pack_into('<4I',data,48,target,mask,blend,0)
+ for i,resource in enumerate(resources):struct.pack_into('<3I',data,64+i*12,*resource)
+ struct.pack_into('<6I',data,88,*modes,sample_count,len(program),0)
+ for i,desc in enumerate(descriptors):struct.pack_into('<4I',data,112+i*16,*desc)
+ struct.pack_into('<16f',data,160,*immediates.reshape(-1))
+ for i,(op,dest,write,left,right) in enumerate(program):struct.pack_into('<8I',data,256+i*32,{'mov':0,'mul':1,'div':2,'sample':3}[op],dest|(write<<4),left if op=='sample' else encode_source(left),encode_source(right) if right else 0,0,0,0,0)
+ struct.pack_into('<4I',expected,0,0x4e52504f,phase,count,hits)
+ return bytes(data),bytes(expected)

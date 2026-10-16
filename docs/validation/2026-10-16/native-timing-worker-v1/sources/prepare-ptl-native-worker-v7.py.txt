@@ -1,0 +1,52 @@
+"""Add QPC timing and shader identity without changing qualified rendering math."""
+from pathlib import Path
+import hashlib
+import json
+import shutil
+import tarfile
+
+r = Path('results/render-driver')
+d = r / 'ptl-native-worker-v7'
+shutil.copytree(r / 'ptl-native-worker-v6', d)
+p = d / 'local_indexed_worker.cpp'
+s = p.read_text()
+needle = 'namespace {\n'
+s = s.replace(needle, needle + r'''
+uint64_t qpc_now(){LARGE_INTEGER value{};ex::require(QueryPerformanceCounter(&value)!=0 && value.QuadPart>=0);return uint64_t(value.QuadPart);}
+uint64_t qpc_frequency(){LARGE_INTEGER value{};ex::require(QueryPerformanceFrequency(&value)!=0 && value.QuadPart>0);return uint64_t(value.QuadPart);}
+std::string shader_digest(const std::vector<uint32_t> &words){
+    ex::require(words.size()<=ULONG_MAX/sizeof(uint32_t));BCRYPT_ALG_HANDLE algorithm=nullptr;
+    ex::require(BCryptOpenAlgorithmProvider(&algorithm,BCRYPT_SHA256_ALGORITHM,nullptr,0)>=0);
+    std::array<unsigned char,32> digest{};
+    const auto status=BCryptHash(algorithm,nullptr,0,reinterpret_cast<PUCHAR>(const_cast<uint32_t *>(words.data())),ULONG(words.size()*sizeof(uint32_t)),digest.data(),ULONG(digest.size()));
+    BCryptCloseAlgorithmProvider(algorithm,0);ex::require(status>=0);
+    constexpr char hex[]="0123456789abcdef";std::string result;result.reserve(64);
+    for(const auto byte:digest){result.push_back(hex[byte>>4]);result.push_back(hex[byte&15]);}return result;
+}
+''', 1)
+s = s.replace('const auto deadline=GetTickCount64()', 'const auto frequency=qpc_frequency();\n    const auto deadline=GetTickCount64()', 1)
+s = s.replace('const auto started=GetTickCount64();', 'const auto connected_qpc=qpc_now();const auto started=GetTickCount64();', 1)
+s = s.replace('h=ex::Reader(bytes).value<ex::Header>();', 'const auto received_qpc=qpc_now();\n                    h=ex::Reader(bytes).value<ex::Header>();', 1)
+s = s.replace('const auto queued=GetTickCount64();ULONGLONG entered=0,finished=0;', 'const auto queued_qpc=qpc_now();uint64_t entered_qpc=0,finished_qpc=0,reply_qpc=0;\n                    const auto queued=GetTickCount64();ULONGLONG entered=0,finished=0;', 1)
+s = s.replace('entered=GetTickCount64();recording.request', 'entered_qpc=qpc_now();entered=GetTickCount64();recording.request', 1)
+needle='const auto request=ex::decode(bytes);'
+assert needle in s
+s=s.replace(needle, needle+r'''
+                        const auto pixel_digest=shader_digest(request.pixel.bytecode);
+                        std::printf("{\"kind\":\"request_identity\",\"pid\":%lu,\"dispatch_ticket\":%u,\"client_pid\":%u,\"sequence\":%u,\"abi\":%u,\"flags\":%u,\"width\":%u,\"height\":%u,\"vertices\":%u,\"pixel_sha256\":\"%s\",\"provider_parent\":%s}\n",GetCurrentProcessId(),ticket,h.client_pid,h.sequence,h.abi,h.flags,h.width,h.height,h.vertices,pixel_digest.c_str(),provider.enabled()?"true":"false");std::fflush(stdout);
+                        ''', 1)
+s=s.replace('finished=GetTickCount64();return result;', 'finished=GetTickCount64();finished_qpc=qpc_now();return result;', 1)
+s=s.replace('phase="ack";uint32_t acknowledged=0;', 'reply_qpc=qpc_now();phase="ack";uint32_t acknowledged=0;', 1)
+needle='ex::require(acknowledged==h.sequence);'
+s=s.replace(needle, needle+r'''
+                    const auto acknowledged_qpc=qpc_now();
+                    std::printf("{\"kind\":\"request_timeline\",\"pid\":%lu,\"dispatch_ticket\":%u,\"client_pid\":%u,\"sequence\":%u,\"provider_parent\":%s,\"qpc_frequency\":%llu,\"connected_qpc\":%llu,\"received_qpc\":%llu,\"queued_qpc\":%llu,\"entered_qpc\":%llu,\"finished_qpc\":%llu,\"reply_qpc\":%llu,\"acknowledged_qpc\":%llu}\n",GetCurrentProcessId(),ticket,h.client_pid,h.sequence,provider.enabled()?"true":"false",static_cast<unsigned long long>(frequency),static_cast<unsigned long long>(connected_qpc),static_cast<unsigned long long>(received_qpc),static_cast<unsigned long long>(queued_qpc),static_cast<unsigned long long>(entered_qpc),static_cast<unsigned long long>(finished_qpc),static_cast<unsigned long long>(reply_qpc),static_cast<unsigned long long>(acknowledged_qpc));std::fflush(stdout);
+''', 1)
+p.write_text(s)
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()}
+(r/'ptl-native-worker-v7-source.json').write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/'ptl-native-worker-v7.tar.gz','w:gz') as tar:tar.add(d,arcname=d.name)
+(r/'build-ptl-native-worker-v7.ps1').write_text((r/'build-ptl-native-worker-v6.ps1').read_text().replace('ptl-native-worker-v6','ptl-native-worker-v7'))
+changed=[p.name for p in d.iterdir() if p.is_file() and p.read_bytes()!=(r/'ptl-native-worker-v6'/p.name).read_bytes()]
+assert changed==['local_indexed_worker.cpp'],changed
+print(json.dumps(dict(changed=changed,source_files=len(manifest),rendering_math_changed=False)))

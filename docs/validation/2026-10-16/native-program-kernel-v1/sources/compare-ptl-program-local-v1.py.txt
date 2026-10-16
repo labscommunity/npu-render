@@ -1,0 +1,39 @@
+"""CPU-only implementation/oracle comparison. Not evidence of NPU execution."""
+import ctypes
+import hashlib
+import json
+import struct
+from pathlib import Path
+
+from ptl_program_fixtures_v1 import fixture
+
+r = Path(__file__).parent
+lib = ctypes.CDLL(str((r/'ptl-program-v1-local.dylib').resolve()))
+run = lib.nr_program_local
+run.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+checks = []
+report = dict(completed=False, passed=False, npu_tested=False, checks=checks)
+try:
+    for index in range(224):
+        payload, expected = fixture(index)
+        actual = ctypes.create_string_buffer(262144)
+        run(payload, actual)
+        if actual.raw != expected:
+            offsets = [n for n, (a, b) in enumerate(zip(actual.raw, expected)) if a != b]
+            report['mismatch'] = dict(index=index, offsets=offsets[:24],
+                                      actual=[actual.raw[n] for n in offsets[:24]],
+                                      expected=[expected[n] for n in offsets[:24]])
+            raise AssertionError(f'exact full span fixture {index}')
+        checks.append(dict(index=index, phase=struct.unpack_from('<I', payload, 8)[0],
+                           count=struct.unpack_from('<I', payload, 12)[0],
+                           hits=struct.unpack_from('<I', expected, 12)[0],
+                           input_sha256=hashlib.sha256(payload).hexdigest(),
+                           output_sha256=hashlib.sha256(expected).hexdigest()))
+    report['passed'] = True
+except Exception as error:
+    report['error'] = repr(error)
+finally:
+    report['completed'] = True
+    (r/'ptl-program-v1-local-comparison.json').write_text(json.dumps(report, indent=2)+'\n')
+print(json.dumps({k:v for k,v in report.items() if k!='checks'}))
+raise SystemExit(0 if report['passed'] else 1)

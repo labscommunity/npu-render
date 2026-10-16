@@ -1,41 +1,36 @@
 # Reusable bounded shader kernel
 
-The retained capture contains 24 pixel programs. Fifteen programs of one to six
-instructions account for 609 draws. The latest worker replay attributes its two
-largest remaining shader groups to single-texture multiply programs: 74 draws
-with 3,026 provider calls and 36 draws with 1,592 calls. These are attribution
-within a diagnostic replay, not matched performance results.
+Updated 2026-10-16. The [six-span kernel qualification](../validation/2026-10-16/native-program-kernel-v1/README.md)
+passes 228 independent NPU cases: 192 valid geometry/shading fixtures and 36
+malformed inputs, with original-carrier checks before and after. The compiled
+kernel occupies 16,720 of the 18,256 available code bytes. This establishes the
+bounded kernel, not complete draw or desktop correctness.
 
-The next candidate should generalize the qualified two-phase masked kernel's
-contract instead of selecting another set of exact shader hashes. The initial
-instruction subset is MOV, MUL, DIV and SAMPLE, with explicit input/output masks,
-swizzles, scalar broadcasts and immediate constants. DOT4, more arithmetic,
-derivatives and loops require subsequent semantic and performance checks. Programs
-outside the accepted subset retain the qualified NPU graph path.
+The structural lowerer accepts MOV, MUL, DIV and SAMPLE with explicit masks,
+swizzles, temporaries and finite immediates. It selects by program semantics,
+without a shader-hash allowlist. Fourteen captured programs representing 605 draws
+lower successfully; 390 draws also pass the initial linear-clamp resource and
+sampler gate. Point sampling remains unimplemented in this candidate.
 
-Phase zero should retain NPU coverage and interpolation, accepting three varying
-registers with validated interpolation modes. A validated address plan admits at
-most two samples whose coordinates come directly from a varying register or its
-XY/Z quotient. All addressing arithmetic and point/linear clamp behavior remain
-on the NPU. The host only transports the resulting addressed texel bytes.
+The host adapter preserves NPU vertex/projection, then combines coverage,
+interpolation and sample addressing in phase zero. The host transports addressed
+packed texel words; phase one performs filtering, shader execution and blending
+on the NPU. One shared serialized imported model serves the adapters. The ABI
+uses six 262,144-byte spans, three varying vectors, up to two texture samples,
+eight instructions, four temporary vectors, four immediate vectors and one
+output. Each span accepts 2,048 samples; the draw admits up to 2,046 vertices.
 
-Phase one should filter those texels, execute a bounded instruction stream and
-merge the output. A proposed layout allows eight instructions, four temporary
-vectors, three varying vectors and one output vector. Instruction order and
-per-channel write masks must be preserved. It must reject unsupported register
-uses, invalid indices, uninitialized reads, malformed programs and nonfinite
-results explicitly. No host shader evaluation belongs in the runtime path.
+Complete-draw qualification remains open. The first two selected captures pass
+four original/changed-image comparisons each. The third matches the recorded
+image and two variants but differs by one byte in 856 components of its randomized
+variant. The comparison remains failed. Arithmetic tracing must identify which
+path meets the independent contract; preserving historical output alone cannot
+settle a precision discrepancy. No live worker uses this candidate yet.
 
-One possible six-span carrier layout places uniform instructions/constants below
-byte 2,048, keeps 96-byte vertex records for up to 2,046 vertices, and moves task
-records to byte 200,704. With 112-byte plan/shading records, a span admits at most
-2,048 samples, or 12,288 across six spans. Every range must be checked against
-the 262,144-byte span. These are proposed limits, not an implemented or qualified
-ABI; compiler output must also fit the retained code region.
-
-Acceptance requires independent per-operation and malformed-program fixtures,
-original/custom/original hardware checks, structural admission rejection tests,
-every eligible captured draw with changed images, the complete worker replay,
-and live interaction/recovery. Use the same shared, serialized model policy as
-the qualified geometry component. The shader inventory and arithmetic design
-do not establish NPU output, speed, desktop coverage or Tahoma benefit.
+Remaining gates are explicit rejection-reason coverage, independent arithmetic
+attribution, every admitted capture with changed images, full worker replay,
+registered Direct3D, then live interaction, recovery and sustained operation.
+More instructions, filtering modes, derivatives and loops require their own
+semantic and performance checks. Unsupported programs keep the qualified NPU
+graph path. Neither component timing nor parser admission proves desktop speed,
+application migration or a Tahoma benefit.

@@ -10,6 +10,16 @@ RGBA composition and an explicit backend switch. The packaged runtime passed
 GPU → NPU → CPU → GPU → NPU switching on Panther Lake. It supports CPU/GPU/NPU through
 its first OpenVINO provider; other providers can implement the same contracts.
 
+**Latest qualification, October 16:** the [instrumented desktop run](docs/validation/2026-10-16/native-timing-live-v1/README.md)
+passes 1,190 acknowledged NPU operations, 48 matching physical submissions and
+ordinary recovery. Its controlled mouse response takes 8.24 seconds; causal timing
+locates most of that delay in frame production. A normally started, same-session
+application now passes [automatic registered D3D11 admission](docs/validation/2026-10-16/native-automatic-graphics-v1/README.md)
+and eight exact NPU operations. Interactive applications and Tahoma benefit are
+still unqualified. The reusable shader candidate passes its independent kernel
+suite but has an unresolved changed-image comparison and remains outside the
+live worker. See the [current acceptance plan](docs/research/desktop-offload-plan.md).
+
 **Full desktop offload is unfinished.** The current Windows/Panther Lake path
 executes real DWM rendering on the NPU, delivers changing desktop frames to the
 physical presenter, and supports a controlled mouse/keyboard sequence. The
@@ -40,7 +50,7 @@ Larger batches alone are 8.5% slower; adding model sharing yields only a 3.1%
 overall improvement. The combination also regresses on the separate expensive-draw
 sample. It is not promoted as a responsiveness fix.
 
-The [latest short desktop trial](docs/validation/2026-10-15/native-duration-app-routing-v1/README.md)
+An [earlier short desktop trial](docs/validation/2026-10-15/native-duration-app-routing-v1/README.md)
 completes 1,536 acknowledged NPU operations and exact restoration, but delivers
 only 31 correlated physical submissions over 512 seconds. Another real device
 loss takes 63 seconds to recover. Ordinary unleased applications fail to create
@@ -92,7 +102,7 @@ captured draw: CPU, NPU and the local transport return identical pixels, and
 eight existing sampling regression runs pass. This repairs a specific desktop
 blocker; it does not yet establish a stable native desktop.
 
-The latest [scripted desktop trial](docs/validation/2026-10-13/sole-display-v121/README.md)
+An earlier [scripted desktop trial](docs/validation/2026-10-13/sole-display-v121/README.md)
 renders the VM's desktop on Delta's physical NPU and passes desktop, Run,
 Notepad, typing, maximize and close checks through the guest's sole indirect
 display. It remains far too slow for normal use. Delta's physical desktop has

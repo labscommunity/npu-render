@@ -1,0 +1,32 @@
+from pathlib import Path
+from datetime import UTC,datetime
+import hashlib,json,os,secrets,subprocess,time,traceback
+r=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=r/'vm';out=vm/'native-auto-broker-v1-qualification';out.mkdir(exist_ok=False)
+probe=r/'builds/native-auto-admission-v2/Release/nr_auto_admission_probe.exe';broker=r/'builds/native-auto-broker-v1/Release/nr_auto_admission_broker.exe'
+assert hashlib.sha256(probe.read_bytes()).hexdigest()=='53d466b49265f83853281e7ff94d2e8cd2bc94f3e7bb6daf5911aaca385bb556'
+assert hashlib.sha256(broker.read_bytes()).hexdigest()=='63396fcda5330b0590b038c8bd9d6ab8a31f0ee2887716fc4f4ec1af1f89ea6f'
+def rows(p):return [json.loads(x) for x in p.read_text().splitlines() if x.startswith('{') and x.endswith('}')] if p.exists() else []
+report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,graphics_tested=False,npu_tested=False,driver_changed=False);worker=server=None
+def save():(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+save()
+try:
+ worker=subprocess.Popen([str(probe),'--idle'],stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,creationflags=subprocess.CREATE_NO_WINDOW)
+ with (out/'broker.stdout.jsonl').open('wb') as stdout,(out/'broker.stderr.log').open('wb') as stderr:
+  server=subprocess.Popen([str(broker),str(worker.pid),secrets.token_hex(16)],stdout=stdout,stderr=stderr,creationflags=subprocess.CREATE_NO_WINDOW)
+  until=time.monotonic()+5
+  while not any(x.get('automatic_broker_ready') for x in rows(out/'broker.stdout.jsonl')):
+   assert time.monotonic()<until and server.poll() is None;time.sleep(.01)
+  client=subprocess.run([str(probe),'--consumer','0'],capture_output=True,timeout=10,creationflags=subprocess.CREATE_NO_WINDOW)
+  (out/'consumer.stdout.jsonl').write_bytes(client.stdout);(out/'consumer.stderr.log').write_bytes(client.stderr);assert client.returncode==0
+  consumers=rows(out/'consumer.stdout.jsonl');assert len(consumers)==1 and consumers[0]['consumer_passed'] and consumers[0]['admitted'] and not consumers[0]['started_suspended'] and not consumers[0]['preexisting_lease']
+  server.wait(timeout=10);assert server.returncode==0 and not (out/'broker.stderr.log').read_bytes()
+  records=rows(out/'broker.stdout.jsonl');accepted=[x for x in records if x.get('automatic_consumer_admitted')];finished=[x for x in records if x.get('automatic_broker_completed')]
+  assert len(accepted)==len(finished)==1 and accepted[0]['client_pid']==consumers[0]['pid'] and finished[0]['owned_mappings_removed'] and finished[0]['passed']
+ absent=subprocess.run([str(probe),'--absent'],capture_output=True,timeout=10,creationflags=subprocess.CREATE_NO_WINDOW);(out/'absent.stdout.jsonl').write_bytes(absent.stdout);(out/'absent.stderr.log').write_bytes(absent.stderr);assert absent.returncode==0
+ report.update(passed=True,broker_binary_sha256=hashlib.sha256(broker.read_bytes()).hexdigest(),normal_consumer_start=True,actual_client_verified=True,publication_removed=True,scope='same-session dummy worker; no graphics')
+except Exception as e:report.update(error=repr(e),traceback=traceback.format_exc())
+finally:
+ for proc in [server,worker]:
+  if proc and proc.poll() is None:proc.kill();proc.wait(timeout=5)
+ report.update(completed=True,finished=datetime.now(UTC).isoformat());save()
+print(json.dumps(report));raise SystemExit(0 if report['passed'] else 1)
