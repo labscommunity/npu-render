@@ -1,12 +1,18 @@
 # Automatic application admission: next integration boundary
 
-Updated 2026-10-16. Ordinary default-adapter creation still fails in live v41.
-The native adapter is selected, but its UMD requires a valid process-specific
-admission record. The current controller supplies records for DWM and the
-indirect driver host. The separate successful application fixture creates its
-consumer suspended, publishes a lease for that known PID, then resumes it.
-That proves default-adapter rendering with manual admission, not automatic
-admission of applications started normally.
+Updated 2026-10-16. A normally started, non-admin default-adapter fixture now
+shares DWM's NPU worker and passes eight correlated graphics operations in
+[live v51](../validation/2026-10-16/native-integer-rectangle-live-v1/README.md).
+The fixture's process and token access changes are restored, and DWM continues
+rendering after the consumer exits. This qualifies finite automatic admission;
+continuous application use, renewal, revocation and multiple concurrent clients
+remain open.
+
+The earlier live v41 failed ordinary default-adapter creation because the UMD
+required a valid process-specific admission record. At that point only DWM and
+the indirect host received automatic records; a separate fixture used a
+suspended consumer and manually published lease. The component results below
+trace how the normally started interactive fixture became supported.
 
 The implementation boundary is `indexed_exchange_configured()` in the qualified
 UMD's `indexed_exchange.hpp`. It calls `native_probe::read_mapping()` and verifies
@@ -48,14 +54,22 @@ exact NPU results and acknowledgements, one provider generation, and successful
 broker and driver cleanup. The first registration attempt failed on missing stage
 evidence before rendering; both that failure and the corrected run are retained.
 
-This test explicitly selects the registered adapter and uses elevated same-session
+That earlier test explicitly selects the registered adapter and uses elevated same-session
 processes in session zero. It does not qualify ordinary interactive applications.
-The next boundary is an explicit interactive-consumer lease scope: verify the
-consumer's actual SID, session and process creation time while controller and
-worker remain in session zero. Reuse the central desktop worker rather than
-creating independent application providers. Qualify standard-user process access,
-negative session/identity checks, finite renewal/revocation and cleanup before a
-normally started default-adapter application runs on the live desktop.
+The subsequent interactive-consumer scope verifies the consumer's actual SID,
+session and process creation time while the controller and worker remain in
+session zero. It reuses the central desktop worker and has passed standard-user
+access and finite cleanup in the linked live trial.
+
+The current v7 broker accepts one connection, retains its lease until that
+consumer exits, and then removes its mappings. Interactive leases have a
+120-second maximum; the UMD's `Admission` object keeps an immutable copy and
+checks that deadline on subsequent exchanges. Extending a broker's mapping alone
+cannot renew that existing object. The next implementation must therefore cover
+both broker lifetime and UMD refresh, retain the pinned process/worker/session
+identity, reject stale or revoked generations, and bound each refresh attempt.
+It must qualify expiry during use, broker/worker exit, session locking, PID reuse,
+concurrent clients and exact cleanup before extending the live application test.
 The final scheduler must serialize NPU submissions rather than independently
 importing and running per-application providers. Browser sandbox tokens, child
 processes, graphics capabilities, application restart/device recreation and
