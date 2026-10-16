@@ -1,0 +1,34 @@
+from pathlib import Path
+r=Path('results/render-driver')
+s=(r/'ptl-six-span-quad-coordinate-v1.c').read_text()
+s=s.replace('One invocation shades 4096 four-tap rectangle pixels.', 'One invocation shades zero to 4096 four-tap rectangle pixels.')
+s=s.replace('unsigned barycentric,float4 *us', 'unsigned barycentric,unsigned second_order,float4 *us')
+a='''        float ax=triangle?s[2]:s[0],ay=triangle?s[3]:s[1];
+        float bx=triangle?s[0]:s[2],by=triangle?s[3]:s[1];
+        float cx=triangle?s[0]:s[2],cy=triangle?s[1]:s[3];'''
+b='''        unsigned ia=triangle?(second_order?0:2):0;
+        unsigned ib=triangle?(second_order?2:3):1;
+        unsigned ic=triangle?(second_order?3:0):2;
+        float ax=s[ia==1||ia==2?2:0],ay=s[ia>=2?3:1];
+        float bx=s[ib==1||ib==2?2:0],by=s[ib>=2?3:1];
+        float cx=s[ic==1||ic==2?2:0],cy=s[ic>=2?3:1];'''
+assert a in s;s=s.replace(a,b)
+a='''        float ua=uv[triangle?2:0],ub=uv[triangle?0:2],uc=uv[triangle?0:2];
+        float va=uv[triangle?3:1],vb=uv[triangle?3:1],vc=uv[triangle?1:3];'''
+b='''        float ua=uv[ia==1||ia==2?2:0],ub=uv[ib==1||ib==2?2:0],uc=uv[ic==1||ic==2?2:0];
+        float va=uv[ia>=2?3:1],vb=uv[ib>=2?3:1],vc=uv[ic>=2?3:1];'''
+assert a in s;s=s.replace(a,b)
+s=s.replace('unsigned count=4096,source_bytes=262144;', 'unsigned count=u32(data+28),source_bytes=262144;')
+s=s.replace('u32(data+4)!=3', 'u32(data+4)!=4').replace('u32(data+28)!=count', 'count>4096')
+s=s.replace('u32(data+148) || u32(data+152)', 'u32(data+148)>1 || u32(data+152)')
+s=s.replace('triangle,barycentric,&us,&vs', 'triangle,barycentric,u32(data+148),&us,&vs')
+(r/'ptl-six-span-general-v1.c').write_text(s)
+q=(r/'qualify-ptl-six-span-quad-coordinate-v1.py').read_text().replace('ptl-six-span-quad-coordinate','ptl-six-span-general')
+q=q.replace("assert hashlib.sha256(elf).hexdigest()=='9a194d4532309e73bb16f360624ee11733274458116a35070842821512d1074d'", "assert hashlib.sha256(elf).hexdigest()==obj(vm/'ptl-six-span-general-build-v1/build-report.json')['elf_sha256']")
+# The builder report schema is checked when build completes, before qualification.
+q=q.replace('import openvino as ov', 'import struct\n import openvino as ov')
+q=q.replace('payload,full=fixture(i*6+plane);e,_,_=reference(full);data[plane]=np.frombuffer(payload,np.float16);target[plane,:16384]=e.astype(np.float16).reshape(-1)', '''payload,full=fixture(i*6+plane);e,_,_=reference(full)
+      payload=bytearray(payload);struct.pack_into('<I',payload,4,4)
+      count=4096 if i<8 else [0,1,17,729,4095,4096][plane];struct.pack_into('<I',payload,28,count)
+      data[plane]=np.frombuffer(payload,np.float16);target[plane,:count*4]=e.astype(np.float16).reshape(-1)[:count*4]''')
+(r/'qualify-ptl-six-span-general-v1.py').write_text(q)

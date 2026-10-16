@@ -1,0 +1,9 @@
+typedef union {float4 f;uint4 u;} Bits4;
+INLINE float4 normalize_byte4(uint4 bytes) {
+    Bits4 source,result;source.f=__builtin_convertvector(bytes,float4);
+    result.f=source.f*0x1.010102p-8f;
+    uint4 high=__builtin_convertvector((source.u & (uint4)0x00400000u)!=(uint4)0,uint4);
+    uint4 except_255=__builtin_convertvector(bytes!=(uint4)255,uint4);
+    result.u-=(high & except_255 & (uint4)1);
+    return result.f;
+}

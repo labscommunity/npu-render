@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "C:\Users\tatef\AppData\Local\npu-render\vm\replay-recorded-requests-v17.py", line 30, in <module>
+    proof=obj(binary.parent.parent/'registered-build-report.json');assert proof['clean_build'] and hashlib.sha256(binary.read_bytes()).hexdigest()==proof['binary_sha256'][binary.name].lower()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\tatef\AppData\Local\npu-render\vm\replay-recorded-requests-v17.py", line 7, in obj
+    data=path.read_bytes();return json.loads(data.decode('utf-16') if data.startswith(b'\xff\xfe') else data.decode('utf-8-sig'))
+         ^^^^^^^^^^^^^^^^^
+  File "C:\Users\tatef\AppData\Local\Programs\Python\Python312\Lib\pathlib.py", line 1019, in read_bytes
+    with self.open(mode='rb') as f:
+         ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\tatef\AppData\Local\Programs\Python\Python312\Lib\pathlib.py", line 1013, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\ptl-native-worker-v2\\registered-build-report.json'

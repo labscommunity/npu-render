@@ -1,0 +1,180 @@
+{
+  "started": "2026-10-15T08:41:15.871875+00:00",
+  "completed": true,
+  "passed": false,
+  "desktop_changed": false,
+  "tahoma_tested": false,
+  "cases": [
+    {
+      "ticket": 5,
+      "packet_sha256": "c73a7db2962690efc8512c712337a2f782878b216445fcaf75f930330f082996",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 2357.7274,
+          "candidate_full_ms": 77.3293,
+          "candidate_prepare_ms": 1.0765,
+          "candidate_raster_ms": 76.0137,
+          "baseline_calls": 276,
+          "candidate_calls": 8,
+          "components": 565248,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 1988.2445,
+          "candidate_full_ms": 77.2569,
+          "candidate_prepare_ms": 2.4987,
+          "candidate_raster_ms": 74.4442,
+          "baseline_calls": 276,
+          "candidate_calls": 8,
+          "components": 565248,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 2042.2808,
+          "candidate_full_ms": 79.4075,
+          "candidate_prepare_ms": 1.9341,
+          "candidate_raster_ms": 76.9109,
+          "baseline_calls": 276,
+          "candidate_calls": 8,
+          "components": 565248,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 2059.491,
+          "candidate_full_ms": 82.2913,
+          "candidate_prepare_ms": 2.6734,
+          "candidate_raster_ms": 78.9496,
+          "baseline_calls": 276,
+          "candidate_calls": 8,
+          "components": 565248,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 565248,
+          "sha256": "3489b5951d56fe49b6f824068267181e29e566d8349a3bc04739ab2eebed58b4"
+        },
+        "candidate.rgba": {
+          "bytes": 565248,
+          "sha256": "3489b5951d56fe49b6f824068267181e29e566d8349a3bc04739ab2eebed58b4"
+        }
+      }
+    },
+    {
+      "ticket": 7,
+      "packet_sha256": "9d176f16cc5e34f71ae84b863c49742b87c6a60ed4727ba4aba34eb3d35d1fcb",
+      "exit_code": 0,
+      "pairs": [
+        {
+          "kind": "pair",
+          "iteration": 0,
+          "order": "baseline-first",
+          "baseline_full_ms": 583.4327,
+          "candidate_full_ms": 22.8371,
+          "candidate_prepare_ms": 2.1371,
+          "candidate_raster_ms": 20.5467,
+          "baseline_calls": 58,
+          "candidate_calls": 5,
+          "components": 565248,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 1,
+          "order": "custom-first",
+          "baseline_full_ms": 280.4827,
+          "candidate_full_ms": 19.8337,
+          "candidate_prepare_ms": 2.2979,
+          "candidate_raster_ms": 17.3805,
+          "baseline_calls": 58,
+          "candidate_calls": 5,
+          "components": 565248,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 2,
+          "order": "baseline-first",
+          "baseline_full_ms": 219.963,
+          "candidate_full_ms": 18.9414,
+          "candidate_prepare_ms": 1.5692,
+          "candidate_raster_ms": 17.2402,
+          "baseline_calls": 58,
+          "candidate_calls": 5,
+          "components": 565248,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        },
+        {
+          "kind": "pair",
+          "iteration": 3,
+          "order": "custom-first",
+          "baseline_full_ms": 217.0134,
+          "candidate_full_ms": 19.1358,
+          "candidate_prepare_ms": 1.8786,
+          "candidate_raster_ms": 17.1403,
+          "baseline_calls": 58,
+          "candidate_calls": 5,
+          "components": 565248,
+          "different_components": 0,
+          "maximum_byte_error": 0,
+          "exact": true
+        }
+      ],
+      "passed": true,
+      "pixel_artifacts": {
+        "baseline.rgba": {
+          "bytes": 565248,
+          "sha256": "3489b5951d56fe49b6f824068267181e29e566d8349a3bc04739ab2eebed58b4"
+        },
+        "candidate.rgba": {
+          "bytes": 565248,
+          "sha256": "3489b5951d56fe49b6f824068267181e29e566d8349a3bc04739ab2eebed58b4"
+        }
+      }
+    },
+    {
+      "ticket": 41,
+      "packet_sha256": "75d41f0b2edb0ed4a2edd095303d7655dd7c428c12f3dd5098281e81d3acbfeb",
+      "exit_code": 1,
+      "pairs": [],
+      "passed": false,
+      "pixel_artifacts": {}
+    }
+  ],
+  "model_sha256": "710f6e5586da59f4040213435c5ecc13bb669e6b1be668f838edd00bca5dd697",
+  "executable_sha256": "785fab44d85555fa0c2b0e3d25f10d0889b2fbdf706b1228f92b887b5258f7ab",
+  "pixel_fixture": "recorded pixels and three independently generated premultiplied images per case; CPU fixture generation only",
+  "active_ticket": 41,
+  "error": "AssertionError('case 41 failed')",
+  "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\run-ptl-four-tap-general-compare-v2.py\", line 31, in <module>\n    report['cases'].append(result);write();print(json.dumps(result),flush=True);assert passed,f'case {ticket} failed'\n                                                                                       ^^^^^^\nAssertionError: case 41 failed\n",
+  "finished": "2026-10-15T08:41:36.991538+00:00"
+}

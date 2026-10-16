@@ -1,0 +1,24 @@
+{
+  "started": "2026-10-15T08:39:25.718751+00:00",
+  "completed": true,
+  "passed": false,
+  "desktop_changed": false,
+  "tahoma_tested": false,
+  "cases": [
+    {
+      "ticket": 5,
+      "packet_sha256": "c73a7db2962690efc8512c712337a2f782878b216445fcaf75f930330f082996",
+      "exit_code": 1,
+      "pairs": [],
+      "passed": false,
+      "pixel_artifacts": {}
+    }
+  ],
+  "model_sha256": "710f6e5586da59f4040213435c5ecc13bb669e6b1be668f838edd00bca5dd697",
+  "executable_sha256": "e83e7414c056c66ffaacda446ab75f1c449312f82148769f7cceaec47bdf7a4a",
+  "pixel_fixture": "recorded pixels and three independently generated premultiplied images per case; CPU fixture generation only",
+  "active_ticket": 5,
+  "error": "AssertionError('case 5 failed')",
+  "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\run-ptl-four-tap-general-compare-v1.py\", line 31, in <module>\n    report['cases'].append(result);write();print(json.dumps(result),flush=True);assert passed,f'case {ticket} failed'\n                                                                                       ^^^^^^\nAssertionError: case 5 failed\n",
+  "finished": "2026-10-15T08:39:26.423269+00:00"
+}

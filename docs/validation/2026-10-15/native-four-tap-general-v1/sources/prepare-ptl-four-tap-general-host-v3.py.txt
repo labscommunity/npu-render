@@ -1,0 +1,10 @@
+from pathlib import Path
+import hashlib,json,tarfile,shutil
+r=Path('results/render-driver');o=r/'ptl-four-tap-general-v3';shutil.copytree(r/'ptl-four-tap-general-v2',o)
+p=o/'ptl_four_tap.hpp';s=p.read_text().replace('double(y)-2-screen[1]','double(y)-.25-screen[1]').replace('double(y+rows)+2-screen[1]','double(y+rows)+.25-screen[1]').replace('std::min(lo,hi)*sh))-4','std::min(lo,hi)*sh))-3').replace('std::max(lo,hi)*sh))+4','std::max(lo,hi)*sh))+3')
+s=s.replace('if(rows==1){result.timings.total_ms=elapsed(start);failed=false;return attempt;}', 'if(rows==1){std::printf("{\\\"ptl_geometry_declined\\\":\\\"source_band_capacity\\\",\\\"source_rows\\\":%u}\\n",bottom-top);std::fflush(stdout);result.timings.total_ms=elapsed(start);failed=false;return attempt;}')
+p.write_text(s)
+(r/'ptl-four-tap-general-v3-source.json').write_text(json.dumps({p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in o.iterdir()},indent=2)+'\n')
+with tarfile.open(r/'ptl-four-tap-general-v3.tar.gz','w:gz') as t:
+ for p in o.iterdir():t.add(p,arcname=o.name+'/'+p.name)
+s=(r/'build-ptl-four-tap-general-v2.ps1').read_text().replace('ptl-four-tap-general-v2','ptl-four-tap-general-v3');(r/'build-ptl-four-tap-general-v3.ps1').write_text(s)

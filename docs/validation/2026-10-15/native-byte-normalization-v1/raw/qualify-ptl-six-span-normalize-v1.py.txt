@@ -1,0 +1,59 @@
+"""Original/custom/original qualification of six independent compiler-owned spans."""
+from pathlib import Path
+from datetime import UTC,datetime
+import argparse,hashlib,json,os,subprocess,sys,time,traceback
+from ptl_softmax_contract_v2 import patch,ORIGINAL_SHA
+from npu_render.ptl_carrier import read_kernel_text
+vm=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm'
+def obj(p):return json.loads(p.read_text(encoding='utf-8-sig'))
+def write(p,v):p.write_text(json.dumps(v,indent=2)+'\n')
+def child(out):
+ import openvino as ov
+ import numpy as np
+ from ptl_six_span_fixture_v1 import fixture,reference
+ report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,phases=[])
+ try:
+  assert ov.get_version()=='2026.4.1-22982-e213a147257-releases/2026/4';core=ov.Core()
+  for phase in ['original-before','custom-four-tap','original-after']:
+   model=core.import_model((out/('patched.blob' if phase=='custom-four-tap' else 'original.blob')).read_bytes(),'NPU');raw=model.get_property('EXECUTION_DEVICES');devices=[raw] if isinstance(raw,str) else list(raw);assert devices in (['NPU'],['NPU.0']);request=model.create_infer_request();checks=[]
+   for i in range(16 if phase=='custom-four-tap' else 8):
+    rng=np.random.default_rng(220000+i)
+    if phase=='custom-four-tap':
+     data=np.zeros((6,131072),np.float16);target=np.zeros_like(data)
+     for plane in range(6):
+      payload,full=fixture(i*6+plane);e,_,_=reference(full);data[plane]=np.frombuffer(payload,np.float16);target[plane,:16384]=e.astype(np.float16).reshape(-1)
+     expected=target.view(np.uint16)
+    else:
+     data=np.full((6,131072),-np.inf,np.float16);target=np.zeros_like(data);active=1024*(2**(i%4))
+     for b in range(6):at=rng.choice(131072,active,replace=False);data[b,at]=np.float16(i%4);target[b,at]=np.float16(1/active)
+     expected=target.view(np.uint16)
+    began=time.perf_counter_ns();request.start_async({0:data});assert request.wait_for(10000);actual=request.get_output_tensor().data.copy().view(np.uint16);elapsed=(time.perf_counter_ns()-began)/1e6
+    if not np.array_equal(actual,expected):
+     report['mismatch']=dict(phase=phase,iteration=i,positions=np.argwhere(actual!=expected)[:16].tolist(),actual=actual[actual!=expected][:16].tolist(),expected=expected[actual!=expected][:16].tolist());raise AssertionError('exact full-span oracle')
+    checks.append(dict(iteration=i,request_ms=elapsed,exact_components=int(expected.size),input_sha256=hashlib.sha256(data.tobytes()).hexdigest(),output_sha256=hashlib.sha256(actual.tobytes()).hexdigest()))
+   report['phases'].append(dict(phase=phase,passed=True,execution_devices=devices,checks=checks));write(out/'child-report.json',report);del request,model
+  report['passed']=True
+ except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+ finally:report.update(completed=True,finished=datetime.now(UTC).isoformat());write(out/'child-report.json',report)
+ print(json.dumps({k:v for k,v in report.items() if k!='phases'}));return 0 if report['passed'] else 1
+
+def main():
+ p=argparse.ArgumentParser();p.add_argument('--child',type=Path);a=p.parse_args()
+ if a.child:return child(a.child)
+ out=vm/'ptl-six-span-normalize-v1';out.mkdir(exist_ok=False);process=None;report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,desktop_changed=False,tahoma_tested=False)
+ try:
+  assert obj(vm/'ptl-byte-normalize-probe-v1/report.json')['passed'];assert obj(vm/'ptl-six-span-identity-v1/report.json')['passed'];assert obj(vm/'ptl-softmax-carriers-v1/report.json')['passed'];q=obj(vm/'ptl-softmax-contract-v2-qualification.json');assert q['passed'] and len(q['checks'])==24
+  for name,digest in q['source_sha256'].items():assert hashlib.sha256((vm/name).read_bytes()).hexdigest()==digest
+  original=(vm/'ptl-softmax-carriers-v1/6/carrier.blob').read_bytes();assert hashlib.sha256(original).hexdigest()==ORIGINAL_SHA;elf=(vm/'ptl-six-span-normalize-v1-build/kernel.elf').read_bytes();assert hashlib.sha256(elf).hexdigest()=='b2ffef175676ff50ed8898ecb33934be4d8473690739dc0ebcc5615c1d99c2aa'
+  modified,proof=patch(original,read_kernel_text(elf));(out/'original.blob').write_bytes(original);(out/'patched.blob').write_bytes(modified);write(out/'contract.json',proof);report['patched_sha256']=hashlib.sha256(modified).hexdigest()
+  with (out/'stdout.log').open('xb') as stdout,(out/'stderr.log').open('xb') as stderr:
+   process=subprocess.Popen([sys.executable,__file__,'--child',str(out)],stdout=stdout,stderr=stderr,creationflags=subprocess.CREATE_NO_WINDOW)
+   try:process.wait(timeout=90)
+   except subprocess.TimeoutExpired:process.kill();process.wait(timeout=5);report['child_timeout']=True
+  result=obj(out/'child-report.json');report.update(exit_code=process.returncode,child_result=result,passed=process.returncode==0 and result['passed'])
+ except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+ finally:
+  if process is not None and process.poll() is None:process.kill();process.wait(timeout=5)
+  report.update(completed=True,finished=datetime.now(UTC).isoformat());write(out/'report.json',report)
+ print(json.dumps({k:v for k,v in report.items() if k!='child_result'}));return 0 if report['passed'] else 1
+if __name__=='__main__':raise SystemExit(main())

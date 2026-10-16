@@ -26,7 +26,9 @@ video and game migration remain open.
 
 ## Why the next work changes focus
 
-The complete replay is exact for all 972 available recorded references. It still
+The complete replay finishes all 972 requests and matches all 971 available original
+pixel references. One request has no original reference; its successful replay is
+not an additional original-reference match. It still
 makes 33,174 provider calls. Summed draw time is 180.53 s, with 239.83 s including
 preparation; these are single-run diagnostic sums, not a matched baseline/offload
 benchmark. The slowest remaining recorded draw takes 5.03 s with 322 calls and no

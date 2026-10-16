@@ -1,0 +1,10 @@
+from pathlib import Path
+import json,hashlib,shutil,tarfile
+r=Path('results/render-driver');o=r/'ptl-native-worker-v2';shutil.copytree(r/'ptl-native-worker-v1',o)
+for name in ['ptl_four_tap.hpp','ptl_four_tap_shaders.hpp']:(o/name).write_bytes((r/'ptl-four-tap-general-v3'/name).read_bytes())
+(r/'ptl-native-worker-v2-source.json').write_text(json.dumps({p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in o.iterdir()},indent=2)+'\n')
+with tarfile.open(r/'ptl-native-worker-v2.tar.gz','w:gz') as t:
+ for p in o.iterdir():t.add(p,arcname=o.name+'/'+p.name)
+s=(r/'build-ptl-native-worker-v1.ps1').read_text().replace('ptl-native-worker-v1','ptl-native-worker-v2');s=s.replace("rendering_implementation='native-routing-v45 qualified native renderer'","rendering_implementation='native-routing-v45 with general four-tap candidate'");(r/'build-ptl-native-worker-v2.ps1').write_text(s)
+s=(r/'qualify-ptl-native-worker-v1.py').read_text().replace('ptl-native-worker-v1','ptl-native-worker-v2').replace('ptl-four-tap-integration-comparison-v1','ptl-four-tap-general-comparison-v3').replace('ptl-six-span-quad-coordinate-v1','ptl-six-span-general-v1').replace('e0aca557415dba5fc651e1b47e67a33ec28cc6e20be715ba7066457f8eba4cba','710f6e5586da59f4040213435c5ecc13bb669e6b1be668f838edd00bca5dd697').replace('ba1ba641f10d19565ae732d7601209c659f91609618546b0e98b554789d61f27','WORKER_SHA').replace('0,1,20,41,42,140,354,803','0,1,5,7,20,41,43,140,177,354,474,476,803,970').replace("x['provider_requests']==34","x['provider_requests']>=2").replace("assert report['specialization_accepted']>=3", "assert report['specialization_accepted']==(10 if a.stage=='selected' else 24)")
+(r/'qualify-ptl-native-worker-v2.py').write_text(s)

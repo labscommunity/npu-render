@@ -1,6 +1,6 @@
 # Full desktop offload: acceptance and execution plan
 
-Updated 2026-10-15. Target: Delta, Windows 11, Panther Lake. The repository stays
+Updated 2026-10-16. Target: Delta, Windows 11, Panther Lake. The repository stays
 private. **Full desktop offload is unfinished.** The latest qualified native trial
 routes Windows desktop composition through the NPU, delivers 42 matching frames
 over a 523.93-second span to the physical output, verifies mouse/keyboard color
@@ -21,7 +21,11 @@ worker passes all 972 recorded requests, registered Direct3D qualification and
 native live v37. That finite live trial delivers 42 matching submissions over
 523.93 seconds, exercises the specialization three times, and restores ordinary
 desktop state. It remains slow: one controlled mouse response takes 27.21 seconds.
-The largest remaining shader groups and model preparation must now be addressed.
+A broader revision now covers all 24 recorded uses of that four-sample shader,
+with 96 exact component comparisons. Its integrated worker passes all 972 requests,
+matches all 971 original references, and matches all 972 outputs from the prior
+worker. This revision has not yet repeated the live trial. The largest remaining
+shader groups and model preparation must now be addressed.
 Normal application admission and matched Tahoma A/B remain open. The earlier
 thirty-minute delivery qualification belongs to the previous renderer.
 
@@ -56,9 +60,10 @@ role, and any GPU rendering/copy cost in the bridge must be measured.
 2. Preserve the exact six-span four-sample replay result and corrected capacity
    guard qualification. Reduce per-pixel work and broaden changing-image checks;
    independent imported-model overlap is excluded after real device loss.
-3. Extend the qualified specialization to the other observed geometries and
-   prioritize the measured three-texture, two-texture and remaining slow shader
-   groups. V37 passes finite live integration; repeat responsiveness and sustained
+3. Retain the now-qualified 24-draw specialization and complete its live integration.
+   Reduce the measured solid-color, three-texture and two-texture shader costs.
+   The five slow solid-color draws alone account for about 10.8 s in the diagnostic
+   replay; a direct multi-rectangle kernel is under qualification. V37 passes finite live integration; repeat responsiveness and sustained
    stability checks after further renderer changes.
 4. Add automatic application admission and the missing graphics operations;
    establish per-process rendering devices under representative real workloads.
@@ -86,6 +91,11 @@ The [guarded integration checks](../validation/2026-10-15/native-six-span-integr
 and [complete replay and live trial](../validation/2026-10-15/native-six-span-live-v1/README.md)
 now pass. They also identify remaining multi-second draws and a slow controlled
 mouse response. They do not establish normal application migration or Tahoma benefit.
+The [broader geometry checks](../validation/2026-10-15/native-four-tap-general-v1/README.md)
+and [integrated worker replay](../validation/2026-10-16/native-general-worker-v1/README.md)
+now cover all 24 observed uses of the four-sample shader. The
+[normalization experiments](../validation/2026-10-15/native-byte-normalization-v1/README.md)
+are exact but do not resolve the overall performance gap.
 These are prerequisites toward the stated
 goal, not substitutes for application migration or Tahoma improvement.
 
