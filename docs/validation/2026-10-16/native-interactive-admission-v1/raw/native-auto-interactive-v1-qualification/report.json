@@ -1,0 +1,18 @@
+{
+  "started": "2026-10-16T19:34:50.322749+00:00",
+  "completed": true,
+  "passed": false,
+  "graphics_tested": false,
+  "npu_tested": false,
+  "driver_changed": false,
+  "cases": [],
+  "target_session": 1,
+  "binary_sha256": {
+    "nr_auto_interactive_consumer.exe": "300e625475405ff1516d20541fa0c2130479c48a4ea43950e1a608dc72f67ce5",
+    "nr_auto_interactive_broker.exe": "25f63d2108f9cee70d84fc1f16916f07edab94e79be87a7d3089ca29d764e80e"
+  },
+  "error": "AssertionError({'completed': True, 'passed': False, 'graphics_tested': False, 'npu_tested': False, 'session': 1, 'elevated': False, 'exit_code': 1, 'error': 'AssertionError()', 'traceback': 'Traceback (most recent call last):\\n  File \"C:\\\\Users\\\\tatef\\\\AppData\\\\Local\\\\npu-render\\\\vm\\\\run-native-interactive-consumer-v1.py\", line 22, in <module>\\n    assert result.returncode == 0 and not result.stderr\\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\nAssertionError\\n'})",
+  "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\qualify-native-auto-interactive-v1.py\", line 74, in <module>\n    assert proof['completed'] and proof['passed'], proof\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: {'completed': True, 'passed': False, 'graphics_tested': False, 'npu_tested': False, 'session': 1, 'elevated': False, 'exit_code': 1, 'error': 'AssertionError()', 'traceback': 'Traceback (most recent call last):\\n  File \"C:\\\\Users\\\\tatef\\\\AppData\\\\Local\\\\npu-render\\\\vm\\\\run-native-interactive-consumer-v1.py\", line 22, in <module>\\n    assert result.returncode == 0 and not result.stderr\\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\nAssertionError\\n'}\n",
+  "cleanup_passed": true,
+  "finished": "2026-10-16T19:34:55.550345+00:00"
+}

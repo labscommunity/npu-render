@@ -1,0 +1,23 @@
+from native_session_broker_v3 import C,W,adv,k,require,process_acl,acl_bytes,Explicit,Trustee
+class TokenQueryGrant:
+ def __init__(self,handle,sid_text):
+  self.handle=handle;self.acl,self.sd=process_acl(handle);self.before=acl_bytes(self.acl);self.active=False;self.restored=False
+  sid=W.LPVOID();candidate=W.LPVOID()
+  try:
+   require(adv.ConvertStringSidToSidW(sid_text,C.byref(sid)));entry=Explicit(8,1,0,Trustee(None,0,0,1,C.cast(sid,W.LPWSTR)))
+   code=adv.SetEntriesInAclW(1,C.byref(entry),self.acl,C.byref(candidate));assert code==0,code
+   code=adv.SetSecurityInfo(handle,6,4,None,None,candidate,None);assert code==0,code;self.active=True
+  except BaseException:
+   if self.sd:k.LocalFree(self.sd);self.sd=None
+   raise
+  finally:
+   if sid:k.LocalFree(sid)
+   if candidate:k.LocalFree(candidate)
+ def restore(self):
+  if self.active:
+   code=adv.SetSecurityInfo(self.handle,6,4,None,None,self.acl,None);assert code==0,code
+   acl,sd=process_acl(self.handle)
+   try:assert acl_bytes(acl)==self.before,'Owned process DACL did not restore exactly'
+   finally:k.LocalFree(sd)
+   self.active=False;self.restored=True
+  if self.sd:k.LocalFree(self.sd);self.sd=None

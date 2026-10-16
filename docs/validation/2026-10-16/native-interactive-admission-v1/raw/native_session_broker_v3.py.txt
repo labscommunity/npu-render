@@ -1,0 +1,103 @@
+"""Windows-only owned-process identity, permission and lease primitives."""
+import argparse,ctypes as C,json,os,secrets,subprocess,time,hashlib,msvcrt,_winapi
+from ctypes import wintypes as W
+from pathlib import Path
+from datetime import UTC,datetime
+class Identity(C.Structure):_fields_=[('pid',C.c_uint32),('session',C.c_uint32),('created',C.c_uint64)]
+class Lease(C.Structure):_fields_=[('magic',C.c_uint64),('version',C.c_uint32),('bytes',C.c_uint32),('issued_tick',C.c_uint64),('deadline_tick',C.c_uint64),('controller',Identity),('worker',Identity),('consumer',Identity),('scope',C.c_uint32),('sid_bytes',C.c_uint32),('nonce',C.c_uint64*2),('pipe_suffix',C.c_char*32),('consumer_sid',C.c_uint8*68),('desktop_session',C.c_uint32),('reserved',C.c_uint32*4)]
+class Attributes(C.Structure):_fields_=[('length',W.DWORD),('descriptor',W.LPVOID),('inherit',W.BOOL)]
+assert C.sizeof(Lease)==224
+k=C.WinDLL('kernel32',use_last_error=True);adv=C.WinDLL('advapi32',use_last_error=True)
+for name,args,result in [('GetCurrentProcess',[],W.HANDLE),('GetProcessTimes',[W.HANDLE,W.LPVOID,W.LPVOID,W.LPVOID,W.LPVOID],W.BOOL),('GetTickCount64',[],C.c_uint64),('ProcessIdToSessionId',[W.DWORD,C.POINTER(W.DWORD)],W.BOOL),('CreateFileMappingW',[W.HANDLE,C.POINTER(Attributes),W.DWORD,W.DWORD,W.DWORD,W.LPCWSTR],W.HANDLE),('MapViewOfFile',[W.HANDLE,W.DWORD,W.DWORD,W.DWORD,C.c_size_t],W.LPVOID),('UnmapViewOfFile',[W.LPCVOID],W.BOOL),('CloseHandle',[W.HANDLE],W.BOOL),('LocalFree',[W.LPVOID],W.LPVOID),('ResumeThread',[W.HANDLE],W.DWORD)]:
+ f=getattr(k,name);f.argtypes=args;f.restype=result
+adv.OpenProcessToken.argtypes=[W.HANDLE,W.DWORD,C.POINTER(W.HANDLE)];adv.OpenProcessToken.restype=W.BOOL
+adv.GetTokenInformation.argtypes=[W.HANDLE,C.c_int,W.LPVOID,W.DWORD,C.POINTER(W.DWORD)];adv.GetTokenInformation.restype=W.BOOL
+adv.GetLengthSid.argtypes=[W.LPVOID];adv.GetLengthSid.restype=W.DWORD
+adv.ConvertStringSecurityDescriptorToSecurityDescriptorW.argtypes=[W.LPCWSTR,W.DWORD,C.POINTER(W.LPVOID),W.LPVOID];adv.ConvertStringSecurityDescriptorToSecurityDescriptorW.restype=W.BOOL
+def require(v):
+ if not v:raise C.WinError(C.get_last_error())
+def created(handle):
+ values=[C.c_uint64() for _ in range(4)];require(k.GetProcessTimes(handle,*[C.byref(x) for x in values]));return values[0].value
+def obj(p):
+ b=p.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+def rows(p):return [json.loads(x) for x in p.read_text(encoding='utf-8-sig').splitlines() if x.startswith('{')]
+
+k.CreateEventW.argtypes=[C.POINTER(Attributes),W.BOOL,W.BOOL,W.LPCWSTR];k.CreateEventW.restype=W.HANDLE
+k.SetEvent.argtypes=[W.HANDLE];k.SetEvent.restype=W.BOOL
+k.GetProcessId.argtypes=[W.HANDLE];k.GetProcessId.restype=W.DWORD
+k.OpenProcess.argtypes=[W.DWORD,W.BOOL,W.DWORD];k.OpenProcess.restype=W.HANDLE
+class Trustee(C.Structure):_fields_=[('multiple',W.LPVOID),('operation',C.c_int),('form',C.c_int),('type',C.c_int),('name',W.LPWSTR)]
+class Explicit(C.Structure):_fields_=[('permissions',W.DWORD),('mode',C.c_int),('inheritance',W.DWORD),('trustee',Trustee)]
+for name,args,result in [('GetSecurityInfo',[W.HANDLE,C.c_int,W.DWORD,W.LPVOID,W.LPVOID,C.POINTER(W.LPVOID),W.LPVOID,C.POINTER(W.LPVOID)],W.DWORD),('SetSecurityInfo',[W.HANDLE,C.c_int,W.DWORD,W.LPVOID,W.LPVOID,W.LPVOID,W.LPVOID],W.DWORD),('SetEntriesInAclW',[W.DWORD,C.POINTER(Explicit),W.LPVOID,C.POINTER(W.LPVOID)],W.DWORD),('ConvertStringSidToSidW',[W.LPCWSTR,C.POINTER(W.LPVOID)],W.BOOL),('GetAclInformation',[W.LPVOID,W.LPVOID,W.DWORD,C.c_int],W.BOOL)]:
+ f=getattr(adv,name);f.argtypes=args;f.restype=result
+k.OpenProcess.argtypes=[W.DWORD,W.BOOL,W.DWORD];k.OpenProcess.restype=W.HANDLE
+class AclInfo(C.Structure):_fields_=[('count',W.DWORD),('bytes',W.DWORD),('free',W.DWORD)]
+def acl_bytes(acl):
+ size=AclInfo();require(adv.GetAclInformation(acl,C.byref(size),C.sizeof(size),2));return C.string_at(acl,size.bytes)
+def process_acl(handle):
+ acl=W.LPVOID();sd=W.LPVOID();code=adv.GetSecurityInfo(handle,6,4,None,None,C.byref(acl),None,C.byref(sd));assert code==0,code;return acl,sd
+class ProcessGrant:
+ def __init__(self,handle,sid_text):
+  self.handle=handle;self.acl,self.sd=process_acl(handle);self.before=acl_bytes(self.acl);self.active=False;self.restored=False
+  sid=W.LPVOID();candidate=W.LPVOID()
+  try:
+   require(adv.ConvertStringSidToSidW(sid_text,C.byref(sid)));entry=Explicit(0x101000,1,0,Trustee(None,0,0,1,C.cast(sid,W.LPWSTR)))
+   code=adv.SetEntriesInAclW(1,C.byref(entry),self.acl,C.byref(candidate));assert code==0,code
+   code=adv.SetSecurityInfo(handle,6,4,None,None,candidate,None);assert code==0,code;self.active=True
+  except BaseException:
+   if self.sd:k.LocalFree(self.sd);self.sd=None
+   raise
+  finally:
+   if sid:k.LocalFree(sid)
+   if candidate:k.LocalFree(candidate)
+ def restore(self):
+  if self.active:
+   code=adv.SetSecurityInfo(self.handle,6,4,None,None,self.acl,None);assert code==0,code
+   acl,sd=process_acl(self.handle)
+   try:assert acl_bytes(acl)==self.before,'Owned process DACL did not restore exactly'
+   finally:k.LocalFree(sd)
+   self.active=False;self.restored=True
+  if self.sd:k.LocalFree(self.sd);self.sd=None
+def process_identity(handle):
+ pid=k.GetProcessId(handle);require(pid);session=W.DWORD();require(k.ProcessIdToSessionId(pid,C.byref(session)));return Identity(pid,session.value,created(handle))
+def process_sid(handle):
+ token=W.HANDLE();require(adv.OpenProcessToken(handle,8,C.byref(token)))
+ try:
+  size=W.DWORD();adv.GetTokenInformation(token,1,None,0,C.byref(size));assert 0<size.value<=65536
+  buffer=C.create_string_buffer(size.value);require(adv.GetTokenInformation(token,1,buffer,size,C.byref(size)))
+  sid=C.cast(buffer,C.POINTER(W.LPVOID)).contents.value;count=adv.GetLengthSid(sid);assert 8<=count<=68;data=C.string_at(sid,count)
+  adv.ConvertSidToStringSidW.argtypes=[W.LPVOID,C.POINTER(W.LPWSTR)];adv.ConvertSidToStringSidW.restype=W.BOOL;text=W.LPWSTR();require(adv.ConvertSidToStringSidW(sid,C.byref(text)))
+  try:return data,text.value
+  finally:k.LocalFree(text)
+ finally:k.CloseHandle(token)
+class LeaseGrant:
+ def __init__(self,worker_handle,consumer_handle,suffix,*,scope=0,desktop_session=0,milliseconds=120000):
+  assert len(suffix)==32 and all(c in '0123456789abcdef' for c in suffix)
+  self.mapping=None;self.event=None;record=Lease();record.magic=0x33564250524e3854;record.version=3;record.bytes=C.sizeof(Lease)
+  record.controller=process_identity(k.GetCurrentProcess());record.worker=process_identity(worker_handle);record.consumer=process_identity(consumer_handle)
+  assert len({record.controller.pid,record.worker.pid,record.consumer.pid})==3
+  sid,sid_text=process_sid(consumer_handle);record.scope=scope;record.desktop_session=desktop_session
+  if scope==0:assert desktop_session==0 and record.controller.session==record.worker.session==record.consumer.session and not sid_text.startswith('S-1-5-90-') and 0<milliseconds<=120000
+  else:
+   assert scope in (1,2) and record.controller.session==record.worker.session==0 and 0<desktop_session<0xffffffff and 0<milliseconds<=2400000
+   if scope==1:assert record.consumer.session==desktop_session and sid_text==f'S-1-5-90-0-{desktop_session}'
+   else:assert record.consumer.session==0 and sid_text=='S-1-5-19'
+  record.issued_tick=k.GetTickCount64();record.deadline_tick=record.issued_tick+milliseconds;record.sid_bytes=len(sid);C.memmove(C.addressof(record)+Lease.consumer_sid.offset,sid,len(sid))
+  record.nonce[0]=secrets.randbits(64)|1;record.nonce[1]=secrets.randbits(64);record.pipe_suffix=suffix.encode();self.record=record;self.name=rf'Global\T8.NpuRender.NativeSession.v3.{record.consumer.pid}'
+  sd=W.LPVOID();event_sd=W.LPVOID();view=None
+  try:
+   require(adv.ConvertStringSecurityDescriptorToSecurityDescriptorW(f'O:BAG:BAD:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;0x00020004;;;{sid_text})',1,C.byref(sd),None))
+   attributes=Attributes(C.sizeof(Attributes),sd,False);self.mapping=k.CreateFileMappingW(C.c_void_p(-1),C.byref(attributes),4,0,C.sizeof(record),self.name);error=C.get_last_error();require(self.mapping)
+   assert error!=183,'Consumer admission record already exists'
+   view=k.MapViewOfFile(self.mapping,2,0,0,C.sizeof(record));require(view);C.memmove(view,C.byref(record),C.sizeof(record));require(k.UnmapViewOfFile(view));view=None
+   require(adv.ConvertStringSecurityDescriptorToSecurityDescriptorW(f'O:BAG:BAD:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;0x00100000;;;{sid_text})',1,C.byref(event_sd),None))
+   attributes=Attributes(C.sizeof(Attributes),event_sd,False);self.event=k.CreateEventW(C.byref(attributes),True,False,self.name+'.Ready');error=C.get_last_error();require(self.event)
+   assert error!=183,'Consumer readiness record already exists';require(k.SetEvent(self.event))
+  except BaseException:self.close();raise
+  finally:
+   if view:k.UnmapViewOfFile(view)
+   if sd:k.LocalFree(sd)
+   if event_sd:k.LocalFree(event_sd)
+ def close(self):
+  if self.event:k.CloseHandle(self.event);self.event=None
+  if self.mapping:k.CloseHandle(self.mapping);self.mapping=None

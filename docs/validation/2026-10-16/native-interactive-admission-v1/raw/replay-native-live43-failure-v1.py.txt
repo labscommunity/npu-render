@@ -1,0 +1,16 @@
+"""Isolate the captured live43 timeout without changing the desktop."""
+from pathlib import Path
+import hashlib,json,os,subprocess,sys
+r=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=r/'vm'
+def obj(p):
+ b=p.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+previous=obj(vm/'native-desktop-admission-v53/report.json');assert previous['completed'] and previous['cleanup_passed']
+capture=vm/'native-live43-failure-capture-v1';capture.mkdir(exist_ok=False)
+source=vm/'native-desktop-admission-v53/bootstrap/failed-request.bin';data=source.read_bytes();assert len(data)==254476 and hashlib.sha256(data).hexdigest()=='46caf6546bcde449d3829a05aaedfcefc719686f25264cec6786065df7a628c3'
+(capture/'request-00000000.bin').write_bytes(data)
+(capture/'index.jsonl').write_text(json.dumps(dict(recording_started=True,maximum_request_bytes=17179869184,synthesized_index_of_captured_failure=True,original_ticket=767))+'\n'+json.dumps(dict(request_recorded=True,ticket=0,file='request-00000000.bin',bytes=len(data),sha256=hashlib.sha256(data).hexdigest()))+'\n')
+command=[sys.executable,str(vm/'replay-recorded-requests-v18.py'),'--worker',str(r/'builds/ptl-native-worker-v8/Release/nr_registered_local_indexed_worker.exe'),'--client',str(r/'builds/native-routing-v20/Release/nr_registered_local_indexed_client_probe.exe'),'--runtime',str(r/'toolchains/openvino-2026.4.1/Lib/site-packages/openvino/libs'),'--cache',str(vm/'model-cache-2026-4-v209'),'--capture',str(capture),'--output',str(vm/'native-live43-failure-replay-v1'),'--shared-core','1','--shared-queue','1','--memory-cache','1','--memory-capacity','512','--pipeline-cache','retained','--quad-batch','1','--generic-batch','4096','--infer-trace','1','--compile-trace','1','--infer-profile','0','--provider-recovery','1','--texture-scope','1']
+env=os.environ.copy()
+for key,directory in [('PROGRAM','ptl-six-span-program-v3'),('FOUR_TAP','ptl-six-span-general-v1'),('SOLID','ptl-six-span-solid-v3'),('TEXTURE','ptl-six-span-three-texture-v1'),('GEOMETRY','ptl-six-span-geometry-v2'),('MASKED','ptl-six-span-masked-v1')]:env['NR_RENDER_PTL_'+key+'_BLOB']=str(vm/directory/'patched.blob')
+result=subprocess.run(command,env=env,creationflags=subprocess.CREATE_NO_WINDOW)
+raise SystemExit(result.returncode)

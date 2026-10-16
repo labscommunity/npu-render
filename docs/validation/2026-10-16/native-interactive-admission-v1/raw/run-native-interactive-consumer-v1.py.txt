@@ -1,0 +1,35 @@
+"""Finite ordinary, non-elevated interactive admission consumer; no graphics."""
+from pathlib import Path
+import ctypes
+import hashlib
+import json
+import subprocess
+import sys
+import traceback
+
+out, binary, mutation = Path(sys.argv[1]), Path(sys.argv[2]), int(sys.argv[3])
+report = dict(completed=False, passed=False, graphics_tested=False, npu_tested=False)
+try:
+    session = ctypes.c_ulong()
+    assert ctypes.windll.kernel32.ProcessIdToSessionId(ctypes.windll.kernel32.GetCurrentProcessId(), ctypes.byref(session))
+    assert session.value > 0 and not ctypes.windll.shell32.IsUserAnAdmin()
+    assert hashlib.sha256(binary.read_bytes()).hexdigest() == '300e625475405ff1516d20541fa0c2130479c48a4ea43950e1a608dc72f67ce5'
+    report.update(session=session.value, elevated=False)
+    result = subprocess.run([str(binary), '--consumer', str(mutation)], capture_output=True, timeout=12, creationflags=subprocess.CREATE_NO_WINDOW)
+    (out/'consumer.stdout.jsonl').write_bytes(result.stdout)
+    (out/'consumer.stderr.log').write_bytes(result.stderr)
+    report['exit_code'] = result.returncode
+    assert result.returncode == 0 and not result.stderr
+    proof = json.loads(result.stdout)
+    assert proof['consumer_passed'] and proof['session'] == session.value and proof['mutation'] == mutation
+    assert proof['admitted'] == (mutation == 0)
+    assert not proof['preexisting_lease'] and not proof['started_suspended']
+    if not mutation:
+        assert proof['scope'] == 3
+    report.update(passed=True, consumer=proof)
+except Exception as error:
+    report.update(error=repr(error), traceback=traceback.format_exc())
+finally:
+    report['completed'] = True
+    (out/'consumer-report.json').write_text(json.dumps(report, indent=2)+'\n')
+raise SystemExit(0 if report['passed'] else 1)

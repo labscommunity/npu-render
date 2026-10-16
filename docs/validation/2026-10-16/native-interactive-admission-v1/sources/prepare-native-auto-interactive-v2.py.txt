@@ -1,0 +1,21 @@
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');d=r/'native-auto-interactive-v2';shutil.copytree(r/'native-auto-interactive-v1',d)
+s=(r/'native-auto-umd-v1/native/windows/registered_lab/native_probe_lease_test.cpp').read_text();needle='    const auto console=WTSGetActiveConsoleSessionId();';assert needle in s
+s=s.replace(needle,r'''
+    auto interactive=base;interactive.scope=3;interactive.controller.session=interactive.worker.session=0;interactive.desktop_session=interactive.consumer.session=4;
+    check(n::shape_valid(interactive,10000,3,19,4));++shape_cases;interactive.deadline_tick=interactive.issued_tick+120000;check(n::shape_valid(interactive,10000,3,19,4));++shape_cases;
+    for(unsigned kind=0;kind<12;++kind){auto value=interactive;switch(kind){
+      case 0:value.desktop_session=0;break;case 1:value.desktop_session=UINT32_MAX;break;case 2:value.consumer.session=0;break;case 3:value.controller.session=4;break;case 4:value.worker.session=4;break;case 5:++value.deadline_tick;break;case 6:value.scope=4;break;case 7:value.desktop_session=5;break;
+      default:{const wchar_t *sids[]={L"S-1-5-90-0-4",L"S-1-5-18",L"S-1-5-19",L"S-1-5-20"};PSID sid=nullptr;check(ConvertStringSidToSidW(sids[kind-8],&sid)!=FALSE);value.sid_bytes=GetLengthSid(sid);std::memset(value.consumer_sid,0,sizeof(value.consumer_sid));check(CopySid(sizeof(value.consumer_sid),value.consumer_sid,sid)!=FALSE);LocalFree(sid);break;}
+    }check(!n::shape_valid(value,10000,3,19,4));++shape_cases;}
+'''+needle);(d/'contract.cpp').write_text(s)
+p=d/'CMakeLists.txt';s=p.read_text().replace('foreach(t nr_auto_interactive_broker nr_auto_interactive_consumer)','add_executable(nr_auto_interactive_contract contract.cpp)\nforeach(t nr_auto_interactive_broker nr_auto_interactive_consumer nr_auto_interactive_contract)');s+='\nenable_testing()\nadd_test(NAME interactive_lease_contract COMMAND nr_auto_interactive_contract)\n';p.write_text(s)
+p=d/'consumer.cpp';s=p.read_text().replace('mutation<=6','mutation<=6&&mutation!=5');p.write_text(s)
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};(r/'native-auto-interactive-v2-source.json').write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/'native-auto-interactive-v2.tar.gz','w:gz') as t:t.add(d,arcname=d.name)
+s=(r/'build-native-auto-broker-v1.ps1').read_text().replace('native-auto-broker-v1','native-auto-interactive-v2');a=s.index('[ordered]@{clean_build=');s=s[:a]+'''& ctest --test-dir $b -C Release --output-on-failure *> "$b\\contract.log";if($LASTEXITCODE){Get-Content "$b\\contract.log";throw 'Lease contract failed'}
+$hashes=@{};foreach($exe in @('nr_auto_interactive_broker.exe','nr_auto_interactive_consumer.exe','nr_auto_interactive_contract.exe')){$hashes[$exe]=(Get-FileHash "$b\\Release\\$exe").Hash}
+[ordered]@{clean_build=$true;source_sha256=$expected;binary_sha256=$hashes;contract_passed=$true;npu_tested=$false;physical_driver_installed=$false}|ConvertTo-Json -Depth 5|Set-Content "$b\\registered-build-report.json"
+Get-Content "$b\\registered-build-report.json" -Raw
+''';(r/'build-native-auto-interactive-v2.ps1').write_text(s)

@@ -1,0 +1,118 @@
+"""Real cross-session admission with limited interactive Scheduled Task clients."""
+from pathlib import Path
+from datetime import UTC, datetime
+import base64
+import ctypes
+from ctypes import wintypes
+import hashlib
+import json
+import os
+import secrets
+import subprocess
+import time
+import traceback
+
+r = Path(os.environ['LOCALAPPDATA'])/'npu-render'
+vm = r/'vm'
+out = vm/'native-auto-interactive-v6-qualification'
+out.mkdir(exist_ok=False)
+binary = r/'builds/native-auto-interactive-v7/Release/nr_auto_interactive_consumer.exe'
+broker = binary.with_name('nr_auto_interactive_broker.exe')
+pythonw = r/'toolchains/openvino-2026.4.1/Scripts/pythonw.exe'
+report = dict(started=datetime.now(UTC).isoformat(), completed=False, passed=False,
+              graphics_tested=False, npu_tested=False, driver_changed=False, cases=[])
+worker = server = None
+tasks = []
+from native_session_broker_v3 import ProcessGrant, process_sid, k as broker_kernel
+grants=[]
+owned_processes=[]
+k = ctypes.WinDLL('kernel32', use_last_error=True)
+k.WTSGetActiveConsoleSessionId.restype = wintypes.DWORD
+k.OpenFileMappingW.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.LPCWSTR]
+k.OpenFileMappingW.restype = wintypes.HANDLE
+k.CloseHandle.argtypes = [wintypes.HANDLE]
+def save():
+    (out/'report.json').write_text(json.dumps(report, indent=2)+'\n')
+def rows(p):
+    return [json.loads(x) for x in p.read_text(encoding='utf-8-sig').splitlines() if x.startswith('{') and x.endswith('}')] if p.exists() else []
+def psquote(value):
+    return "'"+str(value).replace("'", "''")+"'"
+def powershell(script):
+    return subprocess.run(['powershell.exe','-NoProfile','-NonInteractive','-EncodedCommand',base64.b64encode(script.encode('utf-16-le')).decode()], capture_output=True, timeout=20, creationflags=subprocess.CREATE_NO_WINDOW)
+def absent(name):
+    handle = k.OpenFileMappingW(4, False, name)
+    if handle:
+        k.CloseHandle(handle)
+    assert not handle and ctypes.get_last_error() == 2
+save()
+try:
+    session = k.WTSGetActiveConsoleSessionId()
+    assert session not in (0, 0xffffffff)
+    assert hashlib.sha256(binary.read_bytes()).hexdigest() == 'ad71638f9a12645b7c192536eae15270e3d47af7b792338694e13c3e0079b404'
+    assert hashlib.sha256(broker.read_bytes()).hexdigest() == '3d64a9136af00050dd3b8ed7c452f8ccd994cf5307962ebfa74d7f0b4d4bb41c'
+    report.update(target_session=session, binary_sha256={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in [binary, broker]})
+    worker = subprocess.Popen([str(binary),'--idle'], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW)
+    sid_text=process_sid(broker_kernel.GetCurrentProcess())[1]
+    grants.append(ProcessGrant(int(worker._handle),sid_text));owned_processes.append(worker)
+    for index, mutation in enumerate([0,1,2,3,4,6,0]):
+        case = out/f'case-{index}-mutation-{mutation}'
+        case.mkdir()
+        task = 'T8-NpuRender-AutoInteractive-V6-'+str(index)
+        tasks.append(task)
+        with (case/'broker.stdout.jsonl').open('wb') as stdout, (case/'broker.stderr.log').open('wb') as stderr:
+            server = subprocess.Popen([str(broker),str(worker.pid),secrets.token_hex(16),str(session)], stdout=stdout, stderr=stderr, creationflags=subprocess.CREATE_NO_WINDOW)
+            deadline = time.monotonic()+5
+            while not any(x.get('automatic_broker_ready') for x in rows(case/'broker.stdout.jsonl')):
+                assert server.poll() is None and time.monotonic() < deadline
+                time.sleep(.01)
+            grants.append(ProcessGrant(int(server._handle),sid_text));owned_processes.append(server)
+            arguments = subprocess.list2cmdline([str(vm/'run-native-interactive-consumer-v5.py'), str(case), str(binary), str(mutation)])
+            script = "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';"+"$action=New-ScheduledTaskAction -Execute "+psquote(pythonw)+" -Argument "+psquote(arguments)+";"+"$principal=New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value) -LogonType Interactive -RunLevel Limited;"+"$settings=New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 1) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries;"+"Register-ScheduledTask -TaskName "+psquote(task)+" -Action $action -Principal $principal -Settings $settings|Out-Null;Start-ScheduledTask -TaskName "+psquote(task)
+            result = powershell(script)
+            (case/'task.stdout.log').write_bytes(result.stdout)
+            (case/'task.stderr.log').write_bytes(result.stderr)
+            assert result.returncode == 0
+            deadline = time.monotonic()+20
+            while not (case/'consumer-report.json').exists():
+                assert time.monotonic()<deadline
+                time.sleep(.05)
+            proof=json.loads((case/'consumer-report.json').read_text())
+            assert proof['completed'] and proof['passed'], proof
+            server.wait(timeout=8)
+            evidence=rows(case/'broker.stdout.jsonl')
+            received=[x for x in evidence if x.get('automatic_request_received')]
+            admitted=[x for x in evidence if x.get('automatic_consumer_admitted')]
+            assert len(received)==1 and received[0]['actual_client_pid']==proof['consumer']['pid']
+            assert received[0]['actual_session']==session and received[0]['sid_matches']
+            if not mutation:
+                assert server.returncode==0 and len(admitted)==1 and any(x.get('owned_mappings_removed') for x in evidence)
+            else:
+                assert server.returncode==1 and not admitted
+                key={1:'claimed_client_pid',2:'creation_matches',3:'signature_matches',4:'nonce_matches',6:'claimed_session'}[mutation]
+                expected=received[0]['actual_client_pid'] if mutation==1 else session if mutation==6 else True
+                assert received[0][key]!=expected
+            absent('Global\\T8.NpuRender.AutoAdmission.v2.'+str(session))
+            absent('Global\\T8.NpuRender.NativeSession.v3.'+str(proof['consumer']['pid']))
+            report['cases'].append(dict(index=index, mutation=mutation, passed=True, admitted=not mutation, actual_client_verified=True, mappings_removed=True, consumer_session=session, elevated=False))
+            save()
+    report['passed']=True
+except Exception as error:
+    report.update(error=repr(error), traceback=traceback.format_exc())
+finally:
+    restored=[]
+    for grant in reversed(grants):
+        try:grant.restore();restored.append(grant.restored)
+        except Exception as error:restored.append(False);report.setdefault("restore_errors",[]).append(repr(error))
+    report["owned_process_acls_restored_exactly"]=bool(grants) and all(restored)
+    for process in [server]+owned_processes:
+        if process and process.poll() is None:
+            process.kill();process.wait(timeout=5)
+    cleanup=[]
+    for task in tasks:
+        result=powershell("$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$task="+psquote(task)+";Stop-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue;Unregister-ScheduledTask -TaskName $task -Confirm:$false -ErrorAction SilentlyContinue;if(Get-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue){throw 'Owned task remains'}")
+        cleanup.append(result.returncode==0)
+    report.update(completed=True, cleanup_passed=all(cleanup), finished=datetime.now(UTC).isoformat())
+    report['passed']=report['passed'] and report['cleanup_passed'] and report['owned_process_acls_restored_exactly']
+    save()
+print(json.dumps(report))
+raise SystemExit(0 if report['passed'] else 1)

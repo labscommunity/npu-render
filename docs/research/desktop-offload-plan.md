@@ -37,6 +37,12 @@ explicitly selects the adapter and shares session zero with its worker. It does
 not qualify interactive default-adapter applications, existing-device migration,
 browsers, video or games.
 
+The [interactive admission component](../validation/2026-10-16/native-interactive-admission-v1/README.md)
+now passes normally started non-elevated clients across the session boundary,
+identity-spoof rejection and exact access-list restoration. It has not yet been
+integrated into the graphics driver or the shared desktop worker. The same archive
+retains an isolated reproduction of live v43's 17,057-node graph timeout.
+
 The primary obstacle is responsiveness. A captured cold graph takes 89.1 seconds
 to compile. The fully cached v35 worker also makes 42,760 provider calls across
 1,253 completed operations; its slowest operation takes 9.60 seconds with 1,282
@@ -145,10 +151,11 @@ role, and any GPU rendering/copy cost in the bridge must be measured.
    replay and registered D3D, but live stability fails. Preserve explicit routing
    declines and original evidence. Repeat finite and sustained desktop tests after
    the reliability repair.
-5. Extend automatic admission to interactive processes sharing the serialized
-   desktop worker, with negative identity/session tests, bounded renewal and
-   revocation. Qualify ordinary default-adapter applications before browsers,
-   video and representative 3D workloads.
+5. Integrate the qualified interactive admission component with the serialized
+   desktop worker. Two ordinary non-elevated clients and five spoof rejections
+   now pass, with exact process/token access-list restoration. Graphics routing,
+   bounded renewal and revocation remain open. Qualify ordinary default-adapter
+   applications before browsers, video and representative 3D workloads.
 6. Measure matched Tahoma baseline/offload performance and remaining GPU work.
    Finish install/on/off/recovery only after these functional and benefit gates.
 
