@@ -1,0 +1,170 @@
+"""Replay the real named-pipe worker, with pinned NPU specialization and inherited recovery."""
+from pathlib import Path
+from datetime import UTC,datetime
+import argparse,hashlib,json,os,subprocess,sys,traceback
+root=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=root/'vm'
+def obj(p):
+ b=p.read_bytes();return json.loads(b.decode('utf-16') if b.startswith(b'\xff\xfe') else b.decode('utf-8-sig'))
+def rows(p):return [json.loads(x) for x in p.read_text(encoding='utf-8-sig').splitlines() if x.startswith('{') and x.endswith('}')]
+def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+p=argparse.ArgumentParser();p.add_argument('stage',choices=['selected','full']);p.add_argument('--worker-sha256',required=True);a=p.parse_args()
+out=vm/('ptl-native-worker-v18-'+a.stage);out.mkdir(exist_ok=False);trial=out/'replay';process=None
+report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,desktop_changed=False,tahoma_tested=False,stage=a.stage)
+def save():(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+try:
+ assert obj(vm/'ptl-program-compact-v1-qualification/report.json')['passed']
+ assert obj(vm/'ptl-program-point-comparison-v1-full/report.json')['passed'];assert obj(vm/'ptl-complex-original-timing-v1/report.json')['passed'];assert obj(vm/'native-desktop-admission-v58/report.json')['cleanup_passed']
+ complex_model=vm/'ptl-six-span-complex-shader-v1/patched.blob';assert sha(complex_model)=='47f69b5861732a03014b58160116ebbb928fd6e818a11b7f553e423a4cf3c43a'
+ complex_tickets={58,196,302,363,482,602,668,723,790,820}
+ assert obj(vm/'ptl-native-worker-v13-full/report.json')['passed'];assert obj(vm/'ptl-rectangle-capture-v4-qualification/report.json')['passed'] and obj(vm/'ptl-native-worker-v12-full/report.json')['passed']
+ rectangle_model=vm/'ptl-six-span-point-rectangle-v2/patched.blob';assert sha(rectangle_model)=='d651d6101dbccc5796873dc2016ec9e23d262cd955e9bc4bee6d56b86756eb2d'
+ rectangle_tickets=set(obj(vm/'ptl-point-rectangle-admission-v4/report.json')['accepted_tickets']);assert len(rectangle_tickets)==37
+ assert obj(vm/'ptl-native-worker-v9-full/report.json')['passed']
+ assert obj(vm/'ptl-long-shader-capture-v2/report.json')['passed']
+ long_model=vm/'ptl-six-span-long-shader-v2/patched.blob';assert sha(long_model)=='895831be2695bc151454833249996608f38d35880c635900bb731515bc2bcda1'
+ assert obj(vm/'ptl-program-comparison-v4-full/report.json')['passed']
+ program=vm/'ptl-six-span-program-compact-v1/patched.blob';assert sha(program)=='92e04a6734dc6e70ffed15b67fddba02892c66168aa0d47a6cf4bcc65a6a585d'
+ assert obj(vm/'ptl-masked-comparison-v1/report.json')['passed']
+ masked=vm/'ptl-six-span-masked-v1/patched.blob';assert sha(masked)=='81104c9ea8760bbeb7cc028ea2a9c81e8605482af219f57c082c737b9662d1e0'
+ assert obj(vm/'ptl-general-geometry-comparison-v1/report.json')['passed']
+ geometry=vm/'ptl-six-span-geometry-v2/patched.blob';assert sha(geometry)=='ea4432abd7b548396b86665c1b318353e0d2f3ec847bcd3e6f56c10bd1336dfa'
+ assert obj(vm/'ptl-four-tap-general-comparison-v3/report.json')['passed']
+ assert obj(vm/'ptl-three-texture-integration-comparison-v3/report.json')['passed']
+ texture=vm/'ptl-six-span-three-texture-v1/patched.blob';assert sha(texture)=='481765dd51d8d9b051b87db8be7e62ae7931245fe051b33b6457be77816c2e87'
+ corrections=vm/'ptl-qualified-precision-profiles-v2.json';assert obj(corrections)['qualified'] and len(obj(corrections)['cases'])==5
+ assert obj(vm/'ptl-solid-integration-comparison-v2/report.json')['passed']
+ solid=vm/'ptl-six-span-solid-v3/patched.blob';assert sha(solid)=='21360321c21d4a0253b260ce62420ffef47ec03daae8b89e6cf05bd4c541ee8f'
+ worker=root/'builds/ptl-native-worker-v18/Release/nr_registered_local_indexed_worker.exe';assert sha(worker)==a.worker_sha256
+ model=vm/'ptl-six-span-general-v1/patched.blob';assert sha(model)=='710f6e5586da59f4040213435c5ecc13bb669e6b1be668f838edd00bca5dd697'
+ if a.stage=='full':assert obj(vm/'ptl-native-worker-v18-selected/report.json')['passed']
+ for source,digest in {'replay-recorded-requests-v19.py': '0a360383e4ad5084f77a07f0ece68467caa4debfcbe4c4c24a16a7f5345e112d', 'precision_corrections_v2.py': '7321d6c917414f60097a0126db60fc15bf012984693d617e3839afe27ec3e414', 'precision_corrections_v1.py': '464b6c8da9f5ef1f8b19790f5feabe178e9a38ff6cf07c4e75cacd271198fcda'}.items():assert sha(vm/source)==digest
+ env=os.environ.copy();env['NR_RENDER_PTL_RECTANGLE_BLOB']=str(rectangle_model);env['NR_RENDER_PTL_COMPLEX_BLOB']=str(complex_model);env['NR_RENDER_PTL_LONG_BLOB']=str(long_model);env['NR_RENDER_PTL_PROGRAM_BLOB']=str(program);env['NR_RENDER_PTL_FOUR_TAP_BLOB']=str(model);env['NR_RENDER_PTL_SOLID_BLOB']=str(solid);env['NR_RENDER_PTL_TEXTURE_BLOB']=str(texture);env['NR_RENDER_PTL_GEOMETRY_BLOB']=str(geometry);env['NR_RENDER_PTL_MASKED_BLOB']=str(masked)
+ command=[sys.executable,str(vm/'replay-recorded-requests-v19.py'),'--worker',str(worker),'--client',str(root/'builds/native-routing-v20/Release/nr_registered_local_indexed_client_probe.exe'),'--runtime',str(root/'toolchains/openvino-2026.4.1/Lib/site-packages/openvino/libs'),'--cache',str(vm/'model-cache-2026-4-v209'),'--capture',str(vm/'native-desktop-admission-v33/bootstrap/requests'),'--output',str(trial),'--shared-core','1','--shared-queue','1','--memory-cache','1','--memory-capacity','512','--pipeline-cache','retained','--quad-batch','1','--generic-batch','4096','--infer-trace','0','--compile-trace','0','--infer-profile','0','--provider-recovery','1','--texture-scope','1','--precision-corrections',str(corrections),'--precision-corrections-sha256',sha(corrections)]
+ if a.stage=='selected':command+=['--tickets','0,1,5,7,20,41,43,59,75,140,172,173,174,177,181,196,197,203,292,293,294,302,303,309,333,334,335,354,455,465,474,476,580,585,646,651,712,717,767,773,803,964,965,970,14,17,18,78,127,182,256,262,280,512,479,481,599,601,665,667,35,160,58,363,482,602,668,723,790,820']
+ if a.stage=='selected':command[-1]=','.join(str(x) for x in sorted({int(x) for x in command[-1].split(',')}|rectangle_tickets))
+ report.update(long_model_sha256=sha(long_model),program_model_sha256=sha(program),masked_model_sha256=sha(masked),geometry_model_sha256=sha(geometry),worker_sha256=sha(worker),solid_model_sha256=sha(solid),texture_model_sha256=sha(texture),precision_corrections_sha256=sha(corrections),model_sha256=sha(model),command=command);save()
+ with (out/'stdout.log').open('xb') as stdout,(out/'stderr.log').open('xb') as stderr:
+  process=subprocess.Popen(command,env=env,stdout=stdout,stderr=stderr,creationflags=subprocess.CREATE_NO_WINDOW)
+  try:process.wait(timeout=1950)
+  except subprocess.TimeoutExpired:process.kill();process.wait(timeout=5);report['replay_timeout']=True
+ replay_exit=process.returncode
+ proof=obj(trial/'report.json');assert proof['worker_binary_sha256']==a.worker_sha256;report.update(replay_exit=replay_exit,replay=proof)
+ assert replay_exit==0 and proof['passed'];assert proof['original_pixel_hashes_matched']+proof['qualified_correction_hashes_matched']+proof['unreferenced_successes']==proof['delivery_acknowledgments']
+ parent=rows(trial/'worker.stdout.jsonl');report['provider_generations']=sum(bool(x.get('provider_process_started')) for x in parent);report['provider_failures']=sum(bool(x.get('provider_process_failure')) for x in parent)
+ attempts=[]
+ for log in (trial/'provider-processes').glob('generation-*/worker.stdout.jsonl'):attempts += [x for x in rows(log) if x.get('ptl_four_tap_attempt')]
+ report.update(specialization_attempts=len(attempts),specialization_accepted=sum(bool(x['accepted']) for x in attempts),specialization_declined=sum(not x['accepted'] for x in attempts))
+ assert len(attempts)>=3 and all(x['provider_requests']>=2 for x in attempts if x['accepted']);assert report['specialization_accepted']==(10 if a.stage=='selected' else 24)
+ solid_attempts=[]
+ for log in (trial/'provider-processes').glob('generation-*/worker.stdout.jsonl'):solid_attempts += [x for x in rows(log) if x.get('ptl_solid_attempt')]
+ report.update(solid_attempts=len(solid_attempts),solid_accepted=sum(bool(x['accepted']) for x in solid_attempts),solid_declined=sum(not x['accepted'] for x in solid_attempts))
+ assert report['solid_accepted']==5 and all(x['provider_requests']==5 for x in solid_attempts if x['accepted'])
+ texture_attempts=[]
+ for log in (trial/'provider-processes').glob('generation-*/worker.stdout.jsonl'):texture_attempts += [x for x in rows(log) if x.get('ptl_texture_draw')]
+ report.update(texture_attempts=len(texture_attempts),texture_accepted=sum(bool(x['accepted']) for x in texture_attempts))
+ assert report['texture_accepted']==9 and all(x['coverage_compacted'] and x['provider_requests']>=2 for x in texture_attempts)
+ geometry_attempts=[];imports=[]
+ for log in (trial/'provider-processes').glob('generation-*/worker.stdout.jsonl'):
+  events=rows(log);geometry_attempts += [x for x in events if x.get('ptl_geometry_draw')];imports += [x for x in events if x.get('ptl_geometry_provider_created')]
+ report.update(geometry_attempts=len(geometry_attempts),geometry_accepted=sum(bool(x['accepted']) for x in geometry_attempts),geometry_declined=sum(not x['accepted'] for x in geometry_attempts),geometry_imports=len(imports))
+ assert report['geometry_imports']==1  # Exact expected routed ticket set is checked below; selected set may be empty.
+ masked_attempts=[];masked_imports=[]
+ for log in (trial/'provider-processes').glob('generation-*/worker.stdout.jsonl'):
+  events=rows(log);masked_attempts += [x for x in events if x.get('ptl_masked_draw')];masked_imports += [x for x in events if x.get('ptl_masked_provider_created')]
+ report.update(masked_accepted=sum(bool(x['accepted']) for x in masked_attempts),masked_imports=len(masked_imports))
+ assert report['masked_accepted']==0 and report['masked_imports']==0
+ program_events=[];program_imports=[]
+ for log in (trial/'provider-processes').glob('generation-*/worker.stdout.jsonl'):
+  events=rows(log);program_events += [x for x in events if x.get('ptl_program_draw')];program_imports += [x for x in events if x.get('ptl_program_provider_created')]
+ selected=set(proof['selected_tickets']);expected=obj(vm/'ptl-program-worker-v8-expected.json');point_admission=obj(vm/'ptl-program-point-admission-v1/report.json');assert point_admission['passed'];point_tickets=set(point_admission['newly_accepted_tickets']);assert len(point_tickets)==87
+ expected_tickets=(set(expected['expected_program_tickets'])|point_tickets)&selected
+ # Each original packet's sequence is checked rather than inferred from its ticket.
+ import struct
+ expected_sequences={struct.unpack_from('<20I',(vm/f'native-desktop-admission-v33/bootstrap/requests/request-{ticket:08d}.bin').read_bytes())[14] for ticket in expected_tickets}
+ actual_sequences={x['sequence'] for x in program_events}
+ report.update(program_accepted=len(program_events),program_imports=len(program_imports),expected_program_draws=len(expected_tickets),program_sequences_matched=actual_sequences==expected_sequences)
+ assert len(program_events)==len(expected_tickets)==(26 if a.stage=='selected' else 463) and len(program_imports)==1 and actual_sequences==expected_sequences
+ # Request sequences can repeat across original clients. Join each serialized
+ # dispatch ticket to its retained replay iteration and original packet ticket.
+ def routed_tickets(directory,key):
+  mapping={x['iteration']:x['ticket'] for x in rows(directory/'replays.jsonl')};assert len(mapping)==len(rows(directory/'replays.jsonl'))
+  dispatch=None;result=set()
+  for event in rows(directory/'provider-processes/generation-1/worker.stdout.jsonl'):
+   if event.get('kind')=='request_identity':dispatch=event['dispatch_ticket'];assert dispatch in mapping
+   if event.get(key) and event['accepted']:
+    assert dispatch is not None;ticket=mapping[dispatch];assert ticket not in result;result.add(ticket)
+  return result
+ prior_geometry=routed_tickets(vm/'ptl-native-worker-v9-full/replay','ptl_geometry_draw')
+ actual_geometry=routed_tickets(trial,'ptl_geometry_draw');expected_geometry=(prior_geometry&selected)-expected_tickets-complex_tickets
+ actual_program=routed_tickets(trial,'ptl_program_draw')
+ report.update(geometry_tickets_matched=actual_geometry==expected_geometry,expected_geometry_draws=len(expected_geometry),program_tickets_matched=actual_program==expected_tickets)
+ assert actual_geometry==expected_geometry and len(actual_geometry)==report['geometry_accepted']
+ assert actual_program==expected_tickets and len(actual_program)==report['program_accepted']
+ assert all(x['accepted'] and x['structural_admission'] and x['fallback_backend']=='none' and 0<x['batch']<=6*16384 for x in program_events)
+ assert any(x['batch']>12288 for x in program_events);report['larger_program_batches_observed']=True
+ long_events=[];long_imports=[]
+ for log in (trial/'provider-processes').glob('generation-*/worker.stdout.jsonl'):
+  events=rows(log);long_events += [x for x in events if x.get('ptl_long_draw')];long_imports += [x for x in events if x.get('ptl_long_provider_created')]
+ long_tickets={479,481,599,601,665,667};assert long_tickets<=selected
+ long_sequences={struct.unpack_from('<20I',(vm/f'native-desktop-admission-v33/bootstrap/requests/request-{ticket:08d}.bin').read_bytes())[14] for ticket in long_tickets}
+ report.update(long_accepted=len(long_events),long_imports=len(long_imports),long_sequences_matched={x['sequence'] for x in long_events}==long_sequences)
+ assert report['long_accepted']==6 and report['long_imports']==1 and report['long_sequences_matched']
+ assert all(x['accepted'] and x['coverage_compacted'] and x['fallback_backend']=='none' for x in long_events)
+ complex_events=[];complex_imports=[]
+ for log in (trial/'provider-processes').glob('generation-*/worker.stdout.jsonl'):
+  events=rows(log);complex_events += [x for x in events if x.get('ptl_complex_draw')];complex_imports += [x for x in events if x.get('ptl_complex_provider_created')]
+ actual_complex=routed_tickets(trial,'ptl_complex_draw');assert actual_complex==complex_tickets and len(complex_events)==10 and len(complex_imports)==1
+ assert all(x['accepted'] and x['coverage_compacted'] and x['fallback_backend']=='none' for x in complex_events)
+ report.update(complex_accepted=10,complex_imports=1,complex_tickets_matched=True,complex_model_sha256=sha(complex_model))
+ rectangle_events=[];rectangle_imports=[];rectangle_kernels=[];rectangle_crops=[]
+ for log in (trial/'provider-processes').glob('generation-*/worker.stdout.jsonl'):
+  events=rows(log);rectangle_events += [x for x in events if x.get('ptl_rectangle_draw')];rectangle_imports += [x for x in events if x.get('ptl_rectangle_provider_created')];rectangle_kernels += [x for x in events if x.get('ptl_rectangle_kernel_executed')];rectangle_crops += [x for x in events if x.get('ptl_rectangle_preserved_crop')]
+ actual_rectangles=routed_tickets(trial,'ptl_rectangle_draw');assert actual_rectangles==rectangle_tickets and len(rectangle_events)==37 and len(rectangle_imports)==1
+ assert all(x['accepted'] and x['structural_admission'] and x['fallback_backend']=='none' for x in rectangle_events)
+ assert rectangle_kernels and rectangle_crops and len(rectangle_kernels)+len(rectangle_crops)<=37
+ report.update(rectangle_accepted=37,rectangle_imports=1,rectangle_tickets_matched=True,rectangle_kernel_draws=len(rectangle_kernels),rectangle_preserved_crops=len(rectangle_crops),rectangle_model_sha256=sha(rectangle_model))
+ assert proof['qualified_correction_hashes_matched']==14 and report['provider_generations']==1 and report['provider_failures']==0
+ timing_sets=[]
+ for log,is_parent in [(trial/'worker.stdout.jsonl',True),(trial/'provider-processes/generation-1/worker.stdout.jsonl',False)]:
+  events=rows(log);timelines=[x for x in events if x.get('kind')=='request_timeline'];identities=[x for x in events if x.get('kind')=='request_identity']
+  assert len(timelines)==len(identities)==proof['delivery_acknowledgments']
+  by_ticket={x['dispatch_ticket']:x for x in identities};assert len(by_ticket)==len(identities)
+  assert sorted(x['dispatch_ticket'] for x in timelines)==list(range(len(timelines)))
+  for x in timelines:
+   keys=['connected_qpc','received_qpc','queued_qpc','entered_qpc','finished_qpc','reply_qpc','acknowledged_qpc'];times=[x[k] for k in keys]
+   assert times==sorted(times) and times[0]>0 and x['qpc_frequency']>0 and x['provider_parent']==is_parent
+   y=by_ticket[x['dispatch_ticket']];assert all(x[k]==y[k] for k in ['pid','sequence','client_pid','provider_parent']);assert len(y['pixel_sha256'])==64
+  timing_sets.append((timelines,by_ticket))
+ left={x['dispatch_ticket']:x for x in timing_sets[0][0]};right={x['dispatch_ticket']:x for x in timing_sets[1][0]}
+ assert len({x['qpc_frequency'] for group in timing_sets for x in group[0]})==1
+ for ticket,x in left.items():
+  y=right[ticket];assert x['pid']==y['client_pid'] and x['sequence']==y['sequence']
+  assert x['entered_qpc']<=y['connected_qpc']<=y['finished_qpc']<=x['finished_qpc']
+  assert timing_sets[0][1][ticket]['pixel_sha256']==timing_sets[1][1][ticket]['pixel_sha256']
+ report.update(timeline_records=len(left)+len(right),timeline_monotonic=True,parent_child_correlated=True,shader_identities_matched=True,qpc_frequency=left[0]['qpc_frequency'])
+ if a.stage=='full':
+  prior=rows(vm/'ptl-native-worker-v11-full/replay/replays.jsonl');current=rows(trial/'replays.jsonl');assert len(prior)==len(current)==972
+  profiles={x['ticket']:x for x in obj(corrections)['cases']};unchanged=0;changed=0
+  for old,new in zip(prior,current,strict=True):
+   assert old['ticket']==new['ticket'] and old['pixel_bytes']==new['pixel_bytes']
+   ticket=new['ticket']
+   if ticket in profiles:
+    assert old['pixels_sha256']==profiles[ticket]['legacy_pixel_sha256'] and new['pixels_sha256']==profiles[ticket]['corrected_pixel_sha256'];changed+=1
+   else:assert old['pixels_sha256']==new['pixels_sha256'];unchanged+=1
+  assert unchanged==967 and changed==5
+  report.update(independent_full_replay_audit=True,unchanged_prior_outputs=unchanged,explicit_new_profile_outputs=changed,matched_tahoma_performance=False)
+  last=rows(vm/'ptl-native-worker-v12-full/replay/replays.jsonl');assert len(last)==972
+  assert all(old['ticket']==new['ticket'] and old['pixels_sha256']==new['pixels_sha256'] and old['pixel_bytes']==new['pixel_bytes'] for old,new in zip(last,current,strict=True))
+  report['all_prior_worker_v12_outputs_preserved']=True
+  previous=rows(vm/'ptl-native-worker-v13-full/replay/replays.jsonl');assert len(previous)==972
+  assert all(old['ticket']==new['ticket'] and old['pixels_sha256']==new['pixels_sha256'] and old['pixel_bytes']==new['pixel_bytes'] for old,new in zip(previous,current,strict=True))
+  report['all_prior_worker_v13_outputs_preserved']=True
+  previous=rows(vm/'ptl-native-worker-v15-full/replay/replays.jsonl');assert len(previous)==972
+  assert all(old['ticket']==new['ticket'] and old['pixels_sha256']==new['pixels_sha256'] and old['pixel_bytes']==new['pixel_bytes'] for old,new in zip(previous,current,strict=True))
+  report['all_prior_worker_v15_outputs_preserved']=True
+ report['passed']=True
+except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+finally:
+ if process is not None and process.poll() is None:process.kill();process.wait(timeout=5)
+ report.update(completed=True,finished=datetime.now(UTC).isoformat());save()
+print(json.dumps({k:v for k,v in report.items() if k not in ('command','replay')}));raise SystemExit(0 if report['passed'] else 1)

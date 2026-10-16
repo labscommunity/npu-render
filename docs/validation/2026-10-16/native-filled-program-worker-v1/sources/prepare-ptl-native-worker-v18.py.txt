@@ -1,0 +1,18 @@
+from pathlib import Path
+import shutil,json,hashlib,tarfile
+r=Path(__file__).parent;name='ptl-native-worker-v18';d=r/name;shutil.copytree(r/'ptl-native-worker-v17',d)
+p=d/'ptl_program_triangle_draw.cpp';s=p.read_text();s=s.replace('    std::vector<std::array<ProjectedVertex,3>> vertices(s.batch);\n','')
+a=s.index('        for(size_t n=0;n<s.batch;++n){');b=s.index('        began=Clock::now();const auto merged=',a)
+s=s[:a]+'''        // Only filled addresses belong to this submission. The provider ABI
+        // accepts partial spans, so do not shade synthetic padding samples.
+        points.resize(valid);triangle_base.resize(valid);tile.resize(valid);
+        for(size_t n=0;n<valid;++n)tile[n]=stored_pixel[n]?result.pixels[pixel_index[n]]:PackedColor{};
+'''+s[b:]
+needle='        ++result.tile_executions;';assert needle in s;s=s.replace(needle,'        points.resize(s.batch);triangle_base.resize(s.batch);tile.resize(s.batch);\n'+needle)
+needle='                    vertices[n]={projected.vertices[base],projected.vertices[base+1],projected.vertices[base+2]};\n';assert needle in s;s=s.replace(needle,'');p.write_text(s)
+manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in d.iterdir() if p.is_file()};before=json.loads((r/'ptl-native-worker-v17-source.json').read_text());assert [k for k in before if before[k]!=manifest[k]]==['ptl_program_triangle_draw.cpp'];(r/(name+'-source.json')).write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/(name+'.tar.gz'),'w:gz') as t:t.add(d,arcname=name)
+s=(r/'build-ptl-native-worker-v17.ps1').read_text().replace('ptl-native-worker-v17',name);(r/('build-'+name+'.ps1')).write_text(s)
+s=(r/'qualify-ptl-native-worker-v17-v2.py').read_text().replace('ptl-native-worker-v17-v2',name).replace('ptl-native-worker-v17',name);(r/('qualify-'+name+'.py')).write_text(s)
+s=(r/'run-ptl-worker-v16-qualification.ps1').read_text().replace('ptl-worker-v16-qualification','ptl-worker-v18-qualification').replace('ptl-native-worker-v16',name);(r/'run-ptl-worker-v18-qualification.ps1').write_text(s)
+print(json.dumps({'prepared':name,'kernel_unchanged':True,'only_filled_samples_submitted':True,'unused_per_sample_vertex_copy_removed':True}))
