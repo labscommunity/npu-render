@@ -1,0 +1,63 @@
+"""Prepare finite DWM/default-client sharing using qualified graphics binaries."""
+from pathlib import Path
+import ast,hashlib,json,re
+r=Path('results/render-driver')
+changes={'native_desktop_bootstrap_v28':'native_desktop_bootstrap_v29','native-desktop-v54':'native-desktop-v55','native-desktop-admission-v54':'native-desktop-admission-v55','NativeDesktopRecovery-v54':'NativeDesktopRecovery-v55','native-registration-v34':'native-registration-v36','native-driver-package-v17':'native-driver-package-v19','0.0.1317.0':'0.0.1319.0','native-live-v44':'native-live-v45','NativeLiveV44':'NativeLiveV45','native-topology-primary-v30':'native-topology-primary-v31','native-topology-v72':'native-topology-v74','native-topology-v73':'native-topology-v75','InspectTopology-V72':'InspectTopology-V74','InspectTopology-V73':'InspectTopology-V75','observer73':'observer75','dismiss-native-saver-v17':'dismiss-native-saver-v18','dismiss-v17':'dismiss-v18','ptl-native-live-v8':'ptl-native-live-v9'}
+pattern=re.compile('|'.join(re.escape(x) for x in sorted(changes,key=len,reverse=True)))
+def rename(s):return pattern.sub(lambda m:changes[m[0]],s)
+def save(name,s):
+ p=r/name;assert not p.exists(),p
+ if name.endswith('.py'):ast.parse(s)
+ p.write_text(s)
+s=(r/'run-native-interactive-graphics-v2.py').read_text()
+s=s.replace("report.update(passed=True,component=proof[0])","assert proof[0]['ordinary_default_adapter'] and not proof[0]['configure_export_used']\n report.update(passed=True,component=proof[0])")
+s=s.replace("(out/'consumer-report.json').write_text(json.dumps(report,indent=2)+'\\n')","temporary=out/'consumer-report.tmp';temporary.write_text(json.dumps(report,indent=2)+'\\n');temporary.replace(out/'consumer-report.json')")
+save('run-native-interactive-graphics-v3.py',s)
+s=rename((r/'native_desktop_bootstrap_v28.py').read_text())
+s=s.replace('import traceback,struct','import traceback,struct\nfrom native_shared_app_v1 import SharedInteractiveApp')
+s=s.replace("p.add_argument('--monitor-seconds'","p.add_argument('--interactive-dll',type=Path,required=True)\np.add_argument('--monitor-seconds'")
+s=s.replace("env=os.environ.copy();","env=os.environ.copy();env['NR_RENDER_INTERACTIVE_PIPE']='1';")
+s=s.replace('worker=None;installer=None;', 'shared=None;worker=None;installer=None;')
+needle="    admission_started=time.perf_counter();";assert needle in s
+s=s.replace(needle,"    shared=SharedInteractiveApp(v.transaction,worker,suffix,session['console_session'],v.interactive_dll,env,own_process)\n"+needle)
+needle="        evidence.poll();report.update(evidence.snapshot(compositor.identity.pid,host.identity.pid))";assert needle in s
+s=s.replace(needle,needle+"\n        shared.poll(evidence,compositor.identity.pid);report['shared_application_qualified']=shared.passed")
+s=s.replace("    assert report['passed'],'Native indirect frame evidence incomplete at trial deadline'","    assert report['passed'] and shared.passed,'Native frame or shared default application evidence incomplete at trial deadline'")
+needle='    for lease in reversed(leases):lease.close()';assert needle in s
+s=s.replace(needle,"    if shared:\n        try:shared.close();report['shared_application']=shared.report\n        except Exception as error:report['shared_application_cleanup_error']=repr(error);report['passed']=False\n"+needle)
+save('native_desktop_bootstrap_v29.py',s)
+for prefix in ['run-native-desktop','recover-native-desktop']:
+ s=rename((r/(prefix+'-v54.ps1')).read_text())
+ if prefix=='run-native-desktop':
+  s=s.replace('builds\\ptl-native-worker-v9','builds\\ptl-native-worker-v10')
+  s=s.replace("'--monitor-seconds','660'","'--interactive-dll',$dll,'--monitor-seconds','660'")
+  s=s.replace("-or !$trial.preferred_adapter_selected)","-or !$trial.preferred_adapter_selected -or !$trial.shared_application_qualified -or !$trial.shared_application.passed)")
+ else:
+  s=s.replace("@('controller','worker')","@('controller','worker','interactive-broker')")
+  s=s.replace("$expectedName=if($owned.role -eq 'controller'){'python.exe'}else{'nr_registered_local_indexed_worker.exe'}","$expectedName=@{'controller'='python.exe';'worker'='nr_registered_local_indexed_worker.exe';'interactive-broker'='nr_auto_interactive_broker.exe'}[$owned.role]")
+ save(prefix+'-v55.ps1',s)
+for n,new in [(72,74),(73,75)]:save('start-native-topology-v'+str(new)+'.ps1',rename((r/('start-native-topology-v'+str(n)+'.ps1')).read_text()).replace('V'+str(n),'V'+str(new)))
+save('dismiss-native-saver-v18.ps1',rename((r/'dismiss-native-saver-v17.ps1').read_text()))
+s=rename((r/'run-native-live-v44.ps1').read_text());s=s.replace('$screenStarted=$false;$clickCued=$false;$keyCued=$false','$screenStarted=$false;$clickCued=$false;$keyCued=$false;$appCued=$false;$appStarted=$false')
+needle="  if(!$clickCued -and $cursorCued";assert needle in s
+s=s.replace(needle,'''  if(!$appCued -and $keyCued -and $redObserved){New-Item -ItemType File "$r\\vm\\native-desktop-admission-v55\\interactive-admission-start"|Out-Null;$appCued=$true;$report.application_cued=[DateTime]::UtcNow.ToString('o');Save-Report}
+  if($appCued -and !$appStarted -and (Test-Path "$r\\vm\\native-desktop-admission-v55\\bootstrap\\interactive\\job.json")){
+   Start-Interactive 'app' @("$r\\toolchains\\openvino-2026.4.1\\Scripts\\python.exe","$r\\vm\\run-native-interactive-graphics-v3.py","$r\\vm\\native-desktop-admission-v55\\bootstrap\\interactive\\job.json")
+   $appStarted=$true;$report.application_started=[DateTime]::UtcNow.ToString('o');Save-Report
+  }
+'''+needle)
+needle=" $report.continuous_delivery_gate_passed=$true";assert needle in s
+s=s.replace(needle,''' $application=Get-Content "$r\\vm\\native-desktop-admission-v55\\bootstrap\\interactive\\shared-report.json" -Raw|ConvertFrom-Json
+ $appExit=@(Read-Rows "$out\\app\\probe.log"|Where-Object {$_.PSObject.Properties.Name -contains 'exit_code'})
+ if(!$appStarted -or !$application.completed -or !$application.passed -or !$application.ordinary_default_adapter -or !$application.dwm_continued_after_consumer -or !$application.owned_process_and_token_acls_restored_exactly -or $application.correlated_child_receipts -ne 8 -or $appExit.Count -ne 1 -or $appExit[0].exit_code -ne 0){throw 'Shared automatic default application proof incomplete'}
+ $report.shared_default_application_qualified=$true;$report.shared_default_application_npu_operations=8
+'''+needle)
+save('run-native-live-v45.ps1',s)
+s=rename((r/'run-ptl-native-live-v8.ps1').read_text()).replace('native-desktop-admission-v53','native-desktop-admission-v54')
+s=s.replace('-or !$q.initial_response_held_until_observed','-or !$q.shared_default_application_qualified -or !$q.initial_response_held_until_observed')
+save('run-ptl-native-live-v9.ps1',s)
+files=[rename(f) for f in json.loads((r/'native-desktop-v54-source.json').read_text())]+['native_shared_app_v1.py','native_token_query_grant_v1.py','run-native-interactive-graphics-v3.py']
+save('native-desktop-v55-source.json',json.dumps({f:hashlib.sha256((r/f).read_bytes()).hexdigest() for f in files},indent=2)+'\n')
+files=[f for f in files if f not in json.loads((r/'native-desktop-v54-source.json').read_text())]+['start-native-topology-v75.ps1','dismiss-native-saver-v18.ps1','run-ptl-native-live-v9.ps1','native-desktop-v55-source.json']
+save('native-shared-app-v1-upload.json',json.dumps(files,indent=2)+'\n')
+print('Prepared shared automatic default client and DWM trial; no execution performed')

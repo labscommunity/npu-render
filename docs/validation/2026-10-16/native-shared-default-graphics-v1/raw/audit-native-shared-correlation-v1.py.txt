@@ -1,0 +1,16 @@
+from pathlib import Path
+import copy,json,os,traceback
+from native_shared_correlation_v1 import complete_rows,correlate
+vm=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm';out=vm/'native-shared-correlation-v1';out.mkdir(exist_ok=False);report=dict(completed=False,passed=False,read_only=True,original_live_trial_passed=False)
+try:
+ root=vm/'native-desktop-admission-v55/bootstrap';q=json.loads((root/'interactive/consumer-report.json').read_text());assert q['passed'];parent=complete_rows(root/'worker.stdout.jsonl');child=complete_rows(root/'provider-processes/generation-1/worker.stdout.jsonl');pid=q['consumer_pid'];worker=next(x['pid'] for x in parent if x.get('local_worker_ready'))
+ report['actual']=correlate(parent,child,pid,worker);report['rejected_mutations']=[]
+ ticket=report['actual']['checks'][0]['ticket']
+ for field in ['sequence','abi','width','pixel_sha256']:
+  broken=copy.deepcopy(child);entry=next(x for x in broken if x.get('kind')=='request_identity' and x['dispatch_ticket']==ticket);entry[field]=entry[field]+1 if isinstance(entry[field],int) else '0'*64
+  try:correlate(parent,broken,pid,worker)
+  except (AssertionError,KeyError):report['rejected_mutations'].append(field)
+  else:raise AssertionError('Corrupt correlation accepted: '+field)
+ report['passed']=len(report['rejected_mutations'])==4
+except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+report['completed']=True;(out/'report.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report));raise SystemExit(0 if report['passed'] else 1)

@@ -1,0 +1,22 @@
+from pathlib import Path
+import ast,hashlib,json,re
+r=Path('results/render-driver');changes={'native_shared_app_v1':'native_shared_app_v2','native_desktop_bootstrap_v29':'native_desktop_bootstrap_v30','native-desktop-v55':'native-desktop-v56','native-desktop-admission-v55':'native-desktop-admission-v56','NativeDesktopRecovery-v55':'NativeDesktopRecovery-v56','native-live-v45':'native-live-v46','NativeLiveV45':'NativeLiveV46','native-topology-primary-v31':'native-topology-primary-v32','native-topology-v74':'native-topology-v76','native-topology-v75':'native-topology-v77','InspectTopology-V74':'InspectTopology-V76','InspectTopology-V75':'InspectTopology-V77','observer75':'observer77','dismiss-native-saver-v18':'dismiss-native-saver-v19','dismiss-v18':'dismiss-v19','ptl-native-live-v9':'ptl-native-live-v10'}
+pattern=re.compile('|'.join(re.escape(x) for x in sorted(changes,key=len,reverse=True)))
+def rename(s):return pattern.sub(lambda m:changes[m[0]],s)
+files=['native_shared_app_v1.py','native_desktop_bootstrap_v29.py','run-native-desktop-v55.ps1','recover-native-desktop-v55.ps1','run-native-live-v45.ps1','start-native-topology-v74.ps1','start-native-topology-v75.ps1','dismiss-native-saver-v18.ps1','run-ptl-native-live-v9.ps1']
+for f in files:
+ s=rename((r/f).read_text());p=r/rename(f);assert not p.exists()
+ if f=='native_shared_app_v1.py':
+  s=s.replace('from native_session_broker_v3 import *','from native_session_broker_v3 import *\nfrom native_shared_correlation_v1 import complete_rows,correlate')
+  s=s.replace("parent=rows(self.transaction/'bootstrap/worker.stdout.jsonl')","parent=complete_rows(self.transaction/'bootstrap/worker.stdout.jsonl')").replace('child=rows(children[0])','child=complete_rows(children[0])')
+  a=s.index('   for parent_identity in identities:');b=s.index('   self.dwm_after=',a)
+  s=s[:a]+"   self.report['correlation']=correlate(parent,child,pid,self.worker.pid)\n"+s[b:]
+  s=s.replace("q=obj(self.vm/'native-registration-v36/qualification/report.json');", "assert obj(self.vm/'native-shared-correlation-v1/report.json')['passed']\n  q=obj(self.vm/'native-registration-v36/qualification/report.json');")
+ if f=='run-ptl-native-live-v9.ps1':s=s.replace('native-desktop-admission-v54','native-desktop-admission-v55')
+ if f.endswith('.py'):ast.parse(s)
+ p.write_text(s)
+files=[rename(f) for f in json.loads((r/'native-desktop-v55-source.json').read_text())]+['native_shared_correlation_v1.py']
+(r/'native-desktop-v56-source.json').write_text(json.dumps({f:hashlib.sha256((r/f).read_bytes()).hexdigest() for f in files},indent=2)+'\n')
+files=[rename(f) for f in json.loads((r/'native-shared-app-v1-upload.json').read_text())]+['native_shared_correlation_v1.py']
+(r/'native-shared-app-v2-upload.json').write_text(json.dumps(files,indent=2)+'\n')
+print('Prepared corrected correlation only; graphics binaries unchanged')

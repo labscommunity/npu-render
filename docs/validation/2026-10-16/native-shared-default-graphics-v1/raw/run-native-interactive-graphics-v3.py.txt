@@ -1,0 +1,34 @@
+"""Run the pinned real D3D11 fixture as an ordinary interactive process."""
+from pathlib import Path
+from datetime import UTC,datetime
+import ctypes,hashlib,json,subprocess,sys,traceback
+from ctypes import wintypes as W
+job=json.loads(Path(sys.argv[1]).read_text());out=Path(job['output']);report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,consumer_started_suspended=False,preauthorized_consumer_pid=False);child=None
+k=ctypes.WinDLL('kernel32',use_last_error=True);k.CreateFileW.argtypes=[W.LPCWSTR,W.DWORD,W.DWORD,W.LPVOID,W.DWORD,W.DWORD,W.HANDLE];k.CreateFileW.restype=W.HANDLE;k.CloseHandle.argtypes=[W.HANDLE]
+k.CreateNamedPipeW.argtypes=[W.LPCWSTR,W.DWORD,W.DWORD,W.DWORD,W.DWORD,W.DWORD,W.DWORD,W.LPVOID];k.CreateNamedPipeW.restype=W.HANDLE
+try:
+ session=W.DWORD();assert k.ProcessIdToSessionId(k.GetCurrentProcessId(),ctypes.byref(session));assert session.value==job['session'] and session.value>0 and not ctypes.windll.shell32.IsUserAnAdmin()
+ binary=Path(job['binary']);dll=Path(job['dll']);assert hashlib.sha256(binary.read_bytes()).hexdigest()==job['binary_sha256'];assert hashlib.sha256(dll.read_bytes()).hexdigest()==job['dll_sha256']
+ # Test actual server creation; CreateFile with bit four does not test this right.
+ report.update(session=session.value,elevated=False)
+ ctypes.set_last_error(0)
+ handle=k.CreateNamedPipeW(job['worker_pipe'],3|0x40000000,8,4,65536,65536,1000,None);error=ctypes.get_last_error()
+ report['server_creation_probe']=dict(allowed=handle not in (None,ctypes.c_void_p(-1).value),win32_error=error)
+ if handle not in (None,ctypes.c_void_p(-1).value):k.CloseHandle(handle)
+ assert handle==ctypes.c_void_p(-1).value and error==5,(handle,error)
+ report.update(session=session.value,elevated=False,pipe_server_creation_access_denied=True)
+ with (out/'consumer.stdout.jsonl').open('wb') as stdout,(out/'consumer.stderr.log').open('wb') as stderr:
+  child=subprocess.Popen([str(binary),str(dll)],stdout=stdout,stderr=stderr,stdin=subprocess.DEVNULL,creationflags=subprocess.CREATE_NO_WINDOW)
+  report['consumer_pid']=child.pid
+  (out/'consumer-started.json').write_text(json.dumps(report,indent=2)+'\n')
+  child.wait(timeout=105)
+ report['consumer_exit_code']=child.returncode;assert child.returncode==0
+ events=[json.loads(x) for x in (out/'consumer.stdout.jsonl').read_text().splitlines() if x.startswith('{') and x.endswith('}')]
+ proof=[x for x in events if x.get('native_registered_component')];assert len(proof)==1 and proof[0]['passed'] and proof[0]['npu_local_executions']==8 and proof[0]['clears']==6 and proof[0]['draws']==2 and proof[0]['cpu_executions']==proof[0]['gpu_executions']==0
+ assert proof[0]['ordinary_default_adapter'] and not proof[0]['configure_export_used']
+ report.update(passed=True,component=proof[0])
+except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+finally:
+ if child is not None and child.poll() is None:child.kill();child.wait(timeout=5)
+ report.update(completed=True,finished=datetime.now(UTC).isoformat());temporary=out/'consumer-report.tmp';temporary.write_text(json.dumps(report,indent=2)+'\n');temporary.replace(out/'consumer-report.json')
+raise SystemExit(0 if report['passed'] else 1)

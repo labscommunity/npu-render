@@ -1,0 +1,57 @@
+{
+  "started": "2026-10-16T20:32:01.386784+00:00",
+  "completed": true,
+  "passed": false,
+  "published": 13,
+  "desktop_offloaded": false,
+  "producer": {
+    "pid": 19576,
+    "session": 0,
+    "creation_filetime": 134366563149231567,
+    "image_name": "WUDFHost.exe",
+    "sid": "S-1-5-19"
+  },
+  "compositor": {
+    "pid": 16980,
+    "session": 1,
+    "creation_filetime": 134364673055826287,
+    "image_name": "dwm.exe",
+    "sid": "S-1-5-90-0-1"
+  },
+  "earliest_qpc": 3910317188566,
+  "frame_io_statistics": {
+    "sharing_retries": 18,
+    "sharing_timeouts": 0
+  },
+  "publication_statistics": {
+    "publications": 13,
+    "retries": 0,
+    "timeouts": 0,
+    "errors": {}
+  },
+  "frame_wait": "directory change notification, 100ms maximum cancellation wait",
+  "change_notifications": 67,
+  "latest": {
+    "sequence": 13,
+    "qpc": 3911129169664,
+    "producer_pid": 19576,
+    "width": 1024,
+    "height": 768,
+    "format": 87,
+    "pixel_bytes": 3145728,
+    "pixel_sha256": "01689f234625829404196c52cfc3a08272232fb32bb0bd0fc1c72ab7f1d0a28f",
+    "packet_sha256": "ed8bd744e25096dfcce70c4a1416a2eb33fac2f726591b5da198f550a3b8a73d",
+    "observed": "2026-10-16T20:33:22.629332+00:00",
+    "npu_receipts_observed": 666,
+    "known_stimulus_pixel": [
+      80,
+      30,
+      180,
+      255
+    ]
+  },
+  "producer_and_compositor_verified": true,
+  "error": "AssertionError()",
+  "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\relay_native_frames_v8.py\", line 42, in <module>\n    for peer in peers:peer.verify()\n                      ^^^^^^^^^^^^^\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\native_process_observer_v1.py\", line 55, in verify\n    assert self.handle and k.WaitForSingleObject(self.handle,0)==258\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n",
+  "finished": "2026-10-16T20:33:22.954361+00:00"
+}

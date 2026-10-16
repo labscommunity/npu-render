@@ -10,18 +10,18 @@ RGBA composition and an explicit backend switch. The packaged runtime passed
 GPU → NPU → CPU → GPU → NPU switching on Panther Lake. It supports CPU/GPU/NPU through
 its first OpenVINO provider; other providers can implement the same contracts.
 
-**Latest results, October 16:** the [new finite native desktop trial passes](docs/validation/2026-10-16/native-long-shader-live-v1/README.md)
-with 1,112 acknowledged NPU operations, 51 matching physical submissions,
-controlled mouse/keyboard input and exact ordinary restoration. It executes the
-repaired long shader four times. Responsiveness remains unqualified: the controlled
-mouse response takes 4.54 seconds to confirm through physical-output pixel readback,
-and the keyboard response takes 173 ms. Two shader groups account for 2.21 seconds
-of the mouse delay before publication. The [integrated worker also passes all 972
-retained requests and registered D3D11](docs/validation/2026-10-16/native-long-shader-worker-v1/README.md).
-[Automatic non-admin interactive graphics](docs/validation/2026-10-16/native-interactive-graphics-v1/README.md)
-now passes six clears and two draws through registered Direct3D, with exact cleanup.
-The fixture explicitly selects the adapter; sharing the desktop worker and ordinary
-default-adapter routing remain separate gates.
+**Latest results, October 16:** a [normally started, non-admin default-adapter
+application now shares the NPU renderer with DWM](docs/validation/2026-10-16/native-shared-default-graphics-v1/README.md).
+The fixture passes six clears and two draws through ordinary D3D11; DWM continues
+afterward. The finite desktop trial passes 1,209 acknowledged NPU operations,
+53 matching physical submissions, controlled input and exact ordinary restoration.
+Continuous admission for arbitrary applications remains open; a separate
+unadmitted observer still fails device creation.
+Responsiveness remains inadequate: this run's controlled mouse response takes
+6.60 seconds to confirm through physical-output readback, and keyboard response
+takes 237 ms. These events are not a matched performance comparison.
+The [integrated renderer also passes all 972 retained requests and registered
+D3D11](docs/validation/2026-10-16/native-long-shader-worker-v1/README.md).
 Sustained responsiveness, broad application coverage and a Tahoma benefit remain
 unqualified.
 See the [current acceptance plan](docs/research/desktop-offload-plan.md).
