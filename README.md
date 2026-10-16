@@ -10,15 +10,21 @@ RGBA composition and an explicit backend switch. The packaged runtime passed
 GPU → NPU → CPU → GPU → NPU switching on Panther Lake. It supports CPU/GPU/NPU through
 its first OpenVINO provider; other providers can implement the same contracts.
 
-**Latest results, October 16:** the [integer rectangle worker
-passes a finite Windows desktop trial](docs/validation/2026-10-16/native-integer-rectangle-live-v1/README.md).
-It completes 1,163 acknowledged NPU operations, 56 exact physical submissions,
+**Latest results, October 16:** the [compact filled-batch worker
+passes a finite Windows desktop trial](docs/validation/2026-10-16/native-filled-program-live-v1/README.md).
+It completes 1,225 acknowledged NPU operations, 57 exact physical submissions,
 controlled input, an ordinary default-adapter test application and full restoration.
-The new paths execute 26 complex-shader draws and 147 rectangle draws, with no
-provider faults or retries. Mouse confirmation takes 2.54 seconds and keyboard
-confirmation 125 ms. Responsiveness remains inadequate; these two events are not
+The new paths execute 26 complex-shader draws and 151 rectangle draws, with no
+provider faults or retries. Mouse pixel confirmation takes 2.17 seconds and keyboard
+confirmation 94.7 ms. Responsiveness remains inadequate; these two events are not
 a matched performance comparison. Continuous arbitrary-application admission,
 sustained responsiveness and a Tahoma benefit remain unqualified.
+
+Its [complete-image component comparison](docs/validation/2026-10-16/native-filled-program-comparison-v1/README.md)
+preserves all 1,852 preceding NPU images. Across 1,389 warm pairs, aggregate draw
+time falls from 76.77 to 59.58 seconds, with 121 slower candidate pairs. Existing
+one-byte disagreements with the independent CPU reference remain unchanged.
+This is a component measurement, not a desktop or Tahoma speedup.
 
 The [point-sampling component](docs/validation/2026-10-16/native-point-program-v1/README.md)
 preserves all 348 changed-image comparisons for 87 newly supported draws.

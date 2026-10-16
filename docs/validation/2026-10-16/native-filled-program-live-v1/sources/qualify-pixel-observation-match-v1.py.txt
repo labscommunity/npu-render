@@ -1,0 +1,39 @@
+from pathlib import Path
+import copy
+import json
+from pixel_observation_match_v1 import match_owned_pixel_observation as match
+
+first = dict(qpc=99, read_completed_qpc=110, last_present_qpc=108, accumulated_frames=1,
+             ownership_verified_before_and_after=True,
+             points=[dict(owned_presenter_at_point=True, color=7), dict(owned_presenter_at_point=True, color=7)])
+later = dict(copy.deepcopy(first), qpc=120, read_completed_qpc=130, last_present_qpc=0, accumulated_frames=0)
+predicate = lambda point: point.get('color') == 7
+assert match([later, first], 100, predicate) is first
+assert match([later], 100, predicate)['last_present_qpc'] == 0
+cases = ['acquisition_before_input', 'pointer_only_has_no_update_timestamp']
+mutations = [
+    ('completed_before_input', lambda x:x.update(qpc=90,read_completed_qpc=99,last_present_qpc=98)),
+    ('stale_image_update',lambda x:x.update(last_present_qpc=98)),
+    ('inverted_interval',lambda x:x.update(qpc=111)),
+    ('future_update',lambda x:x.update(last_present_qpc=111)),
+    ('invalid_pointer_only',lambda x:x.update(last_present_qpc=0)),
+    ('wrong_owner',lambda x:x['points'][0].update(owned_presenter_at_point=False)),
+    ('different_color',lambda x:x['points'][0].update(color=8)),
+    ('missing_point',lambda x:x['points'].pop()),
+    ('unverified_ownership',lambda x:x.update(ownership_verified_before_and_after=False)),
+]
+for name, mutate in mutations:
+    bad = copy.deepcopy(first)
+    mutate(bad)
+    try:
+        match([bad],100,predicate)
+    except AssertionError:
+        cases.append(name)
+    else:
+        raise AssertionError(name+' accepted')
+out = Path(__file__).with_name('pixel-observation-match-v1-qualification.json')
+assert not out.exists()
+report = dict(passed=True,cases=cases,scope='Synthetic timing joins; no NPU or desktop execution proof',
+              primary_source='https://learn.microsoft.com/en-us/windows/win32/api/dxgi1_2/ns-dxgi1_2-dxgi_outdupl_frame_info')
+out.write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(report))

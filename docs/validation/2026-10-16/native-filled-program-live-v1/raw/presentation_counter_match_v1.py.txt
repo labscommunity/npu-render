@@ -1,0 +1,18 @@
+"""Correlate displayed statistics to submitted counts, not the newest source label."""
+def match_display_observation(rows, sequence, submission):
+    observations=[x for x in rows if x.get('display_observation')]
+    submitted=[x for x in observations if x.get('source_sequence')==sequence and x.get('submitted_count_status')==0]
+    counts={x['submitted_present_count'] for x in submitted};assert len(counts)==1,'Ambiguous or absent submitted count'
+    count=counts.pop();assert count>0
+    # Distinct source submissions must not reuse this counter within this swapchain.
+    owners={x['source_sequence'] for x in observations if x.get('submitted_count_status')==0 and x.get('submitted_present_count')==count}
+    assert owners=={sequence},'Submitted counter reused'
+    candidates=[x for x in observations
+        if x.get('submitted_count_status')==x.get('statistics_status')==x.get('media_status')==0
+        and x.get('displayed_present_count')==x.get('media_present_count')==count
+        and x.get('submitted_present_count',0)>=count
+        and x.get('present_refresh_count')==x.get('sync_refresh_count')
+        and x.get('sync_qpc')==x.get('media_sync_qpc')
+        and submission['accepted_qpc']<=x['sync_qpc']<=x['observed_qpc']]
+    assert candidates,'No matching displayed counter and synchronization evidence'
+    return count,min(candidates,key=lambda x:x['observed_qpc'])

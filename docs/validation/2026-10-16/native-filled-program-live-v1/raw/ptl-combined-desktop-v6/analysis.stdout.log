@@ -1,0 +1,135 @@
+{
+  "completed": true,
+  "passed": true,
+  "active_snapshot": false,
+  "final_trial_qualification": false,
+  "qpc_frequency": 10000000,
+  "serial_intervals_verified": true,
+  "controlled_events": [
+    {
+      "event": "mouse_received",
+      "color": "green",
+      "input_qpc": 4013233344325,
+      "observed_qpc": 4013254907784,
+      "response_ms": 2156.3459,
+      "serialized_child_busy_ms": 1359.5973,
+      "child_busy_fraction": 0.6305098361074631,
+      "remaining_ms": 796.7485999999999,
+      "draw_count": 41,
+      "by_shader": {
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 5,
+          "overlap_ms": 295.93510000000003,
+          "whole_request_provider_calls": 76,
+          "whole_request_backend_compile_ms": 12.481
+        },
+        "95b1c4fbb5f9bf0f34ad7b76eca5ae122d956a9570e1796e1bd4aecf43ca7dbe": {
+          "requests": 4,
+          "overlap_ms": 134.8594,
+          "whole_request_provider_calls": 31,
+          "whole_request_backend_compile_ms": 0.0
+        },
+        "c71638aa9df382391c81ce814b60b92cff815bf2b31547a5569cfe785beaf341": {
+          "requests": 1,
+          "overlap_ms": 276.8258,
+          "whole_request_provider_calls": 71,
+          "whole_request_backend_compile_ms": 0.0
+        },
+        "fbe68f57c834b0adb911c186b19a28bb833bdfe10ea91385708ebe228012561c": {
+          "requests": 8,
+          "overlap_ms": 92.2073,
+          "whole_request_provider_calls": 111,
+          "whole_request_backend_compile_ms": 0.0
+        },
+        "d056c6dcba0a34d02c9f01218f22c4db02daf7082789276afc0c166cb1553772": {
+          "requests": 5,
+          "overlap_ms": 34.114399999999996,
+          "whole_request_provider_calls": 30,
+          "whole_request_backend_compile_ms": 0.0
+        },
+        "4e5ed0f81f4172324fd21bccde5309aff541f82c95c0f51b0690b9441d599932": {
+          "requests": 7,
+          "overlap_ms": 121.05189999999999,
+          "whole_request_provider_calls": 129,
+          "whole_request_backend_compile_ms": 0.0
+        },
+        "20e56de0447ed62eeb48ce9d442b806d3afb2d3c6fb6a2674aad53d98bd03c69": {
+          "requests": 1,
+          "overlap_ms": 21.6301,
+          "whole_request_provider_calls": 24,
+          "whole_request_backend_compile_ms": 0.0
+        },
+        "b7f4e6d0abea95bb235098b7e357eacd906679d4626ba4abf4b3c5e3ca31ecf7": {
+          "requests": 7,
+          "overlap_ms": 330.13219999999995,
+          "whole_request_provider_calls": 154,
+          "whole_request_backend_compile_ms": 0.0
+        },
+        "b92ae2a7745b2cc0a94ec294a23dba3b6f34a1035d78c9751cc28b9bdf038b15": {
+          "requests": 1,
+          "overlap_ms": 5.1157,
+          "whole_request_provider_calls": 4,
+          "whole_request_backend_compile_ms": 0.0
+        },
+        "d8e0b49792a47247020c5b93508846b0b0954403359f83d18e02544d338e8480": {
+          "requests": 1,
+          "overlap_ms": 39.6591,
+          "whole_request_provider_calls": 21,
+          "whole_request_backend_compile_ms": 0.0
+        },
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 8.0663,
+          "whole_request_provider_calls": 7,
+          "whole_request_backend_compile_ms": 0.0
+        }
+      },
+      "serialized_parent_breakdown": {
+        "parent_pre_child_ms": 84.49929999999999,
+        "child_packet_read_ms": 68.79100000000001,
+        "child_pre_execution_ms": 0.24349999999999997,
+        "child_execution_ms": 1359.5973,
+        "parent_post_child_ms": 175.45289999999997
+      },
+      "outside_serialized_parent_ms": 467.76189999999997,
+      "input_to_publication_ms": 2041.5105,
+      "publication_to_observation_ms": 114.8354
+    },
+    {
+      "event": "key_received",
+      "color": "red",
+      "input_qpc": 4013265014722,
+      "observed_qpc": 4013298123057,
+      "response_ms": 3310.8335,
+      "serialized_child_busy_ms": 15.871899999999998,
+      "child_busy_fraction": 0.0047939287795656284,
+      "remaining_ms": 3294.9616,
+      "draw_count": 3,
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 2,
+          "overlap_ms": 9.645,
+          "whole_request_provider_calls": 14,
+          "whole_request_backend_compile_ms": 0.0
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 6.2269,
+          "whole_request_provider_calls": 3,
+          "whole_request_backend_compile_ms": 0.0
+        }
+      },
+      "serialized_parent_breakdown": {
+        "parent_pre_child_ms": 5.1342,
+        "child_packet_read_ms": 4.9433,
+        "child_pre_execution_ms": 0.0257,
+        "child_execution_ms": 15.871899999999998,
+        "parent_post_child_ms": 7.5634999999999994
+      },
+      "outside_serialized_parent_ms": 3277.2949000000003,
+      "input_to_publication_ms": 54.4064,
+      "publication_to_observation_ms": 3256.4271
+    }
+  ],
+  "limitation": "Two controlled events, not p95 or matched A/B. Child intervals include CPU orchestration and NPU waits; they are not NPU hardware utilization. Partial interval whole-request compilation/call counts are context, not apportioned overlap. Physical observation includes sampling cadence; no panel photon timing."
+}

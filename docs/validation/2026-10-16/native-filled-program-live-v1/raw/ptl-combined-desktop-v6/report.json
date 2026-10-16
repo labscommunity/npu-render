@@ -1,0 +1,29 @@
+{
+    "started":  "2026-10-16T23:21:36.3968696Z",
+    "completed":  true,
+    "passed":  false,
+    "full_desktop_offload":  false,
+    "tahoma_tested":  false,
+    "active_phase":  "timing-analysis",
+    "phases":  [
+                   {
+                       "phase":  "pre-registration-readiness",
+                       "passed":  true
+                   },
+                   {
+                       "phase":  "registered-d3d",
+                       "cleanup_passed":  true,
+                       "passed":  true
+                   },
+                   {
+                       "phase":  "finite-live",
+                       "passed":  true
+                   }
+               ],
+    "reference_discrepant_variants":  93,
+    "image_qualification":  "exact preceding NPU outputs; any CPU-reference disagreement retained unchanged",
+    "warm_program_previous_ms":  76773.444699999862,
+    "warm_program_compact_ms":  59582.336700000138,
+    "error":  "presentation failed; full stderr retained",
+    "finished":  "2026-10-16T23:34:27.0061512Z"
+}

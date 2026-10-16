@@ -1,0 +1,22 @@
+from pathlib import Path
+import re,ast,hashlib,json
+r=Path(__file__).parent
+changes={'native-registration-v41':'native-registration-v42','native-registered-v41':'native-registered-v42','NativeRecovery-v41':'NativeRecovery-v42','ptl-native-worker-v17-v2-full':'ptl-native-worker-v18-full','ptl-native-worker-v17':'ptl-native-worker-v18','ptl-worker-v17-qualification-v2':'ptl-worker-v18-qualification','native_shared_app_v8':'native_shared_app_v9','native_desktop_bootstrap_v36':'native_desktop_bootstrap_v37','native-desktop-v62':'native-desktop-v63','native-desktop-admission-v62':'native-desktop-admission-v63','NativeDesktopRecovery-v62':'NativeDesktopRecovery-v63','native-live-v52':'native-live-v53','NativeLiveV52':'NativeLiveV53','native-topology-primary-v38':'native-topology-primary-v39','native-topology-v90':'native-topology-v93','native-topology-v91':'native-topology-v94','native-topology-v92':'native-topology-v95','InspectTopology-V90':'InspectTopology-V93','InspectTopology-V91':'InspectTopology-V94','InspectTopology-V92':'InspectTopology-V95','observer92':'observer95','dismiss-native-saver-v26':'dismiss-native-saver-v27','dismiss-v26':'dismiss-v27','ptl-native-live-v16':'ptl-native-live-v17','native-latency-v14-analysis':'native-latency-v15-analysis','native-presentation-v10-analysis':'native-presentation-v11-analysis','ptl-combined-desktop-v4':'ptl-combined-desktop-v5','analyze-native-latency-v12.py':'analyze-native-latency-v13.py','analyze-native-presentation-v10.py':'analyze-native-presentation-v11.py','ptl-program-compact-comparison-v3':'ptl-program-compact-comparison-v4','b275962727eadefa5d1444dace22673b1832e598c8ae74421d0a6d189993b000':'d75e2fb82ab038f02054931c9cc2e862c08546e2dfe363a23dd9997394b239a6'}
+pat=re.compile('|'.join(re.escape(x) for x in sorted(changes,key=len,reverse=True)))
+def rename(s):return pat.sub(lambda m:changes[m[0]],s)
+files=[x for x in json.loads((r/'ptl-combined-live-v4-upload.json').read_text()) if not x.endswith('-source.json')]
+for f in files:
+ s=rename((r/f).read_text())
+ if f=='run-ptl-combined-desktop-v4.ps1':
+  needle=' $warm=@($pairs.cases|ForEach-Object {$_.pairs|Where-Object iteration -gt 0})'
+  extra=''' $reference=@($pairs.cases|ForEach-Object {$_.reference_compatibility})
+ if($reference.Count -ne 1852 -or @($reference|Where-Object {!$_.same_difference_positions_and_values}).Count){throw 'Reference discrepancy changed'}
+ $report.reference_discrepant_variants=@($reference|Where-Object {!$_.reference_exact}).Count
+ $report.image_qualification='exact preceding NPU outputs; any CPU-reference disagreement retained unchanged'
+''';assert needle in s;s=s.replace(needle,extra+needle)
+ if f.endswith('.py'):ast.parse(s)
+ path=r/rename(f);assert not path.exists();path.write_text(s)
+for old in ('native-registration-v41-source.json','native-desktop-v62-source.json'):
+ names=[rename(f) for f in json.loads((r/old).read_text())];(r/rename(old)).write_text(json.dumps({f:hashlib.sha256((r/f).read_bytes()).hexdigest() for f in names},indent=2)+'\n')
+(r/'ptl-combined-live-v5-upload.json').write_text(json.dumps([rename(f) for f in files]+['native-registration-v42-source.json','native-desktop-v63-source.json'],indent=2)+'\n')
+print(json.dumps({'prepared':True,'worker':'v18','requires_paired_full_comparison':True,'requires_unchanged_reference_differences':True,'driver_package_unchanged':True}))

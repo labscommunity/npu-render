@@ -1,0 +1,14 @@
+from pathlib import Path
+import os,json,hashlib
+from datetime import UTC,datetime
+vm=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm';out=vm/'ptl-combined-desktop-v6-completion-v2';out.mkdir(exist_ok=False)
+def obj(name):return json.loads((vm/name/'report.json').read_text(encoding='utf-8-sig'))
+old=obj('ptl-combined-desktop-v6');assert old['completed'] and not old['passed'] and old['active_phase']=='timing-analysis' and old['error']=='presentation failed; full stderr retained'
+assert [x['phase'] for x in old['phases'] if x['passed']]==['pre-registration-readiness','registered-d3d','finite-live']
+names=['native-registration-v43','native-live-v54','native-desktop-admission-v64','ptl-native-live-v18','native-latency-v18-analysis','native-presentation-v15-analysis']
+proof={name:obj(name) for name in names};assert all(x['completed'] and x['passed'] for x in proof.values())
+assert proof['native-desktop-admission-v64']['cleanup_passed'] and proof['native-desktop-admission-v64']['memory_integrity_after']
+assert proof['native-live-v54']['cleanup_passed'] and proof['native-live-v54']['shared_default_application_qualified']
+assert not proof['native-latency-v18-analysis']['active_snapshot'] and not proof['native-presentation-v15-analysis']['active_snapshot']
+report=dict(completed=True,passed=True,finished=datetime.now(UTC).isoformat(),prior_coordinator_report_preserved=True,prior_error=old['error'],live_trial_rerun=False,correction='Use completed owned pixel reads even when acquisition started before input; preserve zero update timestamps explicitly',source_sha256={name+'/report.json':hashlib.sha256((vm/name/'report.json').read_bytes()).hexdigest() for name in names+['ptl-combined-desktop-v6']},full_desktop_offload=False,tahoma_tested=False)
+(out/'report.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report))

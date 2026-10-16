@@ -1,0 +1,90 @@
+{
+  "started": "2026-10-16T23:16:37.501496+00:00",
+  "completed": true,
+  "passed": false,
+  "display_changed": false,
+  "samples": 0,
+  "failed_samples": 0,
+  "probe_sha256": "5ED148CA61769B325FBBE291884CE4F49D4B4C4584D4CFB53A2847220AB7A3C5",
+  "interactive_state": {
+    "session": 1,
+    "console_session": 1,
+    "input_open": true,
+    "input_open_error": 0,
+    "input_name": "Screen-saver"
+  },
+  "screen_saver_input_sent": true,
+  "after_input_state": {
+    "session": 1,
+    "console_session": 1,
+    "input_open": true,
+    "input_open_error": 5,
+    "input_name": "Screen-saver"
+  },
+  "screen_saver_settings": {
+    "running": true,
+    "secure": false,
+    "blocks_simulated_resets": false
+  },
+  "screen_saver_close_requests": [
+    {
+      "hwnd": 16646222,
+      "posted": true
+    },
+    {
+      "hwnd": 10158638,
+      "posted": true
+    },
+    {
+      "hwnd": 2621814,
+      "posted": true
+    },
+    {
+      "hwnd": 6096326,
+      "posted": true
+    },
+    {
+      "hwnd": 2098122,
+      "posted": true
+    },
+    {
+      "hwnd": 3540452,
+      "posted": true
+    },
+    {
+      "hwnd": 6293024,
+      "posted": true
+    },
+    {
+      "hwnd": 6817314,
+      "posted": true
+    },
+    {
+      "hwnd": 5636914,
+      "posted": true
+    },
+    {
+      "hwnd": 8258990,
+      "posted": true
+    },
+    {
+      "hwnd": 4587952,
+      "posted": true
+    },
+    {
+      "hwnd": 7669266,
+      "posted": true
+    }
+  ],
+  "screen_saver_enumerated": true,
+  "after_screen_saver_close": {
+    "session": 1,
+    "console_session": 1,
+    "input_open": true,
+    "input_open_error": 0,
+    "input_name": "Screen-saver"
+  },
+  "error": "AssertionError('Unlocked Default desktop required')",
+  "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\observe_native_topology_v8.py\", line 53, in <module>\n    assert input_state()['input_name']=='Default','Unlocked Default desktop required'\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: Unlocked Default desktop required\n",
+  "finished": "2026-10-16T23:16:45.619702+00:00"
+}

@@ -1,0 +1,18 @@
+{
+  "passed": true,
+  "cases": [
+    "acquisition_before_input",
+    "pointer_only_has_no_update_timestamp",
+    "completed_before_input",
+    "stale_image_update",
+    "inverted_interval",
+    "future_update",
+    "invalid_pointer_only",
+    "wrong_owner",
+    "different_color",
+    "missing_point",
+    "unverified_ownership"
+  ],
+  "scope": "Synthetic timing joins; no NPU or desktop execution proof",
+  "primary_source": "https://learn.microsoft.com/en-us/windows/win32/api/dxgi1_2/ns-dxgi1_2-dxgi_outdupl_frame_info"
+}
