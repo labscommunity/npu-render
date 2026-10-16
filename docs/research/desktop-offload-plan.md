@@ -2,31 +2,36 @@
 
 Updated 2026-10-16. Target: Delta, Windows 11, Panther Lake. The repository stays
 private. **Full desktop offload is unfinished.** The latest
-[integer-worker live v51 trial](../validation/2026-10-16/native-integer-rectangle-live-v1/README.md)
-passes 1,163 acknowledged NPU operations, 56 exact physical submissions, a shared
-default-adapter application and restoration. Mouse readback completes in 2,544.636 ms
-and keyboard readback in 125.073 ms. The new routes execute 26 complex-shader draws
-and 147 rectangles, including 59 direct kernels. No provider fault or retry occurs.
-These two events do not establish matched improvement, p95, GPU relief or Tahoma
-benefit. The preceding v50 trial exposed an incorrect join of asynchronous display
-statistics to the latest submitted-source label. The corrected counter-based join
-passes twelve local cases and both trials. Its initial failure remains preserved.
-The current mouse event still includes 1,685.570 ms in child rendering intervals
-and 770.841 ms outside them before publication. Responsiveness remains the
-immediate gate, followed by sustained use,
+[filled-program live v54 trial](../validation/2026-10-16/native-filled-program-live-v1/README.md)
+passes 1,225 acknowledged NPU operations, 57 exact physical submissions, a shared
+default-adapter application and restoration. Mouse readback completes in 2,171.722 ms
+and keyboard readback in 94.671 ms; matching display counters occur at 2,076.730 ms
+and 84.381 ms. The new routes execute 26 complex-shader draws and 151 rectangles.
+No provider fault or retry occurs. These two events do not establish matched
+improvement, p95, GPU relief or Tahoma benefit.
+
+V54 also exposes an observer-analysis error: a valid acquisition began before
+input and completed afterward. Filtering on acquisition start incorrectly skipped
+that read. The corrected analysis selects completed owned pixel reads, retains
+missing desktop-update timestamps explicitly, and passes eleven synthetic checks.
+The failed analysis remains archived. The current mouse interval still includes
+1,359.597 ms in child rendering and 681.913 ms outside it before publication.
+Responsiveness remains the immediate gate, followed by sustained use,
 application coverage and matched Tahoma performance.
 
 The [compact generic-program component](../validation/2026-10-16/native-compact-program-v1/README.md)
 passes 448 NPU fixtures within the existing code allocation. Profiling 586 batches
 places 4,313.479 of 4,626.834 ms in NPU request waits, motivating a smaller payload
 and larger batches. The [integrated worker](../validation/2026-10-16/native-compact-program-worker-v1/README.md)
-preserves all 972 recorded outputs. Paired complete-image timing remains a
-separate gate; capacity alone is not evidence of a desktop improvement.
-The [first selected image comparison is rejected](../validation/2026-10-16/native-compact-program-comparison-rejected-v1/README.md):
-the candidate preserves every observed preceding NPU output, but three cases
-disagree with the additional CPU shader reference and some small draws regress.
-No desktop admission follows. The next candidate removes synthetic padding;
-reference disagreements remain explicit and require separate attribution.
+preserves all 972 recorded outputs. The first selected comparison is retained as
+[a rejected attempt](../validation/2026-10-16/native-compact-program-comparison-rejected-v1/README.md).
+The subsequent [filled-batch comparison](../validation/2026-10-16/native-filled-program-comparison-v1/README.md)
+preserves all 1,852 NPU images across 463 recorded draws. Its 1,389 warm pairs total
+76.77 seconds before and 59.58 seconds after, with 121 slower pairs. Ninety-three
+variants disagree with the CPU reference by at most one byte; every discrepancy
+is unchanged between the two NPU implementations. This qualifies prior-output
+preservation and component timing, not universal CPU-reference agreement or
+matched desktop improvement.
 
 Earlier milestones retain their original qualification scope. Worker v9 passes all 972 retained
 requests and registered D3D11. Its [finite live v44 trial](../validation/2026-10-16/native-long-shader-live-v1/README.md)
@@ -232,12 +237,12 @@ renderer does not establish where every application renders.
 
 | Gate | Work | Acceptance evidence | Current status |
 | --- | --- | --- | --- |
-| 1. Routing | Identify physical/indirect paths and the actual renderer before, during and after admission. | Timestamped topology, DWM NPU receipts, frame producer, exact restoration. | Finite v51 passes native routing and restoration. The physical output remains available. |
-| 2. Continuous rendering | Render changing content without hidden fallback; handle failed draws and preparation. | Fresh frames, pixel checks, provider receipts, sustained operation. | V51 passes 1,163 acknowledged operations and 56 matching physical submissions. The earlier v36 thirty-minute result does not qualify the current renderer. |
-| 3. Physical presentation | Deliver fresh NPU frames to the physical output without recursive mirroring; quantify remaining GPU work. | Sequence-to-present correlation, output identity, display statistics, residual GPU activity. | V51 correlates 56 exact submissions and controlled colors. GPU presentation copies and scanout remain; their cost is unmeasured against a matched baseline. |
-| 4. Interaction and recovery | Route pointer, keyboard and focus; handle cursor, DPI and resolution; restore topology and windows. | Physical input observations, owned-process fault recovery, ordinary lock/login path retained. | V51 passes controlled input, confinement/reacquisition and ordinary restoration with memory integrity enabled. Current sleep/wake, secure-desktop and broader fault qualification remain open. |
-| 5. Responsiveness | Reduce rendering, request, copy and scheduling costs; report cold start separately. | Ordinary animated desktop at 30 fps, p95 visible response ≤100 ms, thirty-minute stable run. | Not met. V51 observes mouse pixel-read completion at 2,544.636 ms and keyboard at 125.073 ms. These are two events, not p95. Compact-program replay preserves 972 outputs; paired image and live performance are separate gates. |
-| 6. Application coverage | Admit ordinary applications and implement required browser, video and 3D operations; verify per-process renderer. | Capability matrix and hardware runs accounting for every remaining iGPU operation. | V51 passes a normally started non-admin default-adapter fixture sharing DWM's NPU worker. Continuous admission, renewal/revocation, multiple applications and broad browser/video/game coverage remain unqualified. |
+| 1. Routing | Identify physical/indirect paths and the actual renderer before, during and after admission. | Timestamped topology, DWM NPU receipts, frame producer, exact restoration. | Finite v54 passes native routing and restoration. The physical output remains available. |
+| 2. Continuous rendering | Render changing content without hidden fallback; handle failed draws and preparation. | Fresh frames, pixel checks, provider receipts, sustained operation. | V54 passes 1,225 acknowledged operations and 57 matching physical submissions. The earlier v36 thirty-minute result does not qualify the current renderer. |
+| 3. Physical presentation | Deliver fresh NPU frames to the physical output without recursive mirroring; quantify remaining GPU work. | Sequence-to-present correlation, output identity, display statistics, residual GPU activity. | V54 correlates 57 exact submissions and controlled colors. GPU presentation copies and scanout remain; their cost is unmeasured against a matched baseline. |
+| 4. Interaction and recovery | Route pointer, keyboard and focus; handle cursor, DPI and resolution; restore topology and windows. | Physical input observations, owned-process fault recovery, ordinary lock/login path retained. | V54 passes controlled input, confinement/reacquisition and ordinary restoration with memory integrity enabled. Current sleep/wake, secure-desktop and broader fault qualification remain open. |
+| 5. Responsiveness | Reduce rendering, request, copy and scheduling costs; report cold start separately. | Ordinary animated desktop at 30 fps, p95 visible response ≤100 ms, thirty-minute stable run. | Not met. V54 observes mouse pixel-read completion at 2,171.722 ms and keyboard at 94.671 ms. These are two events, not p95. The compact worker preserves 972 replay outputs and passes paired image comparison and finite live delivery; a matched desktop speedup is not established. |
+| 6. Application coverage | Admit ordinary applications and implement required browser, video and 3D operations; verify per-process renderer. | Capability matrix and hardware runs accounting for every remaining iGPU operation. | V54 passes a normally started non-admin default-adapter fixture sharing DWM's NPU worker. Continuous admission, renewal/revocation, multiple applications and broad browser/video/game coverage remain unqualified. |
 | 7. Tahoma benefit | Repeat baseline/offload trials with matched power, resolution, content and work rate. | Tahoma throughput/latency, desktop frame times, per-engine activity, memory and power; measurable GPU relief without material regression. | Earlier experiments regressed. No native-desktop Tahoma A/B or GPU-relief result is established. |
 | 8. Usable switch | Integrate qualified components into install/on/off/status/recovery; complete distribution and CI work. | Clean install and repeated enable/disable cycles, failures and target-hardware end-to-end tests. | Private research prototype. No usable full-offload product or complete application migration. |
 
@@ -248,22 +253,22 @@ role, and any GPU rendering/copy cost in the bridge must be measured.
 
 ## Immediate work and decision gates
 
-1. Finish the compact-program comparison. Require exact preservation of the
-   preceding NPU images across all affected recorded draws and varied pixels.
-   Keep independent-reference disagreements explicit. Submit filled samples only
-   to avoid wasting time on larger synthetic padding regions. Use paired timing;
-   greater batch capacity alone does not qualify an improvement.
-2. Run registered graphics and the finite desktop trial only after the replay and
-   comparison gates pass. Reattribute input delay from that trial. The current v51
-   mouse interval includes 1,685.570 ms in child rendering and 770.841 ms outside
-   those intervals before publication.
-3. Measure and reduce redundant response copies without changing packet checks,
-   process ownership, recovery or rendering arithmetic. Compare validator behavior
-   on valid and malformed packets, then require full replay, fault recovery and
-   paired/live timing for the integrated worker.
-4. Once the finite path is responsive, run a repeated-input latency distribution,
-   continuous animation, the current renderer's thirty-minute soak, and sleep/wake,
-   secure-desktop and owned-failure recovery. A two-event trial cannot pass p95.
+1. Run repeated owned mouse and keyboard inputs with unique response colors and a
+   short 30 Hz animation. Measure completed pixel reads and matched display counters;
+   separate the first event from warm samples and count skipped updates explicitly.
+   The finite trial's two inputs and fifteen-second color changes cannot establish
+   p95 or interactive frame delivery.
+2. Reduce redundant response copies without changing packet checks, process
+   ownership, recovery or rendering arithmetic. The validator passes 3,598
+   equivalence checks. Require full worker replay, injected-fault recovery, paired
+   worker timing and live qualification before adopting the integrated change.
+3. Use those measurements to target the remaining delay. The current v54 mouse
+   frame includes 1,359.597 ms in child rendering and 681.913 ms outside it before
+   publication. Component timing and copy elimination do not by themselves prove
+   a faster desktop or reduced GPU contention.
+4. After responsiveness passes, run the current renderer's thirty-minute soak,
+   sleep/wake, secure-desktop and owned-failure recovery. Keep moving/resizing
+   windows and broader desktop interaction separate from the simple color fixture.
 5. Extend automatic admission to continuous leases, renewal/revocation and multiple
    ordinary clients. Establish a real browser/video/3D capability matrix. Account
    for every operation still using the iGPU; a successful DWM trial does not prove
