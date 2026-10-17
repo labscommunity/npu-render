@@ -1,0 +1,59 @@
+from pathlib import Path
+import ast
+r=Path(__file__).parent
+source=(r/'qualify-packet-provider-recovery-v2.py').read_text()
+models=source[source.index(' models={'):source.index(' tickets=')]
+prefix='''from pathlib import Path
+from datetime import UTC,datetime
+import hashlib,json,os,subprocess,sys,time,traceback
+r=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=r/'vm';out=vm/'packet-transport-comparison-v1';out.mkdir(exist_ok=False)
+def obj(p):return json.loads(p.read_text(encoding='utf-8-sig'))
+def rows(p):return [json.loads(x) for x in p.read_text(encoding='utf-8-sig').splitlines() if x.startswith('{') and x.endswith('}')]
+def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,desktop_changed=False,tahoma_tested=False,phases=[]);process=None
+def save():(out/'report.json').write_text(json.dumps(report,indent=2)+'\\n')
+save()
+try:
+ assert obj(vm/'packet-provider-recovery-v2/report.json')['passed']
+ assert sha(vm/'replay-recorded-requests-v19.py')=='0a360383e4ad5084f77a07f0ece68467caa4debfcbe4c4c24a16a7f5345e112d'
+ expected=rows(vm/'ptl-native-worker-v18-full/replay/replays.jsonl');assert len(expected)==972
+ env=os.environ.copy()
+'''
+body=''' for phase,version in [('A1',18),('B1',19),('B2',19),('A2',18)]:
+  proof=obj(vm/f'ptl-native-worker-v{version}-full/report.json');assert proof['passed']
+  worker=r/f'builds/ptl-native-worker-v{version}/Release/nr_registered_local_indexed_worker.exe';assert sha(worker)==proof['worker_sha256']
+  trial=out/phase;command=list(proof['command']);command[command.index('--output')+1]=str(trial);started=time.perf_counter()
+  with (out/(phase+'.stdout.log')).open('xb') as stdout,(out/(phase+'.stderr.log')).open('xb') as stderr:
+   process=subprocess.Popen(command,env=env,stdout=stdout,stderr=stderr,creationflags=subprocess.CREATE_NO_WINDOW)
+   try:process.wait(timeout=1200)
+   except subprocess.TimeoutExpired:process.kill();process.wait(timeout=5);raise AssertionError('Replay deadline')
+  elapsed=time.perf_counter()-started;q=obj(trial/'report.json');actual=rows(trial/'replays.jsonl')
+  assert process.returncode==0 and q['passed'] and q['successful_replays']==q['delivery_acknowledgments']==len(actual)==972
+  assert all((a['ticket'],a['pixels_sha256'],a['pixel_bytes'])==(b['ticket'],b['pixels_sha256'],b['pixel_bytes']) for a,b in zip(actual,expected))
+  parent=rows(trial/'worker.stdout.jsonl');generations=[x for x in parent if x.get('provider_process_started')]
+  assert len(generations)==1 and not any(x.get('provider_process_failure') for x in parent)
+  child=rows(trial/'provider-processes/generation-1/worker.stdout.jsonl')
+  pt={x['dispatch_ticket']:x for x in parent if x.get('kind')=='request_timeline'};ct={x['dispatch_ticket']:x for x in child if x.get('kind')=='request_timeline'}
+  assert len(pt)==len(ct)==972 and set(pt)==set(ct)
+  frequencies={x['qpc_frequency'] for event in (parent,child) for x in event if 'qpc_frequency' in x};assert len(frequencies)==1;hz=frequencies.pop();assert hz>0
+  items=[]
+  for ticket in sorted(pt):
+   p,c=pt[ticket],ct[ticket];assert p['pid']==c['client_pid'] and p['sequence']==c['sequence'];assert p['entered_qpc']<=c['entered_qpc']<=c['finished_qpc']<=p['finished_qpc']
+   assert 0<=ticket<972
+   items.append(dict(dispatch_ticket=ticket,original_ticket=actual[ticket]['ticket'],parent_ms=(p['finished_qpc']-p['entered_qpc'])*1000/hz,child_ms=(c['finished_qpc']-c['entered_qpc'])*1000/hz))
+  total_parent=sum(x['parent_ms'] for x in items);total_child=sum(x['child_ms'] for x in items)
+  record=dict(phase=phase,worker_version=version,worker_sha256=sha(worker),passed=True,exact_images=972,provider_generations=1,provider_failures=0,replay_elapsed_seconds=elapsed,parent_ms=total_parent,child_ms=total_child,outside_child_ms=total_parent-total_child,requests=items)
+  report['phases'].append(record);save()
+ pairs=[]
+ for old,new in ((report['phases'][0],report['phases'][1]),(report['phases'][3],report['phases'][2])):
+  for a,b in zip(old['requests'],new['requests']):
+   assert a['original_ticket']==b['original_ticket'];pairs.append(dict(original_ticket=a['original_ticket'],old_phase=old['phase'],new_phase=new['phase'],old_parent_ms=a['parent_ms'],new_parent_ms=b['parent_ms'],old_outside_child_ms=a['parent_ms']-a['child_ms'],new_outside_child_ms=b['parent_ms']-b['child_ms']))
+ report.update(passed=True,paired_requests=pairs,summary=dict(pairs=len(pairs),old_parent_ms=sum(x['old_parent_ms'] for x in pairs),new_parent_ms=sum(x['new_parent_ms'] for x in pairs),old_outside_child_ms=sum(x['old_outside_child_ms'] for x in pairs),new_outside_child_ms=sum(x['new_outside_child_ms'] for x in pairs),slower_parent_pairs=sum(x['new_parent_ms']>x['old_parent_ms'] for x in pairs)),scope='Four complete recorded replays in A/B/B/A order; two runs per worker; no desktop or Tahoma performance claim')
+except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+finally:
+ if process is not None and process.poll() is None:process.kill();process.wait(timeout=5)
+ report.update(completed=True,finished=datetime.now(UTC).isoformat());save()
+print(json.dumps({k:v for k,v in report.items() if k not in ('phases','paired_requests')}));raise SystemExit(0 if report['passed'] else 1)
+'''
+s=prefix+models+body;ast.parse(s);p=r/'qualify-packet-transport-comparison-v1.py';assert not p.exists();p.write_text(s)
+print('Prepared recorded transport ABBA comparison')

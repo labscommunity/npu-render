@@ -19,6 +19,16 @@ The failed analysis remains archived. The current mouse interval still includes
 Responsiveness remains the immediate gate, followed by sustained use,
 application coverage and matched Tahoma performance.
 
+The [response-packet worker comparison](../validation/2026-10-16/native-response-packet-comparison-v1/README.md)
+preserves all 3,888 images in four A/B/B/A replays. Removing redundant parent-side
+response decoding and encoding reduces time outside child execution by 23.73%,
+but total parent request time falls only 2.03%, with 610 slower individual pairs.
+This narrows the diagnosis: child rendering remains dominant. It does not yet
+establish a desktop or Tahoma gain. The worker also passes
+[two bounded provider-failure scenarios](../validation/2026-10-16/native-response-packet-recovery-v1/README.md).
+The [repeated-input tools](../validation/2026-10-16/native-repeated-input-tools-v1/README.md)
+are qualified for the next live response distribution and animation measurement.
+
 The [compact generic-program component](../validation/2026-10-16/native-compact-program-v1/README.md)
 passes 448 NPU fixtures within the existing code allocation. Profiling 586 batches
 places 4,313.479 of 4,626.834 ms in NPU request waits, motivating a smaller payload
