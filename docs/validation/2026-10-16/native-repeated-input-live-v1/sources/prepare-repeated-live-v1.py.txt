@@ -1,0 +1,44 @@
+from pathlib import Path
+import re,json,hashlib,ast
+r=Path(__file__).parent
+changes={'native-registration-v43':'native-registration-v44','native-registered-v43':'native-registered-v44','NativeRecovery-v43':'NativeRecovery-v44','native_shared_app_v10':'native_shared_app_v11','native_desktop_bootstrap_v38':'native_desktop_bootstrap_v39','native-desktop-v64':'native-desktop-v65','native-desktop-admission-v64':'native-desktop-admission-v65','NativeDesktopRecovery-v64':'NativeDesktopRecovery-v65','native-live-v54':'native-live-v55','NativeLiveV54':'NativeLiveV55','native-topology-primary-v40':'native-topology-primary-v41','native-topology-v96':'native-topology-v99','native-topology-v97':'native-topology-v100','native-topology-v98':'native-topology-v101','InspectTopology-V96':'InspectTopology-V99','InspectTopology-V97':'InspectTopology-V100','InspectTopology-V98':'InspectTopology-V101','observer98':'observer101','dismiss-native-saver-v28':'dismiss-native-saver-v29','dismiss-v28':'dismiss-v29','ptl-native-live-v18':'ptl-native-live-v19','native-latency-v16-analysis':'native-latency-v17-analysis','native-presentation-v12-analysis':'native-presentation-v13-analysis','ptl-combined-desktop-v6':'ptl-combined-desktop-v7','analyze-native-latency-v14.py':'analyze-native-latency-v15.py','analyze-native-presentation-v12.py':'analyze-native-presentation-v13.py'}
+pat=re.compile('|'.join(re.escape(x) for x in sorted(changes,key=len,reverse=True)))
+def rename(s):return pat.sub(lambda m:changes[m[0]],s)
+files=[x for x in json.loads((r/'ptl-combined-live-v6-upload.json').read_text()) if not x.endswith('-source.json')]
+for f in files:
+ s=rename((r/f).read_text())
+ if f=='run-native-live-v54.ps1':
+  s=s.replace('native-output-observer-v4','native-output-observer-v5')
+  needle='$inputQualification=Get-Content '
+  at=s.index(needle)
+  s=s[:at]+r'''$repeatProof=Get-Content "$r\builds\native-input-benchmark-v1\build-report.json" -Raw|ConvertFrom-Json
+$repeatQualification=Get-Content "$r\vm\native-input-benchmark-v1-qualification\report.json" -Raw|ConvertFrom-Json
+$repeatBinary="$r\builds\native-input-benchmark-v1\Release\nr_repeated_input.exe"
+if(!$repeatProof.clean_build -or !$repeatQualification.completed -or !$repeatQualification.passed -or $repeatQualification.binary_sha256 -ne $repeatProof.binary_sha256 -or (Get-FileHash $repeatBinary).Hash -ne $repeatProof.binary_sha256){throw 'Repeated input contract is not qualified'}
+'''+s[at:]
+  s=s.replace('$screenStarted=$false;$clickCued=$false;$keyCued=$false;$appCued=$false;$appStarted=$false','$screenStarted=$false;$clickCued=$false;$keyCued=$false;$appCued=$false;$appStarted=$false;$repeatStarted=$false;$repeatFinished=$false;$animationObserved=$null')
+  old='if($keyCued -and $redObserved -and !(Test-Path "$out\\cues\\animate")){New-Item -ItemType File "$out\\cues\\animate"|Out-Null;$report.initial_response_held_until_observed=$true;Save-Report}'
+  new='if($keyCued -and $redObserved -and !$report.initial_response_held_until_observed){$report.initial_response_held_until_observed=$true;Save-Report}'
+  assert old in s;s=s.replace(old,new)
+  needle=' }while(($presentState';assert needle in s;s=s.replace(needle,(r/'repeated-live-poll-v1.ps1').read_text()+needle)
+  needle=" $report.continuous_delivery_gate_passed=$true";s=s.replace(needle," if(!$repeatFinished -or !$report.repeated_input_execution_passed){throw 'Repeated input benchmark did not finish'}\n"+needle)
+  needle='finally{\n if(Test-Path "$out\\screen")';s=s.replace(needle,'finally{\n if(Test-Path "$out\\repeat-cues"){New-Item -ItemType File "$out\\repeat-cues\\stop" -Force|Out-Null}\n if(Test-Path "$out\\screen")')
+ if f=='run-ptl-combined-desktop-v6.ps1':
+  s=s.replace('packet-provider-recovery-v1-qualification','native-input-tools-v1-qualification')
+  needle=" $deadline=[DateTime]::UtcNow.AddMinutes(40)"
+  extra=r''' if(!$previous.passed){throw 'Input tools are not qualified'}
+ $priorLive=Get-Content "$vm\ptl-combined-desktop-v6\report.json" -Raw|ConvertFrom-Json
+ if(!$priorLive.completed -or !$priorLive.passed){throw 'Prior compact live trial not qualified'}
+'''
+  s=s.replace(needle,extra+needle,1).replace('native-registration-v42','native-registration-v43')
+  needle=" $report.phases+=@{phase='timing-analysis';passed=$true};$report.passed=$true"
+  extra=r''' $analysis=Start-Process "$r\toolchains\openvino-2026.4.1\Scripts\python.exe" -ArgumentList @(('"'+$vm+'\analyze-repeated-input-v1.py"'),'--trial',('"'+$vm+'\native-live-v55"'),'--output',('"'+$vm+'\native-repeated-input-v1-analysis"')) -PassThru -NoNewWindow -RedirectStandardOutput "$out\repeat-analysis.stdout.log" -RedirectStandardError "$out\repeat-analysis.stderr.log"
+ try{if(!$analysis.WaitForExit(60000)){$analysis.Kill();$analysis.WaitForExit();throw 'Repeated analysis deadline'};$analysis.Refresh();if($analysis.ExitCode){throw 'Repeated input analysis failed'}}finally{$analysis.Dispose()}
+'''
+  assert needle in s;s=s.replace(needle,extra+needle)
+ if f.endswith('.py'):ast.parse(s)
+ p=r/rename(f);assert not p.exists();p.write_text(s)
+for old in ('native-registration-v43-source.json','native-desktop-v64-source.json'):
+ names=[rename(f) for f in json.loads((r/old).read_text())];(r/rename(old)).write_text(json.dumps({f:hashlib.sha256((r/f).read_bytes()).hexdigest() for f in names},indent=2)+'\n')
+(r/'ptl-combined-live-v7-upload.json').write_text(json.dumps([rename(f) for f in files]+['native-registration-v44-source.json','native-desktop-v65-source.json','analyze-repeated-input-v1.py'],indent=2)+'\n')
+print('Prepared repeated live v55; unchanged qualified worker v18')

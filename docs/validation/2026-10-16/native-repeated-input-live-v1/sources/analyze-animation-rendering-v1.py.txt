@@ -1,0 +1,65 @@
+"""Locate worker and delivery time inside a completed animation measurement."""
+from pathlib import Path
+import argparse
+import hashlib
+import importlib.util
+import json
+
+r=Path(__file__).parent
+spec=importlib.util.spec_from_file_location('repeated_rendering',r/'analyze-repeated-rendering-v1.py')
+m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+
+def analyze(measured,stimulus,frames,present,parent,child):
+    assert measured['passed'] and measured['completed']
+    clocks=[x for x in stimulus if x.get('animation_clock')]
+    assert len(clocks)==1
+    hz=measured['qpc_frequency'];start=clocks[0]['start_qpc'];end=start+10*hz
+    assert {x['qpc_frequency'] for stream in (parent,child) for x in stream if 'qpc_frequency' in x}=={hz}
+    interval=m.attribute(parent,child,start,end,hz)
+    profile={};current=None
+    for x in child:
+        if x.get('kind')=='request_identity':current=x
+        if x.get('passed') and x.get('execution_device')=='NPU':
+            assert current is not None and current['sequence']==x['sequence']
+            assert current['dispatch_ticket'] not in profile
+            profile[current['dispatch_ticket']]=x
+    for draw in interval['overlapping_draws']:
+        stats=profile[draw['dispatch_ticket']]
+        draw['whole_request_provider_calls']=stats['provider_requests']
+        draw['whole_request_backend_compile_ms']=stats['backend_compile_ms']
+        draw['whole_request_draw_ms']=stats['draw_ms']
+    publication=[x for x in frames if start<=x['qpc']<end]
+    submission=[x for x in present if x.get('live_frame_presented') and start<=x['accepted_qpc']<end]
+    stalls=[]
+    for event in measured['controlled_events']:
+        if event['send_to_receive_ms']>100:
+            stalls.append(dict(sequence=event['sequence'],kind=event['kind'],
+                               send_to_receive_ms=event['send_to_receive_ms'],
+                               worker_overlap=m.attribute(parent,child,event['sent_qpc'],event['received_qpc'],hz)))
+    return dict(completed=True,passed=True,animation_start_qpc=start,animation_end_qpc=end,
+                qpc_frequency=hz,animation_interval=interval,
+                all_publications_during_interval=len(publication),
+                all_submissions_during_interval=len(submission),
+                publication_timestamps=[dict(sequence=x['sequence'],qpc=x['qpc'],known_stimulus_pixel=x.get('known_stimulus_pixel')) for x in publication],
+                measured_animation=measured['animation'],input_delivery_stalls=stalls,
+                scope='Overlap with the scheduled ten-second animation interval. Child execution includes host work and NPU waits. Whole-request counters for boundary-crossing requests are context, not apportioned time. Publication/submission counts include any content, while the measured animation counts only matching unique colors. No hardware-utilization or Tahoma claim.',
+                full_desktop_offload=False,tahoma_tested=False)
+
+if __name__=='__main__':
+    p=argparse.ArgumentParser()
+    for name in ('input-analysis','trial','bootstrap','output'):p.add_argument('--'+name,type=Path,required=True)
+    a=p.parse_args()
+    paths=[a.input_analysis/'report.json',a.trial/'repeat/probe.log',a.trial/'relay/frames.jsonl',
+           a.trial/'present/probe.log',a.bootstrap/'worker.stdout.jsonl',
+           a.bootstrap/'provider-processes/generation-1/worker.stdout.jsonl']
+    measured=json.loads(paths[0].read_text(encoding='utf-8-sig'))
+    report=analyze(measured,*(m.rows(path) for path in paths[1:]))
+    report['source_sha256']={str(path):hashlib.sha256(path.read_bytes()).hexdigest() for path in paths}
+    a.output.mkdir(exist_ok=False)
+    (a.output/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+    print(json.dumps(dict(passed=True,stages=report['animation_interval']['stages'],
+                         outside_serialized_parent_ms=report['animation_interval']['outside_serialized_parent_ms'],
+                         shader_overlap=report['animation_interval']['by_shader'],
+                         publications=report['all_publications_during_interval'],
+                         submissions=report['all_submissions_during_interval'],
+                         input_delivery_stalls=len(report['input_delivery_stalls']))))

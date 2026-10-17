@@ -10,15 +10,16 @@ RGBA composition and an explicit backend switch. The packaged runtime passed
 GPU → NPU → CPU → GPU → NPU switching on Panther Lake. It supports CPU/GPU/NPU through
 its first OpenVINO provider; other providers can implement the same contracts.
 
-**Latest results, October 16:** the [compact filled-batch worker
-passes a finite Windows desktop trial](docs/validation/2026-10-16/native-filled-program-live-v1/README.md).
-It completes 1,225 acknowledged NPU operations, 57 exact physical submissions,
-controlled input, an ordinary default-adapter test application and full restoration.
-The new paths execute 26 complex-shader draws and 151 rectangle draws, with no
-provider faults or retries. Mouse pixel confirmation takes 2.17 seconds and keyboard
-confirmation 94.7 ms. Responsiveness remains inadequate; these two events are not
-a matched performance comparison. Continuous arbitrary-application admission,
-sustained responsiveness and a Tahoma benefit remain unqualified.
+**Latest results, October 16:** the [repeated-input desktop trial](docs/validation/2026-10-16/native-repeated-input-live-v1/README.md)
+passes 1,680 acknowledged NPU operations, 103 exact physical submissions, forty
+controlled inputs, the default-adapter test application and restoration, with
+no provider fault or retry. Responsiveness fails: warm p95 from application receipt
+to matching display is 116 ms for mouse and 110 ms for keyboard. One mouse input
+also waits 3.32 seconds before the application receives it. Only seven distinct
+animation updates are display-counter verified during a ten-second 30 Hz test.
+The trace places 6.6 seconds inside child rendering with no compilation time.
+Full desktop offload, sustained responsiveness, broad application coverage and
+a Tahoma benefit remain unqualified.
 
 Its [complete-image component comparison](docs/validation/2026-10-16/native-filled-program-comparison-v1/README.md)
 preserves all 1,852 preceding NPU images. Across 1,389 warm pairs, aggregate draw

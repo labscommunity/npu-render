@@ -1,0 +1,1547 @@
+{
+  "completed": true,
+  "passed": true,
+  "events": [
+    {
+      "sequence": 1,
+      "kind": "mouse",
+      "first_of_kind": true,
+      "interval_ms": 376.9945,
+      "stages": {
+        "parent_pre_child_ms": 6.4614,
+        "child_packet_read_ms": 5.343,
+        "child_pre_execution_ms": 0.0207,
+        "child_execution_ms": 298.68800000000005,
+        "parent_post_child_ms": 15.952100000000002
+      },
+      "outside_serialized_parent_ms": 50.52929999999998,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 705,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 262.0081,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 706,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 23.0328,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 707,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 7.9554,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 708,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 5.6917,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 2,
+          "overlap_ms": 269.9635
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 2,
+          "overlap_ms": 28.724500000000003
+        }
+      }
+    },
+    {
+      "sequence": 2,
+      "kind": "key",
+      "first_of_kind": true,
+      "interval_ms": 50.1372,
+      "stages": {
+        "parent_pre_child_ms": 3.2431,
+        "child_packet_read_ms": 2.928,
+        "child_pre_execution_ms": 0.0138,
+        "child_execution_ms": 16.6449,
+        "parent_post_child_ms": 8.2606
+      },
+      "outside_serialized_parent_ms": 19.0468,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 709,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 10.4962,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 710,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 6.1487,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 10.4962
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 6.1487
+        }
+      }
+    },
+    {
+      "sequence": 3,
+      "kind": "mouse",
+      "first_of_kind": false,
+      "interval_ms": 55.4803,
+      "stages": {
+        "parent_pre_child_ms": 3.2934,
+        "child_packet_read_ms": 2.7447,
+        "child_pre_execution_ms": 0.015899999999999997,
+        "child_execution_ms": 17.1059,
+        "parent_post_child_ms": 8.0778
+      },
+      "outside_serialized_parent_ms": 24.242600000000003,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 711,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 10.6603,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 712,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 6.4456,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 10.6603
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 6.4456
+        }
+      }
+    },
+    {
+      "sequence": 4,
+      "kind": "key",
+      "first_of_kind": false,
+      "interval_ms": 49.3282,
+      "stages": {
+        "parent_pre_child_ms": 3.4996,
+        "child_packet_read_ms": 2.7594,
+        "child_pre_execution_ms": 0.0174,
+        "child_execution_ms": 15.9138,
+        "parent_post_child_ms": 7.9798
+      },
+      "outside_serialized_parent_ms": 19.1582,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 713,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 9.9785,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 714,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 5.9353,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 9.9785
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 5.9353
+        }
+      }
+    },
+    {
+      "sequence": 5,
+      "kind": "mouse",
+      "first_of_kind": false,
+      "interval_ms": 54.3267,
+      "stages": {
+        "parent_pre_child_ms": 3.2055,
+        "child_packet_read_ms": 3.0721999999999996,
+        "child_pre_execution_ms": 0.0148,
+        "child_execution_ms": 15.5005,
+        "parent_post_child_ms": 7.4152000000000005
+      },
+      "outside_serialized_parent_ms": 25.1185,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 715,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 9.7231,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 716,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 5.7774,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 9.7231
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 5.7774
+        }
+      }
+    },
+    {
+      "sequence": 6,
+      "kind": "key",
+      "first_of_kind": false,
+      "interval_ms": 49.5787,
+      "stages": {
+        "parent_pre_child_ms": 3.3208,
+        "child_packet_read_ms": 2.8387000000000002,
+        "child_pre_execution_ms": 0.016,
+        "child_execution_ms": 16.749200000000002,
+        "parent_post_child_ms": 7.847300000000001
+      },
+      "outside_serialized_parent_ms": 18.806699999999996,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 717,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 10.4542,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 718,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 6.295,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 10.4542
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 6.295
+        }
+      }
+    },
+    {
+      "sequence": 7,
+      "kind": "mouse",
+      "first_of_kind": false,
+      "interval_ms": 50.62,
+      "stages": {
+        "parent_pre_child_ms": 3.2456,
+        "child_packet_read_ms": 2.6593999999999998,
+        "child_pre_execution_ms": 0.0126,
+        "child_execution_ms": 16.0061,
+        "parent_post_child_ms": 7.6358
+      },
+      "outside_serialized_parent_ms": 21.060499999999998,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 719,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 10.1145,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 720,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 5.8916,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 10.1145
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 5.8916
+        }
+      }
+    },
+    {
+      "sequence": 8,
+      "kind": "key",
+      "first_of_kind": false,
+      "interval_ms": 50.9503,
+      "stages": {
+        "parent_pre_child_ms": 3.3193,
+        "child_packet_read_ms": 2.7084,
+        "child_pre_execution_ms": 0.0149,
+        "child_execution_ms": 17.456400000000002,
+        "parent_post_child_ms": 7.7780000000000005
+      },
+      "outside_serialized_parent_ms": 19.673299999999994,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 721,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 11.1196,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 722,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 6.3368,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 11.1196
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 6.3368
+        }
+      }
+    },
+    {
+      "sequence": 9,
+      "kind": "mouse",
+      "first_of_kind": false,
+      "interval_ms": 56.6764,
+      "stages": {
+        "parent_pre_child_ms": 3.2895000000000003,
+        "child_packet_read_ms": 3.0441000000000003,
+        "child_pre_execution_ms": 0.0157,
+        "child_execution_ms": 17.839399999999998,
+        "parent_post_child_ms": 7.627000000000001
+      },
+      "outside_serialized_parent_ms": 24.8607,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 723,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 11.5421,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 724,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 6.2973,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 11.5421
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 6.2973
+        }
+      }
+    },
+    {
+      "sequence": 10,
+      "kind": "key",
+      "first_of_kind": false,
+      "interval_ms": 48.2266,
+      "stages": {
+        "parent_pre_child_ms": 3.3853,
+        "child_packet_read_ms": 2.7702999999999998,
+        "child_pre_execution_ms": 0.0141,
+        "child_execution_ms": 16.3639,
+        "parent_post_child_ms": 7.5306
+      },
+      "outside_serialized_parent_ms": 18.162399999999998,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 725,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 10.4736,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 726,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 5.8903,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 10.4736
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 5.8903
+        }
+      }
+    },
+    {
+      "sequence": 11,
+      "kind": "mouse",
+      "first_of_kind": false,
+      "interval_ms": 51.2814,
+      "stages": {
+        "parent_pre_child_ms": 3.4454000000000002,
+        "child_packet_read_ms": 2.7446,
+        "child_pre_execution_ms": 0.0174,
+        "child_execution_ms": 15.55,
+        "parent_post_child_ms": 7.830299999999999
+      },
+      "outside_serialized_parent_ms": 21.693699999999996,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 727,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 9.7425,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 728,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 5.8075,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 9.7425
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 5.8075
+        }
+      }
+    },
+    {
+      "sequence": 12,
+      "kind": "key",
+      "first_of_kind": false,
+      "interval_ms": 50.5411,
+      "stages": {
+        "parent_pre_child_ms": 3.5175,
+        "child_packet_read_ms": 2.878,
+        "child_pre_execution_ms": 0.0175,
+        "child_execution_ms": 16.137700000000002,
+        "parent_post_child_ms": 8.0747
+      },
+      "outside_serialized_parent_ms": 19.915699999999998,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 729,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 10.0919,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 730,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 6.0458,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 10.0919
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 6.0458
+        }
+      }
+    },
+    {
+      "sequence": 13,
+      "kind": "mouse",
+      "first_of_kind": false,
+      "interval_ms": 49.352,
+      "stages": {
+        "parent_pre_child_ms": 3.2084,
+        "child_packet_read_ms": 2.6999000000000004,
+        "child_pre_execution_ms": 0.012199999999999999,
+        "child_execution_ms": 15.7853,
+        "parent_post_child_ms": 7.9646
+      },
+      "outside_serialized_parent_ms": 19.681599999999996,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 731,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 9.6819,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 732,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 6.1034,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 9.6819
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 6.1034
+        }
+      }
+    },
+    {
+      "sequence": 14,
+      "kind": "key",
+      "first_of_kind": false,
+      "interval_ms": 47.5348,
+      "stages": {
+        "parent_pre_child_ms": 3.3678,
+        "child_packet_read_ms": 2.6244,
+        "child_pre_execution_ms": 0.0113,
+        "child_execution_ms": 15.824,
+        "parent_post_child_ms": 7.4948
+      },
+      "outside_serialized_parent_ms": 18.2125,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 733,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 10.0222,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 734,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 5.8018,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 10.0222
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 5.8018
+        }
+      }
+    },
+    {
+      "sequence": 15,
+      "kind": "mouse",
+      "first_of_kind": false,
+      "interval_ms": 71.4766,
+      "stages": {
+        "parent_pre_child_ms": 3.4182,
+        "child_packet_read_ms": 2.9821999999999997,
+        "child_pre_execution_ms": 0.0166,
+        "child_execution_ms": 16.0701,
+        "parent_post_child_ms": 8.6698
+      },
+      "outside_serialized_parent_ms": 40.319700000000005,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 819,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 10.5681,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 820,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 5.502,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 10.5681
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 5.502
+        }
+      }
+    },
+    {
+      "sequence": 16,
+      "kind": "key",
+      "first_of_kind": false,
+      "interval_ms": 52.5682,
+      "stages": {
+        "parent_pre_child_ms": 3.2957,
+        "child_packet_read_ms": 2.5611,
+        "child_pre_execution_ms": 0.0086,
+        "child_execution_ms": 15.236799999999999,
+        "parent_post_child_ms": 7.7927
+      },
+      "outside_serialized_parent_ms": 23.673299999999998,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 821,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 9.7174,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 822,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 5.5194,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 9.7174
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 5.5194
+        }
+      }
+    },
+    {
+      "sequence": 17,
+      "kind": "mouse",
+      "first_of_kind": false,
+      "interval_ms": 49.9904,
+      "stages": {
+        "parent_pre_child_ms": 3.2991,
+        "child_packet_read_ms": 2.5723000000000003,
+        "child_pre_execution_ms": 0.0127,
+        "child_execution_ms": 15.1766,
+        "parent_post_child_ms": 8.018799999999999
+      },
+      "outside_serialized_parent_ms": 20.9109,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 823,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 9.4183,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 824,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 5.7583,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 9.4183
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 5.7583
+        }
+      }
+    },
+    {
+      "sequence": 18,
+      "kind": "key",
+      "first_of_kind": false,
+      "interval_ms": 51.7572,
+      "stages": {
+        "parent_pre_child_ms": 3.2366,
+        "child_packet_read_ms": 3.0003,
+        "child_pre_execution_ms": 0.0143,
+        "child_execution_ms": 16.5169,
+        "parent_post_child_ms": 7.6431000000000004
+      },
+      "outside_serialized_parent_ms": 21.345999999999997,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 825,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 10.7707,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 826,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 5.7462,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 10.7707
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 5.7462
+        }
+      }
+    },
+    {
+      "sequence": 19,
+      "kind": "mouse",
+      "first_of_kind": false,
+      "interval_ms": 62.6832,
+      "stages": {
+        "parent_pre_child_ms": 3.2599,
+        "child_packet_read_ms": 2.5814000000000004,
+        "child_pre_execution_ms": 0.012199999999999999,
+        "child_execution_ms": 15.8291,
+        "parent_post_child_ms": 7.9807
+      },
+      "outside_serialized_parent_ms": 33.0199,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 827,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 9.953,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 828,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 5.8761,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 9.953
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 5.8761
+        }
+      }
+    },
+    {
+      "sequence": 20,
+      "kind": "key",
+      "first_of_kind": false,
+      "interval_ms": 50.4506,
+      "stages": {
+        "parent_pre_child_ms": 3.2636000000000003,
+        "child_packet_read_ms": 2.6891,
+        "child_pre_execution_ms": 0.014600000000000002,
+        "child_execution_ms": 17.384,
+        "parent_post_child_ms": 7.5267
+      },
+      "outside_serialized_parent_ms": 19.5726,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 829,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 11.1057,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 830,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 6.2783,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 11.1057
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 6.2783
+        }
+      }
+    },
+    {
+      "sequence": 21,
+      "kind": "mouse",
+      "first_of_kind": false,
+      "interval_ms": 61.3138,
+      "stages": {
+        "parent_pre_child_ms": 3.3324,
+        "child_packet_read_ms": 2.7964,
+        "child_pre_execution_ms": 0.0129,
+        "child_execution_ms": 16.561899999999998,
+        "parent_post_child_ms": 7.8781
+      },
+      "outside_serialized_parent_ms": 30.732100000000003,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 831,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 10.5156,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 832,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 6.0463,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 10.5156
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 6.0463
+        }
+      }
+    },
+    {
+      "sequence": 22,
+      "kind": "key",
+      "first_of_kind": false,
+      "interval_ms": 49.3209,
+      "stages": {
+        "parent_pre_child_ms": 3.4393000000000002,
+        "child_packet_read_ms": 3.3365,
+        "child_pre_execution_ms": 0.016300000000000002,
+        "child_execution_ms": 16.6798,
+        "parent_post_child_ms": 7.4922
+      },
+      "outside_serialized_parent_ms": 18.3568,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 833,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 10.4363,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 834,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 6.2435,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 10.4363
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 6.2435
+        }
+      }
+    },
+    {
+      "sequence": 23,
+      "kind": "mouse",
+      "first_of_kind": false,
+      "interval_ms": 59.6849,
+      "stages": {
+        "parent_pre_child_ms": 3.2723,
+        "child_packet_read_ms": 2.8468,
+        "child_pre_execution_ms": 0.0154,
+        "child_execution_ms": 17.0288,
+        "parent_post_child_ms": 8.075800000000001
+      },
+      "outside_serialized_parent_ms": 28.4458,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 835,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 10.6369,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 836,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 6.3919,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 10.6369
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 6.3919
+        }
+      }
+    },
+    {
+      "sequence": 24,
+      "kind": "key",
+      "first_of_kind": false,
+      "interval_ms": 49.812,
+      "stages": {
+        "parent_pre_child_ms": 3.2904,
+        "child_packet_read_ms": 2.7824,
+        "child_pre_execution_ms": 0.0187,
+        "child_execution_ms": 17.0318,
+        "parent_post_child_ms": 7.473599999999999
+      },
+      "outside_serialized_parent_ms": 19.215099999999996,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 837,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 10.9765,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 838,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 6.0553,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 10.9765
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 6.0553
+        }
+      }
+    },
+    {
+      "sequence": 25,
+      "kind": "mouse",
+      "first_of_kind": false,
+      "interval_ms": 50.8332,
+      "stages": {
+        "parent_pre_child_ms": 3.4777,
+        "child_packet_read_ms": 2.9264,
+        "child_pre_execution_ms": 0.016800000000000002,
+        "child_execution_ms": 15.5186,
+        "parent_post_child_ms": 7.8844
+      },
+      "outside_serialized_parent_ms": 21.0093,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 839,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 9.6002,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 840,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 5.9184,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 9.6002
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 5.9184
+        }
+      }
+    },
+    {
+      "sequence": 26,
+      "kind": "key",
+      "first_of_kind": false,
+      "interval_ms": 48.9051,
+      "stages": {
+        "parent_pre_child_ms": 3.2333,
+        "child_packet_read_ms": 2.9043,
+        "child_pre_execution_ms": 0.013,
+        "child_execution_ms": 16.5599,
+        "parent_post_child_ms": 7.223599999999999
+      },
+      "outside_serialized_parent_ms": 18.971,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 841,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 10.5702,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 842,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 5.9897,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 10.5702
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 5.9897
+        }
+      }
+    },
+    {
+      "sequence": 27,
+      "kind": "mouse",
+      "first_of_kind": false,
+      "interval_ms": 52.3287,
+      "stages": {
+        "parent_pre_child_ms": 3.2485999999999997,
+        "child_packet_read_ms": 2.7545,
+        "child_pre_execution_ms": 0.0143,
+        "child_execution_ms": 15.9978,
+        "parent_post_child_ms": 7.477399999999999
+      },
+      "outside_serialized_parent_ms": 22.8361,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 843,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 10.148,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 844,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 5.8498,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 10.148
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 5.8498
+        }
+      }
+    },
+    {
+      "sequence": 28,
+      "kind": "key",
+      "first_of_kind": false,
+      "interval_ms": 50.9028,
+      "stages": {
+        "parent_pre_child_ms": 3.2804,
+        "child_packet_read_ms": 2.812,
+        "child_pre_execution_ms": 0.0177,
+        "child_execution_ms": 17.8394,
+        "parent_post_child_ms": 7.6837
+      },
+      "outside_serialized_parent_ms": 19.269599999999997,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 845,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 11.2789,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 846,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 6.5605,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 11.2789
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 6.5605
+        }
+      }
+    },
+    {
+      "sequence": 29,
+      "kind": "mouse",
+      "first_of_kind": false,
+      "interval_ms": 50.7717,
+      "stages": {
+        "parent_pre_child_ms": 3.3639,
+        "child_packet_read_ms": 2.8162000000000003,
+        "child_pre_execution_ms": 0.014,
+        "child_execution_ms": 17.737000000000002,
+        "parent_post_child_ms": 7.972900000000001
+      },
+      "outside_serialized_parent_ms": 18.8677,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 847,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 11.4086,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 848,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 6.3284,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 11.4086
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 6.3284
+        }
+      }
+    },
+    {
+      "sequence": 30,
+      "kind": "key",
+      "first_of_kind": false,
+      "interval_ms": 48.1945,
+      "stages": {
+        "parent_pre_child_ms": 3.3311,
+        "child_packet_read_ms": 2.8236,
+        "child_pre_execution_ms": 0.0114,
+        "child_execution_ms": 16.275100000000002,
+        "parent_post_child_ms": 7.5878
+      },
+      "outside_serialized_parent_ms": 18.165499999999998,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 849,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 10.4054,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 850,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 5.8697,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 10.4054
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 5.8697
+        }
+      }
+    },
+    {
+      "sequence": 31,
+      "kind": "mouse",
+      "first_of_kind": false,
+      "interval_ms": 56.2454,
+      "stages": {
+        "parent_pre_child_ms": 3.4462,
+        "child_packet_read_ms": 3.0675,
+        "child_pre_execution_ms": 0.016399999999999998,
+        "child_execution_ms": 16.7917,
+        "parent_post_child_ms": 8.0558
+      },
+      "outside_serialized_parent_ms": 24.8678,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 851,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 10.6953,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 852,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 6.0964,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 10.6953
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 6.0964
+        }
+      }
+    },
+    {
+      "sequence": 32,
+      "kind": "key",
+      "first_of_kind": false,
+      "interval_ms": 49.6345,
+      "stages": {
+        "parent_pre_child_ms": 3.5842,
+        "child_packet_read_ms": 2.7351,
+        "child_pre_execution_ms": 0.013,
+        "child_execution_ms": 15.7898,
+        "parent_post_child_ms": 7.945399999999999
+      },
+      "outside_serialized_parent_ms": 19.567000000000004,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 853,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 9.8427,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 854,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 5.9471,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 9.8427
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 5.9471
+        }
+      }
+    },
+    {
+      "sequence": 33,
+      "kind": "mouse",
+      "first_of_kind": false,
+      "interval_ms": 56.202,
+      "stages": {
+        "parent_pre_child_ms": 3.2275,
+        "child_packet_read_ms": 2.7981,
+        "child_pre_execution_ms": 0.014100000000000001,
+        "child_execution_ms": 16.6896,
+        "parent_post_child_ms": 7.877000000000001
+      },
+      "outside_serialized_parent_ms": 25.5957,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 855,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 10.5785,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 856,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 6.1111,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 10.5785
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 6.1111
+        }
+      }
+    },
+    {
+      "sequence": 34,
+      "kind": "key",
+      "first_of_kind": false,
+      "interval_ms": 51.369,
+      "stages": {
+        "parent_pre_child_ms": 3.3245,
+        "child_packet_read_ms": 2.6795999999999998,
+        "child_pre_execution_ms": 0.0144,
+        "child_execution_ms": 20.6991,
+        "parent_post_child_ms": 7.497400000000001
+      },
+      "outside_serialized_parent_ms": 17.153999999999996,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 857,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 15.1117,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 858,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 5.5874,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 15.1117
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 5.5874
+        }
+      }
+    },
+    {
+      "sequence": 35,
+      "kind": "mouse",
+      "first_of_kind": false,
+      "interval_ms": 58.6751,
+      "stages": {
+        "parent_pre_child_ms": 3.25,
+        "child_packet_read_ms": 2.8937,
+        "child_pre_execution_ms": 0.0166,
+        "child_execution_ms": 17.7183,
+        "parent_post_child_ms": 7.8377
+      },
+      "outside_serialized_parent_ms": 26.9588,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 859,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 11.2163,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 860,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 6.502,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 11.2163
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 6.502
+        }
+      }
+    },
+    {
+      "sequence": 36,
+      "kind": "key",
+      "first_of_kind": false,
+      "interval_ms": 56.0372,
+      "stages": {
+        "parent_pre_child_ms": 3.2654,
+        "child_packet_read_ms": 2.8415,
+        "child_pre_execution_ms": 0.015,
+        "child_execution_ms": 17.4637,
+        "parent_post_child_ms": 7.9971
+      },
+      "outside_serialized_parent_ms": 24.4545,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 861,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 10.9947,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 862,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 6.469,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 10.9947
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 6.469
+        }
+      }
+    },
+    {
+      "sequence": 37,
+      "kind": "mouse",
+      "first_of_kind": false,
+      "interval_ms": 62.1178,
+      "stages": {
+        "parent_pre_child_ms": 2.8339,
+        "child_packet_read_ms": 3.4202,
+        "child_pre_execution_ms": 0.0177,
+        "child_execution_ms": 15.9024,
+        "parent_post_child_ms": 7.815799999999999
+      },
+      "outside_serialized_parent_ms": 32.12780000000001,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 863,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 10.1193,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 864,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 5.7831,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 10.1193
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 5.7831
+        }
+      }
+    },
+    {
+      "sequence": 38,
+      "kind": "key",
+      "first_of_kind": false,
+      "interval_ms": 56.2485,
+      "stages": {
+        "parent_pre_child_ms": 3.4609,
+        "child_packet_read_ms": 2.9035,
+        "child_pre_execution_ms": 0.013900000000000001,
+        "child_execution_ms": 16.4113,
+        "parent_post_child_ms": 7.8165
+      },
+      "outside_serialized_parent_ms": 25.6424,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 865,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 10.3515,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 866,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 6.0598,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 10.3515
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 6.0598
+        }
+      }
+    },
+    {
+      "sequence": 39,
+      "kind": "mouse",
+      "first_of_kind": false,
+      "interval_ms": 61.0766,
+      "stages": {
+        "parent_pre_child_ms": 3.2485999999999997,
+        "child_packet_read_ms": 3.0244,
+        "child_pre_execution_ms": 0.0167,
+        "child_execution_ms": 16.5207,
+        "parent_post_child_ms": 7.6879
+      },
+      "outside_serialized_parent_ms": 30.5783,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 867,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 10.4717,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 868,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 6.049,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 10.4717
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 6.049
+        }
+      }
+    },
+    {
+      "sequence": 40,
+      "kind": "key",
+      "first_of_kind": false,
+      "interval_ms": 56.7868,
+      "stages": {
+        "parent_pre_child_ms": 3.3452,
+        "child_packet_read_ms": 2.6935000000000002,
+        "child_pre_execution_ms": 0.0165,
+        "child_execution_ms": 17.5973,
+        "parent_post_child_ms": 8.024000000000001
+      },
+      "outside_serialized_parent_ms": 25.1103,
+      "overlapping_draws": [
+        {
+          "dispatch_ticket": 869,
+          "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "overlap_ms": 11.4113,
+          "whole_request_inside_interval": true
+        },
+        {
+          "dispatch_ticket": 870,
+          "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "overlap_ms": 6.186,
+          "whole_request_inside_interval": true
+        }
+      ],
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 11.4113
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 6.186
+        }
+      }
+    }
+  ],
+  "source_sha256": {
+    "C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\native-repeated-input-v2-analysis\\report.json": "83595330931d6b59f33c47154a28546d4d93be4483fc8ffd5e176aca1c64f49a",
+    "C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\native-live-v55\\relay\\frames.jsonl": "8b209a02e3837017aaa30f18d6bc8a784eb94bd4fff7bdd9397e11b9106d86dc",
+    "C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\native-desktop-admission-v65\\bootstrap\\worker.stdout.jsonl": "942a614c60fb0d46fd4f41b7dc1915225de20ab295cafc508320745b7f4cb92a",
+    "C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\native-desktop-admission-v65\\bootstrap\\provider-processes\\generation-1\\worker.stdout.jsonl": "be02acef9945a51dd2aa059cc3780e96d41f5732ff49162cdd692ab1b8f8d531"
+  },
+  "scope": "Time overlap between received input and its first submitted matching publication. CPU orchestration and NPU waits both contribute to child execution. Other processes can overlap. This is not NPU utilization or exclusive causal attribution.",
+  "full_desktop_offload": false,
+  "tahoma_tested": false
+}
