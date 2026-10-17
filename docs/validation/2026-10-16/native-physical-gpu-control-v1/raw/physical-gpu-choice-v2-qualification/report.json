@@ -1,0 +1,73 @@
+{
+    "started":  "2026-10-17T00:14:01.2234050Z",
+    "completed":  true,
+    "passed":  true,
+    "desktop_changed":  false,
+    "npu_tested":  false,
+    "tahoma_tested":  false,
+    "active_phase":  "clear",
+    "cases":  [
+                  {
+                      "exit_code":  0,
+                      "case":  "contract",
+                      "result":  {
+                                     "completed":  true,
+                                     "passed":  true,
+                                     "selection_contract_checks":  11,
+                                     "gpu_commands":  0,
+                                     "npu_commands":  0
+                                 },
+                      "passed":  true
+                  },
+                  {
+                      "exit_code":  0,
+                      "case":  "inspect",
+                      "result":  {
+                                     "completed":  true,
+                                     "passed":  true,
+                                     "hardware_gpu_control":  true,
+                                     "vendor":  32902,
+                                     "device":  45184,
+                                     "luid_low":  59527,
+                                     "luid_high":  0,
+                                     "session":  0,
+                                     "feature_level":  0,
+                                     "exact_clear_images":  0,
+                                     "npu_commands":  0,
+                                     "desktop_changed":  false,
+                                     "tahoma_tested":  false
+                                 },
+                      "passed":  true
+                  },
+                  {
+                      "exit_code":  1,
+                      "case":  "wrong-device",
+                      "result":  {
+                                     "expected_rejection":  true
+                                 },
+                      "passed":  true
+                  },
+                  {
+                      "exit_code":  0,
+                      "case":  "clear",
+                      "result":  {
+                                     "completed":  true,
+                                     "passed":  true,
+                                     "hardware_gpu_control":  true,
+                                     "vendor":  32902,
+                                     "device":  45184,
+                                     "luid_low":  59527,
+                                     "luid_high":  0,
+                                     "session":  0,
+                                     "feature_level":  45056,
+                                     "exact_clear_images":  4,
+                                     "npu_commands":  0,
+                                     "desktop_changed":  false,
+                                     "tahoma_tested":  false
+                                 },
+                      "passed":  true
+                  }
+              ],
+    "binary_sha256":  "6A1AD45DCFEFD52DE18CADE1D5BEB9268D4B7AED7B27ABBE81068721D45A242A",
+    "finished":  "2026-10-17T00:24:21.9308082Z"
+}

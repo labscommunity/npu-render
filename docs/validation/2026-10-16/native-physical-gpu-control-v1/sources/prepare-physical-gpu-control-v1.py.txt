@@ -1,0 +1,71 @@
+"""Prepare a bounded GPU routing control using the same IDD readback geometry."""
+from pathlib import Path
+import ast
+import hashlib
+import json
+
+r=Path(__file__).parent
+def write(name,text):
+    p=r/name;assert not p.exists()
+    if p.suffix=='.py':ast.parse(text)
+    p.write_text(text)
+
+s=(r/'package-native-idd-v2.ps1').read_text()
+s=s.replace('native-idd-v2-native','physical-gpu-idd-v1-native-gpu').replace('native-idd-v2','physical-gpu-idd-v1').replace('native-idd-package-v2','physical-gpu-idd-package-v1')
+s=s.replace('$report.cpu_contract_suites -ne 4','$report.cpu_contract_suites -ne 5 -or !$report.hardware_gpu_control -or $report.target_vendor -ne 32902 -or $report.target_device -ne 45184')
+s=s.replace("version='0.0.1502.0'","version='0.0.1601.0';hardware_gpu_control=$true;target_vendor=32902;target_device=45184")
+write('package-physical-gpu-idd-v1.ps1',s)
+
+s=(r/'native_desktop_bootstrap_v40.py').read_text()
+s=s.replace('from native_incremental_evidence_v1 import NativeEvidence','from physical_gpu_evidence_v1 import GpuControlEvidence')
+s=s.replace('from native_shared_app_v12 import SharedInteractiveApp\n','')
+s=s.replace("p.add_argument('--interactive-dll',type=Path,required=True)","p.add_argument('--interactive-dll',type=Path,required=True)\np.add_argument('--control-probe',type=Path,required=True)")
+s=s.replace("shared=None;worker=None;", "worker=None;")
+s=s.replace("    session=gate();report['session_gate']=session", """    session=gate();report['session_gate']=session
+    target_process=subprocess.run([str(v.control_probe),'--inspect','0x8086','0xb080'],capture_output=True,timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
+    assert target_process.returncode==0 and not target_process.stderr
+    gpu_target=json.loads(target_process.stdout)
+    assert gpu_target['passed'] and gpu_target['hardware_gpu_control'] and gpu_target['vendor']==0x8086 and gpu_target['device']==0xb080
+    report.update(hardware_gpu_control=True,control_target=gpu_target,actual_hardware_gpu_route=False)
+    (out/'control-target.json').write_text(json.dumps(gpu_target,indent=2)+'\\n')""")
+s=s.replace("evidence=NativeEvidence(out,v.trace/f'process-{host.identity.pid}.jsonl')", "evidence=GpuControlEvidence(out,v.trace/f'process-{host.identity.pid}.jsonl',gpu_target)")
+needle="    shared=SharedInteractiveApp(v.transaction,worker,suffix,session['console_session'],v.interactive_dll,env,own_process)\n"
+assert needle in s;s=s.replace(needle,'')
+needle="        shared.poll(evidence,compositor.identity.pid);report['shared_application_qualified']=shared.passed\n"
+assert needle in s;s=s.replace(needle,'')
+needle="        matched_acks=evidence.ack_pids[compositor.identity.pid]>0\n"
+assert needle in s;s=s.replace(needle,'')
+s=s.replace("and report['actual_dwm_npu_execution'] and matched_acks:","and report['actual_hardware_gpu_route'] and report['npu_receipts']==0:")
+s=s.replace("assert report['passed'] and shared.passed,'Native frame or shared default application evidence incomplete at trial deadline'", "assert report['passed'] and report['actual_hardware_gpu_route'] and report['npu_receipts']==0,'Hardware GPU route evidence incomplete at trial deadline'")
+a=s.index('    if shared:\n');b=s.index('    for lease in reversed(leases):',a);s=s[:a]+s[b:]
+assert 'SharedInteractiveApp' not in s and 'shared.passed' not in s and 'matched_acks' not in s
+s=s.replace('"""Bounded native indirect-display admission; never disables a physical output."""','"""Bounded hardware GPU routing control; not an NPU desktop-offload trial."""')
+write('physical_gpu_bootstrap_v1.py',s)
+
+s=(r/'run-native-desktop-v66.ps1').read_text()
+changes={'native-desktop-admission-v66':'physical-gpu-desktop-v1','native-desktop-v66':'physical-gpu-desktop-v1','NativeDesktopRecovery-v66':'GpuDesktopRecovery-v1','native_desktop_bootstrap_v40.py':'physical_gpu_bootstrap_v1.py','native-idd-package-v2':'physical-gpu-idd-package-v1','0.0.1502.0':'0.0.1601.0'}
+for a,b in changes.items():s=s.replace(a,b)
+# Source-driven recovery names are changed separately from output identity.
+s=s.replace('recover-physical-gpu-desktop-v1.ps1','recover-physical-gpu-desktop-v1.ps1')
+needle="if(!$iddProof.prepared -or $iddProof.desktop_lease_max_ms"
+assert needle in s;s=s.replace(needle,"if(!$iddProof.prepared -or !$iddProof.hardware_gpu_control -or $iddProof.target_vendor -ne 32902 -or $iddProof.target_device -ne 45184 -or $iddProof.desktop_lease_max_ms")
+needle="$packages=@("
+pos=s.index(needle)
+s=s[:pos]+'''$controlProbe="$r\\builds\\physical-gpu-choice-v1\\Release\\nr_physical_gpu_probe.exe"
+$controlProof=Get-Content "$r\\vm\\physical-gpu-choice-v2-qualification\\report.json" -Raw|ConvertFrom-Json
+$controlBuild=Get-Content "$r\\builds\\physical-gpu-choice-v1\\build-report.json" -Raw|ConvertFrom-Json
+if(!$controlProof.completed -or !$controlProof.passed -or (Get-FileHash $controlProbe).Hash -ne $controlBuild.binary_sha256){throw 'GPU control probe not qualified'}
+'''+s[pos:]
+s=s.replace("'--monitor-seconds','660'","'--control-probe',$controlProbe,'--monitor-seconds','90'")
+needle="if(!$trial.passed -or !$trial.completed -or $trial.error -or !$trial.owned_process_acls_restored_exactly -or !$trial.native_indirect_frame_produced -or !$trial.actual_dwm_npu_execution -or !$trial.preferred_adapter_selected -or !$trial.shared_application_qualified -or !$trial.shared_application.passed){throw 'Native compositor evidence absent'}"
+assert needle in s
+s=s.replace(needle,"if(!$trial.passed -or !$trial.completed -or $trial.error -or !$trial.owned_process_acls_restored_exactly -or !$trial.native_indirect_frame_produced -or !$trial.actual_hardware_gpu_route -or !$trial.preferred_adapter_selected -or $trial.npu_receipts -ne 0 -or $trial.actual_dwm_npu_execution){throw 'Hardware GPU control evidence absent'}")
+s=s.replace("$report.native_indirect_frame_produced=$true;$report.actual_dwm_npu_execution=$true","$report.native_indirect_frame_produced=$true;$report.actual_dwm_npu_execution=$false;$report.actual_hardware_gpu_route=$true;$report.hardware_gpu_control=$true")
+s=s.replace('function Save-Report{$report|ConvertTo-Json -Depth 6|Set-Content "$out\\report.json"}', '. ([scriptblock]::Create([IO.File]::ReadAllText("$r\\vm\\atomic_lab_report_v1.ps1")))\nfunction Save-Report{Write-NrLabReport "$out/report.json" $report}')
+write('run-physical-gpu-desktop-v1.ps1',s)
+s=(r/'recover-native-desktop-v66.ps1').read_text()
+for a,b in changes.items():s=s.replace(a,b)
+write('recover-physical-gpu-desktop-v1.ps1',s)
+names=['run-physical-gpu-desktop-v1.ps1','recover-physical-gpu-desktop-v1.ps1','physical_gpu_bootstrap_v1.py','physical_gpu_evidence_v1.py']
+(r/'physical-gpu-desktop-v1-source.json').write_text(json.dumps({n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in names},indent=2)+'\n')
+print('Prepared GPU control package and ninety-second routing controller; no driver installed')

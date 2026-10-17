@@ -1,0 +1,60 @@
+"""Hardware-GPU control evidence; never substitutes for NPU attribution."""
+from native_incremental_evidence_v1 import NativeEvidence, JsonlTail
+
+
+class GpuRoute:
+    def __init__(self, target):
+        assert target['passed'] and target['hardware_gpu_control']
+        assert target['vendor'] == 0x8086 and target['device'] == 0xb080
+        self.target = target
+        self.luid = (target['luid_low'], target['luid_high'])
+        assert self.luid != (0, 0)
+        self.chosen = self.prepared = self.assigned = self.readback = False
+
+    def observe(self, entry):
+        event = entry.get('event')
+        if event == 'hardware_gpu_control':
+            assert not self.chosen, 'Duplicate GPU-control selection'
+            assert (entry['vendor'],entry['device']) == (self.target['vendor'],self.target['device'])
+            assert (entry['low'],entry['high']) == self.luid, 'Selected GPU changed'
+            self.chosen = True
+        elif event == 'prepared_device':
+            assert self.chosen and entry['status'] == '00000000'
+            assert (entry['low'],entry['high']) == self.luid, 'Prepared device differs'
+            self.prepared = True
+        elif event == 'assigned':
+            assert self.prepared and entry['preferred_selected']
+            assert (entry['actual_low'],entry['actual_high']) == self.luid, 'Actual render adapter differs'
+            self.assigned = True
+        elif event == 'frame_readback':
+            assert self.assigned and entry['status'] == '00000000'
+            assert entry['bytes'] == 1024*768*4
+            self.readback = True
+        elif event in ('system_renderer_control','prepared_adapter_mismatch','frame_readback_failed'):
+            raise AssertionError('GPU-control renderer evidence rejected: '+event)
+
+    def snapshot(self, native):
+        assert all(native[key] == 0 for key in ('npu_receipts','delivery_acknowledgments',
+                   'hardware_child_receipts','provider_generations','provider_faults','provider_retries'))
+        assert not native['actual_dwm_npu_execution'] and not native['actual_umdf_npu_execution']
+        return dict(native, hardware_gpu_control=True, npu_execution_observed=False,
+                    control_adapter=dict(vendor=self.target['vendor'],device=self.target['device'],
+                                         luid_low=self.luid[0],luid_high=self.luid[1]),
+                    actual_hardware_gpu_route=(self.chosen and self.prepared and self.assigned and self.readback))
+
+
+class GpuControlEvidence(NativeEvidence):
+    def __init__(self, directory, host_log, target):
+        super().__init__(directory,host_log)
+        self.route_tail = JsonlTail(host_log)
+        self.route = GpuRoute(target)
+
+    def poll(self):
+        super().poll()
+        for entry in self.route_tail.poll():
+            self.route.observe(entry)
+
+    def snapshot(self, compositor_pid, host_pid):
+        result = self.route.snapshot(super().snapshot(compositor_pid,host_pid))
+        result['evidence_backlog'] |= self.route_tail.backlog
+        return result

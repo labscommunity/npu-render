@@ -1,0 +1,100 @@
+"""Prepare an explicitly selected hardware-GPU IDD control; do not install it."""
+from pathlib import Path
+import ast
+import hashlib
+import json
+import shutil
+import tarfile
+
+r = Path(__file__).parent
+d = r / 'physical-gpu-idd-v1'
+shutil.copytree(r / 'native-idd-v2', d)
+lab = d / 'native/windows/indirect_lab'
+for name in ('physical_gpu_choice_v1.hpp',):
+    shutil.copyfile(r / name, lab / name)
+shutil.copyfile(r / 'physical_gpu_probe_v1.cpp', lab / 'physical_gpu_probe_v1.cpp')
+p = lab / 'driver.cpp'
+s = p.read_text()
+needle = 'using Microsoft::WRL::ComPtr;'
+s = s.replace(needle, '''#ifdef NR_IDD_HARDWARE_RENDERER_CONTROL
+#include "physical_gpu_choice_v1.hpp"
+#if defined(NR_IDD_SYSTEM_RENDERER_CONTROL)
+#error Hardware and system renderer controls are mutually exclusive
+#endif
+static_assert(NR_IDD_GPU_VENDOR > 0 && NR_IDD_GPU_VENDOR <= 0xffff);
+static_assert(NR_IDD_GPU_DEVICE > 0 && NR_IDD_GPU_DEVICE <= 0xffff);
+#endif
+''' + needle, 1)
+needle = 'void signal(DISPLAYCONFIG_VIDEO_SIGNAL_INFO &mode, bool monitor) {'
+addition = r'''#ifdef NR_IDD_HARDWARE_RENDERER_CONTROL
+HRESULT physical_control_adapter(LUID &luid) {
+    try {
+        ComPtr<IDXGIFactory1> factory;
+        auto status = CreateDXGIFactory1(IID_PPV_ARGS(&factory));
+        if (FAILED(status)) return status;
+        std::vector<nr::control::Adapter> descriptions;
+        for (UINT index = 0; index <= 64; ++index) {
+            ComPtr<IDXGIAdapter1> adapter;
+            status = factory->EnumAdapters1(index, &adapter);
+            if (status == DXGI_ERROR_NOT_FOUND) break;
+            if (FAILED(status)) return status;
+            DXGI_ADAPTER_DESC1 description{};
+            status = adapter->GetDesc1(&description);
+            if (FAILED(status)) return status;
+            descriptions.push_back({description.VendorId, description.DeviceId,
+                UINT(description.Flags), description.AdapterLuid.LowPart,
+                description.AdapterLuid.HighPart});
+        }
+        const auto selected = nr::control::choose(descriptions, NR_IDD_GPU_VENDOR, NR_IDD_GPU_DEVICE);
+        const auto &chosen = descriptions[selected];
+        luid = {chosen.low, chosen.high};
+        trace("{\"event\":\"hardware_gpu_control\",\"vendor\":%u,\"device\":%u,\"low\":%lu,\"high\":%ld}\n",
+            chosen.vendor, chosen.device, luid.LowPart, luid.HighPart);
+        return S_OK;
+    } catch (...) { return DXGI_ERROR_NOT_FOUND; }
+}
+#endif
+'''
+s = s.replace(needle, addition + needle, 1)
+needle = '''    const auto found = paired_adapter(state->preferred);
+    trace("{\\\"event\\\":\\\"paired_adapter\\\",\\\"status\\\":\\\"%08lx\\\"}\\n", ULONG(found));'''
+assert needle in s
+s = s.replace(needle, '''#ifdef NR_IDD_HARDWARE_RENDERER_CONTROL
+    const auto found = physical_control_adapter(state->preferred);
+    trace("{\\\"event\\\":\\\"hardware_control_selection\\\",\\\"status\\\":\\\"%08lx\\\"}\\n", ULONG(found));
+#else
+''' + needle + '\n#endif', 1)
+# The existing actual-LUID swapchain gate and native host lease are retained.
+p.write_text(s)
+p = lab / 'CMakeLists.txt'
+s = p.read_text()
+needle = 'target_compile_features(nr_indirect_lab PRIVATE cxx_std_17)'
+assert s.count(needle) == 1
+s = s.replace(needle, '''option(NR_IDD_HARDWARE_RENDERER_CONTROL "Explicit hardware GPU control" OFF)
+if(NR_IDD_HARDWARE_RENDERER_CONTROL)
+  if(NR_IDD_SYSTEM_RENDERER_CONTROL OR NOT DEFINED NR_IDD_GPU_VENDOR OR NOT DEFINED NR_IDD_GPU_DEVICE)
+    message(FATAL_ERROR "Hardware control needs exclusive explicit PCI IDs")
+  endif()
+  target_compile_definitions(nr_indirect_lab PRIVATE NR_IDD_HARDWARE_RENDERER_CONTROL=1
+    NR_IDD_GPU_VENDOR=${NR_IDD_GPU_VENDOR} NR_IDD_GPU_DEVICE=${NR_IDD_GPU_DEVICE})
+endif()
+''' + needle, 1)
+s += '''
+add_executable(nr_physical_gpu_control_probe physical_gpu_probe_v1.cpp)
+target_compile_features(nr_physical_gpu_control_probe PRIVATE cxx_std_17)
+target_compile_options(nr_physical_gpu_control_probe PRIVATE /W4 /WX)
+target_link_libraries(nr_physical_gpu_control_probe PRIVATE d3d11 dxgi)
+set_property(TARGET nr_physical_gpu_control_probe PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+add_test(NAME physical_gpu_selection_contract COMMAND nr_physical_gpu_control_probe --contract)
+set_tests_properties(physical_gpu_selection_contract PROPERTIES TIMEOUT 30)
+'''
+p.write_text(s)
+p = lab / 'nr_native_indirect_probe.inf'
+s = p.read_text()
+assert '10/15/2026,0.0.1502.0' in s
+p.write_text(s.replace('10/15/2026,0.0.1502.0', '10/16/2026,0.0.1601.0'))
+hashes = {p.relative_to(d).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()}
+(r / 'physical-gpu-idd-v1-source.json').write_text(json.dumps(hashes, indent=2)+'\n')
+with tarfile.open(r / 'physical-gpu-idd-v1.tar.gz', 'w:gz') as t:
+    t.add(d, arcname=d.name)
+print(json.dumps({'source_files':len(hashes),'prepared':True,'driver_installed':False,'desktop_or_tahoma_tested':False}))

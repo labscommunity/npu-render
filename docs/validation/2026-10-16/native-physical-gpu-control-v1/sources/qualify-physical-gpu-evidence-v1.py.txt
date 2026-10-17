@@ -1,0 +1,40 @@
+"""Reject control attribution without matching selected/prepared/assigned LUIDs."""
+from pathlib import Path
+import copy
+import json
+from physical_gpu_evidence_v1 import GpuRoute
+target=dict(passed=True,hardware_gpu_control=True,vendor=0x8086,device=0xb080,luid_low=11,luid_high=0)
+entries=[dict(event='hardware_gpu_control',vendor=0x8086,device=0xb080,low=11,high=0),
+         dict(event='prepared_device',status='00000000',low=11,high=0),
+         dict(event='assigned',preferred_selected=True,actual_low=11,actual_high=0),
+         dict(event='frame_readback',status='00000000',bytes=1024*768*4)]
+native={key:0 for key in ('npu_receipts','delivery_acknowledgments','hardware_child_receipts',
+                        'provider_generations','provider_faults','provider_retries')}
+native.update(actual_dwm_npu_execution=False,actual_umdf_npu_execution=False)
+def check(rows,values):
+    route=GpuRoute(target)
+    for row in rows:route.observe(row)
+    return route.snapshot(values)
+assert check(entries,native)['actual_hardware_gpu_route']
+assert not check(entries[:-1],native)['actual_hardware_gpu_route']
+checks=['matching-route','missing-readback-unqualified']
+cases=[('wrong-vendor',0,dict(vendor=0x1414)),('changed-selection',0,dict(low=12)),
+       ('wrong-device-preparation',1,dict(low=12)),('failed-preparation',1,dict(status='80004005')),
+       ('different-actual-adapter',2,dict(actual_low=12)),('preferred-not-selected',2,dict(preferred_selected=False)),
+       ('failed-readback',3,dict(status='80004005')),('wrong-geometry',3,dict(bytes=16))]
+for name,index,change in cases:
+    altered=copy.deepcopy(entries);altered[index].update(change)
+    try:check(altered,native)
+    except AssertionError:checks.append(name)
+    else:raise AssertionError(name+' accepted')
+for name,rows,values in [('duplicate-selection',[entries[0]]+entries,native),
+                         ('assignment-before-prepare',[entries[0],entries[2]],native),
+                         ('warp-control',entries+[dict(event='system_renderer_control')],native),
+                         ('unexpected-npu-work',entries,dict(native,npu_receipts=1)),
+                         ('unexpected-provider',entries,dict(native,provider_generations=1))]:
+    try:check(rows,values)
+    except AssertionError:checks.append(name)
+    else:raise AssertionError(name+' accepted')
+report=dict(passed=True,checks=checks,scope='Synthetic hardware-control evidence checks; no driver execution')
+out=Path(__file__).with_name('physical-gpu-evidence-v1-contract.json');assert not out.exists();out.write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(report))

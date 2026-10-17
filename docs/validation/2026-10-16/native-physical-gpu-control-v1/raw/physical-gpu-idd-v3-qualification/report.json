@@ -1,0 +1,44 @@
+{
+    "started":  "2026-10-17T00:25:50.9207861Z",
+    "completed":  true,
+    "passed":  true,
+    "driver_installed":  false,
+    "desktop_changed":  false,
+    "tahoma_tested":  false,
+    "active_phase":  "build-four-control-configurations",
+    "builds":  [
+                   {
+                       "passed":  true,
+                       "binary_sha256":  {
+                                             "nr_physical_gpu_control_probe.exe":  "B58A73C7693C4D0F2FD95CFDC4E7928FF9E28AC9A37BF5C913EDCB97D2641097",
+                                             "nr_native_indirect_probe.dll":  "DA7D61A9BC7D4E174BE0B8E67CEB27DF24B5A8D9C2FB0296DFDDF88E852C2318"
+                                         },
+                       "kind":  "native-gpu"
+                   },
+                   {
+                       "passed":  true,
+                       "binary_sha256":  {
+                                             "nr_indirect_lab.dll":  "08078D70242ED7A64A2A84BC7AEE3B1B4ED30DCD479D366A300719A9F5B6F6DD",
+                                             "nr_physical_gpu_control_probe.exe":  "2FE7712EECE4814294BE9879AB2E724C1D9EBD72AAE6F3EFA8E88E8C55E9F220"
+                                         },
+                       "kind":  "guest-gpu"
+                   },
+                   {
+                       "passed":  true,
+                       "binary_sha256":  {
+                                             "nr_physical_gpu_control_probe.exe":  "3665A96A3BF5E5DCDB9810000BAF333D68AA0A9E20A80EA9FCA2C8D1D5D843B1",
+                                             "nr_native_indirect_probe.dll":  "02E7FDFBA396533BD6B58256CD5420A4F788C3AA2594FECA39979CF2D5358318"
+                                         },
+                       "kind":  "native-paired"
+                   },
+                   {
+                       "passed":  true,
+                       "binary_sha256":  {
+                                             "nr_indirect_lab.dll":  "CE3E0031F9C4FE4E6788F0352601D3CEA0DCC2CF07EAD8A85AF4684D7A79790E",
+                                             "nr_physical_gpu_control_probe.exe":  "A6118F1D55FB07AA7F3BE2A0DCD994C6511E05E858817A3F9EC86F47C061DD70"
+                                         },
+                       "kind":  "guest-paired"
+                   }
+               ],
+    "finished":  "2026-10-17T00:27:08.5586090Z"
+}

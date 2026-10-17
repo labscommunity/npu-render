@@ -1,0 +1,61 @@
+{
+  "schema": 3,
+  "packages": [
+    {
+      "hardware_id": "ROOT\\NPURENDER_NATIVE_PROBE",
+      "inf": "nr_native_probe.inf",
+      "inf_sha256": "7F3D3036C5C280C721487DF8235815677F2B8F1BFBCCB397BF6CCE41FBBE7806",
+      "folder": "native-driver-package-v19",
+      "version": "0.0.1319.0"
+    },
+    {
+      "hardware_id": "ROOT\\NPURENDER_NATIVE_INDIRECT_V1",
+      "inf": "nr_native_indirect_probe.inf",
+      "inf_sha256": "DD8662EA66BB13EA575E67D539224FF12E8869E38B1717FCB4CCA99A5F1126E7",
+      "folder": "physical-gpu-idd-package-v1",
+      "version": "0.0.1601.0"
+    }
+  ],
+  "thumbprint": "3112355AF6B6C6265E9B849662D3E02F6797343A",
+  "devcon": "C:\\Users\\tatef\\AppData\\Local\\npu-render\\dependencies\\wdk-tools\\devcon.exe",
+  "devcon_sha256": "282FF232C35FCB82DAD2FDAE56C775523409494B175A5A83D7441B5FA65CB3F9",
+  "physical_display_before": [
+    {
+      "instance": "PCI\\VEN_8086&DEV_B080&SUBSYS_14641043&REV_04\\3&11583659&0&10",
+      "status": "OK",
+      "hardware_ids": [
+        "PCI\\VEN_8086&DEV_B080&SUBSYS_14641043&REV_04",
+        "PCI\\VEN_8086&DEV_B080&SUBSYS_14641043",
+        "PCI\\VEN_8086&DEV_B080&CC_030000",
+        "PCI\\VEN_8086&DEV_B080&CC_0300"
+      ]
+    }
+  ],
+  "added_stores": [
+    "Root",
+    "TrustedPublisher"
+  ],
+  "owned_processes": [
+    {
+      "pid": 9600,
+      "created": 134366704481902756,
+      "image": "C:\\Users\\tatef\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+      "sha256": "4d6f5f81a4bca11191c4c7c6b43632694d0a4ce74e068619d8fdc161d469859a",
+      "role": "controller"
+    },
+    {
+      "pid": 8812,
+      "created": 134366704486838091,
+      "image": "C:\\Users\\tatef\\AppData\\Local\\npu-render\\builds\\ptl-native-worker-v19\\Release\\nr_registered_local_indexed_worker.exe",
+      "sha256": "d4ddc1238bf91e94190b873f7f985def21c64c85f57fde18b6456f60c175f96c",
+      "role": "worker"
+    }
+  ],
+  "owned_trace_directories": [
+    "T8-NpuRender-NativeTraceV1",
+    "T8-NpuRender-NativeIddV1"
+  ],
+  "controller_pid": 18932,
+  "created": "2026-10-17T00:27:20.4050412Z",
+  "mode": "native-admission"
+}
