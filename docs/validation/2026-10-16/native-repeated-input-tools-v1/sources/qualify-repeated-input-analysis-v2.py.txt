@@ -1,0 +1,62 @@
+"""Synthetic positive/negative evidence joins; never an execution-device proof."""
+from pathlib import Path
+import copy
+import importlib.util
+import json
+
+r = Path(__file__).parent
+spec = importlib.util.spec_from_file_location('repeat_analysis', r/'analyze-repeated-input-v2.py')
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+stimulus = [dict(repeat_ready=True, count=4, contract_only=False, qpc_frequency=1000)]
+published, present, screen = [], [], []
+for n in range(1, 5):
+    kind, t, pixel = 'mouse' if n % 2 else 'key', n*100, [64,48,32+n,255]
+    for event, offset in ((kind+'_sent',0),(kind+'_received',1),('painted',2)):
+        stimulus.append(dict(repeat_event=event, sequence=n, qpc=t+offset, bgra=pixel))
+    published.append(dict(sequence=n, qpc=t+3, producer_pid=7, known_stimulus_pixel=pixel))
+    present.append(dict(live_frame_presented=True, source_sequence=n, source_qpc=t+3, producer_pid=7,
+                        qpc_frequency=1000, backbuffer_exact=True, submitted_qpc=t+4, accepted_qpc=t+5))
+    present.append(dict(display_observation=True, source_sequence=n, submitted_count_status=0,
+                        submitted_present_count=n, statistics_status=0, media_status=0,
+                        displayed_present_count=n, media_present_count=n, present_refresh_count=n,
+                        sync_refresh_count=n, sync_qpc=t+6, media_sync_qpc=t+6, observed_qpc=t+7))
+    screen.append(dict(qpc=t+8, last_present_qpc=t+6, read_completed_qpc=t+9,
+                       ownership_verified_before_and_after=True,
+                       points=[dict(owned_presenter_at_point=True, owned_bgra_or_zero=pixel)]*2))
+stimulus.extend([
+    dict(animation_clock=True,start_qpc=1000),
+    dict(repeat_event='animation_requested',sequence=1000,qpc=1001,bgra=[64,55,136,255]),
+    dict(animation_completed=True,emitted=1,skipped_scheduled_updates=299,target_hz=30,duration_seconds=10),
+    dict(completed=True,repeated_input=True,passed=True,received=4,mouse=2,keyboard=2,
+         unicode_packets=2,animation_emitted=1), dict(exit_code=0)])
+screen[0]['qpc'] = 99  # Acquisition spans the first input event.
+result = m.analyze(stimulus,published,present,screen,4)
+assert result['animation']['missing_submission'] == 1
+assert result['animation']['observed_unique_updates_per_second'] == 0
+assert result['distributions']['mouse_warm']['sent_to_matching_display_ms']['p95_ms'] == 6
+cases = ['valid']
+mutations = [
+    ('missing_publication',1,lambda x:x.pop()),
+    ('wrong_owner',3,lambda x:x[0]['points'][0].update(owned_presenter_at_point=False)),
+    ('inexact_backbuffer',2,lambda x:x[0].update(backbuffer_exact=False)),
+    ('reused_counter',2,lambda x:x[3].update(submitted_present_count=1)),
+    ('unobserved_color',3,lambda x:x[0]['points'][0].update(owned_bgra_or_zero=[0,0,0,0])),
+    ('duplicate_input',0,lambda x:x.append(copy.deepcopy(x[1]))),
+    ('wrong_input_color',0,lambda x:x[1].update(bgra=[0,0,0,0])),
+    ('failed_child',0,lambda x:x[-1].update(exit_code=1)),
+]
+for name, index, mutate in mutations:
+    data = copy.deepcopy([stimulus,published,present,screen])
+    mutate(data[index])
+    try:
+        m.analyze(*data,4)
+    except AssertionError:
+        cases.append(name)
+    else:
+        raise AssertionError(name+' accepted')
+report = dict(passed=True,cases=cases,scope='Synthetic evidence joins only; no NPU or desktop claim')
+path = r/'repeated-input-analysis-v2-contract.json'
+assert not path.exists()
+path.write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(report))

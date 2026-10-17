@@ -1,0 +1,134 @@
+"""Join unique owned stimulus colors to published, submitted and observed frames."""
+from pathlib import Path
+import argparse
+import hashlib
+import json
+import math
+from presentation_counter_match_v1 import match_display_observation
+from pixel_observation_match_v1 import match_owned_pixel_observation
+
+
+def rows(path):
+    return [json.loads(line) for line in path.read_text(encoding='utf-8-sig').splitlines()
+            if line.startswith('{') and line.endswith('}')]
+
+
+def distribution(values):
+    ordered = sorted(values)
+    assert ordered
+    return dict(count=len(ordered), minimum_ms=ordered[0],
+                median_ms=ordered[(len(ordered)-1)//2],
+                p95_ms=ordered[math.ceil(.95*len(ordered))-1], maximum_ms=ordered[-1])
+
+
+def analyze(stimulus, published, present, screen, expected=40):
+    ready = [x for x in stimulus if x.get('repeat_ready')]
+    done = [x for x in stimulus if x.get('completed') and x.get('repeated_input')]
+    assert len(ready) == len(done) == 1
+    assert ready[0]['count'] == expected and not ready[0]['contract_only']
+    assert done[0]['passed'] and done[0]['received'] == expected
+    assert done[0]['mouse'] == done[0]['keyboard'] == done[0]['unicode_packets'] == expected//2
+    assert [x['exit_code'] for x in stimulus if 'exit_code' in x] == [0]
+    hz = ready[0]['qpc_frequency']
+    assert hz > 0
+    assert {x['qpc_frequency'] for x in present if 'qpc_frequency' in x} == {hz}
+    submissions = [x for x in present if x.get('live_frame_presented')]
+    output = []
+    for sequence in range(1, expected+1):
+        kind = 'mouse' if sequence % 2 else 'key'
+        sent = [x for x in stimulus if x.get('repeat_event') == kind+'_sent' and x['sequence'] == sequence]
+        received = [x for x in stimulus if x.get('repeat_event') == kind+'_received' and x['sequence'] == sequence]
+        assert len(sent) == len(received) == 1
+        sent, received = sent[0], received[0]
+        pixel = [64+((sequence >> 14)&127), 48+((sequence >> 7)&127), 32+(sequence&127), 255]
+        assert sent['bgra'] == received['bgra'] == pixel and sent['qpc'] <= received['qpc']
+        paints = [x for x in stimulus if x.get('repeat_event') == 'painted' and x['sequence'] == sequence]
+        assert paints and all(x['bgra'] == pixel and x['qpc'] >= received['qpc'] for x in paints)
+        paint = min(paints, key=lambda x: x['qpc'])
+        frames = [x for x in published if x['qpc'] >= received['qpc'] and x.get('known_stimulus_pixel') == pixel]
+        assert frames, 'Input color was never published'
+        # Select the first actual submitted matching frame; the relay may coalesce.
+        matches = [(frame, submit) for frame in frames for submit in submissions
+                   if (frame['sequence'], frame['qpc'], frame['producer_pid']) ==
+                   (submit['source_sequence'], submit['source_qpc'], submit['producer_pid'])]
+        assert matches, 'Input color was never submitted'
+        frame, submit = min(matches, key=lambda pair: pair[1]['accepted_qpc'])
+        assert submit['backbuffer_exact'] and frame['qpc'] <= submit['submitted_qpc'] <= submit['accepted_qpc']
+        counter, display = match_display_observation(present, frame['sequence'], submit)
+        observation = match_owned_pixel_observation(screen,received['qpc'],lambda point: point.get('owned_bgra_or_zero') == pixel)
+        output.append(dict(sequence=sequence, kind=kind, first_of_kind=sequence <= 2,
+                           sent_qpc=sent['qpc'], received_qpc=received['qpc'],
+                           first_paint_qpc=paint['qpc'], source_sequence=frame['sequence'],
+                           present_count=counter, bgra=pixel,
+                           send_to_receive_ms=(received['qpc']-sent['qpc'])*1000/hz,
+                           received_to_publication_ms=(frame['qpc']-received['qpc'])*1000/hz,
+                           received_to_matching_display_ms=(display['sync_qpc']-received['qpc'])*1000/hz,
+                           sent_to_matching_display_ms=(display['sync_qpc']-sent['qpc'])*1000/hz,
+                           received_to_read_completed_ms=(observation['read_completed_qpc']-received['qpc'])*1000/hz))
+    summaries = {}
+    for kind in ('mouse', 'key'):
+        for scope in ('all', 'warm'):
+            selected = [x for x in output if x['kind'] == kind and (scope == 'all' or not x['first_of_kind'])]
+            summaries[kind+'_'+scope] = {
+                metric: distribution([x[metric] for x in selected])
+                for metric in ('sent_to_matching_display_ms', 'received_to_matching_display_ms', 'received_to_read_completed_ms')}
+    requested = [x for x in stimulus if x.get('repeat_event') == 'animation_requested']
+    animation_done = [x for x in stimulus if x.get('animation_completed')]
+    animation_clock = [x for x in stimulus if x.get('animation_clock')]
+    assert requested and len(animation_done) == 1
+    assert len(animation_clock) == 1
+    animation_start = animation_clock[0]['start_qpc']
+    ad = animation_done[0]
+    assert ad['emitted'] == len(requested) == done[0]['animation_emitted']
+    assert ad['target_hz'] == 30 and ad['duration_seconds'] == 10
+    assert ad['emitted'] + ad['skipped_scheduled_updates'] == 300
+    assert len({x['sequence'] for x in requested}) == len(requested)
+    assert all(1000 <= x['sequence'] < 1300 for x in requested)
+    assert all(a['sequence'] < b['sequence'] and a['qpc'] < b['qpc'] for a,b in zip(requested, requested[1:]))
+    delivered, display_verified = [], []
+    for request in requested:
+        sequence = request['sequence']
+        assert request['bgra'] == [64+((sequence >> 14)&127),48+((sequence >> 7)&127),32+(sequence&127),255]
+        assert animation_start <= request['qpc'] < animation_start+10*hz
+        frames = [x for x in published if x['qpc'] >= request['qpc'] and x.get('known_stimulus_pixel') == request['bgra']]
+        matches = [(frame, submit) for frame in frames for submit in submissions
+                   if (frame['sequence'], frame['qpc'], frame['producer_pid']) ==
+                   (submit['source_sequence'], submit['source_qpc'], submit['producer_pid'])]
+        if not matches:
+            continue
+        frame, submit = min(matches, key=lambda pair: pair[1]['accepted_qpc'])
+        assert submit['backbuffer_exact']
+        delivered.append(dict(stimulus_sequence=request['sequence'], source_sequence=frame['sequence'],
+                              requested_qpc=request['qpc'], accepted_qpc=submit['accepted_qpc']))
+        try:
+            counter, display = match_display_observation(present, frame['sequence'], submit)
+        except AssertionError:
+            continue  # Missing display evidence is counted, never assumed.
+        display_verified.append(dict(stimulus_sequence=request['sequence'], present_count=counter, sync_qpc=display['sync_qpc']))
+    displayed_during = [x for x in display_verified if animation_start <= x['sync_qpc'] < animation_start+10*hz]
+    return dict(completed=True, passed=True, qpc_frequency=hz, controlled_events=output,
+                distributions=summaries,
+                animation=dict(requested=len(requested), producer_skipped=ad['skipped_scheduled_updates'],
+                               target_hz=30, scheduled_seconds=10, submitted_unique=len(delivered),
+                               display_counter_verified_unique=len(display_verified),
+                               displayed_during_scheduled_interval=len(displayed_during),
+                               observed_unique_updates_per_second=len(displayed_during)/10,
+                               missing_submission=len(requested)-len(delivered),
+                               submitted=delivered, display_counter_verified=display_verified),
+                scope='Owned-window input and 512x256 color animation on the instrumented desktop',
+                limitations='Small sample; warm excludes the first event of each kind. Independent pixel reads include observer cadence. Display counters do not measure panel photons. The ten-second observed update rate counts only uniquely verified colors within the scheduled interval; it is not a long-duration stability result. Other animation totals include the drain interval. No GPU utilization or Tahoma measurement.',
+                full_desktop_offload=False, tahoma_tested=False)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--trial', type=Path, required=True)
+    parser.add_argument('--output', type=Path, required=True)
+    args = parser.parse_args()
+    paths = [args.trial / p for p in ('repeat/probe.log', 'relay/frames.jsonl', 'present/probe.log', 'screen/probe.log')]
+    report = analyze(*(rows(p) for p in paths))
+    report['source_sha256'] = {str(p.relative_to(args.trial)): hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
+    args.output.mkdir(exist_ok=False, parents=True)
+    (args.output/'report.json').write_text(json.dumps(report, indent=2)+'\n')
+    print(json.dumps(dict(passed=True, inputs=len(report['controlled_events']), distributions=report['distributions'],
+                         animation={k:v for k,v in report['animation'].items() if not isinstance(v,list)})))
