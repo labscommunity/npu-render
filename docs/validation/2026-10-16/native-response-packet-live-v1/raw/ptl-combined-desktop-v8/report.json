@@ -1,0 +1,40 @@
+{
+    "started":  "2026-10-16T23:57:25.0618295Z",
+    "completed":  true,
+    "passed":  true,
+    "full_desktop_offload":  false,
+    "tahoma_tested":  false,
+    "active_phase":  "timing-analysis",
+    "phases":  [
+                   {
+                       "phase":  "pre-registration-readiness",
+                       "passed":  true
+                   },
+                   {
+                       "phase":  "registered-d3d",
+                       "cleanup_passed":  true,
+                       "passed":  true
+                   },
+                   {
+                       "phase":  "finite-live",
+                       "passed":  true
+                   },
+                   {
+                       "phase":  "timing-analysis",
+                       "passed":  true
+                   }
+               ],
+    "paired_transport":  {
+                             "pairs":  1944,
+                             "old_parent_ms":  243223.7904,
+                             "new_parent_ms":  238292.23070000001,
+                             "old_outside_child_ms":  17811.6479,
+                             "new_outside_child_ms":  13585.7147,
+                             "slower_parent_pairs":  610
+                         },
+    "reference_discrepant_variants":  93,
+    "image_qualification":  "exact preceding NPU outputs; any CPU-reference disagreement retained unchanged",
+    "warm_program_previous_ms":  76773.444699999862,
+    "warm_program_compact_ms":  59582.336700000138,
+    "finished":  "2026-10-17T00:24:21.1103530Z"
+}

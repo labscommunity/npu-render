@@ -1,0 +1,38 @@
+from pathlib import Path
+import re,json,hashlib,ast
+r=Path(__file__).parent
+changes={'native-registration-v44':'native-registration-v45','native-registered-v44':'native-registered-v45','NativeRecovery-v44':'NativeRecovery-v45','native_shared_app_v11':'native_shared_app_v12','native_desktop_bootstrap_v39':'native_desktop_bootstrap_v40','native-desktop-v65':'native-desktop-v66','native-desktop-admission-v65':'native-desktop-admission-v66','NativeDesktopRecovery-v65':'NativeDesktopRecovery-v66','run-native-live-v55-v2':'run-native-live-v56','native-live-v55':'native-live-v56','NativeLiveV55':'NativeLiveV56','native-topology-primary-v41':'native-topology-primary-v42','native-topology-v99':'native-topology-v102','native-topology-v100':'native-topology-v103','native-topology-v101':'native-topology-v104','InspectTopology-V99':'InspectTopology-V102','InspectTopology-V100':'InspectTopology-V103','InspectTopology-V101':'InspectTopology-V104','observer101':'observer104','dismiss-native-saver-v29':'dismiss-native-saver-v30','dismiss-v29':'dismiss-v30','run-ptl-native-live-v19-v2':'run-ptl-native-live-v20','ptl-native-live-v19':'ptl-native-live-v20','native-latency-v19-analysis':'native-latency-v20-analysis','native-presentation-v16-analysis':'native-presentation-v17-analysis','native-repeated-input-v2-analysis':'native-repeated-input-v3-analysis','ptl-combined-desktop-v7-v2':'ptl-combined-desktop-v8','analyze-native-latency-v17.py':'analyze-native-latency-v18.py','analyze-native-presentation-v16.py':'analyze-native-presentation-v17.py','ptl-native-worker-v18':'ptl-native-worker-v19','ptl-worker-v18-qualification':'ptl-worker-v19-qualification-v3','d75e2fb82ab038f02054931c9cc2e862c08546e2dfe363a23dd9997394b239a6':'d4ddc1238bf91e94190b873f7f985def21c64c85f57fde18b6456f60c175f96c'}
+pat=re.compile('|'.join(re.escape(x) for x in sorted(changes,key=len,reverse=True)))
+def rename(s):return pat.sub(lambda m:changes[m[0]],s)
+replacement={'run-native-live-v55.ps1':'run-native-live-v55-v2.ps1','run-ptl-native-live-v19.ps1':'run-ptl-native-live-v19-v2.ps1','run-ptl-combined-desktop-v7.ps1':'run-ptl-combined-desktop-v7-v2.ps1','analyze-native-latency-v15.py':'analyze-native-latency-v17.py','analyze-native-presentation-v13.py':'analyze-native-presentation-v16.py'}
+files=[replacement.get(x,x) for x in json.loads((r/'ptl-combined-live-v7-upload.json').read_text()) if not x.endswith('-source.json') and not x.startswith('analyze-repeated-input')]
+for f in files:
+ s=rename((r/f).read_text())
+ if f=='qualify-native-registered-v44.py':
+  a=s.index("qualified=obj(root/'builds/ptl-native-worker-v15/");b=s.index("assert report['worker_binary_sha256']",a)
+  names=['local_indexed_worker.cpp','response_envelope_v1.hpp','local_indexed_validated_client.hpp','packet_provider_process.hpp'];hashes={n:hashlib.sha256((r/'ptl-native-worker-v19'/n).read_bytes()).hexdigest() for n in names}
+  s=s[:a]+"qualified=obj(root/'builds/ptl-native-worker-v18/registered-build-report.json')\ncandidate=obj(v.worker.parent.parent/'registered-build-report.json')\nexpected_changes="+repr(hashes)+"\nassert candidate['linked_libraries']==qualified['linked_libraries']\nassert set(candidate['source_sha256'])==set(qualified['source_sha256'])|{'response_envelope_v1.hpp','local_indexed_validated_client.hpp','packet_provider_process.hpp'}\nassert {n:h for n,h in candidate['source_sha256'].items() if h!=qualified['source_sha256'].get(n)}==expected_changes\n"+s[b:]
+ if f=='run-ptl-combined-desktop-v7-v2.ps1':
+  # Serialize against the offscreen GPU-control probe as well as the prior live trial.
+  s=s.replace('packet-transport-comparison-v1-qualification\\report.json','physical-gpu-choice-v1-qualification\\report.json',1)
+  s=s.replace('ptl-combined-desktop-v6-completion-v2\\report.json','ptl-combined-desktop-v7-v2\\report.json')
+  s=s.replace('native-registration-v43','native-registration-v44')
+  needle=" $deadline=[DateTime]::UtcNow.AddMinutes(40)"
+  extra=r''' $transport=Get-Content "$vm\packet-transport-comparison-v1\report.json" -Raw|ConvertFrom-Json
+ if(!$transport.completed -or !$transport.passed -or $transport.summary.pairs -ne 1944 -or $transport.summary.new_parent_ms -ge $transport.summary.old_parent_ms -or $transport.summary.new_outside_child_ms -ge $transport.summary.old_outside_child_ms){throw 'Packet worker has no measured aggregate transport improvement'}
+ $report.paired_transport=$transport.summary
+ $fault=Get-Content "$vm\packet-provider-recovery-v2\report.json" -Raw|ConvertFrom-Json
+ if(!$fault.completed -or !$fault.passed -or @($fault.phases).Count -ne 2){throw 'Packet recovery qualification missing'}
+'''
+  s=s.replace(needle,extra+needle,1)
+ # New controllers use the existing contention-tested atomic writer.
+ if f in ('run-native-live-v55-v2.ps1','run-ptl-combined-desktop-v7-v2.ps1','run-ptl-native-live-v19-v2.ps1'):
+  needle='function Save-Report{';at=s.index(needle)
+  s=s[:at]+'. ([scriptblock]::Create([IO.File]::ReadAllText("$r\\vm\\atomic_lab_report_v1.ps1")))\n'+s[at:]
+  s=re.sub(r'function Save-Report\{\$report\|ConvertTo-Json -Depth \d+\|Set-Content "\$out\\report.json"\}', 'function Save-Report{Write-NrLabReport "$out/report.json" $report}',s)
+ if f.endswith('.py'):ast.parse(s)
+ p=r/rename(f);assert not p.exists();p.write_text(s)
+for old in ('native-registration-v44-source.json','native-desktop-v65-source.json'):
+ names=[rename(f) for f in json.loads((r/old).read_text())];(r/rename(old)).write_text(json.dumps({f:hashlib.sha256((r/f).read_bytes()).hexdigest() for f in names},indent=2)+'\n')
+(r/'ptl-combined-live-v8-upload.json').write_text(json.dumps([rename(f) for f in files]+['native-registration-v45-source.json','native-desktop-v66-source.json'],indent=2)+'\n')
+print('Prepared packet-worker repeated live trial; gated on prior live success and matched transport improvement')

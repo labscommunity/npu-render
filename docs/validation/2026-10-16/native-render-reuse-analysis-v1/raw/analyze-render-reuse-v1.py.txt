@@ -1,0 +1,76 @@
+"""Measure identical render inputs in retained capture; no renderer changes."""
+from pathlib import Path
+from collections import OrderedDict
+from datetime import UTC,datetime
+import hashlib
+import json
+import os
+import struct
+import traceback
+
+r=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=r/'vm'
+out=vm/'render-reuse-v1-analysis';out.mkdir(exist_ok=False)
+def obj(p):return json.loads(p.read_text(encoding='utf-8-sig'))
+def rows(p):return [json.loads(x) for x in p.read_text(encoding='utf-8-sig').splitlines() if x.startswith('{') and x.endswith('}')]
+header=struct.Struct('<QQQ14I');assert header.size==80
+capture=vm/'native-desktop-admission-v33/bootstrap/requests'
+index=capture/'index.jsonl'
+report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,cpu_only=True,
+            desktop_changed=False,tahoma_tested=False,renderer_changed=False)
+def save():(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+save()
+try:
+    assert hashlib.sha256(index.read_bytes()).hexdigest()=='0f22ee6a6f4184e06a4338562abc24b843ad7b3882fec6c189bdaa9983237d9d'
+    entries=[x for x in rows(index) if x.get('request_recorded')];assert len(entries)==972
+    expected=rows(vm/'ptl-native-worker-v18-full/replay/replays.jsonl');assert len(expected)==972
+    by_ticket={x['ticket']:x for x in expected};assert len(by_ticket)==972
+    comparison=obj(vm/'packet-transport-comparison-v1/report.json');assert comparison['passed'] and comparison['completed']
+    timed=next(x for x in comparison['phases'] if x['phase']=='B1')
+    times={x['original_ticket']:x['child_ms'] for x in timed['requests']};assert len(times)==972
+    groups={};all_requests=[];conflicts=[];total_bytes=0
+    for entry in entries:
+        ticket=entry['ticket'];assert entry['file']==f'request-{ticket:08d}.bin'
+        data=(capture/entry['file']).read_bytes()
+        assert len(data)==entry['bytes'] and hashlib.sha256(data).hexdigest()==entry['sha256'].lower()
+        h=list(header.unpack_from(data));assert h[0]==0x4e525f4452415731 and h[12]+80==len(data) and h[14]==1 and h[15]==0
+        assert by_ticket[ticket]['pixel_bytes']==h[4]*h[5]*4
+        # Exclude only transport identity. Keep all geometry, shaders, constants,
+        # source pixels, destination pixels, samplers, flags and padding bytes.
+        h[1]=h[2]=h[11]=h[13]=0
+        normalized=header.pack(*h)+data[80:]
+        digest=hashlib.sha256(normalized).hexdigest()
+        result_hash=by_ticket[ticket]['pixels_sha256']
+        item=dict(ticket=ticket,render_input_sha256=digest,request_bytes=len(data),
+                  output_bytes=by_ticket[ticket]['pixel_bytes'],output_sha256=result_hash,
+                  prior_child_ms=times[ticket])
+        group=groups.setdefault(digest,dict(tickets=[],output_hashes=set(),request_bytes=len(data),output_bytes=item['output_bytes']))
+        group['tickets'].append(ticket);group['output_hashes'].add(result_hash)
+        all_requests.append(item);total_bytes+=len(data)
+    for digest,group in groups.items():
+        if len(group['output_hashes'])!=1:conflicts.append(dict(render_input_sha256=digest,tickets=group['tickets'],output_hashes=sorted(group['output_hashes'])))
+    simulations=[]
+    for capacity in (64,128,256):
+        cache=OrderedDict();used=0;hits=0;avoided=0;evictions=0;too_large=0
+        for item in all_requests:
+            key=item['render_input_sha256'];size=item['request_bytes']+item['output_bytes']
+            if key in cache:
+                hits+=1;avoided+=item['prior_child_ms'];cache.move_to_end(key);continue
+            if size>capacity*1024*1024:too_large+=1;continue
+            while used+size>capacity*1024*1024:
+                _,old=cache.popitem(last=False);used-=old;evictions+=1
+            cache[key]=size;used+=size
+        simulations.append(dict(capacity_mib=capacity,hits=hits,misses=972-hits,evictions=evictions,
+                                oversized_misses=too_large,resident_bytes=used,prior_child_ms_on_hits=avoided))
+    report.update(passed=not conflicts,captured_requests=972,total_request_bytes_read=total_bytes,
+                  unique_normalized_inputs=len(groups),duplicate_requests=972-len(groups),
+                  conflicting_output_groups=conflicts,simulated_lru=simulations,
+                  repeated_groups=[dict(render_input_sha256=k,tickets=g['tickets'],request_bytes=g['request_bytes'],
+                                        output_bytes=g['output_bytes'],output_hashes=sorted(g['output_hashes']))
+                                   for k,g in groups.items() if len(g['tickets'])>1],
+                  requests=all_requests,
+                  sources={str(index):hashlib.sha256(index.read_bytes()).hexdigest()},
+                  scope='SHA-256 grouping and bounded-LRU opportunity estimate for an older retained capture. No result cache is implemented, no current live input is captured, and no new performance is measured. Prior child time on hypothetical cache hits is an upper bound on removable work before hashing, validation, lookup and copying. A real cache must validate every request, compare exact input bytes, retain NPU-output provenance, bound memory, and invalidate on renderer or provider changes.')
+except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+finally:report.update(completed=True,finished=datetime.now(UTC).isoformat());save()
+print(json.dumps({k:v for k,v in report.items() if k not in ('requests','repeated_groups','sources')}))
+raise SystemExit(0 if report['passed'] else 1)

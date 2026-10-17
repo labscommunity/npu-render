@@ -1,0 +1,33 @@
+"""Independent clipped-interval arithmetic and malformed-timeline rejection."""
+from pathlib import Path
+import copy
+import importlib.util
+import json
+r=Path(__file__).parent
+spec=importlib.util.spec_from_file_location('rendering',r/'analyze-repeated-rendering-v1.py')
+m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+p=[dict(kind='request_timeline',dispatch_ticket=0,pid=9,sequence=2,entered_qpc=5,finished_qpc=35)]
+c=[dict(kind='request_identity',dispatch_ticket=0,sequence=2,pixel_sha256='shader'),
+   dict(kind='request_timeline',dispatch_ticket=0,client_pid=9,sequence=2,connected_qpc=10,received_qpc=15,entered_qpc=20,finished_qpc=30)]
+a=m.attribute(p,c,12,32,1000)
+assert a['stages']==dict(parent_pre_child_ms=0,child_packet_read_ms=3,child_pre_execution_ms=5,child_execution_ms=10,parent_post_child_ms=2)
+assert a['outside_serialized_parent_ms']==0 and a['by_shader']['shader']['overlap_ms']==10
+assert m.attribute(p,c,0,40,1000)['outside_serialized_parent_ms']==10
+assert m.attribute(p,c,40,50,1000)['outside_serialized_parent_ms']==10
+checks=['clipped-stages','outside-interval','no-request-overlap']
+for name,stream,mutate in [
+    ('duplicate-parent',0,lambda x:x.append(copy.deepcopy(x[0]))),
+    ('wrong-pid',1,lambda x:x[1].update(client_pid=10)),
+    ('reversed-child',1,lambda x:x[1].update(finished_qpc=19)),
+    ('inverted-packet-time',1,lambda x:x[1].update(received_qpc=21)),
+    ('wrong-request-sequence',1,lambda x:x[0].update(sequence=3)),
+    ('duplicate-child',1,lambda x:x.append(copy.deepcopy(x[1]))),
+    ('overlapping-parent',0,lambda x:x.append(dict(x[0],dispatch_ticket=1))),
+]:
+    data=copy.deepcopy([p,c]);mutate(data[stream])
+    try:m.attribute(*data,12,32,1000)
+    except AssertionError:checks.append(name)
+    else:raise AssertionError(name+' accepted')
+report=dict(passed=True,checks=checks,scope='Synthetic interval attribution only; no device execution')
+out=r/'repeated-rendering-v1-contract.json';assert not out.exists();out.write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(report))

@@ -10,14 +10,13 @@ RGBA composition and an explicit backend switch. The packaged runtime passed
 GPU → NPU → CPU → GPU → NPU switching on Panther Lake. It supports CPU/GPU/NPU through
 its first OpenVINO provider; other providers can implement the same contracts.
 
-**Latest results, October 16:** the [repeated-input desktop trial](docs/validation/2026-10-16/native-repeated-input-live-v1/README.md)
-passes 1,680 acknowledged NPU operations, 103 exact physical submissions, forty
+**Latest results, October 16:** the [packet-worker desktop trial](docs/validation/2026-10-16/native-response-packet-live-v1/README.md)
+passes 1,682 acknowledged NPU operations, 103 exact physical submissions, forty
 controlled inputs, the default-adapter test application and restoration, with
-no provider fault or retry. Responsiveness fails: warm p95 from application receipt
-to matching display is 116 ms for mouse and 110 ms for keyboard. One mouse input
-also waits 3.32 seconds before the application receives it. Only seven distinct
-animation updates are display-counter verified during a ten-second 30 Hz test.
-The trace places 6.6 seconds inside child rendering with no compilation time.
+no provider fault or retry. Responsiveness still fails: both recent workers show
+only seven verified animation updates during a ten-second 30 Hz test. The latest
+warm sent-input-to-display p95 is 108 ms for mouse and 1,632 ms for keyboard.
+The trace places 6.84 seconds inside child rendering with no compilation time.
 Full desktop offload, sustained responsiveness, broad application coverage and
 a Tahoma benefit remain unqualified.
 

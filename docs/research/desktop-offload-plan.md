@@ -2,20 +2,26 @@
 
 Updated 2026-10-16. Target: Delta, Windows 11, Panther Lake. The repository stays
 private. **Full desktop offload is unfinished.** The latest
-[repeated-input v55 trial](../validation/2026-10-16/native-repeated-input-live-v1/README.md)
-passes 1,680 acknowledged NPU operations, 103 exact physical submissions, forty
-controlled inputs, the ordinary test application and restoration. It fails the
-responsiveness target: warm received-input-to-display p95 is 116.208 ms for mouse
-and 109.503 ms for keyboard. Mouse input 15 additionally waits 3,320.379 ms before
-application receipt. Nineteen warm samples per kind are a small distribution.
+[packet-worker v56 trial](../validation/2026-10-16/native-response-packet-live-v1/README.md)
+passes 1,682 acknowledged NPU operations, 103 exact physical submissions, forty
+controlled inputs, the ordinary test application and restoration. Warm
+sent-input-to-display p95 is 107.663 ms for mouse and 1,632.388 ms for keyboard.
+Nineteen warm samples per kind are a small distribution, with p95 equal to maximum.
 
-Only seven unique animation colors are display-counter verified inside the
-ten-second 30 Hz schedule, with nine total including drain. Seven frames are
-published during that interval. Across 207 overlapping draw requests, child
-rendering occupies 6,599.588 ms and compilation occupies zero. Reducing rendering
-calls and shader cost is the immediate bottleneck; improving the presenter alone
-cannot recover frames that were never published. Matched GPU relief and Tahoma
-performance remain unmeasured.
+Both v56 and the [preceding v55 trial](../validation/2026-10-16/native-repeated-input-live-v1/README.md)
+verify only seven unique animation colors during the ten-second 30 Hz schedule,
+with nine including drain. In v56, 210 overlapping draws contain 3,442 whole-request
+provider calls; child execution occupies 6,839.935 ms with zero compilation time.
+Only seven frames are published during that interval. The response-packet change
+does not improve this animation result. Reducing rendering calls and shader cost
+remains the immediate bottleneck. Matched GPU relief and Tahoma are unmeasured.
+
+The [whole-request reuse analysis](../validation/2026-10-16/native-render-reuse-analysis-v1/README.md)
+finds only about 3.7 seconds of prior child time on hypothetical bounded-cache hits
+in a 110-second replay. No cache is implemented and no saved time is demonstrated.
+A [read-only capacity query](../validation/2026-10-16/native-npu-capacity-v1/README.md)
+reports three NPU tiles, matching the configured models. Turbo is disabled and
+has not been benchmarked. Neither result supplies a responsiveness fix.
 
 The preceding
 [filled-program live v54 trial](../validation/2026-10-16/native-filled-program-live-v1/README.md)

@@ -1,0 +1,26 @@
+"""Read device properties only; no model compilation, import or inference."""
+from pathlib import Path
+from datetime import UTC,datetime
+import json
+import os
+import openvino as ov
+r=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm/npu-capacity-v1'
+r.mkdir(exist_ok=False)
+core=ov.Core();supported=core.get_property('NPU','SUPPORTED_PROPERTIES')
+names={str(x) for x in supported};values={};unavailable={}
+for name in ('FULL_DEVICE_NAME','DEVICE_ARCHITECTURE','NPU_MAX_TILES','NPU_TILES',
+             'NPU_TURBO','OPTIMIZATION_CAPABILITIES','RANGE_FOR_ASYNC_INFER_REQUESTS',
+             'RANGE_FOR_STREAMS','NUM_STREAMS'):
+    try:
+        value=core.get_property('NPU',name)
+        try:json.dumps(value)
+        except TypeError:value=str(value)
+        values[name]=value
+    except Exception as error:unavailable[name]=str(error)
+report=dict(completed=True,passed=True,observed=datetime.now(UTC).isoformat(),
+            openvino_version=ov.get_version(),supported_properties=sorted(names),
+            values=values,unavailable=unavailable,inference_calls=0,models_compiled=0,
+            models_imported=0,settings_changed=False,
+            scope='Device-property query; configured tile count is not a utilization measurement.')
+(r/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps({k:v for k,v in report.items() if k not in ('supported_properties','unavailable')}))
