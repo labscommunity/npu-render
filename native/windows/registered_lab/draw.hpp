@@ -96,6 +96,7 @@ void APIENTRY set_topology(D3D10DDI_HDEVICE h, D3D10_DDI_PRIMITIVE_TOPOLOGY valu
 }
 std::vector<uint8_t> read_pixels(Allocation &source) {
     require(!source.locked && !source.context->poisoned);
+    frame_batches_before_read(source);
     const auto &s = source.surface;
     const UINT row_bytes = s.width * texel_bytes(s.format);
     std::vector<uint8_t> result(size_t(row_bytes) * s.height);
@@ -116,6 +117,7 @@ std::vector<uint8_t> read_pixels(Allocation &source) {
     return result;
 }
 #include "draw_capture.hpp"
+#include "frame_batcher.hpp"
 #include "indexed_draw.hpp"
 void APIENTRY draw_indexed(D3D10DDI_HDEVICE h, UINT count, UINT first, INT base) {
     guard(h, __FUNCTION__, [&] {

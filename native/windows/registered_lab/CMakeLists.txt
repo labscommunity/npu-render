@@ -283,7 +283,7 @@ foreach(target nr_native_probe_umd nr_native_probe_ddi_test)
  target_compile_features(${target} PRIVATE cxx_std_17)
  target_compile_options(${target} PRIVATE /W4 /WX)
  target_include_directories(${target} PRIVATE "${NR_WDK_INCLUDE_ROOT}/um" "${NR_WDK_INCLUDE_ROOT}/shared" "${NR_WDK_INCLUDE_ROOT}/km")
- target_link_libraries(${target} PRIVATE nr_registered_blend nr_registered_vertex d3dcompiler advapi32 user32 wtsapi32)
+ target_link_libraries(${target} PRIVATE nr_registered_blend nr_registered_vertex d3dcompiler advapi32 user32 wtsapi32 bcrypt)
  set_property(TARGET ${target} PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endforeach()
 

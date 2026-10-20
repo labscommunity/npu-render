@@ -129,6 +129,22 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
     const bool textured = std::any_of(d.pixel_program->textures.begin(),d.pixel_program->textures.end(),[](bool v){return v;});
     const auto cull=static_cast<nr::raster::CullMode>(UINT(d.raster.CullMode)-1);
     const bool front_ccw=d.raster.FrontCounterClockwise!=0;
+    if (d.backend == "NPU_LAB_INDEXED") {
+        // Frame batch first: the draw joins the open batch when its shader pair is
+        // compiled into the kernel and the planner admits it; otherwise the batch is
+        // flushed so the per-draw route below sees current target pixels.
+        if (!d.batcher) d.batcher = std::make_shared<FrameBatcher>(d);
+        const nr::raster::Viewport batch_viewport{d.viewport.TopLeftX, d.viewport.TopLeftY, d.viewport.Width, d.viewport.Height, d.viewport.MinDepth, d.viewport.MaxDepth};
+        std::string reason;
+        if (d.batcher->record_draw(target, inputs, d.vertex_program, d.pixel_program, vc, pc, blend_mode, d.blend.RenderTargetWriteMask[0], cull, front_ccw, clip, clip != full, batch_viewport, blend_constant, reason)) {
+            ++counters.executions; ++counters.remote_npu_executions; ++counters.draws;
+            lab_trace("{\"event\":\"%s\",\"vertices\":%u,\"textured\":%s,\"batched\":true,\"execution_device\":\"NPU (frame batch)\",\"wall_ms\":%llu}\n",
+                indexed ? "indexed_draw_recorded" : "draw_recorded", count, textured ? "true" : "false", static_cast<unsigned long long>(GetTickCount64() - started));
+            return;
+        }
+        lab_trace("{\"event\":\"draw_not_batched\",\"reason\":\"%s\",\"vertices\":%u}\n", reason.c_str(), count);
+        flush_frame_batches(d);
+    }
     nr::raster::PackedTexture texture; bool linear=false, modulated=false, general_texture=false;
     bool general_resources=nr::shader::quad_derivatives(*d.pixel_program);
     for(unsigned slot=0;slot<16;++slot)general_resources=general_resources ||

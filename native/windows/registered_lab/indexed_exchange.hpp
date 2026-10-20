@@ -85,5 +85,28 @@ public:
 #endif
         } catch (...) { failed = true; throw; }
     }
+    // Frame batch (abi 24): sends the header and body as one packet and returns the validated reply.
+    std::vector<uint8_t> exchange_batch(indexed_exchange::Header h, const std::vector<uint8_t> &body) {
+        if (failed) throw std::runtime_error("indexed NPU transport previously failed");
+        try {
+            h.sequence = ++sequence; h.client_pid = GetCurrentProcessId(); h.abi = 24; h.kind = 1; h.device = 0; h.body_bytes = uint32_t(body.size());
+            if (BCryptGenRandom(nullptr, reinterpret_cast<PUCHAR>(h.nonce), sizeof(h.nonce), BCRYPT_USE_SYSTEM_PREFERRED_RNG) < 0)
+                throw std::runtime_error("indexed NPU nonce generation failed");
+            std::vector<uint8_t> bytes(sizeof(h) + body.size());
+            std::memcpy(bytes.data(), &h, sizeof(h)); std::memcpy(bytes.data() + sizeof(h), body.data(), body.size());
+            indexed_exchange::require(indexed_exchange::frame_batch_valid(h, bytes.size()));
+#ifdef NR_NATIVE_PROBE
+            admission->verify();
+            auto reply = local_client->exchange(bytes);
+#else
+            indexed_exchange::require(!pipe.empty());
+            auto reply = indexed_stream::exchange_packet(pipe, bytes);
+#endif
+            const auto rh = indexed_exchange::Reader(reply).value<indexed_exchange::Header>();
+            if (indexed_exchange::failure_valid(rh, h, reply.size())) throw std::runtime_error("NPU worker rejected the frame batch");
+            indexed_exchange::require(indexed_exchange::frame_batch_response_valid(rh, h, reply.size()));
+            return reply;
+        } catch (...) { failed = true; throw; }
+    }
 };
 }

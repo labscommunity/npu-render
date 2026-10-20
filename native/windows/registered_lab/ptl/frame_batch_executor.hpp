@@ -289,27 +289,14 @@ private:
         if (d.record.scissor_enabled) d.scissor_bounds = frame::intersect(d.scissor_bounds, {d.record.scissor[0], d.record.scissor[1], d.record.scissor[2], d.record.scissor[3]});
         d.eligible = true; d.route = "frame";
     }
-    // Bytes a tile span needs for one draw's texture windows plus fixed costs; chooses the tile edge.
+    // Chooses the tile edge at which every tile span fits; otherwise the draw falls back.
     void fit(Draw &d, const std::vector<ResourceRef> &refs) {
         const auto &target = refs[d.record.target].record;
         const frame::Rect bounds = frame::intersect(frame::intersect(d.plan.bounds, d.scissor_bounds), {0, 0, int32_t(target.width), int32_t(target.height)});
-        if (bounds.empty()) { d.tile = 128; return; }
-        for (uint32_t edge : {128u, 64u, 32u}) {
-            bool fits = true;
-            for (int32_t ty = bounds.y0 / int32_t(edge) * int32_t(edge); ty < bounds.y1 && fits; ty += int32_t(edge)) for (int32_t tx = bounds.x0 / int32_t(edge) * int32_t(edge); tx < bounds.x1 && fits; tx += int32_t(edge)) {
-                const frame::Rect clip = frame::intersect(bounds, {tx, ty, tx + int32_t(edge), ty + int32_t(edge)});
-                if (clip.empty()) continue;
-                size_t bytes = NR_FRAME_HEADER_BYTES + NR_FRAME_COMMAND_BYTES + d.kernel_entry.size() + 64 + d.record.vertex_words * 4 + (d.vertex_constants.size() + d.pixel_constants.size()) * 4 + 4 + edge * edge * 4;
-                for (uint32_t t = 0; t < d.record.texture_count; ++t) {
-                    const auto &tref = refs[d.textures[t].resource];
-                    const auto r = frame::texel_window(*d.program, d.plan, clip, t, tref.record.width, tref.record.height, d.textures[t].filter != 0);
-                    bytes += NR_FRAME_WINDOW_BYTES + (r.empty() ? 4 : size_t(r.x1 - r.x0) * size_t(r.y1 - r.y0) * 4);
-                }
-                if (bytes > frame::span_bytes - 1024) fits = false;
-            }
-            if (fits) { d.tile = edge; return; }
-        }
-        d.eligible = false; d.route = "fallback:span budget";
+        std::array<uint32_t, 4> tw{}, th{}; std::array<bool, 4> point{};
+        for (uint32_t t = 0; t < d.record.texture_count; ++t) { const auto &ref = refs[d.textures[t].resource]; tw[t] = ref.record.width; th[t] = ref.record.height; point[t] = d.textures[t].filter != 0; }
+        d.tile = frame::fitting_tile(*d.program, d.plan, bounds, d.kernel_entry.size(), d.record.vertex_words, uint32_t(d.vertex_constants.size() + d.pixel_constants.size()), tw, th, point);
+        if (!d.tile) { d.eligible = false; d.route = "fallback:span budget"; }
     }
     void clear(const Draw &d, std::vector<ResourceRef> &refs, std::map<uint64_t, frame::Rect> &dirty) {
         auto &ref = refs[d.record.target]; auto &res = *ref.resident;
@@ -347,6 +334,8 @@ private:
             else request.texture = std::move(texture);
         }
         raster::UniformDrawExecutor::Result result;
+        require(h.abi && h.abi <= 15);
+        (void)indexed_exchange::encode(request);   // applies the large-target and large-texture abi wrapping in place
         try { result = legacy.execute(request); }
         catch (const std::exception &error) { throw std::runtime_error(std::string("frame batch fallback (") + d.route + ") failed: " + error.what()); }
         require(result.execution_device == "NPU" && result.pixels.size() == res.pixels.size());

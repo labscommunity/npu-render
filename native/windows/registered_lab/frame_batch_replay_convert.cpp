@@ -56,7 +56,7 @@ uint32_t texture_index(Batch &b, const nr::raster::PackedTexture &t) {
 }
 void add_command(Batch &b, const ex::Request &r) {
     const auto &h = r.header; fb::CommandRecord c; ex::Writer w;
-    c.target = 0; c.legacy_abi = h.abi | (h.reserved << 16); c.legacy_flags = h.flags;
+    c.target = 0; c.legacy_abi = ex::payload_abi(h); c.legacy_flags = h.flags;   // the worker re-wraps large variants
     if (ex::color_clear(h)) {
         c.kind = 1; for (unsigned k = 0; k < 4; ++k) c.clear_color[k] = r.clear_color[k];
         w.value(c); b.commands.push_back(w.finish()); return;

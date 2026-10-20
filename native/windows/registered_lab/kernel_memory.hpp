@@ -8,6 +8,7 @@
 #include <cstring>
 #include <cstdint>
 #include <cstdio>
+#include <atomic>
 #include <memory>
 #include "../kmd/contract.hpp"
 namespace nr::registered_lab {
@@ -100,6 +101,10 @@ struct Context {
         poisoned = false;
     }
 };
+// Process-unique allocation identities and a single monotonically increasing
+// content version shared by CPU writes and NPU frame batches.
+inline uint64_t next_allocation_id() { static std::atomic<uint64_t> counter{0}; return ++counter; }
+inline uint64_t next_content_version() { static std::atomic<uint64_t> counter{0}; return ++counter; }
 struct Allocation {
     std::shared_ptr<Context> context;
     kernel_contract::Surface surface{};
@@ -107,6 +112,9 @@ struct Allocation {
     HANDLE runtime_resource = nullptr;
     void *mapping = nullptr;
     bool locked = false;
+    uint64_t id = next_allocation_id();                     // stable across handle rotation
+    uint64_t content_version = next_content_version();      // bumps on every write to the pixels
+    uint64_t worker_version = 0;                            // version the NPU worker holds resident, 0 none
     explicit Allocation(std::shared_ptr<Context> c) : context(std::move(c)) {}
     Allocation(const Allocation &) = delete;
     Allocation &operator=(const Allocation &) = delete;

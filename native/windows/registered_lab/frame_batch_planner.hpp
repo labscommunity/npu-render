@@ -186,4 +186,26 @@ inline Rect texel_window(const LoweredProgram &program, const DrawPlan &plan, Re
            std::min(int32_t(tw), int32_t(std::floor(clamp01(umax) * float(tw) - half)) + 3), std::min(int32_t(th), int32_t(std::floor(clamp01(vmax) * float(th) - half)) + 3)};
     return intersect(r, plan.texels[t]);
 }
+// Tile edge (128, 64 or 32) at which every tile of a planned draw fits one span
+// with its texture windows, or 0 when the draw needs the per-draw route.
+inline uint32_t fitting_tile(const LoweredProgram &program, const DrawPlan &plan, Rect bounds, size_t entry_bytes, uint32_t vertex_words, uint32_t constant_words,
+                             const std::array<uint32_t, NR_FRAME_MAX_TEXTURES> &tw, const std::array<uint32_t, NR_FRAME_MAX_TEXTURES> &th, const std::array<bool, NR_FRAME_MAX_TEXTURES> &point) {
+    if (bounds.empty()) return 128;
+    for (uint32_t edge : {128u, 64u, 32u}) {
+        bool fits = true;
+        for (int32_t ty = bounds.y0 / int32_t(edge) * int32_t(edge); ty < bounds.y1 && fits; ty += int32_t(edge))
+            for (int32_t tx = bounds.x0 / int32_t(edge) * int32_t(edge); tx < bounds.x1 && fits; tx += int32_t(edge)) {
+                const Rect clip = intersect(bounds, {tx, ty, tx + int32_t(edge), ty + int32_t(edge)});
+                if (clip.empty()) continue;
+                size_t bytes = NR_FRAME_HEADER_BYTES + NR_FRAME_COMMAND_BYTES + entry_bytes + 64 + size_t(vertex_words) * 4 + size_t(constant_words) * 4 + 4 + size_t(edge) * edge * 4;
+                for (size_t t = 0; t < program.texture_slots.size() && t < NR_FRAME_MAX_TEXTURES; ++t) {
+                    const auto r = texel_window(program, plan, clip, unsigned(t), tw[t], th[t], point[t]);
+                    bytes += NR_FRAME_WINDOW_BYTES + (r.empty() ? 4 : size_t(r.x1 - r.x0) * size_t(r.y1 - r.y0) * 4);
+                }
+                if (bytes > span_bytes - 1024) fits = false;
+            }
+        if (fits) return edge;
+    }
+    return 0;
+}
 }
