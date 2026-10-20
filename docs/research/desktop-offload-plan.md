@@ -142,8 +142,13 @@ affect the iGPU.
 The [vector memory-fill component](../validation/2026-10-20/native-program-vector-fill-component-v1/README.md)
 passes 448 NPU fixtures inside the existing code allocation. The original program
 kernel contains a byte-store clearing loop; the replacement uses aligned wider
-stores. Its frequency and performance impact remain unmeasured. A complete
-renderer comparison is running after the desktop trial and restoration.
+stores. The [complete renderer comparison](../validation/2026-10-20/native-program-vector-fill-worker-v1/README.md)
+preserves all 3,888 images and lowers aggregate parent time by 2.35%, below the
+five-percent live threshold. Program-route child time falls by 12.80%; this is
+not isolated instruction timing. A separate candidate now enlarges the bounded
+transport batch for the complex shader that dominates the live animation.
+Its kernel arithmetic remains unchanged; correctness, timing and recovery
+qualification are still pending.
 
 The rectangle candidate also passes
 [two targeted provider-recovery scenarios](../validation/2026-10-20/native-quad-rectangle-recovery-v1/README.md);

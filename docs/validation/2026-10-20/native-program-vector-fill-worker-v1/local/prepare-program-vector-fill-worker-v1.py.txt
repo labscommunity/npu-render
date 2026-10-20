@@ -1,0 +1,89 @@
+"""Pin the qualified vector-fill model and compare identical host renderers."""
+from pathlib import Path
+import ast
+import hashlib
+import json
+import shutil
+import subprocess
+import tarfile
+
+r = Path(__file__).parent
+old_model = "92e04a6734dc6e70ffed15b67fddba02892c66168aa0d47a6cf4bcc65a6a585d"
+new_model = "00793de192c05fc47f58a7a41a184245ded4df14fd83b58a7a31a514df0121b2"
+name = "ptl-native-worker-v27"
+d = r / name
+assert not d.exists()
+old_sources = json.loads((r / "ptl-native-worker-v26-source.json").read_text())
+for n, h in old_sources.items():
+    assert hashlib.sha256((r / "ptl-native-worker-v26" / n).read_bytes()).hexdigest() == h
+shutil.copytree(r / "ptl-native-worker-v26", d)
+p = d / "ptl_program.hpp"
+s = p.read_text()
+old_bytes = ",".join("0x" + old_model[i:i + 2] for i in range(0, 64, 2))
+new_bytes = ",".join("0x" + new_model[i:i + 2] for i in range(0, 64, 2))
+assert s.count(old_bytes) == 1
+p.write_text(s.replace(old_bytes, new_bytes))
+manifest = {str(p.relative_to(d)): hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in d.rglob("*") if p.is_file()}
+assert {n for n, h in manifest.items() if old_sources.get(n) != h} == {"ptl_program.hpp"}
+(r / (name + "-source.json")).write_text(json.dumps(manifest, indent=2) + "\n")
+with tarfile.open(r / (name + ".tar.gz"), "w:gz") as archive:
+    archive.add(d, arcname=name)
+
+s = (r / "build-ptl-native-worker-v26.ps1").read_text().replace("worker-v26", "worker-v27")
+(r / "build-ptl-native-worker-v27.ps1").write_text(s)
+s = (r / "qualify-ptl-native-worker-v26.py").read_text().replace("worker-v26", "worker-v27")
+s = s.replace("ptl-six-span-program-compact-v1/patched.blob", "ptl-six-span-program-vector-fill-v1/patched.blob").replace(old_model, new_model)
+s = s.replace(" report['turbo_imports']=turbo_events;report['kernel_blobs_unchanged']=True;",
+              " report['turbo_imports']=turbo_events;report['kernel_blobs_unchanged']=False;report['only_program_model_changed']=True;")
+s = s.replace("try:\n assert obj", "try:\n assert obj(vm/'ptl-program-vector-fill-v1-qualification/report.json')['passed']\n assert obj", 1)
+ast.parse(s)
+(r / "qualify-ptl-native-worker-v27.py").write_text(s)
+
+s = (r / "qualify-turbo-render-comparison-v2.py").read_text()
+s = s.replace("turbo-render-comparison-v2", "program-vector-fill-comparison-v1")
+s = s.replace("ptl-native-worker-v26-full/report.json", "ptl-native-worker-v27-full/report.json", 1)
+s = s.replace("ptl-native-worker-v24-full/replay/replays.jsonl", "ptl-native-worker-v26-full/replay/replays.jsonl")
+s = s.replace("[('A1',24),('B1',26),('B2',26),('A2',24)]", "[('A1',26),('B1',27),('B2',27),('A2',26)]")
+needle = "  proof=obj(vm/f'ptl-native-worker-v{version}-full/report.json');assert proof['passed']"
+assert s.count(needle) == 1
+s = s.replace(needle, """  program=vm/('ptl-six-span-program-vector-fill-v1' if version==27 else 'ptl-six-span-program-compact-v1')/'patched.blob'
+  assert sha(program)==('""" + new_model + """' if version==27 else '""" + old_model + """')
+  env['NR_RENDER_PTL_PROGRAM_BLOB']=str(program)
+""" + needle)
+s = s.replace("  if version==26:assert len(turbo_events)>=9", "  assert len(turbo_events)>=9")
+s = s.replace("  else:assert not turbo_events\n", "")
+s = s.replace("record=dict(phase=phase,", "record=dict(program_model_sha256=sha(program),phase=phase,")
+s = s.replace("Four complete recorded replays in A/B/B/A order comparing the combined renderer with an otherwise identical renderer requesting NPU_TURBO on its ten custom-model import sites; compiled arithmetic and model blobs unchanged. Two runs per worker; all shader calculations remain on NPU. No desktop or Tahoma performance claim",
+              "Four complete recorded replays in A/B/B/A order comparing the qualified turbo renderer with identical host code except for the pinned program model hash. The candidate program model replaces scalar memset with aligned vector stores; shader arithmetic unchanged. Both workers request NPU_TURBO. Two runs per worker; all shader calculations remain on NPU. No desktop or Tahoma performance claim")
+ast.parse(s)
+(r / "qualify-program-vector-fill-comparison-v1.py").write_text(s)
+
+s = (r / "run-ptl-worker-v26-qualification.ps1").read_text()
+s = s.replace("worker-v26", "worker-v27").replace("turbo-render-comparison-v2", "program-vector-fill-comparison-v1")
+start = s.index(" $report.active_phase='verify-isolated-hint-and-recovery'")
+end = s.index(" Invoke-Step 'build'", start)
+s = s[:start] + r'''
+ $report.active_phase='waiting-for-desktop-restoration';Save-Report
+ $deadline=[DateTime]::UtcNow.AddMinutes(40)
+ while($true){$q=Get-Content "$vm/ptl-combined-desktop-v16/report.json" -Raw|ConvertFrom-Json;if($q.completed){break};if([DateTime]::UtcNow -gt $deadline){throw 'Desktop experiment deadline'};Start-Sleep -Seconds 3}
+ if(!$q.passed){throw 'Inspect preceding desktop failure before NPU work'}
+ $q=Get-Content "$vm/native-desktop-admission-v74/report.json" -Raw|ConvertFrom-Json
+ if(!$q.completed -or !$q.cleanup_passed -or !$q.memory_integrity_after){throw 'Preceding desktop cleanup incomplete'}
+ $q=Get-Content "$vm/ptl-program-vector-fill-v1-qualification/report.json" -Raw|ConvertFrom-Json
+ if(!$q.completed -or !$q.passed -or $q.unique_npu_fixtures -ne 448 -or $q.model_sha256 -ne '00793de192c05fc47f58a7a41a184245ded4df14fd83b58a7a31a514df0121b2'){throw 'Vector fill device proof incomplete'}
+ if(@(Get-Process nr_registered*,nr_native*,nr_ptl*,nr_frame_present_probe -ErrorAction SilentlyContinue).Count){throw 'Another graphics experiment is active'}
+ $sources=Get-Content "$vm/ptl-worker-v27-tools-source.json" -Raw|ConvertFrom-Json
+ foreach($f in $sources.psobject.Properties){if((Get-FileHash "$vm/$($f.Name)").Hash.ToLower() -ne $f.Value){throw 'Worker experiment source mismatch'}}
+''' + s[end:]
+(r / "run-ptl-worker-v27-qualification.ps1").write_text(s)
+names = [name + ".tar.gz", name + "-source.json",
+         "build-ptl-native-worker-v27.ps1", "qualify-ptl-native-worker-v27.py",
+         "qualify-program-vector-fill-comparison-v1.py", "run-ptl-worker-v27-qualification.ps1"]
+p = r / "ptl-worker-v27-tools-source.json"
+p.write_text(json.dumps({n: hashlib.sha256((r / n).read_bytes()).hexdigest() for n in names}, indent=2) + "\n")
+subprocess.run(["scp", "-q", *[str(r / n) for n in names], str(p),
+                "delta:AppData/Local/npu-render/vm/"], check=True, timeout=30)
+print(json.dumps(dict(prepared=name, only_host_change="pinned program model hash",
+                      original_program_model_sha256=old_model, candidate_program_model_sha256=new_model,
+                      hardware_work_started=False, waits_for_desktop_cleanup=True)))
