@@ -1,0 +1,90 @@
+"""Explain observed route coverage and slow input intervals in the failed trial."""
+from pathlib import Path
+from collections import Counter
+import gzip
+import hashlib
+import importlib.util
+import json
+
+root = Path("docs/validation/2026-10-20")
+target = root / "native-combined-fill-turbo-live-v1"
+prior = root / "native-turbo-render-live-v1"
+sources = {}
+
+
+def read(base, name):
+    path = base / "raw" / name
+    if not path.exists():
+        path = Path(str(path) + ".gz")
+    raw = path.read_bytes()
+    if path.suffix == ".gz":
+        raw = gzip.decompress(raw)
+    sources[str(path)] = hashlib.sha256(raw).hexdigest()
+    return raw.decode("utf-8-sig")
+
+
+def rows(base, name):
+    return [json.loads(x) for x in read(base, name).splitlines()
+            if x.startswith("{") and x.endswith("}")]
+
+
+old = rows(prior, "native-desktop-admission-v74/bootstrap/provider-processes/generation-1/worker.stdout.jsonl")
+new = rows(target, "native-desktop-admission-v75/bootstrap/provider-processes/generation-1/worker.stdout.jsonl")
+texture_shader = "39799859d6531970077cbe235484fb7164778b325f8f58e3b8d6774351baf0b3"
+counts = []
+for name, stream in (("v64_worker26", old), ("v65_worker31", new)):
+    identities = [x for x in stream if x.get("kind") == "request_identity"]
+    shaders = Counter(x["pixel_sha256"] for x in identities)
+    counts.append(dict(trial=name, request_identities=len(identities),
+                       texture_shader_requests=shaders[texture_shader],
+                       accepted_texture_routes=sum(bool(x.get("ptl_texture_draw") and x.get("accepted")) for x in stream),
+                       shaders=dict(shaders)))
+
+measured = json.loads(read(target, "native-repeated-input-v12-analysis/report.json"))
+live = json.loads(read(target, "native-live-v65/report.json"))
+assert live["completed"] and not live["passed"]
+assert live["error"] == "Native texture specialization not observed"
+assert measured["passed"] and measured["completed"]
+parent = rows(target, "native-desktop-admission-v75/bootstrap/worker.stdout.jsonl")
+frames = rows(target, "native-live-v65/relay/frames.jsonl")
+spec = importlib.util.spec_from_file_location("attribution", Path(__file__).parent / "analyze-repeated-rendering-v1.py")
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+outliers = []
+for event in measured["controlled_events"]:
+    if event["sent_to_matching_display_ms"] <= 500:
+        continue
+    matching = [x for x in frames if x["sequence"] == event["source_sequence"]]
+    assert len(matching) == 1 and matching[0]["known_stimulus_pixel"] == event["bgra"]
+    end = matching[0]["qpc"]
+    interval = module.attribute(parent, new, event["received_qpc"], end, measured["qpc_frequency"])
+    outliers.append(dict(sequence=event["sequence"], kind=event["kind"],
+                         first_of_kind=event["first_of_kind"],
+                         sent_to_matching_display_ms=event["sent_to_matching_display_ms"],
+                         send_to_receive_ms=event["send_to_receive_ms"],
+                         received_to_publication_ms=event["received_to_publication_ms"],
+                         interval=interval))
+report = dict(completed=True, passed=True, physical_trial_passed=False,
+              trial_error=live["error"], route_coverage=counts,
+              slow_inputs_over_500_ms=outliers, source_sha256=sources,
+              interpretation=(
+                  "Different shader/request counts make these separate desktop runs unmatched. "
+                  "Absence of a route's shader can explain missing natural-workload coverage, "
+                  "but does not qualify that route or justify removing the gate. "
+                  "Attribution is serial host/worker overlap, not NPU utilization or proof "
+                  "of a power-related cause. No GPU relief or Tahoma benefit was measured."
+              ))
+manifest_path = target / "artifact-sha256.json"
+manifest = json.loads(manifest_path.read_text())
+for name, data in (
+    ("combined-live-coverage-v1-analysis.json", json.dumps(report, indent=2).encode() + b"\n"),
+    ("analyze-combined-live-coverage-v1.py.txt", Path(__file__).read_bytes()),
+):
+    path = target / "local" / name
+    assert not path.exists()
+    path.write_bytes(data)
+    manifest.append(dict(path=str(path.relative_to(target)), bytes=len(data),
+                         sha256=hashlib.sha256(data).hexdigest()))
+manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+print(json.dumps(dict(route_coverage=[{k:v for k,v in x.items() if k != "shaders"} for x in counts],
+                      slow_inputs=[{k:v for k,v in x.items() if k != "interval"} for x in outliers])))

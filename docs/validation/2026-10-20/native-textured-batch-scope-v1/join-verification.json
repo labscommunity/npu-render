@@ -1,0 +1,27 @@
+{
+  "passed": true,
+  "matched_request_identities": 1944,
+  "fields": [
+    "abi",
+    "flags",
+    "width",
+    "height",
+    "vertices",
+    "pixel_sha256"
+  ],
+  "phases": [
+    {
+      "phase": "B1",
+      "verified": 972,
+      "source": "docs/validation/2026-10-20/native-combined-fill-turbo-worker-v1/raw/combined-fill-turbo-comparison-v1/B1/provider-processes/generation-1/worker.stdout.jsonl.gz",
+      "decompressed_sha256": "a4137bcb0ee65f0796feaa2962d1389d456db5858ce6d49b08834b1584afb99d"
+    },
+    {
+      "phase": "B2",
+      "verified": 972,
+      "source": "docs/validation/2026-10-20/native-combined-fill-turbo-worker-v1/raw/combined-fill-turbo-comparison-v1/B2/provider-processes/generation-1/worker.stdout.jsonl.gz",
+      "decompressed_sha256": "dbc28f3da76ba0f203a9348093a249aab26fdae216c20dfedac2512b6f8a04bd"
+    }
+  ],
+  "limitation": "Identity metadata validation; this does not prove batching eligibility."
+}

@@ -1,7 +1,7 @@
 # Full desktop offload: acceptance and execution plan
 
 Updated 2026-10-20. Target: Delta, Windows 11, Panther Lake. The repository stays
-private. **Full desktop offload is unfinished.** The latest
+private. **Full desktop offload is unfinished.** The latest passing
 [turbo renderer v64 trial](../validation/2026-10-20/native-turbo-render-live-v1/README.md)
 passes 1,590 acknowledged NPU operations, 110 exact physical submissions, forty
 controlled inputs, the shared test application and restoration. Warm
@@ -13,6 +13,15 @@ occupies 6,021.628 ms, with 4,004 whole-request provider calls across overlappin
 draws and no backend compilation. This remains far short of normal desktop
 responsiveness; Tahoma and GPU relief are unmeasured. The prior uninstrumented
 worker v24 trial delivered 0.8/s in a separate, unmatched run.
+
+The subsequent [worker31 physical trial](../validation/2026-10-20/native-combined-fill-turbo-live-v1/README.md)
+completes after Delta signs in, with 1,464 acknowledged operations, 111 exact
+submissions and successful restoration. It fails a required texture-route check:
+the relevant shader never appears in this desktop workload. Diagnostic analysis
+finds 0.7 verified animation updates/s, warm input medians around 129 ms and
+p95/maxima above one second. This is not a matched regression attribution;
+worker26 remains the passing baseline. The postmortem does not convert the
+failed qualification into a pass.
 
 Both v56 and the [preceding v55 trial](../validation/2026-10-16/native-repeated-input-live-v1/README.md)
 verify only seven unique animation colors during the ten-second 30 Hz schedule,
@@ -459,8 +468,10 @@ role, and any GPU rendering/copy cost in the bridge must be measured.
    preserves all images and passes both recovery cases, but improves aggregate
    time by only 3.13%. The [combined vector-fill/turbo candidate](../validation/2026-10-20/native-combined-fill-turbo-worker-v1/README.md)
    passes its own comparison with 5.66% less parent time and both 31-image
-   recovery tests. Its physical trial is prepared; Delta's signed-out desktop
-   prevents live qualification at the preparation checkpoint. Individual component gains
+   recovery tests. Its physical trial now completes after sign-in but fails
+   required texture-route coverage, with 0.7 animation updates/s in diagnostic
+   analysis. Preserve the failure and restoration; a reproducible coverage
+   workload is needed before another qualification. Individual component gains
    remain too small to explain a path to 30 fps by themselves; reducing
    submissions and redundant work across whole frames remains necessary.
    The [frame command batching contract](frame-command-batching.md) specifies
@@ -473,9 +484,14 @@ role, and any GPU rendering/copy cost in the bridge must be measured.
    Preserve these attempts. Native client timing now places about 95.6% of
    measured synchronous request time inside parent rendering, including CPU
    orchestration, child transport and NPU waits. This is not hardware utilization.
-   Investigate
-   retained resource versions and ordered batches if whole-surface round trips
-   remain material; preserve map/present ordering and restart recovery.
+   Implement retained resource versions and ordered batches, preserving
+   map/present ordering and restart recovery. The
+   [texture-state scope check](../validation/2026-10-20/native-textured-batch-scope-v1/README.md)
+   places 77.70% of replay child time in requests binding linear filtering or
+   multiple textures. The fast point-rectangle component does not implement
+   that state, and even its simpler candidates lack shader/geometry admission
+   proofs. Target real draw semantics and the dominant filtered paths; component
+   timing alone cannot establish a complete-frame solution.
 4. After responsiveness passes, run the current renderer's thirty-minute soak,
    sleep/wake, secure-desktop and owned-failure recovery. Keep moving/resizing
    windows and broader desktop interaction separate from the simple color fixture.

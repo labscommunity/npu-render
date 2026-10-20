@@ -1,0 +1,182 @@
+{
+  "completed": true,
+  "passed": true,
+  "active_snapshot": false,
+  "events": [
+    {
+      "event": "mouse_received",
+      "source_sequence": 8,
+      "submitted_present_count": 8,
+      "display_matched_by_submitted_counter": true,
+      "input_to_publication_ms": 426.071,
+      "input_to_present_acceptance_ms": 449.5222,
+      "input_to_matching_display_statistics_ms": 450.4029,
+      "publication_to_matching_display_statistics_ms": 24.3319,
+      "input_to_observer_acquisition_started_ms": 544.0666,
+      "input_to_pixel_read_completed_ms": 559.9993,
+      "input_to_observed_desktop_update_ms": 451.2644,
+      "pixel_read_has_desktop_update_timestamp": true,
+      "pixel_read_pointer_update_only": false,
+      "serialized_child_before_publication_ms": 356.7037,
+      "other_before_publication_ms": 69.3673,
+      "by_shader_before_publication": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "overlap_ms": 128.9478,
+          "requests": 2
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "overlap_ms": 227.7559,
+          "requests": 2
+        }
+      },
+      "matching_display_statistics": {
+        "display_observation": true,
+        "source_sequence": 8,
+        "observed_qpc": 78096761663,
+        "submitted_count_status": 0,
+        "submitted_present_count": 8,
+        "statistics_status": 0,
+        "displayed_present_count": 8,
+        "present_refresh_count": 935558,
+        "sync_refresh_count": 935558,
+        "sync_qpc": 78091688575,
+        "media_status": 0,
+        "media_present_count": 8,
+        "media_sync_qpc": 78091688575,
+        "media_composition_mode": 1,
+        "residual_gpu_work_measured": false
+      },
+      "first_matching_pixel_read": {
+        "qpc": 78092625212,
+        "read_completed_qpc": 78092784539,
+        "last_present_qpc": 78091697190,
+        "accumulated_frames": 1,
+        "ownership_verified_before_and_after": true,
+        "points": [
+          {
+            "x": 1222,
+            "y": 166,
+            "owned_presenter_at_point": true,
+            "known_blue": false,
+            "known_green": true,
+            "known_red": false,
+            "owned_bgra_or_zero": [
+              60,
+              180,
+              20,
+              255
+            ]
+          },
+          {
+            "x": 1312,
+            "y": 234,
+            "owned_presenter_at_point": true,
+            "known_blue": false,
+            "known_green": true,
+            "known_red": false,
+            "owned_bgra_or_zero": [
+              60,
+              180,
+              20,
+              255
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "event": "key_received",
+      "source_sequence": 11,
+      "submitted_present_count": 11,
+      "display_matched_by_submitted_counter": true,
+      "input_to_publication_ms": 43.787,
+      "input_to_present_acceptance_ms": 77.6041,
+      "input_to_matching_display_statistics_ms": 86.6257,
+      "publication_to_matching_display_statistics_ms": 42.8387,
+      "input_to_observer_acquisition_started_ms": 143.6821,
+      "input_to_pixel_read_completed_ms": 159.634,
+      "input_to_observed_desktop_update_ms": 87.2372,
+      "pixel_read_has_desktop_update_timestamp": true,
+      "pixel_read_pointer_update_only": false,
+      "serialized_child_before_publication_ms": 13.6698,
+      "other_before_publication_ms": 30.117199999999997,
+      "by_shader_before_publication": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "overlap_ms": 8.4116,
+          "requests": 1
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "overlap_ms": 5.2582,
+          "requests": 1
+        }
+      },
+      "matching_display_statistics": {
+        "display_observation": true,
+        "source_sequence": 11,
+        "observed_qpc": 78110136384,
+        "submitted_count_status": 0,
+        "submitted_present_count": 11,
+        "statistics_status": 0,
+        "displayed_present_count": 11,
+        "present_refresh_count": 935717,
+        "sync_refresh_count": 935717,
+        "sync_qpc": 78105112778,
+        "media_status": 0,
+        "media_present_count": 11,
+        "media_sync_qpc": 78105112778,
+        "media_composition_mode": 0,
+        "residual_gpu_work_measured": false
+      },
+      "first_matching_pixel_read": {
+        "qpc": 78105683342,
+        "read_completed_qpc": 78105842861,
+        "last_present_qpc": 78105118893,
+        "accumulated_frames": 1,
+        "ownership_verified_before_and_after": true,
+        "points": [
+          {
+            "x": 1222,
+            "y": 166,
+            "owned_presenter_at_point": true,
+            "known_blue": false,
+            "known_green": false,
+            "known_red": true,
+            "owned_bgra_or_zero": [
+              80,
+              30,
+              180,
+              255
+            ]
+          },
+          {
+            "x": 1312,
+            "y": 234,
+            "owned_presenter_at_point": true,
+            "known_blue": false,
+            "known_green": false,
+            "known_red": true,
+            "owned_bgra_or_zero": [
+              80,
+              30,
+              180,
+              255
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "full_desktop_offload": false,
+  "tahoma_tested": false,
+  "source_sha256": {
+    "native-latency-v29-analysis\\report.json": "d9dfc6ecefdc222af0a8d36fd0cd59cc76ca2b96f06d0c802bbb7a39a8a5c961",
+    "native-live-v65\\present\\probe.log": "6fd2ee854300e69efae2c0ac8992dfe194fa8667a35d19d02d24c206b81458ee",
+    "native-live-v65\\screen\\probe.log": "2e6eda1f9c266a4f0394b387841d60b8ad3bc7380b365f3e2dca06e47863137b"
+  },
+  "limitations": "Two controlled events, no matched A/B or p95. Presentation statistics and independent pixel reads are distinct observations; neither measures panel photons. Observer acquisition can begin before input while AcquireNextFrame waits. Acquisition begin is not read completion. Child overlap after publication is excluded from attribution to producing that frame. Display statistics do not establish that the independent observer saw the same surface update. A pointer-only duplication update has no desktop-update timestamp; its owned pixel read completion remains a separate upper bound and is never substituted for display-counter timing.",
+  "primary_sources": [
+    "https://learn.microsoft.com/en-us/windows/win32/api/dxgi/nf-dxgi-idxgiswapchain-getlastpresentcount",
+    "https://learn.microsoft.com/en-us/windows/win32/api/dxgi/ns-dxgi-dxgi_frame_statistics",
+    "https://learn.microsoft.com/en-us/windows/win32/api/dxgi1_2/ns-dxgi1_2-dxgi_outdupl_frame_info"
+  ]
+}

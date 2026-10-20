@@ -10,7 +10,7 @@ RGBA composition and an explicit backend switch. The packaged runtime passed
 GPU → NPU → CPU → GPU → NPU switching on Panther Lake. It supports CPU/GPU/NPU through
 its first OpenVINO provider; other providers can implement the same contracts.
 
-**Latest desktop result, October 20:** the [turbo-renderer trial](docs/validation/2026-10-20/native-turbo-render-live-v1/README.md)
+**Latest passing desktop trial, October 20:** the [turbo-renderer trial](docs/validation/2026-10-20/native-turbo-render-live-v1/README.md)
 passes 1,590 acknowledged NPU operations, 110 exact physical submissions, forty
 controlled inputs, the shared default-adapter fixture and restoration. It has no
 provider fault or retry. Responsiveness still fails: nine verified animation
@@ -22,18 +22,26 @@ a Tahoma benefit remain unqualified.
 
 **Latest off-screen progress:** the [combined vector-fill/turbo renderer](docs/validation/2026-10-20/native-combined-fill-turbo-worker-v1/README.md)
 preserves all 3,888 comparison images, lowers aggregate request time by 5.66%,
-and passes both 31-image provider-recovery scenarios. Its
-[physical trial is prepared](docs/validation/2026-10-20/native-combined-fill-turbo-live-prepared-v1/README.md);
-the readiness checkpoint finds Delta signed out after Windows servicing.
+and passes both 31-image provider-recovery scenarios. Its subsequent
+[physical trial](docs/validation/2026-10-20/native-combined-fill-turbo-live-v1/README.md)
+restores Delta but fails required texture-route coverage. Diagnostic animation
+delivers 0.7 verified updates/s; warm input medians are about 129 ms, with
+maximums over one second. Different desktop request mixes prevent a causal
+comparison with the preceding run. Worker26 remains the passing baseline.
 The separate [textured batching prototype](docs/validation/2026-10-20/native-textured-batch-vector-v2/README.md)
 passes 144 NPU fixtures and lowers a matched synthetic 1024×768 four-draw median
 from 30.86 to 14.58 ms. Eight-texture, 32-command snapshot/retry cases also pass,
 including 48 MiB of sources. This component is not integrated into Windows
 resource handling and does not change the physical desktop result above.
+The [recorded-workload scope check](docs/validation/2026-10-20/native-textured-batch-scope-v1/README.md)
+finds 77.70% of worker31 replay child time in requests binding linear filtering
+or multiple textures, beyond that component's current state contract. Real
+shader/geometry admission and broader batching remain necessary.
 
 **October 20 follow-up:** the completed [GPU baseline](docs/validation/2026-10-16/native-physical-gpu-live-v1/README.md)
 reaches 29.9 verified animation updates per second through the same display bridge,
-versus 0.7 on the earlier NPU baseline and 0.9 in the latest trial. Its 550-second presentation and restoration pass, with zero
+versus 0.9 in the latest passing NPU trial and 0.7 in the subsequent failed
+qualification. Its 550-second presentation and restoration pass, with zero
 NPU rendering calls. This points to the NPU rendering path rather than the bridge
 as the animation bottleneck. Tahoma throughput has not been measured in this setup.
 The [host-memory experiment](docs/validation/2026-10-20/native-host-tensor-rejected-v1/README.md)

@@ -1,0 +1,44 @@
+"""Independently join each timed request to the retained metadata inventory."""
+from pathlib import Path
+import gzip
+import hashlib
+import json
+
+root = Path("docs/validation/2026-10-20")
+base = root / "native-combined-fill-turbo-worker-v1/raw/combined-fill-turbo-comparison-v1"
+inventory_path = root / "native-batching-contract-v1/raw/native-request-inventory-v2-results/requests.jsonl"
+inventory = {x["ticket"]: x for x in map(json.loads, inventory_path.read_text().splitlines())}
+comparison = json.loads(gzip.decompress((base / "report.json.gz").read_bytes()))
+fields = ("abi", "flags", "width", "height", "vertices", "pixel_sha256")
+phases = []
+for phase in comparison["phases"]:
+    if phase["phase"] not in ("B1", "B2"):
+        continue
+    source = base / phase["phase"] / "provider-processes/generation-1/worker.stdout.jsonl.gz"
+    raw = gzip.decompress(source.read_bytes())
+    records = [json.loads(line) for line in raw.decode("utf-8-sig").splitlines()
+               if line.startswith("{") and line.endswith("}")]
+    identities = [x for x in records if x.get("kind") == "request_identity"]
+    by_ticket = {x["dispatch_ticket"]: x for x in identities}
+    assert len(identities) == len(by_ticket) == len(phase["requests"]) == 972
+    for request in phase["requests"]:
+        observed = by_ticket[request["dispatch_ticket"]]
+        original = inventory[request["original_ticket"]]
+        assert all(observed[key] == original[key] for key in fields)
+    phases.append(dict(phase=phase["phase"], verified=972, source=str(source),
+                       decompressed_sha256=hashlib.sha256(raw).hexdigest()))
+assert len(phases) == 2
+output = root / "native-textured-batch-scope-v1"
+report = dict(passed=True, matched_request_identities=1944, fields=fields, phases=phases,
+              limitation="Identity metadata validation; this does not prove batching eligibility.")
+manifest_path = output / "artifact-sha256.json"
+manifest = json.loads(manifest_path.read_text())
+for name, data in (
+    ("join-verification.json", json.dumps(report, indent=2).encode() + b"\n"),
+    ("verify-textured-batch-scope-joins-v1.py.txt", Path(__file__).read_bytes()),
+):
+    assert not (output / name).exists()
+    (output / name).write_bytes(data)
+    manifest.append(dict(path=name, bytes=len(data), sha256=hashlib.sha256(data).hexdigest()))
+manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+print(json.dumps(dict(passed=True, matched_request_identities=1944)))

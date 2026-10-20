@@ -230,3 +230,18 @@ the same four NPU submissions. Its larger 32-command window retries take 43.89
 and 47.55 ms, excluding snapshot creation and planning. The first result measures
 vector execution under matched work; the latter are separate diagnostic
 observations. Neither changes the Windows integration boundary above.
+
+The [recorded-workload scope check](../validation/2026-10-20/native-textured-batch-scope-v1/README.md)
+now joins all 972 metadata records to both worker31 replays. Requests binding
+linear filtering or multiple textures account for 77.70% of child request time.
+The simple batch packet does not implement that state. The remaining records
+are not proven eligible either: geometry, shaders, modulation, sampling and
+resource dependencies still need semantic checks. Bound resources may be unused,
+so this conservative metadata screen cannot replace an actual admission proof.
+
+Integrating the point-rectangle component alone therefore cannot be treated as
+the complete frame-batching solution. First establish which real draws it can
+represent; then broaden the execution contract for the dominant filtered and
+multi-texture work, with explicit ordered drains for unsupported batching cases.
+These drains continue through the existing NPU renderer. Preserve exact outputs
+and measure the complete frame path before drawing a performance conclusion.

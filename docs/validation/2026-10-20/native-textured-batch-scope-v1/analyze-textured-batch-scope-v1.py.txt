@@ -1,0 +1,108 @@
+"""Compare bound texture state with the narrow rectangle-batch contract.
+
+This is a metadata screen, not shader/geometry admission or a performance test.
+"""
+from pathlib import Path
+from collections import defaultdict
+import gzip
+import hashlib
+import json
+
+root = Path("docs/validation/2026-10-20")
+inventory_path = root / "native-batching-contract-v1/raw/native-request-inventory-v2-results/requests.jsonl"
+comparison_path = root / "native-combined-fill-turbo-worker-v1/raw/combined-fill-turbo-comparison-v1/report.json.gz"
+inventory_bytes = inventory_path.read_bytes()
+comparison_bytes = gzip.decompress(comparison_path.read_bytes())
+inventory = [json.loads(line) for line in inventory_bytes.decode().splitlines()]
+comparison = json.loads(comparison_bytes)
+assert comparison["completed"] and comparison["passed"]
+assert len(inventory) == 972 and {x["ticket"] for x in inventory} == set(range(972))
+assert all(not x["resource_identity_available"] and not x["npu_executed"] for x in inventory)
+phases = [x for x in comparison["phases"] if x["phase"] in ("B1", "B2")]
+assert {x["phase"] for x in phases} == {"B1", "B2"}
+times = defaultdict(lambda: dict(parent_ms=0.0, child_ms=0.0))
+for phase in phases:
+    assert phase["passed"] and phase["worker_version"] == 31
+    assert len(phase["requests"]) == 972
+    assert {x["original_ticket"] for x in phase["requests"]} == set(range(972))
+    for request in phase["requests"]:
+        for field in ("parent_ms", "child_ms"):
+            times[request["original_ticket"]][field] += request[field]
+
+
+def category(item):
+    resources = item["resources"]
+    if item["clear"]:
+        assert not resources
+        return "clear"
+    if not resources:
+        return "no_bound_texture"
+    if len(resources) > 1:
+        return "multiple_bound_textures"
+    resource = resources[0]
+    if resource["filter"] != 0:
+        return "single_linear_texture"
+    if resource["format"] not in (28, 87):
+        return "single_point_other_format"
+    return "single_point_rgba_or_bgra"
+
+
+groups = {}
+for item in inventory:
+    label = category(item)
+    group = groups.setdefault(label, dict(requests=0, parent_ms=0.0, child_ms=0.0, tickets=[]))
+    group["requests"] += 1
+    group["tickets"].append(item["ticket"])
+    for field in ("parent_ms", "child_ms"):
+        group[field] += times[item["ticket"]][field]
+totals = {field: sum(x[field] for x in groups.values()) for field in ("requests", "parent_ms", "child_ms")}
+for field in ("parent_ms", "child_ms"):
+    assert abs(totals[field] - sum(x[field] for x in phases)) < 0.001
+outside = ("multiple_bound_textures", "single_linear_texture", "single_point_other_format")
+outside_child = sum(groups.get(key, {}).get("child_ms", 0) for key in outside)
+report = dict(
+    completed=True, passed=True, new_npu_work_executed=False, desktop_changed=False,
+    sources={
+        str(inventory_path): hashlib.sha256(inventory_bytes).hexdigest(),
+        str(comparison_path): hashlib.sha256(comparison_bytes).hexdigest(),
+    },
+    worker=31, timing_phases=["B1", "B2"], distinct_replay_requests=972,
+    timed_observations=1944, groups=groups, totals=totals,
+    beyond_current_texture_state_requests=sum(groups.get(key, {}).get("requests", 0) for key in outside),
+    beyond_current_texture_state_child_percent=100 * outside_child / totals["child_ms"],
+    eligible_draws_proven=0,
+    interpretation=(
+        "The current batch packet implements solids or one-to-one point RGBA/BGRA texture "
+        "copies with copy/source-over and channel masks. This conservative metadata screen "
+        "does not prove that any remaining draw is representable. It omits shader evaluation, "
+        "geometry, modulation, UV mapping, clipping, blend details and resource lifetimes. "
+        "Bound resources can be unused; simplifying a draw requires a separate semantic proof. "
+        "Times sum two complete worker31 replays, including child host work and NPU waits. "
+        "They are not independent samples per request, physical frame timings, an estimate "
+        "of batching savings, or evidence of a Tahoma benefit."
+    ),
+    next_gate=(
+        "Join real draw semantics and resource dependencies before selecting batches. "
+        "Filtered and multi-texture shader paths require a broader fused execution contract "
+        "or explicit ordered drains to the existing NPU path."
+    ),
+)
+output = root / "native-textured-batch-scope-v1"
+output.mkdir(exist_ok=False)
+data = json.dumps(report, indent=2).encode() + b"\n"
+(output / "report.json").write_bytes(data)
+source = Path(__file__).read_bytes()
+(output / "analyze-textured-batch-scope-v1.py.txt").write_bytes(source)
+manifest = [
+    dict(path=name, bytes=len(value), sha256=hashlib.sha256(value).hexdigest())
+    for name, value in (
+        ("report.json", data),
+        ("analyze-textured-batch-scope-v1.py.txt", source),
+    )
+]
+(output / "artifact-sha256.json").write_text(json.dumps(manifest, indent=2) + "\n")
+print(json.dumps({
+    "passed": True, "groups": {k: {a: b for a, b in v.items() if a != "tickets"} for k, v in groups.items()},
+    "beyond_current_texture_state_child_percent": report["beyond_current_texture_state_child_percent"],
+    "eligible_draws_proven": 0,
+}))

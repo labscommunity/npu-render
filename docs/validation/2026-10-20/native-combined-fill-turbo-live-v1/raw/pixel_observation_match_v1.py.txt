@@ -1,0 +1,29 @@
+"""Match a unique owned response color using completed read time.
+
+The observer timestamps acquisition before AcquireNextFrame, which may block
+across the input event. The caller must use a color unique to that response
+within the observation interval. A zero update timestamp is never fabricated.
+"""
+
+
+def match_owned_pixel_observation(rows, start, point_matches):
+    candidates = []
+    for row in rows:
+        if row.get('read_completed_qpc', 0) < start:
+            continue
+        points = row.get('points', [])
+        if not row.get('ownership_verified_before_and_after') or len(points) != 2:
+            continue
+        if not all(p.get('owned_presenter_at_point') and point_matches(p) for p in points):
+            continue
+        assert row['qpc'] <= row['read_completed_qpc'], 'Inverted observer interval'
+        update = row['last_present_qpc']
+        assert 0 <= update <= row['read_completed_qpc'], 'Invalid desktop update timestamp'
+        if update:
+            if update < start:
+                continue
+        else:
+            assert row['accumulated_frames'] == 0, 'Invalid pointer-only update'
+        candidates.append(row)
+    assert candidates, 'No completed owned response-color read'
+    return min(candidates, key=lambda row: row['read_completed_qpc'])

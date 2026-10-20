@@ -1,0 +1,75 @@
+"""Prepare a source-pinned desktop trial; retain performance and readiness gates."""
+from pathlib import Path
+import ast,hashlib,json,re,subprocess
+r=Path(__file__).parent
+worker='b4429cb12917acb2cc9534cc97227086f3a24cded8ef10ba572d334571320c3b'
+new=json.loads((r/'ptl-native-worker-v31-source.json').read_text())
+old=json.loads((r/'ptl-native-worker-v19-source.json').read_text())
+changes={
+'native-registration-v53':'native-registration-v54','native-registered-v53':'native-registered-v54','NativeRecovery-v53':'NativeRecovery-v54',
+'native_shared_app_v20':'native_shared_app_v21','native_desktop_bootstrap_v48':'native_desktop_bootstrap_v49',
+'native-desktop-v74':'native-desktop-v75','native-desktop-admission-v74':'native-desktop-admission-v75','NativeDesktopRecovery-v74':'NativeDesktopRecovery-v75',
+'native-live-v64':'native-live-v65','NativeLiveV64':'NativeLiveV65',
+'native-topology-primary-v50':'native-topology-primary-v51',
+'native-topology-v129':'native-topology-v132','native-topology-v130':'native-topology-v133','native-topology-v131':'native-topology-v134',
+'InspectTopology-V129':'InspectTopology-V132','InspectTopology-V130':'InspectTopology-V133','InspectTopology-V131':'InspectTopology-V134',
+'observer131':'observer134','dismiss-native-saver-v39':'dismiss-native-saver-v40','dismiss-v39':'dismiss-v40',
+'ptl-native-live-v28':'ptl-native-live-v29','native-latency-v28-analysis':'native-latency-v29-analysis',
+'native-presentation-v25-analysis':'native-presentation-v26-analysis','native-repeated-input-v11-analysis':'native-repeated-input-v12-analysis',
+'ptl-combined-desktop-v16':'ptl-combined-desktop-v17','analyze-native-latency-v26.py':'analyze-native-latency-v27.py',
+'analyze-native-presentation-v25.py':'analyze-native-presentation-v26.py',
+'native-desktop-admission-v73':'native-desktop-admission-v74','native-registration-v52':'native-registration-v53',
+'ptl-native-worker-v26':'ptl-native-worker-v31','ptl-worker-v26-qualification':'ptl-worker-v31-qualification',
+'6e28d3cf151450ef802a85d0b01b81b36d8e9aa13afbfba1c75bd57a13826bd0':worker,
+'turbo-render-comparison-v2':'combined-fill-turbo-comparison-v1',
+'turbo-render-provider-recovery-v1-qualification':'ptl-worker-v31-qualification',
+'turbo-render-provider-recovery-v1':'combined-fill-turbo-provider-recovery-v1',
+'ptl-six-span-program-compact-v1':'ptl-six-span-program-vector-fill-v1',
+'92e04a6734dc6e70ffed15b67fddba02892c66168aa0d47a6cf4bcc65a6a585d':'00793de192c05fc47f58a7a41a184245ded4df14fd83b58a7a31a514df0121b2'}
+pattern=re.compile('|'.join(re.escape(x) for x in sorted(changes,key=len,reverse=True)))
+def rename(s):return pattern.sub(lambda m:changes[m[0]],s)
+files=[n for n in json.loads((r/'ptl-combined-live-v16-upload.json').read_text()) if not n.endswith('-source.json')]
+for name in files:
+ s=rename((r/name).read_text())
+ if name=='qualify-native-registered-v53.py':
+  a=s.index('expected_changes=');b=s.index("assert report['worker_binary_sha256']",a)
+  expected={n:h for n,h in new.items() if old.get(n)!=h}
+  s=s[:a]+"expected_changes="+repr(expected)+"\n"+r'''compiled=obj(root/'builds/ptl-native-worker-v30/registered-build-report.json')
+assert obj(vm/'ptl-native-worker-v30-full/report.json')['passed']
+assert candidate['linked_libraries']==compiled['linked_libraries']
+provider=obj(root/'builds/ptl-compiled-turbo-v1/build-report-v2.json')
+for name,digest in provider['library_sha256'].items():
+ assert hashlib.sha256((root/'builds/ptl-compiled-turbo-v1/Release'/name).read_bytes()).hexdigest()==digest
+'''+"assert set(candidate['source_sha256'])==set(qualified['source_sha256'])|"+repr(set(new)-set(old))+"\n"+"assert {n:h for n,h in candidate['source_sha256'].items() if h!=qualified['source_sha256'].get(n)}==expected_changes\n"+s[b:]
+ if name=='run-native-live-v64.ps1':
+  needle=' $report.turbo_import_audit_passed=$true;$report.turbo_generations=$turboGenerations\n'
+  assert s.count(needle)==1
+  s=s.replace(needle,needle+r'''
+ $compiledGenerations=@()
+ foreach($log in @(Get-ChildItem "$r\vm\native-desktop-admission-v75\bootstrap\provider-processes\generation-*\worker.stdout.jsonl" -File)){
+  $events=@(Read-Rows $log.FullName|Where-Object compiled_turbo_verified)
+  if(!$events.Count -or @($events|Where-Object {!$_.requested -or !$_.readback -or $_.global_power_policy_changed}).Count){throw 'Compiled turbo property readback absent or invalid'}
+  $compiledGenerations+=@{generation=$log.Directory.Name;verifications=$events.Count}
+ }
+ if(!$compiledGenerations.Count){throw 'No compiled turbo provider generation'}
+ $report.compiled_turbo_import_audit_passed=$true;$report.compiled_turbo_generations=$compiledGenerations
+''')
+ if name=='run-ptl-native-live-v28.ps1':
+  s=s.replace('if(!$q.turbo_import_audit_passed','if(!$q.compiled_turbo_import_audit_passed -or !$q.turbo_import_audit_passed')
+ if name=='run-ptl-combined-desktop-v16.ps1':
+  assert '$comparison.summary.new_parent_ms -ge .95*$comparison.summary.old_parent_ms' in s
+  s=s.replace('paired_turbo_renderer','paired_combined_fill_turbo_renderer')
+ if name.endswith('.py'):ast.parse(s)
+ dest=r/rename(name)
+ if dest==r/name:assert dest.read_text()==s,name
+ else:assert not dest.exists(),dest;dest.write_text(s)
+for previous in ['native-registration-v53-source.json','native-desktop-v74-source.json']:
+ names=[rename(n) for n in json.loads((r/previous).read_text())]
+ (r/rename(previous)).write_text(json.dumps({n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in names},indent=2)+'\n')
+uploads=[rename(n) for n in files]+['native-registration-v54-source.json','native-desktop-v75-source.json']
+assert 'native-registration-v54/qualification/report.json' in (r/'native_shared_app_v21.py').read_text()
+assert 'from native_shared_app_v21 import' in (r/'native_desktop_bootstrap_v49.py').read_text()
+(r/'ptl-combined-live-v17-upload.json').write_text(json.dumps(uploads,indent=2)+'\n')
+p=r/'ptl-combined-fill-turbo-live-v1-source.json';p.write_text(json.dumps({n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in uploads},indent=2)+'\n')
+subprocess.run(['scp','-q',*[str(r/n) for n in uploads],str(p),'delta:AppData/Local/npu-render/vm/'],check=True,timeout=30)
+print(json.dumps(dict(prepared=True,started=False,worker=31,driver_package=19,registration=54,desktop=75,live=65,five_percent_gate_preserved=True)))
