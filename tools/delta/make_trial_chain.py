@@ -54,13 +54,66 @@ def main():
     parser.add_argument("--package", default="native-driver-package-v23")
     parser.add_argument("--version", default="0.0.1323.0")
     parser.add_argument("--frame-blobs", default="frame-blobs-v1\\deploy")
+    parser.add_argument(
+        "--generation",
+        type=int,
+        default=0,
+        help="offset added to every transaction number so a repeated chain gets fresh evidence names",
+    )
+    parser.add_argument(
+        "--capture",
+        action="store_true",
+        help="record every DWM request the worker receives into the admission bootstrap directory",
+    )
     args = parser.parse_args()
     src = args.source
     out = args.output
     out.mkdir(parents=True, exist_ok=True)
     produced = {}
+    g = args.generation
+    # Transaction names of the base chain and their generation-shifted replacements. Longer
+    # tokens first so prefixes such as run-/recover- rename as one unit.
+    renames = sorted(
+        [
+            ("recover-native-registration-v55", f"recover-native-registration-v{55 + g}"),
+            ("qualify-native-registered-v55", f"qualify-native-registered-v{55 + g}"),
+            ("run-native-registration-v55", f"run-native-registration-v{55 + g}"),
+            ("native-registration-v55", f"native-registration-v{55 + g}"),
+            ("NativeRecovery-v55", f"NativeRecovery-v{55 + g}"),
+            ("native-desktop-admission-v76", f"native-desktop-admission-v{76 + g}"),
+            ("recover-native-desktop-v76", f"recover-native-desktop-v{76 + g}"),
+            ("run-native-desktop-v76", f"run-native-desktop-v{76 + g}"),
+            ("NativeDesktopRecovery-v76", f"NativeDesktopRecovery-v{76 + g}"),
+            ("native-desktop-v76", f"native-desktop-v{76 + g}"),
+            ("run-native-live-v66", f"run-native-live-v{66 + g}"),
+            ("native-live-v66", f"native-live-v{66 + g}"),
+            ("NativeLiveV66", f"NativeLiveV{66 + g}"),
+            ("start-native-topology-v135", f"start-native-topology-v{135 + 2 * g}"),
+            ("start-native-topology-v136", f"start-native-topology-v{136 + 2 * g}"),
+            ("native-topology-v135", f"native-topology-v{135 + 2 * g}"),
+            ("native-topology-v136", f"native-topology-v{136 + 2 * g}"),
+            ("InspectTopology-V135", f"InspectTopology-V{135 + 2 * g}"),
+            ("InspectTopology-V136", f"InspectTopology-V{136 + 2 * g}"),
+            ("native-topology-primary-v52", f"native-topology-primary-v{52 + g}"),
+            ("run-ptl-native-live-v30", f"run-ptl-native-live-v{30 + g}"),
+            ("ptl-native-live-v30", f"ptl-native-live-v{30 + g}"),
+            ("native_desktop_bootstrap_v50", f"native_desktop_bootstrap_v{50 + g}"),
+            ("native_shared_app_v22", f"native_shared_app_v{22 + g}"),
+        ],
+        key=lambda pair: -len(pair[0]),
+    )
+
+    def final(text):
+        if not g:
+            return text
+        for n, (old, _) in enumerate(renames):
+            text = text.replace(old, f"\x00{n}\x00")
+        for n, (_, new) in enumerate(renames):
+            text = text.replace(f"\x00{n}\x00", new)
+        return text
 
     def write(name, text):
+        name, text = final(name), final(text)
         (out / name).write_text(text, encoding="utf-8", newline="\n")
         produced[name] = hashlib.sha256(text.encode("utf-8")).hexdigest()
 
@@ -242,6 +295,23 @@ Get-Content "$out\\report.json"
                 "p.add_argument('--texture-scope',choices=('0','1'),default='0')\n",
                 "p.add_argument('--texture-scope',choices=('0','1'),default='0')\np.add_argument('--frame-blob-dir',type=Path,required=True)\n",
             ),
+            # Optional bounded capture of every worker request (private pixels stay on Delta).
+            (
+                "env.pop('NR_RENDER_CAPTURE_DIRECTORY',None);env.pop('NR_RENDER_AFFINE_BATCH',None)\n",
+                (
+                    "capture=out/'requests';capture.mkdir(exist_ok=False);env['NR_RENDER_CAPTURE_DIRECTORY']=str(capture);env.pop('NR_RENDER_AFFINE_BATCH',None)\n"
+                    if args.capture
+                    else "env.pop('NR_RENDER_CAPTURE_DIRECTORY',None);env.pop('NR_RENDER_AFFINE_BATCH',None)\n"
+                ),
+            ),
+            (
+                "request_recording_enabled=False,recording_byte_budget=0,",
+                (
+                    "request_recording_enabled=True,recording_byte_budget=17179869184,"
+                    if args.capture
+                    else "request_recording_enabled=False,recording_byte_budget=0,"
+                ),
+            ),
             (
                 "env['NR_RENDER_INTERACTIVE_PIPE']='1';",
                 "env['NR_RENDER_INTERACTIVE_PIPE']='1';env['NR_RENDER_PTL_FRAME_BLOB_DIR']=str(v.frame_blob_dir);",
@@ -250,8 +320,8 @@ Get-Content "$out\\report.json"
         "bootstrap",
     )
     boot = boot.replace(
-        "report.update(request_recording_enabled=False,",
-        "report.update(frame_blob_dir=str(v.frame_blob_dir),frame_blob_manifest_sha256=hashlib.sha256((v.frame_blob_dir/'manifest.txt').read_bytes()).hexdigest(),request_recording_enabled=False,",
+        "report.update(request_recording_enabled=",
+        "report.update(frame_blob_dir=str(v.frame_blob_dir),frame_blob_manifest_sha256=hashlib.sha256((v.frame_blob_dir/'manifest.txt').read_bytes()).hexdigest(),request_recording_enabled=",
     )
     assert "frame_blob_manifest_sha256" in boot
     write("native_desktop_bootstrap_v50.py", boot)
@@ -358,6 +428,23 @@ Get-Content "$out\\report.json"
         ],
         "live",
     )
+    # The compiled per-route turbo kernels are retired; the six frame kernel blobs are the compiled NPU programs.
+    start = live.index(" $compiledGenerations=@()")
+    end = live.index(
+        " $report.compiled_turbo_import_audit_passed=$true;$report.compiled_turbo_generations=$compiledGenerations"
+    )
+    live = (
+        live[:start]
+        + """ $compiledGenerations=@()
+ foreach($log in @(Get-ChildItem "$r\\vm\\native-desktop-admission-v76\\bootstrap\\provider-processes\\generation-*\\worker.stdout.jsonl" -File)){
+  $events=@(Read-Rows $log.FullName|Where-Object {$_.ptl_turbo_import_verified -and $_.route -eq 'frame'})
+  if($events.Count -ne 6 -or @($events|Where-Object {!$_.requested -or !$_.readback -or $_.global_power_policy_changed}).Count){throw 'Frame kernel blob import readback absent or invalid'}
+  $compiledGenerations+=@{generation=$log.Directory.Name;frame_blob_imports=$events.Count}
+ }
+ if(!$compiledGenerations.Count){throw 'No frame kernel provider generation'}
+"""
+        + live[end:]
+    )
     # Per-route specialization gates assumed every DWM draw took a per-draw route; frame batches replace them with batch evidence.
     start = live.index(" $ptlRows=@(Get-ChildItem")
     end = live.index(" $report.active_phase='freshness-validation';Save-Report")
@@ -411,9 +498,15 @@ Get-Content "$out\\report.json"
         (src / "native-registration-v54-source.json").read_text(encoding="utf-8-sig")
     )
     reg_manifest = {
-        "run-native-registration-v55.ps1": produced["run-native-registration-v55.ps1"],
-        "recover-native-registration-v55.ps1": produced["recover-native-registration-v55.ps1"],
-        "qualify-native-registered-v55.py": produced["qualify-native-registered-v55.py"],
+        final("run-native-registration-v55.ps1"): produced[
+            final("run-native-registration-v55.ps1")
+        ],
+        final("recover-native-registration-v55.ps1"): produced[
+            final("recover-native-registration-v55.ps1")
+        ],
+        final("qualify-native-registered-v55.py"): produced[
+            final("qualify-native-registered-v55.py")
+        ],
         **{
             k: v
             for k, v in reg_sources.items()
@@ -434,7 +527,7 @@ Get-Content "$out\\report.json"
     }
     desk_manifest = {}
     for name, digest in desk_sources.items():
-        new = renamed.get(name)
+        new = final(renamed[name]) if name in renamed else None
         desk_manifest[new or name] = produced[new] if new else digest
     write("native-desktop-v76-source.json", json.dumps(desk_manifest, indent=2) + "\n")
     (out / "chain-manifest.json").write_text(
@@ -444,6 +537,8 @@ Get-Content "$out\\report.json"
                 package=args.package,
                 version=args.version,
                 frame_blobs=args.frame_blobs,
+                generation=g,
+                capture=args.capture,
                 files=produced,
             ),
             indent=2,
