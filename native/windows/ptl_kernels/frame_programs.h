@@ -80,11 +80,14 @@ NR_NOINLINE void nr_row_0(const nr_row *row) {
     nr_v4 r0 = nr_v4_zero();
     nr_v4 r1 = nr_v4_zero();
     nr_v4 r2 = nr_v4_zero();
+    const nr_i32 affine = (iw0 == 1.0f) & (iw1 == 1.0f) & (iw2 == 1.0f);
+    const nr_f32 dpa = (w0 + w1) + w2;
+    const nr_f32 rpa = (dpa > 1e-20f || dpa < -1e-20f) ? 1.0f / dpa : 0.0f;
     (void)st;
     for (px = 0; px < row->count; ++px, pixel += 4, w0 += dw0, w1 += dw1, w2 += dw2) {
         const nr_f32 p0 = w0 * iw0, p1 = w1 * iw1, p2 = w2 * iw2, dp = (p0 + p1) + p2;
         if (!(dp > 1e-20f || dp < -1e-20f)) continue;
-        const nr_f32 rp = 1.0f / dp;
+        const nr_f32 rp = affine ? rpa : 1.0f / dp;
         i1 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(p0), va1), nr_v4_mul(nr_v4_splat(p1), vb1)), nr_v4_mul(nr_v4_splat(p2), vc1)), nr_v4_splat(rp));
         i2 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(p0), va2), nr_v4_mul(nr_v4_splat(p1), vb2)), nr_v4_mul(nr_v4_splat(p2), vc2)), nr_v4_splat(rp));
         i3 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(p0), va3), nr_v4_mul(nr_v4_splat(p1), vb3)), nr_v4_mul(nr_v4_splat(p2), vc3)), nr_v4_splat(rp));
@@ -133,11 +136,14 @@ NR_NOINLINE void nr_row_1(const nr_row *row) {
     const nr_v4 va2 = row->v[0].varying[1], vb2 = row->v[1].varying[1], vc2 = row->v[2].varying[1];
     nr_v4 o0 = nr_v4_zero();
     nr_v4 r0 = nr_v4_zero();
+    const nr_i32 affine = (iw0 == 1.0f) & (iw1 == 1.0f) & (iw2 == 1.0f);
+    const nr_f32 dpa = (w0 + w1) + w2;
+    const nr_f32 rpa = (dpa > 1e-20f || dpa < -1e-20f) ? 1.0f / dpa : 0.0f;
     (void)st;
     for (px = 0; px < row->count; ++px, pixel += 4, w0 += dw0, w1 += dw1, w2 += dw2) {
         const nr_f32 p0 = w0 * iw0, p1 = w1 * iw1, p2 = w2 * iw2, dp = (p0 + p1) + p2;
         if (!(dp > 1e-20f || dp < -1e-20f)) continue;
-        const nr_f32 rp = 1.0f / dp;
+        const nr_f32 rp = affine ? rpa : 1.0f / dp;
         i1 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(p0), va1), nr_v4_mul(nr_v4_splat(p1), vb1)), nr_v4_mul(nr_v4_splat(p2), vc1)), nr_v4_splat(rp));
         i2 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(p0), va2), nr_v4_mul(nr_v4_splat(p1), vb2)), nr_v4_mul(nr_v4_splat(p2), vc2)), nr_v4_splat(rp));
 #ifndef NR_EXP_NO_PS
@@ -172,11 +178,14 @@ NR_NOINLINE void nr_row_2(const nr_row *row) {
     const nr_v4 va2 = row->v[0].varying[1], vb2 = row->v[1].varying[1], vc2 = row->v[2].varying[1];
     nr_v4 o0 = nr_v4_zero();
     nr_v4 r0 = nr_v4_zero();
+    const nr_i32 affine = (iw0 == 1.0f) & (iw1 == 1.0f) & (iw2 == 1.0f);
+    const nr_f32 dpa = (w0 + w1) + w2;
+    const nr_f32 rpa = (dpa > 1e-20f || dpa < -1e-20f) ? 1.0f / dpa : 0.0f;
     (void)st;
     for (px = 0; px < row->count; ++px, pixel += 4, w0 += dw0, w1 += dw1, w2 += dw2) {
         const nr_f32 p0 = w0 * iw0, p1 = w1 * iw1, p2 = w2 * iw2, dp = (p0 + p1) + p2;
         if (!(dp > 1e-20f || dp < -1e-20f)) continue;
-        const nr_f32 rp = 1.0f / dp;
+        const nr_f32 rp = affine ? rpa : 1.0f / dp;
         i1 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(p0), va1), nr_v4_mul(nr_v4_splat(p1), vb1)), nr_v4_mul(nr_v4_splat(p2), vc1)), nr_v4_splat(rp));
         i2 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(p0), va2), nr_v4_mul(nr_v4_splat(p1), vb2)), nr_v4_mul(nr_v4_splat(p2), vc2)), nr_v4_splat(rp));
 #ifndef NR_EXP_NO_PS
@@ -322,11 +331,14 @@ NR_NOINLINE void nr_row_3(const nr_row *row) {
     nr_v4 r7 = nr_v4_zero();
     nr_v4 r8 = nr_v4_zero();
     nr_v4 r9 = nr_v4_zero();
+    const nr_i32 affine = (iw0 == 1.0f) & (iw1 == 1.0f) & (iw2 == 1.0f);
+    const nr_f32 dpa = (w0 + w1) + w2;
+    const nr_f32 rpa = (dpa > 1e-20f || dpa < -1e-20f) ? 1.0f / dpa : 0.0f;
     (void)st;
     for (px = 0; px < row->count; ++px, pixel += 4, w0 += dw0, w1 += dw1, w2 += dw2) {
         const nr_f32 p0 = w0 * iw0, p1 = w1 * iw1, p2 = w2 * iw2, dp = (p0 + p1) + p2;
         if (!(dp > 1e-20f || dp < -1e-20f)) continue;
-        const nr_f32 rp = 1.0f / dp;
+        const nr_f32 rp = affine ? rpa : 1.0f / dp;
         i1 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(p0), va1), nr_v4_mul(nr_v4_splat(p1), vb1)), nr_v4_mul(nr_v4_splat(p2), vc1)), nr_v4_splat(rp));
         i2 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(p0), va2), nr_v4_mul(nr_v4_splat(p1), vb2)), nr_v4_mul(nr_v4_splat(p2), vc2)), nr_v4_splat(rp));
         i3 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(p0), va3), nr_v4_mul(nr_v4_splat(p1), vb3)), nr_v4_mul(nr_v4_splat(p2), vc3)), nr_v4_splat(rp));
@@ -1369,11 +1381,14 @@ NR_NOINLINE void nr_row_4(const nr_row *row) {
     nr_v4 r7 = nr_v4_zero();
     nr_v4 r8 = nr_v4_zero();
     nr_v4 r9 = nr_v4_zero();
+    const nr_i32 affine = (iw0 == 1.0f) & (iw1 == 1.0f) & (iw2 == 1.0f);
+    const nr_f32 dpa = (w0 + w1) + w2;
+    const nr_f32 rpa = (dpa > 1e-20f || dpa < -1e-20f) ? 1.0f / dpa : 0.0f;
     (void)st;
     for (px = 0; px < row->count; ++px, pixel += 4, w0 += dw0, w1 += dw1, w2 += dw2) {
         const nr_f32 p0 = w0 * iw0, p1 = w1 * iw1, p2 = w2 * iw2, dp = (p0 + p1) + p2;
         if (!(dp > 1e-20f || dp < -1e-20f)) continue;
-        const nr_f32 rp = 1.0f / dp;
+        const nr_f32 rp = affine ? rpa : 1.0f / dp;
         i1 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(p0), va1), nr_v4_mul(nr_v4_splat(p1), vb1)), nr_v4_mul(nr_v4_splat(p2), vc1)), nr_v4_splat(rp));
         i2 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(p0), va2), nr_v4_mul(nr_v4_splat(p1), vb2)), nr_v4_mul(nr_v4_splat(p2), vc2)), nr_v4_splat(rp));
         i3 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(p0), va3), nr_v4_mul(nr_v4_splat(p1), vb3)), nr_v4_mul(nr_v4_splat(p2), vc3)), nr_v4_splat(rp));
@@ -2381,11 +2396,11 @@ NR_NOINLINE void nr_row_5(const nr_row *row) {
     nr_v4 i1 = nr_v4_zero();
     const nr_v4 va1 = row->v[0].varying[0], vb1 = row->v[1].varying[0], vc1 = row->v[2].varying[0];
     nr_v4 o0 = nr_v4_zero();
+    const nr_f32 dl = (w0 + w1) + w2;
+    if (!(dl > 1e-20f || dl < -1e-20f)) return;
+    const nr_f32 rl = 1.0f / dl;
     (void)st;
     for (px = 0; px < row->count; ++px, pixel += 4, w0 += dw0, w1 += dw1, w2 += dw2) {
-        const nr_f32 dl = (w0 + w1) + w2;
-        if (!(dl > 1e-20f || dl < -1e-20f)) continue;
-        const nr_f32 rl = 1.0f / dl;
         i1 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(w0), va1), nr_v4_mul(nr_v4_splat(w1), vb1)), nr_v4_mul(nr_v4_splat(w2), vc1)), nr_v4_splat(rl));
 #ifndef NR_EXP_NO_PS
         {
@@ -2416,11 +2431,14 @@ NR_NOINLINE void nr_row_6(const nr_row *row) {
     nr_v4 r0 = nr_v4_zero();
     nr_v4 r1 = nr_v4_zero();
     nr_v4 r2 = nr_v4_zero();
+    const nr_i32 affine = (iw0 == 1.0f) & (iw1 == 1.0f) & (iw2 == 1.0f);
+    const nr_f32 dpa = (w0 + w1) + w2;
+    const nr_f32 rpa = (dpa > 1e-20f || dpa < -1e-20f) ? 1.0f / dpa : 0.0f;
     (void)st;
     for (px = 0; px < row->count; ++px, pixel += 4, w0 += dw0, w1 += dw1, w2 += dw2) {
         const nr_f32 p0 = w0 * iw0, p1 = w1 * iw1, p2 = w2 * iw2, dp = (p0 + p1) + p2;
         if (!(dp > 1e-20f || dp < -1e-20f)) continue;
-        const nr_f32 rp = 1.0f / dp;
+        const nr_f32 rp = affine ? rpa : 1.0f / dp;
         i1 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(p0), va1), nr_v4_mul(nr_v4_splat(p1), vb1)), nr_v4_mul(nr_v4_splat(p2), vc1)), nr_v4_splat(rp));
         i2 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(p0), va2), nr_v4_mul(nr_v4_splat(p1), vb2)), nr_v4_mul(nr_v4_splat(p2), vc2)), nr_v4_splat(rp));
         i3 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(p0), va3), nr_v4_mul(nr_v4_splat(p1), vb3)), nr_v4_mul(nr_v4_splat(p2), vc3)), nr_v4_splat(rp));
@@ -2559,11 +2577,11 @@ NR_NOINLINE void nr_row_7(const nr_row *row) {
     const nr_v4 va2 = row->v[0].varying[1], vb2 = row->v[1].varying[1], vc2 = row->v[2].varying[1];
     nr_v4 o0 = nr_v4_zero();
     nr_v4 r0 = nr_v4_zero();
+    const nr_f32 dl = (w0 + w1) + w2;
+    if (!(dl > 1e-20f || dl < -1e-20f)) return;
+    const nr_f32 rl = 1.0f / dl;
     (void)st;
     for (px = 0; px < row->count; ++px, pixel += 4, w0 += dw0, w1 += dw1, w2 += dw2) {
-        const nr_f32 dl = (w0 + w1) + w2;
-        if (!(dl > 1e-20f || dl < -1e-20f)) continue;
-        const nr_f32 rl = 1.0f / dl;
         i1 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(w0), va1), nr_v4_mul(nr_v4_splat(w1), vb1)), nr_v4_mul(nr_v4_splat(w2), vc1)), nr_v4_splat(rl));
         i2 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(w0), va2), nr_v4_mul(nr_v4_splat(w1), vb2)), nr_v4_mul(nr_v4_splat(w2), vc2)), nr_v4_splat(rl));
 #ifndef NR_EXP_NO_PS
@@ -2605,11 +2623,14 @@ NR_NOINLINE void nr_row_8(const nr_row *row) {
     nr_v4 r3 = nr_v4_zero();
     nr_v4 r4 = nr_v4_zero();
     nr_v4 r5 = nr_v4_zero();
+    const nr_i32 affine = (iw0 == 1.0f) & (iw1 == 1.0f) & (iw2 == 1.0f);
+    const nr_f32 dpa = (w0 + w1) + w2;
+    const nr_f32 rpa = (dpa > 1e-20f || dpa < -1e-20f) ? 1.0f / dpa : 0.0f;
     (void)st;
     for (px = 0; px < row->count; ++px, pixel += 4, w0 += dw0, w1 += dw1, w2 += dw2) {
         const nr_f32 p0 = w0 * iw0, p1 = w1 * iw1, p2 = w2 * iw2, dp = (p0 + p1) + p2;
         if (!(dp > 1e-20f || dp < -1e-20f)) continue;
-        const nr_f32 rp = 1.0f / dp;
+        const nr_f32 rp = affine ? rpa : 1.0f / dp;
         i1 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(p0), va1), nr_v4_mul(nr_v4_splat(p1), vb1)), nr_v4_mul(nr_v4_splat(p2), vc1)), nr_v4_splat(rp));
         i2 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(p0), va2), nr_v4_mul(nr_v4_splat(p1), vb2)), nr_v4_mul(nr_v4_splat(p2), vc2)), nr_v4_splat(rp));
         i3 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(p0), va3), nr_v4_mul(nr_v4_splat(p1), vb3)), nr_v4_mul(nr_v4_splat(p2), vc3)), nr_v4_splat(rp));
@@ -2808,11 +2829,14 @@ NR_NOINLINE void nr_row_9(const nr_row *row) {
     nr_v4 i1 = nr_v4_zero();
     const nr_v4 va1 = row->v[0].varying[0], vb1 = row->v[1].varying[0], vc1 = row->v[2].varying[0];
     nr_v4 o0 = nr_v4_zero();
+    const nr_i32 affine = (iw0 == 1.0f) & (iw1 == 1.0f) & (iw2 == 1.0f);
+    const nr_f32 dpa = (w0 + w1) + w2;
+    const nr_f32 rpa = (dpa > 1e-20f || dpa < -1e-20f) ? 1.0f / dpa : 0.0f;
     (void)st;
     for (px = 0; px < row->count; ++px, pixel += 4, w0 += dw0, w1 += dw1, w2 += dw2) {
         const nr_f32 p0 = w0 * iw0, p1 = w1 * iw1, p2 = w2 * iw2, dp = (p0 + p1) + p2;
         if (!(dp > 1e-20f || dp < -1e-20f)) continue;
-        const nr_f32 rp = 1.0f / dp;
+        const nr_f32 rp = affine ? rpa : 1.0f / dp;
         i1 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(p0), va1), nr_v4_mul(nr_v4_splat(p1), vb1)), nr_v4_mul(nr_v4_splat(p2), vc1)), nr_v4_splat(rp));
 #ifndef NR_EXP_NO_PS
         {
@@ -2838,11 +2862,11 @@ NR_NOINLINE void nr_row_10(const nr_row *row) {
     const nr_v4 va2 = row->v[0].varying[1], vb2 = row->v[1].varying[1], vc2 = row->v[2].varying[1];
     nr_v4 o0 = nr_v4_zero();
     nr_v4 r0 = nr_v4_zero();
+    const nr_f32 dl = (w0 + w1) + w2;
+    if (!(dl > 1e-20f || dl < -1e-20f)) return;
+    const nr_f32 rl = 1.0f / dl;
     (void)st;
     for (px = 0; px < row->count; ++px, pixel += 4, w0 += dw0, w1 += dw1, w2 += dw2) {
-        const nr_f32 dl = (w0 + w1) + w2;
-        if (!(dl > 1e-20f || dl < -1e-20f)) continue;
-        const nr_f32 rl = 1.0f / dl;
         i1 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(w0), va1), nr_v4_mul(nr_v4_splat(w1), vb1)), nr_v4_mul(nr_v4_splat(w2), vc1)), nr_v4_splat(rl));
         i2 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(w0), va2), nr_v4_mul(nr_v4_splat(w1), vb2)), nr_v4_mul(nr_v4_splat(w2), vc2)), nr_v4_splat(rl));
 #ifndef NR_EXP_NO_PS
@@ -2923,11 +2947,14 @@ NR_NOINLINE void nr_row_11(const nr_row *row) {
     nr_v4 r5 = nr_v4_zero();
     nr_v4 r6 = nr_v4_zero();
     nr_v4 r7 = nr_v4_zero();
+    const nr_i32 affine = (iw0 == 1.0f) & (iw1 == 1.0f) & (iw2 == 1.0f);
+    const nr_f32 dpa = (w0 + w1) + w2;
+    const nr_f32 rpa = (dpa > 1e-20f || dpa < -1e-20f) ? 1.0f / dpa : 0.0f;
     (void)st;
     for (px = 0; px < row->count; ++px, pixel += 4, w0 += dw0, w1 += dw1, w2 += dw2) {
         const nr_f32 p0 = w0 * iw0, p1 = w1 * iw1, p2 = w2 * iw2, dp = (p0 + p1) + p2;
         if (!(dp > 1e-20f || dp < -1e-20f)) continue;
-        const nr_f32 rp = 1.0f / dp;
+        const nr_f32 rp = affine ? rpa : 1.0f / dp;
         i2 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(p0), va2), nr_v4_mul(nr_v4_splat(p1), vb2)), nr_v4_mul(nr_v4_splat(p2), vc2)), nr_v4_splat(rp));
 #ifndef NR_EXP_NO_PS
         {
@@ -4455,11 +4482,11 @@ NR_NOINLINE void nr_row_12(const nr_row *row) {
     const nr_v4 va2 = row->v[0].varying[1], vb2 = row->v[1].varying[1], vc2 = row->v[2].varying[1];
     nr_v4 o0 = nr_v4_zero();
     nr_v4 r0 = nr_v4_zero();
+    const nr_f32 dl = (w0 + w1) + w2;
+    if (!(dl > 1e-20f || dl < -1e-20f)) return;
+    const nr_f32 rl = 1.0f / dl;
     (void)st;
     for (px = 0; px < row->count; ++px, pixel += 4, w0 += dw0, w1 += dw1, w2 += dw2) {
-        const nr_f32 dl = (w0 + w1) + w2;
-        if (!(dl > 1e-20f || dl < -1e-20f)) continue;
-        const nr_f32 rl = 1.0f / dl;
         i1 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(w0), va1), nr_v4_mul(nr_v4_splat(w1), vb1)), nr_v4_mul(nr_v4_splat(w2), vc1)), nr_v4_splat(rl));
         i2 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(w0), va2), nr_v4_mul(nr_v4_splat(w1), vb2)), nr_v4_mul(nr_v4_splat(w2), vc2)), nr_v4_splat(rl));
 #ifndef NR_EXP_NO_PS
@@ -4552,11 +4579,11 @@ NR_NOINLINE void nr_row_13(const nr_row *row) {
     nr_v4 i1 = nr_v4_zero();
     const nr_v4 va1 = row->v[0].varying[0], vb1 = row->v[1].varying[0], vc1 = row->v[2].varying[0];
     nr_v4 o0 = nr_v4_zero();
+    const nr_f32 dl = (w0 + w1) + w2;
+    if (!(dl > 1e-20f || dl < -1e-20f)) return;
+    const nr_f32 rl = 1.0f / dl;
     (void)st;
     for (px = 0; px < row->count; ++px, pixel += 4, w0 += dw0, w1 += dw1, w2 += dw2) {
-        const nr_f32 dl = (w0 + w1) + w2;
-        if (!(dl > 1e-20f || dl < -1e-20f)) continue;
-        const nr_f32 rl = 1.0f / dl;
         i1 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(w0), va1), nr_v4_mul(nr_v4_splat(w1), vb1)), nr_v4_mul(nr_v4_splat(w2), vc1)), nr_v4_splat(rl));
 #ifndef NR_EXP_NO_PS
         {
@@ -4944,11 +4971,14 @@ NR_NOINLINE void nr_row_14(const nr_row *row) {
     nr_v4 o0 = nr_v4_zero();
     nr_v4 r0 = nr_v4_zero();
     nr_v4 r1 = nr_v4_zero();
+    const nr_i32 affine = (iw0 == 1.0f) & (iw1 == 1.0f) & (iw2 == 1.0f);
+    const nr_f32 dpa = (w0 + w1) + w2;
+    const nr_f32 rpa = (dpa > 1e-20f || dpa < -1e-20f) ? 1.0f / dpa : 0.0f;
     (void)st;
     for (px = 0; px < row->count; ++px, pixel += 4, w0 += dw0, w1 += dw1, w2 += dw2) {
         const nr_f32 p0 = w0 * iw0, p1 = w1 * iw1, p2 = w2 * iw2, dp = (p0 + p1) + p2;
         if (!(dp > 1e-20f || dp < -1e-20f)) continue;
-        const nr_f32 rp = 1.0f / dp;
+        const nr_f32 rp = affine ? rpa : 1.0f / dp;
         i1 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(p0), va1), nr_v4_mul(nr_v4_splat(p1), vb1)), nr_v4_mul(nr_v4_splat(p2), vc1)), nr_v4_splat(rp));
         i2 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(p0), va2), nr_v4_mul(nr_v4_splat(p1), vb2)), nr_v4_mul(nr_v4_splat(p2), vc2)), nr_v4_splat(rp));
         i3 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(p0), va3), nr_v4_mul(nr_v4_splat(p1), vb3)), nr_v4_mul(nr_v4_splat(p2), vc3)), nr_v4_splat(rp));
@@ -5379,11 +5409,14 @@ NR_NOINLINE void nr_row_15(const nr_row *row) {
     nr_v4 o0 = nr_v4_zero();
     nr_v4 r0 = nr_v4_zero();
     nr_v4 r1 = nr_v4_zero();
+    const nr_i32 affine = (iw0 == 1.0f) & (iw1 == 1.0f) & (iw2 == 1.0f);
+    const nr_f32 dpa = (w0 + w1) + w2;
+    const nr_f32 rpa = (dpa > 1e-20f || dpa < -1e-20f) ? 1.0f / dpa : 0.0f;
     (void)st;
     for (px = 0; px < row->count; ++px, pixel += 4, w0 += dw0, w1 += dw1, w2 += dw2) {
         const nr_f32 p0 = w0 * iw0, p1 = w1 * iw1, p2 = w2 * iw2, dp = (p0 + p1) + p2;
         if (!(dp > 1e-20f || dp < -1e-20f)) continue;
-        const nr_f32 rp = 1.0f / dp;
+        const nr_f32 rp = affine ? rpa : 1.0f / dp;
         i1 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(p0), va1), nr_v4_mul(nr_v4_splat(p1), vb1)), nr_v4_mul(nr_v4_splat(p2), vc1)), nr_v4_splat(rp));
         i2 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(p0), va2), nr_v4_mul(nr_v4_splat(p1), vb2)), nr_v4_mul(nr_v4_splat(p2), vc2)), nr_v4_splat(rp));
         i3 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(p0), va3), nr_v4_mul(nr_v4_splat(p1), vb3)), nr_v4_mul(nr_v4_splat(p2), vc3)), nr_v4_splat(rp));
@@ -5567,11 +5600,14 @@ NR_NOINLINE void nr_row_16(const nr_row *row) {
     const nr_v4 va2 = row->v[0].varying[0], vb2 = row->v[1].varying[0], vc2 = row->v[2].varying[0];
     nr_v4 o0 = nr_v4_zero();
     nr_v4 r0 = nr_v4_zero();
+    const nr_i32 affine = (iw0 == 1.0f) & (iw1 == 1.0f) & (iw2 == 1.0f);
+    const nr_f32 dpa = (w0 + w1) + w2;
+    const nr_f32 rpa = (dpa > 1e-20f || dpa < -1e-20f) ? 1.0f / dpa : 0.0f;
     (void)st;
     for (px = 0; px < row->count; ++px, pixel += 4, w0 += dw0, w1 += dw1, w2 += dw2) {
         const nr_f32 p0 = w0 * iw0, p1 = w1 * iw1, p2 = w2 * iw2, dp = (p0 + p1) + p2;
         if (!(dp > 1e-20f || dp < -1e-20f)) continue;
-        const nr_f32 rp = 1.0f / dp;
+        const nr_f32 rp = affine ? rpa : 1.0f / dp;
         i2 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(p0), va2), nr_v4_mul(nr_v4_splat(p1), vb2)), nr_v4_mul(nr_v4_splat(p2), vc2)), nr_v4_splat(rp));
 #ifndef NR_EXP_NO_PS
         {
@@ -5611,11 +5647,14 @@ NR_NOINLINE void nr_row_17(const nr_row *row) {
     const nr_v4 va2 = row->v[0].varying[0], vb2 = row->v[1].varying[0], vc2 = row->v[2].varying[0];
     nr_v4 o0 = nr_v4_zero();
     nr_v4 r0 = nr_v4_zero();
+    const nr_i32 affine = (iw0 == 1.0f) & (iw1 == 1.0f) & (iw2 == 1.0f);
+    const nr_f32 dpa = (w0 + w1) + w2;
+    const nr_f32 rpa = (dpa > 1e-20f || dpa < -1e-20f) ? 1.0f / dpa : 0.0f;
     (void)st;
     for (px = 0; px < row->count; ++px, pixel += 4, w0 += dw0, w1 += dw1, w2 += dw2) {
         const nr_f32 p0 = w0 * iw0, p1 = w1 * iw1, p2 = w2 * iw2, dp = (p0 + p1) + p2;
         if (!(dp > 1e-20f || dp < -1e-20f)) continue;
-        const nr_f32 rp = 1.0f / dp;
+        const nr_f32 rp = affine ? rpa : 1.0f / dp;
         i2 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(p0), va2), nr_v4_mul(nr_v4_splat(p1), vb2)), nr_v4_mul(nr_v4_splat(p2), vc2)), nr_v4_splat(rp));
 #ifndef NR_EXP_NO_PS
         {
@@ -5648,11 +5687,14 @@ NR_NOINLINE void nr_row_18(const nr_row *row) {
     const nr_v4 va3 = row->v[0].varying[1], vb3 = row->v[1].varying[1], vc3 = row->v[2].varying[1];
     nr_v4 o0 = nr_v4_zero();
     nr_v4 r0 = nr_v4_zero();
+    const nr_i32 affine = (iw0 == 1.0f) & (iw1 == 1.0f) & (iw2 == 1.0f);
+    const nr_f32 dpa = (w0 + w1) + w2;
+    const nr_f32 rpa = (dpa > 1e-20f || dpa < -1e-20f) ? 1.0f / dpa : 0.0f;
     (void)st;
     for (px = 0; px < row->count; ++px, pixel += 4, w0 += dw0, w1 += dw1, w2 += dw2) {
         const nr_f32 p0 = w0 * iw0, p1 = w1 * iw1, p2 = w2 * iw2, dp = (p0 + p1) + p2;
         if (!(dp > 1e-20f || dp < -1e-20f)) continue;
-        const nr_f32 rp = 1.0f / dp;
+        const nr_f32 rp = affine ? rpa : 1.0f / dp;
         i1 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(p0), va1), nr_v4_mul(nr_v4_splat(p1), vb1)), nr_v4_mul(nr_v4_splat(p2), vc1)), nr_v4_splat(rp));
         i3 = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(p0), va3), nr_v4_mul(nr_v4_splat(p1), vb3)), nr_v4_mul(nr_v4_splat(p2), vc3)), nr_v4_splat(rp));
 #ifndef NR_EXP_NO_PS

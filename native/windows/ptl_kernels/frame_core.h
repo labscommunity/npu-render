@@ -361,7 +361,10 @@ NR_SAMPLE_ATTR nr_v4 nr_sample(const nr_command_state *st, nr_u32 texture, nr_u3
     rx0 = rx0 < 0 ? 0 : (rx0 >= (nr_i32)ww ? (nr_i32)ww - 1 : rx0); rx1 = rx1 < 0 ? 0 : (rx1 >= (nr_i32)ww ? (nr_i32)ww - 1 : rx1);
     ry0 = ry0 < 0 ? 0 : (ry0 >= (nr_i32)wh ? (nr_i32)wh - 1 : ry0); ry1 = ry1 < 0 ? 0 : (ry1 >= (nr_i32)wh ? (nr_i32)wh - 1 : ry1);
 #define NR_TAP(rx, ry) nr_v4_mul(nr_uv4_to_f(nr_uv4_and(nr_uv4_shr(nr_uv4_splat(nr_ld(window + ((nr_u32)(ry) * ww + (nr_u32)(rx)) * 4)), shifts), ff)), scale)
-    t0 = NR_TAP(rx0, ry0); t1 = NR_TAP(rx1, ry0); t2 = NR_TAP(rx0, ry1); t3 = NR_TAP(rx1, ry1);
+    t0 = NR_TAP(rx0, ry0);
+    /* Point filtering and texel-aligned blits weight the other three taps by zero: one load. */
+    if (tx == 0.0f && ty == 0.0f) return nr_v4_sel(swap, NR_V4_SWZ(t0, 2, 1, 0, 3), t0);
+    t1 = NR_TAP(rx1, ry0); t2 = NR_TAP(rx0, ry1); t3 = NR_TAP(rx1, ry1);
 #undef NR_TAP
     t0 = nr_v4_sel(swap, NR_V4_SWZ(t0, 2, 1, 0, 3), t0); t1 = nr_v4_sel(swap, NR_V4_SWZ(t1, 2, 1, 0, 3), t1);
     t2 = nr_v4_sel(swap, NR_V4_SWZ(t2, 2, 1, 0, 3), t2); t3 = nr_v4_sel(swap, NR_V4_SWZ(t3, 2, 1, 0, 3), t3);

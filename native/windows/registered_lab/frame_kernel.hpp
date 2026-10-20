@@ -188,7 +188,7 @@ inline LoweredProgram lower(const shader::Program &vs, const shader::Program &ps
 // The SHAVE code window holds a few programs at a time, so the inventory is
 // split into blobs by pixel-stage instruction count. A program's blob and its
 // index inside the blob follow from this rule on both the host and the kernel.
-constexpr std::array<std::pair<uint32_t, uint32_t>, 6> blob_ranges{{{0, 2}, {3, 12}, {13, 64}, {65, 115}, {116, 120}, {121, 100000}}};
+constexpr std::array<std::pair<uint32_t, uint32_t>, 7> blob_ranges{{{0, 1}, {2, 3}, {4, 12}, {13, 64}, {65, 115}, {116, 120}, {121, 100000}}};
 inline uint32_t blob_of(uint32_t ps_instructions) {
     for (uint32_t k = 0; k < blob_ranges.size(); ++k) if (ps_instructions >= blob_ranges[k].first && ps_instructions <= blob_ranges[k].second) return k;
     return UINT32_MAX;
@@ -323,11 +323,12 @@ inline std::string emit_row(const LoweredProgram &p, const std::string &name) {
     s += "    nr_v4 o0 = nr_v4_zero();\n";
     const auto used = used_temps(p.ps_words);
     for (unsigned r = 0; r < 16; ++r) if (used[r]) s += "    nr_v4 r" + std::to_string(r) + " = nr_v4_zero();\n";
+    // The edge weights sum to a row constant, so the linear reciprocal is hoisted; the
+    // perspective reciprocal is hoisted too when every vertex has w = 1 (every 2D draw).
+    if (linear) s += "    const nr_f32 dl = (w0 + w1) + w2;\n    if (!(dl > 1e-20f || dl < -1e-20f)) return;\n    const nr_f32 rl = 1.0f / dl;\n";
+    if (perspective) s += "    const nr_i32 affine = (iw0 == 1.0f) & (iw1 == 1.0f) & (iw2 == 1.0f);\n    const nr_f32 dpa = (w0 + w1) + w2;\n    const nr_f32 rpa = (dpa > 1e-20f || dpa < -1e-20f) ? 1.0f / dpa : 0.0f;\n";
     s += "    (void)st;\n    for (px = 0; px < row->count; ++px, pixel += 4, w0 += dw0, w1 += dw1, w2 += dw2) {\n";
-    if (linear) s += "        const nr_f32 dl = (w0 + w1) + w2;\n        if (!(dl > 1e-20f || dl < -1e-20f)) continue;\n";
-    if (perspective) s += "        const nr_f32 p0 = w0 * iw0, p1 = w1 * iw1, p2 = w2 * iw2, dp = (p0 + p1) + p2;\n        if (!(dp > 1e-20f || dp < -1e-20f)) continue;\n";
-    if (linear) s += "        const nr_f32 rl = 1.0f / dl;\n";
-    if (perspective) s += "        const nr_f32 rp = 1.0f / dp;\n";
+    if (perspective) s += "        const nr_f32 p0 = w0 * iw0, p1 = w1 * iw1, p2 = w2 * iw2, dp = (p0 + p1) + p2;\n        if (!(dp > 1e-20f || dp < -1e-20f)) continue;\n        const nr_f32 rp = affine ? rpa : 1.0f / dp;\n";
     for (const auto &[r, c, mode] : varyings) {
         if (mode == 1) continue;
         const std::string R = std::to_string(r), W0 = mode == 2 ? "p0" : "w0", W1 = mode == 2 ? "p1" : "w1", W2 = mode == 2 ? "p2" : "w2", RC = mode == 2 ? "rp" : "rl";

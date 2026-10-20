@@ -137,7 +137,7 @@ struct FrameBatcher {
                      const std::shared_ptr<const nr::shader::Program> &vs, const std::shared_ptr<const nr::shader::Program> &ps,
                      const nr::shader::VertexConstants &vc, const nr::shader::VertexConstants &pc, nr::raster::BlendMode blend_mode, uint32_t write_mask,
                      nr::raster::CullMode cull, bool front_ccw, const std::array<int32_t, 4> &clip, bool scissored, const nr::raster::Viewport &viewport,
-                     const nr::raster::Color &blend_constant, std::string &reason) {
+                     const nr::raster::Color &blend_constant, uint32_t legacy_abi, uint32_t legacy_flags, std::string &reason) {
         namespace fb = frame_batch_detail::fb;
         const std::string ps_id = " ps=" + frame_batch_detail::short_hex(program_digest(ps));
         if (inputs.size() > 4095) { reason = "vertex count" + ps_id; return false; }
@@ -213,7 +213,7 @@ struct FrameBatcher {
         if (scissored) { for (unsigned k = 0; k < 4; ++k) r.scissor[k] = clip[k]; r.scissor_enabled = 1; }
         r.viewport[0] = viewport.x; r.viewport[1] = viewport.y; r.viewport[2] = viewport.width; r.viewport[3] = viewport.height; r.viewport[4] = viewport.min_depth; r.viewport[5] = viewport.max_depth;
         for (unsigned k = 0; k < 4; ++k) r.blend_constant[k] = blend_constant[k];
-        r.texture_count = uint32_t(ordered.size()); r.legacy_abi = 0; r.legacy_flags = 0;
+        r.texture_count = uint32_t(ordered.size()); r.legacy_abi = legacy_abi; r.legacy_flags = legacy_flags;
         for (size_t t = 0; t < ordered.size(); ++t) {
             fb::TextureBinding b; b.resource = resource_index(ordered[t]->allocation, false); b.filter = point[t] ? 1u : 0u;
             c.bindings.push_back(b);

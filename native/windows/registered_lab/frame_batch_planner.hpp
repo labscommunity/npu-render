@@ -100,56 +100,101 @@ inline std::array<CoordinateSource, NR_FRAME_MAX_TEXTURES> coordinate_sources(co
 // of bit patterns. The (u, v) intervals reaching each sample instruction bound
 // the texels the kernel can touch; an unbounded lane means the whole texture.
 namespace interval {
+// The rectangle an evaluation covers; affine forms take their range over it.
+struct Extent { double x0 = 0, y0 = 0, x1 = 0, y1 = 0; };
+inline Extent &extent() { static thread_local Extent e; return e; }
 struct Val {
     bool known = false;                 // false: no information (any value)
     double lo = 0, hi = 0;              // float interpretation when `known`
     std::vector<uint32_t> set;          // exact 32-bit patterns when small and known (masks, integers)
+    bool affine = false;                // value = c0 + cx * px + cy * py across the extent (pixel centers)
+    double c0 = 0, cx = 0, cy = 0;
     static Val any() { return Val{}; }
     static Val range(double a, double b) { Val v; v.known = std::isfinite(a) && std::isfinite(b); v.lo = std::min(a, b); v.hi = std::max(a, b); return v; }
-    static Val exact(uint32_t bits) { float f; std::memcpy(&f, &bits, 4); Val v; v.known = std::isfinite(f); v.lo = v.hi = f; v.set = {bits}; return v; }
+    static Val exact(uint32_t bits) { float f; std::memcpy(&f, &bits, 4); Val v; v.known = std::isfinite(f); v.lo = v.hi = f; v.set = {bits}; if (v.known) { v.affine = true; v.c0 = f; } return v; }
+    static Val form(double c0, double cx, double cy) {
+        Val v; v.affine = std::isfinite(c0) && std::isfinite(cx) && std::isfinite(cy); if (!v.affine) return v;
+        v.c0 = c0; v.cx = cx; v.cy = cy; const auto &e = extent();
+        const double corners[4]{c0 + cx * e.x0 + cy * e.y0, c0 + cx * e.x1 + cy * e.y0, c0 + cx * e.x0 + cy * e.y1, c0 + cx * e.x1 + cy * e.y1};
+        v.known = true; v.lo = std::min({corners[0], corners[1], corners[2], corners[3]}); v.hi = std::max({corners[0], corners[1], corners[2], corners[3]});
+        if (!std::isfinite(v.lo) || !std::isfinite(v.hi)) return Val{};
+        return v;
+    }
     bool point() const { return known && lo == hi; }
+    bool constant() const { return affine && cx == 0 && cy == 0; }
 };
 inline Val from_set(std::vector<uint32_t> set) {
     if (set.empty() || set.size() > 16) return Val::any();
     std::sort(set.begin(), set.end()); set.erase(std::unique(set.begin(), set.end()), set.end());
     double lo = 1e300, hi = -1e300; bool finite = true;
     for (uint32_t b : set) { float f; std::memcpy(&f, &b, 4); if (!std::isfinite(f)) finite = false; lo = std::min(lo, double(f)); hi = std::max(hi, double(f)); }
-    Val v; v.set = std::move(set); if (finite) { v.known = true; v.lo = lo; v.hi = hi; }
+    Val v; v.set = std::move(set); if (finite) { v.known = true; v.lo = lo; v.hi = hi; if (v.set.size() == 1) { v.affine = true; v.c0 = lo; } }
     return v;
 }
 inline Val hull(const Val &a, const Val &b) {
     if (!a.known || !b.known) return Val::any();
+    if (a.affine && b.affine && a.c0 == b.c0 && a.cx == b.cx && a.cy == b.cy) return a;
     Val v = Val::range(std::min(a.lo, b.lo), std::max(a.hi, b.hi));
     if (!a.set.empty() && !b.set.empty()) { auto s = a.set; s.insert(s.end(), b.set.begin(), b.set.end()); if (s.size() <= 16) { auto f = from_set(s); if (f.known) return f; } }
     return v;
 }
-inline Val neg(const Val &a) { if (!a.known) return a; Val v = Val::range(-a.hi, -a.lo); for (uint32_t b : a.set) v.set.push_back(b ^ 0x80000000u); return v; }
-inline Val abs(const Val &a) {
+inline Val neg(const Val &a) {
     if (!a.known) return a;
-    Val v = a.lo >= 0 ? a : a.hi <= 0 ? Val::range(-a.hi, -a.lo) : Val::range(0, std::max(-a.lo, a.hi));
-    for (uint32_t b : a.set) v.set.push_back(b & 0x7fffffffu);
+    Val v = a.affine ? Val::form(-a.c0, -a.cx, -a.cy) : Val::range(-a.hi, -a.lo);
+    for (uint32_t b : a.set) v.set.push_back(b ^ 0x80000000u);
     return v;
 }
-inline Val add(const Val &a, const Val &b) { if (!a.known || !b.known) return Val::any(); return Val::range(a.lo + b.lo, a.hi + b.hi); }
+inline Val abs(const Val &a) {
+    if (!a.known) return a;
+    Val v = a.lo >= 0 ? a : a.hi <= 0 ? neg(a) : Val::range(0, std::max(-a.lo, a.hi));
+    v.set.clear(); for (uint32_t b : a.set) v.set.push_back(b & 0x7fffffffu);
+    return v;
+}
+inline Val add(const Val &a, const Val &b) {
+    if (!a.known || !b.known) return Val::any();
+    if (a.affine && b.affine) return Val::form(a.c0 + b.c0, a.cx + b.cx, a.cy + b.cy);
+    return Val::range(a.lo + b.lo, a.hi + b.hi);
+}
 inline Val mul(const Val &a, const Val &b) {
     if (!a.known || !b.known) return Val::any();
+    if (a.affine && b.constant()) return Val::form(a.c0 * b.c0, a.cx * b.c0, a.cy * b.c0);
+    if (b.affine && a.constant()) return Val::form(b.c0 * a.c0, b.cx * a.c0, b.cy * a.c0);
     const double c[4]{a.lo * b.lo, a.lo * b.hi, a.hi * b.lo, a.hi * b.hi};
     return Val::range(std::min({c[0], c[1], c[2], c[3]}), std::max({c[0], c[1], c[2], c[3]}));
 }
 inline Val div(const Val &a, const Val &b) {
     if (!a.known || !b.known || (b.lo <= 0 && b.hi >= 0)) return Val::any();
+    if (a.affine && b.constant()) return Val::form(a.c0 / b.c0, a.cx / b.c0, a.cy / b.c0);
     return mul(a, Val::range(1.0 / b.lo, 1.0 / b.hi));
 }
-inline Val vmin(const Val &a, const Val &b) { if (!a.known || !b.known) return Val::any(); return Val::range(std::min(a.lo, b.lo), std::min(a.hi, b.hi)); }
-inline Val vmax(const Val &a, const Val &b) { if (!a.known || !b.known) return Val::any(); return Val::range(std::max(a.lo, b.lo), std::max(a.hi, b.hi)); }
-inline Val floor_(const Val &a) { if (!a.known) return a; return Val::range(std::floor(a.lo), std::floor(a.hi)); }
+inline Val vmin(const Val &a, const Val &b) {
+    if (!a.known || !b.known) return Val::any();
+    if (a.hi <= b.lo) return a; if (b.hi <= a.lo) return b;
+    return Val::range(std::min(a.lo, b.lo), std::min(a.hi, b.hi));
+}
+inline Val vmax(const Val &a, const Val &b) {
+    if (!a.known || !b.known) return Val::any();
+    if (a.lo >= b.hi) return a; if (b.lo >= a.hi) return b;
+    return Val::range(std::max(a.lo, b.lo), std::max(a.hi, b.hi));
+}
+inline Val floor_(const Val &a) {
+    if (!a.known) return a;
+    const double f = std::floor(a.lo);
+    if (std::floor(a.hi) == f) return Val::form(f, 0, 0);
+    return Val::range(f, std::floor(a.hi));
+}
 inline Val frc(const Val &a) {
     if (!a.known) return a;
     const double f = std::floor(a.lo);
     if (std::floor(a.hi) != f) return Val::range(0, 1);
+    if (a.affine) return Val::form(a.c0 - f, a.cx, a.cy);
     return Val::range(a.lo - f, a.hi - f);
 }
-inline Val saturate(const Val &a) { if (!a.known) return Val::range(0, 1); return Val::range(std::min(1.0, std::max(0.0, a.lo)), std::min(1.0, std::max(0.0, a.hi))); }
+inline Val saturate(const Val &a) {
+    if (!a.known) return Val::range(0, 1);
+    if (a.lo >= 0 && a.hi <= 1) return a;
+    return Val::range(std::min(1.0, std::max(0.0, a.lo)), std::min(1.0, std::max(0.0, a.hi)));
+}
 // Comparisons yield the SM4 masks 0 / 0xffffffff.
 inline Val compare(const Val &a, const Val &b, uint32_t op) {
     if (!a.known || !b.known) return from_set({0u, 0xffffffffu});
@@ -273,23 +318,26 @@ inline std::array<interval::Lanes, 8> varying_intervals(const LoweredProgram &pr
     const float det = (x[1] - x[0]) * (y[2] - y[0]) - (x[2] - x[0]) * (y[1] - y[0]);
     const bool planar = v[0]->inverse_w == 1.0f && v[1]->inverse_w == 1.0f && v[2]->inverse_w == 1.0f && std::fabs(det) > 1e-12f;
     const float cx[2]{float(rect.x0) + 0.5f, float(rect.x1) - 0.5f}, cy[2]{float(rect.y0) + 0.5f, float(rect.y1) - 0.5f};
+    interval::extent() = {cx[0], cy[0], cx[1], cy[1]};
     for (unsigned r = 0, k = 0; r < 8; ++r) {
         if (!(program.ps_inputs & (1u << r))) continue;
         const uint32_t mode = (program.interpolation >> (r * 4)) & 15u;
         for (unsigned c = 0; c < 4; ++c) {
             const float q[3]{NR_V4_LANE(v[0]->varying[k], c), NR_V4_LANE(v[1]->varying[k], c), NR_V4_LANE(v[2]->varying[k], c)};
             if (!std::isfinite(q[0]) || !std::isfinite(q[1]) || !std::isfinite(q[2])) continue;
-            if (mode == 1) { inputs[r][c] = interval::Val::range(q[0], q[0]); continue; }
-            double lo = std::min({q[0], q[1], q[2]}), hi = std::max({q[0], q[1], q[2]});
+            if (mode == 1) { inputs[r][c] = interval::Val::form(q[0], 0, 0); continue; }
             if (planar) {
+                // The varying is a plane over the triangle: an affine form in the pixel
+                // position, widened by the interpolation drift guard.
                 const double a = ((q[1] - q[0]) * (y[2] - y[0]) - (q[2] - q[0]) * (y[1] - y[0])) / det, b = ((x[1] - x[0]) * (q[2] - q[0]) - (x[2] - x[0]) * (q[1] - q[0])) / det;
-                lo = 1e300; hi = -1e300;
-                for (float px : cx) for (float py : cy) { const double s = q[0] + a * (px - x[0]) + b * (py - y[0]); lo = std::min(lo, s); hi = std::max(hi, s); }
-                // Interpolation drift guard, then the vertex hull keeps the bound honest.
-                const double margin = 1e-5 * (1.0 + std::fabs(hi - lo)); lo -= margin; hi += margin;
-                lo = std::max(lo, double(std::min({q[0], q[1], q[2]})) - margin); hi = std::min(hi, double(std::max({q[0], q[1], q[2]})) + margin);
+                auto form = interval::Val::form(q[0] - a * x[0] - b * y[0], a, b);
+                if (form.known) {
+                    const double margin = 1e-5 * (1.0 + std::fabs(form.hi - form.lo));
+                    form.lo -= margin; form.hi += margin;
+                    inputs[r][c] = form; continue;
+                }
             }
-            inputs[r][c] = interval::Val::range(lo, hi);
+            inputs[r][c] = interval::Val::range(std::min({q[0], q[1], q[2]}), std::max({q[0], q[1], q[2]}));
         }
         ++k;
     }

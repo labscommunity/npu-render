@@ -307,7 +307,7 @@ def main():
                     legacy = bool(entry.get("legacy"))
                     packet_path = (args.capture if legacy else args.batches) / entry["file"]
                     packet = packet_path.read_bytes()
-                    if legacy:
+                    if legacy or entry.get("recorded"):
                         image, width, height = None, 0, 0
                     else:
                         image, width, height = background_of(packet)

@@ -135,8 +135,44 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
         // flushed so the per-draw route below sees current target pixels.
         if (!d.batcher) d.batcher = std::make_shared<FrameBatcher>(d);
         const nr::raster::Viewport batch_viewport{d.viewport.TopLeftX, d.viewport.TopLeftY, d.viewport.Width, d.viewport.Height, d.viewport.MinDepth, d.viewport.MaxDepth};
+        // The per-draw route this draw would take, so the worker can still run it
+        // through the qualified per-draw pipeline if a batch command cannot execute.
+        // Mirrors the selection of the per-draw path below for clamp-sampled draws.
+        const auto legacy_route = [&]() -> std::pair<uint32_t, uint32_t> {
+            bool resources = nr::shader::quad_derivatives(*d.pixel_program);
+            for (unsigned slot = 0; slot < 16; ++slot) resources = resources ||
+                (d.pixel_program->textures[slot] && (slot || d.pixel_program->texture_dimensions[slot] != 3 || d.pixel_program->texture_uint[slot])) ||
+                (slot && d.pixel_program->samplers[slot]);
+            for (const auto &instruction : d.pixel_program->instructions) resources = resources || instruction.opcode == nr::shader::Opcode::load;
+            bool lin = false, mod = false, general = false;
+            if (textured && !resources) {
+                const auto source = d.bound_source; const auto &sampler = d.samplers[2][0];
+                lin = sampler.bound && single_mip_linear_filter(UINT(sampler.desc.Filter));
+                const bool source_smaller = source && (source->surface.width < s.width || source->surface.height < s.height);
+                mod = lin || d.pixel_program->instructions.size() == 2 || blend || clip != full || source_smaller;
+                general = general_blend || count != 6 || cull != nr::raster::CullMode::none || d.blend.RenderTargetWriteMask[0] != 15;
+                if (!general) {
+                    try {
+                        if (mod) nr::raster::LinearTextureDrawExecutor::validate_shader(*d.pixel_program);
+                        else nr::raster::PointTextureDrawExecutor::validate_shader(*d.pixel_program);
+                    } catch (const std::invalid_argument &) { general = true; }
+                }
+            }
+            uint32_t abi = 1, flags = (UINT(d.blend.RenderTargetWriteMask[0]) << 8) | UINT(blend);
+            if (textured && !resources) { abi = 2; flags |= 2; }
+            if (clip != full) { abi = 3; flags |= 4; }
+            if (mod) { abi = lin ? 4 : 5; flags |= lin ? 8 : 16; }
+            if (cull != nr::raster::CullMode::none) { abi = 6; flags |= (UINT(cull) << 5) | (front_ccw ? 128u : 0u); }
+            if (general) { abi = 7; flags |= 0x1000 | (lin ? 8u : 16u); }
+            if (resources) { abi = 8; flags |= 0x2002; }
+            if (destination_in) { abi = 9; flags |= 0x4000; }
+            if (destination_out) { abi = 10; flags |= 0x8000; }
+            if (nr::raster::extended_blend(blend_mode)) { abi = 11; flags |= 0x10000 | (uint32_t(blend_mode) << 17); }
+            if (blend_mode == nr::raster::BlendMode::component_coverage) abi = 15;
+            return {abi, flags};
+        }();
         std::string reason;
-        if (d.batcher->record_draw(target, inputs, d.vertex_program, d.pixel_program, vc, pc, blend_mode, d.blend.RenderTargetWriteMask[0], cull, front_ccw, clip, clip != full, batch_viewport, blend_constant, reason)) {
+        if (d.batcher->record_draw(target, inputs, d.vertex_program, d.pixel_program, vc, pc, blend_mode, d.blend.RenderTargetWriteMask[0], cull, front_ccw, clip, clip != full, batch_viewport, blend_constant, legacy_route.first, legacy_route.second, reason)) {
             ++counters.executions; ++counters.remote_npu_executions; ++counters.draws;
             lab_trace("{\"event\":\"%s\",\"vertices\":%u,\"textured\":%s,\"batched\":true,\"execution_device\":\"NPU (frame batch)\",\"wall_ms\":%llu}\n",
                 indexed ? "indexed_draw_recorded" : "draw_recorded", count, textured ? "true" : "false", static_cast<unsigned long long>(GetTickCount64() - started));

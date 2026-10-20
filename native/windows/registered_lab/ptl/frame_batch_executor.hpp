@@ -214,18 +214,6 @@ public:
         if (missing.empty()) {
             // Plan every draw, then execute runs in order.
             for (auto &d : draws) if (d.record.kind == 0) plan(d, batch_shaders, refs);
-            // One row per batch naming every command: which shader, how much of the target it
-            // covers, which blob and tile serve it, or why it takes the per-draw route.
-            std::string listing;
-            for (const auto &d : draws) {
-                if (!listing.empty()) listing += ",";
-                if (d.record.kind == 1) { listing += "{\"clear\":true}"; continue; }
-                const auto &b = d.scissor_bounds; char item[256];
-                std::snprintf(item, sizeof item, "{\"ps\":\"%.8s\",\"bounds\":[%d,%d,%d,%d],\"textures\":%u,\"tile\":%u,\"blob\":%u,\"route\":\"%s\"}",
-                              batch_shaders[d.record.pixel_shader].sha.c_str(), b.x0, b.y0, b.x1, b.y1, d.record.texture_count, d.eligible ? d.tile : 0u, d.eligible ? d.blob : 0u, d.eligible ? "kernel" : d.route.c_str());
-                listing += item;
-            }
-            std::printf("{\"frame_batch_commands\":true,\"sequence\":%u,\"commands\":[%s]}\n", header.sequence, listing.c_str()); std::fflush(stdout);
             std::vector<size_t> run; size_t run_target = SIZE_MAX; uint32_t run_blob = UINT32_MAX;
             auto flush = [&] { if (!run.empty()) execute_run(draws, run, refs, dirty, stats); run.clear(); run_target = SIZE_MAX; run_blob = UINT32_MAX; };
             for (size_t n = 0; n < draws.size(); ++n) {
@@ -240,6 +228,18 @@ public:
                 run_target = d.record.target; run_blob = d.blob; run.push_back(n);
             }
             flush();
+            // One row per batch naming every command: which shader, how much of the target it
+            // covers, which blob and tile serve it, or why it takes the per-draw route.
+            std::string listing;
+            for (const auto &d : draws) {
+                if (!listing.empty()) listing += ",";
+                if (d.record.kind == 1) { listing += "{\"clear\":true}"; continue; }
+                const auto &b = d.scissor_bounds; char item[256];
+                std::snprintf(item, sizeof item, "{\"ps\":\"%.8s\",\"bounds\":[%d,%d,%d,%d],\"textures\":%u,\"tile\":%u,\"blob\":%u,\"route\":\"%s\"}",
+                              batch_shaders[d.record.pixel_shader].sha.c_str(), b.x0, b.y0, b.x1, b.y1, d.record.texture_count, d.eligible ? d.tile : 0u, d.eligible ? d.blob : 0u, d.eligible ? "kernel" : d.route.c_str());
+                listing += item;
+            }
+            std::printf("{\"frame_batch_commands\":true,\"sequence\":%u,\"commands\":[%s]}\n", header.sequence, listing.c_str()); std::fflush(stdout);
         }
         stats.host_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
         // Reply.
