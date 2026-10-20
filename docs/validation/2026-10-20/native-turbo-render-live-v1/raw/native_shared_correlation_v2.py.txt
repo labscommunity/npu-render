@@ -1,0 +1,73 @@
+"""Join successful shared-client work to the particular NPU child generation."""
+from native_shared_correlation_v1 import complete_rows, indexed
+
+
+def correlate(parent, children, client, worker):
+    pi, pr, pt, pa = indexed(parent)
+    starts, responses, failures = {}, {}, {}
+    for event in parent:
+        if event.get("provider_process_started"):
+            generation = event["generation"]
+            assert generation not in starts and event["execution_device"] == "NPU"
+            assert event["kill_on_owner_exit"]
+            starts[generation] = event
+        if event.get("provider_process_response"):
+            ticket = event["dispatch_ticket"]
+            assert ticket not in responses and event["execution_device"] == "NPU"
+            responses[ticket] = event
+        if event.get("provider_process_failure"):
+            failures.setdefault(event["dispatch_ticket"], []).append(event)
+    assert sorted(starts) == list(range(1, len(starts) + 1)) and 1 <= len(starts) <= 4
+    assert set(children) == set(starts)
+    indices = {generation: indexed(events) for generation, events in children.items()}
+    chosen = {ticket: value for ticket, value in pi.items() if value["client_pid"] == client}
+    assert len(chosen) == 8 and {x["sequence"] for x in chosen.values()} == set(range(1, 9))
+    checks, used = [], set()
+    for ticket, identity in chosen.items():
+        response = responses[ticket]
+        generation = response["generation"]
+        assert generation in starts and response["attempt"] in (0, 1)
+        prior = failures.get(ticket, [])
+        if response["attempt"]:
+            assert len(prior) == 1 and prior[0]["generation"] == generation - 1
+            assert prior[0]["retry_on_npu"] and prior[0]["fallback_backend"] == "none"
+        else:
+            assert not prior
+        ci, cr, ct, ca = indices[generation]
+        a = pt[ticket]
+        candidates = []
+        for child_ticket, target in ci.items():
+            if child_ticket not in cr or child_ticket not in ct or child_ticket not in ca:
+                continue
+            b = ct[child_ticket]
+            if (target["client_pid"] == worker and target["sequence"] == identity["sequence"]
+                    and a["qpc_frequency"] == b["qpc_frequency"]
+                    and a["entered_qpc"] <= b["connected_qpc"]
+                    <= b["finished_qpc"] <= a["finished_qpc"]):
+                candidates.append(child_ticket)
+        assert len(candidates) == 1, (ticket, generation, candidates)
+        child_ticket = candidates[0]
+        assert (generation, child_ticket) not in used
+        used.add((generation, child_ticket))
+        target, b = ci[child_ticket], ct[child_ticket]
+        assert identity["provider_parent"] and not target["provider_parent"]
+        assert identity["pid"] == target["client_pid"] == worker
+        assert target["pid"] == starts[generation]["pid"]
+        assert all(identity[n] == target[n] for n in
+                   ("sequence", "abi", "flags", "width", "height", "vertices", "pixel_sha256"))
+        for data, who in ((pr[ticket], client), (pa[ticket], client),
+                          (cr[child_ticket], worker), (ca[child_ticket], worker)):
+            assert data["client_pid"] == who and data["sequence"] == identity["sequence"]
+        assert pr[ticket]["execution_device"] == cr[child_ticket]["execution_device"] == "NPU"
+        assert a["pid"] == worker and b["pid"] == starts[generation]["pid"]
+        assert a["client_pid"] == client and b["client_pid"] == worker
+        assert a["sequence"] == b["sequence"] == identity["sequence"]
+        assert pa[ticket]["worker_success"] and ca[child_ticket]["worker_success"]
+        checks.append(dict(ticket=ticket, generation=generation, child_ticket=child_ticket,
+                           application_sequence=identity["sequence"],
+                           child_sequence=target["sequence"], pixel_sha256=identity["pixel_sha256"],
+                           retry_attempt=response["attempt"]))
+    return dict(passed=True, operations=len(checks), provider_generations=len(starts),
+                checks=checks, correlation="Explicit parent response generation, child process identity, "
+                "preserved client-local sequence, full shader/operation identity, successful receipts, "
+                "acknowledgments and unique nested QPC interval. Child ticket numbering may restart.")

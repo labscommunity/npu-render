@@ -1,0 +1,248 @@
+{
+  "completed": true,
+  "passed": true,
+  "active_snapshot": false,
+  "final_trial_qualification": false,
+  "qpc_frequency": 10000000,
+  "serial_intervals_verified": true,
+  "controlled_events": [
+    {
+      "event": "mouse_received",
+      "color": "green",
+      "input_qpc": 7003801844875,
+      "observed_qpc": 7003803023092,
+      "observer_acquisition_started_qpc": 7003802861918,
+      "response_ms": 117.8217,
+      "serialized_child_busy_ms": 14.775500000000001,
+      "child_busy_fraction": 0.1254055916694463,
+      "remaining_ms": 103.0462,
+      "draw_count": 2,
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 9.1792,
+          "whole_request_provider_calls": 7,
+          "whole_request_backend_compile_ms": 0.0
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 5.5963,
+          "whole_request_provider_calls": 3,
+          "whole_request_backend_compile_ms": 0.0
+        }
+      },
+      "overlapping_draws": [
+        {
+          "ticket": 479,
+          "sequence": 480,
+          "pixel_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "width": 1024,
+          "height": 768,
+          "vertices": 6,
+          "entered_qpc": 7003801959811,
+          "finished_qpc": 7003802051603,
+          "overlap_ms": 9.1792,
+          "whole_request_ms": 9.1792,
+          "backend_compile_ms": 0.0,
+          "provider_calls": 7,
+          "draw_ms": 7.536
+        },
+        {
+          "ticket": 480,
+          "sequence": 481,
+          "pixel_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "width": 1024,
+          "height": 768,
+          "vertices": 6,
+          "entered_qpc": 7003802167901,
+          "finished_qpc": 7003802223864,
+          "overlap_ms": 5.5963,
+          "whole_request_ms": 5.5963,
+          "backend_compile_ms": 0.0,
+          "provider_calls": 3,
+          "draw_ms": 4.219
+        }
+      ],
+      "first_matching_publication": {
+        "sequence": 8,
+        "qpc": 7003802317745,
+        "producer_pid": 19764,
+        "width": 1024,
+        "height": 768,
+        "format": 87,
+        "pixel_bytes": 3145728,
+        "pixel_sha256": "ee73b1bcf808cb9dff32fd7bd1cccf59e2b6254ce2cb64827e392ca3c219993e",
+        "packet_sha256": "fb8ee2ff70f54204a58a4d3d7bcaa22de91da80be8fddeccd86ce4eb24db2007",
+        "observed": "2026-10-20T10:27:49.923853+00:00",
+        "npu_receipts_observed": 476,
+        "known_stimulus_pixel": [
+          60,
+          180,
+          20,
+          255
+        ]
+      },
+      "first_matching_submission": {
+        "live_frame_presented": true,
+        "source_sequence": 8,
+        "source_qpc": 7003802317745,
+        "producer_pid": 19764,
+        "submitted_qpc": 7003802598408,
+        "accepted_qpc": 7003802601788,
+        "qpc_frequency": 10000000,
+        "backbuffer_exact": true,
+        "pixel_bytes": 3145728,
+        "scanout_mode_verified": false
+      },
+      "serialized_parent_breakdown": {
+        "parent_pre_child_ms": 3.8164999999999996,
+        "child_packet_read_ms": 2.814,
+        "child_pre_execution_ms": 0.0159,
+        "child_execution_ms": 14.775500000000001,
+        "parent_post_child_ms": 3.9181
+      },
+      "outside_serialized_parent_ms": 92.4817,
+      "input_to_publication_ms": 47.287,
+      "publication_to_observation_ms": 70.5347
+    },
+    {
+      "event": "key_received",
+      "color": "red",
+      "input_qpc": 7003817734044,
+      "observed_qpc": 7003819940602,
+      "observer_acquisition_started_qpc": 7003819775906,
+      "response_ms": 220.6558,
+      "serialized_child_busy_ms": 32.4202,
+      "child_busy_fraction": 0.1469265707042371,
+      "remaining_ms": 188.2356,
+      "draw_count": 4,
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 2,
+          "overlap_ms": 20.508499999999998,
+          "whole_request_provider_calls": 14,
+          "whole_request_backend_compile_ms": 0.0
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 2,
+          "overlap_ms": 11.9117,
+          "whole_request_provider_calls": 6,
+          "whole_request_backend_compile_ms": 0.0
+        }
+      },
+      "overlapping_draws": [
+        {
+          "ticket": 481,
+          "sequence": 482,
+          "pixel_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "width": 1024,
+          "height": 768,
+          "vertices": 6,
+          "entered_qpc": 7003817836353,
+          "finished_qpc": 7003817936805,
+          "overlap_ms": 10.0452,
+          "whole_request_ms": 10.0452,
+          "backend_compile_ms": 0.0,
+          "provider_calls": 7,
+          "draw_ms": 8.492
+        },
+        {
+          "ticket": 482,
+          "sequence": 483,
+          "pixel_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "width": 1024,
+          "height": 768,
+          "vertices": 6,
+          "entered_qpc": 7003818053444,
+          "finished_qpc": 7003818113209,
+          "overlap_ms": 5.9765,
+          "whole_request_ms": 5.9765,
+          "backend_compile_ms": 0.0,
+          "provider_calls": 3,
+          "draw_ms": 4.42
+        },
+        {
+          "ticket": 483,
+          "sequence": 484,
+          "pixel_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+          "width": 1024,
+          "height": 768,
+          "vertices": 6,
+          "entered_qpc": 7003818450527,
+          "finished_qpc": 7003818555160,
+          "overlap_ms": 10.4633,
+          "whole_request_ms": 10.4633,
+          "backend_compile_ms": 0.0,
+          "provider_calls": 7,
+          "draw_ms": 8.918
+        },
+        {
+          "ticket": 484,
+          "sequence": 485,
+          "pixel_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+          "width": 1024,
+          "height": 768,
+          "vertices": 6,
+          "entered_qpc": 7003818665637,
+          "finished_qpc": 7003818724989,
+          "overlap_ms": 5.9352,
+          "whole_request_ms": 5.9352,
+          "backend_compile_ms": 0.0,
+          "provider_calls": 3,
+          "draw_ms": 4.445
+        }
+      ],
+      "first_matching_publication": {
+        "sequence": 9,
+        "qpc": 7003818174956,
+        "producer_pid": 19764,
+        "width": 1024,
+        "height": 768,
+        "format": 87,
+        "pixel_bytes": 3145728,
+        "pixel_sha256": "9c8040e276bfbe62ee3a4cb05e1fb720650d9c8681ae94b1cef3fa34eeebbdf9",
+        "packet_sha256": "e32f5f7b74a1c406993bed2a5e2434e71de8e8f5ff181d75f35f72d8345cb025",
+        "observed": "2026-10-20T10:27:51.518513+00:00",
+        "npu_receipts_observed": 481,
+        "known_stimulus_pixel": [
+          80,
+          30,
+          180,
+          255
+        ]
+      },
+      "first_matching_submission": {
+        "live_frame_presented": true,
+        "source_sequence": 9,
+        "source_qpc": 7003818174956,
+        "producer_pid": 19764,
+        "submitted_qpc": 7003818460689,
+        "accepted_qpc": 7003818469411,
+        "qpc_frequency": 10000000,
+        "backbuffer_exact": true,
+        "pixel_bytes": 3145728,
+        "scanout_mode_verified": false
+      },
+      "serialized_parent_breakdown": {
+        "parent_pre_child_ms": 6.9709,
+        "child_packet_read_ms": 6.4023,
+        "child_pre_execution_ms": 0.033800000000000004,
+        "child_execution_ms": 32.4202,
+        "parent_post_child_ms": 6.5503
+      },
+      "outside_serialized_parent_ms": 168.2783,
+      "input_to_publication_ms": 44.0912,
+      "publication_to_observation_ms": 176.5646
+    }
+  ],
+  "source_sha256": {
+    "native-live-v64/relay/frames.jsonl": "3376317684566596471b9316d4b647d8e9a3411cd4178e7826e2a893ba1c10e8",
+    "native-live-v64/stimulus/probe.log": "af23296079766b9052b65cf7b339121376ba12b6c6304a7daddcf922d66eaa6c",
+    "native-live-v64/screen/probe.log": "81d9944dae9b95715b61caccee79c73622f39ea12f7f3c2e1c3e7c180621d755",
+    "native-live-v64/present/probe.log": "dfa83d92bad3252a866cab1b53dd99e84b12c633e73271f8fe4dede0f4b88b52",
+    "native-desktop-admission-v74/bootstrap/frames.jsonl": "9ef10a2ed1481bfff36ad2751ed3e45dd5f3a053edd92390e12e9194ed88fc8c",
+    "native-desktop-admission-v74/bootstrap/worker.stdout.jsonl": "2717c731ae92f60e2e8455013f3f2112c7eff096735f9aea1ca6950fd06628c6",
+    "native-desktop-admission-v74/bootstrap/provider-processes/generation-1/worker.stdout.jsonl": "7c3ff6e8dc1f3d669014c18483596732458a86757bd28ad3d062a6919b35fc31"
+  },
+  "limitation": "Two controlled events, not p95 or matched A/B. Child intervals include CPU orchestration and NPU waits; they are not NPU hardware utilization. Partial interval whole-request compilation/call counts are context, not apportioned overlap. Physical observation uses completed reads, including acquisitions that started before the input; sampling cadence remains included. No panel photon timing."
+}

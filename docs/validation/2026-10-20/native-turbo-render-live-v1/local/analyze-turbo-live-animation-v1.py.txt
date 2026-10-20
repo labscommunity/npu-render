@@ -1,0 +1,46 @@
+"""Analyze the retained ten-second turbo desktop interval without new device work."""
+from pathlib import Path
+import gzip
+import hashlib
+import importlib.util
+import json
+
+r = Path(__file__).parent
+d = Path("docs/validation/2026-10-20/native-turbo-render-live-v1")
+spec = importlib.util.spec_from_file_location("animation", r / "analyze-animation-rendering-v1.py")
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+names = [
+    "native-repeated-input-v11-analysis/report.json", "native-live-v64/repeat/probe.log",
+    "native-live-v64/relay/frames.jsonl", "native-live-v64/present/probe.log",
+    "native-desktop-admission-v74/bootstrap/worker.stdout.jsonl",
+    "native-desktop-admission-v74/bootstrap/provider-processes/generation-1/worker.stdout.jsonl",
+]
+values = []
+hashes = {}
+for name in names:
+    path = d / "raw" / name
+    data = path.read_bytes() if path.exists() else gzip.decompress(Path(str(path) + ".gz").read_bytes())
+    hashes[name] = hashlib.sha256(data).hexdigest()
+    text = data.decode("utf-8-sig")
+    values.append(json.loads(text) if len(values) == 0 else
+                  [json.loads(line) for line in text.splitlines() if line.startswith("{") and line.endswith("}")])
+report = module.analyze(*values)
+report["source_sha256"] = hashes
+(r / "turbo-live-animation-v1-analysis.json").write_text(json.dumps(report, indent=2) + "\n")
+manifest_path = d / "artifact-sha256.json"
+manifest = json.loads(manifest_path.read_text())
+for name in ("analyze-turbo-live-animation-v1.py", "analyze-animation-rendering-v1.py",
+             "analyze-repeated-rendering-v1.py", "turbo-live-animation-v1-analysis.json"):
+    data = (r / name).read_bytes()
+    dest = d / "local" / (name + (".txt" if name.endswith(".py") else ""))
+    assert not dest.exists()
+    dest.write_bytes(data)
+    manifest.append(dict(path=str(dest.relative_to(d)), bytes=len(data),
+                         sha256=hashlib.sha256(data).hexdigest(), local_source=str(r / name)))
+manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+print(json.dumps(dict(passed=report["passed"], stages=report["animation_interval"]["stages"],
+                      outside_serialized_parent_ms=report["animation_interval"]["outside_serialized_parent_ms"],
+                      shader_overlap=report["animation_interval"]["by_shader"],
+                      publications=report["all_publications_during_interval"],
+                      submissions=report["all_submissions_during_interval"])))

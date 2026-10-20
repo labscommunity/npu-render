@@ -1,0 +1,55 @@
+{
+  "completed": true,
+  "passed": true,
+  "new_device_execution": false,
+  "generations": [
+    {
+      "generation": 1,
+      "pid": 14620,
+      "imports": {
+        "geometry": 1,
+        "program": 1,
+        "long": 1,
+        "complex": 1,
+        "rectangle": 1,
+        "resident_clip": 1
+      },
+      "accepted_draws": {
+        "geometry": 50,
+        "program": 753,
+        "long": 4,
+        "complex": 35,
+        "rectangle": 280,
+        "resident_clip": 133
+      },
+      "balanced_schedules": 1
+    }
+  ],
+  "imports": {
+    "geometry": 1,
+    "program": 1,
+    "long": 1,
+    "complex": 1,
+    "rectangle": 1,
+    "resident_clip": 1
+  },
+  "accepted_draws": {
+    "geometry": 50,
+    "program": 753,
+    "long": 4,
+    "complex": 35,
+    "rectangle": 280,
+    "resident_clip": 133
+  },
+  "balanced_schedules": 1,
+  "successful_parent_responses": 1591,
+  "recovered_parent_responses": 0,
+  "incomplete_parent_tickets": [
+    1591
+  ],
+  "scope": "Provider initialization is unique per recorded child process. Aggregate import counts may increase on a proved NPU restart. This audit does not replace request, frame, application or recovery checks.",
+  "source_sha256": {
+    "worker.stdout.jsonl": "2717c731ae92f60e2e8455013f3f2112c7eff096735f9aea1ca6950fd06628c6",
+    "provider-processes\\generation-1\\worker.stdout.jsonl": "7c3ff6e8dc1f3d669014c18483596732458a86757bd28ad3d062a6919b35fc31"
+  }
+}

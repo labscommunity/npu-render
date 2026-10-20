@@ -1,0 +1,146 @@
+"""Prepare a gated turbo trial on the uninstrumented physical-desktop path."""
+from pathlib import Path
+import ast
+import hashlib
+import json
+import re
+import subprocess
+
+r = Path(__file__).parent
+proof = json.loads((r / "ptl-native-worker-v26-qualified-build-report.json").read_text(encoding="utf-8-sig"))
+new = json.loads((r / "ptl-native-worker-v26-source.json").read_text())
+old = json.loads((r / "ptl-native-worker-v19-source.json").read_text())
+assert proof["clean_build"] and proof["source_sha256"] == new
+worker = proof["binary_sha256"].lower()
+assert worker == "6e28d3cf151450ef802a85d0b01b81b36d8e9aa13afbfba1c75bd57a13826bd0"
+changes = {
+    "native-registration-v49": "native-registration-v52",
+    "native-registered-v49": "native-registered-v52",
+    "NativeRecovery-v49": "NativeRecovery-v52",
+    "native_shared_app_v16": "native_shared_app_v19",
+    "native_desktop_bootstrap_v44": "native_desktop_bootstrap_v47",
+    "native-desktop-v70": "native-desktop-v73",
+    "native-desktop-admission-v70": "native-desktop-admission-v73",
+    "NativeDesktopRecovery-v70": "NativeDesktopRecovery-v73",
+    "native-live-v60": "native-live-v63",
+    "NativeLiveV60": "NativeLiveV63",
+    "native-topology-primary-v46": "native-topology-primary-v49",
+    "native-topology-v117": "native-topology-v126",
+    "native-topology-v118": "native-topology-v127",
+    "native-topology-v119": "native-topology-v128",
+    "InspectTopology-V117": "InspectTopology-V126",
+    "InspectTopology-V118": "InspectTopology-V127",
+    "InspectTopology-V119": "InspectTopology-V128",
+    "observer119": "observer128",
+    "dismiss-native-saver-v35": "dismiss-native-saver-v38",
+    "dismiss-v35": "dismiss-v38",
+    "ptl-native-live-v24": "ptl-native-live-v27",
+    "native-latency-v24-analysis": "native-latency-v27-analysis",
+    "native-presentation-v21-analysis": "native-presentation-v24-analysis",
+    "native-repeated-input-v7-analysis": "native-repeated-input-v10-analysis",
+    "ptl-combined-desktop-v12": "ptl-combined-desktop-v15",
+    "analyze-native-latency-v22.py": "analyze-native-latency-v25.py",
+    "analyze-native-presentation-v21.py": "analyze-native-presentation-v24.py",
+    "ptl-native-worker-v24": "ptl-native-worker-v26",
+    "ptl-worker-v24-qualification": "ptl-worker-v26-qualification",
+    "03831470d266a0c0f6e095eb14124812f0899eedaa5c9fdffed063086675e2e4": worker,
+    "combined-render-comparison-v1": "turbo-render-comparison-v2",
+    "combined-render-provider-recovery-v1": "turbo-render-provider-recovery-v1",
+    "native-desktop-admission-v68": "native-desktop-admission-v72",
+    "native-registration-v47": "native-registration-v51",
+    "native-desktop-admission-v67": "native-desktop-admission-v72",
+}
+
+
+def replace(text, mapping):
+    pattern = re.compile("|".join(re.escape(x) for x in sorted(mapping, key=len, reverse=True)))
+    return pattern.sub(lambda match: mapping[match[0]], text)
+
+
+def rename(text):
+    return replace(text, changes)
+
+
+audited = {
+    "native-registration-v51": "native-registration-v52",
+    "native-desktop-admission-v72": "native-desktop-admission-v73",
+    "native-desktop-v72": "native-desktop-v73",
+    "NativeDesktopRecovery-v72": "NativeDesktopRecovery-v73",
+    "native-live-v62": "native-live-v63",
+    "NativeLiveV62": "NativeLiveV63",
+    "native-topology-primary-v48": "native-topology-primary-v49",
+    "native-topology-v123": "native-topology-v126",
+    "native-topology-v125": "native-topology-v128",
+    "InspectTopology-V125": "InspectTopology-V128",
+    "ptl-native-live-v26": "ptl-native-live-v27",
+    "ptl-native-worker-v24": "ptl-native-worker-v26",
+    "native-desktop-admission-v71": "native-desktop-admission-v72",
+}
+files = [n for n in json.loads((r / "ptl-combined-live-v12-upload.json").read_text())
+         if not n.endswith("-source.json")]
+for name in files:
+    s = rename((r / name).read_text())
+    if name == "qualify-native-registered-v49.py":
+        start = s.index("expected_changes=")
+        end = s.index("assert report['worker_binary_sha256']", start)
+        expected = {n: h for n, h in new.items() if old.get(n) != h}
+        s = s[:start] + (
+            "expected_changes=" + repr(expected) + "\n"
+            "assert candidate['linked_libraries']==qualified['linked_libraries']\n"
+            "assert set(candidate['source_sha256'])==set(qualified['source_sha256'])|"
+            + repr(set(new) - set(old)) + "\n"
+            "assert {n:h for n,h in candidate['source_sha256'].items() if h!=qualified['source_sha256'].get(n)}==expected_changes\n"
+        ) + s[end:]
+    if name == "native_shared_app_v16.py":
+        s = (r / "native_shared_app_v18.py").read_text().replace("native_shared_app_v18", "native_shared_app_v19")
+    if name in ("run-native-live-v60.ps1", "run-ptl-native-live-v24.ps1"):
+        source = {"run-native-live-v60.ps1": "run-native-live-v62.ps1",
+                  "run-ptl-native-live-v24.ps1": "run-ptl-native-live-v26.ps1"}[name]
+        s = replace((r / source).read_text(), audited)
+    if name == "run-native-live-v60.ps1":
+        needle = " $report.provider_generation_audit_passed=$true\n"
+        assert s.count(needle) == 1
+        s = s.replace(needle, needle + r'''
+ $turboGenerations=@()
+ foreach($log in @(Get-ChildItem "$r\vm\native-desktop-admission-v73\bootstrap\provider-processes\generation-*\worker.stdout.jsonl" -File)){
+  $events=@(Read-Rows $log.FullName|Where-Object ptl_turbo_import_verified)
+  if(!$events.Count -or @($events|Where-Object {!$_.requested -or !$_.readback -or $_.global_power_policy_changed}).Count){throw 'Turbo property readback absent or invalid'}
+  $routes=@($events|Select-Object -ExpandProperty route)
+  if(@($routes|Sort-Object -Unique).Count -ne $routes.Count){throw 'Duplicate turbo import within child generation'}
+  $turboGenerations+=@{generation=$log.Directory.Name;imports=$events.Count;routes=$routes}
+ }
+ if(!$turboGenerations.Count){throw 'No turbo provider generation'}
+ $report.turbo_import_audit_passed=$true;$report.turbo_generations=$turboGenerations
+''')
+    if name == "run-ptl-native-live-v24.ps1":
+        s = s.replace("if(!$q.provider_generation_audit_passed", "if(!$q.turbo_import_audit_passed -or !$q.provider_generation_audit_passed")
+    if name == "run-ptl-combined-desktop-v12.ps1":
+        # Preserve the existing five-percent gate; no desktop mutation before it.
+        assert "$comparison.summary.new_parent_ms -ge .95*$comparison.summary.old_parent_ms" in s
+        s = s.replace("paired_combined_renderer", "paired_turbo_renderer")
+        s = s.replace("Combined renderer", "Turbo renderer")
+    if name.endswith(".py"):
+        ast.parse(s)
+    dest = r / rename(name)
+    assert not dest.exists(), dest
+    dest.write_text(s)
+extras = ["native_shared_correlation_v2.py", "native_provider_generation_audit_v1.py"]
+for old_name in ("native-registration-v49-source.json", "native-desktop-v70-source.json"):
+    names = [rename(n) for n in json.loads((r / old_name).read_text())]
+    if old_name.startswith("native-desktop"):
+        names.extend(extras)
+    (r / rename(old_name)).write_text(json.dumps({
+        n: hashlib.sha256((r / n).read_bytes()).hexdigest() for n in names
+    }, indent=2) + "\n")
+uploads = [rename(n) for n in files] + [
+    "native-registration-v52-source.json", "native-desktop-v73-source.json", *extras,
+]
+(r / "ptl-combined-live-v15-upload.json").write_text(json.dumps(uploads, indent=2) + "\n")
+manifest = {n: hashlib.sha256((r / n).read_bytes()).hexdigest() for n in uploads}
+(r / "ptl-turbo-live-v1-source.json").write_text(json.dumps(manifest, indent=2) + "\n")
+subprocess.run(["scp", "-q", *[str(r / n) for n in uploads],
+                str(r / "ptl-turbo-live-v1-source.json"), "delta:AppData/Local/npu-render/vm/"],
+               check=True, timeout=30)
+print(json.dumps(dict(prepared="turbo renderer gated desktop", worker=26,
+                      worker_sha256=worker, driver_package=19, files=len(uploads),
+                      desktop_changed=False, five_percent_gate_preserved=True)))

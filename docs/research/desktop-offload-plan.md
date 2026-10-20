@@ -2,14 +2,17 @@
 
 Updated 2026-10-20. Target: Delta, Windows 11, Panther Lake. The repository stays
 private. **Full desktop offload is unfinished.** The latest
-[combined-renderer v60 trial](../validation/2026-10-20/native-combined-render-live-v1/README.md)
-passes 1,694 acknowledged NPU operations, 107 exact physical submissions, forty
+[turbo renderer v64 trial](../validation/2026-10-20/native-turbo-render-live-v1/README.md)
+passes 1,590 acknowledged NPU operations, 110 exact physical submissions, forty
 controlled inputs, the shared test application and restoration. Warm
-sent-input-to-display p95 is 1,725.807 ms for mouse and 96.931 ms for keyboard.
-Nineteen warm samples per kind make p95 equal to maximum. Animation delivers
-only eight verified updates during the ten-second 30 Hz schedule (0.8/s), or ten
-including drain. Child rendering occupies 6,353.803 ms. This remains far short
-of normal desktop responsiveness; Tahoma and GPU relief are unmeasured.
+sent-input-to-display medians are 91.190 ms for mouse and 89.015 ms for keyboard;
+p95 values are 108.234 and 108.017 ms. Nineteen warm samples per kind make p95
+equal to maximum. Animation delivers only nine verified updates during the
+ten-second 30 Hz schedule (0.9/s), or eleven including drain. Child rendering
+occupies 6,021.628 ms, with 4,004 whole-request provider calls across overlapping
+draws and no backend compilation. This remains far short of normal desktop
+responsiveness; Tahoma and GPU relief are unmeasured. The prior uninstrumented
+worker v24 trial delivered 0.8/s in a separate, unmatched run.
 
 Both v56 and the [preceding v55 trial](../validation/2026-10-16/native-repeated-input-live-v1/README.md)
 verify only seven unique animation colors during the ten-second 30 Hz schedule,
@@ -129,10 +132,10 @@ from the capacity comparison. A separate renderer candidate now applies the
 hint at existing custom-model imports without changing shader arithmetic.
 The [complete renderer comparison](../validation/2026-10-20/native-turbo-render-worker-v1/README.md)
 now preserves all 3,888 A/B/B/A images and reduces aggregate parent request time
-by 9.90%. Both thirty-image bounded recovery cases pass. A separate physical
-desktop trial is underway; the first setup attempt rejected a stale test-helper
-reference to the previous worker and restored the machine. This replay gain
-does not replace the 0.8/s uninstrumented desktop baseline or establish GPU relief.
+by 9.90%. Both thirty-image bounded recovery cases pass. The separate physical
+desktop trial now passes at 0.9 verified animation updates/s; the first setup
+attempt rejected a stale test-helper reference to the previous worker and
+restored the machine. This remains inadequate and does not establish GPU relief.
 Matched Tahoma measurements remain necessary because increased NPU power may
 affect the iGPU.
 
@@ -140,7 +143,7 @@ The [vector memory-fill component](../validation/2026-10-20/native-program-vecto
 passes 448 NPU fixtures inside the existing code allocation. The original program
 kernel contains a byte-store clearing loop; the replacement uses aligned wider
 stores. Its frequency and performance impact remain unmeasured. A complete
-renderer comparison is queued after the current desktop trial and restoration.
+renderer comparison is running after the desktop trial and restoration.
 
 The rectangle candidate also passes
 [two targeted provider-recovery scenarios](../validation/2026-10-20/native-quad-rectangle-recovery-v1/README.md);

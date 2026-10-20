@@ -1,0 +1,89 @@
+"""Retain the rejected setup and bind the shared helper to the current worker."""
+from pathlib import Path
+import ast
+import hashlib
+import json
+import re
+import subprocess
+
+r = Path(__file__).parent
+changes = {
+    "native-registration-v52": "native-registration-v53",
+    "native-registered-v52": "native-registered-v53",
+    "NativeRecovery-v52": "NativeRecovery-v53",
+    "native_shared_app_v19": "native_shared_app_v20",
+    "native_desktop_bootstrap_v47": "native_desktop_bootstrap_v48",
+    "native-desktop-v73": "native-desktop-v74",
+    "native-desktop-admission-v73": "native-desktop-admission-v74",
+    "NativeDesktopRecovery-v73": "NativeDesktopRecovery-v74",
+    "native-live-v63": "native-live-v64",
+    "NativeLiveV63": "NativeLiveV64",
+    "native-topology-primary-v49": "native-topology-primary-v50",
+    "native-topology-v126": "native-topology-v129",
+    "native-topology-v127": "native-topology-v130",
+    "native-topology-v128": "native-topology-v131",
+    "InspectTopology-V126": "InspectTopology-V129",
+    "InspectTopology-V127": "InspectTopology-V130",
+    "InspectTopology-V128": "InspectTopology-V131",
+    "observer128": "observer131",
+    "dismiss-native-saver-v38": "dismiss-native-saver-v39",
+    "dismiss-v38": "dismiss-v39",
+    "ptl-native-live-v27": "ptl-native-live-v28",
+    "native-latency-v27-analysis": "native-latency-v28-analysis",
+    "native-presentation-v24-analysis": "native-presentation-v25-analysis",
+    "native-repeated-input-v10-analysis": "native-repeated-input-v11-analysis",
+    "ptl-combined-desktop-v15": "ptl-combined-desktop-v16",
+    "analyze-native-latency-v25.py": "analyze-native-latency-v26.py",
+    "analyze-native-presentation-v24.py": "analyze-native-presentation-v25.py",
+    "native-desktop-admission-v72": "native-desktop-admission-v73",
+    "native-registration-v51": "native-registration-v52",
+}
+pattern = re.compile("|".join(re.escape(x) for x in sorted(changes, key=len, reverse=True)))
+
+
+def rename(text):
+    return pattern.sub(lambda match: changes[match[0]], text)
+
+
+files = [n for n in json.loads((r / "ptl-combined-live-v15-upload.json").read_text())
+         if not n.endswith("-source.json")]
+for name in files:
+    s = rename((r / name).read_text())
+    if name == "native_shared_app_v19.py":
+        # This one reference is the active registration, not a prior cleanup gate.
+        assert s.count("native-registration-v52/qualification/report.json") == 1
+        s = s.replace("native-registration-v52/qualification/report.json",
+                      "native-registration-v53/qualification/report.json")
+    if name == "run-native-live-v63.ps1":
+        # The established generation audit checks singleton shared providers.
+        # Solid/four-tap/texture providers may legitimately import more than once.
+        needle = "  if(@($routes|Sort-Object -Unique).Count -ne $routes.Count){throw 'Duplicate turbo import within child generation'}"
+        assert s.count(needle) == 1
+        s = s.replace(needle, "  if(@($routes|Where-Object {$_ -notin @('program','solid','geometry','four_tap','point_rectangle','complex_shader','resident_clip','texture_shader','long_shader','masked')}).Count){throw 'Unknown turbo import route'}")
+    if name.endswith(".py"):
+        ast.parse(s)
+    dest = r / rename(name)
+    if dest == r / name:
+        assert dest.read_text() == s
+    else:
+        assert not dest.exists(), dest
+        dest.write_text(s)
+for old in ("native-registration-v52-source.json", "native-desktop-v73-source.json"):
+    names = [rename(n) for n in json.loads((r / old).read_text())]
+    (r / rename(old)).write_text(json.dumps({
+        n: hashlib.sha256((r / n).read_bytes()).hexdigest() for n in names
+    }, indent=2) + "\n")
+uploads = [rename(n) for n in files] + [
+    "native-registration-v53-source.json", "native-desktop-v74-source.json"]
+assert "native-registration-v53/qualification/report.json" in (r / "native_shared_app_v20.py").read_text()
+assert "from native_shared_app_v20 import" in (r / "native_desktop_bootstrap_v48.py").read_text()
+assert "builds\\ptl-native-worker-v26\\" in (r / "run-native-registration-v53.ps1").read_text()
+(r / "ptl-combined-live-v16-upload.json").write_text(json.dumps(uploads, indent=2) + "\n")
+manifest = {n: hashlib.sha256((r / n).read_bytes()).hexdigest() for n in uploads}
+p = r / "ptl-turbo-live-v2-source.json"
+p.write_text(json.dumps(manifest, indent=2) + "\n")
+subprocess.run(["scp", "-q", *[str(r / n) for n in uploads], str(p),
+                "delta:AppData/Local/npu-render/vm/"], check=True, timeout=30)
+print(json.dumps(dict(prepared="turbo live retry", worker=26, driver_package=19,
+                      registration=53, desktop=74, live=64, failed_trial_preserved=True,
+                      shared_helper_bound_to_current_registration=True, desktop_changed=False)))

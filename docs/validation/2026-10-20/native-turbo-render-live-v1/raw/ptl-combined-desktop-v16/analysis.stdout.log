@@ -1,0 +1,83 @@
+{
+  "completed": true,
+  "passed": true,
+  "active_snapshot": false,
+  "final_trial_qualification": false,
+  "qpc_frequency": 10000000,
+  "serial_intervals_verified": true,
+  "controlled_events": [
+    {
+      "event": "mouse_received",
+      "color": "green",
+      "input_qpc": 7003801844875,
+      "observed_qpc": 7003803023092,
+      "observer_acquisition_started_qpc": 7003802861918,
+      "response_ms": 117.8217,
+      "serialized_child_busy_ms": 14.775500000000001,
+      "child_busy_fraction": 0.1254055916694463,
+      "remaining_ms": 103.0462,
+      "draw_count": 2,
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 1,
+          "overlap_ms": 9.1792,
+          "whole_request_provider_calls": 7,
+          "whole_request_backend_compile_ms": 0.0
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 1,
+          "overlap_ms": 5.5963,
+          "whole_request_provider_calls": 3,
+          "whole_request_backend_compile_ms": 0.0
+        }
+      },
+      "serialized_parent_breakdown": {
+        "parent_pre_child_ms": 3.8164999999999996,
+        "child_packet_read_ms": 2.814,
+        "child_pre_execution_ms": 0.0159,
+        "child_execution_ms": 14.775500000000001,
+        "parent_post_child_ms": 3.9181
+      },
+      "outside_serialized_parent_ms": 92.4817,
+      "input_to_publication_ms": 47.287,
+      "publication_to_observation_ms": 70.5347
+    },
+    {
+      "event": "key_received",
+      "color": "red",
+      "input_qpc": 7003817734044,
+      "observed_qpc": 7003819940602,
+      "observer_acquisition_started_qpc": 7003819775906,
+      "response_ms": 220.6558,
+      "serialized_child_busy_ms": 32.4202,
+      "child_busy_fraction": 0.1469265707042371,
+      "remaining_ms": 188.2356,
+      "draw_count": 4,
+      "by_shader": {
+        "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3": {
+          "requests": 2,
+          "overlap_ms": 20.508499999999998,
+          "whole_request_provider_calls": 14,
+          "whole_request_backend_compile_ms": 0.0
+        },
+        "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5": {
+          "requests": 2,
+          "overlap_ms": 11.9117,
+          "whole_request_provider_calls": 6,
+          "whole_request_backend_compile_ms": 0.0
+        }
+      },
+      "serialized_parent_breakdown": {
+        "parent_pre_child_ms": 6.9709,
+        "child_packet_read_ms": 6.4023,
+        "child_pre_execution_ms": 0.033800000000000004,
+        "child_execution_ms": 32.4202,
+        "parent_post_child_ms": 6.5503
+      },
+      "outside_serialized_parent_ms": 168.2783,
+      "input_to_publication_ms": 44.0912,
+      "publication_to_observation_ms": 176.5646
+    }
+  ],
+  "limitation": "Two controlled events, not p95 or matched A/B. Child intervals include CPU orchestration and NPU waits; they are not NPU hardware utilization. Partial interval whole-request compilation/call counts are context, not apportioned overlap. Physical observation uses completed reads, including acquisitions that started before the input; sampling cadence remains included. No panel photon timing."
+}

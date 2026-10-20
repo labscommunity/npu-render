@@ -1,0 +1,36 @@
+{
+    "started":  "2026-10-20T10:26:09.3243482Z",
+    "completed":  true,
+    "passed":  true,
+    "full_desktop_offload":  false,
+    "tahoma_tested":  false,
+    "active_phase":  "timing-analysis",
+    "phases":  [
+                   {
+                       "phase":  "pre-registration-readiness",
+                       "passed":  true
+                   },
+                   {
+                       "phase":  "registered-d3d",
+                       "cleanup_passed":  true,
+                       "passed":  true
+                   },
+                   {
+                       "phase":  "finite-live",
+                       "passed":  true
+                   },
+                   {
+                       "phase":  "timing-analysis",
+                       "passed":  true
+                   }
+               ],
+    "paired_turbo_renderer":  {
+                                  "pairs":  1944,
+                                  "old_parent_ms":  214610.1706,
+                                  "new_parent_ms":  193356.6356,
+                                  "old_outside_child_ms":  13348.7243,
+                                  "new_outside_child_ms":  13103.268100000001,
+                                  "slower_parent_pairs":  380
+                              },
+    "finished":  "2026-10-20T10:39:01.5212619Z"
+}
