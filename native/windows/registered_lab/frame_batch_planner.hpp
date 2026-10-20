@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <vector>
 namespace nr::frame {
 struct Rect { int32_t x0 = 0, y0 = 0, x1 = 0, y1 = 0; bool empty() const { return x0 >= x1 || y0 >= y1; } };
@@ -17,7 +18,7 @@ inline Rect unite(const Rect &a, const Rect &b) {
 }
 // Per-texture coordinate provenance recorded at lowering: direct varyings give
 // exact extents from the vertex attributes; anything else needs the whole texture.
-struct CoordinateTap { uint32_t input = 0, lane_u = 0, lane_v = 0, divide_lane = 4; };
+struct CoordinateTap { uint32_t input = 0, lane_u = 0, lane_v = 0, divide_lane = 4; float margin = 0; };
 // All sample instructions reading one texture; direct only when every tap is a varying (or its perspective divide).
 struct CoordinateSource { bool direct = false; std::vector<CoordinateTap> taps; };
 struct DrawPlan {
@@ -27,6 +28,7 @@ struct DrawPlan {
     std::vector<core::nr_projected> projected;
     std::array<Rect, NR_FRAME_MAX_TEXTURES> texels{};   // sampled texel windows per command texture
     std::array<bool, NR_FRAME_MAX_TEXTURES> whole{};    // window could not be bounded: whole texture
+    std::vector<uint32_t> constants;          // vertex then pixel constant words, for interval evaluation
 };
 // Packs decoded vertex registers for the kernel's vertex pool (declared inputs only).
 inline std::vector<uint32_t> pack_vertices(const LoweredProgram &program, const std::vector<shader::VertexRegisters> &vertices) {
@@ -34,50 +36,294 @@ inline std::vector<uint32_t> pack_vertices(const LoweredProgram &program, const 
     for (const auto &v : vertices) for (unsigned r = 0; r < 16; ++r) if (program.vs_inputs & (1u << r)) words.insert(words.end(), v[r].begin(), v[r].end());
     return words;
 }
-// Determines where each sampled texture's coordinates come from.
+// Determines where each sampled texture's coordinates come from, lane by lane.
+// A lane is a varying lane (optionally divided by another lane of the same
+// varying), a value independent of the pixel (constants, immediates), or
+// unknown. Moves keep provenance; min/max against pixel-independent values keep
+// it too, since clamping only narrows the texel range the kernel can reach.
 inline std::array<CoordinateSource, NR_FRAME_MAX_TEXTURES> coordinate_sources(const LoweredProgram &program) {
     std::array<CoordinateSource, NR_FRAME_MAX_TEXTURES> result{};
-    // A temporary written by `div input, input.w` (perspective divide) before the sample is also direct.
-    struct TempSource { bool valid = false; uint32_t input = 0, lane_u = 0, lane_v = 0, divide_lane = 4; };
-    std::array<TempSource, 16> temps{};
+    struct Lane { bool valid = false, constant = false; uint32_t input = 0, lane = 0, divide_lane = 4; float margin = 0; };
+    std::array<std::array<Lane, 4>, 16> temps{};
+    auto operand_lane = [&](uint32_t src, unsigned k) {
+        const uint32_t kind = src & 15u, index = (src >> 4) & 255u, lane = (src >> (12 + 2 * k)) & 3u, modifier = (src >> 20) & 3u;
+        Lane l;
+        if (kind == 2 || kind == 3) { l.valid = true; l.constant = true; return l; }
+        if (modifier) return l;
+        if (kind == 1) { l.valid = true; l.input = index; l.lane = lane; return l; }
+        if (kind == 0 && index < 16) return temps[index][lane];
+        return l;
+    };
     for (const auto &w : program.ps_words) {
-        const uint32_t op = w[0], dest = w[1], src0 = w[2], src1 = w[3], extra = w[5];
+        const uint32_t op = w[0], dest = w[1], src0 = w[2], src1 = w[3], src2 = w[4], extra = w[5];
         const uint32_t dest_kind = dest & 15u, dest_index = (dest >> 4) & 255u, mask = (dest >> 12) & 15u;
         if (op == core::NR_OP_SAMPLE) {
-            const uint32_t texture = extra & 15u, kind = src0 & 15u, index = (src0 >> 4) & 255u, lanes = (src0 >> 12) & 255u;
+            const uint32_t texture = extra & 15u;
             if (texture >= NR_FRAME_MAX_TEXTURES) continue;
             auto &c = result[texture];
-            bool direct = false; CoordinateTap tap;
-            if (kind == 1 && !(src0 >> 20)) { direct = true; tap.input = index; tap.lane_u = lanes & 3u; tap.lane_v = (lanes >> 2) & 3u; }
-            else if (kind == 0 && temps[index].valid && !(src0 >> 20)) {
-                const auto &t = temps[index];
-                direct = true; tap.input = t.input; tap.divide_lane = t.divide_lane;
-                // The temp holds (input.lane_u/w, input.lane_v/w) in lanes 0,1; the sample reads lanes of the temp.
-                const uint32_t lu = lanes & 3u, lv = (lanes >> 2) & 3u;
-                if (lu > 1 || lv > 1) direct = false; else { tap.lane_u = lu ? t.lane_v : t.lane_u; tap.lane_v = lv ? t.lane_v : t.lane_u; }
-            }
+            const Lane u = operand_lane(src0, 0), v = operand_lane(src0, 1);
+            bool direct = u.valid && v.valid && !u.constant && !v.constant && u.input == v.input && u.divide_lane == v.divide_lane;
+            CoordinateTap tap;
+            if (direct) { tap.input = u.input; tap.lane_u = u.lane; tap.lane_v = v.lane; tap.divide_lane = u.divide_lane; tap.margin = std::max(u.margin, v.margin); }
             if (c.taps.empty()) c.direct = direct; else c.direct = c.direct && direct;
             if (direct) c.taps.push_back(tap);
             continue;
         }
-        if (dest_kind == 0 && dest_index < 16) {
-            TempSource t;
-            const uint32_t kind0 = src0 & 15u, kind1 = src1 & 15u;
-            if (op == core::NR_OP_DIV && kind0 == 1 && kind1 == 1 && ((src0 >> 4) & 255u) == ((src1 >> 4) & 255u) && (mask & 3u) == 3u && !(src0 >> 20) && !(src1 >> 20)) {
-                const uint32_t l0 = (src0 >> 12) & 255u, l1 = (src1 >> 12) & 255u;
-                if ((l1 & 3u) == ((l1 >> 2) & 3u)) { t.valid = true; t.input = (src0 >> 4) & 255u; t.lane_u = l0 & 3u; t.lane_v = (l0 >> 2) & 3u; t.divide_lane = l1 & 3u; }
+        if (dest_kind != 0 || dest_index >= 16) continue;
+        for (unsigned k = 0; k < 4; ++k) {
+            if (!(mask & (1u << k))) continue;
+            Lane out;
+            if (op == core::NR_OP_MOV) out = operand_lane(src0, k);
+            else if (op == core::NR_OP_DIV) {
+                const Lane a = operand_lane(src0, k), b = operand_lane(src1, k);
+                if (a.valid && b.valid && !a.constant && !b.constant && a.divide_lane == 4 && b.divide_lane == 4 && a.input == b.input) { out = a; out.divide_lane = b.lane; }
+                else if (a.valid && b.valid && a.constant && b.constant) { out.valid = true; out.constant = true; }
+            } else if (op == core::NR_OP_MIN || op == core::NR_OP_MAX) {
+                const Lane a = operand_lane(src0, k), b = operand_lane(src1, k);
+                if (a.valid && b.valid && a.constant && b.constant) { out.valid = true; out.constant = true; }
+                else if (a.valid && b.valid && b.constant) out = a;
+                else if (a.valid && b.valid && a.constant) out = b;
+            } else if (op == core::NR_OP_MUL || op == core::NR_OP_ADD || op == core::NR_OP_MAD) {
+                const Lane a = operand_lane(src0, k), b = operand_lane(src1, k), c2 = op == core::NR_OP_MAD ? operand_lane(src2, k) : Lane{true, true};
+                if (a.valid && b.valid && c2.valid && a.constant && b.constant && c2.constant) { out.valid = true; out.constant = true; }
             }
-            temps[dest_index] = t;   // any other write invalidates the provenance
+            temps[dest_index][k] = out;   // any other write makes the lane unknown
         }
     }
     return result;
+}
+// --- Interval evaluation of a pixel stage over a screen rectangle -----------
+// When a texture's coordinates are not a plain varying, the pixel stage is
+// evaluated over intervals: every varying lane spans the values it takes across
+// the rectangle, constants are points, and each instruction maps intervals to a
+// conservative result. Comparison masks and integer lanes travel as small sets
+// of bit patterns. The (u, v) intervals reaching each sample instruction bound
+// the texels the kernel can touch; an unbounded lane means the whole texture.
+namespace interval {
+struct Val {
+    bool known = false;                 // false: no information (any value)
+    double lo = 0, hi = 0;              // float interpretation when `known`
+    std::vector<uint32_t> set;          // exact 32-bit patterns when small and known (masks, integers)
+    static Val any() { return Val{}; }
+    static Val range(double a, double b) { Val v; v.known = std::isfinite(a) && std::isfinite(b); v.lo = std::min(a, b); v.hi = std::max(a, b); return v; }
+    static Val exact(uint32_t bits) { float f; std::memcpy(&f, &bits, 4); Val v; v.known = std::isfinite(f); v.lo = v.hi = f; v.set = {bits}; return v; }
+    bool point() const { return known && lo == hi; }
+};
+inline Val from_set(std::vector<uint32_t> set) {
+    if (set.empty() || set.size() > 16) return Val::any();
+    std::sort(set.begin(), set.end()); set.erase(std::unique(set.begin(), set.end()), set.end());
+    double lo = 1e300, hi = -1e300; bool finite = true;
+    for (uint32_t b : set) { float f; std::memcpy(&f, &b, 4); if (!std::isfinite(f)) finite = false; lo = std::min(lo, double(f)); hi = std::max(hi, double(f)); }
+    Val v; v.set = std::move(set); if (finite) { v.known = true; v.lo = lo; v.hi = hi; }
+    return v;
+}
+inline Val hull(const Val &a, const Val &b) {
+    if (!a.known || !b.known) return Val::any();
+    Val v = Val::range(std::min(a.lo, b.lo), std::max(a.hi, b.hi));
+    if (!a.set.empty() && !b.set.empty()) { auto s = a.set; s.insert(s.end(), b.set.begin(), b.set.end()); if (s.size() <= 16) { auto f = from_set(s); if (f.known) return f; } }
+    return v;
+}
+inline Val neg(const Val &a) { if (!a.known) return a; Val v = Val::range(-a.hi, -a.lo); for (uint32_t b : a.set) v.set.push_back(b ^ 0x80000000u); return v; }
+inline Val abs(const Val &a) {
+    if (!a.known) return a;
+    Val v = a.lo >= 0 ? a : a.hi <= 0 ? Val::range(-a.hi, -a.lo) : Val::range(0, std::max(-a.lo, a.hi));
+    for (uint32_t b : a.set) v.set.push_back(b & 0x7fffffffu);
+    return v;
+}
+inline Val add(const Val &a, const Val &b) { if (!a.known || !b.known) return Val::any(); return Val::range(a.lo + b.lo, a.hi + b.hi); }
+inline Val mul(const Val &a, const Val &b) {
+    if (!a.known || !b.known) return Val::any();
+    const double c[4]{a.lo * b.lo, a.lo * b.hi, a.hi * b.lo, a.hi * b.hi};
+    return Val::range(std::min({c[0], c[1], c[2], c[3]}), std::max({c[0], c[1], c[2], c[3]}));
+}
+inline Val div(const Val &a, const Val &b) {
+    if (!a.known || !b.known || (b.lo <= 0 && b.hi >= 0)) return Val::any();
+    return mul(a, Val::range(1.0 / b.lo, 1.0 / b.hi));
+}
+inline Val vmin(const Val &a, const Val &b) { if (!a.known || !b.known) return Val::any(); return Val::range(std::min(a.lo, b.lo), std::min(a.hi, b.hi)); }
+inline Val vmax(const Val &a, const Val &b) { if (!a.known || !b.known) return Val::any(); return Val::range(std::max(a.lo, b.lo), std::max(a.hi, b.hi)); }
+inline Val floor_(const Val &a) { if (!a.known) return a; return Val::range(std::floor(a.lo), std::floor(a.hi)); }
+inline Val frc(const Val &a) {
+    if (!a.known) return a;
+    const double f = std::floor(a.lo);
+    if (std::floor(a.hi) != f) return Val::range(0, 1);
+    return Val::range(a.lo - f, a.hi - f);
+}
+inline Val saturate(const Val &a) { if (!a.known) return Val::range(0, 1); return Val::range(std::min(1.0, std::max(0.0, a.lo)), std::min(1.0, std::max(0.0, a.hi))); }
+// Comparisons yield the SM4 masks 0 / 0xffffffff.
+inline Val compare(const Val &a, const Val &b, uint32_t op) {
+    if (!a.known || !b.known) return from_set({0u, 0xffffffffu});
+    bool t = false, f = false;
+    auto decide = [&](bool all_true, bool all_false) { t = !all_false; f = !all_true; };
+    switch (op) {
+    case core::NR_OP_LT: decide(a.hi < b.lo, a.lo >= b.hi); break;
+    case core::NR_OP_GE: decide(a.lo >= b.hi, a.hi < b.lo); break;
+    case core::NR_OP_EQ: decide(a.point() && b.point() && a.lo == b.lo, a.hi < b.lo || b.hi < a.lo); break;
+    case core::NR_OP_NE: decide(a.hi < b.lo || b.hi < a.lo, a.point() && b.point() && a.lo == b.lo); break;
+    default: t = f = true;
+    }
+    std::vector<uint32_t> s; if (f) s.push_back(0u); if (t) s.push_back(0xffffffffu);
+    return from_set(s);
+}
+inline Val bitwise(const Val &a, const Val &b, bool is_or) {
+    if (a.set.empty() || b.set.empty()) return Val::any();
+    std::vector<uint32_t> s;
+    for (uint32_t x : a.set) for (uint32_t y : b.set) s.push_back(is_or ? (x | y) : (x & y));
+    return from_set(s);
+}
+inline Val iadd(const Val &a, const Val &b) {
+    if (a.set.empty() || b.set.empty()) return Val::any();
+    std::vector<uint32_t> s; for (uint32_t x : a.set) for (uint32_t y : b.set) s.push_back(x + y);
+    return from_set(s);
+}
+inline Val itof(const Val &a) {
+    if (a.set.empty()) return Val::any();
+    std::vector<uint32_t> s; for (uint32_t x : a.set) { const float f = float(int32_t(x)); uint32_t b; std::memcpy(&b, &f, 4); s.push_back(b); }
+    return from_set(s);
+}
+inline Val ige(const Val &a, const Val &b) {
+    if (a.set.empty() || b.set.empty()) return from_set({0u, 0xffffffffu});
+    bool t = false, f = false; for (uint32_t x : a.set) for (uint32_t y : b.set) (int32_t(x) >= int32_t(y) ? t : f) = true;
+    std::vector<uint32_t> s; if (f) s.push_back(0u); if (t) s.push_back(0xffffffffu);
+    return from_set(s);
+}
+inline Val select(const Val &c, const Val &a, const Val &b) {
+    bool t = false, f = false;
+    if (c.set.empty()) t = f = true; else for (uint32_t x : c.set) (x ? t : f) = true;
+    if (t && !f) return a; if (f && !t) return b; return hull(a, b);
+}
+using Lanes = std::array<Val, 4>;
+// (u, v) coordinate intervals every sample of one texture reaches over the rectangle.
+struct Window { bool any = false, bounded = true; double umin = 1e300, umax = -1e300, vmin = 1e300, vmax = -1e300; };
+inline void evaluate(const LoweredProgram &program, const std::vector<uint32_t> &constants, const std::array<Lanes, 8> &inputs, std::array<Window, NR_FRAME_MAX_TEXTURES> &windows) {
+    std::array<Lanes, 16> temps{};
+    for (auto &t : temps) for (auto &l : t) l = Val::exact(0);
+    auto operand = [&](const Words &w, unsigned k) {
+        const uint32_t src = w[2 + k], kind = src & 15u, idx = (src >> 4) & 255u, lanes = (src >> 12) & 255u, negate = (src >> 20) & 1u, absolute = (src >> 21) & 1u, slot = (src >> 22) & 15u;
+        const uint32_t rel = w[0] == core::NR_OP_SAMPLE ? 0u : (w[5] >> (k * 10)) & 0x3ffu;
+        Lanes out;
+        for (unsigned c = 0; c < 4; ++c) {
+            const uint32_t lane = (lanes >> (2 * c)) & 3u;
+            Val v;
+            if (kind == 0) v = idx < 16 ? temps[idx][lane] : Val::any();
+            else if (kind == 1) v = idx < 8 ? inputs[idx][lane] : Val::any();
+            else if (kind == 3) v = idx < program.ps_immediates.size() ? Val::exact(program.ps_immediates[idx][lane]) : Val::any();
+            else if (rel & 1u) v = Val::any();
+            else {
+                const size_t word = (size_t(program.vs_constants) + program.ps_constant_base[slot] + idx) * 4 + lane;
+                v = slot < 14 && idx < program.ps_constant_count[slot] && word < constants.size() ? Val::exact(constants[word]) : Val::any();
+            }
+            if (absolute) v = abs(v);
+            if (negate) v = w[0] == core::NR_OP_IADD ? (v.set.empty() ? Val::any() : from_set([&] { std::vector<uint32_t> s; for (uint32_t b : v.set) s.push_back(0u - b); return s; }())) : neg(v);
+            out[c] = v;
+        }
+        return out;
+    };
+    for (const auto &w : program.ps_words) {
+        const uint32_t op = w[0], dest = w[1], mask = (dest >> 12) & 15u, sat = (dest >> 16) & 1u, dest_kind = dest & 15u, dest_index = (dest >> 4) & 255u;
+        const unsigned sources = detail::source_count(op);
+        const Lanes a = operand(w, 0), b = sources >= 2 ? operand(w, 1) : Lanes{}, e = sources >= 3 ? operand(w, 2) : Lanes{};
+        Lanes r;
+        if (op == core::NR_OP_SAMPLE) {
+            const uint32_t texture = w[5] & 15u;
+            if (texture < NR_FRAME_MAX_TEXTURES) {
+                auto &win = windows[texture]; win.any = true;
+                if (!a[0].known || !a[1].known) win.bounded = false;
+                else { win.umin = std::min(win.umin, a[0].lo); win.umax = std::max(win.umax, a[0].hi); win.vmin = std::min(win.vmin, a[1].lo); win.vmax = std::max(win.vmax, a[1].hi); }
+            }
+            for (auto &l : r) l = Val::range(0, 1);   // UNORM texel colors
+            const uint32_t lanes = (w[5] >> 12) & 255u; Lanes swizzled; for (unsigned c = 0; c < 4; ++c) swizzled[c] = r[(lanes >> (2 * c)) & 3u]; r = swizzled;
+        } else if (op == core::NR_OP_DP2 || op == core::NR_OP_DP3 || op == core::NR_OP_DP4) {
+            const unsigned n = op == core::NR_OP_DP2 ? 2 : op == core::NR_OP_DP3 ? 3 : 4;
+            Val sum = Val::exact(0); for (unsigned c = 0; c < n; ++c) sum = add(sum, mul(a[c], b[c]));
+            for (auto &l : r) l = sum;
+        } else for (unsigned c = 0; c < 4; ++c) {
+            switch (op) {
+            case core::NR_OP_MOV: r[c] = a[c]; break;
+            case core::NR_OP_ADD: r[c] = add(a[c], b[c]); break;
+            case core::NR_OP_MUL: r[c] = mul(a[c], b[c]); break;
+            case core::NR_OP_MAD: r[c] = add(mul(a[c], b[c]), e[c]); break;
+            case core::NR_OP_DIV: r[c] = div(a[c], b[c]); break;
+            case core::NR_OP_MIN: r[c] = vmin(a[c], b[c]); break;
+            case core::NR_OP_MAX: r[c] = vmax(a[c], b[c]); break;
+            case core::NR_OP_FRC: r[c] = frc(a[c]); break;
+            case core::NR_OP_FLOOR: r[c] = floor_(a[c]); break;
+            case core::NR_OP_ITOF: r[c] = itof(a[c]); break;
+            case core::NR_OP_MOVC: r[c] = select(a[c], b[c], e[c]); break;
+            case core::NR_OP_LT: case core::NR_OP_GE: case core::NR_OP_EQ: case core::NR_OP_NE: r[c] = compare(a[c], b[c], op); break;
+            case core::NR_OP_IGE: r[c] = ige(a[c], b[c]); break;
+            case core::NR_OP_AND: r[c] = bitwise(a[c], b[c], false); break;
+            case core::NR_OP_OR: r[c] = bitwise(a[c], b[c], true); break;
+            case core::NR_OP_IADD: r[c] = iadd(a[c], b[c]); break;
+            default: r[c] = Val::any();
+            }
+        }
+        if (sat) for (auto &l : r) l = saturate(l);
+        if (dest_kind == 0 && dest_index < 16) for (unsigned c = 0; c < 4; ++c) if (mask & (1u << c)) temps[dest_index][c] = r[c];
+    }
+}
+}
+// Values each pixel-stage input register takes over `rect` for one triangle,
+// following the row shader's interpolation: constant, linear or perspective.
+inline std::array<interval::Lanes, 8> varying_intervals(const LoweredProgram &program, const DrawPlan &plan, size_t first, Rect rect) {
+    std::array<interval::Lanes, 8> inputs;
+    for (auto &l : inputs) for (auto &v : l) v = interval::Val::any();
+    const core::nr_projected *v[3]{&plan.projected[first], &plan.projected[first + 1], &plan.projected[first + 2]};
+    const float x[3]{v[0]->x, v[1]->x, v[2]->x}, y[3]{v[0]->y, v[1]->y, v[2]->y};
+    const float det = (x[1] - x[0]) * (y[2] - y[0]) - (x[2] - x[0]) * (y[1] - y[0]);
+    const bool planar = v[0]->inverse_w == 1.0f && v[1]->inverse_w == 1.0f && v[2]->inverse_w == 1.0f && std::fabs(det) > 1e-12f;
+    const float cx[2]{float(rect.x0) + 0.5f, float(rect.x1) - 0.5f}, cy[2]{float(rect.y0) + 0.5f, float(rect.y1) - 0.5f};
+    for (unsigned r = 0, k = 0; r < 8; ++r) {
+        if (!(program.ps_inputs & (1u << r))) continue;
+        const uint32_t mode = (program.interpolation >> (r * 4)) & 15u;
+        for (unsigned c = 0; c < 4; ++c) {
+            const float q[3]{NR_V4_LANE(v[0]->varying[k], c), NR_V4_LANE(v[1]->varying[k], c), NR_V4_LANE(v[2]->varying[k], c)};
+            if (!std::isfinite(q[0]) || !std::isfinite(q[1]) || !std::isfinite(q[2])) continue;
+            if (mode == 1) { inputs[r][c] = interval::Val::range(q[0], q[0]); continue; }
+            double lo = std::min({q[0], q[1], q[2]}), hi = std::max({q[0], q[1], q[2]});
+            if (planar) {
+                const double a = ((q[1] - q[0]) * (y[2] - y[0]) - (q[2] - q[0]) * (y[1] - y[0])) / det, b = ((x[1] - x[0]) * (q[2] - q[0]) - (x[2] - x[0]) * (q[1] - q[0])) / det;
+                lo = 1e300; hi = -1e300;
+                for (float px : cx) for (float py : cy) { const double s = q[0] + a * (px - x[0]) + b * (py - y[0]); lo = std::min(lo, s); hi = std::max(hi, s); }
+                // Interpolation drift guard, then the vertex hull keeps the bound honest.
+                const double margin = 1e-5 * (1.0 + std::fabs(hi - lo)); lo -= margin; hi += margin;
+                lo = std::max(lo, double(std::min({q[0], q[1], q[2]})) - margin); hi = std::min(hi, double(std::max({q[0], q[1], q[2]})) + margin);
+            }
+            inputs[r][c] = interval::Val::range(lo, hi);
+        }
+        ++k;
+    }
+    return inputs;
+}
+// Texel window of texture `t` over `rect` from interval evaluation of the pixel stage; empty when unbounded.
+inline bool interval_window(const LoweredProgram &program, const DrawPlan &plan, Rect rect, unsigned t, uint32_t tw, uint32_t th, bool point, Rect &out) {
+    double umin = 1e300, umax = -1e300, vmin = 1e300, vmax = -1e300; bool any = false;
+    for (size_t first = 0; first + 2 < plan.projected.size(); first += 3) {
+        const core::nr_projected *v[3]{&plan.projected[first], &plan.projected[first + 1], &plan.projected[first + 2]};
+        const Rect bbox{int32_t(std::floor(std::min({v[0]->x, v[1]->x, v[2]->x}))), int32_t(std::floor(std::min({v[0]->y, v[1]->y, v[2]->y}))),
+                        int32_t(std::ceil(std::max({v[0]->x, v[1]->x, v[2]->x}))) + 1, int32_t(std::ceil(std::max({v[0]->y, v[1]->y, v[2]->y}))) + 1};
+        const Rect clipped = intersect(bbox, rect);
+        if (clipped.empty()) continue;
+        std::array<interval::Window, NR_FRAME_MAX_TEXTURES> windows{};
+        interval::evaluate(program, plan.constants, varying_intervals(program, plan, first, clipped), windows);
+        const auto &w = windows[t];
+        if (!w.any) continue;
+        if (!w.bounded) return false;
+        umin = std::min(umin, w.umin); umax = std::max(umax, w.umax); vmin = std::min(vmin, w.vmin); vmax = std::max(vmax, w.vmax); any = true;
+    }
+    if (!any) { out = {0, 0, 0, 0}; return true; }
+    auto clamp01 = [](double x) { return x < 0 ? 0.0 : (x > 1 ? 1.0 : x); };
+    const double half = point ? 0.0 : 0.5;
+    out = {std::max(0, int32_t(std::floor(clamp01(umin) * double(tw) - half)) - 1), std::max(0, int32_t(std::floor(clamp01(vmin) * double(th) - half)) - 1),
+           std::min(int32_t(tw), int32_t(std::floor(clamp01(umax) * double(tw) - half)) + 3), std::min(int32_t(th), int32_t(std::floor(clamp01(vmax) * double(th) - half)) + 3)};
+    return true;
 }
 // Projects a draw with the kernel's arithmetic and bounds its coverage and sampling.
 inline DrawPlan plan_draw(const LoweredProgram &program, const std::vector<uint32_t> &packed_vertices, uint32_t vertex_count,
                           const std::vector<uint32_t> &constants, const std::array<float, 4> &viewport,
                           const std::array<uint32_t, NR_FRAME_MAX_TEXTURES> &texture_width, const std::array<uint32_t, NR_FRAME_MAX_TEXTURES> &texture_height,
                           const std::array<bool, NR_FRAME_MAX_TEXTURES> &point_filter) {
-    DrawPlan plan;
+    DrawPlan plan; plan.constants = constants;
     Command command; command.program = 0; command.vertices = packed_vertices; command.vertex_count = vertex_count; command.constants = constants;
     command.viewport = viewport; command.clip = {0, 0, 1, 1};
     // Planning never samples, but the kernel contract binds every texture the program declares: one-texel windows stand in.
@@ -107,7 +353,12 @@ inline DrawPlan plan_draw(const LoweredProgram &program, const std::vector<uint3
     for (unsigned t = 0; t < program.texture_slots.size() && t < NR_FRAME_MAX_TEXTURES; ++t) {
         const auto &src = sources[t];
         const uint32_t tw = texture_width[t], th = texture_height[t];
-        if (!src.direct || src.taps.empty() || !tw || !th) { plan.whole[t] = true; plan.texels[t] = {0, 0, int32_t(tw), int32_t(th)}; continue; }
+        if (!tw || !th) { plan.whole[t] = true; plan.texels[t] = {0, 0, int32_t(tw), int32_t(th)}; continue; }
+        if (!src.direct || src.taps.empty()) {
+            Rect window;
+            if (interval_window(program, plan, plan.bounds, t, tw, th, point_filter[t], window)) { plan.texels[t] = window; continue; }
+            plan.whole[t] = true; plan.texels[t] = {0, 0, int32_t(tw), int32_t(th)}; continue;
+        }
         float umin = 1e30f, umax = -1e30f, vmin = 1e30f, vmax = -1e30f; bool finite = true;
         for (const auto &tap : src.taps) {
             // Varying index of the input register inside the projected varyings.
@@ -140,7 +391,11 @@ inline DrawPlan plan_draw(const LoweredProgram &program, const std::vector<uint3
 inline Rect texel_window(const LoweredProgram &program, const DrawPlan &plan, Rect rect, unsigned t, uint32_t tw, uint32_t th, bool point) {
     if (plan.whole[t] || !tw || !th) return {0, 0, int32_t(tw), int32_t(th)};
     const auto sources = coordinate_sources(program); const auto &source = sources[t];
-    if (!source.direct || source.taps.empty()) return plan.texels[t];
+    if (!source.direct || source.taps.empty()) {
+        Rect window;
+        if (interval_window(program, plan, rect, t, tw, th, point, window)) return intersect(window, plan.texels[t]);
+        return plan.texels[t];
+    }
     float umin = 1e30f, umax = -1e30f, vmin = 1e30f, vmax = -1e30f; bool any = false;
     for (const auto &src : source.taps) {
     uint32_t varying = 0; bool found = false;

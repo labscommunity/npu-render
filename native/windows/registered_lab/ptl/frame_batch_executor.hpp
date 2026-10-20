@@ -96,6 +96,7 @@ class FrameBatchExecutor {
     };
     struct Stats { uint64_t kernel_requests = 0, covered = 0, escapes = 0, executed = 0, fallback = 0; double kernel_ms = 0, host_ms = 0; };
     const std::vector<Shader> *current_shaders = nullptr;   // shaders of the batch being executed
+    const bool force_fallback = [] { char *v = nullptr; size_t n = 0; const bool on = !_dupenv_s(&v, &n, "NR_RENDER_FRAME_BATCH_FORCE_FALLBACK") && v && *v == '1'; std::free(v); return on; }();
     static std::string sampler_key(const std::array<TextureBinding, 4> &t) {
         std::string key; for (const auto &b : t) key += std::to_string(b.filter) + ":" + std::to_string(b.address_u) + ":" + std::to_string(b.address_v) + ",";
         return key;
@@ -213,6 +214,18 @@ public:
         if (missing.empty()) {
             // Plan every draw, then execute runs in order.
             for (auto &d : draws) if (d.record.kind == 0) plan(d, batch_shaders, refs);
+            // One row per batch naming every command: which shader, how much of the target it
+            // covers, which blob and tile serve it, or why it takes the per-draw route.
+            std::string listing;
+            for (const auto &d : draws) {
+                if (!listing.empty()) listing += ",";
+                if (d.record.kind == 1) { listing += "{\"clear\":true}"; continue; }
+                const auto &b = d.scissor_bounds; char item[256];
+                std::snprintf(item, sizeof item, "{\"ps\":\"%.8s\",\"bounds\":[%d,%d,%d,%d],\"textures\":%u,\"tile\":%u,\"blob\":%u,\"route\":\"%s\"}",
+                              batch_shaders[d.record.pixel_shader].sha.c_str(), b.x0, b.y0, b.x1, b.y1, d.record.texture_count, d.eligible ? d.tile : 0u, d.eligible ? d.blob : 0u, d.eligible ? "kernel" : d.route.c_str());
+                listing += item;
+            }
+            std::printf("{\"frame_batch_commands\":true,\"sequence\":%u,\"commands\":[%s]}\n", header.sequence, listing.c_str()); std::fflush(stdout);
             std::vector<size_t> run; size_t run_target = SIZE_MAX; uint32_t run_blob = UINT32_MAX;
             auto flush = [&] { if (!run.empty()) execute_run(draws, run, refs, dirty, stats); run.clear(); run_target = SIZE_MAX; run_blob = UINT32_MAX; };
             for (size_t n = 0; n < draws.size(); ++n) {
@@ -273,6 +286,7 @@ private:
         }
         d.program = found->second;
         if (!d.program->eligible()) { d.route = "fallback:" + d.program->rejection; return; }
+        if (force_fallback) { d.route = "fallback:forced"; return; }   // NR_RENDER_FRAME_BATCH_FORCE_FALLBACK: the qualified per-draw route as an oracle
         {
             const auto *identity = inventory->find(*d.program); require(identity != nullptr);
             if (!kernels[identity->blob]) { d.route = "fallback:kernel blob " + std::to_string(identity->blob) + " unavailable"; return; }

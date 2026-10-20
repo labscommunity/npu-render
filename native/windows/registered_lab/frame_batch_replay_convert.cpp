@@ -11,6 +11,7 @@
 #include <bcrypt.h>
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <map>
@@ -157,16 +158,33 @@ int wmain(int argc, wchar_t **argv) try {
     nr::frame::NativeInventory inventory;
     std::vector<std::unique_ptr<ex::Request>> requests; std::vector<const Recorded *> rows; std::vector<std::string> legacy_reason;
     std::map<std::string, uint32_t> reasons;
+    // Captures taken under the frame-batch driver hold abi-24 batch packets next to
+    // per-draw packets. Recorded batches replay as they were sent, in order, so the
+    // worker's resident state evolves exactly as it did live; their recorded replies
+    // carry timings, so correctness comes from a second replay with forced fallback.
+    std::vector<std::pair<const Recorded *, std::vector<uint8_t>>> recorded_batches;
     for (const auto &[ticket, r] : recorded) {
         if (ticket >= limit) break;
         if (r.file.empty() || r.response_sha.empty()) continue;
         std::ifstream f(capture / r.file, std::ios::binary); std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+        ex::Header h{}; if (bytes.size() >= sizeof(h)) std::memcpy(&h, bytes.data(), sizeof(h));
+        if (h.abi == fb::abi) { recorded_batches.emplace_back(&r, std::move(bytes)); requests.push_back(nullptr); rows.push_back(&r); legacy_reason.push_back("recorded batch"); continue; }
         requests.push_back(std::make_unique<ex::Request>(ex::decode(bytes))); rows.push_back(&r);
         std::string reason; if (!batchable(*requests.back(), inventory, reason)) ++reasons[reason];
         legacy_reason.push_back(reason);
     }
-    std::ofstream list(output / "batches.jsonl"); uint32_t sequence = 0, legacy = 0; size_t n = 0;
+    std::ofstream list(output / "batches.jsonl"); uint32_t sequence = 0, legacy = 0, passthrough = 0; size_t n = 0;
     while (n < requests.size()) {
+        if (!requests[n]) {
+            // A recorded batch: written unchanged under a sequence of its own.
+            const auto &bytes = recorded_batches[passthrough++].second; ++sequence;
+            fb::BatchHeader bh{}; std::memcpy(&bh, bytes.data() + sizeof(ex::Header), sizeof(bh));
+            char name[64]; std::snprintf(name, sizeof name, "batch-%06u.bin", sequence);
+            std::ofstream(output / name, std::ios::binary).write(reinterpret_cast<const char *>(bytes.data()), std::streamsize(bytes.size()));
+            list << "{\"batch\":" << sequence << ",\"recorded\":true,\"file\":\"" << name << "\",\"bytes\":" << bytes.size() << ",\"commands\":" << bh.command_count << ",\"resources\":" << bh.resource_count
+                 << ",\"uploads\":" << bh.upload_count << ",\"tickets\":[" << rows[n]->ticket << "]}\n";
+            ++n; continue;
+        }
         if (!legacy_reason[n].empty()) {
             // Not batchable: the recorded per-draw packet replays as is.
             ++legacy;
@@ -200,7 +218,7 @@ int wmain(int argc, wchar_t **argv) try {
         list << "]}\n";
         n = m;
     }
-    std::printf("{\"frame_batch_convert\":true,\"requests\":%zu,\"batches\":%u,\"legacy\":%u,\"mode\":\"%s\",\"legacy_reasons\":{", requests.size(), sequence, legacy, chained ? "chained" : "per-draw");
+    std::printf("{\"frame_batch_convert\":true,\"requests\":%zu,\"batches\":%u,\"recorded_batches\":%u,\"legacy\":%u,\"mode\":\"%s\",\"legacy_reasons\":{", requests.size(), sequence, passthrough, legacy, chained ? "chained" : "per-draw");
     bool first_reason = true; for (const auto &[reason, count] : reasons) { std::printf("%s\"%s\":%u", first_reason ? "" : ",", reason.c_str(), count); first_reason = false; }
     std::printf("}}\n");
     return 0;

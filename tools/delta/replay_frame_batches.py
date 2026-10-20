@@ -92,6 +92,48 @@ def apply_reply(reply, image, width, height):
     return response
 
 
+def parse_targets(reply):
+    """Response header fields and the dirty rectangles (key, x, y, w, h, pixels) of a reply."""
+    at = HEADER.size
+    fields = RESPONSE_HEADER.unpack_from(reply, at)
+    at += RESPONSE_HEADER.size
+    response = dict(
+        target_count=fields[2],
+        missing_count=fields[3],
+        provider_requests=fields[6],
+        kernel_ms=fields[8] / 1000,
+        host_ms=fields[9] / 1000,
+        commands_executed=fields[10],
+        commands_fallback=fields[11],
+        escapes=fields[12],
+    )
+    targets = []
+    if not response["missing_count"]:
+        for _ in range(response["target_count"]):
+            key, _version, x, y, w, h = TARGET_RECORD.unpack_from(reply, at)
+            at += TARGET_RECORD.size
+            targets.append((key, x, y, w, h, reply[at : at + w * h * 4]))
+            at += w * h * 4
+    return response, targets
+
+
+def compare_targets(ours, theirs):
+    """Pixel difference between two replies' dirty rectangles (same rectangles expected)."""
+    if len(ours) != len(theirs):
+        return dict(comparable=False)
+    worst, differing, total = 0, 0, 0
+    for a, b in zip(ours, theirs, strict=True):
+        if a[:5] != b[:5]:
+            return dict(comparable=False)
+        diff = compare(a[5], b[5])
+        worst = max(worst, diff["max_diff"])
+        differing += diff["differing_fraction"] * (len(a[5]) // 4)
+        total += len(a[5]) // 4
+    return dict(
+        comparable=True, max_diff=worst, differing_fraction=differing / total if total else 0
+    )
+
+
 def replay_reference(args, env, pipe, worker_pid, entry, out):
     """Replays the recorded per-draw packets of a batch; returns the final target pixels."""
     pixels = None
@@ -159,6 +201,14 @@ def main():
         default=0.01,
         help="largest tolerated differing pixel fraction",
     )
+    parser.add_argument(
+        "--compare-with",
+        type=Path,
+        help=(
+            "an earlier replay output of the same batches (for example one run with "
+            "NR_RENDER_FRAME_BATCH_FORCE_FALLBACK=1); recorded batches are compared per rectangle"
+        ),
+    )
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--timeout-ms", type=int, default=90000)
     args = parser.parse_args()
@@ -196,6 +246,8 @@ def main():
         passed=False,
         batches=len(batches),
         legacy_replayed=0,
+        recorded_replayed=0,
+        incomparable=[],
         matched=0,
         within_tolerance=0,
         beyond_tolerance=[],
@@ -286,10 +338,54 @@ def main():
                         record["stderr"] = result.stderr.decode(errors="replace")[-400:]
                         log.write(json.dumps(record) + "\n")
                         raise AssertionError(
-                            f"client failed at batch {entry.get('batch')} tickets {entry['tickets']}: "
-                            + record["stderr"]
+                            f"client failed at batch {entry.get('batch')} "
+                            f"tickets {entry['tickets']}: " + record["stderr"]
                         )
                     reply = (out / "reply.bin").read_bytes()
+                    if entry.get("recorded"):
+                        response, targets = parse_targets(reply)
+                        record.update(response)
+                        report["client_ms"] += elapsed
+                        report["kernel_ms"] += response["kernel_ms"]
+                        report["host_ms"] += response["host_ms"]
+                        report["kernel_requests"] += response["provider_requests"]
+                        report["commands"] += response["commands_executed"]
+                        report["commands_fallback"] += response["commands_fallback"]
+                        report["escapes"] += response["escapes"]
+                        report["recorded_replayed"] += 1
+                        if response["missing_count"]:
+                            report["missing"].append(entry["batch"])
+                        reply_name = f"batch-{entry['batch']:06d}-reply.bin"
+                        (out / reply_name).write_bytes(reply)
+                        if args.compare_with and not response["missing_count"]:
+                            other_path = args.compare_with / reply_name
+                            if other_path.exists():
+                                _, theirs = parse_targets(other_path.read_bytes())
+                                diff = compare_targets(targets, theirs)
+                                record.update(diff)
+                                if diff["comparable"]:
+                                    ok = (
+                                        diff["max_diff"] <= args.max_diff
+                                        and diff["differing_fraction"] <= args.max_fraction
+                                    )
+                                    record["within_tolerance"] = ok
+                                    if ok:
+                                        report["within_tolerance"] += 1
+                                    else:
+                                        report["beyond_tolerance"].append(entry["batch"])
+                                else:
+                                    report["incomparable"].append(entry["batch"])
+                        log.write(json.dumps(record) + "\n")
+                        (out / "reply.bin").unlink()
+                        if n % 50 == 0:
+                            save()
+                            print(
+                                json.dumps(
+                                    dict(replayed=n + 1, recorded=report["recorded_replayed"])
+                                ),
+                                flush=True,
+                            )
+                        continue
                     if legacy:
                         pixels = reply[HEADER.size + 48 :]
                         record["exact"] = (
@@ -361,18 +457,35 @@ def main():
                         )
             worker.wait(timeout=30)
             report["worker_exit"] = worker.returncode
-        batch_count = sum(1 for b in batches if not b.get("legacy"))
+        batch_count = sum(1 for b in batches if not b.get("legacy") and not b.get("recorded"))
+        recorded_count = sum(1 for b in batches if b.get("recorded"))
+        # A recorded batch may legitimately answer "missing" (the live driver then resent
+        # with uploads, and that resend is the next recorded packet).
+        converted_missing = [
+            m
+            for m in report["missing"]
+            if not any(b.get("recorded") and b.get("batch") == m for b in batches)
+        ]
+        report["recorded_missing"] = len(report["missing"]) - len(converted_missing)
         report["passed"] = (
-            report["matched"] == len(batches)
-            and not report["missing"]
+            report["matched"] + report["recorded_replayed"] == len(batches)
+            and not converted_missing
             and report["worker_exit"] == 0
         )
         if args.reference:
             report["passed"] = (
                 report["within_tolerance"] == batch_count
-                and not report["missing"]
+                and not converted_missing
                 and report["worker_exit"] == 0
-                and report["legacy_replayed"] + batch_count == len(batches)
+                and report["legacy_replayed"] + batch_count + report["recorded_replayed"]
+                == len(batches)
+            )
+        if args.compare_with:
+            report["passed"] = (
+                report["passed"]
+                and not report["beyond_tolerance"]
+                and not report["incomparable"]
+                and report["within_tolerance"] + report["recorded_missing"] == recorded_count
             )
     except Exception as error:  # noqa: BLE001
         report.update(error=repr(error), traceback=traceback.format_exc())

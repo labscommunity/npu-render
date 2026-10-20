@@ -66,7 +66,7 @@ struct FrameBatcher {
         std::shared_ptr<Allocation> allocation; bool is_volatile = false, target = false; uint64_t version = 0;
         std::vector<uint8_t> full;          // full upload (packed) when non-empty
         Rect window{}; std::vector<uint8_t> partial;   // partial upload (packed) of `window` when non-empty
-        Rect pending{};                     // union of the bounds this batch's commands write on the target
+        std::vector<Rect> pending;          // bounds of this batch's commands on the target
     };
     struct CommandEntry { frame_batch_detail::fb::CommandRecord record; std::vector<frame_batch_detail::fb::TextureBinding> bindings; std::vector<uint32_t> vertices, constants; };
     std::vector<ShaderEntry> shaders; std::vector<ResourceEntry> resources; std::vector<CommandEntry> commands;
@@ -80,7 +80,7 @@ struct FrameBatcher {
             if (r.allocation.get() != &a || !r.target) continue;
             if (!box) return true;
             const Rect read{box->left, box->top, box->right, box->bottom};
-            if (!nr::frame::intersect(r.pending, read).empty()) return true;
+            for (const auto &pending_rect : r.pending) if (!nr::frame::intersect(pending_rect, read).empty()) return true;
         }
         return false;
     }
@@ -104,12 +104,17 @@ struct FrameBatcher {
         ResourceEntry r; r.allocation = a; r.is_volatile = a->runtime_resource != nullptr; r.target = as_target;
         const auto &s = a->surface;
         if (!as_target && r.is_volatile) {
-            // Another process may write a shared surface between batches: compare the current
-            // pixels with the snapshot the worker holds and upload them again only when they differ.
-            auto snapshot = read_pixels(*a); snapshot_bytes += snapshot.size();
-            if (!a->worker_version || a->shadow.size() != snapshot.size() || std::memcmp(a->shadow.data(), snapshot.data(), snapshot.size()) != 0) {
-                a->content_version = next_content_version(); a->shadow = snapshot;
-                r.full = frame_batch_detail::packed(snapshot, s.format);
+            // Another process may write a shared surface between frames: compare the current
+            // pixels with the snapshot the worker holds and upload them again only when they
+            // differ. The compositor reads each surface once per frame, so one comparison per
+            // present is enough.
+            const uint64_t frame = counters.present_requests + 1;
+            if (a->snapshot_frame != frame || !a->worker_version) {
+                auto snapshot = read_pixels(*a); snapshot_bytes += snapshot.size(); a->snapshot_frame = frame;
+                if (!a->worker_version || a->shadow.size() != snapshot.size() || std::memcmp(a->shadow.data(), snapshot.data(), snapshot.size()) != 0) {
+                    a->content_version = next_content_version(); a->shadow = snapshot;
+                    r.full = frame_batch_detail::packed(snapshot, s.format);
+                }
             }
             a->clear_dirty();
         } else if (a->worker_version != a->content_version) {
@@ -219,11 +224,7 @@ struct FrameBatcher {
         commands.push_back(std::move(c)); ++draws;
         return true;
     }
-    static void extend_pending(ResourceEntry &entry, const Rect &r) {
-        if (r.empty()) return;
-        if (entry.pending.empty()) entry.pending = r;
-        else entry.pending = {std::min(entry.pending.x0, r.x0), std::min(entry.pending.y0, r.y0), std::max(entry.pending.x1, r.x1), std::max(entry.pending.y1, r.y1)};
-    }
+    static void extend_pending(ResourceEntry &entry, const Rect &r) { if (!r.empty()) entry.pending.push_back(r); }
     void record_clear(const std::shared_ptr<Allocation> &target, const nr::raster::Color &color) {
         if (commands.size() >= 1000 || bytes > 40u * 1024 * 1024) flush("limit");
         CommandEntry c; c.record.kind = 1; c.record.target = resource_index(target, true);
@@ -303,10 +304,10 @@ struct FrameBatcher {
         // The worker executed the batch on the NPU through the local indexed pipe; the
         // probe-visible device string matches the per-draw indexed route it replaces.
         strncpy_s(counters.last_execution_device, "NPU (local indexed)", _TRUNCATE);
-        lab_trace("{\"event\":\"frame_batch_flushed\",\"reason\":\"%s\",\"sequence\":%llu,\"commands\":%zu,\"resources\":%zu,\"uploads\":%u,\"upload_bytes\":%zu,\"resent\":%u,\"bytes\":%zu,\"targets\":%u,\"writeback_bytes\":%llu,\"kernel_requests\":%llu,\"kernel_ms\":%.3f,\"worker_ms\":%.3f,\"wall_ms\":%llu,\"execution_device\":\"NPU\"}\n",
-            reason, (unsigned long long)sequence, commands.size(), resources.size(), uploads, uploaded, resent, bytes, response.target_count, (unsigned long long)writeback_bytes, (unsigned long long)response.provider_requests,
+        lab_trace("{\"event\":\"frame_batch_flushed\",\"reason\":\"%s\",\"sequence\":%llu,\"commands\":%zu,\"resources\":%zu,\"uploads\":%u,\"upload_bytes\":%zu,\"snapshot_bytes\":%llu,\"resent\":%u,\"bytes\":%zu,\"targets\":%u,\"writeback_bytes\":%llu,\"kernel_requests\":%llu,\"kernel_ms\":%.3f,\"worker_ms\":%.3f,\"wall_ms\":%llu,\"execution_device\":\"NPU\"}\n",
+            reason, (unsigned long long)sequence, commands.size(), resources.size(), uploads, uploaded, (unsigned long long)snapshot_bytes, resent, bytes, response.target_count, (unsigned long long)writeback_bytes, (unsigned long long)response.provider_requests,
             response.kernel_ms_x1000 / 1000.0, response.host_ms_x1000 / 1000.0, (unsigned long long)(GetTickCount64() - started));
-        writeback_bytes = 0;
+        writeback_bytes = 0; snapshot_bytes = 0;
         shaders.clear(); resources.clear(); commands.clear(); bytes = 0;
     }
 };

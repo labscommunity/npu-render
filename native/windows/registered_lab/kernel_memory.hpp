@@ -121,6 +121,7 @@ struct Allocation {
     // content, and the last snapshot sent of a surface another process may write.
     int32_t dirty_x0 = 0, dirty_y0 = 0, dirty_x1 = 0, dirty_y1 = 0; bool dirty_full = true;
     std::vector<uint8_t> shadow;
+    uint64_t snapshot_frame = 0;                            // present sequence of the last shared-surface comparison
     void mark_dirty(int32_t x0, int32_t y0, int32_t x1, int32_t y1) {
         if (dirty_full || x0 >= x1 || y0 >= y1) return;
         if (dirty_x0 >= dirty_x1 || dirty_y0 >= dirty_y1) { dirty_x0 = x0; dirty_y0 = y0; dirty_x1 = x1; dirty_y1 = y1; return; }
