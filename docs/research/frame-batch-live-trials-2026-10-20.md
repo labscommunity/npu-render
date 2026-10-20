@@ -107,3 +107,40 @@ These are controlled-desktop measurements on one machine. They do not measure
 Tahoma, GPU utilization or panel photons. CPU-side timings and request counts
 describe the pipeline's cost; only the display-counter-verified animation
 colors count as delivered updates.
+
+## Offline validation of the interval planner (trial 2 capture)
+
+Trial 2 recorded every packet DWM sent to the worker (1,335 requests: 1,002
+batch packets and 333 per-draw packets). `nr_frame_batch_replay_convert`
+passes recorded batches through unchanged and `replay_frame_batches.py` replays
+them in order through one worker built from the interval planner
+(`native-tree-v9`, `frame-replay-v5-124418\replay-kernel-2` on Delta):
+
+| Measure | Value |
+| --- | --- |
+| Batches replayed | 1,002 recorded + 116 converted, 217 per-draw packets |
+| Converted and per-draw results exact against the recorded responses | 333 of 333 |
+| Kernel escapes (taps outside a texel window) | 0 |
+| Acrylic-style shader c71638aa commands on the kernel route | 103 of 103, 128-pixel tiles |
+| Commands still falling back at fit time | 107 (318-348 vertex glyph draws, span budget) |
+
+Zero escapes across every batch means no tap ever left the windows the
+interval evaluation planned, so the kernel's output for those commands equals
+the output it would produce with the whole texture resident. The worker can
+also be forced onto the qualified per-draw route for every command
+(`NR_RENDER_FRAME_BATCH_FORCE_FALLBACK=1`) and the replay tool compares two
+such runs rectangle by rectangle; that oracle needs the per-draw route
+selectors that batched draws now carry (they were zero in trial 2's capture).
+
+Per-command listings from the replay show what the controlled animation makes
+DWM draw: each update is a five-pass redraw of a 960x768 region (two solid
+passes with 95b1c4fb, two textured passes with 595296ba, one 960x48 strip),
+about 3.7 million shaded pixels per frame, plus the acrylic strip. At the
+kernel's 0.2-0.4 us per pixel that is 130 ms of NPU time per frame before any
+flush or transport cost.
+
+Batched clears are host fills of the worker's resident target (the span
+background), not NPU kernel work; the driver still counts them as NPU
+operations because the registered probe expects eight NPU executions for six
+clears and two draws. That accounting needs a dedicated fill command or a new
+probe contract.

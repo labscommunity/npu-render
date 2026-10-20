@@ -438,13 +438,14 @@ Get-Content "$out\\report.json"
         + """ $compiledGenerations=@()
  foreach($log in @(Get-ChildItem "$r\\vm\\native-desktop-admission-v76\\bootstrap\\provider-processes\\generation-*\\worker.stdout.jsonl" -File)){
   $events=@(Read-Rows $log.FullName|Where-Object {$_.ptl_turbo_import_verified -and $_.route -eq 'frame'})
-  if($events.Count -ne 6 -or @($events|Where-Object {!$_.requested -or !$_.readback -or $_.global_power_policy_changed}).Count){throw 'Frame kernel blob import readback absent or invalid'}
+  $blobCount=@(Get-Content "__FRAME_BLOBS__\\manifest.txt"|Where-Object {$_ -match '^\\d+ [0-9a-f]{64} '}).Count
+  if($events.Count -ne $blobCount -or @($events|Where-Object {!$_.requested -or !$_.readback -or $_.global_power_policy_changed}).Count){throw 'Frame kernel blob import readback absent or invalid'}
   $compiledGenerations+=@{generation=$log.Directory.Name;frame_blob_imports=$events.Count}
  }
  if(!$compiledGenerations.Count){throw 'No frame kernel provider generation'}
 """
         + live[end:]
-    )
+    ).replace("__FRAME_BLOBS__", frame_blobs)
     # Per-route specialization gates assumed every DWM draw took a per-draw route; frame batches replace them with batch evidence.
     start = live.index(" $ptlRows=@(Get-ChildItem")
     end = live.index(" $report.active_phase='freshness-validation';Save-Report")
