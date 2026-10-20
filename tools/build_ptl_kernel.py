@@ -9,6 +9,7 @@ import ctypes as C
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import traceback
@@ -36,6 +37,9 @@ def output_bytes(pointer, size, limit=MAX_OUTPUT):
     if not 0 <= size <= limit or (size and not pointer):
         raise ValueError("Invalid tool output extent")
     return C.string_at(pointer, size) if size else b""
+
+
+OPTIMIZATION = b"-O2"
 
 
 def transform(root, source, output, assemble=False):
@@ -66,7 +70,7 @@ def transform(root, source, output, assemble=False):
             b"-target-cpu",
             b"5000xx",
             b"-S",
-            b"-O2",
+            OPTIMIZATION,
             b"-x",
             b"c",
             b"entry.c",
@@ -159,6 +163,25 @@ def link(root, object_bytes):
         cleanup()
 
 
+def inline_local_includes(path):
+    """Expand `#include "name.h"` from the source directory; the compiler has no filesystem."""
+    text = path.read_bytes()
+    seen = set()
+
+    def expand(data, directory):
+        def replace(match):
+            name = match.group(1).decode()
+            target = (directory / name).resolve()
+            if not target.is_file() or target in seen:
+                raise ValueError(f"Unresolvable or repeated local include: {name}")
+            seen.add(target)
+            return expand(target.read_bytes(), target.parent)
+
+        return re.sub(rb'^[ \t]*#include[ \t]+"([^"]+)"[ \t]*$', replace, data, flags=re.M)
+
+    return expand(text, path.resolve().parent)
+
+
 def write(path, report):
     path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 
@@ -169,7 +192,12 @@ def main():
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--child", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument(
+        "--optimize", choices=["O1", "O2", "O3", "Os", "Oz"], default="O2", help="compiler level"
+    )
     args = parser.parse_args()
+    global OPTIMIZATION
+    OPTIMIZATION = ("-" + args.optimize).encode()
     report = {
         "started": datetime.now(UTC).isoformat(),
         "completed": False,
@@ -177,6 +205,7 @@ def main():
         "target": "5000xx",
         "npu_execution_tested": False,
         "driver_changed": False,
+        "optimization": args.optimize,
     }
     if not args.child:
         args.output.mkdir(parents=True, exist_ok=False)
@@ -186,7 +215,7 @@ def main():
             raise RuntimeError("The qualified toolchain requires Windows")
         root = args.toolchain.resolve()
         report["toolchain_sha256"] = checked_toolchain(root)
-        source = args.source.read_bytes()
+        source = inline_local_includes(args.source)
         if not 0 < len(source) <= 256 * 1024:
             raise ValueError("Kernel source must contain 1..262144 bytes")
         report["source_sha256"] = hashlib.sha256(source).hexdigest()
@@ -219,6 +248,8 @@ def main():
                 str(snapshot.resolve()),
                 "--output",
                 str(args.output.resolve()),
+                "--optimize",
+                args.optimize,
             ]
             with (
                 (args.output / "child.stdout.log").open("xb") as stdout,
