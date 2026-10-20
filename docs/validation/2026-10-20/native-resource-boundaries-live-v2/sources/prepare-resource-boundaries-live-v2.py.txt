@@ -1,0 +1,119 @@
+"""Use complete hazard scopes and qualify imports separately for each child."""
+from pathlib import Path
+import ast
+import hashlib
+import json
+import re
+
+r = Path(__file__).parent
+changes = {
+    "native-registration-v50": "native-registration-v51",
+    "native-registered-v50": "native-registered-v51",
+    "NativeRecovery-v50": "NativeRecovery-v51",
+    "native_shared_app_v17": "native_shared_app_v18",
+    "native_desktop_bootstrap_v45": "native_desktop_bootstrap_v46",
+    "native-desktop-v71": "native-desktop-v72",
+    "native-desktop-admission-v71": "native-desktop-admission-v72",
+    "NativeDesktopRecovery-v71": "NativeDesktopRecovery-v72",
+    "native-live-v61": "native-live-v62",
+    "NativeLiveV61": "NativeLiveV62",
+    "native-topology-primary-v47": "native-topology-primary-v48",
+    "native-topology-v120": "native-topology-v123",
+    "native-topology-v121": "native-topology-v124",
+    "native-topology-v122": "native-topology-v125",
+    "InspectTopology-V120": "InspectTopology-V123",
+    "InspectTopology-V121": "InspectTopology-V124",
+    "InspectTopology-V122": "InspectTopology-V125",
+    "observer122": "observer125",
+    "dismiss-native-saver-v36": "dismiss-native-saver-v37",
+    "dismiss-v36": "dismiss-v37",
+    "ptl-native-live-v25": "ptl-native-live-v26",
+    "native-latency-v25-analysis": "native-latency-v26-analysis",
+    "native-presentation-v22-analysis": "native-presentation-v23-analysis",
+    "native-repeated-input-v8-analysis": "native-repeated-input-v9-analysis",
+    "ptl-combined-desktop-v13": "ptl-combined-desktop-v14",
+    "analyze-native-latency-v23.py": "analyze-native-latency-v24.py",
+    "analyze-native-presentation-v22.py": "analyze-native-presentation-v23.py",
+    "native-driver-package-v21": "native-driver-package-v22",
+    "package-native-driver-v21": "package-native-driver-v22",
+    "native-registration-stage-v21": "native-registration-stage-v22",
+    "0.0.1321.0": "0.0.1322.0",
+    "native-resource-boundaries-v1": "native-resource-boundaries-v2",
+    "B92B9C706FC366BE26FFB3C9B88088914AE64AA8466280C0BA117079074664C3":
+        "3D5177010A8CE2AD8EB3356A92F1EC36C46E01637ECE33435A9E7C7603D5EB3C",
+}
+pattern = re.compile("|".join(re.escape(x) for x in sorted(changes, key=len, reverse=True)))
+
+
+def rename(s):
+    return pattern.sub(lambda m: changes[m[0]], s)
+
+
+files = [n for n in json.loads((r / "ptl-combined-live-v13-upload.json").read_text())
+         if not n.endswith("-source.json")]
+for name in files:
+    s = rename((r / name).read_text())
+    s = s.replace("native-desktop-admission-v70", "native-desktop-admission-v71")
+    s = s.replace("native-registration-v49", "native-registration-v50")
+    if name == "native_shared_app_v17.py":
+        s = s.replace("from native_shared_correlation_v1 import", "from native_shared_correlation_v2 import")
+        s = s.replace("native-shared-correlation-v1/report.json", "native-shared-correlation-v2/report.json")
+        old = "   children=list((self.transaction/'bootstrap/provider-processes').glob('generation-*/worker.stdout.jsonl'));assert len(children)==1\n   child=complete_rows(children[0]);assert len(identities)==len(receipts)==len(acks)==8"
+        new = "   paths=list((self.transaction/'bootstrap/provider-processes').glob('generation-*/worker.stdout.jsonl'))\n   child={int(path.parent.name.split('-')[-1]):complete_rows(path) for path in paths};assert len(identities)==len(receipts)==len(acks)==8"
+        assert s.count(old) == 1
+        s = s.replace(old, new)
+    if name == "run-native-live-v61.ps1":
+        needle = " $ptlRows=@(Get-ChildItem "
+        assert s.count(needle) == 1
+        s = s.replace(needle, r''' & "$r\toolchains\openvino-2026.4.1\Scripts\python.exe" "$r\vm\native_provider_generation_audit_v1.py" --bootstrap "$r\vm\native-desktop-admission-v72\bootstrap" --output "$out\provider-generation-audit" *> "$out\provider-generation-audit.log"
+ if($LASTEXITCODE){throw 'Per-generation provider verification failed'}
+ $generationProof=Get-Content "$out\provider-generation-audit\report.json" -Raw|ConvertFrom-Json
+ if(!$generationProof.completed -or !$generationProof.passed){throw 'Per-generation provider evidence incomplete'}
+ $report.provider_generation_audit_passed=$true
+''' + needle)
+        # Aggregate imports may increase on restart; the preceding audit retains
+        # exactly one import for each exercised route in each child generation.
+        for route in ("geometry", "program", "long", "complex", "rectangle", "resident_clip"):
+            needle = "$report.ptl_" + route + "_imports -ne 1"
+            assert s.count(needle) == 1
+            s = s.replace(needle, "$report.ptl_" + route + "_imports -lt 1")
+        start = s.index(" if($schedule.Count -ne 1)")
+        end = s.index(" $report.active_phase='freshness-validation'", start)
+        s = s[:start] + r''' if($schedule.Count -lt 1 -or $schedule.Count -ne $generationProof.balanced_schedules){throw 'Per-generation balanced geometry schedule not qualified'}
+ $report.ptl_balanced_geometry_schedule=@($schedule)
+''' + s[end:]
+    if name == "run-ptl-native-live-v25.ps1":
+        s = s.replace("$q.ptl_resident_clip_imports -ne 1", "$q.ptl_resident_clip_imports -lt 1")
+        for route in ("geometry", "program", "long", "complex", "rectangle"):
+            s = s.replace("$q.ptl_" + route + "_imports -ne 1", "$q.ptl_" + route + "_imports -lt 1")
+        needle = " if($q.ptl_quad_rectangle_executions"
+        assert s.count(needle) == 1
+        s = s.replace(needle, " if(!$q.provider_generation_audit_passed -or $q.ptl_quad_rectangle_executions")
+    if name == "run-ptl-combined-desktop-v13.ps1":
+        needle = " $report.diagnostic_only=$true;"
+        assert s.count(needle) == 1
+        s = s.replace(needle, r''' $q=Get-Content "$vm\native-shared-correlation-v2\report.json" -Raw|ConvertFrom-Json
+ if(!$q.completed -or !$q.passed -or @($q.rejections).Count -ne 13){throw 'Shared recovery correlation not qualified'}
+ $q=Get-Content "$vm\native-live61-device-loss-replay-v1\report.json" -Raw|ConvertFrom-Json
+ if(!$q.completed -or !$q.passed -or !$q.all_six_npu_outputs_identical){throw 'Captured device-loss replay incomplete'}
+''' + needle)
+    if name.endswith(".py"):
+        ast.parse(s)
+    dest = r / rename(name)
+    assert not dest.exists(), dest
+    dest.write_text(s)
+extra = ["native_shared_correlation_v2.py", "native_provider_generation_audit_v1.py"]
+for old in ("native-registration-v50-source.json", "native-desktop-v71-source.json"):
+    names = [rename(n) for n in json.loads((r / old).read_text())]
+    if old.startswith("native-desktop"):
+        names.extend(extra)
+    (r / rename(old)).write_text(json.dumps({
+        n: hashlib.sha256((r / n).read_bytes()).hexdigest() for n in names
+    }, indent=2) + "\n")
+uploads = [rename(n) for n in files] + [
+    "native-registration-v51-source.json", "native-desktop-v72-source.json", *extra,
+]
+(r / "ptl-combined-live-v14-upload.json").write_text(json.dumps(uploads, indent=2) + "\n")
+print(json.dumps({"prepared": "resource boundary diagnostic with generation-aware evidence",
+                  "source_files": len(uploads), "worker_version": 24, "driver_package": 22,
+                  "desktop_changed": False}))

@@ -1,0 +1,58 @@
+"""Count logical texture-version bytes in observed runs, not physical residency."""
+from pathlib import Path
+from collections import Counter
+import argparse
+import hashlib
+import json
+
+p = argparse.ArgumentParser()
+p.add_argument("--analysis", type=Path, required=True)
+p.add_argument("--output", type=Path, required=True)
+a = p.parse_args()
+assert not a.output.exists()
+paths = [a.analysis / (name + ".jsonl") for name in
+         ("closed-calls", "drawing-runs", "worker-joins")]
+calls = {(x["pid"], x["epoch"], x["call"]): x for x in
+         map(json.loads, paths[0].read_text().splitlines())}
+runs = list(map(json.loads, paths[1].read_text().splitlines()))
+joins = {(x["pid"], x["epoch"], x["call"]): x for x in
+         map(json.loads, paths[2].read_text().splitlines())}
+result = []
+for run in runs:
+    if run["draws"] < 2:
+        continue
+    textures, shaders, reads = {}, Counter(), 0
+    for call in run["calls"]:
+        key = (run["pid"], run["epoch"], call)
+        if key in joins:
+            shaders[joins[key].get("pixel_sha256", "unknown")] += 1
+        for event in calls[key]["reads"]:
+            if (event["operation"] != "internal_pixel_read" or
+                    [event["context"], event["backing"]] == run["target"]):
+                continue
+            assert event["format"] in (28, 87, 65)
+            identity = (event["context"], event["backing"], event["version"])
+            textures[identity] = event
+            reads += 1
+    total = sum(e["width"] * e["height"] * (1 if e["format"] == 65 else 4)
+                for e in textures.values())
+    result.append(dict(pid=run["pid"], epoch=run["epoch"], calls=run["calls"],
+                       draws=run["draws"], target_external=run["target_external_alias_possible"],
+                       texture_versions=len(textures), texture_version_bytes=total,
+                       repeated_texture_reads=reads - len(textures),
+                       external_input=any(e["external_alias_possible"] for e in textures.values()),
+                       shaders=dict(shaders), stopped_by=run["stopped_by"]))
+report = dict(completed=True, passed=True, observed_only=True, safe_deferral_proven=False,
+              groups=len(result), draws=sum(x["draws"] for x in result),
+              private_targets=sum(not x["target_external"] for x in result),
+              private_small_texture_groups=sum(
+                  not x["target_external"] and not x["external_input"] and
+                  x["texture_version_bytes"] <= 65536 for x in result),
+              runs=result, source_sha256={p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+                                         for p in paths},
+              scope="Sums distinct logical texture versions referenced by each observed run. "
+                    "Excludes target-background reads, buffer reads and row padding. "
+                    "Not live memory, device residency, DRAM traffic, alias resolution or a safe schedule. "
+                    "The source trace's finite-prefix, alias and truncation limits still apply; see its report for scoped boundaries.")
+a.output.write_text(json.dumps(report, indent=2) + "\n")
+print(json.dumps({k: v for k, v in report.items() if k not in ("runs", "source_sha256")}))

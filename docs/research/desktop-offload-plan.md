@@ -89,8 +89,33 @@ not integrated. This does not resolve the much larger frame-rate gap.
 The [ordered rectangle batch component](../validation/2026-10-20/native-command-batch-component-v1/README.md)
 passes 120 exact NPU fixtures and lowers its synthetic 1024×768 case from 242 ms
 for separate optimized submissions to 46 ms batched. This is component evidence;
-it does not change the 0.8/s desktop result. Owned resource checkpoints, partial
-batch recovery, textured operations and Windows integration remain outstanding.
+it does not change the 0.8/s desktop result. The
+[owned-checkpoint transaction](../validation/2026-10-20/native-command-batch-transaction-v1/README.md)
+now passes consecutive commits, immutable inputs, blocked pending reads, partial
+NPU failure/retry, stale-completion rejection and abandonment in a narrow C++
+prototype. Textured operations and Windows queue integration remain outstanding.
+
+The [Windows resource diagnostic](../validation/2026-10-20/native-resource-boundaries-v1/README.md)
+observes 380 of 461 closed DWM draws in 78 multi-draw runs under a private-input
+snapshot assumption. This is evidence of grouping opportunities, not safe
+deferral. Its largest run references 48.3 MB of logical texture versions; tiny
+solid-color batching is not representative of those inputs. Missing hazard scopes
+and a capped trace limit V1's coverage. The live diagnostic fails after a real
+NPU device loss is recovered but a single-generation test assumption rejects the
+later application check. Recovery restores the machine.
+The [isolated replay and evidence fix](../validation/2026-10-20/native-device-loss-recovery-v1/README.md)
+preserve that failure, reproduce its output six times without a new fault, and
+verify application work across child generations with negative tests. The actual
+device-loss cause remains unresolved. These results do not replace the passing
+uninstrumented desktop baseline.
+
+The [revised resource diagnostic](../validation/2026-10-20/native-resource-boundaries-live-v2/README.md)
+passes physical delivery, shared-application work and restoration with 1,623 NPU
+receipts and no provider fault. Its capped DWM prefix has 412 closed draws, with
+copy and shader-view hazard scopes now present. The largest observed run has
+39 draws referencing 48.4 MB of logical texture versions. Animation remains
+0.7 verified updates/s in this instrumented run. Neither the diagnostic nor the
+recovery-check correction implements Windows batching or demonstrates GPU relief.
 
 The rectangle candidate also passes
 [two targeted provider-recovery scenarios](../validation/2026-10-20/native-quad-rectangle-recovery-v1/README.md);

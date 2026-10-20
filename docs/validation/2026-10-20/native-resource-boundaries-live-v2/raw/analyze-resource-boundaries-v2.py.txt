@@ -1,0 +1,282 @@
+"""Audit observed logical versions and bounded DDI intervals, never infer aliases."""
+from pathlib import Path
+from collections import Counter, defaultdict
+import argparse
+import hashlib
+import json
+import traceback
+
+WRITES = {
+    "host_upload_complete", "buffer_upload_complete", "ddi_unmap_write",
+    "copy_destination_submitted", "buffer_region_written", "kernel_fill_submitted",
+}
+READS = {
+    "internal_pixel_read", "vertex_read", "index_read", "constant_read",
+    "typed_buffer_read", "copy_source", "copy_region_source", "present_source",
+}
+CREATED = {"resource_created", "resource_opened_external", "buffer_created"}
+GLOBAL_BOUNDARIES = {"flush", "present", "rotate_resources", "hazard", "view_hazard", "destroy_device"}
+
+
+def obj(path):
+    return json.loads(path.read_text(encoding="utf-8-sig"))
+
+
+def rows(path):
+    result, partial = [], []
+    for number, line in enumerate(path.read_text(encoding="utf-8-sig").splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            result.append(json.loads(line))
+        except json.JSONDecodeError:
+            partial.append(number)
+    return result, partial
+
+
+def audit_epoch(events):
+    events = sorted(events, key=lambda e: e["serial"])
+    serials = [e["serial"] for e in events]
+    assert len(set(serials)) == len(serials)
+    gaps = [[left, right] for left, right in zip(serials, serials[1:]) if right != left + 1]
+    calls, unscoped = defaultdict(list), []
+    version, objects, creation = {}, {}, set()
+    version_checks = 0
+    discontinuities, missing_first_version = [], []
+    previous = None
+    for e in events:
+        assert e["logical_version_only"] is True and e["epoch"] > 0 and e["qpc"] > 0
+        if previous is not None and e["serial"] != previous + 1:
+            version.clear()
+            objects.clear()
+        previous = e["serial"]
+        (calls[e["call"]] if e["call"] else unscoped).append(e)
+        if not e["object"]:
+            assert not e["backing"] and not e["version"]
+            continue
+        assert e["context"] > 0 and e["backing"] > 0 and e["version"] > 0
+        identity = (e["context"], e["object"])
+        backing = (e["context"], e["backing"])
+        old = version.get(backing)
+        if old is not None:
+            expected = old + int(e["operation"] in WRITES)
+            if expected != e["version"]:
+                discontinuities.append({"serial": e["serial"], "operation": e["operation"],
+                                        "backing": list(backing), "prior": old,
+                                        "observed": e["version"], "expected": expected})
+            else:
+                version_checks += 1
+        elif e["version"] != 1:
+            missing_first_version.append(e["serial"])
+        version[backing] = e["version"]
+        old_object = objects.get(identity)
+        if old_object and old_object != backing:
+            assert e["operation"] == "rotate_after", ("unobserved backing rotation", e)
+        objects[identity] = backing
+        if e["operation"] in CREATED:
+            assert identity not in creation, ("duplicate object creation", identity)
+            creation.add(identity)
+    complete, incomplete = [], []
+    for call, es in calls.items():
+        begins = [e for e in es if e["operation"] == "call_begin"]
+        ends = [e for e in es if e["operation"] in ("call_success", "call_failed")]
+        contiguous = all(b["serial"] == a["serial"] + 1 for a, b in zip(es, es[1:]))
+        # Each scope emits its named operation immediately before call_begin.
+        closed = (len(begins) == len(ends) == 1 and len(es) >= 3
+                  and es[1] == begins[0] and es[-1] == ends[0] and contiguous)
+        if not closed:
+            incomplete.append({"call": call, "serial_first": es[0]["serial"],
+                               "serial_last": es[-1]["serial"], "events": len(es)})
+            continue
+        assert [e["qpc"] for e in es] == sorted(e["qpc"] for e in es)
+        before = sorted([e for e in es if e["operation"] == "rotate_before"],
+                        key=lambda e: e["argument"])
+        after = sorted([e for e in es if e["operation"] == "rotate_after"],
+                       key=lambda e: e["argument"])
+        if before and es[-1]["operation"] == "call_success":
+            assert len(before) == len(after) and len(before) > 1
+            assert [e["object"] for e in before] == [e["object"] for e in after]
+            expected = [(e["backing"], e["version"]) for e in before[1:] + before[:1]]
+            assert expected == [(e["backing"], e["version"]) for e in after]
+        complete.append({
+            "call": call, "context": es[0]["context"],
+            "operation": es[0]["operation"].split("::")[-1],
+            "first": es[0]["serial"], "last": es[-1]["serial"],
+            "begin_qpc": es[0]["qpc"], "end_qpc": es[-1]["qpc"],
+            "success": es[-1]["operation"] == "call_success",
+            "reads": [e for e in es if e["operation"] in READS],
+            "writes": [e for e in es if e["operation"] in WRITES],
+            "maps": [e for e in es if e["operation"] == "ddi_map_succeeded"],
+            "exchanges": [e for e in es if e["operation"] == "worker_exchange"],
+            "rotated_resources": len(before),
+        })
+    return dict(events=len(events), first_serial=serials[0], last_serial=serials[-1],
+                serial_gaps=gaps, complete_calls=complete, incomplete_calls=incomplete,
+                unscoped_events=len(unscoped), unscoped_operations=dict(Counter(
+                    e["operation"] for e in unscoped)),
+                operations=dict(Counter(e["operation"] for e in events)),
+                known_objects=len(creation), observed_object_ids=len({
+                    (e["context"], e["object"]) for e in events if e["object"]}),
+                external_alias_possible_objects=len({
+                    (e["context"], e["object"]) for e in events
+                    if e["object"] and e["external_alias_possible"]}),
+                logical_version_checks=version_checks,
+                first_observation_after_initial_version=len(missing_first_version),
+                logical_version_discontinuities=discontinuities,
+                # A finite trace still cannot prove coverage of external access or unobserved APIs.
+                complete_boundary_coverage=False)
+
+
+def drawing_runs(calls):
+    """Describe same-target draw opportunities, without claiming safe deferral."""
+    runs, current = [], None
+
+    def finish(reason):
+        nonlocal current
+        if current:
+            current["stopped_by"] = reason
+            runs.append(current)
+            current = None
+
+    for c in sorted(calls, key=lambda x: x["first"]):
+        op = c["operation"]
+        if current and (c["context"] != current["context"] or
+                        c["first"] != current["last_serial"] + 1):
+            finish("unobserved_interval_or_context_change")
+        if not c["success"]:
+            finish("failed_call")
+            continue
+        writes = c["writes"]
+        if op.startswith("draw") and len(writes) == 1:
+            target = writes[0]
+            key = [target["context"], target["backing"]]
+            if current and current["target"] != key:
+                finish("target_change")
+            if current is None:
+                current = dict(context=c["context"], target=key, draws=0,
+                               calls=[], first_qpc=c["begin_qpc"], last_serial=c["last"],
+                               input_versions=set(), target_external_alias_possible=False,
+                               intervening_input_maps=0)
+            current["draws"] += 1
+            current["calls"].append(c["call"])
+            current["last_serial"] = c["last"]
+            current["last_qpc"] = c["end_qpc"]
+            current["target_external_alias_possible"] |= target["external_alias_possible"]
+            current["input_versions"].update(
+                (e["context"], e["backing"], e["version"]) for e in c["reads"]
+                if [e["context"], e["backing"]] != key)
+        elif current and op in ("map", "unmap", "update_resource"):
+            accesses = c["maps"] + c["writes"]
+            if not accesses or any([e["context"], e["backing"]] == current["target"]
+                                   or e["external_alias_possible"] for e in accesses):
+                finish("target_or_external_access")
+            else:
+                current["intervening_input_maps"] += len(c["maps"])
+                current["last_serial"] = c["last"]
+        else:
+            finish(op if op in GLOBAL_BOUNDARIES else "other_observed_operation:" + op)
+    finish("trace_tail")
+    for x in runs:
+        x["distinct_input_versions"] = len(x.pop("input_versions"))
+        x["safe_to_defer_proven"] = False
+    return runs
+
+
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument("--root", type=Path, required=True)
+    p.add_argument("--trial", default="native-desktop-admission-v72")
+    p.add_argument("--output", type=Path, required=True)
+    a = p.parse_args()
+    a.output.mkdir(exist_ok=False)
+    report = dict(completed=False, passed=False, new_device_execution=False,
+                  full_desktop_offload=False, tahoma_tested=False)
+    try:
+        trial = a.root / a.trial
+        proof = obj(trial / "report.json")
+        assert proof["completed"] and proof["cleanup_passed"] and proof["memory_integrity_after"]
+        parent_path = trial / "bootstrap/worker.stdout.jsonl"
+        parent, partial_parent = rows(parent_path)
+        identities = {e["dispatch_ticket"]: e for e in parent if e.get("kind") == "request_identity"}
+        timelines = {e["dispatch_ticket"]: e for e in parent if e.get("kind") == "request_timeline"}
+        by_request = defaultdict(list)
+        for ticket, e in identities.items():
+            by_request[e["client_pid"], e["sequence"]].append(ticket)
+        inputs = [trial / "report.json", parent_path]
+        processes, all_calls, all_runs, joined = [], [], [], []
+        used_tickets = set()
+        for path in sorted((trial / "T8-NpuRender-NativeTraceV1").glob("process-*.jsonl")):
+            source, partial = rows(path)
+            epochs = defaultdict(list)
+            headers = [e for e in source if e.get("event") == "process"]
+            for e in source:
+                if e.get("event") == "resource_boundary":
+                    epochs[e["epoch"]].append(e)
+            if not epochs:
+                continue
+            assert headers and len({e["pid"] for e in headers}) == 1
+            pid = headers[0]["pid"]
+            assert path.name == f"process-{pid}.jsonl"
+            inputs.append(path)
+            process = dict(pid=pid, images=sorted({e["image"] for e in headers}),
+                           bytes=path.stat().st_size, lines=len(source),
+                           partial_lines=partial, trace_end_reason_unknown=True, epochs=[])
+            for epoch, events in epochs.items():
+                audit = audit_epoch(events)
+                assert not audit["logical_version_discontinuities"], audit["logical_version_discontinuities"][:5]
+                calls = audit.pop("complete_calls")
+                for call in calls:
+                    call.update(pid=pid, epoch=epoch)
+                    for e in call["exchanges"]:
+                        candidates = [
+                            t for t in by_request[pid, e["argument"]] if t in timelines
+                            if e["qpc"] <= timelines[t]["received_qpc"]
+                            <= timelines[t]["finished_qpc"] <= call["end_qpc"]
+                        ]
+                        assert len(candidates) == 1, (pid, epoch, call["call"], candidates)
+                        ticket = candidates[0]
+                        assert ticket not in used_tickets
+                        used_tickets.add(ticket)
+                        joined.append(dict(pid=pid, epoch=epoch, call=call["call"],
+                                           dispatch_ticket=ticket, **{
+                                               k: identities[ticket][k] for k in
+                                               ("sequence", "pixel_sha256") if k in identities[ticket]}))
+                runs = drawing_runs(calls)
+                for run in runs:
+                    run.update(pid=pid, epoch=epoch)
+                all_runs.extend(runs)
+                all_calls.extend(calls)
+                process["epochs"].append(dict(epoch=epoch, closed_calls=len(calls), **audit))
+            processes.append(process)
+        assert all_calls and joined and any("dwm.exe" in x["images"] for x in processes)
+        dwm_pids = {x["pid"] for x in processes if "dwm.exe" in x["images"]}
+        dwm_calls = [x for x in all_calls if x["pid"] in dwm_pids]
+        dwm_runs = [x for x in all_runs if x["pid"] in dwm_pids]
+        for name, data in (("closed-calls", all_calls), ("drawing-runs", all_runs),
+                           ("worker-joins", joined)):
+            (a.output / (name + ".jsonl")).write_text(
+                "".join(json.dumps(x, separators=(",", ":")) + "\n" for x in data))
+        report.update(passed=True, processes=processes, closed_calls=len(all_calls),
+                      worker_requests_joined=len(joined), parent_partial_lines=partial_parent,
+                      dwm=dict(closed_calls=len(dwm_calls),
+                               operations=dict(Counter(x["operation"] for x in dwm_calls)),
+                               observed_runs=len(dwm_runs),
+                               run_draw_histogram=dict(sorted(Counter(x["draws"] for x in dwm_runs).items())),
+                               multiple_draw_runs=sum(x["draws"] > 1 for x in dwm_runs),
+                               multiple_draw_run_commands=sum(x["draws"] for x in dwm_runs if x["draws"] > 1),
+                               largest_runs=sorted(dwm_runs, key=lambda x: x["draws"], reverse=True)[:10]),
+                      complete_boundary_coverage=False, safe_deferral_proven=False,
+                      source_sha256={str(path.relative_to(a.root)): hashlib.sha256(path.read_bytes()).hexdigest()
+                                     for path in inputs},
+                      limitations="Instrumented finite prefix only; trace caps and lease loss can truncate recording. Logical versions are not completion fences or identities for external shared aliases. Closed scopes and serial continuity are audited; incomplete calls and unscoped events are retained. V2 scopes copy-region, shader-view hazards and device destruction; resource aliases remain conservative. Draw runs are observed opportunities under an owned-input snapshot assumption, not safe batching proof. Hidden callbacks, external producers, deadline/size limits and Flush submission semantics must still be implemented. No timing speedup or Tahoma claim.")
+    except Exception as error:
+        report.update(error=repr(error), traceback=traceback.format_exc())
+    report["completed"] = True
+    (a.output / "report.json").write_text(json.dumps(report, indent=2) + "\n")
+    print(json.dumps({k: v for k, v in report.items() if k not in ("processes", "source_sha256")}))
+    if not report["passed"]:
+        raise SystemExit(1)
+
+
+if __name__ == "__main__":
+    main()

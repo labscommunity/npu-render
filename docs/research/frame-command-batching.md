@@ -56,6 +56,7 @@ cache or a repeated hash alone does not establish resource ownership.
 | Nonblocking map | Report still-drawing when needed; never expose stale bytes or poison an otherwise valid context. |
 | Discard/no-overwrite upload | Preserve storage referenced by pending commands; publish the new upload version explicitly. |
 | Resource copy | Order source reads and destination writes; account separately for host staging and NPU work. |
+| Resource or shader-view read-after-write hazard | Capture the dependency before the resource is bound as input; preserve the required version and ordering. |
 | Flush | Submit preceding work so completion does not depend on a future application-thread call. |
 | Present | Complete the selected surface version before the existing presentation handoff. |
 | Identity rotation | Preserve the allocation/version relation across swapchain identity changes. |
@@ -63,6 +64,14 @@ cache or a repeated hash alone does not establish resource ownership.
 
 The flush independence condition is explicit in the Windows interface contract.
 [Microsoft Flush documentation](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3d10umddi/nc-d3d10umddi-pfnd3d11_1ddi_flush).
+
+The runtime issues read-after-write hazard callbacks immediately before binding
+the resource as input. They indicate a dependency; they do not themselves require
+all unrelated work to finish on the CPU. A first conservative implementation may
+drain the context, but a versioned queue must preserve that dependency when it
+later avoids such drains.
+[Resource hazard](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3d10umddi/nc-d3d10umddi-pfnd3d10ddi_resourcereadafterwritehazard),
+[shader-view hazard](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3d10umddi/nc-d3d10umddi-pfnd3d10ddi_shaderresourceviewreadafterwritehazard).
 
 ## Recovery and bounded execution
 
@@ -166,3 +175,12 @@ correlation must select the explicit response generation, verify the child PID,
 and join operation identity and nested timing; child dispatch numbers restart.
 Provider imports must remain unique within each child, with all generation
 changes accounted for, rather than requiring one import across a recovered run.
+
+The [V2 diagnostic](../validation/2026-10-20/native-resource-boundaries-live-v2/README.md)
+passes the finite desktop checks with these observations and evidence fixes.
+Its DWM prefix has 412 draws, 144 shader-view hazards, 65 scoped copies and no
+unscoped events. There are 75 observed multi-draw runs containing 316 draws.
+The largest references 47 texture versions totalling 48.4 MB of logical bytes;
+only one run meets a 64 KiB private-texture bound. A small solid-color batch
+cannot represent the general workload. Immutable texture storage, bounded
+spatial working sets and actual Windows dependency handling remain required.

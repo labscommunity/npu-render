@@ -1,0 +1,477 @@
+{
+  "completed": true,
+  "passed": true,
+  "new_device_execution": false,
+  "full_desktop_offload": false,
+  "tahoma_tested": false,
+  "processes": [
+    {
+      "pid": 16980,
+      "images": [
+        "dwm.exe"
+      ],
+      "bytes": 4192450,
+      "lines": 16146,
+      "partial_lines": [],
+      "trace_end_reason_unknown": true,
+      "epochs": [
+        {
+          "epoch": 6960055206378,
+          "closed_calls": 2321,
+          "events": 13860,
+          "first_serial": 1,
+          "last_serial": 13860,
+          "serial_gaps": [],
+          "incomplete_calls": [],
+          "unscoped_events": 0,
+          "unscoped_operations": {},
+          "operations": {
+            "`anonymous-namespace'::create_resource": 226,
+            "call_begin": 2321,
+            "buffer_created": 55,
+            "call_success": 2321,
+            "buffer_upload_complete": 118,
+            "resource_created": 321,
+            "`anonymous-namespace'::destroy_resource": 128,
+            "resource_handle_destroy": 168,
+            "`anonymous-namespace'::update_resource": 132,
+            "host_upload_complete": 799,
+            "`anonymous-namespace'::map": 521,
+            "ddi_map_attempt": 521,
+            "ddi_map_succeeded": 521,
+            "`anonymous-namespace'::unmap": 521,
+            "ddi_unmap_write": 520,
+            "`anonymous-namespace'::clear": 137,
+            "worker_exchange": 549,
+            "`anonymous-namespace'::draw_indexed": 226,
+            "index_read": 226,
+            "vertex_read": 1288,
+            "constant_read": 658,
+            "internal_pixel_read": 873,
+            "`anonymous-namespace'::view_hazard": 144,
+            "ddi_view_hazard": 144,
+            "`anonymous-namespace'::copy_region": 65,
+            "copy_region_source": 65,
+            "`anonymous-namespace'::draw": 186,
+            "`anonymous-namespace'::present": 7,
+            "present_source": 7,
+            "`anonymous-namespace'::rotate_resources": 7,
+            "rotate_before": 21,
+            "rotate_after": 21,
+            "`anonymous-namespace'::flush": 21,
+            "ddi_flush": 21,
+            "ddi_unmap_read": 1
+          },
+          "known_objects": 376,
+          "observed_object_ids": 376,
+          "external_alias_possible_objects": 3,
+          "logical_version_checks": 5807,
+          "first_observation_after_initial_version": 165,
+          "logical_version_discontinuities": [],
+          "complete_boundary_coverage": false
+        }
+      ]
+    },
+    {
+      "pid": 4728,
+      "images": [
+        "WUDFHost.exe"
+      ],
+      "bytes": 4192519,
+      "lines": 15030,
+      "partial_lines": [],
+      "trace_end_reason_unknown": true,
+      "epochs": [
+        {
+          "epoch": 6960055811441,
+          "closed_calls": 3688,
+          "events": 14930,
+          "first_serial": 1,
+          "last_serial": 14930,
+          "serial_gaps": [],
+          "incomplete_calls": [
+            {
+              "call": 3695,
+              "serial_first": 14929,
+              "serial_last": 14930,
+              "events": 2
+            }
+          ],
+          "unscoped_events": 0,
+          "unscoped_operations": {},
+          "operations": {
+            "`anonymous-namespace'::open_resource": 4,
+            "call_begin": 3689,
+            "resource_opened_external": 4,
+            "call_success": 3688,
+            "`anonymous-namespace'::destroy_resource": 1,
+            "resource_handle_destroy": 1,
+            "`anonymous-namespace'::create_resource": 1,
+            "resource_created": 1,
+            "`anonymous-namespace'::copy_resource": 88,
+            "copy_source": 88,
+            "copy_destination_submitted": 88,
+            "`anonymous-namespace'::map": 88,
+            "ddi_map_attempt": 88,
+            "ddi_map_succeeded": 88,
+            "`anonymous-namespace'::unmap": 88,
+            "ddi_unmap_read": 88,
+            "`anonymous-namespace'::flush": 3419,
+            "ddi_flush": 3418
+          },
+          "known_objects": 5,
+          "observed_object_ids": 5,
+          "external_alias_possible_objects": 4,
+          "logical_version_checks": 441,
+          "first_observation_after_initial_version": 0,
+          "logical_version_discontinuities": [],
+          "complete_boundary_coverage": false
+        }
+      ]
+    }
+  ],
+  "closed_calls": 6009,
+  "worker_requests_joined": 549,
+  "parent_partial_lines": [],
+  "dwm": {
+    "closed_calls": 2321,
+    "operations": {
+      "create_resource": 226,
+      "destroy_resource": 128,
+      "update_resource": 132,
+      "map": 521,
+      "unmap": 521,
+      "clear": 137,
+      "draw_indexed": 226,
+      "view_hazard": 144,
+      "copy_region": 65,
+      "draw": 186,
+      "present": 7,
+      "rotate_resources": 7,
+      "flush": 21
+    },
+    "observed_runs": 171,
+    "run_draw_histogram": {
+      "1": 96,
+      "2": 25,
+      "3": 15,
+      "4": 3,
+      "5": 21,
+      "6": 6,
+      "7": 3,
+      "8": 1,
+      "39": 1
+    },
+    "multiple_draw_runs": 75,
+    "multiple_draw_run_commands": 316,
+    "largest_runs": [
+      {
+        "context": 1,
+        "target": [
+          1,
+          1524
+        ],
+        "draws": 39,
+        "calls": [
+          1531,
+          1536,
+          1541,
+          1546,
+          1551,
+          1556,
+          1561,
+          1566,
+          1569,
+          1570,
+          1571,
+          1572,
+          1573,
+          1578,
+          1584,
+          1589,
+          1594,
+          1599,
+          1604,
+          1605,
+          1610,
+          1615,
+          1620,
+          1625,
+          1630,
+          1635,
+          1640,
+          1645,
+          1646,
+          1647,
+          1648,
+          1649,
+          1654,
+          1659,
+          1664,
+          1669,
+          1675,
+          1680,
+          1685
+        ],
+        "first_qpc": 6960406674221,
+        "last_serial": 7817,
+        "target_external_alias_possible": false,
+        "intervening_input_maps": 56,
+        "last_qpc": 6960487922905,
+        "stopped_by": "other_observed_operation:create_resource",
+        "distinct_input_versions": 120,
+        "safe_to_defer_proven": false,
+        "pid": 16980,
+        "epoch": 6960055206378
+      },
+      {
+        "context": 1,
+        "target": [
+          1,
+          988
+        ],
+        "draws": 8,
+        "calls": [
+          1218,
+          1223,
+          1226,
+          1227,
+          1228,
+          1229,
+          1230,
+          1235
+        ],
+        "first_qpc": 6960309511645,
+        "last_serial": 5050,
+        "target_external_alias_possible": false,
+        "intervening_input_maps": 4,
+        "last_qpc": 6960337932258,
+        "stopped_by": "other_observed_operation:clear",
+        "distinct_input_versions": 20,
+        "safe_to_defer_proven": false,
+        "pid": 16980,
+        "epoch": 6960055206378
+      },
+      {
+        "context": 1,
+        "target": [
+          1,
+          44
+        ],
+        "draws": 7,
+        "calls": [
+          273,
+          278,
+          283,
+          288,
+          293,
+          298,
+          303
+        ],
+        "first_qpc": 6960058250109,
+        "last_serial": 793,
+        "target_external_alias_possible": false,
+        "intervening_input_maps": 12,
+        "last_qpc": 6960074453495,
+        "stopped_by": "other_observed_operation:clear",
+        "distinct_input_versions": 18,
+        "safe_to_defer_proven": false,
+        "pid": 16980,
+        "epoch": 6960055206378
+      },
+      {
+        "context": 1,
+        "target": [
+          1,
+          44
+        ],
+        "draws": 7,
+        "calls": [
+          356,
+          361,
+          366,
+          371,
+          376,
+          381,
+          386
+        ],
+        "first_qpc": 6960101236948,
+        "last_serial": 1214,
+        "target_external_alias_possible": false,
+        "intervening_input_maps": 12,
+        "last_qpc": 6960115088135,
+        "stopped_by": "view_hazard",
+        "distinct_input_versions": 18,
+        "safe_to_defer_proven": false,
+        "pid": 16980,
+        "epoch": 6960055206378
+      },
+      {
+        "context": 1,
+        "target": [
+          1,
+          44
+        ],
+        "draws": 7,
+        "calls": [
+          1750,
+          1755,
+          1760,
+          1765,
+          1770,
+          1775,
+          1780
+        ],
+        "first_qpc": 6960488270044,
+        "last_serial": 8183,
+        "target_external_alias_possible": false,
+        "intervening_input_maps": 14,
+        "last_qpc": 6960502793659,
+        "stopped_by": "target_change",
+        "distinct_input_versions": 18,
+        "safe_to_defer_proven": false,
+        "pid": 16980,
+        "epoch": 6960055206378
+      },
+      {
+        "context": 1,
+        "target": [
+          1,
+          40
+        ],
+        "draws": 6,
+        "calls": [
+          311,
+          318,
+          325,
+          332,
+          339,
+          346
+        ],
+        "first_qpc": 6960074806892,
+        "last_serial": 986,
+        "target_external_alias_possible": true,
+        "intervening_input_maps": 10,
+        "last_qpc": 6960100963339,
+        "stopped_by": "other_observed_operation:clear",
+        "distinct_input_versions": 16,
+        "safe_to_defer_proven": false,
+        "pid": 16980,
+        "epoch": 6960055206378
+      },
+      {
+        "context": 1,
+        "target": [
+          1,
+          988
+        ],
+        "draws": 6,
+        "calls": [
+          1118,
+          1123,
+          1128,
+          1133,
+          1138,
+          1143
+        ],
+        "first_qpc": 6960255937243,
+        "last_serial": 4515,
+        "target_external_alias_possible": false,
+        "intervening_input_maps": 10,
+        "last_qpc": 6960278175247,
+        "stopped_by": "other_observed_operation:clear",
+        "distinct_input_versions": 16,
+        "safe_to_defer_proven": false,
+        "pid": 16980,
+        "epoch": 6960055206378
+      },
+      {
+        "context": 1,
+        "target": [
+          1,
+          996
+        ],
+        "draws": 6,
+        "calls": [
+          1150,
+          1155,
+          1160,
+          1165,
+          1170,
+          1175
+        ],
+        "first_qpc": 6960278231853,
+        "last_serial": 4708,
+        "target_external_alias_possible": false,
+        "intervening_input_maps": 10,
+        "last_qpc": 6960287273571,
+        "stopped_by": "view_hazard",
+        "distinct_input_versions": 16,
+        "safe_to_defer_proven": false,
+        "pid": 16980,
+        "epoch": 6960055206378
+      },
+      {
+        "context": 1,
+        "target": [
+          1,
+          988
+        ],
+        "draws": 6,
+        "calls": [
+          1399,
+          1404,
+          1406,
+          1407,
+          1408,
+          1409
+        ],
+        "first_qpc": 6960366385154,
+        "last_serial": 6037,
+        "target_external_alias_possible": false,
+        "intervening_input_maps": 2,
+        "last_qpc": 6960374350221,
+        "stopped_by": "other_observed_operation:clear",
+        "distinct_input_versions": 15,
+        "safe_to_defer_proven": false,
+        "pid": 16980,
+        "epoch": 6960055206378
+      },
+      {
+        "context": 1,
+        "target": [
+          1,
+          42
+        ],
+        "draws": 6,
+        "calls": [
+          1814,
+          1821,
+          1828,
+          1835,
+          1842,
+          1849
+        ],
+        "first_qpc": 6960506250073,
+        "last_serial": 8512,
+        "target_external_alias_possible": true,
+        "intervening_input_maps": 10,
+        "last_qpc": 6960533676915,
+        "stopped_by": "other_observed_operation:clear",
+        "distinct_input_versions": 16,
+        "safe_to_defer_proven": false,
+        "pid": 16980,
+        "epoch": 6960055206378
+      }
+    ]
+  },
+  "complete_boundary_coverage": false,
+  "safe_deferral_proven": false,
+  "source_sha256": {
+    "native-desktop-admission-v72\\report.json": "e2c7b9fe59a918dfaeb0c95518d15b34101c604e9700dd90762dcc81fc29967e",
+    "native-desktop-admission-v72\\bootstrap\\worker.stdout.jsonl": "4588402fba031f5900027375f5a5e782807138dd304fe6b5b0516614867afbcd",
+    "native-desktop-admission-v72\\T8-NpuRender-NativeTraceV1\\process-16980.jsonl": "246f4aa3a223c4962db76e7dfc589c05601cc2adc928197e74c2a3613b432750",
+    "native-desktop-admission-v72\\T8-NpuRender-NativeTraceV1\\process-4728.jsonl": "5bdc10376ab84bf1acabc346c182c7ecb03b0ba6b26411a89102421e7b761e3b"
+  },
+  "limitations": "Instrumented finite prefix only; trace caps and lease loss can truncate recording. Logical versions are not completion fences or identities for external shared aliases. Closed scopes and serial continuity are audited; incomplete calls and unscoped events are retained. V2 scopes copy-region, shader-view hazards and device destruction; resource aliases remain conservative. Draw runs are observed opportunities under an owned-input snapshot assumption, not safe batching proof. Hidden callbacks, external producers, deadline/size limits and Flush submission semantics must still be implemented. No timing speedup or Tahoma claim."
+}

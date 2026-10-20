@@ -1,0 +1,41 @@
+from pathlib import Path
+import base64,subprocess,json,hashlib,concurrent.futures
+r=Path("results/render-driver")
+directories=['native-resource-boundaries-v2-qualification', 'ptl-combined-desktop-v14', 'native-driver-package-v22', 'native-registration-stage-v22', 'native-registration-v51', 'ptl-native-live-v26', 'native-live-v62', 'native-desktop-admission-v72', 'native-topology-v123', 'native-topology-v124', 'native-topology-v125', 'native-resource-boundaries-v2-analysis','native-latency-v26-analysis','native-presentation-v23-analysis','native-repeated-input-v9-analysis']
+extras=[]
+source_files=['run-native-registration-v51.ps1', 'recover-native-registration-v51.ps1', 'qualify-native-registered-v51.py', 'native_shared_app_v18.py', 'native_desktop_bootstrap_v46.py', 'run-native-desktop-v72.ps1', 'recover-native-desktop-v72.ps1', 'run-native-live-v62.ps1', 'start-native-topology-v123.ps1', 'start-native-topology-v125.ps1', 'dismiss-native-saver-v37.ps1', 'run-ptl-native-live-v26.ps1', 'analyze-native-latency-v24.py', 'analyze-native-presentation-v23.py', 'run-ptl-combined-desktop-v14.ps1', 'start-native-topology-v124.ps1', 'package-native-driver-v22.ps1', 'native-registration-v51-source.json', 'native-desktop-v72-source.json', 'native_shared_correlation_v2.py', 'native_provider_generation_audit_v1.py', 'analyze-resource-boundaries-v2.py', 'build-native-resource-boundaries-v2.ps1', 'run-native-resource-boundaries-v2-qualification.ps1', 'native-resource-boundaries-v2-source.json', 'native-resource-boundaries-v2/native/windows/registered_lab/buffer.hpp', 'native-resource-boundaries-v2/native/windows/registered_lab/copy_region.hpp', 'native-resource-boundaries-v2/native/windows/registered_lab/draw.hpp', 'native-resource-boundaries-v2/native/windows/registered_lab/driver.cpp', 'native-resource-boundaries-v2/native/windows/registered_lab/indexed_draw.hpp', 'native-resource-boundaries-v2/native/windows/registered_lab/indexed_exchange.hpp', 'native-resource-boundaries-v2/native/windows/registered_lab/kernel_memory.hpp', 'native-resource-boundaries-v2/native/windows/registered_lab/resource_identity.hpp', 'native-resource-boundaries-v2/native/windows/registered_lab/resource_trace.hpp']
+ps=r'''$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render"
+foreach($trial in @('ptl-combined-desktop-v14')){$q=Get-Content "$r\vm\$trial\report.json" -Raw|ConvertFrom-Json;if(!$q.completed){throw 'Cannot archive active comparison'}}
+function ArtifactHash([string]$path){$stream=[IO.File]::Open($path,[IO.FileMode]::Open,[IO.FileAccess]::Read,([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete));try{return (Get-FileHash -InputStream $stream -Algorithm SHA256).Hash}finally{$stream.Dispose()}}
+$items=@(foreach($name in @('''+','.join("'"+d+"'" for d in directories)+r''')){
+ if(!(Test-Path "$r\vm\$name")){continue}
+ Get-ChildItem "$r\vm\$name" -File -Recurse|Where-Object {($_.Extension -in @('.json','.jsonl','.log','.txt','.inf','.ps1','.py','.c','.cpp','.hpp')) -and ($_.Name -notlike 'client-*' -or ($_.Name -like '*.stderr.log' -and $_.Length -gt 0))}|ForEach-Object {
+ if($_.Length -gt 18000000){throw 'Unexpected artifact size'}
+ [ordered]@{source=$_.FullName.Substring(("$r\vm\").Length).Replace('\','/');bytes=$_.Length;sha256=(ArtifactHash $_.FullName)}
+ }
+}
+foreach($name in @('''+','.join("'"+d+"'" for d in extras+source_files)+r''')){[ordered]@{source=$name;bytes=(Get-Item "$r\vm\$name").Length;sha256=(ArtifactHash "$r\vm\$name")}}
+
+foreach($name in @('native-resource-boundaries-v2')){foreach($artifact in @('build-report.json','registered-build-report.json')){
+ $file="$r\builds\$name\$artifact";if(!(Test-Path $file)){continue}
+ [ordered]@{source="build-$name/$artifact";remote_source="builds/$name/$artifact";bytes=(Get-Item $file).Length;sha256=(ArtifactHash $file)}
+}}
+
+
+);$items|ConvertTo-Json -Depth 5
+'''
+p=r/'hash-native-primary-v109.ps1';p.write_text(ps)
+subprocess.run(['scp','-q',str(p),'delta:AppData/Local/npu-render/vm/'],capture_output=True,check=True,timeout=30)
+invoke=r'''$r="$env:LOCALAPPDATA\npu-render";& ([scriptblock]::Create([IO.File]::ReadAllText("$r\vm\hash-native-primary-v109.ps1")))'''
+result=subprocess.run(['ssh','-o','BatchMode=yes','-o','ConnectTimeout=8','delta','powershell.exe -NoProfile -NonInteractive -EncodedCommand '+base64.b64encode(invoke.encode('utf-16-le')).decode()],capture_output=True,timeout=45)
+if result.returncode:print(result.stderr.decode(errors='replace')[:2000]);raise SystemExit(result.returncode)
+receipts=json.loads(result.stdout.decode('utf-8-sig'));assert 0<len(receipts)<1000
+(r/'native-primary-v109-artifact-sha256.json').write_text(json.dumps(receipts,indent=2)+'\n')
+def fetch(item):
+    name=item['source'];assert '..' not in name and not name.startswith('/');dest=r/'primary-raw-v109'/name;dest.parent.mkdir(parents=True,exist_ok=True)
+    subprocess.run(['scp','-q','-o','BatchMode=yes','delta:AppData/Local/npu-render/'+item.get('remote_source','vm/'+name),str(dest)],capture_output=True,check=True,timeout=90)
+    data=dest.read_bytes();assert len(data)==item['bytes'] and hashlib.sha256(data).hexdigest()==item['sha256'].lower()
+    if name in source_files:assert data==(r/name).read_bytes()
+    return len(data)
+with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:sizes=list(pool.map(fetch,receipts))
+print(json.dumps(dict(hash_verified_files=len(sizes),bytes=sum(sizes),source_files_matched_local=len(source_files))))
