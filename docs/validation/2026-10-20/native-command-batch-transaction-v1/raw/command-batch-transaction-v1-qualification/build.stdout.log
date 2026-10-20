@@ -1,0 +1,422 @@
+MSBuild version 17.14.60+43b635718 for .NET Framework
+
+MSBuild version 17.14.60+43b635718 for .NET Framework
+
+  1>Checking Build System
+  Building Custom Rule C:/Users/tatef/AppData/Local/npu-render/vm/command-batch-transaction-v1/CMakeLists.txt
+  probe.cpp
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(19,7): error C2365: 'Rectangle': redefinition; previous definition was 'function' [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\um\wingdi.h(4639,24):
+      see declaration of 'Rectangle'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(41,96): error C2923: 'std::vector': 'Rectangle' is not a valid template type argument for parameter '_Ty' [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\um\wingdi.h(4639,24):
+      see declaration of 'Rectangle'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(41,96): error C2976: 'std::vector': too few template arguments [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(442,7):
+      see declaration of 'std::vector'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(41,115): error C2955: 'std::vector': use of class template requires template argument list [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(442,7):
+      see declaration of 'std::vector'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(42,160): error C2662: 'bool std::vector<_Ty,_Alloc>::empty(void) noexcept const': cannot convert 'this' pointer from 'const std::vector' to 'const std::vector<_Ty,_Alloc> &' [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(42,151):
+      Reason: cannot convert from 'const std::vector' to 'const std::vector<_Ty,_Alloc>'
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(42,151):
+      Conversion requires a second user-defined-conversion operator or constructor
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(1908,47):
+      see declaration of 'std::vector<_Ty,_Alloc>::empty'
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(42,160):
+      while trying to match the argument list '()'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(42,178): error C2662: 'allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::size_type std::vector<_Ty,_Alloc>::size(void) noexcept const': cannot convert 'this' pointer from 'const std::vector' to 'const std::vector<_Ty,_Alloc> &' [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(42,169):
+      Reason: cannot convert from 'const std::vector' to 'const std::vector<_Ty,_Alloc>'
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(42,169):
+      Conversion requires a second user-defined-conversion operator or constructor
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(1913,39):
+      see declaration of 'std::vector<_Ty,_Alloc>::size'
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(42,178):
+      while trying to match the argument list '()'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(51,94): error C2662: 'allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::size_type std::vector<_Ty,_Alloc>::size(void) noexcept const': cannot convert 'this' pointer from 'const std::vector' to 'const std::vector<_Ty,_Alloc> &' [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(51,85):
+      Reason: cannot convert from 'const std::vector' to 'const std::vector<_Ty,_Alloc>'
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(51,85):
+      Conversion requires a second user-defined-conversion operator or constructor
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(1913,39):
+      see declaration of 'std::vector<_Ty,_Alloc>::size'
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(51,94):
+      while trying to match the argument list '()'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(52,31): error C2662: 'allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::size_type std::vector<_Ty,_Alloc>::size(void) noexcept const': cannot convert 'this' pointer from 'const std::vector' to 'const std::vector<_Ty,_Alloc> &' [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(52,22):
+      Reason: cannot convert from 'const std::vector' to 'const std::vector<_Ty,_Alloc>'
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(52,22):
+      Conversion requires a second user-defined-conversion operator or constructor
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(1913,39):
+      see declaration of 'std::vector<_Ty,_Alloc>::size'
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(52,31):
+      while trying to match the argument list '()'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(52,67): error C2678: binary '[': no operator found which takes a left-hand operand of type 'const std::vector' (or there is no acceptable conversion) [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(1937,40):
+      could be 'const _Ty &std::vector<_Ty,_Alloc>::operator [](const allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::size_type) noexcept const'
+          C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(52,67):
+          'const _Ty &std::vector<_Ty,_Alloc>::operator [](const allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::size_type) noexcept const': cannot convert 'this' pointer from 'const std::vector' to 'const std::vector<_Ty,_Alloc> &'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(52,67):
+              Reason: cannot convert from 'const std::vector' to 'const std::vector<_Ty,_Alloc>'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(52,67):
+              Conversion requires a second user-defined-conversion operator or constructor
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(1927,34):
+      or       '_Ty &std::vector<_Ty,_Alloc>::operator [](const allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::size_type) noexcept'
+          C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(52,67):
+          '_Ty &std::vector<_Ty,_Alloc>::operator [](const allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::size_type) noexcept': cannot convert 'this' pointer from 'const std::vector' to 'std::vector<_Ty,_Alloc> &'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(52,67):
+              Reason: cannot convert from 'const std::vector' to 'std::vector<_Ty,_Alloc>'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(52,67):
+              Conversion requires a second user-defined-conversion operator or constructor
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(52,67):
+      while trying to match the argument list '(const std::vector, size_t)'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(52,47): error C2660: 'memcpy': function does not take 2 arguments [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vcruntime_string.h(43,15):
+      see declaration of 'memcpy'
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(52,47):
+      while trying to match the argument list '(unsigned char *, int)'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(55,42): error C2664: 'bool ov::InferRequest::wait_for(const std::chrono::milliseconds)': cannot convert argument 1 from 'int' to 'const std::chrono::milliseconds' [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(55,51):
+      Constructor for class 'std::chrono::duration<__int64,std::milli>' is declared 'explicit'
+      C:\Users\tatef\AppData\Local\npu-render\toolchains\openvino-2026.4.1\Lib\site-packages\openvino\include\openvino\runtime\infer_request.hpp(294,10):
+      see declaration of 'ov::InferRequest::wait_for'
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(55,42):
+      while trying to match the argument list '(int)'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(58,78): error C2662: 'allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::size_type std::vector<_Ty,_Alloc>::size(void) noexcept const': cannot convert 'this' pointer from 'const std::vector' to 'const std::vector<_Ty,_Alloc> &' [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(58,69):
+      Reason: cannot convert from 'const std::vector' to 'const std::vector<_Ty,_Alloc>'
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(58,69):
+      Conversion requires a second user-defined-conversion operator or constructor
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(1913,39):
+      see declaration of 'std::vector<_Ty,_Alloc>::size'
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(58,78):
+      while trying to match the argument list '()'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(58,115): error C2662: 'allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::size_type std::vector<_Ty,_Alloc>::size(void) noexcept const': cannot convert 'this' pointer from 'const std::vector' to 'const std::vector<_Ty,_Alloc> &' [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(58,106):
+      Reason: cannot convert from 'const std::vector' to 'const std::vector<_Ty,_Alloc>'
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(58,106):
+      Conversion requires a second user-defined-conversion operator or constructor
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(1913,39):
+      see declaration of 'std::vector<_Ty,_Alloc>::size'
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(58,115):
+      while trying to match the argument list '()'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(73,7): error C2923: 'std::vector': 'Rectangle' is not a valid template type argument for parameter '_Ty' [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\um\wingdi.h(4639,24):
+      see declaration of 'Rectangle'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(73,7): error C2976: 'std::vector': too few template arguments [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(442,7):
+      see declaration of 'std::vector'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(73,25): error C2955: 'std::vector': use of class template requires template argument list [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(442,7):
+      see declaration of 'std::vector'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(79,40): error C2923: 'std::vector': 'Rectangle' is not a valid template type argument for parameter '_Ty' [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\um\wingdi.h(4639,24):
+      see declaration of 'Rectangle'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(79,40): error C2976: 'std::vector': too few template arguments [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(442,7):
+      see declaration of 'std::vector'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(79,59): error C2955: 'std::vector': use of class template requires template argument list [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(442,7):
+      see declaration of 'std::vector'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(76,185): error C2512: 'std::vector': no appropriate default constructor available [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(442,7):
+      see declaration of 'std::vector'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(80,21): error C2662: 'bool std::vector<_Ty,_Alloc>::empty(void) noexcept const': cannot convert 'this' pointer from 'const std::vector' to 'const std::vector<_Ty,_Alloc> &' [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(80,12):
+      Reason: cannot convert from 'const std::vector' to 'const std::vector<_Ty,_Alloc>'
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(80,12):
+      Conversion requires a second user-defined-conversion operator or constructor
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(1908,47):
+      see declaration of 'std::vector<_Ty,_Alloc>::empty'
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(80,21):
+      while trying to match the argument list '()'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(80,39): error C2662: 'allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::size_type std::vector<_Ty,_Alloc>::size(void) noexcept const': cannot convert 'this' pointer from 'const std::vector' to 'const std::vector<_Ty,_Alloc> &' [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(80,30):
+      Reason: cannot convert from 'const std::vector' to 'const std::vector<_Ty,_Alloc>'
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(80,30):
+      Conversion requires a second user-defined-conversion operator or constructor
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(1913,39):
+      see declaration of 'std::vector<_Ty,_Alloc>::size'
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(80,39):
+      while trying to match the argument list '()'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(81,29): error C2663: 'std::vector<_Ty,_Alloc>::_Unchecked_begin': no overloaded function has valid conversion for 'this' pointer [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(1896,40):
+      could be 'const _Ty *std::vector<_Ty,_Alloc>::_Unchecked_begin(void) noexcept const'
+          C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(81,29):
+          'const _Ty *std::vector<_Ty,_Alloc>::_Unchecked_begin(void) noexcept const': cannot convert 'this' pointer from 'const std::vector' to 'const std::vector<_Ty,_Alloc> &'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(81,29):
+              Reason: cannot convert from 'const std::vector' to 'const std::vector<_Ty,_Alloc>'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(81,29):
+              Conversion requires a second user-defined-conversion operator or constructor
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(1892,34):
+      or       '_Ty *std::vector<_Ty,_Alloc>::_Unchecked_begin(void) noexcept'
+          C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(81,29):
+          '_Ty *std::vector<_Ty,_Alloc>::_Unchecked_begin(void) noexcept': cannot convert 'this' pointer from 'const std::vector' to 'std::vector<_Ty,_Alloc> &'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(81,29):
+              Reason: cannot convert from 'const std::vector' to 'std::vector<_Ty,_Alloc>'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(81,29):
+              Conversion requires a second user-defined-conversion operator or constructor
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(81,29):
+      while trying to match the argument list '()'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(81,29): error C2663: 'std::vector<_Ty,_Alloc>::_Unchecked_end': no overloaded function has valid conversion for 'this' pointer [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(1904,40):
+      could be 'const _Ty *std::vector<_Ty,_Alloc>::_Unchecked_end(void) noexcept const'
+          C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(81,29):
+          'const _Ty *std::vector<_Ty,_Alloc>::_Unchecked_end(void) noexcept const': cannot convert 'this' pointer from 'const std::vector' to 'const std::vector<_Ty,_Alloc> &'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(81,29):
+              Reason: cannot convert from 'const std::vector' to 'const std::vector<_Ty,_Alloc>'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(81,29):
+              Conversion requires a second user-defined-conversion operator or constructor
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(1900,34):
+      or       '_Ty *std::vector<_Ty,_Alloc>::_Unchecked_end(void) noexcept'
+          C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(81,29):
+          '_Ty *std::vector<_Ty,_Alloc>::_Unchecked_end(void) noexcept': cannot convert 'this' pointer from 'const std::vector' to 'std::vector<_Ty,_Alloc> &'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(81,29):
+              Reason: cannot convert from 'const std::vector' to 'std::vector<_Ty,_Alloc>'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(81,29):
+              Conversion requires a second user-defined-conversion operator or constructor
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(81,29):
+      while trying to match the argument list '()'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(81,146): error C2660: 'memcpy': function does not take 2 arguments [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vcruntime_string.h(43,15):
+      see declaration of 'memcpy'
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(81,146):
+      while trying to match the argument list '(_Ty *, int)'
+          with
+          [
+              _Ty=uint8_t
+          ]
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(85,8): error C2923: 'std::vector': 'Rectangle' is not a valid template type argument for parameter '_Ty' [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\um\wingdi.h(4639,24):
+      see declaration of 'Rectangle'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(85,8): error C2976: 'std::vector': too few template arguments [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(442,7):
+      see declaration of 'std::vector'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(85,26): error C2641: cannot deduce template arguments for 'std::vector' [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(85,26): error C2783: 'std::vector<_Ty,_Alloc> std::vector(void) noexcept(<expr>)': could not deduce template argument for '_Ty' [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(670,5):
+      see declaration of 'std::vector'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(85,26): error C2780: 'std::vector<_Ty,_Alloc> std::vector(std::vector<_Ty,_Alloc>)': expects 1 arguments - 0 provided [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(442,7):
+      see declaration of 'std::vector'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(87,140): error C2146: syntax error: missing ';' before identifier 'q' [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(87,130): warning C4551: function call missing argument list [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(87,140): error C2065: 'q': undeclared identifier [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(87,156): error C2065: 'q': undeclared identifier [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(88,12): error C2065: 'q': undeclared identifier [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(88,18): error C2065: 'q': undeclared identifier [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(88,24): error C2065: 'q': undeclared identifier [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(88,30): error C2065: 'q': undeclared identifier [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(88,36): error C2065: 'q': undeclared identifier [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(88,49): error C2065: 'q': undeclared identifier [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(88,63): error C2065: 'q': undeclared identifier [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(88,72): error C2065: 'q': undeclared identifier [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(88,78): error C2065: 'q': undeclared identifier [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(88,89): error C2065: 'q': undeclared identifier [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(88,116): error C2065: 'q': undeclared identifier [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(90,41): error C2672: 'std::move': no matching overloaded function found [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\xutility(5172,9):
+      could be '_FwdIt2 std::move(_ExPo &&,_FwdIt1,_FwdIt1,_FwdIt2) noexcept'
+          C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(90,41):
+          '_FwdIt2 std::move(_ExPo &&,_FwdIt1,_FwdIt1,_FwdIt2) noexcept': expects 4 arguments - 1 provided
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\xutility(5160,21):
+      or       '_OutIt std::move(_InIt,_InIt,_OutIt)'
+          C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(90,41):
+          '_OutIt std::move(_InIt,_InIt,_OutIt)': expects 3 arguments - 1 provided
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\type_traits(1512,64):
+      or       'remove_reference<_Ty>::type &&std::move(_Ty &&) noexcept'
+          C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(90,41):
+          Failed to specialize function template 'remove_reference<_Ty>::type &&std::move(_Ty &&) noexcept'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(90,41):
+              With the following template arguments:
+                  C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(90,41):
+                  '_Ty=std::vector &'
+              C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\xtr1common(235,78):
+              'std::vector': use of class template requires template argument list
+              C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(442,7):
+              see declaration of 'std::vector'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(106,76): error C2923: 'std::vector': 'Rectangle' is not a valid template type argument for parameter '_Ty' [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\um\wingdi.h(4639,24):
+      see declaration of 'Rectangle'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(106,76): error C2976: 'std::vector': too few template arguments [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(442,7):
+      see declaration of 'std::vector'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(106,95): error C2955: 'std::vector': use of class template requires template argument list [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(442,7):
+      see declaration of 'std::vector'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(107,20): error C2663: 'std::vector<_Ty,_Alloc>::_Unchecked_begin': no overloaded function has valid conversion for 'this' pointer [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(1896,40):
+      could be 'const _Ty *std::vector<_Ty,_Alloc>::_Unchecked_begin(void) noexcept const'
+          C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(107,20):
+          'const _Ty *std::vector<_Ty,_Alloc>::_Unchecked_begin(void) noexcept const': cannot convert 'this' pointer from 'const std::vector' to 'const std::vector<_Ty,_Alloc> &'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(107,20):
+              Reason: cannot convert from 'const std::vector' to 'const std::vector<_Ty,_Alloc>'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(107,20):
+              Conversion requires a second user-defined-conversion operator or constructor
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(1892,34):
+      or       '_Ty *std::vector<_Ty,_Alloc>::_Unchecked_begin(void) noexcept'
+          C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(107,20):
+          '_Ty *std::vector<_Ty,_Alloc>::_Unchecked_begin(void) noexcept': cannot convert 'this' pointer from 'const std::vector' to 'std::vector<_Ty,_Alloc> &'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(107,20):
+              Reason: cannot convert from 'const std::vector' to 'std::vector<_Ty,_Alloc>'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(107,20):
+              Conversion requires a second user-defined-conversion operator or constructor
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(107,20):
+      while trying to match the argument list '()'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(107,20): error C2663: 'std::vector<_Ty,_Alloc>::_Unchecked_end': no overloaded function has valid conversion for 'this' pointer [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(1904,40):
+      could be 'const _Ty *std::vector<_Ty,_Alloc>::_Unchecked_end(void) noexcept const'
+          C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(107,20):
+          'const _Ty *std::vector<_Ty,_Alloc>::_Unchecked_end(void) noexcept const': cannot convert 'this' pointer from 'const std::vector' to 'const std::vector<_Ty,_Alloc> &'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(107,20):
+              Reason: cannot convert from 'const std::vector' to 'const std::vector<_Ty,_Alloc>'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(107,20):
+              Conversion requires a second user-defined-conversion operator or constructor
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(1900,34):
+      or       '_Ty *std::vector<_Ty,_Alloc>::_Unchecked_end(void) noexcept'
+          C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(107,20):
+          '_Ty *std::vector<_Ty,_Alloc>::_Unchecked_end(void) noexcept': cannot convert 'this' pointer from 'const std::vector' to 'std::vector<_Ty,_Alloc> &'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(107,20):
+              Reason: cannot convert from 'const std::vector' to 'std::vector<_Ty,_Alloc>'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(107,20):
+              Conversion requires a second user-defined-conversion operator or constructor
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(107,20):
+      while trying to match the argument list '()'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(110,25): error C2672: 'std::min': no matching overloaded function found [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\utility(109,26):
+      could be '_Ty std::min(std::initializer_list<_Elem>)'
+          C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(110,25):
+          '_Ty std::min(std::initializer_list<_Elem>)': expects 1 arguments - 2 provided
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\utility(106,26):
+      or       '_Ty std::min(std::initializer_list<_Elem>,_Pr)'
+          C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(110,25):
+          '_Ty std::min(std::initializer_list<_Elem>,_Pr)': could not deduce template argument for 'std::initializer_list<_Elem>' from 'unsigned int'
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\utility(98,6):
+      or       'const _Ty &std::min(const _Ty &,const _Ty &) noexcept(<expr>)'
+          C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(110,25):
+          'const _Ty &std::min(const _Ty &,const _Ty &) noexcept(<expr>)': template parameter '_Ty' is ambiguous
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(110,25):
+              could be '_Ty'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(110,25):
+              or       'unsigned int'
+          C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(110,25):
+          'const _Ty &std::min(const _Ty &,const _Ty &) noexcept(<expr>)': could not deduce template argument for 'const _Ty &' from 'const _Ty'
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\utility(88,33):
+      or       'const _Ty &std::min(const _Ty &,const _Ty &,_Pr) noexcept(<expr>)'
+          C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(110,25):
+          'const _Ty &std::min(const _Ty &,const _Ty &,_Pr) noexcept(<expr>)': expects 3 arguments - 2 provided
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(121,9): error C2923: 'std::vector': 'Rectangle' is not a valid template type argument for parameter '_Ty' [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\um\wingdi.h(4639,24):
+      see declaration of 'Rectangle'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(121,9): error C2976: 'std::vector': too few template arguments [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(442,7):
+      see declaration of 'std::vector'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(121,27): error C2641: cannot deduce template arguments for 'std::vector' [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(121,27): error C2783: 'std::vector<_Ty,_Alloc> std::vector(void) noexcept(<expr>)': could not deduce template argument for '_Ty' [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(670,5):
+      see declaration of 'std::vector'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(121,27): error C2780: 'std::vector<_Ty,_Alloc> std::vector(std::vector<_Ty,_Alloc>)': expects 1 arguments - 0 provided [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(442,7):
+      see declaration of 'std::vector'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(123,14): error C2663: 'std::vector<_Ty,_Alloc>::push_back': no overloaded function has valid conversion for 'this' pointer [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(936,23):
+      could be 'void std::vector<_Ty,_Alloc>::push_back(_Ty &&)'
+          C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(123,14):
+          'void std::vector<_Ty,_Alloc>::push_back(_Ty &&)': cannot convert 'this' pointer from 'std::vector' to 'std::vector<_Ty,_Alloc> &'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(123,5):
+              Reason: cannot convert from 'std::vector' to 'std::vector<_Ty,_Alloc>'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(123,5):
+              Conversion requires a second user-defined-conversion operator or constructor
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(932,23):
+      or       'void std::vector<_Ty,_Alloc>::push_back(const _Ty &)'
+          C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(123,14):
+          'void std::vector<_Ty,_Alloc>::push_back(const _Ty &)': cannot convert 'this' pointer from 'std::vector' to 'std::vector<_Ty,_Alloc> &'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(123,5):
+              Reason: cannot convert from 'std::vector' to 'std::vector<_Ty,_Alloc>'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(123,5):
+              Conversion requires a second user-defined-conversion operator or constructor
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(123,14):
+      while trying to match the argument list '(initializer list)'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(137,27): error C2663: 'std::vector<_Ty,_Alloc>::begin': no overloaded function has valid conversion for 'this' pointer [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(1845,44):
+      could be 'std::_Vector_const_iterator<std::_Vector_val<conditional<std::_Is_simple_alloc_v<allocator_traits<_Alloc>::rebind_alloc<_Node>>,std::_Simple_types<_Value_type>,std::_Vec_iter_types<_Ty,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::size_type,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::difference_type,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::pointer,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::const_pointer>>::type>> std::vector<_Ty,_Alloc>::begin(void) noexcept const'
+          C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(137,27):
+          'std::_Vector_const_iterator<std::_Vector_val<conditional<std::_Is_simple_alloc_v<allocator_traits<_Alloc>::rebind_alloc<_Node>>,std::_Simple_types<_Value_type>,std::_Vec_iter_types<_Ty,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::size_type,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::difference_type,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::pointer,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::const_pointer>>::type>> std::vector<_Ty,_Alloc>::begin(void) noexcept const': cannot convert 'this' pointer from 'std::vector' to 'const std::vector<_Ty,_Alloc> &'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(137,18):
+              Reason: cannot convert from 'std::vector' to 'const std::vector<_Ty,_Alloc>'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(137,18):
+              Conversion requires a second user-defined-conversion operator or constructor
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(1840,38):
+      or       'std::_Vector_iterator<std::_Vector_val<conditional<std::_Is_simple_alloc_v<allocator_traits<_Alloc>::rebind_alloc<_Node>>,std::_Simple_types<_Value_type>,std::_Vec_iter_types<_Ty,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::size_type,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::difference_type,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::pointer,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::const_pointer>>::type>> std::vector<_Ty,_Alloc>::begin(void) noexcept'
+          C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(137,27):
+          'std::_Vector_iterator<std::_Vector_val<conditional<std::_Is_simple_alloc_v<allocator_traits<_Alloc>::rebind_alloc<_Node>>,std::_Simple_types<_Value_type>,std::_Vec_iter_types<_Ty,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::size_type,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::difference_type,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::pointer,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::const_pointer>>::type>> std::vector<_Ty,_Alloc>::begin(void) noexcept': cannot convert 'this' pointer from 'std::vector' to 'std::vector<_Ty,_Alloc> &'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(137,18):
+              Reason: cannot convert from 'std::vector' to 'std::vector<_Ty,_Alloc>'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(137,18):
+              Conversion requires a second user-defined-conversion operator or constructor
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(137,27):
+      while trying to match the argument list '()'
+  
+C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(137,44): error C2663: 'std::vector<_Ty,_Alloc>::end': no overloaded function has valid conversion for 'this' pointer [C:\Users\tatef\AppData\Local\npu-render\builds\command-batch-transaction-v1\nr_command_batch_transaction.vcxproj]
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(1855,44):
+      could be 'std::_Vector_const_iterator<std::_Vector_val<conditional<std::_Is_simple_alloc_v<allocator_traits<_Alloc>::rebind_alloc<_Node>>,std::_Simple_types<_Value_type>,std::_Vec_iter_types<_Ty,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::size_type,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::difference_type,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::pointer,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::const_pointer>>::type>> std::vector<_Ty,_Alloc>::end(void) noexcept const'
+          C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(137,44):
+          'std::_Vector_const_iterator<std::_Vector_val<conditional<std::_Is_simple_alloc_v<allocator_traits<_Alloc>::rebind_alloc<_Node>>,std::_Simple_types<_Value_type>,std::_Vec_iter_types<_Ty,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::size_type,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::difference_type,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::pointer,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::const_pointer>>::type>> std::vector<_Ty,_Alloc>::end(void) noexcept const': cannot convert 'this' pointer from 'std::vector' to 'const std::vector<_Ty,_Alloc> &'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(137,35):
+              Reason: cannot convert from 'std::vector' to 'const std::vector<_Ty,_Alloc>'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(137,35):
+              Conversion requires a second user-defined-conversion operator or constructor
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(1850,38):
+      or       'std::_Vector_iterator<std::_Vector_val<conditional<std::_Is_simple_alloc_v<allocator_traits<_Alloc>::rebind_alloc<_Node>>,std::_Simple_types<_Value_type>,std::_Vec_iter_types<_Ty,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::size_type,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::difference_type,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::pointer,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::const_pointer>>::type>> std::vector<_Ty,_Alloc>::end(void) noexcept'
+          C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(137,44):
+          'std::_Vector_iterator<std::_Vector_val<conditional<std::_Is_simple_alloc_v<allocator_traits<_Alloc>::rebind_alloc<_Node>>,std::_Simple_types<_Value_type>,std::_Vec_iter_types<_Ty,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::size_type,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::difference_type,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::pointer,allocator_traits<allocator_traits<_Alloc>::rebind_alloc<_Node>>::const_pointer>>::type>> std::vector<_Ty,_Alloc>::end(void) noexcept': cannot convert 'this' pointer from 'std::vector' to 'std::vector<_Ty,_Alloc> &'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(137,35):
+              Reason: cannot convert from 'std::vector' to 'std::vector<_Ty,_Alloc>'
+              C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(137,35):
+              Conversion requires a second user-defined-conversion operator or constructor
+      C:\Users\tatef\AppData\Local\npu-render\vm\command-batch-transaction-v1\probe.cpp(137,44):
+      while trying to match the argument list '()'
+  

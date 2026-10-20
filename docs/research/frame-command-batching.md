@@ -141,3 +141,12 @@ frame budget and excludes textures, geometry, driver transport and presentation.
 The component does not yet use the ledger or retain general graphics resources.
 The next integration must bind actual owned checkpoints to version references
 and recover a partially executed batch without publishing partial pixels.
+
+The [owned-checkpoint transaction](../validation/2026-10-20/native-command-batch-transaction-v1/README.md)
+now connects the ledger to that NPU kernel in an isolated C++ probe. Consecutive
+commits, immutable snapshots, blocked pending reads, recovery after partial NPU
+output, stale-completion rejection and abandonment all pass. The next boundary
+is Windows resource access: capture explicit object/backing identities and
+logical write versions around draw, map/unmap, copy, flush, present and rotation.
+Treat shared external aliases conservatively and distinguish application access
+from internal staging reads. The trace must not be presented as a benchmark.

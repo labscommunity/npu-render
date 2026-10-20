@@ -1,0 +1,10 @@
+from pathlib import Path
+import hashlib,json,shutil,subprocess
+r=Path('results/render-driver');s=r/'command-batch-transaction-v2';shutil.copytree(r/'command-batch-transaction-v1',s)
+p=s/'probe.cpp';text=p.read_text().replace('Rectangle','BatchRectangle').replace('#include <array>','#include <array>\n#include <chrono>').replace('request.wait_for(15000)','request.wait_for(std::chrono::milliseconds(15000))');p.write_text(text)
+p=r/'run-command-batch-transaction-v2.ps1';p.write_text((r/'run-command-batch-transaction-v1.ps1').read_text().replace('command-batch-transaction-v1','command-batch-transaction-v2'))
+files=[p for p in s.rglob('*') if p.is_file()]+[p];manifest={str(p.relative_to(r)):hashlib.sha256(p.read_bytes()).hexdigest() for p in files}
+m=r/'command-batch-transaction-v2-source.json';m.write_text(json.dumps(manifest,indent=2)+'\n')
+subprocess.run(['scp','-q','-r',str(s),'delta:AppData/Local/npu-render/vm/'],check=True,timeout=30)
+subprocess.run(['scp','-q',str(p),str(m),'delta:AppData/Local/npu-render/vm/'],check=True,timeout=30)
+print(json.dumps(dict(uploaded=True,changes=['avoid Windows Rectangle function name collision','use the C++ chrono timeout type'],original_build_failure_preserved=True)))

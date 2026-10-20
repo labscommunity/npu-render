@@ -1,0 +1,11 @@
+from pathlib import Path
+import ast
+r=Path('results/render-driver');source=(r/'collect-native-primary-v105.py').read_text()
+values=dict(directories=[f'command-batch-transaction-v{v}-qualification' for v in [1,2]],extras=[f'command-batch-transaction-v{v}-source.json' for v in [1,2]],source_files=[name for v in [1,2] for name in [f'command-batch-transaction-v{v}/CMakeLists.txt',f'command-batch-transaction-v{v}/probe.cpp',f'command-batch-transaction-v{v}/command_batch.hpp',f'run-command-batch-transaction-v{v}.ps1']])
+lines=source.splitlines()
+for node in reversed(ast.parse(source).body):
+ if isinstance(node,ast.Assign) and isinstance(node.targets[0],ast.Name) and node.targets[0].id in values:
+  name=node.targets[0].id;lines[node.lineno-1:node.end_lineno]=[name+'='+repr(values[name])]
+source='\n'.join(lines)+'\n';source=source.replace("@('ptl-command-batch-v3-qualification','ptl-command-batch-comparison-v4')","@('command-batch-transaction-v2-qualification')").replace('v105','v106');(r/'collect-native-primary-v106.py').write_text(source)
+source=(r/'curate-native-primary-v105.py').read_text().replace('v105','v106').replace('native-command-batch-component-v1','native-command-batch-transaction-v1');a=source.index('for name in [');b=source.index(']:\n p=r/name',a)
+source=source[:a]+'for name in '+repr(['collect-native-primary-v106.py','prepare-command-batch-transaction-v1.py','prepare-command-batch-transaction-v2.py','prepare-command-batch-transaction-evidence-v1.py'])+source[b+1:];ast.parse(source);(r/'curate-native-primary-v106.py').write_text(source)

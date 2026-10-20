@@ -191,8 +191,10 @@ public:
                 outputs.size() == pending_->request.commands.size());
         for (size_t i = 0; i < outputs.size(); ++i)
             require(outputs[i] == pending_->request.commands[i].after);
-        // All outputs must already be validated and owned by the provider.
-        // These metadata updates cannot throw or expose a partial completion.
+        // Every command must have finished; exported versions must be validated
+        // and owned by the provider. Intermediate storage may be fused only if
+        // no later read needs that version. These metadata updates cannot throw
+        // or expose a partial completion.
         for (const auto &item : pending_->final_versions)
             resources_.find(item.first)->second.version = item.second;
         pending_.reset();

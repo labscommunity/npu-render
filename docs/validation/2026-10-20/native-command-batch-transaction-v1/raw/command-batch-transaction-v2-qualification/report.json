@@ -1,0 +1,91 @@
+{
+    "started":  "2026-10-20T08:45:19.5969293Z",
+    "completed":  true,
+    "passed":  true,
+    "npu_executed":  true,
+    "desktop_changed":  false,
+    "active_phase":  "npu-transaction",
+    "steps":  [
+                  {
+                      "exit_code":  0,
+                      "name":  "configure"
+                  },
+                  {
+                      "exit_code":  0,
+                      "name":  "build"
+                  },
+                  {
+                      "exit_code":  0,
+                      "name":  "npu-transaction"
+                  }
+              ],
+    "binary_sha256":  "AB5162CC110FD8ED0483FB0C002C232B6552808028886C3B60A2982C6904863A",
+    "source_sha256":  {
+                          "command-batch-transaction-v2/CMakeLists.txt":  "93e7d2b531c3e8c9e9513ef1b995646bf11c68bf516c5a4858e35057becd8eaa",
+                          "command-batch-transaction-v2/probe.cpp":  "1629ed2e1d98dd132778db38417eec2fb9e9a6380484e77f65e0cd8990e58042",
+                          "command-batch-transaction-v2/command_batch.hpp":  "a122ff4fc5419541c1d755a2591a5e4b852685e950ebd32022f1c5b6587833de",
+                          "run-command-batch-transaction-v2.ps1":  "aa364e77eacff838e58d5af75859fb26a85970210a5e4a27bd595253577ecee9"
+                      },
+    "cases":  [
+                  {
+                      "scenario":  0,
+                      "passed":  true,
+                      "execution_device":  "NPU",
+                      "injected_after_partial_output":  false,
+                      "retried":  false,
+                      "abandoned":  false,
+                      "provider_generations":  1,
+                      "provider_submissions":  3,
+                      "committed_version":  33,
+                      "committed_pixels_sha256":  "4f07faaa54080826d1de996e2702f4a2826a774bc6b19850aa452f3b4a983634",
+                      "cpu_fallback":  false,
+                      "desktop_tested":  false
+                  },
+                  {
+                      "scenario":  1,
+                      "passed":  true,
+                      "execution_device":  "NPU",
+                      "injected_after_partial_output":  false,
+                      "retried":  false,
+                      "abandoned":  false,
+                      "provider_generations":  1,
+                      "provider_submissions":  6,
+                      "committed_version":  65,
+                      "committed_pixels_sha256":  "a109df251b81cab0808780e2103134e57df06a90b54a6bbab23ea56259db56ef",
+                      "cpu_fallback":  false,
+                      "desktop_tested":  false
+                  },
+                  {
+                      "scenario":  2,
+                      "passed":  true,
+                      "execution_device":  "NPU",
+                      "injected_after_partial_output":  true,
+                      "retried":  true,
+                      "abandoned":  false,
+                      "provider_generations":  2,
+                      "provider_submissions":  4,
+                      "committed_version":  33,
+                      "committed_pixels_sha256":  "ceba3d6cf04b6b656019a2976ab2ec61621db41d153f086fc78f7ae0485bbbff",
+                      "cpu_fallback":  false,
+                      "desktop_tested":  false
+                  },
+                  {
+                      "scenario":  3,
+                      "passed":  true,
+                      "execution_device":  "NPU",
+                      "injected_after_partial_output":  true,
+                      "retried":  false,
+                      "abandoned":  true,
+                      "provider_generations":  1,
+                      "provider_submissions":  1,
+                      "committed_version":  1,
+                      "committed_pixels_sha256":  "2213339c8347bad9efc2888fd827db8816ac9a39a6ca152a4e20ea48325e954c",
+                      "cpu_fallback":  false,
+                      "desktop_tested":  false
+                  }
+              ],
+    "real_device_loss_tested":  false,
+    "desktop_tested":  false,
+    "tahoma_tested":  false,
+    "finished":  "2026-10-20T08:45:28.3963796Z"
+}
