@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <functional>
+#include <cstdio>
 #include <cstring>
 #include <vector>
 namespace nr::frame {
@@ -100,48 +102,74 @@ inline std::array<CoordinateSource, NR_FRAME_MAX_TEXTURES> coordinate_sources(co
 // of bit patterns. The (u, v) intervals reaching each sample instruction bound
 // the texels the kernel can touch; an unbounded lane means the whole texture.
 namespace interval {
-// The rectangle an evaluation covers; affine forms take their range over it.
+// Affine arithmetic: every known value is c0 + sum(ci * s_i) over noise symbols
+// s_i with known ranges. Symbols 0 and 1 are the pixel position across the
+// extent; every non-linear result (a floor that crosses an integer, a product
+// of two varying values, an undecided select) introduces a fresh symbol with
+// the result's range. Linear arithmetic between correlated values stays exact,
+// which is what keeps mirror and tiling coordinate math tight.
 struct Extent { double x0 = 0, y0 = 0, x1 = 0, y1 = 0; };
 inline Extent &extent() { static thread_local Extent e; return e; }
+inline std::vector<std::pair<double, double>> &symbols() { static thread_local std::vector<std::pair<double, double>> s; return s; }
+inline bool &affine_enabled() { static bool enabled = true; return enabled; }   // diagnostics: plain intervals when false
+inline FILE *&trace_sink() { static FILE *sink = nullptr; return sink; }           // diagnostics: per-instruction ranges
+inline void reset_symbols() { symbols().clear(); const auto &e = extent(); symbols().push_back({e.x0, e.x1}); symbols().push_back({e.y0, e.y1}); }
 struct Val {
     bool known = false;                 // false: no information (any value)
-    double lo = 0, hi = 0;              // float interpretation when `known`
-    std::vector<uint32_t> set;          // exact 32-bit patterns when small and known (masks, integers)
-    bool affine = false;                // value = c0 + cx * px + cy * py across the extent (pixel centers)
-    double c0 = 0, cx = 0, cy = 0;
+    double lo = 0, hi = 0;              // range when `known`
+    std::vector<uint32_t> set;          // exact 32-bit patterns when small (masks, integers)
+    bool affine = false;                // c0 + sum(terms) when `known`
+    double c0 = 0;
+    std::vector<std::pair<uint32_t, double>> terms;   // symbol, coefficient (sorted by symbol)
     static Val any() { return Val{}; }
-    static Val range(double a, double b) { Val v; v.known = std::isfinite(a) && std::isfinite(b); v.lo = std::min(a, b); v.hi = std::max(a, b); return v; }
-    static Val exact(uint32_t bits) { float f; std::memcpy(&f, &bits, 4); Val v; v.known = std::isfinite(f); v.lo = v.hi = f; v.set = {bits}; if (v.known) { v.affine = true; v.c0 = f; } return v; }
+    void bound() {
+        lo = hi = c0;
+        for (const auto &[s, c] : terms) { const auto &r = symbols()[s]; lo += c >= 0 ? c * r.first : c * r.second; hi += c >= 0 ? c * r.second : c * r.first; }
+        known = std::isfinite(lo) && std::isfinite(hi); if (!known) { affine = false; terms.clear(); }
+    }
+    static Val constant(double c) { Val v; if (!std::isfinite(c)) return v; v.affine = true; v.c0 = c; v.bound(); return v; }
+    // A fresh symbol spanning [a, b].
+    static Val range(double a, double b) {
+        Val v; if (!std::isfinite(a) || !std::isfinite(b)) return v;
+        if (a > b) std::swap(a, b);
+        if (a == b) return constant(a);
+        symbols().push_back({a, b}); v.affine = true; v.terms.push_back({uint32_t(symbols().size() - 1), 1.0}); v.bound(); return v;
+    }
+    static Val exact(uint32_t bits) { float f; std::memcpy(&f, &bits, 4); Val v = constant(f); v.set = {bits}; return v; }
     static Val form(double c0, double cx, double cy) {
-        Val v; v.affine = std::isfinite(c0) && std::isfinite(cx) && std::isfinite(cy); if (!v.affine) return v;
-        v.c0 = c0; v.cx = cx; v.cy = cy; const auto &e = extent();
-        const double corners[4]{c0 + cx * e.x0 + cy * e.y0, c0 + cx * e.x1 + cy * e.y0, c0 + cx * e.x0 + cy * e.y1, c0 + cx * e.x1 + cy * e.y1};
-        v.known = true; v.lo = std::min({corners[0], corners[1], corners[2], corners[3]}); v.hi = std::max({corners[0], corners[1], corners[2], corners[3]});
-        if (!std::isfinite(v.lo) || !std::isfinite(v.hi)) return Val{};
-        return v;
+        Val v; if (!std::isfinite(c0) || !std::isfinite(cx) || !std::isfinite(cy)) return v;
+        if (!affine_enabled() && (cx != 0 || cy != 0)) {
+            const auto &e = extent(); const double c[4]{c0 + cx * e.x0 + cy * e.y0, c0 + cx * e.x1 + cy * e.y0, c0 + cx * e.x0 + cy * e.y1, c0 + cx * e.x1 + cy * e.y1};
+            return range(std::min({c[0], c[1], c[2], c[3]}), std::max({c[0], c[1], c[2], c[3]}));
+        }
+        v.affine = true; v.c0 = c0; if (cx != 0) v.terms.push_back({0u, cx}); if (cy != 0) v.terms.push_back({1u, cy}); v.bound(); return v;
     }
     bool point() const { return known && lo == hi; }
-    bool constant() const { return affine && cx == 0 && cy == 0; }
+    bool constant_value() const { return affine && terms.empty(); }
+    bool same_form(const Val &o) const { return affine && o.affine && c0 == o.c0 && terms == o.terms; }
 };
 inline Val from_set(std::vector<uint32_t> set) {
     if (set.empty() || set.size() > 16) return Val::any();
     std::sort(set.begin(), set.end()); set.erase(std::unique(set.begin(), set.end()), set.end());
     double lo = 1e300, hi = -1e300; bool finite = true;
     for (uint32_t b : set) { float f; std::memcpy(&f, &b, 4); if (!std::isfinite(f)) finite = false; lo = std::min(lo, double(f)); hi = std::max(hi, double(f)); }
-    Val v; v.set = std::move(set); if (finite) { v.known = true; v.lo = lo; v.hi = hi; if (v.set.size() == 1) { v.affine = true; v.c0 = lo; } }
+    Val v; if (finite) v = Val::range(lo, hi);
+    v.set = std::move(set);
     return v;
+}
+inline Val scaled(const Val &a, double k) {
+    Val v; if (!a.known) return v;
+    v.affine = true; v.c0 = a.c0 * k; for (const auto &[s, c] : a.terms) if (c * k != 0) v.terms.push_back({s, c * k}); v.bound(); return v;
+}
+inline Val neg(const Val &a) {
+    if (!a.known) { Val v; for (uint32_t b : a.set) v.set.push_back(b ^ 0x80000000u); return v; }
+    Val v = scaled(a, -1.0); for (uint32_t b : a.set) v.set.push_back(b ^ 0x80000000u); return v;
 }
 inline Val hull(const Val &a, const Val &b) {
     if (!a.known || !b.known) return Val::any();
-    if (a.affine && b.affine && a.c0 == b.c0 && a.cx == b.cx && a.cy == b.cy) return a;
+    if (a.same_form(b)) return a;
     Val v = Val::range(std::min(a.lo, b.lo), std::max(a.hi, b.hi));
     if (!a.set.empty() && !b.set.empty()) { auto s = a.set; s.insert(s.end(), b.set.begin(), b.set.end()); if (s.size() <= 16) { auto f = from_set(s); if (f.known) return f; } }
-    return v;
-}
-inline Val neg(const Val &a) {
-    if (!a.known) return a;
-    Val v = a.affine ? Val::form(-a.c0, -a.cx, -a.cy) : Val::range(-a.hi, -a.lo);
-    for (uint32_t b : a.set) v.set.push_back(b ^ 0x80000000u);
     return v;
 }
 inline Val abs(const Val &a) {
@@ -152,19 +180,25 @@ inline Val abs(const Val &a) {
 }
 inline Val add(const Val &a, const Val &b) {
     if (!a.known || !b.known) return Val::any();
-    if (a.affine && b.affine) return Val::form(a.c0 + b.c0, a.cx + b.cx, a.cy + b.cy);
-    return Val::range(a.lo + b.lo, a.hi + b.hi);
+    Val v; v.affine = true; v.c0 = a.c0 + b.c0;
+    size_t i = 0, j = 0;
+    while (i < a.terms.size() || j < b.terms.size()) {
+        if (j >= b.terms.size() || (i < a.terms.size() && a.terms[i].first < b.terms[j].first)) { v.terms.push_back(a.terms[i]); ++i; }
+        else if (i >= a.terms.size() || b.terms[j].first < a.terms[i].first) { v.terms.push_back(b.terms[j]); ++j; }
+        else { const double c = a.terms[i].second + b.terms[j].second; if (c != 0) v.terms.push_back({a.terms[i].first, c}); ++i; ++j; }
+    }
+    v.bound(); return v;
 }
 inline Val mul(const Val &a, const Val &b) {
     if (!a.known || !b.known) return Val::any();
-    if (a.affine && b.constant()) return Val::form(a.c0 * b.c0, a.cx * b.c0, a.cy * b.c0);
-    if (b.affine && a.constant()) return Val::form(b.c0 * a.c0, b.cx * a.c0, b.cy * a.c0);
+    if (b.constant_value()) return scaled(a, b.c0);
+    if (a.constant_value()) return scaled(b, a.c0);
     const double c[4]{a.lo * b.lo, a.lo * b.hi, a.hi * b.lo, a.hi * b.hi};
     return Val::range(std::min({c[0], c[1], c[2], c[3]}), std::max({c[0], c[1], c[2], c[3]}));
 }
 inline Val div(const Val &a, const Val &b) {
     if (!a.known || !b.known || (b.lo <= 0 && b.hi >= 0)) return Val::any();
-    if (a.affine && b.constant()) return Val::form(a.c0 / b.c0, a.cx / b.c0, a.cy / b.c0);
+    if (b.constant_value()) return scaled(a, 1.0 / b.c0);
     return mul(a, Val::range(1.0 / b.lo, 1.0 / b.hi));
 }
 inline Val vmin(const Val &a, const Val &b) {
@@ -180,15 +214,14 @@ inline Val vmax(const Val &a, const Val &b) {
 inline Val floor_(const Val &a) {
     if (!a.known) return a;
     const double f = std::floor(a.lo);
-    if (std::floor(a.hi) == f) return Val::form(f, 0, 0);
+    if (std::floor(a.hi) == f) return Val::constant(f);
     return Val::range(f, std::floor(a.hi));
 }
 inline Val frc(const Val &a) {
     if (!a.known) return a;
     const double f = std::floor(a.lo);
     if (std::floor(a.hi) != f) return Val::range(0, 1);
-    if (a.affine) return Val::form(a.c0 - f, a.cx, a.cy);
-    return Val::range(a.lo - f, a.hi - f);
+    return add(a, Val::constant(-f));
 }
 inline Val saturate(const Val &a) {
     if (!a.known) return Val::range(0, 1);
@@ -200,11 +233,12 @@ inline Val compare(const Val &a, const Val &b, uint32_t op) {
     if (!a.known || !b.known) return from_set({0u, 0xffffffffu});
     bool t = false, f = false;
     auto decide = [&](bool all_true, bool all_false) { t = !all_false; f = !all_true; };
+    const Val d = add(a, neg(b));   // correlated difference decides more than separate ranges
     switch (op) {
-    case core::NR_OP_LT: decide(a.hi < b.lo, a.lo >= b.hi); break;
-    case core::NR_OP_GE: decide(a.lo >= b.hi, a.hi < b.lo); break;
-    case core::NR_OP_EQ: decide(a.point() && b.point() && a.lo == b.lo, a.hi < b.lo || b.hi < a.lo); break;
-    case core::NR_OP_NE: decide(a.hi < b.lo || b.hi < a.lo, a.point() && b.point() && a.lo == b.lo); break;
+    case core::NR_OP_LT: decide(d.hi < 0, d.lo >= 0); break;
+    case core::NR_OP_GE: decide(d.lo >= 0, d.hi < 0); break;
+    case core::NR_OP_EQ: decide(d.point() && d.lo == 0, d.lo > 0 || d.hi < 0); break;
+    case core::NR_OP_NE: decide(d.lo > 0 || d.hi < 0, d.point() && d.lo == 0); break;
     default: t = f = true;
     }
     std::vector<uint32_t> s; if (f) s.push_back(0u); if (t) s.push_back(0xffffffffu);
@@ -271,6 +305,7 @@ inline void evaluate(const LoweredProgram &program, const std::vector<uint32_t> 
         Lanes r;
         if (op == core::NR_OP_SAMPLE) {
             const uint32_t texture = w[5] & 15u;
+            if (trace_sink()) std::fprintf(trace_sink(), "sample t%u u=[%.4g,%.4g] v=[%.4g,%.4g] known=%d%d\n", texture, a[0].lo, a[0].hi, a[1].lo, a[1].hi, a[0].known, a[1].known);
             if (texture < NR_FRAME_MAX_TEXTURES) {
                 auto &win = windows[texture]; win.any = true;
                 if (!a[0].known || !a[1].known) win.bounded = false;
@@ -304,6 +339,11 @@ inline void evaluate(const LoweredProgram &program, const std::vector<uint32_t> 
             }
         }
         if (sat) for (auto &l : r) l = saturate(l);
+        if (trace_sink()) {
+            std::fprintf(trace_sink(), "op%u -> %s%u.m%u:", op, dest_kind ? "o" : "r", dest_index, mask);
+            for (unsigned c = 0; c < 4; ++c) { const auto &l = r[c]; if (!l.known) std::fprintf(trace_sink(), " [?]"); else { std::fprintf(trace_sink(), " [%.4g,%.4g|%.3g", l.lo, l.hi, l.c0); for (const auto &[s, k] : l.terms) std::fprintf(trace_sink(), "%+.3gs%u", k, s); std::fprintf(trace_sink(), "]"); } }
+            std::fprintf(trace_sink(), "\n");
+        }
         if (dest_kind == 0 && dest_index < 16) for (unsigned c = 0; c < 4; ++c) if (mask & (1u << c)) temps[dest_index][c] = r[c];
     }
 }
@@ -318,7 +358,7 @@ inline std::array<interval::Lanes, 8> varying_intervals(const LoweredProgram &pr
     const float det = (x[1] - x[0]) * (y[2] - y[0]) - (x[2] - x[0]) * (y[1] - y[0]);
     const bool planar = v[0]->inverse_w == 1.0f && v[1]->inverse_w == 1.0f && v[2]->inverse_w == 1.0f && std::fabs(det) > 1e-12f;
     const float cx[2]{float(rect.x0) + 0.5f, float(rect.x1) - 0.5f}, cy[2]{float(rect.y0) + 0.5f, float(rect.y1) - 0.5f};
-    interval::extent() = {cx[0], cy[0], cx[1], cy[1]};
+    interval::extent() = {cx[0], cy[0], cx[1], cy[1]}; interval::reset_symbols();
     for (unsigned r = 0, k = 0; r < 8; ++r) {
         if (!(program.ps_inputs & (1u << r))) continue;
         const uint32_t mode = (program.interpolation >> (r * 4)) & 15u;
@@ -333,8 +373,7 @@ inline std::array<interval::Lanes, 8> varying_intervals(const LoweredProgram &pr
                 auto form = interval::Val::form(q[0] - a * x[0] - b * y[0], a, b);
                 if (form.known) {
                     const double margin = 1e-5 * (1.0 + std::fabs(form.hi - form.lo));
-                    form.lo -= margin; form.hi += margin;
-                    inputs[r][c] = form; continue;
+                    inputs[r][c] = interval::add(form, interval::Val::range(-margin, margin)); continue;
                 }
             }
             inputs[r][c] = interval::Val::range(std::min({q[0], q[1], q[2]}), std::max({q[0], q[1], q[2]}));
@@ -491,6 +530,18 @@ inline Rect texel_window(const LoweredProgram &program, const DrawPlan &plan, Re
 }
 // Tile edge (128, 64 or 32) at which every tile of a planned draw fits one span
 // with its texture windows, or 0 when the draw needs the per-draw route.
+// Bytes one span needs for this draw alone inside tile `tile` (its pixels plus the texel windows of the clipped draw).
+inline size_t tile_span_bytes(const LoweredProgram &program, const DrawPlan &plan, Rect bounds, Rect tile, size_t entry_bytes, uint32_t vertex_words, uint32_t constant_words,
+                              const std::array<uint32_t, NR_FRAME_MAX_TEXTURES> &tw, const std::array<uint32_t, NR_FRAME_MAX_TEXTURES> &th, const std::array<bool, NR_FRAME_MAX_TEXTURES> &point) {
+    const Rect clip = intersect(bounds, tile);
+    size_t bytes = NR_FRAME_HEADER_BYTES + NR_FRAME_COMMAND_BYTES + entry_bytes + 64 + size_t(vertex_words) * 4 + size_t(constant_words) * 4 + 4 + size_t(tile.x1 - tile.x0) * size_t(tile.y1 - tile.y0) * 4;
+    if (clip.empty()) return bytes;
+    for (size_t t = 0; t < program.texture_slots.size() && t < NR_FRAME_MAX_TEXTURES; ++t) {
+        const auto r = texel_window(program, plan, clip, unsigned(t), tw[t], th[t], point[t]);
+        bytes += NR_FRAME_WINDOW_BYTES + (r.empty() ? 4 : size_t(r.x1 - r.x0) * size_t(r.y1 - r.y0) * 4);
+    }
+    return bytes;
+}
 inline uint32_t fitting_tile(const LoweredProgram &program, const DrawPlan &plan, Rect bounds, size_t entry_bytes, uint32_t vertex_words, uint32_t constant_words,
                              const std::array<uint32_t, NR_FRAME_MAX_TEXTURES> &tw, const std::array<uint32_t, NR_FRAME_MAX_TEXTURES> &th, const std::array<bool, NR_FRAME_MAX_TEXTURES> &point) {
     if (bounds.empty()) return 128;
@@ -498,17 +549,39 @@ inline uint32_t fitting_tile(const LoweredProgram &program, const DrawPlan &plan
         bool fits = true;
         for (int32_t ty = bounds.y0 / int32_t(edge) * int32_t(edge); ty < bounds.y1 && fits; ty += int32_t(edge))
             for (int32_t tx = bounds.x0 / int32_t(edge) * int32_t(edge); tx < bounds.x1 && fits; tx += int32_t(edge)) {
-                const Rect clip = intersect(bounds, {tx, ty, tx + int32_t(edge), ty + int32_t(edge)});
-                if (clip.empty()) continue;
-                size_t bytes = NR_FRAME_HEADER_BYTES + NR_FRAME_COMMAND_BYTES + entry_bytes + 64 + size_t(vertex_words) * 4 + size_t(constant_words) * 4 + 4 + size_t(edge) * edge * 4;
-                for (size_t t = 0; t < program.texture_slots.size() && t < NR_FRAME_MAX_TEXTURES; ++t) {
-                    const auto r = texel_window(program, plan, clip, unsigned(t), tw[t], th[t], point[t]);
-                    bytes += NR_FRAME_WINDOW_BYTES + (r.empty() ? 4 : size_t(r.x1 - r.x0) * size_t(r.y1 - r.y0) * 4);
-                }
-                if (bytes > span_bytes - 1024) fits = false;
+                const Rect tile{tx, ty, tx + int32_t(edge), ty + int32_t(edge)};
+                if (intersect(bounds, tile).empty()) continue;
+                if (tile_span_bytes(program, plan, bounds, tile, entry_bytes, vertex_words, constant_words, tw, th, point) > span_bytes - 1024) fits = false;
             }
         if (fits) return edge;
     }
     return 0;
+}
+// Splits a tile in halves along its longer side; the executor splits the same way.
+inline std::pair<Rect, Rect> split_tile(const Rect &tile) {
+    const int32_t w = tile.x1 - tile.x0, h = tile.y1 - tile.y0;
+    if (w >= h) { const int32_t mid = tile.x0 + w / 2; return {{tile.x0, tile.y0, mid, tile.y1}, {mid, tile.y0, tile.x1, tile.y1}}; }
+    const int32_t mid = tile.y0 + h / 2; return {{tile.x0, tile.y0, tile.x1, mid}, {tile.x0, mid, tile.x1, tile.y1}};
+}
+constexpr int32_t min_adaptive_tile = 8;
+// A draw whose 128-pixel tiles do not all fit may still batch when every tile can be
+// bisected (down to 8 pixels) into sub-tiles that fit: a texture seam then confines
+// the wide window to a few small sub-tiles. The target extent bounds partial tiles.
+inline bool adaptive_fit(const LoweredProgram &program, const DrawPlan &plan, Rect bounds, Rect target, size_t entry_bytes, uint32_t vertex_words, uint32_t constant_words,
+                         const std::array<uint32_t, NR_FRAME_MAX_TEXTURES> &tw, const std::array<uint32_t, NR_FRAME_MAX_TEXTURES> &th, const std::array<bool, NR_FRAME_MAX_TEXTURES> &point) {
+    if (bounds.empty()) return true;
+    unsigned budget = 4096;   // sub-tiles examined; a hopeless draw gives up early
+    std::function<bool(Rect)> fits = [&](Rect tile) -> bool {
+        if (intersect(bounds, tile).empty()) return true;
+        if (!budget--) return false;
+        if (tile_span_bytes(program, plan, bounds, tile, entry_bytes, vertex_words, constant_words, tw, th, point) <= span_bytes - 1024) return true;
+        if (tile.x1 - tile.x0 <= min_adaptive_tile && tile.y1 - tile.y0 <= min_adaptive_tile) return false;
+        const auto halves = split_tile(tile);
+        return fits(halves.first) && fits(halves.second);
+    };
+    for (int32_t ty = bounds.y0 / 128 * 128; ty < bounds.y1; ty += 128)
+        for (int32_t tx = bounds.x0 / 128 * 128; tx < bounds.x1; tx += 128)
+            if (!fits(intersect({tx, ty, tx + 128, ty + 128}, target))) return false;
+    return true;
 }
 }

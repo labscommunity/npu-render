@@ -193,7 +193,8 @@ struct FrameBatcher {
         if (!plan.valid) { reason = "plan: " + plan.rejection + ps_id; return false; }
         const auto &s = target->surface;
         const Rect bounds = nr::frame::intersect(nr::frame::intersect(plan.bounds, {clip[0], clip[1], clip[2], clip[3]}), {0, 0, int32_t(s.width), int32_t(s.height)});
-        if (!nr::frame::fitting_tile(program, plan, bounds, program.entry.size(), uint32_t(inputs.size()) * 64, uint32_t(constants.size()), tw, th, point)) {
+        if (!nr::frame::fitting_tile(program, plan, bounds, program.entry.size(), uint32_t(inputs.size()) * 64, uint32_t(constants.size()), tw, th, point) &&
+            !nr::frame::adaptive_fit(program, plan, bounds, {0, 0, int32_t(s.width), int32_t(s.height)}, program.entry.size(), uint32_t(inputs.size()) * 64, uint32_t(constants.size()), tw, th, point)) {
             std::string windows;
             for (size_t t = 0; t < program.texture_slots.size(); ++t) {
                 const Rect w = plan.whole[t] ? Rect{0, 0, int32_t(tw[t]), int32_t(th[t])} : plan.texels[t];

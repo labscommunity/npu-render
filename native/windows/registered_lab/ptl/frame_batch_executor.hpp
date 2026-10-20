@@ -56,13 +56,23 @@ public:
     }
     const std::string &execution_device() const { return device; }
     // Writes the spans into the input tensor, runs the NPU and copies back each output span prefix.
+    double copy_ms = 0, infer_ms = 0;   // host copies into and out of the tensors vs. the NPU request itself
     void execute(const std::vector<std::vector<uint8_t>> &spans, std::vector<std::vector<uint8_t>> &outputs) {
         require(!failed && !spans.empty() && spans.size() <= rows); failed = true;
+        const auto began = std::chrono::steady_clock::now();
         auto *input = static_cast<uint8_t *>(inference.get_input_tensor(0).data());
-        for (size_t n = 0; n < spans.size(); ++n) { require(spans[n].size() == frame::span_bytes); std::memcpy(input + n * frame::span_bytes, spans[n].data(), frame::span_bytes); }
+        for (size_t n = 0; n < spans.size(); ++n) {
+            require(spans[n].size() == frame::span_bytes);
+            // Only the bytes the kernel declares (through the background region) are read; the rest of the row stays stale.
+            uint32_t tile_w, tile_h, background; std::memcpy(&tile_w, spans[n].data() + 16, 4); std::memcpy(&tile_h, spans[n].data() + 20, 4); std::memcpy(&background, spans[n].data() + 60, 4);
+            const size_t used = std::min<size_t>(size_t(frame::span_bytes), size_t(background) + size_t(tile_w) * tile_h * 4);
+            std::memcpy(input + n * frame::span_bytes, spans[n].data(), used);
+        }
         for (size_t n = spans.size(); n < rows; ++n) std::memset(input + n * frame::span_bytes, 0, 64);   // empty rows fail the header check cheaply
+        const auto copied = std::chrono::steady_clock::now();
         inference.start_async();
         if (!inference.wait_for(std::chrono::milliseconds(10000))) throw std::runtime_error("frame kernel timeout");
+        const auto inferred = std::chrono::steady_clock::now();
         ++requests;
         const auto *output = static_cast<const uint8_t *>(inference.get_output_tensor().data());
         outputs.resize(spans.size());
@@ -71,6 +81,9 @@ public:
             const size_t live = NR_FRAME_OUTPUT_PIXELS + size_t(tile_w) * tile_h * 4;
             outputs[n].assign(output + n * frame::span_bytes, output + n * frame::span_bytes + live);
         }
+        const auto done = std::chrono::steady_clock::now();
+        copy_ms += std::chrono::duration<double, std::milli>(copied - began).count() + std::chrono::duration<double, std::milli>(done - inferred).count();
+        infer_ms += std::chrono::duration<double, std::milli>(inferred - copied).count();
         failed = false;
     }
 };
@@ -92,9 +105,10 @@ class FrameBatchExecutor {
         std::shared_ptr<const frame::LoweredProgram> program; frame::DrawPlan plan; frame::Rect scissor_bounds; bool eligible = false; std::string route;
         uint32_t blob = UINT32_MAX; std::vector<uint8_t> kernel_entry;   // program entry carrying the blob-local native index
         uint32_t tile = 128;                                             // tile edge the draw's texture windows fit at
+        bool adaptive = false;                                           // 128-pixel tiles need bisection where a texture seam widens the window
         bool done = false;                                               // executed (kernel or fallback)
     };
-    struct Stats { uint64_t kernel_requests = 0, covered = 0, escapes = 0, executed = 0, fallback = 0; double kernel_ms = 0, host_ms = 0; };
+    struct Stats { uint64_t kernel_requests = 0, covered = 0, escapes = 0, executed = 0, fallback = 0, tile_splits = 0; double kernel_ms = 0, host_ms = 0, copy_ms = 0, infer_ms = 0; };
     const std::vector<Shader> *current_shaders = nullptr;   // shaders of the batch being executed
     const bool force_fallback = [] { char *v = nullptr; size_t n = 0; const bool on = !_dupenv_s(&v, &n, "NR_RENDER_FRAME_BATCH_FORCE_FALLBACK") && v && *v == '1'; std::free(v); return on; }();
     static std::string sampler_key(const std::array<TextureBinding, 4> &t) {
@@ -256,8 +270,8 @@ public:
             w.value(t); std::vector<uint32_t> pixels; copy_rect(r.pixels.data(), r.width, rect, pixels); w.append(pixels.data(), pixels.size() * 4);
         } else for (const auto &m : missing) w.value(m);
         auto bytes = w.finish(); reply.body_bytes = uint32_t(bytes.size() - sizeof(reply)); std::memcpy(bytes.data(), &reply, sizeof(reply));
-        std::printf("{\"frame_batch\":true,\"sequence\":%u,\"commands\":%u,\"executed\":%llu,\"fallback\":%llu,\"kernel_requests\":%llu,\"covered\":%llu,\"escapes\":%llu,\"missing\":%zu,\"targets\":%zu,\"kernel_ms\":%.3f,\"host_ms\":%.3f,\"execution_device\":\"NPU\"}\n",
-            header.sequence, batch.command_count, (unsigned long long)stats.executed, (unsigned long long)stats.fallback, (unsigned long long)stats.kernel_requests, (unsigned long long)stats.covered, (unsigned long long)stats.escapes, missing.size(), dirty.size(), stats.kernel_ms, stats.host_ms);
+        std::printf("{\"frame_batch\":true,\"sequence\":%u,\"commands\":%u,\"executed\":%llu,\"fallback\":%llu,\"kernel_requests\":%llu,\"covered\":%llu,\"escapes\":%llu,\"missing\":%zu,\"targets\":%zu,\"kernel_ms\":%.3f,\"host_ms\":%.3f,\"copy_ms\":%.3f,\"infer_ms\":%.3f,\"tile_splits\":%llu,\"execution_device\":\"NPU\"}\n",
+            header.sequence, batch.command_count, (unsigned long long)stats.executed, (unsigned long long)stats.fallback, (unsigned long long)stats.kernel_requests, (unsigned long long)stats.covered, (unsigned long long)stats.escapes, missing.size(), dirty.size(), stats.kernel_ms, stats.host_ms, stats.copy_ms, stats.infer_ms, (unsigned long long)stats.tile_splits);
         std::fflush(stdout);
         return bytes;
     }
@@ -313,6 +327,7 @@ private:
         std::array<uint32_t, 4> tw{}, th{}; std::array<bool, 4> point{};
         for (uint32_t t = 0; t < d.record.texture_count; ++t) { const auto &ref = refs[d.textures[t].resource]; tw[t] = ref.record.width; th[t] = ref.record.height; point[t] = d.textures[t].filter != 0; }
         d.tile = frame::fitting_tile(*d.program, d.plan, bounds, d.kernel_entry.size(), d.record.vertex_words, uint32_t(d.vertex_constants.size() + d.pixel_constants.size()), tw, th, point);
+        if (!d.tile && frame::adaptive_fit(*d.program, d.plan, bounds, {0, 0, int32_t(target.width), int32_t(target.height)}, d.kernel_entry.size(), d.record.vertex_words, uint32_t(d.vertex_constants.size() + d.pixel_constants.size()), tw, th, point)) { d.tile = 128; d.adaptive = true; }
         if (!d.tile) { d.eligible = false; d.route = "fallback:span budget"; }
     }
     void clear(const Draw &d, std::vector<ResourceRef> &refs, std::map<uint64_t, frame::Rect> &dirty) {
@@ -372,10 +387,13 @@ private:
         struct Tile { uint32_t x, y, w, h; std::vector<size_t> commands; };
         std::vector<Tile> tiles;
         const int32_t edge = int32_t(draws[run.front()].tile);
+        auto make_tile = [&](frame::Rect rect, const std::vector<size_t> &candidates) {
+            Tile tile{uint32_t(rect.x0), uint32_t(rect.y0), uint32_t(rect.x1 - rect.x0), uint32_t(rect.y1 - rect.y0), {}};
+            for (auto n : candidates) if (!frame::intersect(frame::intersect(draws[n].plan.bounds, draws[n].scissor_bounds), rect).empty()) tile.commands.push_back(n);
+            return tile;
+        };
         for (int32_t ty = touched.y0 / edge * edge; ty < touched.y1; ty += edge) for (int32_t tx = touched.x0 / edge * edge; tx < touched.x1; tx += edge) {
-            Tile tile{uint32_t(tx), uint32_t(ty), uint32_t(std::min<int32_t>(edge, int32_t(res.width) - tx)), uint32_t(std::min<int32_t>(edge, int32_t(res.height) - ty)), {}};
-            const frame::Rect rect{tx, ty, tx + int32_t(tile.w), ty + int32_t(tile.h)};
-            for (auto n : run) if (!frame::intersect(frame::intersect(draws[n].plan.bounds, draws[n].scissor_bounds), rect).empty()) tile.commands.push_back(n);
+            auto tile = make_tile(frame::intersect({tx, ty, tx + edge, ty + edge}, {0, 0, int32_t(res.width), int32_t(res.height)}), run);
             if (!tile.commands.empty()) tiles.push_back(std::move(tile));
         }
         // Each tile may need several sequential spans when its commands exceed the span budget.
@@ -385,7 +403,8 @@ private:
             std::vector<std::vector<uint8_t>> spans; std::vector<Pending> next, in_flight;
             for (auto &p : pending) {
                 if (spans.size() == FrameKernelProvider::rows) { next.push_back(p); continue; }
-                auto &tile = tiles[p.tile];
+                auto tile = tiles[p.tile];   // by value: a split appends to `tiles`
+                bool split = false;
                 std::vector<std::vector<uint8_t>> programs; std::vector<const frame::LoweredProgram *> program_keys; std::vector<frame::Command> commands; std::vector<frame::Window> windows;
                 std::vector<uint32_t> background; copy_rect(res.pixels.data(), res.width, {int32_t(tile.x), int32_t(tile.y), int32_t(tile.x + tile.w), int32_t(tile.y + tile.h)}, background);
                 size_t consumed = p.first_command;
@@ -421,18 +440,30 @@ private:
                         if (program_index == programs.size() - 1 && program_keys.size() < programs.size()) program_keys.push_back(d.program.get());
                         (void)span;
                     } catch (const std::invalid_argument &) {
-                        if (commands.empty()) throw std::runtime_error("frame batch span budget exceeded after fitting");
+                        if (commands.empty()) {
+                            // The first remaining command does not fit this tile alone: bisect the tile
+                            // (as the planner did when it admitted the draw) and continue with the halves.
+                            const frame::Rect rect{int32_t(tile.x), int32_t(tile.y), int32_t(tile.x + tile.w), int32_t(tile.y + tile.h)};
+                            if (rect.x1 - rect.x0 <= frame::min_adaptive_tile && rect.y1 - rect.y0 <= frame::min_adaptive_tile) throw std::runtime_error("frame batch span budget exceeded after fitting");
+                            const auto halves = frame::split_tile(rect);
+                            const std::vector<size_t> remaining(tile.commands.begin() + std::ptrdiff_t(consumed), tile.commands.end());
+                            for (const auto &half : {halves.first, halves.second}) { auto sub = make_tile(half, remaining); if (!sub.commands.empty()) { tiles.push_back(std::move(sub)); next.push_back({tiles.size() - 1, 0}); } }
+                            ++stats.tile_splits; split = true;
+                        }
                         break;
                     }
                 }
+                if (split) continue;
                 spans.push_back(frame::SpanBuilder::build(tile.x, tile.y, tile.w, tile.h, res.format, programs, commands, windows, background.data()));
                 in_flight.push_back({p.tile, consumed});
                 if (consumed < tile.commands.size()) next.push_back({p.tile, consumed});
             }
             if (!spans.empty()) {
                 std::vector<std::vector<uint8_t>> outputs; const auto began = std::chrono::steady_clock::now();
+                const double copy_before = kernel->copy_ms, infer_before = kernel->infer_ms;
                 kernel->execute(spans, outputs); ++stats.kernel_requests;
                 stats.kernel_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - began).count();
+                stats.copy_ms += kernel->copy_ms - copy_before; stats.infer_ms += kernel->infer_ms - infer_before;
                 for (size_t n = 0; n < outputs.size(); ++n) {
                     uint32_t status, executed, covered, escapes; std::memcpy(&status, outputs[n].data() + 4, 4); std::memcpy(&executed, outputs[n].data() + 8, 4); std::memcpy(&covered, outputs[n].data() + 12, 4); std::memcpy(&escapes, outputs[n].data() + 16, 4);
                     const auto &tile = tiles[in_flight[n].tile];
