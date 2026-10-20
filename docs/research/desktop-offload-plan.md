@@ -145,16 +145,19 @@ kernel contains a byte-store clearing loop; the replacement uses aligned wider
 stores. The [complete renderer comparison](../validation/2026-10-20/native-program-vector-fill-worker-v1/README.md)
 preserves all 3,888 images and lowers aggregate parent time by 2.35%, below the
 five-percent live threshold. Program-route child time falls by 12.80%; this is
-not isolated instruction timing. A separate candidate now enlarges the bounded
+not isolated instruction timing. A separate candidate enlarges the bounded
 transport batch for the complex shader that dominates the live animation.
-Its kernel arithmetic remains unchanged; correctness, timing and recovery
-qualification are still pending.
+Its kernel arithmetic remains unchanged.
 The [initial attempts](../validation/2026-10-20/native-complex-batch-interrupted-v1/README.md)
 retain a rejected protocol-capacity call and its correction. The corrected
 worker passes 174 selected images, but Windows servicing restarts interrupt its
-full replay after 55 images. The unchanged binary is now being requalified in
-a separately named local task, measuring both baseline and candidate after the
-update. This interruption is not an NPU performance result or device-loss claim.
+full replay after 55 images. The
+[fresh qualification](../validation/2026-10-20/native-complex-batch-worker-v1/README.md)
+then passes all 3,888 comparison images and both recovery scenarios. Targeted
+provider calls fall from 2,412 to 1,868 across two runs per worker and targeted
+child time improves by 7.19%, but aggregate parent time is 0.91% higher. It is
+not promoted to the desktop. Both sides run after the update in the same task
+context; the interrupted timing is excluded.
 
 The rectangle candidate also passes
 [two targeted provider-recovery scenarios](../validation/2026-10-20/native-quad-rectangle-recovery-v1/README.md);
@@ -449,9 +452,10 @@ role, and any GPU rendering/copy cost in the bridge must be measured.
    The combined geometry/rectangle/clipping candidate passes those gates with
    6.81% lower replay time; turbo imports then lower time by a further measured
    9.90% against that candidate in a separate comparison. Vector memory fill
-   improves its route but only 2.35% overall, below live promotion. Complete the
-   complex-shader batch comparison and recovery after the servicing interruption.
-   Next qualify the prepared compiled-graph turbo candidate, which changes one
+   improves its route but only 2.35% overall, below live promotion. The
+   complex-shader batch result is now complete: exact images and recovery pass,
+   but total time is 0.91% higher, so it remains unpromoted.
+   Qualify the compiled-graph turbo candidate, which changes one
    provider header and preserves shader arithmetic. Individual component gains
    remain too small to explain a path to 30 fps by themselves; reducing
    submissions and redundant work across whole frames remains necessary.

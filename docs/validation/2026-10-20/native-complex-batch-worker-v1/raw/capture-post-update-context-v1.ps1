@@ -1,0 +1,6 @@
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$vm="$env:LOCALAPPDATA\npu-render\vm";$out="$vm\post-update-render-context-v1.json"
+if(Test-Path $out){throw 'Context capture exists'}
+$os=Get-CimInstance Win32_OperatingSystem;$v=Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
+$q=[ordered]@{utc=[DateTime]::UtcNow.ToString('o');boot_utc=$os.LastBootUpTime.ToUniversalTime().ToString('o');os_version=$os.Version;build=$v.CurrentBuildNumber;ubr=$v.UBR;display_version=$v.DisplayVersion;drivers=@(Get-CimInstance Win32_PnPSignedDriver|Where-Object {$_.DeviceName -match 'Intel.*(NPU|Arc)'}|ForEach-Object {[ordered]@{name=$_.DeviceName;version=$_.DriverVersion;inf=$_.InfName}});devices=@(Get-PnpDevice -Class ComputeAccelerator,Display|ForEach-Object {[ordered]@{name=$_.FriendlyName;status=[string]$_.Status}});render_processes=@(Get-Process nr_registered* -ErrorAction SilentlyContinue|ForEach-Object {[ordered]@{pid=$_.Id;name=$_.ProcessName;session=$_.SessionId;priority=[string]$_.PriorityClass}});active_power_scheme=[string]((& powercfg /getactivescheme) -join "`n");timing_comparison_uses_same_post_update_context=$true;pre_update_timings_used_as_control=$false;interactive_desktop_tested=$false}
+$q|ConvertTo-Json -Depth 5|Set-Content $out
+Get-Content $out -Raw

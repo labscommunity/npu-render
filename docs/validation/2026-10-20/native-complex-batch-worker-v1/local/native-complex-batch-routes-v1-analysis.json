@@ -1,0 +1,1418 @@
+{
+  "passed": true,
+  "phase_reports": [
+    {
+      "phase": "A1",
+      "child_ms": 102067.45959999999,
+      "requests": 972,
+      "child_log_sha256": "0009633b2a58ee1e80d562054559ffaa0258d2260b2d98ca513a12a5d8293957"
+    },
+    {
+      "phase": "B1",
+      "child_ms": 104430.82729999995,
+      "requests": 972,
+      "child_log_sha256": "afd65ba71c7fafb706a1e66dfc7a753d82ac844963c09e2b78e68e96cdbdd858"
+    },
+    {
+      "phase": "B2",
+      "child_ms": 104879.35789999999,
+      "requests": 972,
+      "child_log_sha256": "e65d88fbf88fa6feec50c10674608bc6e075b1ed8103fc172a34c21fe2c5709d"
+    },
+    {
+      "phase": "A2",
+      "child_ms": 105217.88610000005,
+      "requests": 972,
+      "child_log_sha256": "2b9d028e8989010fe43766cc907fb62ebac05cf051383b84322a4d7e3451f4a4"
+    }
+  ],
+  "groups": [
+    {
+      "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+      "route": "other_npu_route",
+      "phases": {
+        "A1": {
+          "requests": 16,
+          "parent_ms": 20942.975,
+          "child_ms": 20198.814199999997,
+          "provider_requests": 1413,
+          "compile_calls": 56
+        },
+        "B1": {
+          "requests": 16,
+          "parent_ms": 20899.229399999997,
+          "child_ms": 20111.9121,
+          "provider_requests": 1413,
+          "compile_calls": 56
+        },
+        "B2": {
+          "requests": 16,
+          "parent_ms": 21439.819199999998,
+          "child_ms": 20633.163699999997,
+          "provider_requests": 1413,
+          "compile_calls": 56
+        },
+        "A2": {
+          "requests": 16,
+          "parent_ms": 21341.824800000002,
+          "child_ms": 20528.446499999995,
+          "provider_requests": 1413,
+          "compile_calls": 56
+        }
+      },
+      "requests_per_replay": 16,
+      "old_child_ms": 40727.26069999999,
+      "new_child_ms": 40745.0758,
+      "old_parent_ms": 42284.7998,
+      "new_parent_ms": 42339.048599999995,
+      "old_provider_requests": 2826,
+      "new_provider_requests": 2826,
+      "child_reduction_percent": -0.043742445953420805
+    },
+    {
+      "shader_sha256": "e3ebf67c53b678eb5b77e36cec775237832c2ce5d606d6b0ef8d44f362447872",
+      "route": "ptl_geometry_draw",
+      "phases": {
+        "A1": {
+          "requests": 26,
+          "parent_ms": 11300.2574,
+          "child_ms": 11277.230699999998,
+          "provider_requests": 1040,
+          "compile_calls": 32
+        },
+        "B1": {
+          "requests": 26,
+          "parent_ms": 11065.9819,
+          "child_ms": 11040.061800000001,
+          "provider_requests": 1040,
+          "compile_calls": 32
+        },
+        "B2": {
+          "requests": 26,
+          "parent_ms": 11141.336700000002,
+          "child_ms": 11116.1056,
+          "provider_requests": 1040,
+          "compile_calls": 32
+        },
+        "A2": {
+          "requests": 26,
+          "parent_ms": 11340.696499999998,
+          "child_ms": 11316.861900000002,
+          "provider_requests": 1040,
+          "compile_calls": 32
+        }
+      },
+      "requests_per_replay": 26,
+      "old_child_ms": 22594.0926,
+      "new_child_ms": 22156.167400000002,
+      "old_parent_ms": 22640.9539,
+      "new_parent_ms": 22207.318600000002,
+      "old_provider_requests": 2080,
+      "new_provider_requests": 2080,
+      "child_reduction_percent": 1.938228756307736
+    },
+    {
+      "shader_sha256": "95b1c4fbb5f9bf0f34ad7b76eca5ae122d956a9570e1796e1bd4aecf43ca7dbe",
+      "route": "ptl_program_draw",
+      "phases": {
+        "A1": {
+          "requests": 69,
+          "parent_ms": 10800.713199999997,
+          "child_ms": 10219.231899999999,
+          "provider_requests": 812,
+          "compile_calls": 20
+        },
+        "B1": {
+          "requests": 69,
+          "parent_ms": 10731.004199999996,
+          "child_ms": 10162.075099999996,
+          "provider_requests": 812,
+          "compile_calls": 20
+        },
+        "B2": {
+          "requests": 69,
+          "parent_ms": 10701.1825,
+          "child_ms": 10141.423999999995,
+          "provider_requests": 812,
+          "compile_calls": 20
+        },
+        "A2": {
+          "requests": 69,
+          "parent_ms": 10775.3285,
+          "child_ms": 10185.248500000003,
+          "provider_requests": 812,
+          "compile_calls": 20
+        }
+      },
+      "requests_per_replay": 69,
+      "old_child_ms": 20404.4804,
+      "new_child_ms": 20303.499099999994,
+      "old_parent_ms": 21576.041699999994,
+      "new_parent_ms": 21432.1867,
+      "old_provider_requests": 1624,
+      "new_provider_requests": 1624,
+      "child_reduction_percent": 0.49489767943322605
+    },
+    {
+      "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+      "route": "other_npu_route",
+      "phases": {
+        "A1": {
+          "requests": 15,
+          "parent_ms": 7013.7280999999975,
+          "child_ms": 6614.935600000001,
+          "provider_requests": 576,
+          "compile_calls": 31
+        },
+        "B1": {
+          "requests": 15,
+          "parent_ms": 10155.778000000002,
+          "child_ms": 9765.1289,
+          "provider_requests": 576,
+          "compile_calls": 31
+        },
+        "B2": {
+          "requests": 15,
+          "parent_ms": 10151.4169,
+          "child_ms": 9727.033399999997,
+          "provider_requests": 576,
+          "compile_calls": 31
+        },
+        "A2": {
+          "requests": 15,
+          "parent_ms": 9940.898000000005,
+          "child_ms": 9566.361200000001,
+          "provider_requests": 576,
+          "compile_calls": 31
+        }
+      },
+      "requests_per_replay": 15,
+      "old_child_ms": 16181.296800000002,
+      "new_child_ms": 19492.162299999996,
+      "old_parent_ms": 16954.6261,
+      "new_parent_ms": 20307.194900000002,
+      "old_provider_requests": 1152,
+      "new_provider_requests": 1152,
+      "child_reduction_percent": -20.461064035362075
+    },
+    {
+      "shader_sha256": "39799859d6531970077cbe235484fb7164778b325f8f58e3b8d6774351baf0b3",
+      "route": "ptl_texture_draw",
+      "phases": {
+        "A1": {
+          "requests": 9,
+          "parent_ms": 6498.085099999999,
+          "child_ms": 6247.3393,
+          "provider_requests": 1554,
+          "compile_calls": 3
+        },
+        "B1": {
+          "requests": 9,
+          "parent_ms": 6451.0213,
+          "child_ms": 6181.6678999999995,
+          "provider_requests": 1554,
+          "compile_calls": 3
+        },
+        "B2": {
+          "requests": 9,
+          "parent_ms": 6668.666800000001,
+          "child_ms": 6393.673899999999,
+          "provider_requests": 1554,
+          "compile_calls": 3
+        },
+        "A2": {
+          "requests": 9,
+          "parent_ms": 6426.2511,
+          "child_ms": 6161.485100000001,
+          "provider_requests": 1554,
+          "compile_calls": 3
+        }
+      },
+      "requests_per_replay": 9,
+      "old_child_ms": 12408.824400000001,
+      "new_child_ms": 12575.341799999998,
+      "old_parent_ms": 12924.3362,
+      "new_parent_ms": 13119.688100000001,
+      "old_provider_requests": 3108,
+      "new_provider_requests": 3108,
+      "child_reduction_percent": -1.341927282007438
+    },
+    {
+      "shader_sha256": "e455f7a56bb0a371b874f6fbd213edd72a456f711858fc96f9e88631d4cc6951",
+      "route": "other_npu_route",
+      "phases": {
+        "A1": {
+          "requests": 16,
+          "parent_ms": 5618.5833,
+          "child_ms": 5586.5776,
+          "provider_requests": 200,
+          "compile_calls": 36
+        },
+        "B1": {
+          "requests": 16,
+          "parent_ms": 5575.8714,
+          "child_ms": 5547.156999999999,
+          "provider_requests": 200,
+          "compile_calls": 36
+        },
+        "B2": {
+          "requests": 16,
+          "parent_ms": 5467.0523,
+          "child_ms": 5435.033899999999,
+          "provider_requests": 200,
+          "compile_calls": 36
+        },
+        "A2": {
+          "requests": 16,
+          "parent_ms": 5606.3253,
+          "child_ms": 5577.360500000001,
+          "provider_requests": 200,
+          "compile_calls": 36
+        }
+      },
+      "requests_per_replay": 16,
+      "old_child_ms": 11163.9381,
+      "new_child_ms": 10982.190899999998,
+      "old_parent_ms": 11224.9086,
+      "new_parent_ms": 11042.9237,
+      "old_provider_requests": 400,
+      "new_provider_requests": 400,
+      "child_reduction_percent": 1.62798466250903
+    },
+    {
+      "shader_sha256": "c71638aa9df382391c81ce814b60b92cff815bf2b31547a5569cfe785beaf341",
+      "route": "ptl_complex_draw",
+      "phases": {
+        "A1": {
+          "requests": 10,
+          "parent_ms": 5474.575899999999,
+          "child_ms": 5198.6990000000005,
+          "provider_requests": 1206,
+          "compile_calls": 3
+        },
+        "B1": {
+          "requests": 10,
+          "parent_ms": 5097.5834,
+          "child_ms": 4833.9819,
+          "provider_requests": 934,
+          "compile_calls": 3
+        },
+        "B2": {
+          "requests": 10,
+          "parent_ms": 5206.0923999999995,
+          "child_ms": 4939.033,
+          "provider_requests": 934,
+          "compile_calls": 3
+        },
+        "A2": {
+          "requests": 10,
+          "parent_ms": 5628.819799999999,
+          "child_ms": 5331.759300000001,
+          "provider_requests": 1206,
+          "compile_calls": 3
+        }
+      },
+      "requests_per_replay": 10,
+      "old_child_ms": 10530.458300000002,
+      "new_child_ms": 9773.0149,
+      "old_parent_ms": 11103.395699999997,
+      "new_parent_ms": 10303.6758,
+      "old_provider_requests": 2412,
+      "new_provider_requests": 1868,
+      "child_reduction_percent": 7.192881624154968
+    },
+    {
+      "shader_sha256": "d8e0b49792a47247020c5b93508846b0b0954403359f83d18e02544d338e8480",
+      "route": "ptl_program_draw",
+      "phases": {
+        "A1": {
+          "requests": 41,
+          "parent_ms": 6099.328699999999,
+          "child_ms": 4874.957499999998,
+          "provider_requests": 1974,
+          "compile_calls": 12
+        },
+        "B1": {
+          "requests": 41,
+          "parent_ms": 6035.426500000002,
+          "child_ms": 4785.686299999998,
+          "provider_requests": 1974,
+          "compile_calls": 12
+        },
+        "B2": {
+          "requests": 41,
+          "parent_ms": 6054.429899999998,
+          "child_ms": 4828.623499999999,
+          "provider_requests": 1974,
+          "compile_calls": 12
+        },
+        "A2": {
+          "requests": 41,
+          "parent_ms": 6055.3286,
+          "child_ms": 4848.9128,
+          "provider_requests": 1974,
+          "compile_calls": 12
+        }
+      },
+      "requests_per_replay": 41,
+      "old_child_ms": 9723.870299999999,
+      "new_child_ms": 9614.309799999995,
+      "old_parent_ms": 12154.657299999999,
+      "new_parent_ms": 12089.8564,
+      "old_provider_requests": 3948,
+      "new_provider_requests": 3948,
+      "child_reduction_percent": 1.126717002796751
+    },
+    {
+      "shader_sha256": "b92ae2a7745b2cc0a94ec294a23dba3b6f34a1035d78c9751cc28b9bdf038b15",
+      "route": "other_npu_route",
+      "phases": {
+        "A1": {
+          "requests": 18,
+          "parent_ms": 3849.4754,
+          "child_ms": 3839.6380000000004,
+          "provider_requests": 478,
+          "compile_calls": 42
+        },
+        "B1": {
+          "requests": 18,
+          "parent_ms": 3849.799,
+          "child_ms": 3840.484899999999,
+          "provider_requests": 478,
+          "compile_calls": 42
+        },
+        "B2": {
+          "requests": 18,
+          "parent_ms": 3732.7794,
+          "child_ms": 3723.4349999999995,
+          "provider_requests": 478,
+          "compile_calls": 42
+        },
+        "A2": {
+          "requests": 18,
+          "parent_ms": 3871.543,
+          "child_ms": 3861.9433,
+          "provider_requests": 478,
+          "compile_calls": 42
+        }
+      },
+      "requests_per_replay": 18,
+      "old_child_ms": 7701.5813,
+      "new_child_ms": 7563.919899999999,
+      "old_parent_ms": 7721.0184,
+      "new_parent_ms": 7582.5784,
+      "old_provider_requests": 956,
+      "new_provider_requests": 956,
+      "child_reduction_percent": 1.787443313751691
+    },
+    {
+      "shader_sha256": "fbe68f57c834b0adb911c186b19a28bb833bdfe10ea91385708ebe228012561c",
+      "route": "ptl_program_draw",
+      "phases": {
+        "A1": {
+          "requests": 82,
+          "parent_ms": 4718.453999999998,
+          "child_ms": 3183.627500000001,
+          "provider_requests": 1298,
+          "compile_calls": 38
+        },
+        "B1": {
+          "requests": 82,
+          "parent_ms": 4611.440799999999,
+          "child_ms": 3134.2909999999993,
+          "provider_requests": 1298,
+          "compile_calls": 38
+        },
+        "B2": {
+          "requests": 82,
+          "parent_ms": 4660.296899999999,
+          "child_ms": 3179.461599999999,
+          "provider_requests": 1298,
+          "compile_calls": 38
+        },
+        "A2": {
+          "requests": 82,
+          "parent_ms": 4643.901799999997,
+          "child_ms": 3163.1840000000016,
+          "provider_requests": 1298,
+          "compile_calls": 38
+        }
+      },
+      "requests_per_replay": 82,
+      "old_child_ms": 6346.8115000000025,
+      "new_child_ms": 6313.752599999998,
+      "old_parent_ms": 9362.355799999994,
+      "new_parent_ms": 9271.737699999998,
+      "old_provider_requests": 2596,
+      "new_provider_requests": 2596,
+      "child_reduction_percent": 0.5208741428669228
+    },
+    {
+      "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+      "route": "ptl_rectangle_draw",
+      "phases": {
+        "A1": {
+          "requests": 32,
+          "parent_ms": 3273.73,
+          "child_ms": 2158.4510000000005,
+          "provider_requests": 326,
+          "compile_calls": 26
+        },
+        "B1": {
+          "requests": 32,
+          "parent_ms": 3373.6306999999997,
+          "child_ms": 2237.9320000000002,
+          "provider_requests": 326,
+          "compile_calls": 26
+        },
+        "B2": {
+          "requests": 32,
+          "parent_ms": 3304.0114,
+          "child_ms": 2188.2421999999997,
+          "provider_requests": 326,
+          "compile_calls": 26
+        },
+        "A2": {
+          "requests": 32,
+          "parent_ms": 3248.2029,
+          "child_ms": 2189.7719999999995,
+          "provider_requests": 326,
+          "compile_calls": 26
+        }
+      },
+      "requests_per_replay": 32,
+      "old_child_ms": 4348.223,
+      "new_child_ms": 4426.1741999999995,
+      "old_parent_ms": 6521.9329,
+      "new_parent_ms": 6677.642099999999,
+      "old_provider_requests": 652,
+      "new_provider_requests": 652,
+      "child_reduction_percent": -1.7927139431441086
+    },
+    {
+      "shader_sha256": "595296ba14078f6954e7375a47ce1e63b0df241dec67c3569baf4bc16219c2a5",
+      "route": "ptl_program_draw",
+      "phases": {
+        "A1": {
+          "requests": 27,
+          "parent_ms": 2565.0211000000004,
+          "child_ms": 2091.8257,
+          "provider_requests": 648,
+          "compile_calls": 4
+        },
+        "B1": {
+          "requests": 27,
+          "parent_ms": 2527.6355000000003,
+          "child_ms": 2057.5594,
+          "provider_requests": 648,
+          "compile_calls": 4
+        },
+        "B2": {
+          "requests": 27,
+          "parent_ms": 2535.4807,
+          "child_ms": 2060.7756,
+          "provider_requests": 648,
+          "compile_calls": 4
+        },
+        "A2": {
+          "requests": 27,
+          "parent_ms": 2529.5307000000003,
+          "child_ms": 2066.1573000000003,
+          "provider_requests": 648,
+          "compile_calls": 4
+        }
+      },
+      "requests_per_replay": 27,
+      "old_child_ms": 4157.983,
+      "new_child_ms": 4118.335,
+      "old_parent_ms": 5094.551800000001,
+      "new_parent_ms": 5063.1162,
+      "old_provider_requests": 1296,
+      "new_provider_requests": 1296,
+      "child_reduction_percent": 0.9535392520844899
+    },
+    {
+      "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+      "route": "ptl_geometry_draw",
+      "phases": {
+        "A1": {
+          "requests": 15,
+          "parent_ms": 2715.4115,
+          "child_ms": 1885.0215,
+          "provider_requests": 144,
+          "compile_calls": 4
+        },
+        "B1": {
+          "requests": 15,
+          "parent_ms": 2704.2872,
+          "child_ms": 1909.8087,
+          "provider_requests": 144,
+          "compile_calls": 4
+        },
+        "B2": {
+          "requests": 15,
+          "parent_ms": 2768.3903000000005,
+          "child_ms": 1957.417,
+          "provider_requests": 144,
+          "compile_calls": 4
+        },
+        "A2": {
+          "requests": 15,
+          "parent_ms": 2744.1189,
+          "child_ms": 1972.9252000000001,
+          "provider_requests": 144,
+          "compile_calls": 4
+        }
+      },
+      "requests_per_replay": 15,
+      "old_child_ms": 3857.9467000000004,
+      "new_child_ms": 3867.2257,
+      "old_parent_ms": 5459.5304,
+      "new_parent_ms": 5472.677500000001,
+      "old_provider_requests": 288,
+      "new_provider_requests": 288,
+      "child_reduction_percent": -0.24051654212846607
+    },
+    {
+      "shader_sha256": "4e5ed0f81f4172324fd21bccde5309aff541f82c95c0f51b0690b9441d599932",
+      "route": "ptl_program_draw",
+      "phases": {
+        "A1": {
+          "requests": 63,
+          "parent_ms": 3240.671500000001,
+          "child_ms": 1927.0765999999996,
+          "provider_requests": 1204,
+          "compile_calls": 12
+        },
+        "B1": {
+          "requests": 63,
+          "parent_ms": 3184.533099999999,
+          "child_ms": 1888.3031000000003,
+          "provider_requests": 1204,
+          "compile_calls": 12
+        },
+        "B2": {
+          "requests": 63,
+          "parent_ms": 3238.866600000001,
+          "child_ms": 1934.8234000000002,
+          "provider_requests": 1204,
+          "compile_calls": 12
+        },
+        "A2": {
+          "requests": 63,
+          "parent_ms": 3220.9456999999998,
+          "child_ms": 1935.7388999999996,
+          "provider_requests": 1204,
+          "compile_calls": 12
+        }
+      },
+      "requests_per_replay": 63,
+      "old_child_ms": 3862.8154999999992,
+      "new_child_ms": 3823.1265000000003,
+      "old_parent_ms": 6461.617200000001,
+      "new_parent_ms": 6423.3997,
+      "old_provider_requests": 2408,
+      "new_provider_requests": 2408,
+      "child_reduction_percent": 1.027462999462414
+    },
+    {
+      "shader_sha256": "7c5bc4d830ee9593b7f2a8a59c35ae629122a0b657bf7e2b7a2c1bb462b04f8f",
+      "route": "other_npu_route",
+      "phases": {
+        "A1": {
+          "requests": 18,
+          "parent_ms": 1889.8585999999998,
+          "child_ms": 1881.5526999999993,
+          "provider_requests": 126,
+          "compile_calls": 25
+        },
+        "B1": {
+          "requests": 18,
+          "parent_ms": 1991.4801000000002,
+          "child_ms": 1983.1513,
+          "provider_requests": 126,
+          "compile_calls": 25
+        },
+        "B2": {
+          "requests": 18,
+          "parent_ms": 1840.9827000000002,
+          "child_ms": 1832.8047000000001,
+          "provider_requests": 126,
+          "compile_calls": 25
+        },
+        "A2": {
+          "requests": 18,
+          "parent_ms": 1897.5684,
+          "child_ms": 1888.7373,
+          "provider_requests": 126,
+          "compile_calls": 25
+        }
+      },
+      "requests_per_replay": 18,
+      "old_child_ms": 3770.289999999999,
+      "new_child_ms": 3815.956,
+      "old_parent_ms": 3787.4269999999997,
+      "new_parent_ms": 3832.4628000000002,
+      "old_provider_requests": 252,
+      "new_provider_requests": 252,
+      "child_reduction_percent": -1.2112065650122794
+    },
+    {
+      "shader_sha256": "2a28d3fe3b08585f199e86d5aa500f109761b3e4c5eaafa1730bba3eed7ee0a8",
+      "route": "other_npu_route",
+      "phases": {
+        "A1": {
+          "requests": 4,
+          "parent_ms": 1777.4034000000001,
+          "child_ms": 1751.9565,
+          "provider_requests": 40,
+          "compile_calls": 6
+        },
+        "B1": {
+          "requests": 4,
+          "parent_ms": 1803.7861999999998,
+          "child_ms": 1780.9139,
+          "provider_requests": 40,
+          "compile_calls": 6
+        },
+        "B2": {
+          "requests": 4,
+          "parent_ms": 1848.4072999999999,
+          "child_ms": 1822.8307,
+          "provider_requests": 40,
+          "compile_calls": 6
+        },
+        "A2": {
+          "requests": 4,
+          "parent_ms": 1765.2861,
+          "child_ms": 1739.0952,
+          "provider_requests": 40,
+          "compile_calls": 6
+        }
+      },
+      "requests_per_replay": 4,
+      "old_child_ms": 3491.0517,
+      "new_child_ms": 3603.7446,
+      "old_parent_ms": 3542.6895000000004,
+      "new_parent_ms": 3652.1934999999994,
+      "old_provider_requests": 80,
+      "new_provider_requests": 80,
+      "child_reduction_percent": -3.228050160357121
+    },
+    {
+      "shader_sha256": "d305ca5e55d0ca0d606b416ed015b566dd4746641b030a44af27f8ffd2777a1a",
+      "route": "ptl_four_tap_attempt",
+      "phases": {
+        "A1": {
+          "requests": 24,
+          "parent_ms": 2351.8685,
+          "child_ms": 1783.5082000000002,
+          "provider_requests": 187,
+          "compile_calls": 2
+        },
+        "B1": {
+          "requests": 24,
+          "parent_ms": 2363.8493000000008,
+          "child_ms": 1799.0938999999998,
+          "provider_requests": 187,
+          "compile_calls": 2
+        },
+        "B2": {
+          "requests": 24,
+          "parent_ms": 2352.5602000000003,
+          "child_ms": 1793.3375999999996,
+          "provider_requests": 187,
+          "compile_calls": 2
+        },
+        "A2": {
+          "requests": 24,
+          "parent_ms": 2359.5343000000007,
+          "child_ms": 1778.5359999999994,
+          "provider_requests": 187,
+          "compile_calls": 2
+        }
+      },
+      "requests_per_replay": 24,
+      "old_child_ms": 3562.0441999999994,
+      "new_child_ms": 3592.4314999999997,
+      "old_parent_ms": 4711.402800000001,
+      "new_parent_ms": 4716.409500000002,
+      "old_provider_requests": 374,
+      "new_provider_requests": 374,
+      "child_reduction_percent": -0.8530859892193376
+    },
+    {
+      "shader_sha256": "d056c6dcba0a34d02c9f01218f22c4db02daf7082789276afc0c166cb1553772",
+      "route": "ptl_program_draw",
+      "phases": {
+        "A1": {
+          "requests": 85,
+          "parent_ms": 2567.0807000000004,
+          "child_ms": 1706.2339000000009,
+          "provider_requests": 620,
+          "compile_calls": 16
+        },
+        "B1": {
+          "requests": 85,
+          "parent_ms": 2567.467000000001,
+          "child_ms": 1722.892300000001,
+          "provider_requests": 620,
+          "compile_calls": 16
+        },
+        "B2": {
+          "requests": 85,
+          "parent_ms": 2525.9950999999996,
+          "child_ms": 1686.8326000000002,
+          "provider_requests": 620,
+          "compile_calls": 16
+        },
+        "A2": {
+          "requests": 85,
+          "parent_ms": 2617.3141999999984,
+          "child_ms": 1772.7032,
+          "provider_requests": 620,
+          "compile_calls": 16
+        }
+      },
+      "requests_per_replay": 85,
+      "old_child_ms": 3478.937100000001,
+      "new_child_ms": 3409.724900000001,
+      "old_parent_ms": 5184.394899999999,
+      "new_parent_ms": 5093.462100000001,
+      "old_provider_requests": 1240,
+      "new_provider_requests": 1240,
+      "child_reduction_percent": 1.989463965876237
+    },
+    {
+      "shader_sha256": "b92ae2a7745b2cc0a94ec294a23dba3b6f34a1035d78c9751cc28b9bdf038b15",
+      "route": "ptl_program_draw",
+      "phases": {
+        "A1": {
+          "requests": 46,
+          "parent_ms": 1794.0028999999993,
+          "child_ms": 1595.0648999999994,
+          "provider_requests": 581,
+          "compile_calls": 32
+        },
+        "B1": {
+          "requests": 46,
+          "parent_ms": 1857.9292,
+          "child_ms": 1644.7492,
+          "provider_requests": 581,
+          "compile_calls": 32
+        },
+        "B2": {
+          "requests": 46,
+          "parent_ms": 1785.1215,
+          "child_ms": 1583.3263000000004,
+          "provider_requests": 581,
+          "compile_calls": 32
+        },
+        "A2": {
+          "requests": 46,
+          "parent_ms": 1792.9826999999998,
+          "child_ms": 1595.625,
+          "provider_requests": 581,
+          "compile_calls": 32
+        }
+      },
+      "requests_per_replay": 46,
+      "old_child_ms": 3190.6898999999994,
+      "new_child_ms": 3228.0755000000004,
+      "old_parent_ms": 3586.985599999999,
+      "new_parent_ms": 3643.0507,
+      "old_provider_requests": 1162,
+      "new_provider_requests": 1162,
+      "child_reduction_percent": -1.1717089774221146
+    },
+    {
+      "shader_sha256": "691da1da1f77b5c9e433e7540401fc748700d351e65e7520350bef66e0f3ba2a",
+      "route": "other_npu_route",
+      "phases": {
+        "A1": {
+          "requests": 4,
+          "parent_ms": 1484.47,
+          "child_ms": 1462.4247,
+          "provider_requests": 56,
+          "compile_calls": 6
+        },
+        "B1": {
+          "requests": 4,
+          "parent_ms": 1488.1897999999999,
+          "child_ms": 1465.6389000000001,
+          "provider_requests": 56,
+          "compile_calls": 6
+        },
+        "B2": {
+          "requests": 4,
+          "parent_ms": 1477.4494,
+          "child_ms": 1453.8366999999998,
+          "provider_requests": 56,
+          "compile_calls": 6
+        },
+        "A2": {
+          "requests": 4,
+          "parent_ms": 1257.9041,
+          "child_ms": 1237.9309,
+          "provider_requests": 56,
+          "compile_calls": 6
+        }
+      },
+      "requests_per_replay": 4,
+      "old_child_ms": 2700.3556,
+      "new_child_ms": 2919.4755999999998,
+      "old_parent_ms": 2742.3741,
+      "new_parent_ms": 2965.6391999999996,
+      "old_provider_requests": 112,
+      "new_provider_requests": 112,
+      "child_reduction_percent": -8.114486847584068
+    },
+    {
+      "shader_sha256": "b7f4e6d0abea95bb235098b7e357eacd906679d4626ba4abf4b3c5e3ca31ecf7",
+      "route": "ptl_resident_clip_draw",
+      "phases": {
+        "A1": {
+          "requests": 63,
+          "parent_ms": 2691.7513000000017,
+          "child_ms": 1406.0558999999994,
+          "provider_requests": 756,
+          "compile_calls": 6
+        },
+        "B1": {
+          "requests": 63,
+          "parent_ms": 2705.205100000001,
+          "child_ms": 1410.6852000000003,
+          "provider_requests": 756,
+          "compile_calls": 6
+        },
+        "B2": {
+          "requests": 63,
+          "parent_ms": 2729.163400000001,
+          "child_ms": 1413.8843999999997,
+          "provider_requests": 756,
+          "compile_calls": 6
+        },
+        "A2": {
+          "requests": 63,
+          "parent_ms": 2711.538299999999,
+          "child_ms": 1422.8528000000003,
+          "provider_requests": 756,
+          "compile_calls": 6
+        }
+      },
+      "requests_per_replay": 63,
+      "old_child_ms": 2828.9087,
+      "new_child_ms": 2824.5696,
+      "old_parent_ms": 5403.2896,
+      "new_parent_ms": 5434.368500000002,
+      "old_provider_requests": 1512,
+      "new_provider_requests": 1512,
+      "child_reduction_percent": 0.1533842361190474
+    },
+    {
+      "shader_sha256": "3e6229d456bf2f15688551a8ce0024ef8ee019b7a4a496929eac9bedc9c373e3",
+      "route": "ptl_geometry_draw",
+      "phases": {
+        "A1": {
+          "requests": 18,
+          "parent_ms": 1221.2730999999999,
+          "child_ms": 1204.5785999999996,
+          "provider_requests": 144,
+          "compile_calls": 16
+        },
+        "B1": {
+          "requests": 18,
+          "parent_ms": 1242.3174000000001,
+          "child_ms": 1225.0734999999997,
+          "provider_requests": 144,
+          "compile_calls": 16
+        },
+        "B2": {
+          "requests": 18,
+          "parent_ms": 1183.8732,
+          "child_ms": 1166.0844000000002,
+          "provider_requests": 144,
+          "compile_calls": 16
+        },
+        "A2": {
+          "requests": 18,
+          "parent_ms": 1226.9708,
+          "child_ms": 1208.1794999999997,
+          "provider_requests": 144,
+          "compile_calls": 16
+        }
+      },
+      "requests_per_replay": 18,
+      "old_child_ms": 2412.758099999999,
+      "new_child_ms": 2391.1579,
+      "old_parent_ms": 2448.2439,
+      "new_parent_ms": 2426.1906,
+      "old_provider_requests": 288,
+      "new_provider_requests": 288,
+      "child_reduction_percent": 0.8952492999608652
+    },
+    {
+      "shader_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "route": "other_npu_route",
+      "phases": {
+        "A1": {
+          "requests": 201,
+          "parent_ms": 810.1928000000001,
+          "child_ms": 698.0346,
+          "provider_requests": 201,
+          "compile_calls": 12
+        },
+        "B1": {
+          "requests": 201,
+          "parent_ms": 797.1021999999995,
+          "child_ms": 683.6714,
+          "provider_requests": 201,
+          "compile_calls": 12
+        },
+        "B2": {
+          "requests": 201,
+          "parent_ms": 806.0094999999989,
+          "child_ms": 691.9535000000003,
+          "provider_requests": 201,
+          "compile_calls": 12
+        },
+        "A2": {
+          "requests": 201,
+          "parent_ms": 791.3287999999998,
+          "child_ms": 685.9517000000012,
+          "provider_requests": 201,
+          "compile_calls": 12
+        }
+      },
+      "requests_per_replay": 201,
+      "old_child_ms": 1383.9863000000012,
+      "new_child_ms": 1375.6249000000003,
+      "old_parent_ms": 1601.5216,
+      "new_parent_ms": 1603.1116999999983,
+      "old_provider_requests": 402,
+      "new_provider_requests": 402,
+      "child_reduction_percent": 0.6041533792640053
+    },
+    {
+      "shader_sha256": "20e56de0447ed62eeb48ce9d442b806d3afb2d3c6fb6a2674aad53d98bd03c69",
+      "route": "ptl_program_draw",
+      "phases": {
+        "A1": {
+          "requests": 9,
+          "parent_ms": 855.5919000000001,
+          "child_ms": 654.947,
+          "provider_requests": 174,
+          "compile_calls": 8
+        },
+        "B1": {
+          "requests": 9,
+          "parent_ms": 854.2878999999998,
+          "child_ms": 657.9736999999999,
+          "provider_requests": 174,
+          "compile_calls": 8
+        },
+        "B2": {
+          "requests": 9,
+          "parent_ms": 828.9087000000001,
+          "child_ms": 649.9031,
+          "provider_requests": 174,
+          "compile_calls": 8
+        },
+        "A2": {
+          "requests": 9,
+          "parent_ms": 876.8406999999999,
+          "child_ms": 660.9206,
+          "provider_requests": 174,
+          "compile_calls": 8
+        }
+      },
+      "requests_per_replay": 9,
+      "old_child_ms": 1315.8676,
+      "new_child_ms": 1307.8768,
+      "old_parent_ms": 1732.4326,
+      "new_parent_ms": 1683.1965999999998,
+      "old_provider_requests": 348,
+      "new_provider_requests": 348,
+      "child_reduction_percent": 0.6072647430486189
+    },
+    {
+      "shader_sha256": "7c5bc4d830ee9593b7f2a8a59c35ae629122a0b657bf7e2b7a2c1bb462b04f8f",
+      "route": "ptl_program_draw",
+      "phases": {
+        "A1": {
+          "requests": 22,
+          "parent_ms": 549.2651999999999,
+          "child_ms": 539.3231000000001,
+          "provider_requests": 180,
+          "compile_calls": 12
+        },
+        "B1": {
+          "requests": 22,
+          "parent_ms": 529.6173,
+          "child_ms": 519.2486,
+          "provider_requests": 180,
+          "compile_calls": 12
+        },
+        "B2": {
+          "requests": 22,
+          "parent_ms": 543.3337999999999,
+          "child_ms": 533.1576,
+          "provider_requests": 180,
+          "compile_calls": 12
+        },
+        "A2": {
+          "requests": 22,
+          "parent_ms": 538.7185,
+          "child_ms": 528.9485000000001,
+          "provider_requests": 180,
+          "compile_calls": 12
+        }
+      },
+      "requests_per_replay": 22,
+      "old_child_ms": 1068.2716,
+      "new_child_ms": 1052.4062,
+      "old_parent_ms": 1087.9836999999998,
+      "new_parent_ms": 1072.9510999999998,
+      "old_provider_requests": 360,
+      "new_provider_requests": 360,
+      "child_reduction_percent": 1.4851466612048947
+    },
+    {
+      "shader_sha256": "c58da1994be91ca8ff229b25c20d3ae53488b1db8cd60972d5d1941970d9afb8",
+      "route": "ptl_geometry_draw",
+      "phases": {
+        "A1": {
+          "requests": 4,
+          "parent_ms": 513.8864,
+          "child_ms": 502.4771,
+          "provider_requests": 80,
+          "compile_calls": 4
+        },
+        "B1": {
+          "requests": 4,
+          "parent_ms": 507.24069999999995,
+          "child_ms": 497.47310000000004,
+          "provider_requests": 80,
+          "compile_calls": 4
+        },
+        "B2": {
+          "requests": 4,
+          "parent_ms": 498.3412000000001,
+          "child_ms": 489.24910000000006,
+          "provider_requests": 80,
+          "compile_calls": 4
+        },
+        "A2": {
+          "requests": 4,
+          "parent_ms": 465.5352,
+          "child_ms": 456.3364,
+          "provider_requests": 80,
+          "compile_calls": 4
+        }
+      },
+      "requests_per_replay": 4,
+      "old_child_ms": 958.8135,
+      "new_child_ms": 986.7222000000002,
+      "old_parent_ms": 979.4215999999999,
+      "new_parent_ms": 1005.5819,
+      "old_provider_requests": 160,
+      "new_provider_requests": 160,
+      "child_reduction_percent": -2.9107537597249378
+    },
+    {
+      "shader_sha256": "ec1e65f6664c9faf5af829eebdc7799cdde111ce4bad9f730ea5b13878546804",
+      "route": "ptl_long_draw",
+      "phases": {
+        "A1": {
+          "requests": 6,
+          "parent_ms": 458.98319999999995,
+          "child_ms": 452.8353,
+          "provider_requests": 60,
+          "compile_calls": 6
+        },
+        "B1": {
+          "requests": 6,
+          "parent_ms": 453.65029999999996,
+          "child_ms": 448.1664,
+          "provider_requests": 60,
+          "compile_calls": 6
+        },
+        "B2": {
+          "requests": 6,
+          "parent_ms": 477.0240999999999,
+          "child_ms": 471.22499999999997,
+          "provider_requests": 60,
+          "compile_calls": 6
+        },
+        "A2": {
+          "requests": 6,
+          "parent_ms": 486.10870000000006,
+          "child_ms": 479.908,
+          "provider_requests": 60,
+          "compile_calls": 6
+        }
+      },
+      "requests_per_replay": 6,
+      "old_child_ms": 932.7433000000001,
+      "new_child_ms": 919.3914,
+      "old_parent_ms": 945.0919,
+      "new_parent_ms": 930.6743999999999,
+      "old_provider_requests": 120,
+      "new_provider_requests": 120,
+      "child_reduction_percent": 1.4314656561993155
+    },
+    {
+      "shader_sha256": "95b1c4fbb5f9bf0f34ad7b76eca5ae122d956a9570e1796e1bd4aecf43ca7dbe",
+      "route": "ptl_solid_attempt",
+      "phases": {
+        "A1": {
+          "requests": 5,
+          "parent_ms": 320.25300000000004,
+          "child_ms": 268.3162,
+          "provider_requests": 25,
+          "compile_calls": 2
+        },
+        "B1": {
+          "requests": 5,
+          "parent_ms": 348.77909999999997,
+          "child_ms": 294.8426,
+          "provider_requests": 25,
+          "compile_calls": 2
+        },
+        "B2": {
+          "requests": 5,
+          "parent_ms": 326.85630000000003,
+          "child_ms": 271.3353,
+          "provider_requests": 25,
+          "compile_calls": 2
+        },
+        "A2": {
+          "requests": 5,
+          "parent_ms": 358.3778,
+          "child_ms": 298.8854,
+          "provider_requests": 25,
+          "compile_calls": 2
+        }
+      },
+      "requests_per_replay": 5,
+      "old_child_ms": 567.2016,
+      "new_child_ms": 566.1779,
+      "old_parent_ms": 678.6308,
+      "new_parent_ms": 675.6354,
+      "old_provider_requests": 50,
+      "new_provider_requests": 50,
+      "child_reduction_percent": 0.18048256563450993
+    },
+    {
+      "shader_sha256": "0a7b1c6911deb70e4b09b61d682e8d596d59792a11213250d71725c0bd660bd3",
+      "route": "ptl_rectangle_draw",
+      "phases": {
+        "A1": {
+          "requests": 5,
+          "parent_ms": 267.9039,
+          "child_ms": 214.2026,
+          "provider_requests": 35,
+          "compile_calls": 4
+        },
+        "B1": {
+          "requests": 5,
+          "parent_ms": 267.8696,
+          "child_ms": 217.90030000000002,
+          "provider_requests": 35,
+          "compile_calls": 4
+        },
+        "B2": {
+          "requests": 5,
+          "parent_ms": 272.9488,
+          "child_ms": 217.4072,
+          "provider_requests": 35,
+          "compile_calls": 4
+        },
+        "A2": {
+          "requests": 5,
+          "parent_ms": 273.7503,
+          "child_ms": 220.1697,
+          "provider_requests": 35,
+          "compile_calls": 4
+        }
+      },
+      "requests_per_replay": 5,
+      "old_child_ms": 434.3723,
+      "new_child_ms": 435.3075,
+      "old_parent_ms": 541.6542,
+      "new_parent_ms": 540.8184,
+      "old_provider_requests": 70,
+      "new_provider_requests": 70,
+      "child_reduction_percent": -0.21529917998914794
+    },
+    {
+      "shader_sha256": "5a764502f81741e8cf27e849025854eea948cbfe1a193695cd40e43089577e78",
+      "route": "ptl_program_draw",
+      "phases": {
+        "A1": {
+          "requests": 5,
+          "parent_ms": 329.3101,
+          "child_ms": 165.58259999999999,
+          "provider_requests": 30,
+          "compile_calls": 2
+        },
+        "B1": {
+          "requests": 5,
+          "parent_ms": 337.2842,
+          "child_ms": 167.562,
+          "provider_requests": 30,
+          "compile_calls": 2
+        },
+        "B2": {
+          "requests": 5,
+          "parent_ms": 347.58759999999995,
+          "child_ms": 183.05660000000003,
+          "provider_requests": 30,
+          "compile_calls": 2
+        },
+        "A2": {
+          "requests": 5,
+          "parent_ms": 327.3264,
+          "child_ms": 169.6843,
+          "provider_requests": 30,
+          "compile_calls": 2
+        }
+      },
+      "requests_per_replay": 5,
+      "old_child_ms": 335.26689999999996,
+      "new_child_ms": 350.6186,
+      "old_parent_ms": 656.6365,
+      "new_parent_ms": 684.8717999999999,
+      "old_provider_requests": 60,
+      "new_provider_requests": 60,
+      "child_reduction_percent": -4.578948891167034
+    },
+    {
+      "shader_sha256": "3e6229d456bf2f15688551a8ce0024ef8ee019b7a4a496929eac9bedc9c373e3",
+      "route": "ptl_program_draw",
+      "phases": {
+        "A1": {
+          "requests": 2,
+          "parent_ms": 177.29199999999997,
+          "child_ms": 175.0722,
+          "provider_requests": 36,
+          "compile_calls": 2
+        },
+        "B1": {
+          "requests": 2,
+          "parent_ms": 159.4826,
+          "child_ms": 157.82299999999998,
+          "provider_requests": 36,
+          "compile_calls": 2
+        },
+        "B2": {
+          "requests": 2,
+          "parent_ms": 145.454,
+          "child_ms": 143.49530000000001,
+          "provider_requests": 36,
+          "compile_calls": 2
+        },
+        "A2": {
+          "requests": 2,
+          "parent_ms": 163.453,
+          "child_ms": 161.4042,
+          "provider_requests": 36,
+          "compile_calls": 2
+        }
+      },
+      "requests_per_replay": 2,
+      "old_child_ms": 336.4764,
+      "new_child_ms": 301.3183,
+      "old_parent_ms": 340.745,
+      "new_parent_ms": 304.9366,
+      "old_provider_requests": 72,
+      "new_provider_requests": 72,
+      "child_reduction_percent": 10.448905183246138
+    },
+    {
+      "shader_sha256": "0daddc2311bec2f92d461ec657f6ed418b6b250c89041234548c546a40eaaf36",
+      "route": "ptl_program_draw",
+      "phases": {
+        "A1": {
+          "requests": 4,
+          "parent_ms": 222.97979999999998,
+          "child_ms": 208.40120000000002,
+          "provider_requests": 24,
+          "compile_calls": 2
+        },
+        "B1": {
+          "requests": 4,
+          "parent_ms": 180.9023,
+          "child_ms": 166.4144,
+          "provider_requests": 24,
+          "compile_calls": 2
+        },
+        "B2": {
+          "requests": 4,
+          "parent_ms": 137.5819,
+          "child_ms": 121.4609,
+          "provider_requests": 24,
+          "compile_calls": 2
+        },
+        "A2": {
+          "requests": 4,
+          "parent_ms": 136.4412,
+          "child_ms": 121.76010000000001,
+          "provider_requests": 24,
+          "compile_calls": 2
+        }
+      },
+      "requests_per_replay": 4,
+      "old_child_ms": 330.16130000000004,
+      "new_child_ms": 287.8753,
+      "old_parent_ms": 359.421,
+      "new_parent_ms": 318.4842,
+      "old_provider_requests": 48,
+      "new_provider_requests": 48,
+      "child_reduction_percent": 12.807679155612739
+    },
+    {
+      "shader_sha256": "7823741aa26b80ab1d183a947f93575665d4dd6a334aba98427ae3a142b25ae4",
+      "route": "ptl_program_draw",
+      "phases": {
+        "A1": {
+          "requests": 8,
+          "parent_ms": 121.2836,
+          "child_ms": 93.46620000000001,
+          "provider_requests": 48,
+          "compile_calls": 2
+        },
+        "B1": {
+          "requests": 8,
+          "parent_ms": 117.3736,
+          "child_ms": 91.50350000000002,
+          "provider_requests": 48,
+          "compile_calls": 2
+        },
+        "B2": {
+          "requests": 8,
+          "parent_ms": 125.6952,
+          "child_ms": 95.93110000000001,
+          "provider_requests": 48,
+          "compile_calls": 2
+        },
+        "A2": {
+          "requests": 8,
+          "parent_ms": 109.2934,
+          "child_ms": 84.1008,
+          "provider_requests": 48,
+          "compile_calls": 2
+        }
+      },
+      "requests_per_replay": 8,
+      "old_child_ms": 177.567,
+      "new_child_ms": 187.43460000000005,
+      "old_parent_ms": 230.577,
+      "new_parent_ms": 243.0688,
+      "old_provider_requests": 96,
+      "new_provider_requests": 96,
+      "child_reduction_percent": -5.557113652874701
+    }
+  ],
+  "scope": "Observed child request intervals grouped by shader and accepted route. Includes host work and NPU waits within the child; not a pure kernel timing or desktop measurement."
+}

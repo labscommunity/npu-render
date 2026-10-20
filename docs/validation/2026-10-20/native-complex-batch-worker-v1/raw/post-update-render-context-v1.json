@@ -1,0 +1,54 @@
+{
+    "utc":  "2026-10-20T11:21:41.1014558Z",
+    "boot_utc":  "2026-10-20T11:02:28.5000000Z",
+    "os_version":  "10.0.26200",
+    "build":  "26200",
+    "ubr":  9711,
+    "display_version":  "25H2",
+    "drivers":  [
+                    {
+                        "name":  "Intel(R) NPU",
+                        "version":  "32.0.100.5540",
+                        "inf":  "oem13.inf"
+                    },
+                    {
+                        "name":  "Intel(R) Arc(TM) B390 GPU",
+                        "version":  "32.0.101.8724",
+                        "inf":  "oem168.inf"
+                    }
+                ],
+    "devices":  [
+                    {
+                        "name":  "Intel(R) NPU",
+                        "status":  "OK"
+                    },
+                    {
+                        "name":  "Intel(R) Arc(TM) B390 GPU",
+                        "status":  "OK"
+                    }
+                ],
+    "render_processes":  [
+                             {
+                                 "pid":  12744,
+                                 "name":  "nr_registered_local_indexed_client_probe",
+                                 "session":  0,
+                                 "priority":  ""
+                             },
+                             {
+                                 "pid":  1392,
+                                 "name":  "nr_registered_local_indexed_worker",
+                                 "session":  0,
+                                 "priority":  "BelowNormal"
+                             },
+                             {
+                                 "pid":  2528,
+                                 "name":  "nr_registered_local_indexed_worker",
+                                 "session":  0,
+                                 "priority":  "BelowNormal"
+                             }
+                         ],
+    "active_power_scheme":  "Power Scheme GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (Balanced)",
+    "timing_comparison_uses_same_post_update_context":  true,
+    "pre_update_timings_used_as_control":  false,
+    "interactive_desktop_tested":  false
+}
