@@ -40,7 +40,9 @@ passes 144 exact fixtures on the NPU. Its
 [integrated worker](docs/validation/2026-10-20/native-resident-clip-worker-v1/README.md)
 preserves all replay images and passes recovery. Targeted clipping draws become
 71.69% faster, but total replay time improves only 4.49%, so its standalone live
-promotion is rejected. A combined candidate is under test.
+promotion is rejected. The [combined candidate](docs/validation/2026-10-20/native-combined-render-worker-v1/README.md)
+preserves all 3,888 comparison images, reduces aggregate request time by 6.81%,
+and passes both recovery scenarios. Its separate desktop trial is in progress.
 
 Its [complete-image component comparison](docs/validation/2026-10-16/native-filled-program-comparison-v1/README.md)
 preserves all 1,852 preceding NPU images. Across 1,389 warm pairs, aggregate draw

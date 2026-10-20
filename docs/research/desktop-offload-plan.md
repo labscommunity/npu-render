@@ -73,9 +73,13 @@ preserves all 972 images and all 3,888 A/B/B/A images, and passes two targeted
 recovery cases. Its 63 clipping draws improve by 71.69% across 126 pairs; total
 replay time improves by 4.49%, below the five-percent promotion threshold.
 The [standalone live gate](../validation/2026-10-20/native-resident-clip-live-v1/README.md)
-rejects it before any desktop change. A combined candidate now brings together
-clipping, balanced geometry and ordered rectangles, with separate correctness,
-timing and recovery gates. This does not resolve the much larger frame-rate gap.
+rejects it before any desktop change. The
+[combined candidate](../validation/2026-10-20/native-combined-render-worker-v1/README.md)
+brings together clipping, balanced geometry and ordered rectangles. It preserves
+all 3,888 comparison images, lowers aggregate request time by 6.81%, and passes
+two thirty-image recovery scenarios. Its registered Direct3D check passes and
+the separate desktop trial is in progress. This does not resolve the much larger
+frame-rate gap.
 The rectangle candidate also passes
 [two targeted provider-recovery scenarios](../validation/2026-10-20/native-quad-rectangle-recovery-v1/README.md);
 its unchanged aggregate replay time still precludes a desktop speedup claim.

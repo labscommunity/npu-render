@@ -1,0 +1,28 @@
+"""Exercise restart with all three combined rendering changes in the same worker."""
+from pathlib import Path
+import ast
+r=Path(__file__).parent
+s=(r/'qualify-resident-clip-provider-recovery-v1.py').read_text().replace('resident-clip-provider-recovery-v1','combined-render-provider-recovery-v1').replace('worker-v23','worker-v24')
+s=s.replace('tickets=[0,1,14,58,75,97,98,99,100,103,106,115,118,126,479,481,599,601,820,970]','tickets=[0,1,14,58,75,97,100,103,126,196,467,479,481,587,599,601,620,621,653,665,667,668,686,719,723,741,775,820,859,970]')
+s=s.replace(",flag,'8']",",flag,'13']").replace("['dispatch_ticket']==8","['dispatch_ticket']==13")
+s=s.replace('==20','==30').replace('exact_images=20','exact_images=30').replace('acknowledgments=20','acknowledgments=30')
+s=s.replace('len(draws)==7','len(draws)==9').replace('resident_clip_draws=7','resident_clip_draws=9').replace('targeted_retry_original_ticket=100','targeted_retry_original_ticket=587')
+needle="  report['phases'].append("
+assert s.count(needle)==1
+s=s.replace(needle,"""  quads=[x for x in children if x.get('ptl_quad_rectangle_executed')]
+  assert len(quads)==19 and all(x['ordered_blending'] and x['preflight_all_quads'] and x['execution_device']=='NPU' for x in quads)
+  schedules=[x for x in children if x.get('ptl_geometry_span_distribution')]
+  assert len(schedules)==2
+  for x in schedules:
+   counts=x['counts'];assert len(counts)==6 and sum(counts)==x['total'] and max(counts)-min(counts)<=1
+   assert x['starts']==[sum(counts[:i]) for i in range(6)] and x['arithmetic_backend']=='NPU' and not x['kernel_changed']
+"""+needle)
+s=s.replace('resident_clip_imports=2,','resident_clip_imports=2,quad_rectangle_draws=19,balanced_geometry_generations=2,')
+ast.parse(s);(r/'qualify-combined-render-provider-recovery-v1.py').write_text(s)
+s=(r/'run-resident-clip-provider-recovery-v1-qualification.ps1').read_text().replace('resident-clip-provider-recovery-v1','combined-render-provider-recovery-v1').replace('worker-v23','worker-v24').replace('waiting-for-resident-worker-comparison','waiting-for-combined-worker-comparison').replace('Resident clip correctness','Combined renderer correctness')
+s=s.replace(" $preceding=if(Test-Path", " $preceding=if(Test-Path \"$vm/native-desktop-admission-v69/report.json\"){'native-desktop-admission-v69'}elseif(Test-Path")
+s=s.replace("'native-desktop-admission-v68'))", "'native-desktop-admission-v68','native-desktop-admission-v69'))")
+(r/'run-combined-render-provider-recovery-v1-qualification.ps1').write_text(s)
+p=r/'collect-native-primary-v102.py';s=p.read_text().replace('directories=[',"directories=['combined-render-provider-recovery-v1-qualification','combined-render-provider-recovery-v1',",1).replace('source_files=[',"source_files=['qualify-combined-render-provider-recovery-v1.py','run-combined-render-provider-recovery-v1-qualification.ps1',",1).replace("@('ptl-worker-v24-qualification')","@('ptl-worker-v24-qualification','combined-render-provider-recovery-v1-qualification')");ast.parse(s);p.write_text(s)
+p=r/'curate-native-primary-v102.py';s=p.read_text().replace("'prepare-combined-render-worker-v1.py'","'prepare-combined-render-worker-v1.py','prepare-combined-render-recovery-v1.py'");ast.parse(s);p.write_text(s)
+print('Prepared two 30-image recovery cases after all combined providers have been used.')

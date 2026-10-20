@@ -1,0 +1,37 @@
+"""Combine separately qualified geometry packing, ordered quads and clipping."""
+from pathlib import Path
+import ast,hashlib,json,shutil,tarfile
+r=Path(__file__).parent;name='ptl-native-worker-v24';d=r/name
+assert not d.exists()
+for version in [19,21,22,23]:
+ manifest=json.loads((r/f'ptl-native-worker-v{version}-source.json').read_text())
+ for n,h in manifest.items():assert hashlib.sha256((r/f'ptl-native-worker-v{version}'/n).read_bytes()).hexdigest()==h
+shutil.copytree(r/'ptl-native-worker-v23',d)
+shutil.copyfile(r/'ptl-native-worker-v21/ptl_geometry.hpp',d/'ptl_geometry.hpp')
+shutil.copyfile(r/'ptl-native-worker-v22/ptl_quad_batch.hpp',d/'ptl_quad_batch.hpp')
+p=d/'indexed_pipeline.hpp';s=p.read_text()
+changes={'#include "quad_batch.hpp"':'#include "ptl_quad_batch.hpp"','std::unique_ptr<QuadBatch> executor':'std::unique_ptr<PtlQuadBatch> executor','QuadBatch *executor=nullptr':'PtlQuadBatch *executor=nullptr','std::make_unique<QuadBatch>(request,"NPU")':'std::make_unique<PtlQuadBatch>(request,"NPU",ptl_rectangle_blob)'}
+for a,b in changes.items():assert s.count(a)==1;s=s.replace(a,b)
+p.write_text(s)
+manifest={str(p.relative_to(d)):hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()}
+old=json.loads((r/'ptl-native-worker-v23-source.json').read_text())
+assert {n for n,h in manifest.items() if old.get(n)!=h}=={'ptl_geometry.hpp','ptl_quad_batch.hpp','indexed_pipeline.hpp'}
+(r/(name+'-source.json')).write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/(name+'.tar.gz'),'w:gz') as archive:archive.add(d,arcname=name)
+s=(r/'build-ptl-native-worker-v23.ps1').read_text().replace('worker-v23','worker-v24');(r/'build-ptl-native-worker-v24.ps1').write_text(s)
+s=(r/'qualify-ptl-native-worker-v23.py').read_text().replace('worker-v23','worker-v24')
+needle=" if a.stage=='selected':command[-1]=";a=s.index(needle);b=s.index('\n',a)
+s=s[:b]+"\n if a.stage=='selected':command[-1]=','.join(str(x) for x in sorted({int(x) for x in command[-1].split(',')}|{467,587,653,719,775}))"+s[b:]
+ref=(r/'qualify-ptl-native-worker-v22-v2.py').read_text();a=ref.index(' assert rectangle_kernels and rectangle_crops\n');b=ref.index('\n report.update(rectangle_accepted',a)
+needle=' assert rectangle_kernels and rectangle_crops and len(rectangle_kernels)+len(rectangle_crops)<=37'
+assert s.count(needle)==1;s=s.replace(needle,ref[a:b])
+ref=(r/'qualify-ptl-native-worker-v21.py').read_text();a=ref.index(' schedules=[]');b=ref.index(" if a.stage=='full':",a)
+needle=" report['passed']=True";assert s.count(needle)==1;s=s.replace(needle,ref[a:b]+needle)
+ast.parse(s);(r/'qualify-ptl-native-worker-v24.py').write_text(s)
+s=(r/'qualify-resident-clip-comparison-v1.py').read_text().replace('resident-clip-comparison-v1','combined-render-comparison-v1').replace('worker-v23','worker-v24').replace("('B1',23),('B2',23)","('B1',24),('B2',24)")
+s=s.replace('with one-call resident-texture rasterization for admitted clipping draws','with combined balanced geometry, ordered rectangle routing and resident clipping')
+ast.parse(s);(r/'qualify-combined-render-comparison-v1.py').write_text(s)
+s=(r/'run-ptl-worker-v23-qualification.ps1').read_text().replace('worker-v23','worker-v24').replace('resident-clip-comparison-v1','combined-render-comparison-v1').replace("@('ptl-resident-clip-v3-qualification-v2')","@('ptl-combined-desktop-v11','resident-clip-provider-recovery-v1-qualification')").replace('waiting-for-resident-clip-component','waiting-for-resident-desktop-and-recovery')
+s=s.replace(' $preceding=if(Test-Path', ' $prior=Get-Content "$vm/ptl-worker-v23-qualification/report.json" -Raw|ConvertFrom-Json;if(!$prior.completed -or !$prior.passed){throw \'Resident worker correctness/comparison incomplete\'}\n $preceding=if(Test-Path "$vm/native-desktop-admission-v69/report.json"){\'native-desktop-admission-v69\'}elseif(Test-Path')
+(r/'run-ptl-worker-v24-qualification.ps1').write_text(s)
+print(json.dumps({'prepared':name,'changes_relative_to_worker23':3,'new_device_kernel':False,'hardware_tested':False}))

@@ -1,0 +1,30 @@
+from pathlib import Path
+from collections import defaultdict
+import hashlib,json
+root=Path('docs/validation/2026-10-20/native-combined-render-worker-v1');raw=root/'raw';report=json.loads((raw/'combined-render-comparison-v1/report.json').read_text());assert report['completed'] and report['passed']
+def rows(p):return [json.loads(x) for x in p.read_text(encoding='utf-8-sig').splitlines() if x.startswith('{')]
+groups=defaultdict(lambda:dict(old_parent_ms=0,new_parent_ms=0,old_child_ms=0,new_child_ms=0,old_provider_requests=0,new_provider_requests=0,old_draws=0,new_draws=0))
+for phase in report['phases']:
+ directory=raw/'combined-render-comparison-v1'/phase['phase'];mapping={x['iteration']:x['ticket'] for x in rows(directory/'replays.jsonl')}
+ events=rows(directory/'provider-processes/generation-1/worker.stdout.jsonl');identities={};proofs={};current=None
+ for event in events:
+  if event.get('kind')=='request_identity':
+   current=event['dispatch_ticket'];assert current not in identities;identities[current]=event
+  if event.get('passed') and 'provider_requests' in event:
+   assert current is not None and current not in proofs and event['sequence']==identities[current]['sequence'] and event['client_pid']==identities[current]['client_pid'];proofs[current]=event
+ assert len(mapping)==len(identities)==len(proofs)==972
+ prefix='old' if phase['worker_version']==19 else 'new'
+ for request in phase['requests']:
+  ticket=request['dispatch_ticket'];assert mapping[ticket]==request['original_ticket'];identity=identities[ticket];shader='clear' if identity['abi']==13 else identity['pixel_sha256'];g=groups[shader]
+  for field in ('parent_ms','child_ms'):g[prefix+'_'+field]+=request[field]
+  g[prefix+'_provider_requests']+=proofs[ticket]['provider_requests'];g[prefix+'_draws']+=1
+assert sum(x['old_draws'] for x in groups.values())==sum(x['new_draws'] for x in groups.values())==1944
+for group in groups.values():
+ assert group['old_draws']==group['new_draws'];group['parent_improvement_percent']=100*(1-group['new_parent_ms']/group['old_parent_ms']);group['new_child_share_percent']=100*group['new_child_ms']/sum(x['new_child_ms'] for x in groups.values())
+result=dict(passed=True,source_comparison_sha256=hashlib.sha256((raw/'combined-render-comparison-v1/report.json').read_bytes()).hexdigest(),scope='Retained complete replay, not live animation. Identity joined by dispatch ticket and original replay ticket. Provider counts include the entire draw, including vertex/projection and raster work.',families=[dict(shader_sha256=key,**value) for key,value in sorted(groups.items(),key=lambda x:-x[1]['new_child_ms'])])
+out=root/'analysis';out.mkdir(exist_ok=False);(out/'cost-by-shader.json').write_text(json.dumps(result,indent=2)+'\n')
+script=Path('results/render-driver/analyze-combined-render-cost-v1.py');dest=root/'sources/analyze-combined-render-cost-v1.py.txt';dest.write_bytes(script.read_bytes());manifest=json.loads((root/'artifact-sha256.json').read_text())
+for p in (out/'cost-by-shader.json',dest):
+ data=p.read_bytes();manifest.append(dict(path=str(p.relative_to(root)),bytes=len(data),sha256=hashlib.sha256(data).hexdigest()))
+(root/'artifact-sha256.json').write_text(json.dumps(manifest,indent=2)+'\n')
+print(json.dumps(result['families'][:8],indent=2))
