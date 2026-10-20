@@ -1,0 +1,30 @@
+"""Version the affected-shader recovery check for the corrected batch worker."""
+from pathlib import Path
+import ast
+import hashlib
+import json
+import subprocess
+
+r = Path(__file__).parent
+names = []
+for name in ("qualify-complex-batch-provider-recovery-v1.py",
+             "run-complex-batch-provider-recovery-v1-qualification.ps1"):
+    s = (r / name).read_text().replace("complex-batch-provider-recovery-v1",
+                                     "complex-batch-provider-recovery-v2")
+    s = s.replace("worker-v28", "worker-v29")
+    p = r / name.replace("recovery-v1", "recovery-v2")
+    if name.endswith(".py"):
+        ast.parse(s)
+    if p.exists():
+        assert p.read_text() == s
+    else:
+        p.write_text(s)
+    names.append(p.name)
+p = r / "complex-batch-recovery-v2-source.json"
+expected = {n: hashlib.sha256((r / n).read_bytes()).hexdigest() for n in names}
+if p.exists():
+    assert json.loads(p.read_text()) == expected
+else:
+    p.write_text(json.dumps(expected, indent=2) + "\n")
+subprocess.run(["scp", "-q", *[str(r / n) for n in names], str(p),
+                "delta:AppData/Local/npu-render/vm/"], check=True, timeout=30)

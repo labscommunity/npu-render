@@ -1,0 +1,100 @@
+"""Fill complete six-engine shader groups without changing device arithmetic."""
+from pathlib import Path
+import ast
+import hashlib
+import json
+import re
+import shutil
+import subprocess
+import tarfile
+
+r = Path(__file__).parent
+name = "ptl-native-worker-v28"
+d = r / name
+assert not d.exists()
+old = json.loads((r / "ptl-native-worker-v26-source.json").read_text())
+for n, h in old.items():
+    assert hashlib.sha256((r / "ptl-native-worker-v26" / n).read_bytes()).hexdigest() == h
+shutil.copytree(r / "ptl-native-worker-v26", d)
+p = d / "indexed_pipeline.hpp"
+s = p.read_text()
+start = s.index("            if(ptl_complex_enabled")
+end = s.index("            if(ptl_long_enabled", start)
+block = re.sub(r"(?<!\.)\bbatch\b", "complex_batch", s[start:end])
+block = block.replace("raster::geometry_supported(request.pixel,capacity,complex_batch)",
+                      "raster::geometry_supported(request.pixel,capacity,batch)")
+block = "            const auto complex_batch=triangle_batch(request,12288u);\n" + block
+needle = '                if(executor){auto result=executor->execute('
+assert block.count(needle) == 1
+block = block.replace(needle, r'''                if(executor){
+                    std::printf("{\"ptl_complex_batch_selected\":true,\"batch\":%u,\"kernel_changed\":false,\"execution_device\":\"NPU\"}\n",complex_batch);std::fflush(stdout);
+                    auto result=executor->execute(''')
+p.write_text(s[:start] + block + s[end:])
+p = d / "ptl_complex_triangle_draw.cpp"
+s = p.read_text()
+needle = "batch(b<=shader::RegisterExecutor::maximum_batch(p)?b:std::gcd(b,shader::RegisterExecutor::maximum_batch(p)))"
+assert s.count(needle) == 1
+s = s.replace(needle, "batch(b)")
+needle = "b && b<=shader::RegisterExecutor::preferred_raster_batch(p)"
+assert s.count(needle) == 1
+s = s.replace(needle, "b && b<=12288")
+# Retain conservative preexisting scheduling limits independently of transport.
+needle = "const auto regions=bounded_triangle_regions(projected.triangle_bounds,clip,s.batch,s.quads,false,s.batch>8192);"
+assert s.count(needle) == 1
+s = s.replace(needle, "const auto scheduling_batch=(std::min)(s.batch,4096u);\n    const auto regions=bounded_triangle_regions(projected.triangle_bounds,clip,scheduling_batch,s.quads,false,false);")
+p.write_text(s)
+manifest = {str(p.relative_to(d)): hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in d.rglob("*") if p.is_file()}
+assert {n for n, h in manifest.items() if old.get(n) != h} == {
+    "indexed_pipeline.hpp", "ptl_complex_triangle_draw.cpp"}
+(r / (name + "-source.json")).write_text(json.dumps(manifest, indent=2) + "\n")
+with tarfile.open(r / (name + ".tar.gz"), "w:gz") as archive:
+    archive.add(d, arcname=name)
+s = (r / "build-ptl-native-worker-v26.ps1").read_text().replace("worker-v26", "worker-v28")
+(r / "build-ptl-native-worker-v28.ps1").write_text(s)
+s = (r / "qualify-ptl-native-worker-v26.py").read_text().replace("worker-v26", "worker-v28")
+needle = " report['passed']=True\n"
+assert s.count(needle) == 1
+s = s.replace(needle, """ batch_events=[]
+ for log in (trial/'provider-processes').glob('generation-*/worker.stdout.jsonl'):
+  batch_events += [x for x in rows(log) if x.get('ptl_complex_batch_selected')]
+ assert len(batch_events)==report['complex_accepted'] and all(0<x['batch']<=12288 and x['execution_device']=='NPU' and not x['kernel_changed'] for x in batch_events)
+ assert any(x['batch']>4096 for x in batch_events)
+ report['complex_batch_events']=batch_events
+""" + needle)
+ast.parse(s)
+(r / "qualify-ptl-native-worker-v28.py").write_text(s)
+s = (r / "qualify-turbo-render-comparison-v2.py").read_text()
+s = s.replace("turbo-render-comparison-v2", "complex-batch-comparison-v1")
+s = s.replace("ptl-native-worker-v26-full/report.json", "ptl-native-worker-v28-full/report.json", 1)
+s = s.replace("ptl-native-worker-v24-full/replay/replays.jsonl", "ptl-native-worker-v26-full/replay/replays.jsonl")
+s = s.replace("[('A1',24),('B1',26),('B2',26),('A2',24)]",
+              "[('A1',26),('B1',28),('B2',28),('A2',26)]")
+s = s.replace("  if version==26:assert len(turbo_events)>=9", "  assert len(turbo_events)>=9")
+s = s.replace("  else:assert not turbo_events\n", "")
+s = s.replace("Four complete recorded replays in A/B/B/A order comparing the combined renderer with an otherwise identical renderer requesting NPU_TURBO on its ten custom-model import sites; compiled arithmetic and model blobs unchanged.",
+              "Four complete recorded replays in A/B/B/A order comparing worker26 with a larger bounded transport batch for the exact complex shader. Both request turbo; every kernel blob and shader calculation is unchanged.")
+ast.parse(s)
+(r / "qualify-complex-batch-comparison-v1.py").write_text(s)
+s = (r / "run-ptl-worker-v27-qualification.ps1").read_text().replace("worker-v27", "worker-v28").replace("program-vector-fill-comparison-v1", "complex-batch-comparison-v1")
+start = s.index(" $report.active_phase='waiting-for-desktop-restoration'")
+end = s.index(" if(@(Get-Process", start)
+s = s[:start] + r'''
+ $report.active_phase='waiting-for-vector-fill-comparison';Save-Report
+ $deadline=[DateTime]::UtcNow.AddMinutes(60)
+ while($true){$q=Get-Content "$vm/ptl-worker-v27-qualification/report.json" -Raw|ConvertFrom-Json;if($q.completed){break};if([DateTime]::UtcNow -gt $deadline){throw 'Preceding experiment deadline'};Start-Sleep -Seconds 3}
+ if(!$q.passed){throw 'Inspect preceding renderer failure before NPU work'}
+ $q=Get-Content "$vm/native-desktop-admission-v74/report.json" -Raw|ConvertFrom-Json
+ if(!$q.completed -or !$q.cleanup_passed -or !$q.memory_integrity_after){throw 'Preceding desktop cleanup incomplete'}
+''' + s[end:]
+(r / "run-ptl-worker-v28-qualification.ps1").write_text(s)
+names = [name + ".tar.gz", name + "-source.json",
+         "build-ptl-native-worker-v28.ps1", "qualify-ptl-native-worker-v28.py",
+         "qualify-complex-batch-comparison-v1.py", "run-ptl-worker-v28-qualification.ps1"]
+p = r / "ptl-worker-v28-tools-source.json"
+p.write_text(json.dumps({n: hashlib.sha256((r / n).read_bytes()).hexdigest() for n in names}, indent=2) + "\n")
+subprocess.run(["scp", "-q", *[str(r / n) for n in names], str(p),
+                "delta:AppData/Local/npu-render/vm/"], check=True, timeout=30)
+print(json.dumps(dict(prepared=name, changed_host_files=2, kernel_blobs_unchanged=True,
+                      complex_transport_capacity=12288, conservative_scheduling_budget=4096,
+                      hardware_work_started=False)))

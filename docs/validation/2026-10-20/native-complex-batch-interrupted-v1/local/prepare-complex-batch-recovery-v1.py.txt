@@ -1,0 +1,36 @@
+"""Retry the affected complex shader after bounded provider failures."""
+from pathlib import Path
+import ast
+import hashlib
+import json
+import subprocess
+
+r = Path(__file__).parent
+s = (r / "qualify-turbo-render-provider-recovery-v1.py").read_text()
+s = s.replace("turbo-render-provider-recovery-v1", "complex-batch-provider-recovery-v1")
+s = s.replace("worker-v26", "worker-v28").replace("flag,'13'", "flag,'21'")
+s = s.replace("['dispatch_ticket']==13", "['dispatch_ticket']==21")
+s = s.replace("targeted_retry_original_ticket=587", "targeted_retry_original_ticket=668")
+needle = "  report['phases'].append("
+assert s.count(needle) == 1
+s = s.replace(needle, """  complex_batches=[x for x in children if x.get('ptl_complex_batch_selected')]
+  assert len(complex_batches)==5 and any(x['batch']>4096 for x in complex_batches)
+  assert all(0<x['batch']<=12288 and x['execution_device']=='NPU' and not x['kernel_changed'] for x in complex_batches)
+""" + needle)
+s = s.replace("phase=phase,passed=True,", "phase=phase,passed=True,complex_batch_events=complex_batches,")
+ast.parse(s)
+(r / "qualify-complex-batch-provider-recovery-v1.py").write_text(s)
+s = (r / "run-turbo-render-provider-recovery-v1-qualification.ps1").read_text()
+s = s.replace("turbo-render-provider-recovery-v1", "complex-batch-provider-recovery-v1").replace("worker-v26", "worker-v28")
+s = s.replace("@('ptl-worker-v28-qualification','ptl-program-vector-fill-v1-qualification')", "@('ptl-worker-v28-qualification')")
+s = s.replace("native-desktop-admission-v72", "native-desktop-admission-v74")
+s = s.replace("ptl-program-vector-fill-v1-qualification", "ptl-worker-v28-qualification")
+(r / "run-complex-batch-provider-recovery-v1-qualification.ps1").write_text(s)
+names = ["qualify-complex-batch-provider-recovery-v1.py",
+         "run-complex-batch-provider-recovery-v1-qualification.ps1"]
+p = r / "complex-batch-recovery-v1-source.json"
+p.write_text(json.dumps({n: hashlib.sha256((r / n).read_bytes()).hexdigest() for n in names}, indent=2) + "\n")
+subprocess.run(["scp", "-q", *[str(r / n) for n in names], str(p),
+                "delta:AppData/Local/npu-render/vm/"], check=True, timeout=30)
+print(json.dumps(dict(prepared=True, retry_ticket=668, dispatch_ticket=21,
+                      exact_images_per_case=30, real_device_loss_tested=False)))

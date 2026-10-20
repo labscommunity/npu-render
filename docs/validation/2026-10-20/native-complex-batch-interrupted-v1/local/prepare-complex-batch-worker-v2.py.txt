@@ -1,0 +1,72 @@
+"""Keep protocol admission capacities unchanged; bound the custom path afterward."""
+from pathlib import Path
+import ast
+import hashlib
+import json
+import shutil
+import subprocess
+import tarfile
+
+r = Path(__file__).parent
+name = "ptl-native-worker-v29"
+d = r / name
+assert not d.exists()
+old = json.loads((r / "ptl-native-worker-v28-source.json").read_text())
+for n, h in old.items():
+    assert hashlib.sha256((r / "ptl-native-worker-v28" / n).read_bytes()).hexdigest() == h
+shutil.copytree(r / "ptl-native-worker-v28", d)
+p = d / "indexed_pipeline.hpp"
+s = p.read_text()
+needle = "const auto complex_batch=triangle_batch(request,12288u);"
+assert s.count(needle) == 1
+s = s.replace(needle, "const auto complex_batch=(std::min)(triangle_batch(request,16384u),12288u);")
+p.write_text(s)
+manifest = {str(p.relative_to(d)): hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in d.rglob("*") if p.is_file()}
+assert {n for n, h in manifest.items() if old.get(n) != h} == {"indexed_pipeline.hpp"}
+(r / (name + "-source.json")).write_text(json.dumps(manifest, indent=2) + "\n")
+with tarfile.open(r / (name + ".tar.gz"), "w:gz") as archive:
+    archive.add(d, arcname=name)
+names = [name + ".tar.gz", name + "-source.json"]
+for old_name in ("build-ptl-native-worker-v28.ps1", "qualify-ptl-native-worker-v28.py",
+                 "qualify-complex-batch-comparison-v1.py"):
+    s = (r / old_name).read_text().replace("worker-v28", "worker-v29")
+    s = s.replace("complex-batch-comparison-v1", "complex-batch-comparison-v2")
+    s = s.replace("('B1',28),('B2',28)", "('B1',29),('B2',29)")
+    new_name = old_name.replace("worker-v28", "worker-v29").replace("comparison-v1", "comparison-v2")
+    if new_name.endswith(".py"):
+        ast.parse(s)
+    (r / new_name).write_text(s)
+    names.append(new_name)
+s = (r / "verify-ptl-post-turbo-health-v3.py").read_text().replace("ptl-post-turbo-health-v3", "ptl-post-batch-rejection-health-v1")
+ast.parse(s)
+(r / "verify-ptl-post-batch-rejection-health-v1.py").write_text(s)
+names.append("verify-ptl-post-batch-rejection-health-v1.py")
+s = (r / "run-ptl-worker-v28-qualification.ps1").read_text()
+s = s.replace("worker-v28", "worker-v29").replace("complex-batch-comparison-v1", "complex-batch-comparison-v2")
+start = s.index(" $report.active_phase='waiting-for-vector-fill-comparison'")
+end = s.index(" if(@(Get-Process", start)
+s = s[:start] + r'''
+ $report.active_phase='verify-prior-rejection-cleanup';Save-Report
+ $q=Get-Content "$vm/ptl-worker-v28-qualification/report.json" -Raw|ConvertFrom-Json
+ if(!$q.completed -or $q.passed -or $q.error -ne 'selected failed with exit 1'){throw 'Expected rejected replay not complete'}
+ $q=Get-Content "$vm/complex-batch-provider-recovery-v1-qualification/report.json" -Raw|ConvertFrom-Json
+ if(!$q.completed -or $q.passed){throw 'Prior recovery controller not stopped'}
+ $q=Get-Content "$vm/native-desktop-admission-v74/report.json" -Raw|ConvertFrom-Json
+ if(!$q.completed -or !$q.cleanup_passed -or !$q.memory_integrity_after){throw 'Preceding desktop cleanup incomplete'}
+''' + s[end:]
+needle = " Invoke-Step 'build'"
+assert s.count(needle) == 1
+s = s.replace(needle, r''' Invoke-Step 'original-health' "$r/toolchains/openvino-2026.4.1/Scripts/python.exe" ('"'+$vm+'\verify-ptl-post-batch-rejection-health-v1.py"') 120
+ $q=Get-Content "$vm/ptl-post-batch-rejection-health-v1/report.json" -Raw|ConvertFrom-Json
+ if(!$q.completed -or !$q.passed -or @($q.checks).Count -ne 8){throw 'Original NPU health incomplete'}
+''' + needle)
+(r / "run-ptl-worker-v29-qualification.ps1").write_text(s)
+names.append("run-ptl-worker-v29-qualification.ps1")
+p = r / "ptl-worker-v29-tools-source.json"
+p.write_text(json.dumps({n: hashlib.sha256((r / n).read_bytes()).hexdigest() for n in names}, indent=2) + "\n")
+subprocess.run(["scp", "-q", *[str(r / n) for n in names], str(p),
+                "delta:AppData/Local/npu-render/vm/"], check=True, timeout=30)
+print(json.dumps(dict(prepared=name, rejected_capacity=12288, accepted_protocol_capacity=16384,
+                      custom_transport_bound=12288, prior_failure_preserved=True,
+                      hardware_work_started=False)))

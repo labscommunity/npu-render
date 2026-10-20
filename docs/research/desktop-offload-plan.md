@@ -149,6 +149,12 @@ not isolated instruction timing. A separate candidate now enlarges the bounded
 transport batch for the complex shader that dominates the live animation.
 Its kernel arithmetic remains unchanged; correctness, timing and recovery
 qualification are still pending.
+The [initial attempts](../validation/2026-10-20/native-complex-batch-interrupted-v1/README.md)
+retain a rejected protocol-capacity call and its correction. The corrected
+worker passes 174 selected images, but Windows servicing restarts interrupt its
+full replay after 55 images. The unchanged binary is now being requalified in
+a separately named local task, measuring both baseline and candidate after the
+update. This interruption is not an NPU performance result or device-loss claim.
 
 The rectangle candidate also passes
 [two targeted provider-recovery scenarios](../validation/2026-10-20/native-quad-rectangle-recovery-v1/README.md);
@@ -400,12 +406,12 @@ renderer does not establish where every application renders.
 
 | Gate | Work | Acceptance evidence | Current status |
 | --- | --- | --- | --- |
-| 1. Routing | Identify physical/indirect paths and the actual renderer before, during and after admission. | Timestamped topology, DWM NPU receipts, frame producer, exact restoration. | Finite v56 passes native routing and restoration. The physical output remains available. |
-| 2. Continuous rendering | Render changing content without hidden fallback; handle failed draws and preparation. | Fresh frames, pixel checks, provider receipts, sustained operation. | V56 passes 1,682 acknowledged operations and 103 matching physical submissions. The earlier v36 thirty-minute result does not qualify the current renderer. |
-| 3. Physical presentation | Deliver fresh NPU frames to the physical output without recursive mirroring; quantify remaining GPU work. | Sequence-to-present correlation, output identity, display statistics, residual GPU activity. | V56 correlates 103 exact submissions and controlled colors. The same bridge carries 29.9 animation updates/s in the GPU control. Residual GPU presentation/copy cost and resource relief remain unmeasured. |
-| 4. Interaction and recovery | Route pointer, keyboard and focus; handle cursor, DPI and resolution; restore topology and windows. | Physical input observations, owned-process fault recovery, ordinary lock/login path retained. | V56 passes controlled input, confinement/reacquisition and ordinary restoration with memory integrity enabled. Current sleep/wake, secure-desktop and broader fault qualification remain open. |
-| 5. Responsiveness | Reduce rendering, request, copy and scheduling costs; report cold start separately. | Ordinary animated desktop at 30 fps, p95 visible response ≤100 ms, thirty-minute stable run. | Not met. V56 warm sent-input-to-display p95 is 107.663 ms mouse and 1,632.388 ms keyboard. The NPU animation yields 0.7 verified updates/s versus 29.9 in the separate GPU control. Child rendering occupies 6.84 s of the NPU interval. No NPU desktop speedup is established. |
-| 6. Application coverage | Admit ordinary applications and implement required browser, video and 3D operations; verify per-process renderer. | Capability matrix and hardware runs accounting for every remaining iGPU operation. | V56 passes a normally started non-admin default-adapter fixture sharing DWM's NPU worker. Continuous admission, renewal/revocation, multiple applications and broad browser/video/game coverage remain unqualified. |
+| 1. Routing | Identify physical/indirect paths and the actual renderer before, during and after admission. | Timestamped topology, DWM NPU receipts, frame producer, exact restoration. | Finite v64 passes native routing and restoration. The physical output remains available. |
+| 2. Continuous rendering | Render changing content without hidden fallback; handle failed draws and preparation. | Fresh frames, pixel checks, provider receipts, sustained operation. | V64 passes 1,590 acknowledged operations and 110 exact physical submissions over 550 seconds. The earlier thirty-minute result does not qualify the current renderer. |
+| 3. Physical presentation | Deliver fresh NPU frames to the physical output without recursive mirroring; quantify remaining GPU work. | Sequence-to-present correlation, output identity, display statistics, residual GPU activity. | V64 correlates 110 exact submissions and controlled colors. The same bridge carries 29.9 animation updates/s in the separate GPU control. Residual GPU presentation/copy cost and resource relief remain unmeasured. |
+| 4. Interaction and recovery | Route pointer, keyboard and focus; handle cursor, DPI and resolution; restore topology and windows. | Physical input observations, owned-process fault recovery, ordinary lock/login path retained. | V64 passes forty controlled inputs and restoration with memory integrity enabled. Worker26 passes two injected provider-fault cases. Current sleep/wake, secure-desktop and broader fault qualification remain open. |
+| 5. Responsiveness | Reduce rendering, request, copy and scheduling costs; report cold start separately. | Ordinary animated desktop at 30 fps, p95 visible response ≤100 ms, thirty-minute stable run. | Not met. V64 warm sent-input-to-display p95 is 108.234 ms mouse and 108.017 ms keyboard. Animation yields 0.9 verified updates/s versus 29.9 in the separate GPU control. Child rendering occupies 6.02 s of the NPU interval. Replay gains do not establish a usable desktop. |
+| 6. Application coverage | Admit ordinary applications and implement required browser, video and 3D operations; verify per-process renderer. | Capability matrix and hardware runs accounting for every remaining iGPU operation. | V64 passes a normally started non-admin default-adapter fixture sharing DWM's NPU worker. An unleased observer still fails device creation. Continuous admission, renewal/revocation, multiple applications and broad browser/video/game coverage remain unqualified. |
 | 7. Tahoma benefit | Repeat baseline/offload trials with matched power, resolution, content and work rate. | Tahoma throughput/latency, desktop frame times, per-engine activity, memory and power; measurable GPU relief without material regression. | Earlier experiments regressed. No native-desktop Tahoma A/B or GPU-relief result is established. |
 | 8. Usable switch | Integrate qualified components into install/on/off/status/recovery; complete distribution and CI work. | Clean install and repeated enable/disable cycles, failures and target-hardware end-to-end tests. | Private research prototype. No usable full-offload product or complete application migration. |
 
@@ -416,10 +422,10 @@ role, and any GPU rendering/copy cost in the bridge must be measured.
 
 ## Immediate work and decision gates
 
-1. Preserve the now-complete v55/v56 NPU trials and GPU control as the baseline.
-   Both NPU trials deliver 0.7 verified animation updates/s; the GPU control
-   delivers 29.9 through the same bridge. Keep input send, application receipt,
-   publication, display counters and independent reads distinct.
+1. Use v64 as the latest passing physical NPU baseline: 0.9 verified animation
+   updates/s, compared with 29.9 in the separate GPU control through the same
+   bridge. Keep input send, application receipt, publication, display counters
+   and independent reads distinct. Preserve the earlier v55/v56 results.
 2. Retain plugin-allocated tensors. The host-tensor experiment preserves images
    but is 7.50% slower across 1,944 paired requests. Its recovery tests pass and
    its desktop promotion correctly stops. For subsequent candidates require
@@ -440,10 +446,15 @@ role, and any GPU rendering/copy cost in the bridge must be measured.
    and blending in one NPU call per batch. All 144 target-device fixtures pass.
    Worker23 preserves all replay images and passes recovery, but its 4.49%
    aggregate gain misses live promotion despite 71.69% faster targeted draws.
-   Measure the combined geometry/rectangle/clipping candidate under the same
-   correctness, timing and recovery gates. Individual component gains are too
-   small to explain a path to 30 fps by themselves; reducing submissions and
-   redundant work across whole frames remains an architectural requirement.
+   The combined geometry/rectangle/clipping candidate passes those gates with
+   6.81% lower replay time; turbo imports then lower time by a further measured
+   9.90% against that candidate in a separate comparison. Vector memory fill
+   improves its route but only 2.35% overall, below live promotion. Complete the
+   complex-shader batch comparison and recovery after the servicing interruption.
+   Next qualify the prepared compiled-graph turbo candidate, which changes one
+   provider header and preserves shader arithmetic. Individual component gains
+   remain too small to explain a path to 30 fps by themselves; reducing
+   submissions and redundant work across whole frames remains necessary.
    The [frame command batching contract](frame-command-batching.md) specifies
    resource versions, synchronization boundaries, recovery and staged NPU
    validation. It is a design, not an implemented performance result.
