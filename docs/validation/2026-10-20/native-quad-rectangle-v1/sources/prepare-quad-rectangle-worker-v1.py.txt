@@ -1,0 +1,100 @@
+"""Route preflighted ordered quads through the existing NPU rectangle provider."""
+from pathlib import Path
+import ast
+import hashlib
+import json
+import shutil
+import tarfile
+
+r = Path(__file__).parent
+name = "ptl-native-worker-v22"
+d = r / name
+if d.exists():
+    # A preparation assertion stopped before any modified source was written.
+    assert sorted(x.name for x in d.iterdir()) == sorted(x.name for x in (r / "ptl-native-worker-v19").iterdir())
+    assert all(p.read_bytes() == (r / "ptl-native-worker-v19" / p.name).read_bytes() for p in d.iterdir())
+else:
+    shutil.copytree(r / "ptl-native-worker-v19", d)
+s = (r / "native-routing-v45/native/windows/registered_lab/quad_batch.hpp").read_text()
+s = s.replace('#include "indexed_exchange_protocol.hpp"', '#include "quad_batch.hpp"\n#include "ptl_point_rectangle.hpp"')
+s = s.replace("class QuadBatch {", "class PtlQuadBatch {")
+s = s.replace(
+    "    raster::LinearTextureDrawExecutor executor;",
+    "    raster::LinearTextureDrawExecutor executor;\n"
+    "    std::unique_ptr<raster::PtlPointRectangle> rectangle;",
+)
+needle = '    QuadBatch(const Request &r,const std::string &backend):'
+assert s.count(needle) == 1
+s = s.replace(needle, '    PtlQuadBatch(const Request &r,const std::string &backend,const std::filesystem::path &blob):')
+needle = "{require(eligible(r));}"
+assert s.count(needle) == 1
+s = s.replace(needle, """{
+        require(eligible(r));
+        if(!blob.empty())rectangle=std::make_unique<raster::PtlPointRectangle>(
+            r.vertex,r.pixel,r.header.width,r.header.height,r.header.format,
+            r.texture,(r.header.flags&1)!=0,blob);
+    }""")
+needle = "auto quad=executor.execute(vertices,r.vertex_constants,r.viewport,r.texture,result.pixels,r.scissor);"
+assert s.count(needle) == 1
+s = s.replace(needle, r"""auto quad=rectangle?
+                rectangle->execute(vertices,r.vertex_constants,r.viewport,r.texture,result.pixels,r.scissor):
+                executor.execute(vertices,r.vertex_constants,r.viewport,r.texture,result.pixels,r.scissor);
+            if(rectangle){
+                std::printf("{\"ptl_quad_rectangle_executed\":true,\"first_vertex\":%zu,\"sequence\":%u,\"provider_requests\":%llu,\"execution_device\":\"NPU\",\"ordered_blending\":true,\"preflight_all_quads\":true}\n",
+                    first,r.header.sequence,static_cast<unsigned long long>(quad.provider_requests));
+                std::fflush(stdout);
+            }""")
+assert '\\"ptl_quad_rectangle_executed\\"' in s
+(d / "ptl_quad_batch.hpp").write_text(s)
+p = d / "indexed_pipeline.hpp"
+s = p.read_text().replace('#include "quad_batch.hpp"', '#include "ptl_quad_batch.hpp"')
+s = s.replace("std::unique_ptr<QuadBatch> executor", "std::unique_ptr<PtlQuadBatch> executor")
+s = s.replace("QuadBatch *executor=nullptr", "PtlQuadBatch *executor=nullptr")
+s = s.replace('std::make_unique<QuadBatch>(request,"NPU")', 'std::make_unique<PtlQuadBatch>(request,"NPU",ptl_rectangle_blob)')
+p.write_text(s)
+manifest = {str(p.relative_to(d)): hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob("*") if p.is_file()}
+old = json.loads((r / "ptl-native-worker-v19-source.json").read_text())
+assert {n for n in manifest if manifest[n] != old.get(n)} == {"indexed_pipeline.hpp", "ptl_quad_batch.hpp"}
+(r / (name + "-source.json")).write_text(json.dumps(manifest, indent=2) + "\n")
+with tarfile.open(r / (name + ".tar.gz"), "w:gz") as archive:
+    archive.add(d, arcname=name)
+s = (r / "build-ptl-native-worker-v19.ps1").read_text().replace("ptl-native-worker-v19", name)
+(r / ("build-" + name + ".ps1")).write_text(s)
+s = (r / "qualify-ptl-native-worker-v19-v2.py").read_text().replace("ptl-native-worker-v19", name)
+s = s.replace(
+    "assert rectangle_kernels and rectangle_crops and len(rectangle_kernels)+len(rectangle_crops)<=37",
+    """assert rectangle_kernels and rectangle_crops
+ quad_rectangles=[]
+ for log in (trial/'provider-processes').glob('generation-*/worker.stdout.jsonl'):
+  quad_rectangles += [x for x in rows(log) if x.get('ptl_quad_rectangle_executed')]
+ assert quad_rectangles and all(x['ordered_blending'] and x['preflight_all_quads'] and x['execution_device']=='NPU' and x['first_vertex']%6==0 and x['provider_requests']>=2 for x in quad_rectangles)
+ report['quad_rectangle_executions']=len(quad_rectangles)
+ report['quad_rectangle_provider_requests']=sum(x['provider_requests'] for x in quad_rectangles)
+ # Kernel/crop records now include both the unchanged single-rectangle route
+ # and each newly routed member of an ordered quad batch.
+ assert len(rectangle_kernels)+len(rectangle_crops)<=37+len(quad_rectangles)""",
+)
+needle = " report['passed']=True"
+assert s.count(needle) == 1
+s = s.replace(needle, """ if a.stage=='full':
+  preceding=rows(vm/'ptl-native-worker-v19-full/replay/replays.jsonl');assert len(preceding)==972
+  assert all((x['ticket'],x['pixels_sha256'],x['pixel_bytes'])==(y['ticket'],y['pixels_sha256'],y['pixel_bytes']) for x,y in zip(preceding,current,strict=True))
+  report['all_worker_v19_outputs_preserved']=True
+ report['passed']=True""")
+ast.parse(s)
+(r / ("qualify-" + name + ".py")).write_text(s)
+s = (r / "qualify-host-tensor-comparison-v1.py").read_text()
+s = s.replace("host-tensor-comparison-v1", "quad-rectangle-comparison-v1").replace("worker-v20", "worker-v22")
+s = s.replace("('B1',20),('B2',20)", "('B1',22),('B2',22)")
+s = s.replace("comparing plugin tensors with ordinary host tensors", "comparing the original affine quad path with ordered use of the qualified rectangle kernel")
+ast.parse(s)
+(r / "qualify-quad-rectangle-comparison-v1.py").write_text(s)
+s = (r / "run-ptl-worker-v21-qualification.ps1").read_text()
+s = s.replace("worker-v21", "worker-v22").replace("balanced-geometry-comparison-v1", "quad-rectangle-comparison-v1")
+s = s.replace("waiting-for-host-tensor-experiments", "waiting-for-balanced-geometry-experiment")
+s = s.replace(
+    "@('ptl-worker-v20-qualification','host-tensor-provider-recovery-v1-qualification','ptl-combined-desktop-v9')",
+    "@('ptl-worker-v21-qualification')",
+)
+(r / "run-ptl-worker-v22-qualification.ps1").write_text(s)
+print(json.dumps({"prepared": name, "changed": ["indexed_pipeline.hpp", "ptl_quad_batch.hpp"], "hardware_tested": False}))

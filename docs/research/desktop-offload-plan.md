@@ -48,6 +48,15 @@ also identifies 1,619.620 ms between acknowledgments and subsequent request
 receipts in the retained ten-second animation. Client-side attribution remains
 open; these gaps are not proven to be copying, admission checks or scheduling.
 
+The [ordered-rectangle candidate](../validation/2026-10-20/native-quad-rectangle-v1/README.md)
+also preserves every replay image. Its five targeted draws are 45.03% faster
+across ten pairs, but aggregate time across the complete replay is unchanged.
+The [transport-volume analysis](../validation/2026-10-20/native-transport-volume-v1/README.md)
+counts at least 2.63 GB of logical surface traffic across both worker boundaries
+for 209 complete requests during the retained ten-second animation. This is a
+protocol count, not measured hardware bandwidth. Native client timing and
+retained-resource/command-batch design are now explicit investigation paths.
+
 The preceding
 [filled-program live v54 trial](../validation/2026-10-16/native-filled-program-live-v1/README.md)
 passes 1,225 acknowledged NPU operations, 57 exact physical submissions, a shared
@@ -326,16 +335,19 @@ role, and any GPU rendering/copy cost in the bridge must be measured.
    Whole-request and per-call cache estimates are too small to justify treating
    caching as the principal fix. Continue reducing measured shader and launch
    costs, preserving complete images and tracking the remaining frame-time gap.
-   The next isolated candidate routes ordered multi-rectangle draws through the
-   existing rectangle kernel. The live trace shows a sixty-call draw still using
-   the old affine path. Preserve whole-batch geometry preflight, draw order and
-   exact output before considering any timing result.
+   The ordered multi-rectangle candidate preserves whole-batch geometry
+   preflight, draw order and all 3,888 images. Its targeted calls fall from 380
+   to 176 and targeted time by 45.03%; full-replay time remains unchanged.
+   Do not promote this targeted measurement into a desktop speedup claim.
    A separate combined clipping kernel places small textures, coverage, sampling
    and blending in one NPU call per batch. Local fixtures pass; target execution
    and integration remain pending. Its first target link failed on missing
-   `memset`, and the first quad selection omitted all five relevant draws.
-   Preserve both failed attempts while correcting linkage and test selection.
-   Measure the client-side request gaps as well as child rendering costs.
+   `memset`; the next link was rejected for placing the helper before the
+   kernel entry. The first quad selection omitted all five relevant draws and
+   is now corrected. Preserve these attempts. Measure client request encoding,
+   admission, transport and decoding alongside child rendering. Investigate
+   retained resource versions and ordered batches if whole-surface round trips
+   remain material; preserve map/present ordering and restart recovery.
 4. After responsiveness passes, run the current renderer's thirty-minute soak,
    sleep/wake, secure-desktop and owned-failure recovery. Keep moving/resizing
    windows and broader desktop interaction separate from the simple color fixture.

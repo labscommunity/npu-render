@@ -1,0 +1,46 @@
+"""Count retained protocol bytes without claiming physical memory bandwidth."""
+from pathlib import Path
+import hashlib
+import json
+
+base = Path("docs/validation/2026-10-16/native-response-packet-live-v1")
+timing_path = base / "analysis/animation-rendering-v2.json"
+worker_path = base / "raw/native-desktop-admission-v66/bootstrap/worker.stdout.jsonl"
+index_path = Path("docs/validation/2026-10-14/native-pointer-cost-v1/raw/native-desktop-admission-v33/bootstrap/requests/index.jsonl")
+replay_path = Path("docs/validation/2026-10-16/native-response-packet-worker-v1/raw/ptl-native-worker-v19-full/replay/replays.jsonl")
+protocol_path = Path("results/render-driver/ptl-native-worker-v19/packet_provider_process.hpp")
+
+
+def rows(path):
+    return [json.loads(line) for line in path.read_text(encoding="utf-8-sig").splitlines() if line.startswith("{")]
+
+
+timing = json.loads(timing_path.read_text())
+start, end = timing["animation_start_qpc"], timing["animation_end_qpc"]
+events = rows(worker_path)
+identities = {x["dispatch_ticket"]: x for x in events if x.get("kind") == "request_identity"}
+selected = [identities[x["dispatch_ticket"]] for x in events
+            if x.get("kind") == "request_timeline" and start <= x["received_qpc"] <= x["acknowledged_qpc"] <= end]
+assert len(selected) == 209 and all((x["width"], x["height"], x["flags"] == 0x200000) == (1024, 768, False) for x in selected)
+reply_pixels = sum(x["width"] * x["height"] * 4 for x in selected)
+background = sum(x["width"] * x["height"] * 4 for x in selected if x["flags"] != 0x200000)
+captured = [x for x in rows(index_path) if x.get("request_recorded")]
+replayed = rows(replay_path)
+assert len(captured) == len(replayed) == 972
+assert all(x["ticket"] == y["ticket"] for x, y in zip(captured, replayed, strict=True))
+report = dict(
+    completed=True, passed=True, new_device_execution=False,
+    animation_complete_requests=209, animation_interval_ms=10000,
+    reply_pixel_bytes=reply_pixels, request_background_bytes=background,
+    minimum_bytes_per_worker_boundary=reply_pixels + background,
+    minimum_bytes_across_both_worker_boundaries=2 * (reply_pixels + background),
+    capture_requests=972, capture_request_packet_bytes=sum(x["bytes"] for x in captured),
+    capture_reply_packet_bytes=sum(x["pixel_bytes"] + 128 for x in replayed),
+    source_sha256={str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in
+                   (timing_path, worker_path, index_path, replay_path, protocol_path)},
+    scope="Logical protocol volume, not measured DRAM/PCIe bandwidth. Live lower bound counts only complete operations and excludes textures, headers, internal copies and NPU tensors. Both worker boundaries are client-parent and parent-child. Retained capture volume is a different run and does not predict live frame rate.",
+)
+out = Path("results/render-driver/native-transport-volume-v1")
+out.mkdir(exist_ok=False)
+(out / "report.json").write_text(json.dumps(report, indent=2) + "\n")
+print(json.dumps({k: v for k, v in report.items() if k != "source_sha256"}))

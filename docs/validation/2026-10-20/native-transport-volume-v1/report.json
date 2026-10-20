@@ -1,0 +1,22 @@
+{
+  "completed": true,
+  "passed": true,
+  "new_device_execution": false,
+  "animation_complete_requests": 209,
+  "animation_interval_ms": 10000,
+  "reply_pixel_bytes": 657457152,
+  "request_background_bytes": 657457152,
+  "minimum_bytes_per_worker_boundary": 1314914304,
+  "minimum_bytes_across_both_worker_boundaries": 2629828608,
+  "capture_requests": 972,
+  "capture_request_packet_bytes": 4780282804,
+  "capture_reply_packet_bytes": 3045051772,
+  "source_sha256": {
+    "docs/validation/2026-10-16/native-response-packet-live-v1/analysis/animation-rendering-v2.json": "89462d282863c1676a50af5a28b3889a78e97b63e43355f85adee5358e26408a",
+    "docs/validation/2026-10-16/native-response-packet-live-v1/raw/native-desktop-admission-v66/bootstrap/worker.stdout.jsonl": "9f52ff9ec27570f5948b0f5579acec12da2d00aed84d0c9606ab7b6bca740af6",
+    "docs/validation/2026-10-14/native-pointer-cost-v1/raw/native-desktop-admission-v33/bootstrap/requests/index.jsonl": "0f22ee6a6f4184e06a4338562abc24b843ad7b3882fec6c189bdaa9983237d9d",
+    "docs/validation/2026-10-16/native-response-packet-worker-v1/raw/ptl-native-worker-v19-full/replay/replays.jsonl": "ff7c95d4845b76fc0101739a1557fd33cecdfa37c81b318b161c80c07a491086",
+    "results/render-driver/ptl-native-worker-v19/packet_provider_process.hpp": "4f371aa4d5d0362c507a2ed7ca3f9d3c2b985c8e7aac2428f7a53fd7386aa8b5"
+  },
+  "scope": "Logical protocol volume, not measured DRAM/PCIe bandwidth. Live lower bound counts only complete operations and excludes textures, headers, internal copies and NPU tensors. Both worker boundaries are client-parent and parent-child. Retained capture volume is a different run and does not predict live frame rate."
+}

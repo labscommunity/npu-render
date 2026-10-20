@@ -1,0 +1,189 @@
+{
+  "completed": true,
+  "passed": true,
+  "new_device_execution": false,
+  "target_tickets": [
+    467,
+    587,
+    653,
+    719,
+    775
+  ],
+  "target_pairs": 10,
+  "old_target_parent_ms": 3871.4451,
+  "new_target_parent_ms": 2128.096,
+  "target_parent_reduction_percent": 45.03096531060198,
+  "slower_target_pairs": 0,
+  "complete_draw_provider_calls": {
+    "19": 380,
+    "22": 176
+  },
+  "phases": [
+    {
+      "phase": "A1",
+      "worker_version": 19,
+      "parent_ms": 1909.0439999999999,
+      "child_ms": 1727.4673,
+      "requests": [
+        {
+          "dispatch_ticket": 467,
+          "original_ticket": 467,
+          "parent_ms": 565.5197,
+          "child_ms": 526.6035
+        },
+        {
+          "dispatch_ticket": 587,
+          "original_ticket": 587,
+          "parent_ms": 333.5597,
+          "child_ms": 298.1079
+        },
+        {
+          "dispatch_ticket": 653,
+          "original_ticket": 653,
+          "parent_ms": 334.1656,
+          "child_ms": 300.006
+        },
+        {
+          "dispatch_ticket": 719,
+          "original_ticket": 719,
+          "parent_ms": 340.8258,
+          "child_ms": 306.7012
+        },
+        {
+          "dispatch_ticket": 775,
+          "original_ticket": 775,
+          "parent_ms": 334.9732,
+          "child_ms": 296.0487
+        }
+      ]
+    },
+    {
+      "phase": "B1",
+      "worker_version": 22,
+      "parent_ms": 1033.4066,
+      "child_ms": 859.1097,
+      "requests": [
+        {
+          "dispatch_ticket": 467,
+          "original_ticket": 467,
+          "parent_ms": 329.5713,
+          "child_ms": 287.3537
+        },
+        {
+          "dispatch_ticket": 587,
+          "original_ticket": 587,
+          "parent_ms": 180.1423,
+          "child_ms": 147.9683
+        },
+        {
+          "dispatch_ticket": 653,
+          "original_ticket": 653,
+          "parent_ms": 181.4068,
+          "child_ms": 148.1846
+        },
+        {
+          "dispatch_ticket": 719,
+          "original_ticket": 719,
+          "parent_ms": 160.098,
+          "child_ms": 126.2757
+        },
+        {
+          "dispatch_ticket": 775,
+          "original_ticket": 775,
+          "parent_ms": 182.1882,
+          "child_ms": 149.3274
+        }
+      ]
+    },
+    {
+      "phase": "B2",
+      "worker_version": 22,
+      "parent_ms": 1094.6894,
+      "child_ms": 910.072,
+      "requests": [
+        {
+          "dispatch_ticket": 467,
+          "original_ticket": 467,
+          "parent_ms": 342.3855,
+          "child_ms": 301.3795
+        },
+        {
+          "dispatch_ticket": 587,
+          "original_ticket": 587,
+          "parent_ms": 196.5905,
+          "child_ms": 159.9147
+        },
+        {
+          "dispatch_ticket": 653,
+          "original_ticket": 653,
+          "parent_ms": 199.0219,
+          "child_ms": 161.6911
+        },
+        {
+          "dispatch_ticket": 719,
+          "original_ticket": 719,
+          "parent_ms": 172.9096,
+          "child_ms": 136.4829
+        },
+        {
+          "dispatch_ticket": 775,
+          "original_ticket": 775,
+          "parent_ms": 183.7819,
+          "child_ms": 150.6038
+        }
+      ]
+    },
+    {
+      "phase": "A2",
+      "worker_version": 19,
+      "parent_ms": 1962.4011,
+      "child_ms": 1774.5495,
+      "requests": [
+        {
+          "dispatch_ticket": 467,
+          "original_ticket": 467,
+          "parent_ms": 563.2473,
+          "child_ms": 522.6731
+        },
+        {
+          "dispatch_ticket": 587,
+          "original_ticket": 587,
+          "parent_ms": 356.7751,
+          "child_ms": 317.4159
+        },
+        {
+          "dispatch_ticket": 653,
+          "original_ticket": 653,
+          "parent_ms": 348.8451,
+          "child_ms": 311.7798
+        },
+        {
+          "dispatch_ticket": 719,
+          "original_ticket": 719,
+          "parent_ms": 362.9418,
+          "child_ms": 324.502
+        },
+        {
+          "dispatch_ticket": 775,
+          "original_ticket": 775,
+          "parent_ms": 330.5918,
+          "child_ms": 298.1787
+        }
+      ]
+    }
+  ],
+  "full_replay": {
+    "pairs": 1944,
+    "old_parent_ms": 227871.2024,
+    "new_parent_ms": 227892.4302,
+    "old_outside_child_ms": 13426.563199999999,
+    "new_outside_child_ms": 13343.246000000001,
+    "slower_parent_pairs": 1001
+  },
+  "source_sha256": {
+    "docs/validation/2026-10-20/native-quad-rectangle-v1/raw/quad-rectangle-comparison-v2/report.json": "2293af962a83a5c5522004dfc174a4d6fe38726ef861189991638b37b08067af",
+    "docs/validation/2026-10-16/native-response-packet-worker-v1/raw/ptl-native-worker-v19-full/replay/provider-processes/generation-1/worker.stdout.jsonl": "517d6bacc95be7d388a0bd3c54708c426d1d15496ebd8576c7e17a5df5774f46",
+    "docs/validation/2026-10-20/native-quad-rectangle-v1/raw/ptl-native-worker-v22-full-v2/replay/provider-processes/generation-1/worker.stdout.jsonl": "3e7d56c3c148cdfc60e106f1e9516efde6b2cd28baeb3c8490b14dc512d84d75"
+  },
+  "scope": "All five retained uses of the changed route; ten pairs from two runs per worker. Targeted speedup does not establish full-replay, live-desktop or Tahoma improvement."
+}
