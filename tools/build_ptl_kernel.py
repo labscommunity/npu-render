@@ -40,9 +40,11 @@ def output_bytes(pointer, size, limit=MAX_OUTPUT):
 
 
 OPTIMIZATION = b"-O2"
+CC1_EXTRA = []
+ASM_EXTRA = []
 
 
-def transform(root, source, output, assemble=False):
+def transform(root, source, output, assemble=False, strict=True):
     name = "moviAsm64.dll" if assemble else "moviCompile64.dll"
     lib = C.CDLL(str(root / "bin" / name), winmode=0x1100)
     main = lib.process if assemble else lib.main
@@ -60,7 +62,7 @@ def transform(root, source, output, assemble=False):
     cleanup = lib.freeResults
     cleanup.argtypes, cleanup.restype = [], None
     args = (
-        [b"moviAsm.dll", b"--cv", b"5000xx", b"--noSPrefixing"]
+        [b"moviAsm.dll", b"--cv", b"5000xx", b"--noSPrefixing", *ASM_EXTRA]
         if assemble
         else [
             b"moviCompile.dll",
@@ -72,6 +74,9 @@ def transform(root, source, output, assemble=False):
             b"-S",
             OPTIMIZATION,
             b"-fno-jump-tables",
+            b"-ffp-contract=off",
+            b"-DNR_SHAVE=1",
+            *CC1_EXTRA,
             b"-x",
             b"c",
             b"entry.c",
@@ -101,6 +106,8 @@ def transform(root, source, output, assemble=False):
         )
         messages = output_bytes(diagnostic, diagnostic_length.value, 1024 * 1024)
         (output / ("assembler.log" if assemble else "compiler.log")).write_bytes(messages)
+        if not strict:
+            return code, messages, (output_bytes(result, length.value) if not code else b"")
         if code:
             raise RuntimeError(f"{name} returned {code}; see retained diagnostics")
         value = output_bytes(result, length.value)
@@ -183,6 +190,57 @@ def inline_local_includes(path):
     return expand(text, path.resolve().parent)
 
 
+CONFLICT = re.compile(
+    rb"ERROR: Instruction .*? is conflicting:.*?at line (\d+)\.?\s*$", re.S | re.M
+)
+
+
+def fix_hazards(root, assembly, output, limit=400):
+    """Delay bundles the assembler rejects for a write-port conflict by one NOP each.
+
+    The compiler's VAU latency model and the assembler's disagree for 5000xx;
+    delaying a consumer never changes the data flow. A NOP goes before the
+    conflicting bundle, or before a preceding branch so delay slots stay intact.
+    """
+    inserted = []
+    for _ in range(limit):
+        code, messages, _object = transform(root, assembly, output, assemble=True, strict=False)
+        if not code:
+            break
+        lines = assembly.split(b"\n")
+        targets = set()
+        for block in messages.split(b"moviAsm: ERROR"):
+            numbers = re.findall(rb"at line (\d+)", block)
+            if b"conflicting" in block and numbers:
+                targets.add(int(numbers[-1]))
+        if not targets:
+            raise RuntimeError(
+                "Assembler failed without a conflict to fix; see retained diagnostics"
+            )
+        for line in sorted(targets, reverse=True):
+            at = line - 1
+            while at > 0 and lines[at].lstrip().startswith(b"||"):
+                at -= 1
+            for back in range(1, 8):
+                if at - back >= 0 and b"BRU." in lines[at - back]:
+                    at -= back
+                    break
+            lines.insert(at, b"        NOP")
+            inserted.append(
+                dict(
+                    reported_line=line,
+                    inserted_before=at + 1,
+                    context=[
+                        x.decode(errors="replace").strip() for x in lines[max(0, at - 3) : at + 5]
+                    ],
+                )
+            )
+        assembly = b"\n".join(lines)
+    else:
+        raise RuntimeError("Hazard fixing did not converge")
+    return assembly, inserted
+
+
 def write(path, report):
     path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 
@@ -196,9 +254,25 @@ def main():
     parser.add_argument(
         "--optimize", choices=["O1", "O2", "O3", "Os", "Oz"], default="O2", help="compiler level"
     )
+    parser.add_argument(
+        "--cc1-extra", action="append", default=[], help="extra cc1 flag (repeatable, recorded)"
+    )
+    parser.add_argument(
+        "--asm-extra",
+        action="append",
+        default=[],
+        help="extra assembler flag (repeatable, recorded)",
+    )
+    parser.add_argument(
+        "--fix-hazards",
+        action="store_true",
+        help="insert NOPs where the assembler reports a write conflict the compiler missed",
+    )
     args = parser.parse_args()
-    global OPTIMIZATION
+    global OPTIMIZATION, CC1_EXTRA, ASM_EXTRA
     OPTIMIZATION = ("-" + args.optimize).encode()
+    CC1_EXTRA = [flag.encode() for flag in args.cc1_extra]
+    ASM_EXTRA = [flag.encode() for flag in args.asm_extra]
     report = {
         "started": datetime.now(UTC).isoformat(),
         "completed": False,
@@ -207,6 +281,9 @@ def main():
         "npu_execution_tested": False,
         "driver_changed": False,
         "optimization": args.optimize,
+        "cc1_extra": args.cc1_extra,
+        "asm_extra": args.asm_extra,
+        "fix_hazards": args.fix_hazards,
     }
     if not args.child:
         args.output.mkdir(parents=True, exist_ok=False)
@@ -217,12 +294,16 @@ def main():
         root = args.toolchain.resolve()
         report["toolchain_sha256"] = checked_toolchain(root)
         source = inline_local_includes(args.source)
-        if not 0 < len(source) <= 256 * 1024:
-            raise ValueError("Kernel source must contain 1..262144 bytes")
+        if not 0 < len(source) <= 1024 * 1024:
+            raise ValueError("Kernel source must contain 1..1048576 bytes")
         report["source_sha256"] = hashlib.sha256(source).hexdigest()
         if args.child:
             with os.add_dll_directory(str(root / "bin")):
                 assembly = transform(root, source, args.output)
+                if args.fix_hazards:
+                    assembly, sites = fix_hazards(root, assembly, args.output)
+                    report["hazard_nops"] = len(sites)
+                    report["hazard_sites"] = sites
                 (args.output / "kernel.s").write_bytes(assembly)
                 object_bytes = transform(root, assembly, args.output, assemble=True)
                 (args.output / "kernel.o").write_bytes(object_bytes)
@@ -251,6 +332,9 @@ def main():
                 str(args.output.resolve()),
                 "--optimize",
                 args.optimize,
+                *[flag for extra in args.cc1_extra for flag in ("--cc1-extra", extra)],
+                *[flag for extra in args.asm_extra for flag in ("--asm-extra", extra)],
+                *(["--fix-hazards"] if args.fix_hazards else []),
             ]
             with (
                 (args.output / "child.stdout.log").open("xb") as stdout,

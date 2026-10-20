@@ -18,13 +18,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from ptl_twelve_row_carrier import ORIGINAL_SHA, SPAN, patch  # noqa: E402
+import ptl_frame_carrier  # noqa: E402
+import ptl_twelve_row_carrier  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 from npu_render.ptl_carrier import read_kernel_text  # noqa: E402
 
 RUNTIME = "2026.4.1-22982-e213a147257-releases/2026/4"
 ROWS = 12
+WIDTH = 132096
 HEADER = struct.Struct("<8sIIQ")  # magic, version, record count, span bytes
 
 
@@ -35,7 +37,7 @@ def write(path, value):
 def load_fixtures(path):
     data = path.read_bytes()
     magic, version, count, span = HEADER.unpack_from(data)
-    assert magic == b"NRFFIX01" and version == 1 and span == SPAN and 0 < count <= 4096
+    assert magic == b"NRFFIX01" and version == 1 and span == WIDTH * 2 and 0 < count <= 4096
     records = []
     at = HEADER.size
     for _ in range(count):
@@ -83,6 +85,8 @@ def main():
     parser.add_argument(
         "--skip-original", action="store_true", help="omit the original Softmax phases"
     )
+    parser.add_argument("--timing-only", action="store_true", help="skip output comparison")
+    parser.add_argument("--carrier-kind", choices=["softmax", "scatter"], default="softmax")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=False)
     report = dict(
@@ -100,11 +104,15 @@ def main():
 
         if ov.get_version() != RUNTIME:
             raise RuntimeError("This carrier requires its pinned OpenVINO runtime")
+        carrier_module = (
+            ptl_frame_carrier if args.carrier_kind == "scatter" else ptl_twelve_row_carrier
+        )
+        SPAN = carrier_module.SPAN
         original = args.carrier.read_bytes()
-        assert hashlib.sha256(original).hexdigest() == ORIGINAL_SHA, "carrier pin"
+        assert hashlib.sha256(original).hexdigest() == carrier_module.ORIGINAL_SHA, "carrier pin"
         elf = args.kernel_elf.read_bytes()
         text = read_kernel_text(elf)
-        patched, proof = patch(original, text)
+        patched, proof = carrier_module.patch(original, text)
         (args.output / "patched.blob").write_bytes(patched)
         write(args.output / "contract.json", proof)
         report.update(
@@ -138,6 +146,22 @@ def main():
             assert devices in (["NPU"], ["NPU.0"]), devices
             request = model.create_infer_request()
             timings = []
+            if phase != "custom-frame" and args.carrier_kind == "scatter":
+                rng = np.random.default_rng(4242)
+                for _ in range(4):
+                    values = rng.uniform(-8, 8, (ROWS, WIDTH)).astype(np.float16)
+                    upd = rng.uniform(-8, 8, (ROWS, 16)).astype(np.float16)
+                    expected = values.copy()
+                    for row in range(ROWS):
+                        expected[row, np.arange(16) * 97] = upd[row]
+                    request.start_async({0: values, 1: upd})
+                    assert request.wait_for(10000)
+                    actual = request.get_output_tensor().data.copy()
+                    if not np.array_equal(actual.view(np.uint16), expected.view(np.uint16)):
+                        raise AssertionError("original scatter oracle failed in " + phase)
+                report["phases"].append(dict(phase=phase, passed=True, checks=4))
+                del request, model
+                continue
             if phase != "custom-frame":
                 rng = np.random.default_rng(321)
                 for i in range(4):
@@ -165,7 +189,10 @@ def main():
                         data[row] = np.frombuffer(inputs, np.uint8)
                     tensor = data.view(np.float16)
                     began = time.perf_counter_ns()
-                    request.start_async({0: tensor})
+                    if args.carrier_kind == "scatter":
+                        request.start_async({0: tensor, 1: np.zeros((ROWS, 16), np.float16)})
+                    else:
+                        request.start_async({0: tensor})
                     if not request.wait_for(args.deadline_ms):
                         report["deadline_group"] = dict(first=first, names=[g[0] for g in group])
                         raise AssertionError("NPU inference deadline")
@@ -177,6 +204,8 @@ def main():
                     if repeat:
                         continue
                     for row, (name, _, expected) in enumerate(group):
+                        if args.timing_only:
+                            continue
                         if args.timing_only:
                             continue
                         actual = output[row].tobytes()

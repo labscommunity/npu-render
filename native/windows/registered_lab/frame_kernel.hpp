@@ -1,14 +1,18 @@
 #pragma once
-// Host side of the frame batch kernel: SM4 lowering, span assembly and the exact
-// host reference. The reference shares frame_core.h with the SHAVE kernel; the
-// host never renders for the desktop, it plans and verifies.
+// Host side of the frame batch kernel: SM4 lowering, native stage emission,
+// span assembly and the exact host reference. The reference shares
+// frame_core.h (and the generated frame_programs.h) with the SHAVE kernel;
+// the host never renders for the desktop, it plans and verifies.
 #include "shader_ir.hpp"
 #include "shader_texture.hpp"
 #include "output_merger.hpp"
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
+#include <functional>
+#include <map>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -19,29 +23,37 @@ namespace core {
 }
 using core::NR_OP_MOV; using core::NR_OP_ADD; using core::NR_OP_MUL; using core::NR_OP_MAD; using core::NR_OP_DIV; using core::NR_OP_MIN; using core::NR_OP_MAX;
 using core::NR_OP_DP2; using core::NR_OP_DP3; using core::NR_OP_DP4; using core::NR_OP_FRC; using core::NR_OP_FLOOR; using core::NR_OP_MOVC; using core::NR_OP_LT;
-using core::NR_OP_GE; using core::NR_OP_EQ; using core::NR_OP_NE; using core::NR_OP_AND; using core::NR_OP_IADD; using core::NR_OP_ITOF; using core::NR_OP_IGE; using core::NR_OP_SAMPLE;
+using core::NR_OP_GE; using core::NR_OP_EQ; using core::NR_OP_NE; using core::NR_OP_AND; using core::NR_OP_OR; using core::NR_OP_IADD; using core::NR_OP_ITOF; using core::NR_OP_IGE; using core::NR_OP_SAMPLE;
 constexpr uint32_t span_bytes = NR_FRAME_SPAN, tile_pixels = 128, output_pixels_offset = NR_FRAME_OUTPUT_PIXELS;
 inline void require(bool value, const char *message = "frame kernel contract") { if (!value) throw std::invalid_argument(message); }
 inline uint32_t bits(float value) { uint32_t result; std::memcpy(&result, &value, 4); return result; }
+using Words = std::array<uint32_t, 8>;          // op, dest, src0, src1, src2, extra, 0, 0
+using Immediate = std::array<uint32_t, 4>;
 
-// A lowered vertex/pixel shader pair plus the texture slot mapping it needs.
+// A lowered vertex/pixel shader pair: validated instruction words per stage, the
+// program entry for the span, and the texture slot mapping it needs. The entry's
+// native index is assigned by whoever generated frame_programs.h (set_native).
 struct LoweredProgram {
-    std::vector<uint8_t> entry;              // program entry bytes (header + instructions + immediates)
-    uint32_t vs_inputs = 0, vs_constants = 0, ps_constants = 0;
+    std::vector<uint8_t> entry;              // NR_FRAME_PROGRAM_BYTES header + immediates
+    std::vector<Words> vs_words, ps_words;
+    std::vector<Immediate> vs_immediates, ps_immediates;
+    uint32_t vs_inputs = 0, ps_inputs = 0, position_output = 0, interpolation = 0, varyings = 0, vs_constants = 0, ps_constants = 0;
     std::vector<uint32_t> texture_slots;    // command texture index -> SM4 texture slot
     std::vector<uint32_t> sampler_slots;    // command texture index -> SM4 sampler slot
-    std::array<uint32_t, 14> vs_constant_base{}, ps_constant_base{};
+    std::array<uint32_t, 14> vs_constant_base{}, ps_constant_base{}, vs_constant_count{}, ps_constant_count{};
     std::string rejection;                   // empty when eligible
     bool eligible() const { return rejection.empty(); }
+    uint32_t native() const { uint32_t v; std::memcpy(&v, entry.data(), 4); return v; }
+    void set_native(uint32_t index) { std::memcpy(entry.data(), &index, 4); }
 };
 namespace detail {
 inline uint32_t encode_lanes(const std::array<uint32_t, 4> &lanes) {
     uint32_t packed = 0; for (unsigned c = 0; c < 4; ++c) { require(lanes[c] < 4); packed |= lanes[c] << (c * 2); } return packed;
 }
-inline bool flatten_constants(const shader::Program &p, std::array<uint32_t, 14> &base, uint32_t &total) {
+inline bool flatten_constants(const shader::Program &p, std::array<uint32_t, 14> &base, std::array<uint32_t, 14> &count, uint32_t &total) {
     total = 0;
-    // Dynamically indexed declarations are fine; relative operands are rejected per instruction.
-    for (unsigned i = 0; i < 14; ++i) { base[i] = total; total += p.constants[i]; }
+    // Dynamically indexed declarations are fine; relative operands are checked per instruction.
+    for (unsigned i = 0; i < 14; ++i) { base[i] = total; count[i] = p.constants[i]; total += p.constants[i]; }
     return total <= 256;
 }
 }
@@ -55,7 +67,8 @@ inline LoweredProgram lower(const shader::Program &vs, const shader::Program &ps
     if (vs.vertex_id_input < 16 || vs.instance_id_input < 16) return reject("system vertex inputs");
     for (unsigned i = 0; i < 16; ++i) if (!vs.literal_tables[i].empty() || !ps.literal_tables[i].empty()) return reject("indexable temporaries");
     uint32_t vs_total = 0, ps_total = 0;
-    if (!detail::flatten_constants(vs, out.vs_constant_base, vs_total) || !detail::flatten_constants(ps, out.ps_constant_base, ps_total)) return reject("constant buffers");
+    if (!detail::flatten_constants(vs, out.vs_constant_base, out.vs_constant_count, vs_total) ||
+        !detail::flatten_constants(ps, out.ps_constant_base, out.ps_constant_count, ps_total)) return reject("constant buffers");
     uint32_t ps_inputs = 0, interpolation = 0, varyings = 0;
     for (unsigned r = 0; r < 16; ++r) {
         if (!ps.inputs[r] || r == ps.position_input) continue;
@@ -69,11 +82,10 @@ inline LoweredProgram lower(const shader::Program &vs, const shader::Program &ps
     if (ps_inputs & (1u << vs.position_output)) return reject("position register reused");
     for (unsigned r = 0; r < 16; ++r) if (vs.inputs[r]) out.vs_inputs |= 1u << r;
     if (!out.vs_inputs) return reject("vertex inputs");
-    std::vector<std::array<uint32_t, 4>> immediates;
-    std::vector<std::array<uint32_t, 8>> words;
-    auto immediate_index = [&](const std::array<uint32_t, 4> &literal) {
-        for (size_t i = 0; i < immediates.size(); ++i) if (immediates[i] == literal) return uint32_t(i);
-        require(immediates.size() < 64, "immediate table"); immediates.push_back(literal); return uint32_t(immediates.size() - 1);
+    std::vector<Immediate> *immediates = nullptr;
+    auto immediate_index = [&](const Immediate &literal) {
+        for (size_t i = 0; i < immediates->size(); ++i) if ((*immediates)[i] == literal) return uint32_t(i);
+        require(immediates->size() < NR_FRAME_MAX_IMMEDIATES, "immediate table"); immediates->push_back(literal); return uint32_t(immediates->size() - 1);
     };
     auto operand = [&](const shader::Operand &o, const shader::Program &program, bool vertex, std::string &why, uint32_t &relative) -> std::optional<uint32_t> {
         uint32_t kind, index, slot_bits = 0;
@@ -95,13 +107,14 @@ inline LoweredProgram lower(const shader::Program &vs, const shader::Program &ps
             kind = 2; index = o.element; slot_bits = o.index << 22;
         }
         else { why = o.kind == shader::Register::indexable ? "indexable temporary" : "operand kind"; return std::nullopt; }
+        if (index >= 16 && kind != 2) { why = "operand index"; return std::nullopt; }
         if (index >= 256) { why = "operand index"; return std::nullopt; }
         const uint32_t negate = (o.modifier == shader::Modifier::negate || o.modifier == shader::Modifier::absolute_negate) ? 1u : 0u;
         const uint32_t absolute = (o.modifier == shader::Modifier::absolute || o.modifier == shader::Modifier::absolute_negate) ? 1u : 0u;
         return kind | (index << 4) | (detail::encode_lanes(o.lanes) << 12) | (negate << 20) | (absolute << 21) | slot_bits;
     };
     std::string detail_reason;
-    auto lower_stage = [&](const shader::Program &program, bool vertex) -> const char * {
+    auto lower_stage = [&](const shader::Program &program, bool vertex, std::vector<Words> &words) -> const char * {
         using shader::Opcode;
         for (const auto &i : program.instructions) {
             detail_reason.clear();
@@ -118,7 +131,7 @@ inline LoweredProgram lower(const shader::Program &vs, const shader::Program &ps
             default: return "opcode";
             }
             if (vertex && op == NR_OP_SAMPLE) return "vertex sampling";
-            std::array<uint32_t, 8> w{}; w[0] = op;
+            Words w{}; w[0] = op;
             const auto &d = i.destination;
             uint32_t dest_kind = d.kind == shader::Register::temporary ? 0u : d.kind == shader::Register::output ? 1u : 2u;
             if (dest_kind > 1 || (dest_kind == 1 && d.index >= 8) || (dest_kind == 0 && d.index >= 16) || !d.mask) return "destination";
@@ -151,32 +164,269 @@ inline LoweredProgram lower(const shader::Program &vs, const shader::Program &ps
                 }
             }
             words.push_back(w);
-            if (words.size() > NR_FRAME_MAX_INSTRUCTIONS) return "instruction count";
+            if (words.size() > 1024) return "instruction count";
         }
         return nullptr;
     };
-    const auto vs_begin = words.size();
-    if (const char *why = lower_stage(vs, true)) return reject((std::string("vertex ") + why + (detail_reason.empty() ? "" : ": " + detail_reason)).c_str());
-    const uint32_t vs_count = uint32_t(words.size() - vs_begin);
-    if (const char *why = lower_stage(ps, false)) return reject((std::string("pixel ") + why + (detail_reason.empty() ? "" : ": " + detail_reason)).c_str());
-    const uint32_t ps_count = uint32_t(words.size() - vs_count);
-    if (!vs_count || !ps_count) return reject("empty stage");
-    // Vertex outputs beyond the position must only feed declared varyings.
-    out.vs_constants = vs_total; out.ps_constants = ps_total;
-    const uint32_t vs_layout = NR_FRAME_PROGRAM_BYTES, ps_layout = vs_layout + 64, instructions_offset = ps_layout + 64;
-    const uint32_t immediates_offset = instructions_offset + uint32_t(words.size()) * NR_FRAME_INSTRUCTION_BYTES;
-    out.entry.assign(immediates_offset + immediates.size() * 16, 0);
+    immediates = &out.vs_immediates;
+    if (const char *why = lower_stage(vs, true, out.vs_words)) return reject((std::string("vertex ") + why + (detail_reason.empty() ? "" : ": " + detail_reason)).c_str());
+    immediates = &out.ps_immediates;
+    if (const char *why = lower_stage(ps, false, out.ps_words)) return reject((std::string("pixel ") + why + (detail_reason.empty() ? "" : ": " + detail_reason)).c_str());
+    if (out.vs_words.empty() || out.ps_words.empty()) return reject("empty stage");
+    out.vs_constants = vs_total; out.ps_constants = ps_total; out.ps_inputs = ps_inputs; out.position_output = vs.position_output;
+    out.interpolation = interpolation; out.varyings = varyings;
+    out.entry.assign(NR_FRAME_PROGRAM_BYTES + (out.vs_immediates.size() + out.ps_immediates.size()) * 16, 0);
     auto put = [&](size_t at, uint32_t v) { std::memcpy(out.entry.data() + at, &v, 4); };
-    put(0, vs_count); put(4, ps_count); put(8, out.vs_inputs); put(12, vs_total); put(16, vs_layout); put(20, ps_inputs); put(24, vs.position_output);
-    put(28, interpolation); put(32, varyings); put(36, ps_total); put(40, ps_layout); put(44, instructions_offset); put(48, immediates_offset); put(52, uint32_t(immediates.size()));
-    for (unsigned slot = 0; slot < 14; ++slot) {
-        put(vs_layout + slot * 4, out.vs_constant_base[slot] | (vs.constants[slot] << 16));
-        put(ps_layout + slot * 4, out.ps_constant_base[slot] | (ps.constants[slot] << 16));
-    }
-    for (size_t n = 0; n < words.size(); ++n) for (unsigned k = 0; k < 8; ++k) put(instructions_offset + n * NR_FRAME_INSTRUCTION_BYTES + k * 4, words[n][k]);
-    for (size_t n = 0; n < immediates.size(); ++n) for (unsigned k = 0; k < 4; ++k) put(immediates_offset + n * 16 + k * 4, immediates[n][k]);
+    put(0, 0xffffffffu); put(4, out.vs_inputs); put(8, ps_inputs); put(12, vs.position_output); put(16, interpolation); put(20, varyings);
+    put(24, vs_total); put(28, ps_total); put(32, uint32_t(out.texture_slots.size())); put(36, uint32_t(out.vs_immediates.size())); put(40, uint32_t(out.ps_immediates.size()));
+    size_t at = NR_FRAME_PROGRAM_BYTES;
+    for (const auto &table : {out.vs_immediates, out.ps_immediates}) for (const auto &imm : table) { for (unsigned k = 0; k < 4; ++k) put(at + k * 4, imm[k]); at += 16; }
     return out;
 }
+
+// --- Kernel blobs --------------------------------------------------------------
+// The SHAVE code window holds a few programs at a time, so the inventory is
+// split into blobs by pixel-stage instruction count. A program's blob and its
+// index inside the blob follow from this rule on both the host and the kernel.
+constexpr std::array<std::pair<uint32_t, uint32_t>, 6> blob_ranges{{{0, 2}, {3, 12}, {13, 64}, {65, 115}, {116, 120}, {121, 100000}}};
+inline uint32_t blob_of(uint32_t ps_instructions) {
+    for (uint32_t k = 0; k < blob_ranges.size(); ++k) if (ps_instructions >= blob_ranges[k].first && ps_instructions <= blob_ranges[k].second) return k;
+    return UINT32_MAX;
+}
+// --- Native code emission ----------------------------------------------------
+// Each lowered stage becomes C over the nr_v4 API in frame_core.h. Vertex
+// stages are functions over nr_shade; pixel stages are emitted twice: as a
+// host-only stage function (checked against the SM4 reference) and inside a
+// per-program row shader that interpolates, shades and blends one scanline.
+namespace detail {
+inline std::string hex(uint32_t v) { char b[16]; std::snprintf(b, sizeof b, "0x%08xu", v); return b; }
+inline std::string dec(uint32_t v) { return std::to_string(v) + "u"; }
+inline unsigned source_count(uint32_t op) {
+    return op == NR_OP_SAMPLE || op == NR_OP_MOV || op == NR_OP_FRC || op == NR_OP_FLOOR || op == NR_OP_ITOF ? 1u : (op == NR_OP_MAD || op == NR_OP_MOVC) ? 3u : 2u;
+}
+// How the emitted instructions name registers and tables.
+struct Names {
+    std::function<std::string(uint32_t)> input, output;
+    std::string constants, immediates, escapes, st;
+};
+inline std::array<bool, 16> used_temps(const std::vector<Words> &words) {
+    std::array<bool, 16> used{};
+    for (const auto &w : words) {
+        const uint32_t op = w[0];
+        if ((w[1] & 15u) == 0) used[(w[1] >> 4) & 15u] = true;
+        for (unsigned k = 0; k < source_count(op); ++k) {
+            const uint32_t src = w[2 + k], rel = op == NR_OP_SAMPLE ? 0u : (w[5] >> (k * 10)) & 0x3ffu;
+            if ((src & 15u) == 0) used[(src >> 4) & 15u] = true;
+            if ((rel & 1u) && !(rel & 2u)) used[(rel >> 2) & 15u] = true;
+        }
+    }
+    return used;
+}
+inline std::string emit_instructions(const std::vector<Words> &words, const std::array<uint32_t, 14> &base, const std::array<uint32_t, 14> &count, const Names &names, const std::string &indent) {
+    std::string s;
+    for (const auto &w : words) {
+        const uint32_t op = w[0], dest = w[1], mask = (dest >> 12) & 15u, saturate = (dest >> 16) & 1u;
+        const std::string D = (dest & 15u) ? names.output((dest >> 4) & 255u) : "r" + std::to_string((dest >> 4) & 15u);
+        auto operand = [&](unsigned k) {
+            const uint32_t src = w[2 + k], kind = src & 15u, idx = (src >> 4) & 255u, lanes = (src >> 12) & 255u, neg = (src >> 20) & 1u, abs = (src >> 21) & 1u, slot = (src >> 22) & 15u;
+            const uint32_t rel = op == NR_OP_SAMPLE ? 0u : (w[5] >> (k * 10)) & 0x3ffu;
+            std::string e;
+            if (kind == 0) e = "r" + std::to_string(idx);
+            else if (kind == 1) e = names.input(idx);
+            else if (kind == 3) e = "nr_v4_load(" + names.immediates + " + " + dec(idx * 16) + ")";
+            else {
+                require(slot < 14 && idx < count[slot], "constant element");
+                if (rel & 1u) {
+                    const std::string reg = (rel & 2u) ? names.input((rel >> 2) & 15u) : "r" + std::to_string((rel >> 2) & 15u);
+                    e = "nr_v4_cb(" + names.constants + ", " + dec(base[slot]) + ", " + dec(count[slot]) + ", " + dec(idx) + " + nr_v4_bits(" + reg + ", " + dec((rel >> 6) & 3u) + "))";
+                } else e = "nr_v4_load(" + names.constants + " + " + dec((base[slot] + idx) * 16) + ")";
+            }
+            if (lanes != 0xe4u) e = "NR_V4_SWZ(" + e + ", " + std::to_string(lanes & 3u) + ", " + std::to_string((lanes >> 2) & 3u) + ", " + std::to_string((lanes >> 4) & 3u) + ", " + std::to_string((lanes >> 6) & 3u) + ")";
+            if (abs) e = "nr_v4_abs(" + e + ")";
+            if (neg) e = (op == NR_OP_IADD ? "nr_v4_ineg(" : "nr_v4_neg(") + e + ")";
+            return e;
+        };
+        const unsigned sources = source_count(op);
+        const std::string in = indent + "    ";
+        s += indent + "{\n" + in + "nr_v4 t;\n" + in + "nr_v4 a = " + operand(0) + ";\n";
+        if (sources >= 2) s += in + "nr_v4 b = " + operand(1) + ";\n";
+        if (sources >= 3) s += in + "nr_v4 e = " + operand(2) + ";\n";
+        switch (op) {
+        case NR_OP_MOV: s += in + "t = a;\n"; break;
+        case NR_OP_ADD: s += in + "t = nr_v4_add(a, b);\n"; break;
+        case NR_OP_MUL: s += in + "t = nr_v4_mul(a, b);\n"; break;
+        case NR_OP_DIV: s += in + "t = nr_v4_div(a, b);\n"; break;
+        case NR_OP_MAD: s += in + "t = nr_v4_add(nr_v4_mul(a, b), e);\n"; break;
+        case NR_OP_AND: s += in + "t = nr_v4_and(a, b);\n"; break;
+        case NR_OP_OR: s += in + "t = nr_v4_or(a, b);\n"; break;
+        case NR_OP_IADD: s += in + "t = nr_v4_iadd(a, b);\n"; break;
+        case NR_OP_DP2: s += in + "t = nr_v4_dp(a, b, 2u);\n"; break;
+        case NR_OP_DP3: s += in + "t = nr_v4_dp(a, b, 3u);\n"; break;
+        case NR_OP_DP4: s += in + "t = nr_v4_dp(a, b, 4u);\n"; break;
+        case NR_OP_MIN: s += in + "t = nr_v4_min(a, b);\n"; break;
+        case NR_OP_MAX: s += in + "t = nr_v4_max(a, b);\n"; break;
+        case NR_OP_FRC: s += in + "t = nr_v4_frc(a);\n"; break;
+        case NR_OP_FLOOR: s += in + "t = nr_v4_floor(a);\n"; break;
+        case NR_OP_ITOF: s += in + "t = nr_v4_itof(a);\n"; break;
+        case NR_OP_MOVC: s += in + "t = nr_v4_movc(a, b, e);\n"; break;
+        case NR_OP_LT: s += in + "t = nr_v4_cmp_lt(a, b);\n"; break;
+        case NR_OP_GE: s += in + "t = nr_v4_cmp_ge(a, b);\n"; break;
+        case NR_OP_EQ: s += in + "t = nr_v4_cmp_eq(a, b);\n"; break;
+        case NR_OP_NE: s += in + "t = nr_v4_cmp_ne(a, b);\n"; break;
+        case NR_OP_IGE: s += in + "t = nr_v4_cmp_ige(a, b);\n"; break;
+        case NR_OP_SAMPLE: {
+            const uint32_t texture = w[5] & 15u, lanes = (w[5] >> 12) & 255u;
+            s += in + "t = nr_sample(" + names.st + ", " + dec(texture) + ", nr_v4_bits(a, 0), nr_v4_bits(a, 1), " + names.escapes + ");\n";
+            if (lanes != 0xe4u) s += in + "t = NR_V4_SWZ(t, " + std::to_string(lanes & 3u) + ", " + std::to_string((lanes >> 2) & 3u) + ", " + std::to_string((lanes >> 4) & 3u) + ", " + std::to_string((lanes >> 6) & 3u) + ");\n";
+            break;
+        }
+        default: require(false, "emit opcode");
+        }
+        if (saturate) s += in + "t = nr_v4_sat(t);\n";
+        if (mask == 15) s += in + D + " = t;\n";
+        else for (unsigned c = 0; c < 4; ++c) if ((mask >> c) & 1u) s += in + "NR_V4_SET(" + D + ", " + std::to_string(c) + ", t);\n";
+        s += indent + "}\n";
+    }
+    return s;
+}
+inline std::string emit_stage(const std::vector<Words> &words, const std::array<uint32_t, 14> &base, const std::array<uint32_t, 14> &count, const std::string &name) {
+    Names names{[](uint32_t r) { return "sh->in[" + std::to_string(r) + "]"; }, [](uint32_t r) { return "sh->out[" + std::to_string(r) + "]"; }, "sh->constants", "sh->immediates", "sh->escapes", "st"};
+    std::string s = "NR_NOINLINE nr_i32 " + name + "(const nr_command_state *st, nr_shade *sh) {\n    (void)st;\n";
+    const auto used = used_temps(words);
+    for (unsigned r = 0; r < 16; ++r) if (used[r]) s += "    nr_v4 r" + std::to_string(r) + " = nr_v4_zero();\n";
+    s += emit_instructions(words, base, count, names, "    ");
+    return s + "    return 1;\n}\n";
+}
+// A row shader: interpolates this program's varyings, runs its pixel stage and
+// blends, for `count` pixels of one scanline. Varying modes are compile-time.
+inline std::string emit_row(const LoweredProgram &p, const std::string &name) {
+    Names names{[](uint32_t r) { return "i" + std::to_string(r); }, [](uint32_t) { return std::string("o0"); }, "row->constants", "row->immediates", "row->escapes", "st"};
+    std::string s = "NR_NOINLINE void " + name + "(const nr_row *row) {\n";
+    s += "    const nr_command_state *st = row->st; nr_u8 *pixel = row->pixels; nr_i32 px;\n";
+    s += "    nr_f32 w0 = row->wgt[0], w1 = row->wgt[1], w2 = row->wgt[2], dw0 = row->dwgt[0], dw1 = row->dwgt[1], dw2 = row->dwgt[2];\n";
+    bool linear = false, perspective = false;
+    // Only varyings the pixel stage reads are interpolated.
+    std::array<bool, 16> read{};
+    for (const auto &w : p.ps_words) for (unsigned k = 0; k < detail::source_count(w[0]); ++k) {
+        const uint32_t src = w[2 + k], rel = w[0] == NR_OP_SAMPLE ? 0u : (w[5] >> (k * 10)) & 0x3ffu;
+        if ((src & 15u) == 1) read[(src >> 4) & 15u] = true;
+        if ((rel & 3u) == 3u) read[(rel >> 2) & 15u] = true;
+    }
+    std::vector<std::tuple<uint32_t, uint32_t, uint32_t>> varyings;   // register, ordinal, mode
+    for (uint32_t r = 0, c = 0; r < 8; ++r) if (p.ps_inputs & (1u << r)) { const uint32_t mode = (p.interpolation >> (r * 4)) & 15u, ordinal = c++; if (!read[r]) continue; varyings.emplace_back(r, ordinal, mode); linear |= mode == 4; perspective |= mode == 2; }
+    if (perspective) s += "    const nr_f32 iw0 = row->v[0].inverse_w, iw1 = row->v[1].inverse_w, iw2 = row->v[2].inverse_w;\n";
+    for (const auto &[r, c, mode] : varyings) {
+        const std::string R = std::to_string(r), C = std::to_string(c);
+        if (mode == 1) s += "    const nr_v4 i" + R + " = row->v[0].varying[" + C + "];\n";
+        else s += "    nr_v4 i" + R + " = nr_v4_zero();\n    const nr_v4 va" + R + " = row->v[0].varying[" + C + "], vb" + R + " = row->v[1].varying[" + C + "], vc" + R + " = row->v[2].varying[" + C + "];\n";
+    }
+    s += "    nr_v4 o0 = nr_v4_zero();\n";
+    const auto used = used_temps(p.ps_words);
+    for (unsigned r = 0; r < 16; ++r) if (used[r]) s += "    nr_v4 r" + std::to_string(r) + " = nr_v4_zero();\n";
+    s += "    (void)st;\n    for (px = 0; px < row->count; ++px, pixel += 4, w0 += dw0, w1 += dw1, w2 += dw2) {\n";
+    if (linear) s += "        const nr_f32 dl = (w0 + w1) + w2;\n        if (!(dl > 1e-20f || dl < -1e-20f)) continue;\n";
+    if (perspective) s += "        const nr_f32 p0 = w0 * iw0, p1 = w1 * iw1, p2 = w2 * iw2, dp = (p0 + p1) + p2;\n        if (!(dp > 1e-20f || dp < -1e-20f)) continue;\n";
+    if (linear) s += "        const nr_f32 rl = 1.0f / dl;\n";
+    if (perspective) s += "        const nr_f32 rp = 1.0f / dp;\n";
+    for (const auto &[r, c, mode] : varyings) {
+        if (mode == 1) continue;
+        const std::string R = std::to_string(r), W0 = mode == 2 ? "p0" : "w0", W1 = mode == 2 ? "p1" : "w1", W2 = mode == 2 ? "p2" : "w2", RC = mode == 2 ? "rp" : "rl";
+        s += "        i" + R + " = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(" + W0 + "), va" + R + "), nr_v4_mul(nr_v4_splat(" + W1 + "), vb" + R + ")), nr_v4_mul(nr_v4_splat(" + W2 + "), vc" + R + ")), nr_v4_splat(" + RC + "));\n";
+    }
+    s += "#ifndef NR_EXP_NO_PS\n" + emit_instructions(p.ps_words, p.ps_constant_base, p.ps_constant_count, names, "        ") + "#endif\n";
+    s += "#ifndef NR_EXP_NO_BLEND\n        nr_blend_pixel(st, pixel, o0);\n#else\n        *row->escapes += nr_v4_bits(o0, 0) & 1u;\n#endif\n";
+    s += "    }\n}\n";
+    return s;
+}
+// Balanced if-tree over [lo, hi) so the SHAVE compiler never lowers a switch.
+inline std::string emit_tree(const std::vector<std::string> &leaves, size_t lo, size_t hi, const std::string &indent) {
+    if (hi - lo == 1) return indent + leaves[lo] + "\n";
+    const size_t mid = (lo + hi) / 2;
+    return indent + "if (native < " + dec(uint32_t(mid)) + ") {\n" + emit_tree(leaves, lo, mid, indent + "    ") + indent + "} else {\n" + emit_tree(leaves, mid, hi, indent + "    ") + indent + "}\n";
+}
+}
+// Emits frame_programs.h for a list of programs (native index = position). `codes`
+// identifies each program for consistency checks (nr_native_inventory).
+inline std::string emit_native_header(const std::vector<const LoweredProgram *> &programs, const std::vector<uint32_t> &codes) {
+    require(programs.size() == codes.size() && programs.size() <= 256, "native program list");
+    std::string out = "/* Generated by frame_kernel_test --emit from captured_dwm_shaders.hpp. Do not edit. */\n";
+    out += "#define NR_NATIVE_COUNT " + detail::dec(uint32_t(programs.size())) + "\n";
+    std::map<std::string, std::string> stage_names, row_names; std::vector<std::pair<std::string, std::string>> pair_names; std::vector<std::string> rows;
+    std::string host_only;
+    for (const auto *p : programs) {
+        std::array<std::string, 2> names;
+        for (unsigned stage = 0; stage < 2; ++stage) {
+            const auto &words = stage ? p->ps_words : p->vs_words; const auto &base = stage ? p->ps_constant_base : p->vs_constant_base; const auto &count = stage ? p->ps_constant_count : p->vs_constant_count;
+            std::string key = stage ? "ps" : "vs";
+            for (const auto &w : words) for (auto v : w) key += detail::hex(v);
+            for (unsigned i = 0; i < 14; ++i) key += detail::hex(base[i]) + detail::hex(count[i]);
+            auto found = stage_names.find(key);
+            if (found == stage_names.end() && !stage) {
+                // A vertex stage that only copies inputs to outputs shares the runtime's passthrough.
+                bool passthrough = !words.empty();
+                for (const auto &w : words) {
+                    const uint32_t src = w[2];
+                    if (w[0] != NR_OP_MOV || (w[1] & 15u) != 1 || ((w[1] >> 12) & 31u) != 15u || (src & 15u) != 1 || ((src >> 12) & 0x3ffu) != 0xe4u || ((w[1] >> 4) & 255u) != ((src >> 4) & 255u) || ((src >> 4) & 255u) >= 8 || w[5]) passthrough = false;
+                }
+                if (passthrough) found = stage_names.emplace(key, "nr_stage_passthrough").first;
+            }
+            if (found == stage_names.end()) {
+                char name[64]; std::snprintf(name, sizeof name, "nr_stage_%s_%zu", stage ? "ps" : "vs", stage_names.size());
+                found = stage_names.emplace(key, name).first;
+                (stage ? host_only : out) += detail::emit_stage(words, base, count, name);
+            }
+            names[stage] = found->second;
+            if (stage) {
+                const std::string row_key = key + detail::hex(p->ps_inputs) + detail::hex(p->interpolation);
+                auto row = row_names.find(row_key);
+                if (row == row_names.end()) {
+                    char name[64]; std::snprintf(name, sizeof name, "nr_row_%zu", row_names.size());
+                    row = row_names.emplace(row_key, name).first;
+                    out += detail::emit_row(*p, name);
+                }
+                rows.push_back(row->second);
+            }
+        }
+        pair_names.emplace_back(names[0], names[1]);
+    }
+    // Programs are listed real pairs first, then their passthrough-vertex twins in
+    // the same order, so the vertex dispatch folds the twins onto one stage and
+    // the row and pixel dispatch onto the real pair's code.
+    size_t real = 0;
+    while (real < codes.size() && !(codes[real] & 0x10000u)) ++real;
+    const bool twins = codes.size() == 2 * real;
+    for (size_t j = 0; twins && j < real; ++j) require(codes[real + j] == (0x10000u | codes[j]) && pair_names[real + j].first == "nr_stage_passthrough" && rows[real + j] == rows[j], "passthrough twin order");
+    require(twins || real == codes.size(), "passthrough twins");
+    out += "NR_NOINLINE nr_i32 nr_native_check(const nr_program *p) {\n    switch (p->native) {\n";
+    for (size_t n = 0; n < programs.size(); ++n) {
+        core::nr_program p{};
+        const auto *q = programs[n];
+        p.vs_inputs = q->vs_inputs; p.ps_inputs = q->ps_inputs; p.position_output = q->position_output; p.varying_count = q->varyings; p.interpolation = q->interpolation;
+        p.vs_constants = q->vs_constants; p.ps_constants = q->ps_constants; p.texture_count = uint32_t(q->texture_slots.size());
+        p.vs_immediate_count = uint32_t(q->vs_immediates.size()); p.ps_immediate_count = uint32_t(q->ps_immediates.size());
+        out += "    case " + detail::dec(uint32_t(n)) + ": return p->signature == " + detail::hex(core::nr_program_signature(&p)) + ";\n";
+    }
+    out += "    default: return 0;\n    }\n}\n";
+    out += "NR_INLINE nr_u32 nr_native_inventory(nr_u32 native) {\n    switch (native) {\n";
+    for (size_t n = 0; n < codes.size(); ++n) out += "    case " + detail::dec(uint32_t(n)) + ": return " + detail::hex(codes[n]) + ";\n";
+    out += "    default: return 0xffffffffu;\n    }\n}\n";
+    std::vector<std::string> vs_leaves, row_leaves, ps_leaves;
+    for (size_t n = 0; n < real; ++n) { vs_leaves.push_back("return " + pair_names[n].first + "(st, sh);"); row_leaves.push_back(rows[n] + "(row); return;"); ps_leaves.push_back("return " + pair_names[n].second + "(st, sh);"); }
+    const std::string fold = twins && real ? "    if (native >= " + detail::dec(uint32_t(real)) + ") native -= " + detail::dec(uint32_t(real)) + ";\n" : "";
+    out += "NR_NOINLINE nr_i32 nr_native_vs(nr_u32 native, const nr_command_state *st, nr_shade *sh) {\n";
+    if (twins && real) out += "    if (native >= " + detail::dec(uint32_t(real)) + ") return nr_stage_passthrough(st, sh);\n";
+    out += real ? detail::emit_tree(vs_leaves, 0, real, "    ") : "    (void)native; (void)st; (void)sh; return 0;\n";
+    out += "}\n";
+    out += "NR_NOINLINE void nr_native_row(nr_u32 native, const nr_row *row) {\n" + fold;
+    out += real ? detail::emit_tree(row_leaves, 0, real, "    ") : "    (void)native; (void)row;\n";
+    out += "}\n";
+    out += "#ifndef NR_SHAVE\n/* Host-only pixel stages, checked against the SM4 reference. */\n" + host_only;
+    out += "NR_NOINLINE nr_i32 nr_native_ps(nr_u32 native, const nr_command_state *st, nr_shade *sh) {\n" + fold;
+    out += real ? detail::emit_tree(ps_leaves, 0, real, "    ") : "    (void)native; (void)st; (void)sh; return 0;\n";
+    out += "}\n#endif\n";
+    return out;
+}
+
 // Texture window packed by the host for one tile: a sub-rectangle of a texture.
 struct Window { uint32_t w, h, origin_x, origin_y, texture_w, texture_h, format; std::vector<uint32_t> pixels; };
 struct TextureBinding { uint32_t window = NR_FRAME_NO_WINDOW; bool point = false; };
@@ -195,6 +445,7 @@ struct Command {
 class SpanBuilder {
     std::vector<uint8_t> data_;
     static void put(std::vector<uint8_t> &v, size_t at, uint32_t x) { std::memcpy(v.data() + at, &x, 4); }
+    static size_t align16(size_t at) { return (at + 15) & ~size_t(15); }
 public:
     static std::vector<uint8_t> build(uint32_t tile_x, uint32_t tile_y, uint32_t tile_w, uint32_t tile_h, uint32_t format,
                                       const std::vector<std::vector<uint8_t>> &programs, const std::vector<Command> &commands,
@@ -204,16 +455,16 @@ public:
         std::vector<uint8_t> v(span_bytes, 0);
         size_t at = NR_FRAME_HEADER_BYTES;
         const uint32_t commands_offset = uint32_t(at); at += commands.size() * NR_FRAME_COMMAND_BYTES;
-        const uint32_t programs_offset = uint32_t(at); at += 4 + programs.size() * 4;
+        const uint32_t programs_offset = uint32_t(at); at = align16(at + 4 + programs.size() * 4);
         std::vector<uint32_t> entries;
-        for (const auto &p : programs) { require(p.size() % 4 == 0 && p.size() >= NR_FRAME_PROGRAM_BYTES); entries.push_back(uint32_t(at)); at += p.size(); }
+        for (const auto &p : programs) { require(p.size() % 16 == 0 && p.size() >= NR_FRAME_PROGRAM_BYTES); entries.push_back(uint32_t(at)); at += p.size(); }
         const uint32_t vertices_offset = uint32_t(at);
         std::vector<uint32_t> vertex_offsets;
-        for (const auto &c : commands) { vertex_offsets.push_back(uint32_t(at - vertices_offset)); at += c.vertices.size() * 4; }
+        for (const auto &c : commands) { require(c.vertices.size() % 4 == 0); vertex_offsets.push_back(uint32_t(at - vertices_offset)); at += c.vertices.size() * 4; }
         const uint32_t vertices_bytes = uint32_t(at - vertices_offset);
         const uint32_t constants_offset = uint32_t(at);
         std::vector<uint32_t> constant_offsets;
-        for (const auto &c : commands) { constant_offsets.push_back(uint32_t(at - constants_offset)); at += c.constants.size() * 4; }
+        for (const auto &c : commands) { require(c.constants.size() % 4 == 0); constant_offsets.push_back(uint32_t(at - constants_offset)); at += c.constants.size() * 4; }
         const uint32_t constants_bytes = uint32_t(at - constants_offset);
         const uint32_t atlas_offset = uint32_t(at); at += 4 + windows.size() * NR_FRAME_WINDOW_BYTES;
         std::vector<uint32_t> window_data;

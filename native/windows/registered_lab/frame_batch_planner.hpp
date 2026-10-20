@@ -84,12 +84,14 @@ inline DrawPlan plan_draw(const LoweredProgram &program, const std::vector<uint3
     try { span = SpanBuilder::build(0, 0, 1, 1, 28, {program.entry}, {command}, {}, &background); }
     catch (const std::exception &e) { plan.rejection = std::string("planning span: ") + e.what(); return plan; }
     static thread_local std::vector<uint8_t> scratch(span_bytes);
-    core::nr_span s{}; core::nr_command c{}; core::nr_program p{};
-    if (!core::nr_span_load(&s, span.data(), scratch.data()) || !core::nr_command_load(&s, 0, &c) || !core::nr_program_load(&s, 0, &p)) { plan.rejection = "planning contract"; return plan; }
+    core::nr_span s{}; core::nr_command c{}; core::nr_program p{}; core::nr_command_state st{}; core::nr_shade sh{}; uint32_t escapes = 0;
+    if (!core::nr_span_load(&s, span.data(), scratch.data()) || !core::nr_command_load(&s, 0, &c) ||
+        !core::nr_program_load(&s, 0, &p) || !core::nr_command_state_load(&s, &c, &p, &st)) { plan.rejection = "planning contract"; return plan; }
+    sh.escapes = &escapes;
     plan.projected.resize(vertex_count);
     int32_t minx = INT32_MAX, miny = INT32_MAX, maxx = INT32_MIN, maxy = INT32_MIN;
     for (uint32_t v = 0; v < vertex_count; ++v) {
-        if (!core::nr_vertex(&s, &c, &p, v, &plan.projected[v])) { plan.rejection = "vertex projection limits"; return plan; }
+        if (!core::nr_vertex(&s, &c, &st, &p, v, &sh, &plan.projected[v])) { plan.rejection = "vertex projection limits"; return plan; }
         const auto &q = plan.projected[v];
         minx = std::min(minx, q.sx); maxx = std::max(maxx, q.sx); miny = std::min(miny, q.sy); maxy = std::max(maxy, q.sy);
     }
@@ -106,8 +108,8 @@ inline DrawPlan plan_draw(const LoweredProgram &program, const std::vector<uint3
         float umin = 1e30f, umax = -1e30f, vmin = 1e30f, vmax = -1e30f; bool finite = true;
         for (uint32_t v = 0; v < vertex_count; ++v) {
             const auto &var = plan.projected[v].varying[varying];
-            float u = core::nr_float(var[src.lane_u]), vv = core::nr_float(var[src.lane_v]);
-            if (src.divide_lane < 4) { const float w = core::nr_float(var[src.divide_lane]); if (!(w != 0.f) || !std::isfinite(w)) { finite = false; break; } u /= w; vv /= w; }
+            float u = NR_V4_LANE(var, src.lane_u), vv = NR_V4_LANE(var, src.lane_v);
+            if (src.divide_lane < 4) { const float w = NR_V4_LANE(var, src.divide_lane); if (!(w != 0.f) || !std::isfinite(w)) { finite = false; break; } u /= w; vv /= w; }
             if (!std::isfinite(u) || !std::isfinite(vv)) { finite = false; break; }
             umin = std::min(umin, u); umax = std::max(umax, u); vmin = std::min(vmin, vv); vmax = std::max(vmax, vv);
         }

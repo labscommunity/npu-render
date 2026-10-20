@@ -54,7 +54,7 @@ shader::Program passthrough_vertex(const shader::Program &ps, uint32_t &position
     for (unsigned r = 0; r < 16; ++r) if (ps.inputs[r] && r != ps.position_input) { vs.inputs[r] = 15; vs.outputs[r] = 15; mov(r); }
     return vs;
 }
-struct SpanContext { std::vector<uint8_t> input; frame::core::nr_span span{}; frame::core::nr_command command{}; frame::core::nr_program program{}; };
+struct SpanContext { std::vector<uint8_t> input; frame::core::nr_span span{}; frame::core::nr_command command{}; frame::core::nr_program program{}; frame::core::nr_command_state state{}; };
 SpanContext context_for(const std::vector<uint8_t> &program_entry, const frame::Command &command, const std::vector<frame::Window> &windows, uint32_t format = 28) {
     SpanContext c; std::vector<uint32_t> background(128 * 128, 0xff000000u);
     c.input = frame::SpanBuilder::build(0, 0, 128, 128, format, {program_entry}, {command}, windows, background.data());
@@ -62,7 +62,16 @@ SpanContext context_for(const std::vector<uint8_t> &program_entry, const frame::
     frame::require(frame::core::nr_span_load(&c.span, c.input.data(), scratch.data()), "span load");
     frame::require(frame::core::nr_command_load(&c.span, 0, &c.command), "command load");
     frame::require(frame::core::nr_program_load(&c.span, 0, &c.program), "program load");
+    frame::require(frame::core::nr_command_state_load(&c.span, &c.command, &c.program, &c.state), "state load");
     return c;
+}
+// Stage registers for one native stage call: inputs from SM4 registers, constants and immediates from the span.
+void load_stage(const SpanContext &ctx, bool vertex, const shader::Registers &inputs, frame::core::nr_shade &sh, uint32_t &escapes) {
+    for (unsigned r = 0; r < 16; ++r) sh.in[r] = frame::core::nr_v4_from_bits(inputs[r][0], inputs[r][1], inputs[r][2], inputs[r][3]);
+    for (unsigned r = 0; r < 8; ++r) sh.out[r] = frame::core::nr_v4_zero();
+    sh.constants = vertex ? ctx.state.vs_constants : ctx.state.ps_constants;
+    sh.immediates = vertex ? ctx.program.vs_immediates : ctx.program.ps_immediates;
+    sh.escapes = &escapes;
 }
 shader::Constants random_constants(const shader::Program &p) {
     shader::Constants constants;
@@ -94,26 +103,25 @@ Stats compare_stage(const Pair &pair, const shader::Program &vs, const shader::P
         for (unsigned v = 0; v < 3; ++v) for (unsigned r = 0; r < 16; ++r) if (vs.inputs[r]) for (unsigned c = 0; c < 4; ++c) command.vertices.push_back(vertex_inputs[r][c]);
         std::vector<frame::Window> windows(textures.windows, textures.windows + lowered.texture_slots.size());
         auto ctx = context_for(lowered.entry, command, windows);
-        frame::core::nr_registers regs; frame::core::nr_registers_reset(&ctx.span, &ctx.command, &ctx.program, &regs);
-        for (unsigned r = 0; r < 16; ++r) for (unsigned c = 0; c < 4; ++c) regs.in[r][c] = vertex_inputs[r][c];
-        uint32_t escapes = 0;
-        if (frame::core::nr_execute(&ctx.span, &ctx.command, &ctx.program, &regs, 0, &escapes)) {
+        frame::core::nr_shade sh; uint32_t escapes = 0;
+        load_stage(ctx, true, vertex_inputs, sh, escapes);
+        if (frame::core::nr_native_vs(ctx.program.native, &ctx.state, &sh)) {
             const auto expected = shader::reference_vertex(vs, vertex_inputs, vc);
             bool exact = true;
-            for (unsigned r = 0; r < 8; ++r) if (vs.outputs[r]) for (unsigned c = 0; c < 4; ++c) if ((vs.outputs[r] & (1u << c)) && expected[r][c] != regs.out[r][c]) exact = false;
+            for (unsigned r = 0; r < 8; ++r) if (vs.outputs[r]) for (unsigned c = 0; c < 4; ++c) if ((vs.outputs[r] & (1u << c)) && expected[r][c] != frame::core::nr_v4_bits(sh.out[r], c)) exact = false;
             ++stats.vs_cases; stats.vs_exact += exact;
         }
         // Pixel stage with random varyings.
         shader::Registers pixel_inputs{};
         for (unsigned r = 0; r < 16; ++r) if (ps.inputs[r] && r != ps.position_input) for (unsigned c = 0; c < 4; ++c) pixel_inputs[r][c] = fbits(c < 2 ? uniform(0, 1) : uniform(0.25f, 2));
-        frame::core::nr_registers_reset(&ctx.span, &ctx.command, &ctx.program, &regs);
-        for (unsigned r = 0; r < 16; ++r) for (unsigned c = 0; c < 4; ++c) regs.in[r][c] = pixel_inputs[r][c];
-        if (frame::core::nr_execute(&ctx.span, &ctx.command, &ctx.program, &regs, 1, &escapes)) {
+        load_stage(ctx, false, pixel_inputs, sh, escapes);
+        if (frame::core::nr_native_ps(ctx.program.native, &ctx.state, &sh)) {
             const auto expected = shader::reference_vertex(ps, pixel_inputs, pc, textures.shapes, textures.samplers, textures.pixels);
             bool exact = true; unsigned far = 0;
             for (unsigned c = 0; c < 4; ++c) {
-                if (expected[0][c] == regs.out[0][c]) continue; exact = false;
-                const auto a = std::lround(std::fmin(std::fmax(ffloat(expected[0][c]), 0.f), 1.f) * 255), b = std::lround(std::fmin(std::fmax(ffloat(regs.out[0][c]), 0.f), 1.f) * 255);
+                const uint32_t actual = frame::core::nr_v4_bits(sh.out[0], c);
+                if (expected[0][c] == actual) continue; exact = false;
+                const auto a = std::lround(std::fmin(std::fmax(ffloat(expected[0][c]), 0.f), 1.f) * 255), b = std::lround(std::fmin(std::fmax(ffloat(actual), 0.f), 1.f) * 255);
                 if (std::labs(a - b) > 1) ++far;
             }
             ++stats.ps_cases; stats.ps_exact += exact; stats.ps_within_one += !exact && !far; stats.ps_far += far > 0;
@@ -139,21 +147,29 @@ std::vector<uint32_t> random_background(uint32_t count) { std::vector<uint32_t> 
 // Every blend mode and both formats against the repo's scalar blend reference.
 unsigned check_blend_modes() {
     unsigned failures = 0;
-    for (uint32_t format : {28u, 87u}) for (uint32_t mode = 0; mode <= 13; ++mode) for (unsigned trial = 0; trial < 200; ++trial) {
-        frame::core::nr_span span{}; span.format = format;
+    for (uint32_t format : {28u, 87u}) for (uint32_t mode = 0; mode <= 13; ++mode) for (unsigned trial = 0; trial < 400; ++trial) {
         frame::core::nr_command cmd{}; cmd.blend_mode = mode; cmd.write_mask = 1 + (trial % 15);
         for (unsigned c = 0; c < 4; ++c) cmd.blend_constant[c] = uniform(-0.2f, 1.2f);
+        frame::core::nr_command_state state{}; frame::core::nr_blend_state_load(format, &cmd, &state);
         const uint32_t background = uint32_t(rng());
         float color[4]; for (auto &c : color) c = uniform(-0.2f, 1.2f);
+        if (trial % 4 == 3) {
+            // Special values the GPU would flush or clamp: NaN, infinities, subnormals, negative zero, huge.
+            static const uint32_t specials[]{0x7fc00000u, 0xffc00000u, 0x7f800000u, 0xff800000u, 0x00000001u, 0x807fffffu, 0x80000000u, 0x7e000000u, 0x00400000u};
+            const unsigned lane = trial % 4u, which = (trial / 4u) % unsigned(std::size(specials));
+            color[(lane + trial) % 4u] = ffloat(specials[which]);
+            if (trial % 8 == 7) color[3] = ffloat(specials[(which + 1) % unsigned(std::size(specials))]);
+        }
         uint8_t pixel[4]; std::memcpy(pixel, &background, 4);
-        frame::core::nr_blend_store(&span, &cmd, pixel, color);
+        frame::core::nr_blend_pixel(&state, pixel, frame::core::nr_v4_make(color[0], color[1], color[2], color[3]));
         uint32_t actual; std::memcpy(&actual, pixel, 4);
-        const float alpha = std::fmin(std::fmax(color[3], 0.f), 1.f);
+        auto clamp_ref = [](float v) { return (std::isnan(v) || v < 0.f) ? 0.f : (v > 1.f ? 1.f : v); };
+        const float alpha = clamp_ref(color[3]);
         for (unsigned c = 0; c < 4; ++c) {
             const unsigned logical = (format == 87 && c < 3) ? 2 - c : c;
             uint32_t expected_byte = (background >> (c * 8)) & 255u;
             if (cmd.write_mask & (1u << logical)) {
-                const float fg = std::fmin(std::fmax(color[logical], 0.f), 1.f), dst = float((background >> (c * 8)) & 255u), dst_alpha = float((background >> 24) & 255u);
+                const float fg = clamp_ref(color[logical]), dst = float((background >> (c * 8)) & 255u), dst_alpha = float((background >> 24) & 255u);
                 const float constant = std::fmin(std::fmax(cmd.blend_constant[logical], 0.f), 1.f);
                 const auto terms = raster::reference_blend_terms<float>(raster::BlendMode(mode), fg, alpha, dst, dst_alpha, constant);
                 float value = terms[0] + terms[1]; value = std::fmin(std::fmax(value, 0.f), 255.f);
@@ -163,44 +179,89 @@ unsigned check_blend_modes() {
             if (((actual >> (c * 8)) & 255u) != expected_byte) { ++failures; if (failures < 5) std::printf("{\"blend_mismatch\":true,\"mode\":%u,\"format\":%u}\n", mode, format); }
         }
     }
-    std::printf("{\"blend_modes_checked\":14,\"formats\":2,\"trials\":200,\"blend_failures\":%u}\n", failures);
+    std::printf("{\"blend_modes_checked\":14,\"formats\":2,\"trials\":400,\"blend_failures\":%u}\n", failures);
     return failures;
 }
 int main(int argc, char **argv) {
     const char *fixtures_path = argc >= 3 && std::string(argv[1]) == "--fixtures" ? argv[2] : nullptr;
-    FixtureFile fixtures; unsigned eligible = 0, failures = check_blend_modes();
-    std::vector<std::pair<std::vector<uint8_t>, std::string>> entries;
+    const char *emit_path = argc >= 3 && std::string(argv[1]) == "--emit" ? argv[2] : nullptr;
+    // --emit path [--max-ps N | --blob K]: all eligible pairs, those whose pixel
+    // stage has at most N instructions, or the pairs of kernel blob K.
+    uint32_t max_ps = UINT32_MAX, blob = UINT32_MAX;
+    for (int a = 3; a + 1 < argc; ++a) { if (std::string(argv[a]) == "--max-ps") max_ps = uint32_t(std::stoul(argv[a + 1])); if (std::string(argv[a]) == "--blob") blob = uint32_t(std::stoul(argv[a + 1])); }
+    std::vector<uint32_t> compiled_codes;
+    if (!emit_path) for (uint32_t k = 0; k < NR_NATIVE_COUNT; ++k) compiled_codes.push_back(frame::core::nr_native_inventory(k));
+    auto included = [&](uint32_t code, uint32_t ps_instructions) {
+        if (emit_path) return ps_instructions <= max_ps && (blob == UINT32_MAX || frame::blob_of(ps_instructions) == blob);
+        return std::find(compiled_codes.begin(), compiled_codes.end(), code) != compiled_codes.end();
+    };
+    // Pass 1: parse and lower every captured pair plus its passthrough-vertex
+    // variant; eligible programs get native indices in this order.
+    struct Entry { size_t pair; shader::Program vs, ps, pass; shader::TextureSamplers samplers{}; frame::LoweredProgram lowered, pass_lowered; uint32_t pass_position = 16; bool parsed = false; std::string parse_error; };
+    std::vector<Entry> entries(std::size(pairs));
+    std::vector<const frame::LoweredProgram *> natives; std::vector<uint32_t> codes;
     for (size_t n = 0; n < std::size(pairs); ++n) {
-        const auto &pair = pairs[n];
-        shader::Program vs, ps;
-        try { vs = shader::parse_vertex(pair.vs, pair.vs_words); ps = shader::parse_pixel(pair.ps, pair.ps_words); }
-        catch (const std::exception &e) { std::printf("{\"shader\":\"%s\",\"parse_failed\":\"%s\"}\n", pair.sha, e.what()); continue; }
-        shader::TextureSamplers samplers{};
-        for (unsigned s = 0; s < 16; ++s) samplers[s].filter = (n & 1) ? shader::TextureFilter::point : shader::TextureFilter::linear;
-        auto lowered = frame::lower(vs, ps, samplers);
+        auto &e = entries[n]; e.pair = n;
+        try { e.vs = shader::parse_vertex(pairs[n].vs, pairs[n].vs_words); e.ps = shader::parse_pixel(pairs[n].ps, pairs[n].ps_words); e.parsed = true; }
+        catch (const std::exception &x) { e.parse_error = x.what(); continue; }
+        for (unsigned s = 0; s < 16; ++s) e.samplers[s].filter = (n & 1) ? shader::TextureFilter::point : shader::TextureFilter::linear;
+        e.lowered = frame::lower(e.vs, e.ps, e.samplers);
+        if (!e.lowered.eligible()) continue;
+        if (!included(uint32_t(n), uint32_t(e.lowered.ps_words.size()))) { e.lowered.rejection = "not in the compiled program set"; continue; }
+        try { e.pass = passthrough_vertex(e.ps, e.pass_position); e.pass_lowered = frame::lower(e.pass, e.ps, e.samplers); }
+        catch (const std::exception &x) { e.pass_lowered.rejection = x.what(); }
+        if (!e.pass_lowered.eligible()) { e.lowered.rejection = "no passthrough twin: " + e.pass_lowered.rejection; continue; }
+        e.lowered.set_native(uint32_t(natives.size())); natives.push_back(&e.lowered); codes.push_back(uint32_t(n));
+    }
+    // Passthrough twins follow all real pairs in the same order (the kernel's dispatch folds them).
+    const size_t real_count = natives.size();
+    for (size_t k = 0; k < real_count; ++k) {
+        auto &e = entries[codes[k]];
+        e.pass_lowered.set_native(uint32_t(natives.size())); natives.push_back(&e.pass_lowered); codes.push_back(0x10000u | uint32_t(e.pair));
+    }
+    if (emit_path) {
+        std::ofstream out(emit_path, std::ios::binary); out << frame::emit_native_header(natives, codes);
+        std::printf("{\"native_programs\":%zu,\"emitted\":\"%s\"}\n", natives.size(), emit_path);
+        return out ? 0 : 1;
+    }
+    bool stale = natives.size() != NR_NATIVE_COUNT;
+    for (size_t k = 0; k < natives.size() && !stale; ++k) stale = frame::core::nr_native_inventory(uint32_t(k)) != codes[k];
+    if (stale) { std::printf("{\"error\":\"frame_programs.h is stale: rerun --emit\",\"native_programs\":%zu,\"compiled\":%u}\n", natives.size(), unsigned(NR_NATIVE_COUNT)); return 1; }
+    FixtureFile fixtures; unsigned eligible = 0, failures = check_blend_modes();
+    for (auto &e : entries) {
+        const auto &pair = pairs[e.pair]; const size_t n = e.pair;
+        if (!e.parsed) { std::printf("{\"shader\":\"%s\",\"parse_failed\":\"%s\"}\n", pair.sha, e.parse_error.c_str()); continue; }
+        const auto &lowered = e.lowered; const auto &vs = e.vs; const auto &ps = e.ps; const auto &samplers = e.samplers;
         if (!lowered.eligible()) { std::printf("{\"shader\":\"%s\",\"eligible\":false,\"reason\":\"%s\"}\n", pair.sha, lowered.rejection.c_str()); continue; }
         ++eligible;
         const auto stats = compare_stage(pair, vs, ps, samplers, lowered);
         const bool samples = !lowered.texture_slots.empty();
         const bool ok = stats.vs_exact == stats.vs_cases && stats.ps_far == 0 && (samples || stats.ps_exact == stats.ps_cases);
         if (!ok) ++failures;
-        std::printf("{\"shader\":\"%s\",\"eligible\":true,\"vertex_exact\":%u,\"vertex_cases\":%u,\"pixel_exact\":%u,\"pixel_within_one_byte\":%u,\"pixel_far\":%u,\"pixel_cases\":%u,\"textures\":%zu,\"passed\":%s}\n",
-            pair.sha, stats.vs_exact, stats.vs_cases, stats.ps_exact, stats.ps_within_one, stats.ps_far, stats.ps_cases, lowered.texture_slots.size(), ok ? "true" : "false");
+        std::printf("{\"shader\":\"%s\",\"eligible\":true,\"native\":%u,\"vertex_exact\":%u,\"vertex_cases\":%u,\"pixel_exact\":%u,\"pixel_within_one_byte\":%u,\"pixel_far\":%u,\"pixel_cases\":%u,\"textures\":%zu,\"passed\":%s}\n",
+            pair.sha, lowered.native(), stats.vs_exact, stats.vs_cases, stats.ps_exact, stats.ps_within_one, stats.ps_far, stats.ps_cases, lowered.texture_slots.size(), ok ? "true" : "false");
         if (!fixtures_path) continue;
-        // Fixture A: real vertex program, random constants and vertices.
+        // Fixture A: real vertex program, random constants and vertices. Retry
+        // until the draw projects within the kernel's limits and covers pixels.
         for (unsigned format : {28u, 87u}) {
-            auto textures = make_textures(lowered, samplers, 16);
-            frame::Command command = base_command(lowered, textures, samplers);
-            command.constants = flatten(vs, random_constants(vs), ps, random_constants(ps));
-            command.vertex_count = 6; command.blend_mode = uint32_t(n % 14); command.write_mask = 15 - uint32_t(n % 3);
-            for (unsigned v = 0; v < 6; ++v) for (unsigned r = 0; r < 16; ++r) if (vs.inputs[r]) for (unsigned c = 0; c < 4; ++c) command.vertices.push_back(fbits(uniform(-1.5f, 1.5f)));
-            std::vector<frame::Window> windows(textures.windows, textures.windows + lowered.texture_slots.size());
-            auto background = random_background(128 * 128);
-            append_fixture(fixtures, std::string("real-vs-") + pair.sha + (format == 28 ? "-rgba" : "-bgra"), frame::SpanBuilder::build(0, 0, 128, 128, format, {lowered.entry}, {command}, windows, background.data()));
+            std::vector<uint8_t> span; uint32_t covered = 0;
+            for (unsigned attempt = 0; attempt < 64; ++attempt) {
+                auto textures = make_textures(lowered, samplers, 16);
+                frame::Command command = base_command(lowered, textures, samplers);
+                command.constants = flatten(vs, random_constants(vs), ps, random_constants(ps));
+                command.vertex_count = 6; command.blend_mode = uint32_t(n % 14); command.write_mask = 15 - uint32_t(n % 3);
+                for (unsigned v = 0; v < 6; ++v) for (unsigned r = 0; r < 16; ++r) if (vs.inputs[r]) for (unsigned c = 0; c < 4; ++c) command.vertices.push_back(fbits(uniform(-1.5f, 1.5f)));
+                std::vector<frame::Window> windows(textures.windows, textures.windows + lowered.texture_slots.size());
+                auto background = random_background(128 * 128);
+                span = frame::SpanBuilder::build(0, 0, 128, 128, format, {lowered.entry}, {command}, windows, background.data());
+                std::vector<uint8_t> expected; frame::render_reference(span, expected);
+                uint32_t status; std::memcpy(&status, expected.data() + 4, 4); std::memcpy(&covered, expected.data() + 12, 4);
+                if (status == 0 && covered) break;
+            }
+            append_fixture(fixtures, std::string("real-vs-") + pair.sha + (format == 28 ? "-rgba" : "-bgra"), span);
         }
         // Fixture B: passthrough vertex program covering the tile with two triangles.
-        uint32_t position_register = 16; auto pass = passthrough_vertex(ps, position_register);
-        auto pass_lowered = frame::lower(pass, ps, samplers);
+        const auto &pass = e.pass; const auto &pass_lowered = e.pass_lowered; const uint32_t position_register = e.pass_position;
         if (pass_lowered.eligible()) {
             for (unsigned variant = 0; variant < 2; ++variant) {
                 const uint32_t format = variant ? 87u : 28u;

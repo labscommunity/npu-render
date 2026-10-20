@@ -2,6 +2,7 @@
 #include "indexed_pipe.hpp"
 #include "indexed_pipeline.hpp"
 #include "packet_provider_process.hpp"
+#include "frame_batch_executor.hpp"
 #include "provider_compile.hpp"
 #include "provider_profile.hpp"
 #include "coverage_statistics.hpp"
@@ -58,6 +59,14 @@ int wmain(int argc, wchar_t **argv) try {
     if(argc==8)indirect=std::make_unique<nr::registered_lab::NativeCompositorPeer>(DWORD(nr::registered_lab::NativeCompositorPeer::number(argv[6],UINT32_MAX)),nr::registered_lab::NativeCompositorPeer::number(argv[7],UINT64_MAX),2u);
     ex::require(argc!=7 || !std::wcscmp(argv[6],L"local-service-probe"));
     ex::Pipeline pipeline;nr::registered_lab::PacketProviderProcess provider;nr::registered_lab::RequestRecording recording;std::atomic<uint32_t> succeeded{0};
+    // The frame batch executor lives in the child provider; the parent only forwards batches.
+    std::unique_ptr<nr::registered_lab::frame_batch::FrameBatchExecutor> frame_executor;
+    if(!provider.enabled()){
+        wchar_t *blob=nullptr;size_t blob_length=0;char *sha=nullptr;size_t sha_length=0;
+        ex::require(!_wdupenv_s(&blob,&blob_length,L"NR_RENDER_PTL_FRAME_BLOB") && !_dupenv_s(&sha,&sha_length,"NR_RENDER_PTL_FRAME_SHA256"));
+        const std::unique_ptr<wchar_t,decltype(&std::free)> blob_owner(blob,&std::free);const std::unique_ptr<char,decltype(&std::free)> sha_owner(sha,&std::free);
+        frame_executor=std::make_unique<nr::registered_lab::frame_batch::FrameBatchExecutor>(pipeline,blob&&*blob?std::filesystem::path(blob):std::filesystem::path(),sha?std::string(sha):std::string());
+    }
     PSECURITY_DESCRIPTOR descriptor = nullptr;
     // Private per-job endpoint: only this user and SYSTEM, local clients only.
     const auto worker_user=current_user_sid();
@@ -119,6 +128,20 @@ int wmain(int argc, wchar_t **argv) try {
                     const auto reply=dispatch.execute(ticket,turn_deadline,[&]{
                         entered_qpc=qpc_now();entered=GetTickCount64();recording.request(ticket,bytes);
                         const auto counts=pipeline.retained_pipeline_counts();std::printf("{\"pipeline_before_request\":true,\"dispatch_ticket\":%u,\"uniform\":%zu,\"triangle\":%zu,\"clear\":%zu,\"point\":%zu,\"linear\":%zu}\n",ticket,counts[0],counts[1],counts[2],counts[3],counts[4]);std::fflush(stdout);
+                        if(h.abi==24){
+                            // Frame batch: the child executes; the parent forwards the opaque packet.
+                            std::printf("{\"kind\":\"request_identity\",\"pid\":%lu,\"dispatch_ticket\":%u,\"client_pid\":%u,\"sequence\":%u,\"abi\":24,\"flags\":%u,\"width\":%u,\"height\":%u,\"vertices\":0,\"pixel_sha256\":\"frame-batch\",\"provider_parent\":%s}\n",GetCurrentProcessId(),ticket,h.client_pid,h.sequence,h.flags,h.width,h.height,provider.enabled()?"true":"false");std::fflush(stdout);
+                            const auto began_batch=std::chrono::steady_clock::now();
+                            std::vector<uint8_t> result;
+                            try{
+                                if(provider.enabled()){auto transported=provider.execute_packet(bytes,h,request_deadline,stop_event.value);result=std::move(transported.packet);}
+                                else{ex::require(bool(frame_executor));result=frame_executor->execute(bytes);}
+                            }catch(const std::exception &error){capture_failed_request(bytes,h,ticket);std::fprintf(stderr,"%s\n",error.what());std::fflush(stderr);throw;}
+                            const auto batch_ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-began_batch).count();
+                            recording.response(ticket,result);++succeeded;
+                            std::printf("{\"client_pid\":%u,\"sequence\":%u,\"execution_device\":\"NPU\",\"server_thread_id\":%lu,\"provider_requests\":1,\"draw_ms\":%.3f,\"compile_and_draw_ms\":%.3f,\"compile_calls\":0,\"backend_compile_calls\":0,\"memory_cache_requests\":0,\"memory_cache_hits\":0,\"memory_cache_evictions\":0,\"cache_requests\":0,\"cache_hits\":0,\"provider_setup_ms\":0.000,\"backend_compile_ms\":0.000,\"compact_coverage_calls\":0,\"compact_coverage_samples\":0,\"wide_coverage_calls\":0,\"passed\":true,\"displayed_frames\":0,\"frame_batch\":true}\n",h.client_pid,h.sequence,GetCurrentThreadId(),batch_ms,batch_ms);std::fflush(stdout);
+                            finished=GetTickCount64();finished_qpc=qpc_now();return result;
+                        }
                         const auto request=ex::decode(bytes);
                         const auto pixel_digest=shader_digest(request.pixel.bytecode);
                         std::printf("{\"kind\":\"request_identity\",\"pid\":%lu,\"dispatch_ticket\":%u,\"client_pid\":%u,\"sequence\":%u,\"abi\":%u,\"flags\":%u,\"width\":%u,\"height\":%u,\"vertices\":%u,\"pixel_sha256\":\"%s\",\"provider_parent\":%s}\n",GetCurrentProcessId(),ticket,h.client_pid,h.sequence,h.abi,h.flags,h.width,h.height,h.vertices,pixel_digest.c_str(),provider.enabled()?"true":"false");std::fflush(stdout);

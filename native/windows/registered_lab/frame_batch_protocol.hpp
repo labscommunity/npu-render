@@ -48,9 +48,10 @@ struct CommandRecord {
     uint32_t blend_mode = 0, write_mask = 15, cull = 0, front_ccw = 0;
     int32_t scissor[4]{}; uint32_t scissor_enabled = 0;
     float viewport[6]{}; float blend_constant[4]{}; float clear_color[4]{};
-    uint32_t texture_count = 0, reserved[3]{};
+    uint32_t texture_count = 0;
+    uint32_t legacy_abi = 0, legacy_flags = 0;    // per-draw route selectors for the fallback path
 };
-static_assert(sizeof(CommandRecord) == 128);
+static_assert(sizeof(CommandRecord) == 136);
 struct ResponseHeader {
     uint32_t magic = response_magic, version = 1, target_count = 0, missing_count = 0;
     uint64_t generation = 0, batch_sequence = 0;

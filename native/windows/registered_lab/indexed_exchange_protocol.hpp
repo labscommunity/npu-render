@@ -170,7 +170,21 @@ inline bool shape_valid(const Header &h,bool component_payload=false,bool large_
     // The executor enforces the 4096-tile limit after projection and clipping.
     return true;
 }
+// Frame batches (abi 24) carry an ordered command stream; their body is
+// validated by frame_batch_protocol.hpp and the executor, not by shape_valid.
+inline bool frame_batch_valid(const Header &h, uint64_t bytes) {
+    return h.signature == magic && h.abi == 24 && (h.nonce[0] || h.nonce[1]) && h.client_pid && h.kind == 1 && !h.device &&
+        h.sequence && h.sequence <= max_requests && h.body_bytes >= 48 && h.body_bytes <= max_packet_bytes - 128 &&
+        !h.vs_words && !h.ps_words && !h.vertices && bytes == sizeof(Header) + uint64_t(h.body_bytes);
+}
+inline bool frame_batch_response_valid(const Header &h, const Header &request, uint64_t bytes) {
+    return frame_batch_valid(request, sizeof(Header) + uint64_t(request.body_bytes)) && h.signature == magic && h.abi == 24 &&
+        h.nonce[0] == request.nonce[0] && h.nonce[1] == request.nonce[1] && h.client_pid == request.client_pid && h.sequence == request.sequence &&
+        h.kind == 2 && h.device == 3 && h.body_bytes >= 80 && h.body_bytes <= max_packet_bytes - 128 && bytes == sizeof(Header) + uint64_t(h.body_bytes) &&
+        h.width == request.width && h.height == request.height && h.flags == request.flags;
+}
 inline bool request_valid(const Header &h, uint64_t bytes) {
+    if (h.abi == 24) return frame_batch_valid(h, bytes);
     return shape_valid(h) && h.kind == 1 && !h.device && (!color_clear(h) || h.body_bytes==16) && bytes == sizeof(Header) + uint64_t(h.body_bytes);
 }
 inline bool same_request(const Header &a, const Header &b) {
@@ -179,11 +193,13 @@ inline bool same_request(const Header &a, const Header &b) {
         a.vs_words == b.vs_words && a.ps_words == b.ps_words && a.reserved == b.reserved;
 }
 inline bool response_valid(const Header &h, const Header &request, uint64_t bytes) {
+    if (request.abi == 24) return frame_batch_response_valid(h, request, bytes);
     return request_valid(request, sizeof(Header) + uint64_t(request.body_bytes)) && shape_valid(h) && same_request(h, request) &&
         h.kind == 2 && h.device == 3 && bytes == sizeof(Header) + uint64_t(h.body_bytes) &&
         h.body_bytes == sizeof(Receipt) + uint64_t(h.width) * h.height * 4;
 }
 inline bool failure_valid(const Header &h, const Header &request, uint64_t bytes) {
+    if (request.abi == 24) return frame_batch_valid(request, sizeof(Header) + uint64_t(request.body_bytes)) && h.abi == 24 && same_request(h, request) && h.kind == 3 && !h.device && !h.body_bytes && bytes == sizeof(Header);
     return request_valid(request, sizeof(Header) + uint64_t(request.body_bytes)) && shape_valid(h) && same_request(h, request) &&
         h.kind == 3 && !h.device && !h.body_bytes && bytes == sizeof(Header);
 }
@@ -385,7 +401,9 @@ inline std::vector<uint8_t> response(const Header &request, const raster::Unifor
 inline raster::UniformDrawExecutor::Result decode_response(const std::vector<uint8_t> &bytes, const Header &request) {
     Reader reader(bytes); const auto h = reader.value<Header>();
     if (failure_valid(h, request, bytes.size())) throw std::runtime_error("physical NPU worker rejected indexed draw");
-    require(response_valid(h, request, bytes.size())); const auto receipt = reader.value<Receipt>();
+    require(response_valid(h, request, bytes.size()));
+    if (request.abi == 24) { raster::UniformDrawExecutor::Result batch{}; batch.execution_device = "NPU (frame batch)"; return batch; }
+    const auto receipt = reader.value<Receipt>();
     require(!receipt.reserved && receipt.used_rectangle <= 1 && receipt.provider_requests && receipt.provider_requests <= 4 * 1024 * 1024 &&
         receipt.covered_samples <= uint64_t(h.width) * h.height * (color_clear(h)?1u:h.vertices/3));
     if(color_clear(h))require(receipt.input_bytes==16 && receipt.output_bytes==uint64_t(h.width)*h.height*4 &&
