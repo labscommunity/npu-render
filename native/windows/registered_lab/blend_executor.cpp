@@ -1,3 +1,4 @@
+#include "provider_infer_trace.hpp"
 #include "provider_compile.hpp"
 #include "blend_executor.hpp"
 #include "../blend_model.hpp"
@@ -49,7 +50,7 @@ BlendExecutor::Result BlendExecutor::compose(uint32_t width, uint32_t height,
     try {
         std::memcpy(model.request.get_input_tensor(0).data(), background.data(), background.size());
         std::memcpy(model.request.get_input_tensor(1).data(), foreground.data(), foreground.size());
-        model.request.infer();
+        nr::provider::traced_infer(model.request,__FILE__,__LINE__);
         const auto output = model.request.get_output_tensor();
         if (output.get_byte_size() != foreground.size()) throw std::runtime_error("unexpected composition output");
         const auto pixels = output.data<const uint8_t>();

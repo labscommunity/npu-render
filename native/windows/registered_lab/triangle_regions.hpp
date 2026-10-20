@@ -8,8 +8,8 @@ namespace nr::raster {
 // Address scheduling over bounds already computed by the selected device.
 // This does not evaluate vertex shaders, triangle edges or sample coverage.
 inline std::vector<std::array<int32_t,4>> bounded_triangle_regions(
-    const std::vector<std::array<int32_t,4>> &bounds,const std::array<int32_t,4> &clip,uint32_t batch,bool quads=false){
-    if(!batch || batch>8192 || (quads && batch%4) || clip[0]<0 || clip[1]<0 || clip[0]>clip[2] || clip[1]>clip[3] || clip[2]>8192 || clip[3]>8192)
+    const std::vector<std::array<int32_t,4>> &bounds,const std::array<int32_t,4> &clip,uint32_t batch,bool quads=false,bool large_affine=false,bool large_generic=false){
+    if(!batch || batch>(large_affine?262144u:(large_generic?16384u:8192u)) || (large_affine && large_generic) || (large_affine && quads) || (quads && batch%4) || clip[0]<0 || clip[1]<0 || clip[0]>clip[2] || clip[1]>clip[3] || clip[2]>8192 || clip[3]>8192)
         throw std::invalid_argument("invalid triangle region parameters");
     std::vector<std::array<int32_t,4>> regions;regions.reserve(bounds.size());uint64_t tiles=0;
     for(const auto &b:bounds){

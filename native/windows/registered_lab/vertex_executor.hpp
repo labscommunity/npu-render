@@ -13,6 +13,10 @@ using VertexConstants = std::array<std::vector<VertexBits>, 14>;
 // does not implement rasterization or interpolation. Texture sampling accepts
 // only the explicit single-mip addressing contract in shader_texture.hpp.
 class RegisterExecutor {
+public:
+    class TextureBatch;
+private:
+    TextureBatch *active_batch=nullptr;
     struct State;
     struct Configuration;
     std::unique_ptr<State> state;
@@ -30,9 +34,24 @@ public:
     ~RegisterExecutor();
     RegisterExecutor(const RegisterExecutor &) = delete;
     RegisterExecutor &operator=(const RegisterExecutor &) = delete;
-    struct Result { std::vector<VertexRegisters> vertices; std::string execution_device; uint64_t input_bytes = 0, output_bytes = 0; };
+    struct Result { std::vector<VertexRegisters> vertices; std::string execution_device; uint64_t input_bytes = 0, output_bytes = 0, texture_upload_bytes=0, texture_reused_bytes=0; };
     Result execute(const std::vector<VertexRegisters> &vertices, const VertexConstants &constants,
                    const TexturePixels &textures = {});
+    // Textures must remain immutable and outlive the scope. One scope per
+    // executor; all calls are synchronous and occur on the owning caller.
+    TextureBatch bind_textures(const TexturePixels &textures,bool reuse=true);
+private:
+    Result execute_internal(const std::vector<VertexRegisters> &vertices,const VertexConstants &constants,const TexturePixels &textures,bool reuse);
+};
+class RegisterExecutor::TextureBatch {
+    friend class RegisterExecutor;
+    RegisterExecutor &owner;const TexturePixels &textures;bool reuse;
+    TextureBatch(RegisterExecutor &executor,const TexturePixels &resources,bool reuse);
+public:
+    ~TextureBatch();
+    TextureBatch(const TextureBatch &)=delete;TextureBatch &operator=(const TextureBatch &)=delete;
+    TextureBatch(TextureBatch &&)=delete;TextureBatch &operator=(TextureBatch &&)=delete;
+    Result execute(const std::vector<VertexRegisters> &vertices,const VertexConstants &constants);
 };
 using VertexExecutor = RegisterExecutor;
 using PixelExecutor = RegisterExecutor;

@@ -1,6 +1,9 @@
 #pragma once
 #include "indexed_exchange_protocol.hpp"
 #include "clear_executor.hpp"
+#include "quad_batch.hpp"
+#include <cstdlib>
+#include <cstdio>
 namespace nr::registered_lab::indexed_exchange {
 class Pipeline {
     static uint32_t vertex_capacity(uint32_t count) {
@@ -11,6 +14,7 @@ class Pipeline {
     }
     struct ClearEntry {uint32_t width,height,format;std::unique_ptr<raster::ClearExecutor> executor;};
     std::vector<ClearEntry> clear_cache;
+    uint32_t uniform_limit=8,triangle_limit=24,clear_limit=4;
     struct UniformEntry {
         Header header;
         std::vector<uint32_t> vertex, pixel;
@@ -30,14 +34,46 @@ class Pipeline {
         std::unique_ptr<raster::TriangleTextureDrawExecutor> executor;
     };
     std::vector<TriangleEntry> triangle_cache;
+    bool quad_enabled=false;
+    struct QuadEntry {Header header;std::vector<uint32_t> vertex,pixel;raster::PackedTexture layout;std::unique_ptr<QuadBatch> executor;};
+    std::vector<QuadEntry> quad_cache;
+
 public:
+    Pipeline(){
+        char *quad=nullptr;size_t quad_length=0;
+        if(_dupenv_s(&quad,&quad_length,"NR_RENDER_QUAD_BATCH"))throw std::runtime_error("cannot read quad experiment");
+        if(quad){const std::string value(quad);std::free(quad);if(value!="1")throw std::invalid_argument("quad experiment requires 1");quad_enabled=true;}
+
+        char *value=nullptr;size_t length=0;
+        if(_dupenv_s(&value,&length,"NR_RENDER_PIPELINE_CACHE"))throw std::runtime_error("cannot read pipeline cache experiment");
+        std::unique_ptr<char,decltype(&std::free)> owner(value,&std::free);
+        if(value && *value){
+            if(!std::strcmp(value,"expanded")){uniform_limit=16;triangle_limit=48;}
+            else if(!std::strcmp(value,"retained")){uniform_limit=64;triangle_limit=128;clear_limit=16;}
+            else throw std::invalid_argument("pipeline cache experiment requires expanded or retained");
+        }
+        std::printf("{\"kind\":\"pipeline_cache_policy\",\"uniform_capacity\":%u,\"triangle_capacity\":%u,\"clear_capacity\":%u,\"replacement\":\"FIFO\",\"hardware_queue_count_measured\":false}\n",uniform_limit,triangle_limit,clear_limit);std::fflush(stdout);
+    }
+    std::array<size_t,5> retained_pipeline_counts() const {
+        return {uniform_cache.size(),triangle_cache.size(),clear_cache.size(),texture_executor?1u:0u,linear_executor?1u:0u};
+    }
     raster::UniformDrawExecutor::Result execute(const Request &request) {
+        if(!quad_enabled || !QuadBatch::eligible(request))return execute_standard(request);
+        const auto &h=request.header;const auto &t=request.texture;QuadBatch *executor=nullptr;
+        for(auto &entry:quad_cache){const auto &old=entry.header;if(old.width==h.width && old.height==h.height && old.format==h.format && (old.flags&~4u)==(h.flags&~4u) && entry.layout.width==t.width && entry.layout.height==t.height && entry.layout.format==t.format && entry.vertex==request.vertex.bytecode && entry.pixel==request.pixel.bytecode){executor=entry.executor.get();break;}}
+        if(!executor){if(quad_cache.size()==8)quad_cache.erase(quad_cache.begin());auto candidate=std::make_unique<QuadBatch>(request,"NPU");quad_cache.push_back({h,request.vertex.bytecode,request.pixel.bytecode,{t.width,t.height,t.format,{}},std::move(candidate)});executor=quad_cache.back().executor.get();}
+        auto attempt=executor->execute(request);
+        std::printf("{\"quad_batch_attempt\":true,\"accepted\":%s,\"vertices\":%u,\"provider_requests\":%llu,\"pipeline_count\":%zu,\"fallback_backend\":\"%s\"}\n",attempt.accepted?"true":"false",h.vertices,static_cast<unsigned long long>(attempt.result.provider_requests),quad_cache.size(),attempt.accepted?"none":"NPU");std::fflush(stdout);
+        if(attempt.accepted)return std::move(attempt.result);
+        auto result=execute_standard(request);require(result.execution_device==attempt.result.execution_device);QuadBatch::add_work(result,attempt.result);return result;
+    }
+    raster::UniformDrawExecutor::Result execute_standard(const Request &request) {
         if(color_clear(request.header)){
             const auto &h=request.header;require(shape_valid(h));
             raster::ClearExecutor *executor=nullptr;
             for(auto &entry:clear_cache)if(entry.width==h.width && entry.height==h.height && entry.format==h.format){executor=entry.executor.get();break;}
             if(!executor){
-                if(clear_cache.size()==4)clear_cache.erase(clear_cache.begin());
+                if(clear_cache.size()==clear_limit)clear_cache.erase(clear_cache.begin());
                 auto candidate=std::make_unique<raster::ClearExecutor>(h.width,h.height,h.format,"NPU");
                 clear_cache.push_back({h.width,h.height,h.format,std::move(candidate)});executor=clear_cache.back().executor.get();
             }
@@ -51,8 +87,8 @@ public:
             const auto batch=triangle_batch(request,shader::RegisterExecutor::preferred_raster_batch(request.pixel));
             const auto capacity=vertex_capacity(h.vertices);
             raster::PackedResources resources;shader::TextureSamplers samplers{};
-            if(h.flags&0x2000){require(h.abi==8 || h.abi==9 || h.abi==10 || h.abi==11 || h.abi==12 || h.abi==14 || h.abi==15);resources=request.resources;samplers=request.samplers;}
-            else {require(h.abi==7 || h.abi==9 || h.abi==10 || h.abi==11 || h.abi==15);resources[0]=request.texture;samplers[0].filter=(h.flags&16)?shader::TextureFilter::point:shader::TextureFilter::linear;}
+            if(h.flags&0x2000){const auto abi=payload_abi(h);require(abi==8 || abi==9 || abi==10 || abi==11 || abi==12 || abi==14 || abi==15);resources=request.resources;samplers=request.samplers;}
+            else {const auto abi=payload_abi(h);require(abi==7 || abi==9 || abi==10 || abi==11 || abi==15);resources[0]=request.texture;samplers[0].filter=(h.flags&16)?shader::TextureFilter::point:shader::TextureFilter::linear;}
             for(auto &entry:triangle_cache){const auto &old=entry.header;
                 if(entry.batch==batch && old.vertices==capacity && old.format==h.format &&
                     (old.flags&~4u)==(h.flags&~4u) && raster::resource_layout_equal(resources,entry.layout) &&
@@ -64,7 +100,7 @@ public:
             // encountered command-queue creation failures. This is a bounded
             // policy, not a claim about the driver's hardware queue limit.
             // Evict before constructing a successor for the qualified NPU driver.
-            if(triangle_cache.size()==24)triangle_cache.erase(triangle_cache.begin());
+            if(triangle_cache.size()==triangle_limit)triangle_cache.erase(triangle_cache.begin());
             auto candidate=std::make_unique<raster::TriangleTextureDrawExecutor>(request.vertex,request.pixel,capacity,h.width,h.height,h.format,
                 resources,samplers,"NPU",blend_mode(h),uint8_t((h.flags>>8)&15),static_cast<raster::CullMode>((h.flags>>5)&3),(h.flags&128)!=0,batch);
             auto result=candidate->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,resources,request.background,request.scissor,request.blend_constant);
@@ -75,7 +111,7 @@ public:
         if (request.header.flags & 24) {
             const auto &h=request.header,&old=previous_linear.header;
             const auto &t=request.texture,&pt=previous_linear.texture;
-            require(shape_valid(h) && h.abi==((h.flags&16)?5u:4u));
+            require(shape_valid(h) && payload_abi(h)==((h.flags&16)?5u:4u));
             if(!linear_executor || old.width!=h.width || old.height!=h.height || old.format!=h.format ||
                 (old.flags & ~4u)!=(h.flags & ~4u) || pt.width!=t.width || pt.height!=t.height || pt.format!=t.format ||
                 previous_linear.vertex.bytecode!=request.vertex.bytecode || previous_linear.pixel.bytecode!=request.pixel.bytecode){
@@ -113,7 +149,7 @@ public:
         // Complete eviction before constructing a new NPU model. Releasing an
         // old entry after creating its successor triggers a device-loss failure
         // with the qualified 5540 runtime during mixed desktop draws.
-        if(uniform_cache.size()==8)uniform_cache.erase(uniform_cache.begin());
+        if(uniform_cache.size()==uniform_limit)uniform_cache.erase(uniform_cache.begin());
         const auto batch=raster::UniformDrawExecutor::raster_batch(h.width,h.height);
         auto candidate=std::make_unique<raster::UniformDrawExecutor>(request.vertex,request.pixel,h.vertices,h.width,h.height,
             "NPU",blend_mode(h),h.format==87,uint8_t((h.flags>>8)&15),batch,static_cast<raster::CullMode>((h.flags>>5)&3),(h.flags&128)!=0);

@@ -119,7 +119,11 @@ template<class F> void guard(D3D10DDI_HDEVICE h, const char *operation, F f) noe
     try { f(); }
     catch (const Error &e) { reject(h, e.status, operation); }
     catch (const std::bad_alloc &) { reject(h, E_OUTOFMEMORY, operation); }
-    catch (const std::exception &e) { std::fprintf(stderr, "nr_fill_umd: %s\n", e.what()); reject(h, E_FAIL, operation); }
+    catch (const std::exception &e) {
+        char detail[384]{};size_t n=0;for(const auto *c=e.what();*c && n+3<sizeof(detail);++c){if(*c=='"' || *c=='\\')detail[n++]='\\';detail[n++]=(*c>=32 && *c<127)?*c:' ';}
+        lab_trace("{\"event\":\"operation_exception\",\"operation\":\"%s\",\"message\":\"%s\"}\n",operation,detail);
+        std::fprintf(stderr, "nr_fill_umd: %s\n", e.what()); reject(h, E_FAIL, operation);
+    }
     catch (...) { reject(h, E_FAIL, operation); }
 }
 template<class T, size_t Offset> struct Unsupported;
@@ -318,6 +322,7 @@ void APIENTRY clear(D3D10DDI_HDEVICE h, D3D10DDI_HRENDERTARGETVIEW v, FLOAT colo
         auto a = static_cast<View *>(v.pDrvPrivate)->allocation;
         auto &d=device(h);require(a && !a->locked && a->context==d.context && !d.context->poisoned);
         for(unsigned n=0;n<4;++n)require(std::isfinite(color[n]));
+        lab_trace("{\"event\":\"color_clear_requested\",\"width\":%u,\"height\":%u,\"format\":%u}\n",a->surface.width,a->surface.height,a->surface.format);
         // The historical blend-only file bridge retains its documented CPU
         // clears. Full desktop experiments use the indexed ABI 13 path.
         if(d.backend!="CPU" && d.backend!="NPU_LAB_FILE"){

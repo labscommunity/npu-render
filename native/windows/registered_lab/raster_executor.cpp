@@ -1,5 +1,9 @@
+#include "provider_infer_trace.hpp"
 #include "provider_compile.hpp"
 #include "raster_executor.hpp"
+#include "compact_coverage.hpp"
+#include "coverage_statistics.hpp"
+#include <cstdlib>
 #include <openvino/openvino.hpp>
 #include <openvino/opsets/opset13.hpp>
 #include <openvino/pass/serialize.hpp>
@@ -57,14 +61,14 @@ Sign determinant(const Node &ax, const Node &by, const Node &ay, const Node &bx)
         both(zero(hi),zero(lower_nonzero))};
 }
 }
-struct CoverageExecutor::State {
+struct WideCoverageState {
     uint32_t count;
     ov::Core core;
     ov::CompiledModel compiled;
     ov::InferRequest request;
     std::string execution_device;
     bool failed = false;
-    State(uint32_t size, const std::string &backend, CullMode cull, bool front_ccw) : count(size) {
+    WideCoverageState(uint32_t size, const std::string &backend, CullMode cull, bool front_ccw) : count(size) {
         require(count && count <= 65536 && (backend == "NPU" || backend == "GPU" || backend == "CPU"));
         require(cull == CullMode::none || cull == CullMode::front || cull == CullMode::back);
         auto vertices = std::make_shared<op::Parameter>(ov::element::i32, ov::Shape{count, 6});
@@ -111,12 +115,10 @@ struct CoverageExecutor::State {
         require(devices.size() == 1 && (devices[0] == backend || devices[0].rfind(backend + ".", 0) == 0));
         execution_device = devices[0]; request = compiled.create_infer_request();
     }
+    CoverageExecutor::Result execute(const std::vector<Sample> &samples,const std::optional<std::array<int32_t,4>> &scissor);
 };
-CoverageExecutor::CoverageExecutor(uint32_t samples, const std::string &backend, CullMode cull, bool front_ccw)
-    : state(std::make_unique<State>(samples, backend, cull, front_ccw)) {}
-CoverageExecutor::~CoverageExecutor() = default;
-CoverageExecutor::Result CoverageExecutor::execute(const std::vector<Sample> &samples, const std::optional<std::array<int32_t,4>> &scissor) {
-    auto &s = *state; require(!s.failed && samples.size() == s.count);
+CoverageExecutor::Result WideCoverageState::execute(const std::vector<Sample> &samples,const std::optional<std::array<int32_t,4>> &scissor) {
+    auto &s = *this; require(!s.failed && samples.size() == s.count);
     const auto clip = scissor.value_or(std::array<int32_t,4>{-coordinate_limit,-coordinate_limit,coordinate_limit+1,coordinate_limit+1});
     require(clip[0] <= clip[2] && clip[1] <= clip[3]);
     for (const auto coordinate : clip) require(coordinate >= -coordinate_limit && coordinate <= coordinate_limit+1);
@@ -132,13 +134,39 @@ CoverageExecutor::Result CoverageExecutor::execute(const std::vector<Sample> &sa
         std::memcpy(vertices.data<int32_t>() + i * 6, samples[i].triangle.data(), 6 * sizeof(int32_t));
         std::memcpy(points.data<int32_t>() + i * 2, samples[i].point.data(), 2 * sizeof(int32_t));
     }
-    s.request.infer(); const auto output = s.request.get_output_tensor();
+    nr::provider::traced_infer(s.request,__FILE__,__LINE__); const auto output = s.request.get_output_tensor();
     require(output.get_element_type() == ov::element::i32 && output.get_size() == s.count);
-    Result result{{}, s.execution_device}; result.covered.reserve(s.count);
+    CoverageExecutor::Result result{{}, s.execution_device}; result.covered.reserve(s.count);
     for (size_t i = 0; i < s.count; ++i) {
         const auto value = output.data<const int32_t>()[i]; require(value == 0 || value == 1);
         result.covered.push_back(uint8_t(value));
     }
     s.failed = false; return result;
+}
+
+namespace {
+bool compact_experiment(){
+    char *value=nullptr;size_t length=0;if(_dupenv_s(&value,&length,"NR_RENDER_COMPACT_COVERAGE"))throw std::runtime_error("cannot read compact coverage experiment");const std::unique_ptr<char,decltype(&std::free)> owner(value,&std::free);
+    if(!value || !*value || !std::strcmp(value,"0"))return false;if(std::strcmp(value,"1"))throw std::invalid_argument("compact coverage experiment requires 0 or 1");return true;
+}
+}
+struct CoverageExecutor::State {
+    uint32_t count;std::string backend;CullMode cull;bool ccw,compact_enabled,failed=false;
+    std::unique_ptr<WideCoverageState> wide;std::unique_ptr<compact::Executor> fast;
+    State(uint32_t n,const std::string &device,CullMode mode,bool front):count(n),backend(device),cull(mode),ccw(front),compact_enabled(device=="NPU" && compact_experiment()){
+        require(count && count<=65536 && (backend=="CPU" || backend=="GPU" || backend=="NPU"));require(cull==CullMode::none || cull==CullMode::front || cull==CullMode::back);
+        if(!compact_enabled)wide=std::make_unique<WideCoverageState>(count,backend,cull,ccw);
+    }
+};
+CoverageExecutor::CoverageExecutor(uint32_t samples,const std::string &backend,CullMode cull,bool front_ccw):state(std::make_unique<State>(samples,backend,cull,front_ccw)){}
+CoverageExecutor::~CoverageExecutor()=default;
+CoverageExecutor::Result CoverageExecutor::execute(const std::vector<Sample> &samples,const std::optional<std::array<int32_t,4>> &scissor){
+    auto &s=*state;require(!s.failed && samples.size()==s.count);const auto clip=scissor.value_or(std::array<int32_t,4>{-coordinate_limit,-coordinate_limit,coordinate_limit+1,coordinate_limit+1});require(clip[0]<=clip[2] && clip[1]<=clip[3]);for(auto x:clip)require(x>=-coordinate_limit && x<=coordinate_limit+1);
+    bool eligible=s.compact_enabled;std::array<float,6> vertices;std::array<float,2> point;
+    for(const auto &sample:samples){for(const auto &p:sample.triangle)for(auto x:p)require(x>=-coordinate_limit && x<=coordinate_limit);for(auto x:sample.point)require(x>=-coordinate_limit && x<=coordinate_limit);if(eligible && !compact::normalize(sample,vertices,point))eligible=false;}
+    s.failed=true;Result result;
+    if(eligible){if(!s.fast)s.fast=std::make_unique<compact::Executor>(s.count,s.backend,s.cull,s.ccw);result=s.fast->execute(samples,clip);result.input_bytes=uint64_t(s.count)*40+16;++compact_coverage_calls;compact_coverage_samples+=s.count;}
+    else {if(!s.wide)s.wide=std::make_unique<WideCoverageState>(s.count,s.backend,s.cull,s.ccw);result=s.wide->execute(samples,clip);result.input_bytes=uint64_t(s.count)*32+16;++wide_coverage_calls;}
+    s.failed=false;return result;
 }
 }

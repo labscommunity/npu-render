@@ -6,12 +6,13 @@
 #include <bcrypt.h>
 #ifdef NR_NATIVE_PROBE
 #include "native_probe_lease.hpp"
+#include "native_auto_admission.hpp"
 #include "local_indexed_client.hpp"
 #endif
 namespace nr::registered_lab {
 inline bool indexed_exchange_configured() {
 #ifdef NR_NATIVE_PROBE
-    try { nr::native_probe::Admission admission(nr::native_probe::read_mapping()); admission.verify(); return true; }
+    try { nr::native_probe::Admission admission(nr::auto_admission::read_or_request()); admission.verify(); return true; }
     catch (...) { return false; }
 #else
     return nr_fill_guest() && (GetFileAttributesW(L"C:\\npu-lab\\indexed-exchange-active.txt") != INVALID_FILE_ATTRIBUTES ||

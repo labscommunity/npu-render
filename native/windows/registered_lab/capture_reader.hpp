@@ -14,7 +14,7 @@ class Snapshot {
 public:
     explicit Snapshot(const char *path) {
         std::ifstream file(path, std::ios::binary | std::ios::ate);
-        check(bool(file)); const auto size = file.tellg(); check(size >= 48 && size <= 32 * 1024 * 1024);
+        check(bool(file)); const auto size = file.tellg(); check(size >= 48 && size <= 96 * 1024 * 1024);
         file.seekg(0); char magic[8]{}; file.read(magic, 8); check(!std::memcmp(magic, "NPDRAW01", 8));
         uint64_t remaining = uint64_t(size) - 8; bool complete = false;
         while (remaining) {

@@ -171,7 +171,7 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
                 for(size_t n=0;n<t.pixels.size();++n){const uint32_t value=data[n];std::memcpy(t.pixels[n].data(),&value,4);}read.finish();
             }else{
                 const auto &ss=source->surface;require(d.pixel_program->texture_dimensions[slot]==3 && !d.pixel_program->texture_uint[slot] &&
-                    (ss.format==28 || ss.format==87 || ss.format==65) && ss.width<=8192 && ss.height<=8192 && uint64_t(ss.width)*ss.height<=4194304);
+                    (ss.format==28 || ss.format==87 || ss.format==65) && ss.width<=8192 && ss.height<=8192 && uint64_t(ss.width)*ss.height<=8388608);
                 // A8 is expanded to RGBA transport. Its format-specific border
                 // defaults need separate metadata before border sampling is admitted.
                 if(ss.format==65)for(const auto &instruction:d.pixel_program->instructions)
@@ -204,7 +204,7 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
             sampler.desc.AddressU == D3D10_DDI_TEXTURE_ADDRESS_CLAMP && sampler.desc.AddressV == D3D10_DDI_TEXTURE_ADDRESS_CLAMP &&
             sampler.desc.AddressW == D3D10_DDI_TEXTURE_ADDRESS_CLAMP && sampler.desc.MipLODBias == 0 && sampler.desc.MinLOD == 0 && sampler.desc.MaxLOD >= 0);
         const auto &ss = source->surface;
-        require((ss.format == 28 || ss.format == 87 || ss.format == 65) && ss.width <= 8192 && ss.height <= 8192 && uint64_t(ss.width)*ss.height <= 4*1024*1024);
+        require((ss.format == 28 || ss.format == 87 || ss.format == 65) && ss.width <= 8192 && ss.height <= 8192 && uint64_t(ss.width)*ss.height <= uint64_t(modulated || general_texture?8:4)*1024*1024);
         const auto source_bytes = read_pixels(*source); texture = {ss.width,ss.height,ss.format == 65 ? 28u : ss.format,{}};
         texture.pixels.resize(size_t(ss.width)*ss.height);
         // Format decoding only: sampling, shader math and blending remain on

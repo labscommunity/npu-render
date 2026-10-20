@@ -21,7 +21,7 @@ public:
     ~CoverageExecutor();
     CoverageExecutor(const CoverageExecutor &) = delete;
     CoverageExecutor &operator=(const CoverageExecutor &) = delete;
-    struct Result { std::vector<uint8_t> covered; std::string execution_device; };
+    struct Result { std::vector<uint8_t> covered; std::string execution_device; uint64_t input_bytes=0; };
     // Both windings, top-left edge ownership, and degenerate-triangle rejection.
     // Scissor bounds use the same 1/256-pixel coordinates as sample positions.
     Result execute(const std::vector<Sample> &samples,

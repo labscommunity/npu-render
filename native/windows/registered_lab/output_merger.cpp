@@ -1,3 +1,4 @@
+#include "provider_infer_trace.hpp"
 #include "provider_compile.hpp"
 #include "output_merger.hpp"
 #include <openvino/openvino.hpp>
@@ -153,7 +154,7 @@ OutputMerger::Result OutputMerger::execute(const std::vector<Color> &colors, con
     for (size_t i = 0; i < s.count; ++i) cov.data<int32_t>()[i] = coverage[i];
     if(s.blend==BlendMode::component_coverage)
         std::memcpy(s.request.get_tensor("blend_constant").data<float>(),blend_constant.data(),sizeof(Color));
-    s.request.infer(); const auto output = s.request.get_output_tensor();
+    nr::provider::traced_infer(s.request,__FILE__,__LINE__); const auto output = s.request.get_output_tensor();
     require(output.get_element_type() == ov::element::u8 && output.get_size() == size_t(s.count) * 4);
     Result result{{}, s.execution_device}; result.pixels.resize(s.count);
     std::memcpy(result.pixels.data(), output.data<const uint8_t>(), result.pixels.size() * sizeof(PackedColor));

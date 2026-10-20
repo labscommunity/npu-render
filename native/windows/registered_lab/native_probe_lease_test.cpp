@@ -40,8 +40,8 @@ int wmain(int argc, wchar_t **argv) try {
     }
     check(argc == 1);
     unsigned shape_cases = 0, acl_cases = 0, process_cases = 0;
-    n::Lease base; base.issued_tick = 9000; base.deadline_tick = 11000; base.session = 4;
-    base.controller = {1,0,17}; base.worker = {2,0,18}; base.consumer = {3,0,19}; base.nonce[0] = 7;
+    n::Lease base; base.issued_tick = 9000; base.deadline_tick = 11000; base.scope = 0; n::set_consumer_sid(base,GetCurrentProcess());
+    base.controller = {1,4,17}; base.worker = {2,4,18}; base.consumer = {3,4,19}; base.nonce[0] = 7;
     std::memset(base.pipe_suffix, 'a', sizeof(base.pipe_suffix));
     check(n::shape_valid(base,10000,3,19,4)); ++shape_cases;
     for (unsigned kind = 0; kind < 24; ++kind) {
@@ -50,7 +50,7 @@ int wmain(int argc, wchar_t **argv) try {
         case 0: r.magic = 0; break;
         case 1: ++r.version; break;
         case 2: --r.bytes; break;
-        case 3: r.flags = 1; break;
+        case 3: r.scope = 3; break;
         case 4: r.issued_tick = 0; break;
         case 5: r.issued_tick = 10001; break;
         case 6: r.deadline_tick = 10000; break;
@@ -59,10 +59,10 @@ int wmain(int argc, wchar_t **argv) try {
         case 9: r.worker.pid = 0; break;
         case 10: r.consumer.pid = 0; break;
         case 11: ++r.consumer.created; break;
-        case 12: ++r.session; break;
-        case 13: r.controller.reserved = 1; break;
-        case 14: r.worker.reserved = 1; break;
-        case 15: r.consumer.reserved = 1; break;
+        case 12: ++r.consumer.session; break;
+        case 13: r.controller.session = 5; break;
+        case 14: r.worker.session = 5; break;
+        case 15: r.consumer.session = 5; break;
         case 16: r.controller.created = 0; break;
         case 17: r.worker.created = 0; break;
         case 18: r.controller.pid = r.worker.pid; break;
@@ -74,6 +74,16 @@ int wmain(int argc, wchar_t **argv) try {
         }
         check(!n::shape_valid(r,10000,3,19,4)); ++shape_cases;
     }
+    for(unsigned kind=0;kind<6;++kind){auto value=base;switch(kind){case 0:value.sid_bytes=0;break;case 1:value.sid_bytes=69;break;case 2:value.consumer_sid[0]=0;break;case 3:value.consumer_sid[1]=16;break;case 4:value.consumer_sid[67]=1;break;case 5:value.desktop_session=1;break;}check(!n::shape_valid(value,10000,3,19,4));++shape_cases;}
+    auto desktop=base;desktop.scope=1;desktop.desktop_session=4;desktop.controller.session=desktop.worker.session=0;desktop.consumer.session=4;
+    PSID dwm_sid=nullptr;check(ConvertStringSidToSidW(L"S-1-5-90-0-4",&dwm_sid)!=FALSE);desktop.sid_bytes=GetLengthSid(dwm_sid);std::memset(desktop.consumer_sid,0,sizeof(desktop.consumer_sid));check(CopySid(sizeof(desktop.consumer_sid),desktop.consumer_sid,dwm_sid)!=FALSE);LocalFree(dwm_sid);
+    check(n::shape_valid(desktop,10000,3,19,4));++shape_cases;desktop.deadline_tick=desktop.issued_tick+2400000;check(n::shape_valid(desktop,10000,3,19,4));++shape_cases;++desktop.deadline_tick;check(!n::shape_valid(desktop,10000,3,19,4));++shape_cases;desktop.deadline_tick=11000;desktop.scope=0;check(!n::shape_valid(desktop,10000,3,19,4));++shape_cases;
+    auto host=base;host.scope=2;host.desktop_session=4;host.controller.session=host.worker.session=host.consumer.session=0;host.deadline_tick=host.issued_tick+2400000;
+    PSID host_sid=nullptr;check(ConvertStringSidToSidW(L"S-1-5-19",&host_sid)!=FALSE);host.sid_bytes=GetLengthSid(host_sid);std::memset(host.consumer_sid,0,sizeof(host.consumer_sid));check(CopySid(sizeof(host.consumer_sid),host.consumer_sid,host_sid)!=FALSE);LocalFree(host_sid);
+    check(n::shape_valid(host,10000,3,19,0));++shape_cases;
+    for(unsigned kind=0;kind<7;++kind){auto value=host;switch(kind){case 0:value.desktop_session=0;break;case 1:value.desktop_session=UINT32_MAX;break;case 2:value.consumer.session=1;break;case 3:value.controller.session=1;break;case 4:value.worker.session=1;break;case 5:value.scope=1;break;case 6:++value.deadline_tick;break;}check(!n::shape_valid(value,10000,3,19,0));++shape_cases;}
+    check(!n::current_image_is(L"dwm.exe") && !n::current_image_is(L"WUDFHost.exe"));++shape_cases;
+    const auto console=WTSGetActiveConsoleSessionId();std::printf("{\"console_session\":%lu,\"interactive_session_unlocked\":%s,\"compositor_execution_tested\":false}\n",console,n::session_unlocked(console)?"true":"false");
     const std::pair<const wchar_t *, bool> descriptors[]{
         {L"O:BAG:BAD:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;0x00020004;;;AU)",true},
         {L"O:SYG:SYD:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;0x00020004;;;AU)",true},
@@ -96,28 +106,30 @@ int wmain(int argc, wchar_t **argv) try {
     check(!n::readonly_to_unprivileged(&absolute)); ++acl_cases;
     DWORD session = 0; check(ProcessIdToSessionId(GetCurrentProcessId(), &session) != 0);
     Child worker(L"--hold",false);
-    for (unsigned kind = 0; kind < 5; ++kind) {
-        wchar_t name[160]{}; swprintf_s(name,L"Local\\T8.NpuRender.NativeProbe.Test.%lu.%llu.%u",GetCurrentProcessId(),static_cast<unsigned long long>(GetTickCount64()),kind);
+    for (unsigned kind = 0; kind < 6; ++kind) {
+        wchar_t name[160]{}; swprintf_s(name,L"Global\\T8.NpuRender.NativeSession.TestV3.%lu.%llu.%u",GetCurrentProcessId(),static_cast<unsigned long long>(GetTickCount64()),kind);
         Descriptor descriptor(L"O:BAG:BAD:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;0x00020004;;;AU)");
         SECURITY_ATTRIBUTES attributes{sizeof(attributes),descriptor.value,FALSE};
         HANDLE raw = CreateFileMappingW(INVALID_HANDLE_VALUE,&attributes,PAGE_READWRITE,0,sizeof(n::Lease),name);
         const DWORD error = GetLastError(); n::Handle mapping(raw); check(error != ERROR_ALREADY_EXISTS);
         Child consumer(L"--consume \""+std::wstring(name)+L"\" "+(kind==0?L"accept":L"reject"),true);
-        n::Lease record; record.session=session;record.issued_tick=GetTickCount64();record.deadline_tick=record.issued_tick+10000;
-        record.controller={GetCurrentProcessId(),0,n::creation_time(GetCurrentProcess())};
-        record.worker={worker.info.dwProcessId,0,n::creation_time(worker.info.hProcess)};
-        record.consumer={consumer.info.dwProcessId,0,n::creation_time(consumer.info.hProcess)};
+        n::Lease record; n::set_consumer_sid(record,consumer.info.hProcess);record.issued_tick=GetTickCount64();record.deadline_tick=record.issued_tick+10000;
+        record.controller={GetCurrentProcessId(),session,n::creation_time(GetCurrentProcess())};
+        record.worker={worker.info.dwProcessId,session,n::creation_time(worker.info.hProcess)};
+        record.consumer={consumer.info.dwProcessId,session,n::creation_time(consumer.info.hProcess)};
         record.nonce[0]=1;std::memset(record.pipe_suffix,'a',sizeof(record.pipe_suffix));
         if(kind==1)++record.worker.created;
         if(kind==2)++record.controller.created;
         if(kind==3){record.issued_tick-=100;record.deadline_tick=record.issued_tick+1;}
         if(kind==4)record.consumer.pid=GetCurrentProcessId();
+        if(kind==5){PSID other=nullptr;check(ConvertStringSidToSidW(L"S-1-5-11",&other)!=FALSE);record.sid_bytes=GetLengthSid(other);std::memset(record.consumer_sid,0,sizeof(record.consumer_sid));check(CopySid(sizeof(record.consumer_sid),record.consumer_sid,other)!=FALSE);LocalFree(other);}
+
         auto view=MapViewOfFile(mapping.value,FILE_MAP_WRITE,0,0,sizeof(record));check(view!=nullptr);
         std::memcpy(view,&record,sizeof(record));check(UnmapViewOfFile(view)!=0);
         check(ResumeThread(consumer.info.hThread)!=DWORD(-1));check(WaitForSingleObject(consumer.info.hProcess,10000)==WAIT_OBJECT_0);
         DWORD code=1;check(GetExitCodeProcess(consumer.info.hProcess,&code)!=0);
         std::printf("{\"process_case\":%u,\"child_exit_code\":%lu}\n",kind,code);check(code==0);++process_cases;
     }
-    std::printf("{\"native_admission_contract\":true,\"passed\":true,\"shape_cases\":%u,\"acl_cases\":%u,\"separate_process_cases\":%u,\"driver_installed\":false,\"npu_execution_tested\":false}\n",shape_cases,acl_cases,process_cases);
+    std::printf("{\"native_session_admission_contract\":true,\"passed\":true,\"shape_cases\":%u,\"acl_cases\":%u,\"separate_process_cases\":%u,\"driver_installed\":false,\"npu_execution_tested\":false}\n",shape_cases,acl_cases,process_cases);
     return 0;
 } catch (const std::exception &e) { std::fprintf(stderr,"%s (last Win32 error %lu)\n",e.what(),GetLastError());return 1; }

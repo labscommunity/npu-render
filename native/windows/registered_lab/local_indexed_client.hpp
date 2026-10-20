@@ -48,7 +48,7 @@ public:
             while (opened == INVALID_HANDLE_VALUE) {
                 active(cancellation);
                 (void)indexed_stream::remaining(deadline);
-                opened = CreateFileW(name.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr,
+                opened = CreateFileW(name.c_str(), FILE_READ_DATA | FILE_WRITE_DATA | FILE_READ_ATTRIBUTES | SYNCHRONIZE, 0, nullptr,
                                      OPEN_EXISTING, FILE_FLAG_OVERLAPPED | SECURITY_SQOS_PRESENT |
                                      SECURITY_IDENTIFICATION, nullptr);
                 if (opened != INVALID_HANDLE_VALUE) break;

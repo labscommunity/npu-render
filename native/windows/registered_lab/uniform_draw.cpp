@@ -150,7 +150,7 @@ UniformDrawExecutor::Result UniformDrawExecutor::execute(const std::vector<shade
             points[i]=samples[i].point;
         }
         began = Clock::now(); const auto selected = s.coverage->execute(samples,fixed_clip);
-        result.input_bytes += uint64_t(s.batch) * 32 + 16; result.output_bytes += uint64_t(s.batch) * 4; ++result.provider_requests;
+        result.input_bytes += selected.input_bytes; result.output_bytes += uint64_t(s.batch) * 4; ++result.provider_requests;
         result.timings.coverage_ms += milliseconds(began); require(selected.execution_device == result.execution_device);
         for (const auto value : selected.covered) result.covered_samples += value;
         if(std::none_of(selected.covered.begin(),selected.covered.end(),[](auto v){return v!=0;})){++result.tile_executions;continue;}

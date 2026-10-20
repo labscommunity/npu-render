@@ -15,6 +15,10 @@ public:
     ~LinearTextureDrawExecutor();
     LinearTextureDrawExecutor(const LinearTextureDrawExecutor &) = delete;
     LinearTextureDrawExecutor &operator=(const LinearTextureDrawExecutor &) = delete;
+    // Geometry-only provider work. used_rectangle reports support; pixels stays
+    // empty. All geometry and color transforms remain on the selected backend.
+    UniformDrawExecutor::Result preflight_quad(const std::vector<shader::VertexRegisters> &inputs,
+        const shader::VertexConstants &constants, const Viewport &viewport);
     UniformDrawExecutor::Result execute(const std::vector<shader::VertexRegisters> &inputs,
         const shader::VertexConstants &constants, const Viewport &viewport, const PackedTexture &source,
         const std::vector<PackedColor> &background,
