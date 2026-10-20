@@ -1,0 +1,82 @@
+"""Verify generation-aware joins on captured hardware traces and corrupted copies."""
+from pathlib import Path
+from copy import deepcopy
+import argparse
+import hashlib
+import json
+import traceback
+from native_shared_correlation_v2 import complete_rows, correlate
+
+p = argparse.ArgumentParser()
+p.add_argument("--root", type=Path, required=True)
+p.add_argument("--output", type=Path, required=True)
+a = p.parse_args()
+a.output.mkdir(exist_ok=False)
+report = dict(completed=False, passed=False, new_device_execution=False, phases=[], rejections=[])
+sources = []
+try:
+    for name in ("native-desktop-admission-v70", "native-desktop-admission-v71"):
+        trial = a.root / name / "bootstrap"
+        inputs = [trial / "report.json", trial / "interactive/consumer-report.json",
+                  trial / "worker.stdout.jsonl"]
+        bootstrap = json.loads(inputs[0].read_text(encoding="utf-8-sig"))
+        consumer = json.loads(inputs[1].read_text(encoding="utf-8-sig"))
+        assert bootstrap["completed"] and consumer["passed"]
+        parent = complete_rows(inputs[2])
+        paths = sorted((trial / "provider-processes").glob("generation-*/worker.stdout.jsonl"))
+        children = {int(path.parent.name.split("-")[-1]): complete_rows(path) for path in paths}
+        inputs.extend(paths)
+        sources.extend(inputs)
+        client, worker = consumer["consumer_pid"], bootstrap["worker_pid"]
+        result = correlate(parent, children, client, worker)
+        report["phases"].append(dict(trial=name, **result))
+        if name.endswith("v71"):
+            assert result["provider_generations"] == 2
+            check = result["checks"][0]
+            ticket, generation, child_ticket = check["ticket"], check["generation"], check["child_ticket"]
+            assert generation == 2 and ticket != child_ticket
+            original = (deepcopy(parent), deepcopy(children))
+
+    def corrupt(name, mutation):
+        par, ch = deepcopy(original)
+        mutation(par, ch)
+        try:
+            correlate(par, ch, client, worker)
+        except (AssertionError, KeyError):
+            report["rejections"].append(name)
+        else:
+            raise AssertionError("Corrupted evidence accepted: " + name)
+
+    def parent_response(par):
+        return next(x for x in par if x.get("provider_process_response") and x["dispatch_ticket"] == ticket)
+
+    def child_event(ch, kind):
+        return next(x for x in ch[generation] if x.get("kind") == kind and x["dispatch_ticket"] == child_ticket)
+
+    corrupt("wrong_response_generation", lambda par, ch: parent_response(par).update(generation=1))
+    corrupt("missing_generation_log", lambda par, ch: ch.pop(generation))
+    corrupt("incorrect_child_pid", lambda par, ch: child_event(ch, "request_identity").update(pid=worker))
+    corrupt("wrong_shader_identity", lambda par, ch: child_event(ch, "request_identity").update(pixel_sha256="0" * 64))
+    corrupt("wrong_dimensions", lambda par, ch: child_event(ch, "request_identity").update(width=1))
+    corrupt("wrong_client_local_sequence", lambda par, ch: child_event(ch, "request_identity").update(sequence=99))
+    corrupt("unmatched_child_clock", lambda par, ch: child_event(ch, "request_timeline").update(qpc_frequency=1))
+    corrupt("child_outside_parent_interval", lambda par, ch: child_event(ch, "request_timeline").update(finished_qpc=2**63))
+    corrupt("unproven_retry", lambda par, ch: parent_response(par).update(attempt=1))
+    corrupt("duplicate_parent_response", lambda par, ch: par.append(deepcopy(parent_response(par))))
+    corrupt("gpu_response_claim", lambda par, ch: parent_response(par).update(execution_device="GPU"))
+    corrupt("missing_child_acknowledgment", lambda par, ch: ch.__setitem__(generation, [
+        x for x in ch[generation] if not (x.get("worker_success") and x["dispatch_ticket"] == child_ticket)]))
+    corrupt("missing_child_completion", lambda par, ch: ch.__setitem__(generation, [
+        x for x in ch[generation] if not (x.get("kind") == "request_timeline" and x["dispatch_ticket"] == child_ticket)]))
+    assert len(report["rejections"]) == 13
+    report.update(passed=True, source_sha256={
+        str(path.relative_to(a.root)): hashlib.sha256(path.read_bytes()).hexdigest() for path in sources},
+        scope="CPU evidence audit, including actual NPU hardware traces from one and two generations. "
+              "Eight application operations each; no new rendering, device-loss cause, or desktop success claim.")
+except Exception as error:
+    report.update(error=repr(error), traceback=traceback.format_exc())
+report["completed"] = True
+(a.output / "report.json").write_text(json.dumps(report, indent=2) + "\n")
+print(json.dumps({k: v for k, v in report.items() if k != "source_sha256"}))
+if not report["passed"]:
+    raise SystemExit(1)

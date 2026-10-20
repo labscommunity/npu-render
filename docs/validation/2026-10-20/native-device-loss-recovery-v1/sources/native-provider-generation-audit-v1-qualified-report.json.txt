@@ -1,0 +1,138 @@
+{
+  "passed": true,
+  "completed": true,
+  "new_device_execution": false,
+  "phases": [
+    {
+      "passed": true,
+      "generations": [
+        {
+          "generation": 1,
+          "pid": 6468,
+          "imports": {
+            "geometry": 1,
+            "program": 1,
+            "long": 1,
+            "complex": 1,
+            "rectangle": 1,
+            "resident_clip": 1
+          },
+          "accepted_draws": {
+            "geometry": 52,
+            "program": 833,
+            "long": 4,
+            "complex": 36,
+            "rectangle": 274,
+            "resident_clip": 154
+          },
+          "balanced_schedules": 1
+        }
+      ],
+      "imports": {
+        "geometry": 1,
+        "program": 1,
+        "long": 1,
+        "complex": 1,
+        "rectangle": 1,
+        "resident_clip": 1
+      },
+      "accepted_draws": {
+        "geometry": 52,
+        "program": 833,
+        "long": 4,
+        "complex": 36,
+        "rectangle": 274,
+        "resident_clip": 154
+      },
+      "balanced_schedules": 1,
+      "successful_parent_responses": 1695,
+      "recovered_parent_responses": 0,
+      "incomplete_parent_tickets": [
+        1695
+      ],
+      "scope": "Provider initialization is unique per recorded child process. Aggregate import counts may increase on a proved NPU restart. This audit does not replace request, frame, application or recovery checks."
+    },
+    {
+      "passed": true,
+      "generations": [
+        {
+          "generation": 1,
+          "pid": 5264,
+          "imports": {
+            "geometry": 1,
+            "program": 1,
+            "long": 0,
+            "complex": 0,
+            "rectangle": 1,
+            "resident_clip": 0
+          },
+          "accepted_draws": {
+            "geometry": 1,
+            "program": 2,
+            "long": 0,
+            "complex": 0,
+            "rectangle": 1,
+            "resident_clip": 0
+          },
+          "balanced_schedules": 1
+        },
+        {
+          "generation": 2,
+          "pid": 21384,
+          "imports": {
+            "geometry": 1,
+            "program": 1,
+            "long": 1,
+            "complex": 1,
+            "rectangle": 1,
+            "resident_clip": 1
+          },
+          "accepted_draws": {
+            "geometry": 26,
+            "program": 292,
+            "long": 4,
+            "complex": 10,
+            "rectangle": 39,
+            "resident_clip": 56
+          },
+          "balanced_schedules": 1
+        }
+      ],
+      "imports": {
+        "geometry": 2,
+        "program": 2,
+        "long": 1,
+        "complex": 1,
+        "rectangle": 2,
+        "resident_clip": 1
+      },
+      "accepted_draws": {
+        "geometry": 27,
+        "program": 294,
+        "long": 4,
+        "complex": 10,
+        "rectangle": 40,
+        "resident_clip": 56
+      },
+      "balanced_schedules": 2,
+      "successful_parent_responses": 625,
+      "recovered_parent_responses": 1,
+      "incomplete_parent_tickets": [],
+      "scope": "Provider initialization is unique per recorded child process. Aggregate import counts may increase on a proved NPU restart. This audit does not replace request, frame, application or recovery checks."
+    }
+  ],
+  "rejected": [
+    "duplicate_import",
+    "missing_import",
+    "wrong_schedule",
+    "gpu_response",
+    "unknown_generation"
+  ],
+  "source_sha256": {
+    "one-generation/worker.stdout.jsonl": "5b0454e59c67b23230b06a9b7b1e818308f3b5e5e5c1782cd125d1ea563fc796",
+    "one-generation/provider-processes/generation-1/worker.stdout.jsonl": "82db976d6114edce1ba420042a12c1d9b18d652e90ef7ac80d487bdaa1da2910",
+    "two-generations/worker.stdout.jsonl": "1735d950bffcd1db32af7678971aac7faa889c607c08ef57c665190823a271a9",
+    "two-generations/provider-processes/generation-1/worker.stdout.jsonl": "4e02ed2dc1f06405950400c102e268731487a7e3570937b2159102576102acf9",
+    "two-generations/provider-processes/generation-2/worker.stdout.jsonl": "a7da7a3b83f709edbb3beb26d97f20b01cc92063d17b42d1997a630599466425"
+  }
+}

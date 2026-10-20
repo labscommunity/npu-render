@@ -1,0 +1,44 @@
+{
+  "started": "2026-10-20T09:07:36.788678+00:00",
+  "completed": true,
+  "passed": true,
+  "desktop_changed": false,
+  "tahoma_tested": false,
+  "phases": [
+    {
+      "worker": 24,
+      "passed": true,
+      "images": 3,
+      "output_sha256": "68a32b846344b3eb86702e3b4846e6a3468ef8905fb1d4a630c34ca449da970c",
+      "faults": 0,
+      "generations": 1,
+      "elapsed_ms": [
+        713.7198999989778,
+        628.1861000461504,
+        622.9273000499234
+      ],
+      "worker_sha256": "03831470d266a0c0f6e095eb14124812f0899eedaa5c9fdffed063086675e2e4"
+    },
+    {
+      "worker": 19,
+      "passed": true,
+      "images": 3,
+      "output_sha256": "68a32b846344b3eb86702e3b4846e6a3468ef8905fb1d4a630c34ca449da970c",
+      "faults": 0,
+      "generations": 1,
+      "elapsed_ms": [
+        722.8491000132635,
+        561.8167000357062,
+        575.7868000073358
+      ],
+      "worker_sha256": "d4ddc1238bf91e94190b873f7f985def21c64c85f57fde18b6456f60c175f96c"
+    }
+  ],
+  "source_packet_sha256": "55d07a459f2c54eed7a18694c3f08b7eee3d6917412d066249ea31835ff40b87",
+  "original_error": "OpenVINO ZE_RESULT_ERROR_DEVICE_LOST; not injected",
+  "device_loss_reproduced": false,
+  "all_six_npu_outputs_identical": true,
+  "independent_pixel_reference": false,
+  "scope": "Isolated captured packet, qualified workers 24 and 19, three repetitions each. Cold-first and subsequent in-process executions; no desktop predecessor sequence, instrumented driver, matched workload or device-loss cause proof.",
+  "finished": "2026-10-20T09:07:41.421458+00:00"
+}

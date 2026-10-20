@@ -1,0 +1,37 @@
+"""Correlate single-generation serialized rendering across multiple clients."""
+import json
+def complete_rows(path):
+ return [json.loads(line) for line in path.read_bytes().split(b'\n')[:-1] if line.startswith(b'{')]
+def indexed(events):
+ identities={};renders={};timelines={};acks={};current=None
+ for event in events:
+  if event.get('kind')=='request_identity':
+   ticket=event['dispatch_ticket'];assert ticket not in identities
+   if current is not None:assert current in renders
+   identities[ticket]=event;current=ticket
+  elif event.get('passed') and event.get('execution_device')=='NPU':
+   assert current is not None and current not in renders
+   assert all(event[n]==identities[current][n] for n in ['client_pid','sequence']);renders[current]=event
+  elif event.get('kind')=='request_timeline':
+   ticket=event['dispatch_ticket'];assert ticket not in timelines;timelines[ticket]=event
+  elif event.get('worker_success'):
+   ticket=event['dispatch_ticket'];assert ticket not in acks;acks[ticket]=event
+ return identities,renders,timelines,acks
+def correlate(parent,child,client,worker):
+ pi,pr,pt,pa=indexed(parent);ci,cr,ct,ca=indexed(child)
+ chosen={ticket:value for ticket,value in pi.items() if value['client_pid']==client}
+ assert len(chosen)==8 and {x['sequence'] for x in chosen.values()}==set(range(1,9))
+ checks=[]
+ for ticket,identity in chosen.items():
+  target=ci[ticket]
+  assert identity['provider_parent'] and not target['provider_parent']
+  assert identity['pid']==target['client_pid']==worker
+  assert all(identity[n]==target[n] for n in ['sequence','abi','flags','width','height','vertices','pixel_sha256'])
+  for data,who in [(pr[ticket],client),(pa[ticket],client),(cr[ticket],worker),(ca[ticket],worker)]:
+   assert data['client_pid']==who and data['sequence']==identity['sequence']
+  a,b=pt[ticket],ct[ticket]
+  assert a['qpc_frequency']==b['qpc_frequency'] and a['entered_qpc']<=b['connected_qpc']<=b['finished_qpc']<=a['finished_qpc']
+  assert a['client_pid']==client and b['client_pid']==worker and a['sequence']==b['sequence']==identity['sequence']
+  assert all(x['worker_success'] for x in [pa[ticket],ca[ticket]])
+  checks.append(dict(ticket=ticket,application_sequence=identity['sequence'],child_sequence=target['sequence'],pixel_sha256=identity['pixel_sha256']))
+ return dict(passed=True,operations=len(checks),checks=checks,correlation='single provider generation, shared queue ticket, preserved client-local sequence, identity, receipts, acknowledgments and nested QPC interval')

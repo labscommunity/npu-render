@@ -1,0 +1,50 @@
+"""Audit known one/two-generation captures and reject invalid provider evidence."""
+from pathlib import Path
+from copy import deepcopy
+import argparse
+import hashlib
+import json
+from native_provider_generation_audit_v1 import audit
+from native_shared_correlation_v1 import complete_rows
+
+p = argparse.ArgumentParser()
+p.add_argument("--one", type=Path, required=True)
+p.add_argument("--two", type=Path, required=True)
+p.add_argument("--output", type=Path, required=True)
+a = p.parse_args()
+assert not a.output.exists()
+reports, inputs = [], {}
+for name, path in (("one-generation", a.one), ("two-generations", a.two)):
+    parent_path = path / "worker.stdout.jsonl"
+    parent = complete_rows(parent_path)
+    paths = sorted((path / "provider-processes").glob("generation-*/worker.stdout.jsonl"))
+    children = {int(x.parent.name.split("-")[-1]): complete_rows(x) for x in paths}
+    q = audit(parent, children)
+    assert len(q["generations"]) == (1 if name == "one-generation" else 2)
+    reports.append(q)
+    for item in [parent_path, *paths]:
+        inputs[name + "/" + str(item.relative_to(path))] = hashlib.sha256(item.read_bytes()).hexdigest()
+negative = []
+for case in ("duplicate_import", "missing_import", "wrong_schedule", "gpu_response", "unknown_generation"):
+    par, ch = deepcopy((parent, children))
+    if case == "duplicate_import":
+        ch[2].append(next(x for x in ch[2] if x.get("ptl_program_provider_created")))
+    if case == "missing_import":
+        ch[2] = [x for x in ch[2] if not x.get("ptl_program_provider_created")]
+    if case == "wrong_schedule":
+        next(x for x in ch[2] if x.get("ptl_geometry_span_distribution"))["counts"] = [4096, 0, 0, 0, 0, 0]
+    if case == "gpu_response":
+        next(x for x in par if x.get("provider_process_response"))["execution_device"] = "GPU"
+    if case == "unknown_generation":
+        next(x for x in par if x.get("provider_process_response"))["generation"] = 4
+    try:
+        audit(par, ch)
+    except (AssertionError, KeyError):
+        negative.append(case)
+    else:
+        raise AssertionError("Corrupted evidence accepted: " + case)
+q = dict(passed=True, completed=True, new_device_execution=False, phases=reports,
+         rejected=negative, source_sha256=inputs)
+a.output.write_text(json.dumps(q, indent=2) + "\n")
+print(json.dumps(dict(passed=True, generations=[len(x["generations"]) for x in reports],
+                      rejected=negative)))
