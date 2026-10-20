@@ -25,8 +25,8 @@ $previous=Get-Content "$r\vm\native-desktop-admission-v42\report.json" -Raw|Conv
 if(!$previous.completed -or !$previous.cleanup_passed){throw 'Previous native cleanup incomplete'}
 $publication=Get-Content "$r\vm\native-frame-publication-v2-qualification\report.json" -Raw|ConvertFrom-Json
 if(!$publication.completed -or !$publication.passed -or $publication.source_sha256.'native_frame_publish_v1.py' -ne (Get-FileHash "$r\vm\native_frame_publish_v1.py").Hash){throw 'Atomic publication not qualified'}
-$worker="$r\builds\native-tree-v11\Release\nr_registered_local_indexed_worker.exe"
-$workerProof=Get-Content "$r\builds\native-tree-v11\registered-build-report.json" -Raw|ConvertFrom-Json
+$worker="$r\builds\native-tree-v13\Release\nr_registered_local_indexed_worker.exe"
+$workerProof=Get-Content "$r\builds\native-tree-v13\registered-build-report.json" -Raw|ConvertFrom-Json
 if(!$workerProof.clean_build -or (Get-FileHash $worker).Hash -ne $workerProof.binary_sha256.'nr_registered_local_indexed_worker.exe'){throw 'NPU worker identity mismatch'}
 $registeredWorker=Get-Content "$r\vm\native-registration-v58\qualification\report.json" -Raw|ConvertFrom-Json;if(!$registeredWorker.passed -or $registeredWorker.worker_binary_sha256 -ne (Get-FileHash $worker).Hash){throw 'Registered worker identity mismatch'}
 foreach($name in @('T8-NpuRender-NativeTraceV1','T8-NpuRender-NativeIddV1')){if(Test-Path "$env:ProgramData\$name"){throw 'Native diagnostic directory already exists'}}

@@ -144,3 +144,60 @@ background), not NPU kernel work; the driver still counts them as NPU
 operations because the registered probe expects eight NPU executions for six
 clears and two draws. That accounting needs a dedicated fill command or a new
 probe contract.
+
+## Trial 3 and the kernel optimization pass
+
+Trial 3 (`native-live-v68`, build native-tree-v9 with the first interval
+planner, package v26) passed every chain gate. Its full analysis aborted
+because one controlled mouse event (sequence 9) had no matching displayed
+counter; `native-repeated-input-v15-partial-analysis` records that event as
+skipped and reports 1.9 verified updates/s for the animation (21 unique
+submissions, 19 displayed in the window). The acrylic strip still fell back
+in this trial: the interval evaluation bounded its second texture to a 771x459
+window for the whole 1024x48 strip, too large for a span once the floor and
+fraction arithmetic lost the correlation between a coordinate and its
+integer part. Affine forms in the pixel position (build native-tree-v10 and
+later) keep that correlation.
+
+The emitted row shaders were then changed to compute their interpolation
+reciprocals once per row (the edge weights sum to a row constant and every 2D
+draw has w = 1) and the sampler loads a single texel when the other bilinear
+weights are zero. Blobs 0 and 1 overflowed the 24,496-byte code window by 128
+and 32 bytes after this change, so the programs are partitioned into seven
+blobs ({0-1}, {2-3}, {4-12}, {13-64}, {65-115}, {116-120}, {121+}). All seven
+built with one assembler-requested NOP at most and qualified exactly on the
+NPU against their fixtures (`frame-blob{0..6}-qualify-130815`, deployed as
+`frame-blobs-v3`):
+
+| Blob | Programs | Code bytes | Fixtures | Mismatches |
+| --- | --- | --- | --- | --- |
+| 0 | 5 | 18,208 | 23 | 0 |
+| 1 | 8 | 24,448 | 35 | 0 |
+| 2 | 3 | 20,480 | 15 | 0 |
+| 3 | 2 | 21,408 | 11 | 0 |
+| 4 | 1 | 22,576 | 7 | 0 |
+| 5 | 1 | 22,768 | 7 | 0 |
+| 6 | 1 | 22,544 | 7 | 0 |
+
+## Affine arithmetic, adaptive tiles and the seam limit
+
+Interval evaluation alone widened the acrylic strip's second texture window
+to 772x289 texels per 128-pixel tile because it lost the correlation between
+a coordinate and its integer part in the shader's wrap arithmetic. The
+planner now evaluates the pixel stage in affine arithmetic over noise
+symbols (the pixel position plus one symbol per non-linear result); linear
+combinations of correlated values stay exact, so the same tile needs 260x99
+texels and fits a span. Replaying the trial 2 capture through the v12 worker
+confirmed zero escapes, and a tolerance replay against the per-draw route
+found every converted batch within 1 LSB on at most 0.013% of pixels
+(`frame-replay-v8-132229\replay-reference`).
+
+The strip under the taskbar (y 720-768) still cannot batch: its texture
+coordinates cross a wrap seam in both axes inside the strip, and a pixel whose
+bilinear taps straddle both seams needs texels from both ends of a 256-texel
+period in u and v. One rectangular window per texture must then hold the whole
+256x256 period (262 KB), which exceeds a 264 KB span once the tile and headers
+are added. Bisecting tiles down to 8 pixels (now done by both the driver's
+admission and the worker) admits every other seam case but not this corner.
+Two windows per texture in the kernel, or a larger carrier row, would remove
+the limit; until then that draw stays on the per-draw route at ~400 ms.
