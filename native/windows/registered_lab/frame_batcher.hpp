@@ -226,6 +226,9 @@ struct FrameBatcher {
             else if (!r.full.empty() && !r.is_volatile) r.allocation->worker_version = r.version;
         }
         ++flushes; kernel_requests += response.provider_requests; kernel_ms += response.kernel_ms_x1000 / 1000.0; host_ms += response.host_ms_x1000 / 1000.0; upload_bytes += bytes;
+        // The worker executed the batch on the NPU through the local indexed pipe; the
+        // probe-visible device string matches the per-draw indexed route it replaces.
+        strncpy_s(counters.last_execution_device, "NPU (local indexed)", _TRUNCATE);
         lab_trace("{\"event\":\"frame_batch_flushed\",\"sequence\":%llu,\"commands\":%zu,\"resources\":%zu,\"bytes\":%zu,\"targets\":%u,\"kernel_requests\":%llu,\"kernel_ms\":%.3f,\"worker_ms\":%.3f,\"wall_ms\":%llu,\"execution_device\":\"NPU\"}\n",
             (unsigned long long)sequence, commands.size(), resources.size(), bytes, response.target_count, (unsigned long long)response.provider_requests, response.kernel_ms_x1000 / 1000.0, response.host_ms_x1000 / 1000.0, (unsigned long long)(GetTickCount64() - started));
         shaders.clear(); resources.clear(); commands.clear(); bytes = 0;
