@@ -46,8 +46,9 @@
 #define NR_INLINE static __attribute__((always_inline)) inline
 #define NR_NOINLINE static __attribute__((noinline))
 #else
-#define NR_INLINE static __forceinline
-#define NR_NOINLINE static __declspec(noinline)
+/* MSVC hosts include this header in C++: inline linkage keeps unused helpers from warning. */
+#define NR_INLINE inline __forceinline
+#define NR_NOINLINE inline __declspec(noinline)
 #endif
 /* Code-size knobs for the SHAVE window: the vertex, triangle and sampling
  * routines are out of line by default. */
@@ -258,11 +259,11 @@ NR_HELPER_ATTR nr_v4 nr_v4_min(nr_v4 a, nr_v4 b) { return nr_v4_sel(nr_v4_isnan(
 NR_HELPER_ATTR nr_v4 nr_v4_max(nr_v4 a, nr_v4 b) { return nr_v4_sel(nr_v4_isnan(b), a, nr_v4_sel(nr_v4_lt(a, b), b, a)); }
 NR_HELPER_ATTR nr_v4 nr_v4_floor(nr_v4 a) {
     nr_uv4 mag = nr_uv4_and(nr_v4_asu(a), nr_uv4_splat(0x7fffffffu));
-    nr_uv4 small = nr_uv4_lt(mag, nr_uv4_splat(0x00800000u)), large = nr_uv4_or(nr_uv4_gt(mag, nr_uv4_splat(0x4affffffu)), nr_uv4_eq(mag, nr_uv4_splat(0x4b000000u)));
+    nr_uv4 tiny = nr_uv4_lt(mag, nr_uv4_splat(0x00800000u)), big = nr_uv4_or(nr_uv4_gt(mag, nr_uv4_splat(0x4affffffu)), nr_uv4_eq(mag, nr_uv4_splat(0x4b000000u)));
     nr_v4 b = nr_iv4_to_f(nr_v4_to_i(a));
     b = nr_v4_sel(nr_v4_gt(b, a), nr_v4_sub(b, nr_v4_splat(1.0f)), b);
-    b = nr_v4_sel(large, a, b);
-    return nr_v4_sel(small, nr_uv4_asf(nr_uv4_and(nr_v4_asu(a), nr_uv4_splat(0x80000000u))), b);
+    b = nr_v4_sel(big, a, b);
+    return nr_v4_sel(tiny, nr_uv4_asf(nr_uv4_and(nr_v4_asu(a), nr_uv4_splat(0x80000000u))), b);
 }
 NR_HELPER_ATTR nr_v4 nr_v4_frc(nr_v4 a) { return nr_v4_sel(nr_v4_issubnormal(a), nr_v4_zero(), nr_v4_sub(a, nr_v4_floor(a))); }
 #ifdef __clang__

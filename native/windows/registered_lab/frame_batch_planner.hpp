@@ -34,15 +34,11 @@ inline std::vector<uint32_t> pack_vertices(const LoweredProgram &program, const 
 // Determines where each sampled texture's coordinates come from.
 inline std::array<CoordinateSource, NR_FRAME_MAX_TEXTURES> coordinate_sources(const LoweredProgram &program) {
     std::array<CoordinateSource, NR_FRAME_MAX_TEXTURES> result{};
-    const uint8_t *entry = program.entry.data();
-    auto word = [&](size_t at) { uint32_t v; std::memcpy(&v, entry + at, 4); return v; };
-    const uint32_t vs_count = word(0), ps_count = word(4), instructions_offset = word(44);
     // A temporary written by `div input, input.w` (perspective divide) before the sample is also direct.
     struct TempSource { bool valid = false; uint32_t input = 0, lane_u = 0, lane_v = 0, divide_lane = 4; };
     std::array<TempSource, 16> temps{};
-    for (uint32_t n = vs_count; n < vs_count + ps_count; ++n) {
-        const size_t at = instructions_offset + n * NR_FRAME_INSTRUCTION_BYTES;
-        const uint32_t op = word(at), dest = word(at + 4), src0 = word(at + 8), src1 = word(at + 12), extra = word(at + 20);
+    for (const auto &w : program.ps_words) {
+        const uint32_t op = w[0], dest = w[1], src0 = w[2], src1 = w[3], extra = w[5];
         const uint32_t dest_kind = dest & 15u, dest_index = (dest >> 4) & 255u, mask = (dest >> 12) & 15u;
         if (op == core::NR_OP_SAMPLE) {
             const uint32_t texture = extra & 15u, kind = src0 & 15u, index = (src0 >> 4) & 255u, lanes = (src0 >> 12) & 255u;

@@ -5,6 +5,7 @@
 // eligible draws, the qualified per-draw routes for the rest.
 #include "frame_batch_protocol.hpp"
 #include "frame_batch_planner.hpp"
+#include "frame_inventory.hpp"
 #include "indexed_pipeline.hpp"
 #include "npu_turbo_import.hpp"
 #include <openvino/openvino.hpp>
@@ -43,16 +44,21 @@ public:
         const auto devices = model.get_property(ov::execution_devices);
         require(devices.size() == 1 && (devices[0] == "NPU" || devices[0] == "NPU.0")); device = devices[0];
         inference = model.create_infer_request();
-        require(model.inputs().size() == 1 && model.outputs().size() == 1 &&
-                inference.get_input_tensor().get_element_type() == ov::element::f16 && inference.get_output_tensor().get_element_type() == ov::element::f16 &&
-                inference.get_input_tensor().get_shape() == ov::Shape({rows, frame::span_bytes / 2}) && inference.get_output_tensor().get_shape() == ov::Shape({rows, frame::span_bytes / 2}));
-        std::printf("{\"frame_kernel_provider_created\":true,\"rows\":%u,\"execution_device\":\"%s\"}\n", rows, device.c_str()); std::fflush(stdout);
+        // The Softmax carrier has one input; the ScatterElementsUpdate carrier adds the (unused) updates input.
+        require((model.inputs().size() == 1 || model.inputs().size() == 2) && model.outputs().size() == 1 &&
+                inference.get_input_tensor(0).get_element_type() == ov::element::f16 && inference.get_output_tensor().get_element_type() == ov::element::f16 &&
+                inference.get_input_tensor(0).get_shape() == ov::Shape({rows, frame::span_bytes / 2}) && inference.get_output_tensor().get_shape() == ov::Shape({rows, frame::span_bytes / 2}));
+        if (model.inputs().size() == 2) {
+            auto updates = inference.get_input_tensor(1);
+            std::memset(updates.data(), 0, updates.get_byte_size());
+        }
+        std::printf("{\"frame_kernel_provider_created\":true,\"rows\":%u,\"inputs\":%zu,\"execution_device\":\"%s\"}\n", rows, model.inputs().size(), device.c_str()); std::fflush(stdout);
     }
     const std::string &execution_device() const { return device; }
     // Writes the spans into the input tensor, runs the NPU and copies back each output span prefix.
     void execute(const std::vector<std::vector<uint8_t>> &spans, std::vector<std::vector<uint8_t>> &outputs) {
         require(!failed && !spans.empty() && spans.size() <= rows); failed = true;
-        auto *input = static_cast<uint8_t *>(inference.get_input_tensor().data());
+        auto *input = static_cast<uint8_t *>(inference.get_input_tensor(0).data());
         for (size_t n = 0; n < spans.size(); ++n) { require(spans[n].size() == frame::span_bytes); std::memcpy(input + n * frame::span_bytes, spans[n].data(), frame::span_bytes); }
         for (size_t n = spans.size(); n < rows; ++n) std::memset(input + n * frame::span_bytes, 0, 64);   // empty rows fail the header check cheaply
         inference.start_async();
@@ -68,11 +74,50 @@ public:
         failed = false;
     }
 };
+// The captured inventory lowered once: a batch shader pair is native when its
+// lowered form matches an inventory program; the kernel blob and the index
+// inside that blob follow from the inventory order (frame::blob_of).
+struct NativeIdentity { uint32_t blob = UINT32_MAX, blob_index = 0, host_index = 0; };
+class NativeInventory {
+    struct Entry { frame::LoweredProgram lowered; uint32_t pair = 0; NativeIdentity identity; };
+    std::vector<Entry> entries;
+public:
+    NativeInventory() {
+        std::array<uint32_t, frame::blob_ranges.size()> counts{};
+        for (size_t n = 0; n < std::size(frame::inventory_pairs); ++n) {
+            const auto &pair = frame::inventory_pairs[n];
+            shader::Program vs, ps;
+            try { vs = shader::parse_vertex(pair.vs, pair.vs_words); ps = shader::parse_pixel(pair.ps, pair.ps_words); } catch (const std::exception &) { continue; }
+            Entry e; e.lowered = frame::lower(vs, ps, shader::TextureSamplers{}); e.pair = uint32_t(n);
+            if (!e.lowered.eligible()) continue;
+            e.identity.blob = frame::blob_of(uint32_t(e.lowered.ps_words.size()));
+            require(e.identity.blob < counts.size());
+            e.identity.blob_index = counts[e.identity.blob]++;
+            e.identity.host_index = uint32_t(entries.size());
+            // The compiled host header must list the same programs in the same order.
+            require(e.identity.host_index < NR_NATIVE_COUNT && frame::core::nr_native_inventory(e.identity.host_index) == e.pair);
+            entries.push_back(std::move(e));
+        }
+        require(NR_NATIVE_COUNT == 2 * entries.size());
+        std::printf("{\"native_inventory\":true,\"programs\":%zu}\n", entries.size()); std::fflush(stdout);
+    }
+    const NativeIdentity *find(const frame::LoweredProgram &p) const {
+        for (const auto &e : entries) {
+            const auto &q = e.lowered;
+            if (q.vs_words == p.vs_words && q.ps_words == p.ps_words && q.vs_immediates == p.vs_immediates && q.ps_immediates == p.ps_immediates &&
+                q.vs_constant_base == p.vs_constant_base && q.ps_constant_base == p.ps_constant_base && q.vs_constant_count == p.vs_constant_count && q.ps_constant_count == p.ps_constant_count &&
+                q.vs_inputs == p.vs_inputs && q.ps_inputs == p.ps_inputs && q.position_output == p.position_output && q.interpolation == p.interpolation && q.texture_slots == p.texture_slots)
+                return &e.identity;
+        }
+        return nullptr;
+    }
+};
 struct ResidentResource { uint64_t key = 0, version = 0; uint32_t width = 0, height = 0, format = 0, flags = 0; std::vector<uint32_t> pixels; };
 struct VolatileWindow { uint32_t x, y, width, height; std::vector<uint32_t> pixels; };
 class FrameBatchExecutor {
     indexed_exchange::Pipeline &legacy;
-    std::unique_ptr<FrameKernelProvider> kernel;
+    std::array<std::unique_ptr<FrameKernelProvider>, frame::blob_ranges.size()> kernels;
+    std::unique_ptr<NativeInventory> inventory;
     std::unordered_map<uint64_t, ResidentResource> resident;
     std::unordered_map<std::string, std::shared_ptr<const shader::Program>> shaders;   // sha256 hex -> parsed
     std::map<std::string, std::shared_ptr<const frame::LoweredProgram>> lowered;        // vs sha + ps sha + sampler bits
@@ -83,6 +128,7 @@ class FrameBatchExecutor {
         CommandRecord record; std::array<TextureBinding, 4> textures{}; std::vector<shader::VertexRegisters> inputs;
         std::vector<uint32_t> vertex_constants, pixel_constants;
         std::shared_ptr<const frame::LoweredProgram> program; frame::DrawPlan plan; frame::Rect scissor_bounds; bool eligible = false; std::string route;
+        uint32_t blob = UINT32_MAX; std::vector<uint8_t> kernel_entry;   // program entry carrying the blob-local native index
     };
     struct Stats { uint64_t kernel_requests = 0, covered = 0, escapes = 0, executed = 0, fallback = 0; double kernel_ms = 0, host_ms = 0; };
     const std::vector<Shader> *current_shaders = nullptr;   // shaders of the batch being executed
@@ -106,9 +152,21 @@ class FrameBatchExecutor {
         return false;
     }
 public:
-    FrameBatchExecutor(indexed_exchange::Pipeline &pipeline, const std::filesystem::path &blob, const std::string &blob_sha256) : legacy(pipeline) {
-        if (!blob.empty()) kernel = std::make_unique<FrameKernelProvider>(blob, blob_sha256);
+    // `blob_dir` holds manifest.txt with one line per kernel blob: "<blob> <sha256> <file>".
+    explicit FrameBatchExecutor(indexed_exchange::Pipeline &pipeline, const std::filesystem::path &blob_dir) : legacy(pipeline) {
+        if (blob_dir.empty()) return;
+        inventory = std::make_unique<NativeInventory>();
+        std::ifstream manifest(blob_dir / "manifest.txt"); require(bool(manifest));
+        std::string line;
+        while (std::getline(manifest, line)) {
+            if (line.empty() || line[0] == '#') continue;
+            std::istringstream fields(line); unsigned blob = UINT32_MAX; std::string sha, file;
+            require(bool(fields >> blob >> sha >> file) && blob < kernels.size() && sha.size() == 64 && !kernels[blob]);
+            kernels[blob] = std::make_unique<FrameKernelProvider>(blob_dir / file, sha);
+            std::printf("{\"frame_kernel_blob\":%u,\"file\":\"%s\"}\n", blob, file.c_str()); std::fflush(stdout);
+        }
     }
+    bool kernel_available() const { for (const auto &k : kernels) if (k) return true; return false; }
     uint64_t current_generation() const { return generation; }
     // Executes one batch packet and returns the complete reply packet (Header + body).
     std::vector<uint8_t> execute(const std::vector<uint8_t> &packet) {
@@ -188,16 +246,16 @@ public:
         if (missing.empty()) {
             // Plan every draw, then execute runs in order.
             for (auto &d : draws) if (d.record.kind == 0) plan(d, batch_shaders, refs);
-            std::vector<size_t> run; size_t run_target = SIZE_MAX;
-            auto flush = [&] { if (!run.empty()) execute_run(draws, run, refs, dirty, stats); run.clear(); run_target = SIZE_MAX; };
+            std::vector<size_t> run; size_t run_target = SIZE_MAX; uint32_t run_blob = UINT32_MAX;
+            auto flush = [&] { if (!run.empty()) execute_run(draws, run, refs, dirty, stats); run.clear(); run_target = SIZE_MAX; run_blob = UINT32_MAX; };
             for (size_t n = 0; n < draws.size(); ++n) {
                 auto &d = draws[n];
                 if (d.record.kind == 1) { flush(); clear(d, refs, dirty); ++stats.executed; continue; }
                 bool hazard = false;
                 for (uint32_t t = 0; t < d.record.texture_count; ++t) if (d.textures[t].resource == run_target) hazard = true;
-                if (!d.eligible || !kernel || hazard || (run_target != SIZE_MAX && run_target != d.record.target)) flush();
-                if (!d.eligible || !kernel) { fallback(d, batch_shaders, refs, dirty, stats); continue; }
-                run_target = d.record.target; run.push_back(n);
+                if (!d.eligible || hazard || (run_target != SIZE_MAX && run_target != d.record.target) || (run_blob != UINT32_MAX && run_blob != d.blob)) flush();
+                if (!d.eligible) { fallback(d, batch_shaders, refs, dirty, stats); continue; }
+                run_target = d.record.target; run_blob = d.blob; run.push_back(n);
             }
             flush();
         }
@@ -236,10 +294,22 @@ private:
                 s[first.sampler_slots[t]].filter = d.textures[t].filter ? shader::TextureFilter::point : shader::TextureFilter::linear;
                 s[first.sampler_slots[t]].u = shader::TextureAddress(d.textures[t].address_u); s[first.sampler_slots[t]].v = shader::TextureAddress(d.textures[t].address_v);
             }
-            found = lowered.emplace(key, std::make_shared<frame::LoweredProgram>(frame::lower(vs, ps, s))).first;
+            auto program = std::make_shared<frame::LoweredProgram>(frame::lower(vs, ps, s));
+            if (program->eligible()) {
+                const auto *identity = inventory ? inventory->find(*program) : nullptr;
+                if (!identity) program->rejection = "not a compiled inventory program";
+                else program->set_native(identity->host_index);
+            }
+            found = lowered.emplace(key, std::move(program)).first;
         }
         d.program = found->second;
         if (!d.program->eligible()) { d.route = "fallback:" + d.program->rejection; return; }
+        {
+            const auto *identity = inventory->find(*d.program); require(identity);
+            if (!kernels[identity->blob]) { d.route = "fallback:kernel blob " + std::to_string(identity->blob) + " unavailable"; return; }
+            d.blob = identity->blob; d.kernel_entry = d.program->entry;
+            std::memcpy(d.kernel_entry.data(), &identity->blob_index, 4);
+        }
         if (d.program->texture_slots.size() != d.record.texture_count) { d.route = "fallback:texture count"; return; }
         if (d.record.vertex_constant_words != d.program->vs_constants * 4 || d.record.pixel_constant_words != d.program->ps_constants * 4) { d.route = "fallback:constant words"; return; }
         std::array<uint32_t, 4> tw{}, th{}; std::array<bool, 4> point{};
@@ -296,6 +366,7 @@ private:
     // Renders one ordered run of eligible draws on one target through the frame kernel.
     void execute_run(std::vector<Draw> &draws, const std::vector<size_t> &run, std::vector<ResourceRef> &refs, std::map<uint64_t, frame::Rect> &dirty, Stats &stats) {
         auto &ref = refs[draws[run.front()].record.target]; auto &res = *ref.resident; require(res.pixels.size() == size_t(res.width) * res.height);
+        auto &kernel = kernels[draws[run.front()].blob]; require(bool(kernel));
         frame::Rect touched; for (auto n : run) touched = frame::unite(touched, frame::intersect(draws[n].plan.bounds, draws[n].scissor_bounds));
         touched = frame::intersect(touched, {0, 0, int32_t(res.width), int32_t(res.height)});
         if (touched.empty()) { stats.executed += run.size(); return; }
@@ -324,7 +395,7 @@ private:
                     size_t program_index = SIZE_MAX;
                     for (size_t k = 0; k < program_keys.size(); ++k) if (program_keys[k] == d.program.get()) program_index = k;
                     std::vector<std::vector<uint8_t>> trial_programs = programs; std::vector<frame::Window> trial_windows = windows;
-                    if (program_index == SIZE_MAX) { program_index = programs.size(); trial_programs.push_back(d.program->entry); }
+                    if (program_index == SIZE_MAX) { program_index = programs.size(); trial_programs.push_back(d.kernel_entry); }
                     c.program = uint32_t(program_index); c.vertices = frame::pack_vertices(*d.program, d.inputs); c.vertex_count = d.record.vertex_count;
                     const auto clip = frame::intersect(frame::intersect(d.plan.bounds, d.scissor_bounds), {int32_t(tile.x), int32_t(tile.y), int32_t(tile.x + tile.w), int32_t(tile.y + tile.h)});
                     c.clip = {clip.x0 - int32_t(tile.x), clip.y0 - int32_t(tile.y), clip.x1 - int32_t(tile.x), clip.y1 - int32_t(tile.y)};

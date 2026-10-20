@@ -62,10 +62,10 @@ int wmain(int argc, wchar_t **argv) try {
     // The frame batch executor lives in the child provider; the parent only forwards batches.
     std::unique_ptr<nr::registered_lab::frame_batch::FrameBatchExecutor> frame_executor;
     if(!provider.enabled()){
-        wchar_t *blob=nullptr;size_t blob_length=0;char *sha=nullptr;size_t sha_length=0;
-        ex::require(!_wdupenv_s(&blob,&blob_length,L"NR_RENDER_PTL_FRAME_BLOB") && !_dupenv_s(&sha,&sha_length,"NR_RENDER_PTL_FRAME_SHA256"));
-        const std::unique_ptr<wchar_t,decltype(&std::free)> blob_owner(blob,&std::free);const std::unique_ptr<char,decltype(&std::free)> sha_owner(sha,&std::free);
-        frame_executor=std::make_unique<nr::registered_lab::frame_batch::FrameBatchExecutor>(pipeline,blob&&*blob?std::filesystem::path(blob):std::filesystem::path(),sha?std::string(sha):std::string());
+        wchar_t *blobs=nullptr;size_t blobs_length=0;
+        ex::require(!_wdupenv_s(&blobs,&blobs_length,L"NR_RENDER_PTL_FRAME_BLOB_DIR"));
+        const std::unique_ptr<wchar_t,decltype(&std::free)> blobs_owner(blobs,&std::free);
+        frame_executor=std::make_unique<nr::registered_lab::frame_batch::FrameBatchExecutor>(pipeline,blobs&&*blobs?std::filesystem::path(blobs):std::filesystem::path());
     }
     PSECURITY_DESCRIPTOR descriptor = nullptr;
     // Private per-job endpoint: only this user and SYSTEM, local clients only.
