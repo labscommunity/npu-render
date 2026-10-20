@@ -201,3 +201,30 @@ are added. Bisecting tiles down to 8 pixels (now done by both the driver's
 admission and the worker) admits every other seam case but not this corner.
 Two windows per texture in the kernel, or a larger carrier row, would remove
 the limit; until then that draw stays on the per-draw route at ~400 ms.
+
+## Trial 4 (build v13, seven blobs, affine planner, adaptive tiles)
+
+`native-live-v69` (registration v58, package v27 / 0.0.1327.0, `frame-blobs-v3`)
+passed every chain gate and `native-repeated-input-v15-analysis` reports 1.9
+verified updates/s (21 unique submissions, 19 displayed in the window). The
+animation frames still cost 600-640 ms each: every one of them contains the
+taskbar backdrop draw (c71638aa over 1024x48 at y 720) whose per-tile window
+straddles a wrap seam in both axes, so it stays on the per-draw route (329
+per-draw executions, 83 s of the 12-minute trial). Over the whole trial the
+driver flushed 1,053 batches (median worker time 1.8 ms, median upload 1.2 KB)
+and the kernel ran 3,433 requests for 24.1 s; the worker's timing split shows
+the NPU request itself, not host copies, carries that time (replay: 22.0 s of
+inference against 0.45 s of copies for 3,366 requests).
+
+Where the frame time goes, measured across the four trials:
+
+| Component of a 1024x768 animation frame | Measured | What removes it |
+| --- | --- | --- |
+| c71638aa backdrop strip on the per-draw route | ~400-600 ms | two texel windows per texture in the kernel, or a larger carrier row |
+| Five full-region DWM passes (3.7 Mpx) on the kernel | ~130 ms (6-7 requests) | a vectorised row kernel (several pixels per vector), fewer blobs per frame |
+| Flushes forced by DWM's region copies | 5 per frame, ~2-16 ms each | serve small readbacks from the worker's resident copy |
+| Per-request NPU floor | ~1 ms light, 18 ms for twelve full tiles | more rows per carrier request |
+
+The per-draw baseline was 0.7 updates/s; the batched renderer reaches 1.9-2.2
+on this harness. Reaching 30 needs the strip batched and roughly a five-fold
+reduction of kernel time per frame; the measurements above bound each term.
