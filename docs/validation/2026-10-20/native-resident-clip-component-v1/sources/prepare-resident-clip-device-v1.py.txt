@@ -1,0 +1,51 @@
+"""Prepare serialized target compilation and NPU fixture qualification."""
+from pathlib import Path
+import ast
+import hashlib
+import json
+
+r = Path(__file__).parent
+local = json.loads((r / "ptl-resident-clip-local-v1/report.json").read_text())
+assert local["passed"] and local["cpu_only"] and len(local["checks"]) == 144
+s = (r / "qualify-ptl-six-span-masked-v1.py").read_text()
+s = s.replace("ptl_masked_fixtures_v1", "ptl_resident_clip_fixtures_v1")
+s = s.replace("custom-masked", "custom-resident-clip")
+s = s.replace("ptl-six-span-masked", "ptl-six-span-resident-clip")
+s = s.replace("range(20 if", "range(24 if")
+s = s.replace("assert obj(vm/'ptl-native-live-v4/report.json')['passed'];assert obj(vm/'native-desktop-admission-v50/report.json')['cleanup_passed'];",
+              "assert obj(vm/'physical-gpu-desktop-v2/report.json')['cleanup_passed'];")
+s = s.replace("  report['passed']=True",
+              "  report['unique_component_fixtures']=144\n  report['passed']=True")
+ast.parse(s)
+(r / "qualify-ptl-six-span-resident-clip-v1.py").write_text(s)
+names = [
+    "ptl-six-span-resident-clip-v1.c",
+    "ptl_resident_clip_fixtures_v1.py",
+    "ptl_resident_clip_geometry_v1.py",
+    "qualify-ptl-six-span-resident-clip-v1.py",
+]
+manifest = {n: hashlib.sha256((r / n).read_bytes()).hexdigest() for n in names}
+(r / "ptl-resident-clip-device-v1-source.json").write_text(json.dumps(manifest, indent=2) + "\n")
+s = (r / "run-ptl-worker-v21-qualification.ps1").read_text()
+s = s.replace("ptl-worker-v21-qualification", "ptl-resident-clip-v1-qualification")
+s = s.replace("waiting-for-host-tensor-experiments", "waiting-for-quad-rectangle-experiment")
+s = s.replace("@('ptl-worker-v20-qualification','host-tensor-provider-recovery-v1-qualification','ptl-combined-desktop-v9')",
+              "@('ptl-worker-v22-qualification')")
+a = s.index(" Invoke-Step 'build'")
+b = s.index(" $report.passed=$true", a)
+s = s[:a] + r'''
+ $sources=Get-Content "$vm/ptl-resident-clip-device-v1-source.json" -Raw|ConvertFrom-Json
+ foreach($f in $sources.psobject.Properties){if((Get-FileHash "$vm/$($f.Name)").Hash.ToLower() -ne $f.Value){throw 'Source identity mismatch'}}
+ $python="$r/toolchains/openvino-2026.4.1/Scripts/python.exe";$env:PYTHONPATH="$vm/ptl-reusable-harness-v1/src"
+ Invoke-Step 'target-compile' $python ('"'+$vm+'\ptl-reusable-harness-v1\tools\build_ptl_kernel.py" --toolchain "'+$vm+'\movitools-package-v2\extracted\Driver\MVC_DEPEND" --source "'+$vm+'\ptl-six-span-resident-clip-v1.c" --output "'+$vm+'\ptl-six-span-resident-clip-build-v1"') 600
+ $q=Get-Content "$vm/ptl-six-span-resident-clip-build-v1/report.json" -Raw|ConvertFrom-Json
+ if(!$q.completed -or !$q.passed -or $q.child_result.text_bytes -gt 18256 -or $q.source_sha256 -ne $sources.'ptl-six-span-resident-clip-v1.c'){throw 'Target code contract failed'}
+ $report.text_bytes=$q.child_result.text_bytes
+ $hash=(Get-FileHash "$vm/ptl-six-span-resident-clip-build-v1/kernel.elf").Hash.ToLower()
+ Invoke-Step 'device-fixtures' $python ('"'+$vm+'\qualify-ptl-six-span-resident-clip-v1.py" --elf-sha256 '+$hash) 420
+ $q=Get-Content "$vm/ptl-six-span-resident-clip-v1/report.json" -Raw|ConvertFrom-Json
+ if(!$q.completed -or !$q.passed -or $q.child_result.unique_component_fixtures -ne 144){throw 'NPU fixtures incomplete'}
+ $report.unique_npu_fixtures=144;$report.model_sha256=$q.patched_sha256
+''' + s[b:]
+(r / "run-ptl-resident-clip-v1-qualification.ps1").write_text(s)
+print(json.dumps({"prepared": names, "local_exact_fixtures": 144, "npu_tested": False}))

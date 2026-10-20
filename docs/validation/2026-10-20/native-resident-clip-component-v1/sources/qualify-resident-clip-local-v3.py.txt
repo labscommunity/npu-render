@@ -1,0 +1,52 @@
+"""Compare the local C kernel against independent complete-span fixture bytes."""
+from pathlib import Path
+from datetime import UTC, datetime
+import ctypes
+import hashlib
+import json
+import traceback
+
+import numpy as np
+
+from ptl_resident_clip_fixtures_v1 import fixture
+
+r = Path(__file__).parent
+out = r / "ptl-resident-clip-local-v3"
+out.mkdir(exist_ok=False)
+report = dict(started=datetime.now(UTC).isoformat(), completed=False, passed=False,
+              cpu_only=True, npu_tested=False, checks=[])
+
+
+def save():
+    (out / "report.json").write_text(json.dumps(report, indent=2) + "\n")
+
+
+try:
+    lib = ctypes.CDLL(str((r / "ptl-resident-clip-v3-local.dylib").resolve()))
+    lib.nr_resident_clip_local.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+    lib.nr_resident_clip_local.restype = None
+    for index in range(144):
+        payload, expected = fixture(index)
+        source = ctypes.create_string_buffer(payload)
+        destination = ctypes.create_string_buffer(262144)
+        lib.nr_resident_clip_local(source, destination)
+        actual = destination.raw
+        if actual != expected:
+            a = np.frombuffer(actual, np.uint8)
+            e = np.frombuffer(expected, np.uint8)
+            positions = np.flatnonzero(a != e)
+            report["mismatch"] = dict(fixture=index, count=int(len(positions)),
+                                      positions=positions[:16].tolist(),
+                                      actual=a[positions[:16]].tolist(),
+                                      expected=e[positions[:16]].tolist())
+            raise AssertionError("Exact complete-span mismatch")
+        report["checks"].append(dict(fixture=index, input_sha256=hashlib.sha256(payload).hexdigest(),
+                                     output_sha256=hashlib.sha256(actual).hexdigest(), exact_bytes=len(actual)))
+    report["passed"] = True
+except Exception as error:
+    report.update(error=repr(error), traceback=traceback.format_exc())
+finally:
+    report.update(completed=True, finished=datetime.now(UTC).isoformat())
+    save()
+print(json.dumps({k: v for k, v in report.items() if k != "checks"}))
+raise SystemExit(0 if report["passed"] else 1)

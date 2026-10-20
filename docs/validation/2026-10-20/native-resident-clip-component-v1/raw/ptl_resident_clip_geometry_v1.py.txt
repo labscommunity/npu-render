@@ -1,0 +1,96 @@
+"""Independent integer-edge and explicit FP32 interpolation oracle.
+
+No device calls. Fixtures cover both windings, top-left ownership, culling,
+scissors, shared edges, degenerate triangles, perspective and flat attributes.
+"""
+import struct
+import numpy as np
+
+SPAN = 262144
+
+def fixture(index):
+    seed = index % 96
+    rng = np.random.default_rng(712000 + seed)
+    count = [0, 1, 6, 31, 127, 511, 1024, 3072][seed % 8]
+    vertex_count = [3, 6, 510, 2046][(seed // 8) % 4]
+    cull = (seed // 3) % 3
+    ccw = seed % 2
+    modes = ([2, 2, 2, 2], [4, 4, 4, 4], [1, 2, 4, 0])[seed % 3]
+    coordinates = np.empty((vertex_count, 2), np.int32)
+    for base in range(0, vertex_count, 3):
+        if seed % 13 == 0:
+            tri = [[-268435455, -268435455], [268435455, -268435455], [0, 268435455]]
+        else:
+            x, y = (base // 3) % 7 * 256, (base // 21) * 256
+            tri = [[x, y], [x + 2048, y], [x, y + 2048]]
+        if (base // 3) % 2: tri[1], tri[2] = tri[2], tri[1]
+        if seed % 11 == 0: tri[2] = tri[1]
+        coordinates[base:base+3] = tri
+    screens = coordinates.astype(np.float32) * np.float32(1 / 256)
+    if seed % 7 == 1: screens += np.float32(1 / 1024)
+    inverse_w = np.ones(vertex_count, np.float32)
+    if seed % 4: inverse_w = rng.choice(np.array([.25, .5, 1, 2, 4], np.float32), vertex_count)
+    attributes = rng.integers(-1024, 1025, (vertex_count, 4, 4)).astype(np.float32) * np.float32(1 / 512)
+    # Nonzero perspective denominators for independent clipped-sampling fixtures.
+    attributes[:, 1, 2] = np.float32(.5)
+    attributes[:, 2, 2] = np.float32(2)
+    clip = [-268435455, -268435455, 268435456, 268435456]
+    if seed % 5 == 0: clip = [128, 128, 640, 640]
+    tasks = []
+    for n in range(count):
+        base = (n % (vertex_count // 3)) * 3
+        a, b, c = coordinates[base:base+3].astype(np.int64)
+        if n % 5 == 0: point = a
+        elif n % 5 == 1: point = (a + b) // 2
+        elif n % 5 == 2: point = (a + b + c) // 3
+        elif seed % 13 == 0: point = rng.integers(-268435455, 268435456, 2)
+        else: point = a + rng.integers(-512, 2560, 2)
+        tasks.append((base, int(point[0]), int(point[1])))
+    payload = bytearray(SPAN)
+    struct.pack_into('<8I4i4I', payload, 0, 0x4e524731, 1, count, vertex_count, cull, ccw, SPAN, 0, *clip, *modes)
+    for n in range(vertex_count):
+        struct.pack_into('<2i3f3I16f', payload, 256+n*96, *coordinates[n], *screens[n], inverse_w[n], 0, 0, 0, *attributes[n].reshape(-1))
+    for n, task in enumerate(tasks): struct.pack_into('<I2i', payload, 196864+n*12, *task)
+    expected = bytearray(SPAN)
+    if index >= 96:
+        offset, value = [(0, 0), (4, 2), (8, 3073), (12, 0), (12, 2049), (12, 4), (16, 3), (20, 2), (24, SPAN-1), (28, 1), (48, 3), (256+20, 1)][index-96]
+        struct.pack_into('<I', payload, offset, value)
+        return bytes(payload), bytes(expected)
+    def determinant(a, b, p):
+        ax, ay = map(int, a); bx, by = map(int, b); px, py = map(int, p)
+        return (bx-ax)*(py-ay) - (by-ay)*(px-ax)
+    hits = 0
+    for n, (base, px, py) in enumerate(tasks):
+        tri = coordinates[base:base+3]
+        area = determinant(tri[0], tri[1], tri[2])
+        covered = area != 0 and clip[0] <= px < clip[2] and clip[1] <= py < clip[3]
+        if cull: covered = covered and (area > 0 if ((cull == 2) != bool(ccw)) else area < 0)
+        for a in range(3):
+            b = (a+1) % 3; dx, dy = map(int, tri[b].astype(np.int64)-tri[a])
+            e = determinant(tri[a], tri[b], (px, py))
+            inclusive = (dy < 0 or (dy == 0 and dx > 0)) if area > 0 else (dy > 0 or (dy == 0 and dx < 0))
+            covered = covered and ((e > 0 if area > 0 else e < 0) or (e == 0 and inclusive))
+        if not covered: continue
+        hits += 1
+        struct.pack_into('<I', expected, 16+n*80, 1)
+        point = np.array([px, py], np.float32) * np.float32(1/256)
+        points = screens[base:base+3]
+        weights = []
+        for a in range(3):
+            b, c = (a+1) % 3, (a+2) % 3
+            delta = points[c] - points[b]; sample = point - points[b]
+            weights.append(delta[0]*sample[1] - delta[1]*sample[0])
+        for attribute, mode in enumerate(modes):
+            if not mode: continue
+            values = attributes[base:base+3, attribute]
+            if mode == 1: color = values[0]
+            else:
+                w = np.array(weights, np.float32)
+                if mode == 2: w = w * inverse_w[base:base+3]
+                denominator = np.float32(np.float32(w[0]+w[1])+w[2])
+                denominator = denominator + np.float32(denominator == 0)
+                color = ((w[0]*values[0] + w[1]*values[1]) + w[2]*values[2]) / denominator
+            assert np.isfinite(color).all()
+            struct.pack_into('<4f', expected, 32+n*80+attribute*16, *color)
+    struct.pack_into('<4I', expected, 0, 0x4e52474f, count, hits, 0)
+    return bytes(payload), bytes(expected)

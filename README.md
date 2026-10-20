@@ -31,6 +31,13 @@ Its live promotion is rejected before any desktop change.
 The [balanced-geometry candidate](docs/validation/2026-10-20/native-balanced-geometry-v1/README.md)
 preserves every image but improves aggregate request time by only 1.90%, below
 the five-percent threshold for a new live trial.
+The [client timing diagnostic](docs/validation/2026-10-20/native-client-timing-v1/README.md)
+places about 95.6% of measured synchronous DWM request time inside the rendering
+worker. Its animation still delivers 0.7 verified updates/s; the desktop restores,
+but its overall route-coverage check fails. The
+[combined clipping kernel](docs/validation/2026-10-20/native-resident-clip-component-v1/README.md)
+passes 144 exact fixtures on the NPU. Worker integration and desktop performance
+are separate gates.
 
 Its [complete-image component comparison](docs/validation/2026-10-16/native-filled-program-comparison-v1/README.md)
 preserves all 1,852 preceding NPU images. Across 1,389 warm pairs, aggregate draw

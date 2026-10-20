@@ -1,0 +1,48 @@
+"""Keep the kernel first in linked text; preserve the rejected v2 entry layout."""
+from pathlib import Path
+import ast
+import hashlib
+import json
+
+r = Path(__file__).parent
+s = (r / "ptl-six-span-resident-clip-v2.c").read_text()
+a = s.index("/* The target has no C runtime.")
+b = s.index("#define INLINE", a)
+helper = s[a:b]
+assert "void *memset(" in helper
+s = s[:a] + s[b:] + "\n" + helper
+(r / "ptl-six-span-resident-clip-v3.c").write_text(s)
+a = s.index("void nr_probe_kernel(")
+b = s.index(" uint4 *words=", a)
+(r / "ptl-resident-clip-v3-local.c").write_text(
+    s[:a] + "void nr_resident_clip_local(const unsigned char *data,unsigned char *output){\n" + s[b:])
+s = (r / "qualify-resident-clip-local-v2.py").read_text()
+s = s.replace("resident-clip-local-v2", "resident-clip-local-v3").replace("resident-clip-v2-local", "resident-clip-v3-local")
+ast.parse(s)
+(r / "qualify-resident-clip-local-v3.py").write_text(s)
+s = (r / "qualify-ptl-six-span-resident-clip-v2.py").read_text()
+s = s.replace("ptl-six-span-resident-clip-v2", "ptl-six-span-resident-clip-v3").replace("resident-clip-build-v2", "resident-clip-build-v3")
+ast.parse(s)
+(r / "qualify-ptl-six-span-resident-clip-v3.py").write_text(s)
+names = ["ptl-six-span-resident-clip-v3.c", "ptl_resident_clip_fixtures_v1.py",
+         "ptl_resident_clip_geometry_v1.py", "qualify-ptl-six-span-resident-clip-v3.py"]
+(r / "ptl-resident-clip-device-v3-source.json").write_text(json.dumps({
+    n: hashlib.sha256((r / n).read_bytes()).hexdigest() for n in names
+}, indent=2) + "\n")
+s = (r / "run-ptl-resident-clip-v2-qualification.ps1").read_text()
+s = s.replace("resident-clip-v2", "resident-clip-v3").replace("resident-clip-build-v2", "resident-clip-build-v3")
+s = s.replace("@('ptl-worker-v22-qualification-v2')", "@('quad-rectangle-provider-recovery-v1-qualification')")
+s = s.replace("waiting-for-quad-rectangle-experiment", "waiting-for-quad-provider-recovery")
+s = s.replace("$preceding=if(Test-Path", """$preceding=if(Test-Path "$vm/native-desktop-admission-v68/report.json"){'native-desktop-admission-v68'}elseif(Test-Path""")
+(r / "run-ptl-resident-clip-v3-qualification.ps1").write_text(s)
+s = (r / "prepare-resident-clip-worker-v2.py").read_text()
+s = s.replace("ptl-six-span-resident-clip-v2", "ptl-six-span-resident-clip-v3")
+s = s.replace("ptl-resident-clip-v2-qualification", "ptl-resident-clip-v3-qualification")
+# The worker must wait for the actual v3 device proof, which is serially after
+# the diagnostic desktop and quad-recovery experiments.
+s = s.replace("@('quad-rectangle-provider-recovery-v1-qualification')", "@('ptl-resident-clip-v3-qualification')")
+s = s.replace("waiting-for-quad-provider-recovery", "waiting-for-resident-clip-component")
+ast.parse(s)
+(r / "prepare-resident-clip-worker-v3.py").write_text(s)
+print(json.dumps({"prepared": True, "entry_layout": "kernel before helper",
+                  "kernel_arithmetic_changed": False, "hardware_tested": False}))

@@ -54,8 +54,24 @@ across ten pairs, but aggregate time across the complete replay is unchanged.
 The [transport-volume analysis](../validation/2026-10-20/native-transport-volume-v1/README.md)
 counts at least 2.63 GB of logical surface traffic across both worker boundaries
 for 209 complete requests during the retained ten-second animation. This is a
-protocol count, not measured hardware bandwidth. Native client timing and
-retained-resource/command-batch design are now explicit investigation paths.
+protocol count, not measured hardware bandwidth.
+
+The [native client timing diagnostic](../validation/2026-10-20/native-client-timing-v1/README.md)
+joins 1,482 measured DWM completions: 246.98 of 258.30 seconds in the sequential
+client stages lie inside parent rendering execution. The instrumented animation
+still delivers 0.7 verified updates/s, with 6.88 seconds in child rendering.
+The finite run restores the desktop but fails a required texture-route coverage
+check; it is diagnostic evidence, not a replacement passing desktop baseline.
+Reducing shader work and NPU launches remains the priority. Retained resources
+and command batching remain architectural investigations, not implemented gains.
+
+The [combined clipping component](../validation/2026-10-20/native-resident-clip-component-v1/README.md)
+now passes 144 exact full-span fixtures on the NPU, plus original-model checks
+before and afterward. Its code fits the existing allocation. Worker integration,
+complete replay timing, recovery and desktop acceptance remain separate gates.
+The rectangle candidate also passes
+[two targeted provider-recovery scenarios](../validation/2026-10-20/native-quad-rectangle-recovery-v1/README.md);
+its unchanged aggregate replay time still precludes a desktop speedup claim.
 
 The preceding
 [filled-program live v54 trial](../validation/2026-10-16/native-filled-program-live-v1/README.md)
@@ -340,12 +356,16 @@ role, and any GPU rendering/copy cost in the bridge must be measured.
    to 176 and targeted time by 45.03%; full-replay time remains unchanged.
    Do not promote this targeted measurement into a desktop speedup claim.
    A separate combined clipping kernel places small textures, coverage, sampling
-   and blending in one NPU call per batch. Local fixtures pass; target execution
-   and integration remain pending. Its first target link failed on missing
-   `memset`; the next link was rejected for placing the helper before the
-   kernel entry. The first quad selection omitted all five relevant draws and
-   is now corrected. Preserve these attempts. Measure client request encoding,
-   admission, transport and decoding alongside child rendering. Investigate
+   and blending in one NPU call per batch. All 144 target-device fixtures pass;
+   complete worker replay, timing and recovery must pass before live promotion.
+   Its first target link failed on missing `memset`; the next link was rejected
+   for placing the helper before the kernel entry. A stale manifest in the third
+   coordinator was corrected without changing the successfully built kernel.
+   The first quad selection omitted all five relevant draws and is now corrected.
+   Preserve these attempts. Native client timing now places about 95.6% of
+   measured synchronous request time inside parent rendering, including CPU
+   orchestration, child transport and NPU waits. This is not hardware utilization.
+   Investigate
    retained resource versions and ordered batches if whole-surface round trips
    remain material; preserve map/present ordering and restart recovery.
 4. After responsiveness passes, run the current renderer's thirty-minute soak,

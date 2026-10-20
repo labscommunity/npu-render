@@ -1,0 +1,114 @@
+"""Prepare a diagnostic desktop run of the unchanged worker with client timings."""
+from pathlib import Path
+import ast
+import hashlib
+import json
+import re
+
+r = Path(__file__).parent
+changes = {
+    "native-registration-v45": "native-registration-v47",
+    "native-registered-v45": "native-registered-v47",
+    "NativeRecovery-v45": "NativeRecovery-v47",
+    "native_shared_app_v12": "native_shared_app_v14",
+    "native_desktop_bootstrap_v40": "native_desktop_bootstrap_v42",
+    "native-desktop-v66": "native-desktop-v68",
+    "native-desktop-admission-v66": "native-desktop-admission-v68",
+    "NativeDesktopRecovery-v66": "NativeDesktopRecovery-v68",
+    "run-native-live-v56": "run-native-live-v58",
+    "native-live-v56": "native-live-v58",
+    "NativeLiveV56": "NativeLiveV58",
+    "native-topology-primary-v42": "native-topology-primary-v44",
+    "native-topology-v102": "native-topology-v111",
+    "native-topology-v103": "native-topology-v112",
+    "native-topology-v104": "native-topology-v113",
+    "InspectTopology-V102": "InspectTopology-V111",
+    "InspectTopology-V103": "InspectTopology-V112",
+    "InspectTopology-V104": "InspectTopology-V113",
+    "observer104": "observer113",
+    "dismiss-native-saver-v30": "dismiss-native-saver-v33",
+    "dismiss-v30": "dismiss-v33",
+    "run-ptl-native-live-v20": "run-ptl-native-live-v22",
+    "ptl-native-live-v20": "ptl-native-live-v22",
+    "native-latency-v20-analysis": "native-latency-v22-analysis",
+    "native-presentation-v17-analysis": "native-presentation-v19-analysis",
+    "native-repeated-input-v3-analysis": "native-repeated-input-v5-analysis",
+    "ptl-combined-desktop-v8": "ptl-combined-desktop-v10",
+    "analyze-native-latency-v18.py": "analyze-native-latency-v20.py",
+    "analyze-native-presentation-v17.py": "analyze-native-presentation-v19.py",
+    "native-driver-package-v19": "native-driver-package-v20",
+    "native-registration-stage-v19": "native-registration-stage-v20",
+    "0.0.1319.0": "0.0.1320.0",
+}
+pattern = re.compile("|".join(re.escape(x) for x in sorted(changes, key=len, reverse=True)))
+
+
+def rename(s):
+    return pattern.sub(lambda m: changes[m[0]], s)
+
+
+files = [n for n in json.loads((r / "ptl-combined-live-v8-upload.json").read_text())
+         if not n.endswith("-source.json")]
+for name in files:
+    s = rename((r / name).read_text())
+    if name == "run-ptl-combined-desktop-v8.ps1":
+        a = s.index("try{\n")
+        b = s.index(" if(@(Get-Process nr_registered*", a)
+        s = s[:a] + r'''try{
+ $report.diagnostic_only=$true;$report.rendering_worker_unchanged=$true
+ $report.active_phase='waiting-for-client-timing-build';Save-Report
+ $deadline=[DateTime]::UtcNow.AddMinutes(180)
+ while($true){$q=Get-Content "$vm\native-client-timing-v1-qualification\report.json" -Raw|ConvertFrom-Json;if($q.completed){break};if([DateTime]::UtcNow -gt $deadline){throw 'Client timing build deadline'};Start-Sleep -Seconds 3}
+ if(!$q.passed){throw 'Client timing build contracts failed'}
+ $q=Get-Content "$vm\ptl-native-worker-v19-full\report.json" -Raw|ConvertFrom-Json
+ if(!$q.completed -or !$q.passed -or $q.worker_sha256 -ne 'd4ddc1238bf91e94190b873f7f985def21c64c85f57fde18b6456f60c175f96c'){throw 'Baseline worker identity differs'}
+ $fault=Get-Content "$vm\packet-provider-recovery-v2\report.json" -Raw|ConvertFrom-Json
+ if(!$fault.completed -or !$fault.passed -or @($fault.phases).Count -ne 2){throw 'Baseline provider recovery missing'}
+ $prior=Get-Content "$vm\physical-gpu-desktop-v2\report.json" -Raw|ConvertFrom-Json
+ if(!$prior.completed -or !$prior.cleanup_passed -or !$prior.memory_integrity_after){throw 'Previous desktop cleanup incomplete'}
+''' + s[b:]
+        s = s.replace("native-registration-v44", "native-registration-v45")
+        needle = " $report.active_phase='pre-registration-readiness';Save-Report"
+        assert s.count(needle) == 1
+        s = s.replace(needle, r'''
+ $report.active_phase='package-and-stage';Save-Report
+ Controller 'package-native-driver-v20.ps1' 'package'
+ $q=Get-Content "$vm/native-driver-package-v20/report.json" -Raw|ConvertFrom-Json
+ if(!$q.prepared -or $q.version -ne '0.0.1320.0' -or !$q.kernel_binary_unchanged){throw 'Diagnostic package incomplete'}
+ Controller 'run-native-registration-v47.ps1' 'stage' @('-Mode','stage')
+ $q=Get-Content "$vm/native-registration-stage-v20/report.json" -Raw|ConvertFrom-Json
+ if(!$q.passed -or !$q.cleanup_passed -or !$q.memory_integrity_after){throw 'New package staging/recovery incomplete'}
+''' + needle)
+        # Obtain the exit status before closing the process handle, including
+        # children that exit quickly; preserve bounded step-specific logs.
+        a = s.index("function Controller(")
+        b = s.index("\nfunction Stop-Preflight", a)
+        s = s[:a] + r'''function Controller([string]$file,[string]$name,[string[]]$extra=@()){
+ $arguments=@('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',('"'+$vm+'\'+$file+'"'))+$extra
+ $p=[Diagnostics.Process]::new();$p.StartInfo.FileName='powershell.exe';$p.StartInfo.Arguments=($arguments -join ' ');$p.StartInfo.UseShellExecute=$false;$p.StartInfo.CreateNoWindow=$true;$p.StartInfo.RedirectStandardOutput=$true;$p.StartInfo.RedirectStandardError=$true
+ try{if(!$p.Start()){throw 'Controller did not start'};$stdout=$p.StandardOutput.ReadToEndAsync();$stderr=$p.StandardError.ReadToEndAsync();if(!$p.WaitForExit(1200000)){$p.Kill();$p.WaitForExit();throw "$name controller deadline"};$code=$p.ExitCode;[IO.File]::WriteAllText("$out/$name.stdout.log",$stdout.Result);[IO.File]::WriteAllText("$out/$name.stderr.log",$stderr.Result);if($code -ne 0){throw "$name controller failed with exit $code"}}finally{$p.Dispose()}
+}''' + s[b:]
+    if name.endswith(".py"):
+        ast.parse(s)
+    p = r / rename(name)
+    # The first preparation stopped on ENOSPC before any upload or execution.
+    # Resume only a byte-identical file or an exact truncated prefix.
+    if p.exists():
+        existing = p.read_bytes()
+        assert s.encode().startswith(existing), p
+    p.write_text(s)
+s = (r / "package-native-driver-v19.ps1").read_text()
+s = rename(s).replace("native-auto-umd-v2", "native-client-timing-v1")
+s = s.replace("DriverVer=10/16/2026", "DriverVer=10/20/2026")
+(r / "package-native-driver-v20.ps1").write_text(s)
+for old in ("native-registration-v45-source.json", "native-desktop-v66-source.json"):
+    names = [rename(n) for n in json.loads((r / old).read_text())]
+    (r / rename(old)).write_text(json.dumps({
+        n: hashlib.sha256((r / n).read_bytes()).hexdigest() for n in names
+    }, indent=2) + "\n")
+uploads = [rename(n) for n in files] + ["native-registration-v47-source.json",
+           "native-desktop-v68-source.json", "package-native-driver-v20.ps1"]
+(r / "ptl-combined-live-v10-upload.json").write_text(json.dumps(uploads, indent=2) + "\n")
+print(json.dumps({"prepared": "client timing desktop diagnostic",
+                  "source_files": len(uploads), "worker_version": 19,
+                  "new_driver_package": 20, "desktop_changed": False}))

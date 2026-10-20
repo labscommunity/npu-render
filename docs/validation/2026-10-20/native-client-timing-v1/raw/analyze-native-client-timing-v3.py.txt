@@ -1,0 +1,143 @@
+"""Join measured native client stages to the worker's retained request timeline."""
+from pathlib import Path
+from collections import defaultdict
+import argparse
+import hashlib
+import json
+import math
+import traceback
+
+p = argparse.ArgumentParser()
+p.add_argument("--root", type=Path, required=True)
+p.add_argument("--output", type=Path, required=True)
+a = p.parse_args()
+trial = a.root / "native-desktop-admission-v68"
+a.output.mkdir(exist_ok=False)
+
+
+def obj(path):
+    return json.loads(path.read_text(encoding="utf-8-sig"))
+
+
+def rows(path):
+    return [json.loads(x) for x in path.read_text(encoding="utf-8-sig").splitlines()
+            if x.startswith("{") and x.endswith("}")]
+
+
+try:
+    proof = obj(trial / "report.json")
+    assert proof["completed"] and proof["cleanup_passed"] and proof["memory_integrity_after"]
+    parent_path = trial / "bootstrap/worker.stdout.jsonl"
+    parent = rows(parent_path)
+    identities = {x["dispatch_ticket"]: x for x in parent if x.get("kind") == "request_identity"}
+    timelines = {x["dispatch_ticket"]: x for x in parent if x.get("kind") == "request_timeline"}
+    assert timelines.keys() <= identities.keys()
+    incomplete = sorted(identities.keys() - timelines.keys())
+    # A finite run can end with an outstanding request. Preserve its identity,
+    # exclude it from completed-request timing, and still require every measured
+    # client completion to match exactly one completed parent exchange.
+    assert all(ticket > max(timelines) for ticket in incomplete)
+
+    by_request = defaultdict(list)
+    for ticket, event in identities.items():
+        by_request[event["client_pid"], event["sequence"]].append(ticket)
+    inputs = [parent_path, trial / "report.json"]
+    matched = []
+    used = set()
+    processes = {}
+    for path in sorted((trial / "T8-NpuRender-NativeTraceV1").glob("process-*.jsonl")):
+        events = rows(path)
+        headers = [x for x in events if x.get("event") == "process"]
+        items = []
+        epoch = -1
+        for event in events:
+            if event.get("event") == "process":
+                epoch += 1
+            if event.get("event") == "native_client_timeline":
+                assert epoch >= 0
+                items.append(dict(event, trace_epoch=epoch))
+        if not items:
+            continue
+        inputs.append(path)
+        assert headers
+        pid = items[0]["pid"]
+        assert all(x["pid"] == pid for x in items)
+        names = {x["image"].lower() for x in headers}
+        assert len(names) == 1
+        names = names.pop()
+        for event in items:
+            keys = ("request_started_qpc", "encoded_qpc", "admitted_qpc", "replied_qpc", "decoded_qpc")
+            times = [event[k] for k in keys]
+            assert times == sorted(times) and times[0] > 0 and event["qpc_frequency"] > 0
+            possible = [
+                ticket for ticket in by_request[pid, event["sequence"]] if ticket in timelines
+                if event["admitted_qpc"] <= timelines[ticket]["received_qpc"]
+                <= timelines[ticket]["finished_qpc"] <= event["replied_qpc"]
+            ]
+            assert len(possible) == 1, ("ambiguous or unmatched client event", pid, event["sequence"], possible)
+            ticket = possible[0]
+            assert ticket not in used
+            used.add(ticket)
+            worker = timelines[ticket]
+            assert worker["qpc_frequency"] == event["qpc_frequency"]
+            hz = event["qpc_frequency"]
+            ms = lambda left, right: (event[right] - event[left]) * 1000 / hz
+            matched.append(dict(
+                dispatch_ticket=ticket, pid=pid, image=names, sequence=event["sequence"],
+                encoded_ms=ms(keys[0], keys[1]),
+                admission_ms=ms(keys[1], keys[2]),
+                exchange_ms=ms(keys[2], keys[3]),
+                decoded_ms=ms(keys[3], keys[4]),
+                parent_execution_ms=(worker["finished_qpc"] - worker["entered_qpc"]) * 1000 / hz,
+                request_started_qpc=times[0], decoded_qpc=times[-1],
+                request_bytes=event["request_bytes"], reply_bytes=event["reply_bytes"],
+            ))
+        counter_keys = ("diagnostic_admission_calls", "diagnostic_admission_ticks",
+                        "diagnostic_trace_calls", "diagnostic_trace_ticks")
+        epochs = []
+        for epoch in sorted({x["trace_epoch"] for x in items}):
+            ordered = sorted([x for x in items if x["trace_epoch"] == epoch], key=lambda x: x["decoded_qpc"])
+            first, last = ordered[0], ordered[-1]
+            deltas = {key: last[key] - first[key] for key in counter_keys}
+            assert all(value >= 0 for value in deltas.values())
+            epochs.append(dict(
+                trace_epoch=epoch, requests=len(ordered),
+                counter_window_ms=(last["decoded_qpc"] - first["decoded_qpc"]) * 1000 / last["qpc_frequency"],
+                counter_deltas=deltas,
+                diagnostic_admission_ms=deltas["diagnostic_admission_ticks"] * 1000 / last["qpc_frequency"],
+                diagnostic_trace_inclusive_ms=deltas["diagnostic_trace_ticks"] * 1000 / last["qpc_frequency"],
+            ))
+        processes[str(pid)] = dict(image=names, requests=len(items), epochs=epochs,
+            diagnostic_admission_ms=sum(x["diagnostic_admission_ms"] for x in epochs),
+            diagnostic_trace_inclusive_ms=sum(x["diagnostic_trace_inclusive_ms"] for x in epochs))
+    assert matched and any(x["image"] == "dwm.exe" for x in matched)
+    stages = ("encoded_ms", "admission_ms", "exchange_ms", "decoded_ms", "parent_execution_ms")
+
+
+    def summarize(items):
+        result = {"requests": len(items)}
+        for key in stages:
+            values = sorted(x[key] for x in items)
+            assert values
+            result[key] = dict(total=sum(values), median=values[len(values) // 2],
+                               p95=values[math.ceil(.95 * len(values)) - 1], maximum=values[-1])
+        return result
+
+
+    report = dict(
+        completed=True, passed=True, new_device_execution=False,
+        parent_requests=len(timelines), incomplete_parent_requests=[identities[ticket] for ticket in incomplete], matched_native_client_requests=len(matched),
+        all_measured_client_events_matched=True, processes=processes,
+        dwm=summarize([x for x in matched if x["image"] == "dwm.exe"]),
+        requests=sorted(matched, key=lambda x: x["dispatch_ticket"]),
+        source_sha256={str(path.relative_to(a.root)): hashlib.sha256(path.read_bytes()).hexdigest() for path in inputs},
+        scope="Instrumented diagnostic of the unchanged worker. Client events join by PID, sequence and containing QPC interval, with ambiguity rejected. The completed parent rendering interval must be contained; its post-write timestamp can occur after the client reads the reply and is not a synchronization boundary. Diagnostic counters are partitioned by retained process headers because DLL reloads reset them. Encoding includes nonce generation; exchange includes the original validating decode and acknowledgment; decoded_ms measures the second decode. Trace counters overlap and include added diagnostic work. No performance improvement, GPU relief or Tahoma claim.",
+    )
+    (a.output / "report.json").write_text(json.dumps(report, indent=2) + "\n")
+    print(json.dumps({k: v for k, v in report.items() if k not in ("requests", "source_sha256")}))
+except Exception as error:
+    failure = dict(completed=True, passed=False, new_device_execution=False,
+                   error=repr(error), traceback=traceback.format_exc())
+    (a.output / "report.json").write_text(json.dumps(failure, indent=2) + "\n")
+    print(json.dumps(failure))
+    raise SystemExit(1)

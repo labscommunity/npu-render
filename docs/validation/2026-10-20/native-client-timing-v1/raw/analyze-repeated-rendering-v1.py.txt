@@ -1,0 +1,83 @@
+"""Attribute received-input-to-publication intervals to serialized worker stages."""
+from pathlib import Path
+import argparse
+import hashlib
+import json
+
+
+def rows(path):
+    return [json.loads(line) for line in path.read_text(encoding='utf-8-sig').splitlines()
+            if line.startswith('{') and line.endswith('}')]
+
+
+def attribute(parent, child, start, end, hz):
+    assert 0 < hz and start <= end
+    parents = [x for x in parent if x.get('kind') == 'request_timeline']
+    children = [x for x in child if x.get('kind') == 'request_timeline']
+    for timeline in (parents, children):
+        assert len({x['dispatch_ticket'] for x in timeline}) == len(timeline)
+        timeline.sort(key=lambda x: x['entered_qpc'])
+        assert all(x['entered_qpc'] <= x['finished_qpc'] for x in timeline)
+        assert all(a['finished_qpc'] <= b['entered_qpc'] for a,b in zip(timeline,timeline[1:]))
+    child_times = {x['dispatch_ticket']: x for x in children}
+    identities = {x['dispatch_ticket']: x for x in child if x.get('kind') == 'request_identity'}
+    assert len(identities) == len([x for x in child if x.get('kind') == 'request_identity'])
+    stages = dict(parent_pre_child_ms=0, child_packet_read_ms=0, child_pre_execution_ms=0,
+                  child_execution_ms=0, parent_post_child_ms=0)
+    draws = []
+    by_shader = {}
+    for p in parents:
+        if p['entered_qpc'] >= end or p['finished_qpc'] <= start:
+            continue
+        c = child_times[p['dispatch_ticket']]
+        assert p['pid'] == c['client_pid'] and p['sequence'] == c['sequence']
+        times = [p['entered_qpc'],c['connected_qpc'],c['received_qpc'],c['entered_qpc'],c['finished_qpc'],p['finished_qpc']]
+        assert times == sorted(times)
+        for name,lo,hi in zip(stages,times,times[1:]):
+            stages[name] += max(0,min(hi,end)-max(lo,start))*1000/hz
+        overlap = max(0,min(c['finished_qpc'],end)-max(c['entered_qpc'],start))*1000/hz
+        if overlap:
+            identity = identities[p['dispatch_ticket']]
+            assert identity['sequence'] == c['sequence']
+            shader = identity['pixel_sha256']
+            item = by_shader.setdefault(shader,dict(requests=0,overlap_ms=0))
+            item['requests'] += 1
+            item['overlap_ms'] += overlap
+            draws.append(dict(dispatch_ticket=p['dispatch_ticket'],shader_sha256=shader,
+                              overlap_ms=overlap,whole_request_inside_interval=(start<=c['entered_qpc'] and c['finished_qpc']<=end)))
+    duration = (end-start)*1000/hz
+    outside = duration-sum(stages.values())
+    assert outside >= -1e-7
+    return dict(interval_ms=duration,stages=stages,outside_serialized_parent_ms=max(0,outside),
+                overlapping_draws=draws,by_shader=by_shader)
+
+
+if __name__ == '__main__':
+    parser=argparse.ArgumentParser()
+    parser.add_argument('--input-analysis',type=Path,required=True)
+    parser.add_argument('--trial',type=Path,required=True)
+    parser.add_argument('--bootstrap',type=Path,required=True)
+    parser.add_argument('--output',type=Path,required=True)
+    args=parser.parse_args()
+    paths=[args.input_analysis/'report.json',args.trial/'relay/frames.jsonl',
+           args.bootstrap/'worker.stdout.jsonl',args.bootstrap/'provider-processes/generation-1/worker.stdout.jsonl']
+    measured=json.loads(paths[0].read_text(encoding='utf-8-sig'))
+    assert measured['completed'] and measured['passed'] and len(measured['controlled_events'])==40
+    frames,parent,child=[rows(p) for p in paths[1:]]
+    hz=measured['qpc_frequency']
+    assert {x['qpc_frequency'] for stream in (parent,child) for x in stream if 'qpc_frequency' in x}=={hz}
+    result=[]
+    for event in measured['controlled_events']:
+        frame=[x for x in frames if x['sequence']==event['source_sequence']]
+        assert len(frame)==1 and frame[0]['known_stimulus_pixel']==event['bgra']
+        start,end=event['received_qpc'],frame[0]['qpc']
+        detail=attribute(parent,child,start,end,hz)
+        assert abs(detail['interval_ms']-event['received_to_publication_ms'])<1e-7
+        result.append(dict(sequence=event['sequence'],kind=event['kind'],first_of_kind=event['first_of_kind'],**detail))
+    report=dict(completed=True,passed=True,events=result,
+                source_sha256={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in paths},
+                scope='Time overlap between received input and its first submitted matching publication. CPU orchestration and NPU waits both contribute to child execution. Other processes can overlap. This is not NPU utilization or exclusive causal attribution.',
+                full_desktop_offload=False,tahoma_tested=False)
+    args.output.mkdir(exist_ok=False)
+    (args.output/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+    print(json.dumps(dict(passed=True,inputs=len(result),slowest=sorted(result,key=lambda e:e['interval_ms'],reverse=True)[:3])))

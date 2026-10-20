@@ -1,0 +1,80 @@
+"""Preserve failed v1 attempts and correct selection/linkage for new trials."""
+from pathlib import Path
+import ast
+import hashlib
+import json
+
+r = Path(__file__).parent
+s = (r / "qualify-ptl-native-worker-v22.py").read_text()
+s = s.replace("('ptl-native-worker-v22-'+a.stage)", "('ptl-native-worker-v22-'+a.stage+'-v2')")
+s = s.replace("ptl-native-worker-v22-selected/report.json", "ptl-native-worker-v22-selected-v2/report.json")
+s = s.replace("|rectangle_tickets))", "|rectangle_tickets|{467,587,653,719,775}))")
+s = s.replace(" report['quad_rectangle_executions']=len(quad_rectangles)", """ prior_quads=routed_tickets(vm/'ptl-native-worker-v19-full/replay','quad_batch_attempt')
+ assert prior_quads=={467,587,653,719,775}
+ actual_quads=routed_tickets(trial,'quad_batch_attempt')
+ assert actual_quads==prior_quads&selected and len(quad_rectangles)==19
+ report['quad_tickets_matched']=True
+ report['quad_tickets']=sorted(actual_quads)
+ report['quad_rectangle_executions']=len(quad_rectangles)""")
+ast.parse(s)
+(r / "qualify-ptl-native-worker-v22-v2.py").write_text(s)
+s = (r / "qualify-quad-rectangle-comparison-v1.py").read_text()
+s = s.replace("quad-rectangle-comparison-v1", "quad-rectangle-comparison-v2")
+s = s.replace("ptl-native-worker-v22-full/report.json", "ptl-native-worker-v22-full-v2/report.json")
+s = s.replace("f'ptl-native-worker-v{version}-full/report.json'",
+              "f'ptl-native-worker-v{version}-full'+('-v2' if version==22 else '')+'/report.json'")
+# Parenthesize the string expression before joining the directory path.
+s = s.replace("obj(vm/f'ptl-native-worker", "obj(vm/(f'ptl-native-worker")
+s = s.replace("+'/report.json');assert", "+'/report.json'));assert")
+ast.parse(s)
+(r / "qualify-quad-rectangle-comparison-v2.py").write_text(s)
+s = (r / "run-ptl-worker-v22-qualification.ps1").read_text()
+s = s.replace("ptl-worker-v22-qualification", "ptl-worker-v22-qualification-v2")
+s = s.replace("waiting-for-balanced-geometry-experiment", "waiting-for-prior-qualification")
+s = s.replace("@('ptl-worker-v21-qualification')",
+              "@('ptl-worker-v22-qualification','ptl-resident-clip-v1-qualification')")
+a = s.index(" Invoke-Step 'build'")
+b = s.index(" $b=Get-Content", a)
+s = s[:a] + s[b:]
+s = s.replace("$report.worker_sha256=$hash;", """if($hash -ne '8145fa6d2c85d77d5f79faf45e4fed01f1c851acf0084ba6c40dd2930a48c30c' -or (Get-FileHash "$r/builds/ptl-native-worker-v22/Release/nr_registered_local_indexed_worker.exe").Hash.ToLower() -ne $hash){throw 'Previously built binary changed'};$report.worker_sha256=$hash;""")
+s = s.replace("qualify-ptl-native-worker-v22.py", "qualify-ptl-native-worker-v22-v2.py")
+s = s.replace('ptl-native-worker-v22-$stage/report.json', 'ptl-native-worker-v22-$stage-v2/report.json')
+s = s.replace("quad-rectangle-comparison-v1", "quad-rectangle-comparison-v2")
+(r / "run-ptl-worker-v22-qualification-v2.ps1").write_text(s)
+
+helper = """
+/* The target has no C runtime. Volatile stores prevent recursive lowering. */
+void *memset(void *destination,int value,__SIZE_TYPE__ count){
+ volatile unsigned char *p=(volatile unsigned char*)destination;
+ for(__SIZE_TYPE__ i=0;i<count;++i)p[i]=(unsigned char)value;
+ return destination;
+}
+"""
+s = (r / "ptl-six-span-resident-clip-v1.c").read_text()
+s = s.replace("#pragma STDC FP_CONTRACT OFF", "#pragma STDC FP_CONTRACT OFF\n" + helper)
+(r / "ptl-six-span-resident-clip-v2.c").write_text(s)
+a = s.index("void nr_probe_kernel(")
+b = s.index(" uint4 *words=", a)
+local = s[:a] + "void nr_resident_clip_local(const unsigned char *data,unsigned char *output){\n" + s[b:]
+(r / "ptl-resident-clip-v2-local.c").write_text(local)
+s = (r / "qualify-resident-clip-local-v1.py").read_text()
+s = s.replace("ptl-resident-clip-local-v1", "ptl-resident-clip-local-v2")
+s = s.replace("ptl-resident-clip-v1-local", "ptl-resident-clip-v2-local")
+ast.parse(s)
+(r / "qualify-resident-clip-local-v2.py").write_text(s)
+s = (r / "qualify-ptl-six-span-resident-clip-v1.py").read_text()
+s = s.replace("ptl-six-span-resident-clip-v1", "ptl-six-span-resident-clip-v2")
+s = s.replace("ptl-six-span-resident-clip-build-v1", "ptl-six-span-resident-clip-build-v2")
+ast.parse(s)
+(r / "qualify-ptl-six-span-resident-clip-v2.py").write_text(s)
+names = ["ptl-six-span-resident-clip-v2.c", "ptl_resident_clip_fixtures_v1.py",
+         "ptl_resident_clip_geometry_v1.py", "qualify-ptl-six-span-resident-clip-v2.py"]
+manifest = {n: hashlib.sha256((r / n).read_bytes()).hexdigest() for n in names}
+(r / "ptl-resident-clip-device-v2-source.json").write_text(json.dumps(manifest, indent=2) + "\n")
+s = (r / "run-ptl-resident-clip-v1-qualification.ps1").read_text()
+s = s.replace("resident-clip-v1", "resident-clip-v2").replace("resident-clip-build-v1", "resident-clip-build-v2")
+s = s.replace("@('ptl-worker-v22-qualification')", "@('ptl-worker-v22-qualification-v2')")
+(r / "run-ptl-resident-clip-v2-qualification.ps1").write_text(s)
+print(json.dumps({"prepared": True, "worker_binary_unchanged": True,
+                  "added_quad_tickets": [467, 587, 653, 719, 775],
+                  "kernel_change": "target memset implementation"}))

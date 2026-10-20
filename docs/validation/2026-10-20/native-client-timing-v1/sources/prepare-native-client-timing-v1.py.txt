@@ -1,0 +1,102 @@
+"""Instrument native client request stages without changing rendering/admission."""
+from pathlib import Path
+import hashlib
+import json
+import shutil
+import tarfile
+
+r = Path(__file__).parent
+name = "native-client-timing-v1"
+d = r / name
+assert not d.exists()
+shutil.copytree(r / "native-auto-umd-v2", d)
+lab = d / "native/windows/registered_lab"
+(lab / "client_timing.hpp").write_text(r'''#pragma once
+#include <windows.h>
+#include <atomic>
+#include <cstdint>
+namespace nr::registered_lab {
+inline uint64_t client_qpc() noexcept {
+ LARGE_INTEGER value{};return QueryPerformanceCounter(&value)&&value.QuadPart>0?uint64_t(value.QuadPart):0;
+}
+inline uint64_t client_qpc_frequency() noexcept {
+ static const uint64_t frequency=[](){LARGE_INTEGER value{};return QueryPerformanceFrequency(&value)&&value.QuadPart>0?uint64_t(value.QuadPart):uint64_t(0);}();
+ return frequency;
+}
+struct ClientTraceTiming {
+ std::atomic<uint64_t> admission_calls{0},admission_ticks{0},trace_calls{0},trace_ticks{0};
+};
+inline ClientTraceTiming &client_trace_timing(){static ClientTraceTiming value;return value;}
+struct ClientTimingScope {
+ std::atomic<uint64_t> &calls,&ticks;uint64_t start;
+ ClientTimingScope(std::atomic<uint64_t> &c,std::atomic<uint64_t> &t) noexcept:calls(c),ticks(t),start(client_qpc()){}
+ ~ClientTimingScope(){const auto end=client_qpc();calls.fetch_add(1,std::memory_order_relaxed);if(start&&end>=start)ticks.fetch_add(end-start,std::memory_order_relaxed);}
+};
+}
+''')
+p = lab / "lab_trace.hpp"
+s = p.read_text().replace('#include "contract.hpp"', '#include "contract.hpp"\n#include "client_timing.hpp"')
+s = s.replace("inline uint64_t lab_trace_session() noexcept {", """inline uint64_t lab_trace_session() noexcept {
+    auto &timing=client_trace_timing();
+    const ClientTimingScope measured(timing.admission_calls,timing.admission_ticks);""")
+s = s.replace("inline void lab_trace(const char *format, ...) noexcept {", """inline void lab_trace(const char *format, ...) noexcept {
+    auto &timing=client_trace_timing();
+    const ClientTimingScope measured(timing.trace_calls,timing.trace_ticks);""")
+p.write_text(s)
+p = lab / "indexed_exchange.hpp"
+s = p.read_text().replace('#include "local_indexed_client.hpp"', '#include "local_indexed_client.hpp"\n#include "lab_trace.hpp"')
+s = s.replace("            auto &h = request.header;", """#ifdef NR_NATIVE_PROBE
+            const auto request_started=client_qpc();
+#endif
+            auto &h = request.header;""")
+needle = """            admission->verify();
+            auto result = indexed_exchange::decode_response(local_client->exchange(bytes), h);"""
+assert s.count(needle) == 1
+s = s.replace(needle, r'''            const auto encoded=client_qpc();
+            admission->verify();
+            const auto admitted=client_qpc();
+            auto reply=local_client->exchange(bytes);
+            const auto replied=client_qpc();
+            auto result=indexed_exchange::decode_response(reply,h);
+            const auto decoded=client_qpc();
+            auto &timing=client_trace_timing();
+            // Cumulative process counters overlap: trace_ticks includes its
+            // admission work. They must not be summed as disjoint stages.
+            lab_trace("{\"event\":\"native_client_timeline\",\"pid\":%lu,\"sequence\":%u,\"qpc_frequency\":%llu,\"request_started_qpc\":%llu,\"encoded_qpc\":%llu,\"admitted_qpc\":%llu,\"replied_qpc\":%llu,\"decoded_qpc\":%llu,\"request_bytes\":%zu,\"reply_bytes\":%zu,\"diagnostic_admission_calls\":%llu,\"diagnostic_admission_ticks\":%llu,\"diagnostic_trace_calls\":%llu,\"diagnostic_trace_ticks\":%llu}\n",
+                GetCurrentProcessId(),h.sequence,
+                static_cast<unsigned long long>(client_qpc_frequency()),
+                static_cast<unsigned long long>(request_started),static_cast<unsigned long long>(encoded),
+                static_cast<unsigned long long>(admitted),static_cast<unsigned long long>(replied),
+                static_cast<unsigned long long>(decoded),bytes.size(),reply.size(),
+                static_cast<unsigned long long>(timing.admission_calls.load(std::memory_order_relaxed)),
+                static_cast<unsigned long long>(timing.admission_ticks.load(std::memory_order_relaxed)),
+                static_cast<unsigned long long>(timing.trace_calls.load(std::memory_order_relaxed)),
+                static_cast<unsigned long long>(timing.trace_ticks.load(std::memory_order_relaxed)));''')
+p.write_text(s)
+manifest = {str(p.relative_to(d)): hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in d.rglob("*") if p.is_file()}
+old = json.loads((r / "native-auto-umd-v2-source.json").read_text())
+changed = sorted(n for n in manifest if manifest[n] != old.get(n))
+assert changed == ["native/windows/registered_lab/client_timing.hpp",
+                   "native/windows/registered_lab/indexed_exchange.hpp",
+                   "native/windows/registered_lab/lab_trace.hpp"]
+(r / (name + "-source.json")).write_text(json.dumps(manifest, indent=2) + "\n")
+with tarfile.open(r / (name + ".tar.gz"), "w:gz") as archive:
+    archive.add(d, arcname=name)
+s = (r / "build-native-auto-umd-v2.ps1").read_text().replace("native-auto-umd-v2", name)
+(r / ("build-" + name + ".ps1")).write_text(s)
+s = (r / "run-ptl-resident-clip-v2-qualification.ps1").read_text()
+s = s.replace("ptl-resident-clip-v2-qualification", name + "-qualification")
+s = s.replace("waiting-for-quad-rectangle-experiment", "waiting-for-resident-clip-component")
+s = s.replace("@('ptl-worker-v22-qualification-v2')", "@('ptl-resident-clip-v2-qualification')")
+a = s.index(" $sources=Get-Content")
+b = s.index(" $report.passed=$true", a)
+s = s[:a] + r'''
+ Invoke-Step 'build-and-contracts' 'powershell.exe' ('-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+$vm+'\build-native-client-timing-v1.ps1"') 900
+ $q=Get-Content "$r/builds/native-client-timing-v1/registered-build-report.json" -Raw|ConvertFrom-Json
+ if(!$q.clean_build -or !$q.admission_contract_passed -or !$q.trace_lifecycle_contract_passed){throw 'Diagnostic build contracts failed'}
+ $report.umd_sha256=$q.binary_sha256.'nr_native_probe_umd.dll';$report.driver_installed=$false
+''' + s[b:]
+(r / ("run-" + name + "-qualification.ps1")).write_text(s)
+print(json.dumps({"prepared": name, "changed": changed, "driver_installed": False,
+                  "rendering_and_admission_checks_unchanged": True}))

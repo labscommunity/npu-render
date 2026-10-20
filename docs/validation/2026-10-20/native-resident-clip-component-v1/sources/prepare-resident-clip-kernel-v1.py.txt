@@ -1,0 +1,93 @@
+"""Prepare a bounded single-call raster kernel for the captured clipping shader."""
+from pathlib import Path
+import hashlib
+import json
+
+r = Path(__file__).parent
+s = (r / "ptl-six-span-geometry-v2.c").read_text()
+s = s.replace("typedef unsigned uint4", "typedef float float4 __attribute__((ext_vector_type(4)));\ntypedef unsigned uint4")
+at = s.index("void nr_probe_kernel")
+s = s[:at] + r'''
+INLINE float clip_float(float v,float hi){return v<0?0:(v>hi?hi:v);}
+INLINE float flush(float v){return (bits(v)&0x7f800000u)?v:0.0f;}
+INLINE float4 texel(const unsigned char *p,unsigned format){
+ uint4 raw=((uint4)u32(p)>>(uint4){0,8,16,24})&(uint4)255;
+ float4 v=__builtin_convertvector(raw,float4)/255.0f;return format==87?v.zyxw:v;
+}
+INLINE float4 mix4(float4 a,float4 b,float t){return a*(1.0f-t)+b*t;}
+INLINE unsigned quantize(float v){v=clip_float(v,255.0f);unsigned b=(unsigned)v;float f=v-(float)b;return b+(f>.5f||(f==.5f&&(b&1)));}
+''' + s[at:]
+a = s.index(" unsigned count=u32(data+8)")
+b = s.index(" for(unsigned v=0;v<vertices;++v)", a)
+s = s[:a] + r'''
+ unsigned count=u32(data+8),vertices=u32(data+12),cull=u32(data+16),ccw=u32(data+20);
+ unsigned target=u32(data+48),mask=u32(data+52),blend=u32(data+56);
+ if(u32(data)!=0x4e524231||u32(data+4)!=1||count>16384||!vertices||vertices>2046||vertices%3||cull>2||ccw>1||u32(data+24)!=262144||u32(data+28)||(target!=28&&target!=87)||!mask||mask>15||blend>1||u32(data+60))return;
+ int clip[4];unsigned mode[4]={2,2,2,0};
+ for(unsigned n=0;n<4;++n){clip[n]=(int)u32(data+32+n*4);if(clip[n]<-268435455||clip[n]>268435456)return;}
+ if(clip[0]>clip[2]||clip[1]>clip[3])return;
+ unsigned widths[2],heights[2],formats[2],filters[2],offsets[2],end=256+vertices*96;
+ for(unsigned n=0;n<2;++n){
+  widths[n]=u32(data+64+n*12);heights[n]=u32(data+68+n*12);formats[n]=u32(data+72+n*12);filters[n]=u32(data+88+n*4);
+  if(!widths[n]||widths[n]>8192||!heights[n]||heights[n]>8192||widths[n]*heights[n]>8192||(formats[n]!=28&&formats[n]!=87)||filters[n]>1)return;
+  offsets[n]=end;end+=widths[n]*heights[n]*4;
+  for(unsigned c=0;c<4;++c)if(!finite(f32(data+96+n*16+c*4)))return;
+ }
+ if(end>262144||count>(262144-end)/16)return;unsigned task_offset=end;
+ for(unsigned n=0;n<count;++n){const unsigned char *task=data+task_offset+n*16;unsigned base=u32(task);if(base%3||base>vertices-3||!bounded((int)u32(task+4))||!bounded((int)u32(task+8)))return;}
+''' + s[b:]
+s = s.replace("data+196864+n*12", "data+task_offset+n*16")
+s = s.replace(
+    "  if(!covered)continue;\n  unsigned *result=(unsigned*)(output+16+n*80);result[0]=1;++hits;",
+    "  unsigned background=u32(task+12);((unsigned*)(output+16))[n]=background;\n"
+    "  if(!covered)continue;\n  unsigned result[20]={0};++hits;",
+)
+needle = "  }\n }\n unsigned *header=(unsigned*)output;"
+assert s.count(needle) == 1
+s = s.replace(needle, r'''  }
+  float4 samples[2];float enabled[2];
+  for(unsigned sample=0;sample<2;++sample){
+   unsigned width=widths[sample],height=heights[sample];union{unsigned u;float f;}ux,uy,uz;ux.u=result[8+sample*4];uy.u=result[9+sample*4];uz.u=result[10+sample*4];
+   float u=ux.f/uz.f,v=uy.f/uz.f;if(!finite(u)||!finite(v))return;
+   const unsigned char *bounds=data+96+sample*16;
+   enabled[sample]=(flush(u)>=flush(f32(bounds))&&flush(v)>=flush(f32(bounds+4))&&flush(f32(bounds+8))>=flush(u)&&flush(f32(bounds+12))>=flush(v))?1.0f:0.0f;
+   float half=filters[sample]?0.0f:0.5f;
+   float x=clip_float(clip_float(u,1.0f)*(float)width-half,(float)(width-1));
+   float y=clip_float(clip_float(v,1.0f)*(float)height-half,(float)(height-1));
+   unsigned ix=(unsigned)x,iy=(unsigned)y,jx=ix+1<width?ix+1:ix,jy=iy+1<height?iy+1:iy;
+   const unsigned char *texture=data+offsets[sample];float4 a=texel(texture+(iy*width+ix)*4,formats[sample]);
+   if(filters[sample])samples[sample]=a;
+   else samples[sample]=mix4(mix4(a,texel(texture+(iy*width+jx)*4,formats[sample]),x-(float)ix),mix4(texel(texture+(jy*width+ix)*4,formats[sample]),texel(texture+(jy*width+jx)*4,formats[sample]),x-(float)ix),y-(float)iy);
+  }
+  union{unsigned u;float f;}alpha;alpha.u=result[7];
+  float4 color=((1.0f-enabled[1]*samples[1].w)*(enabled[0]*samples[0]))*alpha.f;
+  for(unsigned c=0;c<4;++c){if(!finite(color[c]))return;color[c]=clip_float(color[c],1.0f);}
+  float source_alpha=color.w;if(target==87)color=color.zyxw;unsigned packed=background;
+  for(unsigned c=0;c<4;++c){unsigned logical=target==87&&c<3?2-c:c;if(!(mask&(1u<<logical)))continue;
+   float v=color[c]*255.0f;if(blend)v=v+(float)((background>>(c*8))&255u)*(1.0f-source_alpha);
+   packed=(packed&~(255u<<(c*8)))|(quantize(v)<<(c*8));
+  }
+  ((unsigned*)(output+16))[n]=packed;
+ }
+ unsigned *header=(unsigned*)output;''')
+s = s.replace("header[0]=0x4e52474f", "header[0]=0x4e52424f")
+assert "196864" not in s and "n*80" not in s
+p = r / "ptl-six-span-resident-clip-v1.c"
+assert not p.exists()
+p.write_text(s)
+a = s.index("void nr_probe_kernel(")
+b = s.index(" uint4 *words=", a)
+local = s[:a] + "void nr_resident_clip_local(const unsigned char *data,unsigned char *output){\n" + s[b:]
+(r / "ptl-resident-clip-v1-local.c").write_text(local)
+(r / "ptl-six-span-resident-clip-v1-source.json").write_text(
+    json.dumps({p.name: hashlib.sha256(p.read_bytes()).hexdigest()}, indent=2) + "\n"
+)
+geometry = (r / "ptl_geometry_fixtures_v2.py").read_text()
+needle = "    clip = [-268435455"
+assert geometry.count(needle) == 1
+geometry = geometry.replace(needle, """    # Nonzero perspective denominators for independent clipped-sampling fixtures.
+    attributes[:, 1, 2] = np.float32(.5)
+    attributes[:, 2, 2] = np.float32(2)
+""" + needle)
+(r / "ptl_resident_clip_geometry_v1.py").write_text(geometry)
+print(json.dumps({"prepared": p.name, "hardware_tested": False}))

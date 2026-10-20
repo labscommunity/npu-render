@@ -1,0 +1,38 @@
+"""Exercise recovery after the new rectangle provider has already rendered."""
+from pathlib import Path
+import ast
+
+r = Path(__file__).parent
+s = (r / "qualify-host-tensor-provider-recovery-v1.py").read_text()
+s = s.replace("host-tensor-provider-recovery-v1", "quad-rectangle-provider-recovery-v1")
+s = s.replace("ptl-native-worker-v20", "ptl-native-worker-v22")
+s = s.replace("ptl-native-worker-v22-full/report.json", "ptl-native-worker-v22-full-v2/report.json")
+s = s.replace("tickets=[0,1,7,11,14,17,18,41,58,75,127,172,181,196,256,280,334,363,820,970]",
+              "tickets=[0,1,14,58,196,467,479,481,587,599,601,653,665,667,668,719,723,775,820,970]")
+s = s.replace(",flag,'5']", ",flag,'8']")
+s = s.replace("['dispatch_ticket']==5", "['dispatch_ticket']==8")
+s = s.replace("  report['phases'].append(", """  quads=[x for x in children if x.get('ptl_quad_rectangle_executed')]
+  assert len(quads)==19 and all(x['ordered_blending'] and x['preflight_all_quads'] and x['execution_device']=='NPU' for x in quads)
+  report['phases'].append(""")
+s = s.replace("phase=phase,passed=True,", "phase=phase,passed=True,targeted_retry_original_ticket=587,quad_rectangles=19,")
+ast.parse(s)
+(r / "qualify-quad-rectangle-provider-recovery-v1.py").write_text(s)
+s = (r / "run-ptl-resident-clip-v2-qualification.ps1").read_text()
+s = s.replace("ptl-resident-clip-v2-qualification", "quad-rectangle-provider-recovery-v1-qualification")
+s = s.replace("waiting-for-quad-rectangle-experiment", "waiting-for-client-timing-desktop")
+s = s.replace("@('ptl-worker-v22-qualification-v2')", "@('ptl-combined-desktop-v10')")
+a = s.index(" $sources=Get-Content")
+b = s.index(" $report.passed=$true", a)
+s = s[:a] + r'''
+ foreach($name in @('native-registration-stage-v20','native-registration-v47','native-desktop-admission-v68')){
+  if(Test-Path "$vm/$name/report.json"){$q=Get-Content "$vm/$name/report.json" -Raw|ConvertFrom-Json;if(!$q.completed -or !$q.cleanup_passed -or !$q.memory_integrity_after){throw 'Latest diagnostic cleanup incomplete'}}
+ }
+ $q=Get-Content "$vm/ptl-worker-v22-qualification-v2/report.json" -Raw|ConvertFrom-Json
+ if(!$q.completed -or !$q.passed){throw 'Quad correctness and comparison incomplete'}
+ Invoke-Step 'provider-faults' "$r/toolchains/openvino-2026.4.1/Scripts/python.exe" ('"'+$vm+'\qualify-quad-rectangle-provider-recovery-v1.py"') 660
+ $q=Get-Content "$vm/quad-rectangle-provider-recovery-v1/report.json" -Raw|ConvertFrom-Json
+ if(!$q.completed -or !$q.passed -or @($q.phases).Count -ne 2){throw 'Targeted recovery incomplete'}
+ $report.worker_sha256=$q.worker_sha256
+''' + s[b:]
+(r / "run-quad-rectangle-provider-recovery-v1-qualification.ps1").write_text(s)
+print("Prepared recovery at original quad ticket 587 after prior rectangle use")
