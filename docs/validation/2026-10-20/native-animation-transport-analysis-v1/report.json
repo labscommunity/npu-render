@@ -1,0 +1,121 @@
+{
+  "completed": true,
+  "passed": true,
+  "new_device_execution": false,
+  "interval_ms": 10000.0,
+  "stages_ms": {
+    "receipt_to_queued": 4.338800000000003,
+    "queue_to_entry": 0.18400000000000016,
+    "execution": 8114.797899999997,
+    "finish_to_reply": 196.323,
+    "reply_to_ack": 64.73610000000001,
+    "ack_to_next_receipt": 1619.6201999999998
+  },
+  "largest_receipt_gaps": [
+    {
+      "after_ticket": 866,
+      "before_ticket": 867,
+      "ms": 49.7938
+    },
+    {
+      "after_ticket": 944,
+      "before_ticket": 945,
+      "ms": 47.3411
+    },
+    {
+      "after_ticket": 904,
+      "before_ticket": 905,
+      "ms": 45.9154
+    },
+    {
+      "after_ticket": 984,
+      "before_ticket": 985,
+      "ms": 44.2357
+    },
+    {
+      "after_ticket": 1024,
+      "before_ticket": 1025,
+      "ms": 43.5544
+    },
+    {
+      "after_ticket": 1066,
+      "before_ticket": 1067,
+      "ms": 38.1668
+    },
+    {
+      "after_ticket": 946,
+      "before_ticket": 947,
+      "ms": 37.7363
+    },
+    {
+      "after_ticket": 1026,
+      "before_ticket": 1027,
+      "ms": 37.1194
+    },
+    {
+      "after_ticket": 1064,
+      "before_ticket": 1065,
+      "ms": 37.0216
+    },
+    {
+      "after_ticket": 906,
+      "before_ticket": 907,
+      "ms": 36.5908
+    },
+    {
+      "after_ticket": 986,
+      "before_ticket": 987,
+      "ms": 36.0979
+    },
+    {
+      "after_ticket": 864,
+      "before_ticket": 865,
+      "ms": 33.5571
+    },
+    {
+      "after_ticket": 862,
+      "before_ticket": 863,
+      "ms": 29.2404
+    },
+    {
+      "after_ticket": 1020,
+      "before_ticket": 1021,
+      "ms": 15.9257
+    },
+    {
+      "after_ticket": 940,
+      "before_ticket": 941,
+      "ms": 15.7346
+    },
+    {
+      "after_ticket": 1060,
+      "before_ticket": 1061,
+      "ms": 15.4319
+    },
+    {
+      "after_ticket": 900,
+      "before_ticket": 901,
+      "ms": 15.3141
+    },
+    {
+      "after_ticket": 980,
+      "before_ticket": 981,
+      "ms": 15.0465
+    },
+    {
+      "after_ticket": 1069,
+      "before_ticket": 1070,
+      "ms": 10.9875
+    },
+    {
+      "after_ticket": 949,
+      "before_ticket": 950,
+      "ms": 10.8569
+    }
+  ],
+  "source_sha256": {
+    "docs/validation/2026-10-16/native-response-packet-live-v1/analysis/animation-rendering-v2.json": "89462d282863c1676a50af5a28b3889a78e97b63e43355f85adee5358e26408a",
+    "docs/validation/2026-10-16/native-response-packet-live-v1/raw/native-desktop-admission-v66/bootstrap/worker.stdout.jsonl": "9f52ff9ec27570f5948b0f5579acec12da2d00aed84d0c9606ab7b6bca740af6"
+  },
+  "scope": "Exact accounting of this retained parent-worker interval. Receipt gaps include client work and transport; these timestamps do not distinguish copying, admission checks, DWM scheduling or other causes. No achieved speedup or future frame-rate prediction."
+}

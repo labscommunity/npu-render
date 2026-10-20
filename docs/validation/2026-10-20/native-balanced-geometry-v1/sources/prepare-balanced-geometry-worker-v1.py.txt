@@ -1,0 +1,38 @@
+"""Distribute geometry records evenly over the six unchanged NPU kernel spans."""
+from pathlib import Path
+import ast,hashlib,json,shutil,tarfile
+r=Path(__file__).parent;name='ptl-native-worker-v21';d=r/name;assert not d.exists();shutil.copytree(r/'ptl-native-worker-v19',d)
+p=d/'ptl_geometry.hpp';s=p.read_text();s=s.replace('bool failed=false;','bool failed=false,distribution_reported=false;',1)
+s=s.replace('unsigned counts[6]{};','unsigned counts[6]{},starts[6]{};',1)
+needle='const unsigned begin=plane*3072;counts[plane]=begin<total?(std::min)(3072u,total-begin):0;';assert s.count(needle)==1
+s=s.replace(needle,'const unsigned begin=plane*(total/6)+(std::min)(plane,total%6);starts[plane]=begin;counts[plane]=total/6+(plane<total%6?1u:0u);')
+assert s.count('plane*3072+n')==2;s=s.replace('plane*3072+n','starts[plane]+n')
+needle='  inference.start_async();';assert s.count(needle)==1
+s=s.replace(needle,'''  if(!provider->distribution_reported){
+   std::printf("{\\"ptl_geometry_span_distribution\\":true,\\"total\\":%u,\\"counts\\":[%u,%u,%u,%u,%u,%u],\\"starts\\":[%u,%u,%u,%u,%u,%u],\\"arithmetic_backend\\":\\"NPU\\",\\"kernel_changed\\":false}\\n",total,counts[0],counts[1],counts[2],counts[3],counts[4],counts[5],starts[0],starts[1],starts[2],starts[3],starts[4],starts[5]);
+   std::fflush(stdout);provider->distribution_reported=true;
+  }
+'''+needle)
+p.write_text(s)
+manifest={str(p.relative_to(d)):hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()};old=json.loads((r/'ptl-native-worker-v19-source.json').read_text());assert {n for n in manifest if manifest[n]!=old.get(n)}=={'ptl_geometry.hpp'}
+(r/(name+'-source.json')).write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/(name+'.tar.gz'),'w:gz') as archive:archive.add(d,arcname=name)
+s=(r/'build-ptl-native-worker-v19.ps1').read_text().replace('ptl-native-worker-v19',name);(r/('build-'+name+'.ps1')).write_text(s)
+s=(r/'qualify-ptl-native-worker-v19-v2.py').read_text().replace('ptl-native-worker-v19',name)
+needle=" report['passed']=True";assert s.count(needle)==1
+s=s.replace(needle,""" schedules=[]
+ for path in (trial/'provider-processes').glob('generation-*/worker.stdout.jsonl'):
+  schedules += [x for x in rows(path) if x.get('ptl_geometry_span_distribution')]
+ assert len(schedules)==1
+ for x in schedules:
+  counts=x['counts'];starts=x['starts'];assert len(counts)==len(starts)==6 and 0<x['total']<=18432
+  assert sum(counts)==x['total'] and max(counts)-min(counts)<=1 and max(counts)<=3072
+  assert starts==[sum(counts[:i]) for i in range(6)] and x['arithmetic_backend']=='NPU' and not x['kernel_changed']
+ report['balanced_geometry_schedule']=schedules
+ if a.stage=='full':
+  preceding=rows(vm/'ptl-native-worker-v19-full/replay/replays.jsonl');assert len(preceding)==972
+  assert all((x['ticket'],x['pixels_sha256'],x['pixel_bytes'])==(y['ticket'],y['pixels_sha256'],y['pixel_bytes']) for x,y in zip(preceding,current,strict=True))
+  report['all_worker_v19_outputs_preserved']=True
+ report['passed']=True""")
+ast.parse(s);(r/('qualify-'+name+'.py')).write_text(s)
+print(json.dumps(dict(prepared=name,changed=['ptl_geometry.hpp'],hardware_tested=False)))

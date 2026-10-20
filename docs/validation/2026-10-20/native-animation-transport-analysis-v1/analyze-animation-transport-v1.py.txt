@@ -1,0 +1,54 @@
+"""Partition the retained animation interval using parent-worker timestamps."""
+from pathlib import Path
+import hashlib
+import json
+import math
+
+base = Path("docs/validation/2026-10-16/native-response-packet-live-v1")
+timing_path = base / "analysis/animation-rendering-v2.json"
+trace_path = base / "raw/native-desktop-admission-v66/bootstrap/worker.stdout.jsonl"
+timing = json.loads(timing_path.read_text())
+rows = [json.loads(x) for x in trace_path.read_text().splitlines() if x.startswith("{")]
+events = sorted([x for x in rows if x.get("kind") == "request_timeline"],
+                key=lambda x: x["dispatch_ticket"])
+start, end, hz = (timing[k] for k in ("animation_start_qpc", "animation_end_qpc", "qpc_frequency"))
+assert start < end and hz > 0 and all(x["qpc_frequency"] == hz for x in events)
+stages = [
+    ("receipt_to_queued", "received_qpc", "queued_qpc"),
+    ("queue_to_entry", "queued_qpc", "entered_qpc"),
+    ("execution", "entered_qpc", "finished_qpc"),
+    ("finish_to_reply", "finished_qpc", "reply_qpc"),
+    ("reply_to_ack", "reply_qpc", "acknowledged_qpc"),
+]
+totals = {name: 0.0 for name, _, _ in stages}
+totals["ack_to_next_receipt"] = 0.0
+gaps = []
+
+
+def overlap(left, right):
+    return max(0, min(end, right) - max(start, left)) * 1000 / hz
+
+
+for index, event in enumerate(events):
+    for name, left, right in stages:
+        assert event[left] <= event[right]
+        totals[name] += overlap(event[left], event[right])
+    if index + 1 < len(events):
+        following = events[index + 1]
+        elapsed = overlap(event["acknowledged_qpc"], following["received_qpc"])
+        totals["ack_to_next_receipt"] += elapsed
+        if elapsed:
+            gaps.append(dict(after_ticket=event["dispatch_ticket"],
+                             before_ticket=following["dispatch_ticket"], ms=elapsed))
+duration = (end - start) * 1000 / hz
+assert math.isclose(sum(totals.values()), duration, rel_tol=0, abs_tol=1e-6)
+report = dict(completed=True, passed=True, new_device_execution=False,
+              interval_ms=duration, stages_ms=totals,
+              largest_receipt_gaps=sorted(gaps, key=lambda x: x["ms"], reverse=True)[:20],
+              source_sha256={str(p): hashlib.sha256(p.read_bytes()).hexdigest()
+                             for p in (timing_path, trace_path)},
+              scope="Exact accounting of this retained parent-worker interval. Receipt gaps include client work and transport; these timestamps do not distinguish copying, admission checks, DWM scheduling or other causes. No achieved speedup or future frame-rate prediction.")
+out = Path("results/render-driver/animation-transport-v1")
+out.mkdir(exist_ok=False)
+(out / "report.json").write_text(json.dumps(report, indent=2) + "\n")
+print(json.dumps({k: v for k, v in report.items() if k not in ("largest_receipt_gaps", "source_sha256")}))

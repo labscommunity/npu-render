@@ -40,6 +40,14 @@ preserves all 3,888 A/B/B/A images but increases aggregate parent time by 7.50%.
 Its provider-recovery tests pass; its live promotion gate rejects the regression
 before any desktop change. Cacheable input memory is not a rendering fix here.
 
+The [balanced-geometry comparison](../validation/2026-10-20/native-balanced-geometry-v1/README.md)
+preserves all 3,888 images and reduces aggregate request time by 1.90%, below the
+five-percent live promotion threshold. The
+[transport accounting](../validation/2026-10-20/native-animation-transport-analysis-v1/README.md)
+also identifies 1,619.620 ms between acknowledgments and subsequent request
+receipts in the retained ten-second animation. Client-side attribution remains
+open; these gaps are not proven to be copying, admission checks or scheduling.
+
 The preceding
 [filled-program live v54 trial](../validation/2026-10-16/native-filled-program-live-v1/README.md)
 passes 1,225 acknowledged NPU operations, 57 exact physical submissions, a shared
@@ -311,10 +319,9 @@ role, and any GPU rendering/copy cost in the bridge must be measured.
    its desktop promotion correctly stops. For subsequent candidates require
    at least five percent aggregate request-time improvement and provider-fault
    recovery before repeating registered graphics and the finite desktop trial.
-3. Separately test balanced geometry packing. The current 4,096-record schedule
-   fills two of six kernel spans; the candidate distributes records across all
-   six without changing NPU arithmetic. All 972 retained images pass; the
-   alternating-order timing comparison remains pending. Do not
+3. Retain balanced geometry packing as a small component result: all 972 images
+   and all 3,888 A/B/B/A images pass, but request time improves only 1.90%.
+   It does not meet the five-percent live promotion threshold. Do not
    infer physical tile utilization or desktop throughput from partition counts.
    Whole-request and per-call cache estimates are too small to justify treating
    caching as the principal fix. Continue reducing measured shader and launch
@@ -323,6 +330,12 @@ role, and any GPU rendering/copy cost in the bridge must be measured.
    existing rectangle kernel. The live trace shows a sixty-call draw still using
    the old affine path. Preserve whole-batch geometry preflight, draw order and
    exact output before considering any timing result.
+   A separate combined clipping kernel places small textures, coverage, sampling
+   and blending in one NPU call per batch. Local fixtures pass; target execution
+   and integration remain pending. Its first target link failed on missing
+   `memset`, and the first quad selection omitted all five relevant draws.
+   Preserve both failed attempts while correcting linkage and test selection.
+   Measure the client-side request gaps as well as child rendering costs.
 4. After responsiveness passes, run the current renderer's thirty-minute soak,
    sleep/wake, secure-desktop and owned-failure recovery. Keep moving/resizing
    windows and broader desktop interaction separate from the simple color fixture.

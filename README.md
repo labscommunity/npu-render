@@ -28,6 +28,9 @@ as the animation bottleneck. Tahoma throughput has not been measured in this set
 The [host-memory experiment](docs/validation/2026-10-20/native-host-tensor-rejected-v1/README.md)
 preserves all 3,888 replay images but increases aggregate request time by 7.50%.
 Its live promotion is rejected before any desktop change.
+The [balanced-geometry candidate](docs/validation/2026-10-20/native-balanced-geometry-v1/README.md)
+preserves every image but improves aggregate request time by only 1.90%, below
+the five-percent threshold for a new live trial.
 
 Its [complete-image component comparison](docs/validation/2026-10-16/native-filled-program-comparison-v1/README.md)
 preserves all 1,852 preceding NPU images. Across 1,389 warm pairs, aggregate draw
