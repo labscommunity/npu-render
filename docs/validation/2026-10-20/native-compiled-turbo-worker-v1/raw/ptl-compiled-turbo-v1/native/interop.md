@@ -1,0 +1,314 @@
+# Graphics-buffer interoperability experiment
+
+`nr_d3d12_interop` is a Windows-only, opt-in hardware probe. CI compiles it but does
+not run it on machines without the target hardware. It creates an Intel D3D12
+device, three shared cross-adapter L0 heaps, and placed linear buffers. Two heaps
+carry background/foreground pixels; the third receives NPU-composited pixels.
+The default format is FP16 planes; `--packed-u8` uses interleaved BGRA8 and performs
+conversion, source-over, clamping and byte rounding on the NPU.
+
+The sequence is: CPU fixture → D3D12 upload → GPU copy to shared input heaps →
+GPU fence completion → NPU source-over using imported NT handles → synchronous
+NPU completion → GPU copy from shared output heap → readback → independent pixel
+check. Eight changing frames reuse allocations, checking stale-buffer behavior.
+All inference requests and remote tensors die before the D3D12 heaps and handles.
+
+This proves a shared allocation handoff only if it passes on hardware. It does not
+prove arbitrary texture import, implicit fence interoperability, zero internal
+driver copies, scanout, or application/compositor performance. The fixture still
+uses upload and readback copies, and serializes producer/consumer completion on
+the host. The default fixture is 64×64; `--width` / `--height` accept extents up to
+4096, and `--frames` controls the number of changing fixtures.
+
+The probe uses OpenVINO's documented low-level parameter map (`MEM_TYPE`,
+`MEM_HANDLE`, `TENSOR_TYPE`) to avoid depending on device-specific headers omitted
+from some wheel distributions. String enum values are defined by the pinned
+2026.1.0 public header. Heap flags and placement follow the same contract exercised
+by Intel's NPU DX12 remote-tensor tests; buffer barriers and bounded fence waits
+are explicit here. The runtime must report NPU execution and every pixel must
+match the source-over oracle within the existing exploratory FP16 tolerance.
+
+Build with `tools/build_native.py`, then run `build/native/Release/nr_d3d12_interop.exe`
+with the pinned OpenVINO `libs` directory on the process PATH. JSON reports include
+failure stage, graphics adapter, actual NPU execution, per-call time and complete
+fixture upload/inference/readback/check time. Never treat an unsupported import as
+a successful copied fallback.
+
+`--host-tensors` is a diagnostic comparison that explicitly disables shared tensor
+binding and reports `input_and_output_shared: false`. It helped isolate a large-shape
+accuracy issue from buffer synchronization. Normalizing all input bytes to 0–1 and
+rescaling the result produced errors near three byte values at 720p/1080p, with
+both shared and ordinary host tensors. Keeping colors in byte units and normalizing
+only alpha fixed the captured fixtures. Direct NHWC arithmetic was also measured,
+but was slower than conversion through planar arithmetic. The final model lives in
+`windows/blend_model.hpp` and is shared by this probe and the native window.
+
+The original byte-unit planar graph passed eight changing frames at 720p and 1080p. Warm NPU
+calls were approximately 9.8–10.3 ms and 21.1–22.1 ms respectively. The FP16 planar
+1080p graph took approximately 3.9–5.0 ms. These are separate small experiments,
+not claims of equal clocks or an isolated conversion cost. The complete fixture
+time includes deliberately expensive CPU fixture generation and pixel checking;
+it is not an application frame-time benchmark. See the dated validation artifacts.
+
+The current graph groups four neighboring BGRA pixels into 16 channels, performs
+the same per-pixel arithmetic, and restores their byte order. Shared-buffer tests
+reduced warm NPU calls to about 4.8–5.1 ms at 720p and 9.3–9.7 ms at 1080p, with
+the same pixel gate. `nr_d3d12_interop --pixel-group 1` reproduces the original
+layout; groups 4/16/32 are diagnostic alternatives. Non-divisible widths use group
+one. This selection never changes the execution device. See the
+[grouping and downscale evidence](../docs/validation/2026-10-06/layout/README.md).
+
+## Native Windows application
+
+`nr_native_live.exe` binds the same shared allocations to an explicit NPU graph or
+a native D3D12 compute shader. CPU mode uses integer source-over. All three paths
+use a BGRA8 contract in the supplied encoded color space, and startup checks opaque,
+transparent and fractional-alpha fixtures at the exact selected resolution against
+the integer oracle. GPU/NPU error must be at most one byte value. Every provider is
+prepared before the window opens; switching activates an already qualified provider
+between frames. A failed qualification aborts startup explicitly.
+
+The application copies one CPU-generated animated foreground into a shared buffer;
+its background is uploaded once. NPU mode performs byte conversion and blending on
+the NPU, then D3D12 copies the shared output directly into a flip-model swapchain.
+There is no per-frame GPU readback or host output conversion. GPU transfers,
+host-waited fences, the OS compositor and display engine remain involved. CPU mode
+avoids uploading input surfaces and uploads its composed output. The GPU baseline
+uses a compute shader, unlike the earlier Python OpenVINO-GPU baseline.
+
+```powershell
+uv run --group native python tools/build_native.py --devices GPU NPU CPU
+# Put the pinned OpenVINO libs directory on PATH, or use the packaged run.cmd.
+build/native/Release/nr_native_live.exe --seconds 60 --sequence NPU,CPU,GPU --switch-every 15
+uv run npu-render select NPU
+uv run python tools/validate_native_live.py --executable build/native/Release/nr_native_live.exe
+```
+
+Keys 1/2/3 choose GPU/NPU/CPU; Escape exits. By default the native window watches the
+same canonical selection file as the CLI every 250 ms. `--config` overrides its
+path. `--backend` or `NPU_RENDER_BACKEND` pins file selection. Invalid saved choices
+keep the active renderer; indexed names and escaped JSON forms are unsupported in
+this small adapter. Width must be a multiple of 64 for the D3D12 copy row pitch.
+Reports include every frame's stage timings, backend, presentation HRESULT, missed
+deadlines, skipped replay slots, and selection/rejection events. Pacing uses a
+process-local high-resolution waitable timer.
+
+The first native window/control run on Delta found an active screen-saver desktop:
+all calls returned `DXGI_STATUS_OCCLUDED`. Its rendering/control results are valid,
+but it is **not a visible-presentation result**. The validator's explicit
+`--allow-occluded` option permits only that narrower check. The native inference
+benchmark refuses occluded trials, including an occluded initial idle frame.
+`S_OK` itself still does not establish physical scanout timing.
+
+After the full restart activated driver 5540, the same installed bundle passed the
+720p control validator without `--allow-occluded`. Twenty native Tahoma trials also
+passed every desktop and presentation check. NPU graphics reduced median paired
+inference throughput by 5.9% versus the native GPU shader. See the
+[new-driver evidence](../docs/validation/2026-10-07/README.md); the earlier occluded
+captures remain unchanged.
+
+`npu-render session --require-desktop` reads session connection state, window
+station, thread/input desktops and monitor count. The contention harness records
+and checks these before inference warmup and around every trial, including IDLE.
+It never changes desktops, sends input or unlocks Windows. Per-frame presentation
+checks remain required; matching desktop names alone do not prove delivery.
+
+When launching a limited interactive task from an elevated SSH session, use a
+report directory writable by that desktop user, for example
+`%LOCALAPPDATA%\npu-render\checks`. An administrator-writable scratch directory
+can make the task exit before writing any report. The installed application uses
+the normal per-user directory; no broad permission changes are necessary.
+
+```powershell
+uv run python tools/benchmark_native.py --executable build/native/Release/nr_native_live.exe `
+  --endpoint http://127.0.0.1:8000/v1 --model YOUR_MODEL --inference-device GPU
+```
+
+This rotates five GPU/NPU/CPU/idle rounds with three requests each, preserving
+per-request and per-frame measurements. It checks for premature renderer exit,
+occlusion and unexpected backend changes. The native trace has one foreground
+surface, so do not compare its numbers directly with the earlier two-layer trace.
+The Windows CI job also builds a private portable bundle containing the runtime,
+notices, launch script and file-hash manifest. It requires installed Intel drivers
+and the Microsoft Visual C++ x64 runtime, but no Python installation.
+The [installed ee4d711 bundle](../docs/validation/2026-10-06/bundle-ee4d711/README.md)
+passed pixel qualification with its bundled runtime and records its loaded driver.
+
+For driver qualification, pass `--expected-npu-driver 1005540` to the native
+window or benchmark harness. The window checks its own loaded runtime before NPU
+compilation and readiness. Its report includes `openvino_runtime`,
+`npu_driver_version` and any property-query error. The harness independently
+records its Python runtime stack and requires the child report to match too;
+adjacent DLLs can otherwise make their runtimes differ. Use the exact version
+spelling emitted by the runtime, not the Windows INF version.
+
+### Diagnose NPU composition cost
+
+`--npu-alpha convolution` replaces the alpha extraction/broadcast/inversion
+sequence with a sparse 1×1 channel convolution. Input/output byte order and the
+original clamp/rounding contract remain unchanged. The default is still `gather`;
+the alternate path requires the same full-shape pixel qualification and explicit
+NPU execution. `--profile-npu` records the final NPU request's device profiling
+entries. Entries can overlap: do not sum them as wall time or interpret their
+`cpu_ms` as host CPU utilization. Profiling is off during throughput comparisons.
+
+Live reports separately record process kernel+user CPU seconds and elapsed live
+seconds, excluding preparation. Their ratio measures CPU core equivalents (1.0
+is one fully occupied logical CPU), including settling time. It is not the
+percentage of the whole machine's CPU capacity.
+
+```powershell
+uv run python tools/benchmark_native.py --executable build/native/Release/nr_native_live.exe `
+  --endpoint http://127.0.0.1:18080/v1 --model YOUR_MODEL --inference-device GPU `
+  --expected-npu-driver 1005540 --conditions GPU,NPU,NPU_CONV,IDLE `
+  --warmup-seconds 120 --report results/native-cost.json
+```
+
+`NPU` denotes the baseline gather graph; `NPU_CONV` explicitly requests the
+convolution graph. Their reported execution backend remains `NPU`. The harness
+rejects a graph mismatch, preserves paired comparisons, and records Windows AC/
+battery status around each trial. `--warmup-seconds` adds sustained inference
+requests after the initial warmup; it does not guarantee a fixed thermal state.
+Review concurrent clock/power telemetry before interpreting throughput differences.
+
+For a controlled investigation of interference, the harness also accepts:
+
+| Condition | Work repeated at the requested frame rate | Purpose |
+|---|---|---|
+| `NPU_ONLY` | Convolution NPU composition on inputs uploaded once | Test NPU/driver activity without animated scene generation, repeated uploads or presentation |
+| `GPU_WAIT` | Full animated GPU path plus a 3 ms paced host wait after composition | Test elapsed frame time without introducing NPU activity |
+| `TRANSFER_PRESENT` | Scene generation, input upload and presentation of an unchanged output | Test surrounding work without a repeated blend |
+
+`NPU_ONLY` and `TRANSFER_PRESENT` deliberately omit stages and are **not complete
+graphics implementations**. Each still qualifies its providers and presents an
+initial frame before measurement. Their differences cannot be added or subtracted
+to partition the normal renderer's slowdown: inputs, output changes and overlapping
+activity differ. In particular, `NPU_ONLY` retains inference-driver and memory costs;
+it does not isolate NPU arithmetic from those costs.
+
+```powershell
+uv run python tools/benchmark_native.py --executable build/native/Release/nr_native_live.exe `
+  --endpoint http://127.0.0.1:18080/v1 --model YOUR_MODEL --inference-device GPU `
+  --expected-npu-driver 1005540 --warmup-seconds 120 `
+  --conditions GPU,NPU_CONV,NPU_ONLY,GPU_WAIT,TRANSFER_PRESENT,IDLE `
+  --report results/native-controls.json
+```
+
+Native flags are `--diagnostic compute-only|transfer-present` and
+`--diagnostic-wait-ms 3`. They require a pinned backend; selection-file and key
+switching are disabled during diagnostics. Reports identify the mode, omitted
+stages, actual wait duration, and composition/presentation separately for each
+iteration. An omitted presentation has a null HRESULT, never a fabricated success.
+The analyzer counts only actual presentation calls as submissions. Ordinary
+rendering remains the default.
+
+The optional read-only Intel graphics telemetry probe builds against an external,
+pinned [IGCL checkout](https://github.com/intel/drivers.gpu.control-library):
+
+```powershell
+git clone https://github.com/intel/drivers.gpu.control-library results/igcl
+git -C results/igcl checkout b6c462933502e13d1537dd5024949a51be30e63d
+# First configure the normal native build using tools/build_native.py.
+uv run --group native cmake -S native -B build/native -DNR_IGCL_ROOT="$PWD/results/igcl"
+uv run --group native cmake --build build/native --config Release --target nr_gpu_power_probe
+build/native/Release/nr_gpu_power_probe.exe 900 results/igcl.jsonl
+```
+
+Run the probe in a separate terminal during the benchmark. It samples at roughly
+2 Hz, loads Intel's installed system library, and calls no setters. Initialization,
+adapter identity, API status, units and per-metric support are retained. A completed
+capture does not imply that every metric is supported. GPU energy is not package
+or NPU energy. No IGCL source or driver binary is bundled in the prototype.
+
+```sh
+python research/analyze_native_cost.py results/native-cost.json results/igcl.jsonl --output results/native-cost-summary.json
+```
+
+The analyzer uses only adjacent valid counter intervals wholly inside inference,
+checks units and counter resets, and keeps unsupported readings null. See the
+[measured cost investigation](../docs/validation/2026-10-07/slowdown/README.md).
+
+`nr_dxcore_probe.exe` inspects Direct3D adapter attributes and device creation.
+It is a diagnostic built with the native tools, not a rendering backend. A listed
+adapter or successful device creation does not prove custom shader execution.
+
+Primary references:
+
+- [OpenVINO NPU remote tensor interface](https://docs.openvino.ai/2026/openvino-workflow/running-inference/inference-devices-and-modes/npu-device/remote-tensor-api-npu-plugin.html)
+- [Pinned remote property definitions](https://github.com/openvinotoolkit/openvino/blob/2026.1.0/src/inference/include/openvino/runtime/intel_npu/remote_properties.hpp)
+- [Intel's pinned DX12 interoperability tests](https://github.com/openvinotoolkit/openvino/blob/2026.1.0/src/plugins/intel_npu/tests/functional/behavior/remote_tensor_tests/dx12_remote_run.hpp)
+- [Microsoft shared heaps and cross-adapter restrictions](https://learn.microsoft.com/en-us/windows/win32/direct3d12/shared-heaps)
+- [Microsoft GPU synchronization](https://learn.microsoft.com/en-us/windows/win32/direct3d12/user-mode-heap-synchronization)
+- [Microsoft presentation return values](https://learn.microsoft.com/en-us/windows/win32/api/dxgi/nf-dxgi-idxgiswapchain-present)
+
+## Cooperating Windows surfaces
+
+The private bundle includes `run-delegate.cmd` (Windows 11, unlocked desktop).
+It creates three opaque GDI windows and starts with Windows composing them.
+Press **1** for DWM, **2** for NPU, **3** for GPU, or **Escape** to exit.
+The default is 1280×720 at 30 updates/s for 30 minutes. Keep the canvas visible;
+the startup and final screen-pixel checks deliberately reject occlusion.
+
+```powershell
+$env:PATH="$PWD\runtime;$env:PATH"
+.\nr_desktop_delegate.exe --fps 30 --seconds 30 --sequence NPU,GPU,DWM --switch-every 7 --report delegate.json
+```
+
+In DWM mode the three original windows remain visible and move over a static
+canvas. In delegated modes the selected device resolves their overlap in shared
+buffers; the originals are hidden only after a replacement frame is ready. The
+same source pixels, motion and z-order are used in all modes. Returning to DWM
+restores the original windows. Invalid selections retain the current mode; a
+runtime failure attempts to restore these owned surfaces to DWM and reports failure.
+
+This is a bounded compositor handoff for cooperating surfaces. It does not hook
+`dwm.exe`, capture the finished desktop, intercept arbitrary applications or
+replace the taskbar. Source painting and placement still use the CPU; shared-buffer
+uploads, final presentation and the outer DWM retain GPU work. Only the owned test
+windows are hidden or moved. Their transitions and rounded corners are disabled
+locally to preserve the rectangular pixel contract; system settings are unchanged.
+
+Eight independent offscreen oracle cases and on-screen DWM/NPU/GPU comparisons
+run before timing. The report distinguishes original-window visibility, NPU/GPU
+composition calls, DWM move calls, copy/composition/presentation costs and restoration.
+DWM window movements are not counted as this process's swapchain presentations.
+Submission status and screen snapshots do not measure physical scanout cadence.
+
+`--npu-graph opaque-select` tests an alpha-0/255-only Select graph; it is not a
+translucent compositor. It passes byte-exact NPU checks, but the measured graph
+is slower than the default source-over graph. `--npu-workload EFFICIENT` requests
+lower execution priority and `--npu-tiles 1` limits compiler tile allocation.
+Neither established a reliable Tahoma improvement; defaults remain unchanged.
+See the [hardware evidence](../docs/validation/2026-10-07/desktop-delegate/README.md).
+
+`nr_windows_route_probe.exe` directly queries the OpenVINO GPU and NPU adapter
+identities and tries explicit Direct3D device creation. It performs no desktop
+redirection and never substitutes the default adapter. Delta's NPU is found through
+DXCore but rejects the tested Direct3D device-creation routes with its current driver.
+
+For the cooperating-window experiment, `--placement retained` uploads the three
+immutable source images once, keeps separate foreground planes, and uses GPU
+row copies to position them. It clears only pixels vacated since the preceding
+composition, preserving zeroes elsewhere. Both GPU and NPU modes use this same
+placement path. NPU mode still performs the three full-canvas blend calls; this
+option does not claim NPU-only placement or damage-limited NPU computation.
+
+Reports include the placement provider, foreground host-upload bytes per live
+frame and GPU placement-copy payload. `preparation_upload_bytes` counts the
+retained-source setup (three source images and the transparent clear buffer), not
+all renderer initialization or qualification traffic. GPU copy payload excludes
+blend reads/writes and final presentation; it is not measured DRAM bandwidth.
+The default remains `--placement staged` for comparison. Retained mode currently
+assumes immutable source pixels; changing application content needs explicit
+source updates and lifecycle integration.
+
+`--placement retained-rect` uses rectangular `CopyTextureRegion` commands instead
+of row-by-row `CopyBufferRegion` commands. Source rows are padded to the required
+256-byte copy pitch; shared foreground planes remain tightly packed at the
+existing supported canvas widths. Both retained variants use the same independent
+pixel gates and report the same operation scope.
+
+The [retained-buffer experiment](../docs/validation/2026-10-08/retained-windows/README.md)
+found that row copies add GPU overhead. Rectangle batching improves the NPU path
+but still reduces Tahoma throughput versus DWM. Both flags remain experimental;
+the default remains staged placement, and the normal launcher starts in DWM mode.

@@ -1,0 +1,14 @@
+"""Account for preparation in completed qualification; not warm benchmark timing."""
+from pathlib import Path
+import hashlib,json,os
+vm=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm';out=vm/'compiled-turbo-preparation-v1.json';assert not out.exists()
+result=[]
+for stage in ('selected','full'):
+ p=vm/f'ptl-native-worker-v30-{stage}';proof=json.loads((p/'report.json').read_text());assert proof['completed'] and proof['passed']
+ f=p/'replay/provider-processes/generation-1/worker.stdout.jsonl';b=f.read_bytes();rows=[json.loads(s) for s in b.decode().splitlines() if s.startswith('{') and s.endswith('}')]
+ draws=[x for x in rows if x.get('passed') and x.get('execution_device')=='NPU' and 'compile_and_draw_ms' in x]
+ assert len(draws)==(174 if stage=='selected' else 972)
+ sums={k:sum(x.get(k,0) for x in draws) for k in ('compile_and_draw_ms','draw_ms','provider_setup_ms','backend_compile_ms','backend_compile_calls','compile_calls','memory_cache_requests','memory_cache_hits','cache_requests','cache_hits')}
+ result.append(dict(stage=stage,requests=len(draws),sums=sums,compiled_turbo_verifications=sum(bool(x.get('compiled_turbo_verified')) for x in rows),source_sha256=hashlib.sha256(b).hexdigest()))
+report=dict(passed=True,phases=result,scope='Completed qualification request counters, including any first-use compilation. Nested timings are not additive. No warm comparison, hardware-frequency, desktop or Tahoma claim.')
+out.write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report))

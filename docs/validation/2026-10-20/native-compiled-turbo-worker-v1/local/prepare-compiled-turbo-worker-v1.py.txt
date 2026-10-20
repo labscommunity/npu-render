@@ -1,0 +1,118 @@
+"""Extend the measured import hint to compiled NPU graphs in an isolated build."""
+from pathlib import Path
+import ast
+import hashlib
+import json
+import shutil
+import subprocess
+import tarfile
+
+r = Path(__file__).parent
+library = "ptl-compiled-turbo-v1"
+source = r / library
+assert not source.exists()
+old_library = json.loads((r / "native-routing-v45-source.json").read_text())
+for name, digest in old_library.items():
+    assert hashlib.sha256((r / "native-routing-v45" / name).read_bytes()).hexdigest() == digest
+shutil.copytree(r / "native-routing-v45", source)
+p = source / "native/windows/registered_lab/provider_compile.hpp"
+s = p.read_text()
+needle = '    if(shared)configured["NPU_SHARED_COMMON_QUEUE"]=*shared;'
+assert s.count(needle) == 1
+s = s.replace(needle, needle + '\n    if(backend=="NPU")configured["NPU_TURBO"]=true;')
+needle = "        int loaded=-1;"
+assert s.count(needle) == 1
+s = s.replace(needle, r'''        if(backend=="NPU"){
+            if(!compiled.get_property("NPU_TURBO").as<bool>())throw std::runtime_error("compiled NPU turbo readback failed");
+            std::printf("{\"compiled_turbo_verified\":true,\"requested\":true,\"readback\":true,\"global_power_policy_changed\":false}\n");std::fflush(stdout);
+        }
+''' + needle)
+p.write_text(s)
+manifest = {str(p.relative_to(source)): hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in source.rglob("*") if p.is_file()}
+assert set(manifest) == set(old_library)
+assert {name for name, digest in manifest.items() if old_library[name] != digest} == {
+    "native/windows/registered_lab/provider_compile.hpp"}
+(r / (library + "-source.json")).write_text(json.dumps(manifest, indent=2) + "\n")
+with tarfile.open(r / (library + ".tar.gz"), "w:gz") as archive:
+    archive.add(source, arcname=library)
+
+build = r'''$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$name='ptl-compiled-turbo-v1';$s="$r\vm\$name";$b="$r\builds\$name";$sdk="$r\toolchains\openvino-2026.4.1\Lib\site-packages\openvino";$log="$r\vm\build-$name.log"
+if((Test-Path $s) -or (Test-Path $b)){throw 'Provider experiment already exists'}
+& tar -xf "$r\vm\$name.tar.gz" -C "$r\vm";if($LASTEXITCODE){throw 'Extraction failed'}
+$expected=Get-Content "$r\vm\$name-source.json" -Raw|ConvertFrom-Json
+foreach($f in $expected.psobject.Properties){if((Get-FileHash "$s\$($f.Name)").Hash.ToLower() -ne $f.Value){throw 'Provider source mismatch'}}
+$env:CMAKE_BUILD_PARALLEL_LEVEL='4';$ErrorActionPreference='Continue'
+& cmake -S "$s\native\windows\registered_lab" -B $b -A x64 "-DOpenVINO_DIR=$sdk\cmake" "-DNR_WDK_INCLUDE_ROOT=$r\dependencies\wdk-26100.6584-headers" *> $log;$code=$LASTEXITCODE
+if(!$code){& cmake --build $b --config Release --clean-first --target nr_registered_vertex nr_registered_provider_cache nr_registered_provider_cache_test nr_registered_provider_memory_cache_test *>> $log;$code=$LASTEXITCODE}
+$ErrorActionPreference='Stop';if($code){Get-Content $log -Tail 15;throw 'Provider build failed'}
+$env:PATH="$sdk\libs;"+$env:PATH
+& ctest --test-dir $b -C Release -R "^registered_provider_(cache|memory_cache)_contract$" --no-tests=error --output-on-failure *> "$r\vm\$name-contract.log"
+if($LASTEXITCODE){throw 'Provider cache contract failed'}
+$contracts=[IO.File]::ReadAllText("$r\vm\$name-contract.log")
+if($contracts -notmatch '100% tests passed, 0 tests failed out of 2'){throw 'Expected exactly two cache contracts'}
+$libs=@{};foreach($n in @('nr_registered_vertex.lib','nr_registered_provider_cache.lib')){$libs[$n]=(Get-FileHash "$b\Release\$n").Hash}
+[ordered]@{clean_build=$true;source_sha256=$expected;library_sha256=$libs;cpu_cache_contracts_passed=$true;npu_execution=$false;desktop_changed=$false}|ConvertTo-Json -Depth 6|Set-Content "$b\build-report.json"
+Get-Content "$b\build-report.json" -Raw
+'''
+(r / "build-ptl-compiled-turbo-v1.ps1").write_text(build)
+worker = "ptl-native-worker-v30"
+dest = r / worker
+assert not dest.exists()
+shutil.copytree(r / "ptl-native-worker-v26", dest)
+worker_manifest = json.loads((r / "ptl-native-worker-v26-source.json").read_text())
+for name, digest in worker_manifest.items():
+    assert hashlib.sha256((dest / name).read_bytes()).hexdigest() == digest
+(r / (worker + "-source.json")).write_text(json.dumps(worker_manifest, indent=2) + "\n")
+with tarfile.open(r / (worker + ".tar.gz"), "w:gz") as archive:
+    archive.add(dest, arcname=worker)
+s = (r / "build-ptl-native-worker-v26.ps1").read_text().replace("worker-v26", "worker-v30")
+s = s.replace("native-routing-v45", library)
+(r / "build-ptl-native-worker-v30.ps1").write_text(s)
+s = (r / "qualify-ptl-native-worker-v26.py").read_text().replace("worker-v26", "worker-v30")
+needle = " report['passed']=True\n"
+assert s.count(needle) == 1
+s = s.replace(needle, """ compiled_turbo=[]
+ for log in (trial/'provider-processes').glob('generation-*/worker.stdout.jsonl'):
+  compiled_turbo += [x for x in rows(log) if x.get('compiled_turbo_verified')]
+ assert compiled_turbo and all(x['requested'] is True and x['readback'] is True and x['global_power_policy_changed'] is False for x in compiled_turbo)
+ report['compiled_turbo_imports']=len(compiled_turbo)
+""" + needle)
+ast.parse(s)
+(r / "qualify-ptl-native-worker-v30.py").write_text(s)
+s = (r / "qualify-turbo-render-comparison-v2.py").read_text().replace("turbo-render-comparison-v2", "compiled-turbo-comparison-v1")
+s = s.replace("ptl-native-worker-v26-full/report.json", "ptl-native-worker-v30-full/report.json", 1)
+s = s.replace("ptl-native-worker-v24-full/replay/replays.jsonl", "ptl-native-worker-v26-full/replay/replays.jsonl")
+s = s.replace("[('A1',24),('B1',26),('B2',26),('A2',24)]",
+              "[('A1',26),('B1',30),('B2',30),('A2',26)]")
+s = s.replace("  if version==26:assert len(turbo_events)>=9", "  assert len(turbo_events)>=9")
+s = s.replace("  else:assert not turbo_events\n", """  compiled_turbo=[x for x in child if x.get('compiled_turbo_verified')]
+  if version==30:assert compiled_turbo and all(x['requested'] and x['readback'] and not x['global_power_policy_changed'] for x in compiled_turbo)
+  else:assert not compiled_turbo
+""")
+s = s.replace("Four complete recorded replays in A/B/B/A order comparing the combined renderer with an otherwise identical renderer requesting NPU_TURBO on its ten custom-model import sites; compiled arithmetic and model blobs unchanged.",
+              "Four complete recorded replays in A/B/B/A order comparing the custom-import turbo renderer with the same renderer also requesting turbo for compiled NPU graphs. The provider libraries are rebuilt with that one header change; shader arithmetic and custom model blobs are unchanged.")
+ast.parse(s)
+(r / "qualify-compiled-turbo-comparison-v1.py").write_text(s)
+s = (r / "run-ptl-worker-v28-qualification.ps1").read_text().replace("worker-v28", "worker-v30").replace("complex-batch-comparison-v1", "compiled-turbo-comparison-v1")
+s = s.replace("ptl-worker-v27-qualification", "ptl-worker-v29-restart-v1-qualification")
+s = s.replace("waiting-for-vector-fill-comparison", "waiting-for-complex-batch-recovery")
+s = s.replace(" $q=Get-Content \"$vm/native-desktop-admission-v74/report.json\"", " $q=Get-Content \"$vm/native-desktop-admission-v74/report.json\"")
+needle = " Invoke-Step 'build'"
+assert s.count(needle) == 1
+s = s.replace(needle, r''' Invoke-Step 'provider-build' 'powershell.exe' ('-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+$vm+'\build-ptl-compiled-turbo-v1.ps1"') 1800
+ $q=Get-Content "$r/builds/ptl-compiled-turbo-v1/build-report.json" -Raw|ConvertFrom-Json
+ if(!$q.clean_build -or !$q.cpu_cache_contracts_passed){throw 'Provider build incomplete'}
+''' + needle)
+(r / "run-ptl-worker-v30-qualification.ps1").write_text(s)
+names = [library + ".tar.gz", library + "-source.json", "build-ptl-compiled-turbo-v1.ps1",
+         worker + ".tar.gz", worker + "-source.json", "build-ptl-native-worker-v30.ps1",
+         "qualify-ptl-native-worker-v30.py", "qualify-compiled-turbo-comparison-v1.py",
+         "run-ptl-worker-v30-qualification.ps1"]
+p = r / "ptl-worker-v30-tools-source.json"
+p.write_text(json.dumps({name: hashlib.sha256((r / name).read_bytes()).hexdigest() for name in names}, indent=2) + "\n")
+subprocess.run(["scp", "-q", *[str(r / name) for name in names], str(p),
+                "delta:AppData/Local/npu-render/vm/"], check=True, timeout=30)
+print(json.dumps(dict(prepared=worker, provider_source_change="provider_compile.hpp",
+                      host_worker_sources_identical_to=26, custom_model_blobs_unchanged=True,
+                      hardware_work_started=False, waits_for_preceding_recovery=True)))

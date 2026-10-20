@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="Win32-MSBuild"
+	tests="2"
+	failures="0"
+	disabled="0"
+	skipped="0"
+	hostname="delta"
+	time="0"
+	timestamp="2026-10-20T04:33:44"
+	>
+	<testcase name="registered_provider_cache_contract" classname="registered_provider_cache_contract" time="0.0200117" status="run">
+		<properties/>
+		<system-out>{"sha256_known_answers":true,"constant_permutation_isolated":true,"generated_names_stable":true,"source_model_unchanged":true,"shape_and_binding_names_isolated":true,"npu_execution_tested":false}
+</system-out>
+	</testcase>
+	<testcase name="registered_provider_memory_cache_contract" classname="registered_provider_memory_cache_contract" time="0.0705192" status="run">
+		<properties/>
+		<system-out>{"execution_device":"CPU","passed":true,"verified_values":2368,"backend_calls":4,"memory_hits":2,"evictions":3,"binding_identity_isolated":true,"properties_isolated":true,"independent_mutable_inputs":true,"creator_core_lifetime":true,"eviction_preserves_active_requests":true,"compile_failure_poisoned":true}
+</system-out>
+	</testcase>
+</testsuite>

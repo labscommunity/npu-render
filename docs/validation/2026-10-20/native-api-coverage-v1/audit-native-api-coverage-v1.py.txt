@@ -1,0 +1,28 @@
+"""Inventory explicit bindings in the qualified UMD; this is not API conformance."""
+from pathlib import Path
+import hashlib,json,re
+r=Path('results/render-driver');base=r/'native-auto-umd-v2';d=Path('docs/validation/2026-10-20/native-api-coverage-v1')
+assert not d.exists();d.mkdir(parents=True)
+manifest=json.loads((r/'native-auto-umd-v2-source.json').read_text())
+names=['native/windows/registered_lab/'+n for n in ('driver.cpp','draw.hpp','indexed_draw.hpp','native_auto_admission.hpp','native_probe_lease.hpp')]+['native/windows/ddi/unsupported.inc']
+items=[]
+for name in names:
+ b=(base/name).read_bytes();assert hashlib.sha256(b).hexdigest()==manifest[name]
+ p=d/'source'/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(b)
+ items.append(dict(path=str(p.relative_to(d)),bytes=len(b),sha256=hashlib.sha256(b).hexdigest(),source_manifest='native-auto-umd-v2-source.json'))
+s=(base/names[0]).read_text();draw=(base/names[1]).read_text();initial=(base/names[-1]).read_text()
+fields=set(re.findall(r'NR_REJECT\((pfn\w+)\)',initial));bound=set(re.findall(r'f\.(pfn\w+)\s*=',s+draw))
+for kind in re.findall(r'NR_BIND\((\w+),\s*\w+\)',s):
+ if kind!='Name':bound|={f'pfnCalcPrivate{kind}Size',f'pfnCreate{kind}',f'pfnDestroy{kind}'}
+assert len(fields)==101 and len(bound)==80 and bound<=fields
+rejected=sorted(fields-bound)
+assert len(rejected)==21 and {'pfnCreateQuery','pfnCreateDepthStencilView','pfnResourceResolveSubresource','pfnCreateGeometryShader'}<=set(rejected)
+null_only={'pfnGsSetShader':'null_shader','pfnSoSetTargets':'null_stream','pfnSetPredication':'null_predication'}
+for name,fn in null_only.items():assert re.search(r'f\.'+name+r'\s*=\s*'+fn+r'\s*;',draw)
+report=dict(source='native-auto-umd-v2',package_script='package-native-driver-v19.ps1',scope='Static source binding inventory; no new execution or feature-level conformance claim',default_rejection_entries=len(fields),overridden_entries=len(bound),remaining_explicit_rejections=rejected,null_only_bindings=null_only,synchronous_ordering_callbacks=['pfnFlush','pfnResourceReadAfterWriteHazard','pfnShaderResourceViewReadAfterWriteHazard'],dxgi_explicit_rejections=re.findall(r'NR_DXGI\((pfn\w+)\)',s),overridden_entry_names=sorted(bound),hardware_tested_by_audit=False,full_desktop_offload=False)
+extra={'coverage.json':(json.dumps(report,indent=2)+'\n').encode(),'native-auto-umd-v2-source.json':(r/'native-auto-umd-v2-source.json').read_bytes(),'package-native-driver-v19.ps1':(r/'package-native-driver-v19.ps1').read_bytes(),'audit-native-api-coverage-v1.py.txt':Path(__file__).read_bytes()}
+for name,b in extra.items():
+ (d/name).write_bytes(b);items.append(dict(path=name,bytes=len(b),sha256=hashlib.sha256(b).hexdigest()))
+(d/'artifact-sha256.json').write_text(json.dumps(items,indent=2)+'\n')
+(d/'.gitattributes').write_text('source/** -text whitespace=cr-at-eol,-blank-at-eol,-blank-at-eof\n*.ps1 -text whitespace=cr-at-eol,-blank-at-eol,-blank-at-eof\n*.py.txt -text whitespace=cr-at-eol,-blank-at-eol,-blank-at-eof\n')
+print(json.dumps(dict(artifacts=len(items),explicit_rejections=len(rejected),overridden_entries=len(bound),conformance_proven=False)))

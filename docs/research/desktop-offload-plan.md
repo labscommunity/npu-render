@@ -455,8 +455,11 @@ role, and any GPU rendering/copy cost in the bridge must be measured.
    improves its route but only 2.35% overall, below live promotion. The
    complex-shader batch result is now complete: exact images and recovery pass,
    but total time is 0.91% higher, so it remains unpromoted.
-   Qualify the compiled-graph turbo candidate, which changes one
-   provider header and preserves shader arithmetic. Individual component gains
+   The [compiled-graph turbo comparison](../validation/2026-10-20/native-compiled-turbo-worker-v1/README.md)
+   preserves all images and passes both recovery cases, but improves aggregate
+   time by only 3.13%. A combined vector-fill/turbo candidate is undergoing its
+   own full comparison and recovery tests; its gain cannot be inferred by adding
+   the individual results. Individual component gains
    remain too small to explain a path to 30 fps by themselves; reducing
    submissions and redundant work across whole frames remains necessary.
    The [frame command batching contract](frame-command-batching.md) specifies
@@ -478,7 +481,10 @@ role, and any GPU rendering/copy cost in the bridge must be measured.
 5. Extend automatic admission to continuous leases, renewal/revocation and multiple
    ordinary clients. Establish a real browser/video/3D capability matrix. Account
    for every operation still using the iGPU; a successful DWM trial does not prove
-   application migration.
+   application migration. The [current adapter inventory](windows-graphics-coverage.md)
+   identifies 21 device-table entries still explicitly rejected and the important
+   restrictions in callbacks that are bound. Use this concrete backlog alongside
+   application traces; callback counts are not a conformance percentage.
 6. Measure native-desktop GPU relief and Tahoma with matched display geometry,
    content, work rate, power and model settings. Keep this benefit gate separate
    from API coverage, and do not infer it from NPU execution or faster components.

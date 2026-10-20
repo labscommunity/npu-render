@@ -1,0 +1,62 @@
+"""Prepare bounded provider recovery for compiled-graph turbo without starting it."""
+from pathlib import Path
+import ast
+import hashlib
+import json
+import subprocess
+
+r = Path(__file__).parent
+s = (r / "qualify-turbo-render-provider-recovery-v1.py").read_text()
+s = s.replace("turbo-render-provider-recovery-v1", "compiled-turbo-provider-recovery-v1")
+s = s.replace("worker-v26", "worker-v30")
+needle = "  assert len(turbo_by_generation)==2\n"
+assert s.count(needle) == 1
+s = s.replace(needle, needle + """  compiled_by_generation={}
+  for f in (trial/'provider-processes').glob('generation-*/worker.stdout.jsonl'):
+   imported=[x for x in rows(f) if x.get('compiled_turbo_verified')]
+   assert imported and all(x['requested'] is True and x['readback'] is True and x['global_power_policy_changed'] is False for x in imported)
+   compiled_by_generation[f.parent.name]=len(imported)
+  assert len(compiled_by_generation)==2
+""")
+s = s.replace("phase=phase,passed=True,turbo_imports_by_generation",
+              "phase=phase,passed=True,compiled_turbo_imports_by_generation=compiled_by_generation,turbo_imports_by_generation")
+ast.parse(s)
+p = r / "qualify-compiled-turbo-provider-recovery-v1.py"
+assert not p.exists()
+p.write_text(s)
+controller = (r / "run-ptl-worker-v30-qualification.ps1").read_text()
+controller = controller.replace('$out="$vm\\ptl-worker-v30-qualification"',
+                                '$out="$vm\\ptl-worker-v30-recovery-qualification"')
+start = controller.index("try{\n\n")
+controller = controller[:start] + r'''
+try{
+ $report.active_phase='waiting-for-comparison';Save-Report
+ $deadline=[DateTime]::UtcNow.AddHours(3)
+ while($true){
+  $q=Get-Content "$vm/ptl-worker-v30-qualification/report.json" -Raw|ConvertFrom-Json
+  if($q.completed){break}
+  if([DateTime]::UtcNow -gt $deadline){throw 'Comparison deadline'}
+  Start-Sleep -Seconds 3
+ }
+ if(!$q.passed){throw 'Compiled turbo qualification incomplete'}
+ if(@(Get-Process nr_registered*,nr_native*,nr_ptl*,nr_frame_present_probe -ErrorAction SilentlyContinue).Count){throw 'Another graphics experiment is active'}
+ $sources=Get-Content "$vm/compiled-turbo-recovery-v1-source.json" -Raw|ConvertFrom-Json
+ foreach($f in $sources.psobject.Properties){if((Get-FileHash "$vm/$($f.Name)").Hash.ToLower() -ne $f.Value){throw 'Recovery source mismatch'}}
+ Invoke-Step 'provider-faults' "$r/toolchains/openvino-2026.4.1/Scripts/python.exe" ('"'+$vm+'\qualify-compiled-turbo-provider-recovery-v1.py"') 660
+ $q=Get-Content "$vm/compiled-turbo-provider-recovery-v1/report.json" -Raw|ConvertFrom-Json
+ if(!$q.completed -or !$q.passed -or @($q.phases).Count -ne 2){throw 'Recovery incomplete'}
+ $report.worker_sha256=$q.worker_sha256;$report.passed=$true
+}catch{$report.error=$_.Exception.Message}
+finally{$report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');Save-Report}
+Get-Content "$out/report.json" -Raw;if(!$report.passed){exit 1}
+'''
+cp = r / "run-ptl-worker-v30-recovery-qualification.ps1"
+assert not cp.exists()
+cp.write_text(controller)
+manifest = {x.name: hashlib.sha256(x.read_bytes()).hexdigest() for x in (p, cp)}
+mp = r / "compiled-turbo-recovery-v1-source.json"
+mp.write_text(json.dumps(manifest, indent=2) + "\n")
+subprocess.run(["scp", "-q", str(p), str(cp), str(mp),
+                "delta:AppData/Local/npu-render/vm/"], check=True, timeout=30)
+print(json.dumps(dict(prepared=True, started=False, worker=30,
+                      fault_modes=["provider-exception", "owned-child-termination"])))

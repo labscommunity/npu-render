@@ -1,0 +1,64 @@
+--- a/libweston/pixman-renderer.c
++++ b/libweston/pixman-renderer.c
+@@ -33,6 +33,7 @@
+ #include <assert.h>
+ 
+ #include "pixman-renderer.h"
++#include "npu-render-weston.h"
+ #include "color.h"
+ #include "pixel-formats.h"
+ #include "output-capture.h"
+@@ -73,6 +74,7 @@
+ 
+ struct pixman_renderer {
+ 	struct weston_renderer base;
++	struct nr_weston *offload;
+ 
+ 	int repaint_debug;
+ 	pixman_image_t *debug_color;
+@@ -364,7 +366,11 @@
+ 		mask_image = NULL;
+ 	}
+ 
+-	if (source_clip)
++	if (nr_weston_repaint(pr->offload, pixman_op, ps->image, target_image,
++			      &transform, filter, repaint_output,
++			      source_clip, ev->alpha)) {
++		/* The native provider completed this damage region. */
++	} else if (source_clip)
+ 		composite_clipped(output, ps->image, mask_image, target_image,
+ 				  &transform, filter, source_clip);
+ 	else
+@@ -881,6 +887,7 @@
+ 
+ 	wl_signal_emit(&pr->destroy_signal, pr);
+ 	weston_binding_destroy(pr->debug_binding);
++	nr_weston_destroy(pr->offload);
+ 	free(pr);
+ 
+ 	ec->renderer = NULL;
+@@ -1011,6 +1018,14 @@
+ 	renderer = zalloc(sizeof *renderer);
+ 	if (renderer == NULL)
+ 		return -1;
++
++	if (getenv("NPU_RENDER_NATIVE_LIBRARY")) {
++		renderer->offload = nr_weston_create();
++		if (!renderer->offload) {
++			free(renderer);
++			return -1;
++		}
++	}
+ 
+ 	renderer->repaint_debug = 0;
+ 	renderer->debug_color = NULL;
+--- a/libweston/meson.build
++++ b/libweston/meson.build
+@@ -28,6 +28,7 @@
+ 	'output-capture.c',
+ 	'pixel-formats.c',
+ 	'pixman-renderer.c',
++	'npu-render-weston.c',
+ 	'plugin-registry.c',
+ 	'screenshooter.c',
+ 	'timeline.c',

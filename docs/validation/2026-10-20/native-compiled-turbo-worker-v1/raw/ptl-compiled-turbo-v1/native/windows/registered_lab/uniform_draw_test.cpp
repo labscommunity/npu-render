@@ -1,0 +1,191 @@
+#include "uniform_draw.hpp"
+#include "blend_reference.hpp"
+#include "shader_contract.hpp"
+#include "shader_reference.hpp"
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
+#include <cstring>
+using namespace nr::raster;
+using namespace nr::shader;
+namespace {
+void test(bool value) { if (!value) throw std::runtime_error("uniform draw contract failed"); }
+std::vector<VertexRegisters> quad(float end, bool degenerate) {
+    const float xy[4][2]{{-1, 1}, {end, 1}, {end, -end}, {-1, -end}};
+    const unsigned order[]{0, 1, 2, 2, 3, 0}; std::vector<VertexRegisters> result(6);
+    for (unsigned i = 0; i < 6; ++i) {
+        const auto index = degenerate ? 0 : order[i];
+        result[i][0] = {as_bits(xy[index][0]), as_bits(xy[index][1]), as_bits(.5f), as_bits(1.f)};
+        result[i][1] = {as_bits(1.f), as_bits(1.f), as_bits(1.f), as_bits(1.f)};
+    }
+    return result;
+}
+}
+int main(int argc, char **argv) try {
+    const std::string backend = argc > 1 ? argv[1] : "CPU";
+    const auto vw = nr::registered_lab::shader_tokens(R"(
+cbuffer C {float4 color;};
+struct O {float4 p:SV_Position; float4 c:COLOR;};
+O main(float4 p:POSITION,float4 c:COLOR) {O o;o.p=p;o.c=c*color;return o;})", "vs_4_0");
+    const auto pw = nr::registered_lab::shader_tokens("float4 main(float4 p:SV_Position,float4 c:COLOR):SV_Target{return c;}", "ps_4_0");
+    const auto vs = parse_vertex(vw.data(), vw.size()), ps = parse_pixel(pw.data(), pw.size());
+    // Odd areas used to reduce a 4096-pixel batch to 1 or 8 pixels, rejecting
+    // ordinary window draws. Check every output byte, clipping and padded tails.
+    uint64_t partial_components=0;
+    for(const auto extent:{std::array<uint32_t,2>{31,29},{756,406},{1,1},{64,17}}) {
+        const auto w=extent[0],h=extent[1],batch=UniformDrawExecutor::raster_batch(w,h);
+        test(batch>=uint64_t(w)*h || batch==4096);
+        test(w!=756 || batch==4096);
+        const PackedColor old{8,20,80,100};const std::vector<PackedColor> background(size_t(w)*h,old);
+        UniformDrawExecutor partial(vs,ps,6,w,h,backend,BlendMode::destination_in,true,5,batch);
+        VertexConstants constants;constants[0].push_back({as_bits(.25f),as_bits(.125f),as_bits(.0625f),as_bits(.5f)});
+        const Viewport viewport{0,0,float(w),float(h),0,1};
+        for(const bool clipped:{false,true}) {
+            const std::array<int32_t,4> clip{clipped?1:0,clipped?1:0,int32_t(w),int32_t(h)};
+            const auto result=partial.execute(quad(1,false),constants,{},viewport,background,clip);
+            test(result.execution_device.rfind(backend,0)==0 && !result.used_rectangle);
+            test(result.covered_samples==uint64_t(w-uint32_t(clipped))*uint64_t(h-uint32_t(clipped)));
+            test(result.tile_executions<=2*((uint64_t(w)*h+batch-1)/batch));
+            for(uint32_t y=0;y<h;++y)for(uint32_t x=0;x<w;++x)for(unsigned c=0;c<4;++c) {
+                const bool changed=x>=uint32_t(clip[0]) && y>=uint32_t(clip[1]) && (c==0 || c==2);
+                test(result.pixels[size_t(y)*w+x][c]==(changed?old[c]/2:old[c]));++partial_components;
+            }
+            test(background==std::vector<PackedColor>(size_t(w)*h,old));
+        }
+    }
+    std::printf("{\"uniform_partial_batch_components\":%llu,\"execution_device\":\"%s\",\"passed\":true}\n",static_cast<unsigned long long>(partial_components),backend.c_str());
+    {
+        const std::vector<PackedColor> old_pixels(1024*768,PackedColor{7,11,13,17});
+        UniformDrawExecutor sparse(vs,ps,66,1024,768,backend,false,true,15,4096);
+        VertexConstants constants;constants[0].push_back({as_bits(1),as_bits(1),as_bits(1),as_bits(1)});
+        std::vector<VertexRegisters> sparse_vertices,dense;auto tiny=quad(1,false);const auto full=quad(1,false);
+        for(auto &v:tiny){v[0][0]=as_bits(-1+(as_float(v[0][0])+1)/32);v[0][1]=as_bits(1-(1-as_float(v[0][1]))/24);}
+        for(unsigned n=0;n<11;++n){sparse_vertices.insert(sparse_vertices.end(),tiny.begin(),tiny.end());dense.insert(dense.end(),full.begin(),full.end());}
+        const Viewport desktop{0,0,1024,768,0,1};
+        const auto result=sparse.execute(sparse_vertices,constants,{},desktop,old_pixels);
+        test(result.execution_device.rfind(backend,0)==0 && result.covered_samples==11*32*32 && result.tile_executions==22);
+        for(unsigned y=0;y<768;++y)for(unsigned x=0;x<1024;++x)
+            test(result.pixels[size_t(y)*1024+x]==(x<32 && y<32?PackedColor{255,255,255,255}:old_pixels[size_t(y)*1024+x]));
+        bool rejected=false;try{(void)sparse.execute(dense,constants,{},desktop,old_pixels);}catch(const std::invalid_argument&){rejected=true;}
+        test(rejected && old_pixels==std::vector<PackedColor>(1024*768,PackedColor{7,11,13,17}));
+        std::printf("{\"sparse_uniform_vertices\":66,\"covered_samples\":11264,\"tile_executions\":22,\"dense_budget_rejected\":true,\"execution_device\":\"%s\"}\n",backend.c_str());
+    }
+    const Viewport viewport{0, 0, 64, 64, 0, 1};
+    const PackedColor old{8, 20, 80, 100}; const std::vector<PackedColor> background(4096, old);
+    UniformDrawExecutor executor(vs, ps, 6, 64, 64, backend, true, true, 15, 256);
+    uint64_t checked = 0;
+    for (unsigned frame = 0; frame < 6; ++frame) {
+        const bool partial = frame == 2 || frame == 5, empty = frame == 3;
+        const Color color = frame == 0 ? Color{0, 0, 0, 1} : (frame == 4 ? Color{.5f, .25f, .125f, 1} : Color{.25f, .125f, .0625f, .5f});
+        VertexConstants cb; cb[0].resize(1); std::memcpy(cb[0][0].data(), color.data(), 16);
+        const auto inputs = quad(partial ? 0.f : 1.f, empty);
+        const auto result = executor.execute(inputs, cb, {}, viewport, background);
+        test(result.used_rectangle == (frame == 0 || frame == 4));
+        test(result.covered_samples == (empty ? 0u : (partial ? 1024u : 4096u)));
+        for (unsigned y = 0; y < 64; ++y) for (unsigned x = 0; x < 64; ++x) for (unsigned c = 0; c < 4; ++c) {
+            const bool covered = !empty && (!partial || (x < 32 && y < 32)); const auto source = c < 3 ? 2 - c : c;
+            const auto expected = covered ? uint8_t(std::nearbyint(double(color[source]) * 255 + double(old[c]) * (1 - double(color[3])))) : old[c];
+            test(result.pixels[size_t(y) * 64 + x][c] == expected); ++checked;
+        }
+        test(background == std::vector<PackedColor>(4096, old));
+        std::printf("{\"uniform_draw\":true,\"frame\":%u,\"covered_samples\":%llu,\"draw_ms\":%.3f,\"execution_device\":\"%s\",\"desktop_offload_tested\":false}\n",
+            frame, static_cast<unsigned long long>(result.covered_samples), result.timings.total_ms, result.execution_device.c_str());
+    }
+    // Destination masks must not enter the source-copy rectangle shortcut,
+    // including alpha=1. Verify spatially varying alpha, swizzle and write masks.
+    for(uint32_t mode_index=2;mode_index<blend_factors.size();++mode_index) for(const bool bgra : {false,true}) {
+        const auto mode=BlendMode(mode_index);UniformDrawExecutor mask_draw(vs,ps,6,64,64,backend,mode,bgra,5,256);
+        auto inputs=quad(1,false);VertexConstants cb;cb[0].push_back({as_bits(1.f),as_bits(1.f),as_bits(1.f),as_bits(1.f)});
+        for(auto &v:inputs)v[1]={as_bits(.75f),as_bits(.25f),as_bits(1.f),as_bits((as_float(v[0][0])+1)*.5f)};
+        const auto result=mask_draw.execute(inputs,cb,{},viewport,background,std::array<int32_t,4>{5,7,61,59});
+        test(!result.used_rectangle && result.covered_samples==56*52);
+        for(unsigned y=0;y<64;++y)for(unsigned x=0;x<64;++x)for(unsigned c=0;c<4;++c) {
+            const auto lane=bgra && c<3?2-c:c;const bool changed=x>=5 && x<61 && y>=7 && y<59 && (5&(1u<<lane));
+            const double alpha=(x+.5)/64;
+            const double source[]{.75,.25,1,alpha};
+            const auto terms=reference_blend_terms(mode,source[lane],alpha,double(old[c]),double(old[3]));
+            const double expected=changed?std::clamp(terms[0]+terms[1],0.,255.):old[c];
+            test(std::abs(result.pixels[size_t(y)*64+x][c]-expected)<=.51);++checked;
+        }
+    }
+    // Alternate indexed triangle order, nontrivial alpha and partial scissor.
+    for(const unsigned alpha : {0u,128u,255u}) {
+        auto inputs=quad(1,false);const auto original=inputs;
+        inputs[3]=original[0];inputs[4]=original[2];inputs[5]=original[4];
+        const Color color{float((std::min)(17u,alpha))/255,float((std::min)(73u,alpha))/255,float((std::min)(123u,alpha))/255,float(alpha)/255};
+        VertexConstants cb;cb[0].resize(1);std::memcpy(cb[0][0].data(),color.data(),16);
+        const std::array<int32_t,4> clip{5,7,61,59};
+        const auto result=executor.execute(inputs,cb,{},viewport,background,clip);
+        test(result.used_rectangle && result.covered_samples==56*52);
+        for(unsigned y=0;y<64;++y) for(unsigned x=0;x<64;++x) for(unsigned c=0;c<4;++c) {
+            const bool inside=x>=5 && x<61 && y>=7 && y<59;const auto lane=c<3 ? 2-c : c;
+            const unsigned source=unsigned(std::round(color[lane]*255));
+            const auto expected=inside ? uint8_t((source*255+unsigned(old[c])*(255-alpha)+127)/255) : old[c];
+            test(result.pixels[size_t(y)*64+x][c]==expected);++checked;
+        }
+    }
+    auto gradient=quad(1,false);VertexConstants white;white[0].push_back({as_bits(1.f),as_bits(1.f),as_bits(1.f),as_bits(1.f)});
+    for(auto &v:gradient)v[1]={as_bits((as_float(v[0][0])+1)*.25f),as_bits((1-as_float(v[0][1]))*.125f),as_bits(.125f),as_bits(.5f)};
+    const std::array<int32_t,4> clip{8,4,56,28};
+    const auto shaded=executor.execute(gradient,white,{},viewport,background,clip);
+    test(!shaded.used_rectangle && shaded.covered_samples==48*24);
+    double max_error=0;
+    for(unsigned y=0;y<64;++y)for(unsigned x=0;x<64;++x)for(unsigned c=0;c<4;++c){
+        const bool inside=x>=8 && x<56 && y>=4 && y<28;
+        const double rgba[]{(x+.5)/128,(y+.5)/256,.125,.5};const auto lane=c<3?2-c:c;
+        const double expected=inside?rgba[lane]*255+old[c]*.5:old[c];
+        const auto error=std::abs(shaded.pixels[size_t(y)*64+x][c]-expected);max_error=(std::max)(max_error,error);test(error<=.51);++checked;
+    }
+    // Arbitrary nonuniform pixel programs remain rejected until their complete
+    // interpolation and shader path is implemented, with no target mutation.
+    for(const std::array<int32_t,4> test_clip: {std::array<int32_t,4>{0,0,0,64},{0,63,64,63},{63,63,64,64}}){
+        const auto result=executor.execute(gradient,white,{},viewport,background,test_clip);
+        const bool one=test_clip[0]==63;test(result.covered_samples==(one?1u:0u));
+        for(unsigned y=0;y<64;++y)for(unsigned x=0;x<64;++x)for(unsigned c=0;c<4;++c){
+            const double rgba[]{(x+.5)/128,(y+.5)/256,.125,.5};const auto lane=c<3?2-c:c;
+            const double expected=one && x==63 && y==63?rgba[lane]*255+old[c]*.5:old[c];
+            test(std::abs(result.pixels[size_t(y)*64+x][c]-expected)<=.51);++checked;
+        }
+    }
+    const auto bad_words=nr::registered_lab::shader_tokens("float4 main(float4 c:COLOR):SV_Target{return c*c;}","ps_4_0");
+    const auto bad_ps=parse_pixel(bad_words.data(),bad_words.size());
+    UniformDrawExecutor unsupported(vs,bad_ps,6,64,64,backend,true,true,15,256);
+    bool rejected=false;try{(void)unsupported.execute(gradient,white,{},viewport,background,clip);}catch(const std::invalid_argument &){rejected=true;}
+    test(rejected && background==std::vector<PackedColor>(4096,old));
+    for(const auto cull:{CullMode::front,CullMode::back})for(const bool ccw:{false,true}){
+        UniformDrawExecutor faces(vs,ps,6,64,64,backend,false,true,15,256,cull,ccw);
+        const auto result=faces.execute(quad(1,false),white,{},viewport,background,clip);
+        const bool visible=(cull==CullMode::back)!=ccw;
+        test(result.covered_samples==(visible?48*24:0));
+        for(unsigned y=0;y<64;++y)for(unsigned x=0;x<64;++x)
+            test(result.pixels[size_t(y)*64+x]==(visible && x>=8 && x<56 && y>=4 && y<28?PackedColor{255,255,255,255}:old));
+    }
+    // Same projected square, different clip-space w: test perspective correction
+    // against analytic barycentric weights, then explicitly disable correction.
+    const float weights[]{1,2,4,4,3,1};
+    auto perspective=gradient;
+    for(size_t v=0;v<perspective.size();++v)for(unsigned c=0;c<4;++c)
+        perspective[v][0][c]=as_bits(as_float(perspective[v][0][c])*weights[v]);
+    const auto np_words=nr::registered_lab::shader_tokens("float4 main(float4 p:SV_Position,noperspective float4 c:COLOR):SV_Target{return c;}","ps_4_0");
+    const auto np=parse_pixel(np_words.data(),np_words.size());
+    UniformDrawExecutor affine(vs,np,6,64,64,backend,true,true,15,256);
+    for(const bool correction:{true,false}){
+        const auto result=(correction?executor:affine).execute(perspective,white,{},viewport,background,clip);
+        test(result.covered_samples==48*24);
+        for(unsigned y=4;y<28;++y)for(unsigned x=8;x<56;++x){
+            const double px=(x+.5)/64,py=(y+.5)/64;
+            const bool first=py<=px;const size_t base=first?0u:3u;
+            double bary[3]{first?1-px:px,first?px-py:py-px,first?py:1-py};
+            double denominator=0;for(unsigned v=0;v<3;++v){if(correction)bary[v]/=weights[base+v];denominator+=bary[v];}
+            for(unsigned c=0;c<4;++c){
+                const auto lane=c<3?2-c:c;double value=0;
+                for(unsigned v=0;v<3;++v)value+=bary[v]*as_float(gradient[base+v][1][lane]);
+                const double expected=value/denominator*255+old[c]*.5;
+                const auto error=std::abs(result.pixels[size_t(y)*64+x][c]-expected);
+                max_error=(std::max)(max_error,error);test(error<=.51);++checked;
+            }
+        }
+    }
+    std::printf("{\"checked_components\":%llu,\"gradient_max_byte_error\":%.9g,\"dynamic_geometry_and_constants\":true,\"unsupported_nonuniform_program_rejected\":true,\"background_unchanged\":true}\n", static_cast<unsigned long long>(checked),max_error);
+    return 0;
+} catch (const std::exception &e) { std::fprintf(stderr, "%s\n", e.what()); return 1; }

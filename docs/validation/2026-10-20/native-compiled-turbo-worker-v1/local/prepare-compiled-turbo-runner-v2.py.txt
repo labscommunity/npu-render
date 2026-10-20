@@ -1,0 +1,57 @@
+"""Use structured CTest results; keep renderer and provider binaries unchanged."""
+from pathlib import Path
+import hashlib
+import json
+import subprocess
+
+r = Path(__file__).parent
+s = (r / "run-ptl-worker-v30-qualification.ps1").read_text()
+s = s.replace('$out="$vm\\ptl-worker-v30-qualification"',
+              '$out="$vm\\ptl-worker-v30-qualification-v2"')
+s = s.replace("build-ptl-compiled-turbo-v1.ps1", "verify-compiled-turbo-build-v2.ps1")
+s = s.replace("ptl-compiled-turbo-v1/build-report.json",
+              "ptl-compiled-turbo-v1/build-report-v2.json")
+needle = " Invoke-Step 'provider-build'"
+assert s.count(needle) == 1
+s = s.replace(needle, r''' $extra=Get-Content "$vm/compiled-turbo-runner-v2-source.json" -Raw|ConvertFrom-Json
+ foreach($f in $extra.psobject.Properties){if((Get-FileHash "$vm/$($f.Name)").Hash.ToLower() -ne $f.Value){throw 'Structured runner source mismatch'}}
+''' + needle)
+names = ["verify-compiled-turbo-build-v2.ps1"]
+p = r / "run-ptl-worker-v30-qualification-v2.ps1"
+assert not p.exists()
+p.write_text(s)
+names.append(p.name)
+s = (r / "run-ptl-worker-v30-recovery-qualification.ps1").read_text()
+s = s.replace("ptl-worker-v30-qualification/report.json",
+              "ptl-worker-v30-qualification-v2/report.json")
+p = r / "run-ptl-worker-v30-recovery-qualification-v2.ps1"
+assert not p.exists()
+p.write_text(s)
+names.append(p.name)
+# The original recovery controller has not executed. Keep its evidence path
+# and source, and authenticate this revised wrapper separately above.
+s = (r / "run-compiled-turbo-chain-v1.ps1").read_text()
+s = s.replace("compiled-turbo-chain-v1", "compiled-turbo-chain-v2")
+s = s.replace("@('ptl-worker-v30-qualification','ptl-worker-v30-recovery-qualification')",
+              "@('ptl-worker-v30-qualification-v2','ptl-worker-v30-recovery-qualification-v2')")
+s = s.replace('$q=Get-Content "$vm/$name/report.json"',
+              '$proofName=$name.Replace("recovery-qualification-v2","recovery-qualification");$q=Get-Content "$vm/$proofName/report.json"')
+p = r / "run-compiled-turbo-chain-v2.ps1"
+assert not p.exists()
+p.write_text(s)
+names.append(p.name)
+s = (r / "start-compiled-turbo-v1.ps1").read_text()
+s = s.replace("CompiledTurbo-v1", "CompiledTurbo-v2")
+s = s.replace("compiled-turbo-chain-v1", "compiled-turbo-chain-v2")
+s = s.replace("compiled-turbo-v1-task", "compiled-turbo-v2-task")
+p = r / "start-compiled-turbo-v2.ps1"
+assert not p.exists()
+p.write_text(s)
+names.append(p.name)
+manifest = r / "compiled-turbo-runner-v2-source.json"
+manifest.write_text(json.dumps({n: hashlib.sha256((r / n).read_bytes()).hexdigest()
+                               for n in names}, indent=2) + "\n")
+subprocess.run(["scp", "-q", *[str(r / n) for n in names], str(manifest),
+                "delta:AppData/Local/npu-render/vm/"], check=True, timeout=30)
+print(json.dumps(dict(prepared=True, renderer_source_changed=False,
+                      hardware_work_started=False)))

@@ -1,0 +1,42 @@
+{
+  "passed": true,
+  "phases": [
+    {
+      "stage": "selected",
+      "requests": 174,
+      "sums": {
+        "compile_and_draw_ms": 68372.221,
+        "draw_ms": 19066.581,
+        "provider_setup_ms": 48853.787000000004,
+        "backend_compile_ms": 47724.538,
+        "backend_compile_calls": 44,
+        "compile_calls": 105,
+        "memory_cache_requests": 105,
+        "memory_cache_hits": 61,
+        "cache_requests": 44,
+        "cache_hits": 0
+      },
+      "compiled_turbo_verifications": 44,
+      "source_sha256": "f312ee8a81ebcbba10c420d71d4debaffe3376877d20f76dbd9943a2d458757d"
+    },
+    {
+      "stage": "full",
+      "requests": 972,
+      "sums": {
+        "compile_and_draw_ms": 307552.549,
+        "draw_ms": 134308.314,
+        "provider_setup_ms": 224208.331,
+        "backend_compile_ms": 216453.346,
+        "backend_compile_calls": 131,
+        "compile_calls": 484,
+        "memory_cache_requests": 484,
+        "memory_cache_hits": 353,
+        "cache_requests": 131,
+        "cache_hits": 44
+      },
+      "compiled_turbo_verifications": 131,
+      "source_sha256": "e0573a03dde768775a4defb4e1d76d1f46f1751e73d137bf4e8542fa57ad8fd2"
+    }
+  ],
+  "scope": "Completed qualification request counters, including any first-use compilation. Nested timings are not additive. No warm comparison, hardware-frequency, desktop or Tahoma claim."
+}
