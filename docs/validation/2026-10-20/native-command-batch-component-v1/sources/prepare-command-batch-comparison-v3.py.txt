@@ -1,0 +1,27 @@
+from pathlib import Path
+import ast,subprocess
+r=Path('results/render-driver');s=(r/'compare-ptl-command-batch-v2.py').read_text()
+a=s.index("  proof=obj(vm/'ptl-six-span-command-batch-v1/report.json')");b=s.index('  def render(',a)
+s=s[:a]+'''  assert ov.get_version()=='2026.4.1-22982-e213a147257-releases/2026/4'
+  core=ov.Core();providers={};model_hashes={}
+  for version in [1,2]:
+   proof=obj(vm/f'ptl-six-span-command-batch-v{version}/report.json');assert proof['passed'] and proof['child_result']['unique_component_fixtures']==72
+   blob=vm/f'ptl-six-span-command-batch-v{version}/patched.blob';assert sha(blob)==proof['patched_sha256'];model_hashes[version]=sha(blob)
+   model=core.import_model(blob.read_bytes(),'NPU');raw_devices=model.get_property('EXECUTION_DEVICES');devices=[raw_devices] if isinstance(raw_devices,str) else list(raw_devices);assert devices in (['NPU'],['NPU.0']);request=model.create_infer_request()
+   data=request.get_input_tensor().data.view(np.uint8).reshape(6,span);providers[version]=(model,request,data)
+'''+s[b:]
+s=s.replace('def render(initial,w,h,commands,batched):\n   frame=', 'def render(initial,w,h,commands,batched,version):\n   model,request,data=providers[version]\n   frame=')
+a=s.index('   for batched in [False,True]:');b=s.index("   report['cases'].append(record)",a)
+s=s[:a]+'''   for version,batched in [(1,True),(2,False),(2,True)]:
+    actual,timing=render(initial,w,h,commands,batched,version);assert np.array_equal(actual,oracle);record['warmups'].append(dict(version=version,batched=batched,exact=True,**timing))
+   schedules=[('batching',[(2,False),(2,True),(2,True),(2,False)]),('traversal',[(1,True),(2,True),(2,True),(1,True)])]
+   record['comparisons']={}
+   for comparison,schedule in schedules:
+    current=[]
+    for phase,(version,batched) in zip(['A1','B1','B2','A2'],schedule):
+     actual,timing=render(initial,w,h,commands,batched,version);assert np.array_equal(actual,oracle);current.append(dict(comparison=comparison,phase=phase,version=version,batched=batched,exact=True,**timing))
+    record['phases']+=current;old=current[0]['elapsed_ms']+current[3]['elapsed_ms'];new=current[1]['elapsed_ms']+current[2]['elapsed_ms'];record['comparisons'][comparison]=dict(old_elapsed_ms=old,new_elapsed_ms=new,elapsed_reduction_percent=100*(1-new/old))
+'''+s[b:]
+s=s.replace('model_sha256=sha(blob)','model_sha256=model_hashes').replace("out=vm/'ptl-command-batch-comparison-v2'","out=vm/'ptl-command-batch-comparison-v3'").replace("assert obj(vm/'ptl-command-batch-v1-qualification/report.json')['passed']","assert obj(vm/'ptl-command-batch-v2-qualification/report.json')['passed']")
+s=s.replace('Both paths use the same qualified NPU kernel; sequential mode submits one command at a time.','The batching comparison uses the same v2 kernel with one command versus ordered batches. The traversal comparison uses batched v1 versus batched v2. Both comparisons use A/B/B/A order.')
+ast.parse(s);p=r/'compare-ptl-command-batch-v3.py';p.write_text(s);subprocess.run(['scp','-q',str(p),'delta:AppData/Local/npu-render/vm/'],check=True,timeout=30)

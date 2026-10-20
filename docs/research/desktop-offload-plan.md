@@ -2,11 +2,14 @@
 
 Updated 2026-10-20. Target: Delta, Windows 11, Panther Lake. The repository stays
 private. **Full desktop offload is unfinished.** The latest
-[packet-worker v56 trial](../validation/2026-10-16/native-response-packet-live-v1/README.md)
-passes 1,682 acknowledged NPU operations, 103 exact physical submissions, forty
-controlled inputs, the ordinary test application and restoration. Warm
-sent-input-to-display p95 is 107.663 ms for mouse and 1,632.388 ms for keyboard.
-Nineteen warm samples per kind are a small distribution, with p95 equal to maximum.
+[combined-renderer v60 trial](../validation/2026-10-20/native-combined-render-live-v1/README.md)
+passes 1,694 acknowledged NPU operations, 107 exact physical submissions, forty
+controlled inputs, the shared test application and restoration. Warm
+sent-input-to-display p95 is 1,725.807 ms for mouse and 96.931 ms for keyboard.
+Nineteen warm samples per kind make p95 equal to maximum. Animation delivers
+only eight verified updates during the ten-second 30 Hz schedule (0.8/s), or ten
+including drain. Child rendering occupies 6,353.803 ms. This remains far short
+of normal desktop responsiveness; Tahoma and GPU relief are unmeasured.
 
 Both v56 and the [preceding v55 trial](../validation/2026-10-16/native-repeated-input-live-v1/README.md)
 verify only seven unique animation colors during the ten-second 30 Hz schedule,
@@ -78,8 +81,17 @@ rejects it before any desktop change. The
 brings together clipping, balanced geometry and ordered rectangles. It preserves
 all 3,888 comparison images, lowers aggregate request time by 6.81%, and passes
 two thirty-image recovery scenarios. Its registered Direct3D check passes and
-the separate desktop trial is in progress. This does not resolve the much larger
-frame-rate gap.
+the [separate desktop trial](../validation/2026-10-20/native-combined-render-live-v1/README.md)
+passes its finite checks but still delivers only 0.8 animation updates/s. The
+[version contract and capture inventory](../validation/2026-10-20/native-batching-contract-v1/README.md)
+now pass their CPU checks. Windows command batching and storage ownership are
+not integrated. This does not resolve the much larger frame-rate gap.
+The [ordered rectangle batch component](../validation/2026-10-20/native-command-batch-component-v1/README.md)
+passes 120 exact NPU fixtures and lowers its synthetic 1024×768 case from 242 ms
+for separate optimized submissions to 46 ms batched. This is component evidence;
+it does not change the 0.8/s desktop result. Owned resource checkpoints, partial
+batch recovery, textured operations and Windows integration remain outstanding.
+
 The rectangle candidate also passes
 [two targeted provider-recovery scenarios](../validation/2026-10-20/native-quad-rectangle-recovery-v1/README.md);
 its unchanged aggregate replay time still precludes a desktop speedup claim.

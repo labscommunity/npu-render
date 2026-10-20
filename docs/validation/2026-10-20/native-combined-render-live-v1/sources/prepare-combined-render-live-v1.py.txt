@@ -1,0 +1,38 @@
+"""Prepare the combined renderer's live trial from its verified target build."""
+from pathlib import Path
+import ast,hashlib,json,re
+r=Path(__file__).parent
+proof=json.loads((r/'ptl-native-worker-v24-qualified-build-report.json').read_text(encoding='utf-8-sig'))
+new=json.loads((r/'ptl-native-worker-v24-source.json').read_text());old=json.loads((r/'ptl-native-worker-v19-source.json').read_text())
+assert proof['clean_build'] and proof['source_sha256']==new
+worker=proof['binary_sha256'].lower();assert worker=='03831470d266a0c0f6e095eb14124812f0899eedaa5c9fdffed063086675e2e4'
+changes={'native-registration-v48':'native-registration-v49','native-registered-v48':'native-registered-v49','NativeRecovery-v48':'NativeRecovery-v49','native_shared_app_v15':'native_shared_app_v16','native_desktop_bootstrap_v43':'native_desktop_bootstrap_v44','native-desktop-v69':'native-desktop-v70','native-desktop-admission-v69':'native-desktop-admission-v70','NativeDesktopRecovery-v69':'NativeDesktopRecovery-v70','run-native-live-v59':'run-native-live-v60','native-live-v59':'native-live-v60','NativeLiveV59':'NativeLiveV60','native-topology-primary-v45':'native-topology-primary-v46','native-topology-v114':'native-topology-v117','native-topology-v115':'native-topology-v118','native-topology-v116':'native-topology-v119','InspectTopology-V114':'InspectTopology-V117','InspectTopology-V115':'InspectTopology-V118','InspectTopology-V116':'InspectTopology-V119','observer116':'observer119','dismiss-native-saver-v34':'dismiss-native-saver-v35','dismiss-v34':'dismiss-v35','run-ptl-native-live-v23':'run-ptl-native-live-v24','ptl-native-live-v23':'ptl-native-live-v24','native-latency-v23-analysis':'native-latency-v24-analysis','native-presentation-v20-analysis':'native-presentation-v21-analysis','native-repeated-input-v6-analysis':'native-repeated-input-v7-analysis','ptl-combined-desktop-v11':'ptl-combined-desktop-v12','analyze-native-latency-v21.py':'analyze-native-latency-v22.py','analyze-native-presentation-v20.py':'analyze-native-presentation-v21.py','ptl-native-worker-v23':'ptl-native-worker-v24','ptl-worker-v23-qualification':'ptl-worker-v24-qualification','b00ce5d698757721f9fa18947430b328fb3278886d2127cfbd9cfee4620142f4':worker,'resident-clip-comparison-v1':'combined-render-comparison-v1','resident-clip-provider-recovery-v1':'combined-render-provider-recovery-v1','waiting-for-resident-clip-comparison':'waiting-for-combined-render-comparison','waiting-for-resident-clip-recovery':'waiting-for-combined-render-recovery','paired_resident_clip':'paired_combined_renderer','Resident clip':'Combined renderer','Resident clipping lack':'Combined renderer lacks'}
+pattern=re.compile('|'.join(re.escape(x) for x in sorted(changes,key=len,reverse=True)))
+def rename(s):return pattern.sub(lambda m:changes[m[0]],s)
+files=[n for n in json.loads((r/'ptl-combined-live-v11-upload.json').read_text()) if not n.endswith('-source.json')]
+for name in files:
+ s=rename((r/name).read_text())
+ if name=='qualify-native-registered-v48.py':
+  a=s.index('expected_changes=');b=s.index("assert report['worker_binary_sha256']",a)
+  expected={n:h for n,h in new.items() if old.get(n)!=h};assert len(expected)==7
+  s=s[:a]+'expected_changes='+repr(expected)+"\nassert candidate['linked_libraries']==qualified['linked_libraries']\nassert set(candidate['source_sha256'])==set(qualified['source_sha256'])|"+repr(set(new)-set(old))+"\nassert {n:h for n,h in candidate['source_sha256'].items() if h!=qualified['source_sha256'].get(n)}==expected_changes\n"+s[b:]
+ if name=='run-native-live-v59.ps1':
+  needle=" $report.active_phase='freshness-validation';Save-Report";assert s.count(needle)==1
+  s=s.replace(needle,r''' $quadRows=@($geometryRows|Where-Object ptl_quad_rectangle_executed)
+ $report.ptl_quad_rectangle_executions=$quadRows.Count
+ if(!$quadRows.Count -or @($quadRows|Where-Object {!$_.ordered_blending -or !$_.preflight_all_quads -or $_.execution_device -ne 'NPU'}).Count){throw 'Ordered quad rectangle route not qualified'}
+ $schedule=@($geometryRows|Where-Object ptl_geometry_span_distribution)
+ if($schedule.Count -ne 1){throw 'Balanced geometry schedule not observed exactly once'}
+ $counts=@($schedule[0].counts);$total=($counts|Measure-Object -Sum).Sum;$range=$counts|Measure-Object -Minimum -Maximum
+ if($counts.Count -ne 6 -or $total -ne $schedule[0].total -or $range.Maximum-$range.Minimum -gt 1 -or $schedule[0].kernel_changed -or $schedule[0].arithmetic_backend -ne 'NPU'){throw 'Balanced geometry schedule invalid'}
+ $report.ptl_balanced_geometry_schedule=$schedule[0]
+'''+needle)
+ if name=='run-ptl-native-live-v23.ps1':
+  s=s.replace('if($q.ptl_resident_clip_accepted -lt 1', 'if($q.ptl_quad_rectangle_executions -lt 1 -or !$q.ptl_balanced_geometry_schedule -or $q.ptl_resident_clip_accepted -lt 1')
+ if name.endswith('.py'):ast.parse(s)
+ p=r/rename(name);assert not p.exists(),p;p.write_text(s)
+for oldname in ['native-registration-v48-source.json','native-desktop-v69-source.json']:
+ names=[rename(n) for n in json.loads((r/oldname).read_text())]
+ (r/rename(oldname)).write_text(json.dumps({n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in names},indent=2)+'\n')
+(r/'ptl-combined-live-v12-upload.json').write_text(json.dumps([rename(n) for n in files]+['native-registration-v49-source.json','native-desktop-v70-source.json'],indent=2)+'\n')
+print(json.dumps({'prepared':'combined renderer gated desktop','worker':24,'driver_package':19,'worker_sha256':worker,'hardware_desktop_tested':False}))

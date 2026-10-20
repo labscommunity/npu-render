@@ -1,0 +1,53 @@
+"""Correlate input, serialized provider intervals, frame publication and presentation."""
+from pathlib import Path
+import argparse,hashlib,json
+from pixel_observation_match_v1 import match_owned_pixel_observation
+p=argparse.ArgumentParser();p.add_argument('--root',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--active-snapshot',action='store_true');a=p.parse_args()
+r=a.root;names=['native-live-v60/relay/frames.jsonl','native-live-v60/stimulus/probe.log','native-live-v60/screen/probe.log','native-live-v60/present/probe.log','native-desktop-admission-v70/bootstrap/frames.jsonl','native-desktop-admission-v70/bootstrap/worker.stdout.jsonl','native-desktop-admission-v70/bootstrap/provider-processes/generation-1/worker.stdout.jsonl']
+def rows(p):
+ result=[]
+ for line in p.read_text(encoding='utf-8-sig').splitlines():
+  if line.startswith('{') and line.endswith('}'):result.append(json.loads(line))
+ return result
+published_frames,stimulus,screen,present,frames,parent,child=[rows(r/n) for n in names]
+frequencies={x['qpc_frequency'] for events in [present,parent,child] for x in events if 'qpc_frequency' in x};assert len(frequencies)==1;frequency=frequencies.pop();assert frequency>0
+identities={x['dispatch_ticket']:x for x in child if x.get('kind')=='request_identity'};timeline=sorted([x for x in child if x.get('kind')=='request_timeline'],key=lambda x:x['entered_qpc'])
+assert all(x['entered_qpc']<=x['finished_qpc'] for x in timeline)
+assert all(a['finished_qpc']<=b['entered_qpc'] for a,b in zip(timeline,timeline[1:]))
+render={};current=None
+for x in child:
+ if x.get('kind')=='request_identity':current=x
+ if x.get('passed') and x.get('execution_device')=='NPU':
+  assert current is not None and x['sequence']==current['sequence'];render[current['dispatch_ticket']]=x
+parent_times={x['dispatch_ticket']:x for x in parent if x.get('kind')=='request_timeline'}
+child_times={x['dispatch_ticket']:x for x in timeline}
+results=[]
+for event,color,pixel in [('mouse_received','green',[60,180,20,255]),('key_received','red',[80,30,180,255])]:
+ inputs=[x for x in stimulus if x.get('input_event')==event];assert len(inputs)==1,event
+ start=inputs[0]['qpc'];observation=match_owned_pixel_observation(screen,start,lambda point: point.get('known_'+color))
+ end=observation['read_completed_qpc'];draws=[]
+ for x in timeline:
+  low=max(start,x['entered_qpc']);high=min(end,x['finished_qpc'])
+  if low>=high:continue
+  ticket=x['dispatch_ticket'];ident=identities[ticket];stats=render[ticket]
+  draws.append(dict(ticket=ticket,sequence=x['sequence'],pixel_sha256=ident['pixel_sha256'],width=ident['width'],height=ident['height'],vertices=ident['vertices'],entered_qpc=x['entered_qpc'],finished_qpc=x['finished_qpc'],overlap_ms=(high-low)*1000/frequency,whole_request_ms=(x['finished_qpc']-x['entered_qpc'])*1000/frequency,backend_compile_ms=stats['backend_compile_ms'],provider_calls=stats['provider_requests'],draw_ms=stats['draw_ms']))
+ duration=(end-start)*1000/frequency;busy=sum(x['overlap_ms'] for x in draws)
+ by_shader={}
+ for x in draws:
+  aggregate=by_shader.setdefault(x['pixel_sha256'],dict(requests=0,overlap_ms=0,whole_request_provider_calls=0,whole_request_backend_compile_ms=0));aggregate['requests']+=1;aggregate['overlap_ms']+=x['overlap_ms'];aggregate['whole_request_provider_calls']+=x['provider_calls'];aggregate['whole_request_backend_compile_ms']+=x['backend_compile_ms']
+ published=[x for x in published_frames if x.get('qpc',0)>=start and x.get('known_stimulus_pixel')==pixel]
+ publication=published[0] if published else None
+ submissions=[x for x in present if x.get('live_frame_presented') and publication and x['source_sequence']==publication['sequence'] and x['source_qpc']==publication['qpc']]
+ result=dict(event=event,color=color,input_qpc=start,observed_qpc=end,observer_acquisition_started_qpc=observation['qpc'],response_ms=duration,serialized_child_busy_ms=busy,child_busy_fraction=busy/duration if duration else None,remaining_ms=duration-busy,draw_count=len(draws),by_shader=by_shader,overlapping_draws=draws,first_matching_publication=publication,first_matching_submission=submissions[0] if submissions else None)
+ breakdown=dict(parent_pre_child_ms=0,child_packet_read_ms=0,child_pre_execution_ms=0,child_execution_ms=0,parent_post_child_ms=0)
+ for ticket,p in parent_times.items():
+  if p['entered_qpc']>=end or p['finished_qpc']<=start:continue
+  c=child_times[ticket];assert p['pid']==c['client_pid'] and p['sequence']==c['sequence']
+  times=[p['entered_qpc'],c['connected_qpc'],c['received_qpc'],c['entered_qpc'],c['finished_qpc'],p['finished_qpc']];assert times==sorted(times)
+  for label,lo,hi in zip(breakdown,times,times[1:]):breakdown[label]+=max(0,min(hi,end)-max(lo,start))*1000/frequency
+ result['serialized_parent_breakdown']=breakdown;result['outside_serialized_parent_ms']=duration-sum(breakdown.values())
+ if publication:result['input_to_publication_ms']=(publication['qpc']-start)*1000/frequency;result['publication_to_observation_ms']=(end-publication['qpc'])*1000/frequency
+ results.append(result)
+report=dict(completed=True,passed=True,active_snapshot=a.active_snapshot,final_trial_qualification=False,qpc_frequency=frequency,serial_intervals_verified=True,controlled_events=results,source_sha256={n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in names},limitation='Two controlled events, not p95 or matched A/B. Child intervals include CPU orchestration and NPU waits; they are not NPU hardware utilization. Partial interval whole-request compilation/call counts are context, not apportioned overlap. Physical observation uses completed reads, including acquisitions that started before the input; sampling cadence remains included. No panel photon timing.')
+a.output.mkdir(exist_ok=False,parents=True);(a.output/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps({k:[{key:value for key,value in event.items() if key not in ('overlapping_draws','first_matching_publication','first_matching_submission')} for event in v] if k=='controlled_events' else v for k,v in report.items() if k not in ('source_sha256',)},indent=2))

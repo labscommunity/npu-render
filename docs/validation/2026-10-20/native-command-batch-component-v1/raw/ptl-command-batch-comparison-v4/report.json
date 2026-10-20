@@ -1,0 +1,706 @@
+{
+  "started": "2026-10-20T08:35:26.226182+00:00",
+  "completed": true,
+  "passed": true,
+  "desktop_changed": false,
+  "tahoma_tested": false,
+  "exit_code": 0,
+  "child_result": {
+    "started": "2026-10-20T08:35:26.448996+00:00",
+    "passed": true,
+    "completed": true,
+    "cases": [
+      {
+        "width": 64,
+        "height": 64,
+        "commands": 8,
+        "oracle_sha256": "5c41cdd473fe7b4090e7149437e68cdbec14c76b89957e7a2af4482fbf6ac5aa",
+        "warmups": [
+          {
+            "version": 2,
+            "batched": true,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 3.6793,
+            "request_wait_ms": 3.5933,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          },
+          {
+            "version": 3,
+            "batched": false,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 8.4143,
+            "request_wait_ms": 7.7572,
+            "provider_requests": 8,
+            "input_span_bytes": 12582912,
+            "output_span_bytes": 12582912
+          },
+          {
+            "version": 3,
+            "batched": true,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 1.053,
+            "request_wait_ms": 0.9423,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          },
+          {
+            "version": 3,
+            "batched": true,
+            "balanced": false,
+            "exact": true,
+            "elapsed_ms": 1.5054,
+            "request_wait_ms": 1.404,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          }
+        ],
+        "phases": [
+          {
+            "comparison": "batching",
+            "phase": "A1",
+            "version": 3,
+            "batched": false,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 8.0396,
+            "request_wait_ms": 7.2818,
+            "provider_requests": 8,
+            "input_span_bytes": 12582912,
+            "output_span_bytes": 12582912
+          },
+          {
+            "comparison": "batching",
+            "phase": "B1",
+            "version": 3,
+            "batched": true,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 1.0777,
+            "request_wait_ms": 0.9921,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          },
+          {
+            "comparison": "batching",
+            "phase": "B2",
+            "version": 3,
+            "batched": true,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 1.0527,
+            "request_wait_ms": 0.9685,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          },
+          {
+            "comparison": "batching",
+            "phase": "A2",
+            "version": 3,
+            "batched": false,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 8.2473,
+            "request_wait_ms": 7.2471,
+            "provider_requests": 8,
+            "input_span_bytes": 12582912,
+            "output_span_bytes": 12582912
+          },
+          {
+            "comparison": "vectorization",
+            "phase": "A1",
+            "version": 2,
+            "batched": true,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 1.3239,
+            "request_wait_ms": 1.2194,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          },
+          {
+            "comparison": "vectorization",
+            "phase": "B1",
+            "version": 3,
+            "batched": true,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 1.2672,
+            "request_wait_ms": 1.1228,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          },
+          {
+            "comparison": "vectorization",
+            "phase": "B2",
+            "version": 3,
+            "batched": true,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 1.0996,
+            "request_wait_ms": 0.998,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          },
+          {
+            "comparison": "vectorization",
+            "phase": "A2",
+            "version": 2,
+            "batched": true,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 1.2806,
+            "request_wait_ms": 1.1809,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          },
+          {
+            "comparison": "balancing",
+            "phase": "A1",
+            "version": 3,
+            "batched": true,
+            "balanced": false,
+            "exact": true,
+            "elapsed_ms": 1.4808,
+            "request_wait_ms": 1.3772,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          },
+          {
+            "comparison": "balancing",
+            "phase": "B1",
+            "version": 3,
+            "batched": true,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 1.2417,
+            "request_wait_ms": 1.0473,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          },
+          {
+            "comparison": "balancing",
+            "phase": "B2",
+            "version": 3,
+            "batched": true,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 0.982,
+            "request_wait_ms": 0.8161,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          },
+          {
+            "comparison": "balancing",
+            "phase": "A2",
+            "version": 3,
+            "batched": true,
+            "balanced": false,
+            "exact": true,
+            "elapsed_ms": 1.991,
+            "request_wait_ms": 1.7011,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          }
+        ],
+        "comparisons": {
+          "batching": {
+            "old_elapsed_ms": 16.2869,
+            "new_elapsed_ms": 2.1304,
+            "elapsed_reduction_percent": 86.91954883986517
+          },
+          "vectorization": {
+            "old_elapsed_ms": 2.6045,
+            "new_elapsed_ms": 2.3668,
+            "elapsed_reduction_percent": 9.126511806488757
+          },
+          "balancing": {
+            "old_elapsed_ms": 3.4718,
+            "new_elapsed_ms": 2.2237,
+            "elapsed_reduction_percent": 35.94965147761968
+          }
+        }
+      },
+      {
+        "width": 256,
+        "height": 256,
+        "commands": 32,
+        "oracle_sha256": "0e6466c989878d49d575f430c7fd44446e9a918b368a33cb21fc61dce2a8e6f5",
+        "warmups": [
+          {
+            "version": 2,
+            "batched": true,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 19.9277,
+            "request_wait_ms": 19.556,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          },
+          {
+            "version": 3,
+            "batched": false,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 57.6224,
+            "request_wait_ms": 50.4798,
+            "provider_requests": 32,
+            "input_span_bytes": 50331648,
+            "output_span_bytes": 50331648
+          },
+          {
+            "version": 3,
+            "batched": true,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 8.6267,
+            "request_wait_ms": 8.0713,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          },
+          {
+            "version": 3,
+            "batched": true,
+            "balanced": false,
+            "exact": true,
+            "elapsed_ms": 33.9787,
+            "request_wait_ms": 33.5076,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          }
+        ],
+        "phases": [
+          {
+            "comparison": "batching",
+            "phase": "A1",
+            "version": 3,
+            "batched": false,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 50.6582,
+            "request_wait_ms": 43.82190000000001,
+            "provider_requests": 32,
+            "input_span_bytes": 50331648,
+            "output_span_bytes": 50331648
+          },
+          {
+            "comparison": "batching",
+            "phase": "B1",
+            "version": 3,
+            "batched": true,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 6.0742,
+            "request_wait_ms": 5.8238,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          },
+          {
+            "comparison": "batching",
+            "phase": "B2",
+            "version": 3,
+            "batched": true,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 6.1633,
+            "request_wait_ms": 5.913,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          },
+          {
+            "comparison": "batching",
+            "phase": "A2",
+            "version": 3,
+            "batched": false,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 42.9039,
+            "request_wait_ms": 37.6483,
+            "provider_requests": 32,
+            "input_span_bytes": 50331648,
+            "output_span_bytes": 50331648
+          },
+          {
+            "comparison": "vectorization",
+            "phase": "A1",
+            "version": 2,
+            "batched": true,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 12.1819,
+            "request_wait_ms": 11.9383,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          },
+          {
+            "comparison": "vectorization",
+            "phase": "B1",
+            "version": 3,
+            "batched": true,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 5.8514,
+            "request_wait_ms": 5.5121,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          },
+          {
+            "comparison": "vectorization",
+            "phase": "B2",
+            "version": 3,
+            "batched": true,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 5.7922,
+            "request_wait_ms": 5.4471,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          },
+          {
+            "comparison": "vectorization",
+            "phase": "A2",
+            "version": 2,
+            "batched": true,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 12.1626,
+            "request_wait_ms": 11.7768,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          },
+          {
+            "comparison": "balancing",
+            "phase": "A1",
+            "version": 3,
+            "batched": true,
+            "balanced": false,
+            "exact": true,
+            "elapsed_ms": 22.4621,
+            "request_wait_ms": 22.0155,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          },
+          {
+            "comparison": "balancing",
+            "phase": "B1",
+            "version": 3,
+            "batched": true,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 5.579,
+            "request_wait_ms": 5.1683,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          },
+          {
+            "comparison": "balancing",
+            "phase": "B2",
+            "version": 3,
+            "batched": true,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 5.4301,
+            "request_wait_ms": 5.0188,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          },
+          {
+            "comparison": "balancing",
+            "phase": "A2",
+            "version": 3,
+            "batched": true,
+            "balanced": false,
+            "exact": true,
+            "elapsed_ms": 20.2981,
+            "request_wait_ms": 19.952,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          }
+        ],
+        "comparisons": {
+          "batching": {
+            "old_elapsed_ms": 93.5621,
+            "new_elapsed_ms": 12.2375,
+            "elapsed_reduction_percent": 86.92045176412245
+          },
+          "vectorization": {
+            "old_elapsed_ms": 24.3445,
+            "new_elapsed_ms": 11.6436,
+            "elapsed_reduction_percent": 52.17153771899197
+          },
+          "balancing": {
+            "old_elapsed_ms": 42.7602,
+            "new_elapsed_ms": 11.0091,
+            "elapsed_reduction_percent": 74.2538622363787
+          }
+        }
+      },
+      {
+        "width": 1024,
+        "height": 768,
+        "commands": 32,
+        "oracle_sha256": "c06f430ad4b96145956b351325fac5b26f2036a2f1fc0f37779ba4e99f1b1d62",
+        "warmups": [
+          {
+            "version": 2,
+            "batched": true,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 189.3711,
+            "request_wait_ms": 187.3274,
+            "provider_requests": 3,
+            "input_span_bytes": 4718592,
+            "output_span_bytes": 4718592
+          },
+          {
+            "version": 3,
+            "batched": false,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 220.0257,
+            "request_wait_ms": 180.58810000000003,
+            "provider_requests": 96,
+            "input_span_bytes": 150994944,
+            "output_span_bytes": 150994944
+          },
+          {
+            "version": 3,
+            "batched": true,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 45.2948,
+            "request_wait_ms": 42.286500000000004,
+            "provider_requests": 3,
+            "input_span_bytes": 4718592,
+            "output_span_bytes": 4718592
+          },
+          {
+            "version": 3,
+            "batched": true,
+            "balanced": false,
+            "exact": true,
+            "elapsed_ms": 46.0753,
+            "request_wait_ms": 42.953900000000004,
+            "provider_requests": 3,
+            "input_span_bytes": 4718592,
+            "output_span_bytes": 4718592
+          }
+        ],
+        "phases": [
+          {
+            "comparison": "batching",
+            "phase": "A1",
+            "version": 3,
+            "batched": false,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 230.2135,
+            "request_wait_ms": 176.55599999999998,
+            "provider_requests": 96,
+            "input_span_bytes": 150994944,
+            "output_span_bytes": 150994944
+          },
+          {
+            "comparison": "batching",
+            "phase": "B1",
+            "version": 3,
+            "batched": true,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 45.5295,
+            "request_wait_ms": 42.1413,
+            "provider_requests": 3,
+            "input_span_bytes": 4718592,
+            "output_span_bytes": 4718592
+          },
+          {
+            "comparison": "batching",
+            "phase": "B2",
+            "version": 3,
+            "batched": true,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 46.3222,
+            "request_wait_ms": 42.4318,
+            "provider_requests": 3,
+            "input_span_bytes": 4718592,
+            "output_span_bytes": 4718592
+          },
+          {
+            "comparison": "batching",
+            "phase": "A2",
+            "version": 3,
+            "batched": false,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 253.8806,
+            "request_wait_ms": 184.8941,
+            "provider_requests": 96,
+            "input_span_bytes": 150994944,
+            "output_span_bytes": 150994944
+          },
+          {
+            "comparison": "vectorization",
+            "phase": "A1",
+            "version": 2,
+            "batched": true,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 110.2713,
+            "request_wait_ms": 106.3528,
+            "provider_requests": 3,
+            "input_span_bytes": 4718592,
+            "output_span_bytes": 4718592
+          },
+          {
+            "comparison": "vectorization",
+            "phase": "B1",
+            "version": 3,
+            "batched": true,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 46.3959,
+            "request_wait_ms": 42.20700000000001,
+            "provider_requests": 3,
+            "input_span_bytes": 4718592,
+            "output_span_bytes": 4718592
+          },
+          {
+            "comparison": "vectorization",
+            "phase": "B2",
+            "version": 3,
+            "batched": true,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 46.6743,
+            "request_wait_ms": 42.17080000000001,
+            "provider_requests": 3,
+            "input_span_bytes": 4718592,
+            "output_span_bytes": 4718592
+          },
+          {
+            "comparison": "vectorization",
+            "phase": "A2",
+            "version": 2,
+            "batched": true,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 111.6082,
+            "request_wait_ms": 106.85910000000001,
+            "provider_requests": 3,
+            "input_span_bytes": 4718592,
+            "output_span_bytes": 4718592
+          },
+          {
+            "comparison": "balancing",
+            "phase": "A1",
+            "version": 3,
+            "batched": true,
+            "balanced": false,
+            "exact": true,
+            "elapsed_ms": 48.1808,
+            "request_wait_ms": 43.3631,
+            "provider_requests": 3,
+            "input_span_bytes": 4718592,
+            "output_span_bytes": 4718592
+          },
+          {
+            "comparison": "balancing",
+            "phase": "B1",
+            "version": 3,
+            "batched": true,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 47.1573,
+            "request_wait_ms": 42.503600000000006,
+            "provider_requests": 3,
+            "input_span_bytes": 4718592,
+            "output_span_bytes": 4718592
+          },
+          {
+            "comparison": "balancing",
+            "phase": "B2",
+            "version": 3,
+            "batched": true,
+            "balanced": true,
+            "exact": true,
+            "elapsed_ms": 47.5869,
+            "request_wait_ms": 42.7931,
+            "provider_requests": 3,
+            "input_span_bytes": 4718592,
+            "output_span_bytes": 4718592
+          },
+          {
+            "comparison": "balancing",
+            "phase": "A2",
+            "version": 3,
+            "batched": true,
+            "balanced": false,
+            "exact": true,
+            "elapsed_ms": 47.0234,
+            "request_wait_ms": 42.7354,
+            "provider_requests": 3,
+            "input_span_bytes": 4718592,
+            "output_span_bytes": 4718592
+          }
+        ],
+        "comparisons": {
+          "batching": {
+            "old_elapsed_ms": 484.0941,
+            "new_elapsed_ms": 91.8517,
+            "elapsed_reduction_percent": 81.02606497373135
+          },
+          "vectorization": {
+            "old_elapsed_ms": 221.8795,
+            "new_elapsed_ms": 93.0702,
+            "elapsed_reduction_percent": 58.05371834712085
+          },
+          "balancing": {
+            "old_elapsed_ms": 95.2042,
+            "new_elapsed_ms": 94.7442,
+            "elapsed_reduction_percent": 0.48317196090087444
+          }
+        }
+      }
+    ],
+    "model_sha256": {
+      "2": "c80285c2abd10626381afa255ca3608c1df31f6fc4aaf8e8f9cebe69c622ab2b",
+      "3": "e4a863410d6e629cd4f5ebcd955201a9024b2e75e6e6f6b19366fe582f6aaf26"
+    },
+    "execution_devices": [
+      "NPU"
+    ],
+    "scope": "Synthetic ordered solid RGBA8 rectangles. Three A/B/B/A comparisons isolate one-command versus ordered submissions with v3, balanced v2 versus balanced v3 pixel processing, and unbalanced versus balanced v3 span assignment. Both kernels preserve the same pixel recurrence. End-to-end loop time includes host packet preparation, NPU waits and output transport. Oracle and final comparison are excluded. No Windows driver or Tahoma measurement.",
+    "finished": "2026-10-20T08:35:29.034590+00:00"
+  },
+  "finished": "2026-10-20T08:35:29.146054+00:00"
+}

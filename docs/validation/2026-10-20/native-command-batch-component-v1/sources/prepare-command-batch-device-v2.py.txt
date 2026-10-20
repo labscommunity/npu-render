@@ -1,0 +1,43 @@
+from pathlib import Path
+import ast,hashlib,json,subprocess
+r=Path('results/render-driver');s=(r/'ptl-six-span-command-batch-v1.c').read_text();a=s.index(' unsigned hits=0,');b=s.index(' unsigned *header=',a)
+s=s[:a]+''' unsigned hits=0;
+ // Preserve the destination in NPU-visible output storage between commands.
+ // Traverse only covered row intervals; application order is unchanged.
+ for(unsigned n=0;n<count;++n)((unsigned*)(output+16))[n]=u32(data+1088+n*4);
+ #pragma clang loop unroll(disable)
+ for(unsigned c=0;c<commands;++c){const unsigned char *p=data+64+c*32;
+  unsigned x0=u32(p),y0=u32(p+4),x1=u32(p+8),y1=u32(p+12),source=u32(p+16),blend=u32(p+20),mask=u32(p+24);
+  if(x0==x1||y0==y1||!count)continue;
+  uint4 value=((uint4)source>>(uint4){0,8,16,24})&(uint4)255;
+  if(format==87){value=value.zyxw;mask=(mask&10)|((mask&1)<<2)|((mask&4)>>2);}
+  unsigned packed=value.x|(value.y<<8)|(value.z<<16)|(value.w<<24);
+  unsigned write=(mask&1?255u:0u)|(mask&2?65280u:0u)|(mask&4?16711680u:0u)|(mask&8?4278190080u:0u);
+  unsigned low=first/w,high=(first+count-1)/w+1;if(low<y0)low=y0;if(high>y1)high=y1;
+  uint4 factor=(uint4)(255-value.w),base=value*(uint4)255;
+  #pragma clang loop unroll(disable)
+  for(unsigned y=low;y<high;++y){
+   unsigned begin=y*w+x0,end=y*w+x1;if(begin<first)begin=first;if(end>first+count)end=first+count;
+   if(begin>=end)continue;hits+=end-begin;
+   #pragma clang loop unroll(disable)
+   for(unsigned at=begin;at<end;++at){unsigned *pixel=(unsigned*)(output+16)+(at-first),background=*pixel,shaded=packed;
+    if(blend){
+     uint4 dest=((uint4)background>>(uint4){0,8,16,24})&(uint4)255;
+     uint4 numerator=base+dest*factor;numerator=numerator>(uint4)65025?(uint4)65025:numerator;
+     uint4 result=((numerator+(uint4)127)*(uint4)32897)>>(uint4)23;
+     shaded=result.x|(result.y<<8)|(result.z<<16)|(result.w<<24);
+    }
+    *pixel=(background&~write)|(shaded&write);
+   }
+  }
+ }
+'''+s[b:];(r/'ptl-six-span-command-batch-v2.c').write_text(s)
+s=(r/'qualify-command-batch-local-v1.py').read_text().replace('ptl-six-span-command-batch-v1','ptl-six-span-command-batch-v2').replace('ptl-command-batch-v1-local','ptl-command-batch-v2-local');(r/'qualify-command-batch-local-v2.py').write_text(s)
+s=(r/'qualify-ptl-six-span-command-batch-v1.py').read_text().replace('ptl-six-span-command-batch-v1','ptl-six-span-command-batch-v2').replace('ptl-six-span-command-batch-build-v1','ptl-six-span-command-batch-build-v2');ast.parse(s);(r/'qualify-ptl-six-span-command-batch-v2.py').write_text(s)
+s=(r/'run-ptl-command-batch-v1-qualification.ps1').read_text().replace('command-batch-v1','command-batch-v2').replace('command-batch-build-v1','command-batch-build-v2').replace('command-batch-device-v1','command-batch-device-v2').replace("@('native-request-inventory-v2-qualification','command-batch-contract-v1-qualification')","@('ptl-command-batch-comparison-v2')")
+(r/'run-ptl-command-batch-v2-qualification.ps1').write_text(s)
+names=['ptl-six-span-command-batch-v2.c','ptl_command_batch_fixtures_v1.py','qualify-ptl-six-span-command-batch-v2.py','run-ptl-command-batch-v2-qualification.ps1']
+p=r/'ptl-command-batch-device-v2-source.json';p.write_text(json.dumps({n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in names},indent=2)+'\n')
+subprocess.run(['uv','run','python',str(r/'qualify-command-batch-local-v2.py')],check=True)
+subprocess.run(['scp','-q',*[str(r/n) for n in names],str(p),'delta:AppData/Local/npu-render/vm/'],check=True,timeout=30)
+print(json.dumps(dict(uploaded=True,change='ordered command traversal of covered row spans',same_72_fixtures=True)))

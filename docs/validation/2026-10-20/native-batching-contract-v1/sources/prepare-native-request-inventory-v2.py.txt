@@ -1,0 +1,17 @@
+from pathlib import Path
+import hashlib,json,shutil,subprocess
+r=Path('results/render-driver');s=r/'native-request-inventory-v2';shutil.copytree(r/'native-request-inventory-v1',s)
+p=s/'inventory.cpp';text=p.read_text().replace('#include <vector>','#include <vector>\n#include <limits>').replace('size > MAXULONG','size > (std::numeric_limits<ULONG>::max)()');p.write_text(text)
+for name in ('qualify-native-request-inventory-v1.py','run-native-request-inventory-v1.ps1'):
+ text=(r/name).read_text().replace('native-request-inventory-v1','native-request-inventory-v2')
+ if name.endswith('.ps1'):text=text.replace("@('ptl-combined-desktop-v12','combined-render-provider-recovery-v1-qualification')","@('ptl-combined-desktop-v12','native-request-inventory-v1-qualification','command-batch-contract-v1-qualification')")
+ (r/name.replace('-v1','-v2')).write_text(text)
+files=list(s.glob('*'))+[r/'qualify-native-request-inventory-v2.py',r/'run-native-request-inventory-v2.ps1']
+headers=list((r/'native-routing-v45/native/windows/registered_lab').glob('*.hpp'))
+p=r/'native-request-inventory-v2-source.json';p.write_text(json.dumps({str(p.relative_to(r)):hashlib.sha256(p.read_bytes()).hexdigest() for p in files+headers},indent=2)+'\n')
+subprocess.run(['scp','-q','-r',str(s),'delta:AppData/Local/npu-render/vm/'],check=True,timeout=30)
+subprocess.run(['scp','-q',str(p),str(files[-2]),str(files[-1]),'delta:AppData/Local/npu-render/vm/'],check=True,timeout=30)
+# Preserve the first failed build alongside the corrected source and result.
+p=r/'collect-native-primary-v104.py';text=p.read_text().replace("directories=['native-request-inventory-v1-qualification',", "directories=['native-request-inventory-v2-qualification','native-request-inventory-v2-results','native-request-inventory-v1-qualification',").replace("extras=['native-request-inventory-v1-source.json',", "extras=['native-request-inventory-v2-source.json','native-request-inventory-v1-source.json',").replace("source_files=['native-request-inventory-v1/inventory.cpp',", "source_files=['native-request-inventory-v2/inventory.cpp','native-request-inventory-v2/CMakeLists.txt','qualify-native-request-inventory-v2.py','run-native-request-inventory-v2.ps1','native-request-inventory-v1/inventory.cpp',").replace("@('native-request-inventory-v1-qualification','command-batch-contract-v1-qualification')", "@('native-request-inventory-v2-qualification','command-batch-contract-v1-qualification')").replace("@('native-request-inventory-v1')", "@('native-request-inventory-v1','native-request-inventory-v2')");p.write_text(text)
+p=r/'curate-native-primary-v104.py';text=p.read_text().replace("'prepare-batching-evidence-v1.py',", "'prepare-batching-evidence-v1.py','prepare-native-request-inventory-v2.py',");p.write_text(text)
+print(json.dumps(dict(uploaded=True,change='standard ULONG maximum replaces unavailable MAXULONG macro',prior_failed_build_preserved=True)))

@@ -1,0 +1,42 @@
+from pathlib import Path
+import hashlib,json,shutil,subprocess
+r=Path('results/render-driver');s=r/'command-batch-contract-v1';s.mkdir(exist_ok=False)
+for name in ('native/include/command_batch.hpp','native/tests/command_batch_test.cpp'):
+ p=s/name;p.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(name,p)
+(s/'CMakeLists.txt').write_text('''cmake_minimum_required(VERSION 3.25)
+project(nr_batch_contract LANGUAGES CXX)
+add_executable(nr_command_batch_test native/tests/command_batch_test.cpp)
+target_compile_features(nr_command_batch_test PRIVATE cxx_std_17)
+target_compile_options(nr_command_batch_test PRIVATE /W4 /WX)
+set_property(TARGET nr_command_batch_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+enable_testing()
+add_test(NAME native_command_batch_contract COMMAND nr_command_batch_test)
+''')
+base=(r/'run-native-request-inventory-v1.ps1').read_text();prefix=base.split('\ntry{\n')[0].replace('native-request-inventory-v1-qualification','command-batch-contract-v1-qualification').replace('Inventory coordinator exists','Contract coordinator exists')
+body=r'''
+try{
+ $deadline=[DateTime]::UtcNow.AddMinutes(90)
+ foreach($name in @('ptl-combined-desktop-v12','native-request-inventory-v1-qualification')){while($true){$q=Get-Content "$vm/$name/report.json" -Raw|ConvertFrom-Json;if($q.completed){break};if([DateTime]::UtcNow -gt $deadline){throw 'Preceding experiment deadline'};Start-Sleep -Seconds 3}}
+ $prior=if(Test-Path "$vm/native-desktop-admission-v70/report.json"){'native-desktop-admission-v70'}else{'native-desktop-admission-v68'}
+ $q=Get-Content "$vm/$prior/report.json" -Raw|ConvertFrom-Json;if(!$q.completed -or !$q.cleanup_passed -or !$q.memory_integrity_after){throw 'Desktop restoration incomplete'}
+ if(@(Get-Process nr_registered*,nr_native*,nr_ptl*,nr_frame_present_probe -ErrorAction SilentlyContinue).Count){throw 'Graphics experiment active'}
+ $expected=Get-Content "$vm/command-batch-contract-v1-source.json" -Raw|ConvertFrom-Json
+ foreach($f in $expected.psobject.Properties){if((Get-FileHash "$vm/$($f.Name)").Hash -ne $f.Value){throw 'Contract source mismatch'}}
+ $s="$vm/command-batch-contract-v1";$b="$r/builds/command-batch-contract-v1"
+ if(Test-Path $b){throw 'Build exists'}
+ Run-Step 'configure' 'cmake.exe' ('-S "'+$s+'" -B "'+$b+'" -A x64') 120
+ Run-Step 'build' 'cmake.exe' ('--build "'+$b+'" --config Release --clean-first') 180
+ Run-Step 'test' 'ctest.exe' ('--test-dir "'+$b+'" -C Release --output-on-failure --verbose') 120
+ foreach($f in $expected.psobject.Properties){if((Get-FileHash "$vm/$($f.Name)").Hash -ne $f.Value){throw 'Contract source changed'}}
+ $report.binary_sha256=(Get-FileHash "$b/Release/nr_command_batch_test.exe").Hash
+ $report.source_sha256=$expected;$report.passed=$true
+}catch{$report.error=$_.Exception.Message}
+finally{$report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');Save-Report}
+Get-Content "$out/report.json" -Raw;if(!$report.passed){exit 1}
+'''
+script=r/'run-command-batch-contract-v1.ps1';script.write_text(prefix+body)
+files=[p for p in s.rglob('*') if p.is_file()]+[script];manifest={str(p.relative_to(r)):hashlib.sha256(p.read_bytes()).hexdigest() for p in files}
+p=r/'command-batch-contract-v1-source.json';p.write_text(json.dumps(manifest,indent=2)+'\n')
+subprocess.run(['scp','-q','-r',str(s),'delta:AppData/Local/npu-render/vm/'],check=True,timeout=30)
+subprocess.run(['scp','-q',str(script),str(p),'delta:AppData/Local/npu-render/vm/'],check=True,timeout=30)
+print(json.dumps(dict(source_files=len(files),uploaded=True)))

@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.25)
+project(nr_batch_contract LANGUAGES CXX)
+add_executable(nr_command_batch_test native/tests/command_batch_test.cpp)
+target_compile_features(nr_command_batch_test PRIVATE cxx_std_17)
+target_compile_options(nr_command_batch_test PRIVATE /W4 /WX)
+set_property(TARGET nr_command_batch_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+enable_testing()
+add_test(NAME native_command_batch_contract COMMAND nr_command_batch_test)

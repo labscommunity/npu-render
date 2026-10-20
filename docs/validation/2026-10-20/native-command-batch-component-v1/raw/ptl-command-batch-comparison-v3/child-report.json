@@ -1,0 +1,460 @@
+{
+  "started": "2026-10-20T08:31:51.668228+00:00",
+  "passed": true,
+  "completed": true,
+  "cases": [
+    {
+      "width": 64,
+      "height": 64,
+      "commands": 8,
+      "oracle_sha256": "5c41cdd473fe7b4090e7149437e68cdbec14c76b89957e7a2af4482fbf6ac5aa",
+      "warmups": [
+        {
+          "version": 1,
+          "batched": true,
+          "exact": true,
+          "elapsed_ms": 21.136,
+          "request_wait_ms": 20.9991,
+          "provider_requests": 1,
+          "input_span_bytes": 1572864,
+          "output_span_bytes": 1572864
+        },
+        {
+          "version": 2,
+          "batched": false,
+          "exact": true,
+          "elapsed_ms": 20.8435,
+          "request_wait_ms": 19.6376,
+          "provider_requests": 8,
+          "input_span_bytes": 12582912,
+          "output_span_bytes": 12582912
+        },
+        {
+          "version": 2,
+          "batched": true,
+          "exact": true,
+          "elapsed_ms": 2.4327,
+          "request_wait_ms": 2.3285,
+          "provider_requests": 1,
+          "input_span_bytes": 1572864,
+          "output_span_bytes": 1572864
+        }
+      ],
+      "phases": [
+        {
+          "comparison": "batching",
+          "phase": "A1",
+          "version": 2,
+          "batched": false,
+          "exact": true,
+          "elapsed_ms": 9.2491,
+          "request_wait_ms": 8.2539,
+          "provider_requests": 8,
+          "input_span_bytes": 12582912,
+          "output_span_bytes": 12582912
+        },
+        {
+          "comparison": "batching",
+          "phase": "B1",
+          "version": 2,
+          "batched": true,
+          "exact": true,
+          "elapsed_ms": 2.2298,
+          "request_wait_ms": 2.0985,
+          "provider_requests": 1,
+          "input_span_bytes": 1572864,
+          "output_span_bytes": 1572864
+        },
+        {
+          "comparison": "batching",
+          "phase": "B2",
+          "version": 2,
+          "batched": true,
+          "exact": true,
+          "elapsed_ms": 2.3644,
+          "request_wait_ms": 2.1702,
+          "provider_requests": 1,
+          "input_span_bytes": 1572864,
+          "output_span_bytes": 1572864
+        },
+        {
+          "comparison": "batching",
+          "phase": "A2",
+          "version": 2,
+          "batched": false,
+          "exact": true,
+          "elapsed_ms": 9.1841,
+          "request_wait_ms": 8.1743,
+          "provider_requests": 8,
+          "input_span_bytes": 12582912,
+          "output_span_bytes": 12582912
+        },
+        {
+          "comparison": "traversal",
+          "phase": "A1",
+          "version": 1,
+          "batched": true,
+          "exact": true,
+          "elapsed_ms": 7.8162,
+          "request_wait_ms": 7.6738,
+          "provider_requests": 1,
+          "input_span_bytes": 1572864,
+          "output_span_bytes": 1572864
+        },
+        {
+          "comparison": "traversal",
+          "phase": "B1",
+          "version": 2,
+          "batched": true,
+          "exact": true,
+          "elapsed_ms": 2.3854,
+          "request_wait_ms": 2.1738,
+          "provider_requests": 1,
+          "input_span_bytes": 1572864,
+          "output_span_bytes": 1572864
+        },
+        {
+          "comparison": "traversal",
+          "phase": "B2",
+          "version": 2,
+          "batched": true,
+          "exact": true,
+          "elapsed_ms": 2.4907,
+          "request_wait_ms": 2.1822,
+          "provider_requests": 1,
+          "input_span_bytes": 1572864,
+          "output_span_bytes": 1572864
+        },
+        {
+          "comparison": "traversal",
+          "phase": "A2",
+          "version": 1,
+          "batched": true,
+          "exact": true,
+          "elapsed_ms": 8.0747,
+          "request_wait_ms": 7.7911,
+          "provider_requests": 1,
+          "input_span_bytes": 1572864,
+          "output_span_bytes": 1572864
+        }
+      ],
+      "comparisons": {
+        "batching": {
+          "old_elapsed_ms": 18.4332,
+          "new_elapsed_ms": 4.5942,
+          "elapsed_reduction_percent": 75.07649241585834
+        },
+        "traversal": {
+          "old_elapsed_ms": 15.8909,
+          "new_elapsed_ms": 4.8761,
+          "elapsed_reduction_percent": 69.31514262880013
+        }
+      }
+    },
+    {
+      "width": 256,
+      "height": 256,
+      "commands": 32,
+      "oracle_sha256": "0e6466c989878d49d575f430c7fd44446e9a918b368a33cb21fc61dce2a8e6f5",
+      "warmups": [
+        {
+          "version": 1,
+          "batched": true,
+          "exact": true,
+          "elapsed_ms": 267.8719,
+          "request_wait_ms": 267.3557,
+          "provider_requests": 1,
+          "input_span_bytes": 1572864,
+          "output_span_bytes": 1572864
+        },
+        {
+          "version": 2,
+          "batched": false,
+          "exact": true,
+          "elapsed_ms": 101.4683,
+          "request_wait_ms": 94.60800000000002,
+          "provider_requests": 32,
+          "input_span_bytes": 50331648,
+          "output_span_bytes": 50331648
+        },
+        {
+          "version": 2,
+          "batched": true,
+          "exact": true,
+          "elapsed_ms": 46.4289,
+          "request_wait_ms": 46.1397,
+          "provider_requests": 1,
+          "input_span_bytes": 1572864,
+          "output_span_bytes": 1572864
+        }
+      ],
+      "phases": [
+        {
+          "comparison": "batching",
+          "phase": "A1",
+          "version": 2,
+          "batched": false,
+          "exact": true,
+          "elapsed_ms": 105.8555,
+          "request_wait_ms": 96.1793,
+          "provider_requests": 32,
+          "input_span_bytes": 50331648,
+          "output_span_bytes": 50331648
+        },
+        {
+          "comparison": "batching",
+          "phase": "B1",
+          "version": 2,
+          "batched": true,
+          "exact": true,
+          "elapsed_ms": 46.7759,
+          "request_wait_ms": 46.311,
+          "provider_requests": 1,
+          "input_span_bytes": 1572864,
+          "output_span_bytes": 1572864
+        },
+        {
+          "comparison": "batching",
+          "phase": "B2",
+          "version": 2,
+          "batched": true,
+          "exact": true,
+          "elapsed_ms": 47.112,
+          "request_wait_ms": 46.585,
+          "provider_requests": 1,
+          "input_span_bytes": 1572864,
+          "output_span_bytes": 1572864
+        },
+        {
+          "comparison": "batching",
+          "phase": "A2",
+          "version": 2,
+          "batched": false,
+          "exact": true,
+          "elapsed_ms": 101.0287,
+          "request_wait_ms": 93.46989999999998,
+          "provider_requests": 32,
+          "input_span_bytes": 50331648,
+          "output_span_bytes": 50331648
+        },
+        {
+          "comparison": "traversal",
+          "phase": "A1",
+          "version": 1,
+          "batched": true,
+          "exact": true,
+          "elapsed_ms": 201.4028,
+          "request_wait_ms": 200.9221,
+          "provider_requests": 1,
+          "input_span_bytes": 1572864,
+          "output_span_bytes": 1572864
+        },
+        {
+          "comparison": "traversal",
+          "phase": "B1",
+          "version": 2,
+          "batched": true,
+          "exact": true,
+          "elapsed_ms": 47.0089,
+          "request_wait_ms": 46.3308,
+          "provider_requests": 1,
+          "input_span_bytes": 1572864,
+          "output_span_bytes": 1572864
+        },
+        {
+          "comparison": "traversal",
+          "phase": "B2",
+          "version": 2,
+          "batched": true,
+          "exact": true,
+          "elapsed_ms": 46.9878,
+          "request_wait_ms": 46.3127,
+          "provider_requests": 1,
+          "input_span_bytes": 1572864,
+          "output_span_bytes": 1572864
+        },
+        {
+          "comparison": "traversal",
+          "phase": "A2",
+          "version": 1,
+          "batched": true,
+          "exact": true,
+          "elapsed_ms": 201.7934,
+          "request_wait_ms": 201.1143,
+          "provider_requests": 1,
+          "input_span_bytes": 1572864,
+          "output_span_bytes": 1572864
+        }
+      ],
+      "comparisons": {
+        "batching": {
+          "old_elapsed_ms": 206.88420000000002,
+          "new_elapsed_ms": 93.8879,
+          "elapsed_reduction_percent": 54.618139036233806
+        },
+        "traversal": {
+          "old_elapsed_ms": 403.1962,
+          "new_elapsed_ms": 93.9967,
+          "elapsed_reduction_percent": 76.68710667412044
+        }
+      }
+    },
+    {
+      "width": 1024,
+      "height": 768,
+      "commands": 32,
+      "oracle_sha256": "c06f430ad4b96145956b351325fac5b26f2036a2f1fc0f37779ba4e99f1b1d62",
+      "warmups": [
+        {
+          "version": 1,
+          "batched": true,
+          "exact": true,
+          "elapsed_ms": 534.8818,
+          "request_wait_ms": 529.5267,
+          "provider_requests": 3,
+          "input_span_bytes": 4718592,
+          "output_span_bytes": 4718592
+        },
+        {
+          "version": 2,
+          "batched": false,
+          "exact": true,
+          "elapsed_ms": 354.6477,
+          "request_wait_ms": 265.269,
+          "provider_requests": 96,
+          "input_span_bytes": 150994944,
+          "output_span_bytes": 150994944
+        },
+        {
+          "version": 2,
+          "batched": true,
+          "exact": true,
+          "elapsed_ms": 112.8255,
+          "request_wait_ms": 107.6323,
+          "provider_requests": 3,
+          "input_span_bytes": 4718592,
+          "output_span_bytes": 4718592
+        }
+      ],
+      "phases": [
+        {
+          "comparison": "batching",
+          "phase": "A1",
+          "version": 2,
+          "batched": false,
+          "exact": true,
+          "elapsed_ms": 351.9595,
+          "request_wait_ms": 255.71689999999998,
+          "provider_requests": 96,
+          "input_span_bytes": 150994944,
+          "output_span_bytes": 150994944
+        },
+        {
+          "comparison": "batching",
+          "phase": "B1",
+          "version": 2,
+          "batched": true,
+          "exact": true,
+          "elapsed_ms": 111.7731,
+          "request_wait_ms": 107.7859,
+          "provider_requests": 3,
+          "input_span_bytes": 4718592,
+          "output_span_bytes": 4718592
+        },
+        {
+          "comparison": "batching",
+          "phase": "B2",
+          "version": 2,
+          "batched": true,
+          "exact": true,
+          "elapsed_ms": 113.2072,
+          "request_wait_ms": 108.3685,
+          "provider_requests": 3,
+          "input_span_bytes": 4718592,
+          "output_span_bytes": 4718592
+        },
+        {
+          "comparison": "batching",
+          "phase": "A2",
+          "version": 2,
+          "batched": false,
+          "exact": true,
+          "elapsed_ms": 352.0357,
+          "request_wait_ms": 254.96860000000004,
+          "provider_requests": 96,
+          "input_span_bytes": 150994944,
+          "output_span_bytes": 150994944
+        },
+        {
+          "comparison": "traversal",
+          "phase": "A1",
+          "version": 1,
+          "batched": true,
+          "exact": true,
+          "elapsed_ms": 436.9997,
+          "request_wait_ms": 432.4692,
+          "provider_requests": 3,
+          "input_span_bytes": 4718592,
+          "output_span_bytes": 4718592
+        },
+        {
+          "comparison": "traversal",
+          "phase": "B1",
+          "version": 2,
+          "batched": true,
+          "exact": true,
+          "elapsed_ms": 113.8371,
+          "request_wait_ms": 108.1897,
+          "provider_requests": 3,
+          "input_span_bytes": 4718592,
+          "output_span_bytes": 4718592
+        },
+        {
+          "comparison": "traversal",
+          "phase": "B2",
+          "version": 2,
+          "batched": true,
+          "exact": true,
+          "elapsed_ms": 112.6549,
+          "request_wait_ms": 107.6835,
+          "provider_requests": 3,
+          "input_span_bytes": 4718592,
+          "output_span_bytes": 4718592
+        },
+        {
+          "comparison": "traversal",
+          "phase": "A2",
+          "version": 1,
+          "batched": true,
+          "exact": true,
+          "elapsed_ms": 437.4062,
+          "request_wait_ms": 432.1569,
+          "provider_requests": 3,
+          "input_span_bytes": 4718592,
+          "output_span_bytes": 4718592
+        }
+      ],
+      "comparisons": {
+        "batching": {
+          "old_elapsed_ms": 703.9952000000001,
+          "new_elapsed_ms": 224.9803,
+          "elapsed_reduction_percent": 68.04235312968044
+        },
+        "traversal": {
+          "old_elapsed_ms": 874.4059,
+          "new_elapsed_ms": 226.49200000000002,
+          "elapsed_reduction_percent": 74.09761301930831
+        }
+      }
+    }
+  ],
+  "model_sha256": {
+    "1": "25bf17967228fa41b8467bb7e63c7df696adf9e2bb1bec6e7e0fe4099f6c557b",
+    "2": "c80285c2abd10626381afa255ca3608c1df31f6fc4aaf8e8f9cebe69c622ab2b"
+  },
+  "execution_devices": [
+    "NPU"
+  ],
+  "scope": "Synthetic ordered solid RGBA8 rectangles. The batching comparison uses the same v2 kernel with one command versus ordered batches. The traversal comparison uses batched v1 versus batched v2. Both comparisons use A/B/B/A order. End-to-end loop time includes host packet preparation, NPU waits and output transport. Oracle and final comparison are excluded. No Windows driver or Tahoma measurement.",
+  "finished": "2026-10-20T08:31:56.643048+00:00"
+}

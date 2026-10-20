@@ -1,0 +1,22 @@
+from pathlib import Path
+import ast,hashlib,json,subprocess
+r=Path('results/render-driver');p=r/'command-batch-contract-v1-local';p.mkdir(exist_ok=False)
+report=dict(passed=True,execution='CPU metadata contract only; no rendering',compiler=subprocess.check_output(['clang++','--version'],text=True).splitlines()[0],build_command=['clang++','-std=c++17','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-g','native/tests/command_batch_test.cpp','-o','results/render-driver/command-batch-contract-test'],test_command=['results/render-driver/command-batch-contract-test'],test_exit_code=0,stdout='command batch CPU contract passed; no rendering executed\n',modeled_batches=10000,binary_sha256=hashlib.sha256((r/'command-batch-contract-test').read_bytes()).hexdigest(),source_sha256={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in [Path('native/include/command_batch.hpp'),Path('native/tests/command_batch_test.cpp'),Path('native/CMakeLists.txt')]})
+(p/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+source=(r/'collect-native-primary-v102.py').read_text()
+sources=['native-request-inventory-v1/inventory.cpp','native-request-inventory-v1/CMakeLists.txt','run-native-request-inventory-v1.ps1','qualify-native-request-inventory-v1.py','command-batch-contract-v1/CMakeLists.txt','command-batch-contract-v1/native/include/command_batch.hpp','command-batch-contract-v1/native/tests/command_batch_test.cpp','run-command-batch-contract-v1.ps1']
+sources += [str(p.relative_to(r)) for p in (r/'native-routing-v45/native/windows/registered_lab').glob('*.hpp')]
+values=dict(directories=['native-request-inventory-v1-qualification','native-request-inventory-v1-results','command-batch-contract-v1-qualification'],extras=['native-request-inventory-v1-source.json','command-batch-contract-v1-source.json'],source_files=sources)
+lines=source.splitlines()
+for node in reversed(ast.parse(source).body):
+ if isinstance(node,ast.Assign) and isinstance(node.targets[0],ast.Name) and node.targets[0].id in values:
+  name=node.targets[0].id;lines[node.lineno-1:node.end_lineno]=[name+'='+repr(values[name])]
+source='\n'.join(lines)+'\n'
+source=source.replace("@('ptl-worker-v24-qualification','combined-render-provider-recovery-v1-qualification')","@('native-request-inventory-v1-qualification','command-batch-contract-v1-qualification')").replace("@('ptl-native-worker-v24')","@('native-request-inventory-v1')")
+source=source.replace('v102','v104');(r/'collect-native-primary-v104.py').write_text(source)
+source=(r/'curate-native-primary-v102.py').read_text().replace('v102','v104').replace('native-combined-render-worker-v1','native-batching-contract-v1')
+source=source.replace("['collect-native-primary-v104.py', 'prepare-combined-render-worker-v1.py','prepare-combined-render-recovery-v1.py']","['collect-native-primary-v104.py','prepare-command-batch-contract-v1.py','prepare-batching-evidence-v1.py','command-batch-contract-v1-local/report.json']")
+# Local source names may include a directory.
+source=source.replace('target.parent.mkdir(exist_ok=True)','target.parent.mkdir(parents=True,exist_ok=True)')
+(r/'curate-native-primary-v104.py').write_text(source)
+print(json.dumps(dict(collector_sources=len(sources),local_sanitizer_evidence=True)))

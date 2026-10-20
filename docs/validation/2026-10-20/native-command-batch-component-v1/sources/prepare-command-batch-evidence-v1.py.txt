@@ -1,0 +1,21 @@
+from pathlib import Path
+import ast
+r=Path('results/render-driver');source=(r/'collect-native-primary-v104.py').read_text()
+directories=[];sources=[]
+for version in [1,2,3]:
+ directories += [f'ptl-command-batch-v{version}-qualification',f'ptl-six-span-command-batch-v{version}',f'ptl-six-span-command-batch-build-v{version}']
+ sources += [f'ptl-six-span-command-batch-v{version}.c',f'qualify-ptl-six-span-command-batch-v{version}.py',f'run-ptl-command-batch-v{version}-qualification.ps1']
+for version in [1,2,3,4]:directories.append(f'ptl-command-batch-comparison-v{version}');sources.append(f'compare-ptl-command-batch-v{version}.py')
+sources += ['ptl_command_batch_fixtures_v1.py','ptl_command_batch_fixtures_v2.py']
+values=dict(directories=directories,extras=[f'ptl-command-batch-device-v{v}-source.json' for v in [1,2,3]],source_files=sources)
+lines=source.splitlines()
+for node in reversed(ast.parse(source).body):
+ if isinstance(node,ast.Assign) and isinstance(node.targets[0],ast.Name) and node.targets[0].id in values:
+  name=node.targets[0].id;lines[node.lineno-1:node.end_lineno]=[name+'='+repr(values[name])]
+source='\n'.join(lines)+'\n'
+source=source.replace("@('native-request-inventory-v2-qualification','command-batch-contract-v1-qualification')","@('ptl-command-batch-v3-qualification','ptl-command-batch-comparison-v4')").replace("@('native-request-inventory-v1','native-request-inventory-v2')","@()").replace('v104','v105');(r/'collect-native-primary-v105.py').write_text(source)
+source=(r/'curate-native-primary-v104.py').read_text().replace('v104','v105').replace('native-batching-contract-v1','native-command-batch-component-v1')
+a=source.index('for name in [');b=source.index(']:\n p=r/name',a)
+local=['collect-native-primary-v105.py','prepare-command-batch-evidence-v1.py','prepare-command-batch-device-v1.py','prepare-command-batch-device-v2.py','prepare-command-batch-device-v3.py','prepare-command-batch-comparison-v3.py','prepare-command-batch-comparison-v4.py']
+for v in [1,2,3]:local += [f'qualify-command-batch-local-v{v}.py',f'ptl-command-batch-v{v}-local-report.json']
+source=source[:a]+'for name in '+repr(local)+source[b+1:];ast.parse(source);(r/'curate-native-primary-v105.py').write_text(source)

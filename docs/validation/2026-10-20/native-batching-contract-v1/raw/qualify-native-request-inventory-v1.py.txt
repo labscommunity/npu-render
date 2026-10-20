@@ -1,0 +1,46 @@
+"""Decode captured request metadata; do not infer resource identity or run rendering."""
+from pathlib import Path
+from datetime import UTC, datetime
+from collections import defaultdict
+import hashlib, json, os, subprocess, traceback
+root=Path(os.environ['LOCALAPPDATA'])/'npu-render'; vm=root/'vm'
+out=vm/'native-request-inventory-v1-results';out.mkdir(exist_ok=False)
+report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,npu_executed=False,desktop_changed=False,pixels_exported=False,resource_identity_available=False)
+def obj(p):return json.loads(p.read_text(encoding='utf-8-sig'))
+def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+def save():(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+save()
+try:
+ capture=vm/'native-desktop-admission-v33/bootstrap/requests';index=capture/'index.jsonl'
+ index_sha='0f22ee6a6f4184e06a4338562abc24b843ad7b3882fec6c189bdaa9983237d9d'
+ assert sha(index)==index_sha
+ source=obj(vm/'native-request-inventory-v1-source.json')
+ for path,digest in source.items():assert sha(vm/path)==digest,path
+ build=obj(root/'builds/native-request-inventory-v1/build-report.json')
+ binary=root/'builds/native-request-inventory-v1/Release/nr_request_inventory.exe'
+ assert build['clean_build'] and sha(binary)==build['binary_sha256'].lower()
+ env=os.environ.copy();env['PATH']=str(root/'toolchains/openvino-2026.4.1/Lib/site-packages/openvino/libs')+os.pathsep+env.get('PATH','')
+ with (out/'inventory.stdout.log').open('xb') as stdout,(out/'inventory.stderr.log').open('xb') as stderr:
+  process=subprocess.run([str(binary),str(capture),str(out/'requests.jsonl')],env=env,stdout=stdout,stderr=stderr,timeout=180,creationflags=subprocess.CREATE_NO_WINDOW)
+ assert process.returncode==0
+ requests=[json.loads(line) for line in (out/'requests.jsonl').read_text().splitlines()]
+ original=[json.loads(line) for line in index.read_text().splitlines() if json.loads(line).get('request_recorded')]
+ assert len(requests)==len(original)==972
+ groups=defaultdict(list)
+ for ordinal,(item,expected) in enumerate(zip(requests,original)):
+  assert item['ticket']==expected['ticket']==ordinal and item['packet_sha256']==expected['sha256'] and item['packet_bytes']==expected['bytes']
+  assert not item['npu_executed'] and not item['pixels_exported'] and not item['resource_identity_available']
+  assert item['clear'] or item['background_pixels']==item['width']*item['height']
+  for resource in item['resources']:assert resource['pixels']==resource['width']*resource['height']
+  groups['clear' if item['clear'] else item['pixel_sha256']].append(item)
+ families=[]
+ for shader,items in sorted(groups.items()):
+  shapes=defaultdict(int)
+  for item in items:
+   shape=tuple((t['slot'],t['width'],t['height'],t['format'],t['filter'],t['address_u'],t['address_v']) for t in item['resources']);shapes[shape]+=1
+  families.append(dict(shader_sha256=shader,draws=len(items),tickets=[x['ticket'] for x in items],min_resource_bytes=min(sum(t['pixels']*4 for t in x['resources']) for x in items),max_resource_bytes=max(sum(t['pixels']*4 for t in x['resources']) for x in items),resource_shapes=[dict(resources=[dict(zip(('slot','width','height','format','filter','address_u','address_v'),r)) for r in shape],draws=count) for shape,count in sorted(shapes.items())]))
+ assert sha(index)==index_sha
+ report.update(passed=True,requests=972,packet_bytes=sum(x['packet_bytes'] for x in requests),capture_index_sha256=index_sha,binary_sha256=sha(binary),inventory_sha256=sha(out/'requests.jsonl'),shader_families=families,scope='CPU decoding and metadata only. No draw ordering, allocation identity, readback boundary, runtime admission or NPU performance is inferred from this capture.')
+except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+finally:report.update(completed=True,finished=datetime.now(UTC).isoformat());save()
+print(json.dumps({k:v for k,v in report.items() if k!='shader_families'}));raise SystemExit(0 if report['passed'] else 1)

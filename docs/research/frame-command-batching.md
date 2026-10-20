@@ -129,3 +129,15 @@ validate graphics state and outputs, restore checkpoints after NPU restart, and
 implement map/write/discard/flush/presentation synchronization. No Windows callback
 uses the ledger yet. Identity tombstones consume its bounded context capacity;
 production resource recycling needs a drained-context handoff.
+
+## Isolated NPU execution evidence
+
+The [ordered rectangle component](../validation/2026-10-20/native-command-batch-component-v1/README.md)
+now passes 120 exact NPU fixtures. It retains per-pixel destination state across
+up to 32 commands, with ordered coverage, copy/source-over blending and masks.
+Matched synthetic 1024×768 runs take about 46 ms for a batch, versus 242 ms for
+separate submissions of the same optimized kernel. This remains above a 30 Hz
+frame budget and excludes textures, geometry, driver transport and presentation.
+The component does not yet use the ledger or retain general graphics resources.
+The next integration must bind actual owned checkpoints to version references
+and recover a partially executed batch without publishing partial pixels.

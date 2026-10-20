@@ -1,0 +1,235 @@
+{
+  "started": "2026-10-20T08:28:00.986317+00:00",
+  "completed": true,
+  "passed": true,
+  "desktop_changed": false,
+  "tahoma_tested": false,
+  "exit_code": 0,
+  "child_result": {
+    "started": "2026-10-20T08:28:01.207926+00:00",
+    "passed": true,
+    "completed": true,
+    "cases": [
+      {
+        "width": 64,
+        "height": 64,
+        "commands": 8,
+        "oracle_sha256": "5c41cdd473fe7b4090e7149437e68cdbec14c76b89957e7a2af4482fbf6ac5aa",
+        "warmups": [
+          {
+            "batched": false,
+            "exact": true,
+            "elapsed_ms": 20.6261,
+            "request_wait_ms": 19.8368,
+            "provider_requests": 8,
+            "input_span_bytes": 12582912,
+            "output_span_bytes": 12582912
+          },
+          {
+            "batched": true,
+            "exact": true,
+            "elapsed_ms": 7.985,
+            "request_wait_ms": 7.8713,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          }
+        ],
+        "phases": [
+          {
+            "phase": "A1",
+            "batched": false,
+            "exact": true,
+            "elapsed_ms": 18.6079,
+            "request_wait_ms": 17.463,
+            "provider_requests": 8,
+            "input_span_bytes": 12582912,
+            "output_span_bytes": 12582912
+          },
+          {
+            "phase": "B1",
+            "batched": true,
+            "exact": true,
+            "elapsed_ms": 8.3463,
+            "request_wait_ms": 8.1392,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          },
+          {
+            "phase": "B2",
+            "batched": true,
+            "exact": true,
+            "elapsed_ms": 8.7636,
+            "request_wait_ms": 8.5338,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          },
+          {
+            "phase": "A2",
+            "batched": false,
+            "exact": true,
+            "elapsed_ms": 20.1888,
+            "request_wait_ms": 18.760900000000003,
+            "provider_requests": 8,
+            "input_span_bytes": 12582912,
+            "output_span_bytes": 12582912
+          }
+        ],
+        "old_elapsed_ms": 38.7967,
+        "new_elapsed_ms": 17.1099,
+        "elapsed_reduction_percent": 55.89856869269809
+      },
+      {
+        "width": 256,
+        "height": 256,
+        "commands": 32,
+        "oracle_sha256": "0e6466c989878d49d575f430c7fd44446e9a918b368a33cb21fc61dce2a8e6f5",
+        "warmups": [
+          {
+            "batched": false,
+            "exact": true,
+            "elapsed_ms": 423.0161,
+            "request_wait_ms": 409.92500000000007,
+            "provider_requests": 32,
+            "input_span_bytes": 50331648,
+            "output_span_bytes": 50331648
+          },
+          {
+            "batched": true,
+            "exact": true,
+            "elapsed_ms": 202.541,
+            "request_wait_ms": 201.6041,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          }
+        ],
+        "phases": [
+          {
+            "phase": "A1",
+            "batched": false,
+            "exact": true,
+            "elapsed_ms": 355.1484,
+            "request_wait_ms": 343.47900000000004,
+            "provider_requests": 32,
+            "input_span_bytes": 50331648,
+            "output_span_bytes": 50331648
+          },
+          {
+            "phase": "B1",
+            "batched": true,
+            "exact": true,
+            "elapsed_ms": 201.946,
+            "request_wait_ms": 201.4191,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          },
+          {
+            "phase": "B2",
+            "batched": true,
+            "exact": true,
+            "elapsed_ms": 201.9799,
+            "request_wait_ms": 201.4076,
+            "provider_requests": 1,
+            "input_span_bytes": 1572864,
+            "output_span_bytes": 1572864
+          },
+          {
+            "phase": "A2",
+            "batched": false,
+            "exact": true,
+            "elapsed_ms": 362.6526,
+            "request_wait_ms": 348.6771,
+            "provider_requests": 32,
+            "input_span_bytes": 50331648,
+            "output_span_bytes": 50331648
+          }
+        ],
+        "old_elapsed_ms": 717.8009999999999,
+        "new_elapsed_ms": 403.92589999999996,
+        "elapsed_reduction_percent": 43.727314394936755
+      },
+      {
+        "width": 1024,
+        "height": 768,
+        "commands": 32,
+        "oracle_sha256": "c06f430ad4b96145956b351325fac5b26f2036a2f1fc0f37779ba4e99f1b1d62",
+        "warmups": [
+          {
+            "batched": false,
+            "exact": true,
+            "elapsed_ms": 977.4662,
+            "request_wait_ms": 860.5307,
+            "provider_requests": 96,
+            "input_span_bytes": 150994944,
+            "output_span_bytes": 150994944
+          },
+          {
+            "batched": true,
+            "exact": true,
+            "elapsed_ms": 529.8664,
+            "request_wait_ms": 525.9446999999999,
+            "provider_requests": 3,
+            "input_span_bytes": 4718592,
+            "output_span_bytes": 4718592
+          }
+        ],
+        "phases": [
+          {
+            "phase": "A1",
+            "batched": false,
+            "exact": true,
+            "elapsed_ms": 903.2175,
+            "request_wait_ms": 779.7230000000002,
+            "provider_requests": 96,
+            "input_span_bytes": 150994944,
+            "output_span_bytes": 150994944
+          },
+          {
+            "phase": "B1",
+            "batched": true,
+            "exact": true,
+            "elapsed_ms": 437.8876,
+            "request_wait_ms": 432.6923,
+            "provider_requests": 3,
+            "input_span_bytes": 4718592,
+            "output_span_bytes": 4718592
+          },
+          {
+            "phase": "B2",
+            "batched": true,
+            "exact": true,
+            "elapsed_ms": 438.3668,
+            "request_wait_ms": 432.7054,
+            "provider_requests": 3,
+            "input_span_bytes": 4718592,
+            "output_span_bytes": 4718592
+          },
+          {
+            "phase": "A2",
+            "batched": false,
+            "exact": true,
+            "elapsed_ms": 929.3401,
+            "request_wait_ms": 790.4708,
+            "provider_requests": 96,
+            "input_span_bytes": 150994944,
+            "output_span_bytes": 150994944
+          }
+        ],
+        "old_elapsed_ms": 1832.5576,
+        "new_elapsed_ms": 876.2544,
+        "elapsed_reduction_percent": 52.18407323185912
+      }
+    ],
+    "model_sha256": "25bf17967228fa41b8467bb7e63c7df696adf9e2bb1bec6e7e0fe4099f6c557b",
+    "execution_devices": [
+      "NPU"
+    ],
+    "scope": "Synthetic ordered solid RGBA8 rectangles. Both paths use the same qualified NPU kernel; sequential mode submits one command at a time. End-to-end loop time includes host packet preparation, NPU waits and output transport. Oracle and final comparison are excluded. No Windows driver or Tahoma measurement.",
+    "finished": "2026-10-20T08:28:07.904779+00:00"
+  },
+  "finished": "2026-10-20T08:28:08.155802+00:00"
+}

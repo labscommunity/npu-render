@@ -10,19 +10,19 @@ RGBA composition and an explicit backend switch. The packaged runtime passed
 GPU → NPU → CPU → GPU → NPU switching on Panther Lake. It supports CPU/GPU/NPU through
 its first OpenVINO provider; other providers can implement the same contracts.
 
-**Latest results, October 16:** the [packet-worker desktop trial](docs/validation/2026-10-16/native-response-packet-live-v1/README.md)
-passes 1,682 acknowledged NPU operations, 103 exact physical submissions, forty
-controlled inputs, the default-adapter test application and restoration, with
-no provider fault or retry. Responsiveness still fails: both recent workers show
-only seven verified animation updates during a ten-second 30 Hz test. The latest
-warm sent-input-to-display p95 is 108 ms for mouse and 1,632 ms for keyboard.
-The trace places 6.84 seconds inside child rendering with no compilation time.
+**Latest desktop result, October 20:** the [combined-renderer trial](docs/validation/2026-10-20/native-combined-render-live-v1/README.md)
+passes 1,694 acknowledged NPU operations, 107 exact physical submissions, forty
+controlled inputs, the shared default-adapter fixture and restoration. It has no
+provider fault or retry. Responsiveness still fails: eight verified animation
+updates occur during the ten-second 30 Hz test (0.8/s). Warm sent-to-display p95
+is 1,726 ms for mouse and 97 ms for keyboard, with nineteen samples per kind.
+The trace places 6.35 seconds inside child rendering during that animation.
 Full desktop offload, sustained responsiveness, broad application coverage and
 a Tahoma benefit remain unqualified.
 
 **October 20 follow-up:** the completed [GPU baseline](docs/validation/2026-10-16/native-physical-gpu-live-v1/README.md)
 reaches 29.9 verified animation updates per second through the same display bridge,
-versus 0.7 on NPU. Its 550-second presentation and restoration pass, with zero
+versus 0.7 on the earlier NPU baseline and 0.8 in the latest trial. Its 550-second presentation and restoration pass, with zero
 NPU rendering calls. This points to the NPU rendering path rather than the bridge
 as the animation bottleneck. Tahoma throughput has not been measured in this setup.
 The [host-memory experiment](docs/validation/2026-10-20/native-host-tensor-rejected-v1/README.md)
@@ -42,7 +42,11 @@ preserves all replay images and passes recovery. Targeted clipping draws become
 71.69% faster, but total replay time improves only 4.49%, so its standalone live
 promotion is rejected. The [combined candidate](docs/validation/2026-10-20/native-combined-render-worker-v1/README.md)
 preserves all 3,888 comparison images, reduces aggregate request time by 6.81%,
-and passes both recovery scenarios. Its separate desktop trial is in progress.
+and passes both recovery scenarios. Its separate desktop trial passes the finite
+checks above while failing the responsiveness target. The
+[batching prerequisites](docs/validation/2026-10-20/native-batching-contract-v1/README.md)
+now include a tested version contract and a complete captured-resource inventory;
+they are not yet an integrated rendering path.
 
 Its [complete-image component comparison](docs/validation/2026-10-16/native-filled-program-comparison-v1/README.md)
 preserves all 1,852 preceding NPU images. Across 1,389 warm pairs, aggregate draw

@@ -1,0 +1,87 @@
+"""Compare one-command NPU submissions with ordered multi-command submissions."""
+from pathlib import Path
+from datetime import UTC,datetime
+import argparse,hashlib,json,os,subprocess,sys,time,traceback
+root=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=root/'vm'
+def obj(p):return json.loads(p.read_text(encoding='utf-8-sig'))
+def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+def write(p,v):p.write_text(json.dumps(v,indent=2)+'\n')
+def child(out):
+ import struct,numpy as np,openvino as ov
+ span=262144;capacity=65264;report=dict(started=datetime.now(UTC).isoformat(),passed=False,completed=False,cases=[])
+ try:
+  assert ov.get_version()=='2026.4.1-22982-e213a147257-releases/2026/4'
+  core=ov.Core();providers={};model_hashes={}
+  for version in [2,3]:
+   proof=obj(vm/f'ptl-six-span-command-batch-v{version}/report.json');assert proof['passed'] and proof['child_result']['unique_component_fixtures']==(120 if version==3 else 72)
+   blob=vm/f'ptl-six-span-command-batch-v{version}/patched.blob';assert sha(blob)==proof['patched_sha256'];model_hashes[version]=sha(blob)
+   model=core.import_model(blob.read_bytes(),'NPU');raw_devices=model.get_property('EXECUTION_DEVICES');devices=[raw_devices] if isinstance(raw_devices,str) else list(raw_devices);assert devices in (['NPU'],['NPU.0']);request=model.create_infer_request()
+   data=request.get_input_tensor().data.view(np.uint8).reshape(6,span);providers[version]=(model,request,data)
+  def render(initial,w,h,commands,batched,version,balanced):
+   model,request,data=providers[version]
+   frame=initial.copy();requests=0;wait_ms=0;started=time.perf_counter_ns()
+   groups=[commands] if batched else [[c] for c in commands]
+   for group in groups:
+    # Independent spatial chunks read the same preceding command-group version.
+    # Host operations below only transport packed pixels and command metadata.
+    previous=frame;frame=np.empty_like(previous)
+    for first in range(0,w*h,capacity*6):
+     data.fill(0);ranges=[];total=min(w*h-first,capacity*6);stride=(total+5)//6 if balanced else capacity
+     for plane in range(6):
+      at=first+min(total,plane*stride);count=min(stride,first+total-at);ranges.append((at,count))
+      struct.pack_into('<9I',data[plane],0,0x4e524351,1,count,at,w,h,len(group),28,span)
+      for n,command in enumerate(group):struct.pack_into('<8I',data[plane],64+n*32,*command)
+      data[plane,1088:1088+count*4]=previous[at:at+count].view(np.uint8)
+     began=time.perf_counter_ns();request.start_async();assert request.wait_for(15000);wait_ms+=(time.perf_counter_ns()-began)/1e6;requests+=1
+     result=request.get_output_tensor().data.view(np.uint8).reshape(6,span)
+     for plane,(at,count) in enumerate(ranges):
+      magic,actual_count,actual_commands,hits=struct.unpack_from('<4I',result[plane]);assert (magic,actual_count,actual_commands)==(0x4e52434f,count,len(group)) and hits<=count*len(group)
+      frame[at:at+count]=result[plane,16:16+count*4].view(np.uint32)
+   elapsed=(time.perf_counter_ns()-started)/1e6
+   return frame,dict(elapsed_ms=elapsed,request_wait_ms=wait_ms,provider_requests=requests,input_span_bytes=requests*6*span,output_span_bytes=requests*6*span)
+  for case,(w,h,count) in enumerate([(64,64,8),(256,256,32),(1024,768,32)]):
+   rng=np.random.default_rng(8140000+case);initial=rng.integers(0,2**32,w*h,dtype=np.uint32);commands=[]
+   for n in range(count):
+    if n%3==0:rect=(0,0,w,h)
+    else:
+     xx=sorted(map(int,rng.integers(0,w+1,2)));yy=sorted(map(int,rng.integers(0,h+1,2)));rect=(xx[0],yy[0],xx[1],yy[1])
+    commands.append((*rect,int(rng.integers(0,2**32,dtype=np.uint32)),n%2,1+n%15,0))
+   # Independent complete-image integer oracle. Never used by render().
+   expected=((initial.astype(np.uint64)[:,None]>>np.array([0,8,16,24],dtype=np.uint64))&255);positions=np.arange(w*h,dtype=np.uint64);x=positions%w;y=positions//w
+   for x0,y0,x1,y1,color,blend,mask,_ in commands:
+    selected=(x>=x0)&(x<x1)&(y>=y0)&(y<y1);rgba=[(color>>(8*k))&255 for k in range(4)]
+    for c in range(4):
+     if mask&(1<<c):
+      value=(np.minimum(65025,rgba[c]*255+expected[:,c]*(255-rgba[3]))+127)//255 if blend else rgba[c]
+      expected[selected,c]=value[selected] if isinstance(value,np.ndarray) else value
+   oracle=np.bitwise_or.reduce(expected<<np.array([0,8,16,24],dtype=np.uint64),axis=1).astype(np.uint32)
+   record=dict(width=w,height=h,commands=count,oracle_sha256=hashlib.sha256(oracle.tobytes()).hexdigest(),warmups=[],phases=[])
+   for version,batched,balanced in [(2,True,True),(3,False,True),(3,True,True),(3,True,False)]:
+    actual,timing=render(initial,w,h,commands,batched,version,balanced);assert np.array_equal(actual,oracle);record['warmups'].append(dict(version=version,batched=batched,balanced=balanced,exact=True,**timing))
+   schedules=[('batching',[(3,False,True),(3,True,True),(3,True,True),(3,False,True)]),('vectorization',[(2,True,True),(3,True,True),(3,True,True),(2,True,True)]),('balancing',[(3,True,False),(3,True,True),(3,True,True),(3,True,False)])]
+   record['comparisons']={}
+   for comparison,schedule in schedules:
+    current=[]
+    for phase,(version,batched,balanced) in zip(['A1','B1','B2','A2'],schedule):
+     actual,timing=render(initial,w,h,commands,batched,version,balanced);assert np.array_equal(actual,oracle);current.append(dict(comparison=comparison,phase=phase,version=version,batched=batched,balanced=balanced,exact=True,**timing))
+    record['phases']+=current;old=current[0]['elapsed_ms']+current[3]['elapsed_ms'];new=current[1]['elapsed_ms']+current[2]['elapsed_ms'];record['comparisons'][comparison]=dict(old_elapsed_ms=old,new_elapsed_ms=new,elapsed_reduction_percent=100*(1-new/old))
+   report['cases'].append(record);write(out/'child-report.json',report)
+  report.update(passed=True,model_sha256=model_hashes,execution_devices=devices,scope='Synthetic ordered solid RGBA8 rectangles. Three A/B/B/A comparisons isolate one-command versus ordered submissions with v3, balanced v2 versus balanced v3 pixel processing, and unbalanced versus balanced v3 span assignment. Both kernels preserve the same pixel recurrence. End-to-end loop time includes host packet preparation, NPU waits and output transport. Oracle and final comparison are excluded. No Windows driver or Tahoma measurement.')
+ except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+ finally:report.update(completed=True,finished=datetime.now(UTC).isoformat());write(out/'child-report.json',report)
+ print(json.dumps({k:v for k,v in report.items() if k!='cases'}));return 0 if report['passed'] else 1
+
+def main():
+ p=argparse.ArgumentParser();p.add_argument('--child',type=Path);a=p.parse_args()
+ if a.child:return child(a.child)
+ out=vm/'ptl-command-batch-comparison-v4';out.mkdir(exist_ok=False);report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,desktop_changed=False,tahoma_tested=False)
+ try:
+  assert obj(vm/'ptl-command-batch-v3-qualification/report.json')['passed']
+  assert obj(vm/'native-desktop-admission-v70/report.json')['cleanup_passed']
+  with (out/'stdout.log').open('xb') as stdout,(out/'stderr.log').open('xb') as stderr:
+   process=subprocess.run([sys.executable,__file__,'--child',str(out)],stdout=stdout,stderr=stderr,timeout=300,creationflags=subprocess.CREATE_NO_WINDOW)
+  child_result=obj(out/'child-report.json');report.update(passed=process.returncode==0 and child_result['passed'],exit_code=process.returncode,child_result=child_result)
+ except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+ finally:report.update(completed=True,finished=datetime.now(UTC).isoformat());write(out/'report.json',report)
+ print(json.dumps({k:v for k,v in report.items() if k!='child_result'}));return 0 if report['passed'] else 1
+if __name__=='__main__':raise SystemExit(main())

@@ -1,0 +1,13 @@
+from pathlib import Path
+import ast,hashlib,json,subprocess
+r=Path('results/render-driver')
+s=(r/'qualify-ptl-six-span-resident-clip-v3.py').read_text().replace('ptl_resident_clip_fixtures_v1','ptl_command_batch_fixtures_v1').replace('custom-resident-clip','custom-command-batch').replace('ptl-six-span-resident-clip-v3','ptl-six-span-command-batch-v1').replace('ptl-six-span-resident-clip-build-v3','ptl-six-span-command-batch-build-v1').replace('range(24 if','range(12 if').replace("['unique_component_fixtures']=144","['unique_component_fixtures']=72")
+ast.parse(s);(r/'qualify-ptl-six-span-command-batch-v1.py').write_text(s)
+s=(r/'run-ptl-resident-clip-v3-qualification.ps1').read_text().replace('resident-clip-v3','command-batch-v1').replace('resident-clip-build-v3','command-batch-build-v1').replace('ptl-resident-clip-device-v1-source.json','ptl-command-batch-device-v1-source.json').replace("@('quad-rectangle-provider-recovery-v1-qualification')","@('native-request-inventory-v2-qualification','command-batch-contract-v1-qualification')").replace("if(Test-Path \"$vm/native-desktop-admission-v68/report.json\"){'native-desktop-admission-v68'}", "if(Test-Path \"$vm/native-desktop-admission-v70/report.json\"){'native-desktop-admission-v70'}").replace('unique_component_fixtures -ne 144','unique_component_fixtures -ne 72').replace('unique_npu_fixtures=144','unique_npu_fixtures=72').replace('waiting-for-quad-provider-recovery','waiting-for-inventory-and-contract')
+s=s.replace('result_cache_implemented=$false','command_batch_component_only=$true')
+(r/'run-ptl-command-batch-v1-qualification.ps1').write_text(s)
+names=['ptl-six-span-command-batch-v1.c','ptl_command_batch_fixtures_v1.py','qualify-ptl-six-span-command-batch-v1.py','run-ptl-command-batch-v1-qualification.ps1']
+p=r/'ptl-command-batch-device-v1-source.json';p.write_text(json.dumps({n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in names},indent=2)+'\n')
+assert 'resident' not in s
+subprocess.run(['scp','-q',*[str(r/n) for n in names],str(p),'delta:AppData/Local/npu-render/vm/'],check=True,timeout=30)
+print(json.dumps(dict(uploaded=True,device_fixtures=72,scope='ordered RGBA8 solid rectangles; copy/source-over, write masks, RGBA/BGRA; component only')))

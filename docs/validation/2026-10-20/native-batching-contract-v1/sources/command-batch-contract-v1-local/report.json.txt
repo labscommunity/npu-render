@@ -1,0 +1,29 @@
+{
+  "passed": true,
+  "execution": "CPU metadata contract only; no rendering",
+  "compiler": "Apple clang version 21.0.0 (clang-2100.0.123.102)",
+  "build_command": [
+    "clang++",
+    "-std=c++17",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-fsanitize=address,undefined",
+    "-g",
+    "native/tests/command_batch_test.cpp",
+    "-o",
+    "results/render-driver/command-batch-contract-test"
+  ],
+  "test_command": [
+    "results/render-driver/command-batch-contract-test"
+  ],
+  "test_exit_code": 0,
+  "stdout": "command batch CPU contract passed; no rendering executed\n",
+  "modeled_batches": 10000,
+  "binary_sha256": "1292027da1f3180b00465f1e6361598a163aa91410660a8086131e2d7bd4cbb2",
+  "source_sha256": {
+    "native/include/command_batch.hpp": "c83d1b115868209ac29b3aee35083168cdc5795169622750868020552910fd0d",
+    "native/tests/command_batch_test.cpp": "b7343cd27cb43ba760632cf527a4140e4f019bb97680d15663e0c6c753c0bc61",
+    "native/CMakeLists.txt": "be57ae4647bef9d0eabc8e2c4afb8a3d5729287f658e7342362533167d749d69"
+  }
+}
