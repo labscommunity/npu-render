@@ -9,7 +9,7 @@
 //   shaders[shader_count]:     ShaderRecord then bytecode words
 //   resources[resource_count]: ResourceRecord
 //   uploads[upload_count]:     UploadRecord then w*h packed pixels
-//   commands[command_count]:   CommandRecord then vertex words, constant words, texture bindings
+//   commands[command_count]:   CommandRecord, texture bindings, vertex words, constant words
 // Response body:
 //   ResponseHeader
 //   targets[target_count]:     TargetRecord then rect pixels
@@ -49,7 +49,7 @@ struct CommandRecord {
     int32_t scissor[4]{}; uint32_t scissor_enabled = 0;
     float viewport[6]{}; float blend_constant[4]{}; float clear_color[4]{};
     uint32_t texture_count = 0;
-    uint32_t legacy_abi = 0, legacy_flags = 0;    // per-draw route selectors for the fallback path
+    uint32_t legacy_abi = 0, legacy_flags = 0;    // per-draw route selectors for the fallback path: abi | reserved << 16, flags
 };
 static_assert(sizeof(CommandRecord) == 136);
 struct ResponseHeader {

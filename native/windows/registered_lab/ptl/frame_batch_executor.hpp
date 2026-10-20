@@ -5,7 +5,7 @@
 // eligible draws, the qualified per-draw routes for the rest.
 #include "frame_batch_protocol.hpp"
 #include "frame_batch_planner.hpp"
-#include "frame_inventory.hpp"
+#include "frame_native_inventory.hpp"
 #include "indexed_pipeline.hpp"
 #include "npu_turbo_import.hpp"
 #include <openvino/openvino.hpp>
@@ -74,50 +74,12 @@ public:
         failed = false;
     }
 };
-// The captured inventory lowered once: a batch shader pair is native when its
-// lowered form matches an inventory program; the kernel blob and the index
-// inside that blob follow from the inventory order (frame::blob_of).
-struct NativeIdentity { uint32_t blob = UINT32_MAX, blob_index = 0, host_index = 0; };
-class NativeInventory {
-    struct Entry { frame::LoweredProgram lowered; uint32_t pair = 0; NativeIdentity identity; };
-    std::vector<Entry> entries;
-public:
-    NativeInventory() {
-        std::array<uint32_t, frame::blob_ranges.size()> counts{};
-        for (size_t n = 0; n < std::size(frame::inventory_pairs); ++n) {
-            const auto &pair = frame::inventory_pairs[n];
-            shader::Program vs, ps;
-            try { vs = shader::parse_vertex(pair.vs, pair.vs_words); ps = shader::parse_pixel(pair.ps, pair.ps_words); } catch (const std::exception &) { continue; }
-            Entry e; e.lowered = frame::lower(vs, ps, shader::TextureSamplers{}); e.pair = uint32_t(n);
-            if (!e.lowered.eligible()) continue;
-            e.identity.blob = frame::blob_of(uint32_t(e.lowered.ps_words.size()));
-            require(e.identity.blob < counts.size());
-            e.identity.blob_index = counts[e.identity.blob]++;
-            e.identity.host_index = uint32_t(entries.size());
-            // The compiled host header must list the same programs in the same order.
-            require(e.identity.host_index < NR_NATIVE_COUNT && frame::core::nr_native_inventory(e.identity.host_index) == e.pair);
-            entries.push_back(std::move(e));
-        }
-        require(NR_NATIVE_COUNT == 2 * entries.size());
-        std::printf("{\"native_inventory\":true,\"programs\":%zu}\n", entries.size()); std::fflush(stdout);
-    }
-    const NativeIdentity *find(const frame::LoweredProgram &p) const {
-        for (const auto &e : entries) {
-            const auto &q = e.lowered;
-            if (q.vs_words == p.vs_words && q.ps_words == p.ps_words && q.vs_immediates == p.vs_immediates && q.ps_immediates == p.ps_immediates &&
-                q.vs_constant_base == p.vs_constant_base && q.ps_constant_base == p.ps_constant_base && q.vs_constant_count == p.vs_constant_count && q.ps_constant_count == p.ps_constant_count &&
-                q.vs_inputs == p.vs_inputs && q.ps_inputs == p.ps_inputs && q.position_output == p.position_output && q.interpolation == p.interpolation && q.texture_slots == p.texture_slots)
-                return &e.identity;
-        }
-        return nullptr;
-    }
-};
 struct ResidentResource { uint64_t key = 0, version = 0; uint32_t width = 0, height = 0, format = 0, flags = 0; std::vector<uint32_t> pixels; };
 struct VolatileWindow { uint32_t x, y, width, height; std::vector<uint32_t> pixels; };
 class FrameBatchExecutor {
     indexed_exchange::Pipeline &legacy;
     std::array<std::unique_ptr<FrameKernelProvider>, frame::blob_ranges.size()> kernels;
-    std::unique_ptr<NativeInventory> inventory;
+    std::unique_ptr<frame::NativeInventory> inventory;
     std::unordered_map<uint64_t, ResidentResource> resident;
     std::unordered_map<std::string, std::shared_ptr<const shader::Program>> shaders;   // sha256 hex -> parsed
     std::map<std::string, std::shared_ptr<const frame::LoweredProgram>> lowered;        // vs sha + ps sha + sampler bits
@@ -129,6 +91,8 @@ class FrameBatchExecutor {
         std::vector<uint32_t> vertex_constants, pixel_constants;
         std::shared_ptr<const frame::LoweredProgram> program; frame::DrawPlan plan; frame::Rect scissor_bounds; bool eligible = false; std::string route;
         uint32_t blob = UINT32_MAX; std::vector<uint8_t> kernel_entry;   // program entry carrying the blob-local native index
+        uint32_t tile = 128;                                             // tile edge the draw's texture windows fit at
+        bool done = false;                                               // executed (kernel or fallback)
     };
     struct Stats { uint64_t kernel_requests = 0, covered = 0, escapes = 0, executed = 0, fallback = 0; double kernel_ms = 0, host_ms = 0; };
     const std::vector<Shader> *current_shaders = nullptr;   // shaders of the batch being executed
@@ -155,7 +119,7 @@ public:
     // `blob_dir` holds manifest.txt with one line per kernel blob: "<blob> <sha256> <file>".
     explicit FrameBatchExecutor(indexed_exchange::Pipeline &pipeline, const std::filesystem::path &blob_dir) : legacy(pipeline) {
         if (blob_dir.empty()) return;
-        inventory = std::make_unique<NativeInventory>();
+        inventory = std::make_unique<frame::NativeInventory>();
         std::ifstream manifest(blob_dir / "manifest.txt"); require(bool(manifest));
         std::string line;
         while (std::getline(manifest, line)) {
@@ -253,7 +217,9 @@ public:
                 if (d.record.kind == 1) { flush(); clear(d, refs, dirty); ++stats.executed; continue; }
                 bool hazard = false;
                 for (uint32_t t = 0; t < d.record.texture_count; ++t) if (d.textures[t].resource == run_target) hazard = true;
-                if (!d.eligible || hazard || (run_target != SIZE_MAX && run_target != d.record.target) || (run_blob != UINT32_MAX && run_blob != d.blob)) flush();
+                if (d.eligible) fit(d, refs);
+                const bool breaks = !run.empty() && draws[run.back()].tile != d.tile;
+                if (!d.eligible || hazard || breaks || (run_target != SIZE_MAX && run_target != d.record.target) || (run_blob != UINT32_MAX && run_blob != d.blob)) flush();
                 if (!d.eligible) { fallback(d, batch_shaders, refs, dirty, stats); continue; }
                 run_target = d.record.target; run_blob = d.blob; run.push_back(n);
             }
@@ -305,7 +271,7 @@ private:
         d.program = found->second;
         if (!d.program->eligible()) { d.route = "fallback:" + d.program->rejection; return; }
         {
-            const auto *identity = inventory->find(*d.program); require(identity);
+            const auto *identity = inventory->find(*d.program); require(identity != nullptr);
             if (!kernels[identity->blob]) { d.route = "fallback:kernel blob " + std::to_string(identity->blob) + " unavailable"; return; }
             d.blob = identity->blob; d.kernel_entry = d.program->entry;
             std::memcpy(d.kernel_entry.data(), &identity->blob_index, 4);
@@ -323,6 +289,28 @@ private:
         if (d.record.scissor_enabled) d.scissor_bounds = frame::intersect(d.scissor_bounds, {d.record.scissor[0], d.record.scissor[1], d.record.scissor[2], d.record.scissor[3]});
         d.eligible = true; d.route = "frame";
     }
+    // Bytes a tile span needs for one draw's texture windows plus fixed costs; chooses the tile edge.
+    void fit(Draw &d, const std::vector<ResourceRef> &refs) {
+        const auto &target = refs[d.record.target].record;
+        const frame::Rect bounds = frame::intersect(frame::intersect(d.plan.bounds, d.scissor_bounds), {0, 0, int32_t(target.width), int32_t(target.height)});
+        if (bounds.empty()) { d.tile = 128; return; }
+        for (uint32_t edge : {128u, 64u, 32u}) {
+            bool fits = true;
+            for (int32_t ty = bounds.y0 / int32_t(edge) * int32_t(edge); ty < bounds.y1 && fits; ty += int32_t(edge)) for (int32_t tx = bounds.x0 / int32_t(edge) * int32_t(edge); tx < bounds.x1 && fits; tx += int32_t(edge)) {
+                const frame::Rect clip = frame::intersect(bounds, {tx, ty, tx + int32_t(edge), ty + int32_t(edge)});
+                if (clip.empty()) continue;
+                size_t bytes = NR_FRAME_HEADER_BYTES + NR_FRAME_COMMAND_BYTES + d.kernel_entry.size() + 64 + d.record.vertex_words * 4 + (d.vertex_constants.size() + d.pixel_constants.size()) * 4 + 4 + edge * edge * 4;
+                for (uint32_t t = 0; t < d.record.texture_count; ++t) {
+                    const auto &tref = refs[d.textures[t].resource];
+                    const auto r = frame::texel_window(*d.program, d.plan, clip, t, tref.record.width, tref.record.height, d.textures[t].filter != 0);
+                    bytes += NR_FRAME_WINDOW_BYTES + (r.empty() ? 4 : size_t(r.x1 - r.x0) * size_t(r.y1 - r.y0) * 4);
+                }
+                if (bytes > frame::span_bytes - 1024) fits = false;
+            }
+            if (fits) { d.tile = edge; return; }
+        }
+        d.eligible = false; d.route = "fallback:span budget";
+    }
     void clear(const Draw &d, std::vector<ResourceRef> &refs, std::map<uint64_t, frame::Rect> &dirty) {
         auto &ref = refs[d.record.target]; auto &res = *ref.resident;
         std::array<float, 4> color{d.record.clear_color[0], d.record.clear_color[1], d.record.clear_color[2], d.record.clear_color[3]};
@@ -335,7 +323,9 @@ private:
         // Build the legacy per-draw request against the resident target and run the qualified route.
         auto &ref = refs[d.record.target]; auto &res = *ref.resident; require(res.pixels.size() == size_t(res.width) * res.height);
         indexed_exchange::Request request; auto &h = request.header;
-        h.abi = d.record.legacy_abi; h.flags = d.record.legacy_flags; h.width = res.width; h.height = res.height; h.vertices = d.record.vertex_count; h.format = res.format;
+        // legacy_abi packs the recorded abi (low 16 bits) and the reserved word that carries the payload abi for large variants.
+        h.abi = d.record.legacy_abi & 0xffffu; h.reserved = d.record.legacy_abi >> 16; h.flags = d.record.legacy_flags; h.width = res.width; h.height = res.height; h.vertices = d.record.vertex_count; h.format = res.format;
+        std::printf("{\"frame_batch_fallback_begin\":true,\"route\":\"%s\",\"abi\":%u,\"reserved\":%u,\"flags\":%u}\n", d.route.c_str(), h.abi, h.reserved, h.flags); std::fflush(stdout);
         h.sequence = 1; h.client_pid = GetCurrentProcessId(); h.nonce[0] = 1;
         request.vertex = *batch_shaders[d.record.vertex_shader].program; request.pixel = *batch_shaders[d.record.pixel_shader].program;
         h.vs_words = uint32_t(request.vertex.bytecode.size()); h.ps_words = uint32_t(request.pixel.bytecode.size());
@@ -356,11 +346,14 @@ private:
             if (h.flags & 0x2000) { request.resources[slots[t]] = std::move(texture); auto &s = request.samplers[slots[t]]; s.filter = d.textures[t].filter ? shader::TextureFilter::point : shader::TextureFilter::linear; s.u = shader::TextureAddress(d.textures[t].address_u); s.v = shader::TextureAddress(d.textures[t].address_v); for (unsigned c = 0; c < 4; ++c) s.border[c] = d.textures[t].border[c]; }
             else request.texture = std::move(texture);
         }
-        auto result = legacy.execute(request); require(result.execution_device == "NPU" && result.pixels.size() == res.pixels.size());
+        raster::UniformDrawExecutor::Result result;
+        try { result = legacy.execute(request); }
+        catch (const std::exception &error) { throw std::runtime_error(std::string("frame batch fallback (") + d.route + ") failed: " + error.what()); }
+        require(result.execution_device == "NPU" && result.pixels.size() == res.pixels.size());
         std::memcpy(res.pixels.data(), result.pixels.data(), res.pixels.size() * 4);
         dirty[ref.record.key] = frame::unite(dirty[ref.record.key], frame::intersect(d.plan.valid ? d.plan.bounds : frame::Rect{0, 0, int32_t(res.width), int32_t(res.height)}, {0, 0, int32_t(res.width), int32_t(res.height)}));
         if (!d.plan.valid) dirty[ref.record.key] = {0, 0, int32_t(res.width), int32_t(res.height)};
-        ++stats.fallback; ++stats.executed;
+        ++stats.fallback; ++stats.executed; d.done = true;
         std::printf("{\"frame_batch_fallback\":true,\"route\":\"%s\",\"provider_requests\":%llu}\n", d.route.c_str(), (unsigned long long)result.provider_requests); std::fflush(stdout);
     }
     // Renders one ordered run of eligible draws on one target through the frame kernel.
@@ -372,8 +365,9 @@ private:
         if (touched.empty()) { stats.executed += run.size(); return; }
         struct Tile { uint32_t x, y, w, h; std::vector<size_t> commands; };
         std::vector<Tile> tiles;
-        for (int32_t ty = touched.y0 / 128 * 128; ty < touched.y1; ty += 128) for (int32_t tx = touched.x0 / 128 * 128; tx < touched.x1; tx += 128) {
-            Tile tile{uint32_t(tx), uint32_t(ty), uint32_t(std::min<int32_t>(128, int32_t(res.width) - tx)), uint32_t(std::min<int32_t>(128, int32_t(res.height) - ty)), {}};
+        const int32_t edge = int32_t(draws[run.front()].tile);
+        for (int32_t ty = touched.y0 / edge * edge; ty < touched.y1; ty += edge) for (int32_t tx = touched.x0 / edge * edge; tx < touched.x1; tx += edge) {
+            Tile tile{uint32_t(tx), uint32_t(ty), uint32_t(std::min<int32_t>(edge, int32_t(res.width) - tx)), uint32_t(std::min<int32_t>(edge, int32_t(res.height) - ty)), {}};
             const frame::Rect rect{tx, ty, tx + int32_t(tile.w), ty + int32_t(tile.h)};
             for (auto n : run) if (!frame::intersect(frame::intersect(draws[n].plan.bounds, draws[n].scissor_bounds), rect).empty()) tile.commands.push_back(n);
             if (!tile.commands.empty()) tiles.push_back(std::move(tile));
@@ -406,12 +400,14 @@ private:
                     bool ok = true;
                     for (uint32_t t = 0; t < d.record.texture_count && ok; ++t) {
                         const auto &tref = refs[d.textures[t].resource]; frame::Window w;
-                        const auto r = d.plan.texels[t]; w.w = uint32_t(r.x1 - r.x0); w.h = uint32_t(r.y1 - r.y0); w.origin_x = uint32_t(r.x0); w.origin_y = uint32_t(r.y0);
+                        auto r = frame::texel_window(*d.program, d.plan, clip, t, tref.record.width, tref.record.height, d.textures[t].filter != 0);
+                        if (r.empty()) r = {0, 0, 1, 1};   // no triangle reaches this tile: a one-texel window keeps the contract
+                        w.w = uint32_t(r.x1 - r.x0); w.h = uint32_t(r.y1 - r.y0); w.origin_x = uint32_t(r.x0); w.origin_y = uint32_t(r.y0);
                         w.texture_w = tref.record.width; w.texture_h = tref.record.height; w.format = tref.record.format;
-                        if (r.empty() || !fetch_window(tref, r, w.pixels)) { ok = false; break; }
+                        if (!fetch_window(tref, r, w.pixels)) { ok = false; break; }
                         trial_windows.push_back(std::move(w)); c.textures[t].window = uint32_t(trial_windows.size() - 1); c.textures[t].point = d.textures[t].filter != 0;
                     }
-                    if (!ok) { d.eligible = false; d.route = "fallback:window"; break; }
+                    if (!ok) throw std::runtime_error("frame batch texture window unavailable after planning");
                     std::vector<frame::Command> trial_commands = commands; trial_commands.push_back(c);
                     try {
                         auto span = frame::SpanBuilder::build(tile.x, tile.y, tile.w, tile.h, res.format, trial_programs, trial_commands, trial_windows, background.data());
@@ -419,18 +415,9 @@ private:
                         if (program_index == programs.size() - 1 && program_keys.size() < programs.size()) program_keys.push_back(d.program.get());
                         (void)span;
                     } catch (const std::invalid_argument &) {
-                        if (commands.empty()) { d.eligible = false; d.route = "fallback:span budget"; }
+                        if (commands.empty()) throw std::runtime_error("frame batch span budget exceeded after fitting");
                         break;
                     }
-                }
-                if (commands.empty()) {
-                    // The next command cannot run through the kernel; execute it alone and continue the tile afterwards.
-                    auto &d = draws[tile.commands[consumed]];
-                    // Flush what is already in flight so ordering is preserved.
-                    if (!spans.empty()) { next.insert(next.begin(), p); break; }
-                    fallback(d, *current_shaders, refs, dirty, stats);
-                    if (consumed + 1 < tile.commands.size()) next.push_back({p.tile, consumed + 1});
-                    continue;
                 }
                 spans.push_back(frame::SpanBuilder::build(tile.x, tile.y, tile.w, tile.h, res.format, programs, commands, windows, background.data()));
                 in_flight.push_back({p.tile, consumed});
@@ -443,7 +430,28 @@ private:
                 for (size_t n = 0; n < outputs.size(); ++n) {
                     uint32_t status, executed, covered, escapes; std::memcpy(&status, outputs[n].data() + 4, 4); std::memcpy(&executed, outputs[n].data() + 8, 4); std::memcpy(&covered, outputs[n].data() + 12, 4); std::memcpy(&escapes, outputs[n].data() + 16, 4);
                     const auto &tile = tiles[in_flight[n].tile];
-                    if (status != 0 || escapes) throw std::runtime_error("frame kernel tile failed: status " + std::to_string(status) + " escapes " + std::to_string(escapes));
+                    if (status != 0) {
+                        // Keep the span for host-side diagnosis next to the failure packet.
+                        char *failure = nullptr; size_t length = 0;
+                        if (!_dupenv_s(&failure, &length, "NR_RENDER_FAILURE_PACKET") && failure && *failure) {
+                            std::ofstream dump(std::filesystem::path(failure).replace_filename("frame-failed-span.bin"), std::ios::binary);
+                            dump.write(reinterpret_cast<const char *>(spans[n].data()), std::streamsize(spans[n].size()));
+                        }
+                        std::free(failure);
+                        throw std::runtime_error("frame kernel tile failed: status " + std::to_string(status) + " escapes " + std::to_string(escapes));
+                    }
+                    // Taps outside the packed windows clamp to the window edge; they are counted and reported, not fatal.
+                    if (escapes) {
+                        static bool dumped = false;
+                        std::printf("{\"frame_kernel_escapes\":%u,\"tile_x\":%u,\"tile_y\":%u,\"commands\":%zu}\n", escapes, tile.x, tile.y, tile.commands.size()); std::fflush(stdout);
+                        char *failure = nullptr; size_t length = 0;
+                        if (!dumped && !_dupenv_s(&failure, &length, "NR_RENDER_FAILURE_PACKET") && failure && *failure) {
+                            std::ofstream dump(std::filesystem::path(failure).replace_filename("frame-escaped-span-blob" + std::to_string(draws[run.front()].blob) + ".bin"), std::ios::binary);
+                            dump.write(reinterpret_cast<const char *>(spans[n].data()), std::streamsize(spans[n].size())); dumped = true;
+                        }
+                        std::free(failure);
+                    }
+                    stats.escapes += escapes;
                     stats.covered += covered;
                     for (uint32_t y = 0; y < tile.h; ++y) std::memcpy(res.pixels.data() + size_t(tile.y + y) * res.width + tile.x, outputs[n].data() + NR_FRAME_OUTPUT_PIXELS + size_t(y) * tile.w * 4, size_t(tile.w) * 4);
                 }
@@ -451,6 +459,7 @@ private:
             pending = std::move(next);
         }
         dirty[ref.record.key] = frame::unite(dirty[ref.record.key], touched);
+        for (auto n : run) draws[n].done = true;
         stats.executed += run.size();
     }
 };

@@ -397,3 +397,11 @@ target_link_libraries(nr_native_trace_lifecycle_test PRIVATE advapi32 user32 wts
 set_property(TARGET nr_native_trace_lifecycle_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 add_test(NAME registered_native_trace_lifecycle_contract COMMAND nr_native_trace_lifecycle_test)
 set_tests_properties(registered_native_trace_lifecycle_contract PROPERTIES TIMEOUT 30)
+
+add_executable(nr_frame_batch_replay_convert frame_batch_replay_convert.cpp)
+target_include_directories(nr_frame_batch_replay_convert PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_compile_features(nr_frame_batch_replay_convert PRIVATE cxx_std_17)
+target_compile_options(nr_frame_batch_replay_convert PRIVATE /W4 /WX)
+target_compile_definitions(nr_frame_batch_replay_convert PRIVATE NOMINMAX)
+target_link_libraries(nr_frame_batch_replay_convert PRIVATE nr_registered_vertex bcrypt)
+set_property(TARGET nr_frame_batch_replay_convert PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
