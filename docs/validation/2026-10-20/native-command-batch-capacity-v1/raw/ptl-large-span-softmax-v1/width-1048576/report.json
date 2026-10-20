@@ -1,0 +1,18 @@
+{
+  "started": "2026-10-20T09:27:00.821203+00:00",
+  "completed": true,
+  "passed": false,
+  "branches": 6,
+  "width": 1048576,
+  "custom_kernel_executed": false,
+  "checks": [],
+  "stage": "compile",
+  "config": {
+    "PERFORMANCE_HINT": "LATENCY",
+    "NPU_COMPILATION_MODE": "DefaultHW",
+    "NPU_TILES": 3
+  },
+  "error": "RuntimeError('Exception from src\\\\inference\\\\src\\\\cpp\\\\core.cpp:120:\\nException from src\\\\inference\\\\src\\\\dev\\\\plugin.cpp:54:\\nException from src\\\\plugins\\\\intel_npu\\\\src\\\\plugin\\\\src\\\\plugin.cpp:560:\\nException from src\\\\plugins\\\\intel_npu\\\\src\\\\compiler_adapter\\\\src\\\\compiler_impl.cpp:323:\\nCompilation failed. vclAllocatedExecutableCreate4 result: 0x78000004 - [NPU_VCL] Compiler returned msg:\\nCompilation failed\\n\\n\\n\\n')",
+  "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\vm\\create-ptl-large-span-softmax-v1.py\", line 18, in child\n    began=time.perf_counter_ns();model=core.compile_model(ov.Model(outputs,parameters),'NPU',config);report['compile_ms']=(time.perf_counter_ns()-began)/1e6\n                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\tatef\\AppData\\Local\\npu-render\\toolchains\\openvino-2026.4.1\\Lib\\site-packages\\openvino\\_ov_api.py\", line 646, in compile_model\n    super().compile_model(model, device_name, {} if config is None else config),\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nRuntimeError: Exception from src\\inference\\src\\cpp\\core.cpp:120:\nException from src\\inference\\src\\dev\\plugin.cpp:54:\nException from src\\plugins\\intel_npu\\src\\plugin\\src\\plugin.cpp:560:\nException from src\\plugins\\intel_npu\\src\\compiler_adapter\\src\\compiler_impl.cpp:323:\nCompilation failed. vclAllocatedExecutableCreate4 result: 0x78000004 - [NPU_VCL] Compiler returned msg:\nCompilation failed\n\n\n\n\n",
+  "finished": "2026-10-20T09:27:09.214081+00:00"
+}

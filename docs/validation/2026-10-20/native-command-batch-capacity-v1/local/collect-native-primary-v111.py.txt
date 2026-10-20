@@ -1,0 +1,41 @@
+from pathlib import Path
+import base64,subprocess,json,hashlib,concurrent.futures
+r=Path("results/render-driver")
+directories=['ptl-large-span-softmax-v1', 'ptl-large-span-softmax-v1-qualification', 'ptl-large-span-softmax-v2', 'ptl-large-span-softmax-v3', 'ptl-six-span-command-batch-build-v4', 'ptl-six-span-command-batch-build-v5', 'ptl-six-span-command-batch-v4', 'ptl-six-span-command-batch-v5', 'ptl-command-batch-v4-qualification', 'ptl-command-batch-v5-qualification', 'ptl-command-batch-comparison-v5', 'ptl-command-batch-comparison-v6', 'ptl-batch-turbo-v2', 'ptl-post-turbo-health-v1','ptl-post-turbo-health-v2','ptl-post-turbo-health-v3','ptl-batch-turbo-v3','ptl-large-span-softmax-v4']
+extras=[]
+source_files=['create-ptl-large-span-softmax-v1.py', 'create-ptl-large-span-softmax-v2.py', 'create-ptl-large-span-softmax-v3.py', 'run-ptl-large-span-softmax-v1-qualification.ps1', 'ptl_elf_v1.py', 'ptl_softmax_wide_contract_v1.py', 'ptl_softmax_repeated_contract_v1.py', 'ptl-softmax-wide-contract-v1-qualification.json', 'ptl-softmax-repeated-contract-v1-qualification.json', 'ptl_command_batch_wide_base_v1.py', 'ptl_command_batch_wide_fixtures_v1.py', 'ptl_command_batch_repeated_base_v1.py', 'ptl_command_batch_repeated_fixtures_v1.py', 'qualify-ptl-batch-turbo-v2.py', 'verify-ptl-post-turbo-health-v1.py','verify-ptl-post-turbo-health-v2.py','verify-ptl-post-turbo-health-v3.py','qualify-ptl-batch-turbo-v3.py','create-ptl-large-span-softmax-v4.py', 'ptl-six-span-command-batch-v4.c', 'qualify-ptl-six-span-command-batch-v4.py', 'run-ptl-command-batch-v4-qualification.ps1', 'ptl-command-batch-device-v4-source.json', 'ptl-six-span-command-batch-v5.c', 'qualify-ptl-six-span-command-batch-v5.py', 'run-ptl-command-batch-v5-qualification.ps1', 'ptl-command-batch-device-v5-source.json', 'compare-ptl-command-batch-v5.py', 'ptl-command-batch-comparison-v5-source.json', 'compare-ptl-command-batch-v6.py', 'ptl-command-batch-comparison-v6-source.json']
+ps=r'''$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render"
+foreach($trial in @('ptl-post-turbo-health-v3')){$q=Get-Content "$r\vm\$trial\report.json" -Raw|ConvertFrom-Json;if(!$q.completed){throw 'Cannot archive active comparison'}}
+function ArtifactHash([string]$path){$stream=[IO.File]::Open($path,[IO.FileMode]::Open,[IO.FileAccess]::Read,([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete));try{return (Get-FileHash -InputStream $stream -Algorithm SHA256).Hash}finally{$stream.Dispose()}}
+$items=@(foreach($name in @('''+','.join("'"+d+"'" for d in directories)+r''')){
+ if(!(Test-Path "$r\vm\$name")){continue}
+ Get-ChildItem "$r\vm\$name" -File -Recurse|Where-Object {($_.Extension -in @('.json','.jsonl','.log','.txt','.inf','.ps1','.py','.c','.cpp','.hpp')) -and ($_.Name -notlike 'client-*' -or ($_.Name -like '*.stderr.log' -and $_.Length -gt 0))}|ForEach-Object {
+ if($_.Length -gt 18000000){throw 'Unexpected artifact size'}
+ [ordered]@{source=$_.FullName.Substring(("$r\vm\").Length).Replace('\','/');bytes=$_.Length;sha256=(ArtifactHash $_.FullName)}
+ }
+}
+foreach($name in @('''+','.join("'"+d+"'" for d in extras+source_files)+r''')){[ordered]@{source=$name;bytes=(Get-Item "$r\vm\$name").Length;sha256=(ArtifactHash "$r\vm\$name")}}
+
+foreach($name in @()){foreach($artifact in @('build-report.json','registered-build-report.json')){
+ $file="$r\builds\$name\$artifact";if(!(Test-Path $file)){continue}
+ [ordered]@{source="build-$name/$artifact";remote_source="builds/$name/$artifact";bytes=(Get-Item $file).Length;sha256=(ArtifactHash $file)}
+}}
+
+
+);$items|ConvertTo-Json -Depth 5
+'''
+p=r/'hash-native-primary-v111.ps1';p.write_text(ps)
+subprocess.run(['scp','-q',str(p),'delta:AppData/Local/npu-render/vm/'],capture_output=True,check=True,timeout=30)
+invoke=r'''$r="$env:LOCALAPPDATA\npu-render";& ([scriptblock]::Create([IO.File]::ReadAllText("$r\vm\hash-native-primary-v111.ps1")))'''
+result=subprocess.run(['ssh','-o','BatchMode=yes','-o','ConnectTimeout=8','delta','powershell.exe -NoProfile -NonInteractive -EncodedCommand '+base64.b64encode(invoke.encode('utf-16-le')).decode()],capture_output=True,timeout=45)
+if result.returncode:print(result.stderr.decode(errors='replace')[:2000]);raise SystemExit(result.returncode)
+receipts=json.loads(result.stdout.decode('utf-8-sig'));assert 0<len(receipts)<1000
+(r/'native-primary-v111-artifact-sha256.json').write_text(json.dumps(receipts,indent=2)+'\n')
+def fetch(item):
+    name=item['source'];assert '..' not in name and not name.startswith('/');dest=r/'primary-raw-v111'/name;dest.parent.mkdir(parents=True,exist_ok=True)
+    subprocess.run(['scp','-q','-o','BatchMode=yes','delta:AppData/Local/npu-render/'+item.get('remote_source','vm/'+name),str(dest)],capture_output=True,check=True,timeout=90)
+    data=dest.read_bytes();assert len(data)==item['bytes'] and hashlib.sha256(data).hexdigest()==item['sha256'].lower()
+    if name in source_files:assert data==(r/name).read_bytes()
+    return len(data)
+with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:sizes=list(pool.map(fetch,receipts))
+print(json.dumps(dict(hash_verified_files=len(sizes),bytes=sum(sizes),source_files_matched_local=len(source_files))))

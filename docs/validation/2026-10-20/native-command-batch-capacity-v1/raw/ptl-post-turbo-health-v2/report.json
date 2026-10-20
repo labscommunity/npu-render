@@ -1,0 +1,72 @@
+{
+  "started": "2026-10-20T09:49:06.494294+00:00",
+  "completed": true,
+  "passed": true,
+  "desktop_changed": false,
+  "checks": [
+    {
+      "iteration": 0,
+      "request_ms": 3.0723,
+      "exact": true,
+      "input_sha256": "4a0adb22e7b59b182f6274db942fcdd491f72bb37ec34d5dbc6c8bea3dff38b4",
+      "output_sha256": "bf0989da0dd6f48b7e3475c73aac4e6cd40e52d741911d73f807a8ddb2867b13"
+    },
+    {
+      "iteration": 1,
+      "request_ms": 0.8953,
+      "exact": true,
+      "input_sha256": "a1c66430b0e6a79121516b0d713335f940dd5de3894aff0db416638cd30c854f",
+      "output_sha256": "0ee2f6b2d2157504abafe5c13d7beb8eca2684bb48886f1674d110d4c831ac00"
+    },
+    {
+      "iteration": 2,
+      "request_ms": 1.0044,
+      "exact": true,
+      "input_sha256": "b583b346698288db453c550b581ea281f0ba5465e845eead5fe81cbb8b4d9cd9",
+      "output_sha256": "0f9b0c361f2860ceb00a1fcec6981f7b2787dc9a45a1bc53d08fe5afab943ecc"
+    },
+    {
+      "iteration": 3,
+      "request_ms": 1.307,
+      "exact": true,
+      "input_sha256": "a82a76638645adf063163530b3d84b7adb05c10db1e840d6597e39292cba8938",
+      "output_sha256": "0f341db044913db87a8a8319bdeadc7c902f467c06cf6726265c75b80c3528da"
+    },
+    {
+      "iteration": 4,
+      "request_ms": 1.2239,
+      "exact": true,
+      "input_sha256": "70bcd186b0699c89d915d0f9a4e7b997a39e4e6471863402ecbcce874d346443",
+      "output_sha256": "97c25bcb95d21d63465fd90c0e2544c7529a87a91a00b51a46967e3ea3d60a60"
+    },
+    {
+      "iteration": 5,
+      "request_ms": 1.0321,
+      "exact": true,
+      "input_sha256": "a8b4cd90e51c190c74af0cb7b3ee7157d119a3328ed0022f3cb29034874e2683",
+      "output_sha256": "a46c22a80eee5d5466702f71b21dfc8863eae6caa7560bc79dbb279d340952e9"
+    },
+    {
+      "iteration": 6,
+      "request_ms": 1.0363,
+      "exact": true,
+      "input_sha256": "73ca866fa20f018d6e717f9d9408ef02a0190bf3fb1dc4f0b32ff76d18d12e54",
+      "output_sha256": "0a4238fd272782511d3d12e7d0568d2c45cbd3c8bb85fb3f7a2e6de1fa5181ac"
+    },
+    {
+      "iteration": 7,
+      "request_ms": 1.0462,
+      "exact": true,
+      "input_sha256": "2300f5f5fa1058c68c3d2edd5a02d7189a261f8795173dda4a4c36b8771027f3",
+      "output_sha256": "17a9b5ce606a4485c177077214782d0098946cce0ddb71780137d7d95efe29d9"
+    }
+  ],
+  "execution_devices": [
+    "NPU"
+  ],
+  "implicit_import_config": {},
+  "model_sha256": "04574cdd9d52105e7414d3c5560a778812b7259743825c63c8bb0aa47f3fd182",
+  "turbo_readback": null,
+  "turbo_readback_error": "Exception from src\\inference\\src\\cpp\\compiled_model.cpp:145:\nException from src\\plugins\\intel_npu\\src\\plugin\\src\\compiled_model_property_manager.cpp:125:\nUnsupported configuration key: NPU_TURBO\n\n",
+  "finished": "2026-10-20T09:49:06.580032+00:00"
+}

@@ -1,0 +1,32 @@
+"""Summarize completed capacity and isolated-hint trials without desktop claims."""
+from pathlib import Path
+import hashlib,json,statistics
+r=Path(__file__).parent;raw=r/'primary-raw-v111';inputs={}
+def read(name):
+ p=raw/name;b=p.read_bytes();inputs[name]=hashlib.sha256(b).hexdigest();return json.loads(b.decode('utf-8-sig'))
+report=dict(completed=True,passed=False,new_device_execution=False,desktop_improvement_demonstrated=False,tahoma_tested=False,capacity=[],hints={})
+for version,new_version in [(5,4),(6,5)]:
+ x=read(f'ptl-command-batch-comparison-v{version}/child-report.json');assert x['passed'] and x['completed'];cases=[]
+ for c in x['cases']:
+  groups={v:[p for p in c['phases'] if p['version']==v] for v in [3,new_version]}
+  assert all(len(rows)==6 and all(p['exact'] for p in rows) for rows in groups.values())
+  modes={str(v):dict(observations=len(rows),median_ms=statistics.median(p['elapsed_ms'] for p in rows),minimum_ms=min(p['elapsed_ms'] for p in rows),maximum_ms=max(p['elapsed_ms'] for p in rows),total_ms=sum(p['elapsed_ms'] for p in rows),provider_requests=sorted({p['provider_requests'] for p in rows}),logical_input_bytes=sorted({p['input_span_bytes'] for p in rows})) for v,rows in groups.items()}
+  cases.append(dict(width=c['width'],height=c['height'],commands=c['commands'],modes=modes,median_reduction_percent=100*(1-modes[str(new_version)]['median_ms']/modes['3']['median_ms'])))
+ report['capacity'].append(dict(comparison=version,baseline_kernel=3,candidate_kernel=new_version,exact_images=70,cases=cases))
+for version in [2,3]:
+ x=read(f'ptl-batch-turbo-v{version}/report.json');assert x['passed'] and x['completed'];groups={}
+ for p in x['processes']:
+  assert p['passed'] and p['completed'] and p['only_one_imported_model'];mode=p['mode'];mode={'default':'explicit_off','turbo':'explicit_on','implicit':'implicit','off':'explicit_off','on':'explicit_on'}[mode]
+  groups.setdefault(mode,[]).append(p)
+ stats={}
+ for mode,processes in groups.items():
+  rows=[p for proc in processes for p in proc['phases'] if not p['warmup']];assert all(p['exact'] for p in rows)
+  stats[mode]=dict(processes=len(processes),warm_observations=len(rows),median_ms=statistics.median(p['elapsed_ms'] for p in rows),total_ms=sum(p['elapsed_ms'] for p in rows),process_medians_ms=[statistics.median(p['elapsed_ms'] for p in proc['phases'] if not p['warmup']) for proc in processes])
+ for i in range(10):
+  rows=[p['phases'][i] for p in x['processes']];assert len({p['input_sha256'] for p in rows})==len({p['output_sha256'] for p in rows})==1
+ report['hints'][str(version)]=dict(exact_images=x['matched_images'],modes=stats,scope=x['scope'])
+for version in [2,3]:
+ h=read(f'ptl-post-turbo-health-v{version}/report.json');assert h['passed'] and len(h['checks'])==8 and h['turbo_readback'] is None and 'Unsupported configuration key' in h['turbo_readback_error']
+failure=read('ptl-post-turbo-health-v1/report.json');assert failure['completed'] and not failure['passed'] and len(failure['checks'])==0
+report.update(passed=True,source_sha256=inputs,limitations='Synthetic ordered solid rectangles only. Six timed observations per kernel/case come from three ABBA rounds. Hint observations are clustered within processes and use changing images with untimed CPU oracle preparation between NPU requests; do not compare their absolute latency with the uninterrupted capacity trials. No frequency, watts, GPU relief, full desktop responsiveness or Tahoma measurement. The first post-hint health tool failed on an unsupported property query before inference; corrected original-model health checks pass without inventing a default readback.')
+p=r/'native-command-batch-capacity-v1-analysis.json';assert not p.exists();p.write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(dict(passed=True,capacity_exact_images=140,hint_exact_images=260,post_hint_original_checks=16)))

@@ -1,0 +1,18 @@
+from pathlib import Path
+import ctypes,hashlib,json,subprocess,traceback
+from ptl_command_batch_repeated_fixtures_v1 import fixture
+r=Path(__file__).parent;s=(r/'ptl-six-span-command-batch-v5.c').read_text();a=s.index('void nr_probe_kernel(');b=s.index(' uint4 *words=',a)
+p=r/'ptl-command-batch-v5-local.c';p.write_text(s[:a]+'void nr_command_batch_local(const unsigned char *data,unsigned char *output){\n'+s[b:])
+binary=r/'ptl-command-batch-v5-local.dylib';command=['clang','-O2','-shared','-Wall','-Wextra','-Werror',str(p),'-o',str(binary)]
+subprocess.run(command,check=True)
+lib=ctypes.CDLL(str(binary.resolve()));fn=lib.nr_command_batch_local;fn.argtypes=[ctypes.c_void_p,ctypes.c_void_p];fn.restype=None
+report=dict(passed=False,device='CPU',npu_execution=False,checks=[],command=command)
+try:
+ for index in range(120):
+  data,expected=fixture(index);input_buffer=ctypes.create_string_buffer(data);output=ctypes.create_string_buffer(len(expected));fn(input_buffer,output);actual=output.raw
+  assert actual==expected,dict(index=index,mismatches=[i for i,(a,b) in enumerate(zip(actual,expected)) if a!=b][:20])
+  report['checks'].append(dict(index=index,passed=True,input_sha256=hashlib.sha256(data).hexdigest(),output_sha256=hashlib.sha256(actual).hexdigest()))
+ report['passed']=True
+except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc());raise
+finally:(r/'ptl-command-batch-v5-local-report.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(dict(passed=True,exact_fixtures=len(report['checks']),device='CPU')))

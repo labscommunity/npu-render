@@ -1,0 +1,455 @@
+{
+  "completed": true,
+  "passed": true,
+  "new_device_execution": false,
+  "desktop_improvement_demonstrated": false,
+  "tahoma_tested": false,
+  "capacity": [
+    {
+      "comparison": 5,
+      "baseline_kernel": 3,
+      "candidate_kernel": 4,
+      "exact_images": 70,
+      "cases": [
+        {
+          "width": 64,
+          "height": 64,
+          "commands": 8,
+          "modes": {
+            "3": {
+              "observations": 6,
+              "median_ms": 1.19135,
+              "minimum_ms": 1.05,
+              "maximum_ms": 1.3059,
+              "total_ms": 7.1102,
+              "provider_requests": [
+                1
+              ],
+              "logical_input_bytes": [
+                1572864
+              ]
+            },
+            "4": {
+              "observations": 6,
+              "median_ms": 2.34215,
+              "minimum_ms": 2.1186,
+              "maximum_ms": 2.4035,
+              "total_ms": 13.878499999999999,
+              "provider_requests": [
+                1
+              ],
+              "logical_input_bytes": [
+                3170304
+              ]
+            }
+          },
+          "median_reduction_percent": -96.59629831703533
+        },
+        {
+          "width": 256,
+          "height": 256,
+          "commands": 32,
+          "modes": {
+            "3": {
+              "observations": 6,
+              "median_ms": 7.42035,
+              "minimum_ms": 6.1682,
+              "maximum_ms": 8.2839,
+              "total_ms": 43.839999999999996,
+              "provider_requests": [
+                1
+              ],
+              "logical_input_bytes": [
+                1572864
+              ]
+            },
+            "4": {
+              "observations": 6,
+              "median_ms": 13.824,
+              "minimum_ms": 11.72,
+              "maximum_ms": 15.8983,
+              "total_ms": 82.9418,
+              "provider_requests": [
+                1
+              ],
+              "logical_input_bytes": [
+                3170304
+              ]
+            }
+          },
+          "median_reduction_percent": -86.29848996341143
+        },
+        {
+          "width": 1024,
+          "height": 768,
+          "commands": 32,
+          "modes": {
+            "3": {
+              "observations": 6,
+              "median_ms": 47.2987,
+              "minimum_ms": 44.4904,
+              "maximum_ms": 84.3162,
+              "total_ms": 315.9654,
+              "provider_requests": [
+                3
+              ],
+              "logical_input_bytes": [
+                4718592
+              ]
+            },
+            "4": {
+              "observations": 6,
+              "median_ms": 80.0902,
+              "minimum_ms": 79.6689,
+              "maximum_ms": 120.5676,
+              "total_ms": 526.8601,
+              "provider_requests": [
+                1
+              ],
+              "logical_input_bytes": [
+                3170304
+              ]
+            }
+          },
+          "median_reduction_percent": -69.32854391346908
+        },
+        {
+          "width": 1920,
+          "height": 1080,
+          "commands": 32,
+          "modes": {
+            "3": {
+              "observations": 6,
+              "median_ms": 108.33385000000001,
+              "minimum_ms": 107.1344,
+              "maximum_ms": 109.5676,
+              "total_ms": 649.7642,
+              "provider_requests": [
+                6
+              ],
+              "logical_input_bytes": [
+                9437184
+              ]
+            },
+            "4": {
+              "observations": 6,
+              "median_ms": 195.5476,
+              "minimum_ms": 192.631,
+              "maximum_ms": 196.8896,
+              "total_ms": 1172.0762,
+              "provider_requests": [
+                3
+              ],
+              "logical_input_bytes": [
+                9510912
+              ]
+            }
+          },
+          "median_reduction_percent": -80.50461605490801
+        },
+        {
+          "width": 2880,
+          "height": 1800,
+          "commands": 32,
+          "modes": {
+            "3": {
+              "observations": 6,
+              "median_ms": 263.72024999999996,
+              "minimum_ms": 258.0322,
+              "maximum_ms": 268.9467,
+              "total_ms": 1583.1332,
+              "provider_requests": [
+                14
+              ],
+              "logical_input_bytes": [
+                22020096
+              ]
+            },
+            "4": {
+              "observations": 6,
+              "median_ms": 473.24175,
+              "minimum_ms": 467.3113,
+              "maximum_ms": 476.5377,
+              "total_ms": 2835.4525,
+              "provider_requests": [
+                7
+              ],
+              "logical_input_bytes": [
+                22192128
+              ]
+            }
+          },
+          "median_reduction_percent": -79.44839275709776
+        }
+      ]
+    },
+    {
+      "comparison": 6,
+      "baseline_kernel": 3,
+      "candidate_kernel": 5,
+      "exact_images": 70,
+      "cases": [
+        {
+          "width": 64,
+          "height": 64,
+          "commands": 8,
+          "modes": {
+            "3": {
+              "observations": 6,
+              "median_ms": 1.1173,
+              "minimum_ms": 0.8865,
+              "maximum_ms": 1.3017,
+              "total_ms": 6.5531,
+              "provider_requests": [
+                1
+              ],
+              "logical_input_bytes": [
+                1572864
+              ]
+            },
+            "5": {
+              "observations": 6,
+              "median_ms": 1.4994,
+              "minimum_ms": 1.2507,
+              "maximum_ms": 1.6954,
+              "total_ms": 8.901,
+              "provider_requests": [
+                1
+              ],
+              "logical_input_bytes": [
+                3170304
+              ]
+            }
+          },
+          "median_reduction_percent": -34.19851427548555
+        },
+        {
+          "width": 256,
+          "height": 256,
+          "commands": 32,
+          "modes": {
+            "3": {
+              "observations": 6,
+              "median_ms": 7.9815,
+              "minimum_ms": 7.1158,
+              "maximum_ms": 8.9654,
+              "total_ms": 47.8187,
+              "provider_requests": [
+                1
+              ],
+              "logical_input_bytes": [
+                1572864
+              ]
+            },
+            "5": {
+              "observations": 6,
+              "median_ms": 8.518699999999999,
+              "minimum_ms": 7.5278,
+              "maximum_ms": 9.1872,
+              "total_ms": 50.5889,
+              "provider_requests": [
+                1
+              ],
+              "logical_input_bytes": [
+                3170304
+              ]
+            }
+          },
+          "median_reduction_percent": -6.730564430244934
+        },
+        {
+          "width": 1024,
+          "height": 768,
+          "commands": 32,
+          "modes": {
+            "3": {
+              "observations": 6,
+              "median_ms": 45.5081,
+              "minimum_ms": 43.8659,
+              "maximum_ms": 61.4296,
+              "total_ms": 287.4944,
+              "provider_requests": [
+                3
+              ],
+              "logical_input_bytes": [
+                4718592
+              ]
+            },
+            "5": {
+              "observations": 6,
+              "median_ms": 42.71315,
+              "minimum_ms": 42.0214,
+              "maximum_ms": 47.5302,
+              "total_ms": 260.9828,
+              "provider_requests": [
+                1
+              ],
+              "logical_input_bytes": [
+                3170304
+              ]
+            }
+          },
+          "median_reduction_percent": 6.141653903371047
+        },
+        {
+          "width": 1920,
+          "height": 1080,
+          "commands": 32,
+          "modes": {
+            "3": {
+              "observations": 6,
+              "median_ms": 108.5333,
+              "minimum_ms": 108.2988,
+              "maximum_ms": 109.4656,
+              "total_ms": 652.2013,
+              "provider_requests": [
+                6
+              ],
+              "logical_input_bytes": [
+                9437184
+              ]
+            },
+            "5": {
+              "observations": 6,
+              "median_ms": 104.9081,
+              "minimum_ms": 104.5336,
+              "maximum_ms": 106.0403,
+              "total_ms": 630.4619,
+              "provider_requests": [
+                3
+              ],
+              "logical_input_bytes": [
+                9510912
+              ]
+            }
+          },
+          "median_reduction_percent": 3.340173016023651
+        },
+        {
+          "width": 2880,
+          "height": 1800,
+          "commands": 32,
+          "modes": {
+            "3": {
+              "observations": 6,
+              "median_ms": 259.1817,
+              "minimum_ms": 256.0785,
+              "maximum_ms": 262.5918,
+              "total_ms": 1556.4541,
+              "provider_requests": [
+                14
+              ],
+              "logical_input_bytes": [
+                22020096
+              ]
+            },
+            "5": {
+              "observations": 6,
+              "median_ms": 250.7661,
+              "minimum_ms": 245.8408,
+              "maximum_ms": 254.105,
+              "total_ms": 1503.3028,
+              "provider_requests": [
+                7
+              ],
+              "logical_input_bytes": [
+                22192128
+              ]
+            }
+          },
+          "median_reduction_percent": 3.246988502660486
+        }
+      ]
+    }
+  ],
+  "hints": {
+    "2": {
+      "exact_images": 80,
+      "modes": {
+        "explicit_off": {
+          "processes": 4,
+          "warm_observations": 32,
+          "median_ms": 81.72489999999999,
+          "total_ms": 2598.5777,
+          "process_medians_ms": [
+            81.3215,
+            81.8668,
+            81.94125,
+            81.7769
+          ]
+        },
+        "explicit_on": {
+          "processes": 4,
+          "warm_observations": 32,
+          "median_ms": 40.1173,
+          "total_ms": 1280.9294,
+          "process_medians_ms": [
+            40.525800000000004,
+            40.0757,
+            39.827799999999996,
+            40.4559
+          ]
+        }
+      },
+      "scope": "Two balanced four-process schedules, ABBA then BAAB. Exactly one NPU model per child. Ten changing 1024x768 images per process; first two warmups excluded. Separate input/oracle preparation excluded. Timing includes packet packing, NPU execution and result copy. No clock, watts, global power change, desktop or Tahoma claim."
+    },
+    "3": {
+      "exact_images": 180,
+      "modes": {
+        "implicit": {
+          "processes": 6,
+          "warm_observations": 48,
+          "median_ms": 81.8305,
+          "total_ms": 3899.5337,
+          "process_medians_ms": [
+            81.1232,
+            81.9171,
+            81.06469999999999,
+            81.46445,
+            81.57825,
+            80.88175000000001
+          ]
+        },
+        "explicit_off": {
+          "processes": 6,
+          "warm_observations": 48,
+          "median_ms": 81.5996,
+          "total_ms": 3909.3414,
+          "process_medians_ms": [
+            81.5996,
+            81.8672,
+            81.9658,
+            80.93090000000001,
+            81.89815,
+            82.07515
+          ]
+        },
+        "explicit_on": {
+          "processes": 6,
+          "warm_observations": 48,
+          "median_ms": 40.10025,
+          "total_ms": 1926.4461000000001,
+          "process_medians_ms": [
+            40.667950000000005,
+            39.5085,
+            40.20285,
+            40.25,
+            40.04355,
+            40.2003
+          ]
+        }
+      },
+      "scope": "Six permutations of three modes (implicit settings, explicitly off, explicitly on). Every mode appears twice in each position; each model lives in a separate child process. Exactly one NPU model per child. Ten changing 1024x768 images per process; first two warmups excluded. Separate input/oracle preparation excluded. Timing includes packet packing, NPU execution and result copy. No clock, watts, global power change, desktop or Tahoma claim."
+    }
+  },
+  "source_sha256": {
+    "ptl-command-batch-comparison-v5/child-report.json": "9d573f8ecb099cc25227e818eb4c8ac6fceba07ca81fc3f2f728d5a96418e92f",
+    "ptl-command-batch-comparison-v6/child-report.json": "1dc1d33aa285861d5c1be8109753c9996dc2eb8f1f5538331acc03fd47360f2b",
+    "ptl-batch-turbo-v2/report.json": "96588a8b1adf680ae0a6da2de6e321335735bafe826c16454dc9b40a6befbf69",
+    "ptl-batch-turbo-v3/report.json": "ca2e95531d6533559c85355a7268e72b65467804ee9c7426c098aa21b41a6c18",
+    "ptl-post-turbo-health-v2/report.json": "8c1f83d5cd94023a180bd3174ad78506c676b8103584095847609d2129724feb",
+    "ptl-post-turbo-health-v3/report.json": "84398bc1c9103d3f7e038fda898e438c5be30c0169f29acbb4e5cf03c270b49b",
+    "ptl-post-turbo-health-v1/report.json": "a0446ac7212624597593958cb766ca479b8cfc00d034f26c75c3d705652ad8ad"
+  },
+  "limitations": "Synthetic ordered solid rectangles only. Six timed observations per kernel/case come from three ABBA rounds. Hint observations are clustered within processes and use changing images with untimed CPU oracle preparation between NPU requests; do not compare their absolute latency with the uninterrupted capacity trials. No frequency, watts, GPU relief, full desktop responsiveness or Tahoma measurement. The first post-hint health tool failed on an unsupported property query before inference; corrected original-model health checks pass without inventing a default readback."
+}

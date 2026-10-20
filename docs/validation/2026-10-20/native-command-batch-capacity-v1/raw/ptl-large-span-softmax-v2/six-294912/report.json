@@ -1,0 +1,261 @@
+{
+  "started": "2026-10-20T09:35:26.129692+00:00",
+  "completed": true,
+  "passed": true,
+  "branches": 6,
+  "width": 294912,
+  "custom_kernel_executed": false,
+  "checks": [
+    {
+      "iteration": 0,
+      "request_ms": 5.3518,
+      "exact_components": 1769472,
+      "input_sha256": "aac5934c7d6111e1437d0fa66a135101ab181c24871cc84539aa5b75c39d909a",
+      "output_sha256": "f1c95cbc2ab613be16dba4a8f7aa2ec8de84148c22401afdf3c7648577ecda20"
+    },
+    {
+      "iteration": 1,
+      "request_ms": 2.1424,
+      "exact_components": 1769472,
+      "input_sha256": "7d8e17c35a330318fd2cc0a435716367e056fc46082ac44249bea2e0cbcca78f",
+      "output_sha256": "b2fcb0e2b7f241d00d4bdf4da7e8377381e1f0a1e1c7bb0143445bdd871e8e01"
+    },
+    {
+      "iteration": 2,
+      "request_ms": 2.483,
+      "exact_components": 1769472,
+      "input_sha256": "3d2270cf87173b38a75479e75d247eaf51ac5730c8c3ec91d2b2b1db42810cf3",
+      "output_sha256": "31f4ca4dcfa848b157cd99bd7f9eff6dc7e644fbbf4b209029d077889ee2088f"
+    },
+    {
+      "iteration": 3,
+      "request_ms": 2.3515,
+      "exact_components": 1769472,
+      "input_sha256": "b01b96621f75fb519c10dcef6cd4a3be7a0f1b173112b3fa64884b7a371cab9c",
+      "output_sha256": "efd277d8c092af44869e3291894012b569a7027ded8304a6addce72eef731949"
+    },
+    {
+      "iteration": 4,
+      "request_ms": 1.7505,
+      "exact_components": 1769472,
+      "input_sha256": "e17f932250b7c3ae48e6a01f973610dee5af462e43eae916576f5db81bfb386e",
+      "output_sha256": "696f9f84a339021accfc48890b41b6171642ef202697d1fbff8cfee1345f0ca9"
+    },
+    {
+      "iteration": 5,
+      "request_ms": 2.3253,
+      "exact_components": 1769472,
+      "input_sha256": "d3202784c136faa75085e017d1665a114d084ebf01f003be0e670ea98362f842",
+      "output_sha256": "2e9b892b512d4d9c1ff76224e808b62eb81c667a4a75f9dfc49ea462615cb72f"
+    },
+    {
+      "iteration": 6,
+      "request_ms": 2.4202,
+      "exact_components": 1769472,
+      "input_sha256": "c5cdb522fc54ecbf76104326a389da9a91223a3ba7bd78f8ff97be65fbc3eb55",
+      "output_sha256": "a65b4ca20c0aec727acd30f4266d20afd708b0986eeb1a5bd4d3041527488400"
+    },
+    {
+      "iteration": 7,
+      "request_ms": 2.4709,
+      "exact_components": 1769472,
+      "input_sha256": "6e6e131f30510d01baadc8915c80ccb921c4c00161232cf007912dc84b49bc38",
+      "output_sha256": "be0fc61c1503de2ce784f68644c0578062cb081d3dc0d494edd125091d2c1bf5"
+    }
+  ],
+  "stage": "complete",
+  "config": {
+    "PERFORMANCE_HINT": "LATENCY",
+    "NPU_COMPILATION_MODE": "DefaultHW",
+    "NPU_TILES": 3
+  },
+  "compile_ms": 1214.1063,
+  "execution_devices": [
+    "NPU"
+  ],
+  "blob_sha256": "1902ca0952d1f50c333832f3c12495b2999d7f234c7176157d42aa97dbbcd71b",
+  "blob_bytes": 73857,
+  "shave_layout": [
+    {
+      "index": 9,
+      "name": "task.shave.range.0.0",
+      "type": 1,
+      "flags": 536870918,
+      "offset": 48064,
+      "size": 80,
+      "link": 0,
+      "info": 0,
+      "entry": 1,
+      "relocations": {
+        "16": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "56": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        }
+      }
+    },
+    {
+      "index": 10,
+      "name": "task.shave.range.1.0",
+      "type": 1,
+      "flags": 536870918,
+      "offset": 48192,
+      "size": 80,
+      "link": 0,
+      "info": 0,
+      "entry": 1,
+      "relocations": {
+        "16": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "56": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        }
+      }
+    },
+    {
+      "index": 11,
+      "name": "task.shave.range.2.0",
+      "type": 1,
+      "flags": 536870918,
+      "offset": 48320,
+      "size": 80,
+      "link": 0,
+      "info": 0,
+      "entry": 1,
+      "relocations": {
+        "16": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        },
+        "56": {
+          "kind": 0,
+          "section": "shave.text",
+          "addend": 0
+        }
+      }
+    },
+    {
+      "index": 12,
+      "name": "task.shave.invocation.0.0",
+      "type": 1,
+      "flags": 536870918,
+      "offset": 48448,
+      "size": 192,
+      "link": 0,
+      "info": 0,
+      "entry": 1,
+      "relocations": {
+        "16": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "8": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 0
+        },
+        "112": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "104": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 768
+        }
+      },
+      "tiles": [
+        0,
+        0
+      ]
+    },
+    {
+      "index": 13,
+      "name": "task.shave.invocation.1.0",
+      "type": 1,
+      "flags": 536870918,
+      "offset": 48640,
+      "size": 192,
+      "link": 0,
+      "info": 0,
+      "entry": 1,
+      "relocations": {
+        "16": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "8": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 256
+        },
+        "112": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "104": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 1024
+        }
+      },
+      "tiles": [
+        1,
+        1
+      ]
+    },
+    {
+      "index": 14,
+      "name": "task.shave.invocation.2.0",
+      "type": 1,
+      "flags": 536870918,
+      "offset": 48832,
+      "size": 192,
+      "link": 0,
+      "info": 0,
+      "entry": 1,
+      "relocations": {
+        "16": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "8": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 512
+        },
+        "112": {
+          "kind": 0,
+          "section": "shave.data",
+          "addend": 0
+        },
+        "104": {
+          "kind": 0,
+          "section": "shave.params",
+          "addend": 1280
+        }
+      },
+      "tiles": [
+        2,
+        2
+      ]
+    }
+  ],
+  "finished": "2026-10-20T09:35:27.441830+00:00"
+}

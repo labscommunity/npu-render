@@ -1,0 +1,25 @@
+"""Retain all original cases and add packed-alpha/overflow/vector-tail cases."""
+import struct
+import numpy as np
+from ptl_command_batch_repeated_base_v1 import fixture as original,SPAN
+
+def fixture(index):
+ if index<72:return original(index)
+ assert index<120
+ payload,_=original(index-72);data=bytearray(payload);out=bytearray(SPAN)
+ count,first,w,h,commands,fmt=struct.unpack_from('<6I',data,8)
+ raw=np.frombuffer(data,dtype='<u4',count=count,offset=1088)
+ values=(raw.astype(np.uint64)[:,None]>>np.array([0,8,16,24],dtype=np.uint64))&255
+ positions=np.arange(first,first+count,dtype=np.uint64);x=positions%w;y=positions//w;hits=0
+ for n in range(commands):
+  x0,y0,x1,y1,_,blend,mask,reserved=struct.unpack_from('<8I',data,64+n*32)
+  color=[0,0xffffffff,0x00ffffff,0xff000000,0x01010101,0x7f7f7f7f][(index+n)%6];struct.pack_into('<I',data,80+n*32,color)
+  selected=(x>=x0)&(x<x1)&(y>=y0)&(y<y1);hits+=int(selected.sum())
+  rgba=[(color>>(8*k))&255 for k in range(4)];order=[2,1,0,3] if fmt==87 else [0,1,2,3]
+  for byte,channel in enumerate(order):
+   if not mask&(1<<channel):continue
+   value=(np.minimum(65025,rgba[channel]*255+values[:,byte]*(255-rgba[3]))+127)//255 if blend else rgba[channel]
+   values[selected,byte]=value[selected] if isinstance(value,np.ndarray) else value
+ packed=np.bitwise_or.reduce(values<<np.array([0,8,16,24],dtype=np.uint64),axis=1).astype('<u4')
+ struct.pack_into('<4I',out,0,0x4e52434f,count,commands,hits);out[16:16+count*4]=packed.tobytes()
+ return bytes(data),bytes(out)

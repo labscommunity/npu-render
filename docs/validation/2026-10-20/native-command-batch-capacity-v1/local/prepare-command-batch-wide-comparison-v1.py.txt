@@ -1,0 +1,17 @@
+from pathlib import Path
+import ast,hashlib,json,subprocess
+r=Path(__file__).parent;s=(r/'compare-ptl-command-batch-v4.py').read_text()
+s=s.replace('Compare one-command NPU submissions with ordered multi-command submissions.','Compare existing six-engine spans with wider sequential-pair spans on identical batches.')
+s=s.replace("span=262144;capacity=65264;report=", "report=")
+s=s.replace('for version in [2,3]:','for version in [3,4]:').replace("(120 if version==3 else 72)",'120')
+s=s.replace("data=request.get_input_tensor().data.view(np.uint8).reshape(6,span);providers[version]=(model,request,data)", "span,capacity=(262144,65264) if version==3 else (528384,131824)\n   data=request.get_input_tensor().data.view(np.uint8).reshape(6,span);providers[version]=(model,request,data,span,capacity)")
+s=s.replace('model,request,data=providers[version]','model,request,data,span,capacity=providers[version]')
+s=s.replace('[(64,64,8),(256,256,32),(1024,768,32)]','[(64,64,8),(256,256,32),(1024,768,32),(1920,1080,32),(2880,1800,32)]')
+s=s.replace('[(2,True,True),(3,False,True),(3,True,True),(3,True,False)]','[(3,True,True),(4,True,True)]')
+a=s.index('   schedules=');b=s.index("   record['comparisons']",a)
+s=s[:a]+"   schedules=[(f'wide-round-{i+1}',[(3,True,True),(4,True,True),(4,True,True),(3,True,True)]) for i in range(3)]\n"+s[b:]
+a=s.index("scope='Synthetic");b=s.index("\n except Exception",a)
+s=s[:a]+"scope='Synthetic ordered solid RGBA8 rectangle batches. Three A/B/B/A rounds compare six 256 KiB spans on six engines with six 516 KiB spans scheduled as sequential pairs on three engines. Same ordered pixel math and commands; no metadata or schedule patch. Balanced assignment in both. End-to-end loop time includes host preparation, NPU waits and output transport. Independent oracle and final comparison excluded. No textures, Windows driver, GPU utilization or Tahoma measurement.')"+s[b:]
+s=s.replace('ptl-command-batch-comparison-v4','ptl-command-batch-comparison-v5').replace("assert obj(vm/'ptl-command-batch-v3-qualification/report.json')['passed']", "assert obj(vm/'ptl-command-batch-v4-qualification/report.json')['passed']").replace('native-desktop-admission-v70','native-desktop-admission-v72')
+ast.parse(s);p=r/'compare-ptl-command-batch-v5.py';assert not p.exists();p.write_text(s)
+m=r/'ptl-command-batch-comparison-v5-source.json';m.write_text(json.dumps({p.name:hashlib.sha256(p.read_bytes()).hexdigest()},indent=2)+'\n');subprocess.run(['scp','-q',str(p),str(m),'delta:AppData/Local/npu-render/vm/'],check=True,timeout=30)

@@ -1,0 +1,36 @@
+"""Independent ordered packed-pixel reference; no resource identity inferred."""
+import struct
+import numpy as np
+SPAN=528384
+MAXIMUM=131824
+INVALID=[(0,0),(4,2),(8,MAXIMUM+1),(12,8388577),(16,0),(16,8193),(20,0),(20,8193),(24,0),(24,33),(28,65),(32,0),(36,1),(60,1),(64,8193),(68,8193),(72,8193),(76,8193),(84,2),(88,0),(88,16),(92,1),(40,1),(44,1)]
+def fixture(index):
+ if index>=48:
+  data,_=fixture(23);data=bytearray(data);offset,value=INVALID[index-48];struct.pack_into('<I',data,offset,value);return bytes(data),bytes(SPAN)
+ rng=np.random.default_rng(4300000+index);w,h=[(1,1),(17,13),(64,64),(1024,768)][index%4];area=w*h
+ count=[0,1,min(area,31),min(area,4096),min(area,MAXIMUM),min(area,MAXIMUM)][(index//4)%6]
+ first=int(rng.integers(0,area-count+1));commands=[1,2,7,32][(index//3)%4];fmt=[28,87][index%2]
+ data=bytearray(SPAN);out=bytearray(SPAN);struct.pack_into('<9I',data,0,0x4e524351,1,count,first,w,h,commands,fmt,SPAN)
+ raw=rng.integers(0,2**32,count,dtype=np.uint32);data[1088:1088+count*4]=raw.astype('<u4').tobytes()
+ # Arithmetic reference uses ordinary integer division, independent of the
+ # target's reciprocal-multiply implementation. Quantize after each command.
+ values=((raw.astype(np.uint64)[:,None]>>np.array([0,8,16,24],dtype=np.uint64))&255).astype(np.uint64)
+ positions=np.arange(first,first+count,dtype=np.uint64);x=positions%w;y=positions//w;hits=0
+ for c in range(commands):
+  if c==0:rect=(0,0,w,h)
+  elif c==1:rect=(0,0,0,h)
+  else:
+   xx=sorted(map(int,rng.integers(0,w+1,2)));yy=sorted(map(int,rng.integers(0,h+1,2)));rect=(xx[0],yy[0],xx[1],yy[1])
+  color=int(rng.integers(0,2**32,dtype=np.uint32));blend=(index+c)%2;mask=1+(index*3+c)%15
+  struct.pack_into('<8I',data,64+c*32,*rect,color,blend,mask,0)
+  enabled=(x>=rect[0])&(y>=rect[1])&(x<rect[2])&(y<rect[3]);hits+=int(enabled.sum())
+  rgba=[(color>>(8*k))&255 for k in range(4)];order=[2,1,0,3] if fmt==87 else [0,1,2,3]
+  for byte,channel in enumerate(order):
+   if not mask&(1<<channel):continue
+   incoming=rgba[channel]
+   if blend:updated=np.minimum(65025,incoming*255+values[:,byte]*(255-rgba[3]));updated=(updated+127)//255
+   else:updated=incoming
+   values[enabled,byte]=updated[enabled] if isinstance(updated,np.ndarray) else updated
+ packed=np.bitwise_or.reduce(values<<np.array([0,8,16,24],dtype=np.uint64),axis=1).astype('<u4')
+ struct.pack_into('<4I',out,0,0x4e52434f,count,commands,hits);out[16:16+count*4]=packed.tobytes()
+ return bytes(data),bytes(out)

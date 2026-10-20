@@ -24,7 +24,8 @@ finds only about 3.7 seconds of prior child time on hypothetical bounded-cache h
 in a 110-second replay. No cache is implemented and no saved time is demonstrated.
 A [read-only capacity query](../validation/2026-10-16/native-npu-capacity-v1/README.md)
 reports three NPU tiles, matching the configured models. Turbo is disabled and
-has not been benchmarked. Neither result supplies a responsiveness fix.
+was not benchmarked by that query. The isolated hint comparison below is later
+evidence; neither query alone supplies a responsiveness fix.
 
 The [physical GPU baseline](../validation/2026-10-16/native-physical-gpu-live-v1/README.md)
 now passes the same logical resolution, presenter, forty-input sequence and 30 Hz
@@ -116,6 +117,18 @@ copy and shader-view hazard scopes now present. The largest observed run has
 39 draws referencing 48.4 MB of logical texture versions. Animation remains
 0.7 verified updates/s in this instrumented run. Neither the diagnostic nor the
 recovery-check correction implements Windows batching or demonstrates GPU relief.
+
+The [capacity and isolated-hint experiments](../validation/2026-10-20/native-command-batch-capacity-v1/README.md)
+reject a larger-buffer layout that halves the number of active execution engines.
+A twelve-row layout retains all six engines and reduces a synthetic 1024×768
+rectangle batch from median 45.5 to 42.7 ms, still above a 30 Hz budget. Separately,
+eighteen isolated processes compare unspecified, disabled and enabled NPU turbo
+hints: all 180 changing images match; enabled median is 40.1 ms versus 81.8 ms
+unspecified in that bursty workload. These timings have different work/cadence
+from the capacity comparison. A separate renderer candidate now applies the
+hint at existing custom-model imports without changing shader arithmetic.
+It needs complete replay, recovery and desktop qualification, followed by
+matched Tahoma measurements because increased NPU power may affect the iGPU.
 
 The rectangle candidate also passes
 [two targeted provider-recovery scenarios](../validation/2026-10-20/native-quad-rectangle-recovery-v1/README.md);

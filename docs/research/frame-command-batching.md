@@ -184,3 +184,19 @@ The largest references 47 texture versions totalling 48.4 MB of logical bytes;
 only one run meets a 64 KiB private-texture bound. A small solid-color batch
 cannot represent the general workload. Immutable texture storage, bounded
 spatial working sets and actual Windows dependency handling remain required.
+
+The [capacity experiments](../validation/2026-10-20/native-command-batch-capacity-v1/README.md)
+show why minimizing request count alone is insufficient. Larger local spans
+reduce the compiler's schedule from six engines to three and make the selected
+batch slower. Repeating smaller spans on all six engines permits one request
+for the same frame and gives a modest gain. The next texture design should
+retain parallel execution and bound each spatial working set, rather than assume
+the entire logical texture-version set fits in local memory.
+
+The pinned public compiler's Gather implementation rejects multicluster
+strategies when its DDR-access interface reports that external-memory access is
+necessary or beneficial. This is consistent with our earlier single-engine
+large-texture Gather graphs; it does not prove that every operation, compiler
+version or possible graph has that restriction. Simply enlarging that Gather
+input is therefore not evidence of a parallel texture path.
+[Intel Gather implementation](https://github.com/openvinotoolkit/npu_compiler/blob/20e7912fbc230725e1ca7394762348d4f480aa65/src/vpux_compiler/src/dialect/VPU/IR/ops/gather.cpp#L156-L176).

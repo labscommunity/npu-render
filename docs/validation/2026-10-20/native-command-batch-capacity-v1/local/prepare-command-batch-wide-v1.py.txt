@@ -1,0 +1,40 @@
+from pathlib import Path
+import ast,hashlib,json,struct,subprocess
+from ptl_softmax_wide_contract_v1 import inspect,patch
+from ptl_elf_v1 import Elf
+r=Path(__file__).parent
+blob=(r/'ptl-large-span-softmax-local-v2/six-264192/carrier.blob').read_bytes();e=Elf(blob);proof=inspect(blob);checks=[dict(case='exact-sequential-six-rows',passed=True)]
+def reject(label,bad):
+ try:inspect(bytes(bad))
+ except ValueError:checks.append(dict(case=label,passed=True))
+ else:raise AssertionError(label)
+for tile in range(3):
+ for row in range(2):
+  s=e.by_name[f'task.shave.invocation.{tile}.0'];bad=bytearray(blob);struct.pack_into('<I',bad,s['offset']+row*96+84,(tile+1)%3);reject(f'tile-{tile}-{row}',bad)
+for n in range(6):
+ for i in range(2):
+  bad=bytearray(blob);struct.pack_into('<I',bad,e.by_name['shave.params']['offset']+n*256+i*40,0);reject(f'address-{n}-{i}',bad)
+  bad=bytearray(blob);struct.pack_into('<I',bad,e.by_name['shave.params']['offset']+n*256+144+i*48,264191);reject(f'dimension-{n}-{i}',bad)
+for size in [0,1,18257,18272]:
+ try:patch(blob,bytes(size))
+ except ValueError:checks.append(dict(case=f'code-{size}',passed=True))
+ else:raise AssertionError('code admitted')
+changed,_=patch(blob,bytes(16));inspect(changed);checks.append(dict(case='all-non-code-preserved',passed=True))
+q=dict(passed=True,hardware_executed=False,checks=checks,contract=proof,source_sha256={n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in ['ptl_softmax_wide_contract_v1.py','ptl_elf_v1.py']});(r/'ptl-softmax-wide-contract-v1-qualification.json').write_text(json.dumps(q,indent=2)+'\n')
+s=(r/'ptl-six-span-command-batch-v3.c').read_text().replace('131072','264192').replace('16384','33024').replace('65264','131824').replace('262144','528384')
+s=s.replace('six', 'six');(r/'ptl-six-span-command-batch-v4.c').write_text(s)
+s=(r/'ptl_command_batch_fixtures_v1.py').read_text().replace('SPAN=262144','SPAN=528384').replace('MAXIMUM=65264','MAXIMUM=131824');(r/'ptl_command_batch_wide_base_v1.py').write_text(s)
+s=(r/'ptl_command_batch_fixtures_v2.py').read_text().replace('ptl_command_batch_fixtures_v1','ptl_command_batch_wide_base_v1');(r/'ptl_command_batch_wide_fixtures_v1.py').write_text(s)
+s=(r/'qualify-command-batch-local-v3.py').read_text().replace('command-batch-v3','command-batch-v4').replace('ptl_command_batch_fixtures_v2','ptl_command_batch_wide_fixtures_v1');(r/'qualify-command-batch-local-v4.py').write_text(s)
+s=(r/'qualify-ptl-six-span-command-batch-v3.py').read_text().replace('command-batch-v3','command-batch-v4').replace('command-batch-build-v3','command-batch-build-v4').replace('ptl_softmax_contract_v2','ptl_softmax_wide_contract_v1').replace('ptl_command_batch_fixtures_v2','ptl_command_batch_wide_fixtures_v1').replace('131072','264192')
+a=s.index("  assert obj(vm/'physical-gpu");b=s.index("  for name,digest in q['source_sha256']",a)
+s=s[:a]+"  prior=obj(vm/'native-desktop-admission-v72/report.json');assert prior['completed'] and prior['cleanup_passed'] and prior['memory_integrity_after'];assert obj(vm/'ptl-large-span-softmax-v2/report.json')['passed'];q=obj(vm/'ptl-softmax-wide-contract-v1-qualification.json');assert q['passed'] and len(q['checks'])==36\n"+s[b:]
+s=s.replace('ptl-softmax-carriers-v1/6/carrier.blob','ptl-large-span-softmax-v2/six-264192/carrier.blob');ast.parse(s);(r/'qualify-ptl-six-span-command-batch-v4.py').write_text(s)
+s=(r/'run-ptl-command-batch-v3-qualification.ps1').read_text().replace('command-batch-v3','command-batch-v4').replace('command-batch-build-v3','command-batch-build-v4').replace('command-batch-device-v3','command-batch-device-v4')
+s=s.replace("@('ptl-command-batch-comparison-v3')","@('ptl-large-span-softmax-v2')").replace('AddMinutes(180)','AddMinutes(2)').replace('native-desktop-admission-v70','native-desktop-admission-v72');(r/'run-ptl-command-batch-v4-qualification.ps1').write_text(s)
+names=['ptl-six-span-command-batch-v4.c','ptl_command_batch_wide_base_v1.py','ptl_command_batch_wide_fixtures_v1.py','qualify-ptl-six-span-command-batch-v4.py','run-ptl-command-batch-v4-qualification.ps1','ptl_softmax_wide_contract_v1.py','ptl-softmax-wide-contract-v1-qualification.json']
+p=r/'ptl-command-batch-device-v4-source.json';p.write_text(json.dumps({n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in names},indent=2)+'\n')
+assert len(checks)==36
+subprocess.run(['uv','run','python',str(r/'qualify-command-batch-local-v4.py')],check=True)
+subprocess.run(['scp','-q',*[str(r/n) for n in names],str(p),'delta:AppData/Local/npu-render/vm/'],check=True,timeout=30)
+print(json.dumps(dict(uploaded=True,offline_contract_checks=len(checks),cpu_fixtures=120)))

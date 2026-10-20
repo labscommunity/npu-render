@@ -1,0 +1,26 @@
+"""A fresh default NPU model after isolated process-hint measurements."""
+from pathlib import Path
+from datetime import UTC,datetime
+import hashlib,json,os,time,traceback
+import numpy as np
+import openvino as ov
+vm=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm';out=vm/'ptl-post-turbo-health-v3';out.mkdir(exist_ok=False)
+r=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,desktop_changed=False,checks=[])
+try:
+ prior=json.loads((vm/'ptl-batch-turbo-v3/report.json').read_text());assert prior['completed'] and prior['passed'] and prior['matched_images']==180
+ b=(vm/'ptl-softmax-carriers-v1/6/carrier.blob').read_bytes();assert hashlib.sha256(b).hexdigest()=='04574cdd9d52105e7414d3c5560a778812b7259743825c63c8bb0aa47f3fd182'
+ assert ov.get_version()=='2026.4.1-22982-e213a147257-releases/2026/4';c=ov.Core();m=c.import_model(b,'NPU');devices=m.get_property('EXECUTION_DEVICES');devices=[devices] if isinstance(devices,str) else list(devices);assert devices in (['NPU'],['NPU.0']);r.update(execution_devices=devices,implicit_import_config={},model_sha256=hashlib.sha256(b).hexdigest())
+ try:r['turbo_readback']=m.get_property('NPU_TURBO')
+ except RuntimeError as error:
+  assert 'Unsupported configuration key: NPU_TURBO' in str(error);r.update(turbo_readback=None,turbo_readback_error=str(error))
+ q=m.create_infer_request()
+ for i in range(8):
+  rng=np.random.default_rng(913000+i);x=np.full((6,131072),-np.inf,np.float16);expected=np.zeros_like(x);active=1024*(2**(i%4))
+  for row in range(6):
+   at=np.concatenate((np.array([0,131071]),rng.choice(131070,active-2,replace=False)+1));x[row,at]=np.float16((row+i)%4);expected[row,at]=np.float16(1/active)
+  start=time.perf_counter_ns();q.start_async({0:x});assert q.wait_for(10000);actual=q.get_output_tensor().data.copy();elapsed=(time.perf_counter_ns()-start)/1e6;assert np.array_equal(actual,expected)
+  r['checks'].append(dict(iteration=i,request_ms=elapsed,exact=True,input_sha256=hashlib.sha256(x.tobytes()).hexdigest(),output_sha256=hashlib.sha256(actual.tobytes()).hexdigest()))
+ r['passed']=True
+except Exception as e:r.update(error=repr(e),traceback=traceback.format_exc())
+finally:r.update(completed=True,finished=datetime.now(UTC).isoformat());(out/'report.json').write_text(json.dumps(r,indent=2)+'\n')
+print(json.dumps({k:v for k,v in r.items() if k!='checks'}));raise SystemExit(0 if r['passed'] else 1)

@@ -1,0 +1,40 @@
+from pathlib import Path
+import hashlib,json,struct,subprocess
+from ptl_elf_v1 import Elf
+r=Path(__file__).parent
+s=(r/'ptl_softmax_wide_contract_v1.py').read_text().replace('six rows, sequential pairs on three tiles','twelve rows, sequential pairs on six engines').replace('dac2b8966e9f80e147854bfea0910e4b6d519c6b2e6964b76f9a2cc6b1143c6a','e549e56964aadbad1adc9e77e208960dd79aa3b0baedc0d4da0be2253a484fd0').replace('WIDTH = 264192','WIDTH = 132096').replace('(1648, 18384, 128)','(3184, 18384, 128)').replace('for n in range(6)','for n in range(12)')
+s=s.replace('f"task.shave.{kind}.{tile}.0"','f"task.shave.{kind}.{tile}.{slot}"').replace('for kind in ["range", "invocation"] for tile in range(3)}','for kind in ["range", "invocation"] for tile in range(3) for slot in range(2)}').replace('three explicit task arrays','six explicit task arrays')
+s=s.replace('    for tile in range(3):\n','    for tile, slot in [(tile, slot) for tile in range(3) for slot in range(2)]:\n').replace('f"task.shave.range.{tile}.0"','f"task.shave.range.{tile}.{slot}"').replace('f"task.shave.invocation.{tile}.0"','f"task.shave.invocation.{tile}.{slot}"').replace('(row * 3 + tile) * 256','(row * 6 + slot * 3 + tile) * 256').replace('memory_size = 1419264 if tile == 2 else 1155072','memory_size = 1419264').replace('tile_base + 0x18000 + i * SPAN','tile_base + 0x18000 + slot * SPAN + i * 2 * SPAN').replace('tile=tile, engine=0','tile=tile, engine=slot').replace('distinct_engines=3','distinct_engines=6')
+p=r/'ptl_softmax_repeated_contract_v1.py';assert not p.exists();p.write_text(s)
+from ptl_softmax_repeated_contract_v1 import inspect,patch
+blob=(r/'ptl-large-span-softmax-local-v3/twelve-132096/carrier.blob').read_bytes();e=Elf(blob);proof=inspect(blob);checks=[dict(case='exact-twelve-rows-six-engines',passed=True)]
+def reject(label,bad):
+ try:inspect(bytes(bad))
+ except ValueError:checks.append(dict(case=label,passed=True))
+ else:raise AssertionError(label)
+for tile in range(3):
+ for slot in range(2):
+  for row in range(2):
+   s=e.by_name[f'task.shave.invocation.{tile}.{slot}'];bad=bytearray(blob);struct.pack_into('<I',bad,s['offset']+row*96+84,(tile+1)%3);reject(f'tile-{tile}-{slot}-{row}',bad)
+for n in range(12):
+ for i in range(2):
+  bad=bytearray(blob);struct.pack_into('<I',bad,e.by_name['shave.params']['offset']+n*256+i*40,0);reject(f'address-{n}-{i}',bad)
+  bad=bytearray(blob);struct.pack_into('<I',bad,e.by_name['shave.params']['offset']+n*256+144+i*48,132095);reject(f'dimension-{n}-{i}',bad)
+for size in [0,1,18257,18272]:
+ try:patch(blob,bytes(size))
+ except ValueError:checks.append(dict(case=f'code-{size}',passed=True))
+ else:raise AssertionError('code admitted')
+changed,_=patch(blob,bytes(16));inspect(changed);checks.append(dict(case='all-non-code-preserved',passed=True));assert len(checks)==66
+q=dict(passed=True,hardware_executed=False,checks=checks,contract=proof,source_sha256={n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in ['ptl_softmax_repeated_contract_v1.py','ptl_elf_v1.py']});(r/'ptl-softmax-repeated-contract-v1-qualification.json').write_text(json.dumps(q,indent=2)+'\n')
+s=(r/'ptl-six-span-command-batch-v3.c').read_text().replace('131072','132096').replace('16384','16512').replace('65264','65776').replace('262144','264192');(r/'ptl-six-span-command-batch-v5.c').write_text(s)
+s=(r/'ptl_command_batch_fixtures_v1.py').read_text().replace('SPAN=262144','SPAN=264192').replace('MAXIMUM=65264','MAXIMUM=65776');(r/'ptl_command_batch_repeated_base_v1.py').write_text(s)
+s=(r/'ptl_command_batch_fixtures_v2.py').read_text().replace('ptl_command_batch_fixtures_v1','ptl_command_batch_repeated_base_v1');(r/'ptl_command_batch_repeated_fixtures_v1.py').write_text(s)
+s=(r/'qualify-command-batch-local-v3.py').read_text().replace('command-batch-v3','command-batch-v5').replace('ptl_command_batch_fixtures_v2','ptl_command_batch_repeated_fixtures_v1');(r/'qualify-command-batch-local-v5.py').write_text(s)
+s=(r/'qualify-ptl-six-span-command-batch-v4.py').read_text().replace('command-batch-v4','command-batch-v5').replace('command-batch-build-v4','command-batch-build-v5').replace('ptl_softmax_wide_contract_v1','ptl_softmax_repeated_contract_v1').replace('ptl_command_batch_wide_fixtures_v1','ptl_command_batch_repeated_fixtures_v1').replace('(6,264192)','(12,132096)').replace('range(6)','range(12)').replace('i*6+plane','i*12+plane').replace('range(20 if','range(10 if').replace('rng.choice(264192','rng.choice(132096').replace('ptl-large-span-softmax-v2','ptl-large-span-softmax-v3').replace('six-264192/carrier.blob','twelve-132096/carrier.blob').replace('ptl-softmax-wide-contract-v1-qualification','ptl-softmax-repeated-contract-v1-qualification').replace("len(q['checks'])==36","len(q['checks'])==66")
+compile(s,'qualifier','exec');(r/'qualify-ptl-six-span-command-batch-v5.py').write_text(s)
+s=(r/'run-ptl-command-batch-v4-qualification.ps1').read_text().replace('command-batch-v4','command-batch-v5').replace('command-batch-build-v4','command-batch-build-v5').replace('command-batch-device-v4','command-batch-device-v5').replace('ptl-large-span-softmax-v2','ptl-large-span-softmax-v3');(r/'run-ptl-command-batch-v5-qualification.ps1').write_text(s)
+names=['ptl-six-span-command-batch-v5.c','ptl_command_batch_repeated_base_v1.py','ptl_command_batch_repeated_fixtures_v1.py','qualify-ptl-six-span-command-batch-v5.py','run-ptl-command-batch-v5-qualification.ps1','ptl_softmax_repeated_contract_v1.py','ptl-softmax-repeated-contract-v1-qualification.json']
+p=r/'ptl-command-batch-device-v5-source.json';p.write_text(json.dumps({n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in names},indent=2)+'\n')
+subprocess.run(['uv','run','python',str(r/'qualify-command-batch-local-v5.py')],check=True)
+subprocess.run(['scp','-q',*[str(r/n) for n in names],str(p),'delta:AppData/Local/npu-render/vm/'],check=True,timeout=30)
+print(json.dumps(dict(uploaded=True,offline_contract_checks=len(checks),cpu_fixtures=120,logical_rows=12,execution_engines=6)))
