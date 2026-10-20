@@ -1,0 +1,98 @@
+"""Prepare a finite resource-access trace with the qualified V24 renderer."""
+from pathlib import Path
+import ast
+import hashlib
+import json
+import re
+
+r = Path(__file__).parent
+changes = {
+    "native-registration-v49": "native-registration-v50",
+    "native-registered-v49": "native-registered-v50",
+    "NativeRecovery-v49": "NativeRecovery-v50",
+    "native_shared_app_v16": "native_shared_app_v17",
+    "native_desktop_bootstrap_v44": "native_desktop_bootstrap_v45",
+    "native-desktop-v70": "native-desktop-v71",
+    "native-desktop-admission-v70": "native-desktop-admission-v71",
+    "NativeDesktopRecovery-v70": "NativeDesktopRecovery-v71",
+    "run-native-live-v60": "run-native-live-v61",
+    "native-live-v60": "native-live-v61",
+    "NativeLiveV60": "NativeLiveV61",
+    "native-topology-primary-v46": "native-topology-primary-v47",
+    "native-topology-v117": "native-topology-v120",
+    "native-topology-v118": "native-topology-v121",
+    "native-topology-v119": "native-topology-v122",
+    "InspectTopology-V117": "InspectTopology-V120",
+    "InspectTopology-V118": "InspectTopology-V121",
+    "InspectTopology-V119": "InspectTopology-V122",
+    "observer119": "observer122",
+    "dismiss-native-saver-v35": "dismiss-native-saver-v36",
+    "dismiss-v35": "dismiss-v36",
+    "run-ptl-native-live-v24": "run-ptl-native-live-v25",
+    "ptl-native-live-v24": "ptl-native-live-v25",
+    "native-latency-v24-analysis": "native-latency-v25-analysis",
+    "native-presentation-v21-analysis": "native-presentation-v22-analysis",
+    "native-repeated-input-v7-analysis": "native-repeated-input-v8-analysis",
+    "ptl-combined-desktop-v12": "ptl-combined-desktop-v13",
+    "analyze-native-latency-v22.py": "analyze-native-latency-v23.py",
+    "analyze-native-presentation-v21.py": "analyze-native-presentation-v22.py",
+    "native-driver-package-v19": "native-driver-package-v21",
+    "native-registration-stage-v19": "native-registration-stage-v21",
+    "0.0.1319.0": "0.0.1321.0",
+}
+pattern = re.compile("|".join(re.escape(x) for x in sorted(changes, key=len, reverse=True)))
+
+
+def rename(s):
+    return pattern.sub(lambda m: changes[m[0]], s)
+
+
+files = [n for n in json.loads((r / "ptl-combined-live-v12-upload.json").read_text())
+         if not n.endswith("-source.json")]
+for name in files:
+    s = rename((r / name).read_text())
+    # These are prerequisites, not new output namespaces.
+    s = s.replace("native-desktop-admission-v68", "native-desktop-admission-v70")
+    s = s.replace("native-registration-v47", "native-registration-v49")
+    if name == "run-ptl-combined-desktop-v12.ps1":
+        needle = "try{\n $report.active_phase='waiting-for-combined-render-comparison';"
+        assert s.count(needle) == 1
+        s = s.replace(needle, r'''try{
+ $report.diagnostic_only=$true;$report.rendering_worker_unchanged=$true;$report.resource_access_observation=$true
+ $q=Get-Content "$vm\native-resource-boundaries-v1-qualification\report.json" -Raw|ConvertFrom-Json
+ if(!$q.completed -or !$q.passed -or $q.umd_sha256 -ne 'B92B9C706FC366BE26FFB3C9B88088914AE64AA8466280C0BA117079074664C3'){throw 'Resource trace build identity or contracts failed'}
+ $report.active_phase='waiting-for-combined-render-comparison';''')
+        needle = " $report.active_phase='pre-registration-readiness';Save-Report"
+        assert s.count(needle) == 1
+        s = s.replace(needle, r'''
+ $report.active_phase='package-and-stage';Save-Report
+ Controller 'package-native-driver-v21.ps1' 'package'
+ $q=Get-Content "$vm/native-driver-package-v21/report.json" -Raw|ConvertFrom-Json
+ if(!$q.prepared -or $q.version -ne '0.0.1321.0' -or !$q.kernel_binary_unchanged){throw 'Resource trace package incomplete'}
+ Controller 'run-native-registration-v50.ps1' 'stage' @('-Mode','stage')
+ $q=Get-Content "$vm/native-registration-stage-v21/report.json" -Raw|ConvertFrom-Json
+ if(!$q.passed -or !$q.cleanup_passed -or !$q.memory_integrity_after){throw 'Resource trace staging/recovery incomplete'}
+''' + needle)
+    if name.endswith(".py"):
+        ast.parse(s)
+    p = r / rename(name)
+    assert not p.exists(), p
+    p.write_text(s)
+
+s = (r / "package-native-driver-v20.ps1").read_text()
+s = s.replace("native-driver-package-v20", "native-driver-package-v21")
+s = s.replace("0.0.1320.0", "0.0.1321.0")
+s = s.replace("native-client-timing-v1", "native-resource-boundaries-v1")
+(r / "package-native-driver-v21.ps1").write_text(s)
+for old in ("native-registration-v49-source.json", "native-desktop-v70-source.json"):
+    names = [rename(n) for n in json.loads((r / old).read_text())]
+    (r / rename(old)).write_text(json.dumps({
+        n: hashlib.sha256((r / n).read_bytes()).hexdigest() for n in names
+    }, indent=2) + "\n")
+uploads = [rename(n) for n in files] + [
+    "native-registration-v50-source.json", "native-desktop-v71-source.json",
+    "package-native-driver-v21.ps1",
+]
+(r / "ptl-combined-live-v13-upload.json").write_text(json.dumps(uploads, indent=2) + "\n")
+print(json.dumps({"prepared": "resource boundary diagnostic", "source_files": len(uploads),
+                  "worker_version": 24, "driver_package": 21, "desktop_changed": False}))

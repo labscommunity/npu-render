@@ -1,0 +1,85 @@
+"""Observe resource identities/access boundaries; do not defer any rendering."""
+from pathlib import Path
+import hashlib,json,shutil,tarfile
+r=Path('results/render-driver');name='native-resource-boundaries-v1';d=r/name;shutil.copytree(r/'native-auto-umd-v2',d);lab=d/'native/windows/registered_lab'
+(lab/'resource_identity.hpp').write_text(r'''#pragma once
+#include <atomic>
+#include <cstdint>
+namespace nr::registered_lab {
+inline uint64_t diagnostic_identity() noexcept {static std::atomic<uint64_t> next{0};return next.fetch_add(1,std::memory_order_relaxed)+1;}
+}
+''')
+p=lab/'kernel_memory.hpp';s=p.read_text().replace('#include "../kmd/contract.hpp"','#include "../kmd/contract.hpp"\n#include "resource_identity.hpp"').replace('struct Context {','struct Context {\n    const uint64_t diagnostic_id=diagnostic_identity();').replace('struct Allocation {','struct Allocation {\n    const uint64_t diagnostic_id=diagnostic_identity();\n    uint64_t diagnostic_backing=diagnostic_id,diagnostic_version=1;');p.write_text(s)
+(lab/'resource_trace.hpp').write_text(r'''#pragma once
+#include "kernel_memory.hpp"
+#include "lab_trace.hpp"
+#include <atomic>
+#include <cstring>
+namespace nr::registered_lab {
+inline thread_local uint64_t diagnostic_call=0;
+inline uint64_t diagnostic_qpc() noexcept {LARGE_INTEGER value{};return QueryPerformanceCounter(&value)?uint64_t(value.QuadPart):0;}
+inline uint64_t diagnostic_epoch() noexcept {static const uint64_t value=diagnostic_qpc();return value;}
+inline void resource_boundary(const char *operation,const Allocation *allocation=nullptr,uint64_t context=0,uint64_t argument=0) noexcept {
+ static std::atomic<uint64_t> serial{0};const auto sequence=serial.fetch_add(1,std::memory_order_relaxed)+1;
+ lab_trace("{\"event\":\"resource_boundary\",\"epoch\":%llu,\"serial\":%llu,\"call\":%llu,\"qpc\":%llu,\"operation\":\"%s\",\"context\":%llu,\"object\":%llu,\"backing\":%llu,\"version\":%llu,\"width\":%u,\"height\":%u,\"format\":%u,\"external_alias_possible\":%s,\"argument\":%llu,\"logical_version_only\":true}\n",
+ static_cast<unsigned long long>(diagnostic_epoch()),static_cast<unsigned long long>(sequence),static_cast<unsigned long long>(diagnostic_call),static_cast<unsigned long long>(diagnostic_qpc()),operation,
+ static_cast<unsigned long long>(allocation?allocation->context->diagnostic_id:context),static_cast<unsigned long long>(allocation?allocation->diagnostic_id:0),static_cast<unsigned long long>(allocation?allocation->diagnostic_backing:0),static_cast<unsigned long long>(allocation?allocation->diagnostic_version:0),
+ allocation?allocation->surface.width:0,allocation?allocation->surface.height:0,allocation?allocation->surface.format:0,allocation&&allocation->runtime_resource?"true":"false",static_cast<unsigned long long>(argument));
+}
+inline void resource_written(const char *operation,Allocation &allocation) noexcept {++allocation.diagnostic_version;resource_boundary(operation,&allocation);}
+struct ResourceBoundaryScope {
+ uint64_t previous=diagnostic_call,context=0;bool enabled=false,complete=false;
+ explicit ResourceBoundaryScope(const Context *c,const char *operation) noexcept:context(c?c->diagnostic_id:0){
+  enabled=std::strstr(operation,"resource")||std::strstr(operation,"draw")||std::strstr(operation,"clear")||std::strstr(operation,"map")||std::strstr(operation,"flush")||std::strstr(operation,"present")||std::strstr(operation,"rotate")||std::strstr(operation,"hazard");
+  if(enabled){diagnostic_call=diagnostic_identity();resource_boundary(operation,nullptr,context);resource_boundary("call_begin",nullptr,context);}
+ }
+ void success() noexcept {complete=true;}
+ ~ResourceBoundaryScope(){if(enabled)resource_boundary(complete?"call_success":"call_failed",nullptr,context);diagnostic_call=previous;}
+};
+}
+''')
+def change(file,old,new,count=1):
+ p=lab/file;s=p.read_text();assert s.count(old)==count,(file,old,s.count(old));p.write_text(s.replace(old,new))
+change('driver.cpp','#include "lab_trace.hpp"','#include "lab_trace.hpp"\n#include "resource_trace.hpp"')
+change('driver.cpp','    try { f(); }','    ResourceBoundaryScope boundary(device(h).context.get(),operation);\n    try { f(); boundary.success(); }')
+change('driver.cpp','    counters.upload_bytes += uint64_t(row_bytes) * rows;','    counters.upload_bytes += uint64_t(row_bytes) * rows;\n    resource_written("host_upload_complete",target);')
+change('driver.cpp','        r.bind_flags = a->BindFlags;','        r.bind_flags = a->BindFlags;\n        for(UINT sub=0;sub<mip_count(r);++sub)resource_boundary("resource_created",mip_allocation(r,sub).get(),0,sub);')
+change('driver.cpp','        r.allocation = std::move(allocation); r.usage = D3D10_DDI_USAGE_DEFAULT;','        r.allocation = std::move(allocation); r.usage = D3D10_DDI_USAGE_DEFAULT;\n        resource_boundary("resource_opened_external",r.allocation.get());')
+change('driver.cpp','    guard(h, __FUNCTION__, [&] { static_cast<Resource *>(r.pDrvPrivate)->~Resource(); });','    guard(h, __FUNCTION__, [&] { auto &value=*static_cast<Resource *>(r.pDrvPrivate);if(value.allocation)for(UINT sub=0;sub<mip_count(value);++sub)resource_boundary("resource_handle_destroy",mip_allocation(value,sub).get(),0,sub);static_cast<Resource *>(r.pDrvPrivate)->~Resource(); });')
+change('driver.cpp','            counters.copies += a->surface.allocation_bytes;','            counters.copies += a->surface.allocation_bytes;\n            resource_boundary("copy_source",b.get(),0,sub);resource_written("copy_destination_submitted",*a);')
+change('driver.cpp','        const bool wants_read=type==D3D10_DDI_MAP_READ','        resource_boundary("ddi_map_attempt",allocation.get(),0,(uint64_t(UINT(type))<<32)|flags);\n        const bool wants_read=type==D3D10_DDI_MAP_READ')
+change('driver.cpp','        v.mapped_write = discard || (staging && wants_write);','        resource_boundary("ddi_map_succeeded",allocation.get(),0,(uint64_t(UINT(type))<<32)|flags);\n        v.mapped_write = discard || (staging && wants_write);')
+change('driver.cpp','        v.mapped_write = false;','        if(v.mapped_write)resource_written("ddi_unmap_write",a);else resource_boundary("ddi_unmap_read",&a);\n        v.mapped_write = false;')
+change('driver.cpp','void APIENTRY flush(D3D10DDI_HDEVICE) {} // Clears submit immediately; draws complete synchronously.','void APIENTRY flush(D3D10DDI_HDEVICE h) {guard(h,__FUNCTION__,[&]{resource_boundary("ddi_flush",nullptr,device(h).context?device(h).context->diagnostic_id:0);});} // Observation only; execution remains synchronous.')
+change('driver.cpp','void APIENTRY hazard(D3D10DDI_HDEVICE, D3D10DDI_HRESOURCE) {} // Blocking locks order our staging copies.','void APIENTRY hazard(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE) {guard(h,__FUNCTION__,[&]{resource_boundary("ddi_hazard",nullptr,device(h).context?device(h).context->diagnostic_id:0);});} // Observation only; blocking locks still order copies.')
+change('driver.cpp','        a->context->fill(a->handle, pattern);','        a->context->fill(a->handle, pattern);resource_written("kernel_fill_submitted",*a);')
+# Explicit direct-HRESULT callbacks do not use guard().
+change('driver.cpp','    auto &d = *reinterpret_cast<Device *>(a->hDevice);','    auto &d = *reinterpret_cast<Device *>(a->hDevice);\n    ResourceBoundaryScope boundary(d.context.get(),__FUNCTION__);',2)
+change('driver.cpp','        callback.hSrcAllocation = source.allocation->handle;','        resource_boundary("present_source",source.allocation.get());\n        callback.hSrcAllocation = source.allocation->handle;')
+change('driver.cpp','        else ++counters.accepted_present_callbacks;','        else {++counters.accepted_present_callbacks;boundary.success();}')
+change('driver.cpp','        const auto first = allocations[0]->handle;','        for(UINT i=0;i<a->Resources;++i)resource_boundary("rotate_before",allocations[i],0,i);\n        const auto first_backing=allocations[0]->diagnostic_backing,first_version=allocations[0]->diagnostic_version;\n        const auto first = allocations[0]->handle;')
+change('driver.cpp','        for (UINT i = 1; i < a->Resources; ++i) allocations[i-1]->handle = allocations[i]->handle;','        for (UINT i = 1; i < a->Resources; ++i) {allocations[i-1]->handle = allocations[i]->handle;allocations[i-1]->diagnostic_backing=allocations[i]->diagnostic_backing;allocations[i-1]->diagnostic_version=allocations[i]->diagnostic_version;}')
+change('driver.cpp','        allocations[a->Resources-1]->handle = first;','        allocations[a->Resources-1]->handle = first;allocations[a->Resources-1]->diagnostic_backing=first_backing;allocations[a->Resources-1]->diagnostic_version=first_version;\n        for(UINT i=0;i<a->Resources;++i)resource_boundary("rotate_after",allocations[i],0,i);boundary.success();')
+change('buffer.hpp','    write.finish(); counters.upload_bytes += r.buffer_bytes;','    write.finish(); counters.upload_bytes += r.buffer_bytes;resource_written("buffer_upload_complete",*r.allocation);')
+change('buffer.hpp','    r.buffer_bytes = m.TexelWidth; r.bind_flags = a.BindFlags;','    r.buffer_bytes = m.TexelWidth; r.bind_flags = a.BindFlags;resource_boundary("buffer_created",r.allocation.get(),0,r.buffer_bytes);')
+change('draw.hpp','std::vector<uint8_t> read_pixels(Allocation &source) {','std::vector<uint8_t> read_pixels(Allocation &source) {\n    resource_boundary("internal_pixel_read",&source);')
+change('indexed_draw.hpp','        Mapping read(*b.allocation,true);','        resource_boundary("vertex_read",b.allocation.get(),0,e.InputSlot);\n        Mapping read(*b.allocation,true);')
+change('indexed_draw.hpp','        Mapping read(*ib.allocation, true);','        resource_boundary("index_read",ib.allocation.get());\n        Mapping read(*ib.allocation, true);')
+change('indexed_draw.hpp','        values[i].resize(program.constants[i]); Mapping read(*a, true);','        values[i].resize(program.constants[i]);resource_boundary("constant_read",a.get(),0,(uint64_t(stage)<<32)|i); Mapping read(*a, true);')
+change('indexed_draw.hpp','t.pixels.resize(view.elements);Mapping read(*source,true);','t.pixels.resize(view.elements);resource_boundary("typed_buffer_read",source.get());Mapping read(*source,true);')
+change('copy_region.hpp','        uint64_t moved=0;','        resource_boundary("copy_region_source",sa.get(),0,src_sub);\n        uint64_t moved=0;')
+change('copy_region.hpp','            moved=bytes;counters.upload_bytes+=bytes;','            moved=bytes;counters.upload_bytes+=bytes;resource_written("buffer_region_written",*da);')
+# Correlate an admitted DDI operation with the worker request identity.
+change('indexed_exchange.hpp','#include "local_indexed_client.hpp"','#include "local_indexed_client.hpp"\n#include "resource_trace.hpp"')
+change('indexed_exchange.hpp','            auto &h = request.header;','            auto &h = request.header;')
+# Use the assigned sequence, after packet encoding sets the request header.
+p=lab/'indexed_exchange.hpp';s=p.read_text();needle='            admission->verify();\n            auto result = indexed_exchange::decode_response(local_client->exchange(bytes), h);';assert s.count(needle)==1;s=s.replace(needle,'            resource_boundary("worker_exchange",nullptr,0,h.sequence);\n'+needle);p.write_text(s)
+manifest={str(p.relative_to(d)):hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()};old=json.loads((r/'native-auto-umd-v2-source.json').read_text());changed=sorted(n for n in manifest if manifest[n]!=old.get(n));assert len(changed)==9,changed
+(r/(name+'-source.json')).write_text(json.dumps(manifest,indent=2)+'\n');(r/(name+'-changes.json')).write_text(json.dumps(dict(changed=changed,rendering_deferred=False,shared_aliases_unresolved=True,trace_budget_unchanged=True),indent=2)+'\n')
+with tarfile.open(r/(name+'.tar.gz'),'w:gz') as archive:archive.add(d,arcname=name)
+s=(r/'build-native-client-timing-v1.ps1').read_text().replace('native-client-timing-v1',name);(r/('build-'+name+'.ps1')).write_text(s)
+s=(r/'run-native-client-timing-v1-qualification.ps1').read_text().replace('native-client-timing-v1',name)
+s=s.replace("@('ptl-resident-clip-v2-qualification')","@('command-batch-transaction-v2-qualification')").replace("if(Test-Path \"$vm/native-desktop-admission-v68/report.json\"){'native-desktop-admission-v68'}", "if(Test-Path \"$vm/native-desktop-admission-v70/report.json\"){'native-desktop-admission-v70'}")
+s='\n'.join(" $preceding='native-desktop-admission-v70'" if line.startswith(' $preceding=') else line for line in s.split('\n'))
+(r/('run-'+name+'-qualification.ps1')).write_text(s)
+print(json.dumps(dict(prepared=name,changed=changed,driver_installed=False)))

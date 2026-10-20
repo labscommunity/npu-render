@@ -150,3 +150,19 @@ is Windows resource access: capture explicit object/backing identities and
 logical write versions around draw, map/unmap, copy, flush, present and rotation.
 Treat shared external aliases conservatively and distinguish application access
 from internal staging reads. The trace must not be presented as a benchmark.
+
+The [first Windows resource trace](../validation/2026-10-20/native-resource-boundaries-v1/README.md)
+records 461 closed DWM draw scopes. Of these, 380 occur in 78 multi-draw runs to
+the same target when private input updates are assumed to have owned snapshots.
+The largest run has 36 draws and 111 distinct input versions. This establishes
+observed grouping opportunities, not safe deferral: external aliases remain
+unresolved, the trace is capped, and V1 misses shader-view hazards and copy-region
+scope boundaries. V2 adds those observations.
+
+The diagnostic also exposed a real NPU device-loss receipt. The provider
+restarted and retried on NPU, but a later shared-application evidence check
+incorrectly required one generation. Preserve that failed trial. Correct
+correlation must select the explicit response generation, verify the child PID,
+and join operation identity and nested timing; child dispatch numbers restart.
+Provider imports must remain unique within each child, with all generation
+changes accounted for, rather than requiring one import across a recovered run.
