@@ -1,0 +1,126 @@
+"""Prepare a worker only after the exact resident-texture model is qualified."""
+from pathlib import Path
+import argparse
+import ast
+import hashlib
+import json
+import shutil
+import tarfile
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--device-report", type=Path, required=True)
+args = parser.parse_args()
+proof = json.loads(args.device_report.read_text(encoding="utf-8-sig"))
+assert proof["completed"] and proof["passed"] and proof["child_result"]["unique_component_fixtures"] == 144
+digest = proof["patched_sha256"]
+assert len(digest) == 64 and all(c in "0123456789abcdef" for c in digest)
+r = Path(__file__).parent
+name = "ptl-native-worker-v23"
+d = r / name
+assert not d.exists()
+shutil.copytree(r / "ptl-native-worker-v19", d)
+s = (r / "ptl_resident_clip_v1.hpp").read_text().replace(
+    "NR_RESIDENT_CLIP_QUALIFIED_DIGEST", ",".join("0x" + digest[n:n+2] for n in range(0, 64, 2))
+)
+(d / "ptl_resident_clip.hpp").write_text(s)
+for extension in ("hpp", "cpp"):
+    s = (r / "ptl-native-worker-v19" / ("ptl_program_triangle_draw." + extension)).read_text()
+    s = s.replace("PtlProgramTriangleDrawExecutor", "PtlResidentClipTriangleDrawExecutor")
+    s = s.replace("ptl_program_triangle_draw", "ptl_resident_clip_triangle_draw")
+    s = s.replace("ptl_program.hpp", "ptl_resident_clip.hpp").replace("PtlProgramRaster", "PtlResidentClip")
+    s = s.replace("PtlResidentClip::maximum_batch(p,samplers,n)", "PtlResidentClip::maximum_batch(resources,n)")
+    s = s.replace("fixed_clip,resources,tile)", "fixed_clip,resources,tile,pc)")
+    (d / ("ptl_resident_clip_triangle_draw." + extension)).write_text(s)
+p = d / "CMakeLists.txt"
+p.write_text(p.read_text().replace("local_indexed_worker.cpp ", "local_indexed_worker.cpp ptl_resident_clip_triangle_draw.cpp "))
+p = d / "indexed_pipeline.hpp"
+s = p.read_text().replace('#include "ptl_program.hpp"', '#include "ptl_program.hpp"\n#include "ptl_resident_clip.hpp"\n#include "ptl_resident_clip_triangle_draw.hpp"')
+a = s.index("    bool quad_enabled=false;")
+s = s[:a] + r'''
+    bool resident_clip_enabled=false;
+    struct ResidentClipEntry {Header header;uint32_t batch;std::vector<uint32_t> vertex,pixel;raster::PackedResources layout;shader::TextureSamplers samplers;std::unique_ptr<raster::PtlResidentClipTriangleDrawExecutor> executor;};
+    std::vector<ResidentClipEntry> resident_clips;
+    std::optional<raster::UniformDrawExecutor::Result> try_resident_clip(const Request &request){
+        if(!resident_clip_enabled||!program_shape(request)||(request.header.flags&0x2000)==0)return {};
+        const auto &h=request.header;const auto capacity=vertex_capacity(h.vertices);
+        const auto &resources=request.resources;const auto &samplers=request.samplers;
+        if(!raster::PtlResidentClip::eligible(request.pixel,resources,samplers,capacity))return {};
+        const auto clip=request.scissor.value_or(std::array<int32_t,4>{0,0,int32_t(h.width),int32_t(h.height)});
+        require(scissor_valid(clip,h));const auto area=uint64_t(clip[2]-clip[0])*uint64_t(clip[3]-clip[1]);
+        unsigned batch=raster::PtlResidentClip::maximum_batch(resources,capacity);
+        while(batch>384&&area<=batch/2)batch/=2;
+        raster::PtlResidentClipTriangleDrawExecutor *executor=nullptr;
+        for(auto &entry:resident_clips){const auto &old=entry.header;
+            if(entry.batch==batch&&old.vertices==capacity&&old.format==h.format&&(old.flags&~4u)==(h.flags&~4u)&&raster::resource_layout_equal(resources,entry.layout)&&raster::sampler_layout_equal(samplers,entry.samplers)&&entry.vertex==request.vertex.bytecode&&entry.pixel==request.pixel.bytecode){executor=entry.executor.get();break;}
+        }
+        if(!executor){
+            if(resident_clips.size()==32)resident_clips.erase(resident_clips.begin());
+            auto candidate=std::make_unique<raster::PtlResidentClipTriangleDrawExecutor>(request.vertex,request.pixel,capacity,h.width,h.height,h.format,resources,samplers,"NPU",blend_mode(h),uint8_t((h.flags>>8)&15),static_cast<raster::CullMode>((h.flags>>5)&3),(h.flags&128)!=0,batch);
+            executor=candidate.get();auto key=h;key.vertices=capacity;resident_clips.push_back({key,batch,request.vertex.bytecode,request.pixel.bytecode,raster::resource_layout(resources),samplers,std::move(candidate)});
+        }
+        auto result=executor->execute(request.inputs,request.vertex_constants,request.pixel_constants,request.viewport,resources,request.background,request.scissor,request.blend_constant);
+        std::printf("{\"ptl_resident_clip_draw\":true,\"accepted\":true,\"sequence\":%u,\"batch\":%u,\"provider_requests\":%llu,\"complete_texture_transport\":true,\"shader_exactly_pinned\":true,\"fallback_backend\":\"none\"}\n",h.sequence,batch,static_cast<unsigned long long>(result.provider_requests));std::fflush(stdout);
+        return result;
+    }
+''' + s[a:]
+s = s.replace("    Pipeline(){", r'''    Pipeline(){
+        wchar_t *resident=nullptr;size_t resident_length=0;
+        if(_wdupenv_s(&resident,&resident_length,L"NR_RENDER_PTL_RESIDENT_CLIP_BLOB"))throw std::runtime_error("cannot read resident clip setting");
+        const std::unique_ptr<wchar_t,decltype(&std::free)> resident_owner(resident,&std::free);
+        if(resident&&*resident){require(std::filesystem::path(resident).is_absolute());resident_clip_enabled=true;}
+''')
+s = s.replace("        if(auto result=try_program(request))", "        if(auto result=try_resident_clip(request))return std::move(*result);\n        if(auto result=try_program(request))")
+p.write_text(s)
+manifest = {str(p.relative_to(d)): hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob("*") if p.is_file()}
+old = json.loads((r / "ptl-native-worker-v19-source.json").read_text())
+assert {n for n in manifest if manifest[n] != old.get(n)} == {
+    "CMakeLists.txt", "indexed_pipeline.hpp", "ptl_resident_clip.hpp",
+    "ptl_resident_clip_triangle_draw.hpp", "ptl_resident_clip_triangle_draw.cpp",
+}
+(r / (name + "-source.json")).write_text(json.dumps(manifest, indent=2) + "\n")
+with tarfile.open(r / (name + ".tar.gz"), "w:gz") as archive:
+    archive.add(d, arcname=name)
+s = (r / "build-ptl-native-worker-v19.ps1").read_text().replace("ptl-native-worker-v19", name)
+(r / ("build-" + name + ".ps1")).write_text(s)
+s = (r / "qualify-ptl-native-worker-v19-v2.py").read_text().replace("ptl-native-worker-v19", name)
+s = s.replace(" env=os.environ.copy();", f""" resident=vm/'ptl-six-span-resident-clip-v1/patched.blob'
+ assert obj(vm/'ptl-six-span-resident-clip-v1/report.json')['passed'] and sha(resident)=={digest!r}
+ env=os.environ.copy();env['NR_RENDER_PTL_RESIDENT_CLIP_BLOB']=str(resident);""")
+needle = " actual_program=routed_tickets(trial,'ptl_program_draw')"
+assert s.count(needle) == 1
+s = s.replace(needle, """ resident_tickets=routed_tickets(trial,'ptl_resident_clip_draw')
+ assert resident_tickets and resident_tickets<=expected_geometry
+ expected_geometry-=resident_tickets
+ resident_events=[];resident_imports=[]
+ for log in (trial/'provider-processes').glob('generation-*/worker.stdout.jsonl'):
+  current_identity=None
+  for event in rows(log):
+   if event.get('kind')=='request_identity':current_identity=event
+   if event.get('ptl_resident_clip_provider_created'):resident_imports.append(event)
+   if event.get('ptl_resident_clip_draw'):
+    assert current_identity['pixel_sha256']=='b7f4e6d0abea95bb235098b7e357eacd906679d4626ba4abf4b3c5e3ca31ecf7'
+    assert event['accepted'] and event['complete_texture_transport'] and event['shader_exactly_pinned'] and event['fallback_backend']=='none'
+    assert 0<event['batch']<=6*16384 and event['provider_requests']>=2
+    resident_events.append(event)
+ assert len(resident_imports)==1 and len(resident_events)==len(resident_tickets)
+ report.update(resident_clip_draws=len(resident_events),resident_clip_imports=1,resident_clip_model_sha256=sha(resident))
+""" + needle)
+s = s.replace(" report['passed']=True", """ if a.stage=='full':
+  preceding=rows(vm/'ptl-native-worker-v19-full/replay/replays.jsonl');assert len(preceding)==972
+  assert all((x['ticket'],x['pixels_sha256'],x['pixel_bytes'])==(y['ticket'],y['pixels_sha256'],y['pixel_bytes']) for x,y in zip(preceding,current,strict=True))
+  report['all_worker_v19_outputs_preserved']=True
+ report['passed']=True""")
+ast.parse(s)
+(r / ("qualify-" + name + ".py")).write_text(s)
+s = (r / "qualify-host-tensor-comparison-v1.py").read_text().replace("host-tensor-comparison-v1", "resident-clip-comparison-v1").replace("worker-v20", "worker-v23")
+s = s.replace("('B1',20),('B2',20)", "('B1',23),('B2',23)")
+s = s.replace("  'PROGRAM':", f"  'RESIDENT_CLIP':('ptl-six-span-resident-clip-v1',{digest!r}),\n  'PROGRAM':")
+s = s.replace("comparing plugin tensors with ordinary host tensors", "comparing the original geometry/shader/merger path with one-call resident-texture rasterization for admitted clipping draws")
+ast.parse(s)
+(r / "qualify-resident-clip-comparison-v1.py").write_text(s)
+s = (r / "run-ptl-worker-v22-qualification.ps1").read_text().replace("worker-v22", "worker-v23")
+s = s.replace("quad-rectangle-comparison-v1", "resident-clip-comparison-v1")
+s = s.replace("@('ptl-worker-v21-qualification')", "@('ptl-resident-clip-v1-qualification')")
+s = s.replace("waiting-for-balanced-geometry-experiment", "waiting-for-resident-clip-component")
+(r / "run-ptl-worker-v23-qualification.ps1").write_text(s)
+print(json.dumps({"prepared": name, "qualified_model_sha256": digest, "worker_hardware_tested": False}))

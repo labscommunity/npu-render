@@ -1,0 +1,108 @@
+# Frame command batching: implementation contract
+
+Status, 2026-10-20: design derived from the measured desktop bottleneck; not an
+implemented or qualified rendering path.
+
+The current Windows driver completes every draw synchronously. Its `flush` and
+`hazard` callbacks are empty because that synchronous behavior supplies ordering.
+`IndexedNpuExchange` sends the destination background with each request and
+returns the full destination. `map`, staging copies, presentation and resource
+identity rotation currently rely on those completed writes.
+
+The [client timing diagnostic](../validation/2026-10-20/native-client-timing-v1/README.md)
+places about 95.6% of measured synchronous request time inside the parent worker.
+During its animation, child rendering occupies 6.88 of ten seconds. Therefore
+batching only the client transport cannot close the 0.7-to-30-updates/s gap.
+The architecture must also reduce NPU submissions and repeated work across draws.
+The [clipping result](../validation/2026-10-20/native-resident-clip-worker-v1/README.md)
+shows that fusion can accelerate its selected work, while its small overall gain
+shows the limitation of optimizing one shader family.
+
+Windows has explicit submission boundaries including presentation, flushing and
+resource access. A batch cannot simply defer everything until the next frame.
+This is the basis for the proposed boundaries below, not proof that our driver
+already implements them.
+[Microsoft command-buffer documentation](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/submitting-a-command-buffer).
+
+OpenVINO's NPU request implementation uses command lists, queues and
+synchronization objects. Its memory interfaces can share buffers between requests,
+subject to lifetime and synchronization requirements. That offers a possible
+implementation mechanism; it does not establish that a Direct3D resource can be
+imported without copying or that concurrent requests improve this workload.
+[OpenVINO NPU request design](https://github.com/openvinotoolkit/openvino/blob/master/src/plugins/intel_npu/docs/inference-request.md).
+
+## Resource and ordering model
+
+Identify each resource by client context, allocation generation, resource ID,
+subresource and content version. IDs never become raw device addresses. A queued
+draw owns immutable references to its geometry, constants, shaders, samplers and
+input versions. Rebinding or destroying an application object cannot change an
+already queued draw.
+
+Each write names the expected preceding destination version and a new version.
+Read dependencies refer to the precise preceding write, even when several
+commands use the same surface. Retained resources eliminate repeated transport
+only after their contents and version are known at the receiver. A descriptor
+cache or a repeated hash alone does not establish resource ownership.
+
+| Trigger | Required behavior before returning or handing off |
+| --- | --- |
+| Draw or clear | Validate captured state; enqueue an ordered NPU operation; retain referenced storage. |
+| CPU read or read/write map | Complete all relevant earlier writes and make the requested version visible. |
+| Nonblocking map | Report still-drawing when needed; never expose stale bytes or poison an otherwise valid context. |
+| Discard/no-overwrite upload | Preserve storage referenced by pending commands; publish the new upload version explicitly. |
+| Resource copy | Order source reads and destination writes; account separately for host staging and NPU work. |
+| Flush | Submit preceding work so completion does not depend on a future application-thread call. |
+| Present | Complete the selected surface version before the existing presentation handoff. |
+| Identity rotation | Preserve the allocation/version relation across swapchain identity changes. |
+| Destroy or lease revocation | Retire pending references and work before releasing their owned storage. |
+
+The flush independence condition is explicit in the Windows interface contract.
+[Microsoft Flush documentation](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3d10umddi/nc-d3d10umddi-pfnd3d11_1ddi_flush).
+
+## Recovery and bounded execution
+
+A batch carries an admission generation, monotonic sequence, bounded command
+count, bounded byte budget and complete resource dependencies. Reject malformed,
+stale, cross-context or unavailable versions before changing committed state.
+Publishing a partially rendered batch as complete is prohibited.
+
+Provider restart must reconstruct the last committed resource versions before
+retrying pending work. The existing per-draw recovery receives a complete
+background and cannot simply be reused once those bytes are omitted. Either
+retain validated checkpoints or retain a bounded replay journal sufficient to
+recreate them on NPU. Account for checkpoint traffic and replay latency.
+
+This remains separate from driver/process teardown and physical desktop
+restoration. Neither silently switching to CPU rendering nor leaving the user
+with a stale frame satisfies recovery.
+
+## Implementation sequence and evidence
+
+1. Inventory captured draw dependencies, resource footprints and readback
+   boundaries. Preserve the distinction between resource identity and identical
+   pixel contents. The existing capture lacks enough identity information to
+   infer a general resource graph from hashes alone.
+2. Implement and test bounded resource-version and command-order contracts.
+   Cover overwrite/discard, overlapping reads and writes, nonblocking maps,
+   identity rotation, destruction and partial failure. These are CPU contract
+   tests, not proof of NPU execution.
+3. Execute command batches in an isolated NPU worker using existing qualified
+   rendering routes. Verify full images against the corresponding ordered
+   unbatched operations. Measure protocol bytes, launches, worker time and
+   checkpoint/recovery cost separately. A transport-only gain is insufficient.
+4. Fuse eligible ordered work within NPU tile batches, preserving overlap,
+   coverage, sampling and blending. Prove resource-footprint bounds and exact
+   output before interpreting a lower submission count as useful acceleration.
+   Keep unsupported operations explicit rather than silently rendering elsewhere.
+5. Integrate the passing contracts into the Windows draw/map/copy/flush/present
+   callbacks. Repeat registered graphics, ordinary application admission,
+   physical frame delivery, input distribution, 30 Hz animation and restoration.
+6. Require current-renderer responsiveness and sustained operation before
+   claiming a usable switch. Measure residual iGPU work and matched Tahoma
+   throughput separately, under matched power, geometry and workload conditions.
+
+The first implementation should preserve a reversible selection between the
+existing synchronous route and the new route at context creation. Changing that
+selection with outstanding work requires an explicit drain and resource-state
+handoff; an environment variable alone is not the user-facing switch.

@@ -36,8 +36,11 @@ places about 95.6% of measured synchronous DWM request time inside the rendering
 worker. Its animation still delivers 0.7 verified updates/s; the desktop restores,
 but its overall route-coverage check fails. The
 [combined clipping kernel](docs/validation/2026-10-20/native-resident-clip-component-v1/README.md)
-passes 144 exact fixtures on the NPU. Worker integration and desktop performance
-are separate gates.
+passes 144 exact fixtures on the NPU. Its
+[integrated worker](docs/validation/2026-10-20/native-resident-clip-worker-v1/README.md)
+preserves all replay images and passes recovery. Targeted clipping draws become
+71.69% faster, but total replay time improves only 4.49%, so its standalone live
+promotion is rejected. A combined candidate is under test.
 
 Its [complete-image component comparison](docs/validation/2026-10-16/native-filled-program-comparison-v1/README.md)
 preserves all 1,852 preceding NPU images. Across 1,389 warm pairs, aggregate draw

@@ -1,0 +1,50 @@
+"""Prepare the next generator without creating an unqualified worker."""
+from pathlib import Path
+import ast
+import json
+
+r = Path(__file__).parent
+s = (r / "prepare-resident-clip-worker-v1.py").read_text()
+s = s.replace("ptl-six-span-resident-clip-v1", "ptl-six-span-resident-clip-v2")
+s = s.replace("ptl-resident-clip-v1-qualification", "ptl-resident-clip-v2-qualification")
+needle = 's = s.replace(" env=os.environ.copy();",'
+assert s.count(needle) == 1
+clips = [97, 100, 103, 106, 115, 118, 126, 225, 228, 231, 234, 243, 246, 254,
+         316, 317, 318, 319, 320, 321, 322, 402, 405, 408, 411, 420, 423, 431,
+         515, 518, 521, 524, 533, 536, 544, 620, 621, 622, 623, 624, 625, 626,
+         686, 687, 688, 689, 690, 691, 692, 741, 742, 743, 744, 745, 746, 747,
+         859, 862, 865, 868, 877, 880, 888]
+# The old 106-packet selection exercised no accepted general geometry draws.
+# Add every retained use of this exact shader, including varied resource sizes.
+s = s.replace(needle, "s = s.replace('|rectangle_tickets))', "
+              + repr("|rectangle_tickets|" + repr(set(clips)) + "))") + ")\n" + needle)
+ast.parse(s)
+(r / "prepare-resident-clip-worker-v2.py").write_text(s)
+
+p = r / "collect-native-primary-v96.py"
+s = p.read_text()
+s = s.replace("directories=[", "directories=['ptl-worker-v22-qualification-v2', 'ptl-native-worker-v22-selected-v2', 'ptl-native-worker-v22-full-v2', 'quad-rectangle-comparison-v2', ")
+s = s.replace("source_files=[", "source_files=['qualify-ptl-native-worker-v22-v2.py', 'qualify-quad-rectangle-comparison-v2.py', 'run-ptl-worker-v22-qualification-v2.ps1', ")
+s = s.replace("@('ptl-worker-v22-qualification')", "@('ptl-worker-v22-qualification','ptl-worker-v22-qualification-v2')")
+ast.parse(s)
+p.write_text(s)
+p = r / "curate-native-primary-v96.py"
+s = p.read_text().replace("['collect-native-primary-v96.py',", "['prepare-next-qualification-v2.py', 'collect-native-primary-v96.py',")
+ast.parse(s)
+p.write_text(s)
+p = r / "collect-native-primary-v97.py"
+s = p.read_text()
+s = s.replace("directories=[", "directories=['ptl-resident-clip-v2-qualification', 'ptl-six-span-resident-clip-build-v2', 'ptl-six-span-resident-clip-v2', ")
+s = s.replace("extras=[", "extras=['ptl-resident-clip-device-v2-source.json', ")
+s = s.replace("source_files=[", "source_files=['ptl-six-span-resident-clip-v2.c', 'qualify-ptl-six-span-resident-clip-v2.py', 'run-ptl-resident-clip-v2-qualification.ps1', ")
+s = s.replace("@('ptl-resident-clip-v1-qualification')", "@('ptl-resident-clip-v1-qualification','ptl-resident-clip-v2-qualification')")
+ast.parse(s)
+p.write_text(s)
+p = r / "curate-native-primary-v97.py"
+s = p.read_text().replace("['collect-native-primary-v97.py',", "['prepare-next-qualification-v2.py', 'qualify-resident-clip-local-v2.py', 'ptl-resident-clip-v2-local.c', 'collect-native-primary-v97.py',")
+needle = "(d/'artifact-sha256.json').write_text"
+s = s.replace(needle, """data=(r/'ptl-resident-clip-local-v2/report.json').read_bytes();target=d/'local-cpu-v2-report.json';target.write_bytes(data);items.append(dict(path=target.name,bytes=len(data),sha256=hashlib.sha256(data).hexdigest(),local_source='results/render-driver/ptl-resident-clip-local-v2/report.json'))
+""" + needle)
+ast.parse(s)
+p.write_text(s)
+print(json.dumps({"prepared": True, "worker_created": False, "additional_clip_tickets": len(clips)}))

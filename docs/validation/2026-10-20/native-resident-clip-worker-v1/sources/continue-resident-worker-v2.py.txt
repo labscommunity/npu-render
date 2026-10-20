@@ -1,0 +1,64 @@
+"""Continue to worker integration only after the exact v3 NPU component passes."""
+from pathlib import Path
+import base64
+import hashlib
+import json
+import subprocess
+import sys
+import time
+
+r = Path(__file__).parent
+
+
+def remote(script, timeout=30):
+    encoded = base64.b64encode(script.encode("utf-16-le")).decode()
+    return subprocess.run(
+        ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", "delta",
+         "powershell.exe -NoProfile -NonInteractive -EncodedCommand " + encoded],
+        capture_output=True, timeout=timeout, check=True,
+    )
+
+
+deadline = time.monotonic() + 3600
+while time.monotonic() < deadline:
+    response = remote(r'''
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$vm="$env:LOCALAPPDATA\npu-render\vm"
+$p="$vm/ptl-six-span-resident-clip-v3/report.json"
+$c="$vm/ptl-resident-clip-v3-qualification-v2/report.json"
+$q=Get-Content $c -Raw|ConvertFrom-Json
+if($q.completed){
+ [pscustomobject]@{completed=$true;passed=$q.passed;error=$q.error;component_exists=(Test-Path $p);component_sha256=$(if(Test-Path $p){(Get-FileHash $p).Hash.ToLower()})}|ConvertTo-Json -Compress
+}else{[pscustomobject]@{completed=$false;phase=$q.active_phase}|ConvertTo-Json -Compress}
+''')
+    status = json.loads(response.stdout.decode("utf-8-sig"))
+    if status["completed"]:
+        print(json.dumps({"component_coordinator": status}), flush=True)
+        if not status["passed"]:
+            raise SystemExit("NPU component did not qualify; worker integration not started")
+        break
+    time.sleep(10)
+else:
+    raise SystemExit("NPU component deadline; worker integration not started")
+assert status["component_exists"]
+proof = r / "ptl-resident-clip-device-v3-qualified-report.json"
+assert not proof.exists()
+subprocess.run(["scp", "-q", "delta:AppData/Local/npu-render/vm/ptl-six-span-resident-clip-v3/report.json",
+                str(proof)], check=True, timeout=30)
+assert hashlib.sha256(proof.read_bytes()).hexdigest() == status["component_sha256"]
+subprocess.run([sys.executable, str(r / "prepare-resident-clip-worker-v4.py"),
+                "--device-report", str(proof)], check=True)
+names = ["ptl-native-worker-v23.tar.gz", "ptl-native-worker-v23-source.json",
+         "build-ptl-native-worker-v23.ps1", "qualify-ptl-native-worker-v23.py",
+         "qualify-resident-clip-comparison-v1.py", "run-ptl-worker-v23-qualification.ps1"]
+subprocess.run(["scp", "-q", *[str(r / name) for name in names],
+                "delta:AppData/Local/npu-render/vm/"], check=True, timeout=90)
+print(json.dumps({"worker_23_prepared_and_uploaded": True, "npu_component_sha256": status["component_sha256"]}), flush=True)
+script = r'''
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$vm="$env:LOCALAPPDATA\npu-render\vm"
+& ([scriptblock]::Create([IO.File]::ReadAllText("$vm/run-ptl-worker-v23-qualification.ps1")))
+'''
+encoded = base64.b64encode(script.encode("utf-16-le")).decode()
+raise SystemExit(subprocess.run([
+    "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", "delta",
+    "powershell.exe -NoProfile -NonInteractive -EncodedCommand " + encoded
+]).returncode)

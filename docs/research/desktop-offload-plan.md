@@ -67,8 +67,15 @@ and command batching remain architectural investigations, not implemented gains.
 
 The [combined clipping component](../validation/2026-10-20/native-resident-clip-component-v1/README.md)
 now passes 144 exact full-span fixtures on the NPU, plus original-model checks
-before and afterward. Its code fits the existing allocation. Worker integration,
-complete replay timing, recovery and desktop acceptance remain separate gates.
+before and afterward. Its code fits the existing allocation. The
+[integrated worker](../validation/2026-10-20/native-resident-clip-worker-v1/README.md)
+preserves all 972 images and all 3,888 A/B/B/A images, and passes two targeted
+recovery cases. Its 63 clipping draws improve by 71.69% across 126 pairs; total
+replay time improves by 4.49%, below the five-percent promotion threshold.
+The [standalone live gate](../validation/2026-10-20/native-resident-clip-live-v1/README.md)
+rejects it before any desktop change. A combined candidate now brings together
+clipping, balanced geometry and ordered rectangles, with separate correctness,
+timing and recovery gates. This does not resolve the much larger frame-rate gap.
 The rectangle candidate also passes
 [two targeted provider-recovery scenarios](../validation/2026-10-20/native-quad-rectangle-recovery-v1/README.md);
 its unchanged aggregate replay time still precludes a desktop speedup claim.
@@ -356,8 +363,16 @@ role, and any GPU rendering/copy cost in the bridge must be measured.
    to 176 and targeted time by 45.03%; full-replay time remains unchanged.
    Do not promote this targeted measurement into a desktop speedup claim.
    A separate combined clipping kernel places small textures, coverage, sampling
-   and blending in one NPU call per batch. All 144 target-device fixtures pass;
-   complete worker replay, timing and recovery must pass before live promotion.
+   and blending in one NPU call per batch. All 144 target-device fixtures pass.
+   Worker23 preserves all replay images and passes recovery, but its 4.49%
+   aggregate gain misses live promotion despite 71.69% faster targeted draws.
+   Measure the combined geometry/rectangle/clipping candidate under the same
+   correctness, timing and recovery gates. Individual component gains are too
+   small to explain a path to 30 fps by themselves; reducing submissions and
+   redundant work across whole frames remains an architectural requirement.
+   The [frame command batching contract](frame-command-batching.md) specifies
+   resource versions, synchronization boundaries, recovery and staged NPU
+   validation. It is a design, not an implemented performance result.
    Its first target link failed on missing `memset`; the next link was rejected
    for placing the helper before the kernel entry. A stale manifest in the third
    coordinator was corrected without changing the successfully built kernel.

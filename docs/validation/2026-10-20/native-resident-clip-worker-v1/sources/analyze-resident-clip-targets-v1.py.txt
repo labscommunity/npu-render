@@ -1,0 +1,41 @@
+"""Attribute whole-request costs to the exact admitted clipping ticket set."""
+from pathlib import Path
+import hashlib,json
+b=Path('docs/validation/2026-10-20/native-resident-clip-worker-v1')
+p=b/'raw/resident-clip-comparison-v1/report.json'
+q=json.loads(p.read_text(encoding='utf-8-sig'))
+assert q['completed'] and q['passed'] and len(q['phases'])==4
+sources=[p]
+def rows(path):
+ sources.append(path)
+ return [json.loads(x) for x in path.read_text(encoding='utf-8-sig').splitlines() if x.startswith('{') and x.endswith('}')]
+directory=b/'raw/ptl-native-worker-v23-full/replay'
+mapping={x['iteration']:x['ticket'] for x in rows(directory/'replays.jsonl')}
+tickets=set();current=None
+for event in rows(directory/'provider-processes/generation-1/worker.stdout.jsonl'):
+ if event.get('kind')=='request_identity':current=event
+ if event.get('ptl_resident_clip_draw'):
+  assert event['accepted'] and event['fallback_backend']=='none' and current['sequence']==event['sequence']
+  assert current['pixel_sha256']=='b7f4e6d0abea95bb235098b7e357eacd906679d4626ba4abf4b3c5e3ca31ecf7'
+  ticket=mapping[current['dispatch_ticket']];assert ticket not in tickets;tickets.add(ticket)
+assert len(tickets)==63
+phases=[]
+for phase in q['phases']:
+ selected=[x for x in phase['requests'] if x['original_ticket'] in tickets]
+ assert len(selected)==63
+ phases.append(dict(phase=phase['phase'],worker_version=phase['worker_version'],parent_ms=sum(x['parent_ms'] for x in selected),child_ms=sum(x['child_ms'] for x in selected),requests=selected))
+pairs=[x for x in q['paired_requests'] if x['original_ticket'] in tickets];assert len(pairs)==126
+old=sum(x['old_parent_ms'] for x in pairs);new=sum(x['new_parent_ms'] for x in pairs)
+calls={}
+for version,d in [(19,Path('docs/validation/2026-10-16/native-response-packet-worker-v1/raw/ptl-native-worker-v19-full/replay')),(23,directory)]:
+ mapping={x['iteration']:x['ticket'] for x in rows(d/'replays.jsonl')};current=None;selected=[]
+ for x in rows(d/'provider-processes/generation-1/worker.stdout.jsonl'):
+  if x.get('kind')=='request_identity':current=x
+  if x.get('passed') and x.get('execution_device')=='NPU' and 'provider_requests' in x and mapping[current['dispatch_ticket']] in tickets:
+   assert current['sequence']==x['sequence'];selected.append(x)
+ assert len(selected)==63
+ calls[str(version)]=sum(x['provider_requests'] for x in selected)
+report=dict(completed=True,passed=True,new_device_execution=False,target_tickets=sorted(tickets),target_pairs=len(pairs),old_target_parent_ms=old,new_target_parent_ms=new,target_parent_reduction_percent=100*(old-new)/old,slower_target_pairs=sum(x['new_parent_ms']>x['old_parent_ms'] for x in pairs),complete_draw_provider_calls=calls,phases=phases,full_replay=q['summary'],source_sha256={str(path):hashlib.sha256(path.read_bytes()).hexdigest() for path in sources},scope='All 63 captured requests admitted to the combined clipping route, compared across 126 whole-request pairs. Calls include vertex/projection and raster work, not just the new kernel. No desktop, GPU relief or Tahoma result.')
+out=Path('results/render-driver/resident-clip-targets-v1');out.mkdir(exist_ok=False)
+(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps({k:v for k,v in report.items() if k not in ('phases','source_sha256','target_tickets')}))

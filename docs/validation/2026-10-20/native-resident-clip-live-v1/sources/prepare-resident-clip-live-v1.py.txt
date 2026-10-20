@@ -1,0 +1,76 @@
+"""Prepare a finite worker23 desktop trial gated on correctness, timing and recovery."""
+from pathlib import Path
+import ast
+import hashlib
+import json
+import re
+
+r=Path(__file__).parent
+changes={
+ 'native-registration-v46':'native-registration-v48',
+ 'native-registered-v46':'native-registered-v48',
+ 'NativeRecovery-v46':'NativeRecovery-v48',
+ 'native_shared_app_v13':'native_shared_app_v15',
+ 'native_desktop_bootstrap_v41':'native_desktop_bootstrap_v43',
+ 'native-desktop-v67':'native-desktop-v69',
+ 'native-desktop-admission-v67':'native-desktop-admission-v69',
+ 'NativeDesktopRecovery-v67':'NativeDesktopRecovery-v69',
+ 'run-native-live-v57':'run-native-live-v59',
+ 'native-live-v57':'native-live-v59','NativeLiveV57':'NativeLiveV59',
+ 'native-topology-primary-v43':'native-topology-primary-v45',
+ 'native-topology-v108':'native-topology-v114','native-topology-v109':'native-topology-v115','native-topology-v110':'native-topology-v116',
+ 'InspectTopology-V108':'InspectTopology-V114','InspectTopology-V109':'InspectTopology-V115','InspectTopology-V110':'InspectTopology-V116',
+ 'observer110':'observer116','dismiss-native-saver-v32':'dismiss-native-saver-v34','dismiss-v32':'dismiss-v34',
+ 'run-ptl-native-live-v21':'run-ptl-native-live-v23','ptl-native-live-v21':'ptl-native-live-v23',
+ 'native-latency-v21-analysis':'native-latency-v23-analysis','native-presentation-v18-analysis':'native-presentation-v20-analysis',
+ 'native-repeated-input-v4-analysis':'native-repeated-input-v6-analysis','ptl-combined-desktop-v9':'ptl-combined-desktop-v11',
+ 'analyze-native-latency-v19.py':'analyze-native-latency-v21.py','analyze-native-presentation-v18.py':'analyze-native-presentation-v20.py',
+ 'ptl-native-worker-v20':'ptl-native-worker-v23','ptl-worker-v20-qualification':'ptl-worker-v23-qualification',
+ '92028cab6f47a1293e39e9e0ebe05bc1d0529e54ea57b4f6a5bf51274ff744e0':'b00ce5d698757721f9fa18947430b328fb3278886d2127cfbd9cfee4620142f4',
+ 'host-tensor':'resident-clip','Host tensors':'Resident clipping','Host tensor':'Resident clip','paired_host_tensor':'paired_resident_clip',
+}
+pattern=re.compile('|'.join(re.escape(x) for x in sorted(changes,key=len,reverse=True)))
+def rename(s):return pattern.sub(lambda m:changes[m[0]],s)
+files=[n for n in json.loads((r/'ptl-combined-live-v9-upload.json').read_text()) if not n.endswith('-source.json')]
+new=json.loads((r/'ptl-native-worker-v23-source.json').read_text())
+old=json.loads((r/'ptl-native-worker-v19-source.json').read_text())
+expected={n:h for n,h in new.items() if old.get(n)!=h}
+assert set(expected)=={'CMakeLists.txt','indexed_pipeline.hpp','ptl_resident_clip.hpp','ptl_resident_clip_triangle_draw.cpp','ptl_resident_clip_triangle_draw.hpp'}
+for name in files:
+ s=rename((r/name).read_text())
+ if name=='qualify-native-registered-v46.py':
+  a=s.index('expected_changes=');b=s.index("assert report['worker_binary_sha256']",a)
+  s=s[:a]+"expected_changes="+repr(expected)+"\nassert candidate['linked_libraries']==qualified['linked_libraries']\nassert set(candidate['source_sha256'])==set(qualified['source_sha256'])|"+repr(set(new)-set(old))+"\nassert {n:h for n,h in candidate['source_sha256'].items() if h!=qualified['source_sha256'].get(n)}==expected_changes\n"+s[b:]
+  needle="env['NR_RENDER_PTL_RECTANGLE_BLOB']=str(rectangle_model)"
+  assert s.count(needle)==1
+  s=s.replace(needle,needle+"\nresident=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm/ptl-six-span-resident-clip-v3/patched.blob'\nassert hashlib.sha256(resident.read_bytes()).hexdigest()=='a5c39dbb825fdd4bd334d8bcbef966e9404132d9b642375665a0892adc48c45c'\nenv['NR_RENDER_PTL_RESIDENT_CLIP_BLOB']=str(resident)")
+ if name=='native_desktop_bootstrap_v41.py':
+  needle='assert 60<=v.monitor_seconds<=2220'
+  assert s.count(needle)==1
+  s=s.replace(needle,"v.ptl_resident_clip_blob=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm/ptl-six-span-resident-clip-v3/patched.blob'\nassert hashlib.sha256(v.ptl_resident_clip_blob.read_bytes()).hexdigest()=='a5c39dbb825fdd4bd334d8bcbef966e9404132d9b642375665a0892adc48c45c'\n"+needle)
+  s=s.replace("env=os.environ.copy();env['NR_RENDER_INTERACTIVE_PIPE']", "env=os.environ.copy();env['NR_RENDER_PTL_RESIDENT_CLIP_BLOB']=str(v.ptl_resident_clip_blob);env['NR_RENDER_INTERACTIVE_PIPE']")
+  s=s.replace('ptl_complex_model_sha256=hashlib.sha256(v.ptl_complex_blob.read_bytes()).hexdigest(),','ptl_resident_clip_model_sha256=hashlib.sha256(v.ptl_resident_clip_blob.read_bytes()).hexdigest(),ptl_complex_model_sha256=hashlib.sha256(v.ptl_complex_blob.read_bytes()).hexdigest(),')
+ if name=='run-native-live-v57.ps1':
+  needle=" $report.active_phase='freshness-validation';Save-Report"
+  assert s.count(needle)==1
+  s=s.replace(needle,r''' $report.ptl_resident_clip_accepted=@($geometryRows|Where-Object {$_.ptl_resident_clip_draw -and $_.accepted}).Count
+ $report.ptl_resident_clip_imports=@($geometryRows|Where-Object ptl_resident_clip_provider_created).Count
+ if($report.ptl_resident_clip_accepted -lt 1 -or $report.ptl_resident_clip_imports -ne 1 -or $bootstrap.ptl_resident_clip_model_sha256 -ne 'a5c39dbb825fdd4bd334d8bcbef966e9404132d9b642375665a0892adc48c45c'){throw 'Resident clipping NPU route not observed'}
+'''+needle)
+ if name=='run-ptl-native-live-v21.ps1':
+  s=s.replace("native-desktop-admission-v61", "native-desktop-admission-v68")
+  s=s.replace("if(!$q.completed -or !$q.passed -or !$q.cleanup_passed", "if($q.ptl_resident_clip_accepted -lt 1 -or $q.ptl_resident_clip_imports -ne 1 -or !$q.completed -or !$q.passed -or !$q.cleanup_passed")
+ if name=='run-ptl-combined-desktop-v9.ps1':
+  s=s.replace('native-registration-v45','native-registration-v47').replace('physical-gpu-desktop-v2','native-desktop-admission-v68')
+  # Use the already exercised bounded process invocation from the timing trial.
+  ref=(r/'run-ptl-combined-desktop-v10.ps1').read_text()
+  a=ref.index('function Controller(');b=ref.index('\nfunction Stop-Preflight',a)
+  low=s.index('function Controller(');high=s.index('\nfunction Stop-Preflight',low)
+  s=s[:low]+ref[a:b]+s[high:]
+ if name.endswith('.py'):ast.parse(s)
+ p=r/rename(name);assert not p.exists(),p;p.write_text(s)
+for oldname in ['native-registration-v46-source.json','native-desktop-v67-source.json']:
+ names=[rename(n) for n in json.loads((r/oldname).read_text())]
+ (r/rename(oldname)).write_text(json.dumps({n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in names},indent=2)+'\n')
+(r/'ptl-combined-live-v11-upload.json').write_text(json.dumps([rename(n) for n in files]+['native-registration-v48-source.json','native-desktop-v69-source.json'],indent=2)+'\n')
+print(json.dumps({'prepared':'resident clip gated desktop','driver_package':19,'worker':23,'hardware_tested':False,'five_percent_gate_preserved':True,'prior_live_route_checks_preserved':True}))
