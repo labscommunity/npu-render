@@ -454,7 +454,7 @@ Get-Content "$out\\report.json"
  $report.frame_batches=$batchRows.Count;$report.frame_batch_commands=($batchRows|Measure-Object -Property commands -Sum).Sum;$report.frame_batch_fallback_commands=($batchRows|Measure-Object -Property fallback -Sum).Sum
  $report.frame_batch_kernel_requests=($batchRows|Measure-Object -Property kernel_requests -Sum).Sum;$report.frame_batch_kernel_ms=($batchRows|Measure-Object -Property kernel_ms -Sum).Sum;$report.frame_batch_host_ms=($batchRows|Measure-Object -Property host_ms -Sum).Sum
  if($report.frame_batches -lt 1){throw 'No frame batch executed on the NPU during the native workload'}
- $umdRows=@(Get-ChildItem "$env:ProgramData\\T8-NpuRender-NativeTraceV1" -Filter 'process-*.jsonl' -File -ErrorAction SilentlyContinue|ForEach-Object {Read-Rows $_.FullName})
+ $umdRows=@(@("$env:ProgramData\\T8-NpuRender-NativeTraceV1","$r\\vm\\native-desktop-admission-v76\\T8-NpuRender-NativeTraceV1")|ForEach-Object {Get-ChildItem $_ -Filter 'process-*.jsonl' -File -ErrorAction SilentlyContinue}|ForEach-Object {Read-Rows $_.FullName})
  $report.umd_batched_draws=@($umdRows|Where-Object {$_.event -in @('draw_recorded','indexed_draw_recorded')}).Count;$report.umd_unbatched_draws=@($umdRows|Where-Object {$_.event -eq 'draw_not_batched'}).Count
  $report.umd_unbatched_reasons=@($umdRows|Where-Object {$_.event -eq 'draw_not_batched'}|Group-Object reason|ForEach-Object {@{reason=$_.Name;count=$_.Count}})
  $report.umd_flushes=@($umdRows|Where-Object {$_.event -eq 'frame_batch_flushed'}).Count
