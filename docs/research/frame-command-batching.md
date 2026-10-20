@@ -1,7 +1,11 @@
 # Frame command batching: implementation contract
 
 Status, 2026-10-20: design derived from the measured desktop bottleneck; not an
-implemented or qualified rendering path.
+implemented or qualified rendering path. An initial provider-independent
+[command ledger](../../native/include/command_batch.hpp) now implements metadata
+admission, ordered version dependencies, immutable command-state capture, bounded
+retention accounting, retirement and atomic completion. It has CPU contract tests;
+it does not retain actual texture storage or submit drawing work.
 
 The current Windows driver completes every draw synchronously. Its `flush` and
 `hazard` callbacks are empty because that synchronous behavior supplies ordering.
@@ -106,3 +110,22 @@ The first implementation should preserve a reversible selection between the
 existing synchronous route and the new route at context creation. Changing that
 selection with outstanding work requires an explicit drain and resource-state
 handoff; an environment variable alone is not the user-facing switch.
+
+## Implemented contract boundary
+
+The ledger permits one outstanding batch in a single owned context. Imported
+resource generations cannot be reused. Each write must extend the current
+destination version; reads may name an older retained version or an earlier
+command's output. Future reads, stale writes, cross-context references, sequence
+replays and byte-budget overflow are rejected before admission. Completion must
+name every ordered output from the current attempt before any committed metadata
+changes. Retry invalidates the old attempt; abandonment preserves checkpoints.
+
+The CPU tests include a 10,000-batch independent version model, partial/stale
+completion, failure/retry, old/new texture reads, state mutation after submission,
+retirement, generation reuse, and budget/overflow rejection. These validate only
+the metadata contract. The renderer must still pin actual resource storage,
+validate graphics state and outputs, restore checkpoints after NPU restart, and
+implement map/write/discard/flush/presentation synchronization. No Windows callback
+uses the ledger yet. Identity tombstones consume its bounded context capacity;
+production resource recycling needs a drained-context handoff.
