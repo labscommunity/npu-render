@@ -94,9 +94,9 @@ void APIENTRY set_viewports(D3D10DDI_HDEVICE h, UINT count, UINT, const D3D10_DD
 void APIENTRY set_topology(D3D10DDI_HDEVICE h, D3D10_DDI_PRIMITIVE_TOPOLOGY value) {
     guard(h, __FUNCTION__, [&] { device(h).topology = value; });
 }
-std::vector<uint8_t> read_pixels(Allocation &source) {
+std::vector<uint8_t> read_pixels(Allocation &source, const D3D10_DDI_BOX *hook_region = nullptr) {
     require(!source.locked && !source.context->poisoned);
-    frame_batches_before_read(source);
+    frame_batches_before_read(source, hook_region);
     const auto &s = source.surface;
     const UINT row_bytes = s.width * texel_bytes(s.format);
     std::vector<uint8_t> result(size_t(row_bytes) * s.height);

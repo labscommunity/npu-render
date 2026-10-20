@@ -127,9 +127,11 @@ struct Shader { UINT kind = 0; std::shared_ptr<const nr::shader::Program> vertex
 Device &device(D3D10DDI_HDEVICE h) { return *static_cast<Device *>(h.pDrvPrivate); }
 // Frame batch hooks (frame_batcher.hpp): pending NPU results are written back
 // before any read of a target and before any CPU write to a referenced resource.
-void flush_frame_batches(Device &d);
+void flush_frame_batches(Device &d, const char *reason);
 void frame_batches_before_write(Allocation &a);
 void frame_batches_before_read(Allocation &a);
+void frame_batches_before_read(Allocation &a, const D3D10_DDI_BOX *box);
+bool frame_batch_writeback_active();
 void frame_batch_clear(Device &d, const std::shared_ptr<Allocation> &target, const nr::raster::Color &color);
 extern std::vector<Device *> frame_devices;
 void reject(D3D10DDI_HDEVICE h, HRESULT status, const char *operation) {
@@ -196,6 +198,7 @@ void upload(Allocation &target, const D3D10_DDI_BOX *box, const void *source, UI
             region.top >= 0 && region.top <= region.bottom && region.bottom <= LONG(s.height) &&
             region.front >= 0 && region.front <= region.back && region.back <= 1);
     if (region.left == region.right || region.top == region.bottom || region.front == region.back) return;
+    if (!frame_batch_writeback_active()) target.mark_dirty(region.left, region.top, region.right, region.bottom);
     const UINT bytes = texel_bytes(s.format);
     const UINT row_bytes = (region.right - region.left) * bytes, rows = region.bottom - region.top;
     const uint64_t source_bytes = uint64_t(rows - 1) * pitch + row_bytes;
@@ -233,7 +236,7 @@ void upload(Allocation &target, const D3D10_DDI_BOX *box, const void *source, UI
         consumed.finish();
     }
     counters.upload_bytes += uint64_t(row_bytes) * rows;
-    target.content_version = next_content_version();
+    if (!frame_batch_writeback_active()) target.content_version = next_content_version();
 }
 SIZE_T APIENTRY resource_size(D3D10DDI_HDEVICE, const D3D10DDIARG_CREATERESOURCE *) { return sizeof(Resource); }
 void APIENTRY create_resource(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATERESOURCE *a,
@@ -412,7 +415,7 @@ void APIENTRY copy_resource(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE dst, D3D10DDI
         for (UINT sub = 0; sub < mip_count(d); ++sub) {
             const auto a = mip_allocation(d, sub), b = mip_allocation(s, sub);
             frame_batches_before_read(*b); frame_batches_before_write(*a);
-            a->content_version = next_content_version();
+            a->content_version = next_content_version(); a->mark_dirty_full();
             if (a->runtime_resource || b->runtime_resource) a->context->copy(b->handle, a->handle);
             else {
                 // Explicit CPU staging, never counted as NPU rendering.
@@ -474,7 +477,7 @@ void APIENTRY unmap(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE r, UINT sub) {
         require(a.locked && a.context == device(h).context); check(a.unlock());
         if (v.mapped_write) counters.upload_bytes += v.buffer_bytes ? v.buffer_bytes :
             uint64_t(a.surface.width)*a.surface.height*texel_bytes(a.surface.format);
-        if (v.mapped_write && !v.buffer_bytes) a.content_version = next_content_version();
+        if (v.mapped_write && !v.buffer_bytes) { a.content_version = next_content_version(); a.mark_dirty_full(); }
         v.mapped_write = false;
     });
 }
@@ -545,7 +548,7 @@ void APIENTRY targets(D3D10DDI_HDEVICE h, const D3D10DDI_HRENDERTARGETVIEW *view
 }
 #include "draw.hpp"
 #include "copy_region.hpp"
-void APIENTRY flush(D3D10DDI_HDEVICE h) { guard(h, __FUNCTION__, [&] { flush_frame_batches(device(h)); }); }
+void APIENTRY flush(D3D10DDI_HDEVICE h) { guard(h, __FUNCTION__, [&] { flush_frame_batches(device(h), "flush_ddi"); }); }
 void APIENTRY hazard(D3D10DDI_HDEVICE, D3D10DDI_HRESOURCE) {} // Blocking locks order our staging copies.
 void APIENTRY format_support(D3D10DDI_HDEVICE, DXGI_FORMAT f, UINT *out) {
     *out = format_ok(f) ? D3D10_DDI_FORMAT_SUPPORT_RENDERTARGET | D3D10_DDI_FORMAT_SUPPORT_SHADER_SAMPLE |
@@ -571,7 +574,7 @@ HRESULT APIENTRY present(DXGI_DDI_ARG_PRESENT *a) {
               a->hDstResource ? "true" : "false", UINT(a->FlipInterval),
               d.context && d.context->poisoned ? "true" : "false");
     try {
-        flush_frame_batches(d);
+        flush_frame_batches(d, "present");
         require((a->Flags.Value == 1 || a->Flags.Value == 2) && !a->SrcSubResourceIndex && !a->DstSubResourceIndex &&
                 d.context && !d.context->poisoned && d.dxgi_callbacks &&
                 d.dxgi_callbacks->pfnPresentCb && a->hSurfaceToPresent);
@@ -635,10 +638,14 @@ HRESULT APIENTRY rotate_resources(DXGI_DDI_ARG_ROTATE_RESOURCE_IDENTITIES *a) {
         // DXGI rotates the runtime's backing association separately: do not
         // rotate runtime_resource, copy pixels, or replace the resource objects.
         for (UINT i = 0; i < a->Resources; ++i) frame_batches_before_read(*allocations[i]);
-        const auto first = allocations[0]->handle;
-        for (UINT i = 1; i < a->Resources; ++i) allocations[i-1]->handle = allocations[i]->handle;
-        allocations[a->Resources-1]->handle = first;
-        for (UINT i = 0; i < a->Resources; ++i) { allocations[i]->content_version = next_content_version(); allocations[i]->worker_version = 0; }
+        // The frame batch identity, versions and dirty state describe the backing
+        // pixels, so they rotate with the handle and the worker's resident copies stay valid.
+        struct Sync { D3DKMT_HANDLE handle; uint64_t id, content_version, worker_version; int32_t dirty[4]; bool dirty_full; std::vector<uint8_t> shadow; };
+        auto take = [](Allocation &x) { return Sync{x.handle, x.id, x.content_version, x.worker_version, {x.dirty_x0, x.dirty_y0, x.dirty_x1, x.dirty_y1}, x.dirty_full, std::move(x.shadow)}; };
+        auto give = [](Allocation &x, Sync &&s) { x.handle = s.handle; x.id = s.id; x.content_version = s.content_version; x.worker_version = s.worker_version; x.dirty_x0 = s.dirty[0]; x.dirty_y0 = s.dirty[1]; x.dirty_x1 = s.dirty[2]; x.dirty_y1 = s.dirty[3]; x.dirty_full = s.dirty_full; x.shadow = std::move(s.shadow); };
+        auto first = take(*allocations[0]);
+        for (UINT i = 1; i < a->Resources; ++i) give(*allocations[i-1], take(*allocations[i]));
+        give(*allocations[a->Resources-1], std::move(first));
         lab_trace("{\"event\":\"resource_identities_rotated\",\"resources\":%u}\n", a->Resources);
         return S_OK;
     } catch (const Error &e) {

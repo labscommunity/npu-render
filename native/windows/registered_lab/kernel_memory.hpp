@@ -9,7 +9,9 @@
 #include <cstdint>
 #include <cstdio>
 #include <atomic>
+#include <algorithm>
 #include <memory>
+#include <vector>
 #include "../kmd/contract.hpp"
 namespace nr::registered_lab {
 struct Error { HRESULT status; };
@@ -115,6 +117,17 @@ struct Allocation {
     uint64_t id = next_allocation_id();                     // stable across handle rotation
     uint64_t content_version = next_content_version();      // bumps on every write to the pixels
     uint64_t worker_version = 0;                            // version the NPU worker holds resident, 0 none
+    // Frame batch synchronization: the region the CPU wrote since the worker last held this
+    // content, and the last snapshot sent of a surface another process may write.
+    int32_t dirty_x0 = 0, dirty_y0 = 0, dirty_x1 = 0, dirty_y1 = 0; bool dirty_full = true;
+    std::vector<uint8_t> shadow;
+    void mark_dirty(int32_t x0, int32_t y0, int32_t x1, int32_t y1) {
+        if (dirty_full || x0 >= x1 || y0 >= y1) return;
+        if (dirty_x0 >= dirty_x1 || dirty_y0 >= dirty_y1) { dirty_x0 = x0; dirty_y0 = y0; dirty_x1 = x1; dirty_y1 = y1; return; }
+        dirty_x0 = (std::min)(dirty_x0, x0); dirty_y0 = (std::min)(dirty_y0, y0); dirty_x1 = (std::max)(dirty_x1, x1); dirty_y1 = (std::max)(dirty_y1, y1);
+    }
+    void mark_dirty_full() { dirty_full = true; }
+    void clear_dirty() { dirty_full = false; dirty_x0 = dirty_y0 = dirty_x1 = dirty_y1 = 0; }
     explicit Allocation(std::shared_ptr<Context> c) : context(std::move(c)) {}
     Allocation(const Allocation &) = delete;
     Allocation &operator=(const Allocation &) = delete;

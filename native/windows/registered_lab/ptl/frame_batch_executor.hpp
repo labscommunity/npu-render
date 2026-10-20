@@ -107,7 +107,7 @@ class FrameBatchExecutor {
     }
     // Texels for a window of a possibly volatile resource; returns false when the uploaded windows do not cover it.
     static bool fetch_window(const ResourceRef &ref, frame::Rect r, std::vector<uint32_t> &out) {
-        if (ref.resident && (!(ref.record.flags & volatile_resource) || ref.uploaded_full)) { copy_rect(ref.resident->pixels.data(), ref.resident->width, r, out); return true; }
+        if (ref.resident && !ref.resident->pixels.empty() && (!(ref.record.flags & volatile_resource) || ref.uploaded_full || ref.resident->version == ref.record.version)) { copy_rect(ref.resident->pixels.data(), ref.resident->width, r, out); return true; }
         for (const auto &w : ref.windows) {
             if (r.x0 >= int32_t(w.x) && r.y0 >= int32_t(w.y) && r.x1 <= int32_t(w.x + w.width) && r.y1 <= int32_t(w.y + w.height)) {
                 copy_rect(w.pixels.data(), w.width, {r.x0 - int32_t(w.x), r.y0 - int32_t(w.y), r.x1 - int32_t(w.x), r.y1 - int32_t(w.y)}, out); return true;
@@ -168,7 +168,8 @@ public:
             }
             entry.flags = ref.record.flags; ref.resident = &entry;
         }
-        // Uploads: full images replace the resident version; windows feed volatile sampling in this batch only.
+        // Uploads: full images replace the resident version; partial images update a resident
+        // copy the driver knows the worker holds; windows feed volatile sampling in this batch only.
         for (uint32_t n = 0; n < batch.upload_count; ++n) {
             const auto up = reader.value<UploadRecord>(); require(up.resource < refs.size() && !up.reserved);
             auto &ref = refs[up.resource];
@@ -176,10 +177,12 @@ public:
             auto pixels = reader.vector<uint32_t>(size_t(up.width) * up.height);
             if (!up.x && !up.y && up.width == ref.record.width && up.height == ref.record.height) {
                 ref.resident->pixels = std::move(pixels); ref.resident->version = ref.record.version; ref.uploaded_full = true;
-            } else {
-                require(ref.record.flags & volatile_resource);
+            } else if (ref.resident->pixels.size() == size_t(ref.record.width) * ref.record.height) {
+                for (uint32_t y = 0; y < up.height; ++y) std::memcpy(ref.resident->pixels.data() + size_t(up.y + y) * ref.record.width + up.x, pixels.data() + size_t(y) * up.width, size_t(up.width) * 4);
+                ref.resident->version = ref.record.version; ref.uploaded_full = true;
+            } else if (ref.record.flags & volatile_resource) {
                 ref.windows.push_back({up.x, up.y, up.width, up.height, std::move(pixels)});
-            }
+            }   // otherwise the worker lost the base image: the version mismatch reports it missing
         }
         // Commands.
         std::vector<Draw> draws(batch.command_count);
@@ -196,10 +199,10 @@ public:
             } else require(!d.record.vertex_count && !d.record.vertex_words && !d.record.vertex_constant_words && !d.record.pixel_constant_words);
         }
         require(reader.done());
-        // Missing versions: a private resource the batch references without the right content.
+        // Missing versions: a resource the batch references without the right content.
         std::vector<MissingRecord> missing;
         for (const auto &d : draws) {
-            auto check = [&](uint32_t index) { const auto &ref = refs[index]; if (!(ref.record.flags & volatile_resource) && ref.resident->version != ref.record.version) missing.push_back({ref.record.key, ref.record.version}); };
+            auto check = [&](uint32_t index) { const auto &ref = refs[index]; if (ref.resident->version != ref.record.version && !ref.uploaded_full && ref.windows.empty()) missing.push_back({ref.record.key, ref.record.version}); };
             check(d.record.target);
             for (uint32_t t = 0; t < d.record.texture_count; ++t) check(d.textures[t].resource);
         }
@@ -327,7 +330,7 @@ private:
         std::vector<uint32_t> slots; for (unsigned slot = 0; slot < 16; ++slot) if (request.pixel.textures[slot]) slots.push_back(slot);
         require(slots.size() == d.record.texture_count);
         for (uint32_t t = 0; t < d.record.texture_count; ++t) {
-            const auto &tref = refs[d.textures[t].resource]; require(tref.resident && (tref.uploaded_full || !(tref.record.flags & volatile_resource)) && tref.resident->pixels.size() == size_t(tref.resident->width) * tref.resident->height);
+            const auto &tref = refs[d.textures[t].resource]; require(tref.resident && (tref.uploaded_full || !(tref.record.flags & volatile_resource) || tref.resident->version == tref.record.version) && tref.resident->pixels.size() == size_t(tref.resident->width) * tref.resident->height);
             raster::PackedTexture texture{tref.resident->width, tref.resident->height, tref.resident->format, {}};
             texture.pixels.resize(tref.resident->pixels.size()); std::memcpy(texture.pixels.data(), tref.resident->pixels.data(), tref.resident->pixels.size() * 4);
             if (h.flags & 0x2000) { request.resources[slots[t]] = std::move(texture); auto &s = request.samplers[slots[t]]; s.filter = d.textures[t].filter ? shader::TextureFilter::point : shader::TextureFilter::linear; s.u = shader::TextureAddress(d.textures[t].address_u); s.v = shader::TextureAddress(d.textures[t].address_v); for (unsigned c = 0; c < 4; ++c) s.border[c] = d.textures[t].border[c]; }

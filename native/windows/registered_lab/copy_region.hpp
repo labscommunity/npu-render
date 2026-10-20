@@ -29,7 +29,7 @@ void APIENTRY copy_region(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE destination, UI
             {Mapping write(*da,false);std::memcpy(static_cast<uint8_t *>(write.data)+x,snapshot.data(),bytes);write.finish();}
             moved=bytes;counters.upload_bytes+=bytes;
         }else{
-            const auto pixels=read_pixels(*sa);
+            const auto pixels=read_pixels(*sa,&region);
             const UINT width=UINT(region.right-region.left),height=UINT(region.bottom-region.top);
             const UINT bytes=texel_bytes(sa->surface.format);
             const D3D10_DDI_BOX target{LONG(x),LONG(y),0,LONG(x+width),LONG(y+height),1};

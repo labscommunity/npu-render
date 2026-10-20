@@ -143,7 +143,7 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
             return;
         }
         lab_trace("{\"event\":\"draw_not_batched\",\"reason\":\"%s\",\"vertices\":%u}\n", reason.c_str(), count);
-        flush_frame_batches(d);
+        flush_frame_batches(d, "legacy_draw");
     }
     nr::raster::PackedTexture texture; bool linear=false, modulated=false, general_texture=false;
     bool general_resources=nr::shader::quad_derivatives(*d.pixel_program);
