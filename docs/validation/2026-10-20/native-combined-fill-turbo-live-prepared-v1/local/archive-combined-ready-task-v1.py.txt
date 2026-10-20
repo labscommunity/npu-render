@@ -1,0 +1,25 @@
+"""Preserve an explicitly sampled active readiness task, not a completed trial."""
+from pathlib import Path
+import base64,hashlib,json,subprocess,tempfile
+r=Path(__file__).parent;d=Path('docs/validation/2026-10-20/native-combined-fill-turbo-live-prepared-v1')
+names=['run-combined-desktop-ready-v1.ps1','start-combined-desktop-ready-v1.ps1','combined-desktop-ready-v1-task.xml','combined-desktop-ready-v1-task-start.json','combined-desktop-ready-v1-snapshot.json']
+ps=r'''$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$vm="$env:LOCALAPPDATA/npu-render/vm"
+$q=Get-Content "$vm/combined-desktop-ready-v1/report.json" -Raw|ConvertFrom-Json
+[ordered]@{sampled_utc=[DateTime]::UtcNow.ToString('o');task_state=[string](Get-ScheduledTask -TaskName NpuRender-CombinedDesktopReady-v1).State;active_report_snapshot=$q}|ConvertTo-Json -Depth 6|Set-Content "$vm/combined-desktop-ready-v1-snapshot.json"
+$items=@(foreach($name in @('''+','.join("'"+n+"'" for n in names)+r''')){$p="$vm/$name";[ordered]@{name=$name;bytes=(Get-Item $p).Length;sha256=(Get-FileHash $p).Hash.ToLower()}});$items|ConvertTo-Json
+'''
+cmd='powershell.exe -NoProfile -NonInteractive -EncodedCommand '+base64.b64encode(ps.encode('utf-16-le')).decode()
+remote=subprocess.run(['ssh','-o','BatchMode=yes','-o','ConnectTimeout=8','delta',cmd],capture_output=True,check=True,timeout=25)
+items=json.loads(remote.stdout.decode('utf-8-sig'));manifest=json.loads((d/'artifact-sha256.json').read_text())
+for item in items:
+ name=item['name'];dest=d/'raw'/name;assert not dest.exists()
+ with tempfile.TemporaryDirectory(dir=r) as tmp:
+  p=Path(tmp)/'source';subprocess.run(['scp','-q','delta:AppData/Local/npu-render/vm/'+name,str(p)],check=True,timeout=30);data=p.read_bytes()
+ assert len(data)==item['bytes'] and hashlib.sha256(data).hexdigest()==item['sha256']
+ if (r/name).exists():assert (r/name).read_bytes()==data
+ dest.write_bytes(data)
+ manifest.append(dict(path=str(dest.relative_to(d)),bytes=len(data),sha256=item['sha256'],remote_source='vm/'+name,source_bytes=len(data),source_sha256=item['sha256'],compression=None))
+source=Path(__file__);data=source.read_bytes();target=d/'local'/(source.name+'.txt');target.write_bytes(data)
+manifest.append(dict(path=str(target.relative_to(d)),bytes=len(data),sha256=hashlib.sha256(data).hexdigest(),local_source=str(source)))
+(d/'artifact-sha256.json').write_text(json.dumps(manifest,indent=2)+'\n')
+print(json.dumps(dict(artifacts=len(manifest),snapshot=obj if False else json.loads((d/'raw/combined-desktop-ready-v1-snapshot.json').read_text(encoding='utf-8-sig')))))

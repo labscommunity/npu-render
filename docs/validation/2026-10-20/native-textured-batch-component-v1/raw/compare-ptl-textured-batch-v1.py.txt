@@ -1,0 +1,125 @@
+"""Exact synthetic texture-window batching, separate from Windows rendering."""
+from pathlib import Path
+from datetime import UTC,datetime
+import argparse,hashlib,json,os,subprocess,sys,time,traceback
+
+r=Path(os.environ['LOCALAPPDATA'])/'npu-render'
+vm=r/'vm'
+def obj(p):return json.loads(p.read_text(encoding='utf-8-sig'))
+def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+def save(p,x):p.write_text(json.dumps(x,indent=2)+'\n')
+
+def child(out):
+ import struct
+ import numpy as np
+ import openvino as ov
+ from ptl_textured_batch_fixtures_v1 import SPAN,BACKGROUND,ATLAS,reference
+ report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,cases=[])
+ try:
+  assert ov.get_version()=='2026.4.1-22982-e213a147257-releases/2026/4'
+  q=obj(vm/'ptl-six-span-textured-batch-v1/report.json')
+  assert q['passed'] and q['child_result']['unique_component_fixtures']==144
+  blob=vm/'ptl-six-span-textured-batch-v1/patched.blob'
+  assert sha(blob)==q['patched_sha256']
+  core=ov.Core()
+  model=core.import_model(blob.read_bytes(),'NPU',{'NPU_TURBO':True})
+  assert model.get_property('NPU_TURBO') is True
+  devices=model.get_property('EXECUTION_DEVICES')
+  if isinstance(devices,str):devices=[devices]
+  assert list(devices) in (['NPU'],['NPU.0'])
+  request=model.create_infer_request()
+  inputs=request.get_input_tensor().data.view(np.uint8).reshape(12,SPAN)
+
+  def render(initial,w,h,tiles,batched):
+   frame=initial.copy();started=time.perf_counter_ns();calls=0;wait_ms=0
+   groups=[list(range(4))] if batched else [[i] for i in range(4)]
+   for group in groups:
+    previous=frame;frame=np.empty_like(previous)
+    for start in range(0,len(tiles),12):
+     selected=tiles[start:start+12];inputs.fill(0)
+     # Unused planes are valid empty packets with no texture references.
+     for plane in range(12):
+      struct.pack_into('<10I',inputs[plane],0,0x4e525451,1,0,0,1,1,1,28,SPAN,0)
+      struct.pack_into('<16I',inputs[plane],64,0,0,0,0,0,0,15,0,0,0,0,0,0,0,0,0)
+     for plane,t in enumerate(selected):
+      x,y,tw,th=t['rect'];packet=inputs[plane];count=tw*th
+      struct.pack_into('<10I',packet,0,0x4e525451,1,count,0,tw,th,len(group),t['format'],SPAN,len(t['textures']))
+      for slot,c in enumerate(group):struct.pack_into('<16I',packet,64+slot*64,*t['commands'][c])
+      packet[BACKGROUND:BACKGROUND+count*4]=previous[y:y+th,x:x+tw].copy().reshape(-1).view(np.uint8)
+      packet[ATLAS:ATLAS+len(t['textures'])]=np.frombuffer(t['textures'],np.uint8)
+     began=time.perf_counter_ns();request.start_async();assert request.wait_for(15000)
+     wait_ms+=(time.perf_counter_ns()-began)/1e6;calls+=1
+     outputs=request.get_output_tensor().data.view(np.uint8).reshape(12,SPAN)
+     for plane,t in enumerate(selected):
+      x,y,tw,th=t['rect'];count=tw*th
+      magic,actual,commands,hits=struct.unpack_from('<4I',outputs[plane])
+      assert (magic,actual,commands)==(0x4e52544f,count,len(group)) and hits<=count*len(group)
+      frame[y:y+th,x:x+tw]=outputs[plane,16:16+count*4].view('<u4').reshape(th,tw)
+   return frame,dict(elapsed_ms=(time.perf_counter_ns()-started)/1e6,request_wait_ms=wait_ms,
+                     provider_requests=calls,input_bytes=calls*12*SPAN,output_bytes=calls*12*SPAN)
+
+  for case,(w,h) in enumerate([(128,128),(1024,768),(1920,1080)]):
+   rng=np.random.default_rng(9100000+case)
+   initial=rng.integers(0,2**32,(h,w),dtype=np.uint32)
+   oracle=np.empty_like(initial);tiles=[]
+   for y in range(0,h,128):
+    for x in range(0,w,128):
+     tw=min(128,w-x);th=min(128,h-y);fmt=28 if case%2==0 else 87
+     textures=rng.integers(0,2**32,(2,128,128),dtype=np.uint32).astype('<u4').tobytes()
+     commands=[
+      (0,0,tw,th,0,0,15,1,128,128,0,0,28,0,0,0),
+      (0,0,tw,th,65536,1,15,1,128,128,0,0,87,0,0,0),
+      (tw//4,th//4,tw*3//4,th*3//4,0x7f291773,0,7,0,0,0,0,0,0,0,0,0),
+      (tw//2,th//2,tw,th,0,1,11,1,128,128,1,1,28,0,0,0)]
+     packet=bytearray(SPAN)
+     struct.pack_into('<10I',packet,0,0x4e525451,1,tw*th,0,tw,th,4,fmt,SPAN,len(textures))
+     for n,c in enumerate(commands):struct.pack_into('<16I',packet,64+n*64,*c)
+     packet[BACKGROUND:BACKGROUND+tw*th*4]=initial[y:y+th,x:x+tw].astype('<u4').tobytes()
+     packet[ATLAS:ATLAS+len(textures)]=textures
+     expected=reference(packet)
+     oracle[y:y+th,x:x+tw]=np.frombuffer(expected,'<u4',count=tw*th,offset=16).reshape(th,tw)
+     tiles.append(dict(rect=(x,y,tw,th),format=fmt,textures=textures,commands=commands))
+   record=dict(width=w,height=h,texture_windows=len(tiles)*2,commands_per_tile=4,
+               oracle_sha256=hashlib.sha256(oracle.tobytes()).hexdigest(),warmups=[],rounds=[])
+   for batched in (False,True):
+    actual,timing=render(initial,w,h,tiles,batched)
+    assert np.array_equal(actual,oracle)
+    record['warmups'].append(dict(batched=batched,exact=True,**timing))
+   for round_index in range(3):
+    phases=[]
+    for label,batched in [('A1',False),('B1',True),('B2',True),('A2',False)]:
+     actual,timing=render(initial,w,h,tiles,batched)
+     assert np.array_equal(actual,oracle)
+     phases.append(dict(phase=label,batched=batched,exact=True,**timing))
+    old=sum(p['elapsed_ms'] for p in phases if not p['batched'])
+    new=sum(p['elapsed_ms'] for p in phases if p['batched'])
+    record['rounds'].append(dict(index=round_index,phases=phases,elapsed_reduction_percent=100*(1-new/old)))
+   report['cases'].append(record);save(out/'child-report.json',report)
+  report.update(passed=True,model_sha256=sha(blob),execution_devices=list(devices),turbo_requested=True,turbo_readback=True,
+                scope='Synthetic independent spatial texture windows, same model and ordered arithmetic in both paths. Host performs transport and assembly only. Loop time includes packing, NPU waits and output copying; excludes initial oracle and texture preparation. Not general Windows batching, resource persistence, physical display, GPU relief or Tahoma.')
+ except Exception as e:report.update(error=repr(e),traceback=traceback.format_exc())
+ finally:report.update(completed=True,finished=datetime.now(UTC).isoformat());save(out/'child-report.json',report)
+ return 0 if report['passed'] else 1
+
+def main():
+ p=argparse.ArgumentParser();p.add_argument('--child',type=Path);a=p.parse_args()
+ if a.child:return child(a.child)
+ out=vm/'ptl-textured-batch-comparison-v1';out.mkdir(exist_ok=False)
+ report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,desktop_changed=False,tahoma_tested=False)
+ process=None
+ try:
+  assert obj(vm/'ptl-textured-batch-v1-qualification/report.json')['passed']
+  with (out/'stdout.log').open('xb') as stdout,(out/'stderr.log').open('xb') as stderr:
+   process=subprocess.Popen([sys.executable,__file__,'--child',str(out)],stdout=stdout,stderr=stderr,creationflags=subprocess.CREATE_NO_WINDOW)
+   try:process.wait(timeout=300)
+   except subprocess.TimeoutExpired:process.kill();process.wait(timeout=5);raise
+  result=obj(out/'child-report.json')
+  report.update(passed=process.returncode==0 and result['passed'],exit_code=process.returncode,child_result=result)
+ except Exception as e:report.update(error=repr(e),traceback=traceback.format_exc())
+ finally:
+  if process is not None and process.poll() is None:process.kill();process.wait(timeout=5)
+  report.update(completed=True,finished=datetime.now(UTC).isoformat());save(out/'report.json',report)
+ print(json.dumps({k:v for k,v in report.items() if k!='child_result'}))
+ return 0 if report['passed'] else 1
+
+if __name__=='__main__':raise SystemExit(main())

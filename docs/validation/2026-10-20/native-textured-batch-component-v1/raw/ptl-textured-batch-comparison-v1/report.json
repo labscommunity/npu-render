@@ -1,0 +1,525 @@
+{
+  "started": "2026-10-20T12:20:34.003686+00:00",
+  "completed": true,
+  "passed": true,
+  "desktop_changed": false,
+  "tahoma_tested": false,
+  "exit_code": 0,
+  "child_result": {
+    "started": "2026-10-20T12:20:34.196520+00:00",
+    "completed": true,
+    "passed": true,
+    "cases": [
+      {
+        "width": 128,
+        "height": 128,
+        "texture_windows": 2,
+        "commands_per_tile": 4,
+        "oracle_sha256": "c4a8b8c28b970febc37d9051882b7c3a5006d5c2e8aa7973414e50fb6c4279ca",
+        "warmups": [
+          {
+            "batched": false,
+            "exact": true,
+            "elapsed_ms": 9.0931,
+            "request_wait_ms": 8.8003,
+            "provider_requests": 4,
+            "input_bytes": 12681216,
+            "output_bytes": 12681216
+          },
+          {
+            "batched": true,
+            "exact": true,
+            "elapsed_ms": 3.9976,
+            "request_wait_ms": 3.9264,
+            "provider_requests": 1,
+            "input_bytes": 3170304,
+            "output_bytes": 3170304
+          }
+        ],
+        "rounds": [
+          {
+            "index": 0,
+            "phases": [
+              {
+                "phase": "A1",
+                "batched": false,
+                "exact": true,
+                "elapsed_ms": 6.8257,
+                "request_wait_ms": 6.4201,
+                "provider_requests": 4,
+                "input_bytes": 12681216,
+                "output_bytes": 12681216
+              },
+              {
+                "phase": "B1",
+                "batched": true,
+                "exact": true,
+                "elapsed_ms": 3.979,
+                "request_wait_ms": 3.9332,
+                "provider_requests": 1,
+                "input_bytes": 3170304,
+                "output_bytes": 3170304
+              },
+              {
+                "phase": "B2",
+                "batched": true,
+                "exact": true,
+                "elapsed_ms": 3.9737,
+                "request_wait_ms": 3.9227,
+                "provider_requests": 1,
+                "input_bytes": 3170304,
+                "output_bytes": 3170304
+              },
+              {
+                "phase": "A2",
+                "batched": false,
+                "exact": true,
+                "elapsed_ms": 7.3154,
+                "request_wait_ms": 6.8855,
+                "provider_requests": 4,
+                "input_bytes": 12681216,
+                "output_bytes": 12681216
+              }
+            ],
+            "elapsed_reduction_percent": 43.761800708572885
+          },
+          {
+            "index": 1,
+            "phases": [
+              {
+                "phase": "A1",
+                "batched": false,
+                "exact": true,
+                "elapsed_ms": 7.0461,
+                "request_wait_ms": 6.6,
+                "provider_requests": 4,
+                "input_bytes": 12681216,
+                "output_bytes": 12681216
+              },
+              {
+                "phase": "B1",
+                "batched": true,
+                "exact": true,
+                "elapsed_ms": 3.9966,
+                "request_wait_ms": 3.9481,
+                "provider_requests": 1,
+                "input_bytes": 3170304,
+                "output_bytes": 3170304
+              },
+              {
+                "phase": "B2",
+                "batched": true,
+                "exact": true,
+                "elapsed_ms": 4.0665,
+                "request_wait_ms": 4.0163,
+                "provider_requests": 1,
+                "input_bytes": 3170304,
+                "output_bytes": 3170304
+              },
+              {
+                "phase": "A2",
+                "batched": false,
+                "exact": true,
+                "elapsed_ms": 7.1361,
+                "request_wait_ms": 6.6811,
+                "provider_requests": 4,
+                "input_bytes": 12681216,
+                "output_bytes": 12681216
+              }
+            ],
+            "elapsed_reduction_percent": 43.146338367813186
+          },
+          {
+            "index": 2,
+            "phases": [
+              {
+                "phase": "A1",
+                "batched": false,
+                "exact": true,
+                "elapsed_ms": 6.8667,
+                "request_wait_ms": 6.565300000000001,
+                "provider_requests": 4,
+                "input_bytes": 12681216,
+                "output_bytes": 12681216
+              },
+              {
+                "phase": "B1",
+                "batched": true,
+                "exact": true,
+                "elapsed_ms": 3.9756,
+                "request_wait_ms": 3.8767,
+                "provider_requests": 1,
+                "input_bytes": 3170304,
+                "output_bytes": 3170304
+              },
+              {
+                "phase": "B2",
+                "batched": true,
+                "exact": true,
+                "elapsed_ms": 4.1196,
+                "request_wait_ms": 4.0093,
+                "provider_requests": 1,
+                "input_bytes": 3170304,
+                "output_bytes": 3170304
+              },
+              {
+                "phase": "A2",
+                "batched": false,
+                "exact": true,
+                "elapsed_ms": 7.2771,
+                "request_wait_ms": 6.8095,
+                "provider_requests": 4,
+                "input_bytes": 12681216,
+                "output_bytes": 12681216
+              }
+            ],
+            "elapsed_reduction_percent": 42.76502778602638
+          }
+        ]
+      },
+      {
+        "width": 1024,
+        "height": 768,
+        "texture_windows": 96,
+        "commands_per_tile": 4,
+        "oracle_sha256": "ee51ae008a91d72fb939c559edfa41d4bf9d02833926a8dc8672a112318b063f",
+        "warmups": [
+          {
+            "batched": false,
+            "exact": true,
+            "elapsed_ms": 50.3937,
+            "request_wait_ms": 44.526500000000006,
+            "provider_requests": 16,
+            "input_bytes": 50724864,
+            "output_bytes": 50724864
+          },
+          {
+            "batched": true,
+            "exact": true,
+            "elapsed_ms": 31.1451,
+            "request_wait_ms": 29.9497,
+            "provider_requests": 4,
+            "input_bytes": 12681216,
+            "output_bytes": 12681216
+          }
+        ],
+        "rounds": [
+          {
+            "index": 0,
+            "phases": [
+              {
+                "phase": "A1",
+                "batched": false,
+                "exact": true,
+                "elapsed_ms": 47.334,
+                "request_wait_ms": 42.49119999999999,
+                "provider_requests": 16,
+                "input_bytes": 50724864,
+                "output_bytes": 50724864
+              },
+              {
+                "phase": "B1",
+                "batched": true,
+                "exact": true,
+                "elapsed_ms": 31.7943,
+                "request_wait_ms": 30.2271,
+                "provider_requests": 4,
+                "input_bytes": 12681216,
+                "output_bytes": 12681216
+              },
+              {
+                "phase": "B2",
+                "batched": true,
+                "exact": true,
+                "elapsed_ms": 31.1178,
+                "request_wait_ms": 29.690400000000004,
+                "provider_requests": 4,
+                "input_bytes": 12681216,
+                "output_bytes": 12681216
+              },
+              {
+                "phase": "A2",
+                "batched": false,
+                "exact": true,
+                "elapsed_ms": 48.2504,
+                "request_wait_ms": 42.9523,
+                "provider_requests": 16,
+                "input_bytes": 50724864,
+                "output_bytes": 50724864
+              }
+            ],
+            "elapsed_reduction_percent": 34.18162377961258
+          },
+          {
+            "index": 1,
+            "phases": [
+              {
+                "phase": "A1",
+                "batched": false,
+                "exact": true,
+                "elapsed_ms": 47.5125,
+                "request_wait_ms": 42.46479999999999,
+                "provider_requests": 16,
+                "input_bytes": 50724864,
+                "output_bytes": 50724864
+              },
+              {
+                "phase": "B1",
+                "batched": true,
+                "exact": true,
+                "elapsed_ms": 31.3272,
+                "request_wait_ms": 29.870199999999997,
+                "provider_requests": 4,
+                "input_bytes": 12681216,
+                "output_bytes": 12681216
+              },
+              {
+                "phase": "B2",
+                "batched": true,
+                "exact": true,
+                "elapsed_ms": 31.358,
+                "request_wait_ms": 29.902,
+                "provider_requests": 4,
+                "input_bytes": 12681216,
+                "output_bytes": 12681216
+              },
+              {
+                "phase": "A2",
+                "batched": false,
+                "exact": true,
+                "elapsed_ms": 47.4757,
+                "request_wait_ms": 42.604400000000005,
+                "provider_requests": 16,
+                "input_bytes": 50724864,
+                "output_bytes": 50724864
+              }
+            ],
+            "elapsed_reduction_percent": 34.0073819695499
+          },
+          {
+            "index": 2,
+            "phases": [
+              {
+                "phase": "A1",
+                "batched": false,
+                "exact": true,
+                "elapsed_ms": 47.4532,
+                "request_wait_ms": 42.3427,
+                "provider_requests": 16,
+                "input_bytes": 50724864,
+                "output_bytes": 50724864
+              },
+              {
+                "phase": "B1",
+                "batched": true,
+                "exact": true,
+                "elapsed_ms": 31.3454,
+                "request_wait_ms": 29.892400000000002,
+                "provider_requests": 4,
+                "input_bytes": 12681216,
+                "output_bytes": 12681216
+              },
+              {
+                "phase": "B2",
+                "batched": true,
+                "exact": true,
+                "elapsed_ms": 31.5748,
+                "request_wait_ms": 30.1687,
+                "provider_requests": 4,
+                "input_bytes": 12681216,
+                "output_bytes": 12681216
+              },
+              {
+                "phase": "A2",
+                "batched": false,
+                "exact": true,
+                "elapsed_ms": 47.9484,
+                "request_wait_ms": 42.748900000000006,
+                "provider_requests": 16,
+                "input_bytes": 50724864,
+                "output_bytes": 50724864
+              }
+            ],
+            "elapsed_reduction_percent": 34.04701807936136
+          }
+        ]
+      },
+      {
+        "width": 1920,
+        "height": 1080,
+        "texture_windows": 270,
+        "commands_per_tile": 4,
+        "oracle_sha256": "ea4d7dde91e24c13f8ddbf43daff76dbffad7e797226af7ea8c75af914e3c9cb",
+        "warmups": [
+          {
+            "batched": false,
+            "exact": true,
+            "elapsed_ms": 135.2381,
+            "request_wait_ms": 117.03729999999997,
+            "provider_requests": 48,
+            "input_bytes": 152174592,
+            "output_bytes": 152174592
+          },
+          {
+            "batched": true,
+            "exact": true,
+            "elapsed_ms": 84.3213,
+            "request_wait_ms": 79.60739999999998,
+            "provider_requests": 12,
+            "input_bytes": 38043648,
+            "output_bytes": 38043648
+          }
+        ],
+        "rounds": [
+          {
+            "index": 0,
+            "phases": [
+              {
+                "phase": "A1",
+                "batched": false,
+                "exact": true,
+                "elapsed_ms": 131.8324,
+                "request_wait_ms": 113.7738,
+                "provider_requests": 48,
+                "input_bytes": 152174592,
+                "output_bytes": 152174592
+              },
+              {
+                "phase": "B1",
+                "batched": true,
+                "exact": true,
+                "elapsed_ms": 84.4713,
+                "request_wait_ms": 79.55899999999998,
+                "provider_requests": 12,
+                "input_bytes": 38043648,
+                "output_bytes": 38043648
+              },
+              {
+                "phase": "B2",
+                "batched": true,
+                "exact": true,
+                "elapsed_ms": 84.56,
+                "request_wait_ms": 79.1885,
+                "provider_requests": 12,
+                "input_bytes": 38043648,
+                "output_bytes": 38043648
+              },
+              {
+                "phase": "A2",
+                "batched": false,
+                "exact": true,
+                "elapsed_ms": 132.4179,
+                "request_wait_ms": 114.71760000000003,
+                "provider_requests": 48,
+                "input_bytes": 152174592,
+                "output_bytes": 152174592
+              }
+            ],
+            "elapsed_reduction_percent": 36.0336393184795
+          },
+          {
+            "index": 1,
+            "phases": [
+              {
+                "phase": "A1",
+                "batched": false,
+                "exact": true,
+                "elapsed_ms": 131.887,
+                "request_wait_ms": 114.83600000000001,
+                "provider_requests": 48,
+                "input_bytes": 152174592,
+                "output_bytes": 152174592
+              },
+              {
+                "phase": "B1",
+                "batched": true,
+                "exact": true,
+                "elapsed_ms": 84.2074,
+                "request_wait_ms": 79.32000000000001,
+                "provider_requests": 12,
+                "input_bytes": 38043648,
+                "output_bytes": 38043648
+              },
+              {
+                "phase": "B2",
+                "batched": true,
+                "exact": true,
+                "elapsed_ms": 85.095,
+                "request_wait_ms": 80.05319999999999,
+                "provider_requests": 12,
+                "input_bytes": 38043648,
+                "output_bytes": 38043648
+              },
+              {
+                "phase": "A2",
+                "batched": false,
+                "exact": true,
+                "elapsed_ms": 132.4346,
+                "request_wait_ms": 115.10860000000001,
+                "provider_requests": 48,
+                "input_bytes": 152174592,
+                "output_bytes": 152174592
+              }
+            ],
+            "elapsed_reduction_percent": 35.94832961059558
+          },
+          {
+            "index": 2,
+            "phases": [
+              {
+                "phase": "A1",
+                "batched": false,
+                "exact": true,
+                "elapsed_ms": 131.821,
+                "request_wait_ms": 114.7046,
+                "provider_requests": 48,
+                "input_bytes": 152174592,
+                "output_bytes": 152174592
+              },
+              {
+                "phase": "B1",
+                "batched": true,
+                "exact": true,
+                "elapsed_ms": 83.7845,
+                "request_wait_ms": 79.4772,
+                "provider_requests": 12,
+                "input_bytes": 38043648,
+                "output_bytes": 38043648
+              },
+              {
+                "phase": "B2",
+                "batched": true,
+                "exact": true,
+                "elapsed_ms": 84.5898,
+                "request_wait_ms": 79.60919999999999,
+                "provider_requests": 12,
+                "input_bytes": 38043648,
+                "output_bytes": 38043648
+              },
+              {
+                "phase": "A2",
+                "batched": false,
+                "exact": true,
+                "elapsed_ms": 132.2909,
+                "request_wait_ms": 114.87859999999999,
+                "provider_requests": 48,
+                "input_bytes": 152174592,
+                "output_bytes": 152174592
+              }
+            ],
+            "elapsed_reduction_percent": 36.24887784306575
+          }
+        ]
+      }
+    ],
+    "model_sha256": "a0ef05ffe0336c6c6bbf299a9c91a101e48253f36f2bb92f43d384d15fe60af6",
+    "execution_devices": [
+      "NPU"
+    ],
+    "turbo_requested": true,
+    "turbo_readback": true,
+    "scope": "Synthetic independent spatial texture windows, same model and ordered arithmetic in both paths. Host performs transport and assembly only. Loop time includes packing, NPU waits and output copying; excludes initial oracle and texture preparation. Not general Windows batching, resource persistence, physical display, GPU relief or Tahoma.",
+    "finished": "2026-10-20T12:20:36.973560+00:00"
+  },
+  "finished": "2026-10-20T12:20:37.005566+00:00"
+}

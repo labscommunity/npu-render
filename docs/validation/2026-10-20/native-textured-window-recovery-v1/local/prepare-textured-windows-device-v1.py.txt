@@ -1,0 +1,18 @@
+"""Bind the CPU-checked immutable-window transport to the qualified NPU kernel."""
+from pathlib import Path
+import ast,hashlib,json,subprocess
+r=Path(__file__).parent
+for n in ['ptl_textured_windows_v1.py','qualify-ptl-textured-windows-v1.py']:ast.parse((r/n).read_text())
+s=(r/'run-ptl-textured-batch-comparison-v1.ps1').read_text()
+s=s.replace('ptl-textured-batch-comparison-v1-qualification','ptl-textured-windows-v1-qualification')
+s=s.replace("@('ptl-textured-batch-v1-qualification')","@('ptl-textured-batch-comparison-v1-qualification')")
+s=s.replace('ptl-textured-batch-comparison-v1-source.json','ptl-textured-windows-v1-source.json')
+s=s.replace('compare-ptl-textured-batch-v1.py','qualify-ptl-textured-windows-v1.py').replace('ptl-textured-batch-comparison-v1/report.json','ptl-textured-windows-v1/report.json')
+s=s.replace('@($q.child_result.cases).Count -ne 3','@($q.child_result.checks).Count -ne 4').replace('exact_complete_images=42','exact_complete_images=4')
+p=r/'run-ptl-textured-windows-v1.ps1';assert not p.exists();p.write_text(s)
+s=(r/'start-textured-batch-comparison-v1.ps1').read_text().replace('NpuRender-TexturedBatchComparison-v1','NpuRender-TexturedWindows-v1').replace('run-ptl-textured-batch-comparison-v1.ps1','run-ptl-textured-windows-v1.ps1').replace('textured-batch-comparison-v1-task','textured-windows-v1-task')
+p=r/'start-textured-windows-v1.ps1';assert not p.exists();p.write_text(s)
+names=['ptl_textured_windows_v1.py','ptl_textured_batch_fixtures_v1.py','qualify-ptl-textured-windows-v1.py','run-ptl-textured-windows-v1.ps1','start-textured-windows-v1.ps1']
+p=r/'ptl-textured-windows-v1-source.json';p.write_text(json.dumps({n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in names},indent=2)+'\n')
+subprocess.run(['scp','-q',*[str(r/n) for n in names],str(p),'delta:AppData/Local/npu-render/vm/'],check=True,timeout=30)
+print('Prepared four immutable-texture window/retry scenarios; no Windows integration')

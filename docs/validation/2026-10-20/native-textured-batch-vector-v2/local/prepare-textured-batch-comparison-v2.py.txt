@@ -1,0 +1,37 @@
+"""Compare scalar and four-pixel kernels with identical batched texture work."""
+from pathlib import Path
+import ast,hashlib,json,subprocess
+r=Path(__file__).parent;s=(r/'compare-ptl-textured-batch-v1.py').read_text()
+s=s.replace('ptl-textured-batch-comparison-v1','ptl-textured-batch-comparison-v2').replace("assert obj(vm/'ptl-textured-batch-v1-qualification/report.json')", "assert obj(vm/'ptl-textured-batch-v2-qualification/report.json')")
+a=s.index("  q=obj(vm/'ptl-six-span-textured-batch-v1/report.json')");b=s.index('\n  def render(',a)
+s=s[:a]+'''  core=ov.Core();providers={};model_hashes={}
+  for version in (1,2):
+   q=obj(vm/f'ptl-six-span-textured-batch-v{version}/report.json')
+   assert q['passed'] and q['child_result']['unique_component_fixtures']==144
+   blob=vm/f'ptl-six-span-textured-batch-v{version}/patched.blob'
+   assert sha(blob)==q['patched_sha256'];model_hashes[version]=sha(blob)
+   model=core.import_model(blob.read_bytes(),'NPU',{'NPU_TURBO':True})
+   assert model.get_property('NPU_TURBO') is True
+   devices=model.get_property('EXECUTION_DEVICES')
+   if isinstance(devices,str):devices=[devices]
+   assert list(devices) in (['NPU'],['NPU.0'])
+   request=model.create_infer_request()
+   inputs=request.get_input_tensor().data.view(np.uint8).reshape(12,SPAN)
+   providers[version]=(model,request,inputs)
+''' +s[b:]
+s=s.replace('def render(initial,w,h,tiles,batched):','def render(initial,w,h,tiles,version):\n   request,inputs=providers[version][1:]')
+s=s.replace('groups=[list(range(4))] if batched else [[i] for i in range(4)]','groups=[list(range(4))]')
+s=s.replace('for batched in (False,True):','for version in (1,2):')
+s=s.replace("for label,batched in [('A1',False),('B1',True),('B2',True),('A2',False)]:","for label,version in [('A1',1),('B1',2),('B2',2),('A2',1)]:")
+s=s.replace('render(initial,w,h,tiles,batched)','render(initial,w,h,tiles,version)').replace('batched=batched','version=version')
+s=s.replace("if not p['batched']","if p['version']==1").replace("if p['batched']","if p['version']==2")
+s=s.replace('model_sha256=sha(blob)','model_sha256=model_hashes')
+s=s.replace('Synthetic independent spatial texture windows, same model and ordered arithmetic in both paths.','Synthetic independent spatial texture windows, scalar versus four-pixel vector kernel with identical batched commands and exact ordered arithmetic.')
+ast.parse(s);(r/'compare-ptl-textured-batch-v2.py').write_text(s)
+s=(r/'run-ptl-textured-batch-comparison-v1.ps1').read_text().replace('textured-batch-comparison-v1','textured-batch-comparison-v2').replace('compare-ptl-textured-batch-v1.py','compare-ptl-textured-batch-v2.py').replace("@('ptl-textured-batch-v1-qualification')","@('ptl-textured-batch-v2-qualification')")
+(r/'run-ptl-textured-batch-comparison-v2.ps1').write_text(s)
+s=(r/'start-textured-batch-comparison-v1.ps1').read_text().replace('TexturedBatchComparison-v1','TexturedBatchComparison-v2').replace('textured-batch-comparison-v1','textured-batch-comparison-v2');(r/'start-textured-batch-comparison-v2.ps1').write_text(s)
+names=['compare-ptl-textured-batch-v2.py','ptl_textured_batch_fixtures_v1.py','run-ptl-textured-batch-comparison-v2.ps1','start-textured-batch-comparison-v2.ps1']
+p=r/'ptl-textured-batch-comparison-v2-source.json';p.write_text(json.dumps({n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in names},indent=2)+'\n')
+subprocess.run(['scp','-q',*[str(r/n) for n in names],str(p),'delta:AppData/Local/npu-render/vm/'],check=True,timeout=30)
+print('Prepared scalar/vector same-batch comparison')

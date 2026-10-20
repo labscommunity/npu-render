@@ -1,0 +1,103 @@
+"""Archive completed turbo renderer trials, compressing large evidence losslessly."""
+from pathlib import Path
+import base64
+import concurrent.futures
+import gzip
+import hashlib
+import json
+import subprocess
+import tempfile
+
+r = Path("results/render-driver")
+d = Path("docs/validation/2026-10-20/native-textured-batch-vector-v2")
+directories = ['ptl-textured-batch-v2-qualification', 'ptl-six-span-textured-batch-build-v2', 'ptl-six-span-textured-batch-v2', 'ptl-textured-batch-comparison-v2-qualification', 'ptl-textured-batch-comparison-v2', 'ptl-textured-windows-v2-qualification', 'ptl-textured-windows-v2']
+source_files = ['ptl-six-span-textured-batch-v2.c', 'ptl_textured_batch_fixtures_v1.py', 'ptl-textured-batch-device-v2-source.json', 'qualify-ptl-six-span-textured-batch-v2.py', 'run-ptl-textured-batch-v2-qualification.ps1', 'start-textured-batch-v2.ps1', 'textured-batch-v2-task.xml', 'textured-batch-v2-task-start.json', 'compare-ptl-textured-batch-v2.py', 'ptl-textured-batch-comparison-v2-source.json', 'run-ptl-textured-batch-comparison-v2.ps1', 'start-textured-batch-comparison-v2.ps1', 'textured-batch-comparison-v2-task.xml', 'textured-batch-comparison-v2-task-start.json', 'ptl_softmax_repeated_contract_v1.py', 'ptl-softmax-repeated-contract-v1-qualification.json', 'ptl-large-span-softmax-v3/twelve-132096/report.json', 'ptl_textured_windows_v1.py', 'qualify-ptl-textured-windows-v2.py', 'run-ptl-textured-windows-v2.ps1', 'start-textured-windows-v2.ps1', 'ptl-textured-windows-v2-source.json', 'textured-windows-v2-task.xml', 'textured-windows-v2-task-start.json']
+ps = r"""$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render"
+foreach($trial in @('ptl-textured-windows-v2-qualification')){
+ $q=Get-Content "$r\vm\$trial\report.json" -Raw|ConvertFrom-Json;if(!$q.completed){throw 'Cannot archive active experiment'}
+}
+function Item([string]$name,[string]$path,[string]$remote){
+ if(!(Test-Path $path)){throw "Missing evidence: $name"}
+ $stream=[IO.File]::Open($path,[IO.FileMode]::Open,[IO.FileAccess]::Read,([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+ try{$h=(Get-FileHash -InputStream $stream).Hash}finally{$stream.Dispose()}
+ [ordered]@{source=$name;remote_source=$remote;bytes=(Get-Item $path).Length;sha256=$h}
+}
+$items=@(
+foreach($name in @(""" + ",".join("'" + n + "'" for n in directories) + r""")){
+ if(!(Test-Path "$r\vm\$name")){continue}
+ Get-ChildItem "$r\vm\$name" -File -Recurse|Where-Object {
+  ($_.Extension -in @('.json','.jsonl','.log','.txt','.inf','.ps1','.py','.c','.cpp','.hpp')) -and
+  ($_.Name -notlike 'client-*' -or ($_.Name -like '*.stderr.log' -and $_.Length -gt 0))
+ }|ForEach-Object {
+  if($_.Length -gt 30000000){throw 'Unexpected artifact size'}
+  $n=$_.FullName.Substring(("$r\vm\").Length).Replace('\','/');Item $n $_.FullName ("vm/"+$n)
+ }
+}
+foreach($name in @(""" + ",".join("'" + n + "'" for n in source_files) + r""")){
+ Item $name "$r\vm\$name" ("vm/"+$name)
+}
+);$items|ConvertTo-Json -Depth 5
+"""
+(r / "hash-native-primary-v125.ps1").write_text(ps)
+# Upload the larger inventory instead of passing it through Windows' command line.
+hash_source = r / "hash-native-primary-v125.ps1"
+subprocess.run(["scp", "-q", str(hash_source), "delta:AppData/Local/npu-render/vm/"],
+               check=True, timeout=30)
+digest = hashlib.sha256(hash_source.read_bytes()).hexdigest()
+check = '$p="$env:LOCALAPPDATA/npu-render/vm/hash-native-primary-v125.ps1";if((Get-FileHash $p).Hash.ToLower() -ne "' + digest + '"){throw "Inventory source mismatch"};& $p'
+command = "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + base64.b64encode(check.encode("utf-16-le")).decode()
+result = subprocess.run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", "delta", command],
+                        capture_output=True, timeout=45)
+if result.returncode:
+    print(result.stderr.decode(errors="replace")[:2000])
+    raise SystemExit(result.returncode)
+receipts = json.loads(result.stdout.decode("utf-8-sig"))
+assert 0 < len(receipts) < 1500
+assert len({x["source"] for x in receipts}) == len(receipts)
+(r / "native-primary-v125-artifact-sha256.json").write_text(json.dumps(receipts, indent=2) + "\n")
+d.mkdir(exist_ok=True)
+
+
+def fetch(item):
+    name = item["source"]
+    assert ".." not in name and not name.startswith("/")
+    relative = "raw/" + name + (".txt" if name.endswith(".py") else "")
+    compressed = item["bytes"] >= 65536
+    if compressed:
+        relative += ".gz"
+    dest = d / relative
+    if dest.exists():
+        data = gzip.decompress(dest.read_bytes()) if compressed else dest.read_bytes()
+    else:
+        with tempfile.TemporaryDirectory(dir=r) as tmp:
+            downloaded = Path(tmp) / "evidence"
+            subprocess.run(["scp", "-q", "-o", "BatchMode=yes",
+                            "delta:AppData/Local/npu-render/" + item["remote_source"], str(downloaded)],
+                           capture_output=True, check=True, timeout=90)
+            data = downloaded.read_bytes()
+        assert len(data) == item["bytes"] and hashlib.sha256(data).hexdigest() == item["sha256"].lower()
+        if name in source_files and (r / name).exists():
+            assert data == (r / name).read_bytes()
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(gzip.compress(data, mtime=0) if compressed else data)
+    assert len(data) == item["bytes"] and hashlib.sha256(data).hexdigest() == item["sha256"].lower()
+    stored = dest.read_bytes()
+    return dict(path=relative, bytes=len(stored), sha256=hashlib.sha256(stored).hexdigest(),
+                remote_source=item["remote_source"], source_bytes=len(data),
+                source_sha256=item["sha256"].lower(), compression="gzip" if compressed else None)
+
+
+with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+    items = list(pool.map(fetch, receipts))
+for name in ('collect-native-primary-v125.py', 'hash-native-primary-v125.ps1', 'prepare-textured-batch-vector-v2.py', 'prepare-textured-batch-comparison-v2.py', 'qualify-textured-batch-local-v2.py', 'ptl-textured-batch-v2-local-report.json', 'qualify-textured-windows-local-v2.py', 'ptl-textured-windows-v2-local-report.json'):
+    data = (r / name).read_bytes()
+    dest = d / "local" / (name + (".txt" if name.endswith(".py") else ""))
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(data)
+    items.append(dict(path=str(dest.relative_to(d)), bytes=len(data),
+                      sha256=hashlib.sha256(data).hexdigest(), local_source=str(r / name)))
+(d / "artifact-sha256.json").write_text(json.dumps(items, indent=2) + "\n")
+(d / ".gitattributes").write_text("raw/** -text whitespace=cr-at-eol,-blank-at-eol,-blank-at-eof\nlocal/** -text whitespace=cr-at-eol,-blank-at-eol,-blank-at-eof\n*.gz binary\n")
+print(json.dumps(dict(artifacts=len(items), stored_bytes=sum(x["bytes"] for x in items),
+                      remote_bytes=sum(x["bytes"] for x in receipts),
+                      remote_sha256_verified=True, lossless_compression=True)))

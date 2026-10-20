@@ -1,0 +1,42 @@
+"""CPU transport/rollback qualification only, using the locally compiled kernel."""
+from pathlib import Path
+import ctypes,hashlib,json
+import numpy as np
+from ptl_textured_windows_v1 import freeze,plan,render,reference,fixture
+from ptl_textured_batch_fixtures_v1 import SPAN
+
+r=Path(__file__).parent
+fn=ctypes.CDLL(str((r/'ptl-textured-batch-v2-local.dylib').resolve())).nr_textured_batch_local
+fn.argtypes=[ctypes.c_void_p,ctypes.c_void_p];fn.restype=None
+def invoke(data):
+    output=np.zeros_like(data)
+    for i in range(12):fn(data[i].ctypes.data,output[i].ctypes.data)
+    return output
+checks=[]
+for index in range(4):
+    original,textures,commands,fmt=fixture(index)
+    expected=reference(original,textures,commands,fmt)
+    image,pinned,decoded=freeze(original,textures,commands)
+    before=image.tobytes()
+    original.fill(0)
+    for t in textures:t.fill(0)
+    commands[0][:]=[0]*11
+    tiles=plan(image,pinned,decoded,fmt)
+    try:render(image,tiles,fmt,invoke,True)
+    except RuntimeError as e:assert str(e)=='injected after partial NPU output'
+    else:raise AssertionError('fault injection did not execute')
+    assert image.tobytes()==before
+    actual,counters=render(image,tiles,fmt,invoke)
+    assert np.array_equal(actual,expected)
+    # Malformed final command must fail planning before any submission.
+    malformed=list(decoded);bad=list(malformed[-1]);bad[2]=image.shape[1]+1;malformed[-1]=tuple(bad)
+    try:plan(image,pinned,malformed,fmt)
+    except AssertionError:pass
+    else:raise AssertionError('malformed trailing command admitted')
+    checks.append(dict(index=index,exact=True,source_snapshot_bytes=sum(t.nbytes for t in pinned),
+                       output_sha256=hashlib.sha256(actual.tobytes()).hexdigest(),
+                       split_tiles=sum(len(t['packets'])>1 for t in tiles),
+                       rollback_preserved=True,caller_mutation_ignored=True,**counters))
+report=dict(passed=True,device='CPU',npu_execution=False,checks=checks)
+(r/'ptl-textured-windows-v2-local-report.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(report))

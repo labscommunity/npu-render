@@ -1,0 +1,19 @@
+"""Add a recorded program draw after recovery before this experiment's first run."""
+from pathlib import Path
+import ast,hashlib,json,subprocess
+r=Path(__file__).parent
+p=r/'qualify-combined-fill-turbo-provider-recovery-v1.py'
+s=p.read_text();old=hashlib.sha256(p.read_bytes()).hexdigest()
+assert '481,587,599' in s
+s=s.replace('481,587,599','481,587,589,599')
+s=s.replace('==30','==31').replace('exact_images=30,acknowledgments=30','exact_images=31,acknowledgments=31')
+s=s.replace('  for f in (trial/\'provider-processes\').glob(\'generation-*/worker.stdout.jsonl\'):\n   events=rows(f)',"  program_by_generation={}\n  for f in (trial/'provider-processes').glob('generation-*/worker.stdout.jsonl'):\n   events=rows(f)")
+s=s.replace("   assert any(x.get('ptl_program_draw') and x.get('accepted') for x in events)","   accepted=[x for x in events if x.get('ptl_program_draw') and x.get('accepted')]\n   assert accepted\n   program_by_generation[f.parent.name]=len(accepted)")
+s=s.replace('phase=phase,passed=True,compiled_turbo', 'phase=phase,passed=True,program_draws_by_generation=program_by_generation,compiled_turbo')
+ast.parse(s);p.write_text(s)
+m=r/'ptl-worker-v31-tools-source.json';manifest=json.loads(m.read_text());assert manifest[p.name]==old
+manifest[p.name]=hashlib.sha256(p.read_bytes()).hexdigest();m.write_text(json.dumps(manifest,indent=2)+'\n')
+record=dict(prepared_before_first_run=True,added_original_ticket=589,reason='Ensure changed program model imports and draws after provider restart',old_recovery_source_sha256=old,new_recovery_source_sha256=manifest[p.name],images_per_scenario=31)
+(r/'combined-recovery-coverage-v1.json').write_text(json.dumps(record,indent=2)+'\n')
+subprocess.run(['scp','-q',str(p),str(m),'delta:AppData/Local/npu-render/vm/'],check=True,timeout=30)
+print(json.dumps(record))

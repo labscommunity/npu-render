@@ -200,3 +200,33 @@ large-texture Gather graphs; it does not prove that every operation, compiler
 version or possible graph has that restriction. Simply enlarging that Gather
 input is therefore not evidence of a parallel texture path.
 [Intel Gather implementation](https://github.com/openvinotoolkit/npu_compiler/blob/20e7912fbc230725e1ca7394762348d4f480aa65/src/vpux_compiler/src/dialect/VPU/IR/ops/gather.cpp#L156-L176).
+
+## Bounded textured execution
+
+The [textured rectangle component](../validation/2026-10-20/native-textured-batch-component-v1/README.md)
+now passes 144 exact NPU fixtures and a same-kernel separate/batched comparison.
+Its synthetic four-draw 1024×768 median falls from 47.49 to 31.35 ms, including
+packet preparation and output assembly. That excludes general shader evaluation,
+Windows resource access and presentation; it is not a 30 fps desktop result.
+
+The [full texture-window prototype](../validation/2026-10-20/native-textured-window-recovery-v1/README.md)
+then passes four complete NPU images using eight immutable textures and 32
+commands. The larger cases retain 48 MiB of sources while packets carry at most
+196,544 texture bytes. Oversized tile working sets are split in command order.
+Caller mutations cannot change pinned data, and partial NPU output is discarded
+before model recreation and exact retry. These two larger diagnostic render
+times are 92.32 and 108.78 ms, excluding snapshot creation and window planning.
+
+This closes the isolated solid-only component limitation for one-to-one point
+texture windows. It does not close Windows queue integration. Next, bind these
+owned snapshots to actual resource versions in the C++ ledger, qualify alias
+and map/present boundaries, and establish which captured shader/geometry
+mappings satisfy the narrow packet contract before routing any desktop draw.
+
+The [four-pixel vector kernel](../validation/2026-10-20/native-textured-batch-vector-v2/README.md)
+now preserves all fixtures, comparison images and window-retry outputs. A fresh
+same-batch comparison lowers the 1024×768 median from 30.86 to 14.58 ms, with
+the same four NPU submissions. Its larger 32-command window retries take 43.89
+and 47.55 ms, excluding snapshot creation and planning. The first result measures
+vector execution under matched work; the latter are separate diagnostic
+observations. Neither changes the Windows integration boundary above.

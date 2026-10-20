@@ -1,0 +1,101 @@
+"""Full texture snapshots, bounded NPU packets, partial-output discard and retry."""
+from pathlib import Path
+from datetime import UTC,datetime
+import argparse,hashlib,json,os,subprocess,sys,time,traceback
+
+r=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=r/'vm'
+def obj(p):return json.loads(p.read_text(encoding='utf-8-sig'))
+def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+def save(p,x):p.write_text(json.dumps(x,indent=2)+'\n')
+
+def child(out):
+ import numpy as np
+ import openvino as ov
+ from ptl_textured_windows_v1 import freeze,plan,render,reference,fixture
+ from ptl_textured_batch_fixtures_v1 import SPAN
+ report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,checks=[])
+ try:
+  assert ov.get_version()=='2026.4.1-22982-e213a147257-releases/2026/4'
+  q=obj(vm/'ptl-six-span-textured-batch-v1/report.json')
+  assert q['passed'] and q['child_result']['unique_component_fixtures']==144
+  blob=vm/'ptl-six-span-textured-batch-v1/patched.blob'
+  assert sha(blob)==q['patched_sha256']
+  core=ov.Core();model=None;request=None;generations=0;submissions=0
+  def restart():
+   nonlocal model,request,generations
+   request=None;model=None
+   model=core.import_model(blob.read_bytes(),'NPU',{'NPU_TURBO':True})
+   assert model.get_property('NPU_TURBO') is True
+   devices=model.get_property('EXECUTION_DEVICES')
+   if isinstance(devices,str):devices=[devices]
+   assert list(devices) in (['NPU'],['NPU.0'])
+   request=model.create_infer_request();generations+=1
+  def invoke(data):
+   nonlocal submissions
+   request.get_input_tensor().data.view(np.uint8).reshape(12,SPAN)[:]=data
+   request.start_async();assert request.wait_for(15000);submissions+=1
+   return request.get_output_tensor().data.view(np.uint8).reshape(12,SPAN).copy()
+  for index in range(4):
+   original,textures,commands,fmt=fixture(index)
+   expected=reference(original,textures,commands,fmt)
+   image,pinned,decoded=freeze(original,textures,commands)
+   before=hashlib.sha256(image.tobytes()).hexdigest()
+   original.fill(0)
+   for t in textures:t.fill(0)
+   commands[0][:]=[0]*11
+   tiles=plan(image,pinned,decoded,fmt)
+   start_generations=generations;start_submissions=submissions
+   restart()
+   try:render(image,tiles,fmt,invoke,True)
+   except RuntimeError as e:assert str(e)=='injected after partial NPU output'
+   else:raise AssertionError('fault injection did not execute')
+   assert submissions-start_submissions==1
+   assert hashlib.sha256(image.tobytes()).hexdigest()==before
+   restart()
+   began=time.perf_counter_ns()
+   actual,counters=render(image,tiles,fmt,invoke)
+   elapsed=(time.perf_counter_ns()-began)/1e6
+   assert np.array_equal(actual,expected) and generations-start_generations==2
+   assert submissions-start_submissions==1+counters['provider_requests']
+   malformed=list(decoded);bad=list(malformed[-1]);bad[2]=image.shape[1]+1;malformed[-1]=tuple(bad)
+   count_before=submissions
+   try:plan(image,pinned,malformed,fmt)
+   except AssertionError:pass
+   else:raise AssertionError('malformed trailing command admitted')
+   assert submissions==count_before
+   report['checks'].append(dict(index=index,exact=True,execution_device='NPU',cpu_fallback=False,
+       source_snapshot_bytes=sum(t.nbytes for t in pinned),source_versions=len(pinned),ordered_commands=len(decoded),
+       output_sha256=hashlib.sha256(actual.tobytes()).hexdigest(),checkpoint_before_sha256=before,
+       split_tiles=sum(len(t['packets'])>1 for t in tiles),rollback_preserved=True,caller_mutation_ignored=True,
+       malformed_tail_rejected_before_submission=True,provider_generations=2,injected_partial_output_requests=1,
+       retry_render_elapsed_ms=elapsed,**counters))
+   save(out/'child-report.json',report)
+  report.update(passed=True,model_sha256=sha(blob),total_provider_generations=generations,
+                total_provider_submissions=submissions,turbo_requested=True,turbo_readback=True,
+                real_device_loss_tested=False,
+                scope='Isolated immutable full-surface texture snapshots and ordered one-to-one point windows. Whole result returned only after all bounded packets validate. Injected partial-output exception plus model recreation, not process/device loss or asynchronous stale completion. Does not implement Windows resource identity, aliases, DDI queue, arbitrary shaders, desktop display or Tahoma.')
+ except Exception as e:report.update(error=repr(e),traceback=traceback.format_exc())
+ finally:report.update(completed=True,finished=datetime.now(UTC).isoformat());save(out/'child-report.json',report)
+ return 0 if report['passed'] else 1
+
+def main():
+ p=argparse.ArgumentParser();p.add_argument('--child',type=Path);a=p.parse_args()
+ if a.child:return child(a.child)
+ out=vm/'ptl-textured-windows-v1';out.mkdir(exist_ok=False);process=None
+ report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,desktop_changed=False,tahoma_tested=False)
+ try:
+  assert obj(vm/'ptl-textured-batch-comparison-v1-qualification/report.json')['passed']
+  with (out/'stdout.log').open('xb') as stdout,(out/'stderr.log').open('xb') as stderr:
+   process=subprocess.Popen([sys.executable,__file__,'--child',str(out)],stdout=stdout,stderr=stderr,creationflags=subprocess.CREATE_NO_WINDOW)
+   try:process.wait(timeout=300)
+   except subprocess.TimeoutExpired:process.kill();process.wait(timeout=5);raise
+  result=obj(out/'child-report.json')
+  report.update(passed=process.returncode==0 and result['passed'],exit_code=process.returncode,child_result=result)
+ except Exception as e:report.update(error=repr(e),traceback=traceback.format_exc())
+ finally:
+  if process is not None and process.poll() is None:process.kill();process.wait(timeout=5)
+  report.update(completed=True,finished=datetime.now(UTC).isoformat());save(out/'report.json',report)
+ print(json.dumps({k:v for k,v in report.items() if k!='child_result'}))
+ return 0 if report['passed'] else 1
+
+if __name__=='__main__':raise SystemExit(main())

@@ -20,6 +20,17 @@ The trace places 6.02 seconds inside child rendering during that animation.
 Full desktop offload, sustained responsiveness, broad application coverage and
 a Tahoma benefit remain unqualified.
 
+**Latest off-screen progress:** the [combined vector-fill/turbo renderer](docs/validation/2026-10-20/native-combined-fill-turbo-worker-v1/README.md)
+preserves all 3,888 comparison images, lowers aggregate request time by 5.66%,
+and passes both 31-image provider-recovery scenarios. Its
+[physical trial is prepared](docs/validation/2026-10-20/native-combined-fill-turbo-live-prepared-v1/README.md);
+the readiness checkpoint finds Delta signed out after Windows servicing.
+The separate [textured batching prototype](docs/validation/2026-10-20/native-textured-batch-vector-v2/README.md)
+passes 144 NPU fixtures and lowers a matched synthetic 1024×768 four-draw median
+from 30.86 to 14.58 ms. Eight-texture, 32-command snapshot/retry cases also pass,
+including 48 MiB of sources. This component is not integrated into Windows
+resource handling and does not change the physical desktop result above.
+
 **October 20 follow-up:** the completed [GPU baseline](docs/validation/2026-10-16/native-physical-gpu-live-v1/README.md)
 reaches 29.9 verified animation updates per second through the same display bridge,
 versus 0.7 on the earlier NPU baseline and 0.9 in the latest trial. Its 550-second presentation and restoration pass, with zero

@@ -1,0 +1,129 @@
+"""Bounded immutable texture-window transport; no host pixel shading."""
+import struct
+import numpy as np
+from ptl_textured_batch_fixtures_v1 import SPAN,BACKGROUND,ATLAS
+
+
+def freeze(initial,textures,commands):
+    """Own every byte and command before any asynchronous provider work."""
+    image=np.array(initial,dtype='<u4',copy=True,order='C')
+    copies=tuple(np.array(t,dtype='<u4',copy=True,order='C') for t in textures)
+    image.flags.writeable=False
+    for t in copies:t.flags.writeable=False
+    return image,copies,tuple(tuple(c) for c in commands)
+
+
+def plan(image,textures,commands,fmt):
+    h,w=image.shape
+    assert 0<w<=8192 and 0<h<=8192 and w*h<=8388576 and fmt in (28,87)
+    assert image.dtype==np.dtype('<u4') and 0<len(commands)<=32
+    for c in commands:
+        x0,y0,x1,y1,source,blend,mask,kind,sx,sy,tf=c
+        assert 0<=x0<=x1<=w and 0<=y0<=y1<=h and blend in (0,1) and 0<mask<16
+        assert kind in (0,1)
+        if kind:
+            assert 0<=source<len(textures) and tf in (28,87)
+            t=textures[source];th,tw=t.shape
+            assert t.dtype==np.dtype('<u4') and 0<=sx<=tw and 0<=sy<=th
+            assert x1-x0<=tw-sx and y1-y0<=th-sy
+        else:assert 0<=source<=0xffffffff and sx==sy==tf==0
+    tiles=[]
+    for y in range(0,h,128):
+        for x in range(0,w,127):
+            tw,th=min(127,w-x),min(128,h-y)
+            packets=[];descriptors=[];atlas=bytearray();windows={}
+            def flush():
+                if descriptors:
+                    packets.append((tuple(descriptors),bytes(atlas)))
+                    descriptors.clear();atlas.clear();windows.clear()
+            for c in commands:
+                x0,y0,x1,y1,source,blend,mask,kind,sx,sy,tf=c
+                left,top,right,bottom=max(x,x0),max(y,y0),min(x+tw,x1),min(y+th,y1)
+                if left>=right or top>=bottom:continue
+                cw,ch=right-left,bottom-top
+                offset=source
+                if kind:
+                    wx,wy=sx+left-x0,sy+top-y0
+                    key=(source,wx,wy,cw,ch)
+                    if key not in windows and len(atlas)+cw*ch*4>SPAN-ATLAS:flush()
+                    if key not in windows:
+                        raw=textures[source][wy:wy+ch,wx:wx+cw].tobytes(order='C')
+                        assert len(raw)==cw*ch*4 and len(atlas)+len(raw)<=SPAN-ATLAS
+                        windows[key]=len(atlas);atlas.extend(raw)
+                    offset=windows[key]
+                descriptors.append((left-x,top-y,right-x,bottom-y,offset,blend,mask,kind,
+                                    cw if kind else 0,ch if kind else 0,0,0,tf,0,0,0))
+                if len(descriptors)==32:flush()
+            flush()
+            tiles.append(dict(rect=(x,y,tw,th),packets=tuple(packets)))
+    return tuple(tiles)
+
+
+def render(image,tiles,fmt,invoke,interrupt_after_first=False):
+    """Return only a whole image. Exceptions discard every partial tile."""
+    result=image.copy()
+    pending=[dict(rect=t['rect'],packets=t['packets'],at=0) for t in tiles if t['packets']]
+    calls=0;max_atlas=0
+    while pending:
+        current=pending[:12]
+        data=np.zeros((12,SPAN),dtype=np.uint8)
+        for plane in range(12):
+            struct.pack_into('<10I',data[plane],0,0x4e525451,1,0,0,1,1,1,28,SPAN,0)
+            struct.pack_into('<16I',data[plane],64,0,0,0,0,0,0,15,0,0,0,0,0,0,0,0,0)
+        for plane,t in enumerate(current):
+            x,y,w,h=t['rect'];commands,atlas=t['packets'][t['at']]
+            max_atlas=max(max_atlas,len(atlas))
+            struct.pack_into('<10I',data[plane],0,0x4e525451,1,w*h,0,w,h,len(commands),fmt,SPAN,len(atlas))
+            for n,c in enumerate(commands):struct.pack_into('<16I',data[plane],64+n*64,*c)
+            data[plane,BACKGROUND:BACKGROUND+w*h*4]=result[y:y+h,x:x+w].copy().reshape(-1).view(np.uint8)
+            data[plane,ATLAS:ATLAS+len(atlas)]=np.frombuffer(atlas,np.uint8)
+        output=invoke(data)
+        assert output.shape==data.shape and output.dtype==np.uint8
+        calls+=1
+        for plane,t in enumerate(current):
+            x,y,w,h=t['rect'];commands,_=t['packets'][t['at']]
+            magic,count,n,hits=struct.unpack_from('<4I',output[plane])
+            assert (magic,count,n)==(0x4e52544f,w*h,len(commands)) and hits<=w*h*n
+            result[y:y+h,x:x+w]=output[plane,16:16+w*h*4].view('<u4').reshape(h,w)
+            t['at']+=1
+        if interrupt_after_first and calls==1:raise RuntimeError('injected after partial NPU output')
+        pending=[t for t in pending if t['at']<len(t['packets'])]
+    return result,dict(provider_requests=calls,max_atlas_bytes=max_atlas,
+                       logical_input_bytes=calls*12*SPAN,logical_output_bytes=calls*12*SPAN)
+
+
+def reference(image,textures,commands,fmt):
+    """Separate full-surface integer oracle, independent of spatial packing."""
+    result=image.copy()
+    for x0,y0,x1,y1,source,blend,mask,kind,sx,sy,tf in commands:
+        region=result[y0:y1,x0:x1]
+        if kind:incoming=textures[source][sy:sy+y1-y0,sx:sx+x1-x0].astype(np.uint64)
+        else:incoming=np.full(region.shape,source,np.uint64);tf=28
+        old=region.astype(np.uint64);alpha=(incoming>>24)&255
+        for byte,channel in enumerate([2,1,0,3] if fmt==87 else [0,1,2,3]):
+            if not mask&(1<<channel):continue
+            source_byte=2-channel if tf==87 and channel<3 else channel
+            v=(incoming>>(8*source_byte))&255
+            if blend:v=(np.minimum(65025,v*255+((old>>(8*byte))&255)*(255-alpha))+127)//255
+            old=(old&np.uint64(0xffffffff^(255<<(8*byte))))|(v<<(8*byte))
+        region[:]=old.astype('<u4')
+    return result
+
+
+def fixture(index):
+    assert 0<=index<4
+    rng=np.random.default_rng(9400000+index)
+    w,h=(257,259) if index<2 else (1024,768)
+    initial=rng.integers(0,2**32,(h,w),dtype=np.uint32)
+    textures=[rng.integers(0,2**32,(h+256,w+512),dtype=np.uint32) for _ in range(8)]
+    commands=[]
+    for n in range(32):
+        if n%8==0:x0=y0=0;x1=w;y1=h
+        else:
+            x0=int(rng.integers(0,w));y0=int(rng.integers(0,h))
+            x1=int(rng.integers(x0,w+1));y1=int(rng.integers(y0,h+1))
+        kind=n%5!=4
+        commands.append([x0,y0,x1,y1,n%8 if kind else int(rng.integers(0,2**32,dtype=np.uint32)),
+                         n%2,1+n%15,int(kind),n*7 if kind else 0,n*3 if kind else 0,
+                         (28 if n%2 else 87) if kind else 0])
+    return initial,textures,commands,28 if index%2==0 else 87

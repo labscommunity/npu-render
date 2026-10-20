@@ -1,0 +1,35 @@
+"""CPU oracle check only; target execution is separately required."""
+from pathlib import Path
+import ctypes
+import hashlib
+import json
+import subprocess
+from ptl_textured_batch_fixtures_v1 import fixture
+
+r=Path(__file__).parent
+s=(r/'ptl-six-span-textured-batch-v1.c').read_text()
+a=s.index('void nr_probe_kernel(')
+b=s.index(' uint4 *zero=',a)
+p=r/'ptl-textured-batch-v1-local.c'
+p.write_text(s[:a]+'void nr_textured_batch_local(const unsigned char *data,unsigned char *output){\n'+s[b:])
+binary=r/'ptl-textured-batch-v1-local.dylib'
+command=['clang','-O2','-shared','-Wall','-Wextra','-Werror',str(p),'-o',str(binary)]
+subprocess.run(command,check=True)
+fn=ctypes.CDLL(str(binary.resolve())).nr_textured_batch_local
+fn.argtypes=[ctypes.c_void_p,ctypes.c_void_p]
+fn.restype=None
+checks=[]
+for index in range(144):
+    data,expected=fixture(index)
+    src=ctypes.create_string_buffer(data)
+    # Guard bytes detect writes beyond the complete output span.
+    dst=ctypes.create_string_buffer(b'\xa5'*32+bytes(len(expected))+b'\x5a'*32)
+    fn(src,ctypes.byref(dst,32))
+    actual=dst.raw[32:32+len(expected)]
+    assert dst.raw[:32]==b'\xa5'*32 and dst.raw[32+len(expected):32+len(expected)+32]==b'\x5a'*32
+    assert actual==expected,dict(index=index,mismatches=[i for i,(a,b) in enumerate(zip(actual,expected)) if a!=b][:12])
+    checks.append(dict(index=index,passed=True,input_sha256=hashlib.sha256(data).hexdigest(),output_sha256=hashlib.sha256(actual).hexdigest()))
+report=dict(passed=True,device='CPU',npu_execution=False,checks=checks,command=command,
+            kernel_source_sha256=hashlib.sha256((r/'ptl-six-span-textured-batch-v1.c').read_bytes()).hexdigest())
+(r/'ptl-textured-batch-v1-local-report.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(dict(passed=True,device='CPU',exact_fixtures=len(checks))))

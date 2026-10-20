@@ -1,0 +1,104 @@
+"""Combine two image-preserving candidates; require a new complete comparison."""
+from pathlib import Path
+import ast
+import hashlib
+import json
+import shutil
+import subprocess
+import tarfile
+
+r = Path(__file__).parent
+worker = "ptl-native-worker-v31"
+dest = r / worker
+assert not dest.exists()
+manifest = json.loads((r / "ptl-native-worker-v27-source.json").read_text())
+for name, digest in manifest.items():
+    assert hashlib.sha256((r / "ptl-native-worker-v27" / name).read_bytes()).hexdigest() == digest
+shutil.copytree(r / "ptl-native-worker-v27", dest)
+(r / (worker + "-source.json")).write_text(json.dumps(manifest, indent=2) + "\n")
+with tarfile.open(r / (worker + ".tar.gz"), "w:gz") as archive:
+    archive.add(dest, arcname=worker)
+names = [worker + "-source.json", worker + ".tar.gz"]
+old_model = "92e04a6734dc6e70ffed15b67fddba02892c66168aa0d47a6cf4bcc65a6a585d"
+new_model = "00793de192c05fc47f58a7a41a184245ded4df14fd83b58a7a31a514df0121b2"
+
+
+def write(name, source):
+    p = r / name
+    assert not p.exists()
+    if name.endswith(".py"):
+        ast.parse(source)
+    p.write_text(source)
+    names.append(name)
+
+
+s = (r / "build-ptl-native-worker-v30.ps1").read_text().replace("worker-v30", "worker-v31")
+write("build-ptl-native-worker-v31.ps1", s)
+s = (r / "qualify-ptl-native-worker-v30.py").read_text().replace("worker-v30", "worker-v31")
+s = s.replace("ptl-six-span-program-compact-v1", "ptl-six-span-program-vector-fill-v1")
+s = s.replace(old_model, new_model)
+write("qualify-ptl-native-worker-v31.py", s)
+s = (r / "qualify-compiled-turbo-comparison-v1.py").read_text()
+s = s.replace("compiled-turbo-comparison-v1", "combined-fill-turbo-comparison-v1")
+s = s.replace("ptl-native-worker-v30-full", "ptl-native-worker-v31-full")
+s = s.replace("('B1',30),('B2',30)", "('B1',31),('B2',31)").replace("version==30", "version==31")
+needle = "  trial=out/phase;command=list(proof['command']);"
+assert s.count(needle) == 1
+s = s.replace(needle, """  program=vm/('ptl-six-span-program-vector-fill-v1' if version==31 else 'ptl-six-span-program-compact-v1')/'patched.blob'
+  assert sha(program)==('""" + new_model + """' if version==31 else '""" + old_model + """')
+  assert proof['program_model_sha256']==sha(program)
+  env['NR_RENDER_PTL_PROGRAM_BLOB']=str(program)
+""" + needle)
+s = s.replace(
+    "Four complete recorded replays in A/B/B/A order comparing the custom-import turbo renderer with the same renderer also requesting turbo for compiled NPU graphs. The provider libraries are rebuilt with that one header change; shader arithmetic and custom model blobs are unchanged.",
+    "Four complete recorded replays in A/B/B/A order comparing worker26 with the combination of vector program memory fill and compiled-graph turbo. The worker sources equal worker27; the provider libraries equal worker30. Both candidates previously preserve every image separately. The combined effect is measured here, not inferred by adding their gains.",
+)
+write("qualify-combined-fill-turbo-comparison-v1.py", s)
+s = (r / "qualify-compiled-turbo-provider-recovery-v1.py").read_text()
+s = s.replace("worker-v30", "worker-v31").replace("compiled-turbo-provider-recovery-v1",
+                                                "combined-fill-turbo-provider-recovery-v1")
+s = s.replace("ptl-six-span-program-compact-v1", "ptl-six-span-program-vector-fill-v1")
+s = s.replace(old_model, new_model)
+needle = "  assert len(compiled_by_generation)==2\n"
+assert s.count(needle) == 1
+s = s.replace(needle, needle + """  for f in (trial/'provider-processes').glob('generation-*/worker.stdout.jsonl'):
+   events=rows(f)
+   assert sum(bool(x.get('ptl_program_provider_created')) for x in events)==1
+   assert any(x.get('ptl_program_draw') and x.get('accepted') for x in events)
+""")
+write("qualify-combined-fill-turbo-provider-recovery-v1.py", s)
+s = (r / "run-ptl-worker-v30-qualification.ps1").read_text()
+s = s.replace("worker-v30", "worker-v31").replace("compiled-turbo-comparison-v1",
+                                                "combined-fill-turbo-comparison-v1")
+s = s.replace("ptl-worker-v29-restart-v1-qualification", "compiled-turbo-chain-v2")
+s = s.replace("waiting-for-complex-batch-recovery", "waiting-for-compiled-turbo-recovery")
+start = s.index(" Invoke-Step 'provider-build'")
+end = s.index(" Invoke-Step 'build'", start)
+s = s[:start] + r''' $q=Get-Content "$vm/ptl-native-worker-v27-full/report.json" -Raw|ConvertFrom-Json
+ if(!$q.passed -or !$q.all_worker_v19_outputs_preserved){throw 'Vector-fill image qualification missing'}
+ $q=Get-Content "$vm/ptl-native-worker-v30-full/report.json" -Raw|ConvertFrom-Json
+ if(!$q.passed -or !$q.all_worker_v19_outputs_preserved){throw 'Compiled-turbo image qualification missing'}
+ $provider=Get-Content "$r/builds/ptl-compiled-turbo-v1/build-report-v2.json" -Raw|ConvertFrom-Json
+ foreach($f in $provider.library_sha256.psobject.Properties){if((Get-FileHash "$r/builds/ptl-compiled-turbo-v1/Release/$($f.Name)").Hash.ToLower() -ne $f.Value){throw 'Qualified provider library changed'}}
+''' + s[end:]
+needle = " $report.passed=$true\n"
+assert s.count(needle) == 1
+s = s.replace(needle, r''' Invoke-Step 'provider-faults' "$r/toolchains/openvino-2026.4.1/Scripts/python.exe" ('"'+$vm+'\qualify-combined-fill-turbo-provider-recovery-v1.py"') 660
+ $q=Get-Content "$vm/combined-fill-turbo-provider-recovery-v1/report.json" -Raw|ConvertFrom-Json
+ if(!$q.completed -or !$q.passed -or @($q.phases).Count -ne 2){throw 'Combined recovery incomplete'}
+''' + needle)
+write("run-ptl-worker-v31-qualification.ps1", s)
+s = (r / "start-complex-batch-restart-v1.ps1").read_text()
+s = s.replace("NpuRender-ComplexBatchRestart-v1", "NpuRender-CombinedFillTurbo-v1")
+s = s.replace("run-ptl-worker-v29-restart-v1-qualification.ps1",
+              "run-ptl-worker-v31-qualification.ps1")
+s = s.replace("complex-batch-restart-v1-task", "combined-fill-turbo-v1-task")
+write("start-combined-fill-turbo-v1.ps1", s)
+p = r / "ptl-worker-v31-tools-source.json"
+p.write_text(json.dumps({n: hashlib.sha256((r / n).read_bytes()).hexdigest()
+                        for n in names}, indent=2) + "\n")
+subprocess.run(["scp", "-q", *[str(r / n) for n in names], str(p),
+                "delta:AppData/Local/npu-render/vm/"], check=True, timeout=30)
+print(json.dumps(dict(prepared=True, worker_sources_identical_to=27,
+                      provider_libraries_reused_from=30, combined_gain_unproven=True,
+                      larger_complex_batch_excluded=True, started=False)))

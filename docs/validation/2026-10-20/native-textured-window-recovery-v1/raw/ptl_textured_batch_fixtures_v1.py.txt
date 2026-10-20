@@ -1,0 +1,95 @@
+"""Independent scalar/integer oracle with immutable texture snapshots."""
+import struct
+import numpy as np
+
+SPAN = 264192
+BACKGROUND = 2112
+ATLAS = 67648
+# Header failures, descriptor failures, overflow and a malformed last command.
+INVALID = [
+    (0, 0), (4, 2), (8, 16385), (12, 8388577), (16, 0), (16, 8193),
+    (20, 0), (20, 8193), (24, 0), (24, 33), (28, 65), (32, 0),
+    (36, 196548), (36, 3), (40, 1), (60, 1), (64, 8193),
+    (68, 8193), (72, 8193), (76, 8193), (84, 2), (88, 0),
+    (88, 16), (92, 2), (80, 0xfffffffc), (96, 0), (100, 0),
+    (96, 0xffffffff), (100, 0xffffffff), (104, 0xffffffff),
+    (108, 0xffffffff), (112, 65), (116, 1), (120, 1), (124, 1),
+    (64+31*64+60, 1),
+]
+
+
+def reference(data):
+    """Oracle for known-valid fixture packets; does not repeat validation code."""
+    count, first, w, h, commands, fmt = struct.unpack_from('<6I', data, 8)
+    raw = np.frombuffer(data, '<u4', count=count, offset=BACKGROUND)
+    values = (raw.astype(np.uint64)[:, None] >> np.array([0, 8, 16, 24], np.uint64)) & 255
+    positions = np.arange(first, first + count, dtype=np.uint64)
+    xs, ys = positions % w, positions // w
+    hits = 0
+    for n in range(commands):
+        x0,y0,x1,y1,source,blend,mask,kind,tw,th,sx,sy,tf,_,_,_ = struct.unpack_from('<16I', data, 64+n*64)
+        indices = np.flatnonzero((xs>=x0)&(xs<x1)&(ys>=y0)&(ys<y1))
+        hits += len(indices)
+        if kind:
+            texture = np.frombuffer(data, '<u4', count=tw*th, offset=ATLAS+source)
+            samples = texture[(ys[indices]-y0+sy)*tw+(xs[indices]-x0+sx)].astype(np.uint64)
+        else:
+            samples = np.full(len(indices), source, np.uint64)
+            tf = 28
+        incoming = (samples[:,None] >> np.array([0,8,16,24], np.uint64)) & 255
+        if tf == 87:
+            incoming = incoming[:, [2,1,0,3]]
+        # Canonical RGBA incoming channels, explicit destination byte order.
+        for byte, channel in enumerate([2,1,0,3] if fmt == 87 else [0,1,2,3]):
+            if mask & (1 << channel):
+                v = incoming[:,channel]
+                if blend:
+                    v = (np.minimum(65025,v*255+values[indices,byte]*(255-incoming[:,3]))+127)//255
+                values[indices,byte] = v
+    packed = np.bitwise_or.reduce(values << np.array([0,8,16,24],np.uint64), axis=1).astype('<u4')
+    out = bytearray(SPAN)
+    struct.pack_into('<4I', out, 0, 0x4e52544f, count, commands, hits)
+    out[16:16+count*4] = packed.tobytes()
+    return bytes(out)
+
+
+def fixture(index):
+    assert 0 <= index < 144
+    if index >= 108:
+        data,_ = fixture(107)
+        data = bytearray(data)
+        offset,value = INVALID[index-108]
+        struct.pack_into('<I',data,offset,value)
+        return bytes(data),bytes(SPAN)
+    rng = np.random.default_rng(7200000+index)
+    w,h = [(1,1),(17,13),(127,128),(128,128),(1024,768),(8192,4)][index%6]
+    count = min(w*h, [0,1,31,4095,16383,16384][(index//6)%6])
+    first = int(rng.integers(0,w*h-count+1))
+    commands = [1,2,7,32][index%4]
+    if index == 107:
+        w=h=128;count=16384;first=0;commands=32
+    fmt = [28,87][(index//2)%2]
+    data = bytearray(SPAN)
+    # Three independent 127x128 resources; windows may share immutable storage.
+    textures = rng.integers(0,2**32,(3,128,127),dtype=np.uint32)
+    textures[0] = [0,0xffffffff,0x00ffffff,0xff000000,0x01010101,0x7f7f7f7f][index%6]
+    texture_bytes = textures.astype('<u4').tobytes()
+    data[ATLAS:ATLAS+len(texture_bytes)] = texture_bytes
+    struct.pack_into('<10I',data,0,0x4e525451,1,count,first,w,h,commands,fmt,SPAN,len(texture_bytes))
+    data[BACKGROUND:BACKGROUND+count*4] = rng.integers(0,2**32,count,dtype=np.uint32).astype('<u4').tobytes()
+    for c in range(commands):
+        if c == 0:
+            x0=y0=0;x1=min(w,127);y1=min(h,128)
+        elif c == 1:
+            x0=x1=0;y0=0;y1=min(h,128)
+        else:
+            x0=int(rng.integers(0,w));y0=int(rng.integers(0,h))
+            x1=x0+int(rng.integers(0,min(w-x0,127)+1))
+            y1=y0+int(rng.integers(0,min(h-y0,128)+1))
+        kind = 1 if c==0 else (index+c)%2
+        source = (c%3)*127*128*4 if kind else int(rng.integers(0,2**32,dtype=np.uint32))
+        sx=int(rng.integers(0,127-(x1-x0)+1)) if kind else 0
+        sy=int(rng.integers(0,128-(y1-y0)+1)) if kind else 0
+        struct.pack_into('<16I',data,64+c*64,x0,y0,x1,y1,source,(index+c)%2,1+(index+3*c)%15,kind,
+                         127 if kind else 0,128 if kind else 0,sx,sy,([28,87][c%2] if kind else 0),0,0,0)
+    return bytes(data),reference(data)

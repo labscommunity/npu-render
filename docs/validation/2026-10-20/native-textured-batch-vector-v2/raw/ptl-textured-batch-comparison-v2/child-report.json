@@ -1,0 +1,519 @@
+{
+  "started": "2026-10-20T12:26:00.281772+00:00",
+  "completed": true,
+  "passed": true,
+  "cases": [
+    {
+      "width": 128,
+      "height": 128,
+      "texture_windows": 2,
+      "commands_per_tile": 4,
+      "oracle_sha256": "c4a8b8c28b970febc37d9051882b7c3a5006d5c2e8aa7973414e50fb6c4279ca",
+      "warmups": [
+        {
+          "version": 1,
+          "exact": true,
+          "elapsed_ms": 6.0493,
+          "request_wait_ms": 5.9324,
+          "provider_requests": 1,
+          "input_bytes": 3170304,
+          "output_bytes": 3170304
+        },
+        {
+          "version": 2,
+          "exact": true,
+          "elapsed_ms": 3.4142,
+          "request_wait_ms": 3.2987,
+          "provider_requests": 1,
+          "input_bytes": 3170304,
+          "output_bytes": 3170304
+        }
+      ],
+      "rounds": [
+        {
+          "index": 0,
+          "phases": [
+            {
+              "phase": "A1",
+              "version": 1,
+              "exact": true,
+              "elapsed_ms": 3.9425,
+              "request_wait_ms": 3.8761,
+              "provider_requests": 1,
+              "input_bytes": 3170304,
+              "output_bytes": 3170304
+            },
+            {
+              "phase": "B1",
+              "version": 2,
+              "exact": true,
+              "elapsed_ms": 1.983,
+              "request_wait_ms": 1.9047,
+              "provider_requests": 1,
+              "input_bytes": 3170304,
+              "output_bytes": 3170304
+            },
+            {
+              "phase": "B2",
+              "version": 2,
+              "exact": true,
+              "elapsed_ms": 2.168,
+              "request_wait_ms": 1.9961,
+              "provider_requests": 1,
+              "input_bytes": 3170304,
+              "output_bytes": 3170304
+            },
+            {
+              "phase": "A2",
+              "version": 1,
+              "exact": true,
+              "elapsed_ms": 3.8628,
+              "request_wait_ms": 3.8105,
+              "provider_requests": 1,
+              "input_bytes": 3170304,
+              "output_bytes": 3170304
+            }
+          ],
+          "elapsed_reduction_percent": 46.818187641730624
+        },
+        {
+          "index": 1,
+          "phases": [
+            {
+              "phase": "A1",
+              "version": 1,
+              "exact": true,
+              "elapsed_ms": 3.8377,
+              "request_wait_ms": 3.7843,
+              "provider_requests": 1,
+              "input_bytes": 3170304,
+              "output_bytes": 3170304
+            },
+            {
+              "phase": "B1",
+              "version": 2,
+              "exact": true,
+              "elapsed_ms": 1.9412,
+              "request_wait_ms": 1.8839,
+              "provider_requests": 1,
+              "input_bytes": 3170304,
+              "output_bytes": 3170304
+            },
+            {
+              "phase": "B2",
+              "version": 2,
+              "exact": true,
+              "elapsed_ms": 1.9058,
+              "request_wait_ms": 1.8576,
+              "provider_requests": 1,
+              "input_bytes": 3170304,
+              "output_bytes": 3170304
+            },
+            {
+              "phase": "A2",
+              "version": 1,
+              "exact": true,
+              "elapsed_ms": 3.8607,
+              "request_wait_ms": 3.8065,
+              "provider_requests": 1,
+              "input_bytes": 3170304,
+              "output_bytes": 3170304
+            }
+          ],
+          "elapsed_reduction_percent": 50.02857736672554
+        },
+        {
+          "index": 2,
+          "phases": [
+            {
+              "phase": "A1",
+              "version": 1,
+              "exact": true,
+              "elapsed_ms": 3.9406,
+              "request_wait_ms": 3.8787,
+              "provider_requests": 1,
+              "input_bytes": 3170304,
+              "output_bytes": 3170304
+            },
+            {
+              "phase": "B1",
+              "version": 2,
+              "exact": true,
+              "elapsed_ms": 2.0714,
+              "request_wait_ms": 1.9298,
+              "provider_requests": 1,
+              "input_bytes": 3170304,
+              "output_bytes": 3170304
+            },
+            {
+              "phase": "B2",
+              "version": 2,
+              "exact": true,
+              "elapsed_ms": 1.9354,
+              "request_wait_ms": 1.8746,
+              "provider_requests": 1,
+              "input_bytes": 3170304,
+              "output_bytes": 3170304
+            },
+            {
+              "phase": "A2",
+              "version": 1,
+              "exact": true,
+              "elapsed_ms": 3.8646,
+              "request_wait_ms": 3.8052,
+              "provider_requests": 1,
+              "input_bytes": 3170304,
+              "output_bytes": 3170304
+            }
+          ],
+          "elapsed_reduction_percent": 48.66499256905652
+        }
+      ]
+    },
+    {
+      "width": 1024,
+      "height": 768,
+      "texture_windows": 96,
+      "commands_per_tile": 4,
+      "oracle_sha256": "ee51ae008a91d72fb939c559edfa41d4bf9d02833926a8dc8672a112318b063f",
+      "warmups": [
+        {
+          "version": 1,
+          "exact": true,
+          "elapsed_ms": 32.6347,
+          "request_wait_ms": 30.5939,
+          "provider_requests": 4,
+          "input_bytes": 12681216,
+          "output_bytes": 12681216
+        },
+        {
+          "version": 2,
+          "exact": true,
+          "elapsed_ms": 14.939,
+          "request_wait_ms": 13.5117,
+          "provider_requests": 4,
+          "input_bytes": 12681216,
+          "output_bytes": 12681216
+        }
+      ],
+      "rounds": [
+        {
+          "index": 0,
+          "phases": [
+            {
+              "phase": "A1",
+              "version": 1,
+              "exact": true,
+              "elapsed_ms": 30.8341,
+              "request_wait_ms": 29.3889,
+              "provider_requests": 4,
+              "input_bytes": 12681216,
+              "output_bytes": 12681216
+            },
+            {
+              "phase": "B1",
+              "version": 2,
+              "exact": true,
+              "elapsed_ms": 14.6083,
+              "request_wait_ms": 13.265,
+              "provider_requests": 4,
+              "input_bytes": 12681216,
+              "output_bytes": 12681216
+            },
+            {
+              "phase": "B2",
+              "version": 2,
+              "exact": true,
+              "elapsed_ms": 14.5446,
+              "request_wait_ms": 13.2671,
+              "provider_requests": 4,
+              "input_bytes": 12681216,
+              "output_bytes": 12681216
+            },
+            {
+              "phase": "A2",
+              "version": 1,
+              "exact": true,
+              "elapsed_ms": 30.7232,
+              "request_wait_ms": 29.2913,
+              "provider_requests": 4,
+              "input_bytes": 12681216,
+              "output_bytes": 12681216
+            }
+          ],
+          "elapsed_reduction_percent": 52.641035263080084
+        },
+        {
+          "index": 1,
+          "phases": [
+            {
+              "phase": "A1",
+              "version": 1,
+              "exact": true,
+              "elapsed_ms": 30.7472,
+              "request_wait_ms": 29.296699999999998,
+              "provider_requests": 4,
+              "input_bytes": 12681216,
+              "output_bytes": 12681216
+            },
+            {
+              "phase": "B1",
+              "version": 2,
+              "exact": true,
+              "elapsed_ms": 14.4821,
+              "request_wait_ms": 13.1823,
+              "provider_requests": 4,
+              "input_bytes": 12681216,
+              "output_bytes": 12681216
+            },
+            {
+              "phase": "B2",
+              "version": 2,
+              "exact": true,
+              "elapsed_ms": 15.0909,
+              "request_wait_ms": 13.3897,
+              "provider_requests": 4,
+              "input_bytes": 12681216,
+              "output_bytes": 12681216
+            },
+            {
+              "phase": "A2",
+              "version": 1,
+              "exact": true,
+              "elapsed_ms": 30.9262,
+              "request_wait_ms": 29.339799999999997,
+              "provider_requests": 4,
+              "input_bytes": 12681216,
+              "output_bytes": 12681216
+            }
+          ],
+          "elapsed_reduction_percent": 52.04901951246404
+        },
+        {
+          "index": 2,
+          "phases": [
+            {
+              "phase": "A1",
+              "version": 1,
+              "exact": true,
+              "elapsed_ms": 30.8764,
+              "request_wait_ms": 29.2899,
+              "provider_requests": 4,
+              "input_bytes": 12681216,
+              "output_bytes": 12681216
+            },
+            {
+              "phase": "B1",
+              "version": 2,
+              "exact": true,
+              "elapsed_ms": 14.6479,
+              "request_wait_ms": 13.2575,
+              "provider_requests": 4,
+              "input_bytes": 12681216,
+              "output_bytes": 12681216
+            },
+            {
+              "phase": "B2",
+              "version": 2,
+              "exact": true,
+              "elapsed_ms": 14.2777,
+              "request_wait_ms": 13.0258,
+              "provider_requests": 4,
+              "input_bytes": 12681216,
+              "output_bytes": 12681216
+            },
+            {
+              "phase": "A2",
+              "version": 1,
+              "exact": true,
+              "elapsed_ms": 30.9992,
+              "request_wait_ms": 29.353899999999996,
+              "provider_requests": 4,
+              "input_bytes": 12681216,
+              "output_bytes": 12681216
+            }
+          ],
+          "elapsed_reduction_percent": 53.252008869408954
+        }
+      ]
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "texture_windows": 270,
+      "commands_per_tile": 4,
+      "oracle_sha256": "ea4d7dde91e24c13f8ddbf43daff76dbffad7e797226af7ea8c75af914e3c9cb",
+      "warmups": [
+        {
+          "version": 1,
+          "exact": true,
+          "elapsed_ms": 83.8627,
+          "request_wait_ms": 78.7613,
+          "provider_requests": 12,
+          "input_bytes": 38043648,
+          "output_bytes": 38043648
+        },
+        {
+          "version": 2,
+          "exact": true,
+          "elapsed_ms": 39.9501,
+          "request_wait_ms": 35.476200000000006,
+          "provider_requests": 12,
+          "input_bytes": 38043648,
+          "output_bytes": 38043648
+        }
+      ],
+      "rounds": [
+        {
+          "index": 0,
+          "phases": [
+            {
+              "phase": "A1",
+              "version": 1,
+              "exact": true,
+              "elapsed_ms": 82.7732,
+              "request_wait_ms": 77.9796,
+              "provider_requests": 12,
+              "input_bytes": 38043648,
+              "output_bytes": 38043648
+            },
+            {
+              "phase": "B1",
+              "version": 2,
+              "exact": true,
+              "elapsed_ms": 39.6125,
+              "request_wait_ms": 35.3658,
+              "provider_requests": 12,
+              "input_bytes": 38043648,
+              "output_bytes": 38043648
+            },
+            {
+              "phase": "B2",
+              "version": 2,
+              "exact": true,
+              "elapsed_ms": 39.4936,
+              "request_wait_ms": 35.337099999999985,
+              "provider_requests": 12,
+              "input_bytes": 38043648,
+              "output_bytes": 38043648
+            },
+            {
+              "phase": "A2",
+              "version": 1,
+              "exact": true,
+              "elapsed_ms": 83.9926,
+              "request_wait_ms": 78.14399999999999,
+              "provider_requests": 12,
+              "input_bytes": 38043648,
+              "output_bytes": 38043648
+            }
+          ],
+          "elapsed_reduction_percent": 52.564554602922186
+        },
+        {
+          "index": 1,
+          "phases": [
+            {
+              "phase": "A1",
+              "version": 1,
+              "exact": true,
+              "elapsed_ms": 82.759,
+              "request_wait_ms": 77.8177,
+              "provider_requests": 12,
+              "input_bytes": 38043648,
+              "output_bytes": 38043648
+            },
+            {
+              "phase": "B1",
+              "version": 2,
+              "exact": true,
+              "elapsed_ms": 39.7914,
+              "request_wait_ms": 35.48729999999999,
+              "provider_requests": 12,
+              "input_bytes": 38043648,
+              "output_bytes": 38043648
+            },
+            {
+              "phase": "B2",
+              "version": 2,
+              "exact": true,
+              "elapsed_ms": 39.9598,
+              "request_wait_ms": 35.7259,
+              "provider_requests": 12,
+              "input_bytes": 38043648,
+              "output_bytes": 38043648
+            },
+            {
+              "phase": "A2",
+              "version": 1,
+              "exact": true,
+              "elapsed_ms": 83.5846,
+              "request_wait_ms": 78.0155,
+              "provider_requests": 12,
+              "input_bytes": 38043648,
+              "output_bytes": 38043648
+            }
+          ],
+          "elapsed_reduction_percent": 52.05634602112734
+        },
+        {
+          "index": 2,
+          "phases": [
+            {
+              "phase": "A1",
+              "version": 1,
+              "exact": true,
+              "elapsed_ms": 82.5061,
+              "request_wait_ms": 77.52669999999999,
+              "provider_requests": 12,
+              "input_bytes": 38043648,
+              "output_bytes": 38043648
+            },
+            {
+              "phase": "B1",
+              "version": 2,
+              "exact": true,
+              "elapsed_ms": 39.5295,
+              "request_wait_ms": 35.34589999999999,
+              "provider_requests": 12,
+              "input_bytes": 38043648,
+              "output_bytes": 38043648
+            },
+            {
+              "phase": "B2",
+              "version": 2,
+              "exact": true,
+              "elapsed_ms": 40.3959,
+              "request_wait_ms": 35.617999999999995,
+              "provider_requests": 12,
+              "input_bytes": 38043648,
+              "output_bytes": 38043648
+            },
+            {
+              "phase": "A2",
+              "version": 1,
+              "exact": true,
+              "elapsed_ms": 82.6968,
+              "request_wait_ms": 77.6977,
+              "provider_requests": 12,
+              "input_bytes": 38043648,
+              "output_bytes": 38043648
+            }
+          ],
+          "elapsed_reduction_percent": 51.61985655215495
+        }
+      ]
+    }
+  ],
+  "model_sha256": {
+    "1": "a0ef05ffe0336c6c6bbf299a9c91a101e48253f36f2bb92f43d384d15fe60af6",
+    "2": "1195240d499e23aeb203047529e5da655d9c62528b2307d5e55922da8fb7650e"
+  },
+  "execution_devices": [
+    "NPU"
+  ],
+  "turbo_requested": true,
+  "turbo_readback": true,
+  "scope": "Synthetic independent spatial texture windows, scalar versus four-pixel vector kernel with identical batched commands and exact ordered arithmetic. Host performs transport and assembly only. Loop time includes packing, NPU waits and output copying; excludes initial oracle and texture preparation. Not general Windows batching, resource persistence, physical display, GPU relief or Tahoma.",
+  "finished": "2026-10-20T12:26:02.139930+00:00"
+}
