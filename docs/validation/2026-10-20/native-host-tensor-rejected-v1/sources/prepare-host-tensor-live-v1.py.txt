@@ -1,0 +1,42 @@
+"""Gate the host-tensor worker on exact replay, ABBA improvement, and recovery."""
+from pathlib import Path
+import ast,hashlib,json,re
+r=Path(__file__).parent
+changes={'native-registration-v45':'native-registration-v46','native-registered-v45':'native-registered-v46','NativeRecovery-v45':'NativeRecovery-v46','native_shared_app_v12':'native_shared_app_v13','native_desktop_bootstrap_v40':'native_desktop_bootstrap_v41','native-desktop-v66':'native-desktop-v67','native-desktop-admission-v66':'native-desktop-admission-v67','NativeDesktopRecovery-v66':'NativeDesktopRecovery-v67','run-native-live-v56':'run-native-live-v57','native-live-v56':'native-live-v57','NativeLiveV56':'NativeLiveV57','native-topology-primary-v42':'native-topology-primary-v43','native-topology-v102':'native-topology-v108','native-topology-v103':'native-topology-v109','native-topology-v104':'native-topology-v110','InspectTopology-V102':'InspectTopology-V108','InspectTopology-V103':'InspectTopology-V109','InspectTopology-V104':'InspectTopology-V110','observer104':'observer110','dismiss-native-saver-v30':'dismiss-native-saver-v32','dismiss-v30':'dismiss-v32','run-ptl-native-live-v20':'run-ptl-native-live-v21','ptl-native-live-v20':'ptl-native-live-v21','native-latency-v20-analysis':'native-latency-v21-analysis','native-presentation-v17-analysis':'native-presentation-v18-analysis','native-repeated-input-v3-analysis':'native-repeated-input-v4-analysis','ptl-combined-desktop-v8':'ptl-combined-desktop-v9','analyze-native-latency-v18.py':'analyze-native-latency-v19.py','analyze-native-presentation-v17.py':'analyze-native-presentation-v18.py','ptl-native-worker-v19':'ptl-native-worker-v20','d4ddc1238bf91e94190b873f7f985def21c64c85f57fde18b6456f60c175f96c':'92028cab6f47a1293e39e9e0ebe05bc1d0529e54ea57b4f6a5bf51274ff744e0'}
+pattern=re.compile('|'.join(re.escape(x) for x in sorted(changes,key=len,reverse=True)))
+def rename(s):return pattern.sub(lambda m:changes[m[0]],s)
+files=[n for n in json.loads((r/'ptl-combined-live-v8-upload.json').read_text()) if not n.endswith('-source.json')]
+for name in files:
+ s=rename((r/name).read_text())
+ if name=='qualify-native-registered-v45.py':
+  a=s.index("qualified=obj(root/'builds/ptl-native-worker-v18/");b=s.index("assert report['worker_binary_sha256']",a)
+  expected={n:hashlib.sha256((r/'ptl-native-worker-v20'/n).read_bytes()).hexdigest() for n in ('ptl_program.hpp','ptl_complex_shader.hpp','ptl_point_rectangle.hpp','ptl_host_tensor_v1.hpp')}
+  s=s[:a]+"qualified=obj(root/'builds/ptl-native-worker-v19/registered-build-report.json')\ncandidate=obj(v.worker.parent.parent/'registered-build-report.json')\nexpected_changes="+repr(expected)+"\nassert candidate['linked_libraries']==qualified['linked_libraries']\nassert set(candidate['source_sha256'])==set(qualified['source_sha256'])|{'ptl_host_tensor_v1.hpp'}\nassert {n:h for n,h in candidate['source_sha256'].items() if h!=qualified['source_sha256'].get(n)}==expected_changes\n"+s[b:]
+ if name=='run-ptl-combined-desktop-v8.ps1':
+  a=s.index('try{\n');b=s.index(' if(@(Get-Process nr_registered*',a)
+  s=s[:a]+r'''try{
+ $report.active_phase='waiting-for-host-tensor-comparison';Save-Report
+ $deadline=[DateTime]::UtcNow.AddMinutes(120)
+ while($true){$q=Get-Content "$vm\ptl-worker-v20-qualification\report.json" -Raw|ConvertFrom-Json;if($q.completed){break};if([DateTime]::UtcNow -gt $deadline){throw 'Host tensor comparison deadline'};Start-Sleep -Seconds 3}
+ if(!$q.passed){throw 'Host tensor qualification incomplete'}
+ $q=Get-Content "$vm\ptl-native-worker-v20-full\report.json" -Raw|ConvertFrom-Json
+ if(!$q.passed -or !$q.all_worker_v19_outputs_preserved -or $q.worker_sha256 -ne '92028cab6f47a1293e39e9e0ebe05bc1d0529e54ea57b4f6a5bf51274ff744e0'){throw 'Host tensor image proof incomplete'}
+ $comparison=Get-Content "$vm\host-tensor-comparison-v1\report.json" -Raw|ConvertFrom-Json
+ if(!$comparison.completed -or !$comparison.passed -or $comparison.summary.pairs -ne 1944 -or $comparison.summary.new_parent_ms -ge .95*$comparison.summary.old_parent_ms){throw 'Host tensors lack five percent aggregate paired improvement'}
+ $report.paired_host_tensor=$comparison.summary
+ $report.active_phase='waiting-for-host-tensor-recovery';Save-Report
+ $deadline=[DateTime]::UtcNow.AddMinutes(20)
+ while($true){$q=Get-Content "$vm\host-tensor-provider-recovery-v1-qualification\report.json" -Raw|ConvertFrom-Json;if($q.completed){break};if([DateTime]::UtcNow -gt $deadline){throw 'Host tensor recovery deadline'};Start-Sleep -Seconds 3}
+ if(!$q.passed){throw 'Host tensor recovery not qualified'}
+ $q=Get-Content "$vm\host-tensor-provider-recovery-v1\report.json" -Raw|ConvertFrom-Json
+ if(!$q.passed -or @($q.phases).Count -ne 2 -or $q.worker_sha256 -ne '92028cab6f47a1293e39e9e0ebe05bc1d0529e54ea57b4f6a5bf51274ff744e0'){throw 'Host tensor recovery proof differs'}
+ $prior=Get-Content "$vm\physical-gpu-desktop-v2\report.json" -Raw|ConvertFrom-Json
+ if(!$prior.completed -or !$prior.cleanup_passed -or !$prior.memory_integrity_after){throw 'GPU baseline not restored'}
+'''+s[b:]
+  s=s.replace('native-registration-v44','native-registration-v45')
+ if name.endswith('.py'):ast.parse(s)
+ p=r/rename(name);assert not p.exists(),p;p.write_text(s)
+for old in ('native-registration-v45-source.json','native-desktop-v66-source.json'):
+ names=[rename(n) for n in json.loads((r/old).read_text())];(r/rename(old)).write_text(json.dumps({n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in names},indent=2)+'\n')
+(r/'ptl-combined-live-v9-upload.json').write_text(json.dumps([rename(n) for n in files]+['native-registration-v46-source.json','native-desktop-v67-source.json'],indent=2)+'\n')
+print('Prepared finite desktop trial gated on exact outputs, five percent paired gain, and two recovery cases')

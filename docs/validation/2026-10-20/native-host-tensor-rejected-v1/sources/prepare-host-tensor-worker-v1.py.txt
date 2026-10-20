@@ -1,0 +1,28 @@
+"""Prepare host tensor candidate; deployment still requires exact images and timing."""
+from pathlib import Path
+import ast,hashlib,json,shutil,tarfile
+r=Path(__file__).parent;name='ptl-native-worker-v20';d=r/name;assert not d.exists();shutil.copytree(r/'ptl-native-worker-v19',d)
+shutil.copyfile(r/'ptl_host_tensor_v1.hpp',d/'ptl_host_tensor_v1.hpp')
+for file,component in [('ptl_program.hpp','program'),('ptl_complex_shader.hpp','complex'),('ptl_point_rectangle.hpp','rectangle')]:
+ p=d/file;s=p.read_text();s=s.replace('#pragma once','#pragma once\n#include "ptl_host_tensor_v1.hpp"',1)
+ needle='inference=model.create_infer_request();';assert s.count(needle)==1;s=s.replace(needle,needle+f'nr::provider::bind_host_tensors(inference,"{component}");');p.write_text(s)
+manifest={str(p.relative_to(d)):hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()};old=json.loads((r/'ptl-native-worker-v19-source.json').read_text())
+changed={n:h for n,h in manifest.items() if h!=old.get(n)};assert set(changed)=={'ptl_program.hpp','ptl_complex_shader.hpp','ptl_point_rectangle.hpp','ptl_host_tensor_v1.hpp'}
+(r/(name+'-source.json')).write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/(name+'.tar.gz'),'w:gz') as archive:archive.add(d,arcname=name)
+s=(r/'build-ptl-native-worker-v19.ps1').read_text().replace('ptl-native-worker-v19',name);(r/('build-'+name+'.ps1')).write_text(s)
+s=(r/'qualify-ptl-native-worker-v19-v2.py').read_text().replace('ptl-native-worker-v19',name)
+needle=" report['passed']=True";assert s.count(needle)==1
+s=s.replace(needle,""" bindings=[]
+ for path in (trial/'provider-processes').glob('generation-*/worker.stdout.jsonl'):
+  bindings += [x for x in rows(path) if x.get('ptl_host_tensor_binding')]
+ assert len(bindings)==3 and {x['component'] for x in bindings}=={'program','complex','rectangle'}
+ assert all(x['bytes_per_tensor']==1572864 and not x['cpu_rendering'] and not x['result_cache'] and x['plugin_managed_transfer'] and not ((x['input_protection']|x['output_protection'])&0x600) for x in bindings)
+ report['host_tensor_bindings']=bindings
+ if a.stage=='full':
+  preceding=rows(vm/'ptl-native-worker-v19-full/replay/replays.jsonl');assert len(preceding)==972
+  assert all((x['ticket'],x['pixels_sha256'],x['pixel_bytes'])==(y['ticket'],y['pixels_sha256'],y['pixel_bytes']) for x,y in zip(preceding,current,strict=True))
+  report['all_worker_v19_outputs_preserved']=True
+ report['passed']=True""")
+ast.parse(s);(r/('qualify-'+name+'.py')).write_text(s)
+print(json.dumps(dict(prepared=name,changes=list(changed),hardware_tested=False)))

@@ -25,6 +25,9 @@ reaches 29.9 verified animation updates per second through the same display brid
 versus 0.7 on NPU. Its 550-second presentation and restoration pass, with zero
 NPU rendering calls. This points to the NPU rendering path rather than the bridge
 as the animation bottleneck. Tahoma throughput has not been measured in this setup.
+The [host-memory experiment](docs/validation/2026-10-20/native-host-tensor-rejected-v1/README.md)
+preserves all 3,888 replay images but increases aggregate request time by 7.50%.
+Its live promotion is rejected before any desktop change.
 
 Its [complete-image component comparison](docs/validation/2026-10-16/native-filled-program-comparison-v1/README.md)
 preserves all 1,852 preceding NPU images. Across 1,389 warm pairs, aggregate draw

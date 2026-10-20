@@ -1,0 +1,49 @@
+from pathlib import Path
+from datetime import UTC,datetime
+import hashlib,json,os,subprocess,sys,traceback
+r=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=r/'vm';out=vm/'host-tensor-provider-recovery-v1';out.mkdir(exist_ok=False)
+def obj(p):return json.loads(p.read_text(encoding='utf-8-sig'))
+def rows(p):return [json.loads(x) for x in p.read_text(encoding='utf-8-sig').splitlines() if x.startswith('{')]
+def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,desktop_changed=False,tahoma_tested=False,real_device_loss_tested=False,phases=[]);process=None
+def save():(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+save()
+try:
+ q=obj(vm/'ptl-native-worker-v20-full/report.json');assert q['passed'] and q['all_worker_v19_outputs_preserved']
+ assert sha(r/'builds/ptl-native-worker-v20/Release/nr_registered_local_indexed_worker.exe')==q['worker_sha256']
+ assert sha(vm/'replay-recorded-requests-v19.py')=='0a360383e4ad5084f77a07f0ece68467caa4debfcbe4c4c24a16a7f5345e112d'
+ expected={x['ticket']:x for x in rows(vm/'ptl-native-worker-v18-full/replay/replays.jsonl')}
+ env=os.environ.copy()
+ models={
+  'PROGRAM':('ptl-six-span-program-compact-v1','92e04a6734dc6e70ffed15b67fddba02892c66168aa0d47a6cf4bcc65a6a585d'),
+  'RECTANGLE':('ptl-six-span-point-rectangle-v2','d651d6101dbccc5796873dc2016ec9e23d262cd955e9bc4bee6d56b86756eb2d'),
+  'COMPLEX':('ptl-six-span-complex-shader-v1','47f69b5861732a03014b58160116ebbb928fd6e818a11b7f553e423a4cf3c43a'),
+  'LONG':('ptl-six-span-long-shader-v2','895831be2695bc151454833249996608f38d35880c635900bb731515bc2bcda1'),
+  'FOUR_TAP':('ptl-six-span-general-v1','710f6e5586da59f4040213435c5ecc13bb669e6b1be668f838edd00bca5dd697'),
+  'SOLID':('ptl-six-span-solid-v3','21360321c21d4a0253b260ce62420ffef47ec03daae8b89e6cf05bd4c541ee8f'),
+  'TEXTURE':('ptl-six-span-three-texture-v1','481765dd51d8d9b051b87db8be7e62ae7931245fe051b33b6457be77816c2e87'),
+  'GEOMETRY':('ptl-six-span-geometry-v2','ea4432abd7b548396b86665c1b318353e0d2f3ec847bcd3e6f56c10bd1336dfa'),
+  'MASKED':('ptl-six-span-masked-v1','81104c9ea8760bbeb7cc028ea2a9c81e8605482af219f57c082c737b9662d1e0')}
+ for name,(directory,digest) in models.items():
+  path=vm/directory/'patched.blob';assert sha(path)==digest;env['NR_RENDER_PTL_'+name+'_BLOB']=str(path)
+ tickets=[0,1,7,11,14,17,18,41,58,75,127,172,181,196,256,280,334,363,820,970]
+ for phase,flag in [('injected-provider-exception','--test-exception-ticket'),('owned-child-termination','--test-kill-ticket')]:
+  trial=out/phase;command=list(q['command']);command[command.index('--output')+1]=str(trial);command+=['--tickets',','.join(map(str,tickets)),flag,'5']
+  with (out/(phase+'.stdout.log')).open('xb') as stdout,(out/(phase+'.stderr.log')).open('xb') as stderr:
+   process=subprocess.Popen(command,env=env,stdout=stdout,stderr=stderr,creationflags=subprocess.CREATE_NO_WINDOW)
+   try:process.wait(timeout=300)
+   except subprocess.TimeoutExpired:process.kill();process.wait(timeout=5);raise AssertionError('Recovery replay deadline')
+  proof=obj(trial/'report.json');assert process.returncode==0 and proof['passed'] and proof['successful_replays']==proof['delivery_acknowledgments']==20
+  replays=rows(trial/'replays.jsonl');assert [x['ticket'] for x in replays]==tickets
+  assert all(x['pixels_sha256']==expected[x['ticket']]['pixels_sha256'] and x['pixel_bytes']==expected[x['ticket']]['pixel_bytes'] for x in replays)
+  events=rows(trial/'worker.stdout.jsonl');generations=[x for x in events if x.get('provider_process_started')];failures=[x for x in events if x.get('provider_process_failure')];responses=[x for x in events if x.get('provider_process_response')]
+  assert len(generations)==2 and len(failures)==1 and failures[0]['retry_on_npu'] and failures[0]['fallback_backend']=='none'
+  assert len(responses)==20 and sum(x['attempt']==1 for x in responses)==1 and next(x for x in responses if x['attempt']==1)['dispatch_ticket']==5
+  children=[x for f in (trial/'provider-processes').glob('generation-*/worker.stdout.jsonl') for x in rows(f)];assert sum(bool(x.get('passed')) and x.get('execution_device')=='NPU' for x in children)==20
+  report['phases'].append(dict(phase=phase,passed=True,exact_images=20,acknowledgments=20,provider_generations=2,provider_failures=1,npu_retries=1,real_device_loss=False,replay_report_sha256=sha(trial/'report.json')));save()
+ report.update(worker_sha256=q['worker_sha256'],passed=True)
+except Exception as error:report.update(error=repr(error),traceback=traceback.format_exc())
+finally:
+ if process is not None and process.poll() is None:process.kill();process.wait(timeout=5)
+ report.update(completed=True,finished=datetime.now(UTC).isoformat());save()
+print(json.dumps(report));raise SystemExit(0 if report['passed'] else 1)

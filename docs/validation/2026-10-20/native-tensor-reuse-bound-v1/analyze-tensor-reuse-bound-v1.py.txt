@@ -1,0 +1,16 @@
+"""Compute an unbounded reuse opportunity from an immutable fingerprint trace."""
+from pathlib import Path
+import argparse,hashlib,json
+p=argparse.ArgumentParser();p.add_argument('--trace',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
+raw=a.trace.read_bytes();seen={};duplicates=0;wait=0.;total=0.;calls=0
+for line in raw.decode('utf-8-sig').splitlines():
+ if not line.startswith('{'):continue
+ x=json.loads(line)
+ if not x.get('ptl_tensor_digest'):continue
+ assert x['npu_call_executed'] and not x['result_reused'];calls+=1;total+=x['inference_wait_ms'];key=(x['component'],x['input_sha256'])
+ if key in seen:
+  assert seen[key]==x['output_sha256'];duplicates+=1;wait+=x['inference_wait_ms']
+ else:seen[key]=x['output_sha256']
+assert calls==7531 and len(seen)==3368 and duplicates==4163
+report=dict(passed=True,completed=True,trace_sha256=hashlib.sha256(raw).hexdigest(),calls=calls,unique_inputs=len(seen),later_duplicates=duplicates,observed_wait_ms_on_later_duplicates=wait,total_profiled_wait_ms=total,scope='Unbounded fingerprint reuse opportunity for the three profiled components. No cache or new execution. Omits lookup, collision comparison, storage and copying; timing comes from an instrumented replay and is not an achieved speedup or directly subtractable from another run.')
+assert not a.output.exists();a.output.parent.mkdir(exist_ok=True);a.output.write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report))

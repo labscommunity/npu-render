@@ -34,9 +34,11 @@ Tahoma or resource-utilization measurements.
 
 The [per-call fingerprint diagnostic](../validation/2026-10-16/native-tensor-fingerprint-v1/README.md)
 preserves all 972 images but finds only 1.07–2.61 seconds of measured NPU waits on
-hypothetical 64–256 MiB cache hits. Hashing is itself expensive. The next experiment
-compares plugin-allocated input memory with ordinary host staging tensors; exact
-images and an alternating-order replay are required before live promotion.
+hypothetical 64–256 MiB cache hits. Hashing is itself expensive. The completed
+[host-tensor comparison](../validation/2026-10-20/native-host-tensor-rejected-v1/README.md)
+preserves all 3,888 A/B/B/A images but increases aggregate parent time by 7.50%.
+Its provider-recovery tests pass; its live promotion gate rejects the regression
+before any desktop change. Cacheable input memory is not a rendering fix here.
 
 The preceding
 [filled-program live v54 trial](../validation/2026-10-16/native-filled-program-live-v1/README.md)
@@ -284,12 +286,12 @@ renderer does not establish where every application renders.
 
 | Gate | Work | Acceptance evidence | Current status |
 | --- | --- | --- | --- |
-| 1. Routing | Identify physical/indirect paths and the actual renderer before, during and after admission. | Timestamped topology, DWM NPU receipts, frame producer, exact restoration. | Finite v55 passes native routing and restoration. The physical output remains available. |
-| 2. Continuous rendering | Render changing content without hidden fallback; handle failed draws and preparation. | Fresh frames, pixel checks, provider receipts, sustained operation. | V55 passes 1,680 acknowledged operations and 103 matching physical submissions. The earlier v36 thirty-minute result does not qualify the current renderer. |
-| 3. Physical presentation | Deliver fresh NPU frames to the physical output without recursive mirroring; quantify remaining GPU work. | Sequence-to-present correlation, output identity, display statistics, residual GPU activity. | V55 correlates 103 exact submissions and controlled colors. GPU presentation copies and scanout remain; their cost is unmeasured against a matched baseline. |
-| 4. Interaction and recovery | Route pointer, keyboard and focus; handle cursor, DPI and resolution; restore topology and windows. | Physical input observations, owned-process fault recovery, ordinary lock/login path retained. | V55 passes controlled input, confinement/reacquisition and ordinary restoration with memory integrity enabled. Current sleep/wake, secure-desktop and broader fault qualification remain open. |
-| 5. Responsiveness | Reduce rendering, request, copy and scheduling costs; report cold start separately. | Ordinary animated desktop at 30 fps, p95 visible response ≤100 ms, thirty-minute stable run. | Not met. Forty inputs give warm received-input-to-display p95 of 116.208 ms mouse and 109.503 ms keyboard; one input also waits 3.32 s before receipt. The ten-second animation yields 0.7 verified unique updates/s. Child rendering occupies 6.6 s of that interval. A matched desktop speedup is not established. |
-| 6. Application coverage | Admit ordinary applications and implement required browser, video and 3D operations; verify per-process renderer. | Capability matrix and hardware runs accounting for every remaining iGPU operation. | V55 passes a normally started non-admin default-adapter fixture sharing DWM's NPU worker. Continuous admission, renewal/revocation, multiple applications and broad browser/video/game coverage remain unqualified. |
+| 1. Routing | Identify physical/indirect paths and the actual renderer before, during and after admission. | Timestamped topology, DWM NPU receipts, frame producer, exact restoration. | Finite v56 passes native routing and restoration. The physical output remains available. |
+| 2. Continuous rendering | Render changing content without hidden fallback; handle failed draws and preparation. | Fresh frames, pixel checks, provider receipts, sustained operation. | V56 passes 1,682 acknowledged operations and 103 matching physical submissions. The earlier v36 thirty-minute result does not qualify the current renderer. |
+| 3. Physical presentation | Deliver fresh NPU frames to the physical output without recursive mirroring; quantify remaining GPU work. | Sequence-to-present correlation, output identity, display statistics, residual GPU activity. | V56 correlates 103 exact submissions and controlled colors. The same bridge carries 29.9 animation updates/s in the GPU control. Residual GPU presentation/copy cost and resource relief remain unmeasured. |
+| 4. Interaction and recovery | Route pointer, keyboard and focus; handle cursor, DPI and resolution; restore topology and windows. | Physical input observations, owned-process fault recovery, ordinary lock/login path retained. | V56 passes controlled input, confinement/reacquisition and ordinary restoration with memory integrity enabled. Current sleep/wake, secure-desktop and broader fault qualification remain open. |
+| 5. Responsiveness | Reduce rendering, request, copy and scheduling costs; report cold start separately. | Ordinary animated desktop at 30 fps, p95 visible response ≤100 ms, thirty-minute stable run. | Not met. V56 warm sent-input-to-display p95 is 107.663 ms mouse and 1,632.388 ms keyboard. The NPU animation yields 0.7 verified updates/s versus 29.9 in the separate GPU control. Child rendering occupies 6.84 s of the NPU interval. No NPU desktop speedup is established. |
+| 6. Application coverage | Admit ordinary applications and implement required browser, video and 3D operations; verify per-process renderer. | Capability matrix and hardware runs accounting for every remaining iGPU operation. | V56 passes a normally started non-admin default-adapter fixture sharing DWM's NPU worker. Continuous admission, renewal/revocation, multiple applications and broad browser/video/game coverage remain unqualified. |
 | 7. Tahoma benefit | Repeat baseline/offload trials with matched power, resolution, content and work rate. | Tahoma throughput/latency, desktop frame times, per-engine activity, memory and power; measurable GPU relief without material regression. | Earlier experiments regressed. No native-desktop Tahoma A/B or GPU-relief result is established. |
 | 8. Usable switch | Integrate qualified components into install/on/off/status/recovery; complete distribution and CI work. | Clean install and repeated enable/disable cycles, failures and target-hardware end-to-end tests. | Private research prototype. No usable full-offload product or complete application migration. |
 
@@ -300,19 +302,27 @@ role, and any GPU rendering/copy cost in the bridge must be measured.
 
 ## Immediate work and decision gates
 
-1. The first forty-input and 30 Hz animation trial is complete. Repeat it with the
-   response-packet worker, preserving sent-input, received-input, publication,
-   display-counter and independent-read timing. Count only verified unique updates;
-   generating thirty updates per second does not establish their delivery.
-2. Response-copy reduction passes 3,598 validator checks, full worker replay,
-   injected-fault recovery and paired worker timing. It reduces aggregate request
-   time only 2.03%; live qualification is the remaining adoption gate.
-3. Target the measured animation cost: 207 overlapping requests, 3,361 whole-request
-   provider calls and 6,599.588 ms in child rendering, without compilation. Three
-   shader groups account for most of this execution interval. Check request reuse
-   and batching opportunities against retained inputs before implementing them.
-   Keep renderer time distinct from packet overhead, input-delivery stalls and
-   display observation cadence.
+1. Preserve the now-complete v55/v56 NPU trials and GPU control as the baseline.
+   Both NPU trials deliver 0.7 verified animation updates/s; the GPU control
+   delivers 29.9 through the same bridge. Keep input send, application receipt,
+   publication, display counters and independent reads distinct.
+2. Retain plugin-allocated tensors. The host-tensor experiment preserves images
+   but is 7.50% slower across 1,944 paired requests. Its recovery tests pass and
+   its desktop promotion correctly stops. For subsequent candidates require
+   at least five percent aggregate request-time improvement and provider-fault
+   recovery before repeating registered graphics and the finite desktop trial.
+3. Separately test balanced geometry packing. The current 4,096-record schedule
+   fills two of six kernel spans; the candidate distributes records across all
+   six without changing NPU arithmetic. All 972 retained images pass; the
+   alternating-order timing comparison remains pending. Do not
+   infer physical tile utilization or desktop throughput from partition counts.
+   Whole-request and per-call cache estimates are too small to justify treating
+   caching as the principal fix. Continue reducing measured shader and launch
+   costs, preserving complete images and tracking the remaining frame-time gap.
+   The next isolated candidate routes ordered multi-rectangle draws through the
+   existing rectangle kernel. The live trace shows a sixty-call draw still using
+   the old affine path. Preserve whole-batch geometry preflight, draw order and
+   exact output before considering any timing result.
 4. After responsiveness passes, run the current renderer's thirty-minute soak,
    sleep/wake, secure-desktop and owned-failure recovery. Keep moving/resizing
    windows and broader desktop interaction separate from the simple color fixture.
