@@ -127,8 +127,20 @@ hints: all 180 changing images match; enabled median is 40.1 ms versus 81.8 ms
 unspecified in that bursty workload. These timings have different work/cadence
 from the capacity comparison. A separate renderer candidate now applies the
 hint at existing custom-model imports without changing shader arithmetic.
-It needs complete replay, recovery and desktop qualification, followed by
-matched Tahoma measurements because increased NPU power may affect the iGPU.
+The [complete renderer comparison](../validation/2026-10-20/native-turbo-render-worker-v1/README.md)
+now preserves all 3,888 A/B/B/A images and reduces aggregate parent request time
+by 9.90%. Both thirty-image bounded recovery cases pass. A separate physical
+desktop trial is underway; the first setup attempt rejected a stale test-helper
+reference to the previous worker and restored the machine. This replay gain
+does not replace the 0.8/s uninstrumented desktop baseline or establish GPU relief.
+Matched Tahoma measurements remain necessary because increased NPU power may
+affect the iGPU.
+
+The [vector memory-fill component](../validation/2026-10-20/native-program-vector-fill-component-v1/README.md)
+passes 448 NPU fixtures inside the existing code allocation. The original program
+kernel contains a byte-store clearing loop; the replacement uses aligned wider
+stores. Its frequency and performance impact remain unmeasured. A complete
+renderer comparison is queued after the current desktop trial and restoration.
 
 The rectangle candidate also passes
 [two targeted provider-recovery scenarios](../validation/2026-10-20/native-quad-rectangle-recovery-v1/README.md);

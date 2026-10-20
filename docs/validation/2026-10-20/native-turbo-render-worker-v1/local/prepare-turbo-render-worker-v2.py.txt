@@ -1,0 +1,21 @@
+"""Qualify the helper name across both raster and shader namespaces."""
+from pathlib import Path
+import ast,hashlib,json,shutil,tarfile,subprocess
+r=Path(__file__).parent;name='ptl-native-worker-v26';d=r/name;assert not d.exists()
+old=json.loads((r/'ptl-native-worker-v25-source.json').read_text())
+for n,h in old.items():assert hashlib.sha256((r/'ptl-native-worker-v25'/n).read_bytes()).hexdigest()==h
+shutil.copytree(r/'ptl-native-worker-v25',d);changed=[]
+for p in d.glob('*.hpp'):
+ if p.name=='npu_turbo_import.hpp':continue
+ s=p.read_text()
+ if 'import_ptl_turbo(core,graph,' in s:s=s.replace('import_ptl_turbo(core,graph,','nr::raster::import_ptl_turbo(core,graph,');p.write_text(s);changed.append(p.name)
+assert len(changed)==10
+manifest={str(p.relative_to(d)):hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()};assert {n for n,h in manifest.items() if old.get(n)!=h}==set(changed)
+(r/(name+'-source.json')).write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/(name+'.tar.gz'),'w:gz') as a:a.add(d,arcname=name)
+for n in ['build-ptl-native-worker-v25.ps1','qualify-ptl-native-worker-v25.py','run-ptl-worker-v25-qualification.ps1']:
+ s=(r/n).read_text().replace('worker-v25','worker-v26').replace('turbo-render-comparison-v1','turbo-render-comparison-v2');p=r/n.replace('worker-v25','worker-v26');p.write_text(s)
+s=(r/'qualify-turbo-render-comparison-v1.py').read_text().replace('turbo-render-comparison-v1','turbo-render-comparison-v2').replace('worker-v25','worker-v26').replace("('B1',25),('B2',25)","('B1',26),('B2',26)").replace('version==25','version==26');ast.parse(s);(r/'qualify-turbo-render-comparison-v2.py').write_text(s)
+names=[name+'.tar.gz',name+'-source.json','build-ptl-native-worker-v26.ps1','qualify-ptl-native-worker-v26.py','qualify-turbo-render-comparison-v2.py','run-ptl-worker-v26-qualification.ps1']
+p=r/'ptl-worker-v26-tools-source.json';p.write_text(json.dumps({n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in names},indent=2)+'\n');subprocess.run(['scp','-q',*[str(r/n) for n in names],str(p),'delta:AppData/Local/npu-render/vm/'],check=True,timeout=30)
+print(json.dumps(dict(prepared=name,changed_import_sites=10,prior_build_failure_preserved=True)))

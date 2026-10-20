@@ -1,0 +1,28 @@
+"""Prepare a bounded vector memset replacement; shader expressions stay unchanged."""
+from pathlib import Path
+import ctypes,hashlib,json,subprocess
+r=Path(__file__).parent
+helper='''__attribute__((noinline)) void *memset(void *destination,int value,__SIZE_TYPE__ count){
+ volatile unsigned char *p=(volatile unsigned char*)destination;const unsigned char byte=(unsigned char)value;
+ while(count&&((__UINTPTR_TYPE__)p&15)){*p++=byte;--count;}
+ const uint4 fill=(uint4)((unsigned)byte*0x01010101u);
+ while(count>=16){*(volatile uint4*)p=fill;p+=16;count-=16;}
+ while(count){*p++=byte;--count;}
+ return destination;
+}
+'''
+s=(r/'ptl-six-span-program-compact-v1.c').read_text();assert hashlib.sha256(s.encode()).hexdigest()=='47771ca002532d8457a789dcab626f2712955e24e1fefa80b56db4bfc9ecd982'
+a=s.index('void *memset(');s=s[:a]+helper;(r/'ptl-six-span-program-vector-fill-v1.c').write_text(s)
+p=r/'ptl-vector-memset-v1-local.c';p.write_text('typedef unsigned uint4 __attribute__((ext_vector_type(4),may_alias));\n'+helper.replace('void *memset','void *nr_vector_memset'))
+b=r/'ptl-vector-memset-v1-local.dylib';command=['clang','-O2','-shared','-Wall','-Wextra','-Werror','-fno-builtin',str(p),'-o',str(b)];subprocess.run(command,check=True)
+lib=ctypes.CDLL(str(b.resolve()));fn=lib.nr_vector_memset;fn.argtypes=[ctypes.c_void_p,ctypes.c_int,ctypes.c_size_t];fn.restype=ctypes.c_void_p
+checks=0;lengths=list(range(513))+[1023,1024,2047,2048,8191,8192,262143,262144]
+for offset in range(32):
+ for length in lengths:
+  for value in [0,1,127,255,-1,256,511]:
+   prefix=64+offset;suffix=64;raw=b'\xa5'*(prefix+length+suffix);buffer=ctypes.create_string_buffer(raw,len(raw));address=ctypes.addressof(buffer)+prefix
+   assert fn(address,value,length)==address
+   assert buffer.raw==raw[:prefix]+bytes([value&255])*length+raw[prefix+length:]
+   checks+=1
+report=dict(passed=True,device='CPU',npu_execution=False,checks=checks,alignment_offsets=32,length_cases=len(lengths),fill_values=[0,1,127,255,-1,256,511],unaligned_heads_and_tails_checked=True,unchanged_surrounding_bytes=True,command=command,source_sha256={n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in ['ptl-six-span-program-compact-v1.c','ptl-six-span-program-vector-fill-v1.c','ptl-vector-memset-v1-local.c']})
+(r/'ptl-vector-memset-v1-local-report.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report))

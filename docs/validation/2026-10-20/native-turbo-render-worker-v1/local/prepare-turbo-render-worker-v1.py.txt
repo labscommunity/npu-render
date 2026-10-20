@@ -1,0 +1,51 @@
+"""A separate worker candidate changes only the import hint for existing NPU blobs."""
+from pathlib import Path
+import ast,hashlib,json,shutil,tarfile,subprocess
+r=Path(__file__).parent;name='ptl-native-worker-v25';d=r/name;assert not d.exists()
+old=json.loads((r/'ptl-native-worker-v24-source.json').read_text())
+for n,h in old.items():assert hashlib.sha256((r/'ptl-native-worker-v24'/n).read_bytes()).hexdigest()==h
+shutil.copytree(r/'ptl-native-worker-v24',d)
+header='''#pragma once
+#include <openvino/openvino.hpp>
+#include <cstdio>
+#include <istream>
+#include <stdexcept>
+namespace nr::raster {
+// Research candidate: this hint applies only to the imported PTL models.
+// It is not a global Windows power policy or a demonstrated Tahoma benefit.
+inline ov::CompiledModel import_ptl_turbo(ov::Core &core,std::istream &graph,const char *route){
+ auto model=core.import_model(graph,"NPU",ov::AnyMap{{"NPU_TURBO",true}});
+ if(!model.get_property("NPU_TURBO").as<bool>())throw std::runtime_error("PTL turbo import readback");
+ std::printf("{\\"ptl_turbo_import_verified\\":true,\\"route\\":\\"%s\\",\\"requested\\":true,\\"readback\\":true,\\"global_power_policy_changed\\":false}\\n",route);std::fflush(stdout);
+ return model;
+}
+}
+'''
+(d/'npu_turbo_import.hpp').write_text(header)
+changed=[]
+for p in d.glob('*.hpp'):
+ if p.name=='npu_turbo_import.hpp':continue
+ s=p.read_text();needle='core.import_model(graph,"NPU")'
+ if needle not in s:continue
+ assert s.count(needle)==1;route=p.stem.removeprefix('ptl_');s=s.replace('#pragma once','#pragma once\n#include "npu_turbo_import.hpp"',1).replace(needle,f'import_ptl_turbo(core,graph,"{route}")');p.write_text(s);changed.append(p.name)
+assert len(changed)==10
+manifest={str(p.relative_to(d)):hashlib.sha256(p.read_bytes()).hexdigest() for p in d.rglob('*') if p.is_file()};assert {n for n,h in manifest.items() if old.get(n)!=h}==set(changed)|{'npu_turbo_import.hpp'}
+(r/(name+'-source.json')).write_text(json.dumps(manifest,indent=2)+'\n')
+with tarfile.open(r/(name+'.tar.gz'),'w:gz') as a:a.add(d,arcname=name)
+s=(r/'build-ptl-native-worker-v24.ps1').read_text().replace('worker-v24','worker-v25');(r/'build-ptl-native-worker-v25.ps1').write_text(s)
+s=(r/'qualify-ptl-native-worker-v24.py').read_text().replace('worker-v24','worker-v25');s=s.replace(" assert obj(vm/'native-response-envelope", " assert obj(vm/'ptl-batch-turbo-v3/report.json')['passed'];assert obj(vm/'ptl-post-turbo-health-v3/report.json')['passed']\n assert obj(vm/'native-response-envelope",1)
+needle=" report['passed']=True";assert s.count(needle)==1
+s=s.replace(needle," turbo_events=[]\n for log in (trial/'provider-processes').glob('generation-*/worker.stdout.jsonl'):\n  turbo_events += [x for x in rows(log) if x.get('ptl_turbo_import_verified')]\n assert len(turbo_events)>=9 and all(x['requested'] is True and x['readback'] is True and x['global_power_policy_changed'] is False for x in turbo_events)\n assert {'program','geometry','point_rectangle'} <= {x['route'] for x in turbo_events}\n report['turbo_imports']=turbo_events;report['kernel_blobs_unchanged']=True;report['global_power_policy_changed']=False\n"+needle)
+ast.parse(s);(r/'qualify-ptl-native-worker-v25.py').write_text(s)
+s=(r/'qualify-combined-render-comparison-v1.py').read_text().replace('combined-render-comparison-v1','turbo-render-comparison-v1').replace("assert obj(vm/'ptl-native-worker-v24-full", "assert obj(vm/'ptl-native-worker-v25-full").replace("expected=rows(vm/'ptl-native-worker-v19-full", "expected=rows(vm/'ptl-native-worker-v24-full")
+s=s.replace("[('A1',19),('B1',24),('B2',24),('A2',19)]", "[('A1',24),('B1',25),('B2',25),('A2',24)]")
+s=s.replace("  pt={x['dispatch_ticket']", "  turbo_events=[x for x in child if x.get('ptl_turbo_import_verified')]\n  if version==25:assert len(turbo_events)>=9 and all(x['requested'] and x['readback'] and not x['global_power_policy_changed'] for x in turbo_events)\n  else:assert not turbo_events\n  pt={x['dispatch_ticket']")
+s=s.replace('comparing the original geometry/shader/merger path with combined balanced geometry, ordered rectangle routing and resident clipping','comparing the combined renderer with an otherwise identical renderer requesting NPU_TURBO on its ten custom-model import sites; compiled arithmetic and model blobs unchanged')
+ast.parse(s);(r/'qualify-turbo-render-comparison-v1.py').write_text(s)
+s=(r/'run-ptl-worker-v24-qualification.ps1').read_text().replace('worker-v24','worker-v25').replace('combined-render-comparison-v1','turbo-render-comparison-v1').replace('waiting-for-resident-desktop-and-recovery','verify-isolated-hint-and-recovery').replace("@('ptl-combined-desktop-v11','resident-clip-provider-recovery-v1-qualification')","@('ptl-batch-turbo-v3','ptl-post-turbo-health-v3','ptl-large-span-softmax-v4')").replace('AddMinutes(180)','AddMinutes(5)').replace('ptl-worker-v23-qualification','ptl-worker-v24-qualification')
+a=s.index(' $preceding=');b=s.index('\n',a);s=s[:a]+" $preceding='native-desktop-admission-v72'"+s[b:]
+(r/'run-ptl-worker-v25-qualification.ps1').write_text(s)
+names=[name+'.tar.gz',name+'-source.json','build-ptl-native-worker-v25.ps1','qualify-ptl-native-worker-v25.py','qualify-turbo-render-comparison-v1.py','run-ptl-worker-v25-qualification.ps1']
+p=r/'ptl-worker-v25-tools-source.json';p.write_text(json.dumps({n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in names},indent=2)+'\n')
+subprocess.run(['scp','-q',*[str(r/n) for n in names],str(p),'delta:AppData/Local/npu-render/vm/'],check=True,timeout=30)
+print(json.dumps(dict(prepared=name,changed_import_sites=10,new_kernel=False,new_blob=False,windows_changed=False)))

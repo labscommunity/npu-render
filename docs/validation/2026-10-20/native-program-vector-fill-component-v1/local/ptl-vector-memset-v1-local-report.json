@@ -1,0 +1,36 @@
+{
+  "passed": true,
+  "device": "CPU",
+  "npu_execution": false,
+  "checks": 116704,
+  "alignment_offsets": 32,
+  "length_cases": 521,
+  "fill_values": [
+    0,
+    1,
+    127,
+    255,
+    -1,
+    256,
+    511
+  ],
+  "unaligned_heads_and_tails_checked": true,
+  "unchanged_surrounding_bytes": true,
+  "command": [
+    "clang",
+    "-O2",
+    "-shared",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-fno-builtin",
+    "/Users/tatef/Workspaces/npu-render/results/render-driver/ptl-vector-memset-v1-local.c",
+    "-o",
+    "/Users/tatef/Workspaces/npu-render/results/render-driver/ptl-vector-memset-v1-local.dylib"
+  ],
+  "source_sha256": {
+    "ptl-six-span-program-compact-v1.c": "47771ca002532d8457a789dcab626f2712955e24e1fefa80b56db4bfc9ecd982",
+    "ptl-six-span-program-vector-fill-v1.c": "68340821c6a0d5ef90aca280ebd7478e3600b4890fc6f5eb3f0d85183bd4a52b",
+    "ptl-vector-memset-v1-local.c": "32d5f8c9e383bf1d47424b7ec7371cabc541442df5ae2d04cfc38dbea6feebc3"
+  }
+}

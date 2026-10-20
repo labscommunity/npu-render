@@ -1,0 +1,12 @@
+from pathlib import Path
+import ast,hashlib,json,subprocess
+r=Path(__file__).parent
+s=(r/'qualify-ptl-six-span-program-compact-v1.py').read_text().replace('ptl-six-span-program-compact-v1','ptl-six-span-program-vector-fill-v1').replace('ptl-six-span-program-compact-build-v1','ptl-six-span-program-vector-fill-build-v1')
+s=s.replace('native-desktop-admission-v61','native-desktop-admission-v72').replace('ptl-program-profile-worker-v1-qualification','ptl-worker-v26-qualification').replace('47771ca002532d8457a789dcab626f2712955e24e1fefa80b56db4bfc9ecd982',hashlib.sha256((r/'ptl-six-span-program-vector-fill-v1.c').read_bytes()).hexdigest())
+ast.parse(s);(r/'qualify-ptl-six-span-program-vector-fill-v1.py').write_text(s)
+s=(r/'run-ptl-command-batch-v5-qualification.ps1').read_text().replace('ptl-command-batch-v5-qualification','ptl-program-vector-fill-v1-qualification').replace('ptl-six-span-command-batch-v5','ptl-six-span-program-vector-fill-v1').replace('ptl-six-span-command-batch-build-v5','ptl-six-span-program-vector-fill-build-v1').replace('ptl-command-batch-device-v5-source','ptl-program-vector-fill-device-v1-source').replace('ptl-large-span-softmax-v3','ptl-worker-v26-qualification').replace('AddMinutes(2)','AddMinutes(120)').replace('unique_component_fixtures -ne 120','unique_component_fixtures -ne 448').replace('unique_npu_fixtures=120','unique_npu_fixtures=448').replace('command_batch_component_only','vector_fill_component_only')
+s=s.replace(' $preceding=if(Test-Path', ' $q=Get-Content "$vm/ptl-worker-v26-qualification/report.json" -Raw|ConvertFrom-Json;if(!$q.completed -or !$q.passed){throw \'Inspect worker qualification failure before hardware work\'}\n $preceding=if(Test-Path')
+(r/'run-ptl-program-vector-fill-v1-qualification.ps1').write_text(s)
+names=['ptl-six-span-program-vector-fill-v1.c','qualify-ptl-six-span-program-vector-fill-v1.py','run-ptl-program-vector-fill-v1-qualification.ps1']
+p=r/'ptl-program-vector-fill-device-v1-source.json';p.write_text(json.dumps({n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in names},indent=2)+'\n');subprocess.run(['scp','-q',*[str(r/n) for n in names],str(p),'delta:AppData/Local/npu-render/vm/'],check=True,timeout=30)
+print(json.dumps(dict(uploaded=True,hardware_work_started=False,fixtures_required=448,old_build_and_worker_evidence_unchanged=True)))

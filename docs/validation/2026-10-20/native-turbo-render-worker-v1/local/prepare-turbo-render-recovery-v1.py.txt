@@ -1,0 +1,21 @@
+from pathlib import Path
+import ast,hashlib,json,subprocess
+r=Path(__file__).parent
+s=(r/'qualify-combined-render-provider-recovery-v1.py').read_text().replace('combined-render-provider-recovery-v1','turbo-render-provider-recovery-v1').replace('worker-v24','worker-v26')
+needle="  report['phases'].append("
+assert s.count(needle)==1
+s=s.replace(needle,"""  turbo_by_generation={}
+  for f in (trial/'provider-processes').glob('generation-*/worker.stdout.jsonl'):
+   imported=[x for x in rows(f) if x.get('ptl_turbo_import_verified')]
+   assert imported and all(x['requested'] is True and x['readback'] is True and x['global_power_policy_changed'] is False for x in imported)
+   turbo_by_generation[f.parent.name]=[x['route'] for x in imported]
+  assert len(turbo_by_generation)==2
+"""+needle)
+s=s.replace('phase=phase,passed=True,','phase=phase,passed=True,turbo_imports_by_generation=turbo_by_generation,')
+ast.parse(s);(r/'qualify-turbo-render-provider-recovery-v1.py').write_text(s)
+s=(r/'run-combined-render-provider-recovery-v1-qualification.ps1').read_text().replace('combined-render-provider-recovery-v1','turbo-render-provider-recovery-v1').replace('worker-v24','worker-v26').replace("@('ptl-worker-v26-qualification')","@('ptl-worker-v26-qualification','ptl-program-vector-fill-v1-qualification')")
+a=s.index(' $preceding=');b=s.index('\n',a);s=s[:a]+" $q=Get-Content \"$vm/ptl-program-vector-fill-v1-qualification/report.json\" -Raw|ConvertFrom-Json;if(!$q.completed -or !$q.passed){throw 'Inspect preceding kernel experiment before NPU recovery tests'}\n $preceding='native-desktop-admission-v72'"+s[b:]
+s=s.replace("'native-desktop-admission-v69'))","'native-desktop-admission-v69','native-desktop-admission-v72'))")
+(r/'run-turbo-render-provider-recovery-v1-qualification.ps1').write_text(s)
+names=['qualify-turbo-render-provider-recovery-v1.py','run-turbo-render-provider-recovery-v1-qualification.ps1'];p=r/'turbo-render-recovery-v1-source.json';p.write_text(json.dumps({n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in names},indent=2)+'\n');subprocess.run(['scp','-q',*[str(r/n) for n in names],str(p),'delta:AppData/Local/npu-render/vm/'],check=True,timeout=30)
+print('Prepared two exact-image recovery checks with hint readback in both generations.')

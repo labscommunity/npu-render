@@ -1,0 +1,109 @@
+"""Attribute completed sequential request intervals to recorded rendering routes."""
+from pathlib import Path
+import gzip
+import hashlib
+import json
+
+r = Path("results/render-driver")
+d = Path("docs/validation/2026-10-20/native-turbo-render-worker-v1")
+
+
+def data(name):
+    path = d / "raw" / name
+    if path.exists():
+        return path.read_bytes()
+    return gzip.decompress(Path(str(path) + ".gz").read_bytes())
+
+
+comparison = json.loads(data("turbo-render-comparison-v2/report.json"))
+assert comparison["passed"] and len(comparison["phases"]) == 4
+groups = {}
+phase_reports = []
+route_keys = [
+    "ptl_program_draw", "ptl_geometry_draw", "ptl_rectangle_draw",
+    "ptl_complex_draw", "ptl_long_draw", "ptl_texture_draw",
+    "ptl_resident_clip_draw", "ptl_four_tap_attempt", "ptl_solid_attempt",
+    "ptl_masked_draw",
+]
+identities = {}
+for phase in comparison["phases"]:
+    name = phase["phase"]
+    raw = data(f"turbo-render-comparison-v2/{name}/provider-processes/generation-1/worker.stdout.jsonl")
+    records = [json.loads(line) for line in raw.decode("utf-8-sig").splitlines()
+               if line.startswith("{") and line.endswith("}")]
+    identity = None
+    accepted = []
+    render = None
+    completed = {}
+    for row in records:
+        if row.get("kind") == "request_identity":
+            assert identity is None
+            identity = row
+            accepted = []
+            render = None
+        if identity is None:
+            continue
+        accepted.extend(key for key in route_keys if row.get(key) and row.get("accepted"))
+        if row.get("execution_device") == "NPU" and row.get("passed") and "compile_and_draw_ms" in row:
+            assert render is None
+            render = row
+        if row.get("kind") == "request_timeline":
+            assert identity["dispatch_ticket"] == row["dispatch_ticket"]
+            assert (identity["pid"], identity["client_pid"], identity["sequence"]) == (
+                row["pid"], row["client_pid"], row["sequence"])
+            assert render and render["client_pid"] == row["client_pid"] and render["sequence"] == row["sequence"]
+            ticket = row["dispatch_ticket"]
+            assert ticket not in completed
+            route = "+".join(sorted(set(accepted))) or "other_npu_route"
+            signature = (identity["abi"], identity["flags"], identity["width"], identity["height"],
+                         identity["vertices"], identity["pixel_sha256"], route)
+            if ticket in identities:
+                assert identities[ticket] == signature
+            else:
+                identities[ticket] = signature
+            completed[ticket] = (identity, route, render)
+            identity = None
+    assert identity is None and len(completed) == len(phase["requests"]) == 972
+    subtotal = 0
+    for request in phase["requests"]:
+        identity, route, render = completed[request["dispatch_ticket"]]
+        key = (identity["pixel_sha256"], route)
+        group = groups.setdefault(key, dict(shader_sha256=key[0], route=route, phases={}))
+        sums = group["phases"].setdefault(name, dict(requests=0, parent_ms=0, child_ms=0,
+                                                    provider_requests=0, compile_calls=0))
+        sums["requests"] += 1
+        sums["parent_ms"] += request["parent_ms"]
+        sums["child_ms"] += request["child_ms"]
+        sums["provider_requests"] += render["provider_requests"]
+        sums["compile_calls"] += render["compile_calls"]
+        subtotal += request["child_ms"]
+    assert abs(subtotal - phase["child_ms"]) < .001
+    phase_reports.append(dict(phase=name, child_ms=subtotal, requests=len(completed),
+                              child_log_sha256=hashlib.sha256(raw).hexdigest()))
+
+for group in groups.values():
+    phases = group["phases"]
+    assert set(phases) == {"A1", "A2", "B1", "B2"}
+    assert len({x["requests"] for x in phases.values()}) == 1
+    group["requests_per_replay"] = phases["A1"]["requests"]
+    group["old_child_ms"] = sum(phases[x]["child_ms"] for x in ("A1", "A2"))
+    group["new_child_ms"] = sum(phases[x]["child_ms"] for x in ("B1", "B2"))
+    group["old_parent_ms"] = sum(phases[x]["parent_ms"] for x in ("A1", "A2"))
+    group["new_parent_ms"] = sum(phases[x]["parent_ms"] for x in ("B1", "B2"))
+    group["child_reduction_percent"] = 100 * (1 - group["new_child_ms"] / group["old_child_ms"])
+report = dict(passed=True, phase_reports=phase_reports,
+              groups=sorted(groups.values(), key=lambda x: x["new_child_ms"], reverse=True),
+              scope="Observed child request intervals grouped by shader and accepted route. Includes host work and NPU waits within the child; not a pure kernel timing or desktop measurement.")
+(r / "native-turbo-render-routes-v1-analysis.json").write_text(json.dumps(report, indent=2) + "\n")
+for name in ("analyze-turbo-render-routes-v1.py", "native-turbo-render-routes-v1-analysis.json"):
+    value = (r / name).read_bytes()
+    target = d / "local" / (name + (".txt" if name.endswith(".py") else ""))
+    target.write_bytes(value)
+    manifest_path = d / "artifact-sha256.json"
+    manifest = json.loads(manifest_path.read_text())
+    assert not any(x["path"] == str(target.relative_to(d)) for x in manifest)
+    manifest.append(dict(path=str(target.relative_to(d)), bytes=len(value),
+                         sha256=hashlib.sha256(value).hexdigest(), local_source=str(r / name)))
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+print(json.dumps(dict(passed=True, groups=len(groups), top_groups=[
+    {k: v for k, v in group.items() if k != "phases"} for group in report["groups"][:8]])))

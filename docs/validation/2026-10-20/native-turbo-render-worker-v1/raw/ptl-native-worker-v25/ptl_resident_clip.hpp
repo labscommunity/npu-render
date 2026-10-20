@@ -1,0 +1,142 @@
+#pragma once
+#include "npu_turbo_import.hpp"
+#include "projection_executor.hpp"
+#include "vertex_executor.hpp"
+#include "packed_resources.hpp"
+#include "mask_fixture.hpp"
+#include <openvino/openvino.hpp>
+#include <windows.h>
+#include <bcrypt.h>
+#include <cstdlib>
+#include <chrono>
+#include <filesystem>
+#include <fstream>
+#include <sstream>
+#include <mutex>
+#include <cstdio>
+
+namespace nr::raster {
+// Experimental one-request path for the exact two-texture clipping shader.
+// The host transports geometry, complete small textures and destination bytes.
+// Coverage, interpolation, addressing, filtering, shader math and blending all
+// execute inside the NPU kernel. Large/unsupported textures are not admitted.
+class PtlResidentClip {
+ static void require(bool v){if(!v)throw std::invalid_argument("PTL resident clip contract");}
+ static void put(unsigned char *p,unsigned v){std::memcpy(p,&v,4);}
+ static unsigned get(const unsigned char *p){unsigned v;std::memcpy(&v,p,4);return v;}
+ struct Provider {
+  ov::Core core;ov::CompiledModel model;ov::InferRequest inference;
+  std::string device;std::mutex mutex;bool failed=false;
+  explicit Provider(const std::string &bytes){
+   std::istringstream graph(bytes,std::ios::binary);model=import_ptl_turbo(core,graph,"resident_clip");
+   const auto devices=model.get_property(ov::execution_devices);
+   require(devices.size()==1&&(devices[0]=="NPU"||devices[0]=="NPU.0"));device=devices[0];
+   inference=model.create_infer_request();
+   require(model.inputs().size()==1&&model.outputs().size()==1&&
+    inference.get_input_tensor().get_element_type()==ov::element::f16&&
+    inference.get_output_tensor().get_element_type()==ov::element::f16&&
+    inference.get_input_tensor().get_shape()==ov::Shape({6,131072})&&
+    inference.get_output_tensor().get_shape()==ov::Shape({6,131072}));
+   std::printf("{\"ptl_resident_clip_provider_created\":true,\"single_import_shared\":true}\n");std::fflush(stdout);
+  }
+ };
+ static std::shared_ptr<Provider> acquire(const std::string &bytes){
+  static std::mutex mutex;static std::weak_ptr<Provider> cached;
+  std::lock_guard<std::mutex> lock(mutex);auto p=cached.lock();
+  if(!p){p=std::make_shared<Provider>(bytes);cached=p;}return p;
+ }
+ std::shared_ptr<Provider> provider;
+ PackedResources layout;unsigned cull=0,ccw=0,target=0,mask=0,blend=0,filters[2]{};
+public:
+ struct Result {
+  std::vector<PackedColor> pixels;uint64_t covered_samples=0;
+  std::string execution_device;uint64_t provider_requests=0,input_bytes=0,output_bytes=0;
+ };
+ static unsigned maximum_batch(const PackedResources &resources,unsigned vertices){
+  require(vertices&&vertices<=2046&&vertices%3==0);
+  uint64_t bytes=256+uint64_t(vertices)*96;
+  for(unsigned n=0;n<2;++n){
+   const auto &r=resources[n];require(r.width&&r.height&&r.width<=8192&&r.height<=8192&&uint64_t(r.width)*r.height<=8192);
+   bytes+=uint64_t(r.width)*r.height*4;
+  }
+  if(bytes>=262144)return 0;
+  return 6*(std::min)(16384u,unsigned((262144-bytes)/16));
+ }
+ static bool eligible(const shader::Program &p,const PackedResources &resources,const shader::TextureSamplers &samplers,unsigned vertices){
+  const auto &words=nr::registered_lab::test_fixture::mask_pixel_words;
+  if(p.bytecode.size()!=std::size(words)||!std::equal(p.bytecode.begin(),p.bytecode.end(),std::begin(words)))return false;
+  for(unsigned n=0;n<16;++n){
+   const auto &r=resources[n];const auto &s=samplers[n];
+   if(n<2){
+    if(!r.width||!r.height||r.width>8192||r.height>8192||uint64_t(r.width)*r.height>8192||
+      (r.format!=28&&r.format!=87)||(s.filter!=shader::TextureFilter::linear&&s.filter!=shader::TextureFilter::point)||
+      s.u!=shader::TextureAddress::clamp||s.v!=shader::TextureAddress::clamp)return false;
+   }else if(r.width||r.height||r.format||!r.pixels.empty())return false;
+  }
+  return vertices&&vertices<=2046&&vertices%3==0&&maximum_batch(resources,vertices)>0;
+ }
+ static std::string verified_blob(const std::filesystem::path &path){
+  std::ifstream f(path,std::ios::binary|std::ios::ate);require(bool(f)&&f.tellg()==73857);
+  std::string bytes(73857,'\0');f.seekg(0);f.read(bytes.data(),std::streamsize(bytes.size()));require(bool(f));
+  BCRYPT_ALG_HANDLE algorithm=nullptr;require(BCryptOpenAlgorithmProvider(&algorithm,BCRYPT_SHA256_ALGORITHM,nullptr,0)>=0);
+  std::array<unsigned char,32> digest{};
+  const auto status=BCryptHash(algorithm,nullptr,0,reinterpret_cast<PUCHAR>(bytes.data()),ULONG(bytes.size()),digest.data(),ULONG(digest.size()));
+  BCryptCloseAlgorithmProvider(algorithm,0);require(status>=0);
+  // Replaced only after the exact target blob passes its NPU fixture gate.
+  constexpr unsigned char expected[]{0xa5,0xc3,0x9d,0xbb,0x82,0x5f,0xdd,0x4b,0xd3,0x34,0xd8,0xbc,0xbe,0xf9,0x66,0xe9,0x40,0x41,0x32,0xd9,0xb6,0x42,0x37,0x56,0x65,0xa0,0x89,0x2a,0xdc,0x48,0xc4,0x5c};
+  static_assert(std::size(expected)==32);
+  require(std::equal(digest.begin(),digest.end(),std::begin(expected)));return bytes;
+ }
+ PtlResidentClip(const shader::Program &ps,const PackedResources &resources,const shader::TextureSamplers &samplers,
+  CullMode c,bool front_ccw,unsigned format,BlendMode mode,unsigned write_mask,const std::string &backend):
+  layout(resource_layout(resources)),cull(unsigned(c)),ccw(front_ccw?1u:0u),target(format),mask(write_mask),blend(unsigned(mode)){
+  require(backend=="NPU"&&cull<=2&&(target==28||target==87)&&mask&&mask<=15&&blend<=1&&eligible(ps,resources,samplers,3));
+  for(unsigned n=0;n<2;++n)filters[n]=samplers[n].filter==shader::TextureFilter::point?1u:0u;
+  wchar_t *value=nullptr;size_t length=0;require(!_wdupenv_s(&value,&length,L"NR_RENDER_PTL_RESIDENT_CLIP_BLOB"));
+  const std::unique_ptr<wchar_t,decltype(&std::free)> owner(value,&std::free);require(value&&*value);
+  const std::filesystem::path path(value);require(path.is_absolute());provider=acquire(verified_blob(path));
+ }
+ Result execute(const std::vector<ProjectedVertex> &vertices,const std::vector<shader::VertexRegisters> &shaded,
+  const std::vector<Point> &points,const std::vector<size_t> &triangle_base,const std::array<int32_t,4> &clip,
+  const PackedResources &resources,const std::vector<PackedColor> &background,const shader::VertexConstants &constants){
+  std::lock_guard<std::mutex> lock(provider->mutex);
+  require(!provider->failed&&!vertices.empty()&&vertices.size()<=2046&&vertices.size()%3==0&&
+   shaded.size()==vertices.size()&&!points.empty()&&points.size()<=maximum_batch(resources,unsigned(vertices.size()))&&
+   points.size()==triangle_base.size()&&points.size()==background.size()&&resource_layout_equal(layout,resources)&&constants[0].size()>=3);
+  for(unsigned n=0;n<2;++n)require(resources[n].pixels.size()==size_t(resources[n].width)*resources[n].height);
+  provider->failed=true;auto &request=provider->inference;
+  Result result;result.execution_device=provider->device;result.pixels.resize(points.size());
+  const unsigned total=unsigned(points.size());unsigned counts[6]{},starts[6]{};
+  auto *data=static_cast<unsigned char*>(request.get_input_tensor().data());std::memset(data,0,1572864);
+  for(unsigned plane=0;plane<6;++plane){
+   auto *p=data+plane*262144;const unsigned first=plane*(total/6)+(std::min)(plane,total%6);
+   starts[plane]=first;counts[plane]=total/6+(plane<total%6?1u:0u);
+   put(p,0x4e524231);put(p+4,1);put(p+8,counts[plane]);put(p+12,unsigned(vertices.size()));
+   put(p+16,cull);put(p+20,ccw);put(p+24,262144);std::memcpy(p+32,clip.data(),16);
+   put(p+48,target);put(p+52,mask);put(p+56,blend);std::memcpy(p+96,constants[0][0].data(),16);std::memcpy(p+112,constants[0][2].data(),16);
+   for(unsigned n=0;n<vertices.size();++n){
+    auto *v=p+256+n*96;std::memcpy(v,vertices[n].snapped.data(),8);std::memcpy(v+8,vertices[n].screen.data(),8);std::memcpy(v+16,&vertices[n].inverse_w,4);
+    for(unsigned a=0;a<3;++a)std::memcpy(v+32+a*16,shaded[n][a+1].data(),16);
+   }
+   size_t offset=256+vertices.size()*96;
+   for(unsigned sample=0;sample<2;++sample){
+    const auto &texture=resources[sample];put(p+64+sample*12,texture.width);put(p+68+sample*12,texture.height);put(p+72+sample*12,texture.format);put(p+88+sample*4,filters[sample]);
+    const auto bytes=texture.pixels.size()*4;require(offset+bytes<=262144);std::memcpy(p+offset,texture.pixels.data(),bytes);offset+=bytes;
+   }
+   require(offset+size_t(counts[plane])*16<=262144);
+   for(unsigned n=0;n<counts[plane];++n){
+    const auto index=first+n;require(triangle_base[index]<=vertices.size()-3&&triangle_base[index]%3==0);
+    auto *task=p+offset+size_t(n)*16;put(task,unsigned(triangle_base[index]));std::memcpy(task+4,points[index].data(),8);std::memcpy(task+12,background[index].data(),4);
+   }
+  }
+  request.start_async();if(!request.wait_for(std::chrono::milliseconds(10000)))throw std::runtime_error("PTL resident clip timeout");
+  result.provider_requests=1;result.input_bytes=result.output_bytes=1572864;
+  const auto *output=static_cast<const unsigned char*>(request.get_output_tensor().data());
+  for(unsigned plane=0;plane<6;++plane){
+   const auto *p=output+plane*262144;require(get(p)==0x4e52424f&&get(p+4)==counts[plane]&&get(p+8)<=counts[plane]&&get(p+12)==0);
+   result.covered_samples+=get(p+8);std::memcpy(result.pixels.data()+starts[plane],p+16,size_t(counts[plane])*4);
+  }
+  provider->failed=false;return result;
+ }
+};
+}
