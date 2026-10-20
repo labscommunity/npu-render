@@ -1,6 +1,6 @@
 # Full desktop offload: acceptance and execution plan
 
-Updated 2026-10-16. Target: Delta, Windows 11, Panther Lake. The repository stays
+Updated 2026-10-20. Target: Delta, Windows 11, Panther Lake. The repository stays
 private. **Full desktop offload is unfinished.** The latest
 [packet-worker v56 trial](../validation/2026-10-16/native-response-packet-live-v1/README.md)
 passes 1,682 acknowledged NPU operations, 103 exact physical submissions, forty
@@ -22,6 +22,21 @@ in a 110-second replay. No cache is implemented and no saved time is demonstrate
 A [read-only capacity query](../validation/2026-10-16/native-npu-capacity-v1/README.md)
 reports three NPU tiles, matching the configured models. Turbo is disabled and
 has not been benchmarked. Neither result supplies a responsiveness fix.
+
+The [physical GPU baseline](../validation/2026-10-16/native-physical-gpu-live-v1/README.md)
+now passes the same logical resolution, presenter, forty-input sequence and 30 Hz
+animation: 299 unique updates appear within ten seconds (29.9/s), and all 300
+including drain. The 550-second trial passes 519 exact submissions and restoration
+with zero NPU rendering calls. This establishes that the bridge can carry the
+requested animation rate; the NPU path remains responsible for the large deficit.
+These are finite separate runs with different application preludes, not matched
+Tahoma or resource-utilization measurements.
+
+The [per-call fingerprint diagnostic](../validation/2026-10-16/native-tensor-fingerprint-v1/README.md)
+preserves all 972 images but finds only 1.07–2.61 seconds of measured NPU waits on
+hypothetical 64–256 MiB cache hits. Hashing is itself expensive. The next experiment
+compares plugin-allocated input memory with ordinary host staging tensors; exact
+images and an alternating-order replay are required before live promotion.
 
 The preceding
 [filled-program live v54 trial](../validation/2026-10-16/native-filled-program-live-v1/README.md)

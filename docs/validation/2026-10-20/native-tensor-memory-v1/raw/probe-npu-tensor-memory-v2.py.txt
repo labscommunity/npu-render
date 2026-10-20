@@ -1,0 +1,48 @@
+"""Compare CPU access to NPU request tensors; no inference or desktop changes."""
+from pathlib import Path
+from datetime import UTC, datetime
+import ctypes as C
+import hashlib
+import json
+import os
+import statistics
+import time
+import traceback
+import numpy as np
+import openvino as ov
+
+root=Path(os.environ['LOCALAPPDATA'])/'npu-render';vm=root/'vm';out=vm/'npu-tensor-memory-v2';out.mkdir(exist_ok=False)
+report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,npu_inferences=0,desktop_changed=False,tahoma_tested=False)
+def save():
+ temporary=out/'report.tmp';temporary.write_text(json.dumps(report,indent=2)+'\n');os.replace(temporary,out/'report.json')
+class MemoryInformation(C.Structure):
+ _fields_=[('BaseAddress',C.c_void_p),('AllocationBase',C.c_void_p),('AllocationProtect',C.c_ulong),('PartitionId',C.c_ushort),('RegionSize',C.c_size_t),('State',C.c_ulong),('Protect',C.c_ulong),('Type',C.c_ulong)]
+def protection(array):
+ query=C.WinDLL('kernel32',use_last_error=True).VirtualQuery;query.argtypes=[C.c_void_p,C.POINTER(MemoryInformation),C.c_size_t];query.restype=C.c_size_t
+ record=MemoryInformation();assert C.sizeof(record)==48 and query(array.ctypes.data,C.byref(record),C.sizeof(record))==48
+ assert record.BaseAddress<=array.ctypes.data and array.ctypes.data+array.nbytes<=record.BaseAddress+record.RegionSize
+ return dict(allocation_protect=record.AllocationProtect,protect=record.Protect,state=record.State,type=record.Type,write_combined=bool(record.Protect&0x400),no_cache=bool(record.Protect&0x200))
+try:
+ save();blob=vm/'ptl-six-span-program-compact-v1/patched.blob';raw=blob.read_bytes();assert hashlib.sha256(raw).hexdigest()=='92e04a6734dc6e70ffed15b67fddba02892c66168aa0d47a6cf4bcc65a6a585d'
+ core=ov.Core();model=core.import_model(raw,'NPU');device_property=model.get_property('EXECUTION_DEVICES');devices=[device_property] if isinstance(device_property,str) else list(device_property);assert devices in (['NPU'],['NPU.0']);report['execution_device_property_type']=type(device_property).__name__;request=model.create_infer_request()
+ sources={'plugin_input':request.get_input_tensor().data.view(np.uint8).reshape(-1),'plugin_output':request.get_output_tensor().data.view(np.uint8).reshape(-1),'numpy_host':np.empty(1572864,dtype=np.uint8)}
+ pattern=np.random.default_rng(20261016).integers(0,256,size=1572864,dtype=np.uint8);expected=hashlib.sha256(memoryview(pattern)).hexdigest();scratch=np.empty_like(pattern)
+ result={}
+ for name,source in sources.items():
+  assert source.flags.c_contiguous and source.nbytes==1572864;np.copyto(source,pattern);assert hashlib.sha256(memoryview(source)).hexdigest()==expected
+  records=[]
+  for repeat in range(8):
+   for mode in (('direct_hash','copy_then_hash','copy_only') if repeat%2==0 else ('copy_only','copy_then_hash','direct_hash')):
+    started=time.perf_counter_ns()
+    if mode=='direct_hash':digest=hashlib.sha256(memoryview(source)).hexdigest()
+    else:
+     np.copyto(scratch,source)
+     if mode=='copy_then_hash':digest=hashlib.sha256(memoryview(scratch)).hexdigest()
+    finished=time.perf_counter_ns()
+    if mode=='copy_only':digest=hashlib.sha256(memoryview(scratch)).hexdigest()
+    assert digest==expected;records.append(dict(iteration=repeat,mode=mode,elapsed_ms=(finished-started)/1e6,bytes_matched=True))
+  result[name]=dict(memory=protection(source),measurements=records,median_ms={mode:statistics.median(x['elapsed_ms'] for x in records if x['mode']==mode) for mode in ('direct_hash','copy_then_hash','copy_only')})
+ report.update(passed=True,model_imported=True,execution_devices=devices,model_sha256=hashlib.sha256(raw).hexdigest(),openvino_version=ov.__version__,byte_count=1572864,pattern_sha256=expected,results=result,scope='CPU hash/copy diagnostic on tensors allocated by an NPU request. No inference ran, no model output is claimed, and results do not establish rendering or Tahoma performance. Source and scratch are distinct and every measured copy is byte-hash verified.')
+except Exception as e:report.update(error=repr(e),traceback=traceback.format_exc())
+finally:report.update(completed=True,finished=datetime.now(UTC).isoformat());save()
+print(json.dumps({k:v for k,v in report.items() if k!='results'}));raise SystemExit(0 if report['passed'] else 1)

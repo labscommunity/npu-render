@@ -1,0 +1,504 @@
+{
+  "started": "2026-10-20T06:06:06.277402+00:00",
+  "completed": true,
+  "passed": true,
+  "npu_inferences": 0,
+  "desktop_changed": false,
+  "tahoma_tested": false,
+  "execution_device_property_type": "str",
+  "model_imported": true,
+  "execution_devices": [
+    "NPU"
+  ],
+  "model_sha256": "92e04a6734dc6e70ffed15b67fddba02892c66168aa0d47a6cf4bcc65a6a585d",
+  "openvino_version": "2026.4.1-22982-e213a147257-releases/2026/4",
+  "byte_count": 1572864,
+  "pattern_sha256": "ccc43d048abafe3a56d64fc22167bda6ec1c88aeba94da2be9f479c82ff34001",
+  "results": {
+    "plugin_input": {
+      "memory": {
+        "allocation_protect": 1028,
+        "protect": 1028,
+        "state": 4096,
+        "type": 262144,
+        "write_combined": true,
+        "no_cache": false
+      },
+      "measurements": [
+        {
+          "iteration": 0,
+          "mode": "direct_hash",
+          "elapsed_ms": 8.815,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 0,
+          "mode": "copy_then_hash",
+          "elapsed_ms": 2.9627,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 0,
+          "mode": "copy_only",
+          "elapsed_ms": 2.2691,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 1,
+          "mode": "copy_only",
+          "elapsed_ms": 2.2641,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 1,
+          "mode": "copy_then_hash",
+          "elapsed_ms": 2.6597,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 1,
+          "mode": "direct_hash",
+          "elapsed_ms": 9.5005,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 2,
+          "mode": "direct_hash",
+          "elapsed_ms": 8.8174,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 2,
+          "mode": "copy_then_hash",
+          "elapsed_ms": 2.6892,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 2,
+          "mode": "copy_only",
+          "elapsed_ms": 2.2804,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 3,
+          "mode": "copy_only",
+          "elapsed_ms": 2.2723,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 3,
+          "mode": "copy_then_hash",
+          "elapsed_ms": 2.6608,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 3,
+          "mode": "direct_hash",
+          "elapsed_ms": 8.9689,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 4,
+          "mode": "direct_hash",
+          "elapsed_ms": 8.7663,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 4,
+          "mode": "copy_then_hash",
+          "elapsed_ms": 3.2016,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 4,
+          "mode": "copy_only",
+          "elapsed_ms": 3.1499,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 5,
+          "mode": "copy_only",
+          "elapsed_ms": 2.665,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 5,
+          "mode": "copy_then_hash",
+          "elapsed_ms": 2.6559,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 5,
+          "mode": "direct_hash",
+          "elapsed_ms": 8.8205,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 6,
+          "mode": "direct_hash",
+          "elapsed_ms": 8.8341,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 6,
+          "mode": "copy_then_hash",
+          "elapsed_ms": 2.7112,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 6,
+          "mode": "copy_only",
+          "elapsed_ms": 2.3059,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 7,
+          "mode": "copy_only",
+          "elapsed_ms": 2.2676,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 7,
+          "mode": "copy_then_hash",
+          "elapsed_ms": 2.7972,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 7,
+          "mode": "direct_hash",
+          "elapsed_ms": 8.9135,
+          "bytes_matched": true
+        }
+      ],
+      "median_ms": {
+        "direct_hash": 8.8273,
+        "copy_then_hash": 2.7001999999999997,
+        "copy_only": 2.27635
+      }
+    },
+    "plugin_output": {
+      "memory": {
+        "allocation_protect": 4,
+        "protect": 4,
+        "state": 4096,
+        "type": 262144,
+        "write_combined": false,
+        "no_cache": false
+      },
+      "measurements": [
+        {
+          "iteration": 0,
+          "mode": "direct_hash",
+          "elapsed_ms": 0.5041,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 0,
+          "mode": "copy_then_hash",
+          "elapsed_ms": 0.5721,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 0,
+          "mode": "copy_only",
+          "elapsed_ms": 0.0608,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 1,
+          "mode": "copy_only",
+          "elapsed_ms": 0.0459,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 1,
+          "mode": "copy_then_hash",
+          "elapsed_ms": 0.4346,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 1,
+          "mode": "direct_hash",
+          "elapsed_ms": 0.4373,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 2,
+          "mode": "direct_hash",
+          "elapsed_ms": 0.3994,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 2,
+          "mode": "copy_then_hash",
+          "elapsed_ms": 0.4564,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 2,
+          "mode": "copy_only",
+          "elapsed_ms": 0.0446,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 3,
+          "mode": "copy_only",
+          "elapsed_ms": 0.0481,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 3,
+          "mode": "copy_then_hash",
+          "elapsed_ms": 0.4371,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 3,
+          "mode": "direct_hash",
+          "elapsed_ms": 0.3943,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 4,
+          "mode": "direct_hash",
+          "elapsed_ms": 0.3906,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 4,
+          "mode": "copy_then_hash",
+          "elapsed_ms": 0.4531,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 4,
+          "mode": "copy_only",
+          "elapsed_ms": 0.0436,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 5,
+          "mode": "copy_only",
+          "elapsed_ms": 0.0447,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 5,
+          "mode": "copy_then_hash",
+          "elapsed_ms": 0.4371,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 5,
+          "mode": "direct_hash",
+          "elapsed_ms": 0.3908,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 6,
+          "mode": "direct_hash",
+          "elapsed_ms": 0.3949,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 6,
+          "mode": "copy_then_hash",
+          "elapsed_ms": 0.4475,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 6,
+          "mode": "copy_only",
+          "elapsed_ms": 0.0437,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 7,
+          "mode": "copy_only",
+          "elapsed_ms": 0.0434,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 7,
+          "mode": "copy_then_hash",
+          "elapsed_ms": 0.4357,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 7,
+          "mode": "direct_hash",
+          "elapsed_ms": 0.4529,
+          "bytes_matched": true
+        }
+      ],
+      "median_ms": {
+        "direct_hash": 0.39715,
+        "copy_then_hash": 0.4423,
+        "copy_only": 0.044649999999999995
+      }
+    },
+    "numpy_host": {
+      "memory": {
+        "allocation_protect": 4,
+        "protect": 4,
+        "state": 4096,
+        "type": 131072,
+        "write_combined": false,
+        "no_cache": false
+      },
+      "measurements": [
+        {
+          "iteration": 0,
+          "mode": "direct_hash",
+          "elapsed_ms": 0.3948,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 0,
+          "mode": "copy_then_hash",
+          "elapsed_ms": 0.4506,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 0,
+          "mode": "copy_only",
+          "elapsed_ms": 0.0382,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 1,
+          "mode": "copy_only",
+          "elapsed_ms": 0.0387,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 1,
+          "mode": "copy_then_hash",
+          "elapsed_ms": 0.4313,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 1,
+          "mode": "direct_hash",
+          "elapsed_ms": 0.3908,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 2,
+          "mode": "direct_hash",
+          "elapsed_ms": 0.3906,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 2,
+          "mode": "copy_then_hash",
+          "elapsed_ms": 0.6281,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 2,
+          "mode": "copy_only",
+          "elapsed_ms": 0.1075,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 3,
+          "mode": "copy_only",
+          "elapsed_ms": 0.0418,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 3,
+          "mode": "copy_then_hash",
+          "elapsed_ms": 0.6883,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 3,
+          "mode": "direct_hash",
+          "elapsed_ms": 0.3931,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 4,
+          "mode": "direct_hash",
+          "elapsed_ms": 0.3937,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 4,
+          "mode": "copy_then_hash",
+          "elapsed_ms": 0.4387,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 4,
+          "mode": "copy_only",
+          "elapsed_ms": 0.0382,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 5,
+          "mode": "copy_only",
+          "elapsed_ms": 0.0379,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 5,
+          "mode": "copy_then_hash",
+          "elapsed_ms": 0.4317,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 5,
+          "mode": "direct_hash",
+          "elapsed_ms": 0.3941,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 6,
+          "mode": "direct_hash",
+          "elapsed_ms": 0.3908,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 6,
+          "mode": "copy_then_hash",
+          "elapsed_ms": 0.4388,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 6,
+          "mode": "copy_only",
+          "elapsed_ms": 0.0377,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 7,
+          "mode": "copy_only",
+          "elapsed_ms": 0.0376,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 7,
+          "mode": "copy_then_hash",
+          "elapsed_ms": 0.4308,
+          "bytes_matched": true
+        },
+        {
+          "iteration": 7,
+          "mode": "direct_hash",
+          "elapsed_ms": 0.3905,
+          "bytes_matched": true
+        }
+      ],
+      "median_ms": {
+        "direct_hash": 0.39195,
+        "copy_then_hash": 0.43875,
+        "copy_only": 0.0382
+      }
+    }
+  },
+  "scope": "CPU hash/copy diagnostic on tensors allocated by an NPU request. No inference ran, no model output is claimed, and results do not establish rendering or Tahoma performance. Source and scratch are distinct and every measured copy is byte-hash verified.",
+  "finished": "2026-10-20T06:06:06.508241+00:00"
+}

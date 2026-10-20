@@ -1,0 +1,56 @@
+"""Prepare a finite GPU desktop control with the qualified physical bridge and input test."""
+from pathlib import Path
+import ast,hashlib,json,re
+r=Path(__file__).parent;written=[]
+def write(name,text):
+ p=r/name;assert not p.exists(),name
+ if p.suffix=='.py':ast.parse(text)
+ p.write_text(text);written.append(name)
+def substitute(text,changes):
+ pattern=re.compile('|'.join(re.escape(x) for x in sorted(changes,key=len,reverse=True)))
+ return pattern.sub(lambda m:changes[m[0]],text)
+changes={'physical-gpu-desktop-v1':'physical-gpu-desktop-v2','GpuDesktopRecovery-v1':'GpuDesktopRecovery-v2'}
+for name in ('run-physical-gpu-desktop-v1.ps1','recover-physical-gpu-desktop-v1.ps1'):
+ s=substitute((r/name).read_text(),changes)
+ if name.startswith('run-'):
+  assert "'--monitor-seconds','90'" in s
+  s=s.replace("'--monitor-seconds','90'","'--monitor-seconds','660'")
+ write(substitute(name,changes),s)
+names=['run-physical-gpu-desktop-v2.ps1','recover-physical-gpu-desktop-v2.ps1','physical_gpu_bootstrap_v1.py','physical_gpu_evidence_v1.py']
+write('physical-gpu-desktop-v2-source.json',json.dumps({n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in names},indent=2)+'\n')
+s=(r/'relay_native_frames_v8.py').read_text()
+needle="  if not (state.get('actual_dwm_npu_execution') and state.get('preferred_adapter_selected') and state.get('successful_frame_readback')):continue"
+assert needle in s
+s=s.replace(needle,"""  assert state.get('hardware_gpu_control') and not state.get('actual_dwm_npu_execution') and state.get('npu_receipts')==0
+  assert state['control_target']['vendor']==0x8086 and state['control_target']['device']==0xb080
+  if not (state.get('actual_hardware_gpu_route') and state.get('preferred_adapter_selected') and state.get('successful_frame_readback')):continue""")
+s=s.replace("desktop_offloaded=False);peers=[]","desktop_offloaded=False,hardware_gpu_control=True);peers=[]")
+write('relay_physical_gpu_frames_v1.py',s)
+for old,new in ((102,105),(104,106)):
+ s=(r/f'start-native-topology-v{old}.ps1').read_text().replace(f'v{old}',f'v{new}').replace(f'V{old}',f'V{new}')
+ write(f'start-native-topology-v{new}.ps1',s)
+s=(r/'run-native-live-v56.ps1').read_text()
+changes={'native-live-v56':'physical-gpu-live-v1','NativeLiveV56':'GpuLiveV1','native-desktop-admission-v66':'physical-gpu-desktop-v2','run-native-desktop-v66.ps1':'run-physical-gpu-desktop-v2.ps1','NativeDesktopRecovery-v66':'GpuDesktopRecovery-v2','native-topology-primary-v42':'physical-gpu-topology-primary-v1','native-topology-v102':'native-topology-v105','InspectTopology-V102':'InspectTopology-V105','relay_native_frames_v8.py':'relay_physical_gpu_frames_v1.py'}
+s=substitute(s,changes)
+s=s.replace("desktop_offloaded=$false;input_forwarding_tested", "desktop_offloaded=$false;hardware_gpu_control=$true;input_forwarding_tested")
+a=s.index("  if(!$appCued -and $keyCued -and $redObserved)");b=s.index("  if(!$clickCued",a);s=s[:a]+s[b:]
+a=s.index("  if($appStarted -and !$repeatStarted");b=s.index("  if($repeatStarted -and !$repeatFinished)",a)
+s=s[:a]+'''  if(!$repeatStarted -and $keyCued -and $redObserved){
+   if(($deadline-[DateTime]::UtcNow).TotalSeconds -lt 190){throw 'Insufficient interval for repeated input'}
+   New-Item -ItemType Directory "$out\\repeat-cues"|Out-Null
+   Start-Interactive 'repeat' @($repeatBinary,'--run',"$out\\repeat-cues",'150','40')
+   $repeatStarted=$true;$report.repeat_started=[DateTime]::UtcNow.ToString('o');Save-Report
+  }
+'''+s[b:]
+a=s.index(' $bootstrap=Get-Content');b=s.index(" $report.active_phase='freshness-validation'",a)
+s=s[:a]+''' $bootstrap=Get-Content "$r\\vm\\physical-gpu-desktop-v2\\bootstrap\\report.json" -Raw|ConvertFrom-Json
+ if(!$bootstrap.completed -or !$bootstrap.passed -or !$bootstrap.actual_hardware_gpu_route -or !$bootstrap.hardware_gpu_control -or $bootstrap.actual_dwm_npu_execution -or $bootstrap.npu_receipts -ne 0 -or $bootstrap.hardware_child_receipts -ne 0 -or $bootstrap.provider_generations -ne 0){throw 'Hardware GPU route or absence of NPU rendering not verified'}
+ $report.actual_hardware_gpu_route=$true;$report.npu_receipts=0;$report.hardware_child_receipts=0;$report.provider_generations=0
+'''+s[b:]
+a=s.index(' $application=Get-Content');b=s.index(" if(!$repeatFinished",a)
+s=s[:a]+" $report.shared_default_application_tested=$false\n"+s[b:]
+assert 'shared-report' not in s and 'ptl_four_tap' not in s
+s=s.replace(";$appCued=$false;$appStarted=$false",'')
+write('run-physical-gpu-live-v1.ps1',s)
+write('physical-gpu-live-v1-upload.json',json.dumps(written,indent=2)+'\n')
+print(json.dumps(dict(prepared=written,desktop_changed=False)))

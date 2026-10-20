@@ -20,6 +20,12 @@ The trace places 6.84 seconds inside child rendering with no compilation time.
 Full desktop offload, sustained responsiveness, broad application coverage and
 a Tahoma benefit remain unqualified.
 
+**October 20 follow-up:** the completed [GPU baseline](docs/validation/2026-10-16/native-physical-gpu-live-v1/README.md)
+reaches 29.9 verified animation updates per second through the same display bridge,
+versus 0.7 on NPU. Its 550-second presentation and restoration pass, with zero
+NPU rendering calls. This points to the NPU rendering path rather than the bridge
+as the animation bottleneck. Tahoma throughput has not been measured in this setup.
+
 Its [complete-image component comparison](docs/validation/2026-10-16/native-filled-program-comparison-v1/README.md)
 preserves all 1,852 preceding NPU images. Across 1,389 warm pairs, aggregate draw
 time falls from 76.77 to 59.58 seconds, with 121 slower candidate pairs. Existing
