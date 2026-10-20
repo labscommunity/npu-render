@@ -5,6 +5,7 @@ record holds one input span and its expected output span. The kernel is patched
 into the pinned twelve-row carrier; original, custom and original phases run.
 Timings include host tensor copies and are diagnostic only.
 """
+
 import argparse
 import hashlib
 import json
@@ -75,6 +76,13 @@ def main():
     parser.add_argument("--fixtures", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--repeat", type=int, default=1, help="timing repeats of the whole set")
+    parser.add_argument(
+        "--only", action="append", default=[], help="fixture name prefix filter (repeatable)"
+    )
+    parser.add_argument("--deadline-ms", type=int, default=10000)
+    parser.add_argument(
+        "--skip-original", action="store_true", help="omit the original Softmax phases"
+    )
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=False)
     report = dict(
@@ -105,12 +113,24 @@ def main():
             patched_sha256=hashlib.sha256(patched).hexdigest(),
         )
         records = load_fixtures(args.fixtures)
+        if args.only:
+            records = [r for r in records if any(r[0].startswith(prefix) for prefix in args.only)]
         report["fixtures"] = len(records)
+        report["fixture_names"] = [r[0] for r in records]
+        if not records:
+            raise RuntimeError("no fixtures selected")
         report["fixtures_sha256"] = hashlib.sha256(args.fixtures.read_bytes()).hexdigest()
         core = ov.Core()
         if "NPU" not in core.available_devices:
             raise RuntimeError("NPU is unavailable")
-        for phase, blob in (("original-before", original), ("custom-frame", patched), ("original-after", original)):
+        phases = (
+            ("original-before", original),
+            ("custom-frame", patched),
+            ("original-after", original),
+        )
+        if args.skip_original:
+            phases = (("custom-frame", patched),)
+        for phase, blob in phases:
             model = core.import_model(blob, "NPU", {"NPU_TURBO": True})
             assert model.get_property("NPU_TURBO") is True
             raw = model.get_property("EXECUTION_DEVICES")
@@ -146,13 +166,19 @@ def main():
                     tensor = data.view(np.float16)
                     began = time.perf_counter_ns()
                     request.start_async({0: tensor})
-                    assert request.wait_for(10000), "NPU inference deadline"
+                    if not request.wait_for(args.deadline_ms):
+                        report["deadline_group"] = dict(first=first, names=[g[0] for g in group])
+                        raise AssertionError("NPU inference deadline")
                     output = request.get_output_tensor().data.copy().view(np.uint8)
                     elapsed = (time.perf_counter_ns() - began) / 1e6
-                    timings.append(dict(repeat=repeat, first=first, rows=len(group), request_ms=elapsed))
+                    timings.append(
+                        dict(repeat=repeat, first=first, rows=len(group), request_ms=elapsed)
+                    )
                     if repeat:
                         continue
                     for row, (name, _, expected) in enumerate(group):
+                        if args.timing_only:
+                            continue
                         actual = output[row].tobytes()
                         difference = compare(name, expected, actual)
                         compared += 1
@@ -160,9 +186,15 @@ def main():
                             report["mismatches"].append(difference)
                             if len(report["mismatches"]) >= 32:
                                 raise AssertionError("too many mismatches")
-            report["phases"].append(dict(phase=phase, passed=not report["mismatches"], compared=compared, timings=timings))
+            report["phases"].append(
+                dict(
+                    phase=phase, passed=not report["mismatches"], compared=compared, timings=timings
+                )
+            )
             del request, model
-        report["passed"] = all(p["passed"] for p in report["phases"]) and len(report["phases"]) == 3
+        report["passed"] = all(p["passed"] for p in report["phases"]) and len(
+            report["phases"]
+        ) == len(phases)
     except Exception as error:
         report.update(error=repr(error), traceback=traceback.format_exc())
     finally:
@@ -171,7 +203,15 @@ def main():
     summary = {k: v for k, v in report.items() if k != "phases"}
     summary["phase_summary"] = [
         {k: v for k, v in p.items() if k != "timings"}
-        | ({"median_request_ms": sorted(t["request_ms"] for t in p["timings"])[len(p["timings"]) // 2]} if p.get("timings") else {})
+        | (
+            {
+                "median_request_ms": sorted(t["request_ms"] for t in p["timings"])[
+                    len(p["timings"]) // 2
+                ]
+            }
+            if p.get("timings")
+            else {}
+        )
         for p in report["phases"]
     ]
     print(json.dumps(summary))

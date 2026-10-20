@@ -71,6 +71,7 @@ def transform(root, source, output, assemble=False):
             b"5000xx",
             b"-S",
             OPTIMIZATION,
+            b"-fno-jump-tables",
             b"-x",
             b"c",
             b"entry.c",

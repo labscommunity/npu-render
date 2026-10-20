@@ -268,7 +268,7 @@ NR_NOINLINE nr_i32 nr_sample(const nr_span *s, const nr_command *cmd, nr_u32 tex
         packed = nr_ld(s->data + s->atlas_offset + w.data_offset + (ry * w.w + rx) * 4);
         for (c = 0; c < 4; ++c) {
             nr_u32 source = (w.format == 87 && c < 3) ? 2 - c : c;
-            taps[tap][c] = (nr_f32)((packed >> (source * 8)) & 255u) / 255.0f;
+            taps[tap][c] = (nr_f32)((packed >> (source * 8)) & 255u) * (1.0f / 255.0f);
         }
     }
     for (c = 0; c < 4; ++c) {
@@ -336,9 +336,8 @@ NR_NOINLINE nr_i32 nr_execute(const nr_span *s, const nr_command *cmd, const nr_
     return 1;
 }
 NR_INLINE void nr_registers_reset(const nr_span *s, const nr_command *cmd, const nr_program *p, nr_registers *regs) {
-    nr_u32 n, c;
-    for (n = 0; n < 16; ++n) for (c = 0; c < 4; ++c) { regs->r[n][c] = 0; regs->in[n][c] = 0; }
-    for (n = 0; n < 8; ++n) for (c = 0; c < 4; ++c) regs->out[n][c] = 0;
+    /* Registers are not cleared: the SM4 parser only admits reads of written
+     * temporaries and declared inputs, so clearing would only cost cycles. */
     regs->vs_constants = s->data + s->constants_offset + cmd->constants_offset;
     regs->ps_constants = regs->vs_constants + p->vs_constants * 16;
 }
@@ -355,20 +354,29 @@ NR_NOINLINE nr_i32 nr_vertex(const nr_span *s, const nr_command *cmd, const nr_p
     if (!(w >= 1.0f / 65536 && w <= 65536.0f)) return 0;
     x = (clip[0] / w + 1.0f) * (cmd->viewport[2] * 0.5f) + cmd->viewport[0];
     y = (1.0f - clip[1] / w) * (cmd->viewport[3] * 0.5f) + cmd->viewport[1];
+    /* Two divisions per vertex are affordable; per-pixel paths use reciprocals. */
     if (!nr_finite(x) || !nr_finite(y) || x < -1048576.0f || x > 1048576.0f || y < -1048576.0f || y > 1048576.0f) return 0;
     out->x = x; out->y = y; out->inverse_w = 1.0f / w; out->sx = nr_snap(x); out->sy = nr_snap(y);
-    for (n = 0, k = 0; n < 8; ++n) if (p->ps_inputs & (1u << n)) { for (c = 0; c < 4; ++c) out->varying[k][c] = regs.out[n][c]; ++k; }
+    for (n = 0, k = 0; n < 8; ++n) if (p->ps_inputs & (1u << n)) {
+        for (c = 0; c < 4; ++c) {
+            /* Bounded varyings keep interpolation and shading finite on both targets. */
+            nr_f32 value = nr_float(regs.out[n][c]);
+            if (!(value >= -65536.0f && value <= 65536.0f)) return 0;
+            out->varying[k][c] = regs.out[n][c];
+        }
+        ++k;
+    }
     return 1;
 }
 NR_NOINLINE void nr_blend_store(const nr_span *s, const nr_command *cmd, nr_u8 *pixel, const nr_f32 color[4]) {
     /* Porter-Duff factors in BlendMode order: source scale 0 zero, 1 255, 2 dstA, 3 255-dstA;
      * destination scale 0 zero, 1 one, 2 alpha, 3 1-alpha. Mode 13 is component coverage. */
-    static const nr_u8 source_factor[13] = {1, 1, 0, 0, 3, 2, 3, 2, 3, 3, 1, 0, 0};
-    static const nr_u8 destination_factor[13] = {0, 3, 2, 3, 1, 0, 0, 3, 2, 3, 1, 1, 0};
+    /* Factor codes packed two bits per mode; no static data so the kernel stays position independent. */
+    const nr_u32 source_codes = 0x001fbb05u, destination_codes = 0x005ec1ecu;
     nr_u32 background = nr_ld(pixel), packed = background, c, mode = cmd->blend_mode;
     nr_f32 alpha = nr_clamp01(color[3]), destination_alpha = (nr_f32)((background >> 24) & 255u), scale_source = 0, scale_destination = 0;
     if (mode < 13) {
-        nr_u32 sf = source_factor[mode], df = destination_factor[mode];
+        nr_u32 sf = (source_codes >> (mode * 2)) & 3u, df = (destination_codes >> (mode * 2)) & 3u;
         scale_source = sf == 0 ? 0.0f : (sf == 1 ? 255.0f : (sf == 2 ? destination_alpha : 255.0f - destination_alpha));
         scale_destination = df == 0 ? 0.0f : (df == 1 ? 1.0f : (df == 2 ? alpha : 1.0f - alpha));
     }
@@ -404,9 +412,21 @@ NR_NOINLINE nr_i32 nr_draw_triangle(nr_span *s, const nr_command *cmd, const nr_
     if (x0 < cmd->clip[0]) x0 = cmd->clip[0]; if (y0 < cmd->clip[1]) y0 = cmd->clip[1];
     if (x1 > cmd->clip[2]) x1 = cmd->clip[2]; if (y1 > cmd->clip[3]) y1 = cmd->clip[3];
     for (py = y0; py < y1; ++py) for (px = x0; px < x1; ++px) {
-        nr_i32 cx = ((nr_i32)s->tile_x + px) * 256 + 128, cy = ((nr_i32)s->tile_y + py) * 256 + 128, a, covered = 1;
+        nr_i32 cx = ((nr_i32)s->tile_x + px) * 256 + 128, cy = ((nr_i32)s->tile_y + py) * 256 + 128, a, covered = 1, degenerate = 0;
         nr_f32 sx, sy, wgt[3], denominator, weights[3];
         nr_registers regs; nr_u32 c, reg, interp_index, color_bits[4]; nr_f32 color[4];
+        for (a = 0; a < 3 && covered; ++a) {
+            nr_i32 b = (a + 1) % 3, dx = v[b].sx - v[a].sx, dy = v[b].sy - v[a].sy, top, reverse;
+            nr_i64 e = nr_edge(v[a].sx, v[a].sy, v[b].sx, v[b].sy, cx, cy);
+            top = dy < 0 || (dy == 0 && dx > 0); reverse = dy > 0 || (dy == 0 && dx < 0);
+            covered = area > 0 ? (e > 0 || (e == 0 && top)) : (e < 0 || (e == 0 && reverse));
+        }
+        if (!covered) continue;
+        ++s->covered;
+#if defined(NR_FRAME_EXPERIMENT) && NR_FRAME_EXPERIMENT == 1
+        nr_st(s->output + NR_FRAME_OUTPUT_PIXELS + ((nr_u32)py * s->tile_w + (nr_u32)px) * 4, 0xff00ff00u); continue;
+#endif
+        sx = (nr_f32)cx * (1.0f / 256.0f); sy = (nr_f32)cy * (1.0f / 256.0f);
         for (a = 0; a < 3; ++a) { nr_i32 b = (a + 1) % 3, c2 = (a + 2) % 3; wgt[a] = nr_weight(v[b].x, v[b].y, v[c2].x, v[c2].y, sx, sy); }
         nr_registers_reset(s, cmd, p, &regs);
         for (reg = 0, interp_index = 0; reg < 8; ++reg) {
@@ -415,20 +435,31 @@ NR_NOINLINE nr_i32 nr_draw_triangle(nr_span *s, const nr_command *cmd, const nr_
             mode = (p->interpolation >> (reg * 4)) & 15u;
             if (mode == 1) { for (c = 0; c < 4; ++c) regs.in[reg][c] = v[0].varying[interp_index][c]; }
             else {
+                nr_f32 reciprocal;
                 for (a = 0; a < 3; ++a) weights[a] = mode == 2 ? wgt[a] * v[a].inverse_w : wgt[a];
                 denominator = (weights[0] + weights[1]) + weights[2];
-                denominator = denominator + (denominator == 0 ? 1.0f : 0.0f);
+                /* Degenerate float geometry (integer area nonzero, float area ~0) is
+                 * skipped identically on both targets instead of producing infinities. */
+                if (!(denominator > 1e-20f || denominator < -1e-20f)) { degenerate = 1; break; }
+                reciprocal = 1.0f / denominator;
                 for (c = 0; c < 4; ++c) {
                     nr_f32 sum = (weights[0] * nr_float(v[0].varying[interp_index][c]) + weights[1] * nr_float(v[1].varying[interp_index][c])) + weights[2] * nr_float(v[2].varying[interp_index][c]);
-                    nr_f32 value = sum / denominator;
+                    nr_f32 value = sum * reciprocal;
                     if (!nr_finite(value)) return 0;
                     regs.in[reg][c] = nr_bits(value);
                 }
             }
             ++interp_index;
         }
+        if (degenerate) continue;
+#if defined(NR_FRAME_EXPERIMENT) && NR_FRAME_EXPERIMENT == 2
+        nr_st(s->output + NR_FRAME_OUTPUT_PIXELS + ((nr_u32)py * s->tile_w + (nr_u32)px) * 4, regs.in[1][0] ^ 0xff000000u); continue;
+#endif
         if (!nr_execute(s, cmd, p, &regs, 1, &s->escapes)) return 0;
         for (c = 0; c < 4; ++c) { color_bits[c] = regs.out[0][c]; color[c] = nr_float(color_bits[c]); if (!nr_finite(color[c])) return 0; }
+#if defined(NR_FRAME_EXPERIMENT) && NR_FRAME_EXPERIMENT == 3
+        nr_st(s->output + NR_FRAME_OUTPUT_PIXELS + ((nr_u32)py * s->tile_w + (nr_u32)px) * 4, color_bits[0] ^ color_bits[3]); continue;
+#endif
         nr_blend_store(s, cmd, s->output + NR_FRAME_OUTPUT_PIXELS + ((nr_u32)py * s->tile_w + (nr_u32)px) * 4, color);
     }
     return 1;

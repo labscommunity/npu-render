@@ -2,6 +2,7 @@
 // on the captured DWM shader pairs, plus NPU fixture generation. CPU only.
 #include "frame_kernel.hpp"
 #include "shader_reference.hpp"
+#include "blend_reference.hpp"
 #include "captured_dwm_shaders.hpp"
 #include <cmath>
 #include <cstdio>
@@ -135,9 +136,39 @@ void write_fixtures(const FixtureFile &file, const char *path) {
 }
 std::vector<uint32_t> random_background(uint32_t count) { std::vector<uint32_t> v(count); for (auto &p : v) p = uint32_t(rng()); return v; }
 }
+// Every blend mode and both formats against the repo's scalar blend reference.
+unsigned check_blend_modes() {
+    unsigned failures = 0;
+    for (uint32_t format : {28u, 87u}) for (uint32_t mode = 0; mode <= 13; ++mode) for (unsigned trial = 0; trial < 200; ++trial) {
+        frame::core::nr_span span{}; span.format = format;
+        frame::core::nr_command cmd{}; cmd.blend_mode = mode; cmd.write_mask = 1 + (trial % 15);
+        for (unsigned c = 0; c < 4; ++c) cmd.blend_constant[c] = uniform(-0.2f, 1.2f);
+        const uint32_t background = uint32_t(rng());
+        float color[4]; for (auto &c : color) c = uniform(-0.2f, 1.2f);
+        uint8_t pixel[4]; std::memcpy(pixel, &background, 4);
+        frame::core::nr_blend_store(&span, &cmd, pixel, color);
+        uint32_t actual; std::memcpy(&actual, pixel, 4);
+        const float alpha = std::fmin(std::fmax(color[3], 0.f), 1.f);
+        for (unsigned c = 0; c < 4; ++c) {
+            const unsigned logical = (format == 87 && c < 3) ? 2 - c : c;
+            uint32_t expected_byte = (background >> (c * 8)) & 255u;
+            if (cmd.write_mask & (1u << logical)) {
+                const float fg = std::fmin(std::fmax(color[logical], 0.f), 1.f), dst = float((background >> (c * 8)) & 255u), dst_alpha = float((background >> 24) & 255u);
+                const float constant = std::fmin(std::fmax(cmd.blend_constant[logical], 0.f), 1.f);
+                const auto terms = raster::reference_blend_terms<float>(raster::BlendMode(mode), fg, alpha, dst, dst_alpha, constant);
+                float value = terms[0] + terms[1]; value = std::fmin(std::fmax(value, 0.f), 255.f);
+                const uint32_t base = uint32_t(value); const float fraction = value - float(base);
+                expected_byte = base + (fraction > .5f || (fraction == .5f && (base & 1u)));
+            }
+            if (((actual >> (c * 8)) & 255u) != expected_byte) { ++failures; if (failures < 5) std::printf("{\"blend_mismatch\":true,\"mode\":%u,\"format\":%u}\n", mode, format); }
+        }
+    }
+    std::printf("{\"blend_modes_checked\":14,\"formats\":2,\"trials\":200,\"blend_failures\":%u}\n", failures);
+    return failures;
+}
 int main(int argc, char **argv) {
     const char *fixtures_path = argc >= 3 && std::string(argv[1]) == "--fixtures" ? argv[2] : nullptr;
-    FixtureFile fixtures; unsigned eligible = 0, failures = 0;
+    FixtureFile fixtures; unsigned eligible = 0, failures = check_blend_modes();
     std::vector<std::pair<std::vector<uint8_t>, std::string>> entries;
     for (size_t n = 0; n < std::size(pairs); ++n) {
         const auto &pair = pairs[n];

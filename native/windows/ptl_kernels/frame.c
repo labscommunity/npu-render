@@ -23,9 +23,13 @@ void nr_probe_kernel(const unsigned char *params) {
     }
 }
 /* The target has no C runtime. Volatile stores prevent recursive lowering. */
-void *memset(void *destination, int value, __SIZE_TYPE__ count) {
+typedef unsigned nr_uint4 __attribute__((ext_vector_type(4)));
+__attribute__((noinline)) void *memset(void *destination, int value, __SIZE_TYPE__ count) {
     volatile unsigned char *p = (volatile unsigned char *)destination;
-    __SIZE_TYPE__ i;
-    for (i = 0; i < count; ++i) p[i] = (unsigned char)value;
+    const unsigned char byte = (unsigned char)value;
+    const nr_uint4 fill = (nr_uint4)((unsigned)byte * 0x01010101u);
+    while (count && ((__UINTPTR_TYPE__)p & 15)) { *p++ = byte; --count; }
+    while (count >= 16) { *(volatile nr_uint4 *)p = fill; p += 16; count -= 16; }
+    while (count) { *p++ = byte; --count; }
     return destination;
 }
