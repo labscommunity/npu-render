@@ -8,6 +8,7 @@ from pathlib import Path
 
 import numpy as np
 
+from . import desktop_switch
 from .config import config_path, resolve_backend, save_backend
 from .contracts import Composition
 from .openvino_backend import OpenVINOProvider
@@ -89,10 +90,19 @@ def main(argv: list[str] | None = None) -> int:
     live.add_argument("--switch-every", type=float, default=10)
     live.add_argument("--headless", action="store_true", help="explicitly skip window presentation")
     live.add_argument("--report", type=Path, default=Path("results/live.json"))
+    desktop_switch.add_parser(commands)
     args = parser.parse_args(argv)
     try:
         if args.command == "devices":
             result = {"devices": [asdict(device) for device in OpenVINOProvider().devices()]}
+        elif args.command == "desktop":
+            result = desktop_switch.run(args)
+            if args.desktop_command == "status" and not args.json:
+                print(desktop_switch.summarize(result))
+                return 0
+            if result.get("passed") is False or result.get("ready") is False:
+                print(json.dumps(result, indent=2))
+                return 1
         elif args.command == "stack":
             result = inspect_stack()
             if args.expected_npu_driver:
