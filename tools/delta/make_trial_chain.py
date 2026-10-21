@@ -79,7 +79,9 @@ def main():
     )
     args = parser.parse_args()
     n = args.monitor_seconds
-    assert 60 <= n <= 2220, "the bootstrap admits 60..2220 s under the indirect lease contract"
+    # Leases renew in place, so the admission itself is bounded only by the controller; the
+    # topology helper (ValidateRange 2160) and the frame relay (assert <= 2160) still cap a run.
+    assert 60 <= n <= 2160, "topology helper and frame relay accept at most 2160 s"
     src = args.source
     out = args.output
     out.mkdir(parents=True, exist_ok=True)
@@ -304,7 +306,29 @@ Get-Content "$out\\report.json"
             (f"hexdigest()=='{VECTOR_FILL_PROGRAM}'", f"hexdigest()=='{COMPACT_PROGRAM}'"),
             (
                 "from native_shared_app_v21 import SharedInteractiveApp",
-                "from native_shared_app_v22 import SharedInteractiveApp",
+                "from native_shared_app_v22 import SharedInteractiveApp\nfrom native_lease_renewal_v1 import Renewal",
+            ),
+            ("assert 60<=v.monitor_seconds<=2220", "assert 60<=v.monitor_seconds<=14400"),
+            # The worker's lifetime and the first grants are bounded by one lease maximum; the
+            # renewal below keeps both ahead of a longer admission.
+            (
+                "worker=subprocess.Popen([str(v.worker),pipe,'65536',str(v.monitor_seconds+45),",
+                "worker=subprocess.Popen([str(v.worker),pipe,'65536',str(min(v.monitor_seconds+45,2400)),",
+            ),
+            (
+                "scope=1,desktop_session=session['console_session'],milliseconds=(v.monitor_seconds+60)*1000))",
+                "scope=1,desktop_session=session['console_session'],milliseconds=min(v.monitor_seconds+60,2400)*1000))",
+            ),
+            (
+                "scope=2,desktop_session=session['console_session'],milliseconds=(v.monitor_seconds+60)*1000))\n",
+                "scope=2,desktop_session=session['console_session'],milliseconds=min(v.monitor_seconds+60,2400)*1000))\n"
+                "    renewal=Renewal(leases,v.recovery_task);report['lease_renewals']=[]\n",
+            ),
+            (
+                "        compositor.verify();host.verify()\n        if time.perf_counter()-last_gate>=1:gate();last_gate=time.perf_counter()\n",
+                "        compositor.verify();host.verify()\n"
+                "        if renewal.poll(stop_after_tick=k.GetTickCount64()+int((deadline-time.perf_counter())*1000)):report['lease_renewals']=renewal.renewals;save()\n"
+                "        if time.perf_counter()-last_gate>=1:gate();last_gate=time.perf_counter()\n",
             ),
             (
                 "p.add_argument('--texture-scope',choices=('0','1'),default='0')\n",
@@ -334,12 +358,29 @@ Get-Content "$out\\report.json"
         ],
         "bootstrap",
     )
+    boot = edit(
+        boot,
+        [
+            (
+                "p.add_argument('--frame-blob-dir',type=Path,required=True)\n",
+                "p.add_argument('--frame-blob-dir',type=Path,required=True)\n"
+                "p.add_argument('--recovery-task',required=True)\n",
+            )
+        ],
+        "bootstrap-renewal",
+    )
     boot = boot.replace(
         "report.update(request_recording_enabled=",
         "report.update(frame_blob_dir=str(v.frame_blob_dir),frame_blob_manifest_sha256=hashlib.sha256((v.frame_blob_dir/'manifest.txt').read_bytes()).hexdigest(),request_recording_enabled=",
     )
     assert "frame_blob_manifest_sha256" in boot
     write("native_desktop_bootstrap_v50.py", boot)
+    write(
+        "native_lease_renewal_v1.py",
+        (Path(__file__).resolve().parent / "native_lease_renewal_v1.py").read_text(
+            encoding="utf-8"
+        ),
+    )
 
     rd = (src / "recover-native-desktop-v75.ps1").read_text(encoding="utf-8")
     rd = edit(
@@ -383,7 +424,8 @@ Get-Content "$out\\report.json"
                 "'--texture-scope','1','--worker'",
                 f"'--texture-scope','1','--frame-blob-dir',\"{frame_blobs}\",'--worker'",
             ),
-            ("'--monitor-seconds','660'", f"'--monitor-seconds','{n}'"),
+            ("'--monitor-seconds','660'", f"'--monitor-seconds','{n}','--recovery-task',$task"),
+            ("'bootstrap' 2340", f"'bootstrap' {n + 120}"),
             (
                 '$worker="$r\\builds\\ptl-native-worker-v31\\Release\\nr_registered_local_indexed_worker.exe"',
                 f'$worker="{worker}"',
@@ -456,6 +498,7 @@ Get-Content "$out\\report.json"
             ("WaitForExit(780000)", f"WaitForExit({(n + 120) * 1000})"),
             ("{14}else{11}", f"{{{n // 60 + 3}}}else{{{n // 60}}}"),
             ("'--seconds','590'", f"'--seconds','{n - 70}'"),
+            ("'-Seconds','600','-CursorCue'", f"'-Seconds','{n - 60}','-CursorCue'"),
             ("{15000}else{640000}", f"{{15000}}else{{{(n - 20) * 1000}}}"),
             ("{90000}else{780000}", f"{{90000}}else{{{(n + 120) * 1000}}}"),
         ],
@@ -563,6 +606,7 @@ Get-Content "$out\\report.json"
     for name, digest in desk_sources.items():
         new = final(renamed[name]) if name in renamed else None
         desk_manifest[new or name] = produced[new] if new else digest
+    desk_manifest["native_lease_renewal_v1.py"] = produced["native_lease_renewal_v1.py"]
     write("native-desktop-v76-source.json", json.dumps(desk_manifest, indent=2) + "\n")
     (out / "chain-manifest.json").write_text(
         json.dumps(
