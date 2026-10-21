@@ -4,7 +4,7 @@ from native_session_broker_v3 import *
 from native_incremental_evidence_v1 import NativeEvidence
 from native_process_observer_v1 import PinnedProcess,named_processes,find_compositor,find_indirect_host,process_image
 import traceback,struct
-from native_shared_app_v47 import SharedInteractiveApp
+from native_shared_app_v48 import SharedInteractiveApp
 from native_lease_renewal_v1 import Renewal
 p=argparse.ArgumentParser()
 for n in ('worker','runtime','cache','session_probe','devcon','idd_inf','transaction','trace'):
@@ -108,8 +108,8 @@ try:
     for key in ('NR_RENDER_RECOVERY_TEST_KILL_TICKET','NR_RENDER_RECOVERY_TEST_EXCEPTION_TICKET','NR_RENDER_PROVIDER_TEST_INFER_EXCEPTION_TICKET'):env.pop(key,None)
     env.update(NR_RENDER_PROVIDER_RECOVERY='1',NR_RENDER_PROVIDER_RECOVERY_DIR=str(provider_root),NR_RENDER_INFER_TRACE='0',NR_RENDER_COMPILE_TRACE='0',NR_RENDER_INFER_PROFILE='0')
     report.update(provider_isolated=True,provider_fault_injected=False,provider_timing_scope='Child roundtrip includes compilation, transport and any recovery.')
-    capture=out/'requests';capture.mkdir(exist_ok=False);env['NR_RENDER_CAPTURE_DIRECTORY']=str(capture);env.pop('NR_RENDER_AFFINE_BATCH',None)
-    report.update(frame_blob_dir=str(v.frame_blob_dir),frame_blob_manifest_sha256=hashlib.sha256((v.frame_blob_dir/'manifest.txt').read_bytes()).hexdigest(),request_recording_enabled=True,recording_byte_budget=17179869184,performance_measurement_valid=False,
+    env.pop('NR_RENDER_CAPTURE_DIRECTORY',None);env.pop('NR_RENDER_AFFINE_BATCH',None)
+    report.update(frame_blob_dir=str(v.frame_blob_dir),frame_blob_manifest_sha256=hashlib.sha256((v.frame_blob_dir/'manifest.txt').read_bytes()).hexdigest(),request_recording_enabled=False,recording_byte_budget=0,performance_measurement_valid=False,
                   affine_batch='default',memory_cache=v.memory_cache,memory_capacity='512',generic_batch=v.generic_batch,
                   uniform_lanes=v.uniform_lanes,texture_scope=v.texture_scope,pipeline_cache='retained',monitor_seconds=v.monitor_seconds,quad_batch='1',
                   ptl_resident_clip_model_sha256=hashlib.sha256(v.ptl_resident_clip_blob.read_bytes()).hexdigest(),ptl_complex_model_sha256=hashlib.sha256(v.ptl_complex_blob.read_bytes()).hexdigest(),ptl_rectangle_model_sha256=hashlib.sha256(v.ptl_rectangle_blob.read_bytes()).hexdigest(),ptl_long_model_sha256=hashlib.sha256(v.ptl_long_blob.read_bytes()).hexdigest(),ptl_program_model_sha256=hashlib.sha256(v.ptl_program_blob.read_bytes()).hexdigest(),ptl_masked_model_sha256=hashlib.sha256(v.ptl_masked_blob.read_bytes()).hexdigest(),ptl_geometry_model_sha256=hashlib.sha256(v.ptl_geometry_blob.read_bytes()).hexdigest(),ptl_texture_model_sha256=hashlib.sha256(v.ptl_texture_blob.read_bytes()).hexdigest(),ptl_solid_model_sha256=hashlib.sha256(v.ptl_solid_blob.read_bytes()).hexdigest(),ptl_four_tap_model_sha256=hashlib.sha256(v.ptl_four_tap_blob.read_bytes()).hexdigest(),worker_seconds=v.monitor_seconds+45,lease_milliseconds=(v.monitor_seconds+60)*1000,incremental_evidence=True)
