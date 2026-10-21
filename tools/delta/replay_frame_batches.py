@@ -284,7 +284,11 @@ def main():
                     str(
                         len(batches)
                         + (
-                            sum(len(b["tickets"]) for b in batches if not b.get("legacy"))
+                            sum(
+                                len(b["tickets"])
+                                for b in batches
+                                if not b.get("legacy") and not b.get("recorded")
+                            )
                             if args.reference
                             else 0
                         )
@@ -455,7 +459,14 @@ def main():
                         print(
                             json.dumps(dict(replayed=n + 1, matched=report["matched"])), flush=True
                         )
-            worker.wait(timeout=30)
+            try:
+                worker.wait(timeout=60)
+            except subprocess.TimeoutExpired:
+                # Reference mode skips the per-draw replay of batches that answered
+                # "missing", so the worker may still expect requests: stop it.
+                worker.kill()
+                worker.wait(timeout=5)
+                report["worker_outlived_requests"] = True
             report["worker_exit"] = worker.returncode
         batch_count = sum(1 for b in batches if not b.get("legacy") and not b.get("recorded"))
         recorded_count = sum(1 for b in batches if b.get("recorded"))
