@@ -879,3 +879,43 @@ The run was not affected beyond a slower monitor loop.
 Runs beyond 36 minutes remain capped by the topology helper, the frame relay
 and the topology control binary (2160 s each); they can be lifted now that
 the lease no longer bounds an admission.
+
+## Trial 13 (generation 15, first grant 1200 s): the indirect display driver's own lease check
+
+Same build, package and registration as trial 12; the first grants and the
+worker lifetime were shortened to 1200 s so every renewal path would run inside
+the 2160 s admission. The controller renewed once at 600 s remaining (1620 s
+granted, no storm), the worker followed (`worker_deadline_extended`, 1619 s
+remaining), DWM's driver kept flushing batches on the NPU to the end (282
+flushes, the last at sequence 450, execution device NPU), and the admission,
+bootstrap and recovery all passed over the full 2160 s. The live controller
+failed the run at its final check, `Continued delivery and fresh physical
+observation not qualified`, because the indirect host stopped publishing frames
+at 17:55:42Z, 1190 s after the first grant was issued: 181 frames, none after
+1200 s.
+
+The indirect display driver (package v2, signed on 2026-10-15) carries its own
+copy of the lease header from before renewal existed. Its `native_ready()` calls
+`Admission::verify()` on the record it read at admission, so at the first
+grant's deadline every frame-loop step returns access denied and the display
+goes stale, while DWM's driver and the worker, which hold the renewing header,
+continue. The fix is a rebuilt indirect display package (v3) from the same
+sources with the tracked lease header; the chain generator gains the package
+and version as options. Measurements for the record:
+
+| Measure | Trial 13 |
+| --- | --- |
+| Admission / bootstrap / recovery | passed / passed / passed (2160 s) |
+| Renewals / worker extensions | 1 / 1 |
+| Frames published (distinct) | 181 (142), last at 1190 s |
+| DWM flushes / batched draws / unbatched | 282 / 2,634 / 0 |
+| Verified updates/s (first 10 min stimulus) | 2.3 |
+| GPU 3D engine over 2215 s | average 0.04 %, maximum 22.5 % at restoration |
+
+Open fidelity item found by the new route contract test
+(`legacy_route_test.cpp`, 63,840 draw states through the shared route, the
+header check and the encoder): the batch recorder stores a binding's address
+modes but never its border colour, so a border-addressed draw that falls back
+samples a zero border where the driver's own per-draw path would carry the
+sampler's colour. No trial has shown a border-addressed fallback yet; it is
+noted here so the next fallback evidence is read with it in mind.

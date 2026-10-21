@@ -71,6 +71,8 @@ def main():
         default=660,
         help="native admission duration; the live phases and process waits scale with it",
     )
+    parser.add_argument("--idd-package", default="native-idd-package-v2")
+    parser.add_argument("--idd-version", default="0.0.1502.0")
     parser.add_argument(
         "--initial-grant-seconds",
         type=int,
@@ -405,6 +407,10 @@ Get-Content "$out\\report.json"
                 f"@('ROOT\\NPURENDER_NATIVE_PROBE','{args.version}')",
             ),
             ("T8-NpuRender-NativeDesktopRecovery-v75", "T8-NpuRender-NativeDesktopRecovery-v76"),
+            (
+                "@('ROOT\\NPURENDER_NATIVE_INDIRECT_V1','0.0.1502.0')",
+                f"@('ROOT\\NPURENDER_NATIVE_INDIRECT_V1','{args.idd_version}')",
+            ),
         ],
         "recover-desktop",
     )
@@ -439,6 +445,8 @@ Get-Content "$out\\report.json"
                 f"'--texture-scope','1','--frame-blob-dir',\"{frame_blobs}\",'--worker'",
             ),
             ("'--monitor-seconds','660'", f"'--monitor-seconds','{n}','--recovery-task',$task"),
+            ("native-idd-package-v2", args.idd_package),
+            ("version='0.0.1502.0'", f"version='{args.idd_version}'"),
             ("'bootstrap' 2340", f"'bootstrap' {n + 120}"),
             (
                 '$worker="$r\\builds\\ptl-native-worker-v31\\Release\\nr_registered_local_indexed_worker.exe"',
@@ -689,6 +697,8 @@ Get-Content "$out\\report.json"
                 capture=args.capture,
                 monitor_seconds=n,
                 initial_grant_seconds=grant,
+                idd_package=args.idd_package,
+                idd_version=args.idd_version,
                 registration_generation=rg,
                 files=produced,
             ),
