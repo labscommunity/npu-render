@@ -1104,3 +1104,10 @@ worker returns. During the saver the indirect display cycled through four swap
 chain releases and reassignments and kept producing (824 frames, 530 distinct),
 and the GPU 3D engine sat at 7.9 % (p50) because the saver itself rendered on
 the iGPU for the physical panel. The two-hour soak restarts without capture.
+
+Harness note: the input stimulus (`--input-stimulus`) failed at its start with
+`relative mouse origin failed` in generations 21 and 26 and ran in generations
+20 and 23, with the same presenter build each time; it depends on the pointer's
+state when it starts. A run without it still exercises the admission, the
+renewals and the presentation path, and its live verdict is read from the
+admission and bootstrap reports; the stimulus-free wrapper avoids the gate.
