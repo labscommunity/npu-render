@@ -65,21 +65,36 @@ def main():
         action="store_true",
         help="record every DWM request the worker receives into the admission bootstrap directory",
     )
+    parser.add_argument(
+        "--monitor-seconds",
+        type=int,
+        default=660,
+        help="native admission duration; the live phases and process waits scale with it",
+    )
+    parser.add_argument(
+        "--registration-generation",
+        type=int,
+        default=None,
+        help="generation whose registration (package qualification) this chain reuses; default: this generation",
+    )
     args = parser.parse_args()
+    n = args.monitor_seconds
+    assert 60 <= n <= 2220, "the bootstrap admits 60..2220 s under the indirect lease contract"
     src = args.source
     out = args.output
     out.mkdir(parents=True, exist_ok=True)
     produced = {}
     g = args.generation
+    rg = g if args.registration_generation is None else args.registration_generation
     # Transaction names of the base chain and their generation-shifted replacements. Longer
     # tokens first so prefixes such as run-/recover- rename as one unit.
     renames = sorted(
         [
-            ("recover-native-registration-v55", f"recover-native-registration-v{55 + g}"),
-            ("qualify-native-registered-v55", f"qualify-native-registered-v{55 + g}"),
-            ("run-native-registration-v55", f"run-native-registration-v{55 + g}"),
-            ("native-registration-v55", f"native-registration-v{55 + g}"),
-            ("NativeRecovery-v55", f"NativeRecovery-v{55 + g}"),
+            ("recover-native-registration-v55", f"recover-native-registration-v{55 + rg}"),
+            ("qualify-native-registered-v55", f"qualify-native-registered-v{55 + rg}"),
+            ("run-native-registration-v55", f"run-native-registration-v{55 + rg}"),
+            ("native-registration-v55", f"native-registration-v{55 + rg}"),
+            ("NativeRecovery-v55", f"NativeRecovery-v{55 + rg}"),
             ("native-desktop-admission-v76", f"native-desktop-admission-v{76 + g}"),
             ("recover-native-desktop-v76", f"recover-native-desktop-v{76 + g}"),
             ("run-native-desktop-v76", f"run-native-desktop-v{76 + g}"),
@@ -104,7 +119,7 @@ def main():
     )
 
     def final(text):
-        if not g:
+        if not g and not rg:
             return text
         for n, (old, _) in enumerate(renames):
             text = text.replace(old, f"\x00{n}\x00")
@@ -368,6 +383,7 @@ Get-Content "$out\\report.json"
                 "'--texture-scope','1','--worker'",
                 f"'--texture-scope','1','--frame-blob-dir',\"{frame_blobs}\",'--worker'",
             ),
+            ("'--monitor-seconds','660'", f"'--monitor-seconds','{n}'"),
             (
                 '$worker="$r\\builds\\ptl-native-worker-v31\\Release\\nr_registered_local_indexed_worker.exe"',
                 f'$worker="{worker}"',
@@ -427,6 +443,23 @@ Get-Content "$out\\report.json"
             ),
         ],
         "live",
+    )
+    # Every live phase and process wait is sized against the 660 s base admission.
+    live = edit(
+        live,
+        [
+            ("'--seconds','700'", f"'--seconds','{n + 40}'"),
+            ("\"$out\\cues\",'585'", f"\"$out\\cues\",'{n - 75}'"),
+            ("580-([DateTime]", f"{n - 80}-([DateTime]"),
+            ("Min(550,", f"Min({n - 110},"),
+            ("WaitForExit(640000)", f"WaitForExit({(n - 20) * 1000})"),
+            ("WaitForExit(780000)", f"WaitForExit({(n + 120) * 1000})"),
+            ("{14}else{11}", f"{{{n // 60 + 3}}}else{{{n // 60}}}"),
+            ("'--seconds','590'", f"'--seconds','{n - 70}'"),
+            ("{15000}else{640000}", f"{{15000}}else{{{(n - 20) * 1000}}}"),
+            ("{90000}else{780000}", f"{{90000}}else{{{(n + 120) * 1000}}}"),
+        ],
+        "live-duration",
     )
     # The compiled per-route turbo kernels are retired; the six frame kernel blobs are the compiled NPU programs.
     start = live.index(" $compiledGenerations=@()")
@@ -540,6 +573,8 @@ Get-Content "$out\\report.json"
                 frame_blobs=args.frame_blobs,
                 generation=g,
                 capture=args.capture,
+                monitor_seconds=n,
+                registration_generation=rg,
                 files=produced,
             ),
             indent=2,
