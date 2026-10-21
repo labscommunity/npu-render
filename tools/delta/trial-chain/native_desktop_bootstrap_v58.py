@@ -4,7 +4,7 @@ from native_session_broker_v3 import *
 from native_incremental_evidence_v1 import NativeEvidence
 from native_process_observer_v1 import PinnedProcess,named_processes,find_compositor,find_indirect_host,process_image
 import traceback,struct
-from native_shared_app_v29 import SharedInteractiveApp
+from native_shared_app_v30 import SharedInteractiveApp
 p=argparse.ArgumentParser()
 for n in ('worker','runtime','cache','session_probe','devcon','idd_inf','transaction','trace'):
     p.add_argument('--'+n.replace('_','-'),type=Path,required=True)

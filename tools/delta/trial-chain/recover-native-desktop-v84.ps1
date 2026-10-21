@@ -1,6 +1,6 @@
 param([Parameter(Mandatory=$true)][string]$Root)
 $ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$state=Get-Content "$Root\ownership.json" -Raw|ConvertFrom-Json
-$expected=@{'nr_native_probe.inf'=@('ROOT\NPURENDER_NATIVE_PROBE','0.0.1331.0');'nr_native_indirect_probe.inf'=@('ROOT\NPURENDER_NATIVE_INDIRECT_V1','0.0.1502.0')}
+$expected=@{'nr_native_probe.inf'=@('ROOT\NPURENDER_NATIVE_PROBE','0.0.1332.0');'nr_native_indirect_probe.inf'=@('ROOT\NPURENDER_NATIVE_INDIRECT_V1','0.0.1502.0')}
 if($state.schema -ne 3 -or $state.packages.Count -ne 2 -or $state.thumbprint -ne '3112355AF6B6C6265E9B849662D3E02F6797343A'){throw 'Recovery ownership mismatch'}
 $names=@();foreach($p in $state.packages){if(!$expected.ContainsKey($p.inf) -or $p.hardware_id -ne $expected[$p.inf][0] -or $p.version -ne $expected[$p.inf][1] -or $p.inf_sha256 -notmatch '^[A-Fa-f0-9]{64}$'){throw 'Package ownership mismatch'};$names+=$p.inf};if(@($names|Select-Object -Unique).Count -ne 2){throw 'Duplicate package identity'}
 $report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');completed=$false;passed=$false;devices_removed=@();packages_removed=@();certificate_stores_restored=@();errors=@()};$mutex=[Threading.Mutex]::new($false,'Global\T8.NpuRender.NativeDesktopRecovery.v1');$held=$false
@@ -71,7 +71,7 @@ try{
  }
  foreach($prior in $state.physical_display_before){try{$now=Get-PnpDevice -InstanceId $prior.instance -PresentOnly;if($now.Status -ne $prior.status){throw 'Original display health changed'}}catch{Record-Error $_.Exception.Message}}
  $report.passed=$report.errors.Count -eq 0
- if($report.passed){Unregister-ScheduledTask -TaskName 'T8-NpuRender-NativeDesktopRecovery-v83' -Confirm:$false -ErrorAction SilentlyContinue}
+ if($report.passed){Unregister-ScheduledTask -TaskName 'T8-NpuRender-NativeDesktopRecovery-v84' -Confirm:$false -ErrorAction SilentlyContinue}
 }catch{Record-Error $_.Exception.Message}
 finally{$report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');$report|ConvertTo-Json -Depth 6|Set-Content "$Root\recovery-report.json";if($held){$mutex.ReleaseMutex()};$mutex.Dispose()}
 $report|ConvertTo-Json -Depth 6;if(!$report.passed){exit 1}
