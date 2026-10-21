@@ -18,6 +18,7 @@ struct LegacyRouteInputs {
     const shader::Program *pixel = nullptr;
     bool textured = false;        // the pixel program samples at least one texture
     bool addressed = false;       // a bound sampler uses mirror or border addressing
+    bool bordered = false;        // a bound sampler uses border addressing (addressed as well)
     bool linear = false;          // sampler slot 0 is bound with a single-mip linear filter
     bool source_smaller = false;  // the slot-0 texture is smaller than the target
     bool scissored = false;       // the scissor rectangle differs from the full target
@@ -57,6 +58,11 @@ inline std::pair<uint32_t, uint32_t> legacy_route(const LegacyRouteInputs &in) {
     if (in.blend_mode == raster::BlendMode::destination_in) { abi = 9; flags |= 0x4000; }
     if (in.blend_mode == raster::BlendMode::destination_out) { abi = 10; flags |= 0x8000; }
     if (raster::extended_blend(in.blend_mode)) { abi = 11; flags |= 0x10000 | (uint32_t(in.blend_mode) << 17); }
+    // Addressing modes travel in the sampler words: abi 12 carries clamp/mirror bits, abi 14 the
+    // two-bit modes with finite border colours. The blend selection stays in the flags; without
+    // this step a mirror-addressed draw records abi 11 and the fallback packet fails to encode.
+    if (in.addressed) abi = 12;
+    if (in.bordered) abi = 14;
     if (in.blend_mode == raster::BlendMode::component_coverage) abi = 15;
     return {abi, flags};
 }

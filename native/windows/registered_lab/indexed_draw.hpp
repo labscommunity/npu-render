@@ -143,6 +143,7 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
             for (unsigned slot = 0; slot < 16; ++slot) if (d.pixel_program->samplers[slot]) {
                 const auto &samp = d.samplers[2][slot];
                 in.addressed = in.addressed || (samp.bound && (samp.desc.AddressU != D3D10_DDI_TEXTURE_ADDRESS_CLAMP || samp.desc.AddressV != D3D10_DDI_TEXTURE_ADDRESS_CLAMP));
+                in.bordered = in.bordered || (samp.bound && (samp.desc.AddressU == D3D10_DDI_TEXTURE_ADDRESS_BORDER || samp.desc.AddressV == D3D10_DDI_TEXTURE_ADDRESS_BORDER));
             }
             { const auto &sampler = d.samplers[2][0]; in.linear = sampler.bound && single_mip_linear_filter(UINT(sampler.desc.Filter)); }
             const auto source = d.bound_source; in.source_smaller = source && (source->surface.width < s.width || source->surface.height < s.height);
