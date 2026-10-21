@@ -1,4 +1,3 @@
-#include "legacy_route.hpp"
 // Decode IA inputs separately from shader arithmetic. Vertex IDs follow the
 // D3D10/11 system-value contract: draw-local ordinal or raw index, without the
 // vertex-buffer start/base address offset (functional spec sections 8.4/8.6).
