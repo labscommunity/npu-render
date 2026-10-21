@@ -217,9 +217,13 @@ public:
             try { kernel.execute(spans, outputs); kernel.execute(spans, again); } catch (const std::exception &) { r.mismatches += spans.size(); if (r.first.empty()) r.first = records[first].name + " (request failed)"; r.fixtures += spans.size(); continue; }
             for (size_t n = 0; n < spans.size(); ++n) {
                 ++r.fixtures; const auto &expected = records[first + n].expected; const auto &actual = outputs[n];
-                // Compare the live part: header words and the tile pixels (the executor reads exactly that much).
-                const size_t live = actual.size(); bool same = std::memcmp(expected, actual.data(), live) == 0;
-                if (again[n] != actual) ++r.unstable;   // the device answered differently to the same request
+                // Compare the live part: the header words and, when the host accepted the span, the tile
+                // pixels (the executor reads exactly that much). A span the kernel rejects leaves the device's
+                // pixel area unwritten, so only its header is compared.
+                uint32_t expected_status; std::memcpy(&expected_status, expected + 4, 4);
+                const size_t live = expected_status ? size_t(NR_FRAME_OUTPUT_PIXELS) : actual.size();
+                bool same = std::memcmp(expected, actual.data(), live) == 0;
+                if (again[n].size() != actual.size() || std::memcmp(again[n].data(), actual.data(), live) != 0) ++r.unstable;   // the device answered differently to the same request
                 if (!same) {
                     ++r.mismatches;
                     // NR_RENDER_FRAME_SELF_TEST_DUMP=<dir>: the device output and the host expectation of every mismatching fixture.
