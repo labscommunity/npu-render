@@ -625,6 +625,13 @@ Get-Content "$out\\report.json"
     wrap = edit(
         wrap,
         [
+            # The readiness observer's own inspect-only probe runs beside this wrapper; the desktop
+            # admission script re-checks presenters by executable and exact arguments, so the wrapper
+            # no longer refuses on the probe's name alone.
+            (
+                "Get-Process nr_registered_local_indexed_worker,nr_pixel_merger_fusion,nr_uniform_draw_diagnostic,nr_native_topology,nr_frame_present_probe -ErrorAction SilentlyContinue",
+                "Get-Process nr_registered_local_indexed_worker,nr_pixel_merger_fusion,nr_uniform_draw_diagnostic,nr_native_topology -ErrorAction SilentlyContinue",
+            ),
             ("ptl-native-live-v29", "ptl-native-live-v30"),
             ("native-topology-v134", "native-topology-v136"),
             ("InspectTopology-V134", "InspectTopology-V136"),
