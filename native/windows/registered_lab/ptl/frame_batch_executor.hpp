@@ -473,14 +473,18 @@ private:
         auto &ref = refs[d.record.target]; auto &res = *ref.resident; require(res.pixels.size() == size_t(res.width) * res.height);
         indexed_exchange::Request request; auto &h = request.header;
         // legacy_abi packs the recorded abi (low 16 bits) and the reserved word that carries the payload abi for large variants.
+        // The route is derived here with the shared selection from the batch's own content; the
+        // route the driver recorded is cross-checked against it. A disagreement is logged and the
+        // derived route runs, so a capture recorded by an older driver (or a driver whose selection
+        // drifted) still executes through a packet this worker can encode.
         uint32_t legacy_abi = d.record.legacy_abi, legacy_flags = d.record.legacy_flags;
-        if (!legacy_abi) {
-            // A command recorded without its per-draw route (captures made before the driver carried
-            // one): derive it exactly as the driver does, so the same per-draw executor runs it.
+        {
             LegacyRouteInputs in; in.pixel = batch_shaders[d.record.pixel_shader].program.get();
             in.textured = std::any_of(in.pixel->textures.begin(), in.pixel->textures.end(), [](bool v) { return v; });
             for (uint32_t t = 0; t < d.record.texture_count; ++t)
                 in.addressed = in.addressed || d.textures[t].address_u != uint32_t(shader::TextureAddress::clamp) || d.textures[t].address_v != uint32_t(shader::TextureAddress::clamp);
+            for (uint32_t t = 0; t < d.record.texture_count; ++t)
+                in.bordered = in.bordered || d.textures[t].address_u == uint32_t(shader::TextureAddress::border) || d.textures[t].address_v == uint32_t(shader::TextureAddress::border);
             if (d.record.texture_count) {
                 in.linear = d.textures[0].filter == 0;
                 const auto &source = refs[d.textures[0].resource].record; in.source_smaller = source.width < res.width || source.height < res.height;
@@ -488,8 +492,11 @@ private:
             in.scissored = d.record.scissor_enabled && !(d.record.scissor[0] == 0 && d.record.scissor[1] == 0 && d.record.scissor[2] == int32_t(res.width) && d.record.scissor[3] == int32_t(res.height));
             in.vertex_count = d.record.vertex_count; in.write_mask = d.record.write_mask;
             in.blend_mode = raster::BlendMode(d.record.blend_mode); in.cull = raster::CullMode(d.record.cull); in.front_ccw = d.record.front_ccw != 0;
-            const auto route = legacy_route(in); legacy_abi = route.first; legacy_flags = route.second;
-            std::printf("{\"frame_batch_route_derived\":true,\"abi\":%u,\"flags\":%u}\n", legacy_abi, legacy_flags); std::fflush(stdout);
+            const auto route = legacy_route(in);
+            if (!legacy_abi) std::printf("{\"frame_batch_route_derived\":true,\"abi\":%u,\"flags\":%u}\n", route.first, route.second);
+            else if (legacy_abi != route.first || legacy_flags != route.second)
+                std::printf("{\"frame_batch_route_disagreement\":true,\"recorded_abi\":%u,\"recorded_flags\":%u,\"derived_abi\":%u,\"derived_flags\":%u}\n", legacy_abi, legacy_flags, route.first, route.second);
+            legacy_abi = route.first; legacy_flags = route.second; std::fflush(stdout);
         }
         h.abi = legacy_abi & 0xffffu; h.reserved = legacy_abi >> 16; h.flags = legacy_flags; h.width = res.width; h.height = res.height; h.vertices = d.record.vertex_count; h.format = res.format;
         std::printf("{\"frame_batch_fallback_begin\":true,\"route\":\"%s\",\"abi\":%u,\"reserved\":%u,\"flags\":%u}\n", d.route.c_str(), h.abi, h.reserved, h.flags); std::fflush(stdout);
