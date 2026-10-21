@@ -72,6 +72,13 @@ def main():
         help="native admission duration; the live phases and process waits scale with it",
     )
     parser.add_argument(
+        "--initial-grant-seconds",
+        type=int,
+        default=None,
+        help="first lease and worker lifetime (default: the admission plus a minute, at most 2400);"
+        " shorter than the admission exercises every renewal path",
+    )
+    parser.add_argument(
         "--registration-generation",
         type=int,
         default=None,
@@ -79,6 +86,12 @@ def main():
     )
     args = parser.parse_args()
     n = args.monitor_seconds
+    grant = (
+        args.initial_grant_seconds if args.initial_grant_seconds is not None else min(n + 60, 2400)
+    )
+    assert 660 <= grant <= 2400, (
+        "the first grant must cover the admission's start and one lease maximum"
+    )
     # Leases renew in place, so the admission itself is bounded only by the controller; the
     # topology helper (ValidateRange 2160) and the frame relay (assert <= 2160) still cap a run.
     assert 60 <= n <= 2160, "topology helper and frame relay accept at most 2160 s"
@@ -313,16 +326,17 @@ Get-Content "$out\\report.json"
             # renewal below keeps both ahead of a longer admission.
             (
                 "worker=subprocess.Popen([str(v.worker),pipe,'65536',str(v.monitor_seconds+45),",
-                "worker=subprocess.Popen([str(v.worker),pipe,'65536',str(min(v.monitor_seconds+45,2400)),",
+                f"worker=subprocess.Popen([str(v.worker),pipe,'65536',str({grant - 15}),",
             ),
             (
                 "scope=1,desktop_session=session['console_session'],milliseconds=(v.monitor_seconds+60)*1000))",
-                "scope=1,desktop_session=session['console_session'],milliseconds=min(v.monitor_seconds+60,2400)*1000))",
+                f"scope=1,desktop_session=session['console_session'],milliseconds={grant * 1000}))",
             ),
             (
                 "scope=2,desktop_session=session['console_session'],milliseconds=(v.monitor_seconds+60)*1000))\n",
-                "scope=2,desktop_session=session['console_session'],milliseconds=min(v.monitor_seconds+60,2400)*1000))\n"
-                "    renewal=Renewal(leases,v.recovery_task);report['lease_renewals']=[]\n",
+                f"scope=2,desktop_session=session['console_session'],milliseconds={grant * 1000}))\n"
+                "    renewal=Renewal(leases,v.recovery_task);report['lease_renewals']=[];report['initial_grant_s']="
+                f"{grant}\n",
             ),
             (
                 "        compositor.verify();host.verify()\n        if time.perf_counter()-last_gate>=1:gate();last_gate=time.perf_counter()\n",
@@ -618,6 +632,7 @@ Get-Content "$out\\report.json"
                 generation=g,
                 capture=args.capture,
                 monitor_seconds=n,
+                initial_grant_seconds=grant,
                 registration_generation=rg,
                 files=produced,
             ),
