@@ -996,3 +996,17 @@ and creates new composition targets, and with our adapter as the primary
 renderer that transition took DWM down. This is the screen-saver robustness
 case the plan lists under gate 4, now reproduced with a time to crash; the next
 run keeps a DWM mini dump so the failing call is identified.
+
+## Trial 15 (generation 21, 1200 s first grant): renewal proven at every layer
+
+Same components as trial 14 with the first grant shortened to 1200 s and DWM
+fresh after its restart. The controller renewed at 19:35:55Z (600 s remaining,
+2340 s granted), the worker extended its lifetime, and the indirect display
+package v3 kept publishing frames past its original deadline of 19:45:54Z:
+frames observed at 19:46:00, 19:47:00 and 19:48:00Z with the indirect host's
+readbacks continuing. With trial 13's DWM-side result this closes the lease
+renewal chain: controller, worker, DWM's driver and the indirect display driver.
+The trial's input stimulus failed at start (`relative mouse origin failed`, an
+environmental pointer failure the generation-20 run did not show), so the
+desktop idled from the beginning; the run continues toward the screen saver's
+idle trigger with DWM mini dumps enabled.
