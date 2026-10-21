@@ -1135,3 +1135,12 @@ worker-loss probe, but the worker-stop helper had detached its timer from the
 SSH session and never fired; the helper is now a scheduled task and the probe
 reruns. Build v45 carries the recorder change and the device creation that
 tolerates a lost worker.
+
+## Trial 21 (generation 27 rerun, build v45): the worker's loss no longer takes DWM down
+
+Through the switch again, 660 s, with both worker processes stopped by a
+scheduled task at 21:44:02Z, four minutes into the admission. DWM stayed up
+(no crash event, no dump, the same DWM process before and after), the
+bootstrap detected the loss within seconds (`NPU worker stopped before native
+frame evidence`) and restored the display cleanly. Before build v45 the loss of
+the worker made DWM's next device creation fail and DWM fail fast (trial 18).
