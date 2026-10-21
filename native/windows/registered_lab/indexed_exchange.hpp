@@ -12,7 +12,9 @@
 namespace nr::registered_lab {
 inline bool indexed_exchange_configured() {
 #ifdef NR_NATIVE_PROBE
-    try { nr::native_probe::Admission admission(nr::auto_admission::read_or_request()); admission.verify(); return true; }
+    // Device creation needs the lease, not a live worker: with the worker gone the device runs
+    // on the CPU fallback and the exchange's own strict check fails per request instead.
+    try { nr::native_probe::Admission admission(nr::auto_admission::read_or_request()); admission.verify(false); return true; }
     catch (...) { return false; }
 #else
     return nr_fill_guest() && (GetFileAttributesW(L"C:\\npu-lab\\indexed-exchange-active.txt") != INVALID_FILE_ATTRIBUTES ||

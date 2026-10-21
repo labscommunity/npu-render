@@ -155,7 +155,11 @@ class Admission {
     }
 public:
     explicit Admission(const Lease &record) : lease(record), controller(open(record.controller)), worker(open(record.worker)) { verify(); }
-    void verify() {
+    // worker_required: the exchange needs a live worker to connect to; device creation does
+    // not. A consumer whose worker has gone keeps its lease (the controller still owns the
+    // admission) and keeps creating devices, running on its CPU fallback until the admission
+    // ends: the loss of the worker must never make DWM's device creation fail (trial 18).
+    void verify(bool worker_required = true) {
         DWORD session = 0; require(ProcessIdToSessionId(GetCurrentProcessId(), &session) != 0);
         const auto now = GetTickCount64(), created = creation_time(GetCurrentProcess()); const auto pid = GetCurrentProcessId();
         refresh(now, pid, created, session);
@@ -163,7 +167,7 @@ public:
         const auto sid=user_sid(GetCurrentProcess());
         require(sid.size()==lease.sid_bytes && EqualSid(const_cast<uint8_t*>(lease.consumer_sid),const_cast<uint8_t*>(sid.data())));
         verify_process(controller.value, lease.controller);
-        verify_process(worker.value, lease.worker);
+        if (worker_required) verify_process(worker.value, lease.worker);
         if(lease.scope)require(session_unlocked(lease.desktop_session));
         // The compositor composes every desktop: the screen saver's, the lock screen's and UAC's
         // secure desktop switch the input desktop away from "Default", and DWM creates a new
