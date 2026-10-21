@@ -123,9 +123,11 @@ namespace interval {
 struct Extent { double x0 = 0, y0 = 0, x1 = 0, y1 = 0; };
 inline Extent &extent() { static thread_local Extent e; return e; }
 inline std::vector<std::pair<double, double>> &symbols() { static thread_local std::vector<std::pair<double, double>> s; return s; }
+// Symbols that do not vary with the pixel position (interpolation drift guards): their screen derivative is zero.
+inline std::vector<bool> &pixel_independent() { static thread_local std::vector<bool> p; return p; }
 inline bool &affine_enabled() { static bool enabled = true; return enabled; }   // diagnostics: plain intervals when false
 inline FILE *&trace_sink() { static FILE *sink = nullptr; return sink; }           // diagnostics: per-instruction ranges
-inline void reset_symbols() { symbols().clear(); const auto &e = extent(); symbols().push_back({e.x0, e.x1}); symbols().push_back({e.y0, e.y1}); }
+inline void reset_symbols() { symbols().clear(); pixel_independent().clear(); const auto &e = extent(); symbols().push_back({e.x0, e.x1}); symbols().push_back({e.y0, e.y1}); pixel_independent().assign(2, false); }
 struct Val {
     bool known = false;                 // false: no information (any value)
     double lo = 0, hi = 0;              // range when `known`
@@ -145,8 +147,10 @@ struct Val {
         Val v; if (!std::isfinite(a) || !std::isfinite(b)) return v;
         if (a > b) std::swap(a, b);
         if (a == b) return constant(a);
-        symbols().push_back({a, b}); v.affine = true; v.terms.push_back({uint32_t(symbols().size() - 1), 1.0}); v.bound(); return v;
+        symbols().push_back({a, b}); pixel_independent().push_back(false); v.affine = true; v.terms.push_back({uint32_t(symbols().size() - 1), 1.0}); v.bound(); return v;
     }
+    // A fresh symbol spanning [a, b] that is constant across the pixel position (a drift guard).
+    static Val noise(double a, double b) { Val v = range(a, b); if (v.affine && !v.terms.empty()) pixel_independent()[v.terms.back().first] = true; return v; }
     static Val exact(uint32_t bits) { float f; std::memcpy(&f, &bits, 4); Val v = constant(f); v.set = {bits}; return v; }
     static Val form(double c0, double cx, double cy) {
         Val v; if (!std::isfinite(c0) || !std::isfinite(cx) || !std::isfinite(cy)) return v;
@@ -401,7 +405,7 @@ inline void evaluate(const LoweredProgram &program, const std::vector<uint32_t> 
             const uint32_t src = w[2], reg = (src >> 4) & 255u, lanes = (src >> 12) & 255u, divide = w[3];
             auto gradient = [&](const Val &v) {
                 Val g; if (!v.affine) return g;
-                double coef = 0; for (const auto &[s, c] : v.terms) { if (s == (op == core::NR_OP_DDX ? 0u : 1u)) coef = c; else if (s > 1) return g; }
+                double coef = 0; for (const auto &[s, c] : v.terms) { if (s == (op == core::NR_OP_DDX ? 0u : 1u)) coef = c; else if (s > 1 && !(s < pixel_independent().size() && pixel_independent()[s])) return g; }
                 return Val::constant(coef);
             };
             for (unsigned c = 0; c < 4; ++c) {
@@ -483,7 +487,7 @@ inline std::array<interval::Lanes, 8> varying_intervals(const LoweredProgram &pr
                 auto form = interval::Val::form(q[0] - a * x[0] - b * y[0], a, b);
                 if (form.known) {
                     const double margin = 1e-5 * (1.0 + std::fabs(form.hi - form.lo));
-                    inputs[r][c] = interval::add(form, interval::Val::range(-margin, margin)); continue;
+                    inputs[r][c] = interval::add(form, interval::Val::noise(-margin, margin)); continue;
                 }
             }
             inputs[r][c] = interval::Val::range(std::min({q[0], q[1], q[2]}), std::max({q[0], q[1], q[2]}));

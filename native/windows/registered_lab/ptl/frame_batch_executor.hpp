@@ -58,18 +58,29 @@ public:
     const std::string &execution_device() const { return device; }
     // Writes the spans into the input tensor, runs the NPU and copies back each output span prefix.
     double copy_ms = 0, infer_ms = 0;   // host copies into and out of the tensors vs. the NPU request itself
+    ov::Tensor staging;                  // NR_RENDER_FRAME_INPUT_TENSOR_COPY: host tensor handed to the plugin per request
+    static bool env_flag(const char *name) { char *v = nullptr; size_t n = 0; const bool on = !_dupenv_s(&v, &n, name) && v && *v && *v != '0'; std::free(v); return on; }
     void execute(const std::vector<std::vector<uint8_t>> &spans, std::vector<std::vector<uint8_t>> &outputs) {
         require(!failed && !spans.empty() && spans.size() <= rows); failed = true;
         const auto began = std::chrono::steady_clock::now();
-        auto *input = static_cast<uint8_t *>(inference.get_input_tensor(0).data());
+        // Input delivery diagnostics for the open acrylic-alpha question (the worker returns 255 where
+        // the qualification tool returns 250 for byte-identical spans and blobs): NR_RENDER_FRAME_FULL_SPAN_COPY=1
+        // copies whole rows instead of the declared prefix; NR_RENDER_FRAME_INPUT_TENSOR_COPY=1 hands the
+        // plugin a host tensor per request (set_input_tensor; this path failed its request on 2026-10-20 and
+        // fell back, so it is not a fix); NR_RENDER_FRAME_ZERO_OUTPUT=1 clears the output tensor before each request.
+        static const bool full_copy = env_flag("NR_RENDER_FRAME_FULL_SPAN_COPY"), tensor_copy = env_flag("NR_RENDER_FRAME_INPUT_TENSOR_COPY"), zero_output = env_flag("NR_RENDER_FRAME_ZERO_OUTPUT");
+        if (zero_output) { auto out = inference.get_output_tensor(); std::memset(out.data(), 0, out.get_byte_size()); }
+        if (tensor_copy && staging.get_size() == 0) staging = ov::Tensor(ov::element::f16, ov::Shape({rows, frame::span_bytes / 2}));
+        auto *input = static_cast<uint8_t *>(tensor_copy ? staging.data() : inference.get_input_tensor(0).data());
         for (size_t n = 0; n < spans.size(); ++n) {
             require(spans[n].size() == frame::span_bytes);
             // Only the bytes the kernel declares (through the background region) are read; the rest of the row stays stale.
             uint32_t tile_w, tile_h, background; std::memcpy(&tile_w, spans[n].data() + 16, 4); std::memcpy(&tile_h, spans[n].data() + 20, 4); std::memcpy(&background, spans[n].data() + 60, 4);
-            const size_t used = std::min<size_t>(size_t(frame::span_bytes), size_t(background) + size_t(tile_w) * tile_h * 4);
+            const size_t used = full_copy ? size_t(frame::span_bytes) : std::min<size_t>(size_t(frame::span_bytes), size_t(background) + size_t(tile_w) * tile_h * 4);
             std::memcpy(input + n * frame::span_bytes, spans[n].data(), used);
         }
-        for (size_t n = spans.size(); n < rows; ++n) std::memset(input + n * frame::span_bytes, 0, 64);   // empty rows fail the header check cheaply
+        for (size_t n = spans.size(); n < rows; ++n) std::memset(input + n * frame::span_bytes, 0, full_copy ? frame::span_bytes : 64);   // empty rows fail the header check cheaply
+        if (tensor_copy) inference.set_input_tensor(0, staging);
         const auto copied = std::chrono::steady_clock::now();
         inference.start_async();
         if (!inference.wait_for(std::chrono::milliseconds(10000))) throw std::runtime_error("frame kernel timeout");
