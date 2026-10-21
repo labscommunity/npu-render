@@ -9,6 +9,11 @@ and worker: new transaction names and recovery tasks, the HEAD-pinned PTL
 blobs, the frame kernel blob directory, and evidence checks that no longer
 assume one NPU request per draw. Each substitution is asserted so a drifted
 source fails loudly instead of silently keeping an old pin.
+
+With --no-stimulus the live trial keeps the admission, topology helper, frame relay,
+presenter, output observer and cursor watchdog but omits the measurement stimuli (owned
+input stimulus, repeated input, shared default-adapter application) and every gate that
+reads their evidence; it then passes on frames, presentation, freshness and restoration.
 """
 
 import argparse
@@ -18,6 +23,7 @@ from pathlib import Path
 
 COMPACT_PROGRAM = "92e04a6734dc6e70ffed15b67fddba02892c66168aa0d47a6cf4bcc65a6a585d"
 VECTOR_FILL_PROGRAM = "00793de192c05fc47f58a7a41a184245ded4df14fd83b58a7a31a514df0121b2"
+NO_STIMULUS_VALIDATOR = "validate-native-delivery-no-stimulus-v1.py"
 
 
 def edit(text, replacements, name):
@@ -91,6 +97,12 @@ def main():
         type=int,
         default=None,
         help="generation whose registration (package qualification) this chain reuses; default: this generation",
+    )
+    parser.add_argument(
+        "--no-stimulus",
+        action="store_true",
+        help="omit the measurement stimuli (input stimulus, repeated input, shared application) and"
+        " the gates that need them; the live trial passes on frames, presentation, freshness and restoration",
     )
     args = parser.parse_args()
     n = args.monitor_seconds
@@ -407,6 +419,28 @@ Get-Content "$out\\report.json"
         "report.update(frame_blob_dir=str(v.frame_blob_dir),frame_blob_manifest_sha256=hashlib.sha256((v.frame_blob_dir/'manifest.txt').read_bytes()).hexdigest(),request_recording_enabled=",
     )
     assert "frame_blob_manifest_sha256" in boot
+    if args.no_stimulus:
+        # No interactive-admission-start cue arrives, so the shared default-adapter fixture is not
+        # constructed (its close() asserts its own pass) and the deadline assertion rests on the
+        # native frame evidence alone.
+        boot = edit(
+            boot,
+            [
+                (
+                    "    shared=SharedInteractiveApp(v.transaction,worker,suffix,session['console_session'],v.interactive_dll,env,own_process)\n",
+                    "    report['shared_application_qualified']=False;report['shared_application_disabled']=True;save()\n",
+                ),
+                (
+                    "        shared.poll(evidence,compositor.identity.pid);report['shared_application_qualified']=shared.passed\n",
+                    "",
+                ),
+                (
+                    "    assert report['passed'] and shared.passed,'Native frame or shared default application evidence incomplete at trial deadline'",
+                    "    assert report['passed'],'Native frame evidence incomplete at trial deadline'",
+                ),
+            ],
+            "bootstrap-no-stimulus",
+        )
     write("native_desktop_bootstrap_v50.py", boot)
     write(
         "native_lease_renewal_v1.py",
@@ -481,6 +515,17 @@ Get-Content "$out\\report.json"
         ],
         "desktop",
     )
+    if args.no_stimulus:
+        desk = edit(
+            desk,
+            [
+                (
+                    " -or !$trial.shared_application_qualified -or !$trial.shared_application.passed){throw 'Native compositor evidence absent'}",
+                    "){throw 'Native compositor evidence absent'}",
+                )
+            ],
+            "desktop-no-stimulus",
+        )
     write("run-native-desktop-v76.ps1", desk)
 
     # 5. Topology observer and readiness instances for this run.
@@ -632,6 +677,139 @@ Get-Content "$out\\report.json"
 """
         + live[end:]
     )
+    if args.no_stimulus:
+        # The measurement stimuli (owned input stimulus, repeated input, shared default-adapter
+        # application) and every gate that reads their evidence go. The cursor phase stays: the
+        # topology helper runs primary-cursor on the live script's cue and the watchdog is the
+        # independent pointer recovery behind pointer_confined_and_restored; its reacquisition
+        # count only ever came from the stimulus window taking the foreground.
+        live = drop_lines(
+            live,
+            [
+                "$repeatProof=Get-Content",
+                "$repeatQualification=Get-Content",
+                "$repeatBinary=",
+                "throw 'Repeated input contract is not qualified'",
+                "$inputQualification=Get-Content",
+                "throw 'Owned input contract is not qualified'",
+                "Start-Interactive 'stimulus'",
+                "throw 'Owned input process identity missing'",
+                "$blueSubmitted=",
+                "$greenSubmitted=",
+                "$blueObserved=",
+                "$greenObserved=",
+                "$redObserved=",
+                "$report.stimulus_task_result=",
+                "$report.stimulus_child_success=",
+                "$report.controlled_color_submitted=",
+                "$inputEvents=@($stimulusRows",
+                "$report.mouse_received=",
+                "$report.keyboard_received=",
+                "$report.relative_mouse_received=",
+                "$report.normal_windows_input_tested=",
+                "$application=Get-Content",
+                "$appExit=@(Read-Rows",
+                "throw 'Shared automatic default application proof incomplete'",
+                "$report.shared_default_application_qualified=$true",
+                "throw 'Repeated input benchmark did not finish'",
+                'if(Test-Path "$out\\repeat-cues")',
+            ],
+            "live-no-stimulus",
+        )
+        # The cue, application and repeated-input block of the presentation loop.
+        start = live.index(
+            "  if($keyCued -and $redObserved -and !$report.initial_response_held_until_observed)"
+        )
+        end = live.index(" }while(($presentState -eq 'Running' -or !$presentRows.Count)")
+        removed = live[start:end]
+        assert removed.count("\n") == 44 and all(
+            x in removed
+            for x in (
+                "Start-Interactive 'app'",
+                "Start-Interactive 'repeat'",
+                "throw 'Insufficient interval for repeated input'",
+                "throw 'Repeated input execution incomplete'",
+            )
+        ), "live-no-stimulus: stimulus loop block drifted"
+        live = live[:start] + live[end:]
+        live = edit(
+            live,
+            [
+                (
+                    " -or !$inputQualification.relative_mouse_received){throw 'Pointer qualification failed'}",
+                    "){throw 'Pointer qualification failed'}",
+                ),
+                (
+                    "input_forwarding_tested=$false;tahoma_tested=$false}",
+                    "input_forwarding_tested=$false;tahoma_tested=$false;no_stimulus=$true}",
+                ),
+                (
+                    "$screenStarted=$false;$clickCued=$false;$keyCued=$false;$appCued=$false;$appStarted=$false;$repeatStarted=$false;$repeatFinished=$false;$animationObserved=$null",
+                    "$screenStarted=$false",
+                ),
+                (
+                    '  $submitted=@($presentRows|Where-Object live_frame_presented);$publishedNow=Read-Rows "$out\\relay\\frames.jsonl";$screenRows=Read-Rows "$out\\screen\\probe.log"',
+                    '  $screenRows=Read-Rows "$out\\screen\\probe.log"',
+                ),
+                (
+                    ";$stimulusRows=Read-Rows \"$out\\stimulus\\probe.log\";$stimulusExit=@($stimulusRows|Where-Object {$_.PSObject.Properties.Name -contains 'exit_code'})",
+                    "",
+                ),
+                # Without controlled colors the physical evidence is the observer completing and
+                # independently seeing the owned presenter at both points.
+                (
+                    " if($screenDone.Count -eq 1){$report.screen_observer_result=$screenDone[0]}\n",
+                    " if($screenDone.Count -eq 1){$report.screen_observer_result=$screenDone[0]}\n"
+                    " $report.physical_presenter_observed=($screenDone.Count -eq 1 -and @($screenFinalRows|Where-Object {$_.ownership_verified_before_and_after -and @($_.points).Count -eq 2 -and @($_.points|Where-Object owned_presenter_at_point).Count -eq 2}).Count -gt 0)\n",
+                ),
+                ("validate-native-delivery-v1.py", NO_STIMULUS_VALIDATOR),
+                (
+                    " $report.passed=($report.pointer_reacquisitions -ge 1 -and $report.pointer_confined_and_restored -and $report.relative_mouse_received -and $report.normal_windows_input_tested -and $report.primary_topology_restored -and $report.ordinary_windows_restored -and $report.presenter_child_success -and $report.stimulus_child_success -and $report.controlled_color_submitted -and $report.presenter_task_result -eq 0 -and $report.topology_exit -eq 0 -and $report.native_exit -eq 0 -and $nr.passed -and $nr.cleanup_passed -and $frames.Count -ge 2 -and $report.matching_source_frames -eq $frames.Count -and $report.backbuffer_copies_exact -and $done.Count -eq 1 -and $report.distinct_source_pixel_hashes -ge 2 -and $report.stimulus_task_result -eq 0)",
+                    " $report.passed=($report.pointer_confined_and_restored -and $report.physical_presenter_observed -and $report.primary_topology_restored -and $report.ordinary_windows_restored -and $report.presenter_child_success -and $report.presenter_task_result -eq 0 -and $report.topology_exit -eq 0 -and $report.native_exit -eq 0 -and $nr.passed -and $nr.cleanup_passed -and $frames.Count -ge 2 -and $report.matching_source_frames -eq $frames.Count -and $report.backbuffer_copies_exact -and $done.Count -eq 1 -and $report.distinct_source_pixel_hashes -ge 2)",
+                ),
+            ],
+            "live-no-stimulus",
+        )
+        # The freshness validator on Delta requires a fresh controlled color beneath the presenter
+        # and the observer's own pass; this variant of the same qualified source requires a fresh
+        # independent observation of the owned presenter instead.
+        validator_base = src / "validate-native-delivery-v1.py"
+        if not validator_base.exists():
+            validator_base = (
+                Path(__file__).resolve().parents[2]
+                / "results/render-driver/validate-native-delivery-v1.py"
+            )
+        recorded = json.loads(
+            (src / "native-desktop-v75-source.json").read_text(encoding="utf-8-sig")
+        )["validate-native-delivery-v1.py"]
+        assert hashlib.sha256(validator_base.read_bytes()).hexdigest() == recorded, (
+            "validator base is not the qualified Delta copy"
+        )
+        validator = edit(
+            validator_base.read_text(encoding="utf-8"),
+            [
+                (
+                    '"""Reject frozen finite trials; this is not a desktop responsiveness gate."""',
+                    '"""Reject frozen finite trials run without a color stimulus; this is not a desktop responsiveness gate."""',
+                ),
+                (
+                    "    assert len(screen_done)==1 and screen_done[0]['passed'] and [x['exit_code'] for x in screen if 'exit_code' in x]==[0],'physical observer did not complete'\n",
+                    "    assert len(screen_done)==1,'physical observer did not complete'\n",
+                ),
+                (
+                    "    fresh=[x for x in screen if x.get('qpc',0)>=end-60*hz and x.get('last_present_qpc',0)>=end-60*hz and x.get('ownership_verified_before_and_after') and any(p.get('owned_presenter_at_point') and any(p.get('known_'+c) for c in ('blue','green','red')) for p in x.get('points',[]))]\n"
+                    "    assert fresh,'fresh independently observed physical color absent'\n",
+                    "    fresh=[x for x in screen if x.get('qpc',0)>=end-60*hz and x.get('last_present_qpc',0)>=end-60*hz and x.get('ownership_verified_before_and_after') and len(x.get('points',[]))==2 and all(p.get('owned_presenter_at_point') for p in x['points'])]\n"
+                    "    assert fresh,'fresh independently observed owned presenter absent'\n",
+                ),
+                (
+                    "fresh_physical_observations=len(fresh),",
+                    "fresh_physical_observations=len(fresh),stimulus_colors_required=False,physical_observer_passed=bool(screen_done[0].get('passed')),physical_observer_exit_codes=[x['exit_code'] for x in screen if 'exit_code' in x],",
+                ),
+            ],
+            "validator-no-stimulus",
+        )
+        write(NO_STIMULUS_VALIDATOR, validator)
     write("run-native-live-v66.ps1", live)
 
     wrap = (src / "run-ptl-native-live-v29.ps1").read_text(encoding="utf-8")
@@ -669,6 +847,17 @@ Get-Content "$out\\report.json"
         + " if(!$q.compiled_turbo_import_audit_passed -or !$q.turbo_import_audit_passed -or !$q.provider_generation_audit_passed -or $q.frame_batches -lt 1 -or !$q.completed -or !$q.passed -or !$q.cleanup_passed -or !$q.shared_default_application_qualified -or !$q.repeated_input_execution_passed){throw 'Live proof incomplete'}"
         + wrap[end:]
     )
+    if args.no_stimulus:
+        wrap = edit(
+            wrap,
+            [
+                (
+                    " -or !$q.shared_default_application_qualified -or !$q.repeated_input_execution_passed){throw 'Live proof incomplete'}",
+                    "){throw 'Live proof incomplete'}",
+                )
+            ],
+            "wrapper-no-stimulus",
+        )
     write("run-ptl-native-live-v30.ps1", wrap)
 
     # 7. Source manifests the launchers verify (unchanged helpers keep their recorded hashes).
@@ -713,6 +902,8 @@ Get-Content "$out\\report.json"
     ]
     desk_manifest["relay_native_frames_v9.py"] = produced["relay_native_frames_v9.py"]
     desk_manifest["cursor_recovery_watchdog_v3.py"] = produced["cursor_recovery_watchdog_v3.py"]
+    if args.no_stimulus:
+        desk_manifest[NO_STIMULUS_VALIDATOR] = produced[NO_STIMULUS_VALIDATOR]
     write("native-desktop-v76-source.json", json.dumps(desk_manifest, indent=2) + "\n")
     (out / "chain-manifest.json").write_text(
         json.dumps(
@@ -729,6 +920,7 @@ Get-Content "$out\\report.json"
                 idd_version=args.idd_version,
                 clean_stop=args.clean_stop,
                 registration_generation=rg,
+                no_stimulus=args.no_stimulus,
                 files=produced,
             ),
             indent=2,
