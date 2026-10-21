@@ -45,13 +45,30 @@ def upload(local: Path, remote_dir: str = "AppData/Local/npu-render/vm") -> str:
 
 
 def launch(plan_path: Path) -> None:
+    """Start the runner as a one-shot scheduled task so it outlives this SSH session.
+
+    A process started with Start-Process from an SSH session dies with the session;
+    a scheduled task under the same user (S4U, highest run level) runs detached and
+    the runner unregisters it when the sequence ends.
+    """
     plan = json.loads(plan_path.read_text())
     remote_plan = upload(plan_path)
+    task = f"T8-NpuRender-Sequence-{plan['run_id']}"
     script = (
-        f'$p="{remote_plan}";$r="{RUNNER}";'
-        "Start-Process powershell -ArgumentList "
-        "@('-NoProfile','-ExecutionPolicy','Bypass','-File',$r,'-PlanPath',$p) -WindowStyle Hidden;"
-        "[Console]::Out.WriteLine('launched')"
+        f'$p="{remote_plan}";$r="{RUNNER}";$task="{task}";'
+        "$action=New-ScheduledTaskAction -Execute "
+        '"$env:windir\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" '
+        "-Argument ('-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"'+$r+'\" "
+        "-PlanPath \"'+$p+'\"');"
+        "$principal=New-ScheduledTaskPrincipal -UserId "
+        "([Security.Principal.WindowsIdentity]::GetCurrent().User.Value) "
+        "-LogonType S4U -RunLevel Highest;"
+        "$settings=New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Seconds 0) "
+        "-AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew;"
+        "Register-ScheduledTask -TaskName $task -Action $action -Principal $principal "
+        "-Settings $settings -Force | Out-Null;"
+        "Start-ScheduledTask -TaskName $task;"
+        "[Console]::Out.WriteLine('launched as '+$task)"
     )
     print(ssh_powershell(script).strip(), plan["run_id"], plan["status"])
 

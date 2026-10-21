@@ -43,3 +43,5 @@ foreach($step in $spec.steps){
   Save
 }
 $script:status.passed=$ok;$script:status.done=$true;$script:status.finished=[DateTime]::UtcNow.ToString('o');Save
+# Launched as a one-shot scheduled task: remove it so the host's task list stays clean.
+$taskName="T8-NpuRender-Sequence-$($spec.run_id)";if(Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue){Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue}
