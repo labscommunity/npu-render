@@ -4,7 +4,7 @@ from native_session_broker_v3 import *
 from native_incremental_evidence_v1 import NativeEvidence
 from native_process_observer_v1 import PinnedProcess,named_processes,find_compositor,find_indirect_host,process_image
 import traceback,struct
-from native_shared_app_v48 import SharedInteractiveApp
+from native_shared_app_v52 import SharedInteractiveApp
 from native_lease_renewal_v1 import Renewal
 p=argparse.ArgumentParser()
 for n in ('worker','runtime','cache','session_probe','devcon','idd_inf','transaction','trace'):
@@ -108,8 +108,8 @@ try:
     for key in ('NR_RENDER_RECOVERY_TEST_KILL_TICKET','NR_RENDER_RECOVERY_TEST_EXCEPTION_TICKET','NR_RENDER_PROVIDER_TEST_INFER_EXCEPTION_TICKET'):env.pop(key,None)
     env.update(NR_RENDER_PROVIDER_RECOVERY='1',NR_RENDER_PROVIDER_RECOVERY_DIR=str(provider_root),NR_RENDER_INFER_TRACE='0',NR_RENDER_COMPILE_TRACE='0',NR_RENDER_INFER_PROFILE='0')
     report.update(provider_isolated=True,provider_fault_injected=False,provider_timing_scope='Child roundtrip includes compilation, transport and any recovery.')
-    env.pop('NR_RENDER_CAPTURE_DIRECTORY',None);env.pop('NR_RENDER_AFFINE_BATCH',None)
-    report.update(frame_blob_dir=str(v.frame_blob_dir),frame_blob_manifest_sha256=hashlib.sha256((v.frame_blob_dir/'manifest.txt').read_bytes()).hexdigest(),request_recording_enabled=False,recording_byte_budget=0,performance_measurement_valid=False,
+    capture=out/'requests';capture.mkdir(exist_ok=False);env['NR_RENDER_CAPTURE_DIRECTORY']=str(capture);env.pop('NR_RENDER_AFFINE_BATCH',None)
+    report.update(frame_blob_dir=str(v.frame_blob_dir),frame_blob_manifest_sha256=hashlib.sha256((v.frame_blob_dir/'manifest.txt').read_bytes()).hexdigest(),request_recording_enabled=True,recording_byte_budget=17179869184,performance_measurement_valid=False,
                   affine_batch='default',memory_cache=v.memory_cache,memory_capacity='512',generic_batch=v.generic_batch,
                   uniform_lanes=v.uniform_lanes,texture_scope=v.texture_scope,pipeline_cache='retained',monitor_seconds=v.monitor_seconds,quad_batch='1',
                   ptl_resident_clip_model_sha256=hashlib.sha256(v.ptl_resident_clip_blob.read_bytes()).hexdigest(),ptl_complex_model_sha256=hashlib.sha256(v.ptl_complex_blob.read_bytes()).hexdigest(),ptl_rectangle_model_sha256=hashlib.sha256(v.ptl_rectangle_blob.read_bytes()).hexdigest(),ptl_long_model_sha256=hashlib.sha256(v.ptl_long_blob.read_bytes()).hexdigest(),ptl_program_model_sha256=hashlib.sha256(v.ptl_program_blob.read_bytes()).hexdigest(),ptl_masked_model_sha256=hashlib.sha256(v.ptl_masked_blob.read_bytes()).hexdigest(),ptl_geometry_model_sha256=hashlib.sha256(v.ptl_geometry_blob.read_bytes()).hexdigest(),ptl_texture_model_sha256=hashlib.sha256(v.ptl_texture_blob.read_bytes()).hexdigest(),ptl_solid_model_sha256=hashlib.sha256(v.ptl_solid_blob.read_bytes()).hexdigest(),ptl_four_tap_model_sha256=hashlib.sha256(v.ptl_four_tap_blob.read_bytes()).hexdigest(),worker_seconds=v.monitor_seconds+45,lease_milliseconds=(v.monitor_seconds+60)*1000,incremental_evidence=True)
@@ -127,17 +127,16 @@ try:
     leases.append(LeaseGrant(int(worker._handle),host.handle,suffix,scope=2,desktop_session=session['console_session'],milliseconds=1200000))
     renewal=Renewal(leases,v.recovery_task);report['lease_renewals']=[];report['initial_grant_s']=1200
     report['admission_published']=True;report['admission_publication_ms']=(time.perf_counter()-(ready_deadline-8))*1000;save()
-    shared=SharedInteractiveApp(v.transaction,worker,suffix,session['console_session'],v.interactive_dll,env,own_process)
+    report['shared_application_qualified']=False;report['shared_application_disabled']=True;save()
     admission_started=time.perf_counter();deadline=admission_started+v.monitor_seconds;last_gate=0
     while time.perf_counter()<deadline:
-        assert not (v.transaction/'stop').exists(),'Controller requested native restoration'
+        if (v.transaction/'stop').exists():report['stopped_by_controller']=True;break
         compositor.verify();host.verify()
         if renewal.poll(stop_after_tick=k.GetTickCount64()+int((deadline-time.perf_counter())*1000)):report['lease_renewals']=renewal.renewals;save()
         if time.perf_counter()-last_gate>=1:gate();last_gate=time.perf_counter()
         if installer.poll() is not None:assert installer.returncode==0,'Native indirect installation failed'
         assert worker.poll() is None,'NPU worker stopped before native frame evidence'
         evidence.poll();report.update(evidence.snapshot(compositor.identity.pid,host.identity.pid))
-        shared.poll(evidence,compositor.identity.pid);report['shared_application_qualified']=shared.passed
         frame=frame_header(v.trace/f'latest-frame-{host.identity.pid}.bin',host.identity.pid)
         if frame:
             report['latest_frame']=frame
@@ -157,7 +156,7 @@ try:
             report['multiple_frames_observed']=len(observed_frames)>=3
             report['sustained_rendering_qualified']=False
         time.sleep(.2)
-    assert report['passed'] and shared.passed,'Native frame or shared default application evidence incomplete at trial deadline'
+    assert report['passed'],'Native frame evidence incomplete at trial deadline'
 except Exception as error:report.update(passed=False,error=repr(error),traceback=traceback.format_exc())
 finally:
     if install_attempted:

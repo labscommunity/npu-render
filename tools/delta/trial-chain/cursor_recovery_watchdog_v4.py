@@ -23,6 +23,9 @@ def default_desktop():
  try:
   name=C.create_unicode_buffer(128);count=W.DWORD();require(u.GetUserObjectInformationW(d,2,name,C.sizeof(name),C.byref(count)));assert name.value=='Default'
  finally:u.CloseDesktop(d)
+def default_desktop_now():
+ try:default_desktop();return True
+ except Exception:return False
 save()
 try:
  require(u.SetThreadDpiAwarenessContext(W.HANDLE(-4)));default_desktop();deadline=time.monotonic()+15
@@ -40,7 +43,12 @@ try:
   status=k.WaitForSingleObject(peer.handle,100);assert status in (0,258)
   if status==0:report['trigger']='owner-exited';break
   if (out/'stop').exists():report['trigger']='controller-stop';break
-  default_desktop()
+  if not default_desktop_now():
+   left=time.monotonic();report['desktop_switches']=report.get('desktop_switches',0)+1;save()
+   while not default_desktop_now():
+    status=k.WaitForSingleObject(peer.handle,100);assert status in (0,258)
+    if status==0 or (out/'stop').exists():break
+   report['desktop_away_s']=round(report.get('desktop_away_s',0)+time.monotonic()-left,3);save();continue
   if not observed and clip()==snapshot['desired_clip']:
    observed=True;report['owned_confinement_observed']=True;save();(out/'confined.json').write_text(json.dumps(dict(observed=True,owner_pid=peer.identity.pid))+'\n')
  else:report['trigger']='finite-deadline'

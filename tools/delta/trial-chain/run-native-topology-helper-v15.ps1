@@ -1,5 +1,5 @@
 param([ValidateSet('inspect','validate-extend','extend','validate-primary','primary','primary-cursor')][string]$Mode='inspect',[ValidatePattern('^[a-z0-9-]+$')][Parameter(Mandatory=$true)][string]$Trial,[ValidateRange(1,14400)][int]$Seconds=60,[string]$CursorCue='')
-$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$out="$r\vm\$Trial";$source="$env:LOCALAPPDATA\Temp\npu-graphics-probe-0146a2388f25";$task="T8-NpuRender-$Trial";$b="$r\builds\native-topology-control-v14";$registered=$false
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$out="$r\vm\$Trial";$source="$env:LOCALAPPDATA\Temp\npu-graphics-probe-0146a2388f25";$task="T8-NpuRender-$Trial";$b="$r\builds\native-topology-control-v15";$registered=$false
 if((Test-Path $out) -or (Get-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue)){throw 'Trial identity exists'}
 $proof=Get-Content "$b\build-report.json" -Raw|ConvertFrom-Json;if(!$proof.clean_build -or (Get-FileHash "$b\Release\nr_native_topology.exe").Hash -ne $proof.binary_sha256){throw 'Topology helper identity mismatch'}
 New-Item -ItemType Directory $out|Out-Null;Copy-Item "$b\build-report.json" "$out\build-report.json"

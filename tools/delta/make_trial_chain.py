@@ -112,8 +112,8 @@ def main():
     assert 660 <= grant <= 2400, (
         "the first grant must cover the admission's start and one lease maximum"
     )
-    # Leases renew in place; the topology helper v14, the frame relay v9 and the topology control
-    # binary v14 accept up to four hours.
+    # Leases renew in place; the topology helper v15, the frame relay v9 and the topology control
+    # binary v15 accept up to four hours and wait out desktop switches.
     assert 60 <= n <= 14400, "the chain admits 60 s to 4 h"
     src = args.source
     out = args.output
@@ -541,9 +541,9 @@ Get-Content "$out\\report.json"
         )
         write(f"start-native-topology-{new}.ps1", t)
 
-    # 5b. Topology helper v14 and frame relay v9: the 2160 s limits become four hours, the helper
-    #     drives topology control v14 (same sources with the same change) and its task limit follows
-    #     the requested duration.
+    # 5b. Topology helper v15 and frame relay v9: the 2160 s limits become four hours, the helper
+    #     drives topology control v15 (waits out desktop switches) and its task limit follows the
+    #     requested duration.
     helper = (src / "run-native-topology-helper-v13.ps1").read_text(encoding="utf-8")
     helper = edit(
         helper,
@@ -551,7 +551,7 @@ Get-Content "$out\\report.json"
             ("[ValidateRange(1,2160)][int]$Seconds=60", "[ValidateRange(1,14400)][int]$Seconds=60"),
             (
                 '$b="$r\\builds\\native-topology-control-v13"',
-                '$b="$r\\builds\\native-topology-control-v14"',
+                '$b="$r\\builds\\native-topology-control-v15"',
             ),
             (
                 "-ExecutionTimeLimit (New-TimeSpan -Minutes 40)",
@@ -560,7 +560,7 @@ Get-Content "$out\\report.json"
         ],
         "topology-helper",
     )
-    write("run-native-topology-helper-v14.ps1", helper)
+    write("run-native-topology-helper-v15.ps1", helper)
     relay = (src / "relay_native_frames_v8.py").read_text(encoding="utf-8")
     relay = edit(
         relay,
@@ -571,10 +571,22 @@ Get-Content "$out\\report.json"
     watchdog = (src / "cursor_recovery_watchdog_v2.py").read_text(encoding="utf-8")
     watchdog = edit(
         watchdog,
-        [("assert 1<=v.seconds<=2400", "assert 1<=v.seconds<=14400")],
+        [
+            ("assert 1<=v.seconds<=2400", "assert 1<=v.seconds<=14400"),
+            # A desktop switch (saver, lock, secure prompt) is waited out, not treated as a fault; the
+            # owner and the controller stop are still watched meanwhile.
+            (
+                " finally:u.CloseDesktop(d)\n",
+                " finally:u.CloseDesktop(d)\ndef default_desktop_now():\n try:default_desktop();return True\n except Exception:return False\n",
+            ),
+            (
+                "  default_desktop()\n  if not observed and clip()==snapshot['desired_clip']:",
+                "  if not default_desktop_now():\n   left=time.monotonic();report['desktop_switches']=report.get('desktop_switches',0)+1;save()\n   while not default_desktop_now():\n    status=k.WaitForSingleObject(peer.handle,100);assert status in (0,258)\n    if status==0 or (out/'stop').exists():break\n   report['desktop_away_s']=round(report.get('desktop_away_s',0)+time.monotonic()-left,3);save();continue\n  if not observed and clip()==snapshot['desired_clip']:",
+            ),
+        ],
         "watchdog",
     )
-    write("cursor_recovery_watchdog_v3.py", watchdog)
+    write("cursor_recovery_watchdog_v4.py", watchdog)
 
     # 6. Live presentation trial: new identities, batch-aware provider evidence.
     live = (src / "run-native-live-v65.ps1").read_text(encoding="utf-8")
@@ -618,26 +630,26 @@ Get-Content "$out\\report.json"
             ("{14}else{11}", f"{{{n // 60 + 3}}}else{{{n // 60}}}"),
             ("'--seconds','590'", f"'--seconds','{n - 70}'"),
             ("'-Seconds','600','-CursorCue'", f"'-Seconds','{n - 60}','-CursorCue'"),
-            ("run-native-topology-helper-v13.ps1", "run-native-topology-helper-v14.ps1"),
+            ("run-native-topology-helper-v13.ps1", "run-native-topology-helper-v15.ps1"),
             ("relay_native_frames_v8.py", "relay_native_frames_v9.py"),
-            ("cursor_recovery_watchdog_v2.py", "cursor_recovery_watchdog_v3.py"),
-            # Presenter v23 (live, input-stimulus and stimulus durations), output observer v6 and the
-            # frame reader qualified on v23 accept four hours; same sources, only the limits raised.
+            ("cursor_recovery_watchdog_v2.py", "cursor_recovery_watchdog_v4.py"),
+            # Presenter v24, output observer v7 and topology control v15 accept four hours and wait out
+            # desktop switches (screen saver, lock screen) instead of ending the trial.
             (
                 '"$r\\builds\\native-present-v21\\build-report.json"',
-                '"$r\\builds\\native-present-v23\\build-report.json"',
+                '"$r\\builds\\native-present-v24\\build-report.json"',
             ),
             (
                 '"$r\\builds\\native-present-v21\\Release\\nr_frame_present_probe.exe"',
-                '"$r\\builds\\native-present-v23\\Release\\nr_frame_present_probe.exe"',
+                '"$r\\builds\\native-present-v24\\Release\\nr_frame_present_probe.exe"',
             ),
-            ("live-frame-reader-v12", "live-frame-reader-v14"),
-            ("native-present-v21-qualification", "native-present-v23-qualification"),
-            ("native-output-observer-v5", "native-output-observer-v6"),
+            ("live-frame-reader-v12", "live-frame-reader-v15"),
+            ("native-present-v21-qualification", "native-present-v24-qualification"),
+            ("native-output-observer-v5", "native-output-observer-v7"),
             # The cursor watchdog verifies the topology control binary the helper runs, so the live
-            # script's proof and cursor-guard qualification follow the helper to control v14.
-            ("native-topology-control-v13", "native-topology-control-v14"),
-            ("native-cursor-guard-v5-qualification", "native-cursor-guard-v6-qualification"),
+            # script's proof and cursor-guard qualification follow the helper to control v15.
+            ("native-topology-control-v13", "native-topology-control-v15"),
+            ("native-cursor-guard-v5-qualification", "native-cursor-guard-v7-qualification"),
             ("{15000}else{640000}", f"{{15000}}else{{{(n - 20) * 1000}}}"),
             ("{90000}else{780000}", f"{{90000}}else{{{(n + 120) * 1000}}}"),
         ],
@@ -897,11 +909,11 @@ Get-Content "$out\\report.json"
         new = final(renamed[name]) if name in renamed else None
         desk_manifest[new or name] = produced[new] if new else digest
     desk_manifest["native_lease_renewal_v1.py"] = produced["native_lease_renewal_v1.py"]
-    desk_manifest["run-native-topology-helper-v14.ps1"] = produced[
-        "run-native-topology-helper-v14.ps1"
+    desk_manifest["run-native-topology-helper-v15.ps1"] = produced[
+        "run-native-topology-helper-v15.ps1"
     ]
     desk_manifest["relay_native_frames_v9.py"] = produced["relay_native_frames_v9.py"]
-    desk_manifest["cursor_recovery_watchdog_v3.py"] = produced["cursor_recovery_watchdog_v3.py"]
+    desk_manifest["cursor_recovery_watchdog_v4.py"] = produced["cursor_recovery_watchdog_v4.py"]
     if args.no_stimulus:
         desk_manifest[NO_STIMULUS_VALIDATOR] = produced[NO_STIMULUS_VALIDATOR]
     write("native-desktop-v76-source.json", json.dumps(desk_manifest, indent=2) + "\n")
