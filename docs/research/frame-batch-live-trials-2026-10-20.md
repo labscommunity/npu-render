@@ -1088,3 +1088,19 @@ display's swap chain, which is lost only when the indirect display is primary
 with the presentation bridge attached (trial 17's access-lost exit). The
 driver's reassignment after such a switch is the next product item; the
 two-hour soak meanwhile raises the OLED saver timer for its duration.
+
+Trial 18's ending, from the dump and the worker log: DWM crashed at 20:37:17Z,
+four and a half minutes into the saver, in `CD3DDevice::CreateD3D11Device`
+under `CLegacyRenderTarget::EnsureSwapChain`, the same "failed to create a
+graphics device" fail-fast, but with a different cause. The worker had just
+exited with `request recording budget exceeded`: the saver's animation drove
+841 batches of about 20 MB each through the capture in four minutes and filled
+its 16 GiB budget, the recorder threw, the worker stopped, and DWM's next device
+creation found no exchange. Two items follow. The recorder must stop recording
+and keep serving (worker change). More important for the product, the loss of
+the worker must never make DWM's device creation fail: the driver should keep
+creating devices while the lease holds and run on its CPU fallback until the
+worker returns. During the saver the indirect display cycled through four swap
+chain releases and reassignments and kept producing (824 frames, 530 distinct),
+and the GPU 3D engine sat at 7.9 % (p50) because the saver itself rendered on
+the iGPU for the physical panel. The two-hour soak restarts without capture.
