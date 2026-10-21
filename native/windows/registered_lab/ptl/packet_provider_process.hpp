@@ -40,7 +40,8 @@ class PacketProviderProcess {
                    !_wcsicmp(key.c_str(),L"NR_RENDER_RECOVERY_TEST_EXCEPTION_TICKET") ||
                    !_wcsicmp(key.c_str(),L"NR_RENDER_PROVIDER_TEST_INFER_EXCEPTION_TICKET") ||
                    !_wcsicmp(key.c_str(),L"NR_RENDER_CAPTURE_DIRECTORY") ||
-                   !_wcsicmp(key.c_str(),L"NR_RENDER_FAILURE_PACKET"))continue;
+                   !_wcsicmp(key.c_str(),L"NR_RENDER_FAILURE_PACKET") ||
+                   !_wcsicmp(key.c_str(),L"NR_RENDER_PROVIDER_OWNER_PID"))continue;
                 entries.push_back(std::move(entry));
             }
         }catch(...){FreeEnvironmentStringsW(block);throw;}
@@ -48,6 +49,8 @@ class PacketProviderProcess {
         entries.push_back(L"NR_RENDER_PROVIDER_RECOVERY=0");
         if(generation_==1 && test_exception_ticket_!=UINT32_MAX)entries.push_back(L"NR_RENDER_PROVIDER_TEST_INFER_EXCEPTION_TICKET="+std::to_wstring(test_exception_ticket_));
         entries.push_back(L"NR_RENDER_FAILURE_PACKET="+failure.wstring());
+        // The child's lifetime follows this process (local_indexed_worker.cpp), not its fixed grant.
+        entries.push_back(L"NR_RENDER_PROVIDER_OWNER_PID="+std::to_wstring(GetCurrentProcessId()));
         std::sort(entries.begin(),entries.end(),[](const auto &a,const auto &b){return _wcsicmp(a.c_str(),b.c_str())<0;});
         std::vector<wchar_t> result;
         for(const auto &entry:entries){result.insert(result.end(),entry.begin(),entry.end());result.push_back(0);}

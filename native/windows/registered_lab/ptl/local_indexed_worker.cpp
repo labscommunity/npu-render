@@ -196,6 +196,28 @@ int wmain(int argc, wchar_t **argv) try {
     // Lease renewal: re-read the compositor's lease every 20 s and extend the lifetime to its
     // deadline. Only a renewal of the lease first seen (same nonce, identities and scope) counts,
     // and never beyond the scope's maximum from now; an unreadable mapping leaves the deadline alone.
+    // Provider child (no peers): the lifetime follows the owning parent instead of the fixed grant.
+    // While the parent lives the deadline moves to now+<seconds> every 20 s; the job object ends
+    // the child with the parent, so the grant only bounds an orphan. Admission v106 ended at the
+    // child's fixed 2400 s while the parent's lease kept renewing (trials report, trial 23).
+    std::unique_ptr<stream::Handle> owner;
+    if(argc==4){
+        wchar_t *text=nullptr;size_t size=0;ex::require(!_wdupenv_s(&text,&size,L"NR_RENDER_PROVIDER_OWNER_PID"));
+        const std::unique_ptr<wchar_t,decltype(&std::free)> text_owner(text,&std::free);
+        if(text && *text){
+            wchar_t *owner_end=nullptr;const auto owner_pid=std::wcstoul(text,&owner_end,10);ex::require(owner_end!=text && !*owner_end && owner_pid && owner_pid!=GetCurrentProcessId());
+            owner=std::make_unique<stream::Handle>(OpenProcess(SYNCHRONIZE|PROCESS_QUERY_LIMITED_INFORMATION,FALSE,DWORD(owner_pid)));
+            std::printf("{\"provider_lifetime_follows_owner\":true,\"owner_pid\":%lu,\"grant_s\":%lu}\n",owner_pid,seconds);std::fflush(stdout);
+        }
+    }
+    const auto follow_owner=[&]{
+        unsigned extensions=0;
+        while(!stopping.load() && GetTickCount64()<deadline.load()){
+            if(WaitForSingleObject(stop_event.value,20000)!=WAIT_TIMEOUT)return;
+            if(WaitForSingleObject(owner->value,0)!=WAIT_TIMEOUT){std::printf("{\"provider_owner_exited\":true,\"extensions\":%u}\n",extensions);std::fflush(stdout);stop();return;}
+            deadline.store(GetTickCount64()+uint64_t(seconds)*1000);++extensions;
+        }
+    };
     const auto renew=[&]{
         std::optional<nr::native_probe::Lease> first;bool unreadable_logged=false;
         while(!stopping.load() && GetTickCount64()<deadline.load()){
@@ -212,7 +234,7 @@ int wmain(int argc, wchar_t **argv) try {
             }
         }
     };
-    try{for(const auto &pipe:pipes)threads.emplace_back(serve,pipe->value);if(compositor && indirect)threads.emplace_back(renew);}
+    try{for(const auto &pipe:pipes)threads.emplace_back(serve,pipe->value);if(compositor && indirect)threads.emplace_back(renew);if(owner)threads.emplace_back(follow_owner);}
     catch(...){fail(std::current_exception());}
     std::printf("{\"local_worker_ready\":true,\"pid\":%lu,\"concurrent_clients\":%lu,\"provider_concurrency\":1,\"client_pid_verified\":true,\"private_user_acl\":true,\"network_listener\":false}\n",GetCurrentProcessId(),clients);std::fflush(stdout);
     for(auto &thread:threads)thread.join();
