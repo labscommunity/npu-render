@@ -4,7 +4,7 @@ from native_session_broker_v3 import *
 from native_incremental_evidence_v1 import NativeEvidence
 from native_process_observer_v1 import PinnedProcess,named_processes,find_compositor,find_indirect_host,process_image
 import traceback,struct
-from native_shared_app_v45 import SharedInteractiveApp
+from native_shared_app_v47 import SharedInteractiveApp
 from native_lease_renewal_v1 import Renewal
 p=argparse.ArgumentParser()
 for n in ('worker','runtime','cache','session_probe','devcon','idd_inf','transaction','trace'):
@@ -114,7 +114,7 @@ try:
                   uniform_lanes=v.uniform_lanes,texture_scope=v.texture_scope,pipeline_cache='retained',monitor_seconds=v.monitor_seconds,quad_batch='1',
                   ptl_resident_clip_model_sha256=hashlib.sha256(v.ptl_resident_clip_blob.read_bytes()).hexdigest(),ptl_complex_model_sha256=hashlib.sha256(v.ptl_complex_blob.read_bytes()).hexdigest(),ptl_rectangle_model_sha256=hashlib.sha256(v.ptl_rectangle_blob.read_bytes()).hexdigest(),ptl_long_model_sha256=hashlib.sha256(v.ptl_long_blob.read_bytes()).hexdigest(),ptl_program_model_sha256=hashlib.sha256(v.ptl_program_blob.read_bytes()).hexdigest(),ptl_masked_model_sha256=hashlib.sha256(v.ptl_masked_blob.read_bytes()).hexdigest(),ptl_geometry_model_sha256=hashlib.sha256(v.ptl_geometry_blob.read_bytes()).hexdigest(),ptl_texture_model_sha256=hashlib.sha256(v.ptl_texture_blob.read_bytes()).hexdigest(),ptl_solid_model_sha256=hashlib.sha256(v.ptl_solid_blob.read_bytes()).hexdigest(),ptl_four_tap_model_sha256=hashlib.sha256(v.ptl_four_tap_blob.read_bytes()).hexdigest(),worker_seconds=v.monitor_seconds+45,lease_milliseconds=(v.monitor_seconds+60)*1000,incremental_evidence=True)
     evidence=NativeEvidence(out,v.trace/f'process-{host.identity.pid}.jsonl')
-    worker=subprocess.Popen([str(v.worker),pipe,'65536',str(705),str(compositor.identity.pid),str(compositor.identity.created),str(host.identity.pid),str(host.identity.created)],env=env,stdin=subprocess.DEVNULL,stdout=streams[2],stderr=streams[3],creationflags=subprocess.CREATE_NO_WINDOW)
+    worker=subprocess.Popen([str(v.worker),pipe,'65536',str(1185),str(compositor.identity.pid),str(compositor.identity.created),str(host.identity.pid),str(host.identity.created)],env=env,stdin=subprocess.DEVNULL,stdout=streams[2],stderr=streams[3],creationflags=subprocess.CREATE_NO_WINDOW)
     own_process(int(worker._handle),'worker');report['worker_pid']=worker.pid;save()
     evidence.poll()
     while not evidence.ready:
@@ -123,9 +123,9 @@ try:
         for sid in (compositor.sid,host.sid):permissions.append(ProcessGrant(handle,sid))
     gate();compositor.verify();host.verify();assert time.perf_counter()<ready_deadline
     # Publish compositor first. Host Ready allows DriverEntry and monitor arrival.
-    leases.append(LeaseGrant(int(worker._handle),compositor.handle,suffix,scope=1,desktop_session=session['console_session'],milliseconds=720000))
-    leases.append(LeaseGrant(int(worker._handle),host.handle,suffix,scope=2,desktop_session=session['console_session'],milliseconds=720000))
-    renewal=Renewal(leases,v.recovery_task);report['lease_renewals']=[];report['initial_grant_s']=720
+    leases.append(LeaseGrant(int(worker._handle),compositor.handle,suffix,scope=1,desktop_session=session['console_session'],milliseconds=1200000))
+    leases.append(LeaseGrant(int(worker._handle),host.handle,suffix,scope=2,desktop_session=session['console_session'],milliseconds=1200000))
+    renewal=Renewal(leases,v.recovery_task);report['lease_renewals']=[];report['initial_grant_s']=1200
     report['admission_published']=True;report['admission_publication_ms']=(time.perf_counter()-(ready_deadline-8))*1000;save()
     shared=SharedInteractiveApp(v.transaction,worker,suffix,session['console_session'],v.interactive_dll,env,own_process)
     admission_started=time.perf_counter();deadline=admission_started+v.monitor_seconds;last_gate=0

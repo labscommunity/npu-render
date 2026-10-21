@@ -71,7 +71,7 @@ try{
  }
  foreach($prior in $state.physical_display_before){try{$now=Get-PnpDevice -InstanceId $prior.instance -PresentOnly;if($now.Status -ne $prior.status){throw 'Original display health changed'}}catch{Record-Error $_.Exception.Message}}
  $report.passed=$report.errors.Count -eq 0
- if($report.passed){Unregister-ScheduledTask -TaskName 'T8-NpuRender-NativeDesktopRecovery-v99' -Confirm:$false -ErrorAction SilentlyContinue}
+ if($report.passed){Unregister-ScheduledTask -TaskName 'T8-NpuRender-NativeDesktopRecovery-v101' -Confirm:$false -ErrorAction SilentlyContinue}
 }catch{Record-Error $_.Exception.Message}
 finally{$report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');$report|ConvertTo-Json -Depth 6|Set-Content "$Root\recovery-report.json";if($held){$mutex.ReleaseMutex()};$mutex.Dispose()}
 $report|ConvertTo-Json -Depth 6;if(!$report.passed){exit 1}
