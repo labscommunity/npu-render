@@ -165,7 +165,12 @@ public:
         verify_process(controller.value, lease.controller);
         verify_process(worker.value, lease.worker);
         if(lease.scope)require(session_unlocked(lease.desktop_session));
-        if(lease.scope==1)require(current_image_is(L"dwm.exe") && current_input_is_default());
+        // The compositor composes every desktop: the screen saver's, the lock screen's and UAC's
+        // secure desktop switch the input desktop away from "Default", and DWM creates a new
+        // graphics device for each. Requiring the Default desktop here made that creation fail
+        // and DWM fail fast (0x889800b0, trials 14 and 16). Identity, session and SID still bind
+        // the compositor; only interactive clients (scope 3) must sit on the Default desktop.
+        if(lease.scope==1)require(current_image_is(L"dwm.exe"));
         if(lease.scope==2)require(current_image_is(L"WUDFHost.exe"));
         if(lease.scope==3){require(current_input_is_default());require(user_sid(worker.value)==sid&&user_sid(controller.value)==sid);}
     }

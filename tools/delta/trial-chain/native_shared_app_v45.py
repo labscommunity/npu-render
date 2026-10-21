@@ -10,7 +10,7 @@ class SharedInteractiveApp:
   self.broker=None;self.streams=[];self.grants=[];self.tokens=[];self.started=False;self.checked=False;self.passed=False;self.dwm_after=None
   self.report=dict(completed=False,passed=False,shared_desktop_worker=True,ordinary_default_adapter=False,full_desktop_offload=False,tahoma_tested=False)
   assert obj(self.vm/'native-shared-correlation-v2/report.json')['passed']
-  q=obj(self.vm/'native-registration-v69/qualification/report.json');assert q['passed'] and q['automatic_admission'] and q['owned_process_and_token_acls_restored_exactly']
+  q=obj(self.vm/'native-registration-v78/qualification/report.json');assert q['passed'] and q['automatic_admission'] and q['owned_process_and_token_acls_restored_exactly']
   assert hashlib.sha256(Path(worker.args[0]).read_bytes()).hexdigest()==q['worker_binary_sha256']
   assert hashlib.sha256(dll.read_bytes()).hexdigest()==q['dll_sha256']
   self.binary=self.root/'builds/native-default-app-v2/Release/nr_native_registered_probe.exe'
