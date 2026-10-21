@@ -34,7 +34,8 @@ foreach($step in $spec.steps){
     $entry.exit_code=$code
     if($step.match){ $m=[regex]::Matches($text,$step.match) | ForEach-Object { $_.Value }; $entry.matched=@($m | Select-Object -First 20) }
     $reportOk=$true
-    if($step.report){ $j=Get-Content $step.report -Raw|ConvertFrom-Json; $reportOk=[bool]$j.passed; $entry.report_passed=$reportOk; if($j.error){ $entry.report_error="$($j.error)" } }
+    # A report passes on its own verdict key: trials say passed, builds clean_build, packages prepared.
+    if($step.report){ $j=Get-Content $step.report -Raw|ConvertFrom-Json; $key=if($step.report_key){$step.report_key}elseif($null -ne $j.passed){'passed'}elseif($null -ne $j.clean_build){'clean_build'}elseif($null -ne $j.prepared){'prepared'}else{'passed'}; $reportOk=[bool]$j.$key; $entry.report_passed=$reportOk; $entry.report_key=$key; if($j.error){ $entry.report_error="$($j.error)" } }
     $entry.ok=($code -eq 0 -or $step.ignore_exit) -and $reportOk -and (-not $step.match -or $entry.matched.Count -gt 0)
     $entry.tail=($text -split "`n" | Select-Object -Last 6) -join "`n"
   }catch{ $entry.error=$_.Exception.Message; $entry.ok=$false }
