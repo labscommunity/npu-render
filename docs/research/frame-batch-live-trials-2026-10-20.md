@@ -680,3 +680,140 @@ Worker tree v40 carries the rejected-span self-test rule, the shared per-draw ro
 selection and the swizzle fix in its host copy of the core (the host path was never
 affected). Build v39 failed to compile because the route header was first included
 inside the driver's anonymous namespace; v40 includes it at file scope.
+
+## Replay of the trial-2 capture with worker v40 and bundle v18 (2026-10-21)
+
+The 1,335-request capture from trial 2 replayed through worker v40 with bundle v18
+(`frame-replay-v25-085958` on Delta):
+
+| Measure | Value |
+| --- | --- |
+| Batches replayed (recorded / converted per-draw) | 1,002 / 333 |
+| Converted batches within tolerance of the host reference | 333 of 333 (305 bit-exact) |
+| Beyond tolerance / incomparable | 0 / 0 |
+| Commands / kernel / fallback | 5,165 / 4,492 kernel, 185 transparent no-ops |
+| Fallback routes | 122 `kernel blob 10 unavailable` (e3ebf67c), 2 `span budget` |
+| Blobs retired by the startup self-test | 0 (all ten blobs, 0 mismatches) |
+| Kernel time | 38,973 ms over 4,747 requests |
+
+The acrylic shader c71638aa now runs on the kernel for all 108 of its draws (tiles
+32/64/128); before the swizzle fix the self-test retired blobs 7–9. The only
+per-draw fallbacks are the blur shader whose blob does not fit the window and two
+span-budget overflows.
+
+## Trial 10 (build v40, bundle v18): the fallback packet for mirror addressing
+
+Generation-11 chain: package v35 (0.0.1335.0), registration v66 (qualification
+passed, 16 frame batches, 8 receipts), readiness observer v158. The GPU 3D
+utilisation sampler (`\GPU Engine(*engtype_3D)\Utilization Percentage`, 2 s
+interval) ran alongside the live trial for the first time.
+
+The trial ended 5 s into the admission: `NPU worker stopped before native frame
+evidence`. The child provider's log shows batch 1 executing on the kernel (5
+commands, 33 kernel requests, 364 ms) and batch 2 failing at its first per-draw
+fallback:
+
+```
+{"frame_batch_fallback_begin":true,"route":"fallback:kernel blob 10 unavailable","abi":11,"reserved":0,"flags":1388295}
+invalid indexed NPU exchange packet
+```
+
+The captured request (`failed-request.bin`, 135 commands) holds two blur draws
+(e3ebf67c, 192×64 targets, blend `plus`, 6 vertices) whose sampler uses mirror
+addressing (`address_u = address_v = mirror`). Their recorded route is abi 11 with
+flags 0x152f07. The per-draw encoder requires clamp addressing unless the packet
+carries abi 12 (clamp/mirror bits) or 14 (two-bit modes with border colours); abi
+11 with a mirror sampler cannot be encoded, so `require` threw before the request
+reached the per-draw executor, the child reported the batch as failed, the parent
+pipe completed with error 233, and the bootstrap stopped the trial. Recovery
+restored the display and removed both packages (cleanup passed).
+
+Root cause: the driver's own per-draw path upgrades the abi to 12 or 14 after its
+route selection (`indexed_draw.hpp`: `if(addressed) abi=12; if(bordered) abi=14;`),
+but the shared `legacy_route` that records the route into each batched draw stopped
+at the blend selection. Every mirror- or border-addressed draw that falls back
+therefore carried an unencodable route. The trial-2 capture replayed cleanly
+because its blur draws used clamp addressing.
+
+Fix (worker tree v41): `legacy_route` takes `bordered` next to `addressed` and
+applies the same two upgrades before the component-coverage override; the driver
+feeds both from the bound samplers, and the worker feeds them from the batch's
+texture bindings. A replay of the failing capture (its second request appended to
+the index by hand, since the worker never recorded a response for it) still failed
+with v41: the capture carries the routes driver v40 recorded, and the worker ran
+the recorded route. Tree v42 therefore derives every fallback route from the
+batch content with the shared function and runs the derived route; a recorded
+route that differs is logged as `frame_batch_route_disagreement` with both pairs,
+so every trial now measures whether driver and worker agree. The GPU sampler
+recorded 19 samples during the 42 s trial (idle desktop, 1.1 % average), which is
+not an offload measurement.
+
+Verification of tree v42 on Delta (`frame-replay-v30-092310`): the trial-10
+capture, both requests, replays completely: 140 commands, 123 kernel requests,
+the two blur draws on the per-draw route (56 and 32 provider requests), no
+rejected packet. The worker logged the expected disagreement for each:
+
+```
+{"frame_batch_route_disagreement":true,"recorded_abi":11,"recorded_flags":1388295,"derived_abi":12,"derived_flags":1388295}
+{"frame_batch_fallback_begin":true,"route":"fallback:kernel blob 10 unavailable","abi":12,"reserved":0,"flags":1388295}
+```
+
+The trial-2 capture replayed through v42 (`frame-replay-v31-092319`) exactly as
+through v40: 333 of 333 converted batches within tolerance, 124 fallbacks, no
+route disagreement. Its 122 blur fallbacks already carried abi 12 because they
+come from per-draw packets the driver's per-draw path had encoded; the batch
+recording lambda the shared route replaced on 2026-10-21 lacked the two upgrades
+as well, so the defect was latent since the recorded route was introduced, and
+trial 10 was the first live run in which a mirror-addressed draw fell back inside
+a batch.
+
+## Trial 11 (build v42, bundle v18, package v36): 2.5 updates/s, GPU 3D engine idle
+
+Generation-12 chain (registration v67 qualified with 16 frame batches), live
+trial `native-live-v78` / `ptl-native-live-v42`, 660 s admission, request
+capture on (218 files, 1.3 GB, private pixels stay on Delta). Passed end to end
+with cleanup; one provider generation; no worker stderr.
+
+| Measure | Trial 9 (v32, blobs v17) | Trial 11 (v42, bundle v18) |
+| --- | --- | --- |
+| Verified unique updates/s (300 requested at 30 Hz) | 2.4 | 2.5 (26 of 300) |
+| Mouse sent-to-display median / p95 | — | 94 ms / 1,497 ms |
+| Frame batches / commands | — | 424 / 6,079 |
+| Commands on the kernel / copy / clear / no-op / fallback | — | 4,772 / 595 / 405 / 195 / 112 |
+| Fallbacks | blobs 7–9 retired | 112, all `kernel blob 10 unavailable` (e3ebf67c), abi 12 |
+| Startup self-test | retired 7–9 | 10 blobs, 0 mismatches, 0 retired |
+| Route disagreements (driver vs worker) | not measured | 0 of 112 |
+| Kernel / infer / copy / host time | — | 42.7 s / 41.9 s / 0.7 s / 81.9 s |
+| Flushes (UMD) | — | 204: 117 present, 76 write, 5 legacy draw, 4 limit |
+| Flush wall p50 / p90 / max | — | 265 / 1,000 / 3,500 ms |
+| Draws batched / not batched | 2 unbatched | 5,096 / 5 (span budget, d8e0b497 348 vertices) |
+| Acrylic c71638aa on the kernel | per-draw | 119 draws |
+| Physically submitted frames | — | 170 |
+
+The acrylic, blur-adjacent long shaders now run on the kernel, the only
+per-draw fallback left is the blur blob that does not fit the window, and driver
+and worker agreed on every recorded route. The update rate did not move: the
+per-flush wall (p50 265 ms, p90 1 s) is still the limit, and present-triggered
+flushes carry 66 of the 92 s of flush time.
+
+### GPU 3D engine utilisation during the NPU-rendered desktop (first measurement)
+
+`\GPU Engine(*engtype_3D)\Utilization Percentage` summed over all instances,
+sampled every 2 s for 720 s from before admission until after restoration
+(`vm\gpu-samples-live78.jsonl`, 341 samples):
+
+| Statistic | Value |
+| --- | --- |
+| Average | 0.13 % |
+| p50 / p90 / p99 | 0 / 0.21 / 1.18 % |
+| Samples above 10 % | 1 (18.9 %, dwm.exe, 16:39:21Z) |
+| Non-zero samples | 114 of 341 |
+
+The admission ran 16:27–16:39Z; the two highest samples (5.9 % and 18.9 %) fall
+at 16:39:19–21Z, when the topology was restored and DWM resumed rendering on the
+iGPU. During the NPU-rendered interval the 3D engine stayed below 1.2 % in every
+sample. Caveats: this is the 3D engine only (copy and video engines were not
+sampled), the desktop ran the controlled trial stimulus rather than ordinary
+applications, and the physical bridge's presentation work is not separated out;
+it is evidence that composition left the 3D engine, not a Tahoma benefit
+measurement.
