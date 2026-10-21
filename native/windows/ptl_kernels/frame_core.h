@@ -149,7 +149,11 @@ typedef unsigned nr_uv4 __attribute__((ext_vector_type(4)));
 typedef int nr_iv4 __attribute__((ext_vector_type(4)));
 #define NR_V4_LANE(a, i) ((a)[i])
 #define NR_UV4_LANE(a, i) ((a)[i])
-#define NR_V4_SWZ(a, x, y, z, w) __builtin_shufflevector((a), (a), (x), (y), (z), (w))
+/* Swizzles are spelled as lane extraction, not __builtin_shufflevector: moviCompile's
+ * shuffle lowering (CMU.CMB combines) returns wrong lanes inside the long generated
+ * shaders (2026-10-21, blobs 7-9 of the frame kernel; every fixture passes with this
+ * form at the same code size, and the assembler's CMB write-port hazard disappears). */
+#define NR_V4_SWZ(a, x, y, z, w) nr_v4_make(NR_V4_LANE((a), (x)), NR_V4_LANE((a), (y)), NR_V4_LANE((a), (z)), NR_V4_LANE((a), (w)))
 #define NR_V4_SET(d, i, s) ((d)[i] = (s)[i])
 NR_INLINE nr_v4 nr_v4_make(nr_f32 x, nr_f32 y, nr_f32 z, nr_f32 w) { nr_v4 r; r.x = x; r.y = y; r.z = z; r.w = w; return r; }
 NR_INLINE nr_uv4 nr_uv4_make(nr_u32 x, nr_u32 y, nr_u32 z, nr_u32 w) { nr_uv4 r; r.x = x; r.y = y; r.z = z; r.w = w; return r; }
