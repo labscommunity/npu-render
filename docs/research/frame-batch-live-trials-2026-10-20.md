@@ -651,3 +651,32 @@ them with the corrected tool; the worker's strict self-test then keeps all of th
 so the acrylic strip and the two other long shaders return to the kernel route with
 GPU-identical pixels. The small shaders were never wrong: their generated code holds
 few repeated-index swizzles, or none that the lowering mishandled.
+
+## Bundle v18 and worker v40 (2026-10-21)
+
+Bundle v18 regenerates all eleven blobs from the corrected core and qualifies them
+on Delta with the corrected tool (full pixel comparison, one request per group of
+twelve fixtures):
+
+| Blob | Programs | Text bytes (v17 → v18) | Fixtures | Mismatches |
+| --- | --- | --- | --- | --- |
+| 0 | 6 solid/simple | 20,416 → 20,496 | 29 | 0 |
+| 1 | 5 textured | 23,504 → 23,600 | 33 | 0 |
+| 2 | 4 (incl. e87ed647) | 22,240 → 22,320 | 27 | 0 |
+| 3 | 3 | 22,816 → 22,848 | 21 | 0 |
+| 4 | d305ca5e, 1b8e912b | 21,536 → 21,568 | 15 | 0 |
+| 5 | e455f7a5 | 19,808 → 19,792 | 9 | 0 |
+| 6 | b7f4e6d0, 2a28d3fe | 23,856 → 23,808 | 15 | 0 |
+| 7 | c71638aa | 24,304 → 24,304 | 9 | 0 (was 4) |
+| 8 | 39799859 | 24,496 → 24,496 | 9 | 0 (was 4) |
+| 9 | ec1e65f6 | 24,464 → 24,416 | 9 | 0 (was 6) |
+| 10 | e3ebf67c | 28,912 | — | does not fit the window; per-draw route |
+
+The small shaders needed no hazard NOPs any more except blobs 0–4 (one each, as
+before). Deployed as `frame-blobs-v18\deploy` with identities unchanged (they hash
+the per-blob program header, not the core).
+
+Worker tree v40 carries the rejected-span self-test rule, the shared per-draw route
+selection and the swizzle fix in its host copy of the core (the host path was never
+affected). Build v39 failed to compile because the route header was first included
+inside the driver's anonymous namespace; v40 includes it at file scope.
