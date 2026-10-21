@@ -19,7 +19,7 @@ KERNELS = ROOT / "native/windows/ptl_kernels"
 sys.path.insert(0, str(ROOT / "tools"))
 from build_ptl_kernel import inline_local_includes  # noqa: E402
 
-BLOBS = 7
+BLOBS = 10
 CXX = [
     "clang++",
     "-std=c++17",

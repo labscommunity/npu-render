@@ -28,6 +28,13 @@ void APIENTRY copy_region(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE destination, UI
             {Mapping read(*sa,true);std::memcpy(snapshot.data(),static_cast<const uint8_t *>(read.data)+region.left,bytes);read.finish();}
             {Mapping write(*da,false);std::memcpy(static_cast<uint8_t *>(write.data)+x,snapshot.data(),bytes);write.finish();}
             moved=bytes;counters.upload_bytes+=bytes;
+        }else if(frame_batch_copy(device(h),sa,da,region,x,y)){
+            // The source is being drawn by the open frame batch: the worker copies the region
+            // after those draws and the destination pixels return with the batch.
+            moved=uint64_t(region.right-region.left)*uint64_t(region.bottom-region.top)*texel_bytes(sa->surface.format);
+            da->content_version=next_content_version();
+            lab_trace("{\"event\":\"resource_region_copy_batched\",\"bytes\":%llu}\n",static_cast<unsigned long long>(moved));
+            counters.copies+=moved; return;
         }else{
             const auto pixels=read_pixels(*sa,&region);
             const UINT width=UINT(region.right-region.left),height=UINT(region.bottom-region.top);

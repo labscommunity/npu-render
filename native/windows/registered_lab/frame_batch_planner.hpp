@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <cstdio>
 #include <cstring>
 #include <vector>
@@ -56,9 +57,20 @@ inline std::array<CoordinateSource, NR_FRAME_MAX_TEXTURES> coordinate_sources(co
         if (kind == 0 && index < 16) return temps[index][lane];
         return l;
     };
-    for (const auto &w : program.ps_words) {
+    const auto &words = program.ps_words;
+    for (size_t wi = 0; wi < words.size(); ++wi) {
+        const auto &w = words[wi];
         const uint32_t op = w[0], dest = w[1], src0 = w[2], src1 = w[3], src2 = w[4], extra = w[5];
         const uint32_t dest_kind = dest & 15u, dest_index = (dest >> 4) & 255u, mask = (dest >> 12) & 15u;
+        if (op == core::NR_OP_LOOP) {
+            // Temporaries written inside the loop take unknown values throughout and after it.
+            for (size_t m = wi + 1; m < words.size() && words[m][0] != core::NR_OP_ENDLOOP; ++m) {
+                const uint32_t d = words[m][1]; if ((d & 15u) != 0 || ((d >> 4) & 255u) >= 16) continue;
+                for (unsigned k = 0; k < 4; ++k) if ((d >> 12) & (1u << k)) temps[(d >> 4) & 255u][k] = Lane{};
+            }
+            continue;
+        }
+        if (op == core::NR_OP_BREAKC || op == core::NR_OP_ENDLOOP) continue;
         if (op == core::NR_OP_SAMPLE) {
             const uint32_t texture = extra & 15u;
             if (texture >= NR_FRAME_MAX_TEXTURES) continue;
@@ -144,16 +156,45 @@ struct Val {
         }
         v.affine = true; v.c0 = c0; if (cx != 0) v.terms.push_back({0u, cx}); if (cy != 0) v.terms.push_back({1u, cy}); v.bound(); return v;
     }
+    std::shared_ptr<Val> alt;           // a second case: the value is in this OR *alt (wrap seams)
     bool point() const { return known && lo == hi; }
     bool constant_value() const { return affine && terms.empty(); }
     bool same_form(const Val &o) const { return affine && o.affine && c0 == o.c0 && terms == o.terms; }
+    Val stripped() const { Val v = *this; v.alt.reset(); return v; }
 };
+inline std::vector<Val> cases(const Val &v) { std::vector<Val> c{v.stripped()}; if (v.alt) c.push_back(v.alt->stripped()); return c; }
+inline Val hull(const Val &a, const Val &b);
+// Two cases stay separate; more collapse to their hull.
+inline Val from_set(std::vector<uint32_t> set);
+inline Val join(std::vector<Val> results) {
+    std::vector<Val> flat; for (auto &r : results) for (auto &c : cases(r)) flat.push_back(c);
+    if (flat.empty()) return Val::any();
+    bool all_sets = true; for (const auto &c : flat) all_sets = all_sets && !c.set.empty();
+    if (all_sets) { std::vector<uint32_t> s; for (const auto &c : flat) s.insert(s.end(), c.set.begin(), c.set.end()); return from_set(s); }   // masks and integers merge by their patterns
+    for (const auto &c : flat) if (!c.known) return Val::any();
+    if (flat.size() == 1) return flat[0];
+    if (flat.size() == 2) { if (flat[0].same_form(flat[1])) return flat[0]; Val v = flat[0]; v.alt = std::make_shared<Val>(flat[1]); return v; }
+    Val h = flat[0]; for (size_t n = 1; n < flat.size(); ++n) h = hull(h, flat[n]); return h;
+}
+template <class F> Val lift1(const Val &a, F f) { if (!a.alt) return f(a); std::vector<Val> r; for (const auto &c : cases(a)) r.push_back(f(c)); return join(r); }
+template <class F> Val lift2(const Val &a, const Val &b, F f) {
+    if (!a.alt && !b.alt) return f(a, b);
+    std::vector<Val> r; for (const auto &ca : cases(a)) for (const auto &cb : cases(b)) r.push_back(f(ca, cb)); return join(r);
+}
 inline Val from_set(std::vector<uint32_t> set) {
     if (set.empty() || set.size() > 16) return Val::any();
     std::sort(set.begin(), set.end()); set.erase(std::unique(set.begin(), set.end()), set.end());
     double lo = 1e300, hi = -1e300; bool finite = true;
     for (uint32_t b : set) { float f; std::memcpy(&f, &b, 4); if (!std::isfinite(f)) finite = false; lo = std::min(lo, double(f)); hi = std::max(hi, double(f)); }
-    Val v; if (finite) v = Val::range(lo, hi);
+    Val v;
+    if (finite && set.size() == 2) {
+        // Two finite patterns (a mask ANDed with a constant, a sign) stay two cases, not a continuum.
+        v = Val::constant(lo); v.set = {set[0]}; Val other = Val::constant(hi); other.set = {set[1]};
+        if (lo == hi) { v.set = set; return v; }
+        float f0; std::memcpy(&f0, &set[0], 4); if (double(f0) != lo) std::swap(v.set, other.set);
+        v.alt = std::make_shared<Val>(other); return v;
+    }
+    if (finite) v = Val::range(lo, hi);
     v.set = std::move(set);
     return v;
 }
@@ -213,15 +254,21 @@ inline Val vmax(const Val &a, const Val &b) {
 }
 inline Val floor_(const Val &a) {
     if (!a.known) return a;
-    const double f = std::floor(a.lo);
-    if (std::floor(a.hi) == f) return Val::constant(f);
-    return Val::range(f, std::floor(a.hi));
+    const double f = std::floor(a.lo), g = std::floor(a.hi);
+    if (g == f) return Val::constant(f);
+    if (g == f + 1) { Val v = Val::constant(f); v.alt = std::make_shared<Val>(Val::constant(g)); return v; }
+    return Val::range(f, g);
 }
 inline Val frc(const Val &a) {
     if (!a.known) return a;
-    const double f = std::floor(a.lo);
-    if (std::floor(a.hi) != f) return Val::range(0, 1);
-    return add(a, Val::constant(-f));
+    const double f = std::floor(a.lo), g = std::floor(a.hi);
+    if (g == f) return add(a, Val::constant(-f));
+    if (g == f + 1) {
+        // One wrap seam inside the range: the values below the seam and the values above it.
+        Val below = Val::range(a.lo - f, 1.0), above = Val::range(0.0, a.hi - g);
+        below.alt = std::make_shared<Val>(above); return below;
+    }
+    return Val::range(0, 1);
 }
 inline Val saturate(const Val &a) {
     if (!a.known) return Val::range(0, 1);
@@ -272,11 +319,26 @@ inline Val select(const Val &c, const Val &a, const Val &b) {
     if (t && !f) return a; if (f && !t) return b; return hull(a, b);
 }
 using Lanes = std::array<Val, 4>;
-// (u, v) coordinate intervals every sample of one texture reaches over the rectangle.
-struct Window { bool any = false, bounded = true; double umin = 1e300, umax = -1e300, vmin = 1e300, vmax = -1e300; };
-inline void evaluate(const LoweredProgram &program, const std::vector<uint32_t> &constants, const std::array<Lanes, 8> &inputs, std::array<Window, NR_FRAME_MAX_TEXTURES> &windows) {
+// (u, v) coordinate boxes every sample of one texture reaches over the rectangle; a
+// wrap seam yields two boxes per axis case.
+struct Box { double umin, umax, vmin, vmax; };
+struct Window { bool any = false, bounded = true; std::vector<Box> boxes; };
+// `output`, when given, receives the values written to o0 (lanes the program never writes stay
+// exactly zero, as the row shader initialises them).
+// Mirror addressing folds a coordinate span onto [0, 1]: a span inside one integer cell maps
+// exactly (reversed in odd cells); a span crossing a cell edge covers the whole axis.
+inline std::pair<double, double> mirror_span(double lo, double hi, bool mirror) {
+    if (!mirror) return {lo, hi};
+    const double cell = std::floor(lo);
+    if (std::floor(hi) != cell && hi != cell + 1) return {0.0, 1.0};
+    const double a = lo - cell, b = hi - cell;
+    const bool odd = std::fmod(std::fabs(cell), 2.0) == 1.0;
+    return odd ? std::make_pair(1.0 - b, 1.0 - a) : std::make_pair(a, b);
+}
+inline void evaluate(const LoweredProgram &program, const std::vector<uint32_t> &constants, const std::array<Lanes, 8> &inputs, std::array<Window, NR_FRAME_MAX_TEXTURES> &windows, Lanes *output = nullptr) {
     std::array<Lanes, 16> temps{};
     for (auto &t : temps) for (auto &l : t) l = Val::exact(0);
+    if (output) for (auto &l : *output) l = Val::exact(0);
     auto operand = [&](const Words &w, unsigned k) {
         const uint32_t src = w[2 + k], kind = src & 15u, idx = (src >> 4) & 255u, lanes = (src >> 12) & 255u, negate = (src >> 20) & 1u, absolute = (src >> 21) & 1u, slot = (src >> 22) & 15u;
         const uint32_t rel = w[0] == core::NR_OP_SAMPLE ? 0u : (w[5] >> (k * 10)) & 0x3ffu;
@@ -292,61 +354,107 @@ inline void evaluate(const LoweredProgram &program, const std::vector<uint32_t> 
                 const size_t word = (size_t(program.vs_constants) + program.ps_constant_base[slot] + idx) * 4 + lane;
                 v = slot < 14 && idx < program.ps_constant_count[slot] && word < constants.size() ? Val::exact(constants[word]) : Val::any();
             }
-            if (absolute) v = abs(v);
-            if (negate) v = w[0] == core::NR_OP_IADD ? (v.set.empty() ? Val::any() : from_set([&] { std::vector<uint32_t> s; for (uint32_t b : v.set) s.push_back(0u - b); return s; }())) : neg(v);
+            if (absolute) v = lift1(v, abs);
+            if (negate) v = w[0] == core::NR_OP_IADD ? (v.set.empty() ? Val::any() : from_set([&] { std::vector<uint32_t> s; for (uint32_t b : v.set) s.push_back(0u - b); return s; }())) : lift1(v, neg);
             out[c] = v;
         }
         return out;
     };
-    for (const auto &w : program.ps_words) {
+    const auto &words = program.ps_words; size_t loop_end = SIZE_MAX;
+    for (size_t wi = 0; wi < words.size(); ++wi) {
+        const auto &w = words[wi];
         const uint32_t op = w[0], dest = w[1], mask = (dest >> 12) & 15u, sat = (dest >> 16) & 1u, dest_kind = dest & 15u, dest_index = (dest >> 4) & 255u;
+        if (op == core::NR_OP_LOOP) {
+            // Every value the body writes is unknown for all iterations and after the loop; the body
+            // is walked once for its samples (their windows) with those unknowns in place.
+            loop_end = wi + 1; while (loop_end < words.size() && words[loop_end][0] != core::NR_OP_ENDLOOP) ++loop_end;
+            for (size_t m = wi + 1; m < loop_end; ++m) {
+                const uint32_t d = words[m][1], kind = d & 15u, index = (d >> 4) & 255u, written = (d >> 12) & 15u;
+                if (kind == 0 && index < 16) for (unsigned c = 0; c < 4; ++c) if (written & (1u << c)) temps[index][c] = Val::any();
+                if (kind != 0 && index == 0 && output) for (unsigned c = 0; c < 4; ++c) if (written & (1u << c)) (*output)[c] = Val::any();
+            }
+            continue;
+        }
+        if (op == core::NR_OP_BREAKC) continue;
+        if (op == core::NR_OP_ENDLOOP) { loop_end = SIZE_MAX; continue; }
+        const bool in_loop = loop_end != SIZE_MAX && wi < loop_end;
         const unsigned sources = detail::source_count(op);
         const Lanes a = operand(w, 0), b = sources >= 2 ? operand(w, 1) : Lanes{}, e = sources >= 3 ? operand(w, 2) : Lanes{};
         Lanes r;
         if (op == core::NR_OP_SAMPLE) {
             const uint32_t texture = w[5] & 15u;
-            if (trace_sink()) std::fprintf(trace_sink(), "sample t%u u=[%.4g,%.4g] v=[%.4g,%.4g] known=%d%d\n", texture, a[0].lo, a[0].hi, a[1].lo, a[1].hi, a[0].known, a[1].known);
+            if (trace_sink()) std::fprintf(trace_sink(), "sample t%u u=[%.4g,%.4g]%s v=[%.4g,%.4g]%s known=%d%d\n", texture, a[0].lo, a[0].hi, a[0].alt ? "+alt" : "", a[1].lo, a[1].hi, a[1].alt ? "+alt" : "", a[0].known, a[1].known);
             if (texture < NR_FRAME_MAX_TEXTURES) {
                 auto &win = windows[texture]; win.any = true;
                 if (!a[0].known || !a[1].known) win.bounded = false;
-                else { win.umin = std::min(win.umin, a[0].lo); win.umax = std::max(win.umax, a[0].hi); win.vmin = std::min(win.vmin, a[1].lo); win.vmax = std::max(win.vmax, a[1].hi); }
+                else for (const auto &u : cases(a[0])) for (const auto &v : cases(a[1])) {
+                    const auto mu = mirror_span(u.lo, u.hi, texture < program.texture_mirror_u.size() && program.texture_mirror_u[texture]);
+                    const auto mv = mirror_span(v.lo, v.hi, texture < program.texture_mirror_v.size() && program.texture_mirror_v[texture]);
+                    win.boxes.push_back({mu.first, mu.second, mv.first, mv.second});
+                }
             }
             for (auto &l : r) l = Val::range(0, 1);   // UNORM texel colors
             const uint32_t lanes = (w[5] >> 12) & 255u; Lanes swizzled; for (unsigned c = 0; c < 4; ++c) swizzled[c] = r[(lanes >> (2 * c)) & 3u]; r = swizzled;
+        } else if (op == core::NR_OP_DDX || op == core::NR_OP_DDY) {
+            // Screen derivative of a varying lane: the coefficient of the pixel position in its
+            // affine form (exact for planar interpolation); with a perspective divide, the quotient rule.
+            const uint32_t src = w[2], reg = (src >> 4) & 255u, lanes = (src >> 12) & 255u, divide = w[3];
+            auto gradient = [&](const Val &v) {
+                Val g; if (!v.affine) return g;
+                double coef = 0; for (const auto &[s, c] : v.terms) { if (s == (op == core::NR_OP_DDX ? 0u : 1u)) coef = c; else if (s > 1) return g; }
+                return Val::constant(coef);
+            };
+            for (unsigned c = 0; c < 4; ++c) {
+                const uint32_t lane = (lanes >> (2 * c)) & 3u;
+                if (reg >= 8) { r[c] = Val::any(); continue; }
+                const Val va = inputs[reg][lane].stripped(), da = gradient(va);
+                if (divide >= 4) { r[c] = da; continue; }
+                const Val ww = inputs[reg][divide].stripped(), dw = gradient(ww);
+                if (!da.known || !dw.known) { r[c] = Val::any(); continue; }
+                r[c] = div(add(mul(da, ww), neg(mul(va, dw))), mul(ww, ww));
+            }
         } else if (op == core::NR_OP_DP2 || op == core::NR_OP_DP3 || op == core::NR_OP_DP4) {
             const unsigned n = op == core::NR_OP_DP2 ? 2 : op == core::NR_OP_DP3 ? 3 : 4;
-            Val sum = Val::exact(0); for (unsigned c = 0; c < n; ++c) sum = add(sum, mul(a[c], b[c]));
+            Val sum = Val::exact(0); for (unsigned c = 0; c < n; ++c) sum = lift2(sum, lift2(a[c], b[c], mul), add);
             for (auto &l : r) l = sum;
         } else for (unsigned c = 0; c < 4; ++c) {
             switch (op) {
             case core::NR_OP_MOV: r[c] = a[c]; break;
-            case core::NR_OP_ADD: r[c] = add(a[c], b[c]); break;
-            case core::NR_OP_MUL: r[c] = mul(a[c], b[c]); break;
-            case core::NR_OP_MAD: r[c] = add(mul(a[c], b[c]), e[c]); break;
-            case core::NR_OP_DIV: r[c] = div(a[c], b[c]); break;
-            case core::NR_OP_MIN: r[c] = vmin(a[c], b[c]); break;
-            case core::NR_OP_MAX: r[c] = vmax(a[c], b[c]); break;
-            case core::NR_OP_FRC: r[c] = frc(a[c]); break;
-            case core::NR_OP_FLOOR: r[c] = floor_(a[c]); break;
-            case core::NR_OP_ITOF: r[c] = itof(a[c]); break;
-            case core::NR_OP_MOVC: r[c] = select(a[c], b[c], e[c]); break;
-            case core::NR_OP_LT: case core::NR_OP_GE: case core::NR_OP_EQ: case core::NR_OP_NE: r[c] = compare(a[c], b[c], op); break;
-            case core::NR_OP_IGE: r[c] = ige(a[c], b[c]); break;
-            case core::NR_OP_AND: r[c] = bitwise(a[c], b[c], false); break;
-            case core::NR_OP_OR: r[c] = bitwise(a[c], b[c], true); break;
-            case core::NR_OP_IADD: r[c] = iadd(a[c], b[c]); break;
+            case core::NR_OP_ADD: r[c] = lift2(a[c], b[c], add); break;
+            case core::NR_OP_MUL: r[c] = lift2(a[c], b[c], mul); break;
+            case core::NR_OP_MAD: r[c] = lift2(lift2(a[c], b[c], mul), e[c], add); break;
+            case core::NR_OP_DIV: r[c] = lift2(a[c], b[c], div); break;
+            case core::NR_OP_MIN: r[c] = lift2(a[c], b[c], vmin); break;
+            case core::NR_OP_MAX: r[c] = lift2(a[c], b[c], vmax); break;
+            case core::NR_OP_FRC: r[c] = lift1(a[c], frc); break;
+            case core::NR_OP_FLOOR: r[c] = lift1(a[c], floor_); break;
+            case core::NR_OP_ITOF: r[c] = lift1(a[c], itof); break;
+            case core::NR_OP_MOVC: {
+                // The condition's cases merge by pattern; an unknown mask in any case keeps both branches.
+                Val cond = a[c].alt ? join(cases(a[c])) : a[c].stripped(); if (a[c].alt && cond.set.empty()) cond = Val::any();
+                r[c] = lift2(b[c], e[c], [&](const Val &x, const Val &y) { return select(cond, x, y); }); break;
+            }
+            case core::NR_OP_LT: case core::NR_OP_GE: case core::NR_OP_EQ: case core::NR_OP_NE: r[c] = lift2(a[c], b[c], [&](const Val &x, const Val &y) { return compare(x, y, op); }); break;
+            case core::NR_OP_IGE: r[c] = lift2(a[c], b[c], ige); break;
+            case core::NR_OP_AND: r[c] = lift2(a[c], b[c], [](const Val &x, const Val &y) { return bitwise(x, y, false); }); break;
+            case core::NR_OP_OR: r[c] = lift2(a[c], b[c], [](const Val &x, const Val &y) { return bitwise(x, y, true); }); break;
+            case core::NR_OP_IADD: r[c] = lift2(a[c], b[c], iadd); break;
             default: r[c] = Val::any();
             }
         }
-        if (sat) for (auto &l : r) l = saturate(l);
+        if (sat) for (auto &l : r) l = lift1(l, saturate);
         if (trace_sink()) {
             std::fprintf(trace_sink(), "op%u -> %s%u.m%u:", op, dest_kind ? "o" : "r", dest_index, mask);
             for (unsigned c = 0; c < 4; ++c) { const auto &l = r[c]; if (!l.known) std::fprintf(trace_sink(), " [?]"); else { std::fprintf(trace_sink(), " [%.4g,%.4g|%.3g", l.lo, l.hi, l.c0); for (const auto &[s, k] : l.terms) std::fprintf(trace_sink(), "%+.3gs%u", k, s); std::fprintf(trace_sink(), "]"); } }
             std::fprintf(trace_sink(), "\n");
         }
+        if (in_loop) continue;   // loop-written values stay unknown
         if (dest_kind == 0 && dest_index < 16) for (unsigned c = 0; c < 4; ++c) if (mask & (1u << c)) temps[dest_index][c] = r[c];
+        if (dest_kind != 0 && dest_index == 0 && output) for (unsigned c = 0; c < 4; ++c) if (mask & (1u << c)) (*output)[c] = r[c];
     }
 }
+// True when every case of `v` is exactly zero.
+inline bool exactly_zero(const Val &v) { for (const auto &c : cases(v)) if (!c.known || c.lo != 0 || c.hi != 0) return false; return true; }
 }
 // Values each pixel-stage input register takes over `rect` for one triangle,
 // following the row shader's interpolation: constant, linear or perspective.
@@ -366,6 +474,8 @@ inline std::array<interval::Lanes, 8> varying_intervals(const LoweredProgram &pr
             const float q[3]{NR_V4_LANE(v[0]->varying[k], c), NR_V4_LANE(v[1]->varying[k], c), NR_V4_LANE(v[2]->varying[k], c)};
             if (!std::isfinite(q[0]) || !std::isfinite(q[1]) || !std::isfinite(q[2])) continue;
             if (mode == 1) { inputs[r][c] = interval::Val::form(q[0], 0, 0); continue; }
+            // Three zero vertex values interpolate to exactly zero (every product is zero), with no drift guard.
+            if (q[0] == 0.0f && q[1] == 0.0f && q[2] == 0.0f) { inputs[r][c] = interval::Val::exact(0); continue; }
             if (planar) {
                 // The varying is a plane over the triangle: an affine form in the pixel
                 // position, widened by the interpolation drift guard.
@@ -382,9 +492,37 @@ inline std::array<interval::Lanes, 8> varying_intervals(const LoweredProgram &pr
     }
     return inputs;
 }
-// Texel window of texture `t` over `rect` from interval evaluation of the pixel stage; empty when unbounded.
-inline bool interval_window(const LoweredProgram &program, const DrawPlan &plan, Rect rect, unsigned t, uint32_t tw, uint32_t th, bool point, Rect &out) {
-    double umin = 1e300, umax = -1e300, vmin = 1e300, vmax = -1e300; bool any = false;
+// Up to two texel windows of texture `t` over `rect` from interval evaluation of the
+// pixel stage. The sample boxes of every triangle and case are merged into one
+// rectangle, or two when a gap along one axis (a wrap seam) makes two rectangles
+// smaller than their hull. Returns false when a coordinate is unbounded.
+using Windows = std::array<Rect, 2>;
+inline Rect box_rect(const interval::Box &b, uint32_t tw, uint32_t th, bool point) {
+    auto clamp01 = [](double x) { return x < 0 ? 0.0 : (x > 1 ? 1.0 : x); };
+    const double half = point ? 0.0 : 0.5;
+    return {std::max(0, int32_t(std::floor(clamp01(b.umin) * double(tw) - half)) - 1), std::max(0, int32_t(std::floor(clamp01(b.vmin) * double(th) - half)) - 1),
+            std::min(int32_t(tw), int32_t(std::floor(clamp01(b.umax) * double(tw) - half)) + 3), std::min(int32_t(th), int32_t(std::floor(clamp01(b.vmax) * double(th) - half)) + 3)};
+}
+inline int64_t area(const Rect &r) { return r.empty() ? 0 : int64_t(r.x1 - r.x0) * int64_t(r.y1 - r.y0); }
+inline Windows merge_rects(std::vector<Rect> rects) {
+    rects.erase(std::remove_if(rects.begin(), rects.end(), [](const Rect &r) { return r.empty(); }), rects.end());
+    if (rects.empty()) return {Rect{0, 0, 0, 0}, Rect{0, 0, 0, 0}};
+    Rect hull = rects[0]; for (const auto &r : rects) hull = unite(hull, r);
+    Windows best{hull, Rect{0, 0, 0, 0}}; int64_t best_area = area(hull);
+    // Try splitting along the widest gap in x, then in y.
+    for (int axis = 0; axis < 2; ++axis) {
+        auto lo = [&](const Rect &r) { return axis ? r.y0 : r.x0; }; auto hi = [&](const Rect &r) { return axis ? r.y1 : r.x1; };
+        std::sort(rects.begin(), rects.end(), [&](const Rect &a, const Rect &b) { return lo(a) < lo(b); });
+        int32_t reach = hi(rects[0]); int32_t gap = 0; size_t cut = 0;
+        for (size_t n = 1; n < rects.size(); ++n) { if (lo(rects[n]) - reach > gap) { gap = lo(rects[n]) - reach; cut = n; } reach = std::max(reach, hi(rects[n])); }
+        if (!cut) continue;
+        Rect a = rects[0], b = rects[cut]; for (size_t n = 0; n < rects.size(); ++n) { if (n < cut) a = unite(a, rects[n]); else b = unite(b, rects[n]); }
+        if (area(a) + area(b) < best_area) { best = {a, b}; best_area = area(a) + area(b); }
+    }
+    return best;
+}
+inline bool interval_windows(const LoweredProgram &program, const DrawPlan &plan, Rect rect, unsigned t, uint32_t tw, uint32_t th, bool point, Windows &out) {
+    std::vector<Rect> rects;
     for (size_t first = 0; first + 2 < plan.projected.size(); first += 3) {
         const core::nr_projected *v[3]{&plan.projected[first], &plan.projected[first + 1], &plan.projected[first + 2]};
         const Rect bbox{int32_t(std::floor(std::min({v[0]->x, v[1]->x, v[2]->x}))), int32_t(std::floor(std::min({v[0]->y, v[1]->y, v[2]->y}))),
@@ -396,14 +534,29 @@ inline bool interval_window(const LoweredProgram &program, const DrawPlan &plan,
         const auto &w = windows[t];
         if (!w.any) continue;
         if (!w.bounded) return false;
-        umin = std::min(umin, w.umin); umax = std::max(umax, w.umax); vmin = std::min(vmin, w.vmin); vmax = std::max(vmax, w.vmax); any = true;
+        for (const auto &b : w.boxes) rects.push_back(box_rect(b, tw, th, point));
     }
-    if (!any) { out = {0, 0, 0, 0}; return true; }
-    auto clamp01 = [](double x) { return x < 0 ? 0.0 : (x > 1 ? 1.0 : x); };
-    const double half = point ? 0.0 : 0.5;
-    out = {std::max(0, int32_t(std::floor(clamp01(umin) * double(tw) - half)) - 1), std::max(0, int32_t(std::floor(clamp01(vmin) * double(th) - half)) - 1),
-           std::min(int32_t(tw), int32_t(std::floor(clamp01(umax) * double(tw) - half)) + 3), std::min(int32_t(th), int32_t(std::floor(clamp01(vmax) * double(th) - half)) + 3)};
+    out = merge_rects(rects);
     return true;
+}
+// True when the pixel stage writes exactly (0, 0, 0, 0) at every pixel of `rect`: under
+// source-over blending such a draw leaves the target untouched (0 * 255 + dst * (1 - 0) = dst).
+inline bool transparent_output(const LoweredProgram &program, const DrawPlan &plan, Rect rect) {
+    for (size_t first = 0; first + 2 < plan.projected.size(); first += 3) {
+        const core::nr_projected *v[3]{&plan.projected[first], &plan.projected[first + 1], &plan.projected[first + 2]};
+        const Rect bbox{int32_t(std::floor(std::min({v[0]->x, v[1]->x, v[2]->x}))), int32_t(std::floor(std::min({v[0]->y, v[1]->y, v[2]->y}))),
+                        int32_t(std::ceil(std::max({v[0]->x, v[1]->x, v[2]->x}))) + 1, int32_t(std::ceil(std::max({v[0]->y, v[1]->y, v[2]->y}))) + 1};
+        const Rect clipped = intersect(bbox, rect);
+        if (clipped.empty()) continue;
+        std::array<interval::Window, NR_FRAME_MAX_TEXTURES> windows{}; interval::Lanes output;
+        interval::evaluate(program, plan.constants, varying_intervals(program, plan, first, clipped), windows, &output);
+        for (const auto &l : output) if (!interval::exactly_zero(l)) return false;
+    }
+    return true;
+}
+inline bool interval_window(const LoweredProgram &program, const DrawPlan &plan, Rect rect, unsigned t, uint32_t tw, uint32_t th, bool point, Rect &out) {
+    Windows w; if (!interval_windows(program, plan, rect, t, tw, th, point, w)) return false;
+    out = unite(w[0], w[1]); return true;
 }
 // Projects a draw with the kernel's arithmetic and bounds its coverage and sampling.
 inline DrawPlan plan_draw(const LoweredProgram &program, const std::vector<uint32_t> &packed_vertices, uint32_t vertex_count,
@@ -475,6 +628,18 @@ inline DrawPlan plan_draw(const LoweredProgram &program, const std::vector<uint3
 // pixels): each triangle's varying is an affine plane over the screen when the
 // vertices share w, so its extremes lie on the corners of the clipped bounding
 // box. Falls back to the draw-wide window when a plane cannot be fitted.
+inline Rect texel_window(const LoweredProgram &program, const DrawPlan &plan, Rect rect, unsigned t, uint32_t tw, uint32_t th, bool point);
+// One or two texel windows for texture `t` over `rect`; the second is empty unless a seam splits the taps.
+inline Windows texel_windows(const LoweredProgram &program, const DrawPlan &plan, Rect rect, unsigned t, uint32_t tw, uint32_t th, bool point) {
+    if (plan.whole[t] || !tw || !th) return {Rect{0, 0, int32_t(tw), int32_t(th)}, Rect{0, 0, 0, 0}};
+    const auto sources = coordinate_sources(program); const auto &source = sources[t];
+    if (!source.direct || source.taps.empty()) {
+        Windows w;
+        if (interval_windows(program, plan, rect, t, tw, th, point, w)) return {intersect(w[0], plan.texels[t]), intersect(w[1], plan.texels[t])};
+        return {plan.texels[t], Rect{0, 0, 0, 0}};
+    }
+    return {texel_window(program, plan, rect, t, tw, th, point), Rect{0, 0, 0, 0}};
+}
 inline Rect texel_window(const LoweredProgram &program, const DrawPlan &plan, Rect rect, unsigned t, uint32_t tw, uint32_t th, bool point) {
     if (plan.whole[t] || !tw || !th) return {0, 0, int32_t(tw), int32_t(th)};
     const auto sources = coordinate_sources(program); const auto &source = sources[t];
@@ -537,8 +702,9 @@ inline size_t tile_span_bytes(const LoweredProgram &program, const DrawPlan &pla
     size_t bytes = NR_FRAME_HEADER_BYTES + NR_FRAME_COMMAND_BYTES + entry_bytes + 64 + size_t(vertex_words) * 4 + size_t(constant_words) * 4 + 4 + size_t(tile.x1 - tile.x0) * size_t(tile.y1 - tile.y0) * 4;
     if (clip.empty()) return bytes;
     for (size_t t = 0; t < program.texture_slots.size() && t < NR_FRAME_MAX_TEXTURES; ++t) {
-        const auto r = texel_window(program, plan, clip, unsigned(t), tw[t], th[t], point[t]);
-        bytes += NR_FRAME_WINDOW_BYTES + (r.empty() ? 4 : size_t(r.x1 - r.x0) * size_t(r.y1 - r.y0) * 4);
+        const auto w = texel_windows(program, plan, clip, unsigned(t), tw[t], th[t], point[t]);
+        bytes += NR_FRAME_WINDOW_BYTES + (w[0].empty() ? 4 : size_t(w[0].x1 - w[0].x0) * size_t(w[0].y1 - w[0].y0) * 4);
+        if (!w[1].empty()) bytes += NR_FRAME_WINDOW_BYTES + size_t(w[1].x1 - w[1].x0) * size_t(w[1].y1 - w[1].y0) * 4;
     }
     return bytes;
 }

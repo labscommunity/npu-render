@@ -133,6 +133,7 @@ void frame_batches_before_read(Allocation &a);
 void frame_batches_before_read(Allocation &a, const D3D10_DDI_BOX *box);
 bool frame_batch_writeback_active();
 void frame_batch_clear(Device &d, const std::shared_ptr<Allocation> &target, const nr::raster::Color &color);
+bool frame_batch_copy(Device &d, const std::shared_ptr<Allocation> &source, const std::shared_ptr<Allocation> &destination, const D3D10_DDI_BOX &region, uint32_t x, uint32_t y);
 extern std::vector<Device *> frame_devices;
 void reject(D3D10DDI_HDEVICE h, HRESULT status, const char *operation) {
     lab_trace("{\"event\":\"reject\",\"operation\":\"%s\",\"status\":\"%08lx\"}\n", operation, ULONG(status));
@@ -456,6 +457,8 @@ void APIENTRY map(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE r, UINT sub, D3D10_DDI_
             v.usage == D3D10_DDI_USAGE_DYNAMIC && v.map_flags == D3D10_DDI_CPU_ACCESS_WRITE;
         const bool do_not_wait=(flags & D3D10_DDI_MAP_FLAG_DONOTWAIT)!=0;
         require(staging || (discard && !do_not_wait));
+        // CPU access to a surface the open frame batch still writes or reads: settle the batch first.
+        if (!v.buffer_bytes) { if (wants_read) frame_batches_before_read(*allocation); if (wants_write) frame_batches_before_write(*allocation); }
         try {
             out->pData = allocation->lock(staging && wants_read && !wants_write,staging && wants_read && wants_write,do_not_wait);
         } catch(const Error &e) {

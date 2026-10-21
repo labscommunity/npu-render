@@ -17,6 +17,7 @@
 #include <bcrypt.h>
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <map>
 #include <string>
@@ -56,7 +57,7 @@ struct FrameBatcher {
     Device &d;
     nr::frame::NativeInventory inventory;
     bool flushing = false;
-    uint64_t flushes = 0, draws = 0, clears = 0, kernel_requests = 0, writeback_bytes = 0, upload_bytes = 0, snapshot_bytes = 0;
+    uint64_t flushes = 0, draws = 0, clears = 0, copies = 0, kernel_requests = 0, writeback_bytes = 0, upload_bytes = 0, snapshot_bytes = 0;
     double kernel_ms = 0, host_ms = 0;
     struct Lowered { std::shared_ptr<nr::frame::LoweredProgram> program; const nr::frame::NativeIdentity *identity = nullptr; };
     std::map<std::string, Lowered> lowered;
@@ -74,6 +75,11 @@ struct FrameBatcher {
     explicit FrameBatcher(Device &device) : d(device) {}
     bool referenced(const Allocation &a) const { for (const auto &r : resources) if (r.allocation.get() == &a) return true; return false; }
     bool pending(const Allocation &a) const { for (const auto &r : resources) if (r.allocation.get() == &a && r.target) return true; return false; }
+    // NR_RENDER_FRAME_BATCH_HAZARD_FLUSH=1 flushes before a draw samples a texture rendered earlier in the batch (the pre-2026-10-20 behaviour).
+    static bool hazard_flush_enabled() {
+        static const bool enabled = [] { char *v = nullptr; size_t n = 0; const bool on = !_dupenv_s(&v, &n, "NR_RENDER_FRAME_BATCH_HAZARD_FLUSH") && v && *v && *v != '0'; std::free(v); return on; }();
+        return enabled;
+    }
     // True when this batch still has to write pixels of `a` inside `box` (any pixels when box is null).
     bool pending_in(const Allocation &a, const D3D10_DDI_BOX *box) const {
         for (const auto &r : resources) {
@@ -147,15 +153,19 @@ struct FrameBatcher {
         for (UINT slot = 0; slot < 16; ++slot) {
             if (ps->samplers[slot]) {
                 const auto &samp = d.samplers[2][slot];
-                if (!samp.bound || !single_mip_filter_supported(UINT(samp.desc.Filter)) || samp.desc.AddressU != D3D10_DDI_TEXTURE_ADDRESS_CLAMP || samp.desc.AddressV != D3D10_DDI_TEXTURE_ADDRESS_CLAMP ||
-                    samp.desc.AddressW != D3D10_DDI_TEXTURE_ADDRESS_CLAMP || samp.desc.MipLODBias != 0 || samp.desc.MinLOD != 0 || samp.desc.MaxLOD < 0) {
+                auto address_ok = [](D3D10_DDI_TEXTURE_ADDRESS_MODE m) { return m == D3D10_DDI_TEXTURE_ADDRESS_CLAMP || m == D3D10_DDI_TEXTURE_ADDRESS_MIRROR; };
+                if (!samp.bound || !single_mip_filter_supported(UINT(samp.desc.Filter)) || !address_ok(samp.desc.AddressU) || !address_ok(samp.desc.AddressV) ||
+                    !address_ok(samp.desc.AddressW) || samp.desc.MipLODBias != 0 || samp.desc.MinLOD != 0 || samp.desc.MaxLOD < 0) {
                     char detail[160];
                     std::snprintf(detail, sizeof detail, "sampler state: slot %u bound %d filter %u address %u/%u/%u lod %g/%g/%g", slot, samp.bound ? 1 : 0, UINT(samp.desc.Filter),
                                   UINT(samp.desc.AddressU), UINT(samp.desc.AddressV), UINT(samp.desc.AddressW), double(samp.desc.MipLODBias), double(samp.desc.MinLOD), double(samp.desc.MaxLOD));
                     reason = detail + ps_id; return false;
                 }
                 samplers[slot].filter = single_mip_linear_filter(UINT(samp.desc.Filter)) ? nr::shader::TextureFilter::linear : nr::shader::TextureFilter::point;
+                samplers[slot].u = samp.desc.AddressU == D3D10_DDI_TEXTURE_ADDRESS_MIRROR ? nr::shader::TextureAddress::mirror : nr::shader::TextureAddress::clamp;
+                samplers[slot].v = samp.desc.AddressV == D3D10_DDI_TEXTURE_ADDRESS_MIRROR ? nr::shader::TextureAddress::mirror : nr::shader::TextureAddress::clamp;
                 key += samplers[slot].filter == nr::shader::TextureFilter::point ? "p" : "l";
+                key += samplers[slot].u == nr::shader::TextureAddress::mirror ? "m" : "c"; key += samplers[slot].v == nr::shader::TextureAddress::mirror ? "m" : "c";
             }
             if (!ps->textures[slot]) continue;
             const auto &view = d.shader_sources[2][slot];
@@ -203,9 +213,12 @@ struct FrameBatcher {
             reason = "span budget" + ps_id + " bounds=" + std::to_string(bounds.x1 - bounds.x0) + "x" + std::to_string(bounds.y1 - bounds.y0) + " vertices=" + std::to_string(inputs.size()) + texture_shapes + windows;
             return false;
         }
-        // A texture rendered earlier in this batch must be flushed first; so must an oversized batch.
+        // A texture rendered earlier in this batch is served in order by the worker (it fetches
+        // texel windows from its resident copy after the earlier runs executed), so the batch
+        // continues; NR_RENDER_FRAME_BATCH_HAZARD_FLUSH=1 restores a flush at each such read.
         bool hazard = false; for (const auto *use : ordered) hazard = hazard || pending(*use->allocation);
-        if (hazard) flush("hazard"); else if (commands.size() >= 1000 || bytes > 40u * 1024 * 1024) flush("limit");
+        if (hazard) { lab_trace("{\"event\":\"frame_batch_hazard_in_batch\",\"commands\":%zu}\n", commands.size()); if (hazard_flush_enabled()) flush("hazard"); }
+        if (commands.size() >= 1000 || bytes > 40u * 1024 * 1024) flush("limit");
         CommandEntry c; auto &r = c.record;
         r.kind = 0; r.target = resource_index(target, true);
         r.vertex_shader = shader_index(vs, 1); r.pixel_shader = shader_index(ps, 2);
@@ -217,6 +230,7 @@ struct FrameBatcher {
         r.texture_count = uint32_t(ordered.size()); r.legacy_abi = legacy_abi; r.legacy_flags = legacy_flags;
         for (size_t t = 0; t < ordered.size(); ++t) {
             fb::TextureBinding b; b.resource = resource_index(ordered[t]->allocation, false); b.filter = point[t] ? 1u : 0u;
+            b.address_u = uint32_t(samplers[program.sampler_slots[t]].u); b.address_v = uint32_t(samplers[program.sampler_slots[t]].v);
             c.bindings.push_back(b);
         }
         extend_pending(resources[r.target], bounds);
@@ -226,6 +240,17 @@ struct FrameBatcher {
         return true;
     }
     static void extend_pending(ResourceEntry &entry, const Rect &r) { if (!r.empty()) entry.pending.push_back(r); }
+    // Records a region copy between two allocations the worker holds; the destination
+    // becomes a pending target whose pixels return with the batch.
+    void record_copy(const std::shared_ptr<Allocation> &source, const std::shared_ptr<Allocation> &destination, const D3D10_DDI_BOX &region, uint32_t x, uint32_t y) {
+        if (commands.size() >= 1000 || bytes > 40u * 1024 * 1024) flush("limit");
+        CommandEntry c; c.record.kind = 2; c.record.target = resource_index(destination, true);
+        frame_batch_detail::fb::TextureBinding binding; binding.resource = resource_index(source, false); c.bindings.push_back(binding); c.record.texture_count = 1;
+        c.record.scissor[0] = region.left; c.record.scissor[1] = region.top; c.record.scissor[2] = region.right; c.record.scissor[3] = region.bottom; c.record.scissor_enabled = 1;
+        c.record.viewport[0] = float(x); c.record.viewport[1] = float(y);
+        extend_pending(resources[c.record.target], {int32_t(x), int32_t(y), int32_t(x) + (region.right - region.left), int32_t(y) + (region.bottom - region.top)});
+        bytes += sizeof(frame_batch_detail::fb::CommandRecord) + sizeof(frame_batch_detail::fb::TextureBinding); commands.push_back(std::move(c)); ++copies;
+    }
     void record_clear(const std::shared_ptr<Allocation> &target, const nr::raster::Color &color) {
         if (commands.size() >= 1000 || bytes > 40u * 1024 * 1024) flush("limit");
         CommandEntry c; c.record.kind = 1; c.record.target = resource_index(target, true);
@@ -318,6 +343,13 @@ void flush_frame_batches(Device &d, const char *reason) { if (d.batcher) d.batch
 void frame_batches_before_write(Allocation &a) { for (auto *dev : frame_devices) if (dev->batcher && !dev->batcher->flushing && dev->batcher->referenced(a)) dev->batcher->flush("write"); }
 void frame_batches_before_read(Allocation &a, const D3D10_DDI_BOX *box) { for (auto *dev : frame_devices) if (dev->batcher && !dev->batcher->flushing && dev->batcher->pending_in(a, box)) dev->batcher->flush(box ? "read_region" : "read"); }
 void frame_batches_before_read(Allocation &a) { frame_batches_before_read(a, nullptr); }
+// A region copy whose source has pending batch results joins the batch instead of forcing a flush.
+bool frame_batch_copy(Device &d, const std::shared_ptr<Allocation> &source, const std::shared_ptr<Allocation> &destination, const D3D10_DDI_BOX &region, uint32_t x, uint32_t y) {
+    if (!d.batcher || d.batcher->flushing || !d.batcher->pending_in(*source, &region)) return false;
+    if (source->surface.format != destination->surface.format || source->surface.format == 65) return false;
+    d.batcher->record_copy(source, destination, region, x, y);
+    return true;
+}
 void frame_batch_clear(Device &d, const std::shared_ptr<Allocation> &target, const nr::raster::Color &color) {
     if (!d.batcher) d.batcher = std::make_shared<FrameBatcher>(d);
     d.batcher->record_clear(target, color);

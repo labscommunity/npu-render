@@ -26,7 +26,8 @@
  *       constants_offset; vertex-stage float4s then pixel-stage float4s, counts from the program)
  *   72  viewport x,y,w,h f32    88  depth min,max f32
  *   96  textures[4]: u32 (window index | sampler bits << 16); window 0xffff = none
- *   112 reserved
+ *   112 textures2[4]: u32 second window index of the same texture (0xffff = none); a tap
+ *       outside the first window is served from the second before it counts as an escape
  * Program entry (NR_FRAME_PROGRAM_BYTES header at a 16-aligned offset, then data):
  *   0   native index (frame_programs.h)   4 vs_input_mask   8 ps_input_mask (varying registers)
  *   12  position_output   16 interpolation (4 bits per PS input register 0..7)   20 varying_count
@@ -80,7 +81,7 @@
 enum {
     NR_OP_MOV = 0, NR_OP_ADD, NR_OP_MUL, NR_OP_MAD, NR_OP_DIV, NR_OP_MIN, NR_OP_MAX, NR_OP_DP2, NR_OP_DP3, NR_OP_DP4,
     NR_OP_FRC, NR_OP_FLOOR, NR_OP_RSQ, NR_OP_MOVC, NR_OP_LT, NR_OP_GE, NR_OP_EQ, NR_OP_NE, NR_OP_AND, NR_OP_OR,
-    NR_OP_IADD, NR_OP_ITOF, NR_OP_FTOI, NR_OP_IGE, NR_OP_IMAD, NR_OP_ISHL, NR_OP_ISHR, NR_OP_USHR, NR_OP_SAMPLE,
+    NR_OP_IADD, NR_OP_ITOF, NR_OP_FTOI, NR_OP_IGE, NR_OP_IMAD, NR_OP_ISHL, NR_OP_ISHR, NR_OP_USHR, NR_OP_SAMPLE, NR_OP_DDX, NR_OP_DDY, NR_OP_LOOP, NR_OP_BREAKC, NR_OP_ENDLOOP,
     NR_OP_COUNT
 };
 enum { NR_STATUS_OK = 0, NR_STATUS_HEADER = 1, NR_STATUS_COMMAND = 2, NR_STATUS_PROGRAM = 3, NR_STATUS_VERTEX = 4,
@@ -152,7 +153,7 @@ NR_INLINE nr_v4 nr_uv4_asf(nr_uv4 a) { return (nr_v4)a; }
 NR_INLINE nr_v4 nr_v4_add(nr_v4 a, nr_v4 b) { return a + b; }
 NR_INLINE nr_v4 nr_v4_sub(nr_v4 a, nr_v4 b) { return a - b; }
 NR_INLINE nr_v4 nr_v4_mul(nr_v4 a, nr_v4 b) { return a * b; }
-NR_INLINE nr_v4 nr_v4_div(nr_v4 a, nr_v4 b) { return a / b; }
+NR_INLINE nr_v4 nr_v4_div_raw(nr_v4 a, nr_v4 b) { return a / b; }
 NR_INLINE nr_uv4 nr_uv4_and(nr_uv4 a, nr_uv4 b) { return a & b; }
 NR_INLINE nr_uv4 nr_uv4_or(nr_uv4 a, nr_uv4 b) { return a | b; }
 NR_INLINE nr_uv4 nr_uv4_xor(nr_uv4 a, nr_uv4 b) { return a ^ b; }
@@ -192,7 +193,7 @@ NR_INLINE nr_v4 nr_uv4_asf(nr_uv4 a) { return nr_v4_make(nr_float(a.v[0]), nr_fl
 NR_V4_OP(nr_v4_add, nr_v4, a.v[i] + b.v[i])
 NR_V4_OP(nr_v4_sub, nr_v4, a.v[i] - b.v[i])
 NR_V4_OP(nr_v4_mul, nr_v4, a.v[i] * b.v[i])
-NR_V4_OP(nr_v4_div, nr_v4, a.v[i] / b.v[i])
+NR_V4_OP(nr_v4_div_raw, nr_v4, a.v[i] / b.v[i])
 NR_V4_OP(nr_uv4_and, nr_uv4, a.v[i] & b.v[i])
 NR_V4_OP(nr_uv4_or, nr_uv4, a.v[i] | b.v[i])
 NR_V4_OP(nr_uv4_xor, nr_uv4, a.v[i] ^ b.v[i])
@@ -234,6 +235,17 @@ NR_INLINE nr_v4 nr_v4_abs(nr_v4 a) { return nr_uv4_asf(nr_uv4_and(nr_v4_asu(a), 
 NR_INLINE nr_v4 nr_v4_neg(nr_v4 a) { return nr_uv4_asf(nr_uv4_xor(nr_v4_asu(a), nr_uv4_splat(0x80000000u))); }
 NR_INLINE nr_v4 nr_v4_ineg(nr_v4 a) { return nr_uv4_asf(nr_uv4_sub(nr_uv4_splat(0u), nr_v4_asu(a))); }
 NR_INLINE nr_uv4 nr_v4_isnan(nr_v4 a) { return nr_uv4_gt(nr_uv4_and(nr_v4_asu(a), nr_uv4_splat(0x7fffffffu)), nr_uv4_splat(0x7f800000u)); }
+/* IEEE/SM4 division whatever the target's divider does at the edges: x / 0 is an infinity
+ * with the quotient's sign, 0 / 0 and a NaN operand give NaN. Out of line: one copy per blob. */
+NR_HELPER_ATTR nr_v4 nr_v4_div(nr_v4 a, nr_v4 b) {
+    nr_v4 q = nr_v4_div_raw(a, b);
+    nr_uv4 mag_mask = nr_uv4_splat(0x7fffffffu), zero = nr_uv4_splat(0u);
+    nr_uv4 b_zero = nr_uv4_eq(nr_uv4_and(nr_v4_asu(b), mag_mask), zero), a_zero = nr_uv4_eq(nr_uv4_and(nr_v4_asu(a), mag_mask), zero);
+    nr_uv4 nan = nr_uv4_or(nr_uv4_or(nr_v4_isnan(a), nr_v4_isnan(b)), nr_uv4_and(b_zero, a_zero));
+    nr_uv4 inf = nr_uv4_or(nr_uv4_and(nr_uv4_xor(nr_v4_asu(a), nr_v4_asu(b)), nr_uv4_splat(0x80000000u)), nr_uv4_splat(0x7f800000u));
+    nr_uv4 bits = nr_uv4_sel(b_zero, inf, nr_v4_asu(q));
+    return nr_uv4_asf(nr_uv4_sel(nan, nr_uv4_splat(0x7fc00000u), bits));
+}
 NR_INLINE nr_uv4 nr_v4_issubnormal(nr_v4 a) {
     nr_uv4 m = nr_uv4_and(nr_v4_asu(a), nr_uv4_splat(0x7fffffffu));
     return nr_uv4_and(nr_uv4_lt(m, nr_uv4_splat(0x00800000u)), nr_uv4_not(nr_uv4_eq(m, nr_uv4_splat(0u))));
@@ -255,8 +267,9 @@ NR_INLINE nr_v4 nr_v4_clamp01_fast(nr_v4 a) {
     bits = nr_uv4_sel(nr_uv4_gt(bits, nr_uv4_splat(0x3f800000u)), nr_uv4_splat(0x3f800000u), bits);
     return nr_uv4_asf(nr_uv4_and(bits, nr_uv4_not(bad)));
 }
-NR_HELPER_ATTR nr_v4 nr_v4_min(nr_v4 a, nr_v4 b) { return nr_v4_sel(nr_v4_isnan(b), a, nr_v4_sel(nr_v4_lt(a, b), a, b)); }
-NR_HELPER_ATTR nr_v4 nr_v4_max(nr_v4 a, nr_v4 b) { return nr_v4_sel(nr_v4_isnan(b), a, nr_v4_sel(nr_v4_lt(a, b), b, a)); }
+/* SM4 min/max: a NaN operand yields the other operand (both NaN yields NaN). */
+NR_HELPER_ATTR nr_v4 nr_v4_min(nr_v4 a, nr_v4 b) { return nr_v4_sel(nr_v4_isnan(a), b, nr_v4_sel(nr_v4_isnan(b), a, nr_v4_sel(nr_v4_lt(a, b), a, b))); }
+NR_HELPER_ATTR nr_v4 nr_v4_max(nr_v4 a, nr_v4 b) { return nr_v4_sel(nr_v4_isnan(a), b, nr_v4_sel(nr_v4_isnan(b), a, nr_v4_sel(nr_v4_lt(a, b), b, a))); }
 NR_HELPER_ATTR nr_v4 nr_v4_floor(nr_v4 a) {
     nr_uv4 mag = nr_uv4_and(nr_v4_asu(a), nr_uv4_splat(0x7fffffffu));
     nr_uv4 tiny = nr_uv4_lt(mag, nr_uv4_splat(0x00800000u)), big = nr_uv4_or(nr_uv4_gt(mag, nr_uv4_splat(0x4affffffu)), nr_uv4_eq(mag, nr_uv4_splat(0x4b000000u)));
@@ -266,16 +279,28 @@ NR_HELPER_ATTR nr_v4 nr_v4_floor(nr_v4 a) {
     return nr_v4_sel(tiny, nr_uv4_asf(nr_uv4_and(nr_v4_asu(a), nr_uv4_splat(0x80000000u))), b);
 }
 NR_HELPER_ATTR nr_v4 nr_v4_frc(nr_v4 a) { return nr_v4_sel(nr_v4_issubnormal(a), nr_v4_zero(), nr_v4_sub(a, nr_v4_floor(a))); }
+/* SM4 mirror addressing on a normalised coordinate: reflect at every integer so [0, 1] maps onto
+ * itself and odd cells reverse; equivalent to mirroring the integer taps (the reference's method)
+ * because the edge taps of the reduced coordinate coincide with the clamped ones. */
+NR_HELPER_ATTR nr_f32 nr_mirror01(nr_f32 t) {   /* out of line: sampling sites stay small */
+    nr_f32 m;
+    if (!nr_finite(t)) return t;
+    m = t - 2.0f * NR_V4_LANE(nr_v4_floor(nr_v4_splat(t * 0.5f)), 0);
+    return m > 1.0f ? 2.0f - m : m;
+}
 #ifdef __clang__
 NR_INLINE nr_v4 nr_v4_itof(nr_v4 a) { return nr_iv4_to_f((nr_iv4)a); }
 #else
 NR_INLINE nr_v4 nr_v4_itof(nr_v4 a) { nr_v4 r; nr_u32 i; for (i = 0; i < 4; ++i) r.v[i] = (nr_f32)(nr_i32)nr_bits(a.v[i]); return r; }
 #endif
 NR_HELPER_ATTR nr_v4 nr_v4_movc(nr_v4 a, nr_v4 b, nr_v4 e) { return nr_v4_sel(nr_uv4_not(nr_uv4_eq(nr_v4_asu(a), nr_uv4_splat(0u))), b, e); }
-NR_HELPER_ATTR nr_v4 nr_v4_cmp_lt(nr_v4 a, nr_v4 b) { return nr_uv4_asf(nr_v4_lt(a, b)); }
-NR_HELPER_ATTR nr_v4 nr_v4_cmp_ge(nr_v4 a, nr_v4 b) { return nr_uv4_asf(nr_v4_ge(nr_v4_flush(a), nr_v4_flush(b))); }
-NR_HELPER_ATTR nr_v4 nr_v4_cmp_eq(nr_v4 a, nr_v4 b) { return nr_uv4_asf(nr_v4_eq(nr_v4_flush(a), nr_v4_flush(b))); }
-NR_HELPER_ATTR nr_v4 nr_v4_cmp_ne(nr_v4 a, nr_v4 b) { return nr_uv4_asf(nr_v4_ne(nr_v4_flush(a), nr_v4_flush(b))); }
+/* SM4 comparisons are IEEE ordered: a NaN operand makes lt/ge/eq false and ne true, whatever
+ * the target's compare instruction does with unordered lanes. */
+NR_INLINE nr_uv4 nr_v4_unordered(nr_v4 a, nr_v4 b) { return nr_uv4_or(nr_v4_isnan(a), nr_v4_isnan(b)); }
+NR_HELPER_ATTR nr_v4 nr_v4_cmp_lt(nr_v4 a, nr_v4 b) { return nr_uv4_asf(nr_uv4_and(nr_v4_lt(a, b), nr_uv4_not(nr_v4_unordered(a, b)))); }
+NR_HELPER_ATTR nr_v4 nr_v4_cmp_ge(nr_v4 a, nr_v4 b) { return nr_uv4_asf(nr_uv4_and(nr_v4_ge(nr_v4_flush(a), nr_v4_flush(b)), nr_uv4_not(nr_v4_unordered(a, b)))); }
+NR_HELPER_ATTR nr_v4 nr_v4_cmp_eq(nr_v4 a, nr_v4 b) { return nr_uv4_asf(nr_uv4_and(nr_v4_eq(nr_v4_flush(a), nr_v4_flush(b)), nr_uv4_not(nr_v4_unordered(a, b)))); }
+NR_HELPER_ATTR nr_v4 nr_v4_cmp_ne(nr_v4 a, nr_v4 b) { return nr_uv4_asf(nr_uv4_or(nr_v4_ne(nr_v4_flush(a), nr_v4_flush(b)), nr_v4_unordered(a, b))); }
 NR_HELPER_ATTR nr_v4 nr_v4_cmp_ige(nr_v4 a, nr_v4 b) { return nr_uv4_asf(nr_iv4_ge(nr_v4_asu(a), nr_v4_asu(b))); }
 /* Ordered dot products: left to right, no contraction. */
 NR_HELPER_ATTR nr_v4 nr_v4_dp(nr_v4 a, nr_v4 b, nr_u32 n) {
@@ -302,22 +327,25 @@ typedef struct {
     nr_i32 clip[4];
     nr_u32 blend_mode, write_mask, cull, front_ccw, fill_color, constants_offset;
     nr_f32 blend_constant[4], viewport[4], depth[2];
-    nr_u32 textures[4];
+    nr_u32 textures[4]; nr_u32 textures2[4];
 } nr_command;
 typedef struct {
     const nr_u8 *data; nr_u8 *output;
     nr_u32 tile_x, tile_y, tile_w, tile_h, format, command_count, commands_offset, programs_offset, program_count;
     nr_u32 vertices_offset, vertices_bytes, atlas_offset, atlas_bytes, background_offset, constants_offset, constants_bytes, window_count;
-    nr_u32 covered, escapes;
+    nr_u32 covered, escapes, loop_overflows;   /* loop_overflows: shader loops stopped at the iteration budget */
 } nr_span;
 /* Shader stage registers: inputs, outputs and the stage's flat constant and immediate tables. */
-typedef struct { nr_v4 in[16], out[8]; const nr_u8 *constants, *immediates; nr_u32 *escapes; } nr_shade;
+typedef struct { nr_v4 in[16], out[8], dx[8], dy[8]; const nr_u8 *constants, *immediates; nr_u32 *escapes, *overflows; } nr_shade;   /* dx/dy: screen derivatives of inputs 0..7 for stage evaluation */
 typedef struct { nr_i32 sx, sy; nr_f32 x, y, inverse_w; nr_v4 varying[NR_FRAME_MAX_VARYINGS]; } nr_projected;
 /* Per-command state resolved once: texture windows, blend factors, constants, vertex stride. */
 typedef struct {
     const nr_u8 *window_data[NR_FRAME_MAX_TEXTURES];
     nr_u32 window_w[NR_FRAME_MAX_TEXTURES], window_h[NR_FRAME_MAX_TEXTURES], origin_x[NR_FRAME_MAX_TEXTURES], origin_y[NR_FRAME_MAX_TEXTURES];
+    const nr_u8 *window2_data[NR_FRAME_MAX_TEXTURES];                     /* optional second window of the same texture */
+    nr_u32 window2_w[NR_FRAME_MAX_TEXTURES], window2_h[NR_FRAME_MAX_TEXTURES], origin2_x[NR_FRAME_MAX_TEXTURES], origin2_y[NR_FRAME_MAX_TEXTURES], bound2[NR_FRAME_MAX_TEXTURES];
     nr_u32 texture_w[NR_FRAME_MAX_TEXTURES], texture_h[NR_FRAME_MAX_TEXTURES], format[NR_FRAME_MAX_TEXTURES], point[NR_FRAME_MAX_TEXTURES], bound[NR_FRAME_MAX_TEXTURES];
+    nr_u32 mirror_u[NR_FRAME_MAX_TEXTURES], mirror_v[NR_FRAME_MAX_TEXTURES];                /* SM4 mirror addressing per axis */
     nr_f32 half[NR_FRAME_MAX_TEXTURES], lerp[NR_FRAME_MAX_TEXTURES];     /* 0.5/1 bilinear, 0/0 point */
     nr_uv4 swap_mask_texture[NR_FRAME_MAX_TEXTURES];                      /* all ones for BGRA windows */
     nr_u32 source_factor, destination_factor, mode, mask_bytes[4], byte_lane[4];
@@ -330,20 +358,34 @@ typedef struct {
 } nr_command_state;
 /* One scanline of one triangle handed to a generated row shader. */
 typedef struct {
-    const nr_command_state *st; const nr_projected *v; nr_u8 *pixels; nr_u32 *escapes;
+    const nr_command_state *st; const nr_projected *v; nr_u8 *pixels; nr_u32 *escapes, *overflows;
     const nr_u8 *constants, *immediates;
-    nr_i32 count; nr_f32 wgt[3], dwgt[3];
+    nr_i32 count; nr_f32 wgt[3], dwgt[3], dwgt_y[3];   /* edge weights at the row start and their x and y steps */
 } nr_row;
 
 NR_INLINE nr_i32 nr_region(nr_u32 offset, nr_u32 bytes) {
     return offset <= NR_FRAME_SPAN && bytes <= NR_FRAME_SPAN - offset && !(offset & 3u);
 }
-/* Bilinear or point sample of a texture window, branch-free. Taps outside the
- * host-packed window clamp to its edge and count as escapes. */
+/* Address of one texel tap: the first window, else the second window of the same
+ * texture, else the nearest texel of the first window counted as an escape. */
+NR_HELPER_ATTR const nr_u8 *nr_tap(const nr_command_state *st, nr_u32 t, nr_i32 x, nr_i32 y, nr_u32 *escapes) {
+    nr_i32 rx = x - (nr_i32)st->origin_x[t], ry = y - (nr_i32)st->origin_y[t];
+    nr_u32 ww = st->window_w[t], wh = st->window_h[t];
+    if (rx >= 0 && ry >= 0 && rx < (nr_i32)ww && ry < (nr_i32)wh) return st->window_data[t] + ((nr_u32)ry * ww + (nr_u32)rx) * 4;
+    if (st->bound2[t]) {
+        nr_i32 bx = x - (nr_i32)st->origin2_x[t], by = y - (nr_i32)st->origin2_y[t];
+        if (bx >= 0 && by >= 0 && bx < (nr_i32)st->window2_w[t] && by < (nr_i32)st->window2_h[t]) return st->window2_data[t] + ((nr_u32)by * st->window2_w[t] + (nr_u32)bx) * 4;
+    }
+    *escapes += 1u;
+    rx = rx < 0 ? 0 : (rx >= (nr_i32)ww ? (nr_i32)ww - 1 : rx); ry = ry < 0 ? 0 : (ry >= (nr_i32)wh ? (nr_i32)wh - 1 : ry);
+    return st->window_data[t] + ((nr_u32)ry * ww + (nr_u32)rx) * 4;
+}
+/* Bilinear or point sample of a texture: taps are served from one of up to two
+ * host-packed windows; a tap outside both clamps to the first and counts as an escape. */
 NR_SAMPLE_ATTR nr_v4 nr_sample(const nr_command_state *st, nr_u32 texture, nr_u32 u_bits, nr_u32 v_bits, nr_u32 *escapes) {
     nr_f32 tw = (nr_f32)st->texture_w[texture], th = (nr_f32)st->texture_h[texture], half = st->half[texture], lerp = st->lerp[texture];
-    nr_f32 u = NR_V4_LANE(nr_v4_clamp01_fast(nr_v4_splat(nr_float(u_bits))), 0) * tw - half;
-    nr_f32 v = NR_V4_LANE(nr_v4_clamp01_fast(nr_v4_splat(nr_float(v_bits))), 0) * th - half;
+    nr_f32 u = NR_V4_LANE(nr_v4_clamp01_fast(nr_v4_splat(st->mirror_u[texture] ? nr_mirror01(nr_float(u_bits)) : nr_float(u_bits))), 0) * tw - half;
+    nr_f32 v = NR_V4_LANE(nr_v4_clamp01_fast(nr_v4_splat(st->mirror_v[texture] ? nr_mirror01(nr_float(v_bits)) : nr_float(v_bits))), 0) * th - half;
     nr_f32 xmax = tw - 1.0f, ymax = th - 1.0f, x, y, tx, ty;
     nr_u32 ix, iy, jx, jy, ww = st->window_w[texture], wh = st->window_h[texture];
     nr_i32 ox = (nr_i32)st->origin_x[texture], oy = (nr_i32)st->origin_y[texture], rx0, rx1, ry0, ry1, miss;
@@ -355,17 +397,16 @@ NR_SAMPLE_ATTR nr_v4 nr_sample(const nr_command_state *st, nr_u32 texture, nr_u3
     ix = (nr_u32)x; iy = (nr_u32)y;
     jx = ix + ((ix + 1u < st->texture_w[texture]) & (lerp != 0.0f)); jy = iy + ((iy + 1u < st->texture_h[texture]) & (lerp != 0.0f));
     tx = (x - (nr_f32)ix) * lerp; ty = (y - (nr_f32)iy) * lerp;
-    rx0 = (nr_i32)ix - ox; rx1 = (nr_i32)jx - ox; ry0 = (nr_i32)iy - oy; ry1 = (nr_i32)jy - oy;
-    miss = (rx0 < 0) | (rx0 >= (nr_i32)ww) | (rx1 < 0) | (rx1 >= (nr_i32)ww) | (ry0 < 0) | (ry0 >= (nr_i32)wh) | (ry1 < 0) | (ry1 >= (nr_i32)wh);
-    *escapes += (nr_u32)miss;
-    rx0 = rx0 < 0 ? 0 : (rx0 >= (nr_i32)ww ? (nr_i32)ww - 1 : rx0); rx1 = rx1 < 0 ? 0 : (rx1 >= (nr_i32)ww ? (nr_i32)ww - 1 : rx1);
-    ry0 = ry0 < 0 ? 0 : (ry0 >= (nr_i32)wh ? (nr_i32)wh - 1 : ry0); ry1 = ry1 < 0 ? 0 : (ry1 >= (nr_i32)wh ? (nr_i32)wh - 1 : ry1);
-#define NR_TAP(rx, ry) nr_v4_mul(nr_uv4_to_f(nr_uv4_and(nr_uv4_shr(nr_uv4_splat(nr_ld(window + ((nr_u32)(ry) * ww + (nr_u32)(rx)) * 4)), shifts), ff)), scale)
-    t0 = NR_TAP(rx0, ry0);
+    (void)rx0; (void)rx1; (void)ry0; (void)ry1; (void)miss;
+    /* Taps inside the first window take the inline path; the second window and escapes go through nr_tap. */
+#define NR_TAP_PTR(x, y) (((nr_u32)((nr_i32)(x) - ox) < ww && (nr_u32)((nr_i32)(y) - oy) < wh) ? window + ((nr_u32)((nr_i32)(y) - oy) * ww + (nr_u32)((nr_i32)(x) - ox)) * 4 : nr_tap(st, texture, (nr_i32)(x), (nr_i32)(y), escapes))
+#define NR_TAP(x, y) nr_v4_mul(nr_uv4_to_f(nr_uv4_and(nr_uv4_shr(nr_uv4_splat(nr_ld(NR_TAP_PTR(x, y))), shifts), ff)), scale)
+    t0 = NR_TAP(ix, iy);
     /* Point filtering and texel-aligned blits weight the other three taps by zero: one load. */
     if (tx == 0.0f && ty == 0.0f) return nr_v4_sel(swap, NR_V4_SWZ(t0, 2, 1, 0, 3), t0);
-    t1 = NR_TAP(rx1, ry0); t2 = NR_TAP(rx0, ry1); t3 = NR_TAP(rx1, ry1);
+    t1 = NR_TAP(jx, iy); t2 = NR_TAP(ix, jy); t3 = NR_TAP(jx, jy);
 #undef NR_TAP
+#undef NR_TAP_PTR
     t0 = nr_v4_sel(swap, NR_V4_SWZ(t0, 2, 1, 0, 3), t0); t1 = nr_v4_sel(swap, NR_V4_SWZ(t1, 2, 1, 0, 3), t1);
     t2 = nr_v4_sel(swap, NR_V4_SWZ(t2, 2, 1, 0, 3), t2); t3 = nr_v4_sel(swap, NR_V4_SWZ(t3, 2, 1, 0, 3), t3);
     one_tx = nr_v4_splat(1.0f - tx); one_ty = nr_v4_splat(1.0f - ty);
@@ -498,7 +539,7 @@ NR_EXECUTE_ATTR nr_i32 nr_draw_triangle(nr_span *s, const nr_command *cmd, const
         top_left[n] = sign > 0 ? top : reverse;
         step[n] = nr_shl64((nr_i64)(-dy), 8); if (sign < 0) step[n] = -step[n];
     }
-    row.st = st; row.v = v; row.escapes = &s->escapes; row.constants = st->ps_constants; row.immediates = p->ps_immediates;
+    row.st = st; row.v = v; row.escapes = &s->escapes; row.overflows = &s->loop_overflows; row.constants = st->ps_constants; row.immediates = p->ps_immediates;
     for (py = y0; py < y1; ++py) {
         nr_i32 cy = ((nr_i32)s->tile_y + py) * 256 + 128, cx0 = ((nr_i32)s->tile_x + x0) * 256 + 128, xs = x0, xe = x1;
         nr_f32 sy = (nr_f32)cy * (1.0f / 256.0f);
@@ -514,7 +555,7 @@ NR_EXECUTE_ATTR nr_i32 nr_draw_triangle(nr_span *s, const nr_command *cmd, const
             nr_i32 b = (n + 1) % 3, c2 = (n + 2) % 3;
             nr_f32 sx = (nr_f32)(((nr_i32)s->tile_x + xs) * 256 + 128) * (1.0f / 256.0f);
             row.wgt[n] = nr_weight(v[b].x, v[b].y, v[c2].x, v[c2].y, sx, sy);
-            row.dwgt[n] = v[b].y - v[c2].y;
+            row.dwgt[n] = v[b].y - v[c2].y; row.dwgt_y[n] = v[c2].x - v[b].x;
         }
         s->covered += (nr_u32)(xe - xs);
         row.pixels = s->output + NR_FRAME_OUTPUT_PIXELS + ((nr_u32)py * s->tile_w + (nr_u32)xs) * 4;
@@ -532,14 +573,14 @@ NR_NOINLINE nr_i32 nr_command_load(const nr_span *s, nr_u32 index, nr_command *c
     cmd->fill_color = nr_ld(c + 64); cmd->constants_offset = nr_ld(c + 68);
     for (n = 0; n < 4; ++n) cmd->viewport[n] = nr_float(nr_ld(c + 72 + n * 4));
     cmd->depth[0] = nr_float(nr_ld(c + 88)); cmd->depth[1] = nr_float(nr_ld(c + 92));
-    for (n = 0; n < 4; ++n) cmd->textures[n] = nr_ld(c + 96 + n * 4);
+    for (n = 0; n < 4; ++n) { cmd->textures[n] = nr_ld(c + 96 + n * 4); cmd->textures2[n] = nr_ld(c + 112 + n * 4); }
     if (cmd->kind > 1 || cmd->blend_mode > 13 || !cmd->write_mask || cmd->write_mask > 15 || cmd->cull > 2 || cmd->front_ccw > 1) return 0;
     if (cmd->clip[0] < 0 || cmd->clip[1] < 0 || cmd->clip[0] > cmd->clip[2] || cmd->clip[1] > cmd->clip[3] ||
         cmd->clip[2] > (nr_i32)s->tile_w || cmd->clip[3] > (nr_i32)s->tile_h) return 0;
-    for (n = 112; n < NR_FRAME_COMMAND_BYTES; n += 4) if (nr_ld(c + n)) return 0;
     for (n = 0; n < 4; ++n) {
         if (!nr_finite(cmd->blend_constant[n]) || !nr_finite(cmd->viewport[n])) return 0;
-        if ((cmd->textures[n] >> 17) || ((cmd->textures[n] & 0xffffu) != NR_FRAME_NO_WINDOW && (cmd->textures[n] & 0xffffu) >= s->window_count)) return 0;
+        if ((cmd->textures[n] >> 19) || ((cmd->textures[n] & 0xffffu) != NR_FRAME_NO_WINDOW && (cmd->textures[n] & 0xffffu) >= s->window_count)) return 0;
+        if ((cmd->textures2[n] >> 16) || (cmd->textures2[n] != NR_FRAME_NO_WINDOW && (cmd->textures2[n] >= s->window_count || (cmd->textures[n] & 0xffffu) == NR_FRAME_NO_WINDOW))) return 0;
     }
     if (cmd->kind == 0) {
         if (!cmd->vertex_count || cmd->vertex_count % 3 || cmd->vertex_count > 4095 || (cmd->vertex_offset & 15u) || (cmd->constants_offset & 15u) ||
@@ -578,25 +619,34 @@ NR_NOINLINE nr_i32 nr_command_state_load(const nr_span *s, const nr_command *cmd
     st->byte_shifts = nr_uv4_make(0u, 8u, 16u, 24u);
     for (n = 0; n < NR_FRAME_MAX_TEXTURES; ++n) {
         nr_u32 binding = cmd->textures[n], index = binding & 0xffffu; const nr_u8 *rec;
-        st->bound[n] = index != NR_FRAME_NO_WINDOW; st->point[n] = (binding >> 16) & 1u;
+        st->bound[n] = index != NR_FRAME_NO_WINDOW; st->point[n] = (binding >> 16) & 1u; st->mirror_u[n] = (binding >> 17) & 1u; st->mirror_v[n] = (binding >> 18) & 1u;
         st->half[n] = st->point[n] ? 0.0f : 0.5f; st->lerp[n] = st->point[n] ? 0.0f : 1.0f;
         if (!st->bound[n]) {
             if (n < p->texture_count) return 0;     /* the program samples an unbound texture */
             st->window_data[n] = s->data; st->window_w[n] = st->window_h[n] = 1; st->origin_x[n] = st->origin_y[n] = 0; st->texture_w[n] = st->texture_h[n] = 1; st->format[n] = 28;
             st->swap_mask_texture[n] = nr_uv4_splat(0u);
+            st->bound2[n] = 0; st->window2_data[n] = s->data; st->window2_w[n] = st->window2_h[n] = 0; st->origin2_x[n] = st->origin2_y[n] = 0;
+            if (cmd->textures2[n] != NR_FRAME_NO_WINDOW) return 0;
             continue;
         }
         rec = s->data + s->atlas_offset + 4 + index * NR_FRAME_WINDOW_BYTES;
         st->window_data[n] = s->data + s->atlas_offset + nr_ld(rec); st->window_w[n] = nr_ld(rec + 4); st->window_h[n] = nr_ld(rec + 8);
         st->origin_x[n] = nr_ld(rec + 12); st->origin_y[n] = nr_ld(rec + 16); st->texture_w[n] = nr_ld(rec + 20); st->texture_h[n] = nr_ld(rec + 24); st->format[n] = nr_ld(rec + 28);
         st->swap_mask_texture[n] = nr_uv4_splat(st->format[n] == 87 ? 0xffffffffu : 0u);
+        st->bound2[n] = cmd->textures2[n] != NR_FRAME_NO_WINDOW;
+        if (st->bound2[n]) {
+            const nr_u8 *rec2 = s->data + s->atlas_offset + 4 + cmd->textures2[n] * NR_FRAME_WINDOW_BYTES;
+            st->window2_data[n] = s->data + s->atlas_offset + nr_ld(rec2); st->window2_w[n] = nr_ld(rec2 + 4); st->window2_h[n] = nr_ld(rec2 + 8);
+            st->origin2_x[n] = nr_ld(rec2 + 12); st->origin2_y[n] = nr_ld(rec2 + 16);
+            if (nr_ld(rec2 + 20) != st->texture_w[n] || nr_ld(rec2 + 24) != st->texture_h[n] || nr_ld(rec2 + 28) != st->format[n]) return 0;
+        } else { st->window2_data[n] = st->window_data[n]; st->window2_w[n] = st->window2_h[n] = 0; st->origin2_x[n] = st->origin2_y[n] = 0; }
     }
     nr_blend_state_load(s->format, cmd, st);
     return 1;
 }
 NR_NOINLINE nr_i32 nr_span_load(nr_span *s, const nr_u8 *data, nr_u8 *output) {
     nr_u32 n;
-    s->data = data; s->output = output; s->covered = 0; s->escapes = 0;
+    s->data = data; s->output = output; s->covered = 0; s->escapes = 0; s->loop_overflows = 0;
     if (nr_ld(data) != NR_FRAME_MAGIC || nr_ld(data + 4) != 1) return 0;
     s->tile_x = nr_ld(data + 8); s->tile_y = nr_ld(data + 12); s->tile_w = nr_ld(data + 16); s->tile_h = nr_ld(data + 20);
     s->format = nr_ld(data + 24); s->command_count = nr_ld(data + 28); s->commands_offset = nr_ld(data + 32);
@@ -637,7 +687,7 @@ NR_INLINE nr_u32 nr_render_span(const nr_u8 *data, nr_u8 *output) {
     for (n = 0; n < bytes; n += 4) nr_st(pixels + n, nr_ld(data + s.background_offset + n));
     for (n = 0; n < 16; ++n) sh.in[n] = nr_v4_zero();
     for (n = 0; n < 8; ++n) sh.out[n] = nr_v4_zero();
-    sh.escapes = &s.escapes;
+    sh.escapes = &s.escapes; sh.overflows = &s.loop_overflows;
     for (n = 0; n < s.command_count; ++n) {
         nr_command cmd;
         if (!nr_command_load(&s, n, &cmd)) { status = NR_STATUS_COMMAND; break; }
@@ -670,7 +720,7 @@ NR_INLINE nr_u32 nr_render_span(const nr_u8 *data, nr_u8 *output) {
         ++executed;
     }
     nr_st(output, NR_FRAME_OUTPUT_MAGIC); nr_st(output + 4, status); nr_st(output + 8, executed);
-    nr_st(output + 12, s.covered); nr_st(output + 16, s.escapes);
+    nr_st(output + 12, s.covered); nr_st(output + 16, s.escapes); nr_st(output + 20, s.loop_overflows);
     return status;
 }
 #endif

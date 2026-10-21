@@ -23,6 +23,7 @@ namespace core {
 }
 using core::NR_OP_MOV; using core::NR_OP_ADD; using core::NR_OP_MUL; using core::NR_OP_MAD; using core::NR_OP_DIV; using core::NR_OP_MIN; using core::NR_OP_MAX;
 using core::NR_OP_DP2; using core::NR_OP_DP3; using core::NR_OP_DP4; using core::NR_OP_FRC; using core::NR_OP_FLOOR; using core::NR_OP_MOVC; using core::NR_OP_LT;
+using core::NR_OP_DDX; using core::NR_OP_DDY; using core::NR_OP_LOOP; using core::NR_OP_BREAKC; using core::NR_OP_ENDLOOP;
 using core::NR_OP_GE; using core::NR_OP_EQ; using core::NR_OP_NE; using core::NR_OP_AND; using core::NR_OP_OR; using core::NR_OP_IADD; using core::NR_OP_ITOF; using core::NR_OP_IGE; using core::NR_OP_SAMPLE;
 constexpr uint32_t span_bytes = NR_FRAME_SPAN, tile_pixels = 128, output_pixels_offset = NR_FRAME_OUTPUT_PIXELS;
 inline void require(bool value, const char *message = "frame kernel contract") { if (!value) throw std::invalid_argument(message); }
@@ -40,6 +41,7 @@ struct LoweredProgram {
     uint32_t vs_inputs = 0, ps_inputs = 0, position_output = 0, interpolation = 0, varyings = 0, vs_constants = 0, ps_constants = 0;
     std::vector<uint32_t> texture_slots;    // command texture index -> SM4 texture slot
     std::vector<uint32_t> sampler_slots;    // command texture index -> SM4 sampler slot
+    std::vector<uint8_t> texture_mirror_u, texture_mirror_v;   // command texture index -> SM4 mirror addressing per axis
     std::array<uint32_t, 14> vs_constant_base{}, ps_constant_base{}, vs_constant_count{}, ps_constant_count{};
     std::string rejection;                   // empty when eligible
     bool eligible() const { return rejection.empty(); }
@@ -116,9 +118,63 @@ inline LoweredProgram lower(const shader::Program &vs, const shader::Program &ps
     std::string detail_reason;
     auto lower_stage = [&](const shader::Program &program, bool vertex, std::vector<Words> &words) -> const char * {
         using shader::Opcode;
+        // Per-lane provenance of pixel temporaries for derivative operands: a varying lane,
+        // optionally divided by another lane of the same varying (perspective divide).
+        struct LaneSource { bool valid = false; uint32_t input = 0, lane = 0, divide = 4; };
+        std::array<std::array<LaneSource, 4>, 16> provenance{};
+        auto lane_source = [&](const shader::Operand &o, unsigned k) {
+            LaneSource s; if (o.modifier != shader::Modifier::none || o.relative.enabled) return s;
+            const uint32_t lane = o.lanes[k] & 3u;
+            if (o.kind == shader::Register::input && o.index < 8 && o.index != program.position_input) { s.valid = true; s.input = o.index; s.lane = lane; return s; }
+            if (o.kind == shader::Register::temporary && o.index < 16) return provenance[o.index][lane];
+            return s;
+        };
         for (const auto &i : program.instructions) {
             detail_reason.clear();
             uint32_t op;
+            if (!vertex && (i.opcode == Opcode::derivative_x || i.opcode == Opcode::derivative_y)) {
+                // Encode: w[2] the varying operand (kind 1) with the composed swizzle, w[3] the divide lane or 4.
+                const auto &d = i.destination;
+                if (d.kind != shader::Register::temporary || d.index >= 16 || !d.mask) return "destination";
+                uint32_t input = 16, divide = 4, lanes = 0;
+                for (unsigned k = 0; k < 4; ++k) {
+                    if (!(d.mask & (1u << k))) { lanes |= (k & 3u) << (2 * k); continue; }
+                    const LaneSource s = lane_source(i.sources[0], k);
+                    if (!s.valid) { detail_reason = "derivative operand"; return "derivative"; }
+                    if (input == 16) { input = s.input; divide = s.divide; }
+                    if (s.input != input || s.divide != divide) { detail_reason = "derivative operand mixes varyings"; return "derivative"; }
+                    lanes |= s.lane << (2 * k);
+                }
+                Words w{}; w[0] = i.opcode == Opcode::derivative_x ? NR_OP_DDX : NR_OP_DDY;
+                w[1] = 0u | (d.index << 4) | (d.mask << 12) | ((i.saturate ? 1u : 0u) << 16);
+                w[2] = 1u | (input << 4) | (lanes << 12); w[3] = divide;
+                words.push_back(w); if (words.size() > 1024) return "instruction count";
+                for (unsigned k = 0; k < 4; ++k) if (d.mask & (1u << k)) provenance[d.index][k] = LaneSource{};
+                continue;
+            }
+            if (i.opcode == Opcode::begin_loop || i.opcode == Opcode::break_if || i.opcode == Opcode::end_loop) {
+                // Loops stay loops in the generated C (bounded by the reference's iteration budget);
+                // temporaries written inside lose their derivative provenance.
+                if (vertex) return "vertex loop";
+                Words w{}; w[0] = i.opcode == Opcode::begin_loop ? NR_OP_LOOP : i.opcode == Opcode::end_loop ? NR_OP_ENDLOOP : NR_OP_BREAKC;
+                if (i.opcode == Opcode::break_if) {
+                    std::string why; uint32_t relative = 0;
+                    const auto condition = operand(i.sources[0], program, vertex, why, relative);
+                    if (!condition || relative) { detail_reason = why; return "break condition"; }
+                    w[2] = *condition; w[3] = i.test_nonzero ? 1u : 0u;
+                }
+                if (i.opcode == Opcode::begin_loop) {
+                    bool inside = false;
+                    for (const auto &j : program.instructions) {
+                        if (&j == &i) { inside = true; continue; }
+                        if (!inside) continue;
+                        if (j.opcode == Opcode::end_loop) break;
+                        if (j.destination.kind == shader::Register::temporary && j.destination.index < 16) for (unsigned k = 0; k < 4; ++k) if (j.destination.mask & (1u << k)) provenance[j.destination.index][k] = LaneSource{};
+                    }
+                }
+                words.push_back(w); if (words.size() > 1024) return "instruction count";
+                continue;
+            }
             switch (i.opcode) {
             case Opcode::move: op = NR_OP_MOV; break; case Opcode::add: op = NR_OP_ADD; break; case Opcode::multiply: op = NR_OP_MUL; break;
             case Opcode::mad: op = NR_OP_MAD; break; case Opcode::divide: op = NR_OP_DIV; break; case Opcode::minimum: op = NR_OP_MIN; break;
@@ -145,7 +201,7 @@ inline LoweredProgram lower(const shader::Program &vs, const shader::Program &ps
                 if (texture.kind != shader::Register::texture || texture.index >= 16 || !program.textures[texture.index] || program.texture_uint[texture.index] ||
                     program.texture_dimensions[texture.index] != 3 || sampler.kind != shader::Register::sampler || !program.samplers[sampler.index]) return "sample resources";
                 const auto &s = samplers[sampler.index];
-                if (s.u != shader::TextureAddress::clamp || s.v != shader::TextureAddress::clamp) return "texture addressing";
+                if (s.u == shader::TextureAddress::border || s.v == shader::TextureAddress::border) return "texture addressing";
                 uint32_t slot_index = UINT32_MAX;
                 for (size_t n = 0; n < out.texture_slots.size(); ++n) if (out.texture_slots[n] == texture.index) {
                     if (out.sampler_slots[n] != sampler.index) return "texture sampled with two samplers";
@@ -154,6 +210,7 @@ inline LoweredProgram lower(const shader::Program &vs, const shader::Program &ps
                 if (slot_index == UINT32_MAX) {
                     if (out.texture_slots.size() >= NR_FRAME_MAX_TEXTURES) return "texture count";
                     out.texture_slots.push_back(texture.index); out.sampler_slots.push_back(sampler.index); slot_index = uint32_t(out.texture_slots.size() - 1);
+                    out.texture_mirror_u.push_back(s.u == shader::TextureAddress::mirror); out.texture_mirror_v.push_back(s.v == shader::TextureAddress::mirror);
                 }
                 w[2] = *coordinate; w[5] = slot_index | (detail::encode_lanes(texture.lanes) << 12);
             } else {
@@ -165,6 +222,18 @@ inline LoweredProgram lower(const shader::Program &vs, const shader::Program &ps
             }
             words.push_back(w);
             if (words.size() > 1024) return "instruction count";
+            if (!vertex && i.destination.kind == shader::Register::temporary && i.destination.index < 16) {
+                for (unsigned k = 0; k < 4; ++k) {
+                    if (!(i.destination.mask & (1u << k))) continue;
+                    LaneSource s;
+                    if (i.opcode == Opcode::move) s = lane_source(i.sources[0], k);
+                    else if (i.opcode == Opcode::divide) {
+                        const LaneSource a = lane_source(i.sources[0], k), b = lane_source(i.sources[1], k);
+                        if (a.valid && b.valid && a.divide == 4 && b.divide == 4 && a.input == b.input) { s = a; s.divide = b.lane; }
+                    }
+                    provenance[i.destination.index][k] = s;
+                }
+            }
         }
         return nullptr;
     };
@@ -188,7 +257,7 @@ inline LoweredProgram lower(const shader::Program &vs, const shader::Program &ps
 // The SHAVE code window holds a few programs at a time, so the inventory is
 // split into blobs by pixel-stage instruction count. A program's blob and its
 // index inside the blob follow from this rule on both the host and the kernel.
-constexpr std::array<std::pair<uint32_t, uint32_t>, 7> blob_ranges{{{0, 1}, {2, 3}, {4, 12}, {13, 64}, {65, 115}, {116, 120}, {121, 100000}}};
+constexpr std::array<std::pair<uint32_t, uint32_t>, 10> blob_ranges{{{0, 1}, {2, 2}, {3, 3}, {4, 12}, {13, 21}, {22, 64}, {65, 115}, {116, 120}, {121, 181}, {182, 100000}}};
 inline uint32_t blob_of(uint32_t ps_instructions) {
     for (uint32_t k = 0; k < blob_ranges.size(); ++k) if (ps_instructions >= blob_ranges[k].first && ps_instructions <= blob_ranges[k].second) return k;
     return UINT32_MAX;
@@ -202,13 +271,17 @@ namespace detail {
 inline std::string hex(uint32_t v) { char b[16]; std::snprintf(b, sizeof b, "0x%08xu", v); return b; }
 inline std::string dec(uint32_t v) { return std::to_string(v) + "u"; }
 inline unsigned source_count(uint32_t op) {
-    return op == NR_OP_SAMPLE || op == NR_OP_MOV || op == NR_OP_FRC || op == NR_OP_FLOOR || op == NR_OP_ITOF ? 1u : (op == NR_OP_MAD || op == NR_OP_MOVC) ? 3u : 2u;
+    return (op == NR_OP_LOOP || op == NR_OP_ENDLOOP) ? 0u : op == NR_OP_BREAKC ? 1u : op == NR_OP_SAMPLE || op == NR_OP_MOV || op == NR_OP_FRC || op == NR_OP_FLOOR || op == NR_OP_ITOF || op == NR_OP_DDX || op == NR_OP_DDY ? 1u : (op == NR_OP_MAD || op == NR_OP_MOVC) ? 3u : 2u;
 }
 // How the emitted instructions name registers and tables.
 struct Names {
     std::function<std::string(uint32_t)> input, output;
     std::string constants, immediates, escapes, st;
+    std::function<std::string(uint32_t, bool)> derivative;   // screen derivative vector of input r along x (true) or y
+    std::string overflows;                                   // counter of loops stopped at the iteration budget
 };
+inline bool uses_derivatives(const std::vector<Words> &words) { for (const auto &w : words) if (w[0] == NR_OP_DDX || w[0] == NR_OP_DDY) return true; return false; }
+inline std::array<bool, 8> derivative_inputs(const std::vector<Words> &words) { std::array<bool, 8> r{}; for (const auto &w : words) if ((w[0] == NR_OP_DDX || w[0] == NR_OP_DDY) && ((w[2] >> 4) & 255u) < 8) r[(w[2] >> 4) & 255u] = true; return r; }
 inline std::array<bool, 16> used_temps(const std::vector<Words> &words) {
     std::array<bool, 16> used{};
     for (const auto &w : words) {
@@ -226,6 +299,8 @@ inline std::string emit_instructions(const std::vector<Words> &words, const std:
     std::string s;
     for (const auto &w : words) {
         const uint32_t op = w[0], dest = w[1], mask = (dest >> 12) & 15u, saturate = (dest >> 16) & 1u;
+        if (op == NR_OP_LOOP) { s += indent + "{ nr_u32 nr_loop_guard = 0; for (;;) {\n" + indent + "    if (++nr_loop_guard > " + dec(shader::maximum_loop_iterations) + ") { *" + names.overflows + " += 1u; break; }   /* iteration budget exceeded: reported */\n"; continue; }
+        if (op == NR_OP_ENDLOOP) { s += indent + "} }\n"; continue; }
         const std::string D = (dest & 15u) ? names.output((dest >> 4) & 255u) : "r" + std::to_string((dest >> 4) & 15u);
         auto operand = [&](unsigned k) {
             const uint32_t src = w[2 + k], kind = src & 15u, idx = (src >> 4) & 255u, lanes = (src >> 12) & 255u, neg = (src >> 20) & 1u, abs = (src >> 21) & 1u, slot = (src >> 22) & 15u;
@@ -246,6 +321,7 @@ inline std::string emit_instructions(const std::vector<Words> &words, const std:
             if (neg) e = (op == NR_OP_IADD ? "nr_v4_ineg(" : "nr_v4_neg(") + e + ")";
             return e;
         };
+        if (op == NR_OP_BREAKC) { s += indent + "{ nr_v4 a = " + operand(0) + "; if ((nr_v4_bits(a, 0) != 0u) == " + (w[3] ? "1" : "0") + ") break; }\n"; continue; }
         const unsigned sources = source_count(op);
         const std::string in = indent + "    ";
         s += indent + "{\n" + in + "nr_v4 t;\n" + in + "nr_v4 a = " + operand(0) + ";\n";
@@ -274,6 +350,20 @@ inline std::string emit_instructions(const std::vector<Words> &words, const std:
         case NR_OP_EQ: s += in + "t = nr_v4_cmp_eq(a, b);\n"; break;
         case NR_OP_NE: s += in + "t = nr_v4_cmp_ne(a, b);\n"; break;
         case NR_OP_IGE: s += in + "t = nr_v4_cmp_ige(a, b);\n"; break;
+        case NR_OP_DDX: case NR_OP_DDY: {
+            const uint32_t src = w[2], r = (src >> 4) & 255u, lanes = (src >> 12) & 255u, divide = w[3];
+            auto swz = [&](const std::string &e, uint32_t l) { return "NR_V4_SWZ(" + e + ", " + std::to_string(l & 3u) + ", " + std::to_string((l >> 2) & 3u) + ", " + std::to_string((l >> 4) & 3u) + ", " + std::to_string((l >> 6) & 3u) + ")"; };
+            const std::string g = names.derivative(r, op == NR_OP_DDX), v = names.input(r);
+            s += in + "(void)a;\n";   // the generic source load is unused: the gradient comes from the row
+            if (divide >= 4) s += in + "t = " + swz(g, lanes) + ";\n";
+            else {
+                // d(a / w) = (da * w - a * dw) / (w * w) for lanes a of the varying and its divide lane w.
+                const uint32_t wl = divide | (divide << 2) | (divide << 4) | (divide << 6);
+                s += in + "{ nr_v4 ww = " + swz(v, wl) + ", dw = " + swz(g, wl) + ", aa = " + swz(v, lanes) + ", da = " + swz(g, lanes) + ";\n";
+                s += in + "  t = nr_v4_div(nr_v4_add(nr_v4_mul(da, ww), nr_v4_neg(nr_v4_mul(aa, dw))), nr_v4_mul(ww, ww)); }\n";
+            }
+            break;
+        }
         case NR_OP_SAMPLE: {
             const uint32_t texture = w[5] & 15u, lanes = (w[5] >> 12) & 255u;
             s += in + "t = nr_sample(" + names.st + ", " + dec(texture) + ", nr_v4_bits(a, 0), nr_v4_bits(a, 1), " + names.escapes + ");\n";
@@ -290,7 +380,8 @@ inline std::string emit_instructions(const std::vector<Words> &words, const std:
     return s;
 }
 inline std::string emit_stage(const std::vector<Words> &words, const std::array<uint32_t, 14> &base, const std::array<uint32_t, 14> &count, const std::string &name) {
-    Names names{[](uint32_t r) { return "sh->in[" + std::to_string(r) + "]"; }, [](uint32_t r) { return "sh->out[" + std::to_string(r) + "]"; }, "sh->constants", "sh->immediates", "sh->escapes", "st"};
+    Names names{[](uint32_t r) { return "sh->in[" + std::to_string(r) + "]"; }, [](uint32_t r) { return "sh->out[" + std::to_string(r) + "]"; }, "sh->constants", "sh->immediates", "sh->escapes", "st",
+                [](uint32_t r, bool x) { return std::string(x ? "sh->dx[" : "sh->dy[") + std::to_string(r) + "]"; }, "sh->overflows"};
     std::string s = "NR_NOINLINE nr_i32 " + name + "(const nr_command_state *st, nr_shade *sh) {\n    (void)st;\n";
     const auto used = used_temps(words);
     for (unsigned r = 0; r < 16; ++r) if (used[r]) s += "    nr_v4 r" + std::to_string(r) + " = nr_v4_zero();\n";
@@ -300,10 +391,13 @@ inline std::string emit_stage(const std::vector<Words> &words, const std::array<
 // A row shader: interpolates this program's varyings, runs its pixel stage and
 // blends, for `count` pixels of one scanline. Varying modes are compile-time.
 inline std::string emit_row(const LoweredProgram &p, const std::string &name) {
-    Names names{[](uint32_t r) { return "i" + std::to_string(r); }, [](uint32_t) { return std::string("o0"); }, "row->constants", "row->immediates", "row->escapes", "st"};
+    Names names{[](uint32_t r) { return "i" + std::to_string(r); }, [](uint32_t) { return std::string("o0"); }, "row->constants", "row->immediates", "row->escapes", "st",
+                [](uint32_t r, bool x) { return std::string(x ? "dxi" : "dyi") + std::to_string(r); }, "row->overflows"};
+    const auto gradients = derivative_inputs(p.ps_words);
     std::string s = "NR_NOINLINE void " + name + "(const nr_row *row) {\n";
     s += "    const nr_command_state *st = row->st; nr_u8 *pixel = row->pixels; nr_i32 px;\n";
     s += "    nr_f32 w0 = row->wgt[0], w1 = row->wgt[1], w2 = row->wgt[2], dw0 = row->dwgt[0], dw1 = row->dwgt[1], dw2 = row->dwgt[2];\n";
+    if (uses_derivatives(p.ps_words)) s += "    const nr_f32 dy0 = row->dwgt_y[0], dy1 = row->dwgt_y[1], dy2 = row->dwgt_y[2];\n";
     bool linear = false, perspective = false;
     // Only varyings the pixel stage reads are interpolated.
     std::array<bool, 16> read{};
@@ -320,6 +414,17 @@ inline std::string emit_row(const LoweredProgram &p, const std::string &name) {
         if (mode == 1) s += "    const nr_v4 i" + R + " = row->v[0].varying[" + C + "];\n";
         else s += "    nr_v4 i" + R + " = nr_v4_zero();\n    const nr_v4 va" + R + " = row->v[0].varying[" + C + "], vb" + R + " = row->v[1].varying[" + C + "], vc" + R + " = row->v[2].varying[" + C + "];\n";
     }
+    for (const auto &[r, c, mode] : varyings) {
+        if (!gradients[r]) continue;
+        const std::string R = std::to_string(r);
+        if (mode == 1) { s += "    const nr_v4 dxi" + R + " = nr_v4_zero(), dyi" + R + " = nr_v4_zero();\n"; continue; }
+        // Weight derivatives along x and y: dw_n (times 1/w_n for perspective weights).
+        const std::string f0 = mode == 2 ? "iw0" : "1.0f", f1 = mode == 2 ? "iw1" : "1.0f", f2 = mode == 2 ? "iw2" : "1.0f";
+        s += "    const nr_v4 nx" + R + " = nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(dw0 * " + f0 + "), va" + R + "), nr_v4_mul(nr_v4_splat(dw1 * " + f1 + "), vb" + R + ")), nr_v4_mul(nr_v4_splat(dw2 * " + f2 + "), vc" + R + "));\n";
+        s += "    const nr_v4 ny" + R + " = nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(dy0 * " + f0 + "), va" + R + "), nr_v4_mul(nr_v4_splat(dy1 * " + f1 + "), vb" + R + ")), nr_v4_mul(nr_v4_splat(dy2 * " + f2 + "), vc" + R + "));\n";
+        s += "    const nr_f32 sdx" + R + " = dw0 * " + f0 + " + dw1 * " + f1 + " + dw2 * " + f2 + ", sdy" + R + " = dy0 * " + f0 + " + dy1 * " + f1 + " + dy2 * " + f2 + ";\n";
+        s += "    nr_v4 dxi" + R + " = nr_v4_zero(), dyi" + R + " = nr_v4_zero();\n";
+    }
     s += "    nr_v4 o0 = nr_v4_zero();\n";
     const auto used = used_temps(p.ps_words);
     for (unsigned r = 0; r < 16; ++r) if (used[r]) s += "    nr_v4 r" + std::to_string(r) + " = nr_v4_zero();\n";
@@ -333,6 +438,11 @@ inline std::string emit_row(const LoweredProgram &p, const std::string &name) {
         if (mode == 1) continue;
         const std::string R = std::to_string(r), W0 = mode == 2 ? "p0" : "w0", W1 = mode == 2 ? "p1" : "w1", W2 = mode == 2 ? "p2" : "w2", RC = mode == 2 ? "rp" : "rl";
         s += "        i" + R + " = nr_v4_mul(nr_v4_add(nr_v4_add(nr_v4_mul(nr_v4_splat(" + W0 + "), va" + R + "), nr_v4_mul(nr_v4_splat(" + W1 + "), vb" + R + ")), nr_v4_mul(nr_v4_splat(" + W2 + "), vc" + R + ")), nr_v4_splat(" + RC + "));\n";
+        if (gradients[r]) {
+            // d(N/D)/dx = (dN - i * dD) / D with dN the weight-derivative numerator and dD its sum.
+            s += "        dxi" + R + " = nr_v4_mul(nr_v4_add(nx" + R + ", nr_v4_neg(nr_v4_mul(i" + R + ", nr_v4_splat(sdx" + R + ")))), nr_v4_splat(" + RC + "));\n";
+            s += "        dyi" + R + " = nr_v4_mul(nr_v4_add(ny" + R + ", nr_v4_neg(nr_v4_mul(i" + R + ", nr_v4_splat(sdy" + R + ")))), nr_v4_splat(" + RC + "));\n";
+        }
     }
     s += "#ifndef NR_EXP_NO_PS\n" + emit_instructions(p.ps_words, p.ps_constant_base, p.ps_constant_count, names, "        ") + "#endif\n";
     s += "#ifndef NR_EXP_NO_BLEND\n        nr_blend_pixel(st, pixel, o0);\n#else\n        *row->escapes += nr_v4_bits(o0, 0) & 1u;\n#endif\n";
@@ -430,7 +540,7 @@ inline std::string emit_native_header(const std::vector<const LoweredProgram *> 
 
 // Texture window packed by the host for one tile: a sub-rectangle of a texture.
 struct Window { uint32_t w, h, origin_x, origin_y, texture_w, texture_h, format; std::vector<uint32_t> pixels; };
-struct TextureBinding { uint32_t window = NR_FRAME_NO_WINDOW; bool point = false; };
+struct TextureBinding { uint32_t window = NR_FRAME_NO_WINDOW, window2 = NR_FRAME_NO_WINDOW; bool point = false, mirror_u = false, mirror_v = false; };
 struct Command {
     uint32_t kind = 0, program = 0;
     std::vector<uint32_t> vertices;          // packed vertex pool words for this command
@@ -489,7 +599,7 @@ public:
             field(64, c.fill_color); field(68, constant_offsets[n]);
             for (unsigned k = 0; k < 4; ++k) field(72 + k * 4, bits(c.viewport[k]));
             field(88, bits(c.depth[0])); field(92, bits(c.depth[1]));
-            for (unsigned k = 0; k < 4; ++k) field(96 + k * 4, c.textures[k].window | ((c.textures[k].point ? 1u : 0u) << 16));
+            for (unsigned k = 0; k < 4; ++k) { field(96 + k * 4, c.textures[k].window | ((c.textures[k].point ? 1u : 0u) << 16) | ((c.textures[k].mirror_u ? 1u : 0u) << 17) | ((c.textures[k].mirror_v ? 1u : 0u) << 18)); field(112 + k * 4, c.textures[k].window2); }
             if (!c.vertices.empty()) std::memcpy(v.data() + vertices_offset + vertex_offsets[n], c.vertices.data(), c.vertices.size() * 4);
             if (!c.constants.empty()) std::memcpy(v.data() + constants_offset + constant_offsets[n], c.constants.data(), c.constants.size() * 4);
         }

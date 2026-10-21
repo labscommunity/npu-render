@@ -1,6 +1,7 @@
 // Frame kernel host checks: the shared core against the scalar shader reference
 // on the captured DWM shader pairs, plus NPU fixture generation. CPU only.
 #include "frame_kernel.hpp"
+#include "frame_batch_planner.hpp"
 #include "shader_reference.hpp"
 #include "blend_reference.hpp"
 #include "frame_inventory.hpp"
@@ -19,7 +20,9 @@ float uniform(float lo, float hi) { return lo + (hi - lo) * float(std::uniform_r
 uint32_t fbits(float v) { uint32_t b; std::memcpy(&b, &v, 4); return b; }
 float ffloat(uint32_t b) { float v; std::memcpy(&v, &b, 4); return v; }
 struct Textures { frame::Window windows[4]; shader::TextureShapes shapes{}; shader::TexturePixels pixels; shader::TextureSamplers samplers{}; };
-Textures make_textures(const frame::LoweredProgram &lowered, const shader::TextureSamplers &samplers, uint32_t size) {
+// zero_alpha: every texel transparent, the case DWM hands the acrylic shader (division by a
+// zero alpha then min/max over NaN) and where SM4 NaN semantics decide the result.
+Textures make_textures(const frame::LoweredProgram &lowered, const shader::TextureSamplers &samplers, uint32_t size, bool zero_alpha = false) {
     Textures t; t.samplers = samplers;
     for (size_t n = 0; n < lowered.texture_slots.size(); ++n) {
         auto &w = t.windows[n]; w.w = w.texture_w = size; w.h = w.texture_h = size; w.origin_x = w.origin_y = 0; w.format = n & 1 ? 87u : 28u;
@@ -27,7 +30,7 @@ Textures make_textures(const frame::LoweredProgram &lowered, const shader::Textu
         const auto slot = lowered.texture_slots[n];
         t.shapes[slot] = {size, size, 15}; t.pixels[slot].resize(w.pixels.size());
         for (size_t i = 0; i < w.pixels.size(); ++i) {
-            w.pixels[i] = uint32_t(rng());
+            w.pixels[i] = uint32_t(rng()) & (zero_alpha ? 0x00ffffffu : 0xffffffffu);
             for (unsigned c = 0; c < 4; ++c) { const unsigned byte = (w.format == 87 && c < 3) ? 2 - c : c; t.pixels[slot][i][c] = float((w.pixels[i] >> (byte * 8)) & 255u) / 255.f; }
         }
     }
@@ -66,11 +69,11 @@ void load_stage(const SpanContext &ctx, bool vertex, const shader::Registers &in
     for (unsigned r = 0; r < 8; ++r) sh.out[r] = frame::core::nr_v4_zero();
     sh.constants = vertex ? ctx.state.vs_constants : ctx.state.ps_constants;
     sh.immediates = vertex ? ctx.program.vs_immediates : ctx.program.ps_immediates;
-    sh.escapes = &escapes;
+    sh.escapes = &escapes; static uint32_t overflows = 0; sh.overflows = &overflows;
 }
-shader::Constants random_constants(const shader::Program &p) {
+shader::Constants random_constants(const shader::Program &p, bool unit = false) {
     shader::Constants constants;
-    for (unsigned i = 0; i < 14; ++i) { constants[i].resize(p.constants[i]); for (auto &v : constants[i]) for (auto &lane : v) lane = fbits(uniform(-2, 2)); }
+    for (unsigned i = 0; i < 14; ++i) { constants[i].resize(p.constants[i]); for (auto &v : constants[i]) for (auto &lane : v) lane = fbits(unit ? uniform(0, 1) : uniform(-2, 2)); }
     return constants;
 }
 std::vector<uint32_t> flatten(const shader::Program &vs, const shader::Constants &vc, const shader::Program &ps, const shader::Constants &pc) {
@@ -81,15 +84,17 @@ std::vector<uint32_t> flatten(const shader::Program &vs, const shader::Constants
 }
 frame::Command base_command(const frame::LoweredProgram &lowered, const Textures &textures, const shader::TextureSamplers &samplers) {
     frame::Command c; c.viewport = {0, 0, 128, 128}; c.clip = {0, 0, 128, 128};
-    for (size_t n = 0; n < lowered.texture_slots.size(); ++n) { c.textures[n].window = uint32_t(n); c.textures[n].point = samplers[lowered.sampler_slots[n]].filter == shader::TextureFilter::point; }
+    for (size_t n = 0; n < lowered.texture_slots.size(); ++n) { c.textures[n].window = uint32_t(n); c.textures[n].point = samplers[lowered.sampler_slots[n]].filter == shader::TextureFilter::point; c.textures[n].mirror_u = samplers[lowered.sampler_slots[n]].u == shader::TextureAddress::mirror; c.textures[n].mirror_v = samplers[lowered.sampler_slots[n]].v == shader::TextureAddress::mirror; }
     (void)textures; return c;
 }
 struct Stats { unsigned vs_cases = 0, vs_exact = 0, ps_cases = 0, ps_exact = 0, ps_within_one = 0, ps_far = 0; };
 Stats compare_stage(const Pair &pair, const shader::Program &vs, const shader::Program &ps, const shader::TextureSamplers &samplers, const frame::LoweredProgram &lowered) {
     Stats stats;
-    for (unsigned trial = 0; trial < 64; ++trial) {
-        auto textures = make_textures(lowered, samplers, 8);
-        auto vc = random_constants(vs), pc = random_constants(ps);
+    // Trials 64.. use transparent textures and unit-range constants (the captured DWM operating point).
+    for (unsigned trial = 0; trial < 96; ++trial) {
+        const bool zero_alpha = trial >= 64;
+        auto textures = make_textures(lowered, samplers, 8, zero_alpha);
+        auto vc = random_constants(vs, zero_alpha), pc = random_constants(ps, zero_alpha);
         frame::Command command = base_command(lowered, textures, samplers);
         command.constants = flatten(vs, vc, ps, pc);
         shader::Registers vertex_inputs{};
@@ -98,7 +103,7 @@ Stats compare_stage(const Pair &pair, const shader::Program &vs, const shader::P
         for (unsigned v = 0; v < 3; ++v) for (unsigned r = 0; r < 16; ++r) if (vs.inputs[r]) for (unsigned c = 0; c < 4; ++c) command.vertices.push_back(vertex_inputs[r][c]);
         std::vector<frame::Window> windows(textures.windows, textures.windows + lowered.texture_slots.size());
         auto ctx = context_for(lowered.entry, command, windows);
-        frame::core::nr_shade sh; uint32_t escapes = 0;
+        frame::core::nr_shade sh{}; uint32_t escapes = 0;
         load_stage(ctx, true, vertex_inputs, sh, escapes);
         if (frame::core::nr_native_vs(ctx.program.native, &ctx.state, &sh)) {
             const auto expected = shader::reference_vertex(vs, vertex_inputs, vc);
@@ -108,10 +113,16 @@ Stats compare_stage(const Pair &pair, const shader::Program &vs, const shader::P
         }
         // Pixel stage with random varyings.
         shader::Registers pixel_inputs{};
-        for (unsigned r = 0; r < 16; ++r) if (ps.inputs[r] && r != ps.position_input) for (unsigned c = 0; c < 4; ++c) pixel_inputs[r][c] = fbits(c < 2 ? uniform(0, 1) : uniform(0.25f, 2));
+        for (unsigned r = 0; r < 16; ++r) if (ps.inputs[r] && r != ps.position_input) for (unsigned c = 0; c < 4; ++c) pixel_inputs[r][c] = fbits(c < 2 ? uniform(-0.5f, 1.5f) : uniform(0.25f, 2));   // coordinates reach clamp and mirror addressing
         load_stage(ctx, false, pixel_inputs, sh, escapes);
+        // The single-pixel SM4 reference has no quad to differentiate; derivative programs are
+        // checked through their fixtures (host kernel against the NPU) instead.
+        if (frame::detail::uses_derivatives(lowered.ps_words)) continue;
         if (frame::core::nr_native_ps(ctx.program.native, &ctx.state, &sh)) {
-            const auto expected = shader::reference_vertex(ps, pixel_inputs, pc, textures.shapes, textures.samplers, textures.pixels);
+            shader::Registers expected;
+            // Random constants can drive a shader loop past the reference's iteration budget: no reference for that case.
+            try { expected = shader::reference_vertex(ps, pixel_inputs, pc, textures.shapes, textures.samplers, textures.pixels); }
+            catch (const std::runtime_error &) { continue; }
             bool exact = true; unsigned far = 0;
             for (unsigned c = 0; c < 4; ++c) {
                 const uint32_t actual = frame::core::nr_v4_bits(sh.out[0], c);
@@ -199,7 +210,7 @@ int main(int argc, char **argv) {
         auto &e = entries[n]; e.pair = n;
         try { e.vs = shader::parse_vertex(pairs[n].vs, pairs[n].vs_words); e.ps = shader::parse_pixel(pairs[n].ps, pairs[n].ps_words); e.parsed = true; }
         catch (const std::exception &x) { e.parse_error = x.what(); continue; }
-        for (unsigned s = 0; s < 16; ++s) e.samplers[s].filter = (n & 1) ? shader::TextureFilter::point : shader::TextureFilter::linear;
+        for (unsigned s = 0; s < 16; ++s) { e.samplers[s].filter = (n & 1) ? shader::TextureFilter::point : shader::TextureFilter::linear; if (n % 3 == 0) e.samplers[s].u = e.samplers[s].v = shader::TextureAddress::mirror; }
         e.lowered = frame::lower(e.vs, e.ps, e.samplers);
         if (!e.lowered.eligible()) continue;
         if (!included(uint32_t(n), uint32_t(e.lowered.ps_words.size()))) { e.lowered.rejection = "not in the compiled program set"; continue; }
@@ -274,6 +285,58 @@ int main(int argc, char **argv) {
                 std::vector<frame::Window> windows(textures.windows, textures.windows + pass_lowered.texture_slots.size());
                 auto background = random_background(128 * 128);
                 append_fixture(fixtures, std::string("quad-") + pair.sha + (format == 28 ? "-rgba" : "-bgra"), frame::SpanBuilder::build(0, 0, 128, 128, format, {pass_lowered.entry}, {command}, windows, background.data()));
+                // Planner soundness on the same quad: the plan must be valid, its sampled windows bounded
+                // (coordinates stay in [0, 1]), and a quad with these varyings must never prove transparent.
+                {
+                    std::array<uint32_t, 4> tw{}, th{}; std::array<bool, 4> point{};
+                    for (size_t k = 0; k < pass_lowered.texture_slots.size(); ++k) { tw[k] = textures.windows[k].texture_w; th[k] = textures.windows[k].texture_h; point[k] = command.textures[k].point; }
+                    const auto plan = frame::plan_draw(pass_lowered, command.vertices, 6, command.constants, {0, 0, 128, 128}, tw, th, point);
+                    frame::require(plan.valid, "quad plan must be valid");
+                    if (frame::transparent_output(pass_lowered, plan, {4, 2, 120, 126})) {
+                        // The proof must agree with the host kernel: under source-over the quad leaves every pixel as it was.
+                        frame::Command check = command; check.blend_mode = 1;
+                        auto span = frame::SpanBuilder::build(0, 0, 128, 128, format, {pass_lowered.entry}, {check}, windows, background.data());
+                        std::vector<uint8_t> rendered; frame::render_reference(span, rendered);
+                        uint32_t status, covered; std::memcpy(&status, rendered.data() + 4, 4); std::memcpy(&covered, rendered.data() + 12, 4);
+                        const bool unchanged = status == 0 && covered && std::memcmp(rendered.data() + NR_FRAME_OUTPUT_PIXELS, background.data(), size_t(128) * 128 * 4) == 0;
+                        std::printf("{\"shader\":\"%s\",\"quad_proved_transparent\":true,\"kernel_unchanged\":%s}\n", pair.sha, unchanged ? "true" : "false");
+                        frame::require(unchanged, (std::string("transparent proof disagrees with the host kernel: ") + pair.sha).c_str());
+                    }
+                }
+                // Fixture C: the same quad with every texture split into two windows (left and
+                // right halves), so taps are served from the second window without escapes.
+                if (variant == 0 && !pass_lowered.texture_slots.empty()) {
+                    std::vector<frame::Window> halves;
+                    for (size_t k = 0; k < pass_lowered.texture_slots.size(); ++k) {
+                        const auto &full = textures.windows[k];
+                        for (unsigned half = 0; half < 2; ++half) {
+                            frame::Window w = full; w.w = half ? full.w - full.w / 2 : full.w / 2; w.origin_x = half ? full.w / 2 : 0; w.pixels.clear();
+                            for (uint32_t y = 0; y < full.h; ++y) for (uint32_t x = 0; x < w.w; ++x) w.pixels.push_back(full.pixels[size_t(y) * full.w + w.origin_x + x]);
+                            halves.push_back(std::move(w));
+                        }
+                        command.textures[k].window = uint32_t(2 * k); command.textures[k].window2 = uint32_t(2 * k + 1);
+                    }
+                    auto span = frame::SpanBuilder::build(0, 0, 128, 128, format, {pass_lowered.entry}, {command}, halves, background.data());
+                    std::vector<uint8_t> expected; frame::render_reference(span, expected);
+                    uint32_t status, covered, escapes; std::memcpy(&status, expected.data() + 4, 4); std::memcpy(&covered, expected.data() + 12, 4); std::memcpy(&escapes, expected.data() + 16, 4);
+                    frame::require(status == 0 && covered && !escapes, "split-window fixture must cover the tile without escapes");
+                    append_fixture(fixtures, std::string("split-windows-") + pair.sha, span);
+                }
+                // Fixture D: the quad over transparent textures with unit-range constants under
+                // source-over blending: the captured DWM operating point where division by a zero
+                // alpha and SM4 NaN semantics in min/max decide the result on the device.
+                if (variant == 0 && !pass_lowered.texture_slots.empty()) {
+                    auto clear = make_textures(pass_lowered, samplers, 24, true);
+                    frame::Command transparent = command; transparent.blend_mode = 1; transparent.constants = flatten(pass, shader::Constants{}, ps, random_constants(ps, true));
+                    for (size_t k = 0; k < pass_lowered.texture_slots.size(); ++k) { transparent.textures[k].window = uint32_t(k); transparent.textures[k].window2 = frame::TextureBinding{}.window2; }   // one window per texture again (fixture C split them)
+                    std::vector<frame::Window> clear_windows(clear.windows, clear.windows + pass_lowered.texture_slots.size());
+                    auto span = frame::SpanBuilder::build(0, 0, 128, 128, format, {pass_lowered.entry}, {transparent}, clear_windows, background.data());
+                    std::vector<uint8_t> expected; frame::render_reference(span, expected);
+                    uint32_t status, covered; std::memcpy(&status, expected.data() + 4, 4); std::memcpy(&covered, expected.data() + 12, 4);
+                    if (status != 0 || !covered) { std::printf("{\"shader\":\"%s\",\"transparent_fixture_status\":%u,\"covered\":%u}\n", pair.sha, status, covered); }
+                    frame::require(status == 0 && covered, (std::string("transparent-texture fixture must cover the tile: ") + pair.sha + " status " + std::to_string(status)).c_str());
+                    append_fixture(fixtures, std::string("transparent-textures-") + pair.sha, span);
+                }
             }
         }
     }

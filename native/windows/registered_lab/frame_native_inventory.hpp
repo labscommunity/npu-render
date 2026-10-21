@@ -6,6 +6,7 @@
 #include <array>
 #include <cstdio>
 #include <iterator>
+#include <string>
 #include <vector>
 namespace nr::frame {
 // The captured inventory lowered once: a batch shader pair is native when its
@@ -13,7 +14,7 @@ namespace nr::frame {
 // inside that blob follow from the inventory order (blob_of).
 struct NativeIdentity { uint32_t blob = UINT32_MAX, blob_index = 0, host_index = 0; };
 class NativeInventory {
-    struct Entry { LoweredProgram lowered; uint32_t pair = 0; NativeIdentity identity; };
+    struct Entry { LoweredProgram lowered; uint32_t pair = 0; NativeIdentity identity; bool deployed = true; };
     std::vector<Entry> entries;
 public:
     NativeInventory() {
@@ -41,6 +42,20 @@ public:
         const bool twin = blob_index >= real; if (twin) blob_index -= real;
         for (const auto &e : entries) if (e.identity.blob == blob && e.identity.blob_index == blob_index) return e.identity.host_index + (twin ? uint32_t(entries.size()) : 0u);
         return 0xffffffffu;
+    }
+    // The deployed blob `blob` carries `listed` programs (sha8, blob order). The blob is usable only
+    // when that list is exactly the host inventory's list for the blob: program indices and the
+    // passthrough twins are positional. Returns the number of host programs the blob cannot serve.
+    size_t restrict_blob(uint32_t blob, const std::vector<std::string> &listed) {
+        std::vector<std::string> host;
+        for (const auto &e : entries) if (e.identity.blob == blob) { host.resize(std::max<size_t>(host.size(), e.identity.blob_index + 1)); host[e.identity.blob_index] = std::string(inventory_pairs[e.pair].sha).substr(0, 8); }
+        const bool same = host == listed; size_t absent = 0;
+        for (auto &e : entries) if (e.identity.blob == blob) { e.deployed = same; absent += !same; }
+        return absent;
+    }
+    bool deployed(const NativeIdentity &id) const {
+        for (const auto &e : entries) if (e.identity.blob == id.blob && e.identity.blob_index == id.blob_index) return e.deployed;
+        return false;
     }
     const NativeIdentity *find(const LoweredProgram &p) const {
         for (const auto &e : entries) {
