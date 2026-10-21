@@ -104,3 +104,49 @@ and signed package v39 from tree v45, staged it and ran the registration's
 render qualification as one detached sequence (`sequence-prepare-v82`, all
 steps passed); `desktop status` followed it from the host. `enable` then
 started the generation-27 admission for the worker-loss probe.
+
+## Ordinary applications while the switch is on (2026-10-21 night)
+
+With the indirect display primary, the system's default adapter is ours, and an
+ordinary application's `D3D11CreateDevice(nullptr, HARDWARE, ...)` reaches
+`OpenAdapter10` in our driver. Without a lease that returns
+`DXGI_ERROR_UNSUPPORTED`: the adapter probe the live wrapper starts recorded
+`887a0004` for both device requests in every stimulus-free run so far, so an
+application on the enabled desktop could not create a hardware device. That is a
+loss against the GPU path (priority 2) and the open half of gate 6.
+
+The admission mechanism already existed in one-shot form: the interactive broker
+(`nr_auto_interactive_broker`) publishes the admission for the console session
+(`Global\T8.NpuRender.AutoAdmission.v2.<session>`, a 120 s window), the driver's
+`read_or_request` finds the publication when a process has no lease, verifies the
+broker and worker identities, requests over the broker's pipe, and the broker
+verifies the pipe client's identity, SID, session and nonce before writing that
+process a scope-3 lease mapping. The registration qualification exercises this
+with one cued consumer; the broker then exits.
+
+The switch needs the same for every client for as long as the admission lasts:
+
+- Broker v8 `--serve <stop file>` keeps one publication for the session and
+  admits clients in turn (one pipe instance, the driver waits on a busy one),
+  refreshing the publication window and renewing every live client's lease in
+  place every 40 s (scope-3 grants are 120 s at most; the driver's `Admission`
+  re-reads a renewal within its margin), pruning clients that exited, until the
+  stop file appears or the worker ends. Each admission, rejection and renewal
+  round is one JSON row.
+- The stimulus-free bootstrap starts it right after the compositor and indirect
+  host leases (`native_resident_broker_v1.py`), grants the console user query
+  access to the worker and broker processes and tokens so clients can verify
+  both peers, folds the broker's counts into the admission report, and closes
+  it before the grants are restored.
+- Driver tree v46 binds an interactive client to its own thread desktop
+  (`own_desktop_is_default`) instead of the input desktop, so an admitted
+  application keeps rendering through a screen saver or lock screen the same
+  way the compositor does since build v44; and `request()` waits on a busy
+  broker pipe instead of failing the device.
+
+What this does not do: the application's draws run on the same NPU worker as
+the compositor's, at the same speed, and an application that needs the iGPU
+(the Tahoma case) must select it explicitly, as it can today through DXGI. The
+evidence for gate 6 is the wrapper's `application_default_device_created`, the
+broker's rows, and the lease-holding consumer (`--hold`) proving renewal across
+the 120 s grant, recorded in the trials report once run.

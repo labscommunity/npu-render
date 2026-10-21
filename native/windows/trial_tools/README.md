@@ -28,3 +28,13 @@ hashes in `vm\<name>-source.json`, build with MSVC and write
 `builds\<name>\build-report.json`), the qualification scripts the generated
 trial scripts check, and `build_and_qualify_v24.ps1`, which runs the whole
 chain. The sources here are the ones hashed in those build reports.
+
+## Interactive admission broker
+
+`interactive_broker` is the automatic admission broker (`nr_auto_interactive_broker`),
+its consumer fixture and the lease contract test. It is packaged with the driver's own
+`native_probe_lease.hpp` and `native_auto_admission.hpp` (copied as `admission.hpp`) from
+`native/windows/registered_lab`, so the headers are not duplicated here. One-shot mode
+admits one cued client, as the registration qualification exercises; `--serve <stop file>`
+keeps the session's publication current and admits every same-user interactive client for
+the admission's lifetime, renewing each 120 s lease in place. Build `native-auto-interactive-v8`.

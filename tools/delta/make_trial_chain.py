@@ -438,8 +438,43 @@ Get-Content "$out\\report.json"
                     "    assert report['passed'] and shared.passed,'Native frame or shared default application evidence incomplete at trial deadline'",
                     "    assert report['passed'],'Native frame evidence incomplete at trial deadline'",
                 ),
+                # The resident broker admits every same-user interactive client for the admission's
+                # lifetime (gate 6): started after the leases, polled with them, closed before the
+                # grants are restored. Its build is the serve-capable interactive broker v8.
+                (
+                    "from native_lease_renewal_v1 import Renewal\n",
+                    "from native_lease_renewal_v1 import Renewal\nfrom native_resident_broker_v1 import ResidentBroker\n",
+                ),
+                (
+                    "shared=None;worker=None;installer=None;",
+                    "shared=None;resident=None;worker=None;installer=None;",
+                ),
+                (
+                    "    report['shared_application_qualified']=False;report['shared_application_disabled']=True;save()\n",
+                    "    report['shared_application_qualified']=False;report['shared_application_disabled']=True;save()\n"
+                    "    resident=ResidentBroker(v.transaction,worker,suffix,session['console_session'],env,own_process,Path(os.environ['LOCALAPPDATA'])/'npu-render/builds/native-auto-interactive-v8')\n"
+                    "    report['resident_broker_pid']=resident.start();report['resident_admission']=True;save()\n",
+                ),
+                (
+                    "        if renewal.poll(stop_after_tick=k.GetTickCount64()+int((deadline-time.perf_counter())*1000)):report['lease_renewals']=renewal.renewals;save()\n",
+                    "        if renewal.poll(stop_after_tick=k.GetTickCount64()+int((deadline-time.perf_counter())*1000)):report['lease_renewals']=renewal.renewals;save()\n"
+                    "        if resident:report['resident_broker']=resident.poll()\n",
+                ),
+                (
+                    "        except Exception as error:report['shared_application_cleanup_error']=repr(error);report['passed']=False\n",
+                    "        except Exception as error:report['shared_application_cleanup_error']=repr(error);report['passed']=False\n"
+                    "    if resident:\n"
+                    "        try:report['resident_broker']=resident.close();report['passed']=report['passed'] and report['resident_broker']['grants_restored_exactly']\n"
+                    "        except Exception as error:report['resident_broker_cleanup_error']=repr(error);report['passed']=False\n",
+                ),
             ],
             "bootstrap-no-stimulus",
+        )
+        write(
+            "native_resident_broker_v1.py",
+            (Path(__file__).resolve().parent / "native_resident_broker_v1.py").read_text(
+                encoding="utf-8"
+            ),
         )
     write("native_desktop_bootstrap_v50.py", boot)
     write(
@@ -755,6 +790,13 @@ Get-Content "$out\\report.json"
                     "input_forwarding_tested=$false;tahoma_tested=$false}",
                     "input_forwarding_tested=$false;tahoma_tested=$false;no_stimulus=$true}",
                 ),
+                # With the resident broker an ordinary application's default-adapter device request
+                # succeeds; the wrapper records that outcome instead of only the probe's rows.
+                (
+                    " $report.application_adapter_observation=@($adapterRows|Where-Object {$_.adapter_observation -or $_.default_device_request -or $_.adapter_probe_started})\n",
+                    " $report.application_adapter_observation=@($adapterRows|Where-Object {$_.adapter_observation -or $_.default_device_request -or $_.adapter_probe_started})\n"
+                    " $report.application_default_device_created=@($adapterRows|Where-Object {$_.default_device_request -and $_.device_created}).Count -gt 0\n",
+                ),
                 (
                     "$screenStarted=$false;$clickCued=$false;$keyCued=$false;$appCued=$false;$appStarted=$false;$repeatStarted=$false;$repeatFinished=$false;$animationObserved=$null",
                     "$screenStarted=$false",
@@ -914,6 +956,8 @@ Get-Content "$out\\report.json"
     ]
     desk_manifest["relay_native_frames_v9.py"] = produced["relay_native_frames_v9.py"]
     desk_manifest["cursor_recovery_watchdog_v4.py"] = produced["cursor_recovery_watchdog_v4.py"]
+    if args.no_stimulus:
+        desk_manifest["native_resident_broker_v1.py"] = produced["native_resident_broker_v1.py"]
     if args.no_stimulus:
         desk_manifest[NO_STIMULUS_VALIDATOR] = produced[NO_STIMULUS_VALIDATOR]
     write("native-desktop-v76-source.json", json.dumps(desk_manifest, indent=2) + "\n")
