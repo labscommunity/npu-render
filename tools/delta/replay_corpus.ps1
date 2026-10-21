@@ -2,12 +2,14 @@
 # the per-build correctness gate that runs in minutes, before any live trial. A capture is a
 # bootstrap "requests" directory with an index.jsonl; a request without a recorded response (the
 # worker failed on it) is still replayed, because that is exactly the case worth catching.
-param([Parameter(Mandatory=$true)][string]$Build,[string[]]$Captures=@(),[string]$Output='',[string]$FrameBlobs='frame-blobs-v18\deploy',[int]$MaxDiff=2,[double]$MaxFraction=0.01)
+param([Parameter(Mandatory=$true)][string]$Build,[string[]]$Captures=@(),[string]$Output='',[string]$FrameBlobs='frame-blobs-v18\deploy',[int]$MaxDiff=2,[double]$MaxFraction=0.01,[int]$Latest=5)
 $ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue'
 $r="$env:LOCALAPPDATA\npu-render";$b="$r\builds\$Build\Release";$py="$r\toolchains\openvino-2026.4.1\Scripts\python.exe"
 if(!$Output){$Output="$r\vm\replay-corpus-$Build-$(Get-Date -Format 'MMdd-HHmmss')"}
 New-Item -ItemType Directory $Output|Out-Null
-if(!$Captures.Count){ $Captures=@(Get-ChildItem "$r\vm" -Directory | Where-Object { $_.Name -match '^native-desktop-admission-v\d+$' -and (Test-Path "$($_.FullName)\bootstrap\requests\index.jsonl") } | ForEach-Object { "$($_.FullName)\bootstrap\requests" }) }
+# Without an explicit list, the $Latest most recent admissions' captures form the corpus (the older
+# per-draw-era captures replay too, but dozens of them take hours and are not a build gate).
+if(!$Captures.Count){ $Captures=@(Get-ChildItem "$r\vm" -Directory | Where-Object { $_.Name -match '^native-desktop-admission-v(\d+)$' -and (Test-Path "$($_.FullName)\bootstrap\requests\index.jsonl") } | Sort-Object { [int]($_.Name -replace '\D','') } | Select-Object -Last $Latest | ForEach-Object { "$($_.FullName)\bootstrap\requests" }) }
 $envs=@("NR_RENDER_PTL_COMPLEX_BLOB=$r\vm\ptl-six-span-complex-shader-v1\patched.blob","NR_RENDER_PTL_RECTANGLE_BLOB=$r\vm\ptl-six-span-point-rectangle-v2\patched.blob","NR_RENDER_PTL_LONG_BLOB=$r\vm\ptl-six-span-long-shader-v2\patched.blob","NR_RENDER_PTL_PROGRAM_BLOB=$r\vm\ptl-six-span-program-compact-v1\patched.blob","NR_RENDER_PTL_MASKED_BLOB=$r\vm\ptl-six-span-masked-v1\patched.blob","NR_RENDER_PTL_GEOMETRY_BLOB=$r\vm\ptl-six-span-geometry-v2\patched.blob","NR_RENDER_PTL_TEXTURE_BLOB=$r\vm\ptl-six-span-three-texture-v1\patched.blob","NR_RENDER_PTL_SOLID_BLOB=$r\vm\ptl-six-span-solid-v3\patched.blob","NR_RENDER_PTL_FOUR_TAP_BLOB=$r\vm\ptl-six-span-general-v1\patched.blob","NR_RENDER_PTL_RESIDENT_CLIP_BLOB=$r\vm\ptl-six-span-resident-clip-v3\patched.blob","NR_RENDER_PTL_FRAME_BLOB_DIR=$r\vm\$FrameBlobs")
 $envArgs=@();foreach($e in $envs){$envArgs+='--env';$envArgs+=$e}
 $summary=[ordered]@{build=$Build;frame_blobs=$FrameBlobs;started=[DateTime]::UtcNow.ToString('o');captures=@();passed=$false}
