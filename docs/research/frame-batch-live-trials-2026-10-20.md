@@ -1023,3 +1023,28 @@ answer. No user-mode dump was written in trial 15 because the dump folder sat
 under the user profile, which DWM's own account cannot write; dumps now go to
 `C:\ProgramData\T8-NpuRender-Dumps` for both `dwm.exe` and `WUDFHost.exe`, and
 a helper starts the saver at a chosen second so the case reproduces in minutes.
+
+## Trial 16 (generation 22): the screen saver crash reproduced in six minutes, with a dump
+
+A 660 s admission with the saver requested through the system path five minutes
+in (`trigger_screen_saver_later.ps1` sets the user's saver and broadcasts
+`WM_SYSCOMMAND SC_SCREENSAVE`; launching the `.scr` directly only opens a window
+on the default desktop and changes nothing). Winlogon logged the screen-saver
+start at 20:15:11Z and `dwm.exe` crashed the same second with the trial-14
+signature, this time leaving a full dump (`dwm.exe.8220.dmp`, 685 MB). The
+debugger's verdict:
+
+```
+ERROR_CODE: (NTSTATUS) 0x889800b0 - DWM failed to create a graphics device.
+KERNELBASE!RaiseFailFastException
+dwmcore!MilCompositionEngine_CreateChannel+0x18e349
+dwmcore!MilCompositionEngine_Initialize+0x18068
+```
+
+The screen-saver desktop switch makes DWM initialise another composition
+engine and create another graphics device on the primary adapter, ours, and
+that creation fails, so DWM fails fast. Our trace in that DWM process records
+four `open_adapter` entries and only the first admission's `create_device`, so
+the second device never reached our device-creation entry: the failure is in
+the adapter open or in the runtime and kernel steps before it. This is the
+first product defect of gate 4 with a six-minute reproduction and a dump.
