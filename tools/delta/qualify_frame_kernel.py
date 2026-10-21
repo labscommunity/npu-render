@@ -55,9 +55,14 @@ def load_fixtures(path):
     return records
 
 
-def compare(name, expected, actual):
-    tw, th = struct.unpack_from("<II", expected, 16)
-    live = 64 + tw * th * 4
+def compare(name, inputs, expected, actual):
+    # The output span is a 64-byte header followed by the tile pixels. The tile size
+    # is in the input span (offsets 16 and 20); the output header carries the escape
+    # and loop-overflow counters there. A span the kernel rejects (status != 0) leaves
+    # the pixel area unwritten on the device, so only its header is compared.
+    tw, th = struct.unpack_from("<II", inputs, 16)
+    (expected_status,) = struct.unpack_from("<I", expected, 4)
+    live = 64 if expected_status else 64 + tw * th * 4
     if expected[:live] == actual[:live]:
         return None
     first = next(i for i in range(live) if expected[i] != actual[i])
@@ -74,7 +79,12 @@ def compare(name, expected, actual):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--carrier", type=Path, required=True)
-    parser.add_argument("--kernel-elf", type=Path, required=True)
+    parser.add_argument("--kernel-elf", type=Path, help="kernel ELF whose text patches the carrier")
+    parser.add_argument(
+        "--patched-blob",
+        type=Path,
+        help="run an already patched carrier (a deployed blob) instead of patching --kernel-elf",
+    )
     parser.add_argument("--fixtures", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--repeat", type=int, default=1, help="timing repeats of the whole set")
@@ -110,16 +120,28 @@ def main():
         SPAN = carrier_module.SPAN
         original = args.carrier.read_bytes()
         assert hashlib.sha256(original).hexdigest() == carrier_module.ORIGINAL_SHA, "carrier pin"
-        elf = args.kernel_elf.read_bytes()
-        text = read_kernel_text(elf)
-        patched, proof = carrier_module.patch(original, text)
+        if (args.kernel_elf is None) == (args.patched_blob is None):
+            raise RuntimeError("pass exactly one of --kernel-elf and --patched-blob")
+        if args.patched_blob is not None:
+            patched = args.patched_blob.read_bytes()
+            proof = carrier_module.inspect(original)
+            proof.update(
+                patched_blob=str(args.patched_blob),
+                patched_sha256=hashlib.sha256(patched).hexdigest(),
+            )
+            assert len(patched) == len(original), "patched blob size"
+            report.update(patched_blob=str(args.patched_blob))
+        else:
+            elf = args.kernel_elf.read_bytes()
+            text = read_kernel_text(elf)
+            patched, proof = carrier_module.patch(original, text)
+            report.update(
+                kernel_elf_sha256=hashlib.sha256(elf).hexdigest(),
+                kernel_text_bytes=len(text),
+            )
         (args.output / "patched.blob").write_bytes(patched)
         write(args.output / "contract.json", proof)
-        report.update(
-            kernel_elf_sha256=hashlib.sha256(elf).hexdigest(),
-            kernel_text_bytes=len(text),
-            patched_sha256=hashlib.sha256(patched).hexdigest(),
-        )
+        report.update(patched_sha256=hashlib.sha256(patched).hexdigest())
         records = load_fixtures(args.fixtures)
         if args.only:
             records = [r for r in records if any(r[0].startswith(prefix) for prefix in args.only)]
@@ -203,13 +225,11 @@ def main():
                     )
                     if repeat:
                         continue
-                    for row, (name, _, expected) in enumerate(group):
-                        if args.timing_only:
-                            continue
+                    for row, (name, inputs, expected) in enumerate(group):
                         if args.timing_only:
                             continue
                         actual = output[row].tobytes()
-                        difference = compare(name, expected, actual)
+                        difference = compare(name, inputs, expected, actual)
                         compared += 1
                         if difference:
                             report["mismatches"].append(difference)
