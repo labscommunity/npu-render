@@ -228,3 +228,193 @@ Where the frame time goes, measured across the four trials:
 The per-draw baseline was 0.7 updates/s; the batched renderer reaches 1.9-2.2
 on this harness. Reaching 30 needs the strip batched and roughly a five-fold
 reduction of kernel time per frame; the measurements above bound each term.
+
+## Two texel windows, kernel fills and copies, derivatives (builds v15-v20, blobs v4-v10)
+
+The seam limit of trial 4 is gone: `nr_sample` serves a tap from either of two
+rectangular windows per texture (`textures2` in the command record, window B in
+`nr_command_state`), the planner's affine evaluation yields two-case values at
+`frc`/`floor` crossings and `texel_windows` returns up to two rectangles, and the
+executor bisects a 128-pixel tile when its first command does not fit a span.
+Replaying the trial-2 capture (1,335 requests) through the v17 worker and the
+nine v6 blobs put all 108 c71638aa draws on the kernel (57 at 32-pixel tiles,
+37 at 64, 14 at 128) with zero window escapes and 176 tile splits; 19 glyph
+draws of 318-348 vertices remain on the per-draw route (span budget).
+
+The replay attributes kernel time per shader and tile (single-shader batches):
+
+| Shader, tile | Batches | Kernel ms | Requests | Covered px | ms per request | us per covered px |
+| --- | --- | --- | --- | --- | --- | --- |
+| c71638aa, 32 | 114 | 3,238 | 342 | 2.80 M | 9.5 | 1.16 |
+| c71638aa, 64 | 74 | 2,347 | 84 | 2.05 M | 27.9 | 1.14 |
+| 95b1c4fb, 128 | 32 | 385 | 44 | 6.94 M | 8.8 | 0.055 |
+| d8e0b497, 128 | 130 | 295 | 95 | 155 k | 3.1 | 1.9 |
+| b7f4e6d0, 128 | 60 | 82 | 90 | 45 k | 0.9 | 1.8 |
+
+Total kernel time rose from 22.5 s (seven blobs, strip on the per-draw route) to
+36.4 s because the strip now runs on the kernel (about 6 s of it) and the
+derivative shaders d305ca5e/e455f7a5 joined it; the per-draw route's time for
+those draws left the ledger. For the animation frame the strip draw costs
+28-32 ms of kernel time against 400-600 ms on the per-draw route.
+
+Other changes validated by the same replays: clears execute as kernel fill
+commands (kind 1, ~2 ms per request) and region copies as kind-2 commands
+between resident resources; map hooks flush before a read or write of a batched
+resource; the derivative opcodes (`deriv_rtx`/`deriv_rty`) lower to per-row
+gradients of the interpolated varyings with the quotient rule under perspective;
+the uncaptured taskbar glyph pair (e87ed647 over vs 54e59055) and a 64x64 pass
+(0324b34c) were recovered from the trial-2 request log and compiled into the
+inventory (50 native programs); the deployed blob manifest lists each blob's
+programs and the worker disables a blob whose list differs from its inventory;
+a failing kernel tile (status or request error) restores the touched region and
+sends the run through the per-draw route instead of failing the batch.
+
+## Device float semantics: the acrylic alpha (batch 46)
+
+The tolerance replay flags one batch: the taskbar strip drawn over a transparent
+target. The kernel wrote alpha 255 where the recorded per-draw route wrote 250
+(RGB identical, all 276,480 covered pixels). The SM4 scalar reference, run on the
+real vertices, constants and textures of that pixel, gives alpha 0.98086 (250):
+the kernel was wrong. Causes found and fixed, each with a host check:
+
+1. `nr_v4_min`/`nr_v4_max` returned NaN when the first operand was NaN; SM4
+   returns the other operand. The acrylic shader divides the noise texture's
+   colour by its alpha, which is zero in this frame. Host trials with transparent
+   textures went from 34 of 64 cases more than one byte off to none.
+2. The SHAVE divider does not give inf/NaN for x/0 and 0/0 (the host did, so
+   fixtures with random textures could not show it). `nr_v4_div` now forces the
+   IEEE results explicitly, out of line (inline copies pushed blobs 6-8 past the
+   code window).
+3. Comparisons are now explicitly ordered (a NaN operand gives false for lt/ge/eq
+   and true for ne) so a device compare with other unordered behaviour cannot
+   change a select.
+
+The host test gained 32 transparent-texture trials per program and a fixture
+("transparent-textures-<sha>") per textured program; `strip_check` in the
+session scratchpad builds fixtures from the real strip tiles of the capture so
+the device result for this exact draw is checked by `qualify_frame_kernel.py`.
+
+## Transparent source-over draws
+
+The animation frame batch (eleven commands over the 1024x768 target and its
+1024x48 taskbar strip target) contains two solid 95b1c4fb draws per target whose
+vertex colour is (0, 0, 0, 0) under source-over blending: the planner proves the
+pixel stage writes exactly zero (three zero vertex values interpolate to zero
+without a drift guard) and the executor records such a draw as a no-op that
+touched no device. The replay skips 185 of 565 such draws and saves 7% of kernel
+requests. The two "full-region" source-over passes are not no-ops: they are
+one-pixel anti-aliasing rings (vertices at -0.5 and 32767.5) whose covered area is
+small because the rasteriser computes exact per-row spans.
+
+## Trial 6 (build v20, ten programs more, blobs v10): 1.9 updates/s
+
+`native-live-v72` (registration v61, package v30 / 0.0.1330.0, `frame-blobs-v10`)
+passed every chain gate; `native-repeated-input-v16-analysis` reports 1.9 verified
+updates/s (21 unique submissions, 19 displayed in the window), unchanged from
+trial 4 although the strip, the derivative shaders and the glyph pair now run on
+the kernel. The archived trace explains the frame time:
+
+| Flush reason | Flushes | Wall ms (sum) |
+| --- | --- | --- |
+| hazard (a draw samples a texture rendered earlier in the batch) | 599 | 43,813 |
+| present | 121 | 8,802 |
+| legacy_draw (per-draw route) | 138 | 6,777 |
+| write / read / limit | 73 | 5,282 |
+
+931 flushes carried 1.46 GB of uploads and 601 MB of writebacks; the kernel ran
+4,287 requests for 32.0 s, and 139 per-draw executions took 29.7 s: 112 of them are
+the blur pass e3ebf67c (two loops with `breakc`, 18 samples, mirror addressing)
+drawn into 128x64 and 192x64 noise targets every frame, the rest derivative draws
+whose point-sampled 2880x1800 source cannot be bounded to a span window. Each
+animation submission waits about 520 ms.
+
+Two changes follow from this trace and ship in build v24 / blobs v14 (the v23
+worker was withdrawn by its own replay: a loop-range test in the planner's
+evaluator was true outside loops, so no temporary was ever written, 532 draws
+"proved" transparent and 670 recorded batches answered missing; the host suite
+now cross-checks every transparency proof against the host kernel on the quad
+fixture, and `frame_batch_planner.hpp` keeps the fix):
+
+1. The driver no longer flushes at an intra-batch hazard. The worker executes the
+   batch in order and fetches texel windows from its resident copy after the
+   earlier runs have applied, so a draw that samples a texture rendered earlier in
+   the same batch reads the right pixels; the executor already flushes its own
+   kernel run when a draw samples that run's target. `NR_RENDER_FRAME_BATCH_HAZARD_FLUSH=1`
+   restores the flush. Correctness is checked by replaying the next trial's capture
+   against the per-draw route.
+2. The kernel runs SM4 loops (`loop`/`breakc`/`endloop`, bounded by the reference
+   interpreter's budget of 16 iterations and reported through the escape counter)
+   and mirror addressing per axis (bit 17/18 of the texture binding; the planner
+   folds mirrored coordinate spans onto one period and takes the whole texture when
+   a span crosses a fold). The blur pass lowers natively and matches the reference
+   on the host (36 of 36 comparable cases exact; the host suite now compares every
+   program with mirror samplers and coordinates in [-0.5, 1.5]), but its 224
+   instruction row function compiles to 27,472 B with the runtime, 3 KB over the
+   24,496 B code window (the runtime alone is about 18.5 KB), so blob 9 is not
+   deployed and e3ebf67c stays on the per-draw route: the worker reports
+   "kernel blob 9 unavailable" for it. Fitting it needs a smaller runtime or a
+   carrier with a larger code window.
+
+Replaying the trial-2 capture through the v24 worker and blobs v14: 315 batches
+exact, 332 within tolerance, zero window escapes, 185 no-op draws, 122 blur draws
+on the per-draw route inside their batches ("kernel blob 9 unavailable") and 19
+glyph draws over the span budget; the one batch beyond tolerance is the strip.
+
+The acrylic strip's alpha (255 against the per-draw route's 250) is still open,
+but it is not the kernel code: the worker's spans for that batch, dumped with
+`NR_RENDER_FRAME_SPAN_DUMP`, are byte-identical to the fixture spans, and the
+qualification tool gets 250 from the same deployed blob for them alone, in full
+twelve-row requests, with stale bytes past the declared prefix, and after other
+blobs ran in the same process. The one remaining difference is how the worker's
+provider drives the inference request (it writes spans into the request's own
+input buffer and reuses the request); an attempt to hand the plugin a host tensor
+per request failed its request and fell back to the per-draw route, which is why
+it first looked like a fix. Build v28 keeps three diagnostic switches for the
+next step (`NR_RENDER_FRAME_FULL_SPAN_COPY`, `NR_RENDER_FRAME_INPUT_TENSOR_COPY`,
+`NR_RENDER_FRAME_ZERO_OUTPUT`).
+
+## Trial 7 (build v24, blobs v14, no hazard flushes): 2.3 updates/s
+
+`native-live-v73` (registration v62, package v31 / 0.0.1331.0, `frame-blobs-v14`)
+passed every chain gate; `native-repeated-input-v17-analysis` reports 2.3
+verified updates/s (26 unique submissions, 25 verified on the display counter, 23
+inside their scheduled interval). The driver flushed 229 batches instead of 931
+(no hazard flushes; 125 presents, 71 writes, 28 per-draw routes, 3 limits) and
+batched 4,794 draws against 29 unbatched. Each submission still waits about
+470-530 ms. The trace puts the remaining time in two places:
+
+| Component | Measured in trial 7 | Cause | Change |
+| --- | --- | --- | --- |
+| 28 per-draw routes, ~500 ms each | 14.3 s over the trial, about one per animation frame | d305ca5e/e455f7a5 sampling the 2880x1800 or 2880x96 texture point-sampled: the planner reported the whole texture because the interpolation drift guard added a noise symbol to every varying and the derivative evaluator refused any symbol it did not know | drift-guard symbols are marked pixel-independent (their screen derivative is zero): both draws now plan bounded windows (184x50 at 64 px tiles, 530x96 at 64 px for the 350x12 draw) and fit |
+| Present flush: p50 109 ms, p90 969 ms | 93 s over 125 presents; kernel p50 75 ms of it, uploads p50 532 KB and p90 31 MB | about ten kernel requests per frame plus the frame's texture uploads | the kernel's per-pixel cost (below) and the upload volume |
+
+The kernel ran 4,545 requests for 38.3 s in the trial. Its per-pixel cost is
+unchanged (about 45 ns for the simple passes, 1.15 us for the acrylic strip), so
+even with every draw batched the animation frame needs roughly 100 ms of NPU
+time: 30 updates/s remains out of reach without a faster kernel (several pixels
+per vector, which the 24,496 B code window allows only for the small shaders) or
+more SHAVE engines per request.
+
+## Trial 8 (build v28, blobs v14, derivative windows bounded): 2.8 updates/s
+
+`native-live-v74` (registration v63, package v32 / 0.0.1332.0, `frame-blobs-v14`)
+passed every chain gate; `native-repeated-input-v18-analysis` reports 2.8
+verified updates/s (30 unique submissions, 30 verified on the display counter, 28
+inside their scheduled interval). 4,810 draws were batched and 12 took the
+per-draw route (ten 318-348 vertex glyph runs over the span budget and two draws
+of an uncaptured pair, 1b8e912b/2ad136ed); the trial flushed 247 batches (146
+presents, 85 writes, 11 per-draw routes, 4 limits, 1 read) with 1.25 GB of
+uploads and 479 MB of writebacks, and the kernel ran 4,694 requests for 42.0 s.
+
+The first five animation submissions were accepted 20-50 ms apart (latency
+59-86 ms); from the sixth on each one waits 470-515 ms again. The present flush
+median is 63 ms (p90 1,016 ms), kernel time per flush median 35 ms (p90 416 ms),
+uploads p90 28 MB: the frame's cost is now the kernel work on about 1.6 Mpx of
+simple passes plus the acrylic strip, the texture uploads of the frame, and the
+present-flush round trip, with no per-draw route in the animation path.
+
+Trials in this report: 0.7 (per-draw baseline), 2.1, 2.2, 1.9, 1.9, 1.9, 1.9, 2.3,
+2.8 verified updates/s. Reaching 30 needs the kernel's per-pixel cost down by
+roughly an order of magnitude (several pixels per vector for the small shaders,
+all SHAVE engines per request, a larger carrier code window for the big ones),
+fewer and smaller uploads per present, and a lower per-request floor.
