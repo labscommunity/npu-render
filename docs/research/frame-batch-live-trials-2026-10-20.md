@@ -1111,3 +1111,17 @@ Harness note: the input stimulus (`--input-stimulus`) failed at its start with
 state when it starts. A run without it still exercises the admission, the
 renewals and the presentation path, and its live verdict is read from the
 admission and bootstrap reports; the stimulus-free wrapper avoids the gate.
+
+## Trial 19 (generation 26, two-hour soak attempt without capture): 39 minutes, ended by the saver again
+
+Build v44 and package v38, 1200 s first grant, no request capture, and the OLED
+Care timer raised to 86,400 s in the registry for the run. Two renewals passed,
+61 frames were observed on an idle desktop (the input stimulus failed at start
+as in generation 21), and at 21:19:50Z, 2350 s in, Winlogon logged the
+screen-saver start regardless of the raised timer: the ASUS service does not
+re-read the value while running. DWM did not crash (the build v44 change
+holds); the indirect display's consumer exited on access lost, the relay and
+presenter ended with the desktop switch, and the controller restored the
+display. The next soak stops the ASUS OLED Care processes for its duration
+(`suspend_oled_care.ps1`) and restarts them after; the harness-side item, the
+presenter and relay re-attaching after a desktop switch, stays open.
