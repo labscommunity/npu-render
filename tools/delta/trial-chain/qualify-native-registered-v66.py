@@ -10,7 +10,7 @@ v=a.parse_args();v.output.mkdir(exist_ok=False);out=v.output
 for path in (v.worker,v.client):
  b=obj(path.parent.parent/'registered-build-report.json');assert b['clean_build'] and hashlib.sha256(path.read_bytes()).hexdigest()==b['binary_sha256'][path.name].lower()
 package=obj(v.package/'report.json');entry=next(x for x in package['files'] if x['name']=='nr_native_probe_umd.dll')
-assert package['prepared'] and package['version']=='0.0.1334.0' and package['admission_protocol']==3 and package['hardware_id']=='ROOT\\NPURENDER_NATIVE_PROBE' and hashlib.sha256(v.dll.read_bytes()).hexdigest()==entry['sha256'].lower()
+assert package['prepared'] and package['version']=='0.0.1335.0' and package['admission_protocol']==3 and package['hardware_id']=='ROOT\\NPURENDER_NATIVE_PROBE' and hashlib.sha256(v.dll.read_bytes()).hexdigest()==entry['sha256'].lower()
 env=os.environ.copy();env['PATH']=str(v.runtime)+os.pathsep+env.get('PATH','');env.update(NR_RENDER_NPU_CACHE=str(v.cache),NR_RENDER_SHARED_QUEUE='1',NR_RENDER_PIPELINE_CACHE='retained',NR_RENDER_MEMORY_CACHE='1',NR_RENDER_MEMORY_CACHE_CAPACITY='512',NR_RENDER_TEXTURE_SCOPE='1',NR_RENDER_GENERIC_BATCH='4096',NR_RENDER_UNIFORM_LANES='0',NR_RENDER_COMPACT_COVERAGE='0',NR_RENDER_SHARED_CORE='1',NR_RENDER_OPAQUE_CROP='1',NR_RENDER_QUAD_BATCH='1')
 model=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm/ptl-six-span-general-v1/patched.blob'
 assert hashlib.sha256(model.read_bytes()).hexdigest()=='710f6e5586da59f4040213435c5ecc13bb669e6b1be668f838edd00bca5dd697'
@@ -43,7 +43,7 @@ resident=Path(os.environ['LOCALAPPDATA'])/'npu-render/vm/ptl-six-span-resident-c
 assert hashlib.sha256(resident.read_bytes()).hexdigest()=='a5c39dbb825fdd4bd334d8bcbef966e9404132d9b642375665a0892adc48c45c'
 env['NR_RENDER_PTL_RESIDENT_CLIP_BLOB']=str(resident)
 env['NR_RENDER_INTERACTIVE_PIPE']='1'
-env['NR_RENDER_PTL_FRAME_BLOB_DIR']=str(Path(os.environ['LOCALAPPDATA'])/'npu-render/vm/frame-blobs-v17/deploy')
+env['NR_RENDER_PTL_FRAME_BLOB_DIR']=str(Path(os.environ['LOCALAPPDATA'])/'npu-render/vm/frame-blobs-v18/deploy')
 env.pop('NR_RENDER_AFFINE_BATCH',None)
 for key in ('NR_RENDER_RECOVERY_TEST_KILL_TICKET','NR_RENDER_RECOVERY_TEST_EXCEPTION_TICKET','NR_RENDER_PROVIDER_TEST_INFER_EXCEPTION_TICKET'):env.pop(key,None)
 provider_root=out/'provider-processes';provider_root.mkdir(exist_ok=False)

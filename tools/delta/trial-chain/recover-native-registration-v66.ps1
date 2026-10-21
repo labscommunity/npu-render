@@ -1,7 +1,7 @@
 param([Parameter(Mandatory=$true)][string]$Root)
 $ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue'
 $statePath=Join-Path $Root 'ownership.json';$state=Get-Content $statePath -Raw|ConvertFrom-Json
-if($state.schema -ne 1 -or $state.hardware_id -ne 'ROOT\NPURENDER_NATIVE_PROBE' -or $state.version -ne '0.0.1334.0' -or $state.thumbprint -ne '3112355AF6B6C6265E9B849662D3E02F6797343A'){throw 'Recovery ownership contract mismatch'}
+if($state.schema -ne 1 -or $state.hardware_id -ne 'ROOT\NPURENDER_NATIVE_PROBE' -or $state.version -ne '0.0.1335.0' -or $state.thumbprint -ne '3112355AF6B6C6265E9B849662D3E02F6797343A'){throw 'Recovery ownership contract mismatch'}
 $mutex=[Threading.Mutex]::new($false,'Global\T8.NpuRender.NativeRegistrationRecovery.v3');$held=$false
 $report=[ordered]@{started=[DateTime]::UtcNow.ToString('o');completed=$false;passed=$false;devices_removed=@();packages_removed=@();certificate_stores_restored=@();errors=@()}
 try {
@@ -32,7 +32,7 @@ try {
  if($remaining.Count){throw 'Diagnostic adapter remains present'}
  foreach($prior in $state.physical_display_before){$now=Get-PnpDevice -InstanceId $prior.instance -PresentOnly;if($now.Status -ne $prior.status){throw 'Original display device health changed'}}
  $report.passed=$true
- Unregister-ScheduledTask -TaskName 'T8-NpuRender-NativeRecovery-v65' -Confirm:$false -ErrorAction SilentlyContinue
+ Unregister-ScheduledTask -TaskName 'T8-NpuRender-NativeRecovery-v66' -Confirm:$false -ErrorAction SilentlyContinue
 }catch{$report.errors+= $_.Exception.Message}
 finally {
  $report.completed=$true;$report.finished=[DateTime]::UtcNow.ToString('o');$report|ConvertTo-Json -Depth 6|Set-Content "$Root\recovery-report.json"
