@@ -332,8 +332,9 @@ def main():
                 str(args.output.resolve()),
                 "--optimize",
                 args.optimize,
-                *[flag for extra in args.cc1_extra for flag in ("--cc1-extra", extra)],
-                *[flag for extra in args.asm_extra for flag in ("--asm-extra", extra)],
+                # Joined form: the values may start with a dash.
+                *[f"--cc1-extra={extra}" for extra in args.cc1_extra],
+                *[f"--asm-extra={extra}" for extra in args.asm_extra],
                 *(["--fix-hazards"] if args.fix_hazards else []),
             ]
             with (
