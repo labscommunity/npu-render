@@ -919,3 +919,24 @@ modes but never its border colour, so a border-addressed draw that falls back
 samples a zero border where the driver's own per-draw path would carry the
 sampler's colour. No trial has shown a border-addressed fallback yet; it is
 noted here so the next fallback evidence is read with it in mind.
+
+## Harness changes after trial 13 (2026-10-21)
+
+The 36-minute caps are lifted for the generation-17 run. Built and qualified
+on Delta from the same sources with only the duration limits raised: topology
+control v14 (four hours), presenter v22 with the frame reader qualified on it
+(`live-frame-reader-v13`) and its input-contract qualification, output observer
+v6 with its self-test qualification; the generator emits topology helper v14,
+frame relay v9 and cursor watchdog v3. The indirect display package v3
+(0.0.1503.0) is built from the v2 sources with the renewing lease header; all
+four of its contract tests pass and it is signed with the lab certificate.
+
+The orchestration that cost most of the day is replaced: Delta runs each
+sequence from one JSON plan as a detached scheduled task and rewrites one
+status document per step (`tools/delta/run_delta_sequence.ps1`,
+`delta_sequence.py`); the engine sampler records the GPU 3D engine and the CPU
+shares of dwm, the NPU worker and the indirect host beside every trial; the
+replay-corpus gate (`replay_corpus.ps1`) replays the latest admissions'
+captures on a build before any live run; and the route contract test runs on
+every lab build. Two qualification attempts failed only because the OLED screen
+saver had taken the console, so every plan now stops it first.
