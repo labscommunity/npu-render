@@ -215,6 +215,15 @@ target_compile_options(nr_registered_border_test PRIVATE /W4 /WX)
 set_property(TARGET nr_registered_border_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 add_test(NAME registered_border_contract COMMAND nr_registered_border_test)
 
+# The shared per-draw route (driver recording and worker fallback) against the
+# per-draw packet encoder; a host contract with no provider or device work.
+add_executable(nr_registered_legacy_route_test legacy_route_test.cpp)
+target_compile_features(nr_registered_legacy_route_test PRIVATE cxx_std_17)
+target_compile_options(nr_registered_legacy_route_test PRIVATE /W4 /WX)
+target_link_libraries(nr_registered_legacy_route_test PRIVATE nr_registered_vertex)
+set_property(TARGET nr_registered_legacy_route_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+add_test(NAME registered_legacy_route_contract COMMAND nr_registered_legacy_route_test)
+
 add_executable(nr_registered_compositor_test compositor_test.cpp)
 target_link_libraries(nr_registered_compositor_test PRIVATE nr_registered_vertex)
 target_compile_features(nr_registered_compositor_test PRIVATE cxx_std_17)
