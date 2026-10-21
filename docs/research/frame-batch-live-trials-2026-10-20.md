@@ -1010,3 +1010,16 @@ The trial's input stimulus failed at start (`relative mouse origin failed`, an
 environmental pointer failure the generation-20 run did not show), so the
 desktop idled from the beginning; the run continues toward the screen saver's
 idle trigger with DWM mini dumps enabled.
+
+Trial 15 ended the same way at 20:05:04Z, 2350 s after admission: the screen
+saver started (Winlogon event 6), the indirect host died within five seconds
+(`host.verify()`), the relay ended, and Windows Error Reporting then logged 49
+`LiveKernelEvent` 141 reports, the video engine timeout. DWM itself did not
+crash this time. Two runs, one trigger: the OLED Care screen saver activating
+about 39 minutes into the admission whether or not the trial's input ran. With
+our adapter as the primary renderer the saver's full-screen rendering ends in a
+display engine timeout; which engine timed out is the question the dumps must
+answer. No user-mode dump was written in trial 15 because the dump folder sat
+under the user profile, which DWM's own account cannot write; dumps now go to
+`C:\ProgramData\T8-NpuRender-Dumps` for both `dwm.exe` and `WUDFHost.exe`, and
+a helper starts the saver at a chosen second so the case reproduces in minutes.
