@@ -12,15 +12,19 @@ abandoned controller still expires on schedule.
 
 import ctypes as C
 import datetime
+import os
 import subprocess
 
-k = C.windll.kernel32
-k.MapViewOfFile.restype = C.c_void_p
-k.MapViewOfFile.argtypes = [C.c_void_p, C.c_uint32, C.c_uint32, C.c_uint32, C.c_size_t]
-k.UnmapViewOfFile.argtypes = [C.c_void_p]
-k.GetTickCount64.restype = C.c_uint64
+k = C.windll.kernel32 if os.name == "nt" else None
+if k is not None:
+    k.MapViewOfFile.restype = C.c_void_p
+    k.MapViewOfFile.argtypes = [C.c_void_p, C.c_uint32, C.c_uint32, C.c_uint32, C.c_size_t]
+    k.UnmapViewOfFile.argtypes = [C.c_void_p]
+    k.GetTickCount64.restype = C.c_uint64
 FILE_MAP_WRITE = 2
 SCOPE_MAXIMUM_MS = {0: 120000, 1: 2400000, 2: 2400000, 3: 120000}
+MINIMUM_EXTENSION_MS = 60000
+RENEWAL_SPACING_MS = 30000
 
 
 def extend(grant, milliseconds):
@@ -83,21 +87,28 @@ class Renewal:
         self.margin_seconds = margin_seconds
         self.recovery_slack_seconds = recovery_slack_seconds
         self.renewals = []
+        self.last_renewal_tick = 0
 
     def poll(self, stop_after_tick=None):
         now = k.GetTickCount64()
         soonest = min(g.record.deadline_tick for g in self.grants)
-        if soonest - now > self.margin_seconds * 1000:
+        step = plan_renewal(
+            now,
+            soonest,
+            grant_ms=self.grant_seconds * 1000,
+            margin_ms=self.margin_seconds * 1000,
+            stop_after_tick=stop_after_tick,
+            last_renewal_tick=self.last_renewal_tick,
+        )
+        if not step:
             return False
-        step = self.grant_seconds * 1000
-        if stop_after_tick is not None:
-            step = min(step, max(60000, stop_after_tick - now + 60000))
         deadlines = []
         for grant in self.grants:
             deadlines.append(extend(grant, min(step, SCOPE_MAXIMUM_MS[grant.record.scope])))
         rearm_recovery_task(
             self.task_name, min(deadlines) // 1000 - now // 1000 + self.recovery_slack_seconds
         )
+        self.last_renewal_tick = now
         self.renewals.append(
             dict(
                 observed=datetime.datetime.now(datetime.UTC).isoformat(),
@@ -107,3 +118,21 @@ class Renewal:
             )
         )
         return True
+
+
+def plan_renewal(now, soonest, *, grant_ms, margin_ms, stop_after_tick=None, last_renewal_tick=0):
+    """How many milliseconds to grant now, or 0 when no renewal is due.
+
+    A renewal is due when the soonest deadline is within the margin, it is
+    worth at least `MINIMUM_EXTENSION_MS` beyond that deadline (a grant capped
+    by the run's own end can otherwise never leave the margin, which would renew
+    on every poll), and at least `RENEWAL_SPACING_MS` have passed since the last.
+    """
+    if soonest - now > margin_ms or now - last_renewal_tick < RENEWAL_SPACING_MS:
+        return 0
+    step = grant_ms
+    if stop_after_tick is not None:
+        step = min(step, max(60000, stop_after_tick - now + 60000))
+    if now + step - soonest < MINIMUM_EXTENSION_MS:
+        return 0
+    return step
