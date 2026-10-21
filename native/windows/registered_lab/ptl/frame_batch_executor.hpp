@@ -18,6 +18,7 @@
 #include <map>
 #include <memory>
 #include <set>
+#include <thread>
 #include <unordered_map>
 namespace nr::registered_lab::frame_batch {
 using indexed_exchange::require;
@@ -85,6 +86,7 @@ public:
         const auto copied = std::chrono::steady_clock::now();
         inference.start_async();
         if (!inference.wait_for(std::chrono::milliseconds(10000))) throw std::runtime_error("frame kernel timeout");
+        { static const int settle = [] { char *v = nullptr; size_t n = 0; const int ms = (!_dupenv_s(&v, &n, "NR_RENDER_FRAME_SETTLE_MS") && v) ? std::atoi(v) : 0; std::free(v); return ms; }(); if (settle > 0) std::this_thread::sleep_for(std::chrono::milliseconds(settle)); }   // diagnostic: readback race test
         const auto inferred = std::chrono::steady_clock::now();
         ++requests;
         const auto *output = static_cast<const uint8_t *>(inference.get_output_tensor().data());
@@ -164,7 +166,57 @@ public:
             // Optional fifth field: the kernel identity the device must echo in every output row.
             if (fields >> identity) kernels[blob]->identity = uint32_t(std::stoul(identity, nullptr, 16));
             std::printf("{\"frame_kernel_blob\":%u,\"file\":\"%s\",\"programs_listed\":%s,\"programs_absent\":%zu}\n", blob, file.c_str(), programs.empty() ? "false" : "true", absent); std::fflush(stdout);
+            // Self-test: NR_RENDER_FRAME_SELF_TEST=1 runs the blob's own fixtures (frame-fixtures-blob<k>.bin next
+            // to the blob) through this provider and compares with the host kernel's expectations; "strict"
+            // also retires a blob that disagrees so its draws take the per-draw route.
+            char *mode = nullptr; size_t mode_length = 0;
+            if (!_dupenv_s(&mode, &mode_length, "NR_RENDER_FRAME_SELF_TEST") && mode && *mode && *mode != '0') {
+                const bool strict = std::string(mode) == "strict";
+                const auto result = self_test(*kernels[blob], blob_dir / ("frame-fixtures-blob" + std::to_string(blob) + ".bin"));
+                std::printf("{\"frame_kernel_self_test\":true,\"blob\":%u,\"fixtures\":%zu,\"mismatches\":%zu,\"unstable\":%zu,\"first\":\"%s\",\"first_offset\":%lld,\"first_bytes\":\"%s\",\"strict\":%s}\n", blob, result.fixtures, result.mismatches, result.unstable, result.first.c_str(), (long long)result.first_offset, result.first_bytes.c_str(), strict ? "true" : "false"); std::fflush(stdout);
+                if (strict && result.mismatches) kernels[blob].reset();
+            }
+            std::free(mode);
         }
+    }
+    struct SelfTest { size_t fixtures = 0, mismatches = 0, unstable = 0; std::string first, first_bytes; long long first_offset = -1; };
+    // Runs a fixture file (NRFFIX01: records of name, span, expected output) through the provider in
+    // groups of twelve rows; the expected rows come from the host kernel built with the blob's identity.
+    static SelfTest self_test(FrameKernelProvider &kernel, const std::filesystem::path &fixtures) {
+        SelfTest r; std::ifstream file(fixtures, std::ios::binary); if (!file) return r;
+        std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        if (bytes.size() < 24 || std::memcmp(bytes.data(), "NRFFIX01", 8) != 0) return r;
+        uint32_t count; uint64_t span; std::memcpy(&count, bytes.data() + 12, 4); std::memcpy(&span, bytes.data() + 16, 8);
+        if (span != frame::span_bytes) return r;
+        struct Record { std::string name; const uint8_t *input; const uint8_t *expected; };
+        std::vector<Record> records; size_t at = 24;
+        for (uint32_t n = 0; n < count && at + 4 <= bytes.size(); ++n) {
+            uint32_t length; std::memcpy(&length, bytes.data() + at, 4); at += 4;
+            if (at + length > bytes.size()) break;
+            std::string name(reinterpret_cast<const char *>(bytes.data() + at), length); at += length; while (at % 4) ++at;
+            if (at + 2 * span > bytes.size()) break;
+            records.push_back({name, bytes.data() + at, bytes.data() + at + span}); at += 2 * span;
+        }
+        for (size_t first = 0; first < records.size(); first += FrameKernelProvider::rows) {
+            std::vector<std::vector<uint8_t>> spans, outputs;
+            for (size_t n = first; n < records.size() && n < first + FrameKernelProvider::rows; ++n) spans.emplace_back(records[n].input, records[n].input + span);
+            std::vector<std::vector<uint8_t>> again;
+            try { kernel.execute(spans, outputs); kernel.execute(spans, again); } catch (const std::exception &) { r.mismatches += spans.size(); if (r.first.empty()) r.first = records[first].name + " (request failed)"; r.fixtures += spans.size(); continue; }
+            for (size_t n = 0; n < spans.size(); ++n) {
+                ++r.fixtures; const auto &expected = records[first + n].expected; const auto &actual = outputs[n];
+                // Compare the live part: header words and the tile pixels (the executor reads exactly that much).
+                const size_t live = actual.size(); bool same = std::memcmp(expected, actual.data(), live) == 0;
+                if (again[n] != actual) ++r.unstable;   // the device answered differently to the same request
+                if (!same) {
+                    ++r.mismatches;
+                    if (r.first.empty()) {
+                        r.first = records[first + n].name;
+                        for (size_t k = 0; k < live; ++k) if (expected[k] != actual[k]) { r.first_offset = (long long)k; char buf[16]; for (size_t j = k; j < live && j < k + 8; ++j) { std::snprintf(buf, sizeof buf, "%02x", expected[j]); r.first_bytes += buf; } r.first_bytes += "/"; for (size_t j = k; j < live && j < k + 8; ++j) { std::snprintf(buf, sizeof buf, "%02x", actual[j]); r.first_bytes += buf; } break; }
+                    }
+                }
+            }
+        }
+        return r;
     }
     bool kernel_available() const { for (const auto &k : kernels) if (k) return true; return false; }
     uint64_t current_generation() const { return generation; }

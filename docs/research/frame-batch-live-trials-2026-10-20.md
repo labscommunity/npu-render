@@ -454,4 +454,30 @@ and run on the NPU first. Only the C++ worker produces 255, even with a single b
 loaded. Build v33 adds a provider self-test (`NR_RENDER_FRAME_SELF_TEST=1`, `strict`
 retires a disagreeing blob) that runs each blob's own fixtures through the worker's
 provider at startup, which is both the next discriminator and a startup health check
-for the deployed worker.
+for the deployed worker. It reproduces the problem on fixed inputs: with the same
+blobs and fixture files that pass completely in the Python tool, the worker's
+provider disagrees with the host on 5 of 9 fixtures of blob 7 (c71638aa), 5 of 9
+of blob 8 (39799859) and 7 of 9 of blob 9 (ec1e65f6), the three long-running
+shaders, and agrees on every small-shader fixture (the one "invalid-version"
+difference is a header-only fixture compared past its header). The mismatches are
+identical under whole-row copies, per-request host tensors and a cleared output
+tensor. Build v34 runs every self-test group twice, dumps the first differing bytes,
+and can delay the readback (`NR_RENDER_FRAME_SETTLE_MS`): the device answers the same
+wrong bytes both times and the delay changes nothing, so it is not a readback race.
+The differences are arithmetic (blob 8: 0x53 against 0x4a, 0xa1 against 0x9c in
+one pixel) and in one blob 7 fixture a run of unwritten pixels (zeros where the host
+has colour). Same bytes, same blob, same device, deterministic per process: what
+differs between the worker and the Python tool is where the plugin places the input
+rows and therefore the memory latency the SHAVE code sees, which is the signature of
+a scheduling hazard the assembler did not flag (the toolchain is known to schedule
+`CMU.CMB` too early after `VAU.MUL.f32`; `--fix-hazards` inserts the NOPs it does
+report). The strip's alpha fits that too: a stale compare result would skip the
+IEEE division fix-up and reproduce the pre-fix 255 exactly. Blob 7 does not fit the window at
+any other optimisation level (-Os 24,560 B, -O1 25,104 B, -O2 30,320 B against
+24,496), so that route is closed. The sizes themselves carry a hint: the three
+failing blobs end within 32-192 bytes of the window (24,304, 24,496, 24,464 B) and
+every passing blob ends at least 640 bytes short of it. The next experiment grows a
+passing blob toward the window end with never-executed code and runs it through
+both the tool and the worker self-test; if it starts failing, the last part of the
+code window is not safe to execute from in the worker's environment and the usable
+window is smaller than the 24,496 bytes assumed so far.
