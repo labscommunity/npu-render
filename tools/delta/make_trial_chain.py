@@ -92,9 +92,9 @@ def main():
     assert 660 <= grant <= 2400, (
         "the first grant must cover the admission's start and one lease maximum"
     )
-    # Leases renew in place, so the admission itself is bounded only by the controller; the
-    # topology helper (ValidateRange 2160) and the frame relay (assert <= 2160) still cap a run.
-    assert 60 <= n <= 2160, "topology helper and frame relay accept at most 2160 s"
+    # Leases renew in place; the topology helper v14, the frame relay v9 and the topology control
+    # binary v14 accept up to four hours.
+    assert 60 <= n <= 14400, "the chain admits 60 s to 4 h"
     src = args.source
     out = args.output
     out.mkdir(parents=True, exist_ok=True)
@@ -471,6 +471,41 @@ Get-Content "$out\\report.json"
         )
         write(f"start-native-topology-{new}.ps1", t)
 
+    # 5b. Topology helper v14 and frame relay v9: the 2160 s limits become four hours, the helper
+    #     drives topology control v14 (same sources with the same change) and its task limit follows
+    #     the requested duration.
+    helper = (src / "run-native-topology-helper-v13.ps1").read_text(encoding="utf-8")
+    helper = edit(
+        helper,
+        [
+            ("[ValidateRange(1,2160)][int]$Seconds=60", "[ValidateRange(1,14400)][int]$Seconds=60"),
+            (
+                '$b="$r\\builds\\native-topology-control-v13"',
+                '$b="$r\\builds\\native-topology-control-v14"',
+            ),
+            (
+                "-ExecutionTimeLimit (New-TimeSpan -Minutes 40)",
+                "-ExecutionTimeLimit (New-TimeSpan -Seconds ($Seconds+300))",
+            ),
+        ],
+        "topology-helper",
+    )
+    write("run-native-topology-helper-v14.ps1", helper)
+    relay = (src / "relay_native_frames_v8.py").read_text(encoding="utf-8")
+    relay = edit(
+        relay,
+        [("assert 1<=v.seconds<=2160", "assert 1<=v.seconds<=14400")],
+        "relay",
+    )
+    write("relay_native_frames_v9.py", relay)
+    watchdog = (src / "cursor_recovery_watchdog_v2.py").read_text(encoding="utf-8")
+    watchdog = edit(
+        watchdog,
+        [("assert 1<=v.seconds<=2400", "assert 1<=v.seconds<=14400")],
+        "watchdog",
+    )
+    write("cursor_recovery_watchdog_v3.py", watchdog)
+
     # 6. Live presentation trial: new identities, batch-aware provider evidence.
     live = (src / "run-native-live-v65.ps1").read_text(encoding="utf-8")
     live = edit(
@@ -513,6 +548,22 @@ Get-Content "$out\\report.json"
             ("{14}else{11}", f"{{{n // 60 + 3}}}else{{{n // 60}}}"),
             ("'--seconds','590'", f"'--seconds','{n - 70}'"),
             ("'-Seconds','600','-CursorCue'", f"'-Seconds','{n - 60}','-CursorCue'"),
+            ("run-native-topology-helper-v13.ps1", "run-native-topology-helper-v14.ps1"),
+            ("relay_native_frames_v8.py", "relay_native_frames_v9.py"),
+            ("cursor_recovery_watchdog_v2.py", "cursor_recovery_watchdog_v3.py"),
+            # Presenter v22, output observer v6 and the frame reader qualified on v22 accept four
+            # hours; the same sources with only the duration limits raised.
+            (
+                '"$r\\builds\\native-present-v21\\build-report.json"',
+                '"$r\\builds\\native-present-v22\\build-report.json"',
+            ),
+            (
+                '"$r\\builds\\native-present-v21\\Release\\nr_frame_present_probe.exe"',
+                '"$r\\builds\\native-present-v22\\Release\\nr_frame_present_probe.exe"',
+            ),
+            ("live-frame-reader-v12", "live-frame-reader-v13"),
+            ("native-present-v21-qualification", "native-present-v22-qualification"),
+            ("native-output-observer-v5", "native-output-observer-v6"),
             ("{15000}else{640000}", f"{{15000}}else{{{(n - 20) * 1000}}}"),
             ("{90000}else{780000}", f"{{90000}}else{{{(n + 120) * 1000}}}"),
         ],
@@ -621,6 +672,11 @@ Get-Content "$out\\report.json"
         new = final(renamed[name]) if name in renamed else None
         desk_manifest[new or name] = produced[new] if new else digest
     desk_manifest["native_lease_renewal_v1.py"] = produced["native_lease_renewal_v1.py"]
+    desk_manifest["run-native-topology-helper-v14.ps1"] = produced[
+        "run-native-topology-helper-v14.ps1"
+    ]
+    desk_manifest["relay_native_frames_v9.py"] = produced["relay_native_frames_v9.py"]
+    desk_manifest["cursor_recovery_watchdog_v3.py"] = produced["cursor_recovery_watchdog_v3.py"]
     write("native-desktop-v76-source.json", json.dumps(desk_manifest, indent=2) + "\n")
     (out / "chain-manifest.json").write_text(
         json.dumps(
