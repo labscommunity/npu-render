@@ -940,3 +940,15 @@ replay-corpus gate (`replay_corpus.ps1`) replays the latest admissions'
 captures on a build before any live run; and the route contract test runs on
 every lab build. Two qualification attempts failed only because the OLED screen
 saver had taken the console, so every plan now stops it first.
+
+Three more finite-duration pins surfaced while starting the two-hour run, each
+ending an attempt within a minute of admission and each now fixed in the
+generator: generation 17's wrapper refused to start while the readiness
+observer's inspect-only probe process existed (the wrapper no longer refuses on
+that name; the admission script keeps its exact-argument check); generation 18's
+cursor watchdog verified the topology control binary against the v13 build proof
+while the helper ran v14 (the live script now follows the helper, with the
+cursor-guard procedure re-run on v14 as qualification v6, passed); generation
+19's presenter rejected the 7,125 s input stimulus from a second cap inside its
+input-stimulus mode (presenter v23 raises every duration cap to four hours).
+Every attempt restored the display cleanly; none produced measurements.
