@@ -979,3 +979,9 @@ DWM reaction to something our driver returned that the trace does not record.
 No dump was kept (WER stored only `Report.wer`), so Delta now keeps local mini
 dumps for `dwm.exe` (`vm\dumps`, five at most) for the next run. The IDD v3
 deadline itself was not reached, so its refresh remains unproven.
+
+The replay-corpus gate on worker v43 (`replay-corpus-v43`, the three latest
+admissions' captures) passed: trial 14's 300 recorded requests replay with no
+rejected packet, no retired blob, no route disagreement and every converted
+batch within tolerance (56 s), as do the two short generation-18 and -19
+captures. The crash is therefore not in the batch path the worker executes.
