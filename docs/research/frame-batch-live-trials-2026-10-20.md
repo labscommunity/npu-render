@@ -952,3 +952,30 @@ cursor-guard procedure re-run on v14 as qualification v6, passed); generation
 19's presenter rejected the 7,125 s input stimulus from a second cap inside its
 input-stimulus mode (presenter v23 raises every duration cap to four hours).
 Every attempt restored the display cleanly; none produced measurements.
+
+## Trial 14 (generation 20, 7200 s requested): DWM crashed at 2342 s
+
+Presenter v23, output observer v6, frame reader v14, topology control v14 with
+the cursor guard re-qualified on it (v6), indirect display package v3 and a
+2400 s first grant. The admission (`native-desktop-admission-v96`, live v86)
+ran on the NPU for 39 minutes: 272 frames observed, 288 batch flushes, the
+controller renewed both leases at 30 minutes (2340 s granted) and the worker
+extended its lifetime. At 19:16:44Z, 2342 s after the admission started and
+58 s before the first grant's original deadline, `dwm.exe` crashed inside
+`dwmcore.dll` (exception 0x889800b0, fault offset 0x1d3cf8). The indirect
+display's consumer then exited with DXGI access lost, the relay ended, the
+indirect host died and the bootstrap stopped at `host.verify()`. Recovery ran
+from the bootstrap's own `finally` and passed; the topology helper reported an
+inexact restore because DWM had already restarted, and the screen saver crashed
+as collateral. The recovery task did not fire: the Task Scheduler log holds no
+entry for it, and the device removal in the logs is the bootstrap's own.
+
+Our driver's trace in DWM shows nothing abnormal before the crash: the last
+flush (sequence 2244) executed on the NPU in 63 ms and its present callback
+returned success, after which DWM rotated resource identities as usual. This
+is the first DWM crash in the trials, three minutes past the longest previous
+admission (2160 s), so it is either time- or count-dependent on our side or a
+DWM reaction to something our driver returned that the trace does not record.
+No dump was kept (WER stored only `Report.wer`), so Delta now keeps local mini
+dumps for `dwm.exe` (`vm\dumps`, five at most) for the next run. The IDD v3
+deadline itself was not reached, so its refresh remains unproven.
