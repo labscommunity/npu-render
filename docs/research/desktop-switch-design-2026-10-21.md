@@ -75,3 +75,17 @@ Ordinary application admission (browser, video, 3D), Tahoma benefit measurement
 and the per-flush latency that holds the desktop at 2.4 updates/s are separate
 gates; the switch makes the current renderer usable and safe to leave running,
 it does not change what it renders or how fast.
+
+## State on 2026-10-21 evening
+
+The host side exists: `npu-render desktop status|enable|disable|install`
+(`src/npu_render/desktop_switch.py`). `status` quotes the newest admission,
+bootstrap, sequence and engine-sample reports; `enable` generates the next
+numbered chain, uploads it and launches the admission as a detached sequence;
+`disable` writes the stop file, waits for the bootstrap's restoration and runs
+the transaction's recovery; `install` verifies the prepared package, indirect
+display, build and blobs and names what is missing. `status` was exercised
+against Delta during a running admission. Still open from the list above: the
+stimulus-free enable (the live wrapper still injects the trial stimulus), the
+open-ended admission (the switch passes a duration), and packaging inside
+`install`.

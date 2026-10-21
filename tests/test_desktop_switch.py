@@ -199,11 +199,15 @@ def test_enable_uploads_the_chain_and_launches_the_plan(monkeypatch):
     steps = {step["name"]: step for step in plan["steps"]}
     assert list(steps) == [
         "stop-saver",
-        "native-topology-v172",
         "sampler",
+        "native-topology-v172",
+        "pause",
         "ptl-native-live-v48",
         "sampler-summary",
     ]
+    assert steps["pause"]["script"] == VM + r"\pause.ps1" and steps["pause"]["named"] == {
+        "Seconds": "8"
+    }
     assert steps["stop-saver"]["script"] == VM + r"\stop_screen_saver.ps1"
     assert steps["stop-saver"]["ignore_exit"] is True
     assert steps["native-topology-v172"]["script"] == VM + r"\start-native-topology-v172.ps1"

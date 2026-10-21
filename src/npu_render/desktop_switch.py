@@ -232,11 +232,14 @@ def plan_steps(root: str, generation: int, config: SwitchConfig) -> list[str]:
     vm, names = f"{root}\\vm", transaction_names(generation)
     samples = f"{vm}\\engine-samples-{names['sequence']}.jsonl"
     summary = f"{vm}\\engine-samples-{names['sequence']}-summary.json"
+    # The readiness observer is a short pre-check, so the wrapper follows it directly; the pause
+    # lets the observer's first inspection finish before the wrapper's own process checks.
     return [
         f"name={vm}\\stop_screen_saver.ps1;label=stop-saver;ignore_exit=1",
-        f"name={vm}\\start-{names['topology']}.ps1;label={names['topology']}",
         f"name={vm}\\start_engine_sampler.ps1,-Output,{samples},-Seconds,"
         f"{config.monitor_seconds + 300},-Interval,2;label=sampler",
+        f"name={vm}\\start-{names['topology']}.ps1;label={names['topology']}",
+        f"name={vm}\\pause.ps1,-Seconds,8;label=pause",
         f"name={vm}\\run-{names['live']}.ps1;label={names['live']}"
         f";report={vm}\\{names['live']}\\report.json;ignore_exit=1",
         f"name={vm}\\summarize_engine_samples.ps1,-Samples,{samples},-Output,{summary}"
