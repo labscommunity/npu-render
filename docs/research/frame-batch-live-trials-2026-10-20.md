@@ -985,3 +985,14 @@ admissions' captures) passed: trial 14's 300 recorded requests replay with no
 rejected packet, no retired blob, no route disagreement and every converted
 batch within tolerance (56 s), as do the two short generation-18 and -19
 captures. The crash is therefore not in the batch path the worker executes.
+
+Cause of the crash's timing: the OLED Care screen saver started at
+19:16:44.120Z, the same second DWM faulted, and Winlogon logged the
+screen-saver-start notification (event 6) at 19:16:44Z and the stop (event 7)
+at 19:16:53Z when the saver itself died with DWM. The saver's idle timer fired
+about 27 minutes after the trial's input stimulus ended; trials 12 and 13 were
+too short to reach it. Screen saver activation switches DWM to another desktop
+and creates new composition targets, and with our adapter as the primary
+renderer that transition took DWM down. This is the screen-saver robustness
+case the plan lists under gate 4, now reproduced with a time to crash; the next
+run keeps a DWM mini dump so the failing call is identified.
