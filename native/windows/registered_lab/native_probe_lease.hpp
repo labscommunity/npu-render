@@ -123,9 +123,28 @@ inline Lease read_mapping(const wchar_t *name = nullptr) {
     const auto view = MapViewOfFile(mapping.value, FILE_MAP_READ, 0, 0, sizeof(Lease)); require(view != nullptr);
     Lease record{}; std::memcpy(&record, view, sizeof(record)); UnmapViewOfFile(view); return record;
 }
+// A lease may be renewed in place by its controller: issued_tick and deadline_tick advance
+// (each grant still within the scope's maximum), everything else stays. A consumer re-reads
+// its mapping as the cached deadline approaches and accepts only such a renewal.
+constexpr uint64_t renewal_margin_ms = 5u * 60u * 1000u;
+inline bool renewal_of(const Lease &current, const Lease &next) {
+    Lease a = current, b = next; a.issued_tick = b.issued_tick = 0; a.deadline_tick = b.deadline_tick = 0;
+    return next.issued_tick >= current.issued_tick && next.deadline_tick > current.deadline_tick && !std::memcmp(&a, &b, sizeof(Lease));
+}
 class Admission {
     Lease lease;
     Handle controller, worker;
+    uint64_t last_refresh_tick = 0;
+    // Re-read the mapping when the cached deadline is within the renewal margin; a renewal
+    // that fails to read or validate leaves the cached lease in force until it expires.
+    void refresh(uint64_t now, DWORD pid, uint64_t created, DWORD session) {
+        if (lease.deadline_tick > now + renewal_margin_ms || now - last_refresh_tick < 15000) return;
+        last_refresh_tick = now;
+        try {
+            const auto next = read_mapping();
+            if (renewal_of(lease, next) && shape_valid(next, now, pid, created, session)) lease = next;
+        } catch (const std::exception &) {}
+    }
     static HANDLE open(const ProcessIdentity &identity) {
         return OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, identity.pid);
     }
@@ -136,9 +155,11 @@ class Admission {
     }
 public:
     explicit Admission(const Lease &record) : lease(record), controller(open(record.controller)), worker(open(record.worker)) { verify(); }
-    void verify() const {
+    void verify() {
         DWORD session = 0; require(ProcessIdToSessionId(GetCurrentProcessId(), &session) != 0);
-        require(shape_valid(lease, GetTickCount64(), GetCurrentProcessId(), creation_time(GetCurrentProcess()), session));
+        const auto now = GetTickCount64(), created = creation_time(GetCurrentProcess()); const auto pid = GetCurrentProcessId();
+        refresh(now, pid, created, session);
+        require(shape_valid(lease, now, pid, created, session));
         const auto sid=user_sid(GetCurrentProcess());
         require(sid.size()==lease.sid_bytes && EqualSid(const_cast<uint8_t*>(lease.consumer_sid),const_cast<uint8_t*>(sid.data())));
         verify_process(controller.value, lease.controller);
@@ -148,8 +169,9 @@ public:
         if(lease.scope==2)require(current_image_is(L"WUDFHost.exe"));
         if(lease.scope==3){require(current_input_is_default());require(user_sid(worker.value)==sid&&user_sid(controller.value)==sid);}
     }
-    HANDLE worker_handle() const { verify(); return worker.value; }
-    std::wstring pipe_name() const {
+    HANDLE worker_handle() { verify(); return worker.value; }
+    uint64_t deadline_tick() const { return lease.deadline_tick; }
+    std::wstring pipe_name() {
         verify(); const std::string suffix(lease.pipe_suffix, sizeof(lease.pipe_suffix));
         return L"\\\\.\\pipe\\npu-render-indexed-" + std::wstring(suffix.begin(), suffix.end());
     }

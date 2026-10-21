@@ -9,9 +9,11 @@
 #include "fifo_dispatch.hpp"
 #include "request_recording.hpp"
 #include "native_compositor_peer.hpp"
+#include "native_probe_lease.hpp"
 #include <sddl.h>
 #include <atomic>
 #include <memory>
+#include <optional>
 #include <thread>
 #include <cstdio>
 namespace stream = nr::registered_lab::indexed_stream;
@@ -52,7 +54,10 @@ int wmain(int argc, wchar_t **argv) try {
     const std::wstring name = argv[1]; ex::require(stream::pipe_name_valid(name));
     end=nullptr;const auto seconds=std::wcstoul(argv[3],&end,10);ex::require(end!=argv[3] && !*end && seconds>=60 && seconds<=2400);
     const auto frequency=qpc_frequency();
-    const auto deadline=GetTickCount64()+uint64_t(seconds)*1000;
+    // The lifetime deadline starts from <seconds>; in desktop admission it follows the compositor's
+    // lease, which the controller may renew in place (native_probe_lease.hpp), so the worker
+    // outlives its first grant exactly as long as the lease it serves does.
+    std::atomic<uint64_t> deadline{GetTickCount64()+uint64_t(seconds)*1000};
     std::unique_ptr<nr::registered_lab::NativeCompositorPeer> compositor;
     if(argc>=6)compositor=std::make_unique<nr::registered_lab::NativeCompositorPeer>(DWORD(nr::registered_lab::NativeCompositorPeer::number(argv[4],UINT32_MAX)),nr::registered_lab::NativeCompositorPeer::number(argv[5],UINT64_MAX),argc==7?1u:0u);
     std::unique_ptr<nr::registered_lab::NativeCompositorPeer> indirect;
@@ -104,7 +109,7 @@ int wmain(int argc, wchar_t **argv) try {
     };
     const auto serve=[&](HANDLE pipe){
         try {
-            while(!stopping.load() && GetTickCount64()<deadline){
+            while(!stopping.load() && GetTickCount64()<deadline.load()){
                 const char *phase="connect";ex::Header h{};uint32_t ticket=UINT32_MAX;bool dispatched=false;
                 const auto departure=[&](DWORD code){
                     std::printf("{\"kind\":\"client_departure\",\"phase\":\"%s\",\"win32_error\":%lu,\"client_pid\":%u,\"sequence\":%u,\"dispatch_ticket\":%u,\"provider_response_received\":%s,\"delivery_acknowledged\":false}\n",
@@ -113,8 +118,8 @@ int wmain(int argc, wchar_t **argv) try {
                 try {
                     stream::Handle event(CreateEventW(nullptr,TRUE,FALSE,nullptr));OVERLAPPED operation{};operation.hEvent=event.value;
                     const BOOL ready=ConnectNamedPipe(pipe,&operation);const auto error=ready?ERROR_SUCCESS:GetLastError();
-                    if(error!=ERROR_PIPE_CONNECTED)(void)stream::completed(pipe,operation,ready,error,deadline,0,stop_event.value);
-                    const auto connected_qpc=qpc_now();const auto started=GetTickCount64();const auto request_deadline=(std::min)(deadline,started+90000);
+                    if(error!=ERROR_PIPE_CONNECTED)(void)stream::completed(pipe,operation,ready,error,deadline.load(),0,stop_event.value);
+                    const auto connected_qpc=qpc_now();const auto started=GetTickCount64();const auto request_deadline=(std::min)(deadline.load(),started+90000);
                     phase="request";const auto bytes=stream::read_packet(pipe,request_deadline,stop_event.value);
                     const auto received_qpc=qpc_now();
                     h=ex::Reader(bytes).value<ex::Header>();ex::require(ex::request_valid(h,bytes.size()));
@@ -188,7 +193,26 @@ int wmain(int argc, wchar_t **argv) try {
     if(compositor){std::printf("{\"compositor_peer_prepared\":true,\"pid\":%lu,\"session\":%lu,\"creation_filetime\":%llu,\"request_identity_pinned\":true,\"desktop_admission_performed\":false}\n",compositor->pid(),compositor->session_id(),static_cast<unsigned long long>(compositor->creation_time()));std::fflush(stdout);}
     if(indirect){std::printf("{\"indirect_peer_prepared\":true,\"pid\":%lu,\"session\":%lu,\"creation_filetime\":%llu,\"request_identity_pinned\":true,\"actual_host_execution\":false}\n",indirect->pid(),indirect->session_id(),static_cast<unsigned long long>(indirect->creation_time()));std::fflush(stdout);}
     std::vector<std::thread> threads;
-    try{for(const auto &pipe:pipes)threads.emplace_back(serve,pipe->value);}
+    // Lease renewal: re-read the compositor's lease every 20 s and extend the lifetime to its
+    // deadline. Only a renewal of the lease first seen (same nonce, identities and scope) counts,
+    // and never beyond the scope's maximum from now; an unreadable mapping leaves the deadline alone.
+    const auto renew=[&]{
+        std::optional<nr::native_probe::Lease> first;bool unreadable_logged=false;
+        while(!stopping.load() && GetTickCount64()<deadline.load()){
+            if(WaitForSingleObject(stop_event.value,20000)!=WAIT_TIMEOUT)return;
+            try{
+                const auto lease=nr::native_probe::read_mapping(nr::native_probe::mapping_name(compositor->pid()).c_str());
+                if(!first){first=lease;continue;}
+                const auto now=GetTickCount64();
+                if(!nr::native_probe::renewal_of(*first,lease) || lease.deadline_tick<=deadline.load() || lease.deadline_tick>now+2400000u || lease.deadline_tick-lease.issued_tick>2400000u)continue;
+                deadline.store(lease.deadline_tick);first=lease;
+                std::printf("{\"worker_deadline_extended\":true,\"remaining_s\":%llu,\"lease_issued_tick\":%llu}\n",(unsigned long long)((lease.deadline_tick-now)/1000),(unsigned long long)lease.issued_tick);std::fflush(stdout);
+            }catch(const std::exception &error){
+                if(!unreadable_logged){unreadable_logged=true;std::printf("{\"worker_lease_unreadable\":true,\"error\":\"%s\"}\n",error.what());std::fflush(stdout);}
+            }
+        }
+    };
+    try{for(const auto &pipe:pipes)threads.emplace_back(serve,pipe->value);if(compositor && indirect)threads.emplace_back(renew);}
     catch(...){fail(std::current_exception());}
     std::printf("{\"local_worker_ready\":true,\"pid\":%lu,\"concurrent_clients\":%lu,\"provider_concurrency\":1,\"client_pid_verified\":true,\"private_user_acl\":true,\"network_listener\":false}\n",GetCurrentProcessId(),clients);std::fflush(stdout);
     for(auto &thread:threads)thread.join();
