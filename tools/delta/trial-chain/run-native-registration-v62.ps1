@@ -1,6 +1,6 @@
 param([ValidateSet('stage','render')][string]$Mode='stage')
-$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$package="$r\vm\native-driver-package-v27";$out=if($Mode -eq 'stage'){"$r\vm\native-registration-stage-v27"}else{"$r\vm\native-registration-v58"};$task='T8-NpuRender-NativeRecovery-v58'
-$sources=Get-Content "$r\vm\native-registration-v58-source.json" -Raw|ConvertFrom-Json
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$package="$r\vm\native-driver-package-v31";$out=if($Mode -eq 'stage'){"$r\vm\native-registration-stage-v31"}else{"$r\vm\native-registration-v62"};$task='T8-NpuRender-NativeRecovery-v62'
+$sources=Get-Content "$r\vm\native-registration-v62-source.json" -Raw|ConvertFrom-Json
 foreach($f in $sources.psobject.Properties){if((Get-FileHash "$r\vm\$($f.Name)").Hash -ne $f.Value){throw 'Registration source mismatch'}}
 foreach($path in @('native-quad-abba-v1','quad-pipeline-v1-qualification','native-ordered-replay-v29-quad-rollback')){$q=Get-Content "$r\vm\$path\report.json" -Raw|ConvertFrom-Json;if(!$q.completed -or !$q.passed){throw 'Quad promotion prerequisites failed'}}
 foreach($path in @('native-provider-process-v2','native-ordered-replay-v39-provider-soak')){$q=Get-Content "$r\vm\$path\report.json" -Raw|ConvertFrom-Json;if(!$q.completed -or !$q.passed){throw 'Provider promotion prerequisites failed'}}
@@ -14,7 +14,7 @@ foreach($candidate in @('alpha-copy-v3-qualification','alpha-copy-integrated-v2'
 $manifest=Get-Content "$package\sha256.json" -Raw|ConvertFrom-Json
 foreach($f in $manifest){if($f.name -notmatch '^[a-zA-Z0-9_.-]+$' -or (Get-FileHash "$package\$($f.name)").Hash -ne $f.sha256){throw 'Package mismatch'}}
 $meta=Get-Content "$package\report.json" -Raw|ConvertFrom-Json
-if(!$meta.prepared -or $meta.hardware_id -ne 'ROOT\NPURENDER_NATIVE_PROBE' -or $meta.version -ne '0.0.1327.0'){throw 'Unexpected package'}
+if(!$meta.prepared -or $meta.hardware_id -ne 'ROOT\NPURENDER_NATIVE_PROBE' -or $meta.version -ne '0.0.1331.0'){throw 'Unexpected package'}
 $prior=@(Get-PnpDevice -PresentOnly -Class Display|ForEach-Object {$ids=@(($_|Get-PnpDeviceProperty -KeyName DEVPKEY_Device_HardwareIds).Data);if($ids -contains $meta.hardware_id){throw 'Diagnostic adapter exists'};[ordered]@{instance=$_.InstanceId;status=$_.Status;hardware_ids=$ids}})
 if(!$prior.Count -or @($prior|Where-Object status -ne 'OK').Count){throw 'Existing display adapter unhealthy'}
 if(@(Get-WindowsDriver -Online|Where-Object {[IO.Path]::GetFileName($_.OriginalFileName) -eq 'nr_native_probe.inf'}).Count){throw 'Native probe package already staged'}
@@ -23,7 +23,7 @@ if($vbs.VirtualizationBasedSecurityStatus -ne 2 -or $vbs.SecurityServicesRunning
 $boot=(& bcdedit /enum '{current}') -join "`n";if($LASTEXITCODE -or $boot -notmatch '(?im)^testsigning\s+Yes\s*$'){throw 'Existing test-signing boot mode required'}
 New-Item -ItemType Directory $out|Out-Null
 & icacls.exe $out /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' > "$out\directory-acl.log";if($LASTEXITCODE){throw 'Recovery directory protection failed'}
-Copy-Item "$r\vm\recover-native-registration-v58.ps1" "$out\recover.ps1"
+Copy-Item "$r\vm\recover-native-registration-v62.ps1" "$out\recover.ps1"
 $ownership=[ordered]@{schema=1;hardware_id=$meta.hardware_id;version=$meta.version;thumbprint=$meta.signer_thumbprint;inf_sha256=(Get-FileHash "$package\nr_native_probe.inf").Hash;devcon="$r\dependencies\wdk-tools\devcon.exe";devcon_sha256=(Get-FileHash "$r\dependencies\wdk-tools\devcon.exe").Hash;physical_display_before=$prior;added_stores=@();controller_pid=$PID;mode=$Mode;created=[DateTime]::UtcNow.ToString('o')}
 function Save-Ownership {$ownership|ConvertTo-Json -Depth 6|Set-Content "$out\ownership.tmp";Move-Item "$out\ownership.tmp" "$out\ownership.json" -Force}
 Save-Ownership
@@ -57,7 +57,7 @@ try {
  if($staged.Count -ne 1 -or $staged[0].Driver -notmatch '^oem\d+\.inf$' -or (Get-FileHash "$env:windir\INF\$($staged[0].Driver)").Hash -ne $ownership.inf_sha256){throw 'Staged package identity mismatch'}
  $report.published_inf=$staged[0].Driver;$ownership.published_inf=$staged[0].Driver;Save-Ownership;Save-Report
  if($Mode -eq 'render'){
-  $stageProof=Get-Content "$r\vm\native-registration-stage-v27\report.json" -Raw|ConvertFrom-Json
+  $stageProof=Get-Content "$r\vm\native-registration-stage-v31\report.json" -Raw|ConvertFrom-Json
   if(!$stageProof.passed -or !$stageProof.cleanup_passed){throw 'Staging and recovery not qualified'}
   $report.install_exit=Run-OwnedTool $ownership.devcon @('install',"$package\nr_native_probe.inf",$meta.hardware_id) 'install';Save-Report;if($report.install_exit){throw 'Diagnostic adapter installation failed or requested restart'}
   $devices=@(Get-PnpDevice -PresentOnly -Class Display|Where-Object {@(($_|Get-PnpDeviceProperty -KeyName DEVPKEY_Device_HardwareIds).Data) -contains $meta.hardware_id})
@@ -70,7 +70,7 @@ try {
   $expected=($manifest|Where-Object name -eq 'nr_native_probe_umd.dll').sha256
   if($modules.Count -ne 1 -or $registration.DriverVersion -ne $meta.version -or $registration.InfPath -ne $report.published_inf -or !$dll.StartsWith("$env:windir\System32\DriverStore\FileRepository\",[StringComparison]::OrdinalIgnoreCase) -or [IO.Path]::GetFileName($dll) -ne 'nr_native_probe_umd.dll' -or (Get-FileHash $dll).Hash -ne $expected){throw 'Installed adapter identity mismatch'}
   $report.installed_umd_sha256=$expected;Save-Report
-  $probeArguments=@("$r\vm\qualify-native-registered-v58.py",'--worker',"$r\builds\native-tree-v13\Release\nr_registered_local_indexed_worker.exe",'--client',"$r\builds\native-registered-v1\Release\nr_native_registered_probe.exe",'--dll',$dll,'--package',$package,'--runtime',"$r\toolchains\openvino-2026.4.1\Lib\site-packages\openvino\libs",'--cache',"$r\vm\model-cache-2026-4-v209",'--output',"$out\qualification")
+  $probeArguments=@("$r\vm\qualify-native-registered-v62.py",'--worker',"$r\builds\native-tree-v24\Release\nr_registered_local_indexed_worker.exe",'--client',"$r\builds\native-registered-v1\Release\nr_native_registered_probe.exe",'--dll',$dll,'--package',$package,'--runtime',"$r\toolchains\openvino-2026.4.1\Lib\site-packages\openvino\libs",'--cache',"$r\vm\model-cache-2026-4-v209",'--output',"$out\qualification")
   $report.qualification_exit=Run-OwnedTool "$r\toolchains\openvino-2026.4.1\Scripts\python.exe" $probeArguments 'qualification' 150;Save-Report;if($report.qualification_exit){throw 'Registered NPU qualification failed'}
   $q=Get-Content "$out\qualification\report.json" -Raw|ConvertFrom-Json;if(!$q.passed -or !$q.registered_adapter_tested){throw 'Registered execution evidence absent'}
   if(!$q.automatic_admission -or $q.consumer_started_suspended -or !$q.automatic_broker_cleanup_passed -or $q.consumer_elevated -or $q.consumer_session -lt 1 -or !$q.pipe_server_creation_access_denied -or !$q.owned_process_and_token_acls_restored_exactly){throw 'Interactive graphics admission proof incomplete'}
