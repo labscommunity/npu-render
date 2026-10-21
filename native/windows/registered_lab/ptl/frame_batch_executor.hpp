@@ -51,8 +51,8 @@ public:
                 inference.get_input_tensor(0).get_element_type() == ov::element::f16 && inference.get_output_tensor().get_element_type() == ov::element::f16 &&
                 inference.get_input_tensor(0).get_shape() == ov::Shape({rows, frame::span_bytes / 2}) && inference.get_output_tensor().get_shape() == ov::Shape({rows, frame::span_bytes / 2}));
         if (model.inputs().size() == 2) {
-            auto updates = inference.get_input_tensor(1);
-            std::memset(updates.data(), 0, updates.get_byte_size());
+            auto updates_plane = inference.get_input_tensor(1);
+            std::memset(updates_plane.data(), 0, updates_plane.get_byte_size());
         }
         std::printf("{\"frame_kernel_provider_created\":true,\"rows\":%u,\"inputs\":%zu,\"execution_device\":\"%s\"}\n", rows, model.inputs().size(), device.c_str()); std::fflush(stdout);
     }
@@ -61,6 +61,7 @@ public:
     double copy_ms = 0, infer_ms = 0;   // host copies into and out of the tensors vs. the NPU request itself
     uint32_t identity = 0;               // expected NR_KERNEL_IDENTITY of this blob (0: unknown, not checked)
     ov::Tensor staging; bool staging_ready = false;   // NR_RENDER_FRAME_INPUT_TENSOR_COPY: host tensor handed to the plugin per request
+    ov::Tensor updates; bool updates_ready = false;   // NR_RENDER_FRAME_SET_UPDATES: zero updates tensor handed to the plugin per request
     static bool env_flag(const char *name) { char *v = nullptr; size_t n = 0; const bool on = !_dupenv_s(&v, &n, name) && v && *v && *v != '0'; std::free(v); return on; }
     void execute(const std::vector<std::vector<uint8_t>> &spans, std::vector<std::vector<uint8_t>> &outputs) {
         require(!failed && !spans.empty() && spans.size() <= rows); failed = true;
@@ -83,6 +84,13 @@ public:
         }
         for (size_t n = spans.size(); n < rows; ++n) std::memset(input + n * frame::span_bytes, 0, full_copy ? frame::span_bytes : 64);   // empty rows fail the header check cheaply
         if (tensor_copy) inference.set_input_tensor(0, staging);
+        // NR_RENDER_FRAME_SET_UPDATES=1: hand the plugin a zero "updates" tensor on every request (the
+        // qualification tool does this; the provider otherwise zeroes the request's own tensor once).
+        static const bool set_updates = env_flag("NR_RENDER_FRAME_SET_UPDATES");
+        if (set_updates && model.inputs().size() == 2) {
+            if (!updates_ready) { const auto shape = inference.get_input_tensor(1).get_shape(); updates = ov::Tensor(ov::element::f16, shape); std::memset(updates.data(), 0, updates.get_byte_size()); updates_ready = true; }
+            inference.set_input_tensor(1, updates);
+        }
         const auto copied = std::chrono::steady_clock::now();
         inference.start_async();
         if (!inference.wait_for(std::chrono::milliseconds(10000))) throw std::runtime_error("frame kernel timeout");
@@ -169,9 +177,14 @@ public:
             // Self-test: NR_RENDER_FRAME_SELF_TEST=1 runs the blob's own fixtures (frame-fixtures-blob<k>.bin next
             // to the blob) through this provider and compares with the host kernel's expectations; "strict"
             // also retires a blob that disagrees so its draws take the per-draw route.
+            // Default: strict when the blob's fixtures are deployed (a blob whose fixtures disagree with the host
+            // kernel serves no draw); "1" reports only; "0" or "off" skips the test.
             char *mode = nullptr; size_t mode_length = 0;
-            if (!_dupenv_s(&mode, &mode_length, "NR_RENDER_FRAME_SELF_TEST") && mode && *mode && *mode != '0') {
-                const bool strict = std::string(mode) == "strict";
+            const bool has_mode = !_dupenv_s(&mode, &mode_length, "NR_RENDER_FRAME_SELF_TEST") && mode && *mode;
+            const std::string mode_text = has_mode ? std::string(mode) : std::string("strict");
+            const bool fixtures_present = std::filesystem::exists(blob_dir / ("frame-fixtures-blob" + std::to_string(blob) + ".bin"));
+            if (mode_text != "0" && mode_text != "off" && (has_mode || fixtures_present)) {
+                const bool strict = mode_text == "strict";
                 const auto result = self_test(*kernels[blob], blob_dir / ("frame-fixtures-blob" + std::to_string(blob) + ".bin"));
                 std::printf("{\"frame_kernel_self_test\":true,\"blob\":%u,\"fixtures\":%zu,\"mismatches\":%zu,\"unstable\":%zu,\"first\":\"%s\",\"first_offset\":%lld,\"first_bytes\":\"%s\",\"strict\":%s}\n", blob, result.fixtures, result.mismatches, result.unstable, result.first.c_str(), (long long)result.first_offset, result.first_bytes.c_str(), strict ? "true" : "false"); std::fflush(stdout);
                 if (strict && result.mismatches) kernels[blob].reset();
@@ -209,6 +222,15 @@ public:
                 if (again[n] != actual) ++r.unstable;   // the device answered differently to the same request
                 if (!same) {
                     ++r.mismatches;
+                    // NR_RENDER_FRAME_SELF_TEST_DUMP=<dir>: the device output and the host expectation of every mismatching fixture.
+                    { char *dir = nullptr; size_t dn = 0;
+                      if (!_dupenv_s(&dir, &dn, "NR_RENDER_FRAME_SELF_TEST_DUMP") && dir && *dir) {
+                          const std::string base = (std::filesystem::path(dir) / (fixtures.stem().string() + "-" + records[first + n].name)).string();
+                          std::ofstream(base + ".device.bin", std::ios::binary).write(reinterpret_cast<const char *>(actual.data()), std::streamsize(live));
+                          std::ofstream(base + ".host.bin", std::ios::binary).write(reinterpret_cast<const char *>(expected), std::streamsize(live));
+                          std::ofstream(base + ".span.bin", std::ios::binary).write(reinterpret_cast<const char *>(records[first + n].input), std::streamsize(span));
+                      }
+                      std::free(dir); }
                     if (r.first.empty()) {
                         r.first = records[first + n].name;
                         for (size_t k = 0; k < live; ++k) if (expected[k] != actual[k]) { r.first_offset = (long long)k; char buf[16]; for (size_t j = k; j < live && j < k + 8; ++j) { std::snprintf(buf, sizeof buf, "%02x", expected[j]); r.first_bytes += buf; } r.first_bytes += "/"; for (size_t j = k; j < live && j < k + 8; ++j) { std::snprintf(buf, sizeof buf, "%02x", actual[j]); r.first_bytes += buf; } break; }
