@@ -98,3 +98,9 @@ every admission it starts. An admission's length is still the hard safety cap th
 switch passes (`--monitor-seconds`, up to four hours under the lifted component
 limits); `disable` ends it earlier at any time. The stimulus-free wrapper is in
 progress; `enable` and `disable` await their first run on Delta.
+
+First live use (2026-10-21 21:3xZ): `npu-render desktop install --prepare` built
+and signed package v39 from tree v45, staged it and ran the registration's
+render qualification as one detached sequence (`sequence-prepare-v82`, all
+steps passed); `desktop status` followed it from the host. `enable` then
+started the generation-27 admission for the worker-loss probe.
