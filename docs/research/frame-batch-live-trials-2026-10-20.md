@@ -1059,3 +1059,17 @@ added nothing for the compositor, which the lease already binds by identity,
 session and SID; it is now applied only to interactive clients. Build v44 and
 package v38 (generation 23) carry the change into the same six-minute
 reproduction.
+
+## Trial 17 (generation 23, build v44, package v38): DWM survives the screen saver
+
+Same six-minute reproduction on the fixed driver. At the saver request
+(Winlogon event 6 at 20:27:05Z) DWM did not crash and no dump was written; its
+trace shows a second `create_device` and `device_created` on our adapter, the
+graphics device it could not create before, and frames continued (118 observed).
+The admission still ended a few seconds later, this time by the harness: the
+frame relay and presenter are trial tools bound to the Default console by
+design, they exited at the desktop switch, and the live controller requested
+restoration, which passed. The product path (DWM, worker, indirect display) is
+therefore checked next with the admission alone across a saver request, and the
+long soak keeps the presentation harness with the saver timer raised until the
+presenter can re-attach after a desktop switch.
