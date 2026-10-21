@@ -1,0 +1,62 @@
+"""Independent interactive pointer recovery for one pinned finite topology helper."""
+from native_process_observer_v1 import PinnedProcess
+from native_session_broker_v1 import C,W,k,require
+from pathlib import Path
+from datetime import datetime,UTC
+import argparse,json,time,hashlib,traceback
+u=C.WinDLL('user32',use_last_error=True)
+for name,args,result in [('GetClipCursor',[C.POINTER(W.RECT)],W.BOOL),('ClipCursor',[C.POINTER(W.RECT)],W.BOOL),('GetCursorPos',[C.POINTER(W.POINT)],W.BOOL),('SetCursorPos',[C.c_int,C.c_int],W.BOOL),('GetSystemMetrics',[C.c_int],C.c_int),('SetThreadDpiAwarenessContext',[W.HANDLE],W.HANDLE),('OpenInputDesktop',[W.DWORD,W.BOOL,W.DWORD],W.HANDLE),('GetUserObjectInformationW',[W.HANDLE,C.c_int,W.LPVOID,W.DWORD,C.POINTER(W.DWORD)],W.BOOL),('CloseDesktop',[W.HANDLE],W.BOOL)]:
+ f=getattr(u,name);f.argtypes=args;f.restype=result
+p=argparse.ArgumentParser();p.add_argument('--log',type=Path,required=True);p.add_argument('--binary-sha256',required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--seconds',type=int,default=700);p.add_argument('--restore-position',action='store_true');v=p.parse_args()
+assert 1<=v.seconds<=14400 and len(v.binary_sha256)==64;v.output.mkdir(exist_ok=False);out=v.output
+report=dict(started=datetime.now(UTC).isoformat(),completed=False,passed=False,independent_cursor_recovery=True,desktop_topology_changed=False);peer=None;snapshot=None;armed=False
+def save():(out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+def rows():
+ if not v.log.exists():return []
+ return [json.loads(x) for x in v.log.read_text(encoding='utf-8-sig').splitlines() if x.startswith('{') and x.endswith('}')]
+def clip():
+ rect=W.RECT();require(u.GetClipCursor(C.byref(rect)));return [rect.left,rect.top,rect.right,rect.bottom]
+def desktop():
+ x=u.GetSystemMetrics(76);y=u.GetSystemMetrics(77);return [x,y,x+u.GetSystemMetrics(78),y+u.GetSystemMetrics(79)]
+def default_desktop():
+ d=u.OpenInputDesktop(0,False,1);require(d)
+ try:
+  name=C.create_unicode_buffer(128);count=W.DWORD();require(u.GetUserObjectInformationW(d,2,name,C.sizeof(name),C.byref(count)));assert name.value=='Default'
+ finally:u.CloseDesktop(d)
+save()
+try:
+ require(u.SetThreadDpiAwarenessContext(W.HANDLE(-4)));default_desktop();deadline=time.monotonic()+15
+ while snapshot is None:
+  candidates=[x for x in rows() if x.get('cursor_guard_snapshot')];assert len(candidates)<=1
+  if candidates:snapshot=candidates[0];break
+  assert time.monotonic()<deadline,'Cursor owner did not publish snapshot';time.sleep(.05)
+ assert snapshot['schema']==1 and snapshot['original_unconfined'] and snapshot['desired_clip'] in ([64,64,576,320],[0,0,1024,768])
+ assert len(snapshot['original_cursor'])==2 and all(isinstance(x,int) and -32768<=x<=32767 for x in snapshot['original_cursor'])
+ peer=PinnedProcess(snapshot['pid']);assert peer.identity.created==snapshot['created'] and peer.identity.session==snapshot['session']==k.WTSGetActiveConsoleSessionId()
+ assert hashlib.sha256(Path(peer.image).read_bytes()).hexdigest()==v.binary_sha256.lower();peer.verify();assert clip()==desktop(),'Pointer already confined before watchdog admission'
+ report['owner']=peer.report();report['snapshot']=snapshot;armed=True;save();(out/'ready.json').write_text(json.dumps(dict(armed=True,owner=peer.report()))+'\n')
+ deadline=time.monotonic()+v.seconds;observed=False
+ while time.monotonic()<deadline:
+  status=k.WaitForSingleObject(peer.handle,100);assert status in (0,258)
+  if status==0:report['trigger']='owner-exited';break
+  if (out/'stop').exists():report['trigger']='controller-stop';break
+  default_desktop()
+  if not observed and clip()==snapshot['desired_clip']:
+   observed=True;report['owned_confinement_observed']=True;save();(out/'confined.json').write_text(json.dumps(dict(observed=True,owner_pid=peer.identity.pid))+'\n')
+ else:report['trigger']='finite-deadline'
+except Exception as e:report.update(error=repr(e),traceback=traceback.format_exc())
+finally:
+ if armed:
+  try:
+   current=clip();full=desktop();report['clip_before_recovery']=current
+   if current==snapshot['desired_clip']:
+    require(u.ClipCursor(None));report['recovery_released_owned_clip']=True
+   else:assert current==full,'Different pointer confinement appeared; preserved'
+   assert clip()==desktop();report['original_unconfined_restored']=True
+   if v.restore_position:
+    x,y=snapshot['original_cursor'];require(u.SetCursorPos(x,y));point=W.POINT();require(u.GetCursorPos(C.byref(point)));assert (point.x,point.y)==(x,y);report['original_cursor_position_restored']=True
+   report['passed']='error' not in report
+  except Exception as e:report.update(recovery_error=repr(e),passed=False)
+ if peer:peer.close()
+ report.update(completed=True,finished=datetime.now(UTC).isoformat());save()
+print(json.dumps(report));raise SystemExit(0 if report['passed'] else 1)
