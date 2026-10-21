@@ -817,3 +817,65 @@ sampled), the desktop ran the controlled trial stimulus rather than ordinary
 applications, and the physical bridge's presentation work is not separated out;
 it is evidence that composition left the 3D engine, not a Tahoma benefit
 measurement.
+
+## Long-run attempt 1 (generation 13, 2220 s requested): ended by the topology helper at 600 s
+
+The chain generator gained `--monitor-seconds` (scaling the presenter, stimulus,
+relay, cursor watchdog, scheduled-task limits and the topology/native process
+waits that were fixed against the 660 s base) and `--registration-generation`
+(reusing registration v67). The 2220 s run (`native-live-v79`, admission v89)
+ran the NPU desktop for 10 minutes and then failed `Frame relay exited during
+presentation`: the relay (`--seconds 2150`) had completed normally at 600 s
+because the topology helper, launched with its own `-Seconds 600` that the
+generator did not scale, restored the physical topology at that point. The
+admission was stopped by the live controller and restoration passed. GPU 3D
+engine over the 10 minutes: 308 samples, average 0.03 %, maximum 0.61 %.
+
+The helper's duration is now scaled with the run as well. Both the helper
+(`ValidateRange(1,2160)`) and the relay (`assert seconds<=2160`) cap a run at
+36 minutes; longer runs need new versions of both and a check of the topology
+binary they drive, which is the step after the lease renewal below.
+
+## Trial 12 (generation 14, build v43, package v37): 36 minutes with lease renewal
+
+Worker tree v43 adds in-place lease renewal: the consumer's `Admission` re-reads
+its mapping when the cached deadline is within five minutes and accepts only a
+renewal (issued and deadline ticks advanced, everything else identical), the
+worker follows the compositor's lease every 20 s, and the generated bootstrap
+rewrites both leases' ticks and re-arms the recovery task's one-shot trigger
+when less than ten minutes of a grant remain (`native_lease_renewal_v1.py`).
+Registration v69 qualified the v43 worker; the admission (`native-desktop-admission-v90`,
+`native-live-v80`) ran 2160 s, the longest NPU-rendered desktop so far.
+
+| Measure | Trial 11 (660 s) | Trial 12 (2160 s) |
+| --- | --- | --- |
+| Passed / cleanup / recovery task removed | yes / yes / yes | yes / yes / yes |
+| Verified unique updates/s | 2.5 | 2.4 (26 of 300) |
+| Frame batches / commands / fallbacks | 424 / 6,079 / 112 | 744 / 9,363 / 202 (all blob 10, abi 12) |
+| Kernel / host time | 42.7 s / 81.9 s | 65.5 s / 133.8 s |
+| Draws batched / not batched | 5,096 / 5 | 5,319 / 0 |
+| Route disagreements / self-test mismatches / stderr | 0 / 0 / 0 | 0 / 0 / 0 |
+| Observed frames (distinct pixel hashes) | — | 334 (190) |
+| Physically submitted frames | 170 | 342 |
+| Flush wall p50 / p90 / max | 265 / 1,000 / 3,500 ms | 281 / 1,000 / 4,968 ms |
+| Lease renewals (controller) | — | 913 (storm, see below) |
+| Worker lifetime extensions | — | 2 (remaining 599 s and 499 s) |
+| GPU 3D engine p50 / p90 / p99 (1,057 samples over 37 min) | 0 / 0.21 / 1.18 % | 0 / 0.11 / 0.37 % |
+| GPU 3D maximum | 18.9 % at restoration | 22.0 % at restoration (dwm.exe, 17:34:05Z) |
+
+The first grant (2220 s) outlasted the admission, so this run shows the
+controller renewing and the worker following, not the consumer re-reading a
+renewed lease; generation 15 (first grant 1200 s, same 2160 s run) exercises
+that path and the worker's expiry path.
+
+Defect found and fixed: from 27 minutes on, the controller renewed on every
+monitor iteration (913 renewals in nine minutes, each spawning a PowerShell to
+re-arm the recovery task) because a grant capped by the run's own end leaves the
+deadline inside the renewal margin. The planner is now a pure function that
+renews only when the extension is worth at least a minute and thirty seconds
+have passed since the last renewal (`tools/delta/test_native_lease_renewal.py`).
+The run was not affected beyond a slower monitor loop.
+
+Runs beyond 36 minutes remain capped by the topology helper, the frame relay
+and the topology control binary (2160 s each); they can be lifted now that
+the lease no longer bounds an admission.
