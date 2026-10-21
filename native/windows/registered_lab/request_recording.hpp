@@ -22,7 +22,14 @@ public:
         append("{\"recording_started\":true,\"maximum_request_bytes\":17179869184,\"contains_private_pixels\":true,\"performance_measurement_valid\":false}");
     }
     void request(uint32_t ticket,const std::vector<uint8_t> &data){
-        if(directory.empty())return;if(data.size()>maximum-bytes)throw std::runtime_error("request recording budget exceeded");
+        if(directory.empty())return;
+        // The budget ends the recording, never the worker: a saver animation filled 16 GiB in
+        // four minutes and the throw here stopped the worker and, through it, DWM (trial 18).
+        if(data.size()>maximum-bytes){
+            append("{\"recording_stopped\":true,\"reason\":\"budget\",\"cumulative_bytes\":"+std::to_string(bytes)+",\"next_request_bytes\":"+std::to_string(data.size())+"}");
+            std::printf("{\"request_recording_stopped\":true,\"reason\":\"budget\",\"cumulative_bytes\":%llu}\n",(unsigned long long)bytes);std::fflush(stdout);
+            directory.clear();return;
+        }
         char filename[32];std::snprintf(filename,sizeof(filename),"request-%08u.bin",ticket);const auto path=directory/filename;
         indexed_stream::Handle file(CreateFileW(path.c_str(),GENERIC_WRITE,FILE_SHARE_READ,nullptr,CREATE_NEW,FILE_ATTRIBUTE_NORMAL,nullptr));DWORD written=0;
         if(!WriteFile(file.value,data.data(),DWORD(data.size()),&written,nullptr) || written!=data.size() || !FlushFileBuffers(file.value))throw std::runtime_error("request recording write failed");
