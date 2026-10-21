@@ -572,6 +572,10 @@ Get-Content "$out\\report.json"
             ("live-frame-reader-v12", "live-frame-reader-v13"),
             ("native-present-v21-qualification", "native-present-v22-qualification"),
             ("native-output-observer-v5", "native-output-observer-v6"),
+            # The cursor watchdog verifies the topology control binary the helper runs, so the live
+            # script's proof and cursor-guard qualification follow the helper to control v14.
+            ("native-topology-control-v13", "native-topology-control-v14"),
+            ("native-cursor-guard-v5-qualification", "native-cursor-guard-v6-qualification"),
             ("{15000}else{640000}", f"{{15000}}else{{{(n - 20) * 1000}}}"),
             ("{90000}else{780000}", f"{{90000}}else{{{(n + 120) * 1000}}}"),
         ],
