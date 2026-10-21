@@ -1201,3 +1201,52 @@ v7). The switch's `enable` now generates the stimulus-free live variant by
 default (`--stimulus` restores the trial measurement stimuli), so an enabled
 desktop has no owned input window, repeated-input benchmark or shared
 application beside it.
+
+## Trial 23 (generation 30, admission v106, stimulus-free soak through the switch): 40 minutes, the provider child's fixed lifetime
+
+Started 22:54:37Z by `npu-render desktop enable --monitor-seconds 7200
+--initial-grant-seconds 1200` with the waiting tools (presenter v24, topology
+control v15, observer v7, watchdog v4) and no stimulus, saver dismissals
+scheduled for 23:44Z and 00:29Z. The desktop idled: 59 frame batches in 40
+minutes, 62 frames relayed, presented and displayed, two lease renewals
+(23:04:38Z and 23:33:38Z, 2340 s each) followed by the worker. No screen saver
+appeared (Winlogon logged nothing); the dismissal tasks had nothing to do.
+
+At 23:35:00Z the worker's provider child ended on its own: its last row is a
+connect wait that hit its deadline (`client_departure`, win32 1460) followed by
+`local_worker_finished` after 73 requests. The parent spawns the child with a
+fixed grant (`"<pipe>" 65536 2400`) and no peers, so the child never runs the
+lease-renewal thread that keeps the parent alive; 2400 s after admission the
+child expires whatever the lease says. The parent then failed DWM's in-flight
+batch (`provider_process_failure`, `retry_on_npu` false), reported "local NPU
+worker is no longer running" and exited with code 1, and the bootstrap asserted
+`NPU worker stopped before native frame evidence`. Every earlier run had either
+ended before 2400 s or kept the child busy; trial 22 would have hit this wall
+about a minute after the saver did.
+
+DWM then crashed (Application event 1000 at 23:35:00.87Z, exception 0x889800b0,
+dump `dwm.exe.20280.dmp`): the stack is `CLegacyRenderTarget::EnsureSwapChain`
+→ `CDeviceManager::CreateNewDevice` → `CD3DDevice::CreateD3D11Device` → fail
+fast. The bootstrap's teardown removed the indirect display and closed the
+leases at 23:35:00.73Z, 150 ms earlier; DWM's device re-creation for the
+changing topology reached our `OpenAdapter10` with no lease left and got
+`DXGI_ERROR_UNSUPPORTED`. Trial 21 won the same race by seconds. Recovery
+passed (23:35:01Z to 23:35:15Z) and the switch's own state is consistent
+(`admission completed, passed=false, cleanup_passed=true`).
+
+Changes:
+
+- `local_indexed_worker.cpp` / `packet_provider_process.hpp` (tree v47): the
+  provider child receives its owner's pid and moves its deadline to now+grant
+  every 20 s while the parent lives (`provider_lifetime_follows_owner`); the job
+  object still ends it with the parent, so the grant only bounds an orphan.
+- Generated bootstrap: after removing the indirect display, wait for the
+  indirect host to end (10 s at most) and settle three more seconds before
+  closing any lease (`teardown_settle_ms`), so the compositor's device
+  re-creation always finds its lease.
+
+What this does not fix yet: a worker that dies for any other reason still ends
+the admission with DWM re-creating its devices during the teardown; the
+driver's in-process CPU path for frame batches, which would keep the desktop
+rendering through a worker loss the way WARP would, is the next robustness
+layer and is not built.

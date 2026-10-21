@@ -419,6 +419,26 @@ Get-Content "$out\\report.json"
         "report.update(frame_blob_dir=str(v.frame_blob_dir),frame_blob_manifest_sha256=hashlib.sha256((v.frame_blob_dir/'manifest.txt').read_bytes()).hexdigest(),request_recording_enabled=",
     )
     assert "frame_blob_manifest_sha256" in boot
+    # The compositor re-creates its graphics devices when the indirect display goes. Its lease
+    # has to outlive that: admission v106 closed the leases 150 ms after the removal and DWM's
+    # re-creation found no lease (fail-fast 0x889800b0). The teardown now waits for the indirect
+    # host to end (10 s at most) and settles three seconds more before the leases close.
+    boot = edit(
+        boot,
+        [
+            (
+                "        except Exception as error:report['remove_error']=repr(error);report['passed']=False\n",
+                "        except Exception as error:report['remove_error']=repr(error);report['passed']=False\n"
+                "        settle_started=time.perf_counter()\n"
+                "        while host is not None and time.perf_counter()-settle_started<10:\n"
+                "            try:host.verify()\n"
+                "            except Exception:break\n"
+                "            time.sleep(.1)\n"
+                "        time.sleep(3);report['teardown_settle_ms']=(time.perf_counter()-settle_started)*1000\n",
+            ),
+        ],
+        "bootstrap-teardown-settle",
+    )
     if args.no_stimulus:
         # No interactive-admission-start cue arrives, so the shared default-adapter fixture is not
         # constructed (its close() asserts its own pass) and the deadline assertion rests on the
