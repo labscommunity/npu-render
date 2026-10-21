@@ -1144,3 +1144,60 @@ scheduled task at 21:44:02Z, four minutes into the admission. DWM stayed up
 bootstrap detected the loss within seconds (`NPU worker stopped before native
 frame evidence`) and restored the display cleanly. Before build v45 the loss of
 the worker made DWM's next device creation fail and DWM fail fast (trial 18).
+
+## Trial 22 (generation 28, admission v105, two-hour soak through the switch): 40 minutes, and the trigger found
+
+Started 21:45:32Z by `npu-render desktop enable --monitor-seconds 7200
+--initial-grant-seconds 1200` on build v45, package v39, frame blobs v18 and
+IDD package v3, with request capture on and the ASUS OLED Care services stopped
+by `suspend_oled_care.ps1` beforehand. The admission renewed its lease twice
+(21:55:40Z and 22:24:39Z, 2340 s each), the worker followed, 278 frame batches
+ran on the NPU, the relay published 290 frames and the presenter submitted and
+displayed 290 (`displayed_present_count` 290 at its last observation). DWM did
+not crash and left no dump. At 22:24:41.8Z Winlogon logged the screen-saver
+start (event 6) and the run ended the same way as trials 19 and 21: the cursor
+watchdog's `OpenInputDesktop` assertion failed at 22:24:41.57Z, the presenter
+exited with `live interactive desktop changed`, the output observer with
+`observer desktop changed`, the relay completed cleanly at 22:24:41.68Z, the
+live wrapper threw `Frame relay exited during presentation`, and the bootstrap's
+own recovery restored the display by 22:25:08Z (passed). The admission report
+reads `completed=True passed=True stopped_by_controller=True`.
+
+The trigger, read afterwards on the live machine: the process that started at
+22:24:41.81Z is `C:\Windows\ASUS\ScreenSaver\OLED Care Screensaver.scr /s`,
+launched by winlogon.exe through the ordinary screen-saver path, and
+`AsusOptimization.exe` had restarted itself at 21:45:07Z, 25 s after the
+suspend helper stopped it and before the admission began. Its setting
+`OLEDProtectScreensaver` under `ASUS System Control Interface\AsusOptimization\
+ASUS Keyboard Hotkeys` is 1800 s, and the stimulus phase's last injected input
+was about 30 minutes before the event. The Windows side shows nothing: the
+registry `SCRNSAVE.EXE` is empty, the live session's `SPI_GETSCREENSAVEACTIVE`
+is 0 and its timeout 0 (read from an interactive one-shot task,
+`screen_saver_session.ps1`), yet `SPI_GETSCREENSAVERRUNNING` was 1 because the
+ASUS saver was still running eight minutes later. Stopping the ASUS services is
+therefore not a control; the saver is the machine's normal behaviour after 30
+idle minutes and the harness has to live with it, as DWM, the worker and the
+indirect display already do.
+
+### Harness changes after trial 22: the live tools wait out a desktop switch
+
+The presenter (`native-present-v24`), the topology control binary
+(`native-topology-control-v15`), the physical output observer
+(`native-output-observer-v7`) and the cursor watchdog
+(`cursor_recovery_watchdog_v4.py`) no longer end when the input desktop
+leaves `Default`. The shared `session_gate.hpp` gained `wait_console_default`,
+which logs one `desktop_departed` row, polls every 250 ms until the signed-in,
+unlocked Default console desktop is back, logs `desktop_returned` with the
+absence in milliseconds, and keeps the tool's own stop conditions live while
+waiting (presenter window close or deadline, observer stop file, topology
+escape hotkey and controller stop file, watchdog owner exit and stop file).
+The presenter also treats `DXGI_STATUS_OCCLUDED` from `Present` as a skipped
+frame instead of a fault, and the observer re-creates its desktop duplication
+after `DXGI_ERROR_ACCESS_LOST`, which every desktop switch produces. Each
+tool's completion row now carries `desktop_switches` and `desktop_away_ms`.
+The trial generator pins these builds (helper v15, reader qualification v15,
+input qualification v24, observer qualification v7, cursor-guard qualification
+v7). The switch's `enable` now generates the stimulus-free live variant by
+default (`--stimulus` restores the trial measurement stimuli), so an enabled
+desktop has no owned input window, repeated-input benchmark or shared
+application beside it.
