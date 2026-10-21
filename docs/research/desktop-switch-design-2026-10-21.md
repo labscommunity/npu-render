@@ -89,3 +89,12 @@ against Delta during a running admission. Still open from the list above: the
 stimulus-free enable (the live wrapper still injects the trial stimulus), the
 open-ended admission (the switch passes a duration), and packaging inside
 `install`.
+
+Later the same evening: `install --prepare` packages a missing build and runs the
+registration's stage and render qualification as one detached sequence; the
+generator's `--clean-stop` lets `disable` end an admission cleanly (the bootstrap
+records `stopped_by_controller` instead of failing), and the switch passes it for
+every admission it starts. An admission's length is still the hard safety cap the
+switch passes (`--monitor-seconds`, up to four hours under the lifted component
+limits); `disable` ends it earlier at any time. The stimulus-free wrapper is in
+progress; `enable` and `disable` await their first run on Delta.
