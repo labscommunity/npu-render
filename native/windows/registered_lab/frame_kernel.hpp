@@ -257,7 +257,7 @@ inline LoweredProgram lower(const shader::Program &vs, const shader::Program &ps
 // The SHAVE code window holds a few programs at a time, so the inventory is
 // split into blobs by pixel-stage instruction count. A program's blob and its
 // index inside the blob follow from this rule on both the host and the kernel.
-constexpr std::array<std::pair<uint32_t, uint32_t>, 10> blob_ranges{{{0, 1}, {2, 2}, {3, 3}, {4, 12}, {13, 21}, {22, 64}, {65, 115}, {116, 120}, {121, 181}, {182, 100000}}};
+constexpr std::array<std::pair<uint32_t, uint32_t>, 11> blob_ranges{{{0, 1}, {2, 2}, {3, 3}, {4, 12}, {13, 16}, {17, 21}, {22, 64}, {65, 115}, {116, 120}, {121, 181}, {182, 100000}}};
 inline uint32_t blob_of(uint32_t ps_instructions) {
     for (uint32_t k = 0; k < blob_ranges.size(); ++k) if (ps_instructions >= blob_ranges[k].first && ps_instructions <= blob_ranges[k].second) return k;
     return UINT32_MAX;

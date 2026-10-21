@@ -14,6 +14,6 @@ inline const InventoryPair inventory_pairs[]{
     NR_PAIR(6, "b92ae2a7"), NR_PAIR(7, "4e5ed0f8"), NR_PAIR(8, "fbe68f57"), NR_PAIR(9, "b7f4e6d0"), NR_PAIR(10, "95b1c4fb"), NR_PAIR(11, "d056c6dc"),
     NR_PAIR(12, "d305ca5e"), NR_PAIR(13, "7c5bc4d8"), NR_PAIR(14, "e455f7a5"), NR_PAIR(15, "ec1e65f6"), NR_PAIR(16, "20e56de0"), NR_PAIR(17, "3e6229d4"),
     NR_PAIR(18, "2a28d3fe"), NR_PAIR(19, "691da1da"), NR_PAIR(20, "c58da199"), NR_PAIR(21, "0daddc23"), NR_PAIR(22, "5a764502"), NR_PAIR(23, "7823741a"),
-    NR_PAIR(24, "e87ed647"), NR_PAIR(25, "0324b34c")};
+    NR_PAIR(24, "e87ed647"), NR_PAIR(25, "0324b34c"), NR_PAIR(26, "1b8e912b")};
 #undef NR_PAIR
 }

@@ -19,7 +19,7 @@ KERNELS = ROOT / "native/windows/ptl_kernels"
 sys.path.insert(0, str(ROOT / "tools"))
 from build_ptl_kernel import inline_local_includes  # noqa: E402
 
-BLOBS = 10
+BLOBS = 11
 CXX = [
     "clang++",
     "-std=c++17",
@@ -35,10 +35,11 @@ CXX = [
 ]
 
 
-def build_test(output, header):
-    """Compile frame_kernel_test against a specific generated header."""
+def build_test(output, header, identity=None):
+    """Compile frame_kernel_test against a specific generated header (and kernel identity)."""
     subprocess.run(
         CXX
+        + ([f"-DNR_KERNEL_IDENTITY={identity}u"] if identity else [])
         + [
             f'-DNR_FRAME_PROGRAMS_HEADER="{header}"',
             "-o",
@@ -68,8 +69,11 @@ def main():
         blob_dir.mkdir(exist_ok=True)
         header = blob_dir / "frame_programs.h"
         subprocess.run([str(stub), "--emit", str(header), "--blob", str(blob)], check=True)
+        # The kernel identity: the first 32 bits of the blob header's sha256, written by the device
+        # into every output row and checked by the worker against the deploy manifest.
+        identity = "0x" + hashlib.sha256(header.read_bytes()).hexdigest()[:8]
         test = blob_dir / "test"
-        build_test(test, header)
+        build_test(test, header, identity)
         fixtures = out / f"frame-fixtures-blob{blob}.bin"
         result = subprocess.run(
             [str(test), "--fixtures", str(fixtures)], check=True, capture_output=True, text=True
@@ -78,11 +82,13 @@ def main():
         programs = [line for line in result.stdout.splitlines() if '"native":' in line]
         shutil.copy(KERNELS / "frame_core.h", blob_dir / "frame_core.h")
         shutil.copy(KERNELS / "frame.c", blob_dir / "frame.c")
-        source = inline_local_includes(blob_dir / "frame.c")
+        define = f"#define NR_KERNEL_IDENTITY {identity}u\n".encode()
+        source = define + inline_local_includes(blob_dir / "frame.c")
         (out / f"frame_blob{blob}.c").write_bytes(source)
         manifest["blobs"].append(
             dict(
                 blob=blob,
+                identity=identity,
                 programs=len(programs),
                 shaders=[json.loads(p)["shader"] for p in programs],
                 header_sha256=hashlib.sha256(header.read_bytes()).hexdigest(),

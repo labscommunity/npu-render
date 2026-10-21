@@ -58,7 +58,8 @@ public:
     const std::string &execution_device() const { return device; }
     // Writes the spans into the input tensor, runs the NPU and copies back each output span prefix.
     double copy_ms = 0, infer_ms = 0;   // host copies into and out of the tensors vs. the NPU request itself
-    ov::Tensor staging;                  // NR_RENDER_FRAME_INPUT_TENSOR_COPY: host tensor handed to the plugin per request
+    uint32_t identity = 0;               // expected NR_KERNEL_IDENTITY of this blob (0: unknown, not checked)
+    ov::Tensor staging; bool staging_ready = false;   // NR_RENDER_FRAME_INPUT_TENSOR_COPY: host tensor handed to the plugin per request
     static bool env_flag(const char *name) { char *v = nullptr; size_t n = 0; const bool on = !_dupenv_s(&v, &n, name) && v && *v && *v != '0'; std::free(v); return on; }
     void execute(const std::vector<std::vector<uint8_t>> &spans, std::vector<std::vector<uint8_t>> &outputs) {
         require(!failed && !spans.empty() && spans.size() <= rows); failed = true;
@@ -70,7 +71,7 @@ public:
         // fell back, so it is not a fix); NR_RENDER_FRAME_ZERO_OUTPUT=1 clears the output tensor before each request.
         static const bool full_copy = env_flag("NR_RENDER_FRAME_FULL_SPAN_COPY"), tensor_copy = env_flag("NR_RENDER_FRAME_INPUT_TENSOR_COPY"), zero_output = env_flag("NR_RENDER_FRAME_ZERO_OUTPUT");
         if (zero_output) { auto out = inference.get_output_tensor(); std::memset(out.data(), 0, out.get_byte_size()); }
-        if (tensor_copy && staging.get_size() == 0) staging = ov::Tensor(ov::element::f16, ov::Shape({rows, frame::span_bytes / 2}));
+        if (tensor_copy && !staging_ready) { staging = ov::Tensor(ov::element::f16, ov::Shape({rows, frame::span_bytes / 2})); staging_ready = true; }   // an empty ov::Tensor has no size to query
         auto *input = static_cast<uint8_t *>(tensor_copy ? staging.data() : inference.get_input_tensor(0).data());
         for (size_t n = 0; n < spans.size(); ++n) {
             require(spans[n].size() == frame::span_bytes);
@@ -152,7 +153,7 @@ public:
         std::string line;
         while (std::getline(manifest, line)) {
             if (line.empty() || line[0] == '#') continue;
-            std::istringstream fields(line); unsigned blob = UINT32_MAX; std::string sha, file, programs;
+            std::istringstream fields(line); unsigned blob = UINT32_MAX; std::string sha, file, programs, identity;
             require(bool(fields >> blob >> sha >> file) && blob < kernels.size() && sha.size() == 64 && !kernels[blob]);
             kernels[blob] = std::make_unique<FrameKernelProvider>(blob_dir / file, sha);
             // Optional fourth field: the programs compiled into the blob (sha8 list in blob order).
@@ -160,6 +161,8 @@ public:
             // the per-draw route instead of reaching a kernel that refuses (or misreads) them.
             size_t absent = 0;
             if (fields >> programs) { std::vector<std::string> listed; std::istringstream items(programs); std::string item; while (std::getline(items, item, ',')) if (!item.empty()) listed.push_back(item); absent = inventory->restrict_blob(blob, listed); }
+            // Optional fifth field: the kernel identity the device must echo in every output row.
+            if (fields >> identity) kernels[blob]->identity = uint32_t(std::stoul(identity, nullptr, 16));
             std::printf("{\"frame_kernel_blob\":%u,\"file\":\"%s\",\"programs_listed\":%s,\"programs_absent\":%zu}\n", blob, file.c_str(), programs.empty() ? "false" : "true", absent); std::fflush(stdout);
         }
     }
@@ -578,6 +581,12 @@ private:
                 stats.kernel_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - began).count();
                 stats.copy_ms += kernel->copy_ms - copy_before; stats.infer_ms += kernel->infer_ms - infer_before;
                 for (size_t n = 0; n < outputs.size(); ++n) {
+                    { uint32_t echoed; std::memcpy(&echoed, outputs[n].data() + 24, 4);
+                      if (kernel->identity && echoed != kernel->identity) {
+                          // The device ran a kernel other than this blob's: nothing it produced is trusted.
+                          std::printf("{\"frame_kernel_identity_mismatch\":true,\"blob\":%u,\"expected\":\"%08x\",\"echoed\":\"%08x\"}\n", blob, kernel->identity, echoed); std::fflush(stdout);
+                          restore_rect(res, touched, before); fallback_run(draws, run, refs, dirty, stats, "fallback:kernel identity mismatch"); return;
+                      } }
                     uint32_t status, executed, covered, escapes; std::memcpy(&status, outputs[n].data() + 4, 4); std::memcpy(&executed, outputs[n].data() + 8, 4); std::memcpy(&covered, outputs[n].data() + 12, 4); std::memcpy(&escapes, outputs[n].data() + 16, 4);
                     const auto &tile = tiles[in_flight[n].tile];
                     if (status != 0) {

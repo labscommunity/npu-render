@@ -56,6 +56,11 @@
 #ifndef NR_EXECUTE_ATTR
 #define NR_EXECUTE_ATTR NR_NOINLINE
 #endif
+/* Identity of the compiled kernel (set per blob by tools/frame_blobs.py from the blob header's sha256);
+ * written to every output row so the host can verify which kernel the device ran. */
+#ifndef NR_KERNEL_IDENTITY
+#define NR_KERNEL_IDENTITY 0u
+#endif
 #ifndef NR_SAMPLE_ATTR
 #define NR_SAMPLE_ATTR NR_NOINLINE
 #endif
@@ -720,7 +725,7 @@ NR_INLINE nr_u32 nr_render_span(const nr_u8 *data, nr_u8 *output) {
         ++executed;
     }
     nr_st(output, NR_FRAME_OUTPUT_MAGIC); nr_st(output + 4, status); nr_st(output + 8, executed);
-    nr_st(output + 12, s.covered); nr_st(output + 16, s.escapes); nr_st(output + 20, s.loop_overflows);
+    nr_st(output + 12, s.covered); nr_st(output + 16, s.escapes); nr_st(output + 20, s.loop_overflows); nr_st(output + 24, NR_KERNEL_IDENTITY);
     return status;
 }
 #endif
