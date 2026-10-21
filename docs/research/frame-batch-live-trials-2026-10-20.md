@@ -365,13 +365,25 @@ but it is not the kernel code: the worker's spans for that batch, dumped with
 `NR_RENDER_FRAME_SPAN_DUMP`, are byte-identical to the fixture spans, and the
 qualification tool gets 250 from the same deployed blob for them alone, in full
 twelve-row requests, with stale bytes past the declared prefix, and after other
-blobs ran in the same process. The one remaining difference is how the worker's
-provider drives the inference request (it writes spans into the request's own
-input buffer and reuses the request); an attempt to hand the plugin a host tensor
-per request failed its request and fell back to the per-draw route, which is why
-it first looked like a fix. Build v28 keeps three diagnostic switches for the
-next step (`NR_RENDER_FRAME_FULL_SPAN_COPY`, `NR_RENDER_FRAME_INPUT_TENSOR_COPY`,
-`NR_RENDER_FRAME_ZERO_OUTPUT`).
+blobs ran in the same process. Input delivery is ruled out too: with build v29 the worker hands the plugin a
+fresh host tensor per request (what the qualification tool does), with whole-row
+copies, and with the output tensor cleared before each request, and the kernel
+(12 requests, no fallback) still returns alpha 255. What is left between the two
+processes is the NPU runtime context itself: the worker holds nine frame blobs and
+ten per-draw-route models, the tool one. Loading and running all of those models
+in the qualification tool before the strip spans made the device answer status 3
+(program signature mismatch) for every span: a kernel other than blob 6's ran. The
+NPU runtime can execute the wrong kernel image when several patched carriers have
+lived in one process, and the worker had no way to notice. From bundle v17 every
+blob writes its identity (the first 32 bits of its header's sha256) into output
+byte 24, the deploy manifest carries it, and the worker treats an unexpected
+identity as a failed run (restored and sent through the per-draw route), so a
+wrong kernel can no longer deliver pixels. It is not the alpha cause: the replay with build v32
+and blobs v17 reports no identity mismatch and the strip still returns 255, so the
+right kernel produces it inside the worker. What differs from the tool is then the
+device state other graphs leave behind in the worker process; the next experiment
+loads the worker's other models after the strip's model and keeps them alive while
+the strip spans run.
 
 ## Trial 7 (build v24, blobs v14, no hazard flushes): 2.3 updates/s
 
@@ -418,3 +430,28 @@ Trials in this report: 0.7 (per-draw baseline), 2.1, 2.2, 1.9, 1.9, 1.9, 1.9, 2.
 roughly an order of magnitude (several pixels per vector for the small shaders,
 all SHAVE engines per request, a larger carrier code window for the big ones),
 fewer and smaller uploads per present, and a lower per-request floor.
+
+## Trial 9 (build v32, blobs v17 with kernel identities): 2.4 updates/s, two draws unbatched
+
+`native-live-v75` (registration v64, package v33 / 0.0.1333.0, `frame-blobs-v17`)
+passed every chain gate; `native-repeated-input-v19-analysis` reports 2.4 verified
+updates/s (27 submissions, 26 verified, 24 inside their interval; trials 7-9 span
+2.3-2.8 with the same kernel path). 4,594 draws were batched and 2 took the
+per-draw route, both 312-318 vertex glyph runs over the span budget; the 512x512
+pass 1b8e912b now runs on the kernel. The worker checked the kernel identity on
+every one of its 4,588 requests and found no mismatch. Flushes: 216 (122 presents,
+87 writes, 4 limits, 2 per-draw routes, 1 read), kernel 40.7 s.
+
+For the functional goal this is the state: every DWM shader pair captured in nine
+trials has a verified route (25 native, one on the per-draw route because its blob
+does not fit the code window, one glyph shape over the span budget), a wrong kernel
+cannot deliver pixels, and a failed kernel run degrades to the per-draw route.
+
+The acrylic alpha remains the one known pixel deviation. Further experiments on the
+qualification side all returned the correct 250: the worker's other nineteen models
+loaded after the strip's model and kept alive, and a model compiled (not imported)
+and run on the NPU first. Only the C++ worker produces 255, even with a single blob
+loaded. Build v33 adds a provider self-test (`NR_RENDER_FRAME_SELF_TEST=1`, `strict`
+retires a disagreeing blob) that runs each blob's own fixtures through the worker's
+provider at startup, which is both the next discriminator and a startup health check
+for the deployed worker.
