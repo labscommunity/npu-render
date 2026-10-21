@@ -559,18 +559,18 @@ Get-Content "$out\\report.json"
             ("run-native-topology-helper-v13.ps1", "run-native-topology-helper-v14.ps1"),
             ("relay_native_frames_v8.py", "relay_native_frames_v9.py"),
             ("cursor_recovery_watchdog_v2.py", "cursor_recovery_watchdog_v3.py"),
-            # Presenter v22, output observer v6 and the frame reader qualified on v22 accept four
-            # hours; the same sources with only the duration limits raised.
+            # Presenter v23 (live, input-stimulus and stimulus durations), output observer v6 and the
+            # frame reader qualified on v23 accept four hours; same sources, only the limits raised.
             (
                 '"$r\\builds\\native-present-v21\\build-report.json"',
-                '"$r\\builds\\native-present-v22\\build-report.json"',
+                '"$r\\builds\\native-present-v23\\build-report.json"',
             ),
             (
                 '"$r\\builds\\native-present-v21\\Release\\nr_frame_present_probe.exe"',
-                '"$r\\builds\\native-present-v22\\Release\\nr_frame_present_probe.exe"',
+                '"$r\\builds\\native-present-v23\\Release\\nr_frame_present_probe.exe"',
             ),
-            ("live-frame-reader-v12", "live-frame-reader-v13"),
-            ("native-present-v21-qualification", "native-present-v22-qualification"),
+            ("live-frame-reader-v12", "live-frame-reader-v14"),
+            ("native-present-v21-qualification", "native-present-v23-qualification"),
             ("native-output-observer-v5", "native-output-observer-v6"),
             # The cursor watchdog verifies the topology control binary the helper runs, so the live
             # script's proof and cursor-guard qualification follow the helper to control v14.
