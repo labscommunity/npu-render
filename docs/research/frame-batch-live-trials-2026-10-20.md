@@ -476,8 +476,178 @@ IEEE division fix-up and reproduce the pre-fix 255 exactly. Blob 7 does not fit 
 any other optimisation level (-Os 24,560 B, -O1 25,104 B, -O2 30,320 B against
 24,496), so that route is closed. The sizes themselves carry a hint: the three
 failing blobs end within 32-192 bytes of the window (24,304, 24,496, 24,464 B) and
-every passing blob ends at least 640 bytes short of it. The next experiment grows a
-passing blob toward the window end with never-executed code and runs it through
-both the tool and the worker self-test; if it starts failing, the last part of the
-code window is not safe to execute from in the worker's environment and the usable
-window is smaller than the 24,496 bytes assumed so far.
+every passing blob ends at least 640 bytes short of it. Growing a passing blob (blob 6)
+toward the window end with never-executed code refutes that reading: at 24,208,
+24,368 and 24,464 bytes (the last one the size of a failing blob) it still passes
+the worker self-test, so the failure belongs to the long shaders' code, not to its
+position. On the tool side nothing reproduces the worker: the other nineteen models
+loaded before or after ours and kept alive, and a model compiled on the NPU first,
+all still give the host's result. What remains is the one call-sequence difference
+between the two: the tool re-sets both carrier inputs on every request, the
+provider zeroes the carrier's second input (the scatter "updates" plane) once and
+never sets it again; build v36 re-sets it per request
+(`NR_RENDER_FRAME_SET_UPDATES=1`), alone and together with the per-request input
+tensor, and the self-test mismatches are unchanged. Every call-sequence difference
+between the two programs is now equalised and the worker still differs, so the
+remaining suspects are what the C++ runtime binding does with the request and the
+device's memory for it (the blob 7 difference starts with a run of zero pixels in a
+region the header counts as covered, which reads like writes that never reached the
+host). Build v37 dumps the device output, the host expectation and the span of every
+mismatching fixture (`NR_RENDER_FRAME_SELF_TEST_DUMP`). The dumps show the device's
+answer in the worker is what an opaque alpha would produce where the host computed
+a near-zero alpha (the acrylic quad: every covered pixel, the destination-out blend
+leaving zeros), and in the other two shaders mostly the alpha lane again. Running
+real fixtures of other blobs first in the tool, so the device carries another
+kernel's leftovers, still gives the host's result there. The cause stays open; the
+worker-side bisection of the shader program is the next experiment.
+
+Until it is found, correctness wins: from build v38 the self-test is strict by
+default whenever a blob's fixtures are deployed, so a blob whose fixtures disagree
+with the host kernel serves no draw and its programs take the per-draw route. On
+Delta that retires blobs 7, 8 and 9 (the acrylic strip, 39799859 and ec1e65f6),
+which costs frame time but delivers the GPU path's pixels.
+
+## Where the per-pixel time goes (device experiment, blobs 0 and 1)
+
+Blobs 0 (five solid one-instruction shaders) and 1 (five textured one- and
+two-instruction shaders) were rebuilt without the blend stage (`NR_EXP_NO_BLEND`)
+and without the pixel stage (`NR_EXP_NO_PS`) and timed on the NPU over the same
+fixture groups (twelve 128x128 tiles per request, best of four repeats):
+
+| Blob, fixture group | Full | No blend | No pixel stage |
+| --- | --- | --- | --- |
+| 0 (solid), real-vertex group | 8.5 ms | 4.2 ms | 8.1 ms |
+| 0 (solid), quad group | 12.0 ms | 7.6 ms | 7.9 ms |
+| 1 (textured), real-vertex group | 28.2 ms | 20.1 ms | 8.0 ms |
+| 1 (textured), quad group | 29.8 ms | 26.5 ms | 7.9 ms |
+
+For the solid passes the blend is 35-50% of the time and the rasteriser and
+interpolation the rest; the one-instruction pixel stage is negligible. For the
+textured passes sampling is about 70% and the blend 10-30%. The frame's pixels are
+mostly textured passes (595296ba, d056c6dc, 0a7b1c69), so the lever is the sampler
+(a point-sampled, texel-aligned fast path and fewer loads per tap), then a
+four-pixel blend; a vectorised arithmetic stage alone would change little.
+
+## Correction: the qualification tool never compared pixels (2026-10-21)
+
+The strict self-test of build v38 retired six healthy blobs on Delta before the
+first replay batch: every blob's `invalid-version` fixture "mismatched". That fixture
+is a span the kernel rejects (status 2), so the device leaves the pixel area
+unwritten while the host expectation is zero-filled; the self-test compared the
+pixel area anyway. Fixing that led to the comparison in
+`tools/delta/qualify_frame_kernel.py`, which read the tile width and height from
+bytes 16 and 20 of the *expected output* — the escape and loop-overflow counters,
+both zero in a healthy fixture — so its live length was 64 bytes: the Python tool
+had only ever compared the 64-byte output header. Every "qualify passed" recorded
+for the frame blobs so far, and every experiment that concluded "the tool does not
+reproduce the worker's difference", was a header-only check. The dumps saved by
+build v37 confirm it: run through the tool's old comparison they all pass, while
+13,507–54,065 of the 65,536 pixel bytes differ.
+
+With the tile size taken from the input span and a header-only comparison for
+rejected spans, the tool now reproduces the worker exactly on the deployed v17
+blobs (`--patched-blob`, no rebuild):
+
+| Blob | Fixtures | Mismatches (first offset) |
+| --- | --- | --- |
+| 0–6 | 29, 33, 27, 21, 15, 9, 15 | 0 |
+| 7 (c71638aa) | 9 | quad rgba/bgra, split-windows, transparent-textures (1624/1627) |
+| 8 (39799859) | 9 | quad rgba/bgra, split-windows (1627), real-vs rgba (38459) |
+| 9 (ec1e65f6) | 9 | real-vs rgba/bgra (64/68), quad, split-windows (1624/1640), transparent-textures (55085) |
+
+So the three 111–181-instruction shaders are wrong on the device in every harness,
+not only in the worker; the worker-versus-tool investigation (call sequences, tensor
+delivery, settle time, model ordering) was chasing an artifact. The strict default
+of v38 retires exactly the wrong blobs, which was the right outcome for the wrong
+reason, and v39 keeps rejected spans out of the comparison so healthy blobs stay.
+
+What the failures look like, from the v37 dumps: the acrylic quad (blob 7,
+destination-out blend) comes back all zero over the whole quad, i.e. the device
+computed source alpha 1 where the host computed a small alpha; the blob 8 quad
+differs in the alpha lane only, by 8–20 of 255, device larger; the blob 9 real-vertex
+fixture differs in a 65x64 region in every lane.
+
+Two hypotheses tested with the corrected tool:
+
+- **Code window tail.** The failing blobs end 32–192 bytes short of the 24,496-byte
+  window and the passing ones 640 bytes or more. The ELF layout (no read-only data;
+  helpers after the generated row functions) puts `nr_tap`, `nr_mirror01` and
+  `nr_blend_pixel` in the last 1.5 KB of blobs 7–9. But blob 6 padded with a dead
+  function to 24,464 bytes moves its live `nr_tap` and `nr_v4_floor` to
+  23,440–24,438 and still passes a full-pixel comparison, so code at the window tail
+  executes correctly. Refuted.
+- **A broken out-of-line helper.** The helpers only the failing blobs use are
+  `nr_v4_movc`, `nr_v4_frc` (and through it `nr_v4_floor`), `nr_v4_min/max`,
+  `nr_v4_sat`, `nr_v4_cmp_lt/eq`, `nr_v4_dp`. A probe kernel evaluated each helper
+  on 12,000 random records (normal, special, random-bit-pattern and integer-valued
+  lanes) and the host evaluated the same records. Every lane whose inputs and
+  outputs are normal numbers agrees. The differences are all edge cases of the
+  device's float unit: it flushes subnormal operands and results to zero
+  (`div`: a subnormal divisor becomes 0, so x/subnormal is inf or NaN on the device
+  and finite on the host; `max`: a subnormal operand comes back as 0; `min` and
+  `cmp_lt`: a subnormal compares equal to zero), and it canonicalises NaN payloads
+  (`frc`, `dp`). `cmp_ge` and `cmp_eq` flush explicitly on both sides and agree.
+  None of this involves the values a DWM shader sees (texel fractions of 1/255 and
+  their products are far from the subnormal range), so the helpers are not the
+  cause either; the subnormal semantics are recorded as a host/device difference to
+  resolve (flush on the host as SM4 does).
+
+The remaining suspect is the generated row function itself (4–6.5 KB for these
+shaders against 1.9–2.5 KB for the passing ones): register pressure, spills or
+scheduling inside one large function. A tapped build of blob 9 (eight instructions
+per build, each pixel storing one lane of one instruction's result into a spare
+output area, no early exit) is scanning all 181 instructions against the host; the
+first instruction whose result differs names the operation.
+
+The replay of build v38 also exposed a worker defect: a batch command recorded
+without its per-draw route (`legacy_abi` 0, as in every batch of the trial-2
+capture, which predates the field) made the fallback build a per-draw request with
+abi 0, which the provider rejected and the batch failed. The route selection now
+lives in `legacy_route.hpp`, shared by the driver and the worker: the driver records
+it and the worker derives the same route for a command that has none. The shared
+version also classes mirror- and border-addressed samplers as general resources, as
+the per-draw path always did; the recorded route had kept the clamp-only selection
+from before the batcher accepted mirror addressing, so a mirror-sampled draw that
+fell back would have been sampled with clamp addressing.
+
+## Root cause of the long-shader failures: the SHAVE swizzle lowering (2026-10-21)
+
+The tapped scan of blob 9 (ec1e65f6, 181 instructions) against the host found the
+first divergent instruction at 154, an add whose operand is the negated z,w lanes of
+register r3 swizzled as (2, 3, 2, 2): the device read 0 (in another build NaN) where
+the host had the values r3 held since instruction 5, although every earlier read of
+the same lanes agreed. Tapping r3 itself right before the instruction made the
+divergence disappear — a layout-dependent fault. Padding passes that delay every
+consumer of a VAU or CMU result, every write to a just-written register, or every
+reload of a just-stored stack slot (new `--pad-raw-*` and `--pad-stack-distance`
+options of `tools/build_ptl_kernel.py`) changed the wrong value but never made it
+right, so this was not a latency hazard.
+
+The generated shader code reaches the vector unit through two macros the runtime
+barely uses: `NR_V4_SET` (a lane insert) and `NR_V4_SWZ` (a swizzle, spelled with
+`__builtin_shufflevector`). Rewriting each in a semantics-preserving way on both
+sides (the host output is byte-identical under every rewrite) and tapping the
+acrylic shader's final value on the device:
+
+| Variant of blob 7 (c71638aa, tap at the last instruction) | Device vs host |
+| --- | --- |
+| as generated | lanes x, y, z agree; alpha wrong at every pixel (device 1.0) |
+| lane insert as a masked select | alpha still wrong |
+| swizzle as explicit lane extraction (`nr_v4_make(a[x], a[y], a[z], a[w])`) | **all lanes agree at every pixel** |
+| both rewrites | every lane wrong (the select lowering fails too) |
+
+moviCompile lowers `__builtin_shufflevector` with repeated indices such as
+(0, 1, 0, 0) and (2, 3, 2, 2) through `CMU.CMB` combines whose result is wrong in
+these long functions; the same compiler's lowering of four lane extractions into a
+new vector is correct. With the swizzle macro changed in `frame_core.h` (SHAVE path
+only; the host path already used scalar swizzles), the production sources of blobs
+7, 8 and 9 pass all 27 fixtures on the device with the full pixel comparison, at
+24,304, 24,496 and 24,416 bytes (blob 9 shrank by 48 bytes), and the assembler no
+longer requests the `CMU.CMB` hazard NOPs that `--fix-hazards` existed for. The
+tapped blob 9 agrees with the host at its final instruction on every covered pixel.
+
+Consequences: bundle v18 rebuilds all blobs from the corrected core and qualifies
+them with the corrected tool; the worker's strict self-test then keeps all of them,
+so the acrylic strip and the two other long shaders return to the kernel route with
+GPU-identical pixels. The small shaders were never wrong: their generated code holds
+few repeated-index swizzles, or none that the lowering mishandled.
