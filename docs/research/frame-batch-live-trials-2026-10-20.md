@@ -1048,3 +1048,14 @@ four `open_adapter` entries and only the first admission's `create_device`, so
 the second device never reached our device-creation entry: the failure is in
 the adapter open or in the runtime and kernel steps before it. This is the
 first product defect of gate 4 with a six-minute reproduction and a dump.
+
+Root cause, from the dump and the driver: `OpenAdapter10` verifies the
+compositor's lease before anything else, and that verification required the
+input desktop to be "Default" for the compositor scope. A screen-saver switch
+(and equally the lock screen or UAC's secure desktop) moves the input desktop
+away, so when DWM created a graphics device for the new desktop the adapter
+open returned unsupported, before even tracing, and DWM failed fast. The rule
+added nothing for the compositor, which the lease already binds by identity,
+session and SID; it is now applied only to interactive clients. Build v44 and
+package v38 (generation 23) carry the change into the same six-minute
+reproduction.
