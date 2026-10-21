@@ -30,7 +30,7 @@ the gate framework is the ordered gates table in
 | 5. Responsiveness | Not met. 2.5 verified updates/s in trial 11 and 2.4 in trial 12 against a 30 Hz, 300-update stimulus at 1024x768; per-flush wall p50 265 to 281 ms; mouse sent-to-display median 94 ms and p95 1,497 ms in trial 11. |
 | 6. Application coverage | Unqualified. A normally started default-adapter fixture shared DWM's worker in the v64 trial; continuous admission, multiple applications and browser, video and 3D coverage are open. |
 | 7. Tahoma benefit | Not measured on the native desktop. Earlier experiments regressed. The GPU 3D engine sample shows composition left that engine; it is not a Tahoma measurement. |
-| 8. Usable switch | Not implemented. [desktop-switch-design-2026-10-21.md](docs/research/desktop-switch-design-2026-10-21.md) describes `npu-render desktop install/enable/disable/status` built from the existing trial components. |
+| 8. Usable switch | Host side implemented: `npu-render desktop status/enable/disable/install` generates, uploads and launches an admission, stops it, runs recovery and quotes the reports; `status` is verified against Delta, `enable` and `disable` are not yet exercised on hardware, and the live wrapper still injects the trial stimulus. See [desktop-switch-design-2026-10-21.md](docs/research/desktop-switch-design-2026-10-21.md). |
 
 Correctness on the kernel path is checked on the device: every blob's fixtures
 are compared pixel for pixel against the host reference, and the trial-2 capture

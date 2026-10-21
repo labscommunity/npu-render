@@ -71,6 +71,12 @@ def main():
         default=660,
         help="native admission duration; the live phases and process waits scale with it",
     )
+    parser.add_argument(
+        "--clean-stop",
+        action="store_true",
+        help="the controller's stop file ends the admission cleanly (the switch's disable)"
+        " instead of failing it as a trial interruption",
+    )
     parser.add_argument("--idd-package", default="native-idd-package-v2")
     parser.add_argument("--idd-version", default="0.0.1502.0")
     parser.add_argument(
@@ -385,6 +391,17 @@ Get-Content "$out\\report.json"
         ],
         "bootstrap-renewal",
     )
+    if args.clean_stop:
+        boot = edit(
+            boot,
+            [
+                (
+                    "        assert not (v.transaction/'stop').exists(),'Controller requested native restoration'\n",
+                    "        if (v.transaction/'stop').exists():report['stopped_by_controller']=True;break\n",
+                )
+            ],
+            "bootstrap-clean-stop",
+        )
     boot = boot.replace(
         "report.update(request_recording_enabled=",
         "report.update(frame_blob_dir=str(v.frame_blob_dir),frame_blob_manifest_sha256=hashlib.sha256((v.frame_blob_dir/'manifest.txt').read_bytes()).hexdigest(),request_recording_enabled=",
@@ -710,6 +727,7 @@ Get-Content "$out\\report.json"
                 initial_grant_seconds=grant,
                 idd_package=args.idd_package,
                 idd_version=args.idd_version,
+                clean_stop=args.clean_stop,
                 registration_generation=rg,
                 files=produced,
             ),

@@ -166,7 +166,7 @@ def test_generator_command_carries_every_pin(tmp_path):
         flags["--idd-package"] == "native-idd-package-v3" and flags["--idd-version"] == "0.0.1503.0"
     )
     assert flags["--monitor-seconds"] == "7200" and flags["--initial-grant-seconds"] == "2400"
-    assert command[-1] == "--capture"
+    assert command[-2:] == ["--clean-stop", "--capture"]
     quiet = desktop_switch.SwitchConfig(capture=False)
     assert "--capture" not in desktop_switch.generator_command(quiet, 18, 14, tmp_path)
 
@@ -363,3 +363,40 @@ def test_cli_desktop_subcommands(monkeypatch, capsys):
         cli.main(["desktop", "--help"])
     help_text = capsys.readouterr().out
     assert all(word in help_text for word in ("status", "enable", "disable", "install"))
+
+
+def test_prepare_packages_when_missing_and_registers(monkeypatch):
+    delta = FakeDelta(monkeypatch, survey())
+    generated = {}
+
+    def fake_generate(config, generation, registration, output):
+        generated.update(generation=generation, registration=registration)
+        output.mkdir(parents=True)
+        (output / "run-native-registration-v73.ps1").write_text("x")
+        return {"generation": generation, "files": {"run-native-registration-v73.ps1": "x"}}
+
+    monkeypatch.setattr(desktop_switch, "generate_chain", fake_generate)
+    monkeypatch.setattr(
+        desktop_switch,
+        "check_prerequisites",
+        lambda config: {
+            "checks": {"package": {"ok": False}},
+            "ready": False,
+            "missing": ["package"],
+        },
+    )
+    result = desktop_switch.prepare(desktop_switch.SwitchConfig())
+    # Registration is the generation's own; the package script runs because the package is absent.
+    assert generated == {"generation": 18, "registration": 18}
+    assert result["registration"] == "native-registration-v73" and result["package_step"] is True
+    plan = json.loads(delta.uploads[-1][2])
+    steps = {step["name"]: step for step in plan["steps"]}
+    assert list(steps) == ["package", "stop-saver", "registration-stage", "registration-render"]
+    assert steps["package"]["report"] == VM + r"\native-driver-package-v37\report.json"
+    assert steps["registration-stage"]["named"] == {"Mode": "stage"}
+    assert (
+        steps["registration-stage"]["report"] == VM + r"\native-registration-stage-v37\report.json"
+    )
+    assert steps["registration-render"]["named"] == {"Mode": "render"}
+    assert steps["registration-render"]["report"] == VM + r"\native-registration-v73\report.json"
+    assert plan["run_id"].startswith("sequence-prepare-v73-")

@@ -8,8 +8,8 @@ counter and drives those transactions from the development machine through two s
 without the host. The switch adds no verdict of its own: ``status`` quotes the fields the
 transaction reports wrote, and only those scripts say whether anything was offloaded.
 
-``install`` verifies prerequisites only; packaging stays with the generated package
-script (package-native-driver-v<N>.ps1) until the switch grows a prepare step.
+``install`` verifies prerequisites; with ``--prepare`` it runs the generated package script
+when the package is missing and then the registration's stage and render qualification.
 """
 
 import argparse
@@ -210,6 +210,9 @@ def generator_command(config: SwitchConfig, generation: int, registration: int, 
     command += ["--monitor-seconds", str(config.monitor_seconds)]
     command += ["--initial-grant-seconds", str(config.initial_grant_seconds)]
     command += ["--idd-package", config.idd_package, "--idd-version", config.idd_version]
+    # The switch's admissions end on `disable`'s stop file, which the generated bootstrap then
+    # treats as a clean end rather than a trial interruption.
+    command.append("--clean-stop")
     return command + (["--capture"] if config.capture else [])
 
 
@@ -339,6 +342,53 @@ def disable(interval: float = 15, timeout: float = 900) -> dict:
     }
 
 
+def prepare(config: SwitchConfig) -> dict:
+    """Package the build if the package is missing, then register and qualify it.
+
+    Registration is its own numbered transaction (the generator's registration family), so
+    prepare generates the next chain with that generation as its own registration, uploads it,
+    and runs the package script when needed, then the registration's stage and render modes.
+    The admission is not started; `enable` finds the passing registration afterwards.
+    """
+    survey = survey_host()
+    sequence = (survey.get("sequence") or {}).get("status") or {}
+    if sequence and not sequence.get("done"):
+        raise RuntimeError(f"sequence {sequence.get('run_id')} is still running")
+    generation = next_generation(survey["admissions"])
+    checks = check_prerequisites(config)
+    vm = f"{survey['root']}\\vm"
+    registration = f"native-registration-v{REGISTRATION_BASE + generation}"
+    stage = config.package.replace("native-driver-package-", "native-registration-stage-")
+    with tempfile.TemporaryDirectory() as tmp:
+        chain = Path(tmp) / "chain"
+        manifest = generate_chain(config, generation, generation, chain)
+        upload([chain / name for name in manifest["files"]], REMOTE_VM_SCP)
+        steps = []
+        if not checks["checks"]["package"]["ok"]:
+            steps.append(
+                f"name={vm}\\package-native-driver-v10.ps1;label=package"
+                f";report={vm}\\{config.package}\\report.json"
+            )
+        steps += [
+            f"name={vm}\\stop_screen_saver.ps1;label=stop-saver;ignore_exit=1",
+            f"name={vm}\\run-{registration}.ps1,-Mode,stage;label=registration-stage"
+            f";report={vm}\\{stage}\\report.json;ignore_exit=1",
+            f"name={vm}\\run-{registration}.ps1,-Mode,render;label=registration-render"
+            f";report={vm}\\{registration}\\report.json;ignore_exit=1",
+        ]
+        launched = launch(
+            f"sequence-prepare-v{REGISTRATION_BASE + generation}", survey["root"], steps, Path(tmp)
+        )
+    return {
+        "generation": generation,
+        "registration": registration,
+        "package_step": not checks["checks"]["package"]["ok"],
+        "uploaded": sorted(manifest["files"]),
+        **launched,
+        "next": "`npu-render desktop status` shows the sequence; `enable` once it passed",
+    }
+
+
 def check_prerequisites(config: SwitchConfig) -> dict:
     names = dict(BUILD=config.build, PACKAGE=config.package, IDD=config.idd_package)
     found = remote_json(fill(PREREQUISITES, BLOBS=config.frame_blobs, **names))
@@ -357,7 +407,7 @@ def check_prerequisites(config: SwitchConfig) -> dict:
         "ready": not missing,
         "missing": missing,
         "checks": checks,
-        "packaging": "stays with the generated package-native-driver-v<N>.ps1; not run here",
+        "packaging": "`install --prepare` runs the package script and the registration",
     }
 
 
@@ -442,7 +492,12 @@ def add_parser(commands) -> None:
     install = sub.add_parser(
         "install", help="verify package, display, build and blobs are prepared"
     )
-    add_config_arguments(install, full=False)
+    add_config_arguments(install, full=True)
+    install.add_argument(
+        "--prepare",
+        action="store_true",
+        help="package the build if needed, then run and qualify its registration",
+    )
 
 
 def run(args: argparse.Namespace) -> dict:
@@ -452,4 +507,6 @@ def run(args: argparse.Namespace) -> dict:
         return enable(SwitchConfig.from_args(args))
     if args.desktop_command == "disable":
         return disable(args.interval, args.timeout)
+    if getattr(args, "prepare", False):
+        return prepare(SwitchConfig.from_args(args))
     return check_prerequisites(SwitchConfig.from_args(args))
