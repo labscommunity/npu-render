@@ -94,17 +94,20 @@ PREREQUISITES = (
 
 @dataclass
 class SwitchConfig:
-    """Chain pins; the defaults are the generation-17 chain manifest's."""
+    """Chain pins; the defaults are the latest qualified chain's (generation 28, soak v105)."""
 
-    build: str = "native-tree-v43"
-    package: str = "native-driver-package-v37"
-    version: str = "0.0.1337.0"
+    build: str = "native-tree-v45"
+    package: str = "native-driver-package-v39"
+    version: str = "0.0.1339.0"
     frame_blobs: str = "frame-blobs-v18\\deploy"
     idd_package: str = "native-idd-package-v3"
     idd_version: str = "0.0.1503.0"
     monitor_seconds: int = 7200
     initial_grant_seconds: int = 2400
     capture: bool = True
+    # The measurement stimuli (owned input window, repeated-input benchmark, shared application)
+    # belong to trials; a desktop switch renders the desktop as it is.
+    stimulus: bool = False
     source: Path = ROOT / "results" / "render-driver"
 
     @classmethod
@@ -213,6 +216,8 @@ def generator_command(config: SwitchConfig, generation: int, registration: int, 
     # The switch's admissions end on `disable`'s stop file, which the generated bootstrap then
     # treats as a clean end rather than a trial interruption.
     command.append("--clean-stop")
+    if not config.stimulus:
+        command.append("--no-stimulus")
     return command + (["--capture"] if config.capture else [])
 
 
@@ -473,6 +478,11 @@ def add_config_arguments(parser: argparse.ArgumentParser, full: bool) -> None:
             ("--source", d.source, "fetched base chain the generator derives from"),
         ]
         parser.add_argument("--no-capture", dest="capture", action="store_false")
+        parser.add_argument(
+            "--stimulus",
+            action="store_true",
+            help="run the trial measurement stimuli beside the desktop (trial mode)",
+        )
     for flag, default, help_text in options:
         parser.add_argument(flag, default=default, type=type(default), help=help_text)
 
