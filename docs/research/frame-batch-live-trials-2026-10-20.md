@@ -1073,3 +1073,18 @@ restoration, which passed. The product path (DWM, worker, indirect display) is
 therefore checked next with the admission alone across a saver request, and the
 long soak keeps the presentation harness with the saver timer raised until the
 presenter can re-attach after a desktop switch.
+
+## Trial 18 (generation 24): the admission alone survives the screen saver
+
+The desktop admission without the presentation harness (no topology helper,
+relay or presenter; the indirect display stays secondary), 660 s, with the
+saver requested through the system path at 20:32:44Z. The admission kept
+running: the bootstrap stayed passed, no dump was written, and the frame count
+rose from 9 to 276 within ninety seconds of the request because DWM composed
+the saver's animation for the indirect display through our adapter at the NPU
+path's usual rate. With trial 17 this separates the two remaining effects of a
+desktop switch: DWM's device creation (fixed in build v44) and the indirect
+display's swap chain, which is lost only when the indirect display is primary
+with the presentation bridge attached (trial 17's access-lost exit). The
+driver's reassignment after such a switch is the next product item; the
+two-hour soak meanwhile raises the OLED saver timer for its duration.
