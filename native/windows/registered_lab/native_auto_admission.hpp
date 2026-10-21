@@ -58,7 +58,12 @@ inline void transfer(HANDLE pipe,void *buffer,DWORD size,bool write,uint64_t dea
 }
 inline nr::native_probe::Lease request(unsigned mutation=0){
  const auto p=discover();const auto name=pipe_name(p);const auto deadline=GetTickCount64()+3000;
- diagnostic_stage="open-broker-pipe";Handle pipe(CreateFileW(name.c_str(),FILE_READ_DATA|FILE_WRITE_DATA|FILE_READ_ATTRIBUTES|SYNCHRONIZE,0,nullptr,OPEN_EXISTING,FILE_FLAG_OVERLAPPED|SECURITY_SQOS_PRESENT|SECURITY_IDENTIFICATION,nullptr));
+ // One pipe instance serves clients in turn; a busy instance is waited for within the deadline.
+ diagnostic_stage="open-broker-pipe";HANDLE raw=INVALID_HANDLE_VALUE;
+ for(;;){raw=CreateFileW(name.c_str(),FILE_READ_DATA|FILE_WRITE_DATA|FILE_READ_ATTRIBUTES|SYNCHRONIZE,0,nullptr,OPEN_EXISTING,FILE_FLAG_OVERLAPPED|SECURITY_SQOS_PRESENT|SECURITY_IDENTIFICATION,nullptr);
+  if(raw!=INVALID_HANDLE_VALUE)break;const auto error=GetLastError();const auto now=GetTickCount64();require(error==ERROR_PIPE_BUSY&&now<deadline);
+  if(!WaitNamedPipeW(name.c_str(),DWORD(deadline-now)))require(GetLastError()==ERROR_SEM_TIMEOUT&&GetTickCount64()<deadline);}
+ Handle pipe(raw);
  diagnostic_stage="verify-broker-server";ULONG server=0;require(GetNamedPipeServerProcessId(pipe.value,&server)&&server==p.controller.pid);verify_peer(p.controller);
  Request q{};q.consumer=identity(GetCurrentProcess());std::memcpy(q.nonce,p.nonce,sizeof(q.nonce));
  if(mutation==1)q.consumer.pid=p.worker.pid;

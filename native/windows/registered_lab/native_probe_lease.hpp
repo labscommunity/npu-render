@@ -87,6 +87,13 @@ inline bool session_unlocked(DWORD session) {
     const bool ready=bytes>=sizeof(WTSINFOEXW) && info->Level==1 && info->Data.WTSInfoExLevel1.SessionId==session && info->Data.WTSInfoExLevel1.SessionState==WTSActive && info->Data.WTSInfoExLevel1.SessionFlags==WTS_SESSIONSTATE_UNLOCK;
     WTSFreeMemory(raw);return ready;
 }
+// The desktop this thread belongs to, not the one that currently has input: an interactive
+// client keeps its Default-desktop binding while the screen saver, lock screen or a secure
+// prompt holds the input desktop (DWM, scope 1, composes every desktop and is not bound).
+inline bool own_desktop_is_default() {
+    const auto desktop=GetThreadDesktop(GetCurrentThreadId());if(!desktop)return false;
+    wchar_t name[128]{};DWORD bytes=0;return GetUserObjectInformationW(desktop,UOI_NAME,name,sizeof(name),&bytes) && bytes<=sizeof(name) && !std::wcscmp(name,L"Default");
+}
 inline bool current_input_is_default() {
     const auto desktop=OpenInputDesktop(0,FALSE,DESKTOP_READOBJECTS);if(!desktop)return false;
     wchar_t name[128]{};DWORD bytes=0;const bool ready=GetUserObjectInformationW(desktop,UOI_NAME,name,sizeof(name),&bytes) && bytes<=sizeof(name) && !std::wcscmp(name,L"Default");CloseDesktop(desktop);return ready;
@@ -173,10 +180,11 @@ public:
         // secure desktop switch the input desktop away from "Default", and DWM creates a new
         // graphics device for each. Requiring the Default desktop here made that creation fail
         // and DWM fail fast (0x889800b0, trials 14 and 16). Identity, session and SID still bind
-        // the compositor; only interactive clients (scope 3) must sit on the Default desktop.
+        // the compositor; interactive clients (scope 3) must belong to the Default desktop, which
+        // their own thread desktop tells without failing while another desktop holds input.
         if(lease.scope==1)require(current_image_is(L"dwm.exe"));
         if(lease.scope==2)require(current_image_is(L"WUDFHost.exe"));
-        if(lease.scope==3){require(current_input_is_default());require(user_sid(worker.value)==sid&&user_sid(controller.value)==sid);}
+        if(lease.scope==3){require(own_desktop_is_default());require(user_sid(worker.value)==sid&&user_sid(controller.value)==sid);}
     }
     HANDLE worker_handle() { verify(); return worker.value; }
     uint64_t deadline_tick() const { return lease.deadline_tick; }
