@@ -1125,3 +1125,13 @@ presenter ended with the desktop switch, and the controller restored the
 display. The next soak stops the ASUS OLED Care processes for its duration
 (`suspend_oled_care.ps1`) and restarts them after; the harness-side item, the
 presenter and relay re-attaching after a desktop switch, stays open.
+
+## Trial 20 (generation 27, build v45, package v39, through the switch): clean 660 s
+
+The first admission started by `npu-render desktop enable`, on the package the
+switch had prepared and registered itself. It ran its full 660 s and passed
+with cleanup (154 frames observed, no crash, no dump). It was meant to be the
+worker-loss probe, but the worker-stop helper had detached its timer from the
+SSH session and never fired; the helper is now a scheduled task and the probe
+reruns. Build v45 carries the recorder change and the device creation that
+tolerates a lost worker.
