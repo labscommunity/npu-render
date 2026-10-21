@@ -48,10 +48,12 @@ lifted to four hours in generation 16.
 ## What must change for that
 
 1. **Transaction naming.** Every script carries a generation number in its
-   transaction identity and refuses to run twice. The switch needs identities
-   derived from a timestamp (or a counter the switch owns) while the generator keeps
-   its asserted substitutions. The generator gains `--transaction <name>` and the
-   switch calls it per enable.
+   transaction identity and refuses to run twice. The identities only have to match
+   `^[a-z0-9-]+$` (topology helper) and `^[a-zA-Z0-9_.-]+$` (file names), which the
+   generator's numbered names already do, so the switch owns the counter: it reads
+   the highest admission generation present on the host, calls the generator with
+   the next number and `--registration-generation` of the package's last passing
+   registration, and runs the emitted scripts. No new naming scheme is needed.
 2. **Open-ended admission.** The bootstrap's monitor loop ends at
    `--monitor-seconds`; the switch passes a large value (four hours is the lifted
    harness limit) and stops it early through the `stop` file. Lifting the four-hour
