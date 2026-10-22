@@ -197,4 +197,5 @@ preserved as written; new results go in new reports.
 
 ## License
 
-No license has been chosen yet; all rights reserved until one is added.
+Apache License 2.0; see [LICENSE](LICENSE) and [NOTICE](NOTICE) for the
+third-party work this project builds on.
