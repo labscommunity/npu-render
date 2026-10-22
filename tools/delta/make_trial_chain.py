@@ -886,7 +886,9 @@ Get-Content "$out\\report.json"
         # The duplication observer only sees the panel change; an idle desktop can go minutes
         # without one (trial 24 missed the 60 s window by a second), so the owned-presenter
         # freshness bound is five minutes here. The presenter's own 60 s delivery bound stays.
-        assert validator.count("end-300*hz") == 2 and "0<=age<=60" in validator, "validator freshness window drifted"
+        assert validator.count("end-300*hz") == 2 and "0<=age<=60" in validator, (
+            "validator freshness window drifted"
+        )
         write(NO_STIMULUS_VALIDATOR, validator)
     write("run-native-live-v66.ps1", live)
 
