@@ -583,7 +583,19 @@ Get-Content "$out\\report.json"
             (
                 " if($report.passed){Unregister-ScheduledTask -TaskName 'T8-NpuRender-NativeDesktopRecovery-v75' -Confirm:$false -ErrorAction SilentlyContinue}\n",
                 ' $admission=$null;try{$admission=Get-Content "$Root\\report.json" -Raw|ConvertFrom-Json}catch{}\n'
-                " if($report.passed -or ($admission -and $admission.completed)){try{Unregister-ScheduledTask -TaskName 'T8-NpuRender-NativeDesktopRecovery-v75' -Confirm:$false -ErrorAction Stop;$report.task_unregistered=$true}catch{$report.task_unregistered=$false;Record-Error ('task: '+$_.Exception.Message)}}\n",
+                " $owned_ids=@($state.packages|ForEach-Object {$_.hardware_id});$remaining=@(Get-PnpDevice -PresentOnly -Class Display -ErrorAction SilentlyContinue|Where-Object {$ids=@(($_|Get-PnpDeviceProperty -KeyName DEVPKEY_Device_HardwareIds -ErrorAction SilentlyContinue).Data);@($ids|Where-Object {$owned_ids -contains $_}).Count -gt 0})\n"
+                " $fatal=@($report.errors|Where-Object {$_ -notmatch '^owned-process|^trace'});$report.cleanup_complete=($remaining.Count -eq 0 -and $fatal.Count -eq 0)\n"
+                " if($report.passed -or $report.cleanup_complete -or ($admission -and $admission.completed)){try{Unregister-ScheduledTask -TaskName 'T8-NpuRender-NativeDesktopRecovery-v75' -Confirm:$false -ErrorAction Stop;$report.task_unregistered=$true}catch{$report.task_unregistered=$false;Record-Error ('task: '+$_.Exception.Message)}}\n",
+            ),
+            # The resident broker is an owned process too; without it every recovery since trial 24 reported
+            # "owned process contract mismatch" and kept its task armed.
+            (
+                "if($owned.role -notin @('controller','worker','interactive-broker') -or",
+                "if($owned.role -notin @('controller','worker','interactive-broker','resident-broker') -or",
+            ),
+            (
+                "'interactive-broker'='nr_auto_interactive_broker.exe'}[$owned.",
+                "'interactive-broker'='nr_auto_interactive_broker.exe';'resident-broker'='nr_auto_interactive_broker.exe'}[$owned.",
             ),
             ("T8-NpuRender-NativeDesktopRecovery-v75", "T8-NpuRender-NativeDesktopRecovery-v76"),
             (
@@ -728,6 +740,21 @@ Get-Content "$out\\report.json"
         live,
         [
             ("native-live-v65", "native-live-v66"),
+            # Task-state queries retry: one failed with ERROR_FILE_NOT_FOUND in the second another task
+            # unregistered itself (trial 26) and ended the admission.
+            (
+                "function Start-Interactive([string]$name,[string[]]$command){\n",
+                "function Task-State([string]$n){for($i=0;$i -lt 5;$i++){try{return (Get-ScheduledTask -TaskName $n -ErrorAction Stop).State}catch{if($i -eq 4){throw};Start-Sleep -Milliseconds 300}}}\n"
+                "function Start-Interactive([string]$name,[string[]]$command){\n",
+            ),
+            (
+                "$presentState=(Get-ScheduledTask -TaskName T8-NpuRender-NativeLiveV65-present).State;",
+                "$presentState=(Task-State 'T8-NpuRender-NativeLiveV65-present');",
+            ),
+            (
+                "while((Get-ScheduledTask -TaskName T8-NpuRender-NativeLiveV65-screen).State -eq 'Running'",
+                "while((Task-State 'T8-NpuRender-NativeLiveV65-screen') -eq 'Running'",
+            ),
             ("NativeLiveV65", "NativeLiveV66"),
             ("run-native-desktop-v75.ps1", "run-native-desktop-v76.ps1"),
             ("native-desktop-admission-v75", "native-desktop-admission-v76"),

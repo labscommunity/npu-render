@@ -1333,3 +1333,46 @@ newer admission is running; the admission wrapper and the switch's `enable`
 sweep stale recovery tasks of completed admissions before starting. Delta was
 cleaned by hand after this trial (both stale tasks removed, display and package
 state verified).
+
+## Trial 26 (generation 33, admission v109, tree v49, package v43, IDD v4): the worker replaced in flight
+
+The first admission with worker failover on both sides, started 01:28:34Z by
+`npu-render desktop enable --monitor-seconds 660 --initial-grant-seconds 1200`
+on tree v49 (provider child following its parent, exchange failover with a 30 s
+window, interactive clients bound to their own desktop), package v43 and the
+IDD v4 that no longer requires a live worker. Scheduled against it: a
+lease-holding consumer at +150 s, a one-shot consumer at +200 s, both worker
+processes stopped by a task at +240 s (01:32:42.84Z), an ordinary adapter probe
+at +300 s and another one-shot consumer at +330 s.
+
+The failover worked. The bootstrap recorded one restart: worker lost at
+01:32:42.88Z (exit code 0xffffffff), replacement pid 18056 ready after 975 ms,
+the compositor's lease rewritten (deadline tick 139820015) with the indirect
+host's left as it was (139607734), the resident broker restarted beside the
+first one's evidence. DWM's driver trace shows `exchange_failover_started`
+("native probe lease rejected" on a frame batch) followed by `exchange_failover`
+to worker 18056 after 47 ms, then the expected `frame_batch_missing` (two
+resources the fresh worker did not hold) and a full resend; the replacement
+served sequences 39 to 41 for DWM, the last a 1.59 MB batch. DWM kept its
+process and its device; the indirect host stayed; the adapter probe at +300 s
+created ordinary devices on our adapter after the restart (S_OK, feature levels
+11.0 and 10.0).
+
+Two things ended the probe early and neither is the failover. The lease-holding
+consumer exited at the worker stop with "native probe lease rejected at
+lease-proof": the fixture verifies its cached admission directly instead of
+going through the driver's exchange, so it has no failover of its own; the
+one-shot consumer at +330 s found no publication because the admission had
+already ended. It ended because the live wrapper threw at 01:32:43Z on
+`Get-ScheduledTask` for its own presenter task ("The system cannot find the file
+specified") in the same second the worker-stop task unregistered itself; the
+wrapper then wrote the stop file, the bootstrap ended cleanly (31 frames,
+`stopped_by_controller`), and recovery removed the device and packages. That
+recovery, like every one since trial 24, reported "owned process contract
+mismatch" because the resident broker's role was not in its allowed list, so it
+did not pass and left its task armed. Changes: the live wrapper's task-state
+queries retry; the recovery script accepts the resident broker as an owned
+process, records `cleanup_complete` (no owned device present, no device or
+package error) and unregisters its task on that as well as on a passing run or
+a completed admission. The next probe stops the worker at +300 s of a 900 s
+admission so the frames after the failover can be counted.
