@@ -10,6 +10,10 @@
 #ifndef NR_LAB_TRACE_ROOT
 #define NR_LAB_TRACE_ROOT LR"(C:\ProgramData\T8-NpuRender-NativeTraceV1)"
 #endif
+// Bytes per ring file of the per-process trace (three files are kept).
+#ifndef NR_LAB_TRACE_FILE_BYTES
+#define NR_LAB_TRACE_FILE_BYTES (16ull * 1024 * 1024)
+#endif
 #else
 #define NR_LAB_TRACE_ROOT LR"(C:\npu-lab\umd-trace)"
 #endif
@@ -43,23 +47,48 @@ inline void lab_trace(const char *format, ...) noexcept {
     static std::mutex trace_mutex;
     std::lock_guard<std::mutex> lock(trace_mutex);
     // Opening the file for every DDI enters the filesystem filter stack on each
-    // call. Retain one handle per loaded UMD and stop I/O once its budget is used.
-    // Read the existing length at load time so device/DLL retries share the cap.
+    // call. Retain one handle per loaded UMD. The trace is a ring of files:
+    // process-<pid>.jsonl, process-<pid>.1.jsonl, .2.jsonl, ... each capped at
+    // NR_LAB_TRACE_FILE_BYTES; when one fills the next file opens and the file two
+    // behind it is deleted, so a process keeps at most three files (the earlier
+    // single 4 MB cap hid the later minutes of every probe longer than ten minutes).
+    // A reloaded UMD continues from the highest file that exists for its process.
     struct TraceFile {
         HANDLE handle = INVALID_HANDLE_VALUE;
         uint64_t bytes = 0, generation = 0;
-        UINT lines = 0;
-        void begin(uint64_t session) noexcept {
+        UINT lines = 0, file = 0;
+        static void name(WCHAR *path, UINT file) noexcept {
+            if (file) swprintf_s(path, MAX_PATH, NR_LAB_TRACE_ROOT L"\\process-%lu.%u.jsonl", GetCurrentProcessId(), file);
+            else swprintf_s(path, MAX_PATH, NR_LAB_TRACE_ROOT L"\\process-%lu.jsonl", GetCurrentProcessId());
+        }
+        // Opens ring file `which`, appending to it; its current length counts against the cap.
+        void open(UINT which) noexcept {
             if (handle != INVALID_HANDLE_VALUE) CloseHandle(handle);
-            handle = INVALID_HANDLE_VALUE; bytes = 0; lines = 0; generation = session;
-            WCHAR path[MAX_PATH]{};
-            swprintf_s(path, NR_LAB_TRACE_ROOT L"\\process-%lu.jsonl", GetCurrentProcessId());
+            handle = INVALID_HANDLE_VALUE; bytes = 0; lines = 0; file = which;
+            WCHAR path[MAX_PATH]{}; name(path, which);
             handle = CreateFileW(path, FILE_APPEND_DATA | FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_DELETE,
                                  nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
             LARGE_INTEGER size{};
             if (handle != INVALID_HANDLE_VALUE && GetFileSizeEx(handle, &size) && size.QuadPart >= 0)
                 bytes = uint64_t(size.QuadPart);
-            else bytes = 4 * 1024 * 1024;
+            else bytes = NR_LAB_TRACE_FILE_BYTES;
+        }
+        void begin(uint64_t session) noexcept {
+            generation = session;
+            // Continue from the highest ring file this process already has.
+            UINT highest = 0;
+            for (UINT which = 1; which < 100000; ++which) {
+                WCHAR path[MAX_PATH]{}; name(path, which);
+                if (GetFileAttributesW(path) == INVALID_FILE_ATTRIBUTES) break;
+                highest = which;
+            }
+            open(highest);
+        }
+        // The current file is full: open the next one and drop the file three behind it.
+        void rotate() noexcept {
+            const UINT next = file + 1;
+            open(next);
+            if (next >= 3) { WCHAR path[MAX_PATH]{}; name(path, next - 3); DeleteFileW(path); }
         }
         ~TraceFile() { if (handle != INVALID_HANDLE_VALUE) CloseHandle(handle); }
     };
@@ -67,7 +96,8 @@ inline void lab_trace(const char *format, ...) noexcept {
     // A delayed call from an older verified lease cannot reopen its old epoch.
     if (session < trace.generation) return;
     if (session != trace.generation) trace.begin(session);
-    if (trace.lines >= 16384 || trace.handle == INVALID_HANDLE_VALUE || trace.bytes > 4 * 1024 * 1024 - 2048) return;
+    if (trace.handle != INVALID_HANDLE_VALUE && trace.bytes > NR_LAB_TRACE_FILE_BYTES - 2048) trace.rotate();
+    if (trace.handle == INVALID_HANDLE_VALUE || trace.bytes > NR_LAB_TRACE_FILE_BYTES - 2048) return;
     const auto file = trace.handle;
     if (!trace.lines) {
         WCHAR module[MAX_PATH]{};
