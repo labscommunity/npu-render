@@ -18,6 +18,11 @@ inline const InventoryPair inventory_pairs[]{
     NR_PAIR(24, "e87ed647"), NR_PAIR(25, "0324b34c"), NR_PAIR(26, "1b8e912b"),
     NR_PAIR(27, "61ce21fb"),
     NR_PAIR(28, "d9523e84"), NR_PAIR(29, "1bf9cbd1"), NR_PAIR(30, "649fb489"), NR_PAIR(31, "7f53ef7d"), NR_PAIR(32, "8c7afc07"), NR_PAIR(33, "e5b2adfb"),
-    NR_PAIR(34, "1cb9ebf7"), NR_PAIR(35, "37b4d2f1"), NR_PAIR(36, "8f244fea")};
+    NR_PAIR(34, "1cb9ebf7"), NR_PAIR(35, "37b4d2f1"), NR_PAIR(36, "8f244fea"),
+    // Pair 37 (c7f4bc92) is captured but not deployed: the SHAVE build of its row miscompiles
+    // (all six of its fixtures fail on the device with the red lane taking green's value, at
+    // every optimisation level) while the host build matches the SM4 reference; it keeps its
+    // per-draw route until the construct is found.
+    NR_PAIR(38, "ca2803d7")};
 #undef NR_PAIR
 }
