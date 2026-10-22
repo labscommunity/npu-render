@@ -1,6 +1,6 @@
 # Contributing
 
-The repository is private until its owner publishes it. Keep work and artifacts within
+The repository is public under the Apache License 2.0. Keep work and artifacts within
 authorized destinations, and never commit model weights, compiled device caches, the SHAVE
 toolchain, credentials, private machine addresses or virtual environments.
 
