@@ -396,6 +396,10 @@ public:
         response.commands_executed = uint32_t(stats.executed); response.commands_fallback = uint32_t(stats.fallback); response.escapes = uint32_t(stats.escapes);
         if (!missing.empty()) response.target_count = 0;
         w.value(reply); w.value(response);
+        if (missing.empty()) {
+            uint64_t writeback = 0; for (const auto &[key, rect] : dirty) writeback += uint64_t(rect.x1 - rect.x0) * uint64_t(rect.y1 - rect.y0) * 4 + sizeof(TargetRecord);
+            if (writeback + sizeof(reply) + sizeof(response) > max_body) throw std::invalid_argument("frame batch reply exceeds the packet limit: " + std::to_string(writeback) + " bytes of writeback");
+        }
         if (missing.empty()) for (const auto &[key, rect] : dirty) {
             auto &r = resident.at(key); r.version = batch.batch_sequence;
             TargetRecord t{key, r.version, uint32_t(rect.x0), uint32_t(rect.y0), uint32_t(rect.x1 - rect.x0), uint32_t(rect.y1 - rect.y0)};

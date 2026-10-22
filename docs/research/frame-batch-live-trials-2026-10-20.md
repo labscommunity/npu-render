@@ -1400,3 +1400,29 @@ starts mid-admission knows no resident resource, and the compositor's next
 batch references the whole desktop's surfaces at once. The driver has to
 re-upload them within the worker's request limit, in pieces, before the batch
 that needs them.
+
+## Trial 28 (generation 35, admission v111, tree v50, package v44): the upload-alone path works, the reply limit and a device-creation hole remain
+
+Same probe as trial 27 on tree v50. Before the stop, the driver already sent a
+21 MB desktop surface alone (`frame_batch_upload_alone`, 359 ms). At the worker
+stop (02:29:52.9Z) the replacement was ready in 685 ms, DWM re-bound after
+63 ms, four resources were missing, the two large ones (21.2 MB and 28.1 MB,
+the 2880x1844 and 3904x1800 desktop surfaces) went alone and were accepted
+(worker sequence 54, 28,109,144 bytes, success), and the command batch that
+followed was 2.95 MB. The worker's provider child rejected that batch with the
+generic packet error, not a decode-stage one, so the failure is outside the
+batch decoder: the only remaining size rule is the 64 MB packet limit on the
+reply, and a batch whose dirty rectangles cover the three desktop surfaces
+writes back about 70 MB. The parent worker then ended on the provider failure
+(exit 1), the bootstrap replaced it a second time (456 ms), and in the
+460 ms between the parent's end and the replacement's readiness DWM created a
+graphics device: `OpenAdapter10` constructs an `Admission` whose constructor
+verifies with the worker required, the lease still named the dead worker, the
+open returned `DXGI_ERROR_UNSUPPORTED`, and DWM failed fast at 02:30:06.2Z
+(dump `dwm.exe.18608.dmp`, `CD3DDevice::CreateD3D11Device` again). Recovery
+passed with `cleanup_complete` and unregistered its task.
+
+Changes for tree v51: the admission constructor verifies without requiring the
+worker (the exchange still requires it where it connects), the packet limit
+rises to 256 MB so a whole-desktop writeback fits, and the executor names a
+reply that would exceed the limit instead of failing the batch generically.

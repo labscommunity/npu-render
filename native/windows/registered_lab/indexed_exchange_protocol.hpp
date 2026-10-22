@@ -12,7 +12,9 @@
 #include <stdexcept>
 namespace nr::registered_lab::indexed_exchange {
 constexpr uint64_t magic = 0x4e525f4452415731ull;
-constexpr uint32_t legacy_packet_bytes=32u*1024*1024, max_packet_bytes=64u*1024*1024, max_requests=65536;
+// 256 MB: a frame batch reply that writes back the whole desktop's surfaces (three of 21 to 28 MB
+// after a worker failover) must fit in one packet (trial 28).
+constexpr uint32_t legacy_packet_bytes=32u*1024*1024, max_packet_bytes=256u*1024*1024, max_requests=65536;
 struct Header {
     uint64_t signature = magic, nonce[2]{};
     uint32_t abi = 1, width = 0, height = 0, vertices = 0, format = 0, flags = 0;

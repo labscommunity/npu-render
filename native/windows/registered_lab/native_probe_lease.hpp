@@ -161,7 +161,10 @@ class Admission {
                 WaitForSingleObject(handle, 0) == WAIT_TIMEOUT && ProcessIdToSessionId(identity.pid, &actual_session) && actual_session == identity.session);
     }
 public:
-    explicit Admission(const Lease &record) : lease(record), controller(open(record.controller)), worker(open(record.worker)) { verify(); }
+    // Construction verifies the lease without requiring a live worker: device creation during a
+    // worker failover (the controller's replacement not yet ready) must still succeed (trial 28).
+    // Whatever connects to the worker verifies it: worker_handle(), pipe_name(), the exchange.
+    explicit Admission(const Lease &record) : lease(record), controller(open(record.controller)), worker(open(record.worker)) { verify(false); }
     // worker_required: the exchange needs a live worker to connect to; device creation does
     // not. A consumer whose worker has gone keeps its lease (the controller still owns the
     // admission) and keeps creating devices, running on its CPU fallback until the admission
