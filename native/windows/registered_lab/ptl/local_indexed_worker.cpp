@@ -137,12 +137,22 @@ int wmain(int argc, wchar_t **argv) try {
                             // Frame batch: the child executes; the parent forwards the opaque packet.
                             std::printf("{\"kind\":\"request_identity\",\"pid\":%lu,\"dispatch_ticket\":%u,\"client_pid\":%u,\"sequence\":%u,\"abi\":24,\"flags\":%u,\"width\":%u,\"height\":%u,\"vertices\":0,\"pixel_sha256\":\"frame-batch\",\"provider_parent\":%s}\n",GetCurrentProcessId(),ticket,h.client_pid,h.sequence,h.flags,h.width,h.height,provider.enabled()?"true":"false");std::fflush(stdout);
                             const auto began_batch=std::chrono::steady_clock::now();
-                            std::vector<uint8_t> result;
+                            std::vector<uint8_t> result;bool batch_failed=false;
                             try{
                                 if(provider.enabled()){auto transported=provider.execute_packet(bytes,h,request_deadline,stop_event.value);result=std::move(transported.packet);}
                                 else{ex::require(bool(frame_executor));result=frame_executor->execute(bytes);}
-                            }catch(const std::exception &error){capture_failed_request(bytes,h,ticket);std::fprintf(stderr,"%s\n",error.what());std::fflush(stderr);throw;}
+                            }catch(const std::exception &error){
+                                // A batch the provider cannot execute is answered with a failure header, not with
+                                // the worker's end: the compositor's driver handles the rejection, and every other
+                                // client (and the compositor's next device) keeps its worker. Trials 27 to 29 lost
+                                // the replacement worker to one rejected batch each.
+                                capture_failed_request(bytes,h,ticket);std::fprintf(stderr,"%s\n",error.what());std::fflush(stderr);
+                                ex::Header failure=h;failure.kind=3;failure.device=0;failure.body_bytes=0;
+                                result.assign(reinterpret_cast<const uint8_t*>(&failure),reinterpret_cast<const uint8_t*>(&failure)+sizeof(failure));batch_failed=true;
+                                std::printf("{\"frame_batch_failed\":true,\"dispatch_ticket\":%u,\"client_pid\":%u,\"sequence\":%u,\"error\":\"%s\"}\n",ticket,h.client_pid,h.sequence,error.what());std::fflush(stdout);
+                            }
                             const auto batch_ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-began_batch).count();
+                            if(batch_failed){finished=GetTickCount64();finished_qpc=qpc_now();return result;}
                             recording.response(ticket,result);++succeeded;
                             std::printf("{\"client_pid\":%u,\"sequence\":%u,\"execution_device\":\"NPU\",\"server_thread_id\":%lu,\"provider_requests\":1,\"draw_ms\":%.3f,\"compile_and_draw_ms\":%.3f,\"compile_calls\":0,\"backend_compile_calls\":0,\"memory_cache_requests\":0,\"memory_cache_hits\":0,\"memory_cache_evictions\":0,\"cache_requests\":0,\"cache_hits\":0,\"provider_setup_ms\":0.000,\"backend_compile_ms\":0.000,\"compact_coverage_calls\":0,\"compact_coverage_samples\":0,\"wide_coverage_calls\":0,\"passed\":true,\"displayed_frames\":0,\"frame_batch\":true}\n",h.client_pid,h.sequence,GetCurrentThreadId(),batch_ms,batch_ms);std::fflush(stdout);
                             finished=GetTickCount64();finished_qpc=qpc_now();return result;
