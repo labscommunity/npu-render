@@ -1941,3 +1941,30 @@ worker and provider logs, the recorded requests, the compositor trace),
 `vm\frame-carrier-scatter-v2\carrier.blob`, `builds\native-tree-v60`,
 `vm\native-driver-package-v52`. The switch's pins move to tree v60, package
 v52 (0.0.1352.0) and bundle v23.
+
+### Probe v121's live step: delivery passes, window restoration does not
+
+`npu-render desktop status` reports the sequence step `ptl-native-live-v75`
+of probe v121 as failed, as it did for probe v120 (`native-live-v110` and
+`v111`, both `passed=false` with no error at the `freshness-validation`
+phase). The live report's own delivery validation passed (54 matching
+physical submissions over 495 s, 10 fresh physical observations, the presenter
+and its task clean, the pointer confined and restored); what fails are the two
+restoration flags the live script derives from the topology helper's log
+(`native-topology-primary-v97`): `primary_topology_restored` and
+`ordinary_windows_restored`. The helper's rows say the physical topology came
+back exactly (`topology_restored_exactly: true`, the panel at 2880x1800), but
+its window-placement recovery restored 7 of the 14 placements it had captured
+and failed 7 (v120: 12 captured, 6 restored, 5 closed during the trial, 1
+failed), did not restore the foreground window in v121, and its
+`physical_baseline_restored_after_device_removal` check is false. The
+admission's own cleanup and the recovery task both pass, and the compositor is
+the same process before and after.
+
+So after an admission that opened application windows, the desktop is back on
+the GPU with its topology intact, but not every window is where it was. The
+helper's source lives on Delta with the trial tools; which windows fail
+(the rows list minimised windows of two processes) and why the baseline check
+is false are open. Until that is fixed the switch's `status` is right to show
+the live step as failed, and "restores the ordinary display" means the
+topology and the compositor, not window placement.
