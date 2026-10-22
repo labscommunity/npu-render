@@ -23,8 +23,21 @@
 #include "frame_file.hpp"
 #include "../registered_lab/contract.hpp"
 #include "../kmd/contract.hpp"
+#ifdef NR_IDD_NATIVE_PROBE
+#include "native_admission.hpp"
+#define NR_IDD_TRACE_ROOT L"C:\\ProgramData\\T8-NpuRender-NativeIddV1"
+#else
+#define NR_IDD_TRACE_ROOT L"C:\\npu-lab\\idd-trace"
+#endif
 using Microsoft::WRL::ComPtr;
 namespace {
+#ifdef NR_IDD_NATIVE_PROBE
+std::unique_ptr<nr::native_probe::Admission> native_admission;
+// The indirect host never talks to the NPU worker: its lease binds the controller, the session
+// and its own identity, so a worker that ended (and the controller's replacement of it, worker
+// failover) must not stop frame consumption. Only the lease itself is verified here.
+bool native_ready(){try{if(!native_admission)return false;native_admission->verify(false);return true;}catch(...){return false;}}
+#endif
 constexpr UINT width = 1024, height = 768;
 std::mutex log_mutex;
 std::mutex frame_output_mutex;
@@ -32,7 +45,7 @@ uint64_t frame_sequence = 0;
 void trace(const char *format, ...) {
     std::lock_guard<std::mutex> lock(log_mutex);
     WCHAR path[MAX_PATH]{};
-    swprintf_s(path, L"C:\\npu-lab\\idd-trace\\process-%lu.jsonl", GetCurrentProcessId());
+    swprintf_s(path, NR_IDD_TRACE_ROOT L"\\process-%lu.jsonl", GetCurrentProcessId());
     HANDLE file = CreateFileW(path, FILE_APPEND_DATA | FILE_READ_ATTRIBUTES, FILE_SHARE_READ,
                              nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (file == INVALID_HANDLE_VALUE) return;
@@ -144,6 +157,9 @@ class Consumer {
         trace("{\"event\":\"set_device\",\"status\":\"%08lx\"}\n", ULONG(status));
         UINT frames = 0;
         while (SUCCEEDED(status) && WaitForSingleObject(stop, 0) == WAIT_TIMEOUT) {
+#ifdef NR_IDD_NATIVE_PROBE
+            if (!native_ready()) {status=E_ACCESSDENIED;break;}
+#endif
             IDARG_OUT_RELEASEANDACQUIREBUFFER out{};
             status = IddCxSwapChainReleaseAndAcquireBuffer(chain, &out);
             if (status == E_PENDING) {
@@ -170,8 +186,8 @@ class Consumer {
                 status = readback.read(device.Get(), context.Get(), texture.Get(), pixels);
                 if (SUCCEEDED(status)) {
                     WCHAR temporary[MAX_PATH]{}, destination[MAX_PATH]{};
-                    swprintf_s(temporary, L"C:\\npu-lab\\idd-trace\\pending-frame-%lu.bin", GetCurrentProcessId());
-                    swprintf_s(destination, L"C:\\npu-lab\\idd-trace\\latest-frame-%lu.bin", GetCurrentProcessId());
+                    swprintf_s(temporary, NR_IDD_TRACE_ROOT L"\\pending-frame-%lu.bin", GetCurrentProcessId());
+                    swprintf_s(destination, NR_IDD_TRACE_ROOT L"\\latest-frame-%lu.bin", GetCurrentProcessId());
                     status = nr::indirect::write_frame_file(temporary, destination, pixels, ++frame_sequence);
                     if (frames <= 8 || FAILED(status))
                         trace("{\"event\":\"frame_readback\",\"sequence\":%llu,\"bytes\":%zu,\"status\":\"%08lx\",\"displayed_frames\":0}\n",
@@ -276,6 +292,9 @@ struct PreparationContext { IDDCX_ADAPTER adapter = nullptr; };
 WDF_DECLARE_CONTEXT_TYPE(PreparationContext);
 EVT_WDF_WORKITEM prepare_monitor;
 void prepare_monitor(WDFWORKITEM item) {
+#ifdef NR_IDD_NATIVE_PROBE
+    if (!native_ready()) return;
+#endif
     const auto adapter = WdfObjectGet_PreparationContext(item)->adapter;
     auto state = WdfObjectGet_DeviceState(adapter);
     // Prepare before monitor arrival, outside the timed assign-swapchain callback.
@@ -349,6 +368,9 @@ NTSTATUS initialized(IDDCX_ADAPTER adapter, const IDARG_IN_ADAPTER_INIT_FINISHED
 }
 EVT_WDF_DEVICE_D0_ENTRY power_on;
 NTSTATUS power_on(WDFDEVICE device, WDF_POWER_DEVICE_STATE) {
+#ifdef NR_IDD_NATIVE_PROBE
+    if (!native_ready()) return STATUS_NOT_SUPPORTED;
+#endif
     auto state = WdfObjectGet_DeviceState(device);
     if (state->adapter) return STATUS_SUCCESS;
 #ifndef NR_IDD_SYSTEM_RENDERER_CONTROL
@@ -382,7 +404,11 @@ NTSTATUS power_on(WDFDEVICE device, WDF_POWER_DEVICE_STATE) {
 }
 EVT_WDF_DRIVER_DEVICE_ADD add_device;
 NTSTATUS add_device(WDFDRIVER, PWDFDEVICE_INIT init) {
+#ifdef NR_IDD_NATIVE_PROBE
+    if (!native_ready()) return STATUS_NOT_SUPPORTED;
+#else
     if (!nr_fill_guest()) return STATUS_NOT_SUPPORTED;
+#endif
     WDF_PNPPOWER_EVENT_CALLBACKS power; WDF_PNPPOWER_EVENT_CALLBACKS_INIT(&power);
     power.EvtDeviceD0Entry = power_on; WdfDeviceInitSetPnpPowerEventCallbacks(init, &power);
     IDD_CX_CLIENT_CONFIG config; IDD_CX_CLIENT_CONFIG_INIT(&config);
@@ -406,7 +432,11 @@ NTSTATUS add_device(WDFDRIVER, PWDFDEVICE_INIT init) {
 }
 extern "C" DRIVER_INITIALIZE DriverEntry;
 extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT object, PUNICODE_STRING path) {
+#ifdef NR_IDD_NATIVE_PROBE
+    try{native_admission=nr::indirect::await_native_admission();}catch(...){return STATUS_NOT_SUPPORTED;}
+#else
     if (!nr_fill_guest()) return STATUS_NOT_SUPPORTED;
+#endif
     WDF_DRIVER_CONFIG config; WDF_DRIVER_CONFIG_INIT(&config, add_device);
     WDF_OBJECT_ATTRIBUTES attributes; WDF_OBJECT_ATTRIBUTES_INIT(&attributes);
     trace("{\"event\":\"driver_entry\"}\n");
