@@ -18,14 +18,14 @@ class NativeInventory {
     std::vector<Entry> entries;
 public:
     NativeInventory() {
-        std::array<uint32_t, blob_ranges.size()> counts{};
+        std::array<uint32_t, blob_count()> counts{}; BlobAssigner assigner;
         for (size_t n = 0; n < std::size(inventory_pairs); ++n) {
             const auto &pair = inventory_pairs[n];
             shader::Program vs, ps;
             try { vs = shader::parse_vertex(pair.vs, pair.vs_words); ps = shader::parse_pixel(pair.ps, pair.ps_words); } catch (const std::exception &) { continue; }
             Entry e; e.lowered = lower(vs, ps, shader::TextureSamplers{}); e.pair = uint32_t(n);
             if (!e.lowered.eligible()) continue;
-            e.identity.blob = blob_of(uint32_t(e.lowered.ps_words.size()));
+            e.identity.blob = assigner.assign(uint32_t(e.lowered.ps_words.size()));
             require(e.identity.blob < counts.size());
             e.identity.blob_index = counts[e.identity.blob]++;
             e.identity.host_index = uint32_t(entries.size());

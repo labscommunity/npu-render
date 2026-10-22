@@ -284,15 +284,31 @@ inline LoweredProgram lower(const shader::Program &vs, const shader::Program &ps
 
 // --- Kernel blobs --------------------------------------------------------------
 // The SHAVE code window holds a few programs at a time, so the inventory is
-// split into blobs by pixel-stage instruction count. A program's blob and its
-// index inside the blob follow from this rule on both the host and the kernel.
-// Blob 4 holds the fetching (ld) text program alone and blob 5 the 10-12 instruction programs, so the
-// ld runtime support and the larger programs never share a code window (bundle v19 measurements).
-constexpr std::array<std::pair<uint32_t, uint32_t>, 13> blob_ranges{{{0, 1}, {2, 2}, {3, 3}, {4, 8}, {9, 9}, {10, 12}, {13, 16}, {17, 21}, {22, 64}, {65, 115}, {116, 120}, {121, 181}, {182, 100000}}};
-inline uint32_t blob_of(uint32_t ps_instructions) {
-    for (uint32_t k = 0; k < blob_ranges.size(); ++k) if (ps_instructions >= blob_ranges[k].first && ps_instructions <= blob_ranges[k].second) return k;
+// split into blobs by pixel-stage instruction count; a range with `splits` > 1
+// deals its programs out round-robin, in inventory order, over that many blobs.
+// A program's blob and its index inside the blob follow from this rule on both
+// the host and the worker (NativeInventory). The fetching (ld) text program has
+// a blob of its own, and the 26-64 instruction Mica programs one each: their row
+// shaders are 4-5 KB beside a 15 KB runtime (bundle v19/v20 measurements).
+struct BlobRange { uint32_t first, last, splits; };
+constexpr std::array<BlobRange, 15> blob_ranges{{{0, 1, 1}, {2, 2, 1}, {3, 3, 1}, {4, 8, 1}, {9, 9, 1}, {10, 12, 1}, {13, 16, 1}, {17, 21, 1}, {22, 25, 1}, {26, 31, 2}, {32, 64, 2},
+                                                {65, 115, 1}, {116, 120, 1}, {121, 181, 1}, {182, 100000, 1}}};
+constexpr uint32_t blob_count() { uint32_t n = 0; for (const auto &r : blob_ranges) n += r.splits; return n; }
+inline uint32_t blob_range_of(uint32_t ps_instructions) {
+    for (uint32_t k = 0; k < blob_ranges.size(); ++k) if (ps_instructions >= blob_ranges[k].first && ps_instructions <= blob_ranges[k].last) return k;
     return UINT32_MAX;
 }
+// Blob of the `ordinal`-th eligible program (inventory order) whose pixel stage has `ps_instructions`.
+inline uint32_t blob_of(uint32_t ps_instructions, uint32_t ordinal_in_range) {
+    const uint32_t range = blob_range_of(ps_instructions); if (range == UINT32_MAX) return UINT32_MAX;
+    uint32_t base = 0; for (uint32_t k = 0; k < range; ++k) base += blob_ranges[k].splits;
+    return base + ordinal_in_range % blob_ranges[range].splits;
+}
+// Deals an inventory's eligible programs, in order, to their blobs.
+struct BlobAssigner {
+    std::array<uint32_t, blob_ranges.size()> seen{};
+    uint32_t assign(uint32_t ps_instructions) { const uint32_t range = blob_range_of(ps_instructions); return range == UINT32_MAX ? UINT32_MAX : blob_of(ps_instructions, seen[range]++); }
+};
 // --- Native code emission ----------------------------------------------------
 // Each lowered stage becomes C over the nr_v4 API in frame_core.h. Vertex
 // stages are functions over nr_shade; pixel stages are emitted twice: as a

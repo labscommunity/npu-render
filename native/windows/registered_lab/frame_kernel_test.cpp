@@ -217,15 +217,15 @@ int main(int argc, char **argv) {
     for (int a = 3; a + 1 < argc; ++a) { if (std::string(argv[a]) == "--max-ps") max_ps = uint32_t(std::stoul(argv[a + 1])); if (std::string(argv[a]) == "--blob") blob = uint32_t(std::stoul(argv[a + 1])); }
     std::vector<uint32_t> compiled_codes;
     if (!emit_path) for (uint32_t k = 0; k < NR_NATIVE_COUNT; ++k) compiled_codes.push_back(frame::core::nr_native_inventory(k));
-    auto included = [&](uint32_t code, uint32_t ps_instructions) {
-        if (emit_path) return ps_instructions <= max_ps && (blob == UINT32_MAX || frame::blob_of(ps_instructions) == blob);
+    auto included = [&](uint32_t code, uint32_t ps_instructions, uint32_t program_blob) {
+        if (emit_path) return ps_instructions <= max_ps && (blob == UINT32_MAX || program_blob == blob);
         return std::find(compiled_codes.begin(), compiled_codes.end(), code) != compiled_codes.end();
     };
     // Pass 1: parse and lower every captured pair plus its passthrough-vertex
     // variant; eligible programs get native indices in this order.
     struct Entry { size_t pair; shader::Program vs, ps, pass; shader::TextureSamplers samplers{}; frame::LoweredProgram lowered, pass_lowered; uint32_t pass_position = 16; bool parsed = false; std::string parse_error; };
     std::vector<Entry> entries(std::size(pairs));
-    std::vector<const frame::LoweredProgram *> natives; std::vector<uint32_t> codes;
+    std::vector<const frame::LoweredProgram *> natives; std::vector<uint32_t> codes; frame::BlobAssigner assigner;   // the inventory's blob rule, applied in its order
     for (size_t n = 0; n < std::size(pairs); ++n) {
         auto &e = entries[n]; e.pair = n;
         try { e.vs = shader::parse_vertex(pairs[n].vs, pairs[n].vs_words); e.ps = shader::parse_pixel(pairs[n].ps, pairs[n].ps_words); e.parsed = true; }
@@ -233,7 +233,8 @@ int main(int argc, char **argv) {
         for (unsigned s = 0; s < 16; ++s) { e.samplers[s].filter = (n & 1) ? shader::TextureFilter::point : shader::TextureFilter::linear; if (n % 3 == 0) e.samplers[s].u = e.samplers[s].v = shader::TextureAddress::mirror; }
         e.lowered = frame::lower(e.vs, e.ps, e.samplers);
         if (!e.lowered.eligible()) continue;
-        if (!included(uint32_t(n), uint32_t(e.lowered.ps_words.size()))) { e.lowered.rejection = "not in the compiled program set"; continue; }
+        const uint32_t program_blob = assigner.assign(uint32_t(e.lowered.ps_words.size()));
+        if (!included(uint32_t(n), uint32_t(e.lowered.ps_words.size()), program_blob)) { e.lowered.rejection = "not in the compiled program set"; continue; }
         try { e.pass = passthrough_vertex(e.ps, e.pass_position); e.pass_lowered = frame::lower(e.pass, e.ps, e.samplers); }
         catch (const std::exception &x) { e.pass_lowered.rejection = x.what(); }
         if (!e.pass_lowered.eligible()) { e.lowered.rejection = "no passthrough twin: " + e.pass_lowered.rejection; continue; }

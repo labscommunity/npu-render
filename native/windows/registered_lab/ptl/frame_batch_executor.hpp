@@ -118,7 +118,7 @@ struct ResidentResource { uint64_t key = 0, version = 0; uint32_t width = 0, hei
 struct VolatileWindow { uint32_t x, y, width, height; std::vector<uint32_t> pixels; };
 class FrameBatchExecutor {
     indexed_exchange::Pipeline &legacy;
-    std::array<std::unique_ptr<FrameKernelProvider>, frame::blob_ranges.size()> kernels;
+    std::array<std::unique_ptr<FrameKernelProvider>, frame::blob_count()> kernels;
     std::unique_ptr<frame::NativeInventory> inventory;
     std::unordered_map<uint64_t, ResidentResource> resident;
     std::unordered_map<std::string, std::shared_ptr<const shader::Program>> shaders;   // sha256 hex -> parsed
