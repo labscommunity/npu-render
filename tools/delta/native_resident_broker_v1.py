@@ -54,10 +54,14 @@ def summarize(broker_rows):
 
 
 class ResidentBroker:
-    def __init__(self, transaction, worker, suffix, session, env, own_process, build_root):
+    def __init__(
+        self, transaction, worker, suffix, session, env, own_process, build_root, generation=1
+    ):
         self.worker, self.suffix, self.session, self.env = worker, suffix, session, env
         self.own_process = own_process
-        self.out = transaction / "bootstrap/resident-broker"
+        # A replacement worker (worker failover) gets a new broker beside the first one's evidence.
+        suffix_dir = "" if generation == 1 else f"-{generation}"
+        self.out = transaction / f"bootstrap/resident-broker{suffix_dir}"
         self.stop = self.out / "stop"
         self.process = None
         self.streams, self.grants, self.tokens = [], [], []

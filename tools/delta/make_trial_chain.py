@@ -419,6 +419,59 @@ Get-Content "$out\\report.json"
         "report.update(frame_blob_dir=str(v.frame_blob_dir),frame_blob_manifest_sha256=hashlib.sha256((v.frame_blob_dir/'manifest.txt').read_bytes()).hexdigest(),request_recording_enabled=",
     )
     assert "frame_blob_manifest_sha256" in boot
+    # Worker failover (native_worker_failover_v1.py): a worker that ends is replaced on the same
+    # pipe with the same grants, every lease is rewritten with the new identity, and the resident
+    # broker restarts; the driver re-binds (indexed_exchange.hpp). The replacement appends to the
+    # same logs with its own capture and provider directories.
+    worker_start = boot.index("    worker=subprocess.Popen([str(v.worker),pipe,'65536',str(1185),")
+    worker_end = boot.index("\n", worker_start)
+    popen = boot[worker_start:worker_end]
+    assert popen.endswith("creationflags=subprocess.CREATE_NO_WINDOW)") and ",env=env," in popen, (
+        popen[-80:]
+    )
+    popen = popen.replace("    worker=subprocess.Popen(", "        return subprocess.Popen(")
+    popen = popen.replace(",env=env,", ",env=worker_env,").replace(
+        "stdout=streams[2],stderr=streams[3]", "stdout=stdout,stderr=stderr"
+    )
+    assert "stdout=stdout,stderr=stderr" in popen and "env=worker_env" in popen
+    boot = (
+        boot[:worker_start]
+        + "    def start_worker(generation):\n"
+        + "        worker_env=dict(env)\n"
+        + "        if generation>1:\n"
+        + "            capture=out/f'requests-{generation}';capture.mkdir(exist_ok=False);worker_env['NR_RENDER_CAPTURE_DIRECTORY']=str(capture)\n"
+        + "            providers=out/f'provider-processes-{generation}';providers.mkdir(exist_ok=False);worker_env['NR_RENDER_PROVIDER_RECOVERY_DIR']=str(providers)\n"
+        + "            streams.append((out/'worker.stdout.jsonl').open('ab'));streams.append((out/'worker.stderr.log').open('ab'));stdout,stderr=streams[-2],streams[-1]\n"
+        + "        else:stdout,stderr=streams[2],streams[3]\n"
+        + popen
+        + "\n    worker=start_worker(1)"
+        + boot[worker_end:]
+    )
+    boot = edit(
+        boot,
+        [
+            (
+                "from native_lease_renewal_v1 import Renewal\n",
+                "from native_lease_renewal_v1 import Renewal\nfrom native_worker_failover_v1 import WorkerFailover\n",
+            ),
+            (
+                "    renewal=Renewal(leases,v.recovery_task);report['lease_renewals']=[];report['initial_grant_s']=1200\n",
+                "    renewal=Renewal(leases,v.recovery_task);report['lease_renewals']=[];report['initial_grant_s']=1200\n"
+                "    def restart_resident(new_worker):\n"
+                "        broker=globals().get('resident')\n"
+                "        if broker is None:return\n"
+                "        report.setdefault('resident_broker_restarts',[]).append(broker.close());save()\n"
+                "        globals()['resident']=ResidentBroker(v.transaction,new_worker,suffix,session['console_session'],env,own_process,Path(os.environ['LOCALAPPDATA'])/'npu-render/builds/native-auto-interactive-v8',generation=len(report['resident_broker_restarts'])+1)\n"
+                "        report['resident_broker_pid']=globals()['resident'].start();save()\n"
+                "    failover=WorkerFailover(start_worker=start_worker,leases=leases,grant=lambda new:[permissions.append(ProcessGrant(int(new._handle),sid)) for sid in (compositor.sid,host.sid)],after_restart=restart_resident,stdout_path=out/'worker.stdout.jsonl',process_identity=process_identity,report=report,save=save)\n",
+            ),
+            (
+                "        assert worker.poll() is None,'NPU worker stopped before native frame evidence'\n",
+                "        worker=failover.check(worker)\n",
+            ),
+        ],
+        "bootstrap-worker-failover",
+    )
     # The compositor re-creates its graphics devices when the indirect display goes. Its lease
     # has to outlive that: admission v106 closed the leases 150 ms after the removal and DWM's
     # re-creation found no lease (fail-fast 0x889800b0). The teardown now waits for the indirect
@@ -500,6 +553,12 @@ Get-Content "$out\\report.json"
     write(
         "native_lease_renewal_v1.py",
         (Path(__file__).resolve().parent / "native_lease_renewal_v1.py").read_text(
+            encoding="utf-8"
+        ),
+    )
+    write(
+        "native_worker_failover_v1.py",
+        (Path(__file__).resolve().parent / "native_worker_failover_v1.py").read_text(
             encoding="utf-8"
         ),
     )
@@ -977,6 +1036,7 @@ Get-Content "$out\\report.json"
         new = final(renamed[name]) if name in renamed else None
         desk_manifest[new or name] = produced[new] if new else digest
     desk_manifest["native_lease_renewal_v1.py"] = produced["native_lease_renewal_v1.py"]
+    desk_manifest["native_worker_failover_v1.py"] = produced["native_worker_failover_v1.py"]
     desk_manifest["run-native-topology-helper-v15.ps1"] = produced[
         "run-native-topology-helper-v15.ps1"
     ]
