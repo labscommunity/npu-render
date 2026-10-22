@@ -1250,3 +1250,50 @@ the admission with DWM re-creating its devices during the teardown; the
 driver's in-process CPU path for frame batches, which would keep the desktop
 rendering through a worker loss the way WARP would, is the next robustness
 layer and is not built.
+
+## Trial 24 (generation 31, admission v107, tree v47, package v41, 660 s): ordinary applications admitted, the saver waited out
+
+The first admission with the provider child following its parent, the resident
+interactive broker (v8 `--serve`) and the own-desktop binding for interactive
+clients, started 23:52:12Z by `npu-render desktop enable --monitor-seconds 660
+--initial-grant-seconds 1200 --build native-tree-v47 --package
+native-driver-package-v41 --version 0.0.1341.0`. Scheduled against it from the
+console session: a lease-holding consumer (`nr_auto_interactive_consumer
+--hold 200` at 23:54:16Z), a one-shot consumer, an ordinary default-adapter
+probe, the screen saver through the system path at 23:56:37Z and its dismissal
+at 23:58:06Z.
+
+The admission passed and recovered cleanly: 66 frame batches, no DWM crash, no
+dump, `teardown_settle_ms` 3,000. The broker admitted ten clients with zero
+rejections and ran sixteen renewal rounds (five clients still live at the last
+one). The worker served every admitted client's requests on the NPU with zero
+failures, by client: DWM 110, `StartMenuExperienceHost` 154 (abi 8 and 24),
+`explorer.exe` 142 (abi 8, 18, 22, 24), `TextInputHost` 12, a process that
+exited before the survey 56, `ClickToDo` 1. The ordinary adapter probe's two
+`D3D11CreateDevice(nullptr, HARDWARE)` requests returned S_OK at feature level
+10.0 (`application_default_device_created` true; every earlier stimulus-free run
+recorded 887a0004). The holding consumer kept its scope-3 lease for 200 s with
+40 verifications, its deadline advancing from tick 132834234 to 133025140
+(`renewed` true), and the hold spanned the saver: the own-desktop binding kept
+an admitted client valid while the input desktop was away. The one-shot
+consumer passed as before.
+
+The presenter and the observer each logged one `desktop_departed` and one
+`desktop_returned` (away 90,016 ms and 89,813 ms), the observer re-created its
+duplication twice, and presentation resumed: 40 frames over 548 s with the
+last one 1.5 s before the end. The live wrapper's only failure was the
+stimulus-free validator's observer freshness bound: the physical panel had not
+changed for 61 s before the end of an idle desktop, and the duplication
+observer only sees changes, so its last owned observation missed the 60 s
+window (`fresh independently observed owned presenter absent`). Delivery
+itself passed every other assertion. The window for the stimulus-free variant
+is now 300 s; the presenter's own 60 s freshness bound stays.
+
+What this does and does not show: ordinary applications on the enabled desktop
+now create devices and have their draws executed on the NPU worker, which is
+the admission half of gate 6; whether their pixels are correct is not
+qualified (the capture of this admission can be replayed against the host
+reference), and the saver process itself did not appear among the admitted
+clients, so WPF's path is still unknown. Priority 3 is not met either: no
+admission has yet run beyond 40 minutes; the multi-hour soak on tree v47 is
+the next run.

@@ -15,8 +15,9 @@ Tahoma. That switch does not exist yet.
 
 ## Status
 
-Updated 2026-10-21. This is not a product. The latest results are trial 11
-(660 s) and trial 12 (2,160 s with lease renewal) in
+Updated 2026-10-22. This is not a product. The latest results are trials 22 to
+24 (the saver's trigger, the provider child's 40-minute wall, and the first
+admission that admitted ordinary applications) in
 [frame-batch-live-trials-2026-10-20.md](docs/research/frame-batch-live-trials-2026-10-20.md);
 the gate framework is the ordered gates table in
 [desktop-offload-plan.md](docs/research/desktop-offload-plan.md).
@@ -26,11 +27,11 @@ the gate framework is the ordered gates table in
 | 1. Routing | Trials 11 and 12 pass registration, admission, presentation and restoration end to end. Driver and worker derive each fallback route from one shared selection; the worker logged zero disagreements in both trials. |
 | 2. Continuous rendering | Trial 12 renders the desktop on the NPU for 2,160 s: 744 frame batches, 9,363 commands, zero self-test mismatches, zero worker stderr. All 202 per-draw fallbacks are the blur blob that does not fit the code window. |
 | 3. Physical presentation | 342 physically submitted frames in trial 12 (170 in trial 11). GPU 3D engine p99 was 1.18% over trial 11's 720 s sample and 0.37% over trial 12's 37 minutes; copy and video engines and the bridge's own presentation work are not separated out. |
-| 4. Interaction and recovery | Controlled input, cleanup and recovery-task removal pass in both trials. Sleep/wake, secure desktop and broader fault qualification remain open. |
+| 4. Interaction and recovery | Controlled input, cleanup and recovery-task removal pass. DWM survives the screen saver (build v44) and the loss of the worker (v45); the live tools wait out a desktop switch (presenter v24, observer v7, topology control v15); the provider child follows its parent's lease (tree v47) and the teardown keeps the compositor lease until the indirect host is gone. Longest clean admission so far 40 minutes; a multi-hour soak on v47 is the next run. Sleep/wake remains open. |
 | 5. Responsiveness | Not met. 2.5 verified updates/s in trial 11 and 2.4 in trial 12 against a 30 Hz, 300-update stimulus at 1024x768; per-flush wall p50 265 to 281 ms; mouse sent-to-display median 94 ms and p95 1,497 ms in trial 11. |
-| 6. Application coverage | Unqualified. A normally started default-adapter fixture shared DWM's worker in the v64 trial; continuous admission, multiple applications and browser, video and 3D coverage are open. |
+| 6. Application coverage | First result: with the resident broker (trial 24, tree v47, 660 s) ten ordinary processes were admitted automatically, among them explorer.exe (142 requests), StartMenuExperienceHost (154) and TextInputHost, all served on the NPU worker with zero failures; an ordinary `D3D11CreateDevice` on the default adapter succeeds; a 200 s client kept its lease through in-place renewal and through the screen saver. Correctness of those applications' pixels, browser, video and 3D coverage are not qualified. |
 | 7. Tahoma benefit | Not measured on the native desktop. Earlier experiments regressed. The GPU 3D engine sample shows composition left that engine; it is not a Tahoma measurement. |
-| 8. Usable switch | Host side implemented: `npu-render desktop status/enable/disable/install` generates, uploads and launches an admission, stops it, runs recovery and quotes the reports; `status` is verified against Delta, `enable` and `disable` are not yet exercised on hardware, and the live wrapper still injects the trial stimulus. See [desktop-switch-design-2026-10-21.md](docs/research/desktop-switch-design-2026-10-21.md). |
+| 8. Usable switch | `npu-render desktop install --prepare` packages, signs and registers a build; `enable` generates, uploads and launches a stimulus-free admission with the resident broker; `status` follows it; `disable` ends it. `install --prepare`, `enable` and `status` are exercised on Delta (trials 20 to 24); `disable` is not yet. See [desktop-switch-design-2026-10-21.md](docs/research/desktop-switch-design-2026-10-21.md). |
 
 Correctness on the kernel path is checked on the device: every blob's fixtures
 are compared pixel for pixel against the host reference, and the trial-2 capture

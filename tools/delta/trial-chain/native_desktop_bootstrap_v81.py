@@ -4,8 +4,9 @@ from native_session_broker_v3 import *
 from native_incremental_evidence_v1 import NativeEvidence
 from native_process_observer_v1 import PinnedProcess,named_processes,find_compositor,find_indirect_host,process_image
 import traceback,struct
-from native_shared_app_v52 import SharedInteractiveApp
+from native_shared_app_v53 import SharedInteractiveApp
 from native_lease_renewal_v1 import Renewal
+from native_resident_broker_v1 import ResidentBroker
 p=argparse.ArgumentParser()
 for n in ('worker','runtime','cache','session_probe','devcon','idd_inf','transaction','trace'):
     p.add_argument('--'+n.replace('_','-'),type=Path,required=True)
@@ -78,7 +79,7 @@ def frame_header(path,pid):
         return dict(sequence=sequence,width=width,height=height,format=fmt,pixel_bytes=byte_count,producer_pid=producer,qpc=qpc,pixel_sha256=frame_hashes[key])
     finally:k.CloseHandle(handle)
 observed_frames=[];first_frame_at=None;seen_frames=set();frame_hashes={}
-shared=None;worker=None;installer=None;compositor=None;host=None;permissions=[];leases=[];install_attempted=False;streams=[];save()
+shared=None;resident=None;worker=None;installer=None;compositor=None;host=None;permissions=[];leases=[];install_attempted=False;streams=[];save()
 try:
     session=gate();report['session_gate']=session
     compositor=find_compositor(session['console_session']);report['compositor']=compositor.report()
@@ -128,11 +129,14 @@ try:
     renewal=Renewal(leases,v.recovery_task);report['lease_renewals']=[];report['initial_grant_s']=1200
     report['admission_published']=True;report['admission_publication_ms']=(time.perf_counter()-(ready_deadline-8))*1000;save()
     report['shared_application_qualified']=False;report['shared_application_disabled']=True;save()
+    resident=ResidentBroker(v.transaction,worker,suffix,session['console_session'],env,own_process,Path(os.environ['LOCALAPPDATA'])/'npu-render/builds/native-auto-interactive-v8')
+    report['resident_broker_pid']=resident.start();report['resident_admission']=True;save()
     admission_started=time.perf_counter();deadline=admission_started+v.monitor_seconds;last_gate=0
     while time.perf_counter()<deadline:
         if (v.transaction/'stop').exists():report['stopped_by_controller']=True;break
         compositor.verify();host.verify()
         if renewal.poll(stop_after_tick=k.GetTickCount64()+int((deadline-time.perf_counter())*1000)):report['lease_renewals']=renewal.renewals;save()
+        if resident:report['resident_broker']=resident.poll()
         if time.perf_counter()-last_gate>=1:gate();last_gate=time.perf_counter()
         if installer.poll() is not None:assert installer.returncode==0,'Native indirect installation failed'
         assert worker.poll() is None,'NPU worker stopped before native frame evidence'
@@ -162,9 +166,18 @@ finally:
     if install_attempted:
         try:remove_indirect()
         except Exception as error:report['remove_error']=repr(error);report['passed']=False
+        settle_started=time.perf_counter()
+        while host is not None and time.perf_counter()-settle_started<10:
+            try:host.verify()
+            except Exception:break
+            time.sleep(.1)
+        time.sleep(3);report['teardown_settle_ms']=(time.perf_counter()-settle_started)*1000
     if shared:
         try:shared.close();report['shared_application']=shared.report
         except Exception as error:report['shared_application_cleanup_error']=repr(error);report['passed']=False
+    if resident:
+        try:report['resident_broker']=resident.close();report['passed']=report['passed'] and report['resident_broker']['grants_restored_exactly']
+        except Exception as error:report['resident_broker_cleanup_error']=repr(error);report['passed']=False
     for lease in reversed(leases):lease.close()
     for grant in reversed(permissions):
         try:grant.restore()

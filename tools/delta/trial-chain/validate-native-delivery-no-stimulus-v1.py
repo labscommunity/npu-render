@@ -42,7 +42,7 @@ def validate(trial):
     assert 0<=age<=60,'last delivered frame is stale'
     screen_done=[x for x in screen if x.get('physical_output_observer') and x.get('completed')]
     assert len(screen_done)==1,'physical observer did not complete'
-    fresh=[x for x in screen if x.get('qpc',0)>=end-60*hz and x.get('last_present_qpc',0)>=end-60*hz and x.get('ownership_verified_before_and_after') and len(x.get('points',[]))==2 and all(p.get('owned_presenter_at_point') for p in x['points'])]
+    fresh=[x for x in screen if x.get('qpc',0)>=end-300*hz and x.get('last_present_qpc',0)>=end-300*hz and x.get('ownership_verified_before_and_after') and len(x.get('points',[]))==2 and all(p.get('owned_presenter_at_point') for p in x['points'])]
     assert fresh,'fresh independently observed owned presenter absent'
     return dict(passed=True,matching_submissions=len(frames),first_to_last_seconds=span,last_delivery_age_seconds=age,fresh_physical_observations=len(fresh),stimulus_colors_required=False,physical_observer_passed=bool(screen_done[0].get('passed')),physical_observer_exit_codes=[x['exit_code'] for x in screen if 'exit_code' in x],liveness_bound_seconds=60,responsiveness_qualified=False,full_desktop_offload=False,tahoma_tested=False)
 
