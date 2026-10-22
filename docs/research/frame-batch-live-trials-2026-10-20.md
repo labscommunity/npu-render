@@ -1753,3 +1753,15 @@ Open after this pass: the span-budget family (minified textures), the blur
 program's code window, the two new programs, the GPU-desktop control sample,
 and the 4 MB cap on the compositor trace that hid the later minutes of probes
 v116 to v119.
+
+### GPU-desktop control sample (2026-10-22 06:15Z to 06:25Z)
+
+The engine sampler ran as an interactive task on the plain GPU desktop with no
+admission and no stimulus for 600 s (`engine-samples-gpu-control-20261021-2315`,
+271 samples; the first attempt from the SSH session at 03:30Z had left no file).
+GPU 3D engine utilisation averaged 0 % with p99 0.01 %, total CPU 3.6 % (p99
+7.6 %), DWM 0.55 % of all cores, the worker and indirect host absent. This is an
+idle-desktop control: the trials' GPU 3D figures (p99 0.37 % in trial 12) were
+sampled under the 30 Hz stimulus, so a stimulus-driven GPU-desktop control is
+still owed before the two can be compared; the number above only shows that an
+idle desktop leaves the 3D engine at zero on this machine.
