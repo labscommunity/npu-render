@@ -1765,3 +1765,179 @@ idle-desktop control: the trials' GPU 3D figures (p99 0.37 % in trial 12) were
 sampled under the 30 Hz stimulus, so a stimulus-driven GPU-desktop control is
 still owed before the two can be compared; the number above only shows that an
 idle desktop leaves the 3D engine at zero on this machine.
+
+## Bundle v23, carrier v2, tree v60: the code window doubled, span-budget draws grouped by triangle, five blobs
+
+Three of probe v120's open items had one root each, found by replaying its
+recorded per-draw requests through the planner on the host
+(`bootstrap/requests/request-<ticket>.bin`, decoded with the lab's own
+`indexed_exchange::decode`, planned with `plan_draw`, `fitting_tile` and
+`adaptive_fit`).
+
+### The code window: the carrier's text section can be grown
+
+The blur program e3ebf67c (224 instructions, 10,930 bytes of row code in
+bundle v22's blob 17 ELF) never fit the 24,496-byte window with the 17.5 KB
+runtime beside it. The window is the `shave.text` section of the compiled
+ScatterElementsUpdate blob, whose size the six `task.shave.range` descriptors
+advertise (two rows each). `tools/delta/grow_frame_carrier.py` rewrites the
+blob: the section grows from 24,624 to 48,176 bytes, every later section's file
+offset shifts by the growth, the twelve range rows advertise 48,048 bytes of
+code, and the OpenVINO NPU metadata trailer (plugin version, compiler string,
+and the size of the ELF region it follows) is re-attached after the re-padded
+ELF. The first attempt left that trailer in place and the plugin refused the
+blob ("metadata version 0.0"); with the trailer rewritten the NPU imported it.
+
+On Delta the v22 blob 17 ELF (28,912 bytes of text) patched into the grown
+carrier passed all 9 of its fixtures bit-exact on the NPU
+(`frame-blob17-qualify-48k`, 2026-10-22 13:29Z), so the grown window executes
+code beyond the original 24,496 bytes. The 9 fixtures took 2,832 ms in one
+request: the blur samples 18 times per pixel and this is the heaviest program in
+the inventory; probe v121 measures what it costs inside live batches against
+the 46 to 203 ms its per-draw route took.
+
+`ptl_frame_carrier.py` now pins both carriers (v1 `06d57d6f`, v2 `aa8fe4fb`) and
+reads the code window from the ELF; qualification and the worker accept either.
+
+### Five blobs instead of eighteen
+
+With 48,048 bytes per blob the inventory repartitions into five blobs by pixel
+instruction count: 0 to 8 (22 programs, the compositor's common quads and
+fills with the dual-source blend), 9 to 31 (9 programs with the text program's
+`ld` runtime), 32 to 64 (4 programs: two Mica passes and the two programs
+below), 65 to 181 (the three acrylic programs) and 182 and up (the blur alone).
+Bundle v22's ELFs put the program code of those groups at 23, 20, 9.5, 16 and
+11 KB beside a 15 to 20 KB runtime. Fewer blobs also means fewer kernel
+requests: the worker runs consecutive draws of one target as one run only while
+they share a blob, and probe v120's batches needed 8 requests for a median of 6
+commands because neighbouring draws came from different blobs.
+
+### Span-budget draws are hulls, not minification
+
+Every draw the driver refused for the span budget in probe v120 (201 trace
+rows, three shapes) is a draw of many small quads whose texels lie far apart in
+one texture:
+
+| Request | Draw | Triangles | Texture | Per-triangle windows | Hull |
+| --- | --- | --- | --- | --- | --- |
+| 100 | 595296ba, 141x31 px | 70 | 590x800 glyph atlas, point | 4 to 10 texels square | 201x672 |
+| 96 | d8e0b497, 1024x37 px (taskbar) | 55 | two 768x576 atlases | 2x2 to 54x8 | 281x443 and 761x63 |
+| 39 | 595296ba, 7x8 px (64x64 target) | 24 | 1536x1006 window image | 6x12 | 1516x996 |
+
+The planner derived one window per texture per tile as the union of every
+triangle's coordinate range, so two glyphs from opposite ends of the atlas
+asked for the whole atlas, and bisecting the tile down to 8x8 pixels did not
+help because the two glyphs stay in the same sub-tile. Nothing is minified: the
+7x8-pixel draw is twelve 1x2-pixel quads reading the four corners of a window
+image.
+
+`frame_batch_planner.hpp` now partitions a draw's triangles into groups
+(`group_triangles`): consecutive triangles join a group while the merged
+windows (at most two per texture, `merge_rects`) stay within 25% plus 512 bytes
+of the sum of the triangles' own windows, and a hull over distant rects starts
+a new group. `tile_span_bytes` sums one command per group with that group's
+vertices and windows; the worker packs each group as its own kernel command
+with the same function, so driver admission and worker packing agree. Replayed
+on the host, the three draws now fit the 128-pixel tile: 2, 3 and 3 groups
+with 3.5, 16.8 and 17.1 KB of windows (spans of 88 to 137 KB). A group the
+packer still cannot place after fitting no longer fails the batch: the run
+restores its target and takes the per-draw routes, reported as
+`frame_batch_span_budget_after_fit`.
+
+### The compositor trace ring
+
+The per-process UMD trace was capped at 4 MB and 16,384 rows, which hid the
+later minutes of probes v116 to v119. It is now a ring of 16 MB files
+(`process-<pid>.jsonl`, `.1.jsonl`, `.2.jsonl`, ...); the file three behind the
+current one is deleted, so a process keeps at most 48 MB, and a reloaded UMD
+continues from the highest file its process has. Readers glob
+`process-*.jsonl` as the live validator already did.
+
+### Two more compositor programs, one of them miscompiled on the device
+
+c7f4bc92 (34 lowered instructions, one texture; 12 per-draw requests in v120)
+and ca2803d7 (35 instructions, four textures, five varyings; 2 requests) were
+captured from v120's recorded requests as pairs 37 and 38. The first bundle v23
+build put both in blob 2 with 649fb489 and 8c7afc07: the blob compiled
+(28,368 bytes) and the other three programs passed every fixture, but all six
+fixtures of c7f4bc92 failed on the NPU, at -Oz, -Os, -O1 and -O2 alike, with
+the host build of the same C matching the SM4 reference. The device writes the
+green lane's value into red (`quad-c7f4bc92-rgba` expected 17,237,125 and got
+237,237,125; the real-draw fixture got 199,199,199 for 238,222,56) with the
+alpha lane right. The program unpremultiplies the texel, keys a clamp on its
+luma (dp3, movc, lt, and) and blends with a constant; which of those constructs
+the SHAVE compiler lowers wrongly is not yet isolated (the tapped-build bisect
+that found the shuffle lowering fault is the tool for it). Pair 37 stays
+captured but out of the inventory, so the draw keeps its per-draw route; bundle
+v23 deploys ca2803d7 (pair 38) in blob 2.
+
+### The GPU desktop under a 30 Hz stimulus (2026-10-22 13:43Z to 13:53Z)
+
+The stimulus-driven control owed since probe v120: the engine sampler and a
+WinForms window that toggles its background colour at 30 Hz in bursts of 300
+updates every 30 s (20 bursts, 6,000 updates in 590 s) both ran as interactive
+tasks on the plain GPU desktop with no admission
+(`engine-samples-gpu-control-stimulus-20261022-0643`, 270 samples). The GPU 3D
+engine averaged 0.18 % with p50 0.13 %, p90 0.35 %, p99 0.37 % and one 3.35 %
+sample (DWM) as the window closed; total CPU 3.6 % (p99 9.6 %), DWM 0.58 % of
+all cores, worker and indirect host absent, NPU 0 %. Trial 12's NPU-desktop
+sample under its own 30 Hz stimulus showed the same p99 (0.37 %), so on this
+machine the compositor's 3D-engine use for a 30 Hz window is already within a
+fraction of a percent either way; the control gives the comparison its
+baseline but does not show a measurable engine saving at this workload. This
+stimulus is a GDI window toggling colours, not the trials' presenter relay, and
+the figures are engine-utilisation samples, not frame timings.
+
+## Probe v121 (generation 45, tree v60, package v52, bundle v23, 660 s): no span-budget draws, the blur on the kernel, half the kernel requests
+
+The application probe (Notepad at +90 s, a WPF window at +120 s, Edge at
++150 s) on bundle v23 through carrier v2, registration v100
+(`native-desktop-admission-v121`, 2026-10-22 14:08Z to 14:20Z). The worker's
+startup self-test passed all 234 fixtures of the five blobs on the NPU (125,
+58, 21, 21, 9; strict). The compositor created one device for the whole
+admission, no draw was rejected or dropped, seven processes were admitted with
+no request failure, the bootstrap observed 57 frames (37 in v120), DWM is the
+same process it was before the probe, and the recovery removed the device.
+
+What changed against probe v120, same 660 s and the same three applications:
+
+| | v120 (tree v59, bundle v22) | v121 (tree v60, bundle v23) |
+| --- | --- | --- |
+| Compositor draws refused for the span budget | 201 | 0 |
+| Compositor per-draw requests | 205 (595296ba, d8e0b497, c7f4bc92, ...) | 5 (two uncaptured programs, 520a2995 and 0b6602eb) |
+| Blur draws inside batches | 58 per-draw fallbacks (blob 17 unavailable) | 50 kernel commands on blob 4, no fallback |
+| Batches without a blur draw: kernel requests, kernel time (p50) | 7 requests, 26.9 ms | 4 requests, 18.7 ms |
+| Batches with a blur draw (p50) | 17 batches: 22 commands, 36 requests, kernel 265 ms, host 1,239 ms | 12 batches: 153 commands, 103 requests, kernel 1,154 ms, host 1,448 ms |
+| Compositor batch at the worker, queue wait excluded (p50 / p90) | 93 / 625 ms (255 batches, p90 5.3 MB) | 187 / 1,234 ms (96 batches, p90 20.7 MB) |
+| Worker busy over the admission | 11 % (513 requests) | 6 % (171 requests) |
+| Kernel escapes, tile failures, identity mismatches, route disagreements | 0 | 0 |
+
+The partition did what it was meant to: an ordinary compositor batch now needs
+four kernel requests instead of seven or eight and spends a third less time in
+the kernel, and the whole admission kept the worker busy for 6 % of the time
+instead of 11 %. The triangle groups removed every span-budget refusal, with
+zero `frame_batch_span_budget_after_fit` rows: the planner's admission and the
+worker's packing agreed on every draw.
+
+The blur on the kernel is correct and expensive. Its 50 commands are small
+strips (175x12, 175x7, 44x55 pixels of a Mica window's edges) but the program
+costs tens of microseconds per pixel on one SHAVE (224 instructions, 18
+bilinear taps with mirror addressing per pixel), so the batches that carry it,
+which are also this probe's largest (p50 153 commands, 3.6 Mpx covered, Edge's
+window uploads at 20 MB a batch), take 1.2 s of kernel time at the median and
+4.1 s at p90, against 0.27 s of kernel plus 1.2 s of per-draw host time for
+v120's blur batches. Those seconds queue the requests behind them (the five
+per-draw requests waited 4 to 14 s), which is why the compositor's median batch
+rose from 93 to 187 ms even as the typical batch got cheaper. The median is
+also not like for like: v121's batches carried four times the bytes at p90.
+The next performance lever is the blur program's per-pixel cost (the sampler
+and the generated row code), or a policy that keeps a program whose kernel
+cost exceeds its per-draw route on that route, reported as such; neither is
+decided here.
+
+Evidence on Delta: `vm\native-desktop-admission-v121` (bootstrap report,
+worker and provider logs, the recorded requests, the compositor trace),
+`vm\frame-blobs-v23\deploy\manifest.txt` (five blobs, stamp 065550),
+`vm\frame-carrier-scatter-v2\carrier.blob`, `builds\native-tree-v60`,
+`vm\native-driver-package-v52`. The switch's pins move to tree v60, package
+v52 (0.0.1352.0) and bundle v23.

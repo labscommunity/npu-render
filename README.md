@@ -5,9 +5,10 @@ A D3D10 user-mode display driver records DWM's draws into frame batches, and a
 separate worker process, reached over a named pipe, executes those batches on
 Delta's Panther Lake NPU through OpenVINO. Pixel work runs in SHAVE kernels
 compiled ahead of time on Delta and patched into a twelve-row
-ScatterElementsUpdate carrier blob with a 24,496-byte code window; twelve of
-the thirteen kernel blobs pass the worker's startup self-test (the blur program
-does not fit). An indirect display carries the NPU
+ScatterElementsUpdate carrier blob whose code window was grown from 24,496 to
+48,048 bytes by rewriting the blob (carrier v2); the inventory's 39 programs
+fill five kernel blobs, every one of which passes its fixtures on the NPU. An
+indirect display carries the NPU
 frames to the physical panel, leases bound admission and now renew in place, and
 a scheduled recovery task tears down the devices and packages and restores the
 ordinary display. The long-term goal is one user-facing switch that moves
@@ -17,10 +18,12 @@ Tahoma. That switch does not exist yet.
 ## Status
 
 Updated 2026-10-22. This is not a product. The latest results are trial 31 and
-the application probes v115 to v120 (what ordinary applications cost on the NPU
+the application probes v115 to v121 (what ordinary applications cost on the NPU
 desktop, WinUI's text program and the compositor's Mica programs moved onto the
-kernel, two new blend modes, and the compositor's device churn traced to three
-rejected-draw causes and ended: one device for a whole admission in v120) in
+kernel, two new blend modes, the compositor's device churn traced to three
+rejected-draw causes and ended, then the carrier's code window doubled, the
+blur program on the kernel, every span-budget refusal removed by per-triangle
+windows, and five blobs instead of eighteen in v121) in
 [frame-batch-live-trials-2026-10-20.md](docs/research/frame-batch-live-trials-2026-10-20.md);
 the gate framework is the ordered gates table in
 [desktop-offload-plan.md](docs/research/desktop-offload-plan.md).
@@ -28,11 +31,11 @@ the gate framework is the ordered gates table in
 | Gate | Current status |
 | --- | --- |
 | 1. Routing | Trials 11 and 12 pass registration, admission, presentation and restoration end to end. Driver and worker derive each fallback route from one shared selection; the worker logged zero disagreements in both trials. |
-| 2. Continuous rendering | Trial 12 renders the desktop on the NPU for 2,160 s: 744 frame batches, 9,363 commands, zero self-test mismatches, zero worker stderr. All 202 per-draw fallbacks are the blur blob that does not fit the code window. |
-| 3. Physical presentation | 342 physically submitted frames in trial 12 (170 in trial 11). GPU 3D engine p99 was 1.18% over trial 11's 720 s sample and 0.37% over trial 12's 37 minutes; copy and video engines and the bridge's own presentation work are not separated out. |
-| 4. Interaction and recovery | Controlled input, cleanup and recovery-task removal pass. DWM survives the screen saver (build v44); a worker that dies is replaced within a second and the compositor, its clients and the display continue (trial 30, tree v52); the live tools wait out a desktop switch; recovery tasks live and die with their admission (trial 25). With an application window on the desktop DWM used to recreate its device every few seconds (probes v115 to v119) because draws the driver could not execute failed the device: dual-source caption text, a shader-digest cache keyed by a reused address, and a separate-alpha invert blend. All three are fixed (tree v59; a draw the kernel cannot take is now dropped and reported, never failed) and probe v120 ran 660 s on one device. DWM fail-fasted once at a teardown that coincided with such a re-creation (probe v117). Longest clean admission so far 40 minutes; sleep/wake remains open. |
+| 2. Continuous rendering | Trial 12 renders the desktop on the NPU for 2,160 s: 744 frame batches, 9,363 commands, zero self-test mismatches, zero worker stderr. Its 202 per-draw fallbacks were the blur blob that did not fit the code window; since bundle v23 (carrier v2, 48,048-byte window) the blur runs on the kernel and probe v121 had no fallback inside any batch. |
+| 3. Physical presentation | 342 physically submitted frames in trial 12 (170 in trial 11). GPU 3D engine p99 was 1.18% over trial 11's 720 s sample and 0.37% over trial 12's 37 minutes; copy and video engines and the bridge's own presentation work are not separated out. The GPU-desktop control under a 30 Hz window stimulus (2026-10-22, no admission) also shows p99 0.37% on the 3D engine, so no engine saving is measurable at this workload. |
+| 4. Interaction and recovery | Controlled input, cleanup and recovery-task removal pass. DWM survives the screen saver (build v44); a worker that dies is replaced within a second and the compositor, its clients and the display continue (trial 30, tree v52); the live tools wait out a desktop switch; recovery tasks live and die with their admission (trial 25). With an application window on the desktop DWM used to recreate its device every few seconds (probes v115 to v119) because draws the driver could not execute failed the device: dual-source caption text, a shader-digest cache keyed by a reused address, and a separate-alpha invert blend. All three are fixed (tree v59; a draw the kernel cannot take is now dropped and reported, never failed) and probes v120 and v121 each ran 660 s on one device. DWM fail-fasted once at a teardown that coincided with such a re-creation (probe v117). Longest clean admission so far 40 minutes; sleep/wake remains open. |
 | 5. Responsiveness | Not met. 2.5 verified updates/s in trial 11 and 2.4 in trial 12 against a 30 Hz, 300-update stimulus at 1024x768; per-flush wall p50 265 to 281 ms; mouse sent-to-display median 94 ms and p95 1,497 ms in trial 11. |
-| 6. Application coverage | Ordinary processes are admitted automatically (explorer, StartMenuExperienceHost, TextInputHost, Notepad, ClickToDo; trials 24 and probes v115 to v118) and served with zero request failures. Every WinUI frame used to pay a 2 to 4 MB per-draw request for the text program (byte-buffer `ld` plus palette); since bundle v19 it runs on the kernel and a Notepad frame costs its batch alone (p50 31 ms). The compositor's Mica backdrop programs (seven) and its dual-source caption text joined the inventory (bundles v20, v21). WPF (D3D9Ex) and Edge never open our adapter and are composited from their own surfaces. Still per-draw: minified textures over the span budget and the blur program (blob 16, 4.4 KB over the code window). Pixel correctness of application programs is checked on the device through their fixtures, not yet by replaying application captures. |
+| 6. Application coverage | Ordinary processes are admitted automatically (explorer, StartMenuExperienceHost, TextInputHost, Notepad, ClickToDo; trials 24 and probes v115 to v118) and served with zero request failures. Every WinUI frame used to pay a 2 to 4 MB per-draw request for the text program (byte-buffer `ld` plus palette); since bundle v19 it runs on the kernel and a Notepad frame costs its batch alone (p50 31 ms). The compositor's Mica backdrop programs (seven), its dual-source caption text and a four-texture composite joined the inventory (bundles v20 to v23). WPF (D3D9Ex) and Edge never open our adapter and are composited from their own surfaces. Draws of many small quads spread over an atlas (text, taskbar icons, a thumbnail mosaic) used to exceed the span budget; since tree v60 the planner binds windows per triangle group and probe v121 refused none. Still per-draw: two uncaptured compositor programs (5 draws in 660 s) and c7f4bc92, whose device build miscompiles (kept out of the inventory). The blur program runs on the kernel but costs tens of microseconds per pixel, so batches that carry it take seconds. Pixel correctness of application programs is checked on the device through their fixtures, not yet by replaying application captures. |
 | 7. Tahoma benefit | Not measured on the native desktop. Earlier experiments regressed. The GPU 3D engine sample shows composition left that engine; it is not a Tahoma measurement. |
 | 8. Usable switch | `npu-render desktop install --prepare` packages, signs and registers a build; `enable` generates, uploads and launches a stimulus-free admission with the resident broker; `status` follows it; `disable` ends it. All four verbs have run on Delta (`disable` first in trial 31); the pins follow the latest qualified build. See [desktop-switch-design-2026-10-21.md](docs/research/desktop-switch-design-2026-10-21.md). |
 
@@ -96,9 +99,11 @@ single-file SHAVE source for each blob from
 `native/windows/ptl_kernels/frame_programs.h`. The blobs are compiled on Delta
 with the locally supplied, pinned SHAVE toolchain that
 `tools/build_ptl_kernel.py` expects, patched into the twelve-row carrier
-(`tools/delta/create_frame_carrier.py`) and qualified fixture by fixture on the
-NPU with `tools/delta/qualify_frame_kernel.py`. The toolchain is never committed
-or redistributed; neither are compiled blobs, carriers or device caches.
+(`tools/delta/create_frame_carrier.py` compiles it; `tools/delta/grow_frame_carrier.py`
+doubles its code window to the pinned carrier v2) and qualified fixture by
+fixture on the NPU with `tools/delta/qualify_frame_kernel.py`. The toolchain is
+never committed or redistributed; neither are compiled blobs, carriers or
+device caches.
 
 ## Evidence and history
 

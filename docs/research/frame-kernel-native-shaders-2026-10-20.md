@@ -46,3 +46,18 @@ A 13,566-pixel quad now costs roughly 3-5 ms on one engine for light shaders
 (about 0.2-0.4 us per pixel including sampling) and 33-60 ms for the three
 heaviest DWM shaders (about 20 ns per shader instruction). Three captured pairs
 stay ineligible (loops or derivatives) and keep the per-draw fallback.
+
+## Carrier v2: a 48,048-byte code window (2026-10-22)
+
+The code window is the `shave.text` section of the ScatterElementsUpdate blob,
+and the section can be grown. `tools/delta/grow_frame_carrier.py` derives
+`vm\frame-carrier-scatter-v2\carrier.blob` from the pinned v1 blob: the text
+section grows from 24,624 to 48,176 bytes, every later section's offset shifts,
+the twelve range-descriptor rows advertise 48,048 bytes of code, and the
+OpenVINO NPU metadata trailer is re-attached with the new ELF size (the plugin
+reads it from the end of the blob and refuses a blob whose trailer no longer
+lines up). Bundle v22's blob 17 (the blur, 28,912 bytes of text) passed all
+nine fixtures bit-exact on the NPU through the grown window on 2026-10-22; the
+inventory then repartitions into five blobs (`frame::blob_ranges`), which the
+bundle v23 section of the live-trials report records. Both carriers stay pinned
+in `tools/delta/ptl_frame_carrier.py`.
