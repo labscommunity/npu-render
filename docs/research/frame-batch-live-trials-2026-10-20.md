@@ -1483,3 +1483,16 @@ than through the driver's exchange, which is the fixture's limitation, not the
 desktop's. With those understood, the priority-3 item "the admission survives
 the loss of its worker" holds: a worker that dies is replaced within a second
 and the compositor, its clients and the display continue.
+
+## Trial 31 (generation 38, admission v114, tree v52): the first live `disable`
+
+A four-hour soak was started at 03:21:43Z and ended by `npu-render desktop
+disable` at 03:27:05Z after the priorities changed: functionality first,
+extended runs later, once Delta is not needed for them. In its six minutes six
+ordinary applications were admitted in the first minute and the admission
+reported `passed=true`; `disable` wrote the stop file, the bootstrap ended
+cleanly, the admission wrapper's recovery removed the device and packages and
+unregistered the recovery task, and `disable`'s own recovery then found nothing
+to do (its only "error" is that the task it meant to unregister was already
+gone, which the script should record as success). `disable` returned
+`passed=true` after 54 s. All four switch verbs have now run on Delta.

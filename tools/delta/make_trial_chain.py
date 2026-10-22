@@ -613,7 +613,7 @@ Get-Content "$out\\report.json"
                 ' $admission=$null;try{$admission=Get-Content "$Root\\report.json" -Raw|ConvertFrom-Json}catch{}\n'
                 " $owned_ids=@($state.packages|ForEach-Object {$_.hardware_id});$remaining=@(Get-PnpDevice -PresentOnly -Class Display -ErrorAction SilentlyContinue|Where-Object {$ids=@(($_|Get-PnpDeviceProperty -KeyName DEVPKEY_Device_HardwareIds -ErrorAction SilentlyContinue).Data);@($ids|Where-Object {$owned_ids -contains $_}).Count -gt 0})\n"
                 " $fatal=@($report.errors|Where-Object {$_ -notmatch '^owned-process|^trace'});$report.cleanup_complete=($remaining.Count -eq 0 -and $fatal.Count -eq 0)\n"
-                " if($report.passed -or $report.cleanup_complete -or ($admission -and $admission.completed)){try{Unregister-ScheduledTask -TaskName 'T8-NpuRender-NativeDesktopRecovery-v75' -Confirm:$false -ErrorAction Stop;$report.task_unregistered=$true}catch{$report.task_unregistered=$false;Record-Error ('task: '+$_.Exception.Message)}}\n",
+                " if($report.passed -or $report.cleanup_complete -or ($admission -and $admission.completed)){try{Unregister-ScheduledTask -TaskName 'T8-NpuRender-NativeDesktopRecovery-v75' -Confirm:$false -ErrorAction Stop;$report.task_unregistered=$true}catch{if($_.Exception.Message -match 'No MSFT_ScheduledTask'){$report.task_unregistered=$true;$report.task_already_gone=$true}else{$report.task_unregistered=$false;Record-Error ('task: '+$_.Exception.Message)}}}\n",
             ),
             # The resident broker is an owned process too; without it every recovery since trial 24 reported
             # "owned process contract mismatch" and kept its task armed.
