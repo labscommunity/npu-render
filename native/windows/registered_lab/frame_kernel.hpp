@@ -293,8 +293,12 @@ inline LoweredProgram lower(const shader::Program &vs, const shader::Program &ps
 // a blob of its own, and the 26-64 instruction Mica programs one each: their row
 // shaders are 4-5 KB beside a 15 KB runtime (bundle v19/v20 measurements).
 struct BlobRange { uint32_t first, last, splits; };
-constexpr std::array<BlobRange, 15> blob_ranges{{{0, 1, 1}, {2, 2, 2}, {3, 3, 1}, {4, 8, 1}, {9, 9, 1}, {10, 12, 1}, {13, 16, 1}, {17, 21, 1}, {22, 25, 1}, {26, 31, 2}, {32, 64, 2},
-                                                {65, 115, 1}, {116, 120, 1}, {121, 181, 1}, {182, 100000, 1}}};
+// Five blobs for the 48,048-byte window of the v2 carrier (grow_frame_carrier.py): the
+// runtime takes 15 to 20 KB of it, so each range below holds at most ~24 KB of program
+// code as bundle v22's ELFs measured it (blob 0: ~23 KB with the dual blend; blob 1:
+// ~20 KB with the ld runtime; blob 4: the blur alone, 11 KB). The common compositor
+// programs (0 to 8 instructions) share one blob so consecutive draws share one run.
+constexpr std::array<BlobRange, 5> blob_ranges{{{0, 8, 1}, {9, 31, 1}, {32, 64, 1}, {65, 181, 1}, {182, 100000, 1}}};
 constexpr uint32_t blob_count() { uint32_t n = 0; for (const auto &r : blob_ranges) n += r.splits; return n; }
 inline uint32_t blob_range_of(uint32_t ps_instructions) {
     for (uint32_t k = 0; k < blob_ranges.size(); ++k) if (ps_instructions >= blob_ranges[k].first && ps_instructions <= blob_ranges[k].last) return k;

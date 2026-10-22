@@ -119,7 +119,8 @@ def main():
         )
         SPAN = carrier_module.SPAN
         original = args.carrier.read_bytes()
-        assert hashlib.sha256(original).hexdigest() == carrier_module.ORIGINAL_SHA, "carrier pin"
+        accepted = getattr(carrier_module, "ORIGINAL_SHAS", {carrier_module.ORIGINAL_SHA})
+        assert hashlib.sha256(original).hexdigest() in accepted, "carrier pin"
         if (args.kernel_elf is None) == (args.patched_blob is None):
             raise RuntimeError("pass exactly one of --kernel-elf and --patched-blob")
         if args.patched_blob is not None:
