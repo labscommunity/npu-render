@@ -4,6 +4,7 @@
 #pragma warning(push)
 #pragma warning(disable: 4201) // Anonymous structures in Microsoft DDI headers.
 #include <d3dumddi.h>
+#include <intrin.h>
 #pragma warning(pop)
 #include <cstring>
 #include <cstdint>
@@ -21,7 +22,10 @@ inline void check(HRESULT status, const char *operation = "runtime") {
         throw Error{status};
     }
 }
-inline void require(bool value) { if (!value) throw Error{E_INVALIDARG}; }
+// The return address of the failing require (resolved against the DLL with its PDB) names the check a
+// rejection came from; `reject` logs it as an offset into the module.
+inline void *&last_require_site() { static thread_local void *site = nullptr; return site; }
+inline void require(bool value) { if (!value) { last_require_site() = _ReturnAddress(); throw Error{E_INVALIDARG}; } }
 struct Counters {
     uint64_t allocations = 0, fills = 0, copies = 0, live_allocations = 0;
     uint64_t live_contexts = 0, cleanup_errors = 0, rejected = 0, dropped_draws = 0;

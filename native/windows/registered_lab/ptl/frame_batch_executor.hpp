@@ -284,17 +284,22 @@ public:
         stage = "shaders";
         std::vector<Shader> batch_shaders(batch.shader_count);
         for (auto &s : batch_shaders) {
-            const auto record = reader.value<ShaderRecord>(); expect((record.stage == 1 || record.stage == 2) && record.words >= 3 && record.words <= 16384);
+            const auto record = reader.value<ShaderRecord>();
+            if (!((record.stage == 1 || record.stage == 2) && record.words >= 3 && record.words <= 16384)) throw std::invalid_argument("invalid frame batch at shaders: record stage " + std::to_string(record.stage) + " words " + std::to_string(record.words));
             const auto words = reader.vector<uint32_t>(record.words);
             s.sha = sha256_hex(words.data(), words.size() * 4); s.stage = record.stage;
             char expected[65]{}; for (unsigned n = 0; n < 32; ++n) std::snprintf(expected + n * 2, 3, "%02x", record.sha256[n]);
-            expect(s.sha == expected);
+            if (s.sha != expected) throw std::invalid_argument("invalid frame batch at shaders: digest of " + s.sha.substr(0, 8) + " recorded as " + std::string(expected).substr(0, 8));
             auto found = shaders.find(s.sha);
             if (found == shaders.end()) {
-                auto program = std::make_shared<shader::Program>(record.stage == 1 ? shader::parse_vertex(words.data(), words.size()) : shader::parse_pixel(words.data(), words.size()));
-                found = shaders.emplace(s.sha, std::move(program)).first;
+                // A program the worker's parser refuses names itself: the driver parsed the same words.
+                try {
+                    auto program = std::make_shared<shader::Program>(record.stage == 1 ? shader::parse_vertex(words.data(), words.size()) : shader::parse_pixel(words.data(), words.size()));
+                    found = shaders.emplace(s.sha, std::move(program)).first;
+                } catch (const std::exception &error) { throw std::invalid_argument("invalid frame batch at shaders: " + s.sha.substr(0, 8) + " (stage " + std::to_string(record.stage) + ", " + std::to_string(record.words) + " words) does not parse: " + error.what()); }
             }
-            s.program = found->second; expect((s.program->stage == shader::Stage::vertex) == (record.stage == 1));
+            s.program = found->second;
+            if ((s.program->stage == shader::Stage::vertex) != (record.stage == 1)) throw std::invalid_argument("invalid frame batch at shaders: " + s.sha.substr(0, 8) + " stage mismatch");
         }
         // Resources.
         stage = "resources";

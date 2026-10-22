@@ -137,7 +137,10 @@ void frame_batch_clear(Device &d, const std::shared_ptr<Allocation> &target, con
 bool frame_batch_copy(Device &d, const std::shared_ptr<Allocation> &source, const std::shared_ptr<Allocation> &destination, const D3D10_DDI_BOX &region, uint32_t x, uint32_t y);
 extern std::vector<Device *> frame_devices;
 void reject(D3D10DDI_HDEVICE h, HRESULT status, const char *operation) {
-    lab_trace("{\"event\":\"reject\",\"operation\":\"%s\",\"status\":\"%08lx\"}\n", operation, ULONG(status));
+    HMODULE self = nullptr; GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, reinterpret_cast<LPCWSTR>(&reject), &self);
+    const auto site = reinterpret_cast<uintptr_t>(last_require_site()), base = reinterpret_cast<uintptr_t>(self);
+    lab_trace("{\"event\":\"reject\",\"operation\":\"%s\",\"status\":\"%08lx\",\"require_offset\":\"%llx\"}\n", operation, ULONG(status), (unsigned long long)(site && self && site >= base ? site - base : 0));
+    last_require_site() = nullptr;
     ++counters.rejected;
     auto &d = device(h);
     d.callbacks.pfnSetErrorCb(d.core, status);

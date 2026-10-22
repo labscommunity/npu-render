@@ -59,9 +59,13 @@ struct FrameBatcher {
     bool flushing = false;
     uint64_t flushes = 0, draws = 0, clears = 0, copies = 0, kernel_requests = 0, writeback_bytes = 0, upload_bytes = 0, snapshot_bytes = 0;
     double kernel_ms = 0, host_ms = 0;
-    struct Lowered { std::shared_ptr<nr::frame::LoweredProgram> program; const nr::frame::NativeIdentity *identity = nullptr; };
+    struct Lowered { std::shared_ptr<nr::frame::LoweredProgram> program; const nr::frame::NativeIdentity *identity = nullptr; std::weak_ptr<const nr::shader::Program> vs, ps; };
     std::map<std::string, Lowered> lowered;
-    std::map<const nr::shader::Program *, std::array<uint8_t, 32>> digests;
+    // Caches keyed by shader address hold a weak reference to the program: a shader freed and another
+    // allocated at the same address must not inherit its digest or lowering (probe v118 rejected a batch
+    // whose record carried a dead program's digest).
+    struct Digest { std::weak_ptr<const nr::shader::Program> owner; std::array<uint8_t, 32> value; };
+    std::map<const nr::shader::Program *, Digest> digests;
     struct ShaderEntry { std::shared_ptr<const nr::shader::Program> program; uint32_t stage; };
     struct ResourceEntry {
         std::shared_ptr<Allocation> allocation; bool is_volatile = false, target = false; uint64_t version = 0;
@@ -92,8 +96,9 @@ struct FrameBatcher {
     }
     const std::array<uint8_t, 32> &program_digest(const std::shared_ptr<const nr::shader::Program> &program) {
         auto found = digests.find(program.get());
-        if (found == digests.end()) found = digests.emplace(program.get(), frame_batch_detail::digest(program->bytecode.data(), program->bytecode.size() * 4)).first;
-        return found->second;
+        if (found != digests.end() && found->second.owner.lock() != program) { digests.erase(found); found = digests.end(); }
+        if (found == digests.end()) found = digests.emplace(program.get(), Digest{program, frame_batch_detail::digest(program->bytecode.data(), program->bytecode.size() * 4)}).first;
+        return found->second.value;
     }
     uint32_t shader_index(const std::shared_ptr<const nr::shader::Program> &program, uint32_t stage) {
         for (size_t n = 0; n < shaders.size(); ++n) if (shaders[n].program == program) return uint32_t(n);
@@ -190,8 +195,9 @@ struct FrameBatcher {
             TextureUse use{slot, view.allocation, false}; use.loaded = fetched[slot]; uses.push_back(use);
         }
         auto found = lowered.find(key);
+        if (found != lowered.end() && (found->second.vs.lock() != vs || found->second.ps.lock() != ps)) { lowered.erase(found); found = lowered.end(); }   // address reuse
         if (found == lowered.end()) {
-            Lowered l; l.program = std::make_shared<nr::frame::LoweredProgram>(nr::frame::lower(*vs, *ps, samplers));
+            Lowered l; l.vs = vs; l.ps = ps; l.program = std::make_shared<nr::frame::LoweredProgram>(nr::frame::lower(*vs, *ps, samplers));
             if (l.program->eligible()) { l.identity = inventory.find(*l.program); if (l.identity) l.program->set_native(l.identity->host_index); }
             found = lowered.emplace(key, std::move(l)).first;
         }
@@ -283,7 +289,7 @@ struct FrameBatcher {
         fb::BatchHeader bh; bh.shader_count = uint32_t(shaders.size()); bh.resource_count = uint32_t(resources.size()); bh.command_count = uint32_t(commands.size()); bh.batch_sequence = sequence;
         uint32_t uploads = 0; for (const auto &r : resources) uploads += (r.full.empty() ? 0u : 1u) + (r.partial.empty() ? 0u : 1u);
         bh.upload_count = uploads; w.value(bh);
-        for (const auto &s : shaders) { fb::ShaderRecord rec; rec.stage = s.stage; rec.words = uint32_t(s.program->bytecode.size()); std::memcpy(rec.sha256, digests.at(s.program.get()).data(), 32); w.value(rec); w.append(s.program->bytecode.data(), s.program->bytecode.size() * 4); }
+        for (const auto &s : shaders) { fb::ShaderRecord rec; rec.stage = s.stage; rec.words = uint32_t(s.program->bytecode.size()); std::memcpy(rec.sha256, digests.at(s.program.get()).value.data(), 32); w.value(rec); w.append(s.program->bytecode.data(), s.program->bytecode.size() * 4); }
         for (const auto &r : resources) { fb::ResourceRecord rec; rec.key = r.allocation->id; rec.version = r.version; rec.width = r.allocation->surface.width; rec.height = r.allocation->surface.height; rec.format = r.allocation->surface.format == 65 ? 28u : r.allocation->surface.format; rec.flags = r.is_volatile ? fb::volatile_resource : 0u; w.value(rec); }
         for (size_t n = 0; n < resources.size(); ++n) {
             const auto &r = resources[n];

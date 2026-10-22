@@ -110,8 +110,10 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
             for(unsigned c=0;c<4;++c){require(std::isfinite(d.blend_factor[c]));blend_constant[c]=d.blend_factor[c];}
         }else if(d.blend.SrcBlend==D3D10_DDI_BLEND_SRC1_ALPHA && d.blend.DestBlend==D3D10_DDI_BLEND_INV_SRC1_ALPHA &&
             d.blend.SrcBlendAlpha==D3D10_DDI_BLEND_SRC1_ALPHA && d.blend.DestBlendAlpha==D3D10_DDI_BLEND_INV_SRC1_ALPHA){
-            // DWM's caption text: the pixel shader's second output carries the blend alpha (probe v117).
-            require(d.pixel_program->outputs[1]!=0);blend_mode=nr::raster::BlendMode::dual_source_over;
+            // DWM's caption text: the pixel shader's second output carries the blend alpha (probe v117). A
+            // single-output program under this state reads an undefined o1: the draw is dropped and reported.
+            blend_mode=nr::raster::BlendMode::dual_source_over;
+            if(!d.pixel_program->outputs[1]){lab_trace("{\"event\":\"draw_dropped\",\"reason\":\"dual-source blend on a single-output program\",\"vertices\":%u}\n",count);++counters.dropped_draws;return;}
         }else{
         require(d.blend.SrcBlend==d.blend.SrcBlendAlpha && d.blend.DestBlend==d.blend.DestBlendAlpha);
         constexpr std::array<D3D10_DDI_BLEND,6> factors{D3D10_DDI_BLEND_ZERO,D3D10_DDI_BLEND_ONE,D3D10_DDI_BLEND_SRC_ALPHA,
