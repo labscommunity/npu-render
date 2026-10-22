@@ -89,7 +89,8 @@ def main():
         # Likewise the dual-source blend (mode 14) stays out of blobs without a two-output program.
         if b"nr_blend_pixel_dual(" not in header.read_bytes():
             define += b"#define NR_FRAME_NO_DUAL 1\n"
-        # Blobs of large programs sit at the code window: the invert blend (mode 15) stays out of them.
+        # Blobs of large programs sit at the code window: the invert blend (mode 15) stays out
+        # of them.
         if b"NR_FRAME_LARGE_PROGRAMS" in header.read_bytes():
             define += b"#define NR_FRAME_NO_INVERT_BLEND 1\n"
         source = define + inline_local_includes(blob_dir / "frame.c")

@@ -27,12 +27,12 @@ def survey(completed=True, admission="native-desktop-admission-v93", sequence_do
             {
                 "name": "native-registration-v69",
                 "passed": True,
-                "package": "native-driver-package-v47",
+                "package": "native-driver-package-v51",
             },
             {
                 "name": "native-registration-v70",
                 "passed": False,
-                "package": "native-driver-package-v47",
+                "package": "native-driver-package-v51",
             },
         ],
         "admission": {
@@ -135,7 +135,7 @@ def test_generation_counter_follows_the_generators_renames():
         desktop_switch.next_generation(["native-registration-v69"])
     registrations = survey()["registrations"]
     assert (
-        desktop_switch.last_passing_registration(registrations, "native-driver-package-v47") == 14
+        desktop_switch.last_passing_registration(registrations, "native-driver-package-v51") == 14
     )
     assert (
         desktop_switch.last_passing_registration(registrations, "native-driver-package-v36") == 12
@@ -159,10 +159,10 @@ def test_generator_command_carries_every_pin(tmp_path):
     flags = dict(zip(command[2::2], command[3::2], strict=False))
     assert flags["--generation"] == "18" and flags["--registration-generation"] == "14"
     assert (
-        flags["--build"] == "native-tree-v55" and flags["--package"] == "native-driver-package-v47"
+        flags["--build"] == "native-tree-v59" and flags["--package"] == "native-driver-package-v51"
     )
     assert (
-        flags["--version"] == "0.0.1347.0" and flags["--frame-blobs"] == "frame-blobs-v19\\deploy"
+        flags["--version"] == "0.0.1351.0" and flags["--frame-blobs"] == "frame-blobs-v22\\deploy"
     )
     assert (
         flags["--idd-package"] == "native-idd-package-v4" and flags["--idd-version"] == "0.0.1504.0"
@@ -308,12 +308,12 @@ def test_install_reports_missing_prerequisites(monkeypatch):
     found = {
         "root": ROOT,
         "build": {
-            "path": ROOT + r"\builds\native-tree-v55",
+            "path": ROOT + r"\builds\native-tree-v59",
             "exists": True,
             "report": {"clean_build": True},
         },
         "package": {
-            "path": VM + r"\native-driver-package-v47",
+            "path": VM + r"\native-driver-package-v51",
             "exists": True,
             "report": {"prepared": True},
         },
@@ -322,22 +322,22 @@ def test_install_reports_missing_prerequisites(monkeypatch):
             "exists": True,
             "report": {"prepared": False},
         },
-        "frame_blobs": {"path": VM + r"\frame-blobs-v19\deploy", "exists": False},
+        "frame_blobs": {"path": VM + r"\frame-blobs-v22\deploy", "exists": False},
     }
     delta = FakeDelta(monkeypatch, found)
     result = desktop_switch.check_prerequisites(desktop_switch.SwitchConfig())
     assert result["ready"] is False and result["missing"] == ["indirect_display", "frame_blobs"]
     assert result["checks"]["package"] == {
-        "path": VM + r"\native-driver-package-v47",
+        "path": VM + r"\native-driver-package-v51",
         "exists": True,
         "prepared": True,
         "ok": True,
     }
     script = delta.scripts[0]
     assert "[Environment]::GetFolderPath('LocalApplicationData')" in script
-    assert r'$b="$root\builds\native-tree-v55"' in script and 'Test-Path "$b\\Release"' in script
+    assert r'$b="$root\builds\native-tree-v59"' in script and 'Test-Path "$b\\Release"' in script
     assert (
-        r'$f="$vm\frame-blobs-v19\deploy"' in script and r'$i="$vm\native-idd-package-v4"' in script
+        r'$f="$vm\frame-blobs-v22\deploy"' in script and r'$i="$vm\native-idd-package-v4"' in script
     )
     assert "C:\\Users" not in script
     with pytest.raises(ValueError, match="package"):
@@ -364,7 +364,7 @@ def test_cli_desktop_subcommands(monkeypatch, capsys):
     )
     assert cli.main(["desktop", "enable", "--monitor-seconds", "600", "--no-capture"]) == 0
     assert seen["config"].monitor_seconds == 600 and seen["config"].capture is False
-    assert seen["config"].package == "native-driver-package-v47"
+    assert seen["config"].package == "native-driver-package-v51"
     with pytest.raises(SystemExit):
         cli.main(["desktop", "--help"])
     help_text = capsys.readouterr().out
@@ -398,10 +398,10 @@ def test_prepare_packages_when_missing_and_registers(monkeypatch):
     plan = json.loads(delta.uploads[-1][2])
     steps = {step["name"]: step for step in plan["steps"]}
     assert list(steps) == ["package", "stop-saver", "registration-stage", "registration-render"]
-    assert steps["package"]["report"] == VM + r"\native-driver-package-v47\report.json"
+    assert steps["package"]["report"] == VM + r"\native-driver-package-v51\report.json"
     assert steps["registration-stage"]["named"] == {"Mode": "stage"}
     assert (
-        steps["registration-stage"]["report"] == VM + r"\native-registration-stage-v47\report.json"
+        steps["registration-stage"]["report"] == VM + r"\native-registration-stage-v51\report.json"
     )
     assert steps["registration-render"]["named"] == {"Mode": "render"}
     assert steps["registration-render"]["report"] == VM + r"\native-registration-v73\report.json"

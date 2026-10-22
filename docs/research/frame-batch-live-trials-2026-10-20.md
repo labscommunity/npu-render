@@ -1729,3 +1729,27 @@ host reference and mapped by the driver; blob 1 splits in two so the
 2-instruction programs keep room (18 blobs), and blobs of large programs leave
 the mode out (they sit at the code window) with the worker routing such draws
 to the reported drop.
+
+## Probe v120 (generation 44, tree v59, package v51, bundle v22, 660 s): one device for the whole admission
+
+The same probe on the invert-blend build (registration v99). The compositor
+opened one exchange and created one device in 660 s; its trace holds no
+rejection and no dropped draw. Requests fell accordingly (DWM 456 against
+3,540 in v119; the desktop's surfaces were uploaded alone 10 times instead of
+88) and the bootstrap observed 37 frames (4 to 15 in the earlier probes, when
+most of the admission went to re-uploading after each device loss). Eight
+processes were admitted, no request failed, no route disagreed, zero kernel
+escapes over 309 batches and 3,485 commands; the recovery removed the device
+cleanly and DWM (pid 5568) is the same process it was before the probe.
+
+Per-draw traffic that remains on the compositor's side: 187 span-budget draws
+(595296ba at 1024x768 and 64x64, d8e0b497 at 1024x768), 14 draws of two
+uncaptured programs (c7f4bc92, ca2803d7) and 58 blur fallbacks (blob 17); a
+DWM batch still costs p50 94 ms with the Notepad window open, which is the
+blur fallback and the span-budget draws interleaving with the batches.
+
+The switch's pins move to tree v59, package v51 (0.0.1351.0) and bundle v22.
+Open after this pass: the span-budget family (minified textures), the blur
+program's code window, the two new programs, the GPU-desktop control sample,
+and the 4 MB cap on the compositor trace that hid the later minutes of probes
+v116 to v119.
