@@ -114,12 +114,12 @@ PREREQUISITES = (
 
 @dataclass
 class SwitchConfig:
-    """Chain pins; the defaults are the latest qualified chain's (generation 37, trial 30)."""
+    """Chain pins; the defaults are the latest qualified chain's (generation 40, probe v116)."""
 
-    build: str = "native-tree-v52"
-    package: str = "native-driver-package-v46"
-    version: str = "0.0.1346.0"
-    frame_blobs: str = "frame-blobs-v18\\deploy"
+    build: str = "native-tree-v55"
+    package: str = "native-driver-package-v47"
+    version: str = "0.0.1347.0"
+    frame_blobs: str = "frame-blobs-v19\\deploy"
     idd_package: str = "native-idd-package-v4"
     idd_version: str = "0.0.1504.0"
     monitor_seconds: int = 7200

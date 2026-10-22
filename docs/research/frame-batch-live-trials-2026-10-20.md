@@ -1496,3 +1496,127 @@ unregistered the recovery task, and `disable`'s own recovery then found nothing
 to do (its only "error" is that the task it meant to unregister was already
 gone, which the script should record as success). `disable` returned
 `passed=true` after 54 s. All four switch verbs have now run on Delta.
+
+## Probe v115 (tree v52, 660 s, no stimulus): what ordinary applications cost on the NPU desktop
+
+After trial 31 the priority moved to functionality. The GPU-desktop control
+sampler that ran before this probe left no sample file (its process had gone
+and no `engine-samples-gpu-control-*.jsonl` exists); that control is still owed.
+The probe itself was a stimulus-free `enable` of 660 s with Notepad launched at
++90 s, a WPF window (PowerShell, PresentationFramework) at +120 s and Edge at
++150 s through interactive tasks. The resident broker admitted seven processes
+in the first minute, among them Notepad (pid 16140); the WPF host and Edge
+never asked our adapter for a device (WPF renders through D3D9Ex, Chromium
+decided against a D3D10-level adapter), so they were composited from their own
+software surfaces by DWM, which is what the GPU path would do with any software
+renderer, not a loss of content.
+
+The worker log (`worker.stdout.jsonl`, `request_identity` and roundtrip rows)
+attributes the admission's requests to processes (pids resolved on Delta):
+
+| Process | Frame batches (abi 24) | Per-draw requests | Per-draw shader, target | Per-draw p50 / sum |
+| --- | --- | --- | --- | --- |
+| Notepad | 1,435, p50 15 ms | 1,433 (abi 8) | 61ce21fb, 16x16 | 31 ms / 51.0 s |
+| StartMenuExperienceHost | 79, p50 31 ms | 77 (abi 8) | 61ce21fb, 16x16 | 94 ms / 11.4 s |
+| explorer | 79, p50 16 ms | 75 (abi 8) | 61ce21fb, 16x16 and 768x576 | 93 ms / 9.9 s |
+| TextInputHost | 6 | 6 (abi 8) | 61ce21fb | 62 ms / 1.1 s |
+| dwm | 1,641, p50 109 ms | 523 (abi 7/8/11) | blur blob (e3ebf67c) fallbacks | 46 to 203 ms / 224 s |
+
+Every application frame was one frame batch followed by one per-draw request
+of the same pixel shader, 61ce21fb. Decoding the captured request
+(`request-00000007.bin` of trial 30, a 2.1 MB request for a 16x16 target)
+explains it: the shader is WinUI's text path. The vertex stage scales integer
+glyph coordinates (`itof`), the pixel stage converts the varying back
+(`ftoi`), forms `y * stride + ((x + offset) >> 3)` with `iadd`, `ishr` and
+`imad`, fetches that element of a 512 KB R8_UINT buffer with `ld` (a glyph
+coverage index: 84 of 524,288 bytes were non-zero), and fetches the colour at
+(index, row) of a 256x80 B8G8R8A8 palette with a second `ld`. The frame kernel
+had no `ld`, so the lowering rejected the pair ("pixel opcode") and the
+driver's batcher rejected the buffer view before that ("texture view"); the
+per-draw route then shipped the whole buffer and palette (2 to 4 MB) and ran 56
+inference calls for 256 pixels. DWM's own cost in this probe is the blur
+program (blob 10 then, blob 12 now) behind the Notepad window's backdrop: 523
+fallbacks.
+
+### Bundle v19, tree v55: the text program runs on the kernel
+
+The kernel now lowers `ftoi`, `ishl`, `ishr`, `ushr`, `imad` and `ld`
+(commits `feat(kernel): fetch texels with ld` and `feat(batch): fetched byte
+buffers travel as texture bindings`). The planner bounds an `ld` by the int32
+range of its address (the captured draw plans to 20 buffer elements and one
+256-texel palette row; an unknown axis takes the whole axis, never an unbounded
+window, because `ld` returns zero outside the resource). The driver admits the
+R8_UINT buffer view as a fetched texture (the buffer is already an 8192-wide
+word surface in the allocation model, so its resident copy and uploads are the
+ordinary ones) and the batch protocol's texture binding carries the view's
+element range (version 2); the worker cuts one-row R32_UINT windows of
+zero-extended bytes for the kernel. Buffer writes now settle an open batch and
+bump the content version like texture writes.
+
+The text program is in a blob of its own (blob 4) and the 10 to 12 instruction
+programs moved to blob 5, so the partition has 13 blobs; blobs without a
+fetching program compile with `NR_FRAME_NO_LD` because moviCompile keeps unused
+out-of-line helpers and the new ones pushed two blobs over the code window.
+Bundle v19 on Delta (`frame-blob*-qualify-212052`):
+
+| Blob | Programs | Text bytes | Fixtures on the NPU |
+| --- | --- | --- | --- |
+| 0 to 3 | 6, 5, 4, 2 | 20,496 / 23,600 / 22,320 / 20,192 | 29, 33, 27, 15, all exact |
+| 4 | 61ce21fb (text) | 16,512 | 10, all exact (includes the in-bounds fetch fixture) |
+| 5 to 11 | 1, 2, 1, 2, 1, 1, 1 | 19,152 to 24,496 | 9 to 15 each, all exact |
+| 12 | e3ebf67c (blur) | 28,912 | does not fit (unchanged) |
+
+Host checks: pair 27 vertex 96/96 exact, pixel 61 exact and 35 within one byte
+of 96 (the palette's UNORM unpack), none far. Tree v55 (13-blob ranges) builds
+clean on Delta; package v47 (0.0.1347.0) registered as v95.
+
+## Probe v116 (generation 40, tree v55, package v47, bundle v19, 660 s): the text program on the kernel
+
+The same 660 s application probe on the new pins (registration v95 passed in
+49 s; `enable` launched the admission at 04:24:52Z, Notepad at +90 s, the WPF
+window at +120 s, Edge at +150 s). The bootstrap reported `passed=true`, the
+resident broker admitted seven processes (StartMenuExperienceHost, ClickToDo,
+explorer, Notepad, TextInputHost and the two probes), no request failed, no
+route disagreement, zero kernel escapes over 1,176 batches and 11,103 commands.
+
+| Process | Frame batches (abi 24) | Per-draw requests | Per-draw shaders |
+| --- | --- | --- | --- |
+| Notepad | 11, p50 31 ms | 17 (abi 7) | 37b4d2f1 (13, explorer's large-texture program), e881b135 (4, 512x512, not captured) |
+| StartMenuExperienceHost | 4 | 1 (abi 8) | 61ce21fb at 768x576 |
+| explorer | 34, p50 47 ms | 0 | |
+| TextInputHost | 1 | 0 | |
+| dwm | 1,239, p50 110 ms, p90 437 ms | 1,116 | see below |
+
+The text program ran on the kernel: the worker listed 61ce21fb as a `kernel`
+command of blob 4 in every batch that carried it (82 commands by the midpoint),
+and the per-draw requests of it fell from 1,591 in probe v115 (Notepad, Start,
+explorer, TextInputHost) to one, a 768x576 target whose planned windows did not
+fit the span budget. The per-frame cost of a WinUI application is now its frame
+batch alone (Notepad p50 31 ms, explorer 47 ms). Notepad issued far fewer frames
+than in v115 (28 requests against 2,868), which is consistent with the caret no
+longer forcing a per-draw flush per blink but was not measured on screen; the
+probe records neither focus nor the caret.
+
+The compositor is now the cost. Its 1,116 per-draw requests (abi 7 p50 63 ms,
+abi 11 p50 110 ms, 266 s of worker time in 660 s) and the 599 `legacy_draw`
+flushes they force are the Mica backdrop of the Notepad window, and the DWM
+trace names the two causes:
+
+| `draw_not_batched` reason | Draws | Programs |
+| --- | --- | --- |
+| not a compiled inventory program | 477 | 1bf9cbd1 (180), 1cb9ebf7 (87), d9523e84 (86), 7f53ef7d (82) |
+| span budget | ~420 | 595296ba sampling a 768x503 window (82) or a 970x390 window of a 1024x1024 texture (41), d8e0b497 with two 768x576 textures (123), 590x800 textures with 200 to 250 by 672 windows (85) |
+| blur blob (e3ebf67c) absent | 404 fallbacks inside batches | the one program still over the code window |
+
+The first group is captured now: the eight per-draw programs of probe v115
+(d9523e84, 1bf9cbd1, 649fb489, 7f53ef7d, 8c7afc07, e5b2adfb, 1cb9ebf7 and
+explorer's 37b4d2f1) were extracted from the admission's request recording,
+use only instructions the kernel has (sample, divide, min, max, dot, compare,
+select, mad), and are eligible; all eight match the SM4 reference on the host
+(vertex 96/96 exact, pixel none far). The partition now deals a range's programs
+round-robin over `splits` blobs so the 26 to 64 instruction Mica programs get a
+blob each (17 blobs). Bundle v20 on Delta (`frame-blob*-qualify-213731`): blobs
+0 to 15 fit (16,512 to 24,496 bytes) and pass all their fixtures on the NPU with
+zero mismatches; blob 16 (blur) still does not fit. The second group, minified
+textures whose per-tile windows are most of the texture, needs a different
+window strategy (sparse taps or a mip chain) and stays on the per-draw route.

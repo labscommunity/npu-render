@@ -5,8 +5,9 @@ A D3D10 user-mode display driver records DWM's draws into frame batches, and a
 separate worker process, reached over a named pipe, executes those batches on
 Delta's Panther Lake NPU through OpenVINO. Pixel work runs in SHAVE kernels
 compiled ahead of time on Delta and patched into a twelve-row
-ScatterElementsUpdate carrier blob with a 24,496-byte code window; ten kernel
-blobs pass the worker's startup self-test. An indirect display carries the NPU
+ScatterElementsUpdate carrier blob with a 24,496-byte code window; twelve of
+the thirteen kernel blobs pass the worker's startup self-test (the blur program
+does not fit). An indirect display carries the NPU
 frames to the physical panel, leases bound admission and now renew in place, and
 a scheduled recovery task tears down the devices and packages and restores the
 ordinary display. The long-term goal is one user-facing switch that moves
@@ -54,7 +55,7 @@ cannot execute take the per-draw routes inside the batch, in order. See
 [frame-kernel-native-shaders-2026-10-20.md](docs/research/frame-kernel-native-shaders-2026-10-20.md).
 
 - `native/windows/registered_lab`: the registered D3D10 UMD, the NPU worker, batch planner and protocol, host reference kernel and contract tests.
-- `native/windows/ptl_kernels`: SHAVE kernel sources; `frame_core.h` is compiled both into the device kernel and into the host reference.
+- `native/windows/ptl_kernels`: SHAVE kernel sources; `frame_core.h` is compiled both into the device kernel and into the host reference (blobs without a fetching program define `NR_FRAME_NO_LD`).
 - `native/`: the C ABI, OpenVINO providers and the restricted Weston adapter from the earlier compositor work.
 - `src/npu_render`: the Python runtime and CLI (backend selection, diagnostics, the software live window, carrier tooling).
 - `tools/` and `tools/delta/`: build, qualification, replay and trial-chain generation; `tools/delta/trial-chain` holds the currently emitted chain.
