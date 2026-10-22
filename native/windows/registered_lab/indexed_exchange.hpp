@@ -30,7 +30,7 @@ class IndexedNpuExchange {
     std::unique_ptr<nr::native_probe::Admission> admission;
     std::unique_ptr<LocalIndexedClient> local_client;
     unsigned failovers = 0;
-    static constexpr uint64_t failover_wait_ms = 15000;
+    static constexpr uint64_t failover_wait_ms = 30000;
     // Worker failover. The controller replaces a worker that ended (a crash, a restart) by
     // publishing a new one: this process's lease is rewritten with the new worker's identity,
     // or, for an automatically admitted client, the resident broker publishes again. The
