@@ -24,18 +24,20 @@ task puts the ordinary display back if anything goes wrong.
 
 Delta's panel, captured by desktop duplication through one admission
 (`npu-render desktop enable`, 660 s, then the recovery that `disable` also
-runs), played at three times real time. The side panel is drawn from Windows'
-GPU engine counters and the admission bootstrap's frame receipts for the same
-second; the small overlay inside the desktop shows the same counters live, and
-it is itself composed by whichever adapter composes the desktop at that moment.
-When the NPU takes over, the panel shows the NPU's 1024x768 frames scaled to
-the display, and the frame counter climbs at about 0.9 frames per second (596
-frames in the admission). The GPU 3D engine does not fall: it idled at 0.2 %
-before, 0.4 % while the NPU rendered, and 0.2 % after, and the compositor's own
-share rose from 0.03 % to 0.24 % because it composes the window that mirrors
-the NPU frames onto the physical panel. Delta exposes no NPU utilisation
-counter, so NPU activity is counted in frames that reached the panel, never
-estimated.
+runs), played at three times real time, with a window repainting at 30 Hz on
+the desktop the whole way through so that composition has a measurable cost.
+The side panel is drawn from Windows' GPU Engine performance counters and the
+admission bootstrap's frame receipts for the same second; the small overlay
+inside the desktop shows the same counters live and is itself composed by
+whichever adapter composes the desktop at that moment. With the GPU composing
+the desktop, its 3D engine runs at 3.4 % (2.8 % of it inside DWM) and the NPU
+at 0 %. After the switch the panel shows the NPU's 1024x768 frames scaled to
+the display, the NPU engine runs at 58 % (p50 over the admission, from the
+`Neural` engine instances of the same counter set that Task Manager's NPU
+graph reads), 1.6 frames per second reach the panel (969 in the admission),
+and the GPU's 3D engine falls to 0.6 %, of which 0.4 % is DWM composing the
+window that mirrors the NPU frames onto the physical panel. The 30 Hz window
+is the stimulus; the NPU composes it at the rate shown, not at 30 Hz.
 
 ## Why
 

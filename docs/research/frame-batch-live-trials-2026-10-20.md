@@ -2000,3 +2000,37 @@ controller's directory (access denied), so the probe runs through an elevated
 variant of the task launcher and reads the bootstrap report's live frame
 count. The recording tools live with the session's scratch scripts, not in the
 repository; the GIF is the only artefact committed.
+
+### Admission v126: the NPU engine counter, and the recording that replaces the README's
+
+Delta's NPU utilisation is readable after all: the device (class
+ComputeAccelerator, Intel NPU driver 32.0.100.5540 on Windows 11 25H2 build
+26200) appears in the `GPU Engine` performance counter set with
+`engtype_Neural` instances on its own adapter LUID, which is also what Task
+Manager's NPU graph reads; there is no separate `NPU Engine` set, and the
+engine sampler had only summed `engtype_3D`, so every earlier "NPU 0 %" was a
+counter that was never collected. The probe now sums the Neural instances.
+
+Admission v126 (2026-10-22 19:03Z to 19:15Z) was recorded with a 560x360
+window repainting at 30 Hz on the desktop before, during and after the switch,
+so that composition has a cost the counters can show. One row per second:
+
+| Phase | GPU 3D engine, all | of which DWM | NPU engine | NPU frames/s |
+| --- | --- | --- | --- | --- |
+| GPU desktop with the 30 Hz window | 3.37 % | 2.83 % | 0 % | 0 |
+| enable (registration to the first NPU frame, 37 s) | 2.21 % | 1.81 % | 0 % (52.8 % at p90, the first frames) | 0 |
+| NPU desktop (521 s) | 0.60 % | 0.41 % | 58.1 % (p90 64.7 %) | 1.59 (969 frames) |
+| after recovery | 1.85 % | 1.35 % | 0 % | 0 |
+
+The GPU's remaining 0.6 % while the NPU renders is DWM composing the presenter
+window that mirrors the NPU frames onto the physical panel. The GPU figure
+after recovery is lower than before because the placement recovery did not put
+the stimulus window back where it was (the restoration gap recorded for probe
+v121 again). The NPU composes the 30 Hz window at 1.6 frames per second, which
+the recording shows as is. In this admission the topology helper gave the
+panel back to the GPU desktop about 90 s before the admission ended (the
+panel showed the GPU-composed desktop while the NPU still composed the
+indirect display and the counter read 66 %); the GIF's second segment
+therefore starts after the recovery. `docs/media/npu-switch.gif` is this
+admission: the first segment from the admission's start to a minute after
+its first NPU frame, the second from the recovery onward.
