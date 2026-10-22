@@ -336,7 +336,7 @@ public:
         std::vector<Draw> draws(batch.command_count);
         for (auto &d : draws) {
             d.record = reader.value<CommandRecord>();
-            expect(d.record.kind <= 2 && d.record.target < refs.size() && d.record.texture_count <= 4 && d.record.blend_mode <= 14 && d.record.write_mask && d.record.write_mask <= 15 && d.record.cull <= 2 && d.record.front_ccw <= 1);
+            expect(d.record.kind <= 2 && d.record.target < refs.size() && d.record.texture_count <= 4 && d.record.blend_mode <= 15 && d.record.write_mask && d.record.write_mask <= 15 && d.record.cull <= 2 && d.record.front_ccw <= 1);
             for (uint32_t t = 0; t < d.record.texture_count; ++t) {
                 auto &b = d.textures[t]; b = reader.value<TextureBinding>();
                 expect(b.resource < refs.size() && b.filter <= 1 && !(b.flags & ~uint32_t(byte_buffer_view)) && !b.reserved);
@@ -485,6 +485,7 @@ private:
         if (d.program->texture_slots.size() != d.record.texture_count) { d.route = "fallback:texture count"; return; }
         if (d.record.vertex_constant_words != d.program->vs_constants * 4 || d.record.pixel_constant_words != d.program->ps_constants * 4) { d.route = "fallback:constant words"; return; }
         if (d.record.blend_mode == uint32_t(raster::BlendMode::dual_source_over) && !d.program->dual_source) { d.route = "fallback:dual-source blend without a second output"; return; }
+        if (d.record.blend_mode == uint32_t(raster::BlendMode::invert_destination_over) && d.program->ps_words.size() > 64) { d.route = "fallback:invert blend not compiled for large programs"; return; }
         std::array<uint32_t, 4> tw{}, th{}; std::array<bool, 4> point{};
         for (uint32_t t = 0; t < d.record.texture_count; ++t) { const auto &ref = refs[d.textures[t].resource]; texture_extent(d.textures[t], ref.record, tw[t], th[t]); point[t] = d.textures[t].filter != 0; }
         std::vector<uint32_t> constants(d.vertex_constants); constants.insert(constants.end(), d.pixel_constants.begin(), d.pixel_constants.end());
@@ -520,10 +521,10 @@ private:
         std::printf("{\"frame_batch_copy\":true,\"target\":%llu,\"width\":%d,\"height\":%d}\n", (unsigned long long)refs[d.record.target].record.key, w, h); std::fflush(stdout);
     }
     void fallback(Draw &d, const std::vector<Shader> &batch_shaders, std::vector<ResourceRef> &refs, std::map<uint64_t, frame::Rect> &dirty, Stats &stats) {
-        if (d.record.blend_mode == uint32_t(raster::BlendMode::dual_source_over)) {
-            // No per-draw route blends dual-source: the draw's pixels are lost, reported here and counted, rather
-            // than failing the batch (which would cost the compositor its device).
-            std::printf("{\"frame_batch_unsupported\":true,\"route\":\"%s\",\"reason\":\"dual-source blend has no per-draw route\"}\n", d.route.c_str()); std::fflush(stdout);
+        if (!raster::valid_blend(raster::BlendMode(d.record.blend_mode))) {
+            // No per-draw route blends dual-source or invert: the draw's pixels are lost, reported here and counted,
+            // rather than failing the batch (which would cost the compositor its device).
+            std::printf("{\"frame_batch_unsupported\":true,\"route\":\"%s\",\"reason\":\"blend mode %u has no per-draw route\"}\n", d.route.c_str(), d.record.blend_mode); std::fflush(stdout);
             ++stats.unsupported; d.done = true; return;
         }
         // Build the legacy per-draw request against the resident target and run the qualified route.

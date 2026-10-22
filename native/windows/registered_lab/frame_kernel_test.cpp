@@ -174,7 +174,7 @@ std::vector<uint32_t> random_background(uint32_t count) { std::vector<uint32_t> 
 // Every blend mode and both formats against the repo's scalar blend reference.
 unsigned check_blend_modes() {
     unsigned failures = 0;
-    for (uint32_t format : {28u, 87u}) for (uint32_t mode = 0; mode <= 14; ++mode) for (unsigned trial = 0; trial < 400; ++trial) {
+    for (uint32_t format : {28u, 87u}) for (uint32_t mode = 0; mode <= 15; ++mode) for (unsigned trial = 0; trial < 400; ++trial) {
         frame::core::nr_command cmd{}; cmd.blend_mode = mode; cmd.write_mask = 1 + (trial % 15);
         for (unsigned c = 0; c < 4; ++c) cmd.blend_constant[c] = uniform(-0.2f, 1.2f);
         frame::core::nr_command_state state{}; frame::core::nr_blend_state_load(format, &cmd, &state);
@@ -200,7 +200,7 @@ unsigned check_blend_modes() {
             if (cmd.write_mask & (1u << logical)) {
                 const float fg = clamp_ref(color[logical]), dst = float((background >> (c * 8)) & 255u), dst_alpha = float((background >> 24) & 255u);
                 const float constant = std::fmin(std::fmax(cmd.blend_constant[logical], 0.f), 1.f);
-                const auto terms = raster::reference_blend_terms<float>(raster::BlendMode(mode), fg, alpha, dst, dst_alpha, constant);
+                const auto terms = raster::reference_blend_terms<float>(raster::BlendMode(mode), fg, alpha, dst, dst_alpha, constant, logical == 3);
                 float value = terms[0] + terms[1]; value = std::fmin(std::fmax(value, 0.f), 255.f);
                 const uint32_t base = uint32_t(value); const float fraction = value - float(base);
                 expected_byte = base + (fraction > .5f || (fraction == .5f && (base & 1u)));
@@ -208,7 +208,7 @@ unsigned check_blend_modes() {
             if (((actual >> (c * 8)) & 255u) != expected_byte) { ++failures; if (failures < 5) std::printf("{\"blend_mismatch\":true,\"mode\":%u,\"format\":%u}\n", mode, format); }
         }
     }
-    std::printf("{\"blend_modes_checked\":15,\"formats\":2,\"trials\":400,\"blend_failures\":%u}\n", failures);
+    std::printf("{\"blend_modes_checked\":16,\"formats\":2,\"trials\":400,\"blend_failures\":%u}\n", failures);
     return failures;
 }
 int main(int argc, char **argv) {

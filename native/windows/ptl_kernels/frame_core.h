@@ -384,7 +384,7 @@ typedef struct {
     nr_u32 source_factor, destination_factor, mode, mask_bytes[4], byte_lane[4];
     nr_f32 constant[4];
     nr_f32 src_const, src_da, src_1mda, dst_const, dst_a, dst_1ma, src_a;   /* blend factor selectors as 0/1 weights */
-    nr_uv4 byte_shifts, mask_lanes, constant_mask, swap_mask;              /* (0,8,16,24); written bytes; mode 13; BGRA target */
+    nr_uv4 byte_shifts, mask_lanes, constant_mask, swap_mask, invert_mask; /* (0,8,16,24); written bytes; mode 13; BGRA target; mode 15 */
     nr_v4 constant255;                                                     /* blend constant * 255 in byte order */
     nr_u32 vs_stride;
     const nr_u8 *vs_constants, *ps_constants;
@@ -488,6 +488,11 @@ NR_HELPER_ATTR void nr_blend_pixel_alpha(const nr_command_state *st, nr_u8 *pixe
     blended = nr_v4_add(nr_v4_mul(fg_b, nr_v4_splat(ss)), nr_v4_mul(dst, nr_v4_splat(sd)));
     constant_value = nr_v4_add(nr_v4_mul(fg_b, st->constant255), nr_v4_mul(dst, nr_v4_sub(nr_v4_splat(1.0f), fg_b)));
     value = nr_v4_sel(st->constant_mask, constant_value, blended);
+#ifndef NR_FRAME_NO_INVERT_BLEND
+    /* Mode 15 (INV_DEST_COLOR / INV_SRC_ALPHA, alpha ZERO / ONE): colour = source * (255 - destination) +
+     * destination * (1 - alpha), alpha lane = destination. Blobs of large programs leave it out (window). */
+    value = nr_v4_sel(st->invert_mask, nr_v4_sel(nr_uv4_make(0u, 0u, 0u, 0xffffffffu), dst, nr_v4_add(nr_v4_mul(fg_b, nr_v4_sub(nr_v4_splat(255.0f), dst)), nr_v4_mul(dst, nr_v4_splat(1.0f - alpha)))), value);
+#endif
     value = nr_v4_sel(nr_v4_gt(value, nr_v4_splat(255.0f)), nr_v4_splat(255.0f), value);
     base = nr_v4_to_u(value); fraction = nr_v4_sub(value, nr_uv4_to_f(base));
     up = nr_uv4_or(nr_v4_gt(fraction, nr_v4_splat(0.5f)), nr_uv4_and(nr_v4_eq(fraction, nr_v4_splat(0.5f)), nr_uv4_eq(nr_uv4_and(base, nr_uv4_splat(1u)), nr_uv4_splat(1u))));
@@ -640,7 +645,10 @@ NR_NOINLINE nr_i32 nr_command_load(const nr_span *s, nr_u32 index, nr_command *c
     for (n = 0; n < 4; ++n) cmd->viewport[n] = nr_float(nr_ld(c + 72 + n * 4));
     cmd->depth[0] = nr_float(nr_ld(c + 88)); cmd->depth[1] = nr_float(nr_ld(c + 92));
     for (n = 0; n < 4; ++n) { cmd->textures[n] = nr_ld(c + 96 + n * 4); cmd->textures2[n] = nr_ld(c + 112 + n * 4); }
-    if (cmd->kind > 1 || cmd->blend_mode > 14 || !cmd->write_mask || cmd->write_mask > 15 || cmd->cull > 2 || cmd->front_ccw > 1) return 0;   /* 14: dual-source over */
+#ifdef NR_FRAME_NO_INVERT_BLEND
+    if (cmd->blend_mode > 14) return 0;   /* mode 15 is not compiled into this blob */
+#endif
+    if (cmd->kind > 1 || cmd->blend_mode > 15 || !cmd->write_mask || cmd->write_mask > 15 || cmd->cull > 2 || cmd->front_ccw > 1) return 0;   /* 14: dual-source over, 15: invert destination over */
     if (cmd->clip[0] < 0 || cmd->clip[1] < 0 || cmd->clip[0] > cmd->clip[2] || cmd->clip[1] > cmd->clip[3] ||
         cmd->clip[2] > (nr_i32)s->tile_w || cmd->clip[3] > (nr_i32)s->tile_h) return 0;
     for (n = 0; n < 4; ++n) {
@@ -674,6 +682,9 @@ NR_INLINE void nr_blend_state_load(nr_u32 format, const nr_command *cmd, nr_comm
     st->byte_shifts = nr_uv4_make(0u, 8u, 16u, 24u);
     st->mask_lanes = nr_uv4_make(st->mask_bytes[0] ? 0xffffffffu : 0u, st->mask_bytes[1] ? 0xffffffffu : 0u, st->mask_bytes[2] ? 0xffffffffu : 0u, st->mask_bytes[3] ? 0xffffffffu : 0u);
     st->constant_mask = nr_uv4_splat(st->mode == 13 ? 0xffffffffu : 0u);
+#ifndef NR_FRAME_NO_INVERT_BLEND
+    st->invert_mask = nr_uv4_splat(st->mode == 15 ? 0xffffffffu : 0u);
+#endif
     st->swap_mask = nr_uv4_splat(format == 87 ? 0xffffffffu : 0u);
     st->constant255 = nr_v4_make(st->constant[st->byte_lane[0]] * 255.0f, st->constant[st->byte_lane[1]] * 255.0f, st->constant[st->byte_lane[2]] * 255.0f, st->constant[st->byte_lane[3]] * 255.0f);
 }

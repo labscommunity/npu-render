@@ -114,6 +114,9 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
             // single-output program under this state reads an undefined o1: the draw is dropped and reported.
             blend_mode=nr::raster::BlendMode::dual_source_over;
             if(!d.pixel_program->outputs[1]){lab_trace("{\"event\":\"draw_dropped\",\"reason\":\"dual-source blend on a single-output program\",\"vertices\":%u}\n",count);++counters.dropped_draws;return;}
+        }else if(d.blend.SrcBlend==D3D10_DDI_BLEND_INV_DEST_COLOR && d.blend.DestBlend==D3D10_DDI_BLEND_INV_SRC_ALPHA &&
+            d.blend.SrcBlendAlpha==D3D10_DDI_BLEND_ZERO && d.blend.DestBlendAlpha==D3D10_DDI_BLEND_ONE){
+            blend_mode=nr::raster::BlendMode::invert_destination_over;   // probe v119: the compositor's separate-alpha inversion
         }else{
         require(d.blend.SrcBlend==d.blend.SrcBlendAlpha && d.blend.DestBlend==d.blend.DestBlendAlpha);
         constexpr std::array<D3D10_DDI_BLEND,6> factors{D3D10_DDI_BLEND_ZERO,D3D10_DDI_BLEND_ONE,D3D10_DDI_BLEND_SRC_ALPHA,
@@ -165,10 +168,10 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
             return;
         }
         lab_trace("{\"event\":\"draw_not_batched\",\"reason\":\"%s\",\"vertices\":%u}\n", reason.c_str(), count);
-        if (blend_mode == nr::raster::BlendMode::dual_source_over) {
-            // The per-draw route has no dual-source blend. Dropping the draw loses its pixels, which this row and
-            // the counter report; failing it made the compositor recreate its device every few seconds (probe v117).
-            lab_trace("{\"event\":\"draw_dropped\",\"reason\":\"dual-source blend not batched: %s\",\"vertices\":%u}\n", reason.c_str(), count);
+        if (!nr::raster::valid_blend(blend_mode)) {
+            // The per-draw route has no dual-source or invert blend. Dropping the draw loses its pixels, which this
+            // row and the counter report; failing it made the compositor recreate its device every few seconds (v117).
+            lab_trace("{\"event\":\"draw_dropped\",\"reason\":\"kernel-only blend %u not batched: %s\",\"vertices\":%u}\n", unsigned(blend_mode), reason.c_str(), count);
             ++counters.dropped_draws; return;
         }
         flush_frame_batches(d, "legacy_draw");
