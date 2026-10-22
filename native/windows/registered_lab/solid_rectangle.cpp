@@ -1,3 +1,4 @@
+#include "provider_infer_trace.hpp"
 #include "provider_compile.hpp"
 #include "solid_rectangle.hpp"
 #include <openvino/openvino.hpp>
@@ -126,7 +127,7 @@ SolidRectangleExecutor::Result SolidRectangleExecutor::execute(const std::array<
     std::memcpy(s.request.get_tensor("rect").data<int32_t>(), bounds.data(), sizeof(bounds));
     std::memcpy(s.request.get_tensor("color").data<float>(), color.data(), sizeof(color));
     std::memcpy(s.request.get_tensor("background").data<uint8_t>(), background.data(), background.size() * sizeof(PackedColor));
-    s.request.infer(); const auto output = s.request.get_output_tensor(0), count = s.request.get_output_tensor(1);
+    nr::provider::traced_infer(s.request,__FILE__,__LINE__); const auto output = s.request.get_output_tensor(0), count = s.request.get_output_tensor(1);
     require(output.get_element_type() == ov::element::u8 && output.get_byte_size() == background.size() * sizeof(PackedColor) &&
         count.get_element_type() == ov::element::u8 && count.get_size() == background.size());
     Result result{{}, 0, s.execution_device};

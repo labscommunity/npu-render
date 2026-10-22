@@ -1,3 +1,4 @@
+#include "provider_infer_trace.hpp"
 #include "provider_compile.hpp"
 #include "texture_crop.hpp"
 #include <openvino/openvino.hpp>
@@ -69,7 +70,7 @@ TextureCropExecutor::Result TextureCropExecutor::execute(uint32_t x, uint32_t y,
     }
     auto &model = *s.models.at(key);
     std::memcpy(model.request.get_tensor("source").data<uint8_t>(), source.data(), source.size() * sizeof(PackedColor));
-    model.request.infer(); const auto output = model.request.get_output_tensor();
+    nr::provider::traced_infer(model.request,__FILE__,__LINE__); const auto output = model.request.get_output_tensor();
     require(output.get_element_type() == ov::element::u8 && output.get_byte_size() == size_t(s.width) * s.height * sizeof(PackedColor));
     Result result{std::vector<PackedColor>(size_t(s.width) * s.height), model.device};
     std::memcpy(result.pixels.data(), output.data<const uint8_t>(), output.get_byte_size()); s.failed = false; return result;

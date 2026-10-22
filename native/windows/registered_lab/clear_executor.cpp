@@ -1,3 +1,4 @@
+#include "provider_infer_trace.hpp"
 #include "clear_executor.hpp"
 #include "provider_compile.hpp"
 #include <openvino/openvino.hpp>
@@ -17,7 +18,7 @@ struct ClearExecutor::State {
     ov::Core core;ov::CompiledModel compiled;ov::InferRequest request;
     std::string execution_device;bool failed=false;
     State(uint32_t w,uint32_t h,uint32_t format,const std::string &backend):width(w),height(h){
-        require(w && w<=8192 && h && h<=8192 && uint64_t(w)*h<=4194304 && (format==28 || format==87));
+        require(w && w<=8192 && h && h<=8192 && uint64_t(w)*h<=8388576 && (format==28 || format==87));
         require(backend=="CPU" || backend=="GPU" || backend=="NPU");
         const auto integer=[](int32_t x){return op::Constant::create(ov::element::i32,ov::Shape{},{x});};
         const auto number=[](float x){return op::Constant::create(ov::element::f32,ov::Shape{},{x});};
@@ -58,7 +59,7 @@ ClearExecutor::~ClearExecutor()=default;
 ClearExecutor::Result ClearExecutor::execute(const Color &color){
     auto &s=*state;require(!s.failed);for(const auto value:color)require(std::isfinite(value));
     const auto started=std::chrono::steady_clock::now();s.failed=true;
-    std::memcpy(s.request.get_input_tensor().data(),color.data(),sizeof(color));s.request.infer();
+    std::memcpy(s.request.get_input_tensor().data(),color.data(),sizeof(color));nr::provider::traced_infer(s.request,__FILE__,__LINE__);
     const auto output=s.request.get_output_tensor();require(output.get_element_type()==ov::element::u8 && output.get_byte_size()==uint64_t(s.width)*s.height*4);
     Result result{std::vector<PackedColor>(size_t(s.width)*s.height),s.execution_device,0};
     std::memcpy(result.pixels.data(),output.data(),output.get_byte_size());

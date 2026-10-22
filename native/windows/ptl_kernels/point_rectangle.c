@@ -1,0 +1,66 @@
+/* Bounded two-phase affine point rectangle. Host transports addressed bytes;
+ * snapped coverage, normalized coordinates, shading and blending run on NPU. */
+#pragma STDC FP_CONTRACT OFF
+#define INLINE static __attribute__((always_inline)) inline
+typedef float float4 __attribute__((ext_vector_type(4)));
+typedef unsigned uint4 __attribute__((ext_vector_type(4)));
+INLINE unsigned u32(const unsigned char *p){return (unsigned)p[0]|((unsigned)p[1]<<8)|((unsigned)p[2]<<16)|((unsigned)p[3]<<24);}
+INLINE float f32(const unsigned char *p){union{unsigned u;float f;}v;v.u=u32(p);return v.f;}
+INLINE float clamp(float v,float hi){return v<0?0:(v>hi?hi:v);}
+INLINE unsigned quantize(float v){v=clamp(v,255.0f);unsigned b=(unsigned)v;float f=v-(float)b;return b+(f>.5f||(f==.5f&&(b&1)));}
+void nr_probe_kernel(const unsigned char *params){
+ if(!params)return;
+ for(unsigned n=0;n<2;++n){const unsigned char *p=params+n*40;
+  if(!u32(p)||u32(p+4)||u32(p+8)!=1||u32(p+12)!=4||!u32(p+16)||!u32(p+20)||u32(p+24)!=2||u32(p+28)!=0x4321||u32(p+32)||u32(p+36)!=2)return;
+  const unsigned *dims=(const unsigned*)u32(p+16);if(dims[0]!=131072||dims[1]!=1||dims[2]!=1||dims[3]!=1)return;
+ }
+ const unsigned char *data=(const unsigned char*)u32(params);unsigned char *output=(unsigned char*)u32(params+40);
+ uint4 *words=(uint4*)output;for(unsigned n=0;n<16384;++n)words[n]=(uint4)0;
+ unsigned phase=u32(data+8),count=u32(data+12),first=u32(data+20),w=u32(data+24),h=u32(data+28),tw=u32(data+32),th=u32(data+36),target=u32(data+40),source=u32(data+44),blend=u32(data+48),opaque=u32(data+52);
+ if(u32(data)!=0x4e525231||u32(data+4)!=1||phase>1||count>21832||u32(data+16)!=262144||!w||w>8192||!h||h>8192||w*h>8388576||first>w*h||count>w*h-first||!tw||tw>8192||!th||th>8192||tw*th>8388608||(target!=28&&target!=87)||(source!=28&&source!=87)||blend>1||opaque>1||u32(data+56)||u32(data+60))return;
+ int rect[4],clip[4];float uv[4];float4 color;
+ for(unsigned c=0;c<4;++c){rect[c]=(int)u32(data+64+c*4);clip[c]=(int)u32(data+80+c*4);uv[c]=f32(data+96+c*4);color[c]=f32(data+112+c*4);
+  if(rect[c]<-8388608||rect[c]>8388608||!(uv[c]>=-16&&uv[c]<=16)||!(color[c]>=0&&color[c]<=1))return;
+ }
+ if(rect[0]>=rect[2]||rect[1]>=rect[3]||clip[0]<0||clip[1]<0||clip[0]>clip[2]||clip[1]>clip[3]||clip[2]>(int)w*256||clip[3]>(int)h*256)return;
+ unsigned hits=0;
+ if(!phase){
+  unsigned x=first%w,y=first/w;
+  float lowx=(float)rect[0]*(1.0f/256.0f),lowy=(float)rect[1]*(1.0f/256.0f),spanx=(float)(rect[2]-rect[0])*(1.0f/256.0f),spany=(float)(rect[3]-rect[1])*(1.0f/256.0f);
+  #pragma clang loop unroll(disable)
+  for(unsigned n=0;n<count;++n){int sx=(int)x*256+128,sy=(int)y*256+128;
+   unsigned inside=sx>=rect[0]&&sx<rect[2]&&sy>=rect[1]&&sy<rect[3]&&sx>=clip[0]&&sx<clip[2]&&sy>=clip[1]&&sy<clip[3];
+   if(inside){++hits;float tx=((float)x+0.5f-lowx)/spanx,ty=((float)y+0.5f-lowy)/spany;
+    float u=uv[0]+tx*(uv[2]-uv[0]),v=uv[1]+ty*(uv[3]-uv[1]);
+    unsigned ix=(unsigned)clamp(clamp(u,1.0f)*(float)tw,(float)(tw-1)),iy=(unsigned)clamp(clamp(v,1.0f)*(float)th,(float)(th-1));
+    unsigned *p=(unsigned*)(output+16+n*8);p[0]=1;p[1]=iy*tw+ix;
+   }
+   ++x;if(x==w){x=0;++y;}
+  }
+ }else if(color.x==1.0f&&color.y==1.0f&&color.z==1.0f&&color.w==1.0f){
+  /* Exact unit modulation. Odd denominator 255 has no half-integer ties.
+   * Exhaustively compare every source/background/alpha byte on the device. */
+  #pragma clang loop unroll(disable)
+  for(unsigned n=0;n<count;++n){const unsigned char *p=data+128+n*12;unsigned bg=u32(p),texel=u32(p+4),covered=u32(p+8);if(covered>1)return;
+   if(covered){++hits;uint4 channels=((uint4)texel>>(uint4){0,8,16,24})&(uint4)255;
+    if(source!=target)channels=channels.zyxw;if(opaque)channels.w=255;
+    if(blend){uint4 background=((uint4)bg>>(uint4){0,8,16,24})&(uint4)255;
+     uint4 numerator=channels*(uint4)255+background*(uint4)(255-channels.w);
+     numerator=numerator>(uint4)65025?(uint4)65025:numerator;
+     channels=((numerator+(uint4)127)*(uint4)32897)>>(uint4)23;
+    }
+    bg=channels.x|(channels.y<<8)|(channels.z<<16)|(channels.w<<24);
+   }((unsigned*)(output+16))[n]=bg;
+  }
+ }else{
+  #pragma clang loop unroll(disable)
+  for(unsigned n=0;n<count;++n){const unsigned char *p=data+128+n*12;unsigned bg=u32(p),texel=u32(p+4),covered=u32(p+8);if(covered>1)return;
+   if(covered){++hits;uint4 channels=((uint4)texel>>(uint4){0,8,16,24})&(uint4)255;float4 sampled=__builtin_convertvector(channels,float4)/255.0f;if(source==87)sampled=sampled.zyxw;if(opaque)sampled.w=1;
+    float4 shaded=sampled*color;float alpha=shaded.w;if(target==87)shaded=shaded.zyxw;
+    float4 value=shaded*255.0f;if(blend){uint4 background=((uint4)bg>>(uint4){0,8,16,24})&(uint4)255;value=value+__builtin_convertvector(background,float4)*(1.0f-alpha);}
+    bg=quantize(value.x)|(quantize(value.y)<<8)|(quantize(value.z)<<16)|(quantize(value.w)<<24);
+   }((unsigned*)(output+16))[n]=bg;
+  }
+ }
+ unsigned *header=(unsigned*)output;header[1]=phase;header[2]=count;header[3]=hits;header[0]=0x4e52524f;
+}

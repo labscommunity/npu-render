@@ -4,11 +4,15 @@
 #pragma warning(push)
 #pragma warning(disable: 4201) // Anonymous structures in Microsoft DDI headers.
 #include <d3dumddi.h>
+#include <intrin.h>
 #pragma warning(pop)
 #include <cstring>
 #include <cstdint>
 #include <cstdio>
+#include <atomic>
+#include <algorithm>
 #include <memory>
+#include <vector>
 #include "../kmd/contract.hpp"
 namespace nr::registered_lab {
 struct Error { HRESULT status; };
@@ -18,10 +22,13 @@ inline void check(HRESULT status, const char *operation = "runtime") {
         throw Error{status};
     }
 }
-inline void require(bool value) { if (!value) throw Error{E_INVALIDARG}; }
+// The return address of the failing require (resolved against the DLL with its PDB) names the check a
+// rejection came from; `reject` logs it as an offset into the module.
+inline void *&last_require_site() { static thread_local void *site = nullptr; return site; }
+inline void require(bool value) { if (!value) { last_require_site() = _ReturnAddress(); throw Error{E_INVALIDARG}; } }
 struct Counters {
     uint64_t allocations = 0, fills = 0, copies = 0, live_allocations = 0;
-    uint64_t live_contexts = 0, cleanup_errors = 0, rejected = 0;
+    uint64_t live_contexts = 0, cleanup_errors = 0, rejected = 0, dropped_draws = 0;
     uint64_t last_unsupported_offset = ~uint64_t(0);
     uint64_t submitted_copies = 0;
     uint64_t upload_bytes = 0;
@@ -100,6 +107,10 @@ struct Context {
         poisoned = false;
     }
 };
+// Process-unique allocation identities and a single monotonically increasing
+// content version shared by CPU writes and NPU frame batches.
+inline uint64_t next_allocation_id() { static std::atomic<uint64_t> counter{0}; return ++counter; }
+inline uint64_t next_content_version() { static std::atomic<uint64_t> counter{0}; return ++counter; }
 struct Allocation {
     std::shared_ptr<Context> context;
     kernel_contract::Surface surface{};
@@ -107,6 +118,21 @@ struct Allocation {
     HANDLE runtime_resource = nullptr;
     void *mapping = nullptr;
     bool locked = false;
+    uint64_t id = next_allocation_id();                     // stable across handle rotation
+    uint64_t content_version = next_content_version();      // bumps on every write to the pixels
+    uint64_t worker_version = 0;                            // version the NPU worker holds resident, 0 none
+    // Frame batch synchronization: the region the CPU wrote since the worker last held this
+    // content, and the last snapshot sent of a surface another process may write.
+    int32_t dirty_x0 = 0, dirty_y0 = 0, dirty_x1 = 0, dirty_y1 = 0; bool dirty_full = true;
+    std::vector<uint8_t> shadow;
+    uint64_t snapshot_frame = 0;                            // present sequence of the last shared-surface comparison
+    void mark_dirty(int32_t x0, int32_t y0, int32_t x1, int32_t y1) {
+        if (dirty_full || x0 >= x1 || y0 >= y1) return;
+        if (dirty_x0 >= dirty_x1 || dirty_y0 >= dirty_y1) { dirty_x0 = x0; dirty_y0 = y0; dirty_x1 = x1; dirty_y1 = y1; return; }
+        dirty_x0 = (std::min)(dirty_x0, x0); dirty_y0 = (std::min)(dirty_y0, y0); dirty_x1 = (std::max)(dirty_x1, x1); dirty_y1 = (std::max)(dirty_y1, y1);
+    }
+    void mark_dirty_full() { dirty_full = true; }
+    void clear_dirty() { dirty_full = false; dirty_x0 = dirty_y0 = dirty_x1 = dirty_y1 = 0; }
     explicit Allocation(std::shared_ptr<Context> c) : context(std::move(c)) {}
     Allocation(const Allocation &) = delete;
     Allocation &operator=(const Allocation &) = delete;

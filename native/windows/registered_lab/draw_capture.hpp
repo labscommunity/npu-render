@@ -7,7 +7,7 @@ class DrawCapture {
     HANDLE file = INVALID_HANDLE_VALUE;
     uint64_t written_bytes = 0;
 public:
-    static constexpr uint64_t budget = 32ull * 1024 * 1024;
+    static constexpr uint64_t budget = 96ull * 1024 * 1024;
     explicit DrawCapture(const WCHAR *path) {
         file = CreateFileW(path, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
     }
@@ -29,15 +29,20 @@ public:
     template<class T> void value(const char *name, const T &data) { record(name, &data, sizeof(data)); }
 };
 void lab_capture_indexed_draw(Device &d, UINT count, UINT first, INT base, bool indexed = true, UINT instances=1, UINT first_instance=0) noexcept {
-    if (!nr_fill_guest()) return;
+    if (!lab_trace_enabled()) return;
     static bool attempted = false; // Called under the UMD device mutex.
     if (attempted) return;
     attempted = true;
     WCHAR path[MAX_PATH]{};
-    swprintf_s(path, L"C:\\npu-lab\\umd-trace\\draw-%lu.bin", GetCurrentProcessId());
+    swprintf_s(path, NR_LAB_TRACE_ROOT L"\\draw-%lu.bin", GetCurrentProcessId());
     // CREATE_NEW survives DLL unload/reload and bounds repeated device failures.
     if (GetFileAttributesW(path) != INVALID_FILE_ATTRIBUTES) return;
+    const char *capture_phase="preflight";
     try {
+        lab_trace("{\"event\":\"failed_draw_metadata\",\"count\":%u,\"first\":%u,\"base\":%d,\"target_width\":%u,\"target_height\":%u,\"source_width\":%u,\"source_height\":%u,\"viewport_width\":%.3f,\"viewport_height\":%.3f,\"capture_budget_bytes\":%llu}\n",
+            count,first,base,d.bound_target?d.bound_target->surface.width:0,d.bound_target?d.bound_target->surface.height:0,
+            d.bound_source?d.bound_source->surface.width:0,d.bound_source?d.bound_source->surface.height:0,
+            double(d.viewport.Width),double(d.viewport.Height),static_cast<unsigned long long>(DrawCapture::budget));
         require(d.context && !d.context->poisoned);
         uint64_t bytes = 1024 * 1024; // Headers, state and two maximum-size shaders.
         auto buffer_size = [&](const std::shared_ptr<Allocation> &a, uint64_t size) {
@@ -55,6 +60,7 @@ void lab_capture_indexed_draw(Device &d, UINT count, UINT first, INT base, bool 
             const auto &view=d.shader_sources[2][slot];const auto &a=view.allocation;
             if(a)buffer_size(a,view.buffer?a->surface.allocation_bytes:uint64_t(a->surface.width)*a->surface.height*4);
         }
+        capture_phase="serialize";
         DrawCapture capture(path); if (!capture.opened()) return;
         capture.write("NPDRAW01", 8);
         const uint32_t args[]{count, first, uint32_t(base), UINT(d.topology), d.viewport_count,
@@ -115,6 +121,6 @@ void lab_capture_indexed_draw(Device &d, UINT count, UINT first, INT base, bool 
         capture.record("complete", nullptr, 0);
         lab_trace("{\"event\":\"indexed_draw_capture\",\"count\":%u,\"first\":%u,\"base\":%d,\"indexed\":%s,\"complete\":true,\"execution_performed\":false}\n", count, first, base, indexed ? "true" : "false");
     } catch (...) {
-        lab_trace("{\"event\":\"indexed_draw_capture\",\"complete\":false,\"execution_performed\":false}\n");
+        lab_trace("{\"event\":\"indexed_draw_capture\",\"complete\":false,\"phase\":\"%s\",\"execution_performed\":false}\n",capture_phase);
     }
 }

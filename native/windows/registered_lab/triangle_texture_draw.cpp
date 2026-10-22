@@ -26,7 +26,7 @@ void TriangleTextureDrawExecutor::validate_shader(const shader::Program &p){
 struct TriangleTextureDrawExecutor::State {
     shader::Program vs,ps;
     uint32_t count,width,height,format,batch;
-    bool quads,component_coverage;
+    bool quads,component_coverage,texture_reuse=false;
     PackedResources layout;
     shader::VertexExecutor vertex;
     ProjectionExecutor projection;
@@ -40,8 +40,11 @@ struct TriangleTextureDrawExecutor::State {
         BlendMode blend,uint8_t mask,CullMode cull,bool ccw,uint32_t b)
         :vs(v),ps(p),count(n),width(w),height(h),format(f),batch(b<=shader::RegisterExecutor::maximum_batch(p)?b:std::gcd(b,shader::RegisterExecutor::maximum_batch(p))),quads(shader::quad_derivatives(p)),component_coverage(blend==BlendMode::component_coverage),layout(resource_layout(resources)),
          vertex(v,n,backend),projection(n,backend),coverage(batch,backend,cull,ccw),merger(batch,backend,blend,f==87,mask){
+        char *setting=nullptr;size_t length=0;
+        if(_dupenv_s(&setting,&length,"NR_RENDER_TEXTURE_SCOPE"))throw std::runtime_error("texture scope setting unavailable");
+        if(setting){const std::string value(setting);std::free(setting);require(value=="0" || value=="1");texture_reuse=value=="1";}
         validate_shader(ps);
-        require(n && n<=4096 && !(n%3) && w && w<=8192 && h && h<=8192 && uint64_t(w)*h<=4*1024*1024 &&
+        require(n && n<=4096 && !(n%3) && w && w<=8192 && h && h<=8192 && uint64_t(w)*h<=8388576 &&
             b && b<=shader::RegisterExecutor::preferred_raster_batch(p) && (!quads || !(b%4)) &&
             (f==28 || f==87) && vs.stage==shader::Stage::vertex && vs.position_output<16);
         const auto shapes=resource_shapes(ps,resources);
@@ -90,7 +93,7 @@ UniformDrawExecutor::Result TriangleTextureDrawExecutor::execute(const std::vect
         viewport.width>=1 && viewport.width<=8192 && viewport.height>=1 && viewport.height<=8192);
     const auto target_width=uint32_t(viewport.width),target_height=uint32_t(viewport.height);
     require(viewport.width==float(target_width) && viewport.height==float(target_height) &&
-        uint64_t(target_width)*target_height<=4*1024*1024 && !inputs.empty() && inputs.size()<=s.count && !(inputs.size()%3) &&
+        uint64_t(target_width)*target_height<=8388576 && !inputs.empty() && inputs.size()<=s.count && !(inputs.size()%3) &&
         background.size()==size_t(target_width)*target_height && resource_layout_equal(resources,s.layout));
     const auto clip=scissor.value_or(std::array<int32_t,4>{0,0,int32_t(target_width),int32_t(target_height)});
     require(clip[0]>=0 && clip[1]>=0 && clip[0]<=clip[2] && clip[1]<=clip[3] && clip[2]<=int32_t(target_width) && clip[3]<=int32_t(target_height));
@@ -113,9 +116,10 @@ UniformDrawExecutor::Result TriangleTextureDrawExecutor::execute(const std::vect
     // Vertex count and shader graphs are bounded before compilation. Once the
     // device establishes geometry bounds, admit at most 4096 raster tiles.
     // Reject the whole draw before coverage or destination modification.
-    const auto regions=bounded_triangle_regions(projected.triangle_bounds,clip,s.batch,s.quads);
+    const auto regions=bounded_triangle_regions(projected.triangle_bounds,clip,s.batch,s.quads,false,s.batch>8192);
     const auto layers=triangle_region_layers(regions);
     const auto textures=decode_resources(s.ps,resources);
+    auto texture_batch=s.pixel->bind_textures(textures,s.texture_reuse);uint64_t texture_upload_bytes=0,texture_reused_bytes=0;
     result.pixels=background;std::vector<Sample> samples(s.batch);std::vector<Point> points(s.batch);
     std::vector<PackedColor> tile(s.batch);std::vector<Color> colors(s.batch);std::vector<shader::VertexRegisters> fragments(s.batch);
     std::vector<std::array<ProjectedVertex,3>> vertices(s.batch);
@@ -137,7 +141,7 @@ UniformDrawExecutor::Result TriangleTextureDrawExecutor::execute(const std::vect
             samples[n]={{vertices[n][0].snapped,vertices[n][1].snapped,vertices[n][2].snapped},points[n]};
         }
         began=Clock::now();const auto covered=s.coverage.execute(samples,fixed_clip);require(covered.execution_device==result.execution_device);
-        result.timings.coverage_ms+=ms(began);result.input_bytes+=uint64_t(s.batch)*32+16;result.output_bytes+=uint64_t(s.batch)*4;++result.provider_requests;
+        result.timings.coverage_ms+=ms(began);result.input_bytes+=covered.input_bytes;result.output_bytes+=uint64_t(s.batch)*4;++result.provider_requests;
         for(const auto v:covered.covered)result.covered_samples+=v;
         // The NPU has established that no samples survive. Skipping later
         // stages is control flow only; no host coverage/shader calculation.
@@ -179,8 +183,8 @@ UniformDrawExecutor::Result TriangleTextureDrawExecutor::execute(const std::vect
             for(size_t q=0;q<s.batch;q+=4)if(!interpolation_coverage[q])
                 for(size_t lane=0;lane<4;++lane)fragments[q+lane]=fragments[live_quad+lane];
         }else for(size_t n=0;n<s.batch;++n)if(!covered.covered[n])fragments[n]=fragments[first_live];
-        began=Clock::now();const auto pixels=s.pixel->execute(fragments,pc,textures);require(pixels.execution_device==result.execution_device);
-        result.timings.shader_ms+=ms(began);result.input_bytes+=pixels.input_bytes;result.output_bytes+=pixels.output_bytes;++result.provider_requests;
+        began=Clock::now();const auto pixels=texture_batch.execute(fragments,pc);require(pixels.execution_device==result.execution_device);
+        texture_upload_bytes+=pixels.texture_upload_bytes;texture_reused_bytes+=pixels.texture_reused_bytes;result.timings.shader_ms+=ms(began);result.input_bytes+=pixels.input_bytes;result.output_bytes+=pixels.output_bytes;++result.provider_requests;
         for(size_t n=0;n<s.batch;++n)std::memcpy(colors[n].data(),pixels.vertices[n][0].data(),16);
         for(size_t n=0;n<s.batch;++n)tile[n]=stored_pixel[n]?result.pixels[pixel_index[n]]:PackedColor{};
         began=Clock::now();const auto merged=s.merger.execute(colors,tile,covered.covered,blend_constant);require(merged.execution_device==result.execution_device);
@@ -210,6 +214,7 @@ UniformDrawExecutor::Result TriangleTextureDrawExecutor::execute(const std::vect
         }
         if(filled)submit(filled);
     }
+    std::printf("{\"texture_upload_scope\":true,\"host_uploaded_bytes\":%llu,\"host_recopy_bytes_avoided\":%llu,\"device_dma_measured\":false}\n",static_cast<unsigned long long>(texture_upload_bytes),static_cast<unsigned long long>(texture_reused_bytes));
     result.vertices=std::move(shaded.vertices);result.timings.total_ms=ms(start);return result;
 }
 }

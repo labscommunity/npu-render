@@ -10,14 +10,30 @@
 #pragma warning(pop)
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
+#include <functional>
+#include <iterator>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <new>
+#include <optional>
+#include <set>
+#include <stdexcept>
+#include <string>
 #include <type_traits>
+#include <vector>
 #include "contract.hpp"
 #include "kernel_memory.hpp"
+// Frame batch contracts and the shared planner live outside the anonymous
+// namespace below; the batcher itself (frame_batcher.hpp) is included from
+// draw.hpp once Device, upload and read_pixels exist.
+#include "frame_batch_protocol.hpp"
+#include "frame_batch_planner.hpp"
+#include "frame_native_inventory.hpp"
 #include "blend_executor.hpp"
 #include "clear_executor.hpp"
 #include "vertex_executor.hpp"
@@ -26,6 +42,7 @@
 #include "shader_contract.hpp"
 #include "lab_trace.hpp"
 #include "single_mip_filter.hpp"
+#include "legacy_route.hpp"
 namespace {
 using namespace nr::registered_lab;
 std::recursive_mutex mutex;
@@ -68,6 +85,7 @@ struct Device {
     nr::shader::TextureSamplers resources_samplers{};
 #endif
     std::unique_ptr<IndexedNpuExchange> indexed_exchange;
+    std::shared_ptr<struct FrameBatcher> batcher;   // frame batches on the indexed NPU path
     std::shared_ptr<const nr::shader::Program> indexed_vertex, indexed_pixel;
     std::array<uint64_t, 5> indexed_key{};
     std::shared_ptr<const nr::shader::Program> vertex_program;
@@ -108,8 +126,21 @@ struct Resource {
 };
 struct Shader { UINT kind = 0; std::shared_ptr<const nr::shader::Program> vertex_program, pixel_program; };
 Device &device(D3D10DDI_HDEVICE h) { return *static_cast<Device *>(h.pDrvPrivate); }
+// Frame batch hooks (frame_batcher.hpp): pending NPU results are written back
+// before any read of a target and before any CPU write to a referenced resource.
+void flush_frame_batches(Device &d, const char *reason);
+void frame_batches_before_write(Allocation &a);
+void frame_batches_before_read(Allocation &a);
+void frame_batches_before_read(Allocation &a, const D3D10_DDI_BOX *box);
+bool frame_batch_writeback_active();
+void frame_batch_clear(Device &d, const std::shared_ptr<Allocation> &target, const nr::raster::Color &color);
+bool frame_batch_copy(Device &d, const std::shared_ptr<Allocation> &source, const std::shared_ptr<Allocation> &destination, const D3D10_DDI_BOX &region, uint32_t x, uint32_t y);
+extern std::vector<Device *> frame_devices;
 void reject(D3D10DDI_HDEVICE h, HRESULT status, const char *operation) {
-    lab_trace("{\"event\":\"reject\",\"operation\":\"%s\",\"status\":\"%08lx\"}\n", operation, ULONG(status));
+    HMODULE self = nullptr; GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, reinterpret_cast<LPCWSTR>(&reject), &self);
+    const auto site = reinterpret_cast<uintptr_t>(last_require_site()), base = reinterpret_cast<uintptr_t>(self);
+    lab_trace("{\"event\":\"reject\",\"operation\":\"%s\",\"status\":\"%08lx\",\"require_offset\":\"%llx\"}\n", operation, ULONG(status), (unsigned long long)(site && self && site >= base ? site - base : 0));
+    last_require_site() = nullptr;
     ++counters.rejected;
     auto &d = device(h);
     d.callbacks.pfnSetErrorCb(d.core, status);
@@ -119,7 +150,11 @@ template<class F> void guard(D3D10DDI_HDEVICE h, const char *operation, F f) noe
     try { f(); }
     catch (const Error &e) { reject(h, e.status, operation); }
     catch (const std::bad_alloc &) { reject(h, E_OUTOFMEMORY, operation); }
-    catch (const std::exception &e) { std::fprintf(stderr, "nr_fill_umd: %s\n", e.what()); reject(h, E_FAIL, operation); }
+    catch (const std::exception &e) {
+        char detail[384]{};size_t n=0;for(const auto *c=e.what();*c && n+3<sizeof(detail);++c){if(*c=='"' || *c=='\\')detail[n++]='\\';detail[n++]=(*c>=32 && *c<127)?*c:' ';}
+        lab_trace("{\"event\":\"operation_exception\",\"operation\":\"%s\",\"message\":\"%s\"}\n",operation,detail);
+        std::fprintf(stderr, "nr_fill_umd: %s\n", e.what()); reject(h, E_FAIL, operation);
+    }
     catch (...) { reject(h, E_FAIL, operation); }
 }
 template<class T, size_t Offset> struct Unsupported;
@@ -161,12 +196,14 @@ std::shared_ptr<Allocation> mip_allocation(const Resource &r, UINT sub) {
 #include "input_assembler.hpp"
 void upload(Allocation &target, const D3D10_DDI_BOX *box, const void *source, UINT pitch) {
     require(!target.locked && !target.context->poisoned);
+    frame_batches_before_write(target);
     const auto &s = target.surface;
     const D3D10_DDI_BOX region = box ? *box : D3D10_DDI_BOX{0, 0, 0, LONG(s.width), LONG(s.height), 1};
     require(region.left >= 0 && region.left <= region.right && region.right <= LONG(s.width) &&
             region.top >= 0 && region.top <= region.bottom && region.bottom <= LONG(s.height) &&
             region.front >= 0 && region.front <= region.back && region.back <= 1);
     if (region.left == region.right || region.top == region.bottom || region.front == region.back) return;
+    if (!frame_batch_writeback_active()) target.mark_dirty(region.left, region.top, region.right, region.bottom);
     const UINT bytes = texel_bytes(s.format);
     const UINT row_bytes = (region.right - region.left) * bytes, rows = region.bottom - region.top;
     const uint64_t source_bytes = uint64_t(rows - 1) * pitch + row_bytes;
@@ -204,6 +241,7 @@ void upload(Allocation &target, const D3D10_DDI_BOX *box, const void *source, UI
         consumed.finish();
     }
     counters.upload_bytes += uint64_t(row_bytes) * rows;
+    if (!frame_batch_writeback_active()) target.content_version = next_content_version();
 }
 SIZE_T APIENTRY resource_size(D3D10DDI_HDEVICE, const D3D10DDIARG_CREATERESOURCE *) { return sizeof(Resource); }
 void APIENTRY create_resource(D3D10DDI_HDEVICE h, const D3D10DDIARG_CREATERESOURCE *a,
@@ -318,16 +356,19 @@ void APIENTRY clear(D3D10DDI_HDEVICE h, D3D10DDI_HRENDERTARGETVIEW v, FLOAT colo
         auto a = static_cast<View *>(v.pDrvPrivate)->allocation;
         auto &d=device(h);require(a && !a->locked && a->context==d.context && !d.context->poisoned);
         for(unsigned n=0;n<4;++n)require(std::isfinite(color[n]));
+        lab_trace("{\"event\":\"color_clear_requested\",\"width\":%u,\"height\":%u,\"format\":%u}\n",a->surface.width,a->surface.height,a->surface.format);
         // The historical blend-only file bridge retains its documented CPU
         // clears. Full desktop experiments use the indexed ABI 13 path.
         if(d.backend!="CPU" && d.backend!="NPU_LAB_FILE"){
             const auto &surface=a->surface;nr::raster::Color input{};std::copy_n(color,4,input.begin());
             std::vector<nr::raster::PackedColor> pixels;std::string execution_device;
             if(d.backend=="NPU_LAB_INDEXED"){
-                if(!d.indexed_exchange)d.indexed_exchange=std::make_unique<IndexedNpuExchange>();
-                indexed_exchange::Request request;auto &header=request.header;header.abi=13;header.flags=0x200000;
-                header.width=surface.width;header.height=surface.height;header.format=surface.format;request.clear_color=input;
-                auto result=d.indexed_exchange->execute(std::move(request));pixels=std::move(result.pixels);execution_device=std::move(result.execution_device);
+                // Clears join the open frame batch; the NPU fills the resident target and
+                // the pixels reach VidMm at the next flush point.
+                frame_batch_clear(d,a,input);
+                ++counters.fills;++counters.executions;++counters.remote_npu_executions;
+                lab_trace("{\"event\":\"color_clear_batched\",\"width\":%u,\"height\":%u}\n",surface.width,surface.height);
+                return;
             }else{
                 require(d.backend=="NPU" || d.backend=="GPU");
 #ifdef NR_NATIVE_PROBE
@@ -378,6 +419,8 @@ void APIENTRY copy_resource(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE dst, D3D10DDI
         }
         for (UINT sub = 0; sub < mip_count(d); ++sub) {
             const auto a = mip_allocation(d, sub), b = mip_allocation(s, sub);
+            frame_batches_before_read(*b); frame_batches_before_write(*a);
+            a->content_version = next_content_version(); a->mark_dirty_full();
             if (a->runtime_resource || b->runtime_resource) a->context->copy(b->handle, a->handle);
             else {
                 // Explicit CPU staging, never counted as NPU rendering.
@@ -395,7 +438,11 @@ void APIENTRY update_resource(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE dst, UINT s
         auto &r = resource(dst);
         require(r.usage == D3D10_DDI_USAGE_DEFAULT && r.allocation->context == device(h).context);
         const auto allocation = mip_allocation(r, sub);
-        if (r.buffer_bytes) { require(!box); update_buffer(r, source); return; }
+        if (r.buffer_bytes) {
+            // A buffer may be a fetched texture of the open frame batch (WinUI glyph indices): settle it first.
+            require(!box); frame_batches_before_write(*r.allocation); update_buffer(r, source);
+            r.allocation->content_version = next_content_version(); r.allocation->mark_dirty_full(); return;
+        }
         upload(*allocation, box, source, pitch); // CPU upload bytes are counted separately from submitted work.
     });
 }
@@ -418,6 +465,8 @@ void APIENTRY map(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE r, UINT sub, D3D10_DDI_
             v.usage == D3D10_DDI_USAGE_DYNAMIC && v.map_flags == D3D10_DDI_CPU_ACCESS_WRITE;
         const bool do_not_wait=(flags & D3D10_DDI_MAP_FLAG_DONOTWAIT)!=0;
         require(staging || (discard && !do_not_wait));
+        // CPU access to a surface the open frame batch still writes or reads: settle the batch first.
+        if (wants_read) frame_batches_before_read(*allocation); if (wants_write) frame_batches_before_write(*allocation);   // buffers too: a batch may fetch them
         try {
             out->pData = allocation->lock(staging && wants_read && !wants_write,staging && wants_read && wants_write,do_not_wait);
         } catch(const Error &e) {
@@ -439,6 +488,7 @@ void APIENTRY unmap(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE r, UINT sub) {
         require(a.locked && a.context == device(h).context); check(a.unlock());
         if (v.mapped_write) counters.upload_bytes += v.buffer_bytes ? v.buffer_bytes :
             uint64_t(a.surface.width)*a.surface.height*texel_bytes(a.surface.format);
+        if (v.mapped_write) { a.content_version = next_content_version(); a.mark_dirty_full(); }
         v.mapped_write = false;
     });
 }
@@ -509,7 +559,7 @@ void APIENTRY targets(D3D10DDI_HDEVICE h, const D3D10DDI_HRENDERTARGETVIEW *view
 }
 #include "draw.hpp"
 #include "copy_region.hpp"
-void APIENTRY flush(D3D10DDI_HDEVICE) {} // Clears submit immediately; draws complete synchronously.
+void APIENTRY flush(D3D10DDI_HDEVICE h) { guard(h, __FUNCTION__, [&] { flush_frame_batches(device(h), "flush_ddi"); }); }
 void APIENTRY hazard(D3D10DDI_HDEVICE, D3D10DDI_HRESOURCE) {} // Blocking locks order our staging copies.
 void APIENTRY format_support(D3D10DDI_HDEVICE, DXGI_FORMAT f, UINT *out) {
     *out = format_ok(f) ? D3D10_DDI_FORMAT_SUPPORT_RENDERTARGET | D3D10_DDI_FORMAT_SUPPORT_SHADER_SAMPLE |
@@ -518,7 +568,11 @@ void APIENTRY format_support(D3D10DDI_HDEVICE, DXGI_FORMAT f, UINT *out) {
 void APIENTRY multisample(D3D10DDI_HDEVICE, DXGI_FORMAT f, UINT samples, UINT *out) { *out = format_ok(f) && samples == 1 ? 1 : 0; }
 void APIENTRY counter_info(D3D10DDI_HDEVICE, D3D10DDI_COUNTER_INFO *out) { *out = {}; }
 void APIENTRY relocate(D3D10DDI_HDEVICE h, D3D10DDI_DEVICEFUNCS *out) { *out = device(h).functions; }
-void APIENTRY destroy_device(D3D10DDI_HDEVICE h) { std::lock_guard<std::recursive_mutex> lock(mutex); device(h).~Device(); }
+void APIENTRY destroy_device(D3D10DDI_HDEVICE h) {
+    std::lock_guard<std::recursive_mutex> lock(mutex);
+    frame_devices.erase(std::remove(frame_devices.begin(), frame_devices.end(), &device(h)), frame_devices.end());
+    device(h).~Device();
+}
 // DXGI returns an HRESULT directly. A callback acceptance is not evidence of
 // display delivery, and no local pixel copy substitutes for the callback.
 HRESULT APIENTRY present(DXGI_DDI_ARG_PRESENT *a) {
@@ -531,6 +585,7 @@ HRESULT APIENTRY present(DXGI_DDI_ARG_PRESENT *a) {
               a->hDstResource ? "true" : "false", UINT(a->FlipInterval),
               d.context && d.context->poisoned ? "true" : "false");
     try {
+        flush_frame_batches(d, "present");
         require((a->Flags.Value == 1 || a->Flags.Value == 2) && !a->SrcSubResourceIndex && !a->DstSubResourceIndex &&
                 d.context && !d.context->poisoned && d.dxgi_callbacks &&
                 d.dxgi_callbacks->pfnPresentCb && a->hSurfaceToPresent);
@@ -593,9 +648,15 @@ HRESULT APIENTRY rotate_resources(DXGI_DDI_ARG_ROTATE_RESOURCE_IDENTITIES *a) {
         // new backing handle on their next use without stale embedded addresses.
         // DXGI rotates the runtime's backing association separately: do not
         // rotate runtime_resource, copy pixels, or replace the resource objects.
-        const auto first = allocations[0]->handle;
-        for (UINT i = 1; i < a->Resources; ++i) allocations[i-1]->handle = allocations[i]->handle;
-        allocations[a->Resources-1]->handle = first;
+        for (UINT i = 0; i < a->Resources; ++i) frame_batches_before_read(*allocations[i]);
+        // The frame batch identity, versions and dirty state describe the backing
+        // pixels, so they rotate with the handle and the worker's resident copies stay valid.
+        struct Sync { D3DKMT_HANDLE handle; uint64_t id, content_version, worker_version; int32_t dirty[4]; bool dirty_full; std::vector<uint8_t> shadow; };
+        auto take = [](Allocation &x) { return Sync{x.handle, x.id, x.content_version, x.worker_version, {x.dirty_x0, x.dirty_y0, x.dirty_x1, x.dirty_y1}, x.dirty_full, std::move(x.shadow)}; };
+        auto give = [](Allocation &x, Sync &&s) { x.handle = s.handle; x.id = s.id; x.content_version = s.content_version; x.worker_version = s.worker_version; x.dirty_x0 = s.dirty[0]; x.dirty_y0 = s.dirty[1]; x.dirty_x1 = s.dirty[2]; x.dirty_y1 = s.dirty[3]; x.dirty_full = s.dirty_full; x.shadow = std::move(s.shadow); };
+        auto first = take(*allocations[0]);
+        for (UINT i = 1; i < a->Resources; ++i) give(*allocations[i-1], take(*allocations[i]));
+        give(*allocations[a->Resources-1], std::move(first));
         lab_trace("{\"event\":\"resource_identities_rotated\",\"resources\":%u}\n", a->Resources);
         return S_OK;
     } catch (const Error &e) {
@@ -612,6 +673,7 @@ HRESULT APIENTRY create_device(D3D10DDI_HADAPTER, D3D10DDIARG_CREATEDEVICE *a) {
     if (a->Interface != D3D10_0_DDI_INTERFACE_VERSION && a->Interface != D3D10_0_x_DDI_INTERFACE_VERSION &&
         a->Interface != D3D10_0_7_DDI_INTERFACE_VERSION) return E_NOINTERFACE;
     auto d = new (a->hDrvDevice.pDrvPrivate) Device();
+    frame_devices.push_back(d);
     HRESULT status = E_FAIL;
     try {
         d->core = a->hRTCoreLayer; d->callbacks = *a->pUMCallbacks;

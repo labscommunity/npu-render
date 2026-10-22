@@ -1,0 +1,180 @@
+#pragma once
+#include "local_indexed_validated_client.hpp"
+#include <bcrypt.h>
+#include <filesystem>
+#include <fstream>
+#include <memory>
+#include <string>
+#include <vector>
+#include <cstdio>
+
+namespace nr::registered_lab {
+// Experimental isolation boundary. Every request carries all source pixels and
+// state; retrying in a fresh NPU process cannot partially mutate the caller's
+// resource. The caller receives exactly one validated response and one ACK.
+class PacketProviderProcess {
+    using Handle=indexed_stream::Handle;
+    bool active_=false,test_killed_=false;
+    uint32_t generation_=0,restarts_=0,requests_=0;
+    uint32_t test_kill_ticket_=UINT32_MAX,test_exception_ticket_=UINT32_MAX;
+    std::filesystem::path root_,current_;
+    std::wstring pipe_;
+    std::unique_ptr<Handle> job_,process_;
+    static std::wstring setting(const wchar_t *name){
+        wchar_t *text=nullptr;size_t size=0;
+        if(_wdupenv_s(&text,&size,name))throw std::runtime_error("provider setting unavailable");
+        const std::unique_ptr<wchar_t,decltype(&std::free)> owner(text,&std::free);
+        return text?text:L"";
+    }
+    static void require(bool value,const char *message){if(!value)throw std::runtime_error(message);}
+    std::vector<wchar_t> child_environment(const std::filesystem::path &failure){
+        const auto block=GetEnvironmentStringsW();require(block!=nullptr,"provider environment unavailable");
+        std::vector<std::wstring> entries;
+        try{
+            for(const wchar_t *p=block;*p;p+=std::wcslen(p)+1){
+                std::wstring entry(p);const auto equals=entry.find(L'=',entry[0]==L'='?1:0);
+                const auto key=entry.substr(0,equals);
+                if(!_wcsicmp(key.c_str(),L"NR_RENDER_PROVIDER_RECOVERY") ||
+                   !_wcsicmp(key.c_str(),L"NR_RENDER_PROVIDER_RECOVERY_DIR") ||
+                   !_wcsicmp(key.c_str(),L"NR_RENDER_RECOVERY_TEST_KILL_TICKET") ||
+                   !_wcsicmp(key.c_str(),L"NR_RENDER_RECOVERY_TEST_EXCEPTION_TICKET") ||
+                   !_wcsicmp(key.c_str(),L"NR_RENDER_PROVIDER_TEST_INFER_EXCEPTION_TICKET") ||
+                   !_wcsicmp(key.c_str(),L"NR_RENDER_CAPTURE_DIRECTORY") ||
+                   !_wcsicmp(key.c_str(),L"NR_RENDER_FAILURE_PACKET") ||
+                   !_wcsicmp(key.c_str(),L"NR_RENDER_PROVIDER_OWNER_PID"))continue;
+                entries.push_back(std::move(entry));
+            }
+        }catch(...){FreeEnvironmentStringsW(block);throw;}
+        FreeEnvironmentStringsW(block);
+        entries.push_back(L"NR_RENDER_PROVIDER_RECOVERY=0");
+        if(generation_==1 && test_exception_ticket_!=UINT32_MAX)entries.push_back(L"NR_RENDER_PROVIDER_TEST_INFER_EXCEPTION_TICKET="+std::to_wstring(test_exception_ticket_));
+        entries.push_back(L"NR_RENDER_FAILURE_PACKET="+failure.wstring());
+        // The child's lifetime follows this process (local_indexed_worker.cpp), not its fixed grant.
+        entries.push_back(L"NR_RENDER_PROVIDER_OWNER_PID="+std::to_wstring(GetCurrentProcessId()));
+        std::sort(entries.begin(),entries.end(),[](const auto &a,const auto &b){return _wcsicmp(a.c_str(),b.c_str())<0;});
+        std::vector<wchar_t> result;
+        for(const auto &entry:entries){result.insert(result.end(),entry.begin(),entry.end());result.push_back(0);}
+        result.push_back(0);return result;
+    }
+    void stop()noexcept{
+        if(process_ && WaitForSingleObject(process_->value,0)==WAIT_TIMEOUT){
+            if(job_)TerminateJobObject(job_->value,0xe0000002);
+            WaitForSingleObject(process_->value,5000);
+        }
+        process_.reset();job_.reset();
+    }
+    void start(){
+        require(!process_ && !job_,"provider generation already active");
+        require(generation_<4,"provider generation limit reached");
+        current_=root_/(L"generation-"+std::to_wstring(++generation_));
+        require(CreateDirectoryW(current_.c_str(),nullptr)!=0,"provider evidence directory already exists");
+        std::array<unsigned char,16> random{};
+        require(BCryptGenRandom(nullptr,random.data(),ULONG(random.size()),BCRYPT_USE_SYSTEM_PREFERRED_RNG)>=0,"provider endpoint randomness unavailable");
+        pipe_=L"\\\\.\\pipe\\npu-render-indexed-";
+        for(auto byte:random){pipe_+=L"0123456789abcdef"[byte>>4];pipe_+=L"0123456789abcdef"[byte&15];}
+        std::vector<wchar_t> executable(32768);const auto length=GetModuleFileNameW(nullptr,executable.data(),DWORD(executable.size()));
+        require(length && length<executable.size(),"provider executable identity unavailable");
+        const std::wstring image(executable.data(),length);
+        std::wstring command=L"\""+image+L"\" \""+pipe_+L"\" 65536 2400";
+        auto environment=child_environment(current_/L"failed-request.bin");
+        SECURITY_ATTRIBUTES attributes{sizeof(SECURITY_ATTRIBUTES),nullptr,TRUE};
+        Handle output(CreateFileW((current_/L"worker.stdout.jsonl").c_str(),GENERIC_WRITE,FILE_SHARE_READ,&attributes,CREATE_NEW,FILE_ATTRIBUTE_NORMAL,nullptr));
+        Handle error(CreateFileW((current_/L"worker.stderr.log").c_str(),GENERIC_WRITE,FILE_SHARE_READ,&attributes,CREATE_NEW,FILE_ATTRIBUTE_NORMAL,nullptr));
+        Handle input(CreateFileW(L"NUL",GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE,&attributes,OPEN_EXISTING,0,nullptr));
+        auto job=std::make_unique<Handle>(CreateJobObjectW(nullptr,nullptr));
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};limits.BasicLimitInformation.LimitFlags=JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        require(SetInformationJobObject(job->value,JobObjectExtendedLimitInformation,&limits,sizeof(limits))!=0,"provider job configuration failed");
+        SIZE_T size=0;InitializeProcThreadAttributeList(nullptr,1,0,&size);require(size>0,"provider handle list size unavailable");
+        std::vector<unsigned char> storage(size);auto list=reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(storage.data());
+        require(InitializeProcThreadAttributeList(list,1,0,&size)!=0,"provider handle list initialization failed");
+        PROCESS_INFORMATION process{};BOOL created=FALSE;
+        try{
+            HANDLE inherited[]{input.value,output.value,error.value};
+            require(UpdateProcThreadAttribute(list,0,PROC_THREAD_ATTRIBUTE_HANDLE_LIST,inherited,sizeof(inherited),nullptr,nullptr)!=0,"provider handle list rejected");
+            STARTUPINFOEXW startup{};startup.StartupInfo.cb=sizeof(startup);startup.StartupInfo.dwFlags=STARTF_USESTDHANDLES;
+            startup.StartupInfo.hStdInput=input.value;startup.StartupInfo.hStdOutput=output.value;startup.StartupInfo.hStdError=error.value;startup.lpAttributeList=list;
+            created=CreateProcessW(image.c_str(),command.data(),nullptr,nullptr,TRUE,CREATE_SUSPENDED|CREATE_NO_WINDOW|CREATE_UNICODE_ENVIRONMENT|EXTENDED_STARTUPINFO_PRESENT,environment.data(),nullptr,&startup.StartupInfo,&process);
+        }catch(...){DeleteProcThreadAttributeList(list);throw;}
+        DeleteProcThreadAttributeList(list);require(created!=0,"provider process creation failed");
+        Handle thread(process.hThread);auto child=std::make_unique<Handle>(process.hProcess);
+        if(!AssignProcessToJobObject(job->value,child->value)){
+            TerminateProcess(child->value,0xe0000002);WaitForSingleObject(child->value,5000);throw std::runtime_error("provider job assignment failed");
+        }
+        job_=std::move(job);process_=std::move(child);
+        if(ResumeThread(thread.value)==DWORD(-1)){stop();throw std::runtime_error("provider process resume failed");}
+        std::printf("{\"provider_process_started\":true,\"generation\":%u,\"pid\":%lu,\"kill_on_owner_exit\":true,\"execution_device\":\"NPU\"}\n",generation_,GetProcessId(process_->value));std::fflush(stdout);
+    }
+    bool recoverable(){
+        if(!process_)return false;
+        // Wait briefly for the child's final error receipt, never reuse its Core.
+        WaitForSingleObject(process_->value,500);
+        DWORD code=STILL_ACTIVE;GetExitCodeProcess(process_->value,&code);
+        if(test_killed_ && code==0xe0000001)return true;
+        std::ifstream file(current_/L"worker.stderr.log",std::ios::binary);
+        std::string contents(16384,'\0');file.read(contents.data(),std::streamsize(contents.size()));contents.resize(size_t(file.gcount()));
+        return contents.find("ZE_RESULT_ERROR_DEVICE_LOST")!=std::string::npos;
+    }
+public:
+    struct PacketResult {raster::UniformDrawExecutor::Result metadata;std::vector<uint8_t> packet;};
+    PacketProviderProcess(){
+        const auto mode=setting(L"NR_RENDER_PROVIDER_RECOVERY");
+        require(mode.empty() || mode==L"0" || mode==L"1","invalid provider recovery setting");active_=mode==L"1";
+        if(!active_)return;
+        root_=setting(L"NR_RENDER_PROVIDER_RECOVERY_DIR");
+        require(root_.is_absolute() && std::filesystem::is_directory(root_),"provider evidence root unavailable");
+        const auto exception=setting(L"NR_RENDER_RECOVERY_TEST_EXCEPTION_TICKET");
+        if(!exception.empty()){
+            wchar_t *end=nullptr;const auto value=std::wcstoul(exception.c_str(),&end,10);
+            require(end!=exception.c_str() && !*end && value>0 && value<4096,"invalid provider exception injection ticket");test_exception_ticket_=value;
+        }
+        const auto test=setting(L"NR_RENDER_RECOVERY_TEST_KILL_TICKET");
+        if(!test.empty()){
+            wchar_t *end=nullptr;const auto value=std::wcstoul(test.c_str(),&end,10);
+            require(end!=test.c_str() && !*end && value>0 && value<4096,"invalid provider fault injection ticket");test_kill_ticket_=value;
+        }
+    }
+    ~PacketProviderProcess(){stop();}
+    bool enabled()const noexcept{return active_;}
+    PacketResult execute_packet(const std::vector<uint8_t> &bytes,const indexed_exchange::Header &original,ULONGLONG deadline,HANDLE cancel){
+        require(active_,"provider isolation is disabled");
+        auto forwarded=bytes;auto header=original;header.client_pid=GetCurrentProcessId();std::memcpy(forwarded.data(),&header,sizeof(header));
+        const auto ticket=requests_++;const auto began=GetTickCount64();
+        for(unsigned attempt=0;attempt<2;++attempt){
+            (void)indexed_stream::remaining(deadline);
+            if(cancel && WaitForSingleObject(cancel,0)!=WAIT_TIMEOUT)throw std::runtime_error("provider recovery cancelled");
+            if(!process_)start();
+            if(ticket==test_kill_ticket_ && !test_killed_){
+                require(TerminateProcess(process_->value,0xe0000001)!=0,"provider test termination failed");
+                require(WaitForSingleObject(process_->value,5000)==WAIT_OBJECT_0,"provider test termination incomplete");test_killed_=true;
+                std::printf("{\"provider_fault_injected\":true,\"dispatch_ticket\":%u,\"generation\":%u,\"real_device_loss\":false}\n",ticket,generation_);std::fflush(stdout);
+            }
+            try{
+                LocalIndexedValidatedClient client(pipe_,process_->value,(std::min)(DWORD(90000),indexed_stream::remaining(deadline)));
+                auto reply=client.exchange(forwarded,cancel);const auto receipt=indexed_exchange::validate_response_envelope(reply,header);
+                auto delivered=indexed_exchange::Reader(reply).value<indexed_exchange::Header>();delivered.client_pid=original.client_pid;std::memcpy(reply.data(),&delivered,sizeof(delivered));
+                (void)indexed_exchange::validate_response_envelope(reply,original);
+                PacketResult result;auto &metadata=result.metadata;metadata.execution_device="NPU";metadata.timings.total_ms=double(GetTickCount64()-began);
+                metadata.input_bytes=receipt.input_bytes;metadata.output_bytes=receipt.output_bytes;metadata.provider_requests=receipt.provider_requests;metadata.covered_samples=receipt.covered_samples;metadata.tile_executions=receipt.tile_executions;metadata.used_rectangle=receipt.used_rectangle!=0;result.packet=std::move(reply);
+                std::printf("{\"provider_process_response\":true,\"dispatch_ticket\":%u,\"generation\":%u,\"attempt\":%u,\"elapsed_ms\":%llu,\"timing_scope\":\"child_roundtrip_including_compilation_and_recovery\",\"execution_device\":\"NPU\"}\n",ticket,generation_,attempt,static_cast<unsigned long long>(GetTickCount64()-began));std::fflush(stdout);
+                return result;
+            }catch(...){
+                const bool retry=attempt==0 && restarts_<3 && recoverable() && GetTickCount64()+1000<deadline && (!cancel || WaitForSingleObject(cancel,0)==WAIT_TIMEOUT);
+                std::printf("{\"provider_process_failure\":true,\"dispatch_ticket\":%u,\"generation\":%u,\"retry_on_npu\":%s,\"fallback_backend\":\"none\"}\n",ticket,generation_,retry?"true":"false");std::fflush(stdout);
+                stop();if(!retry)throw;++restarts_;
+            }
+        }
+        throw std::runtime_error("provider recovery exhausted");
+    }
+};
+inline void provider_test_exception(uint32_t ticket){
+    static const uint32_t target=[](){
+        wchar_t *text=nullptr;size_t size=0;if(_wdupenv_s(&text,&size,L"NR_RENDER_PROVIDER_TEST_INFER_EXCEPTION_TICKET"))throw std::runtime_error("provider test setting unavailable");
+        const std::unique_ptr<wchar_t,decltype(&std::free)> owner(text,&std::free);if(!text)return UINT32_MAX;
+        wchar_t *end=nullptr;const auto value=std::wcstoul(text,&end,10);
+        if(end==text || *end || !value || value>=4096)throw std::invalid_argument("invalid provider test exception ticket");return uint32_t(value);
+    }();
+    if(ticket!=target)return;
+    std::printf("{\"provider_device_loss_injected\":true,\"dispatch_ticket\":%u,\"real_device_loss\":false}\n",ticket);std::fflush(stdout);
+    throw std::runtime_error("injected test only: ZE_RESULT_ERROR_DEVICE_LOST");
+}
+}

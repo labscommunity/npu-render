@@ -61,7 +61,8 @@ struct O{float4 p:SV_Position;noperspective float4 uv:TEXCOORD;};
 O main(float4 p:POSITION,float4 uv:TEXCOORD){O o;o.p=p;o.uv=uv;return o;})","vs_4_0");
     const auto vs=parse_vertex(vw.data(),vw.size());constexpr unsigned width=31,height=29;
     const auto edge=[](Point a,Point b,Point p){return int64_t(b[0]-a[0])*(p[1]-a[1])-int64_t(b[1]-a[1])*(p[0]-a[0]);};
-    for(const bool tiny:{false,true})for(const uint32_t format:{28u,87u})for(const uint32_t batch:{16u,64u}){
+    for(const bool tiny:{false,true})for(const uint32_t format:{28u,87u})for(const uint32_t batch:{16u,64u,8192u,16384u}){
+        if(batch>RegisterExecutor::preferred_raster_batch(ps))continue;
         const std::array<std::array<float,2>,3> positions=tiny?
             std::array<std::array<float,2>,3>{{{3.25f,5.25f},{4.25f,5.25f},{3.25f,6.25f}}}:
             std::array<std::array<float,2>,3>{{{0,0},{31,0},{0,29}}};

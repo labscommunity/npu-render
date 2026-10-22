@@ -1,6 +1,8 @@
+#include "provider_infer_trace.hpp"
 #include "provider_compile.hpp"
 #include "linear_texture_draw.hpp"
 #include "triangle_regions.hpp"
+#include "opaque_affine_crop.hpp"
 #include <openvino/openvino.hpp>
 #include <openvino/opsets/opset13.hpp>
 #include <openvino/pass/serialize.hpp>
@@ -8,6 +10,7 @@
 #include <cstring>
 #include <chrono>
 #include <sstream>
+#include <cstdlib>
 namespace nr::raster {
 namespace {
 void require(bool v) { if (!v) throw std::invalid_argument("unsupported linear-textured rectangle draw"); }
@@ -65,28 +68,67 @@ Node both(const Node &a,const Node &b) { return std::make_shared<op::BitwiseAnd>
 }
 struct LinearTextureDrawExecutor::State {
     shader::Program vs; Pattern pixel;
-    uint32_t width,height,sw,sh,sf,rows,count; bool failed=false, point=false;
+    uint32_t width,height,sw,sh,sf,rows,count,source_chunk=0; bool failed=false, point=false;
+    uint32_t target_format;bool source_over,general_ready=false;std::string selected_backend;
+    std::unique_ptr<OpaqueAffineCrop> crop;
     shader::VertexExecutor vertex; ProjectionExecutor projection;
     ov::Core core; ov::CompiledModel compiled; ov::InferRequest request; std::string device;
+    std::string source_name(unsigned channel,uint32_t base) const {
+        return "source"+std::to_string(channel)+(source_chunk<uint64_t(sw)*sh?"_"+std::to_string(base):"");
+    }
     State(const shader::Program &v,const shader::Program &p,uint32_t w,uint32_t h,uint32_t format,
         uint32_t source_width,uint32_t source_height,uint32_t source_format,const std::string &backend,bool blend,shader::TextureFilter filter)
         : vs(v),pixel(pattern(p)),width(w),height(h),sw(source_width),sh(source_height),sf(source_format),
-          rows(1),count(w),point(filter==shader::TextureFilter::point),vertex(v,6,backend),projection(6,backend) {
+          rows(1),count(w),point(filter==shader::TextureFilter::point),target_format(format),source_over(blend),selected_backend(backend),vertex(v,6,backend),projection(6,backend),device(backend) {
+        char *crop_text=nullptr;size_t crop_length=0;
+        require(!_dupenv_s(&crop_text,&crop_length,"NR_RENDER_OPAQUE_CROP"));
+        if(crop_text){const std::string value(crop_text);std::free(crop_text);require(value=="1");if(pixel.opaque || point)crop=std::make_unique<OpaqueAffineCrop>(sw,sh,w,h,format!=sf,backend,pixel.opaque,source_over);}
         // Alpha replacement happens after sampling. The RGB taps remain valid
         // for both point and bilinear filtering; source alpha is unused.
         require(filter==shader::TextureFilter::point || filter==shader::TextureFilter::linear);
-        require(w && w<=4096 && h && h<=8192 && uint64_t(w)*h<=4*1024*1024 && sw && sw<=8192 && sh && sh<=8192 && uint64_t(sw)*sh<=4*1024*1024);
+        require(w && w<=4096 && h && h<=8192 && uint64_t(w)*h<=8388576 && sw && sw<=8192 && sh && sh<=8192 && uint64_t(sw)*sh<=8*1024*1024);
         require((format==28 || format==87) && (sf==28 || sf==87) && vs.stage==shader::Stage::vertex && vs.position_output<16 &&
             (vs.outputs[pixel.color]&15)==15 && (vs.outputs[pixel.uv]&3)==3);
-        rows=(std::min)(h,4096/w);while(h%rows)--rows;count=w*rows;
+        // Larger targets use a larger NPU raster batch so full-resolution
+        // rendering does not require one inference for every output row.
+        uint32_t capacity=uint64_t(w)*h>4194304?16384u:4096u;
+        // Isolated batch-size qualification. Unset preserves the existing graph.
+        // The generated graph and cache identity include the resulting shape.
+        char *batch_text=nullptr;size_t batch_length=0;
+        require(!_dupenv_s(&batch_text,&batch_length,"NR_RENDER_AFFINE_BATCH"));
+        if(batch_text){
+            const std::string value(batch_text);std::free(batch_text);
+            if(value=="16384")capacity=16384;
+            else if(value=="65535")capacity=65535;
+            else if(value=="65536")capacity=65536;
+            else if(value=="262144")capacity=262144;
+            else throw std::invalid_argument("unsupported affine batch experiment");
+        }
+
+        rows=(std::min)(h,capacity/w);while(h%rows)--rows;count=w*rows;
+        if(!crop)prepare_general();
+    }
+    void prepare_general(){
+        if(general_ready)return;
+        const auto w=width,format=target_format;const auto &backend=selected_backend;const bool blend=source_over;
         auto parameter=[](ov::element::Type type,ov::Shape shape,const char *name) {
             auto p=std::make_shared<op::Parameter>(type,shape);p->output(0).get_tensor().set_names({name});return p;
         };
-        std::array<std::shared_ptr<op::Parameter>,4> source{},color{};
+        // The qualified NPU stack wraps Gather indices at 2^21 for a scalar
+        // FP32 source. Independent probes reproduce the boundary. Separate
+        // <=2^20-element ports keep each Gather below it; mask selection and
+        // all filtering stay on the selected device. Small/CPU models retain
+        // their original ports and graph.
+        const auto source_size=sw*sh;
+        source_chunk=backend=="NPU" && source_size>2097152u?1048576u:source_size;
+        std::array<std::vector<std::shared_ptr<op::Parameter>>,4> source{};
+        std::array<std::shared_ptr<op::Parameter>,4> color{};
         ov::ParameterVector parameters;
         for(unsigned c=0;c<(pixel.opaque?3u:4u);++c) {
-            source[c]=parameter(ov::element::f32,{size_t(sw)*sh,1},("source"+std::to_string(c)).c_str());
-            parameters.push_back(source[c]);
+            for(uint32_t base=0;base<source_size;base+=source_chunk){
+                auto port=parameter(ov::element::f32,{(std::min)(source_chunk,source_size-base),1},source_name(c,base).c_str());
+                source[c].push_back(port);parameters.push_back(port);
+            }
         }
         for(unsigned c=0;c<4;++c) {
             color[c]=parameter(ov::element::f32,{1,1},("color"+std::to_string(c)).c_str());
@@ -123,7 +165,20 @@ struct LinearTextureDrawExecutor::State {
             auto sx=std::make_shared<op::Minimum>(add(ix,integer(dx)),integer(int32_t(sw-1)));
             auto sy=std::make_shared<op::Minimum>(add(iy,integer(dy)),integer(int32_t(sh-1)));
             auto index=std::make_shared<op::Reshape>(add(sx,mul(sy,integer(int32_t(sw)))),axes({count}),false);
-            return std::make_shared<op::Gather>(source[channel],index,op::Constant::create(ov::element::i32,ov::Shape{},{0}));
+            const auto scalar=[](int32_t value){return op::Constant::create(ov::element::i32,ov::Shape{},{value});};
+            if(source[channel].size()==1)return std::make_shared<op::Gather>(source[channel][0],index,scalar(0));
+            Node selected;
+            for(uint32_t base=0,port=0;base<source_size;base+=source_chunk,++port){
+                const auto length=(std::min)(source_chunk,source_size-base);
+                const auto local=std::make_shared<op::Minimum>(std::make_shared<op::Maximum>(sub(index,scalar(int32_t(base))),scalar(0)),scalar(int32_t(length-1)));
+                const auto value=std::make_shared<op::Gather>(source[channel][port],local,scalar(0));
+                // LogicalAnd is miscompiled in this stack for index ranges;
+                // compose the established exact integer 0/1 comparisons.
+                const auto bits=both(pred(std::make_shared<op::GreaterEqual>(index,scalar(int32_t(base)))),pred(std::make_shared<op::Less>(index,scalar(int32_t(base+length)))));
+                const auto mask=floating(std::make_shared<op::Reshape>(bits,axes({count,1}),false));
+                const auto term=mul(value,mask);selected=selected?add(selected,term):term;
+            }
+            return selected;
         };
         auto mix=[](const Node &a,const Node &b,const Node &t)->Node{return add(mul(a,sub(number(1),t)),mul(b,t));};
         auto tx=sub(x,floating(ix)),ty=sub(y,floating(iy));
@@ -166,12 +221,35 @@ struct LinearTextureDrawExecutor::State {
         }
         compiled=nr::provider::compile_model(core,model,backend,properties);const auto devices=compiled.get_property(ov::execution_devices);
         require(devices.size()==1 && (devices[0]==backend || devices[0].rfind(backend+".",0)==0));device=devices[0];request=compiled.create_infer_request();
+        general_ready=true;
     }
 };
 void LinearTextureDrawExecutor::validate_shader(const shader::Program &p){(void)pattern(p);}
 LinearTextureDrawExecutor::LinearTextureDrawExecutor(const shader::Program &v,const shader::Program &p,uint32_t w,uint32_t h,uint32_t f,uint32_t sw,uint32_t sh,uint32_t sf,const std::string &b,bool blend,shader::TextureFilter filter)
     :state(std::make_unique<State>(v,p,w,h,f,sw,sh,sf,b,blend,filter)){}
 LinearTextureDrawExecutor::~LinearTextureDrawExecutor()=default;
+UniformDrawExecutor::Result LinearTextureDrawExecutor::preflight_quad(const std::vector<shader::VertexRegisters> &inputs,const shader::VertexConstants &constants,const Viewport &viewport){
+    auto &s=*state;const auto start=Clock::now();
+    require(!s.failed && inputs.size()==6 && viewport.x==0 && viewport.y==0 && viewport.width==float(s.width) && viewport.height==float(s.height));
+    UniformDrawExecutor::Result result{};auto began=Clock::now();auto shaded=s.vertex.execute(inputs,constants);
+    result.execution_device=shaded.execution_device;require(result.execution_device==s.device);result.timings.shader_ms=elapsed(began);
+    result.input_bytes=shaded.input_bytes;result.output_bytes=shaded.output_bytes;++result.provider_requests;
+    const auto done=[&](bool supported){result.used_rectangle=supported;result.timings.total_ms=elapsed(start);return result;};
+    std::vector<ClipPosition> positions(6);const auto color_bits=shaded.vertices[0][s.pixel.color];std::array<float,4> color{};std::memcpy(color.data(),color_bits.data(),16);
+    for(const auto v:color)if(!std::isfinite(v) || v<0 || v>1)return done(false);
+    for(size_t n=0;n<6;++n){if(shaded.vertices[n][s.pixel.color]!=color_bits)return done(false);std::memcpy(positions[n].data(),shaded.vertices[n][s.vs.position_output].data(),16);if(positions[n][3]!=1.f)return done(false);}
+    began=Clock::now();const auto projected=s.projection.execute(positions,viewport);result.timings.projection_ms=elapsed(began);require(projected.execution_device==s.device);
+    result.input_bytes+=6*16+24;result.output_bytes+=6*24+2*16;++result.provider_requests;
+    const auto &a=projected.vertices[0],&b=projected.vertices[2];const std::array<float,4> rect{a.screen[0],a.screen[1],b.screen[0],b.screen[1]};const std::array<int32_t,4> bounds{a.snapped[0],a.snapped[1],b.snapped[0],b.snapped[1]};
+    if(!(rect[0]<rect[2] && rect[1]<rect[3] && bounds[0]<bounds[2] && bounds[1]<bounds[3]))return done(false);
+    std::array<float,4> uv{};for(unsigned c=0;c<2;++c){std::memcpy(&uv[c],&shaded.vertices[0][s.pixel.uv][c],4);std::memcpy(&uv[c+2],&shaded.vertices[2][s.pixel.uv][c],4);}
+    for(auto v:uv)if(!std::isfinite(v) || std::abs(v)>16)return done(false);
+    const uint32_t orders[2][6]{{0,1,2,2,3,0},{0,1,2,0,2,3}};bool accepted=false;
+    for(const auto &order:orders){bool matches=true;for(size_t n=0;n<6;++n){const auto corner=order[n];const bool right=corner==1 || corner==2,bottom=corner>=2;
+        const std::array<float,2> expected{rect[right?2:0],rect[bottom?3:1]};const Point snapped{bounds[right?2:0],bounds[bottom?3:1]};matches &= projected.vertices[n].screen==expected && projected.vertices[n].snapped==snapped;
+        float u=0,v=0;std::memcpy(&u,&shaded.vertices[n][s.pixel.uv][0],4);std::memcpy(&v,&shaded.vertices[n][s.pixel.uv][1],4);matches &= u==uv[right?2:0] && v==uv[bottom?3:1];}accepted |= matches;}
+    return done(accepted);
+}
 UniformDrawExecutor::Result LinearTextureDrawExecutor::execute(const std::vector<shader::VertexRegisters> &inputs,const shader::VertexConstants &constants,
     const Viewport &viewport,const PackedTexture &source,const std::vector<PackedColor> &background,const std::optional<std::array<int32_t,4>> &scissor){
     auto &s=*state;const auto start=Clock::now();
@@ -208,7 +286,7 @@ UniformDrawExecutor::Result LinearTextureDrawExecutor::execute(const std::vector
     // The provider has already projected and bounded both triangles. Schedule
     // only row blocks intersecting those bounds and the scissor; the graph
     // still decides exact sample coverage, sampling and blending.
-    const auto regions=bounded_triangle_regions(projected.triangle_bounds,clip,s.count);
+    const auto regions=bounded_triangle_regions(projected.triangle_bounds,clip,s.count,false,s.count>8192);
     uint32_t first_row=s.height,end_row=0;
     for(const auto &region:regions)if(region[0]<region[2] && region[1]<region[3]){
         first_row=(std::min)(first_row,uint32_t(region[1]));end_row=(std::max)(end_row,uint32_t(region[3]));
@@ -217,12 +295,24 @@ UniformDrawExecutor::Result LinearTextureDrawExecutor::execute(const std::vector
     if(first_row>=end_row){
         result.timings.total_ms=elapsed(start);result.used_rectangle=true;result.vertices=std::move(shaded.vertices);return result;
     }
+    if(s.crop){
+        began=Clock::now();
+        try{auto cropped=s.crop->execute(bounds,clip,uv,color,source,background,s.point);if(cropped){
+            require(cropped->device==s.device);result.timings.merger_ms=elapsed(began);result.pixels=std::move(cropped->pixels);result.covered_samples=cropped->covered;
+            result.input_bytes+=cropped->input_bytes;result.output_bytes+=cropped->output_bytes;result.provider_requests+=cropped->provider_calls;result.tile_executions=cropped->provider_calls;result.used_rectangle=true;result.vertices=std::move(shaded.vertices);result.timings.total_ms=elapsed(start);
+            std::printf("{\"affine_crop\":true,\"alpha_replaced\":%s,\"source_over\":%s,\"point_sampling\":%s,\"maximum_byte_error_bound\":%.9g,\"source_x\":%u,\"source_y\":%u,\"width\":%u,\"height\":%u}\n",s.pixel.opaque?"true":"false",s.source_over?"true":"false",s.point?"true":"false",cropped->maximum_byte_error,cropped->mapping[4],cropped->mapping[5],cropped->mapping[2],cropped->mapping[3]);return result;
+        }}catch(...){s.failed=true;throw;}
+    }
+    try{s.prepare_general();require(result.execution_device==s.device);}catch(...){s.failed=true;throw;}
     first_row-=first_row%s.rows;
     for(auto &v:clip)v*=256;
     s.failed=true;began=Clock::now();
     for(unsigned c=0;c<(s.pixel.opaque?3u:4u);++c) {
-        auto *texels=s.request.get_tensor("source"+std::to_string(c)).data<float>();
-        for(size_t n=0;n<source.pixels.size();++n)texels[n]=float(source.pixels[n][c])/255;
+        for(uint32_t base=0;base<source.pixels.size();base+=s.source_chunk){
+            auto *texels=s.request.get_tensor(s.source_name(c,base)).data<float>();
+            const auto length=(std::min)(size_t(s.source_chunk),source.pixels.size()-base);
+            for(size_t n=0;n<length;++n)texels[n]=float(source.pixels[base+n][c])/255;
+        }
     }
     for(unsigned c=0;c<4;++c)s.request.get_tensor("color"+std::to_string(c)).data<float>()[0]=color[c];
     std::memcpy(s.request.get_tensor("uv").data<float>(),uv.data(),16);
@@ -230,7 +320,7 @@ UniformDrawExecutor::Result LinearTextureDrawExecutor::execute(const std::vector
     s.request.get_tensor("half").data<float>()[0]=s.point?0.f:.5f;
     for(uint32_t y=first_row;y<end_row;y+=s.rows){
         const auto offset=size_t(y)*s.width;s.request.get_tensor("origin").data<float>()[0]=float(y);s.request.get_tensor("origin_i").data<int32_t>()[0]=int32_t(y);
-        std::memcpy(s.request.get_tensor("background").data<uint8_t>(),background.data()+offset,size_t(s.count)*4);s.request.infer();
+        std::memcpy(s.request.get_tensor("background").data<uint8_t>(),background.data()+offset,size_t(s.count)*4);nr::provider::traced_infer(s.request,__FILE__,__LINE__);
         const auto output=s.request.get_output_tensor(0),coverage=s.request.get_output_tensor(1);
         require(output.get_element_type()==ov::element::u8 && output.get_byte_size()==size_t(s.count)*4 && coverage.get_element_type()==ov::element::u8 && coverage.get_size()==s.count);
         std::memcpy(result.pixels.data()+offset,output.data<const uint8_t>(),size_t(s.count)*4);

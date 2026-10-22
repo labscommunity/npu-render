@@ -108,6 +108,15 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
             d.blend.SrcBlendAlpha==D3D10_DDI_BLEND_BLEND_FACTOR && d.blend.DestBlendAlpha==D3D10_DDI_BLEND_INV_SRC_ALPHA){
             blend_mode=nr::raster::BlendMode::component_coverage;
             for(unsigned c=0;c<4;++c){require(std::isfinite(d.blend_factor[c]));blend_constant[c]=d.blend_factor[c];}
+        }else if(d.blend.SrcBlend==D3D10_DDI_BLEND_SRC1_ALPHA && d.blend.DestBlend==D3D10_DDI_BLEND_INV_SRC1_ALPHA &&
+            d.blend.SrcBlendAlpha==D3D10_DDI_BLEND_SRC1_ALPHA && d.blend.DestBlendAlpha==D3D10_DDI_BLEND_INV_SRC1_ALPHA){
+            // DWM's caption text: the pixel shader's second output carries the blend alpha (probe v117). A
+            // single-output program under this state reads an undefined o1: the draw is dropped and reported.
+            blend_mode=nr::raster::BlendMode::dual_source_over;
+            if(!d.pixel_program->outputs[1]){lab_trace("{\"event\":\"draw_dropped\",\"reason\":\"dual-source blend on a single-output program\",\"vertices\":%u}\n",count);++counters.dropped_draws;return;}
+        }else if(d.blend.SrcBlend==D3D10_DDI_BLEND_INV_DEST_COLOR && d.blend.DestBlend==D3D10_DDI_BLEND_INV_SRC_ALPHA &&
+            d.blend.SrcBlendAlpha==D3D10_DDI_BLEND_ZERO && d.blend.DestBlendAlpha==D3D10_DDI_BLEND_ONE){
+            blend_mode=nr::raster::BlendMode::invert_destination_over;   // probe v119: the compositor's separate-alpha inversion
         }else{
         require(d.blend.SrcBlend==d.blend.SrcBlendAlpha && d.blend.DestBlend==d.blend.DestBlendAlpha);
         constexpr std::array<D3D10_DDI_BLEND,6> factors{D3D10_DDI_BLEND_ZERO,D3D10_DDI_BLEND_ONE,D3D10_DDI_BLEND_SRC_ALPHA,
@@ -129,6 +138,44 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
     const bool textured = std::any_of(d.pixel_program->textures.begin(),d.pixel_program->textures.end(),[](bool v){return v;});
     const auto cull=static_cast<nr::raster::CullMode>(UINT(d.raster.CullMode)-1);
     const bool front_ccw=d.raster.FrontCounterClockwise!=0;
+    if (d.backend == "NPU_LAB_INDEXED") {
+        // Frame batch first: the draw joins the open batch when its shader pair is
+        // compiled into the kernel and the planner admits it; otherwise the batch is
+        // flushed so the per-draw route below sees current target pixels.
+        if (!d.batcher) d.batcher = std::make_shared<FrameBatcher>(d);
+        const nr::raster::Viewport batch_viewport{d.viewport.TopLeftX, d.viewport.TopLeftY, d.viewport.Width, d.viewport.Height, d.viewport.MinDepth, d.viewport.MaxDepth};
+        // The per-draw route this draw would take, so the worker can still run it
+        // through the qualified per-draw pipeline if a batch command cannot execute
+        // (legacy_route.hpp: the same selection the per-draw path below makes).
+        const auto route = [&] {
+            LegacyRouteInputs in; in.pixel = d.pixel_program.get(); in.textured = textured;
+            for (unsigned slot = 0; slot < 16; ++slot) if (d.pixel_program->samplers[slot]) {
+                const auto &samp = d.samplers[2][slot];
+                in.addressed = in.addressed || (samp.bound && (samp.desc.AddressU != D3D10_DDI_TEXTURE_ADDRESS_CLAMP || samp.desc.AddressV != D3D10_DDI_TEXTURE_ADDRESS_CLAMP));
+                in.bordered = in.bordered || (samp.bound && (samp.desc.AddressU == D3D10_DDI_TEXTURE_ADDRESS_BORDER || samp.desc.AddressV == D3D10_DDI_TEXTURE_ADDRESS_BORDER));
+            }
+            { const auto &sampler = d.samplers[2][0]; in.linear = sampler.bound && single_mip_linear_filter(UINT(sampler.desc.Filter)); }
+            const auto source = d.bound_source; in.source_smaller = source && (source->surface.width < s.width || source->surface.height < s.height);
+            in.scissored = clip != full; in.vertex_count = count; in.write_mask = d.blend.RenderTargetWriteMask[0];
+            in.blend_mode = blend_mode; in.cull = cull; in.front_ccw = front_ccw;
+            return legacy_route(in);
+        }();
+        std::string reason;
+        if (d.batcher->record_draw(target, inputs, d.vertex_program, d.pixel_program, vc, pc, blend_mode, d.blend.RenderTargetWriteMask[0], cull, front_ccw, clip, clip != full, batch_viewport, blend_constant, route.first, route.second, reason)) {
+            ++counters.executions; ++counters.remote_npu_executions; ++counters.draws;
+            lab_trace("{\"event\":\"%s\",\"vertices\":%u,\"textured\":%s,\"batched\":true,\"execution_device\":\"NPU (frame batch)\",\"wall_ms\":%llu}\n",
+                indexed ? "indexed_draw_recorded" : "draw_recorded", count, textured ? "true" : "false", static_cast<unsigned long long>(GetTickCount64() - started));
+            return;
+        }
+        lab_trace("{\"event\":\"draw_not_batched\",\"reason\":\"%s\",\"vertices\":%u}\n", reason.c_str(), count);
+        if (!nr::raster::valid_blend(blend_mode)) {
+            // The per-draw route has no dual-source or invert blend. Dropping the draw loses its pixels, which this
+            // row and the counter report; failing it made the compositor recreate its device every few seconds (v117).
+            lab_trace("{\"event\":\"draw_dropped\",\"reason\":\"kernel-only blend %u not batched: %s\",\"vertices\":%u}\n", unsigned(blend_mode), reason.c_str(), count);
+            ++counters.dropped_draws; return;
+        }
+        flush_frame_batches(d, "legacy_draw");
+    }
     nr::raster::PackedTexture texture; bool linear=false, modulated=false, general_texture=false;
     bool general_resources=nr::shader::quad_derivatives(*d.pixel_program);
     for(unsigned slot=0;slot<16;++slot)general_resources=general_resources ||
@@ -171,7 +218,7 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
                 for(size_t n=0;n<t.pixels.size();++n){const uint32_t value=data[n];std::memcpy(t.pixels[n].data(),&value,4);}read.finish();
             }else{
                 const auto &ss=source->surface;require(d.pixel_program->texture_dimensions[slot]==3 && !d.pixel_program->texture_uint[slot] &&
-                    (ss.format==28 || ss.format==87 || ss.format==65) && ss.width<=8192 && ss.height<=8192 && uint64_t(ss.width)*ss.height<=4194304);
+                    (ss.format==28 || ss.format==87 || ss.format==65) && ss.width<=8192 && ss.height<=8192 && uint64_t(ss.width)*ss.height<=8388608);
                 // A8 is expanded to RGBA transport. Its format-specific border
                 // defaults need separate metadata before border sampling is admitted.
                 if(ss.format==65)for(const auto &instruction:d.pixel_program->instructions)
@@ -204,7 +251,7 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
             sampler.desc.AddressU == D3D10_DDI_TEXTURE_ADDRESS_CLAMP && sampler.desc.AddressV == D3D10_DDI_TEXTURE_ADDRESS_CLAMP &&
             sampler.desc.AddressW == D3D10_DDI_TEXTURE_ADDRESS_CLAMP && sampler.desc.MipLODBias == 0 && sampler.desc.MinLOD == 0 && sampler.desc.MaxLOD >= 0);
         const auto &ss = source->surface;
-        require((ss.format == 28 || ss.format == 87 || ss.format == 65) && ss.width <= 8192 && ss.height <= 8192 && uint64_t(ss.width)*ss.height <= 4*1024*1024);
+        require((ss.format == 28 || ss.format == 87 || ss.format == 65) && ss.width <= 8192 && ss.height <= 8192 && uint64_t(ss.width)*ss.height <= uint64_t(modulated || general_texture?8:4)*1024*1024);
         const auto source_bytes = read_pixels(*source); texture = {ss.width,ss.height,ss.format == 65 ? 28u : ss.format,{}};
         texture.pixels.resize(size_t(ss.width)*ss.height);
         // Format decoding only: sampling, shader math and blending remain on

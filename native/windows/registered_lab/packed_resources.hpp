@@ -9,8 +9,14 @@ inline shader::TextureShapes resource_shapes(const shader::Program &program,cons
     shader::TextureShapes shapes{};
     for(unsigned slot=0;slot<16;++slot){const auto &r=resources[slot];
         if(!r.width && !r.height && !r.format){shader::check(r.pixels.empty());continue;}
-        shader::check(program.textures[slot] && r.width && r.height && uint64_t(r.width)*r.height<=4194304);
         const bool buffer=program.texture_dimensions[slot]==1;
+        const auto area=uint64_t(r.width)*r.height;
+        shader::check(program.textures[slot] && r.width && r.height && area<=(buffer?4194304u:8388608u));
+        // Larger inputs are qualified for normalized sampling only. Typed
+        // loads retain their previous explicit capacity rather than silently
+        // sharing an unqualified large Gather graph.
+        if(area>4194304)for(const auto &instruction:program.instructions)
+            shader::check(instruction.opcode!=shader::Opcode::load || instruction.sources[1].index!=slot);
         shader::check(buffer?(program.texture_uint[slot] && r.format==42 && r.height==1):
             (!program.texture_uint[slot] && (r.format==28 || r.format==87) && r.width<=8192 && r.height<=8192));
         shapes[slot]={r.width,r.height,buffer?1u:15u};

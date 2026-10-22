@@ -17,6 +17,14 @@ int main(int argc,char **argv)try{
     TEST(bounded_triangle_regions(std::vector<std::array<int32_t,4>>(32,full),full,8192).size()==32);
     rejected=false;try{bounded_triangle_regions(std::vector<std::array<int32_t,4>>(33,full),full,8192);}catch(const std::invalid_argument &){rejected=true;}TEST(rejected);
     rejected=false;try{bounded_triangle_regions({full},full,16384);}catch(const std::invalid_argument &){rejected=true;}TEST(rejected);
+    TEST(bounded_triangle_regions(std::vector<std::array<int32_t,4>>(64,full),full,16384,true,false,true).size()==64);
+    rejected=false;try{bounded_triangle_regions(std::vector<std::array<int32_t,4>>(65,full),full,16384,true,false,true);}catch(const std::invalid_argument &){rejected=true;}TEST(rejected);
+    rejected=false;try{bounded_triangle_regions({full},full,16385,false,false,true);}catch(const std::invalid_argument &){rejected=true;}TEST(rejected);
+    TEST(bounded_triangle_regions({full},full,262144,false,true).size()==1);
+    for(const auto batch:{262145u,UINT32_MAX}){
+        rejected=false;try{bounded_triangle_regions({full},full,batch,false,true);}catch(const std::invalid_argument &){rejected=true;}TEST(rejected);
+    }
+    rejected=false;try{bounded_triangle_regions({full},full,16384,true,true);}catch(const std::invalid_argument &){rejected=true;}TEST(rejected);
     TEST(bounded_triangle_regions(std::vector<std::array<int32_t,4>>(70,{4,4,6,6}),full,256).size()==70);
     TEST(bounded_triangle_regions(std::vector<std::array<int32_t,4>>(70,full),{0,0,0,0},1).size()==70);
     for(const std::array<int32_t,4> bad:{std::array<int32_t,4>{-1,0,2,2},{0,0,8193,2},{2,2,1,1}}){
@@ -130,7 +138,7 @@ float4 main(float4 p:SV_Position,noperspective float4 c:COLOR,noperspective floa
     TEST(collated_components==32768);
     // Multiple affine and perspective attributes plus a flat attribute must
     // retain their own values and interpolation modes when sharing a request.
-    for(const auto attribute_batch : {256u,4096u}){
+    for(const auto attribute_batch : {256u,4096u,8192u,16384u}){
         const auto mixed_vw=nr::registered_lab::shader_tokens(R"(
 struct O{float4 p:SV_Position;noperspective float4 a:TEXCOORD0;noperspective float4 b:TEXCOORD1;float4 c:TEXCOORD2;float4 d:TEXCOORD3;nointerpolation float4 e:TEXCOORD4;};
 O main(float4 p:POSITION,float4 a:TEXCOORD0,float4 b:TEXCOORD1,float4 c:TEXCOORD2,float4 d:TEXCOORD3,float4 e:TEXCOORD4){O o;o.p=p;o.a=a;o.b=b;o.c=c;o.d=d;o.e=e;return o;})","vs_4_0");
@@ -138,6 +146,7 @@ O main(float4 p:POSITION,float4 a:TEXCOORD0,float4 b:TEXCOORD1,float4 c:TEXCOORD
 Texture2D t:register(t0);SamplerState s:register(s0);
 float4 main(float4 p:SV_Position,noperspective float4 a:TEXCOORD0,noperspective float4 b:TEXCOORD1,float4 c:TEXCOORD2,float4 d:TEXCOORD3,nointerpolation float4 e:TEXCOORD4):SV_Target{return t.Sample(s,float2(.5,.5))*(a*.25+b*.125+c*.25+d*.125+e*.125);})","ps_4_0");
         const auto mixed_vs=parse_vertex(mixed_vw.data(),mixed_vw.size()),mixed_ps=parse_pixel(mixed_pw.data(),mixed_pw.size());
+        if(attribute_batch>RegisterExecutor::preferred_raster_batch(mixed_ps))continue;
         const float xy[3][2]{{2,2},{30,2},{2,30}},w[3]{1,2,4};
         std::vector<VertexRegisters> input(3);
         for(unsigned v=0;v<3;++v){

@@ -1,3 +1,4 @@
+#include "provider_infer_trace.hpp"
 #include "provider_compile.hpp"
 #include "loop_fixture.hpp"
 #include "compositor_fixture.hpp"
@@ -61,7 +62,7 @@ struct RegisterExecutor::State {
     bool mirrored_taps;
     TextureShapes texture_shapes;
     bool checks_sample_coordinates = false;
-    struct Binding { std::shared_ptr<op::Parameter> parameter; bool constant; unsigned index; std::string name; bool texture = false, half_texel = false; };
+    struct Binding { std::shared_ptr<op::Parameter> parameter; bool constant; unsigned index; std::string name; bool texture = false, half_texel = false; uint32_t texture_offset=0, texture_rows=0; };
     std::vector<Binding> bindings;
     std::vector<unsigned> outputs;
     std::array<uint32_t, 16> output_bit_masks{};
@@ -69,7 +70,7 @@ struct RegisterExecutor::State {
     ov::CompiledModel compiled;
     ov::InferRequest request;
     std::string execution_device;
-    bool failed = false, ready = false;
+    bool failed = false, ready = false, textures_uploaded=false;
     State(const Program &p, uint32_t vertices, const std::string &backend,
           const TextureShapes &shapes, const TextureSamplers &samplers, uint32_t tap_limit=128, bool defer_compile=false) : program(mirrored_loop_shader(p)?mirrored_tap_program(p):lower_bounded_loops(p)), count(vertices), logical_count(vertices), tap_capacity(tap_limit), mirrored_taps(mirrored_loop_shader(p)), texture_shapes(shapes) {
         check(count && count <= 65536 && (backend == "CPU" || backend == "GPU" || backend == "NPU"));
@@ -82,6 +83,7 @@ struct RegisterExecutor::State {
         std::array<Value, 14> constants{};
         std::array<Value,16> literal_tables{};
         std::array<Node, 16> textures{}, texture_bits{};
+        std::array<std::vector<Node>,16> texture_chunks{};
         Node half_texel;
         std::vector<Node> invalid_coordinates;
         auto parameter_pair = [&](bool constant, unsigned index, size_t rows) {
@@ -207,12 +209,28 @@ struct RegisterExecutor::State {
             const auto sampler = samplers[instruction.sources[2].index];
             const auto filter = sampler.filter;
             check(shape.width && shape.width <= 8192 && shape.height && shape.height <= 8192 &&
-                  uint64_t(shape.width) * shape.height <= 4194304 &&
+                  uint64_t(shape.width) * shape.height <= 8388608 &&
                   (filter == TextureFilter::point || filter == TextureFilter::linear) &&
                   (sampler.u==TextureAddress::clamp || sampler.u==TextureAddress::mirror || sampler.u==TextureAddress::border) &&
                   (sampler.v==TextureAddress::clamp || sampler.v==TextureAddress::mirror || sampler.v==TextureAddress::border));
             for(const auto value:sampler.border)check(std::isfinite(value));
-            if (!textures[slot]) {
+            const auto source_size=shape.width*shape.height;
+            // The qualified NPU compiler wraps Gather indices at 2^21 for
+            // both scalar and RGBA FP32 inputs. Separate bounded ports keep
+            // all reads, filtering and selection on the requested provider.
+            const bool segmented=backend=="NPU" && source_size>2097152u;
+            constexpr uint32_t chunk_rows=1048576;
+            if(segmented && texture_chunks[slot].empty()){
+                for(uint32_t base=0;base<source_size;base+=chunk_rows){
+                    const auto length=(std::min)(chunk_rows,source_size-base);
+                    auto parameter=std::make_shared<op::Parameter>(ov::element::f32,ov::Shape{length,4});
+                    const auto name="texture_"+std::to_string(slot)+"_"+std::to_string(base);
+                    parameter->set_friendly_name(name);parameter->output(0).get_tensor().set_names({name});
+                    bindings.push_back({parameter,false,slot,name,true,false,base,length});
+                    texture_chunks[slot].push_back(parameter);
+                }
+            }
+            if (!segmented && !textures[slot]) {
                 auto parameter = std::make_shared<op::Parameter>(ov::element::f32, ov::Shape{size_t(shape.width) * shape.height, 4});
                 const auto name = "texture_" + std::to_string(slot);
                 parameter->set_friendly_name(name); parameter->output(0).get_tensor().set_names({name});
@@ -314,7 +332,7 @@ struct RegisterExecutor::State {
             };
             const bool bordered=sampler.u==TextureAddress::border || sampler.v==TextureAddress::border;
             Node texels=textures[slot];
-            if(bordered)texels=std::make_shared<op::Concat>(ov::OutputVector{texels,
+            if(bordered && !segmented)texels=std::make_shared<op::Concat>(ov::OutputVector{texels,
                 op::Constant::create(ov::element::f32,ov::Shape{1,4},std::vector<float>(sampler.border.begin(),sampler.border.end()))},0);
             auto fetch = [&](int dx, int dy) -> Node {
                 const auto sx = tap(ix,dx,shape.width,sampler.u),sy=tap(iy,dy,shape.height,sampler.v);
@@ -335,7 +353,27 @@ struct RegisterExecutor::State {
                     address=std::make_shared<op::Select>(std::make_shared<op::NotEqual>(valid,integer(0)),address,integer(int32_t(shape.width*shape.height)));
                 }
                 const auto index=std::make_shared<op::Reshape>(address,indices({int64_t(count)}),false);
-                return std::make_shared<op::Gather>(texels,index,integer(0));
+                if(!segmented)return std::make_shared<op::Gather>(texels,index,integer(0));
+                Node selected;
+                for(uint32_t base=0,port=0;base<source_size;base+=chunk_rows,++port){
+                    const auto length=(std::min)(chunk_rows,source_size-base);
+                    const auto safe=std::make_shared<op::Minimum>(std::make_shared<op::Maximum>(
+                        std::make_shared<op::Subtract>(index,integer(int32_t(base))),integer(0)),integer(int32_t(length-1)));
+                    const auto value=std::make_shared<op::Gather>(texture_chunks[slot][port],safe,integer(0));
+                    const auto bits=std::make_shared<op::BitwiseAnd>(
+                        std::make_shared<op::Convert>(std::make_shared<op::GreaterEqual>(index,integer(int32_t(base))),ov::element::i32),
+                        std::make_shared<op::Convert>(std::make_shared<op::Less>(index,integer(int32_t(base+length))),ov::element::i32));
+                    const auto mask=std::make_shared<op::Convert>(std::make_shared<op::Reshape>(bits,batch_shape,false),ov::element::f32);
+                    const auto term=std::make_shared<op::Multiply>(value,mask);
+                    selected=selected?Node(std::make_shared<op::Add>(selected,term)):term;
+                }
+                if(bordered){
+                    const auto bits=std::make_shared<op::Convert>(std::make_shared<op::Equal>(index,integer(int32_t(source_size))),ov::element::i32);
+                    const auto mask=std::make_shared<op::Convert>(std::make_shared<op::Reshape>(bits,batch_shape,false),ov::element::f32);
+                    const auto border=op::Constant::create(ov::element::f32,ov::Shape{1,4},std::vector<float>(sampler.border.begin(),sampler.border.end()));
+                    selected=std::make_shared<op::Add>(selected,std::make_shared<op::Multiply>(border,mask));
+                }
+                return selected;
             };
             if (filter == TextureFilter::point) return fetch(0, 0);
             const auto tx = std::make_shared<op::Subtract>(x, std::make_shared<op::Convert>(ix, ov::element::f32));
@@ -891,9 +929,14 @@ uint32_t RegisterExecutor::maximum_batch(const Program &p){
     return 65536u;
 }
 uint32_t RegisterExecutor::preferred_raster_batch(const Program &p){
-    // Preserve existing scheduling for all other programs and older runtimes.
+    // Preserve captured compositor scheduling; generic enlargement is opt-in.
     // The executor still applies maximum_batch to the selected raster shape.
-    return captured_compositor_program(p)?(std::max)(4096u,nr::provider::compositor_batch_capacity()):4096u;
+    if(captured_compositor_program(p))return (std::max)(4096u,nr::provider::compositor_batch_capacity());
+    auto batch=nr::provider::generic_raster_capacity();std::array<uint32_t,2> attributes{};
+    for(unsigned r=0;r<16;++r)if(p.inputs[r] && r!=p.position_input){if(p.interpolation[r]==2)++attributes[0];if(p.interpolation[r]==4)++attributes[1];}
+    // Interpolators pack equal-mode attributes; their graph limit is 65,536.
+    const auto count=(std::max)({1u,attributes[0],attributes[1]});while(batch>4096 && uint64_t(batch)*count>65536)batch/=2;
+    return batch;
 }
 struct RegisterExecutor::Configuration {
     Program program;
@@ -908,8 +951,18 @@ RegisterExecutor::RegisterExecutor(const Program &p, uint32_t count, const std::
     if(mirrored_loop_shader(p))configuration=std::make_unique<Configuration>(Configuration{p,count,backend,textures,samplers});
 }
 RegisterExecutor::~RegisterExecutor() = default;
-RegisterExecutor::Result RegisterExecutor::execute(const std::vector<VertexRegisters> &vertices, const VertexConstants &constants,
-                                                   const TexturePixels &textures) {
+RegisterExecutor::TextureBatch::TextureBatch(RegisterExecutor &executor,const TexturePixels &resources,bool enable):owner(executor),textures(resources),reuse(enable){
+    check(owner.state && !owner.state->failed && !owner.active_batch);owner.active_batch=this;owner.state->textures_uploaded=false;
+}
+RegisterExecutor::TextureBatch::~TextureBatch(){owner.active_batch=nullptr;}
+RegisterExecutor::Result RegisterExecutor::TextureBatch::execute(const std::vector<VertexRegisters> &vertices,const VertexConstants &constants){
+    check(owner.active_batch==this);return owner.execute_internal(vertices,constants,textures,reuse);
+}
+RegisterExecutor::TextureBatch RegisterExecutor::bind_textures(const TexturePixels &textures,bool reuse){return TextureBatch(*this,textures,reuse);}
+RegisterExecutor::Result RegisterExecutor::execute(const std::vector<VertexRegisters> &vertices,const VertexConstants &constants,const TexturePixels &textures){
+    check(!active_batch);return execute_internal(vertices,constants,textures,false);
+}
+RegisterExecutor::Result RegisterExecutor::execute_internal(const std::vector<VertexRegisters> &vertices,const VertexConstants &constants,const TexturePixels &textures,bool reuse){
     check(state && !state->failed && vertices.size() == state->logical_count);
     for (unsigned i = 0; i < 14; ++i) check(constants[i].size() >= state->program.constants[i]);
     Result result;
@@ -931,15 +984,18 @@ RegisterExecutor::Result RegisterExecutor::execute(const std::vector<VertexRegis
     try {
         for (size_t i = 0; i < state->bindings.size(); ++i) {
             const auto &binding = state->bindings[i]; auto tensor = state->request.get_tensor(binding.name);
-            result.input_bytes += tensor.get_byte_size();
+            if(!binding.texture || !reuse || !state->textures_uploaded)result.input_bytes += tensor.get_byte_size();
             if (binding.half_texel) {
                 check(tensor.get_size() == 1 && tensor.get_element_type() == ov::element::f32);
                 *tensor.data<float>() = .5f;
             } else if (binding.texture) {
                 const auto shape = state->texture_shapes[binding.index];
-                check(textures[binding.index].size() == size_t(shape.width) * shape.height &&
-                      tensor.get_byte_size() == textures[binding.index].size() * sizeof(std::array<float, 4>));
-                std::memcpy(tensor.data(), textures[binding.index].data(), tensor.get_byte_size());
+                const auto total=size_t(shape.width)*shape.height;
+                const auto length=binding.texture_rows?size_t(binding.texture_rows):total;
+                check(textures[binding.index].size()==total && binding.texture_offset<=total && length<=total-binding.texture_offset &&
+                      tensor.get_byte_size()==length*sizeof(std::array<float,4>));
+                if(!reuse || !state->textures_uploaded){std::memcpy(tensor.data(),textures[binding.index].data()+binding.texture_offset,tensor.get_byte_size());result.texture_upload_bytes+=tensor.get_byte_size();}
+                else result.texture_reused_bytes+=tensor.get_byte_size();
             } else if (binding.constant) {
                 check(tensor.get_byte_size() == size_t(state->program.constants[binding.index]) * sizeof(VertexBits));
                 std::memcpy(tensor.data(), constants[binding.index].data(), tensor.get_byte_size());
@@ -950,7 +1006,7 @@ RegisterExecutor::Result RegisterExecutor::execute(const std::vector<VertexRegis
                     std::memcpy(destination + v * sizeof(VertexBits), vertices[v][binding.index].data(), sizeof(VertexBits));
             }
         }
-        state->request.infer();
+        nr::provider::traced_infer(state->request,__FILE__,__LINE__);state->textures_uploaded=true;
         if (state->checks_sample_coordinates) {
             const auto status = state->request.get_tensor("invalid_sample_coordinates");
             result.output_bytes += status.get_byte_size();

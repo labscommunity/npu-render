@@ -1,3 +1,4 @@
+#include "provider_infer_trace.hpp"
 #include "provider_compile.hpp"
 #include "color_interpolator.hpp"
 #include <openvino/openvino.hpp>
@@ -104,7 +105,7 @@ ColorInterpolator::Result ColorInterpolator::State::run(const std::array<Project
     std::memcpy(s.request.get_tensor("colors").data<float>(),values.data(),values.size()*sizeof(Color));
     std::memcpy(s.request.get_tensor("points").data<int32_t>(),points.data(),points.size()*sizeof(Point));
     auto c=s.request.get_tensor("coverage");for(size_t i=0;i<coverage.size();++i)c.data<int32_t>()[i]=coverage[i];
-    s.request.infer();const auto output=s.request.get_output_tensor();
+    nr::provider::traced_infer(s.request,__FILE__,__LINE__);const auto output=s.request.get_output_tensor();
     require(output.get_element_type()==ov::element::f32 && output.get_size()==size_t(s.count)*4);
     Result result{{},s.device};result.colors.resize(s.count);
     std::memcpy(result.colors.data(),output.data<const float>(),result.colors.size()*sizeof(Color));

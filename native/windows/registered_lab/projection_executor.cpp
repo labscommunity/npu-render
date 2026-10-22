@@ -1,3 +1,4 @@
+#include "provider_infer_trace.hpp"
 #include "provider_compile.hpp"
 #include "projection_executor.hpp"
 #include <openvino/openvino.hpp>
@@ -129,7 +130,7 @@ ProjectionExecutor::Result ProjectionExecutor::execute(const std::vector<ClipPos
     auto clip = s.request.get_tensor("clip"), vp = s.request.get_tensor("viewport");
     std::memcpy(clip.data<float>(), vertices.data(), vertices.size() * sizeof(ClipPosition));
     std::memcpy(vp.data<float>(), v.data(), sizeof(v));
-    s.request.infer();
+    nr::provider::traced_infer(s.request,__FILE__,__LINE__);
     const auto floating = s.request.get_output_tensor(0), snapped = s.request.get_output_tensor(1);
     if(floating.get_element_type() != ov::element::f32 || floating.get_size() != size_t(s.count) * 4 ||
        snapped.get_element_type() != ov::element::i32 || snapped.get_size() != size_t(s.count) * 2)
