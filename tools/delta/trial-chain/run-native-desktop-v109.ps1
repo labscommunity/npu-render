@@ -1,14 +1,14 @@
 param([ValidateSet('preflight','admit')][string]$Mode='preflight')
-$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$out="$r\vm\native-desktop-admission-v107";$task='T8-NpuRender-NativeDesktopRecovery-v107';$thumb='3112355AF6B6C6265E9B849662D3E02F6797343A'
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$r="$env:LOCALAPPDATA\npu-render";$out="$r\vm\native-desktop-admission-v109";$task='T8-NpuRender-NativeDesktopRecovery-v109';$thumb='3112355AF6B6C6265E9B849662D3E02F6797343A'
 $probe="$r\builds\native-present-v6\Release\nr_frame_present_probe.exe"
 $proof=Get-Content "$r\builds\native-present-v6\build-report.json" -Raw|ConvertFrom-Json
 if(!$proof.clean_build -or (Get-FileHash $probe).Hash -ne $proof.binary_sha256){throw 'Session inspector identity mismatch'}
-$source=Get-Content "$r\vm\native-desktop-v107-source.json" -Raw|ConvertFrom-Json
+$source=Get-Content "$r\vm\native-desktop-v109-source.json" -Raw|ConvertFrom-Json
 foreach($f in $source.psobject.Properties){if((Get-FileHash "$r\vm\$($f.Name)").Hash -ne $f.Value){throw 'Native controller source mismatch'}}
 $gate=(& $probe --inspect-session)|ConvertFrom-Json;if($LASTEXITCODE){throw 'Console inspection failed'}
 $preflight=[ordered]@{observed=[DateTime]::UtcNow.ToString('o');mode=$Mode;session_gate=$gate;ready=[bool]$gate.ready_for_interactive_task;admission_attempted=$false;driver_installed=$false;desktop_offloaded=$false}
-if(!$gate.ready_for_interactive_task -or $Mode -eq 'preflight'){$preflight|ConvertTo-Json -Depth 5|Set-Content "$r\vm\native-desktop-v107-preflight.json";$preflight|ConvertTo-Json -Depth 5;return}
-$registered=Get-Content "$r\vm\native-registration-v86\report.json" -Raw|ConvertFrom-Json
+if(!$gate.ready_for_interactive_task -or $Mode -eq 'preflight'){$preflight|ConvertTo-Json -Depth 5|Set-Content "$r\vm\native-desktop-v109-preflight.json";$preflight|ConvertTo-Json -Depth 5;return}
+$registered=Get-Content "$r\vm\native-registration-v88\report.json" -Raw|ConvertFrom-Json
 $broker=Get-Content "$r\vm\native-broker-v3-qualification\report.json" -Raw|ConvertFrom-Json
 $observer=Get-Content "$r\vm\native-observer-v1-qualification\report.json" -Raw|ConvertFrom-Json
 if(!$registered.passed -or !$registered.registered_npu_qualified -or !$registered.cleanup_passed -or !$broker.passed -or !$broker.owned_process_acls_restored_exactly -or !$observer.passed){throw 'Native prerequisites are not qualified'}
@@ -25,14 +25,16 @@ $previous=Get-Content "$r\vm\native-desktop-admission-v42\report.json" -Raw|Conv
 if(!$previous.completed -or !$previous.cleanup_passed){throw 'Previous native cleanup incomplete'}
 $publication=Get-Content "$r\vm\native-frame-publication-v2-qualification\report.json" -Raw|ConvertFrom-Json
 if(!$publication.completed -or !$publication.passed -or $publication.source_sha256.'native_frame_publish_v1.py' -ne (Get-FileHash "$r\vm\native_frame_publish_v1.py").Hash){throw 'Atomic publication not qualified'}
-$worker="$r\builds\native-tree-v47\Release\nr_registered_local_indexed_worker.exe"
-$workerProof=Get-Content "$r\builds\native-tree-v47\registered-build-report.json" -Raw|ConvertFrom-Json
+$worker="$r\builds\native-tree-v49\Release\nr_registered_local_indexed_worker.exe"
+$workerProof=Get-Content "$r\builds\native-tree-v49\registered-build-report.json" -Raw|ConvertFrom-Json
 if(!$workerProof.clean_build -or (Get-FileHash $worker).Hash -ne $workerProof.binary_sha256.'nr_registered_local_indexed_worker.exe'){throw 'NPU worker identity mismatch'}
-$registeredWorker=Get-Content "$r\vm\native-registration-v86\qualification\report.json" -Raw|ConvertFrom-Json;if(!$registeredWorker.passed -or $registeredWorker.worker_binary_sha256 -ne (Get-FileHash $worker).Hash){throw 'Registered worker identity mismatch'}
+$registeredWorker=Get-Content "$r\vm\native-registration-v88\qualification\report.json" -Raw|ConvertFrom-Json;if(!$registeredWorker.passed -or $registeredWorker.worker_binary_sha256 -ne (Get-FileHash $worker).Hash){throw 'Registered worker identity mismatch'}
 foreach($name in @('T8-NpuRender-NativeTraceV1','T8-NpuRender-NativeIddV1')){if(Test-Path "$env:ProgramData\$name"){throw 'Native diagnostic directory already exists'}}
 $boot=(& bcdedit /enum '{current}') -join "`n";if($LASTEXITCODE -or $boot -notmatch '(?im)^testsigning\s+Yes\s*$'){throw 'Existing test-signing mode required'}
 $principal=[Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent());if(!$principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)){throw 'Elevated controller required'}
 if((Test-Path $out) -or (Get-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue)){throw 'Transaction identity exists'}
+# Recovery tasks of completed admissions are stale (trial 25: one fired into the next admission).
+$stale=@();foreach($st in @(Get-ScheduledTask|Where-Object {$_.TaskName -like 'T8-NpuRender-NativeDesktopRecovery-v*'})){$sn=$st.TaskName -replace '.*-v','';$sr="$r\vm\native-desktop-admission-v$sn\report.json";$sd=$false;if(Test-Path $sr){try{$sd=[bool](Get-Content $sr -Raw|ConvertFrom-Json).completed}catch{}};if($sd){Unregister-ScheduledTask -TaskName $st.TaskName -Confirm:$false;$stale+=$st.TaskName}}
 if(@(Get-Process nr_registered*,nr_native_service_probe,nr_native_local_session -ErrorAction SilentlyContinue).Count){throw 'Another rendering experiment active'}
 # The pinned topology inspector is read-only and may overlap this preflight.
 # Live/static presentation probes remain excluded by executable and exact args.
@@ -48,9 +50,9 @@ foreach($process in @(Get-CimInstance Win32_Process -Filter "Name = 'nr_frame_pr
   }
  }finally{$pinned.Dispose()}
 }
-$iddProof=Get-Content "$r\vm\native-idd-package-v3\report.json" -Raw|ConvertFrom-Json
+$iddProof=Get-Content "$r\vm\native-idd-package-v4\report.json" -Raw|ConvertFrom-Json
 if(!$iddProof.prepared -or $iddProof.desktop_lease_max_ms -ne 2400000 -or $iddProof.owned_app_lease_max_ms -ne 120000){throw 'Indirect duration contract not qualified'}
-$packages=@(@{folder='native-driver-package-v41';inf='nr_native_probe.inf';hardware_id='ROOT\NPURENDER_NATIVE_PROBE';version='0.0.1341.0'},@{folder='native-idd-package-v3';inf='nr_native_indirect_probe.inf';hardware_id='ROOT\NPURENDER_NATIVE_INDIRECT_V1';version='0.0.1503.0'})
+$packages=@(@{folder='native-driver-package-v43';inf='nr_native_probe.inf';hardware_id='ROOT\NPURENDER_NATIVE_PROBE';version='0.0.1343.0'},@{folder='native-idd-package-v4';inf='nr_native_indirect_probe.inf';hardware_id='ROOT\NPURENDER_NATIVE_INDIRECT_V1';version='0.0.1504.0'})
 foreach($p in $packages){
  $directory="$r\vm\$($p.folder)";$m=Get-Content "$directory\report.json" -Raw|ConvertFrom-Json
  if(!$m.prepared -or $m.hardware_id -ne $p.hardware_id -or $m.version -ne $p.version -or $m.signer_thumbprint -ne $thumb){throw 'Package metadata mismatch'}
@@ -64,7 +66,7 @@ if(!$before.Count -or @($before|Where-Object status -ne 'OK').Count){throw 'Orig
 $vbs=Get-CimInstance -Namespace root\Microsoft\Windows\DeviceGuard -ClassName Win32_DeviceGuard;if($vbs.VirtualizationBasedSecurityStatus -ne 2 -or $vbs.SecurityServicesRunning -notcontains 2){throw 'Expected running memory integrity'}
 New-Item -ItemType Directory $out|Out-Null
 & icacls.exe $out /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' > "$out\directory-acl.log";if($LASTEXITCODE){throw 'Ownership directory protection failed'}
-Copy-Item "$r\vm\recover-native-desktop-v107.ps1" "$out\recover.ps1"
+Copy-Item "$r\vm\recover-native-desktop-v109.ps1" "$out\recover.ps1"
 $ownership=[ordered]@{schema=3;packages=$packages;thumbprint=$thumb;devcon="$r\dependencies\wdk-tools\devcon.exe";devcon_sha256=(Get-FileHash "$r\dependencies\wdk-tools\devcon.exe").Hash;physical_display_before=$before;added_stores=@();owned_processes=@();owned_trace_directories=@();controller_pid=$PID;created=[DateTime]::UtcNow.ToString('o');mode='native-admission'}
 function Save-Ownership{$ownership|ConvertTo-Json -Depth 7|Set-Content "$out\ownership.tmp";Move-Item "$out\ownership.tmp" "$out\ownership.json" -Force}
 Save-Ownership
@@ -85,7 +87,7 @@ try{
   $extra=if($name -eq 'T8-NpuRender-NativeTraceV1'){"(A;OICI;0x1301bf;;;$dwmSid)"}else{''}
   $acl.SetSecurityDescriptorSddlForm("O:BAG:BAD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301bf;;;LS)$extra");Set-Acl $directory -AclObject $acl
  }
- $cert=[Security.Cryptography.X509Certificates.X509Certificate2]::new("$r\vm\native-driver-package-v41\test-signing.cer");if($cert.Thumbprint -ne $thumb){throw 'Certificate mismatch'}
+ $cert=[Security.Cryptography.X509Certificates.X509Certificate2]::new("$r\vm\native-driver-package-v43\test-signing.cer");if($cert.Thumbprint -ne $thumb){throw 'Certificate mismatch'}
  foreach($name in @('Root','TrustedPublisher')){if(!(Test-Path "Cert:\LocalMachine\$name\$thumb")){$ownership.added_stores+=$name;Save-Ownership;$store=[Security.Cryptography.X509Certificates.X509Store]::new($name,'LocalMachine');$store.Open('ReadWrite');try{$store.Add($cert)}finally{$store.Close()};if(!(Test-Path "Cert:\LocalMachine\$name\$thumb")){throw 'Temporary trust unavailable'}}}
  foreach($p in $packages){
   $code=Run-Owned "$env:windir\System32\pnputil.exe" @('/add-driver',"$r\vm\$($p.folder)\$($p.inf)") $p.folder;if($code){throw 'Package staging failed'}
@@ -104,12 +106,12 @@ try{
  if($key -notmatch '^\{4d36e968-e325-11ce-bfc1-08002be10318\}\\\d{4}$'){throw 'Unexpected renderer class registration'}
  $registration=Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\Class\$key"
  $modules=@($registration.UserModeDriverName|Select-Object -Unique);$dll=$modules[0]
- $renderFiles=Get-Content "$r\vm\native-driver-package-v41\sha256.json" -Raw|ConvertFrom-Json
+ $renderFiles=Get-Content "$r\vm\native-driver-package-v43\sha256.json" -Raw|ConvertFrom-Json
  $expected=($renderFiles|Where-Object name -eq 'nr_native_probe_umd.dll').sha256
  if($modules.Count -ne 1 -or $registration.DriverVersion -ne $renderer.version -or !$dll.StartsWith("$env:windir\System32\DriverStore\FileRepository\",[StringComparison]::OrdinalIgnoreCase) -or [IO.Path]::GetFileName($dll) -ne 'nr_native_probe_umd.dll' -or (Get-FileHash $dll).Hash -ne $expected){throw 'Installed renderer identity mismatch'}
  $report.installed_umd_sha256=$expected
  $report.renderer_instance=$devices[0].InstanceId;Save-Report
- $arguments=@("$r\vm\native_desktop_bootstrap_v81.py",'--interactive-dll',$dll,'--monitor-seconds','660','--recovery-task',$task,'--ptl-complex-blob',"$r\vm\ptl-six-span-complex-shader-v1\patched.blob",'--ptl-rectangle-blob',"$r\vm\ptl-six-span-point-rectangle-v2\patched.blob",'--ptl-long-blob',"$r\vm\ptl-six-span-long-shader-v2\patched.blob",'--ptl-program-blob',"$r\vm\ptl-six-span-program-compact-v1\patched.blob",'--ptl-masked-blob',"$r\vm\ptl-six-span-masked-v1\patched.blob",'--ptl-geometry-blob',"$r\vm\ptl-six-span-geometry-v2\patched.blob",'--ptl-texture-blob',"$r\vm\ptl-six-span-three-texture-v1\patched.blob",'--ptl-solid-blob',"$r\vm\ptl-six-span-solid-v3\patched.blob",'--ptl-four-tap-blob',"$r\vm\ptl-six-span-general-v1\patched.blob",'--memory-cache','1','--texture-scope','1','--frame-blob-dir',"$r\vm\frame-blobs-v18\deploy",'--worker',$worker,'--runtime',"$r\toolchains\openvino-2026.4.1\Lib\site-packages\openvino\libs",'--cache',"$r\vm\model-cache-2026-4-v209",'--session-probe',$probe,'--devcon',$ownership.devcon,'--idd-inf',"$r\vm\native-idd-package-v3\nr_native_indirect_probe.inf",'--transaction',$out,'--trace',"$env:ProgramData\T8-NpuRender-NativeIddV1")
+ $arguments=@("$r\vm\native_desktop_bootstrap_v83.py",'--interactive-dll',$dll,'--monitor-seconds','660','--recovery-task',$task,'--ptl-complex-blob',"$r\vm\ptl-six-span-complex-shader-v1\patched.blob",'--ptl-rectangle-blob',"$r\vm\ptl-six-span-point-rectangle-v2\patched.blob",'--ptl-long-blob',"$r\vm\ptl-six-span-long-shader-v2\patched.blob",'--ptl-program-blob',"$r\vm\ptl-six-span-program-compact-v1\patched.blob",'--ptl-masked-blob',"$r\vm\ptl-six-span-masked-v1\patched.blob",'--ptl-geometry-blob',"$r\vm\ptl-six-span-geometry-v2\patched.blob",'--ptl-texture-blob',"$r\vm\ptl-six-span-three-texture-v1\patched.blob",'--ptl-solid-blob',"$r\vm\ptl-six-span-solid-v3\patched.blob",'--ptl-four-tap-blob',"$r\vm\ptl-six-span-general-v1\patched.blob",'--memory-cache','1','--texture-scope','1','--frame-blob-dir',"$r\vm\frame-blobs-v18\deploy",'--worker',$worker,'--runtime',"$r\toolchains\openvino-2026.4.1\Lib\site-packages\openvino\libs",'--cache',"$r\vm\model-cache-2026-4-v209",'--session-probe',$probe,'--devcon',$ownership.devcon,'--idd-inf',"$r\vm\native-idd-package-v4\nr_native_indirect_probe.inf",'--transaction',$out,'--trace',"$env:ProgramData\T8-NpuRender-NativeIddV1")
  $code=Run-Owned "$r\toolchains\openvino-2026.4.1\Scripts\python.exe" $arguments 'bootstrap' 780
  $report.bootstrap_exit=$code;Save-Report;if($code){throw 'Native desktop admission trial failed'}
  $trial=Get-Content "$out\bootstrap\report.json" -Raw|ConvertFrom-Json

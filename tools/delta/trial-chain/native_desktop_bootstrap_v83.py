@@ -4,9 +4,10 @@ from native_session_broker_v3 import *
 from native_incremental_evidence_v1 import NativeEvidence
 from native_process_observer_v1 import PinnedProcess,named_processes,find_compositor,find_indirect_host,process_image
 import traceback,struct
-from native_shared_app_v53 import SharedInteractiveApp
+from native_shared_app_v55 import SharedInteractiveApp
 from native_lease_renewal_v1 import Renewal
 from native_resident_broker_v1 import ResidentBroker
+from native_worker_failover_v1 import WorkerFailover
 p=argparse.ArgumentParser()
 for n in ('worker','runtime','cache','session_probe','devcon','idd_inf','transaction','trace'):
     p.add_argument('--'+n.replace('_','-'),type=Path,required=True)
@@ -115,7 +116,15 @@ try:
                   uniform_lanes=v.uniform_lanes,texture_scope=v.texture_scope,pipeline_cache='retained',monitor_seconds=v.monitor_seconds,quad_batch='1',
                   ptl_resident_clip_model_sha256=hashlib.sha256(v.ptl_resident_clip_blob.read_bytes()).hexdigest(),ptl_complex_model_sha256=hashlib.sha256(v.ptl_complex_blob.read_bytes()).hexdigest(),ptl_rectangle_model_sha256=hashlib.sha256(v.ptl_rectangle_blob.read_bytes()).hexdigest(),ptl_long_model_sha256=hashlib.sha256(v.ptl_long_blob.read_bytes()).hexdigest(),ptl_program_model_sha256=hashlib.sha256(v.ptl_program_blob.read_bytes()).hexdigest(),ptl_masked_model_sha256=hashlib.sha256(v.ptl_masked_blob.read_bytes()).hexdigest(),ptl_geometry_model_sha256=hashlib.sha256(v.ptl_geometry_blob.read_bytes()).hexdigest(),ptl_texture_model_sha256=hashlib.sha256(v.ptl_texture_blob.read_bytes()).hexdigest(),ptl_solid_model_sha256=hashlib.sha256(v.ptl_solid_blob.read_bytes()).hexdigest(),ptl_four_tap_model_sha256=hashlib.sha256(v.ptl_four_tap_blob.read_bytes()).hexdigest(),worker_seconds=v.monitor_seconds+45,lease_milliseconds=(v.monitor_seconds+60)*1000,incremental_evidence=True)
     evidence=NativeEvidence(out,v.trace/f'process-{host.identity.pid}.jsonl')
-    worker=subprocess.Popen([str(v.worker),pipe,'65536',str(1185),str(compositor.identity.pid),str(compositor.identity.created),str(host.identity.pid),str(host.identity.created)],env=env,stdin=subprocess.DEVNULL,stdout=streams[2],stderr=streams[3],creationflags=subprocess.CREATE_NO_WINDOW)
+    def start_worker(generation):
+        worker_env=dict(env)
+        if generation>1:
+            capture=out/f'requests-{generation}';capture.mkdir(exist_ok=False);worker_env['NR_RENDER_CAPTURE_DIRECTORY']=str(capture)
+            providers=out/f'provider-processes-{generation}';providers.mkdir(exist_ok=False);worker_env['NR_RENDER_PROVIDER_RECOVERY_DIR']=str(providers)
+            streams.append((out/'worker.stdout.jsonl').open('ab'));streams.append((out/'worker.stderr.log').open('ab'));stdout,stderr=streams[-2],streams[-1]
+        else:stdout,stderr=streams[2],streams[3]
+        return subprocess.Popen([str(v.worker),pipe,'65536',str(1185),str(compositor.identity.pid),str(compositor.identity.created),str(host.identity.pid),str(host.identity.created)],env=worker_env,stdin=subprocess.DEVNULL,stdout=stdout,stderr=stderr,creationflags=subprocess.CREATE_NO_WINDOW)
+    worker=start_worker(1)
     own_process(int(worker._handle),'worker');report['worker_pid']=worker.pid;save()
     evidence.poll()
     while not evidence.ready:
@@ -127,6 +136,13 @@ try:
     leases.append(LeaseGrant(int(worker._handle),compositor.handle,suffix,scope=1,desktop_session=session['console_session'],milliseconds=1200000))
     leases.append(LeaseGrant(int(worker._handle),host.handle,suffix,scope=2,desktop_session=session['console_session'],milliseconds=1200000))
     renewal=Renewal(leases,v.recovery_task);report['lease_renewals']=[];report['initial_grant_s']=1200
+    def restart_resident(new_worker):
+        broker=globals().get('resident')
+        if broker is None:return
+        report.setdefault('resident_broker_restarts',[]).append(broker.close());save()
+        globals()['resident']=ResidentBroker(v.transaction,new_worker,suffix,session['console_session'],env,own_process,Path(os.environ['LOCALAPPDATA'])/'npu-render/builds/native-auto-interactive-v8',generation=len(report['resident_broker_restarts'])+1)
+        report['resident_broker_pid']=globals()['resident'].start();save()
+    failover=WorkerFailover(start_worker=start_worker,leases=leases,grant=lambda new:[permissions.append(ProcessGrant(int(new._handle),sid)) for sid in (compositor.sid,host.sid)],after_restart=restart_resident,stdout_path=out/'worker.stdout.jsonl',process_identity=process_identity,report=report,save=save)
     report['admission_published']=True;report['admission_publication_ms']=(time.perf_counter()-(ready_deadline-8))*1000;save()
     report['shared_application_qualified']=False;report['shared_application_disabled']=True;save()
     resident=ResidentBroker(v.transaction,worker,suffix,session['console_session'],env,own_process,Path(os.environ['LOCALAPPDATA'])/'npu-render/builds/native-auto-interactive-v8')
@@ -139,7 +155,7 @@ try:
         if resident:report['resident_broker']=resident.poll()
         if time.perf_counter()-last_gate>=1:gate();last_gate=time.perf_counter()
         if installer.poll() is not None:assert installer.returncode==0,'Native indirect installation failed'
-        assert worker.poll() is None,'NPU worker stopped before native frame evidence'
+        worker=failover.check(worker)
         evidence.poll();report.update(evidence.snapshot(compositor.identity.pid,host.identity.pid))
         frame=frame_header(v.trace/f'latest-frame-{host.identity.pid}.bin',host.identity.pid)
         if frame:

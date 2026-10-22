@@ -1297,3 +1297,39 @@ reference), and the saver process itself did not appear among the admitted
 clients, so WPF's path is still unknown. Priority 3 is not met either: no
 admission has yet run beyond 40 minutes; the multi-hour soak on tree v47 is
 the next run.
+
+## Trial 25 (generation 32, admission v108, four-hour soak attempt on tree v47): 22 minutes, ended by the previous admission's recovery task
+
+Started 00:09:43Z by `npu-render desktop enable --monitor-seconds 14000
+--initial-grant-seconds 1200` on tree v47, package v41, IDD v3, with the
+resident broker and saver dismissals scheduled every fifty minutes. It ran
+cleanly: six ordinary clients admitted (the Start menu host, explorer,
+TextInputHost among them), 32 broker renewal rounds, one lease renewal at
+00:20:12Z followed by the worker, 39 frame batches, 37 frames presented, no
+desktop switch, no crash.
+
+At 00:32:07Z the scheduled task `T8-NpuRender-NativeDesktopRecovery-v107`, armed
+by trial 24's admission 2370 s after its start and never unregistered, fired
+under SYSTEM and ran trial 24's recovery script: it removed `ROOT\DISPLAY\0000`
+and `ROOT\DISPLAY\0001` (the live admission's indirect display), deleted the
+staged driver packages (oem24.inf, oem21.inf), restored the certificate stores
+and reported `passed=false` ("owned-process contract mismatch", "existing
+immutable trace archive"), which is also why it had not unregistered itself
+after trial 24: the script removes its task only on a passing run. The indirect
+host process ended with the device, the relay and the bootstrap asserted on
+their pinned host, and the admission's own recovery then failed to take the
+recovery mutex that the stale run was holding ("Access to the path
+'Global\T8.NpuRender.NativeDesktopRecovery.v1' is denied"), so `cleanup_passed`
+is false although the stale run had already removed everything.
+
+Trial 24's own recovery had passed at 00:03:48Z through the wrapper; the task
+registered at the admission's start is a separate object that only its own
+passing run deletes. Any admission whose recovery reports an error therefore
+leaves a loaded gun pointed at the next admission, and its boot trigger
+survives restarts. The fix is a lifecycle, not a flag: a recovery task is
+unregistered whenever its admission has completed, whatever its own run
+reported; the recovery script refuses to touch devices and packages while a
+newer admission is running; the admission wrapper and the switch's `enable`
+sweep stale recovery tasks of completed admissions before starting. Delta was
+cleaned by hand after this trial (both stale tasks removed, display and package
+state verified).
