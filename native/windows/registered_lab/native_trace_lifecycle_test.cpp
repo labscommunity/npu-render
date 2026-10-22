@@ -25,6 +25,18 @@ struct Child {
     }
     Child(const Child &) = delete;
 };
+// Removes a previous run's directory (its files are closed once that process exited): the
+// contract runs in every build tree of one CI job, and the trace handle lives until exit.
+void purge(const std::wstring &directory) {
+    if (GetFileAttributesW(directory.c_str()) == INVALID_FILE_ATTRIBUTES) return;
+    WIN32_FIND_DATAW entry{};
+    const auto search = FindFirstFileW((directory + L"\\*").c_str(), &entry);
+    if (search != INVALID_HANDLE_VALUE) {
+        do { if (!(entry.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) check(DeleteFileW((directory + L"\\" + entry.cFileName).c_str()) != 0); } while (FindNextFileW(search, &entry));
+        FindClose(search);
+    }
+    check(RemoveDirectoryW(directory.c_str()) != 0);
+}
 std::string contents(const std::wstring &path) {
     std::ifstream f(path); check(bool(f));
     return std::string(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
@@ -33,6 +45,7 @@ int wmain(int argc, wchar_t **argv) try {
     if (argc == 2 && !std::wcscmp(argv[1], L"--hold")) { Sleep(25000); return 0; }
     check(argc == 1);
     const std::wstring root = NR_LAB_TRACE_ROOT, archived = root + L".archived";
+    purge(root); purge(archived);
     check(GetFileAttributesW(root.c_str()) == INVALID_FILE_ATTRIBUTES && GetFileAttributesW(archived.c_str()) == INVALID_FILE_ATTRIBUTES);
     check(CreateDirectoryW(root.c_str(), nullptr) != 0);
     check(l::lab_trace_session() == 0);
