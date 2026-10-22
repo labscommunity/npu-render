@@ -1426,3 +1426,34 @@ Changes for tree v51: the admission constructor verifies without requiring the
 worker (the exchange still requires it where it connects), the packet limit
 rises to 256 MB so a whole-desktop writeback fits, and the executor names a
 reply that would exceed the limit instead of failing the batch generically.
+
+## Trial 29 (generation 36, admission v112, tree v51, package v45): DWM survives two worker losses; the fresh worker's missing-resource rule
+
+Same probe on tree v51. The worker was stopped at 02:43:30.7Z; the replacement
+was ready in 942 ms and DWM re-bound to it. The 21 MB and 28 MB desktop
+surfaces went alone and were accepted; the command batch that followed
+(4.5 MB, 7 shaders, 6 resources, 4 uploads, 8 commands) was rejected again with
+the generic packet error, the replacement ended on that provider failure at
+02:44:06.2Z, and the bootstrap replaced it a second time (392 ms). This time
+DWM kept its device through both replacements: the admission constructor no
+longer requires the worker, so the device DWM created in the gap succeeded.
+The second replacement served the compositor (its first batches 638 KB in,
+2.6 MB back), frames continued (50 observed against 28 at the stop), the
+ordinary adapter probe created devices after the restarts, and the admission
+ran to its end. Recovery passed and unregistered its task. The live wrapper's
+only failure was its end-of-run provider-generation audit, which expects one
+worker lineage.
+
+The rejected packet, parsed offline, is consistent to the byte: 80-byte header,
+48-byte batch header, seven shaders, six resource records, four uploads and
+eight commands ending exactly at the packet's end, and every decode-stage
+check passes. The rejection is therefore in execution, and the packet shows
+why: its first upload is a partial image (x 512, 512x768) of resource 0, the
+1024x768 volatile target. A fresh worker holds no base image for that target,
+but the executor's missing-resource rule accepted a volatile resource with a
+window as present, so the batch drew into an empty target and failed on a
+generic bounds check instead of reporting the resource missing (which would
+have made the driver resend the full image). Trial 27's 50.9 MB resend was the
+same batch shape one step earlier. Changes for tree v52: a resource used as a
+target needs its base image whatever windows it carries, and a rejection names
+the execution stage it failed in, not only the decode stage.

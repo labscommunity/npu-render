@@ -330,6 +330,34 @@ Get-Content "$out\\report.json"
         "shared-app",
     )
     write("native_shared_app_v22.py", app)
+    # The provider-generation audit follows the worker lineage that ended the admission: after a worker
+    # failover the shared parent log holds every worker's rows and each worker's children live under
+    # their own provider-processes-<n> root (trial 29's audit asserted one lineage).
+    audit = (src / "native_provider_generation_audit_v1.py").read_text(encoding="utf-8")
+    audit = edit(
+        audit,
+        [
+            (
+                '        parent_path = args.bootstrap / "worker.stdout.jsonl"\n'
+                '        paths = sorted((args.bootstrap / "provider-processes").glob("generation-*/worker.stdout.jsonl"))\n'
+                '        children = {int(path.parent.name.split("-")[-1]): complete_rows(path) for path in paths}\n'
+                "        result.update(audit(complete_rows(parent_path), children))\n",
+                '        parent_path = args.bootstrap / "worker.stdout.jsonl"\n'
+                "        parent = complete_rows(parent_path)\n"
+                '        cuts = [i for i, x in enumerate(parent) if x.get("local_worker_ready")]\n'
+                "        lineage = max(1, len(cuts))\n"
+                "        if lineage > 1:\n"
+                "            parent = parent[cuts[-1]:]\n"
+                '        root = args.bootstrap / ("provider-processes" if lineage == 1 else f"provider-processes-{lineage}")\n'
+                '        paths = sorted(root.glob("generation-*/worker.stdout.jsonl"))\n'
+                '        children = {int(path.parent.name.split("-")[-1]): complete_rows(path) for path in paths}\n'
+                '        result["worker_lineages"] = lineage\n'
+                "        result.update(audit(parent, children))\n",
+            ),
+        ],
+        "provider-audit",
+    )
+    write("native_provider_generation_audit_v2.py", audit)
 
     # 4. Desktop bootstrap: HEAD blob pins and the frame kernel blobs.
     boot = (src / "native_desktop_bootstrap_v49.py").read_text(encoding="utf-8")
@@ -755,6 +783,7 @@ Get-Content "$out\\report.json"
                 "while((Get-ScheduledTask -TaskName T8-NpuRender-NativeLiveV65-screen).State -eq 'Running'",
                 "while((Task-State 'T8-NpuRender-NativeLiveV65-screen') -eq 'Running'",
             ),
+            ("native_provider_generation_audit_v1.py", "native_provider_generation_audit_v2.py"),
             ("NativeLiveV65", "NativeLiveV66"),
             ("run-native-desktop-v75.ps1", "run-native-desktop-v76.ps1"),
             ("native-desktop-admission-v75", "native-desktop-admission-v76"),
@@ -1077,6 +1106,7 @@ Get-Content "$out\\report.json"
         "run-native-live-v65.ps1": "run-native-live-v66.ps1",
         "start-native-topology-v132.ps1": "start-native-topology-v135.ps1",
         "native_shared_app_v21.py": "native_shared_app_v22.py",
+        "native_provider_generation_audit_v1.py": "native_provider_generation_audit_v2.py",
     }
     desk_manifest = {}
     for name, digest in desk_sources.items():
