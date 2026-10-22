@@ -251,10 +251,16 @@ public:
     bool kernel_available() const { for (const auto &k : kernels) if (k) return true; return false; }
     uint64_t current_generation() const { return generation; }
     // Executes one batch packet and returns the complete reply packet (Header + body).
+    // A rejected batch names the stage it failed in; the protocol's generic packet error hid the causes
+    // of trials 27 to 29.
     std::vector<uint8_t> execute(const std::vector<uint8_t> &packet) {
+        const char *stage = "header";
+        try { return execute_staged(packet, stage); }
+        catch (const std::invalid_argument &error) { throw std::invalid_argument(std::string(error.what()) + " (frame batch stage: " + stage + ")"); }
+    }
+    std::vector<uint8_t> execute_staged(const std::vector<uint8_t> &packet, const char *&stage) {
         const auto started = std::chrono::steady_clock::now();
-        // A rejected batch names the stage it failed in (the generic packet error hid trial 27's cause).
-        const char *stage = "header"; const auto expect = [&](bool ok) { if (!ok) throw std::invalid_argument(std::string("invalid frame batch at ") + stage); };
+        const auto expect = [&](bool ok) { if (!ok) throw std::invalid_argument(std::string("invalid frame batch at ") + stage); };
         indexed_exchange::Reader reader(packet); const auto header = reader.value<indexed_exchange::Header>();
         expect(batch_header_valid(header) && packet.size() == sizeof(header) + header.body_bytes);
         const auto batch = reader.value<BatchHeader>();
@@ -335,12 +341,16 @@ public:
         // Missing versions: a resource the batch references without the right content.
         std::vector<MissingRecord> missing;
         for (const auto &d : draws) {
-            auto check = [&](uint32_t index) { const auto &ref = refs[index]; if (ref.resident->version != ref.record.version && !ref.uploaded_full && ref.windows.empty()) missing.push_back({ref.record.key, ref.record.version}); };
-            check(d.record.target);
-            for (uint32_t t = 0; t < d.record.texture_count; ++t) check(d.textures[t].resource);
+            // A target needs its base image whatever windows it carries: a window only feeds volatile
+            // sampling. A fresh worker (failover) that accepted a partial image of a target drew into an
+            // empty one and failed a bounds check instead of reporting it missing (trial 29).
+            auto check = [&](uint32_t index, bool as_target) { const auto &ref = refs[index]; if (ref.resident->version != ref.record.version && !ref.uploaded_full && (as_target || ref.windows.empty())) missing.push_back({ref.record.key, ref.record.version}); };
+            check(d.record.target, true);
+            for (uint32_t t = 0; t < d.record.texture_count; ++t) check(d.textures[t].resource, false);
         }
         std::sort(missing.begin(), missing.end(), [](const auto &a, const auto &b) { return a.key < b.key || (a.key == b.key && a.version < b.version); });
         missing.erase(std::unique(missing.begin(), missing.end(), [](const auto &a, const auto &b) { return a.key == b.key && a.version == b.version; }), missing.end());
+        stage = "plan-and-execute";
         std::map<uint64_t, frame::Rect> dirty;
         current_shaders = &batch_shaders;
         if (missing.empty()) {
@@ -389,6 +399,7 @@ public:
         }
         stats.host_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
         // Reply.
+        stage = "reply";
         indexed_exchange::Writer w; auto reply = header; reply.kind = 2; reply.device = 3;
         ResponseHeader response; response.target_count = uint32_t(dirty.size()); response.missing_count = uint32_t(missing.size()); response.generation = generation;
         response.batch_sequence = batch.batch_sequence; response.provider_requests = stats.kernel_requests; response.covered_samples = stats.covered;
