@@ -4,7 +4,7 @@ from native_session_broker_v3 import *
 from native_incremental_evidence_v1 import NativeEvidence
 from native_process_observer_v1 import PinnedProcess,named_processes,find_compositor,find_indirect_host,process_image
 import traceback,struct
-from native_shared_app_v55 import SharedInteractiveApp
+from native_shared_app_v60 import SharedInteractiveApp
 from native_lease_renewal_v1 import Renewal
 from native_resident_broker_v1 import ResidentBroker
 from native_worker_failover_v1 import WorkerFailover
@@ -142,7 +142,7 @@ try:
         report.setdefault('resident_broker_restarts',[]).append(broker.close());save()
         globals()['resident']=ResidentBroker(v.transaction,new_worker,suffix,session['console_session'],env,own_process,Path(os.environ['LOCALAPPDATA'])/'npu-render/builds/native-auto-interactive-v8',generation=len(report['resident_broker_restarts'])+1)
         report['resident_broker_pid']=globals()['resident'].start();save()
-    failover=WorkerFailover(start_worker=start_worker,leases=leases,grant=lambda new:[permissions.append(ProcessGrant(int(new._handle),sid)) for sid in (compositor.sid,host.sid)],after_restart=restart_resident,stdout_path=out/'worker.stdout.jsonl',process_identity=process_identity,report=report,save=save)
+    failover=WorkerFailover(start_worker=start_worker,leases=leases,grant=lambda new:[permissions.append(ProcessGrant(int(new._handle),sid)) for sid in (compositor.sid,host.sid)],after_restart=restart_resident,stdout_path=out/'worker.stdout.jsonl',process_identity=process_identity,report=report,save=save,permissions=permissions)
     report['admission_published']=True;report['admission_publication_ms']=(time.perf_counter()-(ready_deadline-8))*1000;save()
     report['shared_application_qualified']=False;report['shared_application_disabled']=True;save()
     resident=ResidentBroker(v.transaction,worker,suffix,session['console_session'],env,own_process,Path(os.environ['LOCALAPPDATA'])/'npu-render/builds/native-auto-interactive-v8')

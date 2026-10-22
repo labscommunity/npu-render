@@ -1,0 +1,104 @@
+"""Retain once-per-child provider and NPU recovery evidence requirements."""
+from native_shared_correlation_v1 import indexed
+
+ROUTES = ("geometry", "program", "long", "complex", "rectangle", "resident_clip")
+
+
+def audit(parent, children):
+    starts = {x["generation"]: x for x in parent if x.get("provider_process_started")}
+    assert sorted(starts) == list(range(1, len(starts) + 1)) and 1 <= len(starts) <= 4
+    assert sum(bool(x.get("provider_process_started")) for x in parent) == len(starts)
+    assert set(starts) == set(children)
+    pi, pr, pt, pa = indexed(parent)
+    responses, failures = {}, {}
+    for x in parent:
+        if x.get("provider_process_response"):
+            assert x["dispatch_ticket"] not in responses and x["execution_device"] == "NPU"
+            assert x["generation"] in starts and x["attempt"] in (0, 1)
+            responses[x["dispatch_ticket"]] = x
+        if x.get("provider_process_failure"):
+            assert x["fallback_backend"] == "none" and x["generation"] in starts
+            failures.setdefault(x["dispatch_ticket"], []).append(x)
+    assert set(pr) <= set(responses) <= set(pi)
+    for ticket, response in responses.items():
+        fs = failures.get(ticket, [])
+        if response["attempt"] == 0:
+            assert not fs
+        else:
+            assert len(fs) == 1 and fs[0]["retry_on_npu"]
+            assert fs[0]["generation"] + 1 == response["generation"]
+    generations = []
+    for generation, events in sorted(children.items()):
+        start = starts[generation]
+        assert start["execution_device"] == "NPU" and start["kill_on_owner_exit"]
+        ready = [x for x in events if x.get("local_worker_ready")]
+        assert len(ready) == 1 and ready[0]["pid"] == start["pid"]
+        imports, draws = {}, {}
+        for route in ROUTES:
+            imports[route] = sum(bool(x.get(f"ptl_{route}_provider_created")) for x in events)
+            draws[route] = sum(bool(x.get(f"ptl_{route}_draw")) and x.get("accepted", False)
+                              for x in events)
+            assert imports[route] <= 1, (generation, route, "duplicate provider")
+            if draws[route]:
+                assert imports[route] == 1, (generation, route, "unproven provider")
+        schedules = [x for x in events if x.get("ptl_geometry_span_distribution")]
+        assert len(schedules) <= 1
+        if draws["geometry"]:
+            assert len(schedules) == 1
+        for x in schedules:
+            counts = x["counts"]
+            assert len(counts) == 6 and all(isinstance(v, int) and v >= 0 for v in counts)
+            assert sum(counts) == x["total"] and max(counts) - min(counts) <= 1
+            assert x["starts"] == [sum(counts[:i]) for i in range(6)]
+            assert x["arithmetic_backend"] == "NPU" and not x["kernel_changed"]
+        generations.append(dict(generation=generation, pid=start["pid"], imports=imports,
+                                accepted_draws=draws, balanced_schedules=len(schedules)))
+    return dict(passed=True, generations=generations,
+                imports={route: sum(x["imports"][route] for x in generations) for route in ROUTES},
+                accepted_draws={route: sum(x["accepted_draws"][route] for x in generations)
+                                for route in ROUTES},
+                balanced_schedules=sum(x["balanced_schedules"] for x in generations),
+                successful_parent_responses=len(responses),
+                recovered_parent_responses=sum(x["attempt"] == 1 for x in responses.values()),
+                incomplete_parent_tickets=sorted(set(pi) - (set(pr) & set(pt) & set(pa))),
+                scope="Provider initialization is unique per recorded child process. "
+                      "Aggregate import counts may increase on a proved NPU restart. "
+                      "This audit does not replace request, frame, application or recovery checks.")
+
+
+if __name__ == "__main__":
+    from pathlib import Path
+    import argparse
+    import hashlib
+    import json
+    import traceback
+    from native_shared_correlation_v1 import complete_rows
+
+    p = argparse.ArgumentParser()
+    p.add_argument("--bootstrap", type=Path, required=True)
+    p.add_argument("--output", type=Path, required=True)
+    args = p.parse_args()
+    args.output.mkdir(exist_ok=False)
+    result = dict(completed=False, passed=False, new_device_execution=False)
+    try:
+        parent_path = args.bootstrap / "worker.stdout.jsonl"
+        parent = complete_rows(parent_path)
+        cuts = [i for i, x in enumerate(parent) if x.get("local_worker_ready")]
+        lineage = max(1, len(cuts))
+        if lineage > 1:
+            parent = parent[cuts[-1]:]
+        root = args.bootstrap / ("provider-processes" if lineage == 1 else f"provider-processes-{lineage}")
+        paths = sorted(root.glob("generation-*/worker.stdout.jsonl"))
+        children = {int(path.parent.name.split("-")[-1]): complete_rows(path) for path in paths}
+        result["worker_lineages"] = lineage
+        result.update(audit(parent, children))
+        result["source_sha256"] = {
+            str(path.relative_to(args.bootstrap)): hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in [parent_path, *paths]}
+    except Exception as error:
+        result.update(error=repr(error), traceback=traceback.format_exc())
+    result["completed"] = True
+    (args.output / "report.json").write_text(json.dumps(result, indent=2) + "\n")
+    print(json.dumps(result))
+    if not result["passed"]:
+        raise SystemExit(1)
