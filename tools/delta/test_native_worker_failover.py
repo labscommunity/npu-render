@@ -9,6 +9,16 @@ sys.path.insert(0, str(Path(__file__).parent))
 failover = importlib.import_module("native_worker_failover_v1")
 
 
+class FakeRecord:
+    def __init__(self, scope):
+        self.scope, self.deadline_tick = scope, 777
+
+
+class FakeGrant:
+    def __init__(self, scope):
+        self.record, self.mapping = FakeRecord(scope), 1
+
+
 class FakeWorker:
     def __init__(self, pid, alive=True, code=None):
         self.pid, self._alive, self.returncode, self._handle = pid, alive, code, pid * 10
@@ -51,7 +61,7 @@ def test_check_replaces_a_dead_worker_and_regrants(tmp_path, monkeypatch):
 
     f = failover.WorkerFailover(
         start_worker=start_worker,
-        leases=["compositor", "host"],
+        leases=[FakeGrant(1), FakeGrant(2)],
         grant=granted.append,
         after_restart=restarted.append,
         stdout_path=log,
@@ -60,14 +70,20 @@ def test_check_replaces_a_dead_worker_and_regrants(tmp_path, monkeypatch):
         save=lambda: saves.append(1),
         limit=1,
     )
-    monkeypatch.setattr(
-        f, "regrant_all", lambda identity: [111, 222] if identity == ("identity", 90) else []
-    )
+    rewritten = []
+
+    def fake_regrant(grant, identity, milliseconds):
+        assert identity == ("identity", 90) and milliseconds == 1200000
+        rewritten.append(grant.record.scope)
+        return 111
+
+    monkeypatch.setattr(failover, "regrant", fake_regrant)
     assert f.check(FakeWorker(5, alive=False, code=1)) is replacement
     assert granted == [replacement] and restarted == [replacement]
     record = report["worker_restarts"][0]
     assert record["exit_code"] == 1 and record["restart"] == 1 and record["pid"] == 9
-    assert record["deadlines"] == [111, 222] and "restored" in record and saves
+    # The compositor lease is rewritten for the new worker; the indirect host's keeps its deadline.
+    assert record["deadlines"] == [111, 777] and rewritten == [1] and "restored" in record and saves
     # The limit is per admission: a second loss ends it.
     try:
         f.check(FakeWorker(9, alive=False, code=0))

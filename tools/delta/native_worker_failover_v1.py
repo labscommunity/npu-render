@@ -93,10 +93,18 @@ class WorkerFailover:
         self.restarts = []
 
     def regrant_all(self, identity):
-        return [
-            int(regrant(g, identity, min(self.grant_ms, SCOPE_MAXIMUM_MS[g.record.scope])))
-            for g in self.leases
-        ]
+        """Rewrites the grants whose consumer talks to the worker (the compositor's and any
+        same-session client's); the indirect host's lease (scope 2) never names the worker it
+        would re-bind to, so it keeps renewing unchanged."""
+        deadlines = []
+        for g in self.leases:
+            if g.record.scope == 2:
+                deadlines.append(int(g.record.deadline_tick))
+                continue
+            deadlines.append(
+                int(regrant(g, identity, min(self.grant_ms, SCOPE_MAXIMUM_MS[g.record.scope])))
+            )
+        return deadlines
 
     def check(self, worker):
         """Returns the worker to keep polling: the same one while it lives, else its replacement."""

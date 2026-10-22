@@ -150,3 +150,34 @@ the compositor's, at the same speed, and an application that needs the iGPU
 evidence for gate 6 is the wrapper's `application_default_device_created`, the
 broker's rows, and the lease-holding consumer (`--hold`) proving renewal across
 the 120 s grant, recorded in the trials report once run.
+
+## When the worker ends (2026-10-22 night)
+
+The native driver cannot render on the host: the CPU executors are compiled out
+of the probe build (`#ifndef NR_NATIVE_PROBE`), and a WARP-like in-process
+fallback for frame batches would need a host implementation of the per-draw
+routes as well as the kernel. So a lost worker is handled by replacement, not
+by degradation:
+
+- The driver's exchange (`IndexedNpuExchange::send`) treats a failed request as
+  the start of a failover: it re-reads the admission (`read_or_request`) every
+  250 ms for up to 15 s, binds to the worker it names once that worker is alive,
+  and sends the request once more. Only the retry's failure poisons the device
+  the way any failure did before. DWM's render thread stalls for the failover
+  instead of losing its device.
+- The generated bootstrap polls the worker; when it has ended, `WorkerFailover`
+  starts a replacement on the same private pipe (appending to the same logs,
+  with its own capture and provider directories), grants the compositor and
+  indirect host query access to it, waits for its ready row, rewrites every
+  lease with the new worker's identity and fresh ticks, and restarts the
+  resident broker. A rewrite is not a renewal, so a consumer's cached admission
+  is replaced rather than extended, which is what binding to a new worker
+  needs. Three replacements per admission; the fourth loss ends it as before.
+- Automatically admitted clients lose their lease mappings with the broker and
+  re-request from the new publication inside the same failover window.
+
+Built as tree v48 (clean, lease contract passing). The probe is an admission
+whose worker is stopped by a scheduled task mid-run with a lease-holding client
+spanning the stop: the expected evidence is one `worker_restarts` record,
+`exchange_failover` rows in the compositor's driver trace, frames continuing
+after the restart, and the client still admitted. Not run yet.
