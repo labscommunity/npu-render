@@ -29,7 +29,9 @@ inline uint64_t lab_trace_session() noexcept {
         static std::unique_ptr<nr::native_probe::Admission> admission;
         static uint64_t generation = 0;
         if (admission) {
-            try { admission->verify(); return generation; }
+            // The trace never connects to the worker: a consumer keeps its lease while the
+            // controller replaces a lost worker, and so does its trace (same rule as device creation).
+            try { admission->verify(false); return generation; }
             catch (...) { admission.reset(); }
         }
         admission = std::make_unique<nr::native_probe::Admission>(nr::native_probe::read_mapping());

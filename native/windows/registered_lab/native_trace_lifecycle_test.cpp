@@ -36,7 +36,7 @@ int wmain(int argc, wchar_t **argv) try {
     check(GetFileAttributesW(root.c_str()) == INVALID_FILE_ATTRIBUTES && GetFileAttributesW(archived.c_str()) == INVALID_FILE_ATTRIBUTES);
     check(CreateDirectoryW(root.c_str(), nullptr) != 0);
     check(l::lab_trace_session() == 0);
-    Child controller, first_worker, second_worker;
+    Child controller, first_worker, second_worker, second_controller;
     PSECURITY_DESCRIPTOR descriptor = nullptr;
     check(ConvertStringSecurityDescriptorToSecurityDescriptorW(L"O:BAG:BAD:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;0x00020004;;;AU)", SDDL_REVISION_1, &descriptor, nullptr) != 0);
     SECURITY_ATTRIBUTES attributes{sizeof(attributes), descriptor, FALSE};
@@ -59,7 +59,13 @@ int wmain(int argc, wchar_t **argv) try {
     l::lab_trace("{\"trial\":1}\n");
     const auto file = L"\\process-" + std::to_wstring(GetCurrentProcessId()) + L".jsonl";
     check(contents(root + file).find("\"trial\":1") != std::string::npos);
-    first_worker.stop(); check(l::lab_trace_session() == 0);
+    // A lost worker does not end the lease: the controller replaces it and the consumer keeps
+    // creating devices (and tracing) meanwhile, so the session continues unchanged.
+    first_worker.stop(); check(l::lab_trace_session() == 1);
+    l::lab_trace("{\"worker_lost\":true}\n");
+    check(contents(root + file).find("worker_lost") != std::string::npos);
+    // The controller owns the admission: its loss ends the lease and the trace with it.
+    controller.stop(); check(l::lab_trace_session() == 0);
     l::lab_trace("{\"invalid\":true}\n");
     check(contents(root + file).find("invalid") == std::string::npos);
     // Windows refuses a directory rename while a child file is open, even
@@ -68,16 +74,18 @@ int wmain(int argc, wchar_t **argv) try {
     check(MoveFileW((root + file).c_str(), (archived + file).c_str()) != 0);
     check(RemoveDirectoryW(root.c_str()) != 0);
     check(CreateDirectoryW(root.c_str(), nullptr) != 0);
+    // A second admission in the same process: a new controller and worker, a new nonce.
+    lease.controller = {second_controller.info.dwProcessId, session, n::creation_time(second_controller.info.hProcess)};
     lease.worker = {second_worker.info.dwProcessId, session, n::creation_time(second_worker.info.hProcess)};
     lease.nonce[0] = 0; publish(); check(l::lab_trace_session() == 0);
     lease.nonce[0] = 2; publish(); check(l::lab_trace_session() == 2);
     l::lab_trace("{\"trial\":2}\n");
     const auto old_log = contents(archived + file), new_log = contents(root + file);
-    check(old_log.find("\"trial\":1") != std::string::npos && old_log.find("\"trial\":2") == std::string::npos);
+    check(old_log.find("\"trial\":1") != std::string::npos && old_log.find("worker_lost") != std::string::npos && old_log.find("\"trial\":2") == std::string::npos && old_log.find("invalid") == std::string::npos);
     check(new_log.find("\"trial\":2") != std::string::npos && new_log.find("\"trial\":1") == std::string::npos);
     check(new_log.find("\"event\":\"process\"") != std::string::npos);
-    controller.stop(); check(l::lab_trace_session() == 0);
+    second_controller.stop(); check(l::lab_trace_session() == 0);
     l::lab_trace("{\"invalid\":true}\n"); check(contents(root + file) == new_log);
-    std::printf("{\"trace_lifecycle_contract\":true,\"passed\":true,\"same_process_leases\":2,\"terminated_worker_rejected\":true,\"invalid_replacement_rejected\":true,\"terminated_controller_rejected\":true,\"archived_log_unchanged\":true,\"fresh_log_opened\":true,\"driver_installed\":false}\n");
+    std::printf("{\"trace_lifecycle_contract\":true,\"passed\":true,\"same_process_leases\":2,\"worker_loss_tolerated\":true,\"invalid_replacement_rejected\":true,\"terminated_controller_rejected\":true,\"archived_log_unchanged\":true,\"fresh_log_opened\":true,\"driver_installed\":false}\n");
     return 0;
 } catch (const std::exception &e) { std::fprintf(stderr, "%s (Win32 %lu)\n", e.what(), GetLastError()); return 1; }
