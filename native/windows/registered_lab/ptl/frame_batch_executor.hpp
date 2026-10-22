@@ -661,8 +661,10 @@ private:
             if (!tile.commands.empty()) tiles.push_back(std::move(tile));
         }
         // Each tile may need several sequential spans when its commands exceed the span budget.
-        struct Pending { size_t tile; size_t first_command; };
-        std::vector<Pending> pending; for (size_t t = 0; t < tiles.size(); ++t) pending.push_back({t, 0});
+        // A draw is packed as one kernel command per triangle group (frame::group_triangles), so
+        // the cursor into a tile is a draw and the next group of that draw.
+        struct Pending { size_t tile; size_t first_command; uint32_t first_group; };
+        std::vector<Pending> pending; for (size_t t = 0; t < tiles.size(); ++t) pending.push_back({t, 0, 0});
         while (!pending.empty()) {
             std::vector<std::vector<uint8_t>> spans; std::vector<Pending> next, in_flight;
             for (auto &p : pending) {
@@ -671,9 +673,10 @@ private:
                 bool split = false;
                 std::vector<std::vector<uint8_t>> programs; std::vector<const frame::LoweredProgram *> program_keys; std::vector<frame::Command> commands; std::vector<frame::Window> windows;
                 std::vector<uint32_t> background; copy_rect(res.pixels.data(), res.width, {int32_t(tile.x), int32_t(tile.y), int32_t(tile.x + tile.w), int32_t(tile.y + tile.h)}, background);
-                size_t consumed = p.first_command;
+                size_t consumed = p.first_command; uint32_t resume_group = p.first_group, stopped_group = 0;
                 for (; consumed < tile.commands.size(); ++consumed) {
                     auto &d = draws[tile.commands[consumed]];
+                    const uint32_t first_group = resume_group; resume_group = 0; stopped_group = 0;
                     if (d.record.kind == 1) {
                         // Kernel fill of the tile (whole tile; the clear covers the target).
                         frame::Command c; c.kind = 1; c.clip = {0, 0, int32_t(tile.w), int32_t(tile.h)}; c.write_mask = d.record.write_mask;
@@ -683,61 +686,80 @@ private:
                         catch (const std::invalid_argument &) { if (commands.empty()) throw std::runtime_error("frame batch fill does not fit a span"); break; }
                         continue;
                     }
-                    frame::Command c; c.kind = 0;
-                    size_t program_index = SIZE_MAX;
-                    for (size_t k = 0; k < program_keys.size(); ++k) if (program_keys[k] == d.program.get()) program_index = k;
-                    std::vector<std::vector<uint8_t>> trial_programs = programs; std::vector<frame::Window> trial_windows = windows;
-                    if (program_index == SIZE_MAX) { program_index = programs.size(); trial_programs.push_back(d.kernel_entry); }
-                    c.program = uint32_t(program_index); c.vertices = frame::pack_vertices(*d.program, d.inputs); c.vertex_count = d.record.vertex_count;
                     const auto clip = frame::intersect(frame::intersect(d.plan.bounds, d.scissor_bounds), {int32_t(tile.x), int32_t(tile.y), int32_t(tile.x + tile.w), int32_t(tile.y + tile.h)});
-                    c.clip = {clip.x0 - int32_t(tile.x), clip.y0 - int32_t(tile.y), clip.x1 - int32_t(tile.x), clip.y1 - int32_t(tile.y)};
-                    c.blend_mode = d.record.blend_mode; c.write_mask = d.record.write_mask; c.cull = d.record.cull; c.front_ccw = d.record.front_ccw;
-                    c.blend_constant = {d.record.blend_constant[0], d.record.blend_constant[1], d.record.blend_constant[2], d.record.blend_constant[3]};
-                    c.viewport = {d.record.viewport[0], d.record.viewport[1], d.record.viewport[2], d.record.viewport[3]}; c.depth = {d.record.viewport[4], d.record.viewport[5]};
-                    c.constants = d.vertex_constants; c.constants.insert(c.constants.end(), d.pixel_constants.begin(), d.pixel_constants.end());
-                    bool ok = true;
-                    for (uint32_t t = 0; t < d.record.texture_count && ok; ++t) {
-                        const auto &tref = refs[d.textures[t].resource]; const bool bytes_view = (d.textures[t].flags & byte_buffer_view) != 0;
-                        uint32_t extent_w, extent_h; texture_extent(d.textures[t], tref.record, extent_w, extent_h);
-                        auto rects = frame::texel_windows(*d.program, d.plan, clip, t, extent_w, extent_h, d.textures[t].filter != 0);
-                        if (rects[0].empty()) { rects[0] = {0, 0, 1, 1}; rects[1] = {0, 0, 0, 0}; }   // no triangle reaches this tile: a one-texel window keeps the contract
-                        for (unsigned k = 0; k < 2 && ok; ++k) {
-                            if (rects[k].empty()) continue;
-                            frame::Window w; const auto &r = rects[k];
-                            w.w = uint32_t(r.x1 - r.x0); w.h = uint32_t(r.y1 - r.y0); w.origin_x = uint32_t(r.x0); w.origin_y = uint32_t(r.y0);
-                            w.texture_w = extent_w; w.texture_h = extent_h; w.format = bytes_view ? 42u : tref.record.format;
-                            if (!(bytes_view ? fetch_elements(tref, d.textures[t], r, w.pixels) : fetch_window(tref, r, w.pixels))) { ok = false; break; }
-                            trial_windows.push_back(std::move(w));
-                            (k ? c.textures[t].window2 : c.textures[t].window) = uint32_t(trial_windows.size() - 1);
+                    std::array<uint32_t, 4> tw{}, th{}; std::array<bool, 4> point{};
+                    for (uint32_t t = 0; t < d.record.texture_count; ++t) { const auto &source = refs[d.textures[t].resource]; texture_extent(d.textures[t], source.record, tw[t], th[t]); point[t] = d.textures[t].filter != 0; }
+                    // The draw's triangles that reach this tile, grouped so each command binds small windows.
+                    const auto groups = frame::group_triangles(*d.program, d.plan, clip, tw, th, point);
+                    if (groups.empty()) continue;   // no triangle of the draw reaches this tile (the hull of its bounds does)
+                    bool stopped = false;
+                    for (uint32_t g = first_group; g < groups.size(); ++g) {
+                        const auto &group = groups[g];
+                        frame::Command c; c.kind = 0;
+                        size_t program_index = SIZE_MAX;
+                        for (size_t k = 0; k < program_keys.size(); ++k) if (program_keys[k] == d.program.get()) program_index = k;
+                        std::vector<std::vector<uint8_t>> trial_programs = programs; std::vector<frame::Window> trial_windows = windows;
+                        if (program_index == SIZE_MAX) { program_index = programs.size(); trial_programs.push_back(d.kernel_entry); }
+                        const size_t first_vertex = size_t(group.first) * 3, vertex_count = size_t(group.count) * 3;
+                        require(group.count && first_vertex + vertex_count <= d.inputs.size());
+                        const std::vector<shader::VertexRegisters> inputs(d.inputs.begin() + std::ptrdiff_t(first_vertex), d.inputs.begin() + std::ptrdiff_t(first_vertex + vertex_count));
+                        c.program = uint32_t(program_index); c.vertices = frame::pack_vertices(*d.program, inputs); c.vertex_count = uint32_t(vertex_count);
+                        c.clip = {clip.x0 - int32_t(tile.x), clip.y0 - int32_t(tile.y), clip.x1 - int32_t(tile.x), clip.y1 - int32_t(tile.y)};
+                        c.blend_mode = d.record.blend_mode; c.write_mask = d.record.write_mask; c.cull = d.record.cull; c.front_ccw = d.record.front_ccw;
+                        c.blend_constant = {d.record.blend_constant[0], d.record.blend_constant[1], d.record.blend_constant[2], d.record.blend_constant[3]};
+                        c.viewport = {d.record.viewport[0], d.record.viewport[1], d.record.viewport[2], d.record.viewport[3]}; c.depth = {d.record.viewport[4], d.record.viewport[5]};
+                        c.constants = d.vertex_constants; c.constants.insert(c.constants.end(), d.pixel_constants.begin(), d.pixel_constants.end());
+                        bool ok = true;
+                        for (uint32_t t = 0; t < d.record.texture_count && ok; ++t) {
+                            const auto &tref = refs[d.textures[t].resource]; const bool bytes_view = (d.textures[t].flags & byte_buffer_view) != 0;
+                            auto rects = group.windows[t];
+                            if (rects[0].empty()) { rects[0] = {0, 0, 1, 1}; rects[1] = {0, 0, 0, 0}; }   // nothing to sample here: a one-texel window keeps the contract
+                            for (unsigned k = 0; k < 2 && ok; ++k) {
+                                if (rects[k].empty()) continue;
+                                frame::Window w; const auto &r = rects[k];
+                                w.w = uint32_t(r.x1 - r.x0); w.h = uint32_t(r.y1 - r.y0); w.origin_x = uint32_t(r.x0); w.origin_y = uint32_t(r.y0);
+                                w.texture_w = tw[t]; w.texture_h = th[t]; w.format = bytes_view ? 42u : tref.record.format;
+                                if (!(bytes_view ? fetch_elements(tref, d.textures[t], r, w.pixels) : fetch_window(tref, r, w.pixels))) { ok = false; break; }
+                                trial_windows.push_back(std::move(w));
+                                (k ? c.textures[t].window2 : c.textures[t].window) = uint32_t(trial_windows.size() - 1);
+                            }
+                            c.textures[t].point = d.textures[t].filter != 0;
+                            c.textures[t].mirror_u = d.textures[t].address_u == uint32_t(shader::TextureAddress::mirror); c.textures[t].mirror_v = d.textures[t].address_v == uint32_t(shader::TextureAddress::mirror);
                         }
-                        c.textures[t].point = d.textures[t].filter != 0;
-                        c.textures[t].mirror_u = d.textures[t].address_u == uint32_t(shader::TextureAddress::mirror); c.textures[t].mirror_v = d.textures[t].address_v == uint32_t(shader::TextureAddress::mirror);
-                    }
-                    if (!ok) throw std::runtime_error("frame batch texture window unavailable after planning");
-                    std::vector<frame::Command> trial_commands = commands; trial_commands.push_back(c);
-                    try {
-                        auto span = frame::SpanBuilder::build(tile.x, tile.y, tile.w, tile.h, res.format, trial_programs, trial_commands, trial_windows, background.data());
-                        programs = std::move(trial_programs); windows = std::move(trial_windows); commands = std::move(trial_commands);
-                        if (program_index == programs.size() - 1 && program_keys.size() < programs.size()) program_keys.push_back(d.program.get());
-                        (void)span;
-                    } catch (const std::invalid_argument &) {
-                        if (commands.empty()) {
-                            // The first remaining command does not fit this tile alone: bisect the tile
-                            // (as the planner did when it admitted the draw) and continue with the halves.
-                            const frame::Rect rect{int32_t(tile.x), int32_t(tile.y), int32_t(tile.x + tile.w), int32_t(tile.y + tile.h)};
-                            if (rect.x1 - rect.x0 <= frame::min_adaptive_tile && rect.y1 - rect.y0 <= frame::min_adaptive_tile) throw std::runtime_error("frame batch span budget exceeded after fitting");
-                            const auto halves = frame::split_tile(rect);
-                            const std::vector<size_t> remaining(tile.commands.begin() + std::ptrdiff_t(consumed), tile.commands.end());
-                            for (const auto &half : {halves.first, halves.second}) { auto sub = make_tile(half, remaining); if (!sub.commands.empty()) { tiles.push_back(std::move(sub)); next.push_back({tiles.size() - 1, 0}); } }
-                            ++stats.tile_splits; split = true;
+                        if (!ok) throw std::runtime_error("frame batch texture window unavailable after planning");
+                        std::vector<frame::Command> trial_commands = commands; trial_commands.push_back(c);
+                        try {
+                            auto span = frame::SpanBuilder::build(tile.x, tile.y, tile.w, tile.h, res.format, trial_programs, trial_commands, trial_windows, background.data());
+                            programs = std::move(trial_programs); windows = std::move(trial_windows); commands = std::move(trial_commands);
+                            if (program_index == programs.size() - 1 && program_keys.size() < programs.size()) program_keys.push_back(d.program.get());
+                            (void)span;
+                        } catch (const std::invalid_argument &) {
+                            if (commands.empty()) {
+                                // The first remaining group does not fit this tile alone: bisect the tile
+                                // (as the planner did when it admitted the draw) and continue with the halves.
+                                const frame::Rect rect{int32_t(tile.x), int32_t(tile.y), int32_t(tile.x + tile.w), int32_t(tile.y + tile.h)};
+                                // Earlier groups of this draw already ran on this tile: its halves would regroup
+                                // and repeat them, so the run cannot be bisected here.
+                                if (g > 0 || (rect.x1 - rect.x0 <= frame::min_adaptive_tile && rect.y1 - rect.y0 <= frame::min_adaptive_tile)) {
+                                    // The planner admitted what the packer cannot place: the run leaves the
+                                    // kernel for its per-draw routes, reported, rather than failing the batch.
+                                    std::printf("{\"frame_batch_span_budget_after_fit\":true,\"tile_x\":%u,\"tile_y\":%u,\"draw\":%zu,\"group\":%u}\n", tile.x, tile.y, tile.commands[consumed], g); std::fflush(stdout);
+                                    restore_rect(res, touched, before); fallback_run(draws, run, refs, dirty, stats, "fallback:span budget after fitting"); return;
+                                }
+                                const auto halves = frame::split_tile(rect);
+                                const std::vector<size_t> remaining(tile.commands.begin() + std::ptrdiff_t(consumed), tile.commands.end());
+                                for (const auto &half : {halves.first, halves.second}) { auto sub = make_tile(half, remaining); if (!sub.commands.empty()) { tiles.push_back(std::move(sub)); next.push_back({tiles.size() - 1, 0, 0}); } }
+                                ++stats.tile_splits; split = true;
+                            }
+                            stopped = true; stopped_group = g; break;
                         }
-                        break;
                     }
+                    if (stopped) break;
                 }
                 if (split) continue;
                 spans.push_back(frame::SpanBuilder::build(tile.x, tile.y, tile.w, tile.h, res.format, programs, commands, windows, background.data()));
-                in_flight.push_back({p.tile, consumed});
-                if (consumed < tile.commands.size()) next.push_back({p.tile, consumed});
+                in_flight.push_back({p.tile, consumed, stopped_group});
+                if (consumed < tile.commands.size()) next.push_back({p.tile, consumed, stopped_group});
             }
             if (!spans.empty()) {
                 dump_spans(spans, "span");

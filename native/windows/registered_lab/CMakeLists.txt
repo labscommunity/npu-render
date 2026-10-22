@@ -182,6 +182,12 @@ target_link_libraries(nr_registered_derivative_test PRIVATE d3dcompiler nr_regis
 set_property(TARGET nr_registered_derivative_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 add_test(NAME registered_derivative_contract COMMAND nr_registered_derivative_test)
 
+add_executable(nr_registered_frame_plan_test frame_plan_test.cpp)
+target_compile_features(nr_registered_frame_plan_test PRIVATE cxx_std_17)
+target_compile_options(nr_registered_frame_plan_test PRIVATE /W4 /WX)
+set_property(TARGET nr_registered_frame_plan_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+add_test(NAME registered_frame_plan_contract COMMAND nr_registered_frame_plan_test)
+
 add_executable(nr_registered_loop_test loop_test.cpp)
 target_link_libraries(nr_registered_loop_test PRIVATE d3dcompiler nr_registered_vertex)
 target_compile_features(nr_registered_loop_test PRIVATE cxx_std_17)

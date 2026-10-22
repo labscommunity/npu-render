@@ -620,9 +620,12 @@ inline Windows merge_rects(std::vector<Rect> rects) {
 }
 // Textures read with ld have no sampler: their windows are point windows whatever the binding says.
 inline bool loaded_texture(const LoweredProgram &program, unsigned t) { return t < program.texture_loaded.size() && program.texture_loaded[t]; }
-inline bool interval_windows(const LoweredProgram &program, const DrawPlan &plan, Rect rect, unsigned t, uint32_t tw, uint32_t th, bool point, Windows &out) {
-    std::vector<Rect> rects; point = point || loaded_texture(program, t);
-    for (size_t first = 0; first + 2 < plan.projected.size(); first += 3) {
+// Collects the texel rects texture `t` may be sampled at inside `rect` by the triangles
+// [begin, end) of the plan (vertex indices, multiples of 3); false when a tap is unbounded.
+inline bool interval_rects(const LoweredProgram &program, const DrawPlan &plan, Rect rect, unsigned t, uint32_t tw, uint32_t th, bool point, std::vector<Rect> &rects, size_t begin = 0, size_t end = SIZE_MAX) {
+    point = point || loaded_texture(program, t);
+    end = std::min(end, plan.projected.size());
+    for (size_t first = begin; first + 2 < end; first += 3) {
         const core::nr_projected *v[3]{&plan.projected[first], &plan.projected[first + 1], &plan.projected[first + 2]};
         const Rect bbox{int32_t(std::floor(std::min({v[0]->x, v[1]->x, v[2]->x}))), int32_t(std::floor(std::min({v[0]->y, v[1]->y, v[2]->y}))),
                         int32_t(std::ceil(std::max({v[0]->x, v[1]->x, v[2]->x}))) + 1, int32_t(std::ceil(std::max({v[0]->y, v[1]->y, v[2]->y}))) + 1};
@@ -640,6 +643,11 @@ inline bool interval_windows(const LoweredProgram &program, const DrawPlan &plan
             if (x0 < x1 && y0 < y1) rects.push_back({int32_t(x0), int32_t(y0), int32_t(x1), int32_t(y1)});
         }
     }
+    return true;
+}
+inline bool interval_windows(const LoweredProgram &program, const DrawPlan &plan, Rect rect, unsigned t, uint32_t tw, uint32_t th, bool point, Windows &out) {
+    std::vector<Rect> rects;
+    if (!interval_rects(program, plan, rect, t, tw, th, point, rects)) return false;
     out = merge_rects(rects);
     return true;
 }
@@ -732,7 +740,7 @@ inline DrawPlan plan_draw(const LoweredProgram &program, const std::vector<uint3
 // pixels): each triangle's varying is an affine plane over the screen when the
 // vertices share w, so its extremes lie on the corners of the clipped bounding
 // box. Falls back to the draw-wide window when a plane cannot be fitted.
-inline Rect texel_window(const LoweredProgram &program, const DrawPlan &plan, Rect rect, unsigned t, uint32_t tw, uint32_t th, bool point);
+inline Rect texel_window(const LoweredProgram &program, const DrawPlan &plan, Rect rect, unsigned t, uint32_t tw, uint32_t th, bool point, size_t begin = 0, size_t end = SIZE_MAX);
 // One or two texel windows for texture `t` over `rect`; the second is empty unless a seam splits the taps.
 inline Windows texel_windows(const LoweredProgram &program, const DrawPlan &plan, Rect rect, unsigned t, uint32_t tw, uint32_t th, bool point) {
     if (plan.whole[t] || !tw || !th) return {Rect{0, 0, int32_t(tw), int32_t(th)}, Rect{0, 0, 0, 0}};
@@ -744,20 +752,22 @@ inline Windows texel_windows(const LoweredProgram &program, const DrawPlan &plan
     }
     return {texel_window(program, plan, rect, t, tw, th, point), Rect{0, 0, 0, 0}};
 }
-inline Rect texel_window(const LoweredProgram &program, const DrawPlan &plan, Rect rect, unsigned t, uint32_t tw, uint32_t th, bool point) {
+inline Rect texel_window(const LoweredProgram &program, const DrawPlan &plan, Rect rect, unsigned t, uint32_t tw, uint32_t th, bool point, size_t begin, size_t end) {
     if (plan.whole[t] || !tw || !th) return {0, 0, int32_t(tw), int32_t(th)};
     const auto sources = coordinate_sources(program); const auto &source = sources[t];
+    end = std::min(end, plan.projected.size());
     if (!source.direct || source.taps.empty()) {
-        Rect window;
-        if (interval_window(program, plan, rect, t, tw, th, point, window)) return intersect(window, plan.texels[t]);
-        return plan.texels[t];
+        std::vector<Rect> rects;
+        if (!interval_rects(program, plan, rect, t, tw, th, point, rects, begin, end)) return plan.texels[t];
+        Rect window; for (const auto &r : rects) window = unite(window, r);
+        return intersect(window, plan.texels[t]);
     }
     float umin = 1e30f, umax = -1e30f, vmin = 1e30f, vmax = -1e30f; bool any = false;
     for (const auto &src : source.taps) {
     uint32_t varying = 0; bool found = false;
     for (unsigned r = 0, k = 0; r < 8; ++r) { if (!(program.ps_inputs & (1u << r))) continue; if (r == src.input) { varying = k; found = true; break; } ++k; }
     if (!found) return plan.texels[t];
-    for (size_t first = 0; first + 2 < plan.projected.size(); first += 3) {
+    for (size_t first = begin; first + 2 < end; first += 3) {
         const core::nr_projected *v[3]{&plan.projected[first], &plan.projected[first + 1], &plan.projected[first + 2]};
         float x[3], y[3], uu[3], vv[3]; bool fit = true;
         for (unsigned i = 0; i < 3; ++i) {
@@ -797,18 +807,87 @@ inline Rect texel_window(const LoweredProgram &program, const DrawPlan &plan, Re
            std::min(int32_t(tw), int32_t(std::floor(clamp01(umax) * float(tw) - half)) + 3), std::min(int32_t(th), int32_t(std::floor(clamp01(vmax) * float(th) - half)) + 3)};
     return intersect(r, plan.texels[t]);
 }
+// Texel rects texture `t` of the triangle at vertex `first` may sample inside `rect`: the
+// plane fit of that triangle alone for direct taps, its interval boxes otherwise.
+inline std::vector<Rect> triangle_rects(const LoweredProgram &program, const DrawPlan &plan, Rect rect, unsigned t, uint32_t tw, uint32_t th, bool point, size_t first) {
+    if (plan.whole[t] || !tw || !th) return {Rect{0, 0, int32_t(tw), int32_t(th)}};
+    const auto sources = coordinate_sources(program);
+    if (sources[t].direct && !sources[t].taps.empty()) {
+        const Rect r = texel_window(program, plan, rect, t, tw, th, point, first, first + 3);
+        return r.empty() ? std::vector<Rect>{} : std::vector<Rect>{r};
+    }
+    std::vector<Rect> rects;
+    if (!interval_rects(program, plan, rect, t, tw, th, point, rects, first, first + 3)) return {plan.texels[t]};
+    for (auto &r : rects) r = intersect(r, plan.texels[t]);
+    rects.erase(std::remove_if(rects.begin(), rects.end(), [](const Rect &r) { return r.empty(); }), rects.end());
+    return rects;
+}
+// Bytes one or two windows take in a span (an empty first window still binds one texel).
+inline size_t windows_bytes(const Windows &w) {
+    size_t bytes = NR_FRAME_WINDOW_BYTES + (w[0].empty() ? 4 : size_t(w[0].x1 - w[0].x0) * size_t(w[0].y1 - w[0].y0) * 4);
+    if (!w[1].empty()) bytes += NR_FRAME_WINDOW_BYTES + size_t(w[1].x1 - w[1].x0) * size_t(w[1].y1 - w[1].y0) * 4;
+    return bytes;
+}
+// True when the triangle at vertex `first` has a screen bounding box inside `rect`.
+inline bool triangle_reaches(const DrawPlan &plan, size_t first, Rect rect) {
+    const core::nr_projected *v[3]{&plan.projected[first], &plan.projected[first + 1], &plan.projected[first + 2]};
+    const Rect bbox{int32_t(std::floor(std::min({v[0]->x, v[1]->x, v[2]->x}))), int32_t(std::floor(std::min({v[0]->y, v[1]->y, v[2]->y}))),
+                    int32_t(std::ceil(std::max({v[0]->x, v[1]->x, v[2]->x}))) + 1, int32_t(std::ceil(std::max({v[0]->y, v[1]->y, v[2]->y}))) + 1};
+    return !intersect(bbox, rect).empty();
+}
+// A run of consecutive triangles of one draw that the kernel executes as one command: the
+// windows are the merged texel rects of the run's triangles, at most two per texture.
+struct TriangleGroup { uint32_t first = 0, count = 0; std::array<Windows, NR_FRAME_MAX_TEXTURES> windows{}; };
+// Partitions the triangles of a planned draw that reach `clip` into groups whose merged
+// windows stay close to the sum of the triangles' own windows. A draw of many small quads
+// spread over an atlas (text, icons, a thumbnail mosaic) then binds a few small windows per
+// group instead of the hull of all of them, which exceeded the span budget at every tile
+// size. Triangles before the first and after the last that reach `clip` are left out; a
+// draw without textures is one group. The driver admits a draw with this partition and the
+// worker packs it the same way, from the same plan.
+inline std::vector<TriangleGroup> group_triangles(const LoweredProgram &program, const DrawPlan &plan, Rect clip,
+                                                  const std::array<uint32_t, NR_FRAME_MAX_TEXTURES> &tw, const std::array<uint32_t, NR_FRAME_MAX_TEXTURES> &th, const std::array<bool, NR_FRAME_MAX_TEXTURES> &point) {
+    std::vector<TriangleGroup> groups;
+    const size_t textures = std::min<size_t>(program.texture_slots.size(), NR_FRAME_MAX_TEXTURES);
+    if (clip.empty()) return groups;
+    std::array<std::vector<Rect>, NR_FRAME_MAX_TEXTURES> rects;   // the open group's per-triangle rects
+    TriangleGroup open; size_t open_bytes = 0;
+    for (size_t first = 0; first + 2 < plan.projected.size(); first += 3) {
+        if (!triangle_reaches(plan, first, clip)) continue;
+        std::array<std::vector<Rect>, NR_FRAME_MAX_TEXTURES> tri; std::array<Windows, NR_FRAME_MAX_TEXTURES> own{}; size_t tri_bytes = 0;
+        for (size_t t = 0; t < textures; ++t) { tri[t] = triangle_rects(program, plan, clip, unsigned(t), tw[t], th[t], point[t], first); own[t] = merge_rects(tri[t]); tri_bytes += windows_bytes(own[t]); }
+        if (open.count) {
+            std::array<Windows, NR_FRAME_MAX_TEXTURES> merged{}; size_t merged_bytes = 0;
+            for (size_t t = 0; t < textures; ++t) { auto all = rects[t]; all.insert(all.end(), tri[t].begin(), tri[t].end()); merged[t] = merge_rects(all); merged_bytes += windows_bytes(merged[t]); }
+            // Merging may cost a little more than the parts (adjacent glyphs with a gap); a hull
+            // over distant rects costs much more and starts a new group.
+            if (merged_bytes <= (open_bytes + tri_bytes) * 5 / 4 + 512) {
+                open.count = uint32_t(first / 3 - open.first + 1); open.windows = merged; open_bytes = merged_bytes;
+                for (size_t t = 0; t < textures; ++t) rects[t].insert(rects[t].end(), tri[t].begin(), tri[t].end());
+                continue;
+            }
+            groups.push_back(open);
+        }
+        open = TriangleGroup{uint32_t(first / 3), 1, own}; open_bytes = tri_bytes; rects = tri;
+    }
+    if (open.count) groups.push_back(open);
+    return groups;
+}
 // Tile edge (128, 64 or 32) at which every tile of a planned draw fits one span
 // with its texture windows, or 0 when the draw needs the per-draw route.
-// Bytes one span needs for this draw alone inside tile `tile` (its pixels plus the texel windows of the clipped draw).
+// Bytes one span needs for this draw alone inside tile `tile`: its pixels, then one command per
+// triangle group with that group's vertices, constants and texel windows.
 inline size_t tile_span_bytes(const LoweredProgram &program, const DrawPlan &plan, Rect bounds, Rect tile, size_t entry_bytes, uint32_t vertex_words, uint32_t constant_words,
                               const std::array<uint32_t, NR_FRAME_MAX_TEXTURES> &tw, const std::array<uint32_t, NR_FRAME_MAX_TEXTURES> &th, const std::array<bool, NR_FRAME_MAX_TEXTURES> &point) {
     const Rect clip = intersect(bounds, tile);
-    size_t bytes = NR_FRAME_HEADER_BYTES + NR_FRAME_COMMAND_BYTES + entry_bytes + 64 + size_t(vertex_words) * 4 + size_t(constant_words) * 4 + 4 + size_t(tile.x1 - tile.x0) * size_t(tile.y1 - tile.y0) * 4;
-    if (clip.empty()) return bytes;
-    for (size_t t = 0; t < program.texture_slots.size() && t < NR_FRAME_MAX_TEXTURES; ++t) {
-        const auto w = texel_windows(program, plan, clip, unsigned(t), tw[t], th[t], point[t]);
-        bytes += NR_FRAME_WINDOW_BYTES + (w[0].empty() ? 4 : size_t(w[0].x1 - w[0].x0) * size_t(w[0].y1 - w[0].y0) * 4);
-        if (!w[1].empty()) bytes += NR_FRAME_WINDOW_BYTES + size_t(w[1].x1 - w[1].x0) * size_t(w[1].y1 - w[1].y0) * 4;
+    size_t bytes = NR_FRAME_HEADER_BYTES + entry_bytes + 64 + 4 + size_t(tile.x1 - tile.x0) * size_t(tile.y1 - tile.y0) * 4;
+    if (clip.empty()) return bytes + NR_FRAME_COMMAND_BYTES + size_t(constant_words) * 4;
+    const size_t vertex_bytes = plan.projected.empty() ? 0 : size_t(vertex_words) * 4 / plan.projected.size();
+    const auto groups = group_triangles(program, plan, clip, tw, th, point);
+    if (groups.empty()) return bytes + NR_FRAME_COMMAND_BYTES + size_t(constant_words) * 4;
+    for (const auto &g : groups) {
+        bytes += NR_FRAME_COMMAND_BYTES + size_t(g.count) * 3 * vertex_bytes + size_t(constant_words) * 4;
+        for (size_t t = 0; t < program.texture_slots.size() && t < NR_FRAME_MAX_TEXTURES; ++t) bytes += windows_bytes(g.windows[t]);
     }
     return bytes;
 }
