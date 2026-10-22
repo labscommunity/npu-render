@@ -18,6 +18,25 @@ task puts the ordinary display back if anything goes wrong.
 > composition passes that carry a blur take seconds. Every number below was
 > measured on one Intel Panther Lake laptop and is labelled as such.
 
+## The switch, recorded
+
+![The desktop switching from the GPU to the NPU and back on Delta](docs/media/npu-switch.gif)
+
+Delta's panel, captured by desktop duplication through one admission
+(`npu-render desktop enable`, 660 s, then the recovery that `disable` also
+runs), played at three times real time. The side panel is drawn from Windows'
+GPU engine counters and the admission bootstrap's frame receipts for the same
+second; the small overlay inside the desktop shows the same counters live, and
+it is itself composed by whichever adapter composes the desktop at that moment.
+When the NPU takes over, the panel shows the NPU's 1024x768 frames scaled to
+the display, and the frame counter climbs at about 0.9 frames per second (596
+frames in the admission). The GPU 3D engine does not fall: it idled at 0.2 %
+before, 0.4 % while the NPU rendered, and 0.2 % after, and the compositor's own
+share rose from 0.03 % to 0.24 % because it composes the window that mirrors
+the NPU frames onto the physical panel. Delta exposes no NPU utilisation
+counter, so NPU activity is counted in frames that reached the panel, never
+estimated.
+
 ## Why
 
 Every new laptop ships an NPU that sits idle while the GPU composes the

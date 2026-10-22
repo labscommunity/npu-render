@@ -1,7 +1,7 @@
 # Repository instructions
 
-- Keep `t8/npu-render` private. Do not publish packages, artifacts, or the repository
-  publicly without an explicit user instruction.
+- Do not change the repository's visibility, and do not publish packages or artifacts,
+  without an explicit instruction from the owner.
 - Every commit MUST follow Conventional Commits 1.0.0. Use the configured types
   and a meaningful lowercase description. Examples: `feat(runtime): add damage
   tiles`, `fix(openvino): preserve output ownership`, `docs: record hardware limits`.

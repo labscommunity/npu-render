@@ -1968,3 +1968,35 @@ helper's source lives on Delta with the trial tools; which windows fail
 is false are open. Until that is fixed the switch's `status` is right to show
 the live step as failed, and "restores the ordinary display" means the
 topology and the compositor, not window placement.
+
+## Admissions v122 to v125: recording the switch for the README (2026-10-22 17:40Z to 18:37Z)
+
+Four admissions on tree v60, package v52 and bundle v23 ran to record
+`docs/media/npu-switch.gif`: Delta's panel through DXGI desktop duplication at
+2 frames per second, an on-screen overlay of the engine counters, a probe
+writing one row per second, and a copy of every frame the relay presented.
+Each admission had no application probes; the overlay's half-second updates
+kept the compositor busy, so the bootstrap observed 449, 596, 231 and 596
+frames in the four (v122 to v125) against 57 in probe v121. v124 was ended
+early with `npu-render desktop disable`, which passed (recovery and
+restoration in 90 s); the others ran their 660 s.
+
+What the counters say, from v125's probe (one row per second): the GPU 3D
+engine over all processes idled at p50 0.23 % before the admission, 0.41 %
+while the NPU rendered and 0.22 % after; the compositor's own share of it
+(the per-process GPU engine counter) was 0.03 % before, 0.24 % during and
+0.03 % after, because DWM composes the presenter window that mirrors the NPU
+frames onto the physical panel; the NPU frame rate was p50 0.92 per second. The
+desktop's load on the 3D engine is too small to show a saving, and the
+recording says so. Delta has no `NPU Engine` performance counter set (the
+sampler had recorded it missing since the first engine samples), so no NPU
+utilisation figure exists for any trial; NPU activity is the frames the
+bootstrap received, which are the worker's provider receipts.
+
+Two recorder defects were found and fixed on the way: the probe matched the
+bootstrap's `frames.jsonl` with a regex that assumed unspaced JSON, and an
+interactive task at the limited run level cannot read the admission
+controller's directory (access denied), so the probe runs through an elevated
+variant of the task launcher and reads the bootstrap report's live frame
+count. The recording tools live with the session's scratch scripts, not in the
+repository; the GIF is the only artefact committed.
