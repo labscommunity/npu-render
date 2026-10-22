@@ -8,6 +8,8 @@ version = "0.2.0"
 description = "Render the Windows desktop on an Intel NPU: a display driver whose compositor draws execute in SHAVE kernels through OpenVINO"
 readme = "README.md"
 requires-python = ">=3.11,<3.15"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 dependencies = ["numpy>=2,<2.5", "openvino==2026.1.0"]
 
 [project.scripts]
