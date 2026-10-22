@@ -17,6 +17,8 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <stdexcept>
+#include <string>
 #include <map>
 #include <memory>
 #include <set>
@@ -251,32 +253,36 @@ public:
     // Executes one batch packet and returns the complete reply packet (Header + body).
     std::vector<uint8_t> execute(const std::vector<uint8_t> &packet) {
         const auto started = std::chrono::steady_clock::now();
+        // A rejected batch names the stage it failed in (the generic packet error hid trial 27's cause).
+        const char *stage = "header"; const auto expect = [&](bool ok) { if (!ok) throw std::invalid_argument(std::string("invalid frame batch at ") + stage); };
         indexed_exchange::Reader reader(packet); const auto header = reader.value<indexed_exchange::Header>();
-        require(batch_header_valid(header) && packet.size() == sizeof(header) + header.body_bytes);
+        expect(batch_header_valid(header) && packet.size() == sizeof(header) + header.body_bytes);
         const auto batch = reader.value<BatchHeader>();
-        require(batch.magic == batch_magic && batch.version == 1 && batch.shader_count <= max_shaders && batch.resource_count <= max_resources &&
+        expect(batch.magic == batch_magic && batch.version == 1 && batch.shader_count <= max_shaders && batch.resource_count <= max_resources &&
                 batch.upload_count <= max_uploads && batch.command_count <= max_commands && !batch.reserved);
         Stats stats; current_sequence = header.sequence; dumped_spans = 0;
         // Shaders.
+        stage = "shaders";
         std::vector<Shader> batch_shaders(batch.shader_count);
         for (auto &s : batch_shaders) {
-            const auto record = reader.value<ShaderRecord>(); require((record.stage == 1 || record.stage == 2) && record.words >= 3 && record.words <= 16384);
+            const auto record = reader.value<ShaderRecord>(); expect((record.stage == 1 || record.stage == 2) && record.words >= 3 && record.words <= 16384);
             const auto words = reader.vector<uint32_t>(record.words);
             s.sha = sha256_hex(words.data(), words.size() * 4); s.stage = record.stage;
             char expected[65]{}; for (unsigned n = 0; n < 32; ++n) std::snprintf(expected + n * 2, 3, "%02x", record.sha256[n]);
-            require(s.sha == expected);
+            expect(s.sha == expected);
             auto found = shaders.find(s.sha);
             if (found == shaders.end()) {
                 auto program = std::make_shared<shader::Program>(record.stage == 1 ? shader::parse_vertex(words.data(), words.size()) : shader::parse_pixel(words.data(), words.size()));
                 found = shaders.emplace(s.sha, std::move(program)).first;
             }
-            s.program = found->second; require((s.program->stage == shader::Stage::vertex) == (record.stage == 1));
+            s.program = found->second; expect((s.program->stage == shader::Stage::vertex) == (record.stage == 1));
         }
         // Resources.
+        stage = "resources";
         std::vector<ResourceRef> refs(batch.resource_count);
         for (auto &ref : refs) {
             ref.record = reader.value<ResourceRecord>();
-            require(ref.record.key && ref.record.width && ref.record.width <= 8192 && ref.record.height && ref.record.height <= 8192 &&
+            expect(ref.record.key && ref.record.width && ref.record.width <= 8192 && ref.record.height && ref.record.height <= 8192 &&
                     uint64_t(ref.record.width) * ref.record.height <= 8388608 && (ref.record.format == 28 || ref.record.format == 87));
             auto &entry = resident[ref.record.key];
             if (entry.width != ref.record.width || entry.height != ref.record.height || entry.format != ref.record.format) {
@@ -284,12 +290,13 @@ public:
             }
             entry.flags = ref.record.flags; ref.resident = &entry;
         }
+        stage = "uploads";
         // Uploads: full images replace the resident version; partial images update a resident
         // copy the driver knows the worker holds; windows feed volatile sampling in this batch only.
         for (uint32_t n = 0; n < batch.upload_count; ++n) {
-            const auto up = reader.value<UploadRecord>(); require(up.resource < refs.size() && !up.reserved);
+            const auto up = reader.value<UploadRecord>(); expect(up.resource < refs.size() && !up.reserved);
             auto &ref = refs[up.resource];
-            require(up.width && up.height && up.x <= ref.record.width && up.y <= ref.record.height && up.width <= ref.record.width - up.x && up.height <= ref.record.height - up.y);
+            expect(up.width && up.height && up.x <= ref.record.width && up.y <= ref.record.height && up.width <= ref.record.width - up.x && up.height <= ref.record.height - up.y);
             auto pixels = reader.vector<uint32_t>(size_t(up.width) * up.height);
             if (!up.x && !up.y && up.width == ref.record.width && up.height == ref.record.height) {
                 ref.resident->pixels = std::move(pixels); ref.resident->version = ref.record.version; ref.uploaded_full = true;
@@ -301,14 +308,15 @@ public:
             }   // otherwise the worker lost the base image: the version mismatch reports it missing
         }
         // Commands.
+        stage = "commands";
         std::vector<Draw> draws(batch.command_count);
         for (auto &d : draws) {
             d.record = reader.value<CommandRecord>();
-            require(d.record.kind <= 2 && d.record.target < refs.size() && d.record.texture_count <= 4 && d.record.blend_mode <= 13 && d.record.write_mask && d.record.write_mask <= 15 && d.record.cull <= 2 && d.record.front_ccw <= 1);
-            for (uint32_t t = 0; t < d.record.texture_count; ++t) { d.textures[t] = reader.value<TextureBinding>(); require(d.textures[t].resource < refs.size() && d.textures[t].filter <= 1); }
+            expect(d.record.kind <= 2 && d.record.target < refs.size() && d.record.texture_count <= 4 && d.record.blend_mode <= 13 && d.record.write_mask && d.record.write_mask <= 15 && d.record.cull <= 2 && d.record.front_ccw <= 1);
+            for (uint32_t t = 0; t < d.record.texture_count; ++t) { d.textures[t] = reader.value<TextureBinding>(); expect(d.textures[t].resource < refs.size() && d.textures[t].filter <= 1); }
             if (d.record.kind == 0) {
-                require(d.record.vertex_shader < batch_shaders.size() && d.record.pixel_shader < batch_shaders.size() && batch_shaders[d.record.vertex_shader].stage == 1 && batch_shaders[d.record.pixel_shader].stage == 2);
-                require(d.record.vertex_count && d.record.vertex_count % 3 == 0 && d.record.vertex_count <= 4095 && d.record.vertex_words == d.record.vertex_count * 64);
+                expect(d.record.vertex_shader < batch_shaders.size() && d.record.pixel_shader < batch_shaders.size() && batch_shaders[d.record.vertex_shader].stage == 1 && batch_shaders[d.record.pixel_shader].stage == 2);
+                expect(d.record.vertex_count && d.record.vertex_count % 3 == 0 && d.record.vertex_count <= 4095 && d.record.vertex_words == d.record.vertex_count * 64);
                 d.inputs.resize(d.record.vertex_count);
                 for (auto &v : d.inputs) for (auto &reg : v) for (auto &lane : reg) lane = reader.value<uint32_t>();
                 d.vertex_constants = reader.vector<uint32_t>(d.record.vertex_constant_words); d.pixel_constants = reader.vector<uint32_t>(d.record.pixel_constant_words);

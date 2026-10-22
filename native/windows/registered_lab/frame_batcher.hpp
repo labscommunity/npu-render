@@ -274,6 +274,37 @@ struct FrameBatcher {
         for (const auto &c : commands) { w.value(c.record); for (const auto &b : c.bindings) w.value(b); if (!c.vertices.empty()) w.append(c.vertices.data(), c.vertices.size() * 4); if (!c.constants.empty()) w.append(c.constants.data(), c.constants.size() * 4); }
         return w.finish();
     }
+    // An upload-only batch: every resource record (so the worker's table matches the batch that
+    // follows), one full image, no shaders, no commands. The worker stores the image under the
+    // record's version and reports nothing missing and no target.
+    std::vector<uint8_t> encode_upload_only(uint64_t sequence, size_t index) const {
+        namespace fb = frame_batch_detail::fb;
+        nr::registered_lab::indexed_exchange::Writer w;
+        fb::BatchHeader bh; bh.resource_count = uint32_t(resources.size()); bh.upload_count = 1; bh.batch_sequence = sequence; w.value(bh);
+        for (const auto &r : resources) { fb::ResourceRecord rec; rec.key = r.allocation->id; rec.version = r.version; rec.width = r.allocation->surface.width; rec.height = r.allocation->surface.height; rec.format = r.allocation->surface.format == 65 ? 28u : r.allocation->surface.format; rec.flags = r.is_volatile ? fb::volatile_resource : 0u; w.value(rec); }
+        const auto &r = resources[index];
+        fb::UploadRecord up; up.resource = uint32_t(index); up.width = r.allocation->surface.width; up.height = r.allocation->surface.height; w.value(up); w.append(r.full.data(), r.full.size());
+        return w.finish();
+    }
+    // Large full images travel alone before the batch that references them, so no request comes
+    // near the packet limit: a worker that starts mid-admission (worker failover) holds nothing and
+    // the compositor's next batch would otherwise carry the whole desktop's surfaces at once
+    // (trial 27: a 50.9 MB resend the worker rejected).
+    static constexpr size_t upload_alone_bytes = 8u * 1024 * 1024;
+    void upload_large_alone(uint64_t sequence) {
+        namespace fb = frame_batch_detail::fb; namespace ex = nr::registered_lab::indexed_exchange;
+        for (size_t n = 0; n < resources.size(); ++n) {
+            auto &r = resources[n];
+            if (r.full.size() <= upload_alone_bytes) continue;
+            const auto started = GetTickCount64();
+            ex::Header h; h.width = 0; h.height = 0; h.format = 0; h.flags = 0;
+            const auto reply = d.indexed_exchange->exchange_batch(h, encode_upload_only(sequence, n));
+            ex::Reader reader(reply); (void)reader.value<ex::Header>(); const auto response = reader.value<fb::ResponseHeader>();
+            require(response.magic == fb::response_magic && response.version == 1 && response.batch_sequence == sequence && !response.missing_count && !response.target_count && reader.done());
+            lab_trace("{\"event\":\"frame_batch_upload_alone\",\"resource\":%zu,\"bytes\":%zu,\"wall_ms\":%llu}\n", n, r.full.size(), static_cast<unsigned long long>(GetTickCount64() - started));
+            upload_bytes += r.full.size(); bytes -= (std::min)(bytes, r.full.size()); r.full.clear(); r.full.shrink_to_fit();
+        }
+    }
     // Sends the batch, resends with full uploads for anything the worker reports missing, writes dirty rectangles back.
     void flush(const char *reason) {
         namespace fb = frame_batch_detail::fb; namespace ex = nr::registered_lab::indexed_exchange;
@@ -285,6 +316,7 @@ struct FrameBatcher {
         const uint64_t sequence = next_content_version();
         std::vector<uint8_t> reply; uint32_t resent = 0;
         for (unsigned attempt = 0;; ++attempt) {
+            upload_large_alone(sequence);
             ex::Header h; h.width = 0; h.height = 0; h.format = 0; h.flags = 0;
             reply = d.indexed_exchange->exchange_batch(h, encode(sequence));
             ex::Reader reader(reply); (void)reader.value<ex::Header>(); const auto response = reader.value<fb::ResponseHeader>();
