@@ -1457,3 +1457,29 @@ have made the driver resend the full image). Trial 27's 50.9 MB resend was the
 same batch shape one step earlier. Changes for tree v52: a resource used as a
 target needs its base image whatever windows it carries, and a rejection names
 the execution stage it failed in, not only the decode stage.
+
+## Trial 30 (generation 37, admission v113, tree v52, package v46, 900 s): the worker replaced in flight, the desktop continues
+
+The same probe on tree v52. The worker was stopped at 03:07:02.2Z; the
+replacement was ready after 921 ms, the compositor's lease was rewritten and
+the broker restarted. This time the replacement stayed: no provider child
+rejected a batch, so there was no second loss. DWM kept its process (the same
+pid since 02:30Z) and its device; the driver's trace shows the failover, the
+large surfaces travelling alone (20.7, 21.2 and 28.1 MB), the fresh worker
+reporting the resources it lacked and the resends, then 31 batches flushed to
+the replacement; the bootstrap observed 24 frames after the stop (57 in all)
+with the last one 33 s before the admission's end, and the worker served 452
+requests. The one-shot client admitted after the restart passed, and the
+ordinary adapter probe created devices on our adapter after it. The
+provider-generation audit passed on the final lineage (`worker_lineages` 2);
+recovery passed with `cleanup_complete` and unregistered its task; no dump.
+
+Two bookkeeping defects remained. The bootstrap reported `passed=false`
+because the grants on the dead worker's process object could not be restored
+(`AssertionError(6)`, an invalid handle); the failover controller now drops a
+dead worker's grants when it replaces it. The lease-holding consumer fixture
+exits at a worker stop because it verifies its cached admission directly rather
+than through the driver's exchange, which is the fixture's limitation, not the
+desktop's. With those understood, the priority-3 item "the admission survives
+the loss of its worker" holds: a worker that dies is replaced within a second
+and the compositor, its clients and the display continue.

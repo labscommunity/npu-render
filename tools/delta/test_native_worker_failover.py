@@ -59,10 +59,16 @@ def test_check_replaces_a_dead_worker_and_regrants(tmp_path, monkeypatch):
         log.write_text(json.dumps({"local_worker_ready": True, "pid": 9}) + "\n")
         return replacement
 
+    class FakeProcessGrant:
+        def __init__(self, handle):
+            self.handle, self.restored, self.active = handle, False, True
+
+    permissions = [FakeProcessGrant(50), FakeProcessGrant(50), FakeProcessGrant(7)]
     f = failover.WorkerFailover(
         start_worker=start_worker,
         leases=[FakeGrant(1), FakeGrant(2)],
         grant=granted.append,
+        permissions=permissions,
         after_restart=restarted.append,
         stdout_path=log,
         process_identity=lambda h: ("identity", h),
@@ -84,6 +90,8 @@ def test_check_replaces_a_dead_worker_and_regrants(tmp_path, monkeypatch):
     assert record["exit_code"] == 1 and record["restart"] == 1 and record["pid"] == 9
     # The compositor lease is rewritten for the new worker; the indirect host's keeps its deadline.
     assert record["deadlines"] == [111, 777] and rewritten == [1] and "restored" in record and saves
+    # The dead worker's two grants are dropped, the controller's own stays.
+    assert record["grants_dropped"] == 2 and [g.handle for g in permissions] == [7]
     # The limit is per admission: a second loss ends it.
     try:
         f.check(FakeWorker(9, alive=False, code=0))

@@ -85,12 +85,23 @@ class WorkerFailover:
         limit=3,
         ready_seconds=20,
         grant_ms=1200000,
+        permissions=None,
     ):
         self.start_worker, self.leases, self.grant = start_worker, leases, grant
         self.after_restart, self.stdout_path = after_restart, stdout_path
+        self.permissions = permissions if permissions is not None else []
         self.process_identity, self.report, self.save = process_identity, report, save
         self.limit, self.ready_seconds, self.grant_ms = limit, ready_seconds, grant_ms
         self.restarts = []
+
+    def drop_grants(self, handle):
+        """Forget the grants held on an exited process; returns how many."""
+        dead = [g for g in self.permissions if getattr(g, "handle", None) == handle]
+        for g in dead:
+            g.restored = True
+            g.active = False
+            self.permissions.remove(g)
+        return len(dead)
 
     def regrant_all(self, identity):
         """Rewrites the grants whose consumer talks to the worker (the compositor's and any
@@ -115,6 +126,9 @@ class WorkerFailover:
         record = dict(lost=now_iso(), exit_code=worker.returncode, restart=n)
         self.restarts.append(record)
         self.report["worker_restarts"] = self.restarts
+        # The grants on the dead worker's process object have nothing left to restore (trial 30:
+        # their restoration failed with an invalid handle and marked the admission as not passed).
+        record["grants_dropped"] = self.drop_grants(int(worker._handle))
         self.save()
         started = time.perf_counter()
         replacement = self.start_worker(n + 1)
