@@ -1620,3 +1620,112 @@ blob each (17 blobs). Bundle v20 on Delta (`frame-blob*-qualify-213731`): blobs
 zero mismatches; blob 16 (blur) still does not fit. The second group, minified
 textures whose per-tile windows are most of the texture, needs a different
 window strategy (sparse taps or a mip chain) and stays on the per-draw route.
+
+## Probe v117 (generation 41, tree v56, package v48, bundle v20, 660 s): the Mica programs on the kernel, and why DWM recreates its device
+
+Same probe, new pins (registration v96 passed; two Notepad instances were on
+the desktop this time, the one from v115 and the newly launched one). No request
+failed, no route disagreement, zero kernel escapes over 1,799 batches and 22,562
+commands. The compositor's `not a compiled inventory program` per-draws fell
+from 477 to 5 (two new programs, 520a2995 and f5df7ac6, three and two draws):
+1bf9cbd1 alone ran 973 times as a `kernel` command of blob 9. What remained on
+the compositor's per-draw route is the span-budget family only (595296ba at
+1024x768 and 64x64, d8e0b497 at 1024x768: 1,457 requests, p50 47 to 93 ms) plus
+780 blur fallbacks inside batches. DWM's batches moved to p50 78 ms (v116: 110).
+
+The bootstrap reported `passed=false`: its process observer found the
+compositor gone at the end. `dwm.exe.8604.dmp` was written at 04:52:17Z, five
+seconds after the admission's stop file, with `0x8898008d` ("No HW rendering
+device is available") raised as a fail-fast from
+`CD2DBitmap::EnsureShaderResourceView` while DWM was creating a device on the
+adapter that the teardown was removing. Why DWM was creating a device at that
+moment is the finding of this probe, and it predates today's changes:
+
+- The worker log shows DWM opening a new exchange (request sequence restarting
+  at 1) 2 times in trial 30 (no application windows), 81 times in probe v115,
+  66 in v116 and 135 in v117, every 5 to 9 seconds once an application window
+  is open. Each new device re-uploads the desktop's surfaces (88
+  `frame_batch_upload_alone` rows of about 20 MB in v117) and the indirect
+  display's swapchain is reassigned each time (270 `assigned` / `consumer_exit
+  887a0026` cycles).
+- The DWM trace (the first 4 MB of the run) pairs every device creation with a
+  rejected draw: 43 `reject draw 80070057` rows, 44 `device_created`. The
+  rejected draw is captured in `draw-8604.bin`: 6 vertices onto a 2880x1800
+  B8G8R8A8 target under a 14x80 scissor, a 6x2880 texture, pixel shader
+  8f244fea writing two outputs (`o0 = sample(t0, v2)`, `o1 = v1.w`) with the
+  blend state `SrcBlend = SRC1_ALPHA, DestBlend = INV_SRC1_ALPHA` for colour and
+  alpha: dual-source blending, DWM's caption text. The driver's blend table had
+  no SRC1 factors, so the per-draw route threw E_INVALIDARG; the runtime treats
+  a failed draw as a lost device and DWM recreates it. The draw's pixels were
+  lost either way.
+
+The fix in progress adds blend mode 14 (`dual_source_over`: source times the
+second output's alpha, destination times one minus it) to the frame kernel
+(`nr_blend_pixel_dual`, host blend reference and the 15-mode check), lets the
+lowering keep a pixel stage's second output, maps the SRC1 blend state in the
+driver, adds the pair as inventory program 36 (host: vertex 96/96 exact, pixel
+none far), and makes both ends drop rather than fail a dual-source draw that the
+kernel cannot take (the driver traces `draw_dropped` and counts it, the worker
+reports `frame_batch_unsupported`): a lost caption glyph is reported, a lost
+device is not acceptable. Bundle v21 and tree v57 carry it; probe v118 will
+tell whether the device churn and the teardown crash go with it.
+
+## Probe v118 (generation 42, tree v57, package v49, bundle v21, 660 s): dual-source blending lands, a second cause of the device churn
+
+Same probe on the dual-source build (registration v97). DWM was a new process
+(pid 5568, restarted after v117's crash). The bootstrap passed; the live
+harness reported "per-generation provider verification failed" because the
+worker's provider child was replaced twice (see below). No `draw_dropped` row
+appeared: the caption text pair batched wherever it was drawn, and the
+compositor's blend-table rejection is gone. The kernel ran 917 of 1,182
+commands in the first provider generation and 19,227 of 19,303 in the third
+(the rest the blur fallback), zero escapes.
+
+DWM still opened 100 exchanges in 660 s. The first 4 MB of its trace (the
+trace is capped there, so later minutes are not recorded) pairs the 40 device
+re-creations with 39 rejected draws and names a different cause:
+
+- One `operation_exception` "physical NPU worker rejected indexed draw": the
+  open batch's flush failed. The worker's provider child rejected the 22 MB
+  batch at its shader stage ("invalid frame batch at shaders") and exited; the
+  worker's parent started generation 2, which rejected the resent batch the
+  same way, then generation 3. The recorded request (ticket 104) decodes on the
+  host: shader record 8, a 46-word pixel program, carries the digest of
+  e5b2adfb, a 235-word program. The driver's digest cache is keyed by the
+  shader object's address and DWM creates and destroys over a thousand pixel
+  shaders per admission, so a freed program's address was reused and the new
+  program inherited the old digest. The lowered-program cache had the same key
+  and could have handed a reused address a wrong lowering, a wrong pixel result
+  rather than a rejected batch.
+- 38 `reject draw_indexed 80070057` rows with no draw row before them: a
+  `require` failing before the draw is recorded. The dual-source blend state on
+  a program without a second output is one candidate (the new mapping required
+  `o1`); the next build logs the failing require's module offset.
+
+Both caches now hold a weak reference to their program and recompute when it
+has gone, a dual-source state on a single-output program is dropped and
+reported, and the worker's shader-stage rejection names the shader and the
+check (tree v58). The remaining per-draw traffic was the span-budget family
+(595296ba at 1024x768 and 64x64, d8e0b497 at 1024x768) plus d8e0b497 on a
+2880x1800 target (200 requests, abi 23) that the capped trace does not explain.
+
+## Probe v119 (generation 43, tree v58, package v50, bundle v21, 660 s): the rejected draw names its check
+
+Tree v58 holds weak references in the driver's shader caches, drops a
+dual-source draw on a single-output program, and logs the failing require's
+module offset with each rejection. The bootstrap passed with nine processes
+admitted (two new Notepad-launched helpers among them), one provider
+generation (no batch was rejected), no new DWM dump, 25,529 of 25,914
+commands on the kernel (794 blur fallbacks), zero escapes. DWM still opened
+126 exchanges in 660 s, but every one of the 38 rejections in the trace now
+reads `require_offset 2dbb5`, and the failed-draw capture shows the state:
+the textured modulate program 595296ba on the 1024x768 desktop, source 16x16,
+blend `SrcBlend INV_DEST_COLOR, DestBlend INV_SRC_ALPHA, SrcBlendAlpha ZERO,
+DestBlendAlpha ONE`. The driver required identical colour and alpha factors
+and threw. That state is blend mode 15 in the next build
+(`invert_destination_over`: colour = source times one minus destination plus
+destination times one minus alpha, alpha lane unchanged), checked against the
+host reference and mapped by the driver; blob 1 splits in two so the
+2-instruction programs keep room (18 blobs), and blobs of large programs leave
+the mode out (they sit at the code window) with the worker routing such draws
+to the reported drop.
