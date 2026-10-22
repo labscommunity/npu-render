@@ -66,6 +66,12 @@ $regs=@(Get-ChildItem $vm -Directory -Filter 'native-registration-v*'|
    package=$(if($m.Success){$m.Value})}})
 $report=$(if($a){[ordered]@{passed=$a.passed;completed=$a.completed;error=$a.error;
  started=$a.started;finished=$a.finished;cleanup_passed=$a.cleanup_passed}})
+$tasks=@(Get-ScheduledTask|Where-Object {$_.TaskName -like 'T8-NpuRender-NativeDesktopRecovery-v*'}|
+ ForEach-Object {$n=$_.TaskName -replace '.*-v',''
+  $rp="$vm\native-desktop-admission-v$n\report.json"
+  $i=$_|Get-ScheduledTaskInfo;$done=$false;if(Test-Path $rp){$done=[bool](J $rp).completed}
+  [ordered]@{name=$_.TaskName;admission_completed=$done;state=[string]$_.State;
+   next_run=$(if($i.NextRunTime){$i.NextRunTime.ToUniversalTime().ToString('o')})}})
 $boot=$(if($b){[ordered]@{passed=$b.passed;completed=$b.completed;error=$b.error;
  started=$b.started;finished=$b.finished;observed_frame_count=$b.observed_frame_count;
  initial_grant_s=$b.initial_grant_s;
@@ -74,8 +80,22 @@ $boot=$(if($b){[ordered]@{passed=$b.passed;completed=$b.completed;error=$b.error
  admission=$(if($adm){[ordered]@{name=$adm[0].Name;stop_requested=(Test-Path "$t\stop");
   report=$report;bootstrap=$boot;recovery=$(J "$t\recovery-report.json")}});
  sequence=$(if($seq){[ordered]@{path=$seq[0].FullName;status=(J $seq[0].FullName)}});
- engine_summary=$(if($sum){[ordered]@{path=$sum[0].FullName;summary=(J $sum[0].FullName)}})
+ engine_summary=$(if($sum){[ordered]@{path=$sum[0].FullName;summary=(J $sum[0].FullName)}});
+ recovery_tasks=$tasks
 }|ConvertTo-Json -Depth 7
+"""
+)
+# A recovery task outlives its admission as the safety net for an abandoned controller; once the
+# admission has completed it is stale, and a stale one fired into the next admission (trial 25).
+SWEEP_STALE_RECOVERY = (
+    PRELUDE
+    + r"""$gone=@()
+foreach($t in @(Get-ScheduledTask|
+  Where-Object {$_.TaskName -like 'T8-NpuRender-NativeDesktopRecovery-v*'})){
+ $n=$t.TaskName -replace '.*-v','';$rp="$vm\native-desktop-admission-v$n\report.json";$done=$false
+ if(Test-Path $rp){try{$done=[bool](J $rp).completed}catch{}}
+ if($done){Unregister-ScheduledTask -TaskName $t.TaskName -Confirm:$false;$gone+=$t.TaskName}}
+[ordered]@{removed=$gone}|ConvertTo-Json -Depth 3
 """
 )
 PREREQUISITES = (
@@ -166,6 +186,11 @@ def read_remote_json(path: str) -> dict | None:
 
 def survey_host() -> dict:
     return remote_json(SURVEY, timeout=300)
+
+
+def sweep_stale_recovery_tasks() -> list[str]:
+    """Unregister recovery tasks whose admission has completed; returns their names."""
+    return list((remote_json(SWEEP_STALE_RECOVERY, timeout=120) or {}).get("removed") or [])
 
 
 def fill(template: str, **values: str) -> str:
@@ -294,6 +319,7 @@ def enable(config: SwitchConfig) -> dict:
     generation = next_generation(survey["admissions"])
     registration = last_passing_registration(survey["registrations"], config.package)
     names = transaction_names(generation)
+    swept = sweep_stale_recovery_tasks()
     with tempfile.TemporaryDirectory() as tmp:
         chain = Path(tmp) / "chain"
         manifest = generate_chain(config, generation, registration, chain)
@@ -304,6 +330,7 @@ def enable(config: SwitchConfig) -> dict:
         "generation": generation,
         "registration_generation": registration,
         "admission": names["admission"],
+        "stale_recovery_tasks_removed": swept,
         "uploaded": sorted(manifest["files"]),
         **launched,
         "next": "`npu-render desktop status` quotes the admission's reports as they appear",
@@ -452,6 +479,9 @@ def summarize(survey: dict) -> str:
             verdict = ("ok" if s.get("ok") else "FAILED") if s.get("finished") else "running"
             error = f" | {str(s['error'])[:120]}" if s.get("error") else ""
             lines.append(f"  {s.get('name')}: {verdict}{error}")
+    for task in survey.get("recovery_tasks") or []:
+        stale = " STALE (its admission completed)" if task.get("admission_completed") else ""
+        lines.append(f"recovery task {task.get('name')}: next run {task.get('next_run')}{stale}")
     summary = survey.get("engine_summary") or {}
     if summary.get("summary"):
         gpu = summary["summary"].get("gpu_3d_percent_sum") or {}

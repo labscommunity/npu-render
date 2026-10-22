@@ -423,7 +423,8 @@ Get-Content "$out\\report.json"
     # pipe with the same grants, every lease is rewritten with the new identity, and the resident
     # broker restarts; the driver re-binds (indexed_exchange.hpp). The replacement appends to the
     # same logs with its own capture and provider directories.
-    worker_start = boot.index("    worker=subprocess.Popen([str(v.worker),pipe,'65536',str(1185),")
+    # The lifetime literal after '65536' follows --initial-grant-seconds, so the prefix stops before it.
+    worker_start = boot.index("    worker=subprocess.Popen([str(v.worker),pipe,'65536',")
     worker_end = boot.index("\n", worker_start)
     popen = boot[worker_start:worker_end]
     assert popen.endswith("creationflags=subprocess.CREATE_NO_WINDOW)") and ",env=env," in popen, (
@@ -447,23 +448,22 @@ Get-Content "$out\\report.json"
         + "\n    worker=start_worker(1)"
         + boot[worker_end:]
     )
+    # The renewal line's initial_grant_s literal follows --initial-grant-seconds too: insert after it.
+    renewal_start = boot.index(
+        "    renewal=Renewal(leases,v.recovery_task);report['lease_renewals']=[];report['initial_grant_s']="
+    )
+    renewal_end = boot.index("\n", renewal_start) + 1
+    boot = (
+        boot[:renewal_end]
+        + "    def restart_resident(new_worker):\n        broker=globals().get('resident')\n        if broker is None:return\n        report.setdefault('resident_broker_restarts',[]).append(broker.close());save()\n        globals()['resident']=ResidentBroker(v.transaction,new_worker,suffix,session['console_session'],env,own_process,Path(os.environ['LOCALAPPDATA'])/'npu-render/builds/native-auto-interactive-v8',generation=len(report['resident_broker_restarts'])+1)\n        report['resident_broker_pid']=globals()['resident'].start();save()\n    failover=WorkerFailover(start_worker=start_worker,leases=leases,grant=lambda new:[permissions.append(ProcessGrant(int(new._handle),sid)) for sid in (compositor.sid,host.sid)],after_restart=restart_resident,stdout_path=out/'worker.stdout.jsonl',process_identity=process_identity,report=report,save=save)\n"
+        + boot[renewal_end:]
+    )
     boot = edit(
         boot,
         [
             (
                 "from native_lease_renewal_v1 import Renewal\n",
                 "from native_lease_renewal_v1 import Renewal\nfrom native_worker_failover_v1 import WorkerFailover\n",
-            ),
-            (
-                "    renewal=Renewal(leases,v.recovery_task);report['lease_renewals']=[];report['initial_grant_s']=1200\n",
-                "    renewal=Renewal(leases,v.recovery_task);report['lease_renewals']=[];report['initial_grant_s']=1200\n"
-                "    def restart_resident(new_worker):\n"
-                "        broker=globals().get('resident')\n"
-                "        if broker is None:return\n"
-                "        report.setdefault('resident_broker_restarts',[]).append(broker.close());save()\n"
-                "        globals()['resident']=ResidentBroker(v.transaction,new_worker,suffix,session['console_session'],env,own_process,Path(os.environ['LOCALAPPDATA'])/'npu-render/builds/native-auto-interactive-v8',generation=len(report['resident_broker_restarts'])+1)\n"
-                "        report['resident_broker_pid']=globals()['resident'].start();save()\n"
-                "    failover=WorkerFailover(start_worker=start_worker,leases=leases,grant=lambda new:[permissions.append(ProcessGrant(int(new._handle),sid)) for sid in (compositor.sid,host.sid)],after_restart=restart_resident,stdout_path=out/'worker.stdout.jsonl',process_identity=process_identity,report=report,save=save)\n",
             ),
             (
                 "        assert worker.poll() is None,'NPU worker stopped before native frame evidence'\n",
@@ -571,6 +571,20 @@ Get-Content "$out\\report.json"
                 "@('ROOT\\NPURENDER_NATIVE_PROBE','0.0.1319.0')",
                 f"@('ROOT\\NPURENDER_NATIVE_PROBE','{args.version}')",
             ),
+            # Recovery task lifecycle (trial 25): a task outlives its admission as the safety net for
+            # an abandoned controller, so it must never act on a newer admission's devices, and it
+            # goes whenever its own admission has completed, whatever this run reported.
+            (
+                " try{$held=$mutex.WaitOne(5000)}catch [Threading.AbandonedMutexException]{$held=$true};if(!$held){throw 'Another recovery owns cleanup'}\n",
+                " try{$held=$mutex.WaitOne(5000)}catch [Threading.AbandonedMutexException]{$held=$true};if(!$held){throw 'Another recovery owns cleanup'}\n"
+                " $me=[int](Split-Path $Root -Leaf).Split('v')[-1];$newer=@(Get-ChildItem (Split-Path $Root -Parent) -Directory -Filter 'native-desktop-admission-v*'|Where-Object {[int]$_.Name.Split('v')[-1] -gt $me}|Where-Object {$rp=Join-Path $_.FullName 'report.json';(Test-Path $rp) -and -not (Get-Content $rp -Raw|ConvertFrom-Json).completed})\n"
+                " if($newer.Count){$report.superseded_by=@($newer|ForEach-Object {$_.Name});$report.passed=$true;try{Unregister-ScheduledTask -TaskName 'T8-NpuRender-NativeDesktopRecovery-v75' -Confirm:$false -ErrorAction Stop;$report.task_unregistered=$true}catch{$report.task_unregistered=$false};return}\n",
+            ),
+            (
+                " if($report.passed){Unregister-ScheduledTask -TaskName 'T8-NpuRender-NativeDesktopRecovery-v75' -Confirm:$false -ErrorAction SilentlyContinue}\n",
+                ' $admission=$null;try{$admission=Get-Content "$Root\\report.json" -Raw|ConvertFrom-Json}catch{}\n'
+                " if($report.passed -or ($admission -and $admission.completed)){try{Unregister-ScheduledTask -TaskName 'T8-NpuRender-NativeDesktopRecovery-v75' -Confirm:$false -ErrorAction Stop;$report.task_unregistered=$true}catch{$report.task_unregistered=$false;Record-Error ('task: '+$_.Exception.Message)}}\n",
+            ),
             ("T8-NpuRender-NativeDesktopRecovery-v75", "T8-NpuRender-NativeDesktopRecovery-v76"),
             (
                 "@('ROOT\\NPURENDER_NATIVE_INDIRECT_V1','0.0.1502.0')",
@@ -593,6 +607,12 @@ Get-Content "$out\\report.json"
     desk = edit(
         desk,
         [
+            (
+                "if((Test-Path $out) -or (Get-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue)){throw 'Transaction identity exists'}\n",
+                "if((Test-Path $out) -or (Get-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue)){throw 'Transaction identity exists'}\n"
+                "# Recovery tasks of completed admissions are stale (trial 25: one fired into the next admission).\n"
+                "$stale=@();foreach($st in @(Get-ScheduledTask|Where-Object {$_.TaskName -like 'T8-NpuRender-NativeDesktopRecovery-v*'})){$sn=$st.TaskName -replace '.*-v','';$sr=\"$r\\vm\\native-desktop-admission-v$sn\\report.json\";$sd=$false;if(Test-Path $sr){try{$sd=[bool](Get-Content $sr -Raw|ConvertFrom-Json).completed}catch{}};if($sd){Unregister-ScheduledTask -TaskName $st.TaskName -Confirm:$false;$stale+=$st.TaskName}}\n",
+            ),
             ("native-desktop-admission-v75", "native-desktop-admission-v76"),
             ("T8-NpuRender-NativeDesktopRecovery-v75", "T8-NpuRender-NativeDesktopRecovery-v76"),
             ("native-desktop-v75-source.json", "native-desktop-v76-source.json"),

@@ -107,6 +107,8 @@ class FakeDelta:
 
     def run_remote(self, script, timeout=120):
         self.scripts.append(script)
+        if "NativeDesktopRecovery-v*" in script and "Unregister-ScheduledTask" in script:
+            return json.dumps({"removed": ["T8-NpuRender-NativeDesktopRecovery-v91"]})
         if "GetFolderPath" in script and "admissions=" in script:
             return "#< CLIXML noise\n" + json.dumps(self.survey_doc)
         if "GetFolderPath" in script:
@@ -187,6 +189,8 @@ def test_enable_uploads_the_chain_and_launches_the_plan(monkeypatch):
 
     monkeypatch.setattr(desktop_switch, "generate_chain", fake_generate)
     result = desktop_switch.enable(desktop_switch.SwitchConfig(monitor_seconds=7200))
+    # Stale recovery tasks of completed admissions are swept before the launch (trial 25).
+    assert result["stale_recovery_tasks_removed"] == ["T8-NpuRender-NativeDesktopRecovery-v91"]
     assert generated["generation"] == 18 and generated["registration"] == 14
     uploaded = {name: remote for name, remote, _ in delta.uploads}
     assert uploaded == {
