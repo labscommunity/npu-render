@@ -1,6 +1,8 @@
 # Contributing
 
-This is a private project. Keep work and artifacts within authorized destinations.
+The repository is private until its owner publishes it. Keep work and artifacts within
+authorized destinations, and never commit model weights, compiled device caches, the SHAVE
+toolchain, credentials, private machine addresses or virtual environments.
 
 ## Setup
 
