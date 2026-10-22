@@ -35,7 +35,7 @@ testpaths = ["tests"]
 [tool.ruff]
 target-version = "py311"
 line-length = 100
-extend-exclude = ["research/probe.py", "tools/delta/trial-chain"]
+extend-exclude = ["research/probe.py", "tools/delta/trial-chain", "tools/delta/trial-tools"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
