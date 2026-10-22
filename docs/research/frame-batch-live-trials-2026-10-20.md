@@ -1376,3 +1376,27 @@ process, records `cleanup_complete` (no owned device present, no device or
 package error) and unregisters its task on that as well as on a passing run or
 a completed admission. The next probe stops the worker at +300 s of a 900 s
 admission so the frames after the failover can be counted.
+
+## Trial 27 (generation 34, admission v110, 900 s requested): the resend after failover is too large
+
+Same pins as trial 26, the worker stopped at +300 s (02:10:29Z). The
+replacement was ready in 762 ms, the compositor's lease rewritten, the broker
+restarted, and DWM's driver trace shows `exchange_failover` to worker 9172 after
+62 ms, then `frame_batch_missing` for the two resources the fresh worker did
+not hold. The resend carried every missing resource in full: one request of
+50,944,884 bytes. The worker's parent accepted it (`request_identity`,
+sequence 39) and its provider child ended the pipe (`indexed pipe completion
+failed: 233`, `provider_request_failed`), so the driver's retry failed, the
+transport was poisoned and DWM's flush returned an error; DWM re-created its
+devices, the indirect display's swap chain was unassigned (`consumer_exit`
+887a0026, `unassigned`), the topology control saw its primary route change and
+restored the topology, the live wrapper wrote the stop file, and the bootstrap
+ended cleanly at 02:10:40Z. DWM kept its process. Recovery passed with
+`cleanup_complete` true and `task_unregistered` true, the first run of the new
+lifecycle; no stale task remained.
+
+So the failover protocol holds and the limit is the resend: a worker that
+starts mid-admission knows no resident resource, and the compositor's next
+batch references the whole desktop's surfaces at once. The driver has to
+re-upload them within the worker's request limit, in pieces, before the batch
+that needs them.
