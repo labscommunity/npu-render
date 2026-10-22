@@ -10,12 +10,12 @@
 #ifndef NR_LAB_TRACE_ROOT
 #define NR_LAB_TRACE_ROOT LR"(C:\ProgramData\T8-NpuRender-NativeTraceV1)"
 #endif
-// Bytes per ring file of the per-process trace (three files are kept).
-#ifndef NR_LAB_TRACE_FILE_BYTES
-#define NR_LAB_TRACE_FILE_BYTES (16ull * 1024 * 1024)
-#endif
 #else
 #define NR_LAB_TRACE_ROOT LR"(C:\npu-lab\umd-trace)"
+#endif
+// Bytes per ring file of the per-process trace (three files are kept), for every build of the lab.
+#ifndef NR_LAB_TRACE_FILE_BYTES
+#define NR_LAB_TRACE_FILE_BYTES (16ull * 1024 * 1024)
 #endif
 namespace nr::registered_lab {
 // The compositor can retain this DLL after a finite trial ends. Validate a
