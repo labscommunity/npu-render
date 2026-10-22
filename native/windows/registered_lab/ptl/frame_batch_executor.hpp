@@ -158,6 +158,19 @@ class FrameBatchExecutor {
         }
         return false;
     }
+    // Texture extent as the program addresses it: a byte buffer view is one row of its elements.
+    static void texture_extent(const TextureBinding &b, const ResourceRecord &r, uint32_t &w, uint32_t &h) { if (b.flags & byte_buffer_view) { w = b.elements; h = 1; } else { w = r.width; h = r.height; } }
+    // Elements [x0, x1) of a byte buffer view, zero-extended to R32_UINT, from the resident word surface
+    // (logical bytes are contiguous in the packed copy, little-endian word order).
+    static bool fetch_elements(const ResourceRef &ref, const TextureBinding &b, frame::Rect r, std::vector<uint32_t> &out) {
+        const auto *res = ref.resident;
+        if (!res || res->pixels.size() != size_t(res->width) * res->height || ((ref.record.flags & volatile_resource) && !ref.uploaded_full && res->version != ref.record.version)) return false;
+        if (r.y0 != 0 || r.y1 != 1 || r.x0 < 0 || r.x1 < r.x0 || uint64_t(r.x1) > b.elements || uint64_t(b.first_element) + b.elements > res->pixels.size() * 4) return false;
+        const auto *bytes = reinterpret_cast<const uint8_t *>(res->pixels.data()) + b.first_element;
+        out.resize(size_t(r.x1 - r.x0));
+        for (int32_t x = r.x0; x < r.x1; ++x) out[size_t(x - r.x0)] = bytes[size_t(x)];
+        return true;
+    }
 public:
     // `blob_dir` holds manifest.txt with one line per kernel blob: "<blob> <sha256> <file>".
     explicit FrameBatchExecutor(indexed_exchange::Pipeline &pipeline, const std::filesystem::path &blob_dir) : legacy(pipeline) {
@@ -264,7 +277,7 @@ public:
         indexed_exchange::Reader reader(packet); const auto header = reader.value<indexed_exchange::Header>();
         expect(batch_header_valid(header) && packet.size() == sizeof(header) + header.body_bytes);
         const auto batch = reader.value<BatchHeader>();
-        expect(batch.magic == batch_magic && batch.version == 1 && batch.shader_count <= max_shaders && batch.resource_count <= max_resources &&
+        expect(batch.magic == batch_magic && batch.version == 2 && batch.shader_count <= max_shaders && batch.resource_count <= max_resources &&
                 batch.upload_count <= max_uploads && batch.command_count <= max_commands && !batch.reserved);
         Stats stats; current_sequence = header.sequence; dumped_spans = 0;
         // Shaders.
@@ -319,7 +332,15 @@ public:
         for (auto &d : draws) {
             d.record = reader.value<CommandRecord>();
             expect(d.record.kind <= 2 && d.record.target < refs.size() && d.record.texture_count <= 4 && d.record.blend_mode <= 13 && d.record.write_mask && d.record.write_mask <= 15 && d.record.cull <= 2 && d.record.front_ccw <= 1);
-            for (uint32_t t = 0; t < d.record.texture_count; ++t) { d.textures[t] = reader.value<TextureBinding>(); expect(d.textures[t].resource < refs.size() && d.textures[t].filter <= 1); }
+            for (uint32_t t = 0; t < d.record.texture_count; ++t) {
+                auto &b = d.textures[t]; b = reader.value<TextureBinding>();
+                expect(b.resource < refs.size() && b.filter <= 1 && !(b.flags & ~uint32_t(byte_buffer_view)) && !b.reserved);
+                if (b.flags & byte_buffer_view) {
+                    // The fetched bytes live inside the buffer's word surface, which the resident copy mirrors.
+                    const auto &rec = refs[b.resource].record;
+                    expect(b.elements && b.elements <= 4194304 && rec.format == 28 && uint64_t(b.first_element) + b.elements <= uint64_t(rec.width) * rec.height * 4);
+                } else expect(!b.first_element && !b.elements);
+            }
             if (d.record.kind == 0) {
                 expect(d.record.vertex_shader < batch_shaders.size() && d.record.pixel_shader < batch_shaders.size() && batch_shaders[d.record.vertex_shader].stage == 1 && batch_shaders[d.record.pixel_shader].stage == 2);
                 expect(d.record.vertex_count && d.record.vertex_count % 3 == 0 && d.record.vertex_count <= 4095 && d.record.vertex_words == d.record.vertex_count * 64);
@@ -434,6 +455,7 @@ private:
             // lower once with clamp/linear defaults to learn the pairing, then re-lower with the real filters.
             auto first = frame::lower(vs, ps, s);
             if (first.eligible()) for (size_t t = 0; t < first.sampler_slots.size() && t < d.record.texture_count; ++t) {
+                if (t < first.texture_loaded.size() && first.texture_loaded[t]) continue;   // ld: no sampler
                 s[first.sampler_slots[t]].filter = d.textures[t].filter ? shader::TextureFilter::point : shader::TextureFilter::linear;
                 s[first.sampler_slots[t]].u = shader::TextureAddress(d.textures[t].address_u); s[first.sampler_slots[t]].v = shader::TextureAddress(d.textures[t].address_v);
             }
@@ -458,7 +480,7 @@ private:
         if (d.program->texture_slots.size() != d.record.texture_count) { d.route = "fallback:texture count"; return; }
         if (d.record.vertex_constant_words != d.program->vs_constants * 4 || d.record.pixel_constant_words != d.program->ps_constants * 4) { d.route = "fallback:constant words"; return; }
         std::array<uint32_t, 4> tw{}, th{}; std::array<bool, 4> point{};
-        for (uint32_t t = 0; t < d.record.texture_count; ++t) { const auto &ref = refs[d.textures[t].resource]; tw[t] = ref.record.width; th[t] = ref.record.height; point[t] = d.textures[t].filter != 0; }
+        for (uint32_t t = 0; t < d.record.texture_count; ++t) { const auto &ref = refs[d.textures[t].resource]; texture_extent(d.textures[t], ref.record, tw[t], th[t]); point[t] = d.textures[t].filter != 0; }
         std::vector<uint32_t> constants(d.vertex_constants); constants.insert(constants.end(), d.pixel_constants.begin(), d.pixel_constants.end());
         d.plan = frame::plan_draw(*d.program, frame::pack_vertices(*d.program, d.inputs), d.record.vertex_count, constants,
                                   {d.record.viewport[0], d.record.viewport[1], d.record.viewport[2], d.record.viewport[3]}, tw, th, point);
@@ -477,7 +499,7 @@ private:
         const auto &target = refs[d.record.target].record;
         const frame::Rect bounds = frame::intersect(frame::intersect(d.plan.bounds, d.scissor_bounds), {0, 0, int32_t(target.width), int32_t(target.height)});
         std::array<uint32_t, 4> tw{}, th{}; std::array<bool, 4> point{};
-        for (uint32_t t = 0; t < d.record.texture_count; ++t) { const auto &ref = refs[d.textures[t].resource]; tw[t] = ref.record.width; th[t] = ref.record.height; point[t] = d.textures[t].filter != 0; }
+        for (uint32_t t = 0; t < d.record.texture_count; ++t) { const auto &ref = refs[d.textures[t].resource]; texture_extent(d.textures[t], ref.record, tw[t], th[t]); point[t] = d.textures[t].filter != 0; }
         d.tile = frame::fitting_tile(*d.program, d.plan, bounds, d.kernel_entry.size(), d.record.vertex_words, uint32_t(d.vertex_constants.size() + d.pixel_constants.size()), tw, th, point);
         if (!d.tile && frame::adaptive_fit(*d.program, d.plan, bounds, {0, 0, int32_t(target.width), int32_t(target.height)}, d.kernel_entry.size(), d.record.vertex_words, uint32_t(d.vertex_constants.size() + d.pixel_constants.size()), tw, th, point)) { d.tile = 128; d.adaptive = true; }
         if (!d.tile) { d.eligible = false; d.route = "fallback:span budget"; }
@@ -510,7 +532,8 @@ private:
                 in.bordered = in.bordered || d.textures[t].address_u == uint32_t(shader::TextureAddress::border) || d.textures[t].address_v == uint32_t(shader::TextureAddress::border);
             if (d.record.texture_count) {
                 in.linear = d.textures[0].filter == 0;
-                const auto &source = refs[d.textures[0].resource].record; in.source_smaller = source.width < res.width || source.height < res.height;
+                // The driver has no bound source for a buffer view (draw.hpp): its selection sees no smaller source.
+                if (!(d.textures[0].flags & byte_buffer_view)) { const auto &source = refs[d.textures[0].resource].record; in.source_smaller = source.width < res.width || source.height < res.height; }
             }
             in.scissored = d.record.scissor_enabled && !(d.record.scissor[0] == 0 && d.record.scissor[1] == 0 && d.record.scissor[2] == int32_t(res.width) && d.record.scissor[3] == int32_t(res.height));
             in.vertex_count = d.record.vertex_count; in.write_mask = d.record.write_mask;
@@ -538,8 +561,15 @@ private:
         require(slots.size() == d.record.texture_count);
         for (uint32_t t = 0; t < d.record.texture_count; ++t) {
             const auto &tref = refs[d.textures[t].resource]; require(tref.resident && (tref.uploaded_full || !(tref.record.flags & volatile_resource) || tref.resident->version == tref.record.version) && tref.resident->pixels.size() == size_t(tref.resident->width) * tref.resident->height);
-            raster::PackedTexture texture{tref.resident->width, tref.resident->height, tref.resident->format, {}};
-            texture.pixels.resize(tref.resident->pixels.size()); std::memcpy(texture.pixels.data(), tref.resident->pixels.data(), tref.resident->pixels.size() * 4);
+            raster::PackedTexture texture;
+            if (d.textures[t].flags & byte_buffer_view) {
+                // The per-draw route takes the buffer as R32_UINT elements (the driver's own per-draw transport).
+                std::vector<uint32_t> words; require(fetch_elements(tref, d.textures[t], {0, 0, int32_t(d.textures[t].elements), 1}, words));
+                texture = raster::PackedTexture{d.textures[t].elements, 1, 42, {}}; texture.pixels.resize(words.size()); std::memcpy(texture.pixels.data(), words.data(), words.size() * 4);
+            } else {
+                texture = raster::PackedTexture{tref.resident->width, tref.resident->height, tref.resident->format, {}};
+                texture.pixels.resize(tref.resident->pixels.size()); std::memcpy(texture.pixels.data(), tref.resident->pixels.data(), tref.resident->pixels.size() * 4);
+            }
             if (h.flags & 0x2000) { request.resources[slots[t]] = std::move(texture); auto &s = request.samplers[slots[t]]; s.filter = d.textures[t].filter ? shader::TextureFilter::point : shader::TextureFilter::linear; s.u = shader::TextureAddress(d.textures[t].address_u); s.v = shader::TextureAddress(d.textures[t].address_v); for (unsigned c = 0; c < 4; ++c) s.border[c] = d.textures[t].border[c]; }
             else request.texture = std::move(texture);
         }
@@ -654,15 +684,16 @@ private:
                     c.constants = d.vertex_constants; c.constants.insert(c.constants.end(), d.pixel_constants.begin(), d.pixel_constants.end());
                     bool ok = true;
                     for (uint32_t t = 0; t < d.record.texture_count && ok; ++t) {
-                        const auto &tref = refs[d.textures[t].resource];
-                        auto rects = frame::texel_windows(*d.program, d.plan, clip, t, tref.record.width, tref.record.height, d.textures[t].filter != 0);
+                        const auto &tref = refs[d.textures[t].resource]; const bool bytes_view = (d.textures[t].flags & byte_buffer_view) != 0;
+                        uint32_t extent_w, extent_h; texture_extent(d.textures[t], tref.record, extent_w, extent_h);
+                        auto rects = frame::texel_windows(*d.program, d.plan, clip, t, extent_w, extent_h, d.textures[t].filter != 0);
                         if (rects[0].empty()) { rects[0] = {0, 0, 1, 1}; rects[1] = {0, 0, 0, 0}; }   // no triangle reaches this tile: a one-texel window keeps the contract
                         for (unsigned k = 0; k < 2 && ok; ++k) {
                             if (rects[k].empty()) continue;
                             frame::Window w; const auto &r = rects[k];
                             w.w = uint32_t(r.x1 - r.x0); w.h = uint32_t(r.y1 - r.y0); w.origin_x = uint32_t(r.x0); w.origin_y = uint32_t(r.y0);
-                            w.texture_w = tref.record.width; w.texture_h = tref.record.height; w.format = tref.record.format;
-                            if (!fetch_window(tref, r, w.pixels)) { ok = false; break; }
+                            w.texture_w = extent_w; w.texture_h = extent_h; w.format = bytes_view ? 42u : tref.record.format;
+                            if (!(bytes_view ? fetch_elements(tref, d.textures[t], r, w.pixels) : fetch_window(tref, r, w.pixels))) { ok = false; break; }
                             trial_windows.push_back(std::move(w));
                             (k ? c.textures[t].window2 : c.textures[t].window) = uint32_t(trial_windows.size() - 1);
                         }

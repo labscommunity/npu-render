@@ -435,7 +435,11 @@ void APIENTRY update_resource(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE dst, UINT s
         auto &r = resource(dst);
         require(r.usage == D3D10_DDI_USAGE_DEFAULT && r.allocation->context == device(h).context);
         const auto allocation = mip_allocation(r, sub);
-        if (r.buffer_bytes) { require(!box); update_buffer(r, source); return; }
+        if (r.buffer_bytes) {
+            // A buffer may be a fetched texture of the open frame batch (WinUI glyph indices): settle it first.
+            require(!box); frame_batches_before_write(*r.allocation); update_buffer(r, source);
+            r.allocation->content_version = next_content_version(); r.allocation->mark_dirty_full(); return;
+        }
         upload(*allocation, box, source, pitch); // CPU upload bytes are counted separately from submitted work.
     });
 }
@@ -459,7 +463,7 @@ void APIENTRY map(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE r, UINT sub, D3D10_DDI_
         const bool do_not_wait=(flags & D3D10_DDI_MAP_FLAG_DONOTWAIT)!=0;
         require(staging || (discard && !do_not_wait));
         // CPU access to a surface the open frame batch still writes or reads: settle the batch first.
-        if (!v.buffer_bytes) { if (wants_read) frame_batches_before_read(*allocation); if (wants_write) frame_batches_before_write(*allocation); }
+        if (wants_read) frame_batches_before_read(*allocation); if (wants_write) frame_batches_before_write(*allocation);   // buffers too: a batch may fetch them
         try {
             out->pData = allocation->lock(staging && wants_read && !wants_write,staging && wants_read && wants_write,do_not_wait);
         } catch(const Error &e) {
@@ -481,7 +485,7 @@ void APIENTRY unmap(D3D10DDI_HDEVICE h, D3D10DDI_HRESOURCE r, UINT sub) {
         require(a.locked && a.context == device(h).context); check(a.unlock());
         if (v.mapped_write) counters.upload_bytes += v.buffer_bytes ? v.buffer_bytes :
             uint64_t(a.surface.width)*a.surface.height*texel_bytes(a.surface.format);
-        if (v.mapped_write && !v.buffer_bytes) { a.content_version = next_content_version(); a.mark_dirty_full(); }
+        if (v.mapped_write) { a.content_version = next_content_version(); a.mark_dirty_full(); }
         v.mapped_write = false;
     });
 }

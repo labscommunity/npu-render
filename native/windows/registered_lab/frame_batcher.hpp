@@ -137,7 +137,7 @@ struct FrameBatcher {
         resources.push_back(std::move(r));
         return uint32_t(resources.size() - 1);
     }
-    struct TextureUse { UINT slot; std::shared_ptr<Allocation> allocation; bool point; };
+    struct TextureUse { UINT slot; std::shared_ptr<Allocation> allocation; bool point; bool loaded = false, buffer = false; uint32_t first_element = 0, elements = 0; };
     // Records one draw. Returns false (with a reason) when the draw must take the per-draw route.
     bool record_draw(const std::shared_ptr<Allocation> &target, const std::vector<nr::shader::VertexRegisters> &inputs,
                      const std::shared_ptr<const nr::shader::Program> &vs, const std::shared_ptr<const nr::shader::Program> &ps,
@@ -150,6 +150,10 @@ struct FrameBatcher {
         // Textures: 2D color surfaces sampled with clamp addressing, in SM4 slot order.
         std::vector<TextureUse> uses; nr::shader::TextureSamplers samplers{}; std::string key = std::to_string(uintptr_t(vs.get())) + ":" + std::to_string(uintptr_t(ps.get()));
         std::string texture_shapes;
+        // How the pixel program reads each slot: sampled (sample) or fetched (ld). Fetched slots may be byte
+        // buffers (WinUI text: glyph coverage indices into a palette) or UNORM textures without a sampler.
+        std::array<bool, 16> fetched{};
+        for (const auto &ins : ps->instructions) if (ins.opcode == nr::shader::Opcode::load && ins.sources[1].kind == nr::shader::Register::texture && ins.sources[1].index < 16) fetched[ins.sources[1].index] = true;
         for (UINT slot = 0; slot < 16; ++slot) {
             if (ps->samplers[slot]) {
                 const auto &samp = d.samplers[2][slot];
@@ -169,12 +173,21 @@ struct FrameBatcher {
             }
             if (!ps->textures[slot]) continue;
             const auto &view = d.shader_sources[2][slot];
-            if (view.buffer || !view.allocation || ps->texture_dimensions[slot] != 3 || ps->texture_uint[slot]) { reason = "texture view" + ps_id; return false; }
+            if (!view.allocation) { reason = "texture view" + ps_id; return false; }
+            if (view.buffer) {
+                if (!fetched[slot] || ps->texture_dimensions[slot] != 1 || !ps->texture_uint[slot] || view.format != 62 || !view.elements || view.elements > 4194304 ||
+                    uint64_t(view.first_element) + view.elements > view.allocation->surface.allocation_bytes) { reason = "buffer view" + ps_id; return false; }
+                if (view.allocation == target || view.allocation->handle == target->handle) { reason = "target sampled" + ps_id; return false; }
+                texture_shapes += " t" + std::to_string(slot) + "=buffer" + std::to_string(view.elements);
+                TextureUse use{slot, view.allocation, true}; use.loaded = true; use.buffer = true; use.first_element = view.first_element; use.elements = view.elements;
+                uses.push_back(use); continue;
+            }
+            if (ps->texture_dimensions[slot] != 3 || ps->texture_uint[slot]) { reason = "texture view" + ps_id; return false; }
             const auto &ss = view.allocation->surface;
             texture_shapes += " t" + std::to_string(slot) + "=" + std::to_string(ss.width) + "x" + std::to_string(ss.height) + (view.allocation->runtime_resource ? "s" : "p");
             if (!(ss.format == 28 || ss.format == 87 || ss.format == 65) || ss.width > 8192 || ss.height > 8192 || uint64_t(ss.width) * ss.height > 8388608) { reason = "texture shape" + ps_id + texture_shapes; return false; }
             if (view.allocation == target || view.allocation->handle == target->handle) { reason = "target sampled" + ps_id; return false; }
-            uses.push_back({slot, view.allocation, false});
+            TextureUse use{slot, view.allocation, false}; use.loaded = fetched[slot]; uses.push_back(use);
         }
         auto found = lowered.find(key);
         if (found == lowered.end()) {
@@ -191,7 +204,10 @@ struct FrameBatcher {
         for (size_t t = 0; t < program.texture_slots.size(); ++t) {
             const TextureUse *use = nullptr; for (const auto &u : uses) if (u.slot == program.texture_slots[t]) use = &u;
             if (!use) { reason = "texture slot" + ps_id; return false; }
-            tw[t] = use->allocation->surface.width; th[t] = use->allocation->surface.height; point[t] = samplers[program.sampler_slots[t]].filter == nr::shader::TextureFilter::point; ordered.push_back(use);
+            const bool loaded = t < program.texture_loaded.size() && program.texture_loaded[t];
+            if (loaded != use->loaded) { reason = "texture use" + ps_id; return false; }
+            tw[t] = use->buffer ? use->elements : use->allocation->surface.width; th[t] = use->buffer ? 1u : use->allocation->surface.height;
+            point[t] = loaded || samplers[program.sampler_slots[t]].filter == nr::shader::TextureFilter::point; ordered.push_back(use);
         }
         std::vector<uint32_t> constants, vertices; vertices.reserve(inputs.size() * 64);
         for (unsigned i = 0; i < 14; ++i) for (const auto &v : vc[i]) constants.insert(constants.end(), v.begin(), v.end());
@@ -230,7 +246,10 @@ struct FrameBatcher {
         r.texture_count = uint32_t(ordered.size()); r.legacy_abi = legacy_abi; r.legacy_flags = legacy_flags;
         for (size_t t = 0; t < ordered.size(); ++t) {
             fb::TextureBinding b; b.resource = resource_index(ordered[t]->allocation, false); b.filter = point[t] ? 1u : 0u;
-            b.address_u = uint32_t(samplers[program.sampler_slots[t]].u); b.address_v = uint32_t(samplers[program.sampler_slots[t]].v);
+            if (ordered[t]->loaded) {
+                b.address_u = b.address_v = uint32_t(nr::shader::TextureAddress::clamp);   // ld has no sampler
+                if (ordered[t]->buffer) { b.flags = fb::byte_buffer_view; b.first_element = ordered[t]->first_element; b.elements = ordered[t]->elements; }
+            } else { b.address_u = uint32_t(samplers[program.sampler_slots[t]].u); b.address_v = uint32_t(samplers[program.sampler_slots[t]].v); }
             c.bindings.push_back(b);
         }
         extend_pending(resources[r.target], bounds);

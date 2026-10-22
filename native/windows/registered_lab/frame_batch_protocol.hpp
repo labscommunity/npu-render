@@ -22,8 +22,11 @@ namespace nr::registered_lab::frame_batch {
 constexpr uint32_t abi = 24, batch_magic = 0x4e524231u, response_magic = 0x4e52424fu;
 constexpr uint32_t max_shaders = 64, max_resources = 1024, max_uploads = 1024, max_commands = 1024, max_body = indexed_exchange::max_packet_bytes - 128;
 enum Flags : uint32_t { volatile_resource = 1, upload_window = 2 };
+// Texture binding flags: the resource is a buffer's word surface and the program fetches (ld) its
+// bytes [first_element, first_element + elements) as R32_UINT elements (R8_UINT views, zero-extended).
+enum BindingFlags : uint32_t { byte_buffer_view = 1 };
 struct BatchHeader {
-    uint32_t magic = batch_magic, version = 1, shader_count = 0, resource_count = 0;
+    uint32_t magic = batch_magic, version = 2, shader_count = 0, resource_count = 0;   // version 2: 48-byte texture bindings
     uint32_t upload_count = 0, command_count = 0, flags = 0, reserved = 0;
     uint64_t batch_sequence = 0, expected_generation = 0;
 };
@@ -37,8 +40,11 @@ struct ResourceRecord {
 static_assert(sizeof(ResourceRecord) == 32);
 struct UploadRecord { uint32_t resource = 0, x = 0, y = 0, width = 0, height = 0, reserved = 0; }; // pixels follow
 static_assert(sizeof(UploadRecord) == 24);
-struct TextureBinding { uint32_t resource = 0xffffffffu, filter = 0, address_u = 0, address_v = 0; float border[4]{}; };
-static_assert(sizeof(TextureBinding) == 32);
+struct TextureBinding {
+    uint32_t resource = 0xffffffffu, filter = 0, address_u = 0, address_v = 0; float border[4]{};
+    uint32_t first_element = 0, elements = 0, flags = 0, reserved = 0;   // byte_buffer_view: the fetched element range
+};
+static_assert(sizeof(TextureBinding) == 48);
 struct CommandRecord {
     uint32_t kind = 0;                        // 0 draw, 1 clear, 2 copy region (reserved)
     uint32_t target = 0;                      // resource index
