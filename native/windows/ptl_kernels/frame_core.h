@@ -87,6 +87,7 @@ enum {
     NR_OP_MOV = 0, NR_OP_ADD, NR_OP_MUL, NR_OP_MAD, NR_OP_DIV, NR_OP_MIN, NR_OP_MAX, NR_OP_DP2, NR_OP_DP3, NR_OP_DP4,
     NR_OP_FRC, NR_OP_FLOOR, NR_OP_RSQ, NR_OP_MOVC, NR_OP_LT, NR_OP_GE, NR_OP_EQ, NR_OP_NE, NR_OP_AND, NR_OP_OR,
     NR_OP_IADD, NR_OP_ITOF, NR_OP_FTOI, NR_OP_IGE, NR_OP_IMAD, NR_OP_ISHL, NR_OP_ISHR, NR_OP_USHR, NR_OP_SAMPLE, NR_OP_DDX, NR_OP_DDY, NR_OP_LOOP, NR_OP_BREAKC, NR_OP_ENDLOOP,
+    NR_OP_LD,                         /* SM4 ld: integer texel fetch at mip 0 (appended: earlier values stay stable) */
     NR_OP_COUNT
 };
 enum { NR_STATUS_OK = 0, NR_STATUS_HEADER = 1, NR_STATUS_COMMAND = 2, NR_STATUS_PROGRAM = 3, NR_STATUS_VERTEX = 4,
@@ -169,6 +170,7 @@ NR_INLINE nr_uv4 nr_uv4_xor(nr_uv4 a, nr_uv4 b) { return a ^ b; }
 NR_INLINE nr_uv4 nr_uv4_not(nr_uv4 a) { return ~a; }
 NR_INLINE nr_uv4 nr_uv4_add(nr_uv4 a, nr_uv4 b) { return a + b; }
 NR_INLINE nr_uv4 nr_uv4_sub(nr_uv4 a, nr_uv4 b) { return a - b; }
+NR_INLINE nr_uv4 nr_uv4_mul(nr_uv4 a, nr_uv4 b) { return a * b; }
 NR_INLINE nr_uv4 nr_uv4_shl(nr_uv4 a, nr_uv4 s) { return a << s; }
 NR_INLINE nr_uv4 nr_uv4_shr(nr_uv4 a, nr_uv4 s) { return a >> s; }
 NR_INLINE nr_uv4 nr_uv4_gt(nr_uv4 a, nr_uv4 b) { return (nr_uv4)(a > b); }
@@ -182,6 +184,7 @@ NR_INLINE nr_uv4 nr_v4_eq(nr_v4 a, nr_v4 b) { return (nr_uv4)(a == b); }
 NR_INLINE nr_uv4 nr_v4_ne(nr_v4 a, nr_v4 b) { return (nr_uv4)(a != b); }
 NR_INLINE nr_uv4 nr_v4_to_u(nr_v4 a) { return __builtin_convertvector(a, nr_uv4); }
 NR_INLINE nr_iv4 nr_v4_to_i(nr_v4 a) { return __builtin_convertvector(a, nr_iv4); }
+NR_INLINE nr_uv4 nr_iv4_asu(nr_iv4 a) { return (nr_uv4)a; }
 NR_INLINE nr_v4 nr_uv4_to_f(nr_uv4 a) { return __builtin_convertvector(a, nr_v4); }
 NR_INLINE nr_v4 nr_iv4_to_f(nr_iv4 a) { return __builtin_convertvector(a, nr_v4); }
 NR_INLINE nr_v4 nr_v4_load(const nr_u8 *p) { return *(const nr_v4 *)p; }
@@ -208,6 +211,7 @@ NR_V4_OP(nr_uv4_or, nr_uv4, a.v[i] | b.v[i])
 NR_V4_OP(nr_uv4_xor, nr_uv4, a.v[i] ^ b.v[i])
 NR_V4_OP(nr_uv4_add, nr_uv4, a.v[i] + b.v[i])
 NR_V4_OP(nr_uv4_sub, nr_uv4, a.v[i] - b.v[i])
+NR_V4_OP(nr_uv4_mul, nr_uv4, a.v[i] * b.v[i])
 NR_V4_OP(nr_uv4_shl, nr_uv4, a.v[i] << b.v[i])
 NR_V4_OP(nr_uv4_shr, nr_uv4, a.v[i] >> b.v[i])
 NR_V4_OP(nr_uv4_gt, nr_uv4, a.v[i] > b.v[i] ? 0xffffffffu : 0u)
@@ -225,6 +229,7 @@ NR_V4_CMP(nr_v4_ne, !=)
 #undef NR_V4_CMP
 NR_INLINE nr_uv4 nr_v4_to_u(nr_v4 a) { nr_uv4 r; nr_u32 i; for (i = 0; i < 4; ++i) r.v[i] = (nr_u32)a.v[i]; return r; }
 NR_INLINE nr_iv4 nr_v4_to_i(nr_v4 a) { nr_iv4 r; nr_u32 i; for (i = 0; i < 4; ++i) r.v[i] = (nr_i32)a.v[i]; return r; }
+NR_INLINE nr_uv4 nr_iv4_asu(nr_iv4 a) { nr_uv4 r; nr_u32 i; for (i = 0; i < 4; ++i) r.v[i] = (nr_u32)a.v[i]; return r; }
 NR_INLINE nr_v4 nr_uv4_to_f(nr_uv4 a) { nr_v4 r; nr_u32 i; for (i = 0; i < 4; ++i) r.v[i] = (nr_f32)a.v[i]; return r; }
 NR_INLINE nr_v4 nr_iv4_to_f(nr_iv4 a) { nr_v4 r; nr_u32 i; for (i = 0; i < 4; ++i) r.v[i] = (nr_f32)a.v[i]; return r; }
 NR_INLINE nr_v4 nr_v4_load(const nr_u8 *p) { return nr_uv4_asf(nr_uv4_make(nr_ld(p), nr_ld(p + 4), nr_ld(p + 8), nr_ld(p + 12))); }
@@ -311,6 +316,25 @@ NR_HELPER_ATTR nr_v4 nr_v4_cmp_ge(nr_v4 a, nr_v4 b) { return nr_uv4_asf(nr_uv4_a
 NR_HELPER_ATTR nr_v4 nr_v4_cmp_eq(nr_v4 a, nr_v4 b) { return nr_uv4_asf(nr_uv4_and(nr_v4_eq(nr_v4_flush(a), nr_v4_flush(b)), nr_uv4_not(nr_v4_unordered(a, b)))); }
 NR_HELPER_ATTR nr_v4 nr_v4_cmp_ne(nr_v4 a, nr_v4 b) { return nr_uv4_asf(nr_uv4_or(nr_v4_ne(nr_v4_flush(a), nr_v4_flush(b)), nr_v4_unordered(a, b))); }
 NR_HELPER_ATTR nr_v4 nr_v4_cmp_ige(nr_v4 a, nr_v4 b) { return nr_uv4_asf(nr_iv4_ge(nr_v4_asu(a), nr_v4_asu(b))); }
+/* SM4 integer arithmetic on bit-pattern lanes. Shift counts come from lane 0 of the count
+ * operand (the reference's convention, low five bits); ftoi saturates and maps NaN to 0. */
+NR_INLINE nr_v4 nr_v4_imad(nr_v4 a, nr_v4 b, nr_v4 e) { return nr_uv4_asf(nr_uv4_add(nr_uv4_mul(nr_v4_asu(a), nr_v4_asu(b)), nr_v4_asu(e))); }
+NR_INLINE nr_v4 nr_v4_ishl(nr_v4 a, nr_v4 b) { return nr_uv4_asf(nr_uv4_shl(nr_v4_asu(a), nr_uv4_splat(nr_v4_bits(b, 0) & 31u))); }
+NR_INLINE nr_v4 nr_v4_ushr(nr_v4 a, nr_v4 b) { return nr_uv4_asf(nr_uv4_shr(nr_v4_asu(a), nr_uv4_splat(nr_v4_bits(b, 0) & 31u))); }
+#ifndef NR_FRAME_NO_LD   /* blobs without a fetching program leave the ld support out (code window) */
+NR_HELPER_ATTR nr_v4 nr_v4_ishr(nr_v4 a, nr_v4 b) {
+    nr_u32 s = nr_v4_bits(b, 0) & 31u; nr_uv4 u = nr_v4_asu(a);
+    nr_uv4 fill = nr_uv4_and(nr_uv4_splat(s ? (0xffffffffu << (32u - s)) : 0u), nr_uv4_gt(u, nr_uv4_splat(0x7fffffffu)));   /* sign extension */
+    return nr_uv4_asf(nr_uv4_or(nr_uv4_shr(u, nr_uv4_splat(s)), fill));
+}
+NR_HELPER_ATTR nr_v4 nr_v4_ftoi(nr_v4 a) {
+    /* `above`/`below`, not `big`/`small`: Windows headers define `small` as a macro for host builds. */
+    nr_uv4 unordered = nr_v4_isnan(a), above = nr_v4_ge(a, nr_v4_splat(2147483648.0f)), below = nr_v4_lt(a, nr_v4_splat(-2147483648.0f));
+    nr_v4 clamped = nr_v4_sel(unordered, nr_v4_zero(), nr_v4_sel(above, nr_v4_splat(2147483520.0f), nr_v4_sel(below, nr_v4_splat(-2147483648.0f), a)));
+    nr_uv4 r = nr_uv4_sel(above, nr_uv4_splat(0x7fffffffu), nr_iv4_asu(nr_v4_to_i(clamped)));
+    return nr_uv4_asf(nr_uv4_sel(unordered, nr_uv4_splat(0u), r));
+}
+#endif
 /* Ordered dot products: left to right, no contraction. */
 NR_HELPER_ATTR nr_v4 nr_v4_dp(nr_v4 a, nr_v4 b, nr_u32 n) {
     nr_f32 d = NR_V4_LANE(a, 0) * NR_V4_LANE(b, 0); nr_u32 c;
@@ -423,6 +447,19 @@ NR_SAMPLE_ATTR nr_v4 nr_sample(const nr_command_state *st, nr_u32 texture, nr_u3
     bottom = nr_v4_add(nr_v4_mul(t2, one_tx), nr_v4_mul(t3, nr_v4_splat(tx)));
     return nr_v4_add(nr_v4_mul(top, one_ty), nr_v4_mul(bottom, nr_v4_splat(ty)));
 }
+/* Integer texel fetch (SM4 ld): element (x, y) of the texture at mip 0, zero for any coordinate
+ * outside the resource. R32_UINT windows (buffers) return the raw element as (x, 0, 0, 1); UNORM
+ * windows unpack like a point tap. Taps outside the bound windows clamp and count as escapes. */
+#ifndef NR_FRAME_NO_LD
+NR_SAMPLE_ATTR nr_v4 nr_load(const nr_command_state *st, nr_u32 texture, nr_u32 x, nr_u32 y, nr_u32 mip, nr_u32 *escapes) {
+    nr_u32 word; nr_v4 t;
+    if (x >= st->texture_w[texture] || y >= st->texture_h[texture] || mip) return nr_v4_zero();
+    word = nr_ld(nr_tap(st, texture, (nr_i32)x, (nr_i32)y, escapes));
+    if (st->format[texture] == 42u) return nr_v4_from_bits(word, 0u, 0u, 1u);
+    t = nr_v4_mul(nr_uv4_to_f(nr_uv4_and(nr_uv4_shr(nr_uv4_splat(word), st->byte_shifts), nr_uv4_splat(255u))), nr_v4_splat(1.0f / 255.0f));
+    return nr_v4_sel(st->swap_mask_texture[texture], NR_V4_SWZ(t, 2, 1, 0, 3), t);
+}
+#endif
 /* Blends one shaded color into a target pixel: all four bytes as vector lanes. */
 NR_HELPER_ATTR void nr_blend_pixel(const nr_command_state *st, nr_u8 *pixel, nr_v4 color) {
     nr_u32 background = nr_ld(pixel), packed;
@@ -680,8 +717,15 @@ NR_NOINLINE nr_i32 nr_span_load(nr_span *s, const nr_u8 *data, nr_u8 *output) {
     for (n = 0; n < s->window_count; ++n) {
         const nr_u8 *rec = data + s->atlas_offset + 4 + n * NR_FRAME_WINDOW_BYTES;
         nr_u32 off = nr_ld(rec), w = nr_ld(rec + 4), h = nr_ld(rec + 8), ox = nr_ld(rec + 12), oy = nr_ld(rec + 16), tw = nr_ld(rec + 20), th = nr_ld(rec + 24), fmt = nr_ld(rec + 28);
+#ifndef NR_FRAME_NO_LD
+        if (!w || !h || !tw || !th || (off & 3u) || off > s->atlas_bytes) return 0;
+        if (fmt == 42u) { if (h != 1 || th != 1 || w > 4194304u || tw > 4194304u) return 0; }   /* R32_UINT buffer elements: one row, read with ld */
+        else if (w > 8192 || h > 8192 || tw > 8192 || th > 8192 || (fmt != 28 && fmt != 87)) return 0;
+        if (w * h > (s->atlas_bytes - off) / 4 || ox > tw - w || oy > th - h) return 0;
+#else
         if (!w || !h || w > 8192 || h > 8192 || (off & 3u) || off > s->atlas_bytes || w * h > (s->atlas_bytes - off) / 4 ||
             !tw || !th || tw > 8192 || th > 8192 || ox > tw - w || oy > th - h || (fmt != 28 && fmt != 87)) return 0;
+#endif
     }
     return 1;
 }

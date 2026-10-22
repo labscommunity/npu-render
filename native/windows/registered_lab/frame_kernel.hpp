@@ -25,6 +25,7 @@ using core::NR_OP_MOV; using core::NR_OP_ADD; using core::NR_OP_MUL; using core:
 using core::NR_OP_DP2; using core::NR_OP_DP3; using core::NR_OP_DP4; using core::NR_OP_FRC; using core::NR_OP_FLOOR; using core::NR_OP_MOVC; using core::NR_OP_LT;
 using core::NR_OP_DDX; using core::NR_OP_DDY; using core::NR_OP_LOOP; using core::NR_OP_BREAKC; using core::NR_OP_ENDLOOP;
 using core::NR_OP_GE; using core::NR_OP_EQ; using core::NR_OP_NE; using core::NR_OP_AND; using core::NR_OP_OR; using core::NR_OP_IADD; using core::NR_OP_ITOF; using core::NR_OP_IGE; using core::NR_OP_SAMPLE;
+using core::NR_OP_FTOI; using core::NR_OP_IMAD; using core::NR_OP_ISHL; using core::NR_OP_ISHR; using core::NR_OP_USHR; using core::NR_OP_LD;
 constexpr uint32_t span_bytes = NR_FRAME_SPAN, tile_pixels = 128, output_pixels_offset = NR_FRAME_OUTPUT_PIXELS;
 inline void require(bool value, const char *message = "frame kernel contract") { if (!value) throw std::invalid_argument(message); }
 inline uint32_t bits(float value) { uint32_t result; std::memcpy(&result, &value, 4); return result; }
@@ -42,6 +43,8 @@ struct LoweredProgram {
     std::vector<uint32_t> texture_slots;    // command texture index -> SM4 texture slot
     std::vector<uint32_t> sampler_slots;    // command texture index -> SM4 sampler slot
     std::vector<uint8_t> texture_mirror_u, texture_mirror_v;   // command texture index -> SM4 mirror addressing per axis
+    std::vector<uint8_t> texture_loaded;    // command texture index -> read with ld (integer texel fetch, no sampler; point windows)
+    std::vector<uint8_t> texture_buffer;    // command texture index -> the ld resource is a Buffer: one row of R32_UINT elements
     std::array<uint32_t, 14> vs_constant_base{}, ps_constant_base{}, vs_constant_count{}, ps_constant_count{};
     std::string rejection;                   // empty when eligible
     bool eligible() const { return rejection.empty(); }
@@ -184,9 +187,13 @@ inline LoweredProgram lower(const shader::Program &vs, const shader::Program &ps
             case Opcode::equal: op = NR_OP_EQ; break; case Opcode::not_equal: op = NR_OP_NE; break; case Opcode::bitwise_and: op = NR_OP_AND; break;
             case Opcode::integer_add: op = NR_OP_IADD; break; case Opcode::integer_to_float: op = NR_OP_ITOF; break;
             case Opcode::integer_greater_equal: op = NR_OP_IGE; break; case Opcode::sample: op = NR_OP_SAMPLE; break;
+            case Opcode::float_to_integer: op = NR_OP_FTOI; break; case Opcode::integer_mad: op = NR_OP_IMAD; break;
+            case Opcode::shift_left: op = NR_OP_ISHL; break; case Opcode::shift_right: op = NR_OP_ISHR; break; case Opcode::unsigned_shift_right: op = NR_OP_USHR; break;
+            case Opcode::load: op = NR_OP_LD; break;
             default: return "opcode";
             }
             if (vertex && op == NR_OP_SAMPLE) return "vertex sampling";
+            if (vertex && op == NR_OP_LD) return "vertex load";
             Words w{}; w[0] = op;
             const auto &d = i.destination;
             uint32_t dest_kind = d.kind == shader::Register::temporary ? 0u : d.kind == shader::Register::output ? 1u : 2u;
@@ -204,6 +211,7 @@ inline LoweredProgram lower(const shader::Program &vs, const shader::Program &ps
                 if (s.u == shader::TextureAddress::border || s.v == shader::TextureAddress::border) return "texture addressing";
                 uint32_t slot_index = UINT32_MAX;
                 for (size_t n = 0; n < out.texture_slots.size(); ++n) if (out.texture_slots[n] == texture.index) {
+                    if (out.texture_loaded[n]) return "texture loaded and sampled";
                     if (out.sampler_slots[n] != sampler.index) return "texture sampled with two samplers";
                     slot_index = uint32_t(n);
                 }
@@ -211,8 +219,29 @@ inline LoweredProgram lower(const shader::Program &vs, const shader::Program &ps
                     if (out.texture_slots.size() >= NR_FRAME_MAX_TEXTURES) return "texture count";
                     out.texture_slots.push_back(texture.index); out.sampler_slots.push_back(sampler.index); slot_index = uint32_t(out.texture_slots.size() - 1);
                     out.texture_mirror_u.push_back(s.u == shader::TextureAddress::mirror); out.texture_mirror_v.push_back(s.v == shader::TextureAddress::mirror);
+                    out.texture_loaded.push_back(0); out.texture_buffer.push_back(0);
                 }
                 w[2] = *coordinate; w[5] = slot_index | (detail::encode_lanes(texture.lanes) << 12);
+            } else if (op == NR_OP_LD) {
+                // Integer texel fetch: the address operand (x, y, -, mip) and a texture without a sampler. The kernel
+                // serves ld from point windows: R32_UINT buffers (one row of elements) or UNORM 2D textures.
+                uint32_t relative = 0;
+                const auto address = operand(i.sources[0], program, vertex, why, relative); if (!address || relative) { detail_reason = why; return "load address"; }
+                const auto &texture = i.sources[1];
+                if (texture.kind != shader::Register::texture || texture.index >= 16 || !program.textures[texture.index]) return "load resources";
+                const bool buffer = program.texture_dimensions[texture.index] == 1, uint_texture = program.texture_uint[texture.index];
+                if (!((buffer && uint_texture) || (program.texture_dimensions[texture.index] == 3 && !uint_texture))) return "load resource kind";
+                uint32_t slot_index = UINT32_MAX;
+                for (size_t n = 0; n < out.texture_slots.size(); ++n) if (out.texture_slots[n] == texture.index) {
+                    if (!out.texture_loaded[n]) return "texture loaded and sampled";
+                    slot_index = uint32_t(n);
+                }
+                if (slot_index == UINT32_MAX) {
+                    if (out.texture_slots.size() >= NR_FRAME_MAX_TEXTURES) return "texture count";
+                    out.texture_slots.push_back(texture.index); out.sampler_slots.push_back(0); slot_index = uint32_t(out.texture_slots.size() - 1);
+                    out.texture_mirror_u.push_back(0); out.texture_mirror_v.push_back(0); out.texture_loaded.push_back(1); out.texture_buffer.push_back(buffer ? 1 : 0);
+                }
+                w[2] = *address; w[5] = slot_index | (detail::encode_lanes(texture.lanes) << 12) | ((buffer ? 1u : 0u) << 20) | ((uint_texture ? 1u : 0u) << 21);
             } else {
                 for (unsigned k = 0; k < i.source_count; ++k) {
                     uint32_t relative = 0;
@@ -257,7 +286,9 @@ inline LoweredProgram lower(const shader::Program &vs, const shader::Program &ps
 // The SHAVE code window holds a few programs at a time, so the inventory is
 // split into blobs by pixel-stage instruction count. A program's blob and its
 // index inside the blob follow from this rule on both the host and the kernel.
-constexpr std::array<std::pair<uint32_t, uint32_t>, 11> blob_ranges{{{0, 1}, {2, 2}, {3, 3}, {4, 12}, {13, 16}, {17, 21}, {22, 64}, {65, 115}, {116, 120}, {121, 181}, {182, 100000}}};
+// Blob 4 holds the fetching (ld) text program alone and blob 5 the 10-12 instruction programs, so the
+// ld runtime support and the larger programs never share a code window (bundle v19 measurements).
+constexpr std::array<std::pair<uint32_t, uint32_t>, 13> blob_ranges{{{0, 1}, {2, 2}, {3, 3}, {4, 8}, {9, 9}, {10, 12}, {13, 16}, {17, 21}, {22, 64}, {65, 115}, {116, 120}, {121, 181}, {182, 100000}}};
 inline uint32_t blob_of(uint32_t ps_instructions) {
     for (uint32_t k = 0; k < blob_ranges.size(); ++k) if (ps_instructions >= blob_ranges[k].first && ps_instructions <= blob_ranges[k].second) return k;
     return UINT32_MAX;
@@ -271,8 +302,12 @@ namespace detail {
 inline std::string hex(uint32_t v) { char b[16]; std::snprintf(b, sizeof b, "0x%08xu", v); return b; }
 inline std::string dec(uint32_t v) { return std::to_string(v) + "u"; }
 inline unsigned source_count(uint32_t op) {
-    return (op == NR_OP_LOOP || op == NR_OP_ENDLOOP) ? 0u : op == NR_OP_BREAKC ? 1u : op == NR_OP_SAMPLE || op == NR_OP_MOV || op == NR_OP_FRC || op == NR_OP_FLOOR || op == NR_OP_ITOF || op == NR_OP_DDX || op == NR_OP_DDY ? 1u : (op == NR_OP_MAD || op == NR_OP_MOVC) ? 3u : 2u;
+    return (op == NR_OP_LOOP || op == NR_OP_ENDLOOP) ? 0u : op == NR_OP_BREAKC ? 1u : op == NR_OP_SAMPLE || op == NR_OP_LD || op == NR_OP_MOV || op == NR_OP_FRC || op == NR_OP_FLOOR || op == NR_OP_ITOF || op == NR_OP_FTOI || op == NR_OP_DDX || op == NR_OP_DDY ? 1u : (op == NR_OP_MAD || op == NR_OP_MOVC || op == NR_OP_IMAD) ? 3u : 2u;
 }
+// Texture instructions keep the texture slot in w[5]; every other instruction keeps relative-addressing bits there.
+inline bool texture_op(uint32_t op) { return op == NR_OP_SAMPLE || op == NR_OP_LD; }
+// Integer instructions negate their operands as two's complement.
+inline bool integer_op(uint32_t op) { return op == NR_OP_IADD || op == NR_OP_IMAD; }
 // How the emitted instructions name registers and tables.
 struct Names {
     std::function<std::string(uint32_t)> input, output;
@@ -288,7 +323,7 @@ inline std::array<bool, 16> used_temps(const std::vector<Words> &words) {
         const uint32_t op = w[0];
         if ((w[1] & 15u) == 0) used[(w[1] >> 4) & 15u] = true;
         for (unsigned k = 0; k < source_count(op); ++k) {
-            const uint32_t src = w[2 + k], rel = op == NR_OP_SAMPLE ? 0u : (w[5] >> (k * 10)) & 0x3ffu;
+            const uint32_t src = w[2 + k], rel = texture_op(op) ? 0u : (w[5] >> (k * 10)) & 0x3ffu;
             if ((src & 15u) == 0) used[(src >> 4) & 15u] = true;
             if ((rel & 1u) && !(rel & 2u)) used[(rel >> 2) & 15u] = true;
         }
@@ -304,7 +339,7 @@ inline std::string emit_instructions(const std::vector<Words> &words, const std:
         const std::string D = (dest & 15u) ? names.output((dest >> 4) & 255u) : "r" + std::to_string((dest >> 4) & 15u);
         auto operand = [&](unsigned k) {
             const uint32_t src = w[2 + k], kind = src & 15u, idx = (src >> 4) & 255u, lanes = (src >> 12) & 255u, neg = (src >> 20) & 1u, abs = (src >> 21) & 1u, slot = (src >> 22) & 15u;
-            const uint32_t rel = op == NR_OP_SAMPLE ? 0u : (w[5] >> (k * 10)) & 0x3ffu;
+            const uint32_t rel = texture_op(op) ? 0u : (w[5] >> (k * 10)) & 0x3ffu;
             std::string e;
             if (kind == 0) e = "r" + std::to_string(idx);
             else if (kind == 1) e = names.input(idx);
@@ -318,7 +353,7 @@ inline std::string emit_instructions(const std::vector<Words> &words, const std:
             }
             if (lanes != 0xe4u) e = "NR_V4_SWZ(" + e + ", " + std::to_string(lanes & 3u) + ", " + std::to_string((lanes >> 2) & 3u) + ", " + std::to_string((lanes >> 4) & 3u) + ", " + std::to_string((lanes >> 6) & 3u) + ")";
             if (abs) e = "nr_v4_abs(" + e + ")";
-            if (neg) e = (op == NR_OP_IADD ? "nr_v4_ineg(" : "nr_v4_neg(") + e + ")";
+            if (neg) e = (integer_op(op) ? "nr_v4_ineg(" : "nr_v4_neg(") + e + ")";
             return e;
         };
         if (op == NR_OP_BREAKC) { s += indent + "{ nr_v4 a = " + operand(0) + "; if ((nr_v4_bits(a, 0) != 0u) == " + (w[3] ? "1" : "0") + ") break; }\n"; continue; }
@@ -344,6 +379,11 @@ inline std::string emit_instructions(const std::vector<Words> &words, const std:
         case NR_OP_FRC: s += in + "t = nr_v4_frc(a);\n"; break;
         case NR_OP_FLOOR: s += in + "t = nr_v4_floor(a);\n"; break;
         case NR_OP_ITOF: s += in + "t = nr_v4_itof(a);\n"; break;
+        case NR_OP_FTOI: s += in + "t = nr_v4_ftoi(a);\n"; break;
+        case NR_OP_IMAD: s += in + "t = nr_v4_imad(a, b, e);\n"; break;
+        case NR_OP_ISHL: s += in + "t = nr_v4_ishl(a, b);\n"; break;
+        case NR_OP_ISHR: s += in + "t = nr_v4_ishr(a, b);\n"; break;
+        case NR_OP_USHR: s += in + "t = nr_v4_ushr(a, b);\n"; break;
         case NR_OP_MOVC: s += in + "t = nr_v4_movc(a, b, e);\n"; break;
         case NR_OP_LT: s += in + "t = nr_v4_cmp_lt(a, b);\n"; break;
         case NR_OP_GE: s += in + "t = nr_v4_cmp_ge(a, b);\n"; break;
@@ -367,6 +407,12 @@ inline std::string emit_instructions(const std::vector<Words> &words, const std:
         case NR_OP_SAMPLE: {
             const uint32_t texture = w[5] & 15u, lanes = (w[5] >> 12) & 255u;
             s += in + "t = nr_sample(" + names.st + ", " + dec(texture) + ", nr_v4_bits(a, 0), nr_v4_bits(a, 1), " + names.escapes + ");\n";
+            if (lanes != 0xe4u) s += in + "t = NR_V4_SWZ(t, " + std::to_string(lanes & 3u) + ", " + std::to_string((lanes >> 2) & 3u) + ", " + std::to_string((lanes >> 4) & 3u) + ", " + std::to_string((lanes >> 6) & 3u) + ");\n";
+            break;
+        }
+        case NR_OP_LD: {
+            const uint32_t texture = w[5] & 15u, lanes = (w[5] >> 12) & 255u, buffer = (w[5] >> 20) & 1u;
+            s += in + "t = nr_load(" + names.st + ", " + dec(texture) + ", nr_v4_bits(a, 0), " + (buffer ? std::string("0u") : "nr_v4_bits(a, 1)") + ", " + (buffer ? std::string("0u") : "nr_v4_bits(a, 3)") + ", " + names.escapes + ");\n";
             if (lanes != 0xe4u) s += in + "t = NR_V4_SWZ(t, " + std::to_string(lanes & 3u) + ", " + std::to_string((lanes >> 2) & 3u) + ", " + std::to_string((lanes >> 4) & 3u) + ", " + std::to_string((lanes >> 6) & 3u) + ");\n";
             break;
         }
@@ -402,7 +448,7 @@ inline std::string emit_row(const LoweredProgram &p, const std::string &name) {
     // Only varyings the pixel stage reads are interpolated.
     std::array<bool, 16> read{};
     for (const auto &w : p.ps_words) for (unsigned k = 0; k < detail::source_count(w[0]); ++k) {
-        const uint32_t src = w[2 + k], rel = w[0] == NR_OP_SAMPLE ? 0u : (w[5] >> (k * 10)) & 0x3ffu;
+        const uint32_t src = w[2 + k], rel = detail::texture_op(w[0]) ? 0u : (w[5] >> (k * 10)) & 0x3ffu;
         if ((src & 15u) == 1) read[(src >> 4) & 15u] = true;
         if ((rel & 3u) == 3u) read[(rel >> 2) & 15u] = true;
     }

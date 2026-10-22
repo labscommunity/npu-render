@@ -19,7 +19,7 @@ KERNELS = ROOT / "native/windows/ptl_kernels"
 sys.path.insert(0, str(ROOT / "tools"))
 from build_ptl_kernel import inline_local_includes  # noqa: E402
 
-BLOBS = 11
+BLOBS = 13
 CXX = [
     "clang++",
     "-std=c++17",
@@ -83,6 +83,9 @@ def main():
         shutil.copy(KERNELS / "frame_core.h", blob_dir / "frame_core.h")
         shutil.copy(KERNELS / "frame.c", blob_dir / "frame.c")
         define = f"#define NR_KERNEL_IDENTITY {identity}u\n".encode()
+        # Blobs whose programs never fetch (ld) leave that runtime support out of the code window.
+        if b"nr_load(" not in header.read_bytes():
+            define += b"#define NR_FRAME_NO_LD 1\n"
         source = define + inline_local_includes(blob_dir / "frame.c")
         (out / f"frame_blob{blob}.c").write_bytes(source)
         manifest["blobs"].append(

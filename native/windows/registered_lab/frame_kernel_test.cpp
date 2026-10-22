@@ -5,6 +5,7 @@
 #include "shader_reference.hpp"
 #include "blend_reference.hpp"
 #include "frame_inventory.hpp"
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <fstream>
@@ -25,9 +26,20 @@ struct Textures { frame::Window windows[4]; shader::TextureShapes shapes{}; shad
 Textures make_textures(const frame::LoweredProgram &lowered, const shader::TextureSamplers &samplers, uint32_t size, bool zero_alpha = false) {
     Textures t; t.samplers = samplers;
     for (size_t n = 0; n < lowered.texture_slots.size(); ++n) {
-        auto &w = t.windows[n]; w.w = w.texture_w = size; w.h = w.texture_h = size; w.origin_x = w.origin_y = 0; w.format = n & 1 ? 87u : 28u;
+        auto &w = t.windows[n]; const auto slot = lowered.texture_slots[n];
+        if (n < lowered.texture_buffer.size() && lowered.texture_buffer[n]) {
+            // A Buffer<uint> read with ld: one row of R32_UINT elements holding byte values (R8_UINT views
+            // travel zero-extended). Values mostly index inside a `size` texture so a dependent ld lands too.
+            w.w = w.texture_w = size * 4; w.h = w.texture_h = 1; w.origin_x = w.origin_y = 0; w.format = 42u;
+            w.pixels.resize(w.w); t.shapes[slot] = {w.w, 1, 1}; t.pixels[slot].resize(w.w);
+            for (size_t i = 0; i < w.pixels.size(); ++i) {
+                w.pixels[i] = uint32_t(rng()) % (size + 2); const uint32_t one = 1;
+                std::memcpy(&t.pixels[slot][i][0], &w.pixels[i], 4); t.pixels[slot][i][1] = t.pixels[slot][i][2] = 0.f; std::memcpy(&t.pixels[slot][i][3], &one, 4);
+            }
+            continue;
+        }
+        w.w = w.texture_w = size; w.h = w.texture_h = size; w.origin_x = w.origin_y = 0; w.format = n & 1 ? 87u : 28u;
         w.pixels.resize(size_t(size) * size);
-        const auto slot = lowered.texture_slots[n];
         t.shapes[slot] = {size, size, 15}; t.pixels[slot].resize(w.pixels.size());
         for (size_t i = 0; i < w.pixels.size(); ++i) {
             w.pixels[i] = uint32_t(rng()) & (zero_alpha ? 0x00ffffffu : 0xffffffffu);
@@ -84,7 +96,11 @@ std::vector<uint32_t> flatten(const shader::Program &vs, const shader::Constants
 }
 frame::Command base_command(const frame::LoweredProgram &lowered, const Textures &textures, const shader::TextureSamplers &samplers) {
     frame::Command c; c.viewport = {0, 0, 128, 128}; c.clip = {0, 0, 128, 128};
-    for (size_t n = 0; n < lowered.texture_slots.size(); ++n) { c.textures[n].window = uint32_t(n); c.textures[n].point = samplers[lowered.sampler_slots[n]].filter == shader::TextureFilter::point; c.textures[n].mirror_u = samplers[lowered.sampler_slots[n]].u == shader::TextureAddress::mirror; c.textures[n].mirror_v = samplers[lowered.sampler_slots[n]].v == shader::TextureAddress::mirror; }
+    for (size_t n = 0; n < lowered.texture_slots.size(); ++n) {
+        c.textures[n].window = uint32_t(n);
+        if (n < lowered.texture_loaded.size() && lowered.texture_loaded[n]) { c.textures[n].point = true; continue; }   // ld: no sampler
+        c.textures[n].point = samplers[lowered.sampler_slots[n]].filter == shader::TextureFilter::point; c.textures[n].mirror_u = samplers[lowered.sampler_slots[n]].u == shader::TextureAddress::mirror; c.textures[n].mirror_v = samplers[lowered.sampler_slots[n]].v == shader::TextureAddress::mirror;
+    }
     (void)textures; return c;
 }
 struct Stats { unsigned vs_cases = 0, vs_exact = 0, ps_cases = 0, ps_exact = 0, ps_within_one = 0, ps_far = 0; };
@@ -113,7 +129,11 @@ Stats compare_stage(const Pair &pair, const shader::Program &vs, const shader::P
         }
         // Pixel stage with random varyings.
         shader::Registers pixel_inputs{};
-        for (unsigned r = 0; r < 16; ++r) if (ps.inputs[r] && r != ps.position_input) for (unsigned c = 0; c < 4; ++c) pixel_inputs[r][c] = fbits(c < 2 ? uniform(-0.5f, 1.5f) : uniform(0.25f, 2));   // coordinates reach clamp and mirror addressing
+        // Programs that fetch (ld) mix float coordinates and integer lanes: small values of both kinds so
+        // the fetched elements fall inside and outside the resources.
+        const bool loads = std::any_of(lowered.texture_loaded.begin(), lowered.texture_loaded.end(), [](uint8_t v) { return v != 0; });
+        for (unsigned r = 0; r < 16; ++r) if (ps.inputs[r] && r != ps.position_input) for (unsigned c = 0; c < 4; ++c)
+            pixel_inputs[r][c] = loads ? ((rng() & 1) ? fbits(float(rng() % 10) - 1.0f) : uint32_t(rng() % 10)) : fbits(c < 2 ? uniform(-0.5f, 1.5f) : uniform(0.25f, 2));   // coordinates reach clamp and mirror addressing
         load_stage(ctx, false, pixel_inputs, sh, escapes);
         // The single-pixel SM4 reference has no quad to differentiate; derivative programs are
         // checked through their fixtures (host kernel against the NPU) instead.
@@ -336,6 +356,22 @@ int main(int argc, char **argv) {
                     if (status != 0 || !covered) { std::printf("{\"shader\":\"%s\",\"transparent_fixture_status\":%u,\"covered\":%u}\n", pair.sha, status, covered); }
                     frame::require(status == 0 && covered, (std::string("transparent-texture fixture must cover the tile: ") + pair.sha + " status " + std::to_string(status)).c_str());
                     append_fixture(fixtures, std::string("transparent-textures-") + pair.sha, span);
+                }
+                // Fixture E: programs that fetch (ld) with varyings the fetches can address: constant-interpolated
+                // inputs carry small integers, the others small floats, so the elements read fall inside the
+                // windows (the quad fixtures above only reach the out-of-range zero).
+                if (variant == 0 && std::any_of(pass_lowered.texture_loaded.begin(), pass_lowered.texture_loaded.end(), [](uint8_t v) { return v != 0; })) {
+                    frame::Command fetch = command; fetch.blend_mode = 1; fetch.vertices.clear();
+                    for (size_t k = 0; k < pass_lowered.texture_slots.size(); ++k) { fetch.textures[k].window = uint32_t(k); fetch.textures[k].window2 = frame::TextureBinding{}.window2; }
+                    for (unsigned v = 0; v < 6; ++v) for (unsigned r = 0; r < 16; ++r) if (pass.inputs[r]) {
+                        if (r == position_register) { fetch.vertices.insert(fetch.vertices.end(), {fbits(quad[v][0]), fbits(quad[v][1]), fbits(0.5f), fbits(1.0f)}); continue; }
+                        for (unsigned c = 0; c < 4; ++c) fetch.vertices.push_back(ps.interpolation[r] == 1 ? uint32_t((r + c + 1) % 6) : fbits(float((v + c) % 4)));
+                    }
+                    auto span = frame::SpanBuilder::build(0, 0, 128, 128, format, {pass_lowered.entry}, {fetch}, windows, background.data());
+                    std::vector<uint8_t> expected; frame::render_reference(span, expected);
+                    uint32_t status, covered; std::memcpy(&status, expected.data() + 4, 4); std::memcpy(&covered, expected.data() + 12, 4);
+                    frame::require(status == 0 && covered, (std::string("fetch fixture must cover the tile: ") + pair.sha).c_str());
+                    append_fixture(fixtures, std::string("loads-") + pair.sha, span);
                 }
             }
         }

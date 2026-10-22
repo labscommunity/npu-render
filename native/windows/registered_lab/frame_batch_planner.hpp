@@ -135,6 +135,9 @@ struct Val {
     bool affine = false;                // c0 + sum(terms) when `known`
     double c0 = 0;
     std::vector<std::pair<uint32_t, double>> terms;   // symbol, coefficient (sorted by symbol)
+    // Integer lanes (ftoi results and what they feed) as an int32 range, independent of the float
+    // fields: such a lane is "any value" to every float operation and exact to the integer ones.
+    bool integer = false; int64_t ilo = 0, ihi = 0;
     static Val any() { return Val{}; }
     void bound() {
         lo = hi = c0;
@@ -210,7 +213,10 @@ inline Val neg(const Val &a) {
     if (!a.known) { Val v; for (uint32_t b : a.set) v.set.push_back(b ^ 0x80000000u); return v; }
     Val v = scaled(a, -1.0); for (uint32_t b : a.set) v.set.push_back(b ^ 0x80000000u); return v;
 }
+inline bool int_range(const Val &a, int64_t &lo, int64_t &hi);
+inline Val make_int(int64_t lo, int64_t hi);
 inline Val hull(const Val &a, const Val &b) {
+    if (a.integer || b.integer) { int64_t al, ah, bl, bh; return int_range(a, al, ah) && int_range(b, bl, bh) ? make_int(std::min(al, bl), std::max(ah, bh)) : Val::any(); }
     if (!a.known || !b.known) return Val::any();
     if (a.same_form(b)) return a;
     Val v = Val::range(std::min(a.lo, b.lo), std::max(a.hi, b.hi));
@@ -301,21 +307,84 @@ inline Val bitwise(const Val &a, const Val &b, bool is_or) {
     for (uint32_t x : a.set) for (uint32_t y : b.set) s.push_back(is_or ? (x | y) : (x & y));
     return from_set(s);
 }
+// Integer lanes travel as small pattern sets (masks, immediates, short ranges) or as int32 ranges.
+inline Val make_int(int64_t lo, int64_t hi) {
+    Val v; if (lo > hi) std::swap(lo, hi);
+    if (lo < INT32_MIN || hi > INT32_MAX) return v;   // wrapped around: any value
+    v.integer = true; v.ilo = lo; v.ihi = hi;
+    if (hi - lo < 16) for (int64_t x = lo; x <= hi; ++x) v.set.push_back(uint32_t(int32_t(x)));
+    return v;
+}
+inline bool int_range(const Val &a, int64_t &lo, int64_t &hi) {
+    if (!a.set.empty()) { lo = INT64_MAX; hi = INT64_MIN; for (uint32_t b : a.set) { lo = std::min<int64_t>(lo, int32_t(b)); hi = std::max<int64_t>(hi, int32_t(b)); } return true; }
+    if (a.integer) { lo = a.ilo; hi = a.ihi; return true; }
+    // A single exact float value (a constant-interpolated varying carrying integer bits, a literal) is
+    // one bit pattern: an integer instruction reads those bits.
+    if (a.known && a.constant_value() && a.lo == a.hi) { const float f = float(a.lo); if (double(f) == a.lo) { uint32_t bits; std::memcpy(&bits, &f, 4); lo = hi = int32_t(bits); return true; } }
+    return false;
+}
+inline int32_t saturate_to_int(double v) { return std::isnan(v) ? 0 : v >= 2147483648.0 ? INT32_MAX : v <= -2147483648.0 ? INT32_MIN : int32_t(std::trunc(v)); }
+inline Val ftoi(const Val &a) {
+    if (!a.set.empty()) { std::vector<uint32_t> s; for (uint32_t b : a.set) { float f; std::memcpy(&f, &b, 4); s.push_back(uint32_t(saturate_to_int(f))); } return from_set(s); }
+    if (!a.known) return Val::any();
+    return make_int(saturate_to_int(a.lo), saturate_to_int(a.hi));   // truncation is monotonic
+}
 inline Val iadd(const Val &a, const Val &b) {
-    if (a.set.empty() || b.set.empty()) return Val::any();
-    std::vector<uint32_t> s; for (uint32_t x : a.set) for (uint32_t y : b.set) s.push_back(x + y);
-    return from_set(s);
+    if (!a.set.empty() && !b.set.empty()) {
+        std::vector<uint32_t> s; for (uint32_t x : a.set) for (uint32_t y : b.set) s.push_back(x + y);
+        if (s.size() <= 16) return from_set(s);
+    }
+    int64_t al, ah, bl, bh; if (int_range(a, al, ah) && int_range(b, bl, bh)) return make_int(al + bl, ah + bh);
+    return Val::any();
+}
+inline Val imul(const Val &a, const Val &b) {
+    if (!a.set.empty() && !b.set.empty()) {
+        std::vector<uint32_t> s; for (uint32_t x : a.set) for (uint32_t y : b.set) s.push_back(x * y);
+        if (s.size() <= 16) return from_set(s);
+    }
+    int64_t al, ah, bl, bh; if (!int_range(a, al, ah) || !int_range(b, bl, bh)) return Val::any();
+    const int64_t c[4]{al * bl, al * bh, ah * bl, ah * bh};
+    return make_int(std::min({c[0], c[1], c[2], c[3]}), std::max({c[0], c[1], c[2], c[3]}));
+}
+// Shift counts are lane 0 of the count operand (the kernel's and reference's convention), low five bits.
+inline bool shift_count(const Val &b, uint32_t &s) { int64_t lo, hi; if (!int_range(b, lo, hi) || lo != hi) return false; s = uint32_t(lo) & 31u; return true; }
+inline Val ishl(const Val &a, const Val &b) {
+    uint32_t s; if (!shift_count(b, s)) return Val::any();
+    if (!a.set.empty()) { std::vector<uint32_t> r; for (uint32_t x : a.set) r.push_back(x << s); return from_set(r); }
+    int64_t lo, hi; if (!int_range(a, lo, hi)) return Val::any();
+    return make_int(lo * (int64_t(1) << s), hi * (int64_t(1) << s));
+}
+inline int64_t floor_div_pow2(int64_t x, uint32_t s) { return x >= 0 ? (x >> s) : -((-x + (int64_t(1) << s) - 1) >> s); }
+inline Val ishr(const Val &a, const Val &b) {
+    uint32_t s; if (!shift_count(b, s)) return Val::any();
+    if (!a.set.empty()) { std::vector<uint32_t> r; for (uint32_t x : a.set) r.push_back(uint32_t(int32_t(x) >> s)); return from_set(r); }
+    int64_t lo, hi; if (!int_range(a, lo, hi)) return Val::any();
+    return make_int(floor_div_pow2(lo, s), floor_div_pow2(hi, s));
+}
+inline Val ushr(const Val &a, const Val &b) {
+    uint32_t s; if (!shift_count(b, s)) return Val::any();
+    if (!a.set.empty()) { std::vector<uint32_t> r; for (uint32_t x : a.set) r.push_back(x >> s); return from_set(r); }
+    int64_t lo, hi; if (!int_range(a, lo, hi) || lo < 0) return Val::any();
+    return make_int(lo >> s, hi >> s);
 }
 inline Val itof(const Val &a) {
-    if (a.set.empty()) return Val::any();
-    std::vector<uint32_t> s; for (uint32_t x : a.set) { const float f = float(int32_t(x)); uint32_t b; std::memcpy(&b, &f, 4); s.push_back(b); }
-    return from_set(s);
+    if (!a.set.empty()) {
+        std::vector<uint32_t> s; for (uint32_t x : a.set) { const float f = float(int32_t(x)); uint32_t b; std::memcpy(&b, &f, 4); s.push_back(b); }
+        return from_set(s);
+    }
+    int64_t lo, hi; if (int_range(a, lo, hi)) return Val::range(double(float(lo)), double(float(hi)));
+    return Val::any();
 }
 inline Val ige(const Val &a, const Val &b) {
-    if (a.set.empty() || b.set.empty()) return from_set({0u, 0xffffffffu});
-    bool t = false, f = false; for (uint32_t x : a.set) for (uint32_t y : b.set) (int32_t(x) >= int32_t(y) ? t : f) = true;
-    std::vector<uint32_t> s; if (f) s.push_back(0u); if (t) s.push_back(0xffffffffu);
-    return from_set(s);
+    int64_t al, ah, bl, bh;
+    if (!int_range(a, al, ah) || !int_range(b, bl, bh)) return from_set({0u, 0xffffffffu});
+    if (!a.set.empty() && !b.set.empty() && a.set.size() * b.set.size() <= 256) {
+        bool t = false, f = false; for (uint32_t x : a.set) for (uint32_t y : b.set) (int32_t(x) >= int32_t(y) ? t : f) = true;
+        std::vector<uint32_t> s; if (f) s.push_back(0u); if (t) s.push_back(0xffffffffu);
+        return from_set(s);
+    }
+    if (al >= bh) return from_set({0xffffffffu}); if (ah < bl) return from_set({0u});
+    return from_set({0u, 0xffffffffu});
 }
 inline Val select(const Val &c, const Val &a, const Val &b) {
     bool t = false, f = false;
@@ -326,7 +395,9 @@ using Lanes = std::array<Val, 4>;
 // (u, v) coordinate boxes every sample of one texture reaches over the rectangle; a
 // wrap seam yields two boxes per axis case.
 struct Box { double umin, umax, vmin, vmax; };
-struct Window { bool any = false, bounded = true; std::vector<Box> boxes; };
+// Texel ranges an ld instruction addresses (inclusive, in elements); an unknown axis reads anywhere on it.
+struct TexelBox { int64_t x0 = 0, x1 = 0, y0 = 0, y1 = 0; bool x_known = false, y_known = false; };
+struct Window { bool any = false, bounded = true; std::vector<Box> boxes; std::vector<TexelBox> texels; };
 // `output`, when given, receives the values written to o0 (lanes the program never writes stay
 // exactly zero, as the row shader initialises them).
 // Mirror addressing folds a coordinate span onto [0, 1]: a span inside one integer cell maps
@@ -345,7 +416,7 @@ inline void evaluate(const LoweredProgram &program, const std::vector<uint32_t> 
     if (output) for (auto &l : *output) l = Val::exact(0);
     auto operand = [&](const Words &w, unsigned k) {
         const uint32_t src = w[2 + k], kind = src & 15u, idx = (src >> 4) & 255u, lanes = (src >> 12) & 255u, negate = (src >> 20) & 1u, absolute = (src >> 21) & 1u, slot = (src >> 22) & 15u;
-        const uint32_t rel = w[0] == core::NR_OP_SAMPLE ? 0u : (w[5] >> (k * 10)) & 0x3ffu;
+        const uint32_t rel = detail::texture_op(w[0]) ? 0u : (w[5] >> (k * 10)) & 0x3ffu;
         Lanes out;
         for (unsigned c = 0; c < 4; ++c) {
             const uint32_t lane = (lanes >> (2 * c)) & 3u;
@@ -359,7 +430,11 @@ inline void evaluate(const LoweredProgram &program, const std::vector<uint32_t> 
                 v = slot < 14 && idx < program.ps_constant_count[slot] && word < constants.size() ? Val::exact(constants[word]) : Val::any();
             }
             if (absolute) v = lift1(v, abs);
-            if (negate) v = w[0] == core::NR_OP_IADD ? (v.set.empty() ? Val::any() : from_set([&] { std::vector<uint32_t> s; for (uint32_t b : v.set) s.push_back(0u - b); return s; }())) : lift1(v, neg);
+            if (negate) {
+                if (!detail::integer_op(w[0])) v = lift1(v, neg);
+                else if (!v.set.empty()) v = from_set([&] { std::vector<uint32_t> s; for (uint32_t b : v.set) s.push_back(0u - b); return s; }());
+                else { int64_t lo, hi; v = int_range(v, lo, hi) ? make_int(-hi, -lo) : Val::any(); }
+            }
             out[c] = v;
         }
         return out;
@@ -398,6 +473,19 @@ inline void evaluate(const LoweredProgram &program, const std::vector<uint32_t> 
                 }
             }
             for (auto &l : r) l = Val::range(0, 1);   // UNORM texel colors
+            const uint32_t lanes = (w[5] >> 12) & 255u; Lanes swizzled; for (unsigned c = 0; c < 4; ++c) swizzled[c] = r[(lanes >> (2 * c)) & 3u]; r = swizzled;
+        } else if (op == core::NR_OP_LD) {
+            // Integer fetch: the address lanes bound the elements read; ld returns zero outside the resource,
+            // so an unknown axis needs at most the whole axis (never an unbounded window).
+            const uint32_t texture = w[5] & 15u; const bool buffer = (w[5] >> 20) & 1u, uint_texture = (w[5] >> 21) & 1u;
+            if (texture < NR_FRAME_MAX_TEXTURES) {
+                auto &win = windows[texture]; win.any = true;
+                TexelBox box; box.x_known = int_range(a[0], box.x0, box.x1);
+                if (buffer) { box.y_known = true; box.y0 = box.y1 = 0; } else box.y_known = int_range(a[1], box.y0, box.y1);
+                win.texels.push_back(box);
+            }
+            if (uint_texture) { r[0] = Val::any(); r[1] = make_int(0, 0); r[2] = make_int(0, 0); r[3] = make_int(1, 1); }   // R32_UINT element: (x, 0, 0, 1)
+            else for (auto &l : r) l = Val::range(0, 1);
             const uint32_t lanes = (w[5] >> 12) & 255u; Lanes swizzled; for (unsigned c = 0; c < 4; ++c) swizzled[c] = r[(lanes >> (2 * c)) & 3u]; r = swizzled;
         } else if (op == core::NR_OP_DDX || op == core::NR_OP_DDY) {
             // Screen derivative of a varying lane: the coefficient of the pixel position in its
@@ -443,6 +531,11 @@ inline void evaluate(const LoweredProgram &program, const std::vector<uint32_t> 
             case core::NR_OP_AND: r[c] = lift2(a[c], b[c], [](const Val &x, const Val &y) { return bitwise(x, y, false); }); break;
             case core::NR_OP_OR: r[c] = lift2(a[c], b[c], [](const Val &x, const Val &y) { return bitwise(x, y, true); }); break;
             case core::NR_OP_IADD: r[c] = lift2(a[c], b[c], iadd); break;
+            case core::NR_OP_FTOI: r[c] = lift1(a[c], ftoi); break;
+            case core::NR_OP_IMAD: r[c] = lift2(lift2(a[c], b[c], imul), e[c], iadd); break;
+            case core::NR_OP_ISHL: r[c] = lift2(a[c], b[c], ishl); break;
+            case core::NR_OP_ISHR: r[c] = lift2(a[c], b[c], ishr); break;
+            case core::NR_OP_USHR: r[c] = lift2(a[c], b[c], ushr); break;
             default: r[c] = Val::any();
             }
         }
@@ -525,8 +618,10 @@ inline Windows merge_rects(std::vector<Rect> rects) {
     }
     return best;
 }
+// Textures read with ld have no sampler: their windows are point windows whatever the binding says.
+inline bool loaded_texture(const LoweredProgram &program, unsigned t) { return t < program.texture_loaded.size() && program.texture_loaded[t]; }
 inline bool interval_windows(const LoweredProgram &program, const DrawPlan &plan, Rect rect, unsigned t, uint32_t tw, uint32_t th, bool point, Windows &out) {
-    std::vector<Rect> rects;
+    std::vector<Rect> rects; point = point || loaded_texture(program, t);
     for (size_t first = 0; first + 2 < plan.projected.size(); first += 3) {
         const core::nr_projected *v[3]{&plan.projected[first], &plan.projected[first + 1], &plan.projected[first + 2]};
         const Rect bbox{int32_t(std::floor(std::min({v[0]->x, v[1]->x, v[2]->x}))), int32_t(std::floor(std::min({v[0]->y, v[1]->y, v[2]->y}))),
@@ -539,6 +634,11 @@ inline bool interval_windows(const LoweredProgram &program, const DrawPlan &plan
         if (!w.any) continue;
         if (!w.bounded) return false;
         for (const auto &b : w.boxes) rects.push_back(box_rect(b, tw, th, point));
+        for (const auto &b : w.texels) {
+            const int64_t x0 = b.x_known ? std::max<int64_t>(0, b.x0) : 0, x1 = b.x_known ? std::min<int64_t>(tw, b.x1 + 1) : tw;
+            const int64_t y0 = b.y_known ? std::max<int64_t>(0, b.y0) : 0, y1 = b.y_known ? std::min<int64_t>(th, b.y1 + 1) : th;
+            if (x0 < x1 && y0 < y1) rects.push_back({int32_t(x0), int32_t(y0), int32_t(x1), int32_t(y1)});
+        }
     }
     out = merge_rects(rects);
     return true;
