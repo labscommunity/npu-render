@@ -383,7 +383,7 @@ typedef struct {
     nr_uv4 swap_mask_texture[NR_FRAME_MAX_TEXTURES];                      /* all ones for BGRA windows */
     nr_u32 source_factor, destination_factor, mode, mask_bytes[4], byte_lane[4];
     nr_f32 constant[4];
-    nr_f32 src_const, src_da, src_1mda, dst_const, dst_a, dst_1ma;       /* blend factor selectors as 0/1 weights */
+    nr_f32 src_const, src_da, src_1mda, dst_const, dst_a, dst_1ma, src_a;   /* blend factor selectors as 0/1 weights */
     nr_uv4 byte_shifts, mask_lanes, constant_mask, swap_mask;              /* (0,8,16,24); written bytes; mode 13; BGRA target */
     nr_v4 constant255;                                                     /* blend constant * 255 in byte order */
     nr_u32 vs_stride;
@@ -461,14 +461,29 @@ NR_SAMPLE_ATTR nr_v4 nr_load(const nr_command_state *st, nr_u32 texture, nr_u32 
 }
 #endif
 /* Blends one shaded color into a target pixel: all four bytes as vector lanes. */
+/* Blobs without a dual-source program (NR_FRAME_NO_DUAL) keep the single-output blend: the blend
+ * factors read the colour's own alpha. Otherwise `factor_alpha` is the alpha the factors read: the
+ * colour's own, or the second output's for dual-source blending (mode 14, SRC1_ALPHA / INV_SRC1_ALPHA). */
+#ifdef NR_FRAME_NO_DUAL
 NR_HELPER_ATTR void nr_blend_pixel(const nr_command_state *st, nr_u8 *pixel, nr_v4 color) {
+#define NR_BLEND_ALPHA_TERMS ss = st->src_const + st->src_da * da + st->src_1mda * (255.0f - da);
+    nr_f32 alpha;
+#else
+NR_HELPER_ATTR void nr_blend_pixel_alpha(const nr_command_state *st, nr_u8 *pixel, nr_v4 color, nr_f32 factor_alpha) {
+#define NR_BLEND_ALPHA_TERMS ss = st->src_const + st->src_da * da + st->src_1mda * (255.0f - da) + st->src_a * 255.0f * alpha;
+    nr_f32 alpha = NR_V4_LANE(nr_v4_clamp01_fast(nr_v4_splat(factor_alpha)), 0);
+#endif
     nr_u32 background = nr_ld(pixel), packed;
     nr_uv4 bg = nr_uv4_and(nr_uv4_shr(nr_uv4_splat(background), st->byte_shifts), nr_uv4_splat(255u));
     nr_v4 dst = nr_uv4_to_f(bg), fg = nr_v4_clamp01_fast(color), fg_b, blended, constant_value, value, fraction;
-    nr_f32 alpha = NR_V4_LANE(fg, 3), da = NR_V4_LANE(dst, 3), ss, sd;
+    nr_f32 da = NR_V4_LANE(dst, 3), ss, sd;
     nr_uv4 base, up, q, shifted;
+#ifdef NR_FRAME_NO_DUAL
+    alpha = NR_V4_LANE(fg, 3);
+#endif
     fg_b = nr_v4_sel(st->swap_mask, NR_V4_SWZ(fg, 2, 1, 0, 3), fg);
-    ss = st->src_const + st->src_da * da + st->src_1mda * (255.0f - da);
+    NR_BLEND_ALPHA_TERMS
+#undef NR_BLEND_ALPHA_TERMS
     sd = st->dst_const + st->dst_a * alpha + st->dst_1ma * (1.0f - alpha);
     blended = nr_v4_add(nr_v4_mul(fg_b, nr_v4_splat(ss)), nr_v4_mul(dst, nr_v4_splat(sd)));
     constant_value = nr_v4_add(nr_v4_mul(fg_b, st->constant255), nr_v4_mul(dst, nr_v4_sub(nr_v4_splat(1.0f), fg_b)));
@@ -482,6 +497,11 @@ NR_HELPER_ATTR void nr_blend_pixel(const nr_command_state *st, nr_u8 *pixel, nr_
     packed = NR_UV4_LANE(shifted, 0) | NR_UV4_LANE(shifted, 1) | NR_UV4_LANE(shifted, 2) | NR_UV4_LANE(shifted, 3);
     nr_st(pixel, packed);
 }
+#ifndef NR_FRAME_NO_DUAL
+NR_INLINE void nr_blend_pixel(const nr_command_state *st, nr_u8 *pixel, nr_v4 color) { nr_blend_pixel_alpha(st, pixel, color, NR_V4_LANE(color, 3)); }
+/* Dual-source blending: the factors read the second output's alpha (clamped), the colour is the first output. */
+NR_INLINE void nr_blend_pixel_dual(const nr_command_state *st, nr_u8 *pixel, nr_v4 color, nr_v4 second) { nr_blend_pixel_alpha(st, pixel, color, NR_V4_LANE(second, 3)); }
+#endif
 /* Vertex stage that copies inputs to outputs; fixture programs share it. */
 NR_NOINLINE nr_i32 nr_stage_passthrough(const nr_command_state *st, nr_shade *sh) {
     nr_u32 r; (void)st;
@@ -620,7 +640,7 @@ NR_NOINLINE nr_i32 nr_command_load(const nr_span *s, nr_u32 index, nr_command *c
     for (n = 0; n < 4; ++n) cmd->viewport[n] = nr_float(nr_ld(c + 72 + n * 4));
     cmd->depth[0] = nr_float(nr_ld(c + 88)); cmd->depth[1] = nr_float(nr_ld(c + 92));
     for (n = 0; n < 4; ++n) { cmd->textures[n] = nr_ld(c + 96 + n * 4); cmd->textures2[n] = nr_ld(c + 112 + n * 4); }
-    if (cmd->kind > 1 || cmd->blend_mode > 13 || !cmd->write_mask || cmd->write_mask > 15 || cmd->cull > 2 || cmd->front_ccw > 1) return 0;
+    if (cmd->kind > 1 || cmd->blend_mode > 14 || !cmd->write_mask || cmd->write_mask > 15 || cmd->cull > 2 || cmd->front_ccw > 1) return 0;   /* 14: dual-source over */
     if (cmd->clip[0] < 0 || cmd->clip[1] < 0 || cmd->clip[0] > cmd->clip[2] || cmd->clip[1] > cmd->clip[3] ||
         cmd->clip[2] > (nr_i32)s->tile_w || cmd->clip[3] > (nr_i32)s->tile_h) return 0;
     for (n = 0; n < 4; ++n) {
@@ -647,6 +667,10 @@ NR_INLINE void nr_blend_state_load(nr_u32 format, const nr_command *cmd, nr_comm
     }
     st->src_const = st->source_factor == 1 ? 255.0f : 0.0f; st->src_da = st->source_factor == 2 ? 1.0f : 0.0f; st->src_1mda = st->source_factor == 3 ? 1.0f : 0.0f;
     st->dst_const = st->destination_factor == 1 ? 1.0f : 0.0f; st->dst_a = st->destination_factor == 2 ? 1.0f : 0.0f; st->dst_1ma = st->destination_factor == 3 ? 1.0f : 0.0f;
+#ifndef NR_FRAME_NO_DUAL
+    /* Mode 14 (dual-source over): source * alpha + destination * (1 - alpha) with the alpha the row shader supplies. */
+    st->src_a = st->mode == 14u ? 1.0f : 0.0f; if (st->mode == 14u) st->dst_1ma = 1.0f;
+#endif
     st->byte_shifts = nr_uv4_make(0u, 8u, 16u, 24u);
     st->mask_lanes = nr_uv4_make(st->mask_bytes[0] ? 0xffffffffu : 0u, st->mask_bytes[1] ? 0xffffffffu : 0u, st->mask_bytes[2] ? 0xffffffffu : 0u, st->mask_bytes[3] ? 0xffffffffu : 0u);
     st->constant_mask = nr_uv4_splat(st->mode == 13 ? 0xffffffffu : 0u);

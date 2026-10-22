@@ -24,7 +24,7 @@ inline void check(HRESULT status, const char *operation = "runtime") {
 inline void require(bool value) { if (!value) throw Error{E_INVALIDARG}; }
 struct Counters {
     uint64_t allocations = 0, fills = 0, copies = 0, live_allocations = 0;
-    uint64_t live_contexts = 0, cleanup_errors = 0, rejected = 0;
+    uint64_t live_contexts = 0, cleanup_errors = 0, rejected = 0, dropped_draws = 0;
     uint64_t last_unsupported_offset = ~uint64_t(0);
     uint64_t submitted_copies = 0;
     uint64_t upload_bytes = 0;

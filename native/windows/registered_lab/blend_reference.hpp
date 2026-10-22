@@ -21,6 +21,7 @@ template<class T> std::array<T,2> reference_blend_terms(BlendMode mode,T color,T
     case BlendMode::destination_copy:return {T(0),destination};
     case BlendMode::clear:return {T(0),T(0)};
     case BlendMode::component_coverage:return {color*(constant*T(255)),destination*(T(1)-color)};
+    case BlendMode::dual_source_over:return {color*T(255)*alpha,destination*(T(1)-alpha)};   // alpha: the second output's
     }
     throw std::invalid_argument("invalid reference blend mode");
 }

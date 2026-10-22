@@ -136,7 +136,7 @@ class FrameBatchExecutor {
         bool done = false;                                               // executed (kernel or fallback)
         bool noop = false;                                               // provably leaves the target unchanged: nothing to execute
     };
-    struct Stats { uint64_t kernel_requests = 0, covered = 0, escapes = 0, executed = 0, fallback = 0, tile_splits = 0, noops = 0, loop_overflows = 0; double kernel_ms = 0, host_ms = 0, copy_ms = 0, infer_ms = 0; };
+    struct Stats { uint64_t kernel_requests = 0, covered = 0, escapes = 0, executed = 0, fallback = 0, unsupported = 0, tile_splits = 0, noops = 0, loop_overflows = 0; double kernel_ms = 0, host_ms = 0, copy_ms = 0, infer_ms = 0; };
     const std::vector<Shader> *current_shaders = nullptr;   // shaders of the batch being executed
     const bool force_fallback = [] { char *v = nullptr; size_t n = 0; const bool on = !_dupenv_s(&v, &n, "NR_RENDER_FRAME_BATCH_FORCE_FALLBACK") && v && *v == '1'; std::free(v); return on; }();
     static std::string sampler_key(const std::array<TextureBinding, 4> &t) {
@@ -331,7 +331,7 @@ public:
         std::vector<Draw> draws(batch.command_count);
         for (auto &d : draws) {
             d.record = reader.value<CommandRecord>();
-            expect(d.record.kind <= 2 && d.record.target < refs.size() && d.record.texture_count <= 4 && d.record.blend_mode <= 13 && d.record.write_mask && d.record.write_mask <= 15 && d.record.cull <= 2 && d.record.front_ccw <= 1);
+            expect(d.record.kind <= 2 && d.record.target < refs.size() && d.record.texture_count <= 4 && d.record.blend_mode <= 14 && d.record.write_mask && d.record.write_mask <= 15 && d.record.cull <= 2 && d.record.front_ccw <= 1);
             for (uint32_t t = 0; t < d.record.texture_count; ++t) {
                 auto &b = d.textures[t]; b = reader.value<TextureBinding>();
                 expect(b.resource < refs.size() && b.filter <= 1 && !(b.flags & ~uint32_t(byte_buffer_view)) && !b.reserved);
@@ -438,8 +438,8 @@ public:
             w.value(t); std::vector<uint32_t> pixels; copy_rect(r.pixels.data(), r.width, rect, pixels); w.append(pixels.data(), pixels.size() * 4);
         } else for (const auto &m : missing) w.value(m);
         auto bytes = w.finish(); reply.body_bytes = uint32_t(bytes.size() - sizeof(reply)); std::memcpy(bytes.data(), &reply, sizeof(reply));
-        std::printf("{\"frame_batch\":true,\"sequence\":%u,\"commands\":%u,\"executed\":%llu,\"fallback\":%llu,\"kernel_requests\":%llu,\"covered\":%llu,\"escapes\":%llu,\"missing\":%zu,\"targets\":%zu,\"kernel_ms\":%.3f,\"host_ms\":%.3f,\"copy_ms\":%.3f,\"infer_ms\":%.3f,\"tile_splits\":%llu,\"noops\":%llu,\"loop_overflows\":%llu,\"execution_device\":\"NPU\"}\n",
-            header.sequence, batch.command_count, (unsigned long long)stats.executed, (unsigned long long)stats.fallback, (unsigned long long)stats.kernel_requests, (unsigned long long)stats.covered, (unsigned long long)stats.escapes, missing.size(), dirty.size(), stats.kernel_ms, stats.host_ms, stats.copy_ms, stats.infer_ms, (unsigned long long)stats.tile_splits, (unsigned long long)stats.noops, (unsigned long long)stats.loop_overflows);
+        std::printf("{\"frame_batch\":true,\"sequence\":%u,\"commands\":%u,\"executed\":%llu,\"fallback\":%llu,\"unsupported\":%llu,\"kernel_requests\":%llu,\"covered\":%llu,\"escapes\":%llu,\"missing\":%zu,\"targets\":%zu,\"kernel_ms\":%.3f,\"host_ms\":%.3f,\"copy_ms\":%.3f,\"infer_ms\":%.3f,\"tile_splits\":%llu,\"noops\":%llu,\"loop_overflows\":%llu,\"execution_device\":\"NPU\"}\n",
+            header.sequence, batch.command_count, (unsigned long long)stats.executed, (unsigned long long)stats.fallback, (unsigned long long)stats.unsupported, (unsigned long long)stats.kernel_requests, (unsigned long long)stats.covered, (unsigned long long)stats.escapes, missing.size(), dirty.size(), stats.kernel_ms, stats.host_ms, stats.copy_ms, stats.infer_ms, (unsigned long long)stats.tile_splits, (unsigned long long)stats.noops, (unsigned long long)stats.loop_overflows);
         std::fflush(stdout);
         return bytes;
     }
@@ -479,6 +479,7 @@ private:
         }
         if (d.program->texture_slots.size() != d.record.texture_count) { d.route = "fallback:texture count"; return; }
         if (d.record.vertex_constant_words != d.program->vs_constants * 4 || d.record.pixel_constant_words != d.program->ps_constants * 4) { d.route = "fallback:constant words"; return; }
+        if (d.record.blend_mode == uint32_t(raster::BlendMode::dual_source_over) && !d.program->dual_source) { d.route = "fallback:dual-source blend without a second output"; return; }
         std::array<uint32_t, 4> tw{}, th{}; std::array<bool, 4> point{};
         for (uint32_t t = 0; t < d.record.texture_count; ++t) { const auto &ref = refs[d.textures[t].resource]; texture_extent(d.textures[t], ref.record, tw[t], th[t]); point[t] = d.textures[t].filter != 0; }
         std::vector<uint32_t> constants(d.vertex_constants); constants.insert(constants.end(), d.pixel_constants.begin(), d.pixel_constants.end());
@@ -514,6 +515,12 @@ private:
         std::printf("{\"frame_batch_copy\":true,\"target\":%llu,\"width\":%d,\"height\":%d}\n", (unsigned long long)refs[d.record.target].record.key, w, h); std::fflush(stdout);
     }
     void fallback(Draw &d, const std::vector<Shader> &batch_shaders, std::vector<ResourceRef> &refs, std::map<uint64_t, frame::Rect> &dirty, Stats &stats) {
+        if (d.record.blend_mode == uint32_t(raster::BlendMode::dual_source_over)) {
+            // No per-draw route blends dual-source: the draw's pixels are lost, reported here and counted, rather
+            // than failing the batch (which would cost the compositor its device).
+            std::printf("{\"frame_batch_unsupported\":true,\"route\":\"%s\",\"reason\":\"dual-source blend has no per-draw route\"}\n", d.route.c_str()); std::fflush(stdout);
+            ++stats.unsupported; d.done = true; return;
+        }
         // Build the legacy per-draw request against the resident target and run the qualified route.
         auto &ref = refs[d.record.target]; auto &res = *ref.resident; require(res.pixels.size() == size_t(res.width) * res.height);
         indexed_exchange::Request request; auto &h = request.header;

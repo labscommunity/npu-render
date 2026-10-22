@@ -108,6 +108,10 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
             d.blend.SrcBlendAlpha==D3D10_DDI_BLEND_BLEND_FACTOR && d.blend.DestBlendAlpha==D3D10_DDI_BLEND_INV_SRC_ALPHA){
             blend_mode=nr::raster::BlendMode::component_coverage;
             for(unsigned c=0;c<4;++c){require(std::isfinite(d.blend_factor[c]));blend_constant[c]=d.blend_factor[c];}
+        }else if(d.blend.SrcBlend==D3D10_DDI_BLEND_SRC1_ALPHA && d.blend.DestBlend==D3D10_DDI_BLEND_INV_SRC1_ALPHA &&
+            d.blend.SrcBlendAlpha==D3D10_DDI_BLEND_SRC1_ALPHA && d.blend.DestBlendAlpha==D3D10_DDI_BLEND_INV_SRC1_ALPHA){
+            // DWM's caption text: the pixel shader's second output carries the blend alpha (probe v117).
+            require(d.pixel_program->outputs[1]!=0);blend_mode=nr::raster::BlendMode::dual_source_over;
         }else{
         require(d.blend.SrcBlend==d.blend.SrcBlendAlpha && d.blend.DestBlend==d.blend.DestBlendAlpha);
         constexpr std::array<D3D10_DDI_BLEND,6> factors{D3D10_DDI_BLEND_ZERO,D3D10_DDI_BLEND_ONE,D3D10_DDI_BLEND_SRC_ALPHA,
@@ -159,6 +163,12 @@ void execute_triangle_draw(Device &d, const std::vector<nr::shader::VertexRegist
             return;
         }
         lab_trace("{\"event\":\"draw_not_batched\",\"reason\":\"%s\",\"vertices\":%u}\n", reason.c_str(), count);
+        if (blend_mode == nr::raster::BlendMode::dual_source_over) {
+            // The per-draw route has no dual-source blend. Dropping the draw loses its pixels, which this row and
+            // the counter report; failing it made the compositor recreate its device every few seconds (probe v117).
+            lab_trace("{\"event\":\"draw_dropped\",\"reason\":\"dual-source blend not batched: %s\",\"vertices\":%u}\n", reason.c_str(), count);
+            ++counters.dropped_draws; return;
+        }
         flush_frame_batches(d, "legacy_draw");
     }
     nr::raster::PackedTexture texture; bool linear=false, modulated=false, general_texture=false;

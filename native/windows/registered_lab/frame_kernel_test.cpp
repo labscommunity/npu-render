@@ -144,10 +144,11 @@ Stats compare_stage(const Pair &pair, const shader::Program &vs, const shader::P
             try { expected = shader::reference_vertex(ps, pixel_inputs, pc, textures.shapes, textures.samplers, textures.pixels); }
             catch (const std::runtime_error &) { continue; }
             bool exact = true; unsigned far = 0;
-            for (unsigned c = 0; c < 4; ++c) {
-                const uint32_t actual = frame::core::nr_v4_bits(sh.out[0], c);
-                if (expected[0][c] == actual) continue; exact = false;
-                const auto a = std::lround(std::fmin(std::fmax(ffloat(expected[0][c]), 0.f), 1.f) * 255), b = std::lround(std::fmin(std::fmax(ffloat(actual), 0.f), 1.f) * 255);
+            for (unsigned o = 0; o < 2; ++o) for (unsigned c = 0; c < 4; ++c) {   // o1: dual-source programs
+                if (o && !(ps.outputs[1] & (1u << c))) continue;
+                const uint32_t actual = frame::core::nr_v4_bits(sh.out[o], c);
+                if (expected[o][c] == actual) continue; exact = false;
+                const auto a = std::lround(std::fmin(std::fmax(ffloat(expected[o][c]), 0.f), 1.f) * 255), b = std::lround(std::fmin(std::fmax(ffloat(actual), 0.f), 1.f) * 255);
                 if (std::labs(a - b) > 1) ++far;
             }
             ++stats.ps_cases; stats.ps_exact += exact; stats.ps_within_one += !exact && !far; stats.ps_far += far > 0;
@@ -173,7 +174,7 @@ std::vector<uint32_t> random_background(uint32_t count) { std::vector<uint32_t> 
 // Every blend mode and both formats against the repo's scalar blend reference.
 unsigned check_blend_modes() {
     unsigned failures = 0;
-    for (uint32_t format : {28u, 87u}) for (uint32_t mode = 0; mode <= 13; ++mode) for (unsigned trial = 0; trial < 400; ++trial) {
+    for (uint32_t format : {28u, 87u}) for (uint32_t mode = 0; mode <= 14; ++mode) for (unsigned trial = 0; trial < 400; ++trial) {
         frame::core::nr_command cmd{}; cmd.blend_mode = mode; cmd.write_mask = 1 + (trial % 15);
         for (unsigned c = 0; c < 4; ++c) cmd.blend_constant[c] = uniform(-0.2f, 1.2f);
         frame::core::nr_command_state state{}; frame::core::nr_blend_state_load(format, &cmd, &state);
@@ -187,10 +188,12 @@ unsigned check_blend_modes() {
             if (trial % 8 == 7) color[3] = ffloat(specials[(which + 1) % unsigned(std::size(specials))]);
         }
         uint8_t pixel[4]; std::memcpy(pixel, &background, 4);
-        frame::core::nr_blend_pixel(&state, pixel, frame::core::nr_v4_make(color[0], color[1], color[2], color[3]));
+        const float alpha1 = uniform(-0.2f, 1.2f);   // mode 14: the second output's alpha
+        if (mode == 14) frame::core::nr_blend_pixel_dual(&state, pixel, frame::core::nr_v4_make(color[0], color[1], color[2], color[3]), frame::core::nr_v4_make(0.f, 0.f, 0.f, alpha1));
+        else frame::core::nr_blend_pixel(&state, pixel, frame::core::nr_v4_make(color[0], color[1], color[2], color[3]));
         uint32_t actual; std::memcpy(&actual, pixel, 4);
         auto clamp_ref = [](float v) { return (std::isnan(v) || v < 0.f) ? 0.f : (v > 1.f ? 1.f : v); };
-        const float alpha = clamp_ref(color[3]);
+        const float alpha = clamp_ref(mode == 14 ? alpha1 : color[3]);
         for (unsigned c = 0; c < 4; ++c) {
             const unsigned logical = (format == 87 && c < 3) ? 2 - c : c;
             uint32_t expected_byte = (background >> (c * 8)) & 255u;
@@ -205,7 +208,7 @@ unsigned check_blend_modes() {
             if (((actual >> (c * 8)) & 255u) != expected_byte) { ++failures; if (failures < 5) std::printf("{\"blend_mismatch\":true,\"mode\":%u,\"format\":%u}\n", mode, format); }
         }
     }
-    std::printf("{\"blend_modes_checked\":14,\"formats\":2,\"trials\":400,\"blend_failures\":%u}\n", failures);
+    std::printf("{\"blend_modes_checked\":15,\"formats\":2,\"trials\":400,\"blend_failures\":%u}\n", failures);
     return failures;
 }
 int main(int argc, char **argv) {
@@ -276,7 +279,7 @@ int main(int argc, char **argv) {
                 auto textures = make_textures(lowered, samplers, 16);
                 frame::Command command = base_command(lowered, textures, samplers);
                 command.constants = flatten(vs, random_constants(vs), ps, random_constants(ps));
-                command.vertex_count = 6; command.blend_mode = uint32_t(n % 14); command.write_mask = 15 - uint32_t(n % 3);
+                command.vertex_count = 6; command.blend_mode = lowered.dual_source ? 14u : uint32_t(n % 14); command.write_mask = 15 - uint32_t(n % 3);
                 for (unsigned v = 0; v < 6; ++v) for (unsigned r = 0; r < 16; ++r) if (vs.inputs[r]) for (unsigned c = 0; c < 4; ++c) command.vertices.push_back(fbits(uniform(-1.5f, 1.5f)));
                 std::vector<frame::Window> windows(textures.windows, textures.windows + lowered.texture_slots.size());
                 auto background = random_background(128 * 128);
@@ -295,7 +298,7 @@ int main(int argc, char **argv) {
                 auto textures = make_textures(pass_lowered, samplers, 24);
                 frame::Command command = base_command(pass_lowered, textures, samplers);
                 command.constants = flatten(pass, shader::Constants{}, ps, random_constants(ps));
-                command.blend_mode = uint32_t((n + variant) % 14); command.write_mask = 15; command.vertex_count = 6;
+                command.blend_mode = pass_lowered.dual_source ? 14u : uint32_t((n + variant) % 14); command.write_mask = 15; command.vertex_count = 6;
                 command.clip = {4, 2, 120, 126};
                 const float quad[6][2]{{-0.9f, 0.95f}, {0.9f, 0.95f}, {0.9f, -0.9f}, {-0.9f, 0.95f}, {0.9f, -0.9f}, {-0.9f, -0.9f}};
                 const float corner[6][2]{{0, 0}, {1, 0}, {1, 1}, {0, 0}, {1, 1}, {0, 1}};

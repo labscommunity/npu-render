@@ -47,6 +47,7 @@ struct LoweredProgram {
     std::vector<uint8_t> texture_buffer;    // command texture index -> the ld resource is a Buffer: one row of R32_UINT elements
     std::array<uint32_t, 14> vs_constant_base{}, ps_constant_base{}, vs_constant_count{}, ps_constant_count{};
     std::string rejection;                   // empty when eligible
+    bool dual_source = false;                // the pixel stage writes o1 too (dual-source blending reads its alpha)
     bool eligible() const { return rejection.empty(); }
     uint32_t native() const { uint32_t v; std::memcpy(&v, entry.data(), 4); return v; }
     void set_native(uint32_t index) { std::memcpy(entry.data(), &index, 4); }
@@ -68,7 +69,8 @@ inline LoweredProgram lower(const shader::Program &vs, const shader::Program &ps
     auto reject = [&](const char *why) { out.rejection = why; return out; };
     if (vs.stage != shader::Stage::vertex || ps.stage != shader::Stage::pixel) return reject("stage");
     if (vs.position_output >= 8 || ps.outputs[0] != 15) return reject("outputs");
-    for (unsigned i = 1; i < 16; ++i) if (ps.outputs[i]) return reject("multiple pixel outputs");
+    for (unsigned i = 2; i < 16; ++i) if (ps.outputs[i]) return reject("multiple pixel outputs");
+    out.dual_source = ps.outputs[1] != 0;   // o1 feeds dual-source blending; other modes ignore it
     if (vs.vertex_id_input < 16 || vs.instance_id_input < 16) return reject("system vertex inputs");
     for (unsigned i = 0; i < 16; ++i) if (!vs.literal_tables[i].empty() || !ps.literal_tables[i].empty()) return reject("indexable temporaries");
     uint32_t vs_total = 0, ps_total = 0;
@@ -198,7 +200,7 @@ inline LoweredProgram lower(const shader::Program &vs, const shader::Program &ps
             const auto &d = i.destination;
             uint32_t dest_kind = d.kind == shader::Register::temporary ? 0u : d.kind == shader::Register::output ? 1u : 2u;
             if (dest_kind > 1 || (dest_kind == 1 && d.index >= 8) || (dest_kind == 0 && d.index >= 16) || !d.mask) return "destination";
-            if (dest_kind == 1 && !vertex && d.index != 0) return "pixel output register";
+            if (dest_kind == 1 && !vertex && d.index > 1) return "pixel output register";
             w[1] = dest_kind | (d.index << 4) | (d.mask << 12) | ((i.saturate ? 1u : 0u) << 16);
             std::string why;
             if (op == NR_OP_SAMPLE) {
@@ -453,7 +455,7 @@ inline std::string emit_stage(const std::vector<Words> &words, const std::array<
 // A row shader: interpolates this program's varyings, runs its pixel stage and
 // blends, for `count` pixels of one scanline. Varying modes are compile-time.
 inline std::string emit_row(const LoweredProgram &p, const std::string &name) {
-    Names names{[](uint32_t r) { return "i" + std::to_string(r); }, [](uint32_t) { return std::string("o0"); }, "row->constants", "row->immediates", "row->escapes", "st",
+    Names names{[](uint32_t r) { return "i" + std::to_string(r); }, [](uint32_t r) { return "o" + std::to_string(r); }, "row->constants", "row->immediates", "row->escapes", "st",
                 [](uint32_t r, bool x) { return std::string(x ? "dxi" : "dyi") + std::to_string(r); }, "row->overflows"};
     const auto gradients = derivative_inputs(p.ps_words);
     std::string s = "NR_NOINLINE void " + name + "(const nr_row *row) {\n";
@@ -488,6 +490,7 @@ inline std::string emit_row(const LoweredProgram &p, const std::string &name) {
         s += "    nr_v4 dxi" + R + " = nr_v4_zero(), dyi" + R + " = nr_v4_zero();\n";
     }
     s += "    nr_v4 o0 = nr_v4_zero();\n";
+    if (p.dual_source) s += "    nr_v4 o1 = nr_v4_zero();\n    const nr_i32 dual = st->mode == 14u;\n";
     const auto used = used_temps(p.ps_words);
     for (unsigned r = 0; r < 16; ++r) if (used[r]) s += "    nr_v4 r" + std::to_string(r) + " = nr_v4_zero();\n";
     // The edge weights sum to a row constant, so the linear reciprocal is hoisted; the
@@ -507,7 +510,7 @@ inline std::string emit_row(const LoweredProgram &p, const std::string &name) {
         }
     }
     s += "#ifndef NR_EXP_NO_PS\n" + emit_instructions(p.ps_words, p.ps_constant_base, p.ps_constant_count, names, "        ") + "#endif\n";
-    s += "#ifndef NR_EXP_NO_BLEND\n        nr_blend_pixel(st, pixel, o0);\n#else\n        *row->escapes += nr_v4_bits(o0, 0) & 1u;\n#endif\n";
+    s += std::string(p.dual_source ? "#ifndef NR_EXP_NO_BLEND\n        if (dual) nr_blend_pixel_dual(st, pixel, o0, o1); else nr_blend_pixel(st, pixel, o0);\n#else\n" : "#ifndef NR_EXP_NO_BLEND\n        nr_blend_pixel(st, pixel, o0);\n#else\n") + "        *row->escapes += nr_v4_bits(o0, 0) & 1u;\n#endif\n";
     s += "    }\n}\n";
     return s;
 }

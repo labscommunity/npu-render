@@ -9,7 +9,7 @@ using Color = std::array<float, 4>;
 using PackedColor = std::array<uint8_t, 4>;
 enum class BlendMode { source_copy, source_over, destination_in, destination_out,
     destination_over, source_in, source_out, source_atop, destination_atop,
-    exclusive_or, plus, destination_copy, clear, component_coverage };
+    exclusive_or, plus, destination_copy, clear, component_coverage, dual_source_over };
 enum class BlendFactor { zero, one, source_alpha, inverse_source_alpha, destination_alpha, inverse_destination_alpha };
 // Provider-independent Porter-Duff factors, in stable BlendMode order.
 inline constexpr std::array<std::array<BlendFactor,2>,13> blend_factors{{
@@ -22,7 +22,11 @@ inline constexpr std::array<std::array<BlendFactor,2>,13> blend_factors{{
 }};
 // Component coverage: source * constant + destination * (1 - source),
 // independently for RGBA. This also describes RGB glyph masks with alpha blend.
+// Dual-source over: source * alpha1 + destination * (1 - alpha1) with alpha1 the pixel shader's second output
+// (SRC1_ALPHA / INV_SRC1_ALPHA, DWM's caption text). Only the frame kernel blends it; the per-draw
+// executors (valid_blend) stop at component_coverage.
 constexpr bool valid_blend(BlendMode mode) { return uint32_t(mode)<=uint32_t(BlendMode::component_coverage); }
+constexpr bool kernel_blend(BlendMode mode) { return uint32_t(mode)<=uint32_t(BlendMode::dual_source_over); }
 constexpr bool extended_blend(BlendMode mode) { return uint32_t(mode)>=4 && valid_blend(mode); }
 constexpr bool general_blend(BlendMode mode) { return mode!=BlendMode::source_copy && mode!=BlendMode::source_over; }
 constexpr bool destination_blend(BlendMode mode) { return mode == BlendMode::destination_in || mode == BlendMode::destination_out; }

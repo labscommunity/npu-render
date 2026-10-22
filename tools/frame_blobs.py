@@ -86,6 +86,9 @@ def main():
         # Blobs whose programs never fetch (ld) leave that runtime support out of the code window.
         if b"nr_load(" not in header.read_bytes():
             define += b"#define NR_FRAME_NO_LD 1\n"
+        # Likewise the dual-source blend (mode 14) stays out of blobs without a two-output program.
+        if b"nr_blend_pixel_dual(" not in header.read_bytes():
+            define += b"#define NR_FRAME_NO_DUAL 1\n"
         source = define + inline_local_includes(blob_dir / "frame.c")
         (out / f"frame_blob{blob}.c").write_bytes(source)
         manifest["blobs"].append(
