@@ -39,10 +39,10 @@ Repository merge settings use squash commits with the PR title as the subject.
 Use a conventional PR title; do not use GitHub's default `Merge ...` message.
 No `--no-verify` bypasses. Fix a rejected message before pushing.
 
-GitHub rejected server-side rules on the current account plan. The policy is
-mandatory, and hooks/CI check it, but GitHub itself cannot currently reject a
-noncompliant direct push to this private repository. See
-[governance status and activation instructions](docs/governance.md).
+GitHub enforces the policy server-side since 2026-10-22: a commit-message
+ruleset on every branch and main-branch protection that requires pull requests,
+the four CI checks and a linear history. See
+[governance status](docs/governance.md).
 
 ## Validation
 
